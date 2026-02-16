@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
+  m_Name: Exercito_Bazooka
+  m_EditorClassIdentifier: Assembly-CSharp::UnitData
+  id: Bazooka
+  displayName: Bazooka
+  description: "Bazooka de Infantaria, essencial para capturar constru\xE7\xF5es
+    e vencer o jogo. Anda em florestas com custo reduzido e \xE9 bom contra helicopteros."
+  spriteDefault: {fileID: 21300000, guid: 5fe376938140a9a4180ef4bad9915343, type: 3}
+  spriteGreen: {fileID: 0}
+  spriteRed: {fileID: 0}
+  spriteBlue: {fileID: 0}
+  spriteYellow: {fileID: 0}
+  maxHP: 10
+  defense: 12
+  movement: 2
+  autonomia: 70
+  cost: 2000

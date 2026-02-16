@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 90a59b8798b242347a6d84ef73ea39f4, type: 3}
+  m_Name: Catalogo de Construcoes
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionDatabase
+  constructions:
+  - {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
+  - {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+  - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
+  - {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
+  - {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}

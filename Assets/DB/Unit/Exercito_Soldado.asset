@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
+  m_Name: Exercito_Soldado
+  m_EditorClassIdentifier: Assembly-CSharp::UnitData
+  id: Soldado
+  displayName: Soldado
+  description: "Soldado de Infantaria b\xE1sica, essencial para capturar constru\xE7\xF5es
+    e vencer o jogo. Anda em florestas com custo reduzido"
+  sprite: {fileID: 21300000, guid: 7a4e98efb59da8447b1de4d056a57e79, type: 3}
+  maxHP: 10
+  defense: 10
+  movement: 3
+  cost: 1000

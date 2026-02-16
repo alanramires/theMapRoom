@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
+  m_Name: "Aeronautica_Ca\xE7a A"
+  m_EditorClassIdentifier: Assembly-CSharp::UnitData
+  id: cacaA
+  displayName: "Ca\xE7a A"
+  description: 
+  spriteDefault: {fileID: 21300000, guid: ab4dd6fb73168824ca05fc40a270a71a, type: 3}
+  spriteGreen: {fileID: 0}
+  spriteRed: {fileID: 0}
+  spriteBlue: {fileID: 0}
+  spriteYellow: {fileID: 0}
+  maxHP: 10
+  defense: 15
+  movement: 9
+  movementCategory: 1
+  domain: 3
+  heightLevel: 5
+  autonomia: 80
+  cost: 26000

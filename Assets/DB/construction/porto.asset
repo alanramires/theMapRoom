@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0746e2e5fa3ba154eb1c64585653d260, type: 3}
+  m_Name: porto
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
+  id: porto
+  displayName: Porto Naval
+  description: 
+  spriteDefault: {fileID: 21300000, guid: f1bc5d6faae2ff144a2013c87abaa197, type: 3}
+  spriteGreen: {fileID: 0}
+  spriteRed: {fileID: 0}
+  spriteBlue: {fileID: 0}
+  spriteYellow: {fileID: 0}
+  maxHP: 40
