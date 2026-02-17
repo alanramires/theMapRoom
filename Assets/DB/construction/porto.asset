@@ -21,3 +21,11 @@ MonoBehaviour:
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   maxHP: 40
+  domain: 0
+  heightLevel: 3
+  additionalLayerModes:
+  - domain: 1
+    heightLevel: 3
+  - domain: 1
+    heightLevel: 2
+  alwaysAllowAirDomain: 1

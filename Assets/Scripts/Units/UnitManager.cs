@@ -26,6 +26,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private int maxFuel = 99;
     [SerializeField] private bool hasActed;
     [SerializeField, HideInInspector] private bool appliedHasActed;
+    [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField] private bool isEmbarked;
     [SerializeField] private bool isSelected;
     [SerializeField] private bool enableSelectionBlink = true;
@@ -83,6 +84,7 @@ public class UnitManager : MonoBehaviour
         CacheSpriteMaterial();
         SyncPositionState();
         appliedHasActed = hasActed;
+        appliedActiveTeamId = matchController != null ? matchController.ActiveTeamId : int.MinValue;
         RefreshActedVisual();
     }
 
@@ -110,6 +112,7 @@ public class UnitManager : MonoBehaviour
         if (autoApplyOnStart)
             ApplyFromDatabase();
         appliedHasActed = hasActed;
+        appliedActiveTeamId = matchController != null ? matchController.ActiveTeamId : int.MinValue;
         RefreshActedVisual();
     }
 
@@ -151,6 +154,14 @@ public class UnitManager : MonoBehaviour
     {
         if (!Application.isPlaying)
             return;
+
+        TryAutoAssignMatchController();
+        int activeTeamId = matchController != null ? matchController.ActiveTeamId : int.MinValue;
+        if (appliedActiveTeamId != activeTeamId)
+        {
+            appliedActiveTeamId = activeTeamId;
+            RefreshActedVisual();
+        }
 
         if (appliedHasActed != hasActed)
         {
@@ -375,6 +386,35 @@ public class UnitManager : MonoBehaviour
         return currentHeightLevel;
     }
 
+    public bool HasSkill(SkillData skill)
+    {
+        if (skill == null)
+            return false;
+
+        UnitData data = TryGetUnitData();
+        if (data == null || data.skills == null)
+            return false;
+
+        if (data.skills.Contains(skill))
+            return true;
+
+        string requestedId = string.IsNullOrWhiteSpace(skill.id) ? string.Empty : skill.id.Trim();
+        if (requestedId.Length == 0)
+            return false;
+
+        for (int i = 0; i < data.skills.Count; i++)
+        {
+            SkillData ownedSkill = data.skills[i];
+            if (ownedSkill == null || string.IsNullOrWhiteSpace(ownedSkill.id))
+                continue;
+
+            if (ownedSkill.id.Trim() == requestedId)
+                return true;
+        }
+
+        return false;
+    }
+
     public void SyncLayerStateFromData(bool forceNativeDefault)
     {
         SyncCurrentLayerStateWithData(forceNativeDefault);
@@ -385,12 +425,12 @@ public class UnitManager : MonoBehaviour
         if (unitDatabase == null || string.IsNullOrWhiteSpace(unitId) || !unitDatabase.TryGetById(unitId, out UnitData data) || data == null)
             return new[] { new UnitLayerMode(Domain.Land, HeightLevel.Surface) };
 
-        int additionalCount = data.additionalLayerModes != null ? data.additionalLayerModes.Count : 0;
+        int additionalCount = data.aditionalDomainsAllowed != null ? data.aditionalDomainsAllowed.Count : 0;
         UnitLayerMode[] modes = new UnitLayerMode[1 + additionalCount];
         modes[0] = new UnitLayerMode(data.domain, data.heightLevel);
 
         for (int i = 0; i < additionalCount; i++)
-            modes[i + 1] = data.additionalLayerModes[i];
+            modes[i + 1] = data.aditionalDomainsAllowed[i];
 
         return modes;
     }
@@ -438,12 +478,12 @@ public class UnitManager : MonoBehaviour
         if (data == null)
             return new[] { new UnitLayerMode(Domain.Land, HeightLevel.Surface) };
 
-        int additionalCount = data.additionalLayerModes != null ? data.additionalLayerModes.Count : 0;
+        int additionalCount = data.aditionalDomainsAllowed != null ? data.aditionalDomainsAllowed.Count : 0;
         UnitLayerMode[] modes = new UnitLayerMode[1 + additionalCount];
         modes[0] = new UnitLayerMode(data.domain, data.heightLevel);
 
         for (int i = 0; i < additionalCount; i++)
-            modes[i + 1] = data.additionalLayerModes[i];
+            modes[i + 1] = data.aditionalDomainsAllowed[i];
 
         return modes;
     }
@@ -482,12 +522,12 @@ public class UnitManager : MonoBehaviour
 
         Sprite baseTeamSprite = TeamUtils.GetTeamSprite(data, teamId);
         Sprite finalSprite = baseTeamSprite;
-        if (currentLayerModeIndex > 0 && data.additionalLayerModes != null)
+        if (currentLayerModeIndex > 0 && data.aditionalDomainsAllowed != null)
         {
             int additionalIndex = currentLayerModeIndex - 1;
-            if (additionalIndex >= 0 && additionalIndex < data.additionalLayerModes.Count)
+            if (additionalIndex >= 0 && additionalIndex < data.aditionalDomainsAllowed.Count)
             {
-                UnitLayerMode mode = data.additionalLayerModes[additionalIndex];
+                UnitLayerMode mode = data.aditionalDomainsAllowed[additionalIndex];
                 Sprite layerSprite = TeamUtils.GetTeamSprite(mode, teamId, baseTeamSprite);
                 if (layerSprite != null)
                     finalSprite = layerSprite;

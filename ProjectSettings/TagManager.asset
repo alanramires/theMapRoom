@@ -41,10 +41,10 @@ TagManager:
   - name: Default
     uniqueID: 0
     locked: 0
-  - name: Tabuleiro
+  - name: Terreno
     uniqueID: 1284489331
     locked: 0
-  - name: Terreno
+  - name: Estruturas
     uniqueID: 2335898607
     locked: 0
   - name: Construcao

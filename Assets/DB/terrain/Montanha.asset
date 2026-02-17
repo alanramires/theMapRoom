@@ -12,11 +12,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 03f8ac18228f9af4b8437383160652a4, type: 3}
   m_Name: Montanha
   m_EditorClassIdentifier: Assembly-CSharp::TerrainTypeData
-  id: 
-  displayName: 
+  id: mountain
+  displayName: Montanha
   description: 
-  paletteTile: {fileID: 0}
+  paletteTile: {fileID: 11400000, guid: 989688aecc1c71149bf0412799bbfe7a, type: 2}
   domain: 0
   heightLevel: 3
   additionalLayerModes: []
   alwaysAllowAirDomain: 1
+  basicAutonomyCost: 99
+  requiredSkillsToEnter:
+  - {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
+  - {fileID: 11400000, guid: 8bfcf50a7b4285c4cad503493431fb4b, type: 2}
+  skillCostOverrides:
+  - skill: {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
+    autonomyCost: 2
+  - skill: {fileID: 11400000, guid: 8bfcf50a7b4285c4cad503493431fb4b, type: 2}
+    autonomyCost: 6

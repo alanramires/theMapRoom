@@ -181,13 +181,17 @@ public partial class TurnStateManager : MonoBehaviour
             return 0;
 
         int moveRange = Mathf.Max(0, unit.GetMovementRange());
-        int fuel = Mathf.Max(0, unit.CurrentFuel);
-        return Mathf.Min(moveRange, fuel);
+        return moveRange;
     }
 
     private void PrepareFuelCostForCommittedPath()
     {
-        int movementCost = Mathf.Max(0, committedMovementPath.Count - 1);
+        Tilemap movementTilemap = terrainTilemap != null ? terrainTilemap : (selectedUnit != null ? selectedUnit.BoardTilemap : null);
+        int movementCost = UnitMovementPathRules.CalculateAutonomyCostForPath(
+            movementTilemap,
+            selectedUnit,
+            committedMovementPath,
+            terrainDatabase);
         ApplyPreparedFuelCost(movementCost);
     }
 

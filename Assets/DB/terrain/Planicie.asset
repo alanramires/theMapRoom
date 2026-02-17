@@ -12,11 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 03f8ac18228f9af4b8437383160652a4, type: 3}
   m_Name: Planicie
   m_EditorClassIdentifier: Assembly-CSharp::TerrainTypeData
-  id: 
-  displayName: 
+  id: plains
+  displayName: "Plan\xEDcie"
   description: 
-  paletteTile: {fileID: 0}
+  paletteTile: {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
   domain: 0
   heightLevel: 3
   additionalLayerModes: []
   alwaysAllowAirDomain: 1
+  basicAutonomyCost: 1
+  requiredSkillsToEnter: []
+  skillCostOverrides: []

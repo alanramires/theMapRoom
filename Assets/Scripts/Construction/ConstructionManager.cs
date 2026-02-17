@@ -53,16 +53,40 @@ public class ConstructionManager : MonoBehaviour
         return false;
     }
 
+    public int GetBaseMovementCost()
+    {
+        if (TryGetConstructionData(out ConstructionData data))
+            return Mathf.Max(1, data.baseMovementCost);
+
+        return 1;
+    }
+
+    public IReadOnlyList<SkillData> GetRequiredSkillsToEnter()
+    {
+        if (TryGetConstructionData(out ConstructionData data) && data.requiredSkillsToEnter != null)
+            return data.requiredSkillsToEnter;
+
+        return System.Array.Empty<SkillData>();
+    }
+
+    public IReadOnlyList<TerrainSkillCostOverride> GetSkillCostOverrides()
+    {
+        if (TryGetConstructionData(out ConstructionData data) && data.skillCostOverrides != null)
+            return data.skillCostOverrides;
+
+        return System.Array.Empty<TerrainSkillCostOverride>();
+    }
+
     public IReadOnlyList<TerrainLayerMode> GetAllLayerModes()
     {
         if (!TryGetConstructionData(out ConstructionData data))
             return new[] { new TerrainLayerMode(Domain.Land, HeightLevel.Surface) };
 
-        int additionalCount = data.additionalLayerModes != null ? data.additionalLayerModes.Count : 0;
+        int additionalCount = data.aditionalDomainsAllowed != null ? data.aditionalDomainsAllowed.Count : 0;
         TerrainLayerMode[] modes = new TerrainLayerMode[1 + additionalCount];
         modes[0] = new TerrainLayerMode(data.domain, data.heightLevel);
         for (int i = 0; i < additionalCount; i++)
-            modes[i + 1] = data.additionalLayerModes[i];
+            modes[i + 1] = data.aditionalDomainsAllowed[i];
 
         return modes;
     }

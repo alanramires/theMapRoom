@@ -10,10 +10,11 @@ public class RoadNetworkManager : MonoBehaviour
     [SerializeField] private Tilemap boardTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
 
-    [Header("Road Visual")]
-    [SerializeField] private Material roadMaterial;
+    [Header("Default Road Visual")]
+    [SerializeField] private Sprite roadSegmentSprite;
     [SerializeField] private Color roadColor = Color.white;
     [SerializeField] [Range(0.03f, 0.6f)] private float roadWidth = 0.16f;
+    [SerializeField] [Range(0f, 0.3f)] private float segmentOverlap = 0.02f;
     [SerializeField] private SortingLayerReference sortingLayer;
     [SerializeField, HideInInspector] private bool sortingLayerInitialized;
     [SerializeField] [Range(-100, 500)] private int sortingOrder = 20;
@@ -28,11 +29,19 @@ public class RoadNetworkManager : MonoBehaviour
     [SerializeField] [Range(0.05f, 1f)] private float livePreviewInterval = 0.2f;
 
     private readonly List<GameObject> generatedRoadObjects = new List<GameObject>();
+    private readonly Dictionary<Vector3Int, StructureData> structureByCell = new Dictionary<Vector3Int, StructureData>();
     private float nextLivePreviewTime;
     private int lastPreviewSignature = int.MinValue;
 
     public Tilemap BoardTilemap => boardTilemap;
     public StructureDatabase StructureDatabase => structureDatabase;
+
+    public bool TryGetStructureAtCell(Vector3Int cell, out StructureData structure)
+    {
+        cell.z = 0;
+        EnsureStructureCellLookup();
+        return structureByCell.TryGetValue(cell, out structure);
+    }
 
     private void Awake()
     {
@@ -79,6 +88,7 @@ public class RoadNetworkManager : MonoBehaviour
     [ContextMenu("Rebuild Road Visuals")]
     public void RebuildRoadVisuals()
     {
+        RebuildStructureCellLookup();
         ClearRoadVisuals();
         if (structureDatabase == null || boardTilemap == null)
         {
@@ -100,7 +110,7 @@ public class RoadNetworkManager : MonoBehaviour
                 RoadRouteDefinition route = structure.roadRoutes[r];
                 if (route == null || route.cells == null || route.cells.Count < 2)
                     continue;
-                if (!IsRouteValid(route))
+                if (!IsRouteValid(structure, route))
                 {
                     if (logInvalidRoadCells)
                     {
@@ -111,7 +121,7 @@ public class RoadNetworkManager : MonoBehaviour
                     continue;
                 }
 
-                CreateRouteLine(structure, route, r);
+                CreateRouteSegments(structure, route, r);
                 drawnRoutes++;
             }
         }
@@ -124,6 +134,10 @@ public class RoadNetworkManager : MonoBehaviour
     [ContextMenu("Clear Road Visuals")]
     public void ClearRoadVisuals()
     {
+        // Rehidrata objetos gerados existentes na hierarquia (ex.: apos recompile/domain reload),
+        // para evitar "lixo" visual quando pontos da rota sao removidos.
+        CollectOrphanedGeneratedRoadObjects();
+
         for (int i = 0; i < generatedRoadObjects.Count; i++)
         {
             GameObject go = generatedRoadObjects[i];
@@ -139,41 +153,100 @@ public class RoadNetworkManager : MonoBehaviour
         generatedRoadObjects.Clear();
     }
 
-    private void CreateRouteLine(StructureData structure, RoadRouteDefinition route, int routeIndex)
+    private void CollectOrphanedGeneratedRoadObjects()
     {
-        GameObject go = new GameObject(GetRouteObjectName(structure, route, routeIndex));
-        go.transform.SetParent(transform, false);
-
-        LineRenderer lr = go.AddComponent<LineRenderer>();
-        lr.useWorldSpace = true;
-        lr.textureMode = LineTextureMode.Stretch;
-        lr.numCapVertices = 0;
-        lr.numCornerVertices = 0;
-        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        lr.receiveShadows = false;
-        lr.startWidth = roadWidth;
-        lr.endWidth = roadWidth;
-        lr.startColor = roadColor;
-        lr.endColor = roadColor;
-        lr.material = roadMaterial != null ? roadMaterial : new Material(Shader.Find("Sprites/Default"));
-        if (sortingLayer.Id != 0)
-            lr.sortingLayerID = sortingLayer.Id;
-        lr.sortingOrder = sortingOrder;
-
-        lr.positionCount = route.cells.Count;
-        for (int i = 0; i < route.cells.Count; i++)
+        for (int i = 0; i < transform.childCount; i++)
         {
-            Vector3Int cell = route.cells[i];
-            cell.z = 0;
-            Vector3 world = boardTilemap.GetCellCenterWorld(cell);
-            world.z = boardTilemap.transform.position.z;
-            lr.SetPosition(i, world);
-        }
+            Transform child = transform.GetChild(i);
+            if (child == null)
+                continue;
 
-        generatedRoadObjects.Add(go);
+            GameObject childGo = child.gameObject;
+            if (childGo == null)
+                continue;
+
+            if (!IsGeneratedRoadVisual(childGo))
+                continue;
+
+            if (!generatedRoadObjects.Contains(childGo))
+                generatedRoadObjects.Add(childGo);
+        }
     }
 
-    private bool IsRouteValid(RoadRouteDefinition route)
+    private static bool IsGeneratedRoadVisual(GameObject go)
+    {
+        if (go == null)
+            return false;
+
+        bool hasLine = go.GetComponent<LineRenderer>() != null;
+        bool hasSprite = go.GetComponent<SpriteRenderer>() != null || go.GetComponentInChildren<SpriteRenderer>() != null;
+        if (!hasLine && !hasSprite)
+            return false;
+
+        return go.name.StartsWith("Road_");
+    }
+
+    private void CreateRouteSegments(StructureData structure, RoadRouteDefinition route, int routeIndex)
+    {
+        Sprite segmentSprite = ResolveSegmentSprite(structure);
+        Color segmentColor = ResolveRoadColor(structure);
+        float width = ResolveRoadWidth(structure);
+        float overlap = ResolveSegmentOverlap(structure);
+
+        GameObject routeRoot = new GameObject(GetRouteObjectName(structure, route, routeIndex));
+        routeRoot.transform.SetParent(transform, false);
+
+        for (int i = 0; i < route.cells.Count - 1; i++)
+        {
+            Vector3Int fromCell = route.cells[i];
+            Vector3Int toCell = route.cells[i + 1];
+            fromCell.z = 0;
+            toCell.z = 0;
+
+            Vector3 from = boardTilemap.GetCellCenterWorld(fromCell);
+            Vector3 to = boardTilemap.GetCellCenterWorld(toCell);
+            from.z = boardTilemap.transform.position.z;
+            to.z = boardTilemap.transform.position.z;
+
+            Vector3 delta = to - from;
+            float length = delta.magnitude;
+            if (length <= 0.0001f)
+                continue;
+
+            float angle = Vector2.SignedAngle(Vector2.up, new Vector2(delta.x, delta.y));
+            Vector3 midpoint = (from + to) * 0.5f;
+
+            GameObject segment = new GameObject($"Segment_{i:00}");
+            segment.transform.SetParent(routeRoot.transform, false);
+            segment.transform.position = midpoint;
+            segment.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+
+            SpriteRenderer renderer = segment.AddComponent<SpriteRenderer>();
+            renderer.sprite = segmentSprite;
+            renderer.color = segmentColor;
+            if (sortingLayer.Id != 0)
+                renderer.sortingLayerID = sortingLayer.Id;
+            renderer.sortingOrder = sortingOrder;
+
+            float spriteWidth = 1f;
+            float spriteHeight = 1f;
+            if (segmentSprite != null)
+            {
+                Vector2 spriteSize = segmentSprite.bounds.size;
+                spriteWidth = Mathf.Max(0.0001f, spriteSize.x);
+                spriteHeight = Mathf.Max(0.0001f, spriteSize.y);
+            }
+
+            float targetLength = length + Mathf.Max(0f, overlap);
+            float scaleX = Mathf.Max(0.0001f, width / spriteWidth);
+            float scaleY = Mathf.Max(0.0001f, targetLength / spriteHeight);
+            segment.transform.localScale = new Vector3(scaleX, scaleY, 1f);
+        }
+
+        generatedRoadObjects.Add(routeRoot);
+    }
+
+    private bool IsRouteValid(StructureData structure, RoadRouteDefinition route)
     {
         if (!enforceLandSurfaceCells)
             return true;
@@ -182,46 +255,74 @@ public class RoadNetworkManager : MonoBehaviour
         {
             Vector3Int cell = route.cells[i];
             cell.z = 0;
-
-            // Mesma regra do movimento: construcao sobrescreve terreno.
-            ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-            if (construction != null)
-            {
-                if (construction.SupportsLayerMode(Domain.Land, HeightLevel.Surface))
-                    continue;
-
-                if (logInvalidRoadCells)
-                    Debug.LogWarning($"[RoadNetworkManager] Rota invalida em ({cell.x},{cell.y}): construcao no hex nao suporta Land/Surface.");
+            if (!IsRoadCellValid(cell, structure, logInvalidRoadCells))
                 return false;
-            }
+        }
 
-            if (!TryGetAnyPaintedTileOnGrid(cell, out TileBase anyPaintedTile))
-            {
-                if (logInvalidRoadCells)
-                    Debug.LogWarning($"[RoadNetworkManager] Rota invalida em ({cell.x},{cell.y}): celula sem tile no grid.");
-                return false;
-            }
+        return true;
+    }
 
-            if (terrainDatabase == null)
-                continue;
+    public bool IsRoadCellValid(Vector3Int cell)
+    {
+        return IsRoadCellValid(cell, logReason: false);
+    }
 
-            if (!TryResolveTerrainAtCell(cell, anyPaintedTile, out TerrainTypeData terrain) || terrain == null)
-            {
-                if (logInvalidRoadCells)
-                    Debug.LogWarning($"[RoadNetworkManager] Rota invalida em ({cell.x},{cell.y}): tile sem mapeamento no TerrainDatabase.");
-                return false;
-            }
+    public bool IsRoadCellValid(Vector3Int cell, bool logReason)
+    {
+        return IsRoadCellValid(cell, null, logReason);
+    }
 
-            bool supportsLandSurface =
-                (terrain.domain == Domain.Land && terrain.heightLevel == HeightLevel.Surface) ||
-                TerrainSupportsLayer(terrain.additionalLayerModes, Domain.Land, HeightLevel.Surface);
+    public bool IsRoadCellValidForStructure(Vector3Int cell, StructureData structure, bool logReason = false)
+    {
+        return IsRoadCellValid(cell, structure, logReason);
+    }
 
-            if (!supportsLandSurface)
-            {
-                if (logInvalidRoadCells)
-                    Debug.LogWarning($"[RoadNetworkManager] Rota invalida em ({cell.x},{cell.y}). Terreno nao suporta Land/Surface.");
-                return false;
-            }
+    private bool IsRoadCellValid(Vector3Int cell, StructureData routeStructure, bool logReason)
+    {
+        if (boardTilemap == null)
+            return false;
+
+        if (!enforceLandSurfaceCells)
+            return true;
+
+        cell.z = 0;
+
+        // Mesma regra do movimento: construcao sobrescreve terreno.
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+        if (construction != null)
+        {
+            if (CanBuildStructureOnConstruction(routeStructure, construction))
+                return true;
+
+            if (logReason)
+                Debug.LogWarning($"[RoadNetworkManager] Rota invalida em ({cell.x},{cell.y}): construcao no hex nao suporta as regras de build da estrutura.");
+            return false;
+        }
+
+        if (!TryGetAnyPaintedTileOnGrid(cell, out TileBase anyPaintedTile))
+        {
+            if (logReason)
+                Debug.LogWarning($"[RoadNetworkManager] Rota invalida em ({cell.x},{cell.y}): celula sem tile no grid.");
+            return false;
+        }
+
+        if (terrainDatabase == null)
+            return true;
+
+        if (!TryResolveTerrainAtCell(cell, anyPaintedTile, out TerrainTypeData terrain) || terrain == null)
+        {
+            if (logReason)
+                Debug.LogWarning($"[RoadNetworkManager] Rota invalida em ({cell.x},{cell.y}): tile sem mapeamento no TerrainDatabase.");
+            return false;
+        }
+
+        bool supportsBuild = SupportsBuildOnTerrain(routeStructure, terrain);
+
+        if (!supportsBuild)
+        {
+            if (logReason)
+                Debug.LogWarning($"[RoadNetworkManager] Rota invalida em ({cell.x},{cell.y}). Terreno nao suporta as regras de build da estrutura.");
+            return false;
         }
 
         return true;
@@ -259,6 +360,38 @@ public class RoadNetworkManager : MonoBehaviour
 
         terrain = null;
         return false;
+    }
+
+    private Sprite ResolveSegmentSprite(StructureData structure)
+    {
+        if (structure != null && structure.roadSegmentSprite != null)
+            return structure.roadSegmentSprite;
+
+        return roadSegmentSprite;
+    }
+
+    private Color ResolveRoadColor(StructureData structure)
+    {
+        if (structure != null)
+            return structure.roadColor;
+
+        return roadColor;
+    }
+
+    private float ResolveRoadWidth(StructureData structure)
+    {
+        if (structure != null)
+            return Mathf.Clamp(structure.roadWidth, 0.03f, 0.6f);
+
+        return Mathf.Clamp(roadWidth, 0.03f, 0.6f);
+    }
+
+    private float ResolveSegmentOverlap(StructureData structure)
+    {
+        if (structure != null)
+            return Mathf.Clamp(structure.segmentOverlap, 0f, 0.3f);
+
+        return Mathf.Clamp(segmentOverlap, 0f, 0.3f);
     }
 
     private bool TryGetAnyPaintedTileOnGrid(Vector3Int cell, out TileBase tile)
@@ -311,6 +444,58 @@ public class RoadNetworkManager : MonoBehaviour
         return false;
     }
 
+    private static bool SupportsBuildOnTerrain(StructureData structure, TerrainTypeData terrain)
+    {
+        if (terrain == null)
+            return false;
+
+        // Compatibilidade com comportamento antigo: sem estrutura explicita, usa Land/Surface.
+        if (structure == null)
+        {
+            bool supportsLandSurface =
+                (terrain.domain == Domain.Land && terrain.heightLevel == HeightLevel.Surface) ||
+                TerrainSupportsLayer(terrain.aditionalDomainsAllowed, Domain.Land, HeightLevel.Surface);
+            return supportsLandSurface;
+        }
+
+        if (structure.SupportsBuildOn(terrain.domain, terrain.heightLevel))
+            return true;
+
+        if (terrain.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0; i < terrain.aditionalDomainsAllowed.Count; i++)
+        {
+            TerrainLayerMode mode = terrain.aditionalDomainsAllowed[i];
+            if (structure.SupportsBuildOn(mode.domain, mode.heightLevel))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool CanBuildStructureOnConstruction(StructureData structure, ConstructionManager construction)
+    {
+        if (construction == null)
+            return false;
+
+        if (structure == null)
+            return construction.SupportsLayerMode(Domain.Land, HeightLevel.Surface);
+
+        IReadOnlyList<TerrainLayerMode> constructionModes = construction.GetAllLayerModes();
+        for (int i = 0; i < constructionModes.Count; i++)
+        {
+            TerrainLayerMode mode = constructionModes[i];
+            if (structure.SupportsBuildOn(mode.domain, mode.heightLevel))
+                return true;
+        }
+
+        if (construction.AllowsAirDomain() && structure.SupportsBuildOn(Domain.Air, HeightLevel.Surface))
+            return true;
+
+        return false;
+    }
+
     private string GetRouteObjectName(StructureData structure, RoadRouteDefinition route, int routeIndex)
     {
         string sid = structure != null && !string.IsNullOrWhiteSpace(structure.id) ? structure.id : "structure";
@@ -348,6 +533,66 @@ public class RoadNetworkManager : MonoBehaviour
         }
     }
 
+    private void EnsureStructureCellLookup()
+    {
+        if (structureByCell.Count > 0)
+            return;
+
+        RebuildStructureCellLookup();
+    }
+
+    private void RebuildStructureCellLookup()
+    {
+        structureByCell.Clear();
+        if (structureDatabase == null || structureDatabase.Structures == null)
+            return;
+
+        IReadOnlyList<StructureData> structures = structureDatabase.Structures;
+        for (int s = 0; s < structures.Count; s++)
+        {
+            StructureData structure = structures[s];
+            if (structure == null || structure.roadRoutes == null)
+                continue;
+
+            for (int r = 0; r < structure.roadRoutes.Count; r++)
+            {
+                RoadRouteDefinition route = structure.roadRoutes[r];
+                if (route == null || route.cells == null)
+                    continue;
+
+                for (int i = 0; i < route.cells.Count; i++)
+                {
+                    Vector3Int cell = route.cells[i];
+                    cell.z = 0;
+                    if (!structureByCell.TryGetValue(cell, out StructureData current))
+                    {
+                        structureByCell.Add(cell, structure);
+                        continue;
+                    }
+
+                    if (ShouldReplaceStructureAtCell(current, structure))
+                        structureByCell[cell] = structure;
+                }
+            }
+        }
+    }
+
+    private bool ShouldReplaceStructureAtCell(StructureData current, StructureData candidate)
+    {
+        if (candidate == null)
+            return false;
+        if (current == null)
+            return true;
+
+        if (structureDatabase != null)
+            return structureDatabase.ComparePriority(candidate, current) > 0;
+
+        if (candidate.priorityOrder != current.priorityOrder)
+            return candidate.priorityOrder > current.priorityOrder;
+
+        return false;
+    }
+
     private void TryRebuildIfChanged()
     {
         int currentSignature = ComputePreviewSignature();
@@ -367,9 +612,11 @@ public class RoadNetworkManager : MonoBehaviour
             hash = hash * 31 + (terrainDatabase != null ? terrainDatabase.GetInstanceID() : 0);
             hash = hash * 31 + (enforceLandSurfaceCells ? 1 : 0);
             hash = hash * 31 + (int)(roadWidth * 1000f);
+            hash = hash * 31 + (int)(segmentOverlap * 1000f);
             hash = hash * 31 + sortingLayer.Id;
             hash = hash * 31 + sortingOrder;
             hash = hash * 31 + roadColor.GetHashCode();
+            hash = hash * 31 + (roadSegmentSprite != null ? roadSegmentSprite.GetInstanceID() : 0);
 
             if (structureDatabase == null || structureDatabase.Structures == null)
                 return hash;
@@ -386,6 +633,10 @@ public class RoadNetworkManager : MonoBehaviour
                 }
 
                 hash = hash * 31 + structure.GetInstanceID();
+                hash = hash * 31 + (structure.roadSegmentSprite != null ? structure.roadSegmentSprite.GetInstanceID() : 0);
+                hash = hash * 31 + structure.roadColor.GetHashCode();
+                hash = hash * 31 + (int)(structure.roadWidth * 1000f);
+                hash = hash * 31 + (int)(structure.segmentOverlap * 1000f);
                 hash = hash * 31 + (structure.roadRoutes != null ? structure.roadRoutes.Count : 0);
                 if (structure.roadRoutes == null)
                     continue;

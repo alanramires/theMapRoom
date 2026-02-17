@@ -230,20 +230,26 @@ MonoBehaviour:
   currentFuel: 99
   maxFuel: 99
   hasActed: 0
+  appliedHasActed: 0
+  appliedActiveTeamId: -2147483648
   isEmbarked: 0
   isSelected: 0
   enableSelectionBlink: 1
   selectionBlinkInterval: 0.16
+  selectionBlinkActiveDuration: 0.16
+  selectionBlinkInactiveDuration: 0.16
   actedDarkenFactor: 0.5
   actedGrayBlend: 0.6
   actedGlowColor: {r: 1, g: 1, b: 1, a: 1}
   actedGlowSize: 1.5
   actedGlowStrength: 1.25
-  autoSyncHasActedWithMatch: 1
   matchController: {fileID: 0}
-  processedActiveTeamChangeVersion: 3
   autoApplyOnStart: 1
   manualMoveAnimationSpeed: 1
+  currentDomain: 0
+  currentHeightLevel: 3
+  currentLayerModeIndex: 0
+  layerStateInitialized: 1
 --- !u!1 &2120091812791158126
 GameObject:
   m_ObjectHideFlags: 0

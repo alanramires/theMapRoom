@@ -12,11 +12,109 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f69f8ff2970547247ab0bb6a5a5f3dc1, type: 3}
   m_Name: Rodovias
   m_EditorClassIdentifier: Assembly-CSharp::StructureData
-  id: 
-  displayName: 
+  id: road
+  displayName: Rodovia
   description: 
+  priorityOrder: 3
   domain: 0
   heightLevel: 3
-  additionalLayerModes: []
-  alwaysAllowAirDomain: 0
-  roadRoutes: []
+  aditionalDomainsAllowed: []
+  alwaysAllowAirDomain: 1
+  baseMovementCost: 1
+  requiredSkillsToEnter: []
+  skillCostOverrides: []
+  canAlsoBeBuiltOnTheFollowDomains: []
+  roadSegmentSprite: {fileID: 21300000, guid: 03650c0a2457e5046b8234d0bc968b5a, type: 3}
+  roadColor: {r: 1, g: 1, b: 1, a: 1}
+  roadWidth: 0.16
+  segmentOverlap: 0.02
+  roadRoutes:
+  - routeName: Rota 66
+    cells:
+    - {x: 0, y: 0, z: 0}
+    - {x: 0, y: 1, z: 0}
+    - {x: 1, y: 2, z: 0}
+    - {x: 2, y: 2, z: 0}
+    - {x: 3, y: 2, z: 0}
+    - {x: 3, y: 3, z: 0}
+    - {x: 4, y: 4, z: 0}
+  - routeName: Avenida afonso pena
+    cells:
+    - {x: 0, y: 0, z: 0}
+    - {x: 1, y: 0, z: 0}
+    - {x: 1, y: -1, z: 0}
+    - {x: 1, y: -2, z: 0}
+    - {x: 1, y: -3, z: 0}
+    - {x: 2, y: -4, z: 0}
+    - {x: 3, y: -4, z: 0}
+    - {x: 4, y: -4, z: 0}
+    - {x: 5, y: -4, z: 0}
+    - {x: 6, y: -4, z: 0}
+    - {x: 6, y: -5, z: 0}
+    - {x: 7, y: -6, z: 0}
+    - {x: 7, y: -7, z: 0}
+    - {x: 8, y: -8, z: 0}
+    - {x: 9, y: -8, z: 0}
+  - routeName: Caminho do Aeroporto
+    cells:
+    - {x: 0, y: 0, z: 0}
+    - {x: -1, y: 0, z: 0}
+    - {x: -2, y: 1, z: 0}
+    - {x: -2, y: 2, z: 0}
+    - {x: -3, y: 3, z: 0}
+    - {x: -3, y: 4, z: 0}
+    - {x: -4, y: 5, z: 0}
+    - {x: -5, y: 5, z: 0}
+    - {x: -6, y: 5, z: 0}
+    - {x: -7, y: 5, z: 0}
+    - {x: -8, y: 5, z: 0}
+    - {x: -9, y: 5, z: 0}
+    - {x: -10, y: 5, z: 0}
+    - {x: -11, y: 5, z: 0}
+  - routeName: Estrada Mirabel
+    cells:
+    - {x: -6, y: 7, z: 0}
+    - {x: -5, y: 7, z: 0}
+    - {x: -4, y: 7, z: 0}
+    - {x: -3, y: 7, z: 0}
+    - {x: -2, y: 7, z: 0}
+    - {x: -1, y: 7, z: 0}
+    - {x: 0, y: 7, z: 0}
+    - {x: 1, y: 7, z: 0}
+    - {x: 2, y: 7, z: 0}
+    - {x: 3, y: 7, z: 0}
+    - {x: 4, y: 6, z: 0}
+    - {x: 3, y: 5, z: 0}
+    - {x: 4, y: 4, z: 0}
+    - {x: 5, y: 4, z: 0}
+    - {x: 6, y: 4, z: 0}
+    - {x: 7, y: 4, z: 0}
+    - {x: 8, y: 4, z: 0}
+    - {x: 8, y: 3, z: 0}
+    - {x: 8, y: 2, z: 0}
+    - {x: 8, y: 1, z: 0}
+    - {x: 8, y: 0, z: 0}
+    - {x: 7, y: -1, z: 0}
+    - {x: 7, y: -2, z: 0}
+    - {x: 7, y: -3, z: 0}
+    - {x: 8, y: -4, z: 0}
+    - {x: 7, y: -4, z: 0}
+    - {x: 6, y: -4, z: 0}
+  - routeName: "Tunel Rebou\xE7as"
+    cells:
+    - {x: -4, y: 5, z: 0}
+    - {x: -3, y: 6, z: 0}
+    - {x: -3, y: 7, z: 0}
+  - routeName: Mountain Route
+    cells:
+    - {x: 8, y: 2, z: 0}
+    - {x: 7, y: 1, z: 0}
+    - {x: 8, y: 0, z: 0}
+  - routeName: Estrada do Lago
+    cells:
+    - {x: 9, y: -11, z: 0}
+    - {x: 10, y: -11, z: 0}
+    - {x: 11, y: -11, z: 0}
+    - {x: 12, y: -11, z: 0}
+    - {x: 13, y: -11, z: 0}
+    - {x: 14, y: -11, z: 0}

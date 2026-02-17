@@ -12,11 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 03f8ac18228f9af4b8437383160652a4, type: 3}
   m_Name: Floresta
   m_EditorClassIdentifier: Assembly-CSharp::TerrainTypeData
-  id: 
-  displayName: 
+  id: forest
+  displayName: Floresta
   description: 
-  paletteTile: {fileID: 0}
+  paletteTile: {fileID: 11400000, guid: 474aa6f1deb7f064fbbe2a7ff46a4dfe, type: 2}
   domain: 0
   heightLevel: 3
   additionalLayerModes: []
   alwaysAllowAirDomain: 1
+  basicAutonomyCost: 2
+  requiredSkillsToEnter: []
+  skillCostOverrides:
+  - skill: {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
+    autonomyCost: 1

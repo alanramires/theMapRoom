@@ -24,5 +24,12 @@ MonoBehaviour:
   maxHP: 10
   defense: 12
   movement: 2
+  movementCategory: 2
+  domain: 0
+  heightLevel: 3
+  additionalLayerModes: []
+  skills:
+  - {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
+  - {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
   autonomia: 70
   cost: 2000

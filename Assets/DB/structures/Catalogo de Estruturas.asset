@@ -12,4 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9fcc8d7ad515dcf47b0af1cea7729cfa, type: 3}
   m_Name: Catalogo de Estruturas
   m_EditorClassIdentifier: Assembly-CSharp::StructureDatabase
-  structures: []
+  structures:
+  - {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
+  - {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}

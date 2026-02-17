@@ -74,8 +74,16 @@ public class CameraController : MonoBehaviour
         scroll /= 120f;
 #endif
 
+        Vector3 mouseScreen = GetMousePosition();
+        mouseScreen.z = -transform.position.z;
+        Vector3 worldBefore = _cam.ScreenToWorldPoint(mouseScreen);
+
         float target = _cam.orthographicSize - scroll * zoomSpeed * Time.unscaledDeltaTime * 10f;
         _cam.orthographicSize = Mathf.Clamp(target, minOrthoSize, GetEffectiveMaxOrthoSize());
+
+        Vector3 worldAfter = _cam.ScreenToWorldPoint(mouseScreen);
+        Vector3 delta = worldBefore - worldAfter;
+        transform.position += new Vector3(delta.x, delta.y, 0f);
     }
 
     void HandlePan()

@@ -16,8 +16,20 @@ MonoBehaviour:
   displayName: Soldado
   description: "Soldado de Infantaria b\xE1sica, essencial para capturar constru\xE7\xF5es
     e vencer o jogo. Anda em florestas com custo reduzido"
-  sprite: {fileID: 21300000, guid: 7a4e98efb59da8447b1de4d056a57e79, type: 3}
+  spriteDefault: {fileID: 21300000, guid: 7a4e98efb59da8447b1de4d056a57e79, type: 3}
+  spriteGreen: {fileID: 0}
+  spriteRed: {fileID: 0}
+  spriteBlue: {fileID: 0}
+  spriteYellow: {fileID: 0}
   maxHP: 10
   defense: 10
   movement: 3
+  movementCategory: 2
+  domain: 0
+  heightLevel: 3
+  additionalLayerModes: []
+  skills:
+  - {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
+  - {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
+  autonomia: 99
   cost: 1000

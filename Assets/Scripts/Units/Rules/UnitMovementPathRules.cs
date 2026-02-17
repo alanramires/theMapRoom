@@ -16,77 +16,151 @@ public static class UnitMovementPathRules
 
         // Garante que o estado de camada usado na validacao vem da instancia em campo.
         unit.SyncLayerStateFromData(forceNativeDefault: false);
+        int maxMovementCost = Mathf.Max(0, maxSteps);
+        int maxAutonomyCost = Mathf.Max(0, unit.CurrentFuel);
 
         Vector3Int origin = unit.CurrentCellPosition;
         origin.z = 0;
-        if (terrainTilemap.GetTile(origin) == null)
-            return pathsByDestination;
+        MovementQueryCache cache = new MovementQueryCache(terrainTilemap, terrainDatabase);
 
-        Queue<Vector3Int> frontier = new Queue<Vector3Int>();
-        Dictionary<Vector3Int, int> distance = new Dictionary<Vector3Int, int>();
-        Dictionary<Vector3Int, Vector3Int> cameFrom = new Dictionary<Vector3Int, Vector3Int>();
+        Queue<PathNodeKey> frontier = new Queue<PathNodeKey>();
+        Dictionary<PathNodeKey, int> autonomyCostByState = new Dictionary<PathNodeKey, int>();
+        Dictionary<PathNodeKey, PathNodeKey> cameFrom = new Dictionary<PathNodeKey, PathNodeKey>();
         List<Vector3Int> neighbors = new List<Vector3Int>(6);
 
-        frontier.Enqueue(origin);
-        distance[origin] = 0;
-        cameFrom[origin] = origin;
+        PathNodeKey originKey = new PathNodeKey(origin, 0);
+        frontier.Enqueue(originKey);
+        autonomyCostByState[originKey] = 0;
+        cameFrom[originKey] = originKey;
 
         while (frontier.Count > 0)
         {
-            Vector3Int current = frontier.Dequeue();
-            int nextStep = distance[current] + 1;
-            if (nextStep > maxSteps)
-                continue;
+            PathNodeKey currentKey = frontier.Dequeue();
+            Vector3Int current = currentKey.cell;
+            int currentSteps = currentKey.steps;
+            int currentAutonomyCost = autonomyCostByState[currentKey];
 
             GetImmediateHexNeighbors(terrainTilemap, current, neighbors);
             for (int i = 0; i < neighbors.Count; i++)
             {
                 Vector3Int next = neighbors[i];
-                if (distance.ContainsKey(next))
+                ConstructionManager construction = cache.GetConstructionAtCell(next);
+                StructureData structure = cache.GetStructureAtCell(next);
+                TerrainTypeData terrainData = cache.ResolveTerrainAtCell(next);
+                bool hasAnyTile = cache.HasAnyPaintedTileAtCell(next);
+                if (!CanTraverseCell(construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit))
                     continue;
-                TileBase nextTile = terrainTilemap.GetTile(next);
-                if (nextTile == null)
+                int autonomyCostToEnter = GetAutonomyCostToEnterCell(construction, structure, terrainData, unit);
+                int nextStep = currentSteps + autonomyCostToEnter;
+                if (nextStep > maxMovementCost)
                     continue;
-                ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(terrainTilemap, next);
-                if (!CanTraverseCell(terrainDatabase, nextTile, construction, unit))
+                PathNodeKey nextKey = new PathNodeKey(next, nextStep);
+                int totalAutonomyCost = currentAutonomyCost + autonomyCostToEnter;
+                if (totalAutonomyCost > maxAutonomyCost)
                     continue;
 
-                UnitManager blocker = UnitOccupancyRules.GetUnitAtCell(terrainTilemap, next, unit);
+                UnitManager blocker = cache.GetUnitAtCell(next, unit);
                 if (blocker != null)
                     blocker.SyncLayerStateFromData(forceNativeDefault: false);
                 if (!UnitRulesDefinition.CanPassThrough(unit, blocker))
                     continue;
 
-                distance[next] = nextStep;
-                cameFrom[next] = current;
-                frontier.Enqueue(next);
+                if (autonomyCostByState.TryGetValue(nextKey, out int knownCost) && knownCost <= totalAutonomyCost)
+                    continue;
+
+                autonomyCostByState[nextKey] = totalAutonomyCost;
+                cameFrom[nextKey] = currentKey;
+                frontier.Enqueue(nextKey);
             }
         }
 
-        foreach (KeyValuePair<Vector3Int, int> pair in distance)
-            pathsByDestination[pair.Key] = BuildPath(origin, pair.Key, cameFrom);
+        Dictionary<Vector3Int, PathNodeKey> bestStateByDestination = new Dictionary<Vector3Int, PathNodeKey>();
+        foreach (KeyValuePair<PathNodeKey, int> pair in autonomyCostByState)
+        {
+            PathNodeKey candidateState = pair.Key;
+            int candidateCost = pair.Value;
+
+            if (!bestStateByDestination.TryGetValue(candidateState.cell, out PathNodeKey currentBest))
+            {
+                bestStateByDestination[candidateState.cell] = candidateState;
+                continue;
+            }
+
+            int currentBestCost = autonomyCostByState[currentBest];
+            if (candidateCost < currentBestCost || (candidateCost == currentBestCost && candidateState.steps < currentBest.steps))
+                bestStateByDestination[candidateState.cell] = candidateState;
+        }
+
+        foreach (KeyValuePair<Vector3Int, PathNodeKey> pair in bestStateByDestination)
+            pathsByDestination[pair.Key] = BuildPath(originKey, pair.Value, cameFrom);
 
         return pathsByDestination;
     }
 
+    public static int CalculateAutonomyCostForPath(
+        Tilemap terrainTilemap,
+        UnitManager unit,
+        IReadOnlyList<Vector3Int> path,
+        TerrainDatabase terrainDatabase = null)
+    {
+        if (terrainTilemap == null || unit == null || path == null || path.Count < 2)
+            return 0;
+
+        MovementQueryCache cache = new MovementQueryCache(terrainTilemap, terrainDatabase);
+        int total = 0;
+        for (int i = 1; i < path.Count; i++)
+        {
+            Vector3Int cell = path[i];
+            cell.z = 0;
+
+            ConstructionManager construction = cache.GetConstructionAtCell(cell);
+            StructureData structure = cache.GetStructureAtCell(cell);
+            TerrainTypeData terrainData = cache.ResolveTerrainAtCell(cell);
+            total += GetAutonomyCostToEnterCell(construction, structure, terrainData, unit);
+        }
+
+        return Mathf.Max(0, total);
+    }
+
     private static bool CanTraverseCell(
-        TerrainDatabase terrainDatabase,
-        TileBase terrainTile,
         ConstructionManager construction,
+        StructureData structure,
+        TerrainTypeData terrainData,
+        bool hasAnyTile,
+        bool terrainRulesAvailable,
         UnitManager unit)
     {
-        if (unit == null || terrainTile == null)
+        if (unit == null)
             return false;
 
         Domain currentDomain = unit.GetDomain();
         HeightLevel currentHeight = unit.GetHeightLevel();
+        bool isAirUnit = currentDomain == Domain.Air;
+
+        // Para unidades aereas: tenta construcao/estrutura, mas se nao permitir ar faz fallback
+        // para o terreno base (em vez de bloquear completamente por sobrescrita).
+        if (isAirUnit)
+        {
+            if (construction != null && CanTraverseUsingConstruction(construction, unit, currentDomain, currentHeight))
+                return true;
+
+            if (structure != null && CanTraverseUsingStructure(structure, unit, currentDomain, currentHeight))
+                return true;
+
+            if (terrainData == null)
+                return !terrainRulesAvailable && hasAnyTile;
+
+            return CanTraverseUsingTerrain(terrainData, unit, currentDomain, currentHeight);
+        }
+
         if (construction != null)
             return CanTraverseUsingConstruction(construction, unit, currentDomain, currentHeight);
 
-        if (terrainDatabase == null)
-            return true;
-        if (!terrainDatabase.TryGetByPaletteTile(terrainTile, out TerrainTypeData terrainData) || terrainData == null)
-            return false;
+        if (structure != null)
+            return CanTraverseUsingStructure(structure, unit, currentDomain, currentHeight);
+
+        if (terrainData == null)
+            return !terrainRulesAvailable && hasAnyTile;
 
         return CanTraverseUsingTerrain(terrainData, unit, currentDomain, currentHeight);
     }
@@ -103,8 +177,10 @@ public static class UnitMovementPathRules
         if (currentDomain == Domain.Air)
         {
             if (construction.AllowsAirDomain())
-                return true;
-            return construction.SupportsLayerMode(currentDomain, currentHeight);
+                return UnitPassesSkillRequirement(unit, construction.GetRequiredSkillsToEnter());
+            if (!construction.SupportsLayerMode(currentDomain, currentHeight))
+                return false;
+            return UnitPassesSkillRequirement(unit, construction.GetRequiredSkillsToEnter());
         }
 
         IReadOnlyList<UnitLayerMode> unitModes = unit.GetAllLayerModes();
@@ -112,10 +188,46 @@ public static class UnitMovementPathRules
         {
             UnitLayerMode mode = unitModes[i];
             if (construction.SupportsLayerMode(mode.domain, mode.heightLevel))
-                return true;
+                return UnitPassesSkillRequirement(unit, construction.GetRequiredSkillsToEnter());
         }
 
         return false;
+    }
+
+    private static bool CanTraverseUsingStructure(
+        StructureData structure,
+        UnitManager unit,
+        Domain currentDomain,
+        HeightLevel currentHeight)
+    {
+        if (structure == null || unit == null)
+            return false;
+
+        if (currentDomain == Domain.Air)
+        {
+            if (structure.alwaysAllowAirDomain)
+                return UnitPassesSkillRequirement(unit, structure.requiredSkillsToEnter);
+            if (!StructureSupportsMode(structure, currentDomain, currentHeight))
+                return false;
+            return UnitPassesSkillRequirement(unit, structure.requiredSkillsToEnter);
+        }
+
+        IReadOnlyList<UnitLayerMode> unitModes = unit.GetAllLayerModes();
+        bool supportsAnyMode = false;
+        for (int i = 0; i < unitModes.Count; i++)
+        {
+            UnitLayerMode mode = unitModes[i];
+            if (StructureSupportsMode(structure, mode.domain, mode.heightLevel))
+            {
+                supportsAnyMode = true;
+                break;
+            }
+        }
+
+        if (!supportsAnyMode)
+            return false;
+
+        return UnitPassesSkillRequirement(unit, structure.requiredSkillsToEnter);
     }
 
     private static bool CanTraverseUsingTerrain(
@@ -135,14 +247,24 @@ public static class UnitMovementPathRules
         }
 
         IReadOnlyList<UnitLayerMode> unitModes = unit.GetAllLayerModes();
+        bool supportsAnyMode = false;
         for (int i = 0; i < unitModes.Count; i++)
         {
             UnitLayerMode mode = unitModes[i];
             if (TerrainSupportsMode(terrainData, mode.domain, mode.heightLevel))
-                return true;
+            {
+                supportsAnyMode = true;
+                break;
+            }
         }
 
-        return false;
+        if (!supportsAnyMode)
+            return false;
+
+        if (terrainData.requiredSkillsToEnter == null || terrainData.requiredSkillsToEnter.Count == 0)
+            return true;
+
+        return UnitHasAnyRequiredSkill(unit, terrainData.requiredSkillsToEnter);
     }
 
     private static bool TerrainSupportsMode(TerrainTypeData terrainData, Domain domain, HeightLevel heightLevel)
@@ -153,13 +275,162 @@ public static class UnitMovementPathRules
         if (terrainData.domain == domain && terrainData.heightLevel == heightLevel)
             return true;
 
-        if (terrainData.additionalLayerModes == null)
+        if (terrainData.aditionalDomainsAllowed == null)
             return false;
 
-        for (int i = 0; i < terrainData.additionalLayerModes.Count; i++)
+        for (int i = 0; i < terrainData.aditionalDomainsAllowed.Count; i++)
         {
-            TerrainLayerMode mode = terrainData.additionalLayerModes[i];
+            TerrainLayerMode mode = terrainData.aditionalDomainsAllowed[i];
             if (mode.domain == domain && mode.heightLevel == heightLevel)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool StructureSupportsMode(StructureData structure, Domain domain, HeightLevel heightLevel)
+    {
+        if (structure == null)
+            return false;
+
+        if (structure.domain == domain && structure.heightLevel == heightLevel)
+            return true;
+
+        if (structure.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
+        {
+            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
+            if (mode.domain == domain && mode.heightLevel == heightLevel)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static int GetAutonomyCostToEnterCell(
+        ConstructionManager construction,
+        StructureData structure,
+        TerrainTypeData terrainData,
+        UnitManager unit)
+    {
+        if (unit != null && unit.GetDomain() == Domain.Air)
+            return 1;
+
+        if (construction != null)
+            return GetAutonomyCostWithSkillOverrides(construction.GetBaseMovementCost(), construction.GetSkillCostOverrides(), unit);
+
+        if (structure != null)
+            return GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, structure.skillCostOverrides, unit);
+
+        if (terrainData != null)
+            return GetAutonomyCostWithSkillOverrides(terrainData.basicAutonomyCost, terrainData.skillCostOverrides, unit);
+
+        return 1;
+    }
+
+    private static int GetAutonomyCostWithSkillOverrides(
+        int baseCost,
+        IReadOnlyList<TerrainSkillCostOverride> overrides,
+        UnitManager unit)
+    {
+        int safeBase = Mathf.Max(1, baseCost);
+        if (unit == null || overrides == null)
+            return safeBase;
+
+        for (int i = 0; i < overrides.Count; i++)
+        {
+            TerrainSkillCostOverride entry = overrides[i];
+            if (entry == null || entry.skill == null)
+                continue;
+
+            if (unit.HasSkill(entry.skill))
+                return Mathf.Max(1, entry.autonomyCost);
+        }
+
+        return safeBase;
+    }
+
+    private static bool UnitHasAnyRequiredSkill(UnitManager unit, IReadOnlyList<SkillData> requiredSkills)
+    {
+        if (unit == null || requiredSkills == null || requiredSkills.Count == 0)
+            return false;
+
+        for (int i = 0; i < requiredSkills.Count; i++)
+        {
+            SkillData requiredSkill = requiredSkills[i];
+            if (requiredSkill == null)
+                continue;
+
+            if (unit.HasSkill(requiredSkill))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool UnitPassesSkillRequirement(UnitManager unit, IReadOnlyList<SkillData> requiredSkills)
+    {
+        if (requiredSkills == null || requiredSkills.Count == 0)
+            return true;
+
+        return UnitHasAnyRequiredSkill(unit, requiredSkills);
+    }
+
+    private static TerrainTypeData ResolveTerrainAtCell(Tilemap terrainTilemap, TerrainDatabase terrainDatabase, Vector3Int cell)
+    {
+        if (terrainTilemap == null || terrainDatabase == null)
+            return null;
+
+        cell.z = 0;
+        TileBase tile = terrainTilemap.GetTile(cell);
+        if (tile != null && terrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData byMainTile) && byMainTile != null)
+            return byMainTile;
+
+        GridLayout grid = terrainTilemap.layoutGrid;
+        if (grid == null)
+            return null;
+
+        Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (map == null)
+                continue;
+
+            TileBase other = map.GetTile(cell);
+            if (other == null)
+                continue;
+
+            if (terrainDatabase.TryGetByPaletteTile(other, out TerrainTypeData byGridTile) && byGridTile != null)
+                return byGridTile;
+        }
+
+        return null;
+    }
+
+    private static bool HasAnyPaintedTileAtCell(Tilemap terrainTilemap, Vector3Int cell)
+    {
+        if (terrainTilemap == null)
+            return false;
+
+        cell.z = 0;
+        if (terrainTilemap.GetTile(cell) != null)
+            return true;
+
+        GridLayout grid = terrainTilemap.layoutGrid;
+        if (grid == null)
+            return false;
+
+        Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (map == null)
+                continue;
+
+            if (map.GetTile(cell) != null)
                 return true;
         }
 
@@ -200,23 +471,53 @@ public static class UnitMovementPathRules
             output.Add(candidates[i].cell);
     }
 
-    private static List<Vector3Int> BuildPath(Vector3Int origin, Vector3Int destination, Dictionary<Vector3Int, Vector3Int> cameFrom)
+    private static List<Vector3Int> BuildPath(PathNodeKey origin, PathNodeKey destination, Dictionary<PathNodeKey, PathNodeKey> cameFrom)
     {
         List<Vector3Int> reversedPath = new List<Vector3Int>();
         if (!cameFrom.ContainsKey(destination))
             return reversedPath;
 
-        Vector3Int current = destination;
-        reversedPath.Add(current);
+        PathNodeKey current = destination;
+        reversedPath.Add(current.cell);
 
-        while (current != origin)
+        while (!current.Equals(origin))
         {
             current = cameFrom[current];
-            reversedPath.Add(current);
+            reversedPath.Add(current.cell);
         }
 
         reversedPath.Reverse();
         return reversedPath;
+    }
+
+    private readonly struct PathNodeKey : System.IEquatable<PathNodeKey>
+    {
+        public readonly Vector3Int cell;
+        public readonly int steps;
+
+        public PathNodeKey(Vector3Int cell, int steps)
+        {
+            this.cell = new Vector3Int(cell.x, cell.y, 0);
+            this.steps = steps;
+        }
+
+        public bool Equals(PathNodeKey other)
+        {
+            return cell == other.cell && steps == other.steps;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is PathNodeKey other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return (cell.GetHashCode() * 397) ^ steps;
+            }
+        }
     }
 
     private struct CellDistance
@@ -228,6 +529,199 @@ public static class UnitMovementPathRules
         {
             this.cell = cell;
             this.distance = distance;
+        }
+    }
+
+    private sealed class MovementQueryCache
+    {
+        private readonly Tilemap referenceTilemap;
+        private readonly TerrainDatabase terrainDatabase;
+        private readonly Tilemap[] gridTilemaps;
+        private readonly UnitManager[] units;
+        private readonly ConstructionManager[] constructions;
+        private readonly RoadNetworkManager[] roadNetworks;
+        private readonly Dictionary<Vector3Int, ConstructionManager> constructionByCell = new Dictionary<Vector3Int, ConstructionManager>();
+        private readonly Dictionary<Vector3Int, StructureData> structureByCell = new Dictionary<Vector3Int, StructureData>();
+        private readonly Dictionary<Vector3Int, TerrainTypeData> terrainByCell = new Dictionary<Vector3Int, TerrainTypeData>();
+        private readonly HashSet<Vector3Int> terrainMisses = new HashSet<Vector3Int>();
+        private readonly Dictionary<Vector3Int, bool> hasAnyTileByCell = new Dictionary<Vector3Int, bool>();
+
+        public MovementQueryCache(Tilemap referenceTilemap, TerrainDatabase terrainDatabase)
+        {
+            this.referenceTilemap = referenceTilemap;
+            this.terrainDatabase = terrainDatabase;
+
+            if (referenceTilemap != null && referenceTilemap.layoutGrid != null)
+                gridTilemaps = referenceTilemap.layoutGrid.GetComponentsInChildren<Tilemap>(includeInactive: true);
+            else
+                gridTilemaps = System.Array.Empty<Tilemap>();
+
+            units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            constructions = Object.FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            roadNetworks = Object.FindObjectsByType<RoadNetworkManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        }
+
+        public ConstructionManager GetConstructionAtCell(Vector3Int cell)
+        {
+            cell.z = 0;
+            if (constructionByCell.TryGetValue(cell, out ConstructionManager cachedConstruction))
+                return cachedConstruction;
+
+            ConstructionManager found = null;
+            for (int i = 0; i < constructions.Length; i++)
+            {
+                ConstructionManager construction = constructions[i];
+                if (construction == null || !construction.gameObject.activeInHierarchy)
+                    continue;
+
+                Vector3Int occupiedCell = construction.BoardTilemap == referenceTilemap
+                    ? construction.CurrentCellPosition
+                    : HexCoordinates.WorldToCell(referenceTilemap, construction.transform.position);
+
+                occupiedCell.z = 0;
+                if (occupiedCell != cell)
+                    continue;
+
+                found = construction;
+                break;
+            }
+
+            constructionByCell[cell] = found;
+            return found;
+        }
+
+        public StructureData GetStructureAtCell(Vector3Int cell)
+        {
+            cell.z = 0;
+            if (structureByCell.TryGetValue(cell, out StructureData cachedStructure))
+                return cachedStructure;
+
+            StructureData found = null;
+            for (int i = 0; i < roadNetworks.Length; i++)
+            {
+                RoadNetworkManager network = roadNetworks[i];
+                if (network == null || !network.gameObject.activeInHierarchy)
+                    continue;
+
+                Tilemap networkTilemap = network.BoardTilemap;
+                if (!IsCompatibleReference(referenceTilemap, networkTilemap))
+                    continue;
+
+                if (network.TryGetStructureAtCell(cell, out StructureData structure) && structure != null)
+                {
+                    found = structure;
+                    break;
+                }
+            }
+
+            structureByCell[cell] = found;
+            return found;
+        }
+
+        public TerrainTypeData ResolveTerrainAtCell(Vector3Int cell)
+        {
+            if (referenceTilemap == null || terrainDatabase == null)
+                return null;
+
+            cell.z = 0;
+            if (terrainByCell.TryGetValue(cell, out TerrainTypeData cachedTerrain))
+                return cachedTerrain;
+            if (terrainMisses.Contains(cell))
+                return null;
+
+            TileBase tile = referenceTilemap.GetTile(cell);
+            if (tile != null && terrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData byMainTile) && byMainTile != null)
+            {
+                terrainByCell[cell] = byMainTile;
+                return byMainTile;
+            }
+
+            for (int i = 0; i < gridTilemaps.Length; i++)
+            {
+                Tilemap map = gridTilemaps[i];
+                if (map == null)
+                    continue;
+
+                TileBase other = map.GetTile(cell);
+                if (other == null)
+                    continue;
+
+                if (terrainDatabase.TryGetByPaletteTile(other, out TerrainTypeData byGridTile) && byGridTile != null)
+                {
+                    terrainByCell[cell] = byGridTile;
+                    return byGridTile;
+                }
+            }
+
+            terrainMisses.Add(cell);
+            return null;
+        }
+
+        public bool HasAnyPaintedTileAtCell(Vector3Int cell)
+        {
+            if (referenceTilemap == null)
+                return false;
+
+            cell.z = 0;
+            if (hasAnyTileByCell.TryGetValue(cell, out bool cached))
+                return cached;
+
+            bool hasAny = referenceTilemap.GetTile(cell) != null;
+            if (!hasAny)
+            {
+                for (int i = 0; i < gridTilemaps.Length; i++)
+                {
+                    Tilemap map = gridTilemaps[i];
+                    if (map == null)
+                        continue;
+
+                    if (map.GetTile(cell) != null)
+                    {
+                        hasAny = true;
+                        break;
+                    }
+                }
+            }
+
+            hasAnyTileByCell[cell] = hasAny;
+            return hasAny;
+        }
+
+        public UnitManager GetUnitAtCell(Vector3Int cell, UnitManager exceptUnit = null)
+        {
+            cell.z = 0;
+            for (int i = 0; i < units.Length; i++)
+            {
+                UnitManager unit = units[i];
+                if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
+                    continue;
+
+                Vector3Int occupiedCell = unit.BoardTilemap == referenceTilemap
+                    ? unit.CurrentCellPosition
+                    : HexCoordinates.WorldToCell(referenceTilemap, unit.transform.position);
+
+                occupiedCell.z = 0;
+                if (occupiedCell == cell)
+                    return unit;
+            }
+
+            return null;
+        }
+
+        private static bool IsCompatibleReference(Tilemap referenceTilemap, Tilemap networkTilemap)
+        {
+            if (referenceTilemap == null || networkTilemap == null)
+                return true;
+
+            if (referenceTilemap == networkTilemap)
+                return true;
+
+            GridLayout referenceGrid = referenceTilemap.layoutGrid;
+            GridLayout networkGrid = networkTilemap.layoutGrid;
+            if (referenceGrid != null && networkGrid != null && referenceGrid == networkGrid)
+                return true;
+
+            return false;
         }
     }
 }

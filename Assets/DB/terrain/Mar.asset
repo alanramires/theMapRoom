@@ -12,11 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 03f8ac18228f9af4b8437383160652a4, type: 3}
   m_Name: Mar
   m_EditorClassIdentifier: Assembly-CSharp::TerrainTypeData
-  id: 
-  displayName: 
+  id: sea
+  displayName: Mar
   description: 
-  paletteTile: {fileID: 0}
-  domain: 0
+  paletteTile: {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+  domain: 1
   heightLevel: 3
-  additionalLayerModes: []
+  additionalLayerModes:
+  - domain: 2
+    heightLevel: 2
   alwaysAllowAirDomain: 1
+  basicAutonomyCost: 1
+  requiredSkillsToEnter: []
+  skillCostOverrides: []

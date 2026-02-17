@@ -26,5 +26,20 @@ MonoBehaviour:
   movementCategory: 1
   domain: 3
   heightLevel: 5
+  additionalLayerModes:
+  - domain: 3
+    heightLevel: 4
+    spriteDefault: {fileID: 0}
+    spriteGreen: {fileID: 0}
+    spriteRed: {fileID: 0}
+    spriteBlue: {fileID: 0}
+    spriteYellow: {fileID: 0}
+  - domain: 0
+    heightLevel: 3
+    spriteDefault: {fileID: 0}
+    spriteGreen: {fileID: 0}
+    spriteRed: {fileID: 0}
+    spriteBlue: {fileID: 0}
+    spriteYellow: {fileID: 0}
   autonomia: 80
   cost: 26000

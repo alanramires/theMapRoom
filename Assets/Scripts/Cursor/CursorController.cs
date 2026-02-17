@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using UnityEngine.EventSystems;
+using System.Collections.Generic;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -48,6 +50,8 @@ public class CursorController : MonoBehaviour
 
     [Header("State")]
     [SerializeField] private TurnStateManager turnStateManager;
+    [SerializeField] private MatchController matchController;
+    [SerializeField] private bool enableNeutralLeftClickTeleport = true;
 
     private Vector3Int heldDirection = Vector3Int.zero;
     private float nextRepeatTime;
@@ -73,7 +77,9 @@ public class CursorController : MonoBehaviour
 
     private void Update()
     {
+        HandleCycleUnitInput();
         HandleActionInput();
+        HandleNeutralLeftClickTeleport();
 
         Vector3Int inputDir = ReadDirectionInput();
         if (inputDir == Vector3Int.zero)
@@ -97,6 +103,156 @@ public class CursorController : MonoBehaviour
         }
     }
 
+    private void HandleCycleUnitInput()
+    {
+        int direction = 0;
+        if (WasCycleForwardPressedThisFrame())
+            direction = 1;
+        else if (WasCycleBackwardPressedThisFrame())
+            direction = -1;
+
+        if (direction == 0)
+            return;
+
+        if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
+            return;
+
+        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return;
+
+        if (!TryCycleToReadyUnit(direction))
+            PlayUiSfx(errorSfx);
+    }
+
+    private bool TryCycleToReadyUnit(int direction)
+    {
+        TryAutoAssignMatchController();
+        int activeTeamId = matchController != null ? matchController.ActiveTeamId : -1;
+        if (activeTeamId < 0)
+            return false;
+
+        List<UnitManager> candidates = CollectCycleCandidates(activeTeamId);
+        if (candidates.Count == 0)
+            return false;
+
+        int currentIndex = -1;
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            Vector3Int cell = candidates[i].CurrentCellPosition;
+            cell.z = 0;
+            if (cell == currentCell)
+            {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        int step = direction >= 0 ? 1 : -1;
+        int nextIndex = currentIndex < 0
+            ? (step > 0 ? 0 : candidates.Count - 1)
+            : (currentIndex + step + candidates.Count) % candidates.Count;
+
+        for (int attempts = 0; attempts < candidates.Count; attempts++)
+        {
+            UnitManager targetUnit = candidates[nextIndex];
+            if (targetUnit != null && targetUnit.gameObject.activeInHierarchy && !targetUnit.IsEmbarked && !targetUnit.HasActed)
+            {
+                Vector3Int cell = targetUnit.CurrentCellPosition;
+                cell.z = 0;
+                if (SetCell(cell))
+                    return true;
+            }
+
+            nextIndex = (nextIndex + step + candidates.Count) % candidates.Count;
+        }
+
+        return false;
+    }
+
+    private List<UnitManager> CollectCycleCandidates(int activeTeamId)
+    {
+        List<UnitManager> list = new List<UnitManager>();
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+
+            if ((int)unit.TeamId != activeTeamId)
+                continue;
+
+            if (unit.HasActed)
+                continue;
+
+            list.Add(unit);
+        }
+
+        list.Sort(CompareCycleCandidate);
+        return list;
+    }
+
+    private static int CompareCycleCandidate(UnitManager a, UnitManager b)
+    {
+        if (ReferenceEquals(a, b))
+            return 0;
+        if (a == null)
+            return 1;
+        if (b == null)
+            return -1;
+
+        int aId = a.InstanceId;
+        int bId = b.InstanceId;
+        bool aHasId = aId > 0;
+        bool bHasId = bId > 0;
+        if (aHasId && bHasId && aId != bId)
+            return aId.CompareTo(bId);
+        if (aHasId != bHasId)
+            return aHasId ? -1 : 1;
+
+        Vector3Int aCell = a.CurrentCellPosition;
+        Vector3Int bCell = b.CurrentCellPosition;
+        int byY = bCell.y.CompareTo(aCell.y);
+        if (byY != 0)
+            return byY;
+
+        int byX = aCell.x.CompareTo(bCell.x);
+        if (byX != 0)
+            return byX;
+
+        return string.CompareOrdinal(a.name, b.name);
+    }
+
+    private void HandleNeutralLeftClickTeleport()
+    {
+        if (!enableNeutralLeftClickTeleport)
+            return;
+
+        if (!GetMouseButtonDown(0))
+            return;
+
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
+        if (turnStateManager == null || turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return;
+
+        Camera cam = cameraController != null ? cameraController.GetComponent<Camera>() : Camera.main;
+        if (cam == null || boardTilemap == null)
+            return;
+
+        Vector3 mouseScreen = GetMousePosition();
+        mouseScreen.z = -cam.transform.position.z;
+        Vector3 mouseWorld = cam.ScreenToWorldPoint(mouseScreen);
+        Vector3Int targetCell = boardTilemap.WorldToCell(mouseWorld);
+        targetCell.z = 0;
+
+        if (!SetCell(targetCell, playMoveSfx: false))
+            return;
+
+        PlayMoveSfx();
+    }
+
     public bool TryMove(Vector3Int delta)
     {
         Vector3Int target;
@@ -117,13 +273,19 @@ public class CursorController : MonoBehaviour
 
     public bool SetCell(Vector3Int cell)
     {
+        return SetCell(cell, playMoveSfx: true);
+    }
+
+    public bool SetCell(Vector3Int cell, bool playMoveSfx)
+    {
         cell.z = 0;
         if (!IsCellValid(cell))
             return false;
 
         currentCell = cell;
         SnapToCell(currentCell);
-        OnCursorMoved();
+        if (playMoveSfx)
+            OnCursorMoved();
         if (adjustCameraOnMove)
             TryAdjustCameraToCursor();
         return true;
@@ -277,6 +439,14 @@ public class CursorController : MonoBehaviour
 
         if (turnStateManager == null)
             turnStateManager = FindAnyObjectByType<TurnStateManager>();
+
+        TryAutoAssignMatchController();
+    }
+
+    private void TryAutoAssignMatchController()
+    {
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
     }
 
     private void TryAdjustCameraToCursor()
@@ -337,6 +507,61 @@ public class CursorController : MonoBehaviour
 #endif
     }
 
+    private bool WasCycleForwardPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current == null || !Keyboard.current.tabKey.wasPressedThisFrame)
+            return false;
+
+        return !IsShiftPressed();
+#else
+        return Input.GetKeyDown(KeyCode.Tab) && !Input.GetKey(KeyCode.LeftShift) && !Input.GetKey(KeyCode.RightShift);
+#endif
+    }
+
+    private bool WasCycleBackwardPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current == null || !Keyboard.current.tabKey.wasPressedThisFrame)
+            return false;
+
+        return IsShiftPressed();
+#else
+        return Input.GetKeyDown(KeyCode.Tab) && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
+#endif
+    }
+
+#if ENABLE_INPUT_SYSTEM
+    private static bool IsShiftPressed()
+    {
+        return Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
+    }
+#endif
+
+    private bool GetMouseButtonDown(int button)
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Mouse.current == null)
+            return false;
+
+        if (button == 0) return Mouse.current.leftButton.wasPressedThisFrame;
+        if (button == 1) return Mouse.current.rightButton.wasPressedThisFrame;
+        if (button == 2) return Mouse.current.middleButton.wasPressedThisFrame;
+        return false;
+#else
+        return Input.GetMouseButtonDown(button);
+#endif
+    }
+
+    private Vector3 GetMousePosition()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
+#else
+        return Input.mousePosition;
+#endif
+    }
+
     private void PlayMoveSfx()
     {
         if (moveSfx == null)
@@ -384,6 +609,11 @@ public class CursorController : MonoBehaviour
     public void PlayDoneSfx()
     {
         PlayUiSfx(doneSfx);
+    }
+
+    public void PlayConfirmSfx()
+    {
+        PlayUiSfx(confirmSfx);
     }
 
     public void PlayUnitMovementSfx(MovementCategory category)

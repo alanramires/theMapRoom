@@ -9,6 +9,7 @@ public class RoadRoutePainterWindow : EditorWindow
     private StructureData structureData;
     private int selectedRouteIndex;
     private bool isPainting;
+    private bool autoConnectAB = true;
     private Vector2 scroll;
 
     [MenuItem("Tools/Structures/Road Route Painter")]
@@ -22,6 +23,7 @@ public class RoadRoutePainterWindow : EditorWindow
     private void OnEnable()
     {
         SceneView.duringSceneGui += OnSceneGUI;
+        TryAutoAssignReferences(force: false);
     }
 
     private void OnDisable()
@@ -29,13 +31,25 @@ public class RoadRoutePainterWindow : EditorWindow
         SceneView.duringSceneGui -= OnSceneGUI;
     }
 
+    private void OnFocus()
+    {
+        TryAutoAssignReferences(force: false);
+    }
+
     private void OnGUI()
     {
+        TryAutoAssignReferences(force: false);
         scroll = EditorGUILayout.BeginScrollView(scroll);
 
         EditorGUILayout.LabelField("References", EditorStyles.boldLabel);
         roadNetworkManager = (RoadNetworkManager)EditorGUILayout.ObjectField("Road Manager", roadNetworkManager, typeof(RoadNetworkManager), true);
         structureData = (StructureData)EditorGUILayout.ObjectField("Structure Data", structureData, typeof(StructureData), false);
+
+        EditorGUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("Auto Detect", GUILayout.Width(110f)))
+            TryAutoAssignReferences(force: true);
+        EditorGUILayout.EndHorizontal();
 
         if (roadNetworkManager == null)
         {
@@ -56,16 +70,23 @@ public class RoadRoutePainterWindow : EditorWindow
             return;
         }
 
+        if (!IsSelectedStructureInManagerDatabase())
+        {
+            EditorGUILayout.HelpBox("Este StructureData nao esta no StructureDatabase do RoadNetworkManager. O preview de sprite no Scene nao sera desenhado.", MessageType.Warning);
+        }
+
         EnsureRouteSelectionInBounds();
 
         EditorGUILayout.Space(6f);
         DrawRouteSelector();
+        DrawRouteNameEditor();
         DrawRouteActions();
 
         EditorGUILayout.Space(8f);
+        autoConnectAB = EditorGUILayout.ToggleLeft("Auto Connect A->B (preenche hexes intermediarios validos)", autoConnectAB);
         DrawTogglePaintButton(disabled: false);
         if (isPainting)
-            EditorGUILayout.HelpBox("Pintura ativa no Scene: Left Click adiciona ponto, Right Click remove ultimo ponto.", MessageType.None);
+            EditorGUILayout.HelpBox("Pintura ativa no Scene: Left Click adiciona destino (com Auto Connect), Right Click remove ultimo ponto.", MessageType.None);
 
         EditorGUILayout.EndScrollView();
     }
@@ -104,6 +125,26 @@ public class RoadRoutePainterWindow : EditorWindow
                 DeleteSelectedRoute();
         }
         EditorGUILayout.EndHorizontal();
+    }
+
+    private void DrawRouteNameEditor()
+    {
+        if (!HasValidSelectedRoute())
+            return;
+
+        RoadRouteDefinition route = structureData.roadRoutes[selectedRouteIndex];
+        if (route == null)
+            return;
+
+        string currentName = route.routeName ?? string.Empty;
+        string newName = EditorGUILayout.TextField("Route Name", currentName);
+        if (newName == currentName)
+            return;
+
+        Undo.RecordObject(structureData, "Rename Road Route");
+        route.routeName = newName;
+        EditorUtility.SetDirty(structureData);
+        roadNetworkManager?.RebuildRoadVisuals();
     }
 
     private void DrawTogglePaintButton(bool disabled)
@@ -158,6 +199,13 @@ public class RoadRoutePainterWindow : EditorWindow
             return;
         }
 
+        if (!roadNetworkManager.IsRoadCellValidForStructure(cell, structureData, logReason: false))
+        {
+            ShowNotification(new GUIContent("Hex invalido para rodovia"));
+            e.Use();
+            return;
+        }
+
         if (route.cells.Count > 0 && route.cells[route.cells.Count - 1] == cell)
         {
             e.Use();
@@ -165,7 +213,27 @@ public class RoadRoutePainterWindow : EditorWindow
         }
 
         Undo.RecordObject(structureData, "Paint Road Route Cell");
-        route.cells.Add(cell);
+        if (route.cells.Count == 0)
+        {
+            route.cells.Add(cell);
+        }
+        else if (autoConnectAB)
+        {
+            Vector3Int start = route.cells[route.cells.Count - 1];
+            if (!TryBuildRoadPath(tilemap, start, cell, out List<Vector3Int> autoPath))
+            {
+                ShowNotification(new GUIContent("Sem caminho valido A->B"));
+                e.Use();
+                return;
+            }
+
+            AppendPathExcludingFirst(route.cells, autoPath);
+        }
+        else
+        {
+            route.cells.Add(cell);
+        }
+
         EditorUtility.SetDirty(structureData);
         roadNetworkManager.RebuildRoadVisuals();
         e.Use();
@@ -346,5 +414,164 @@ public class RoadRoutePainterWindow : EditorWindow
         }
 
         return labels;
+    }
+
+    private bool TryBuildRoadPath(Tilemap tilemap, Vector3Int start, Vector3Int goal, out List<Vector3Int> path)
+    {
+        path = new List<Vector3Int>();
+        start.z = 0;
+        goal.z = 0;
+
+        if (start == goal)
+        {
+            path.Add(start);
+            return true;
+        }
+
+        Queue<Vector3Int> frontier = new Queue<Vector3Int>();
+        Dictionary<Vector3Int, Vector3Int> cameFrom = new Dictionary<Vector3Int, Vector3Int>();
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+
+        frontier.Enqueue(start);
+        cameFrom[start] = start;
+
+        bool found = false;
+        while (frontier.Count > 0)
+        {
+            Vector3Int current = frontier.Dequeue();
+            if (current == goal)
+            {
+                found = true;
+                break;
+            }
+
+            UnitMovementPathRules.GetImmediateHexNeighbors(tilemap, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = neighbors[i];
+                next.z = 0;
+
+                if (cameFrom.ContainsKey(next))
+                    continue;
+                if (!IsCellPaintedOnGrid(tilemap, next))
+                    continue;
+                if (!roadNetworkManager.IsRoadCellValidForStructure(next, structureData, logReason: false))
+                    continue;
+
+                cameFrom[next] = current;
+                frontier.Enqueue(next);
+            }
+        }
+
+        if (!found)
+            return false;
+
+        Vector3Int step = goal;
+        path.Add(step);
+        while (step != start)
+        {
+            step = cameFrom[step];
+            path.Add(step);
+        }
+
+        path.Reverse();
+        return true;
+    }
+
+    private static void AppendPathExcludingFirst(List<Vector3Int> routeCells, List<Vector3Int> autoPath)
+    {
+        if (routeCells == null || autoPath == null || autoPath.Count == 0)
+            return;
+
+        int begin = autoPath.Count > 0 ? 1 : 0;
+        for (int i = begin; i < autoPath.Count; i++)
+        {
+            Vector3Int cell = autoPath[i];
+            if (routeCells.Count > 0 && routeCells[routeCells.Count - 1] == cell)
+                continue;
+
+            routeCells.Add(cell);
+        }
+    }
+
+    private void TryAutoAssignReferences(bool force)
+    {
+        if (force || roadNetworkManager == null)
+        {
+            RoadNetworkManager[] managers = Object.FindObjectsByType<RoadNetworkManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (managers != null && managers.Length > 0)
+                roadNetworkManager = managers[0];
+        }
+
+        if (!force && structureData != null)
+            return;
+
+        StructureData resolved = TryResolveStructureDataFromManager();
+        if (resolved != null)
+        {
+            structureData = resolved;
+            return;
+        }
+
+        string[] guids = AssetDatabase.FindAssets("t:StructureData");
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            StructureData candidate = AssetDatabase.LoadAssetAtPath<StructureData>(path);
+            if (candidate == null)
+                continue;
+
+            structureData = candidate;
+            return;
+        }
+    }
+
+    private StructureData TryResolveStructureDataFromManager()
+    {
+        if (roadNetworkManager == null || roadNetworkManager.StructureDatabase == null)
+            return null;
+
+        IReadOnlyList<StructureData> structures = roadNetworkManager.StructureDatabase.Structures;
+        if (structures == null || structures.Count == 0)
+            return null;
+
+        // Preferencia: estrutura que ja tenha ao menos uma rota.
+        for (int i = 0; i < structures.Count; i++)
+        {
+            StructureData candidate = structures[i];
+            if (candidate == null)
+                continue;
+
+            if (candidate.roadRoutes != null && candidate.roadRoutes.Count > 0)
+                return candidate;
+        }
+
+        // Fallback: primeira estrutura valida.
+        for (int i = 0; i < structures.Count; i++)
+        {
+            if (structures[i] != null)
+                return structures[i];
+        }
+
+        return null;
+    }
+
+    private bool IsSelectedStructureInManagerDatabase()
+    {
+        if (roadNetworkManager == null || structureData == null)
+            return false;
+
+        StructureDatabase db = roadNetworkManager.StructureDatabase;
+        if (db == null || db.Structures == null)
+            return false;
+
+        IReadOnlyList<StructureData> structures = db.Structures;
+        for (int i = 0; i < structures.Count; i++)
+        {
+            if (structures[i] == structureData)
+                return true;
+        }
+
+        return false;
     }
 }

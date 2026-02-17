@@ -12,4 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 20b7a09f30aa03f41af2d3334d60c7c2, type: 3}
   m_Name: Catalogo de Terrenos
   m_EditorClassIdentifier: Assembly-CSharp::TerrainDatabase
-  terrains: []
+  terrains:
+  - {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
+  - {fileID: 11400000, guid: f8bd8dc9dbe197d4f828ad72d3d90df6, type: 2}
+  - {fileID: 11400000, guid: 75d32a51167ec98409039b6f5d4d287f, type: 2}
+  - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
+  - {fileID: 11400000, guid: 47664243e1e61d84aa1c496ae463bd9c, type: 2}
