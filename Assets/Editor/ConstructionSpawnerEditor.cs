@@ -5,6 +5,7 @@ using UnityEngine;
 public class ConstructionSpawnerEditor : Editor
 {
     private SerializedProperty constructionDatabaseProp;
+    private SerializedProperty constructionFieldDatabaseProp;
     private SerializedProperty matchControllerProp;
     private SerializedProperty currentIdProp;
     private SerializedProperty constructionPrefabProp;
@@ -17,10 +18,12 @@ public class ConstructionSpawnerEditor : Editor
 
     private SerializedProperty spawnMapListOnStartProp;
     private SerializedProperty mapSpawnEntriesProp;
+    private SerializedProperty spawnFieldDatabaseOnStartProp;
 
     private void OnEnable()
     {
         constructionDatabaseProp = serializedObject.FindProperty("constructionDatabase");
+        constructionFieldDatabaseProp = serializedObject.FindProperty("constructionFieldDatabase");
         matchControllerProp = serializedObject.FindProperty("matchController");
         currentIdProp = serializedObject.FindProperty("currentId");
         constructionPrefabProp = serializedObject.FindProperty("constructionPrefab");
@@ -33,6 +36,7 @@ public class ConstructionSpawnerEditor : Editor
 
         spawnMapListOnStartProp = serializedObject.FindProperty("spawnMapListOnStart");
         mapSpawnEntriesProp = serializedObject.FindProperty("mapSpawnEntries");
+        spawnFieldDatabaseOnStartProp = serializedObject.FindProperty("spawnFieldDatabaseOnStart");
     }
 
     public override void OnInspectorGUI()
@@ -48,6 +52,7 @@ public class ConstructionSpawnerEditor : Editor
 
         EditorGUILayout.LabelField("Data", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(constructionDatabaseProp);
+        EditorGUILayout.PropertyField(constructionFieldDatabaseProp, new GUIContent("Construction Field Database"));
         EditorGUILayout.PropertyField(matchControllerProp, new GUIContent("Match Controller"));
         EditorGUILayout.PropertyField(currentIdProp, new GUIContent("Current ID"));
         EditorGUILayout.PropertyField(constructionPrefabProp);
@@ -67,6 +72,11 @@ public class ConstructionSpawnerEditor : Editor
         DrawMapSpawnEntries();
         bool spawnMapClicked = GUILayout.Button("Spawn Map List Now");
 
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Field Database Spawn", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(spawnFieldDatabaseOnStartProp, new GUIContent("Spawn Field Database On Start"));
+        bool spawnFieldDbClicked = GUILayout.Button("Spawn Field Database Now");
+
         serializedObject.ApplyModifiedProperties();
 
         ConstructionSpawner spawner = (ConstructionSpawner)target;
@@ -74,6 +84,8 @@ public class ConstructionSpawnerEditor : Editor
             spawner.SpawnManual();
         if (spawnMapClicked)
             spawner.SpawnMapList(true);
+        if (spawnFieldDbClicked)
+            spawner.SpawnFieldDatabase(true);
     }
 
     private void DrawManualConstructionIdPopup()
@@ -95,6 +107,8 @@ public class ConstructionSpawnerEditor : Editor
             SerializedProperty teamIdProp = entry.FindPropertyRelative("teamId");
             SerializedProperty constructionIdProp = entry.FindPropertyRelative("constructionId");
             SerializedProperty cellProp = entry.FindPropertyRelative("cellPosition");
+            SerializedProperty useSiteOverridesProp = entry.FindPropertyRelative("useSiteOverrides");
+            SerializedProperty siteRuntimeProp = entry.FindPropertyRelative("siteRuntime");
 
             EditorGUILayout.BeginVertical("box");
             EditorGUILayout.BeginHorizontal();
@@ -111,8 +125,37 @@ public class ConstructionSpawnerEditor : Editor
             EditorGUILayout.PropertyField(teamIdProp, new GUIContent("Team ID"));
             DrawConstructionIdPopupForProperty(constructionIdProp, "Construction ID");
             EditorGUILayout.PropertyField(cellProp, new GUIContent("Cell Position"));
+            EditorGUILayout.PropertyField(useSiteOverridesProp, new GUIContent("Use Construction Configuration Override"));
+            if (useSiteOverridesProp != null && useSiteOverridesProp.boolValue && siteRuntimeProp != null)
+                DrawConstructionConfigurationExpanded(siteRuntimeProp, "Construction Configuration");
             EditorGUILayout.EndVertical();
         }
+    }
+
+    private static void DrawConstructionConfigurationExpanded(SerializedProperty siteRuntimeProp, string label)
+    {
+        if (siteRuntimeProp == null)
+            return;
+
+        EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
+        EditorGUI.indentLevel++;
+
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("isPlayerHeadQuarter"), "Is Player Head Quarter");
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("isCapturable"), "Is Capturable");
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("canProduceUnits"), "Can Produce Units");
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("offeredUnits"), "Offered Units");
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("canProvideSupplies"), "Can Provide Supplies");
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("offeredSupplies"), "Offered Supplies");
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("offeredServices"), "Offered Services");
+
+        EditorGUI.indentLevel--;
+    }
+
+    private static void DrawIfExists(SerializedProperty prop, string label)
+    {
+        if (prop != null)
+            EditorGUILayout.PropertyField(prop, new GUIContent(label), includeChildren: true);
     }
 
     private void DrawConstructionIdPopupForProperty(SerializedProperty constructionIdProp, string label)

@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 068d725254da2574490f15379f38eaae, type: 3}
+  m_Name: "Gal\xE3o"
+  m_EditorClassIdentifier: Assembly-CSharp::SupplyData
+  id: gasolina
+  displayName: Gasolina
+  description: usado para recuperar Autonomia
+  spriteDefault: {fileID: 21300000, guid: 0d5da139a3219074191fb5a7061cee49, type: 3}
+  relatedServices:
+  - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}

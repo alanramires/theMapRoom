@@ -20,4 +20,41 @@ MonoBehaviour:
   spriteRed: {fileID: 0}
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
-  maxHP: 40
+  baseMovementCost: 1
+  requiredSkillsToEnter: []
+  skillCostOverrides: []
+  domain: 0
+  heightLevel: 3
+  aditionalDomainsAllowed:
+  - domain: 1
+    heightLevel: 3
+  alwaysAllowAirDomain: 1
+  isSupplier: 1
+  supplierTier: 0
+  maxUnitsServedPerTurn: 1
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains:
+  - domain: 0
+    heightLevel: 3
+  supplierServicesProvided:
+  - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+  - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  supplierResources:
+  - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+    maxCapacity: 200
+  - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+    maxCapacity: 500
+  - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+    maxCapacity: 200
+  constructionConfiguration:
+    isPlayerHeadQuarter: 0
+    isCapturable: 1
+    capturePointsMax: 20
+    canProduceUnits: 0
+    offeredUnits: []
+    canProvideSupplies: 0
+    offeredSupplies: []
+    offeredServices: []

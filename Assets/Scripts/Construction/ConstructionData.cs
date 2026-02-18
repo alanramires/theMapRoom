@@ -24,7 +24,6 @@ public class ConstructionData : ScriptableObject
     public Sprite spriteYellow;
 
     [Header("Attributes")]
-    public int maxHP = 30;
     [Tooltip("Custo basico de movimento/autonomia para entrar neste hex de construcao. Minimo 1.")]
     [Min(1)]
     public int baseMovementCost = 1;
@@ -43,4 +42,53 @@ public class ConstructionData : ScriptableObject
     public List<TerrainLayerMode> aditionalDomainsAllowed = new List<TerrainLayerMode>();
     [Tooltip("Se true, dominio do ar e sempre permitido para esta construcao.")]
     public bool alwaysAllowAirDomain = true;
+
+    [Header("Construction Supplier Settings")]
+    public bool isSupplier = false;
+    public SupplierTier supplierTier = SupplierTier.Hub;
+    [Min(0)] public int maxUnitsServedPerTurn = 0;
+    [Tooltip("OverlappingOnly por padrao. Use Adjacent1Hex para casos como porto atendendo navios atracados.")]
+    public ConstructionSupplierRangeMode serviceRange = ConstructionSupplierRangeMode.OverlappingOnly;
+    [Tooltip("OverlappingOnly por padrao.")]
+    public ConstructionSupplierRangeMode collectionRange = ConstructionSupplierRangeMode.OverlappingOnly;
+
+    [Header("Construction Supplier Operation Domain")]
+    [Tooltip("Dominios/alturas onde esta construcao opera logistica.")]
+    public List<TerrainLayerMode> supplierOperationDomains = new List<TerrainLayerMode>();
+
+    [Header("Construction Services Provided")]
+    [Tooltip("Servicos fornecidos por esta construcao.")]
+    public List<ServiceData> supplierServicesProvided = new List<ServiceData>();
+
+    [Header("Construction Resources")]
+    [Tooltip("Supplies fornecidos por esta construcao com capacidade maxima.")]
+    public List<ConstructionSupplierResourceCapacity> supplierResources = new List<ConstructionSupplierResourceCapacity>();
+
+    [Header("Construction Configuration")]
+    [FormerlySerializedAs("defaultSiteRuntime")]
+    [Tooltip("Configuracao padrao de captura, producao e logistica desta construcao. Pode ser sobrescrita por ponto do mapa.")]
+    public ConstructionSiteRuntime constructionConfiguration = new ConstructionSiteRuntime();
+
+    private void OnValidate()
+    {
+        maxUnitsServedPerTurn = Mathf.Max(0, maxUnitsServedPerTurn);
+        if (supplierOperationDomains == null)
+            supplierOperationDomains = new List<TerrainLayerMode>();
+        if (supplierServicesProvided == null)
+            supplierServicesProvided = new List<ServiceData>();
+        if (supplierResources == null)
+            supplierResources = new List<ConstructionSupplierResourceCapacity>();
+        for (int i = 0; i < supplierResources.Count; i++)
+        {
+            ConstructionSupplierResourceCapacity entry = supplierResources[i];
+            if (entry == null)
+                continue;
+            entry.maxCapacity = Mathf.Max(0, entry.maxCapacity);
+        }
+
+        if (constructionConfiguration == null)
+            constructionConfiguration = new ConstructionSiteRuntime();
+
+        constructionConfiguration.Sanitize();
+    }
 }

@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 79f0886d9c429a34d8bd4ed01d09c62a, type: 3}
+  m_Name: Seeker
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponData
+  id: seeker
+  displayName: Seeker Missile
+  description: "Metralhadora de Ca\xE7a"
+  domain: 3
+  heightLevel: 5
+  aditionalDomainsAllowed:
+  - domain: 3
+    heightLevel: 4
+  basicAttack: 8
+  operationRangeMin: 1
+  operationRangeMax: 1
+  trajectories: 00000000
+  sprite: {fileID: 0}
+  ammunitionSprite: {fileID: 0}

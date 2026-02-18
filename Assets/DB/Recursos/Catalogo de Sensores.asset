@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3370ebb34899c2a4ebb0aac5ada721b4, type: 3}
+  m_Name: Catalogo de Sensores
+  m_EditorClassIdentifier: Assembly-CSharp::ResourceDatabase
+  resources:
+  - {fileID: 11400000, guid: 17cc99574eeb2624abe6bcc55018647a, type: 2}
+  - {fileID: 11400000, guid: 6f9f9a0d57972e14c94784c3ce2ec6e0, type: 2}
+  - {fileID: 11400000, guid: 6a1dfe9f4ed599f4c8f536e56582fc9b, type: 2}
+  - {fileID: 11400000, guid: cf17ac8181a693c4a8fbd6edda16ddbc, type: 2}

@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed8c03db54331e744b294b32a2e6d0e5, type: 3}
+  m_Name: Radar Station
+  m_EditorClassIdentifier: Assembly-CSharp::ResourceData
+  id: radarStation
+  displayName: Radar Station
+  description: 
+  spriteDefault: {fileID: 0}
+  resourceType: 0
+  operationRangeMin: 1
+  operationRangeMax: 10
+  domain: 3
+  heightLevel: 5
+  detectableDomainsAllowed:
+  - domain: 3
+    heightLevel: 4
+  - domain: 1
+    heightLevel: 3
+  - domain: 0
+    heightLevel: 3

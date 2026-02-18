@@ -21,10 +21,18 @@ MonoBehaviour:
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   maxHP: 10
-  defense: 15
+  defense: 16
+  armorClass: 2
   movement: 1
   movementCategory: 4
+  militaryForce: 0
+  unitClass: 0
   domain: 0
   heightLevel: 3
+  aditionalDomainsAllowed: []
+  skills: []
+  embarkedWeapons: []
+  embarkedSupplies: []
+  embarkedResources: []
   autonomia: 10
   cost: 26000

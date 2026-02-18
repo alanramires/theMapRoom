@@ -18,6 +18,9 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private string constructionDisplayName;
     [SerializeField] private int currentHP;
     [SerializeField] private bool autoApplyOnStart = true;
+    [SerializeField] private ConstructionSiteRuntime siteRuntime = new ConstructionSiteRuntime();
+    [SerializeField, HideInInspector] private bool hasSiteRuntimeOverride;
+    [SerializeField] private int currentCapturePoints;
 
     public TeamId TeamId => teamId;
     public Tilemap BoardTilemap => boardTilemap;
@@ -28,6 +31,15 @@ public class ConstructionManager : MonoBehaviour
     public string ConstructionDisplayName => constructionDisplayName;
     public int CurrentHP => currentHP;
     public ConstructionDatabase ConstructionDatabase => constructionDatabase;
+    public bool IsCapturable => siteRuntime != null && siteRuntime.isCapturable;
+    public int CapturePointsMax => siteRuntime != null ? siteRuntime.capturePointsMax : 0;
+    public int CurrentCapturePoints => currentCapturePoints;
+    public bool CanProduceUnits => siteRuntime != null && siteRuntime.canProduceUnits;
+    public bool CanProvideSupplies => siteRuntime != null && siteRuntime.canProvideSupplies;
+    public bool IsPlayerHeadQuarter => siteRuntime != null && siteRuntime.isPlayerHeadQuarter;
+    public IReadOnlyList<ServiceData> OfferedServices => siteRuntime != null && siteRuntime.offeredServices != null ? siteRuntime.offeredServices : System.Array.Empty<ServiceData>();
+    public IReadOnlyList<UnitData> OfferedUnits => siteRuntime != null && siteRuntime.offeredUnits != null ? siteRuntime.offeredUnits : System.Array.Empty<UnitData>();
+    public IReadOnlyList<ConstructionSupplyOffer> OfferedSupplies => siteRuntime != null && siteRuntime.offeredSupplies != null ? siteRuntime.offeredSupplies : System.Array.Empty<ConstructionSupplyOffer>();
 
     public Domain GetDomain()
     {
@@ -196,9 +208,11 @@ public class ConstructionManager : MonoBehaviour
             spriteRenderer.color = TeamUtils.GetColor(teamId);
         }
 
-        if (currentHP <= 0 || currentHP > data.maxHP)
-            currentHP = data.maxHP;
+        if (currentHP < 0)
+            currentHP = 0;
 
+        ApplyDefaultSiteRuntime(data);
+        EnsureCapturePointsInitialized();
         currentPosition = transform.position;
         UpdateDynamicName();
     }
@@ -211,9 +225,6 @@ public class ConstructionManager : MonoBehaviour
 
     public int GetMaxHP()
     {
-        if (constructionDatabase != null && !string.IsNullOrWhiteSpace(constructionId) && constructionDatabase.TryGetById(constructionId, out ConstructionData data))
-            return Mathf.Max(1, data.maxHP);
-
         return Mathf.Max(1, currentHP);
     }
 
@@ -253,6 +264,35 @@ public class ConstructionManager : MonoBehaviour
         SnapToCellCenter();
     }
 
+    public void ApplySiteRuntime(ConstructionSiteRuntime runtime)
+    {
+        if (runtime == null)
+        {
+            siteRuntime = new ConstructionSiteRuntime();
+            siteRuntime.Sanitize();
+            hasSiteRuntimeOverride = false;
+            return;
+        }
+
+        siteRuntime = runtime.Clone();
+        hasSiteRuntimeOverride = true;
+    }
+
+    public ConstructionSiteRuntime GetSiteRuntimeSnapshot()
+    {
+        if (siteRuntime == null)
+            siteRuntime = new ConstructionSiteRuntime();
+
+        siteRuntime.Sanitize();
+        return siteRuntime.Clone();
+    }
+
+    public void SetCurrentCapturePoints(int value)
+    {
+        int max = Mathf.Max(0, CapturePointsMax);
+        currentCapturePoints = Mathf.Clamp(value, 0, max);
+    }
+
     public void SnapToCellCenter()
     {
         if (boardTilemap == null)
@@ -286,6 +326,34 @@ public class ConstructionManager : MonoBehaviour
 
         if (instanceId < 0)
             instanceId = 0;
+
+        if (siteRuntime == null)
+            siteRuntime = new ConstructionSiteRuntime();
+        siteRuntime.Sanitize();
+        EnsureCapturePointsInitialized();
+    }
+
+    private void ApplyDefaultSiteRuntime(ConstructionData data)
+    {
+        if (hasSiteRuntimeOverride)
+            return;
+
+        if (data == null || data.constructionConfiguration == null)
+        {
+            siteRuntime = new ConstructionSiteRuntime();
+            siteRuntime.Sanitize();
+            return;
+        }
+
+        siteRuntime = data.constructionConfiguration.Clone();
+        EnsureCapturePointsInitialized();
+    }
+
+    private void EnsureCapturePointsInitialized()
+    {
+        int max = Mathf.Max(0, CapturePointsMax);
+        if (currentCapturePoints < 0 || currentCapturePoints > max)
+            currentCapturePoints = max;
     }
 
     private void SyncPositionState()

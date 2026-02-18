@@ -10,10 +10,14 @@ public class ConstructionSpawner : MonoBehaviour
         public TeamId teamId = TeamId.Green;
         public string constructionId;
         public Vector3Int cellPosition = Vector3Int.zero;
+        [Header("Site Overrides")]
+        public bool useSiteOverrides = false;
+        public ConstructionSiteRuntime siteRuntime = new ConstructionSiteRuntime();
     }
 
     [Header("Data")]
     [SerializeField] private ConstructionDatabase constructionDatabase;
+    [SerializeField] private ConstructionFieldDatabase constructionFieldDatabase;
     [SerializeField] private MatchController matchController;
     [SerializeField] private int currentId = 1;
 
@@ -31,12 +35,16 @@ public class ConstructionSpawner : MonoBehaviour
     [Header("Map Spawn")]
     [SerializeField] private bool spawnMapListOnStart = false;
     [SerializeField] private List<MapSpawnEntry> mapSpawnEntries = new List<MapSpawnEntry>();
+    [SerializeField] private bool spawnFieldDatabaseOnStart = false;
 
     private bool mapSpawnExecuted;
+    private bool fieldDatabaseSpawnExecuted;
 
     private void Start()
     {
         TryAutoAssignMatchController();
+        if (spawnFieldDatabaseOnStart)
+            SpawnFieldDatabase();
         if (spawnMapListOnStart)
             SpawnMapList();
     }
@@ -122,6 +130,23 @@ public class ConstructionSpawner : MonoBehaviour
         return Spawn(constructionId, teamId, HexCoordinates.GetCellCenterWorld(boardTilemap, fixedCell), Quaternion.identity);
     }
 
+    public GameObject SpawnAtCell(MapSpawnEntry entry)
+    {
+        if (entry == null || string.IsNullOrWhiteSpace(entry.constructionId))
+            return null;
+
+        Vector3Int fixedCell = new Vector3Int(entry.cellPosition.x, entry.cellPosition.y, 0);
+        GameObject spawned = SpawnAtCell(entry.constructionId, entry.teamId, fixedCell);
+        if (spawned == null || !entry.useSiteOverrides)
+            return spawned;
+
+        ConstructionManager manager = spawned.GetComponent<ConstructionManager>();
+        if (manager != null)
+            manager.ApplySiteRuntime(entry.siteRuntime);
+
+        return spawned;
+    }
+
     public void SpawnManual()
     {
         Vector3Int fixedCell = new Vector3Int(manualCellPosition.x, manualCellPosition.y, 0);
@@ -145,17 +170,85 @@ public class ConstructionSpawner : MonoBehaviour
             if (entry == null || string.IsNullOrWhiteSpace(entry.constructionId))
                 continue;
 
-            Vector3Int fixedCell = new Vector3Int(entry.cellPosition.x, entry.cellPosition.y, 0);
-            SpawnAtCell(entry.constructionId, entry.teamId, fixedCell);
+            SpawnAtCell(entry);
         }
 
         mapSpawnExecuted = true;
+    }
+
+    public void SpawnFieldDatabase(bool force = false)
+    {
+        if (!CanRunMapSpawn())
+        {
+            Debug.LogWarning("[ConstructionSpawner] Field Database Spawn so pode rodar no turno 0 do MatchController.");
+            return;
+        }
+
+        if (fieldDatabaseSpawnExecuted && !force)
+            return;
+        if (constructionFieldDatabase == null || constructionFieldDatabase.Entries == null)
+            return;
+
+        IReadOnlyList<ConstructionFieldEntry> entries = constructionFieldDatabase.Entries;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            ConstructionFieldEntry entry = entries[i];
+            if (entry == null || entry.construction == null || string.IsNullOrWhiteSpace(entry.construction.id))
+                continue;
+
+            Vector3Int fixedCell = new Vector3Int(entry.cellPosition.x, entry.cellPosition.y, 0);
+            GameObject spawned = SpawnAtCell(entry.construction.id, entry.initialTeamId, fixedCell);
+            if (spawned == null)
+                continue;
+
+            if (!entry.useConstructionConfigurationOverride)
+            {
+                ConstructionManager managerNoOverride = spawned.GetComponent<ConstructionManager>();
+                if (managerNoOverride != null)
+                {
+                    int initialCaptureNoOverride = entry.initialCapturePoints >= 0
+                        ? entry.initialCapturePoints
+                        : managerNoOverride.CapturePointsMax;
+                    managerNoOverride.SetCurrentCapturePoints(initialCaptureNoOverride);
+                }
+                continue;
+            }
+
+            ConstructionManager manager = spawned.GetComponent<ConstructionManager>();
+            if (manager != null)
+            {
+                manager.ApplySiteRuntime(entry.constructionConfiguration);
+                int initialCapture = entry.initialCapturePoints >= 0
+                    ? entry.initialCapturePoints
+                    : manager.CapturePointsMax;
+                manager.SetCurrentCapturePoints(initialCapture);
+            }
+        }
+
+        fieldDatabaseSpawnExecuted = true;
     }
 
     private bool CanRunMapSpawn()
     {
         TryAutoAssignMatchController();
         return matchController != null && matchController.CurrentTurn == 0;
+    }
+
+    private void OnValidate()
+    {
+        if (mapSpawnEntries == null)
+            mapSpawnEntries = new List<MapSpawnEntry>();
+
+        for (int i = 0; i < mapSpawnEntries.Count; i++)
+        {
+            MapSpawnEntry entry = mapSpawnEntries[i];
+            if (entry == null)
+                continue;
+
+            if (entry.siteRuntime == null)
+                entry.siteRuntime = new ConstructionSiteRuntime();
+            entry.siteRuntime.Sanitize();
+        }
     }
 
     private void TryAutoAssignMatchController()

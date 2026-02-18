@@ -61,12 +61,7 @@ public class ConstructionManagerEditor : Editor
 
         EditorGUILayout.PropertyField(currentPositionProp, new GUIContent("Current Position"));
         EditorGUILayout.PropertyField(constructionDisplayNameProp, new GUIContent("Construction Display Name"));
-
-        int maxHp = GetMaxHpFromSelection();
-        if (maxHp > 0)
-            currentHpProp.intValue = EditorGUILayout.IntSlider("Current HP", currentHpProp.intValue, 0, maxHp);
-        else
-            EditorGUILayout.PropertyField(currentHpProp, new GUIContent("Current HP"));
+        EditorGUILayout.PropertyField(currentHpProp, new GUIContent("Current HP"));
 
         EditorGUILayout.PropertyField(autoApplyOnStartProp);
         serializedObject.ApplyModifiedProperties();
@@ -122,18 +117,4 @@ public class ConstructionManagerEditor : Editor
             constructionIdProp.stringValue = db.Constructions[newIndex].id;
     }
 
-    private int GetMaxHpFromSelection()
-    {
-        if (constructionDatabaseProp == null || constructionIdProp == null)
-            return 0;
-
-        ConstructionDatabase db = constructionDatabaseProp.objectReferenceValue as ConstructionDatabase;
-        if (db == null || string.IsNullOrWhiteSpace(constructionIdProp.stringValue))
-            return 0;
-
-        if (!db.TryGetById(constructionIdProp.stringValue, out ConstructionData data) || data == null)
-            return 0;
-
-        return Mathf.Max(1, data.maxHP);
-    }
 }

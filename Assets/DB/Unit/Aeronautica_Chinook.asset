@@ -21,12 +21,15 @@ MonoBehaviour:
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   maxHP: 10
-  defense: 15
+  defense: 11
+  armorClass: 0
   movement: 6
   movementCategory: 0
+  militaryForce: 0
+  unitClass: 5
   domain: 3
   heightLevel: 4
-  additionalLayerModes:
+  aditionalDomainsAllowed:
   - domain: 0
     heightLevel: 3
     spriteDefault: {fileID: 0}
@@ -34,5 +37,15 @@ MonoBehaviour:
     spriteRed: {fileID: 0}
     spriteBlue: {fileID: 0}
     spriteYellow: {fileID: 0}
+  skills: []
+  embarkedWeapons:
+  - weapon: {fileID: 11400000, guid: 961b63e5103c5804f96d870b89696046, type: 2}
+    squadAmmunition: 6
+    operationRangeMin: 1
+    operationRangeMax: 1
+    selectedTrajectory: 0
+    lastSyncedWeapon: {fileID: 11400000, guid: 961b63e5103c5804f96d870b89696046, type: 2}
+  embarkedSupplies: []
+  embarkedResources: []
   autonomia: 60
   cost: 26000

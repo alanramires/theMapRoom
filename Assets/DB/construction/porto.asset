@@ -20,12 +20,27 @@ MonoBehaviour:
   spriteRed: {fileID: 0}
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
-  maxHP: 40
+  baseMovementCost: 1
+  requiredSkillsToEnter: []
+  skillCostOverrides: []
   domain: 0
   heightLevel: 3
-  additionalLayerModes:
+  aditionalDomainsAllowed:
   - domain: 1
     heightLevel: 3
   - domain: 1
     heightLevel: 2
   alwaysAllowAirDomain: 1
+  constructionConfiguration:
+    isPlayerHeadQuarter: 0
+    isCapturable: 1
+    capturePointsMax: 30
+    canProduceUnits: 0
+    offeredUnits:
+    - {fileID: 0}
+    canProvideSupplies: 0
+    offeredSupplies:
+    - supply: {fileID: 0}
+      quantity: 0
+    offeredServices: []
+    resourceStocks: []
