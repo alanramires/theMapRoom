@@ -19,6 +19,13 @@ public class PodeMirarInvalidOption
     [Tooltip("Distancia hex entre atacante e alvo.")]
     public int distance;
 
+    [Header("Posicao (prioridade: construcao > estrutura > terreno)")]
+    [Tooltip("Descricao da posicao atual do atacante no hex.")]
+    public string attackerPositionLabel;
+
+    [Tooltip("Descricao da posicao atual do defensor/alvo no hex.")]
+    public string defenderPositionLabel;
+
     [Tooltip("Motivo de invalidacao.")]
     public string reason;
 
@@ -28,4 +35,3 @@ public class PodeMirarInvalidOption
     [Tooltip("Hexes intermediarios analisados na linha de tiro (debug).")]
     public List<Vector3Int> lineOfFireIntermediateCells = new List<Vector3Int>();
 }
-

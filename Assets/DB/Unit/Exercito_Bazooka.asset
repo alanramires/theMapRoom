@@ -34,8 +34,26 @@ MonoBehaviour:
   skills:
   - {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
   - {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
-  embarkedWeapons: []
+  embarkedWeapons:
+  - weapon: {fileID: 11400000, guid: 49972c9c2056f40489317be1412c41db, type: 2}
+    squadAmmunition: 3
+    operationRangeMin: 1
+    operationRangeMax: 1
+    selectedTrajectory: 0
+    lastSyncedWeapon: {fileID: 11400000, guid: 49972c9c2056f40489317be1412c41db, type: 2}
+  - weapon: {fileID: 11400000, guid: bea1f97758f951a40ad7dbad2c86ca93, type: 2}
+    squadAmmunition: 3
+    operationRangeMin: 1
+    operationRangeMax: 1
+    selectedTrajectory: 0
+    lastSyncedWeapon: {fileID: 11400000, guid: bea1f97758f951a40ad7dbad2c86ca93, type: 2}
   embarkedSupplies: []
-  embarkedResources: []
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
   autonomia: 70
   cost: 2000

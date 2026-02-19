@@ -22,7 +22,8 @@ public static class PodeMirarSensor
         TerrainDatabase terrainDatabase,
         SensorMovementMode movementMode,
         List<PodeMirarTargetOption> output,
-        List<PodeMirarInvalidOption> invalidOutput = null)
+        List<PodeMirarInvalidOption> invalidOutput = null,
+        WeaponPriorityData weaponPriorityData = null)
     {
         if (output == null)
             return false;
@@ -60,7 +61,9 @@ public static class PodeMirarSensor
         Vector3Int origin = attacker.CurrentCellPosition;
         origin.z = 0;
         Dictionary<Vector3Int, int> distances = BuildDistanceMap(map, origin, globalMaxRange);
+        string attackerPositionLabel = ResolveUnitPositionLabel(map, terrainDatabase, attacker, origin);
 
+        int sensorOrderCounter = 0;
         UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
         {
@@ -70,6 +73,7 @@ public static class PodeMirarSensor
 
             Vector3Int targetCell = target.CurrentCellPosition;
             targetCell.z = 0;
+            string defenderPositionLabel = ResolveUnitPositionLabel(map, terrainDatabase, target, targetCell);
             if (!distances.TryGetValue(targetCell, out int distance))
                 continue;
 
@@ -92,6 +96,8 @@ public static class PodeMirarSensor
                         weapon,
                         weaponCandidate.index,
                         distance,
+                        attackerPositionLabel,
+                        defenderPositionLabel,
                         InvalidReasonNoAmmo,
                         Vector3Int.zero,
                         null);
@@ -107,6 +113,8 @@ public static class PodeMirarSensor
                         weapon,
                         weaponCandidate.index,
                         distance,
+                        attackerPositionLabel,
+                        defenderPositionLabel,
                         InvalidReasonLayer,
                         Vector3Int.zero,
                         null);
@@ -132,6 +140,8 @@ public static class PodeMirarSensor
                         weapon,
                         weaponCandidate.index,
                         distance,
+                        attackerPositionLabel,
+                        defenderPositionLabel,
                         $"{InvalidReasonBlocked} ({blockedCell.x},{blockedCell.y})",
                         blockedCell,
                         intermediateCells);
@@ -145,6 +155,9 @@ public static class PodeMirarSensor
                     out WeaponData counterWeapon,
                     out int counterIndex,
                     out string counterReason);
+                GameUnitClass targetClass = ResolveUnitClass(target);
+                WeaponCategory weaponCategory = weapon.WeaponCategory;
+                bool preferredTarget = EvaluateWeaponPriority(weaponPriorityData, weaponCategory, targetClass);
                 output.Add(new PodeMirarTargetOption
                 {
                     attackerUnit = attacker,
@@ -152,6 +165,10 @@ public static class PodeMirarSensor
                     weapon = weapon,
                     embarkedWeaponIndex = weaponCandidate.index,
                     distance = distance,
+                    sensorOrder = sensorOrderCounter++,
+                    isPreferredTargetForWeapon = preferredTarget,
+                    attackerPositionLabel = attackerPositionLabel,
+                    defenderPositionLabel = defenderPositionLabel,
                     defenderCanCounterAttack = canCounter,
                     defenderCounterWeapon = counterWeapon,
                     defenderCounterEmbarkedWeaponIndex = counterIndex,
@@ -162,6 +179,8 @@ public static class PodeMirarSensor
             }
         }
 
+        output.Sort(CompareTargetOptionsByPriority);
+
         for (int i = 0; i < output.Count; i++)
         {
             string weaponName = output[i].weapon != null && !string.IsNullOrWhiteSpace(output[i].weapon.displayName)
@@ -171,6 +190,46 @@ public static class PodeMirarSensor
         }
 
         return output.Count > 0;
+    }
+
+    private static int CompareTargetOptionsByPriority(PodeMirarTargetOption a, PodeMirarTargetOption b)
+    {
+        if (ReferenceEquals(a, b))
+            return 0;
+        if (a == null)
+            return 1;
+        if (b == null)
+            return -1;
+
+        bool samePair = a.attackerUnit == b.attackerUnit && a.targetUnit == b.targetUnit;
+        if (samePair)
+        {
+            int preferredCmp = b.isPreferredTargetForWeapon.CompareTo(a.isPreferredTargetForWeapon);
+            if (preferredCmp != 0)
+                return preferredCmp;
+
+            int weaponIndexCmp = a.embarkedWeaponIndex.CompareTo(b.embarkedWeaponIndex);
+            if (weaponIndexCmp != 0)
+                return weaponIndexCmp;
+        }
+
+        return a.sensorOrder.CompareTo(b.sensorOrder);
+    }
+
+    private static bool EvaluateWeaponPriority(
+        WeaponPriorityData data,
+        WeaponCategory category,
+        GameUnitClass targetClass)
+    {
+        return data != null && data.IsPreferredTarget(category, targetClass);
+    }
+
+    private static GameUnitClass ResolveUnitClass(UnitManager unit)
+    {
+        if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null)
+            return data.unitClass;
+
+        return GameUnitClass.Infantry;
     }
 
     public static bool HasAnyFireCandidateWeapon(UnitManager attacker, SensorMovementMode movementMode)
@@ -587,6 +646,8 @@ public static class PodeMirarSensor
         WeaponData weapon,
         int embarkedWeaponIndex,
         int distance,
+        string attackerPositionLabel,
+        string defenderPositionLabel,
         string reason,
         Vector3Int blockedCell,
         List<Vector3Int> lineOfFireIntermediateCells)
@@ -601,11 +662,49 @@ public static class PodeMirarSensor
             weapon = weapon,
             embarkedWeaponIndex = embarkedWeaponIndex,
             distance = distance,
+            attackerPositionLabel = attackerPositionLabel,
+            defenderPositionLabel = defenderPositionLabel,
             reason = reason,
             blockedCell = blockedCell,
             lineOfFireIntermediateCells = lineOfFireIntermediateCells != null
                 ? new List<Vector3Int>(lineOfFireIntermediateCells)
                 : new List<Vector3Int>()
         });
+    }
+
+    private static string ResolveUnitPositionLabel(Tilemap referenceTilemap, TerrainDatabase terrainDatabase, UnitManager unit, Vector3Int cell)
+    {
+        if (unit == null)
+            return "-";
+
+        cell.z = 0;
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(referenceTilemap, cell);
+        if (construction != null)
+        {
+            string constructionName = !string.IsNullOrWhiteSpace(construction.ConstructionDisplayName)
+                ? construction.ConstructionDisplayName
+                : (!string.IsNullOrWhiteSpace(construction.ConstructionId) ? construction.ConstructionId : construction.name);
+            return $"Construcao: {constructionName}";
+        }
+
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(referenceTilemap, cell);
+        if (structure != null)
+        {
+            string structureName = !string.IsNullOrWhiteSpace(structure.displayName)
+                ? structure.displayName
+                : (!string.IsNullOrWhiteSpace(structure.id) ? structure.id : structure.name);
+            return $"Estrutura: {structureName}";
+        }
+
+        if (TryResolveTerrainAtCell(referenceTilemap, terrainDatabase, cell, out TerrainTypeData terrain) && terrain != null)
+        {
+            string terrainName = !string.IsNullOrWhiteSpace(terrain.displayName)
+                ? terrain.displayName
+                : (!string.IsNullOrWhiteSpace(terrain.id) ? terrain.id : terrain.name);
+            return $"Terreno: {terrainName}";
+        }
+
+        return "Terreno: (desconhecido)";
     }
 }

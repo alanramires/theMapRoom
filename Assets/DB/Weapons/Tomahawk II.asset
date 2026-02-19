@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Tomahawk II
   m_EditorClassIdentifier: Assembly-CSharp::WeaponData
   id: towII
-  displayName: Tomahawk
+  displayName: TOW II
   description: "Metralhadora de Ca\xE7a"
   domain: 0
   heightLevel: 3
@@ -21,6 +21,8 @@ MonoBehaviour:
   - domain: 1
     heightLevel: 3
   basicAttack: 6
+  weaponCategory: 1
+  weaponClass: 0
   operationRangeMin: 1
   operationRangeMax: 1
   trajectories: 00000000

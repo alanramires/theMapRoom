@@ -10,12 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e153de54bfb44154a863edcb45b5a31e, type: 3}
-  m_Name: "Favor\xE1vel"
+  m_Name: "DPQ_Desfavor\xE1vel"
   m_EditorClassIdentifier: Assembly-CSharp::DPQData
-  id: favorable
-  nome: "Favor\xE1vel"
-  descricao: "Condi\xE7\xF5es de defesa superior"
-  qualidadeDePosicao: 3
-  usarValoresPadraoDaQualidade: 1
-  pontos: 3
-  defesaBonus: 4
+  id: unfavorable
+  nome: Unfavorable
+  descricao: Bad terrain or construction
+  qualidadeDePosicao: 0

@@ -1,0 +1,105 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30f693dd3e21f584ab270f075d9a517d, type: 3}
+  m_Name: RPS Armored
+  m_EditorClassIdentifier: Assembly-CSharp::RPSData
+  entries:
+  - ataque:
+      unitClass: 3
+      weaponCategory: 0
+      targetClass: 0
+      attackBonus: -2
+      notes: 
+      rpsAttackText: Armored com AntiInfantaria ataca Infantry com RPS Ataque -2
+    defesa:
+      targetClass: 0
+      unitClass: 3
+      weaponCategory: 0
+      defenseBonus: 2
+      notes: 
+      rpsDefenseText: Infantry se defende de Armored com AntiInfantaria com RPS Defesa
+        +2
+  - ataque:
+      unitClass: 3
+      weaponCategory: 0
+      targetClass: 1
+      attackBonus: -5
+      notes: "canhoes de tanque s\xE3o desbalanceado contra tropas"
+      rpsAttackText: Armored com AntiInfantaria ataca Vehicle com RPS Ataque -5
+    defesa:
+      targetClass: 1
+      unitClass: 3
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: "Infantaria se protegem bem contra canh\xF5es desbalanceados"
+      rpsDefenseText: Vehicle se defende de Armored com AntiInfantaria com RPS Defesa
+        +5
+  - ataque:
+      unitClass: 3
+      weaponCategory: 0
+      targetClass: 3
+      attackBonus: -5
+      notes: "canhoes de tanque s\xE3o desbalanceado contra tropas"
+      rpsAttackText: Armored com AntiInfantaria ataca Armored com RPS Ataque -5
+    defesa:
+      targetClass: 3
+      unitClass: 3
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: "Infantaria se protegem bem contra canh\xF5es desbalanceados"
+      rpsDefenseText: Armored se defende de Armored com AntiInfantaria com RPS Defesa
+        +5
+  - ataque:
+      unitClass: 3
+      weaponCategory: 1
+      targetClass: 0
+      attackBonus: -5
+      notes: "canhoes de tanque s\xE3o desbalanceado contra tropas"
+      rpsAttackText: Armored com AntiTanque ataca Infantry com RPS Ataque -5
+    defesa:
+      targetClass: 0
+      unitClass: 3
+      weaponCategory: 1
+      defenseBonus: 3
+      notes: "Infantaria se protegem bem contra canh\xF5es desbalanceados"
+      rpsDefenseText: Infantry se defende de Armored com AntiTanque com RPS Defesa
+        +3
+  - ataque:
+      unitClass: 3
+      weaponCategory: 1
+      targetClass: 1
+      attackBonus: 0
+      notes: "canhoes de tanque s\xE3o desbalanceado contra tropas"
+      rpsAttackText: Armored com AntiTanque ataca Vehicle com RPS Ataque +0
+    defesa:
+      targetClass: 1
+      unitClass: 3
+      weaponCategory: 1
+      defenseBonus: -2
+      notes: "Infantaria se protegem bem contra canh\xF5es desbalanceados"
+      rpsDefenseText: Vehicle se defende de Armored com AntiTanque com RPS Defesa
+        -2
+  - ataque:
+      unitClass: 3
+      weaponCategory: 1
+      targetClass: 3
+      attackBonus: 0
+      notes: "canhoes de tanque s\xE3o desbalanceado contra tropas"
+      rpsAttackText: Armored com AntiTanque ataca Armored com RPS Ataque +0
+    defesa:
+      targetClass: 3
+      unitClass: 3
+      weaponCategory: 1
+      defenseBonus: 4
+      notes: "Infantaria se protegem bem contra canh\xF5es desbalanceados"
+      rpsDefenseText: Armored se defende de Armored com AntiTanque com RPS Defesa
+        +4

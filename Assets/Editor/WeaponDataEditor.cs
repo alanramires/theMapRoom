@@ -16,6 +16,7 @@ public class WeaponDataEditor : Editor
             "displayName",
             "description",
             "basicAttack",
+            "weaponCategory",
             "weaponClass");
 
         serializedObject.ApplyModifiedProperties();
@@ -27,6 +28,7 @@ public class WeaponDataEditor : Editor
         SerializedProperty displayNameProperty = serializedObject.FindProperty("displayName");
         SerializedProperty descriptionProperty = serializedObject.FindProperty("description");
         SerializedProperty basicAttackProperty = serializedObject.FindProperty("basicAttack");
+        SerializedProperty weaponCategoryProperty = serializedObject.FindProperty("weaponCategory");
         SerializedProperty weaponClassProperty = serializedObject.FindProperty("weaponClass");
 
         if (idProperty != null)
@@ -37,6 +39,8 @@ public class WeaponDataEditor : Editor
             EditorGUILayout.PropertyField(descriptionProperty);
         if (basicAttackProperty != null)
             EditorGUILayout.PropertyField(basicAttackProperty);
+        if (weaponCategoryProperty != null)
+            EditorGUILayout.PropertyField(weaponCategoryProperty, new GUIContent("Weapon Category"));
         if (weaponClassProperty != null)
         {
             using (new EditorGUI.DisabledScope(true))

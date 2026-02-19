@@ -7,7 +7,7 @@ public class UnitDatabase : ScriptableObject
     [Tooltip("Lista manual das unidades que realmente fazem parte do jogo/mapa.")]
     [SerializeField] private List<UnitData> units = new List<UnitData>();
 
-    private readonly Dictionary<string, UnitData> byId = new Dictionary<string, UnitData>();
+    private readonly Dictionary<string, UnitData> byId = new Dictionary<string, UnitData>(System.StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyList<UnitData> Units => units;
 
@@ -33,8 +33,14 @@ public class UnitDatabase : ScriptableObject
 
         if (byId.Count == 0)
             RebuildLookup();
+        string key = id.Trim();
+        if (byId.TryGetValue(key, out unit))
+            return true;
 
-        return byId.TryGetValue(id.Trim(), out unit);
+        // Em edicao, IDs podem mudar em UnitData sem invalidar este cache imediatamente.
+        // Reconstroi e tenta novamente para evitar falha de lookup apos rename.
+        RebuildLookup();
+        return byId.TryGetValue(key, out unit);
     }
 
     public bool TryGetFirst(out UnitData unit)

@@ -200,24 +200,16 @@ public partial class TurnStateManager
             return true;
         }
 
-        UnitManager attacker = option.attackerUnit;
-        UnitManager defender = option.targetUnit;
-
-        attacker.TryConsumeEmbarkedWeaponAmmo(option.embarkedWeaponIndex, 1);
-        if (option.defenderCanCounterAttack && option.defenderCounterEmbarkedWeaponIndex >= 0)
-            defender.TryConsumeEmbarkedWeaponAmmo(option.defenderCounterEmbarkedWeaponIndex, 1);
-
-        string attackWeapon = option.weapon != null ? option.weapon.displayName : "arma";
-        string counterText = option.defenderCanCounterAttack
-            ? "sim"
-            : $"nao ({option.defenderCounterReason})";
-
-        Debug.Log(
-            "[Combate] Resolvido (simulado)\n" +
-            $"Atacante: {attacker.name}\n" +
-            $"Defensor: {defender.name}\n" +
-            $"Arma: {attackWeapon}\n" +
-            $"Revide: {counterText}");
+        CombatResolutionResult combat = ResolveCombatFromSelectedOption(option);
+        Debug.Log(combat.trace);
+        if (!combat.success)
+        {
+            Debug.Log("[Combate] Falha ao resolver combate. Retornando para selecao de alvo.");
+            scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
+            FocusCurrentMirandoTarget(logDetails: true);
+            LogTargetSelectionPanel();
+            return true;
+        }
 
         cursorController?.PlayDoneSfx();
         TryFinalizeSelectedUnitActionFromDebug();

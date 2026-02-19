@@ -47,6 +47,7 @@ public partial class TurnStateManager
             selectedUnit,
             boardMap,
             terrainDatabase,
+            weaponPriorityData,
             movementMode,
             availableSensorActionCodes,
             cachedPodeMirarTargets);

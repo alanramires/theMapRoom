@@ -21,6 +21,8 @@ MonoBehaviour:
   - domain: 3
     heightLevel: 4
   basicAttack: 8
+  weaponCategory: 2
+  weaponClass: 1
   operationRangeMin: 1
   operationRangeMax: 1
   trajectories: 00000000

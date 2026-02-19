@@ -167,7 +167,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
                 ? (!string.IsNullOrWhiteSpace(item.defenderCounterWeapon.displayName) ? item.defenderCounterWeapon.displayName : item.defenderCounterWeapon.name)
                 : "-";
 
-            Debug.Log($"[PodeMirarSensorDebug][VALIDO] {i + 1}. {attackerName} -> {targetName} | arma={weaponName} | dist={item.distance} | alvoLayer={targetLayer} | revide={item.defenderCanCounterAttack} | armaRevide={counterWeapon} | distRevide={item.defenderCounterDistance} | linha={FormatCells(item.lineOfFireIntermediateCells)}");
+            Debug.Log($"[PodeMirarSensorDebug][VALIDO] {i + 1}. {attackerName} -> {targetName} | arma={weaponName} | dist={item.distance} | posAtacante={item.attackerPositionLabel} | posDefensor={item.defenderPositionLabel} | alvoLayer={targetLayer} | revide={item.defenderCanCounterAttack} | armaRevide={counterWeapon} | distRevide={item.defenderCounterDistance} | linha={FormatCells(item.lineOfFireIntermediateCells)}");
         }
 
         for (int i = 0; i < invalidResults.Count; i++)
@@ -182,7 +182,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
                 ? (!string.IsNullOrWhiteSpace(item.weapon.displayName) ? item.weapon.displayName : item.weapon.name)
                 : "(sem arma)";
 
-            Debug.Log($"[PodeMirarSensorDebug][INVALIDO] {i + 1}. {attackerName} -> {targetName} | arma={weaponName} | dist={item.distance} | motivo={item.reason} | bloqueio={item.blockedCell.x},{item.blockedCell.y} | linha={FormatCells(item.lineOfFireIntermediateCells)}");
+            Debug.Log($"[PodeMirarSensorDebug][INVALIDO] {i + 1}. {attackerName} -> {targetName} | arma={weaponName} | dist={item.distance} | posAtacante={item.attackerPositionLabel} | posDefensor={item.defenderPositionLabel} | motivo={item.reason} | bloqueio={item.blockedCell.x},{item.blockedCell.y} | linha={FormatCells(item.lineOfFireIntermediateCells)}");
         }
     }
 
@@ -279,6 +279,8 @@ public class PodeMirarSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Alvo", targetName);
         EditorGUILayout.LabelField("Arma", weaponName);
         EditorGUILayout.LabelField("Distancia", item.distance.ToString());
+        EditorGUILayout.LabelField("Posicao do Atacante", string.IsNullOrWhiteSpace(item.attackerPositionLabel) ? "-" : item.attackerPositionLabel);
+        EditorGUILayout.LabelField("Posicao do Defensor", string.IsNullOrWhiteSpace(item.defenderPositionLabel) ? "-" : item.defenderPositionLabel);
         EditorGUILayout.LabelField("Layer do Alvo", targetLayer);
         EditorGUILayout.LabelField("Defensor revida ?", item.defenderCanCounterAttack ? "Sim" : "Nao");
         EditorGUILayout.LabelField("Com que arma", counterWeapon);
@@ -308,6 +310,8 @@ public class PodeMirarSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Alvo", targetName);
         EditorGUILayout.LabelField("Arma", weaponName);
         EditorGUILayout.LabelField("Distancia", item.distance.ToString());
+        EditorGUILayout.LabelField("Posicao do Atacante", string.IsNullOrWhiteSpace(item.attackerPositionLabel) ? "-" : item.attackerPositionLabel);
+        EditorGUILayout.LabelField("Posicao do Defensor", string.IsNullOrWhiteSpace(item.defenderPositionLabel) ? "-" : item.defenderPositionLabel);
         EditorGUILayout.LabelField("Motivo", string.IsNullOrWhiteSpace(item.reason) ? "-" : item.reason);
         EditorGUILayout.LabelField("Hex bloqueador", $"{item.blockedCell.x},{item.blockedCell.y}");
         EditorGUILayout.LabelField("Linha (hexes intermediarios)", FormatCells(item.lineOfFireIntermediateCells));

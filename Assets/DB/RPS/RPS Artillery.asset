@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30f693dd3e21f584ab270f075d9a517d, type: 3}
+  m_Name: RPS Artillery
+  m_EditorClassIdentifier: Assembly-CSharp::RPSData
+  entries:
+  - ataque:
+      unitClass: 2
+      weaponCategory: 1
+      targetClass: 0
+      attackBonus: -5
+      notes: 
+      rpsAttackText: Artillery com AntiTanque ataca Infantry com RPS Ataque -5
+    defesa:
+      targetClass: 0
+      unitClass: 2
+      weaponCategory: 1
+      defenseBonus: 5
+      notes: 
+      rpsDefenseText: Infantry se defende de Artillery com AntiTanque com RPS Defesa
+        +5
+  - ataque:
+      unitClass: 2
+      weaponCategory: 1
+      targetClass: 1
+      attackBonus: -2
+      notes: 
+      rpsAttackText: Artillery com AntiTanque ataca Vehicle com RPS Ataque -2
+    defesa:
+      targetClass: 1
+      unitClass: 2
+      weaponCategory: 1
+      defenseBonus: 2
+      notes: 
+      rpsDefenseText: Vehicle se defende de Artillery com AntiTanque com RPS Defesa
+        +2
+  - ataque:
+      unitClass: 2
+      weaponCategory: 1
+      targetClass: 3
+      attackBonus: -1
+      notes: 
+      rpsAttackText: Artillery com AntiTanque ataca Armored com RPS Ataque -1
+    defesa:
+      targetClass: 3
+      unitClass: 2
+      weaponCategory: 1
+      defenseBonus: 1
+      notes: 
+      rpsDefenseText: Armored se defende de Artillery com AntiTanque com RPS Defesa
+        +1
+  - ataque:
+      unitClass: 2
+      weaponCategory: 1
+      targetClass: 2
+      attackBonus: -3
+      notes: 
+      rpsAttackText: Artillery com AntiTanque ataca Artillery com RPS Ataque -3
+    defesa:
+      targetClass: 2
+      unitClass: 2
+      weaponCategory: 1
+      defenseBonus: 3
+      notes: 
+      rpsDefenseText: Artillery se defende de Artillery com AntiTanque com RPS Defesa
+        +3

@@ -1,0 +1,105 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30f693dd3e21f584ab270f075d9a517d, type: 3}
+  m_Name: RPS Infantry
+  m_EditorClassIdentifier: Assembly-CSharp::RPSData
+  entries:
+  - ataque:
+      unitClass: 0
+      weaponCategory: 0
+      targetClass: 0
+      attackBonus: 0
+      notes: "Soldados tem treinamento padr\xE3o contra si mesmos"
+      rpsAttackText: Infantry com AntiInfantaria ataca Infantry com RPS Ataque +0
+    defesa:
+      targetClass: 0
+      unitClass: 0
+      weaponCategory: 0
+      defenseBonus: 1
+      notes: "Soldados s\xE3o treinados para se defenderem"
+      rpsDefenseText: Infantry se defende de Infantry com AntiInfantaria com RPS
+        Defesa +1
+  - ataque:
+      unitClass: 0
+      weaponCategory: 0
+      targetClass: 1
+      attackBonus: -3
+      notes: "Soldados n\xE3o atacam bem veiculos"
+      rpsAttackText: Infantry com AntiInfantaria ataca Vehicle com RPS Ataque -3
+    defesa:
+      targetClass: 1
+      unitClass: 0
+      weaponCategory: 0
+      defenseBonus: 2
+      notes: Veiculos tem bonus de defesa contra infantaria
+      rpsDefenseText: Vehicle se defende de Infantry com AntiInfantaria com RPS Defesa
+        +2
+  - ataque:
+      unitClass: 0
+      weaponCategory: 0
+      targetClass: 3
+      attackBonus: -2
+      notes: Uma Infantaria com bazooka pode ser letal contra infantaria
+      rpsAttackText: Infantry com AntiInfantaria ataca Armored com RPS Ataque -2
+    defesa:
+      targetClass: 3
+      unitClass: 0
+      weaponCategory: 0
+      defenseBonus: 2
+      notes: "Infantaria busca cobertura se jogando no ch\xE3o contra projeteis"
+      rpsDefenseText: Armored se defende de Infantry com AntiInfantaria com RPS Defesa
+        +2
+  - ataque:
+      unitClass: 0
+      weaponCategory: 1
+      targetClass: 0
+      attackBonus: 1
+      notes: Uma Infantaria com bazooka pode ser letal contra infantaria
+      rpsAttackText: Infantry com AntiTanque ataca Infantry com RPS Ataque +1
+    defesa:
+      targetClass: 0
+      unitClass: 0
+      weaponCategory: 1
+      defenseBonus: 2
+      notes: "Infantaria busca cobertura se jogando no ch\xE3o contra projeteis"
+      rpsDefenseText: Infantry se defende de Infantry com AntiTanque com RPS Defesa
+        +2
+  - ataque:
+      unitClass: 0
+      weaponCategory: 1
+      targetClass: 1
+      attackBonus: 0
+      notes: Uma Infantaria com bazooka pode ser letal contra infantaria
+      rpsAttackText: Infantry com AntiTanque ataca Vehicle com RPS Ataque +0
+    defesa:
+      targetClass: 1
+      unitClass: 0
+      weaponCategory: 1
+      defenseBonus: 2
+      notes: "Infantaria busca cobertura se jogando no ch\xE3o contra projeteis"
+      rpsDefenseText: Vehicle se defende de Infantry com AntiTanque com RPS Defesa
+        +2
+  - ataque:
+      unitClass: 0
+      weaponCategory: 1
+      targetClass: 3
+      attackBonus: 0
+      notes: Uma Infantaria com bazooka pode ser letal contra infantaria
+      rpsAttackText: Infantry com AntiTanque ataca Armored com RPS Ataque +0
+    defesa:
+      targetClass: 3
+      unitClass: 0
+      weaponCategory: 1
+      defenseBonus: 2
+      notes: "Infantaria busca cobertura se jogando no ch\xE3o contra projeteis"
+      rpsDefenseText: Armored se defende de Infantry com AntiTanque com RPS Defesa
+        +2

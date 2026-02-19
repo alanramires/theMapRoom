@@ -35,6 +35,8 @@ public class WeaponData : ScriptableObject
     [Header("Combat")]
     [Tooltip("Ataque base da arma (antes de modificadores).")]
     public int basicAttack = 1;
+    [Tooltip("Categoria tatica da arma (separada da WeaponClass usada na logistica).")]
+    public WeaponCategory weaponCategory = WeaponCategory.AntiInfantaria;
     [SerializeField, HideInInspector] private WeaponClass weaponClass = WeaponClass.Light;
     [Tooltip("Alcance operacional minimo base da arma.")]
     [Min(0)]
@@ -57,6 +59,7 @@ public class WeaponData : ScriptableObject
     public Sprite ammunitionSprite;
 
     public WeaponClass WeaponClass => weaponClass;
+    public WeaponCategory WeaponCategory => weaponCategory;
 
     private void OnValidate()
     {

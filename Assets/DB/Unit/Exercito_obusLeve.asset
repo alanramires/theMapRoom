@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
-  m_Name: Exercito_morteiro
+  m_Name: Exercito_obusLeve
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
-  id: morteiro
-  displayName: Morteiro
+  id: obusLeve
+  displayName: Obus Leve
   description: 
   spriteDefault: {fileID: 21300000, guid: 6a4e130757b853c4daa6663e05a831b6, type: 3}
   spriteGreen: {fileID: 0}
@@ -26,12 +26,18 @@ MonoBehaviour:
   movement: 5
   movementCategory: 4
   militaryForce: 0
-  unitClass: 0
+  unitClass: 2
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
   skills: []
-  embarkedWeapons: []
+  embarkedWeapons:
+  - weapon: {fileID: 11400000, guid: d902deacb73307c459944646a09acdfc, type: 2}
+    squadAmmunition: 4
+    operationRangeMin: 2
+    operationRangeMax: 3
+    selectedTrajectory: 1
+    lastSyncedWeapon: {fileID: 11400000, guid: d902deacb73307c459944646a09acdfc, type: 2}
   embarkedSupplies: []
   isSupplier: 0
   supplierTier: 0

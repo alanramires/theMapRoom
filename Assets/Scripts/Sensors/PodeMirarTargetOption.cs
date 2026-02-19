@@ -22,6 +22,20 @@ public class PodeMirarTargetOption
     [Tooltip("Texto pronto para listar no menu de alvos.")]
     public string displayLabel;
 
+    [Header("Prioridade de Alvo")]
+    [Tooltip("Ordem original de descoberta no sensor (debug).")]
+    public int sensorOrder;
+
+    [Tooltip("Se este alvo e preferido para a categoria desta arma (debug).")]
+    public bool isPreferredTargetForWeapon;
+
+    [Header("Posicao (prioridade: construcao > estrutura > terreno)")]
+    [Tooltip("Descricao da posicao atual do atacante no hex.")]
+    public string attackerPositionLabel;
+
+    [Tooltip("Descricao da posicao atual do defensor/alvo no hex.")]
+    public string defenderPositionLabel;
+
     [Tooltip("Hexes intermediarios analisados na linha de tiro (debug).")]
     public List<Vector3Int> lineOfFireIntermediateCells = new List<Vector3Int>();
 

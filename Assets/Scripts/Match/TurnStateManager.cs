@@ -27,6 +27,9 @@ public partial class TurnStateManager : MonoBehaviour
     [SerializeField] private AnimationManager animationManager;
     [SerializeField] private PathManager pathManager;
     [SerializeField] private TerrainDatabase terrainDatabase;
+    [SerializeField] private WeaponPriorityData weaponPriorityData;
+    [SerializeField] private DPQMatchupDatabase dpqMatchupDatabase;
+    [SerializeField] private RPSDatabase rpsDatabase;
     [SerializeField] private Tilemap rangeMapTilemap;
     [SerializeField] private Tilemap lineOfFireMapTilemap;
     [SerializeField] private Tilemap terrainTilemap;

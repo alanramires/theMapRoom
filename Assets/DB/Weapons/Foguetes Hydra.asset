@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 79f0886d9c429a34d8bd4ed01d09c62a, type: 3}
-  m_Name: Rockets
+  m_Name: Foguetes Hydra
   m_EditorClassIdentifier: Assembly-CSharp::WeaponData
-  id: rockets
-  displayName: Foguetes
+  id: hydra
+  displayName: Hydra
   description: "Metralhadora de Ca\xE7a"
   domain: 0
   heightLevel: 3
@@ -21,6 +21,8 @@ MonoBehaviour:
   - domain: 1
     heightLevel: 3
   basicAttack: 6
+  weaponCategory: 1
+  weaponClass: 0
   operationRangeMin: 1
   operationRangeMax: 1
   trajectories: 0000000001000000

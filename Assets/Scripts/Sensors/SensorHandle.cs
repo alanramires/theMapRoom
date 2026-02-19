@@ -7,6 +7,7 @@ public static class SensorHandle
         UnitManager selectedUnit,
         Tilemap boardTilemap,
         TerrainDatabase terrainDatabase,
+        WeaponPriorityData weaponPriorityData,
         SensorMovementMode movementMode,
         List<char> availableActionCodes,
         List<PodeMirarTargetOption> podeMirarTargets)
@@ -22,7 +23,7 @@ public static class SensorHandle
 
         bool hasAnyAction = false;
 
-        bool canAim = PodeMirarSensor.CollectTargets(selectedUnit, boardTilemap, terrainDatabase, movementMode, podeMirarTargets);
+        bool canAim = PodeMirarSensor.CollectTargets(selectedUnit, boardTilemap, terrainDatabase, movementMode, podeMirarTargets, null, weaponPriorityData);
         if (canAim)
         {
             availableActionCodes.Add('A');

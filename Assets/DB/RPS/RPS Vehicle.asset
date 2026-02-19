@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30f693dd3e21f584ab270f075d9a517d, type: 3}
+  m_Name: RPS Vehicle
+  m_EditorClassIdentifier: Assembly-CSharp::RPSData
+  entries:
+  - ataque:
+      unitClass: 1
+      weaponCategory: 0
+      targetClass: 0
+      attackBonus: 2
+      notes: "Veiculos atiram padr\xE3o contra infantaria (operador est\xE1vel)"
+      rpsAttackText: Vehicle com AntiInfantaria ataca Infantry com RPS Ataque +2
+    defesa:
+      targetClass: 0
+      unitClass: 1
+      weaponCategory: 0
+      defenseBonus: 2
+      notes: "Soldados se jogam no ch\xE3o e tentam se defender"
+      rpsDefenseText: Infantry se defende de Vehicle com AntiInfantaria com RPS Defesa
+        +2
+  - ataque:
+      unitClass: 1
+      weaponCategory: 0
+      targetClass: 1
+      attackBonus: -1
+      notes: "Veiculos n\xE3o atacam bem a si mesmos usando metralhadora de combate"
+      rpsAttackText: Vehicle com AntiInfantaria ataca Vehicle com RPS Ataque -1
+    defesa:
+      targetClass: 1
+      unitClass: 1
+      weaponCategory: 0
+      defenseBonus: 2
+      notes: a blindagem natural do veiculo aguenta o tranco
+      rpsDefenseText: Vehicle se defende de Vehicle com AntiInfantaria com RPS Defesa
+        +2
+  - ataque:
+      unitClass: 1
+      weaponCategory: 0
+      targetClass: 3
+      attackBonus: -4
+      notes: "Veiculos n\xE3o atacam bem a si mesmos usando metralhadora de combate"
+      rpsAttackText: Vehicle com AntiInfantaria ataca Armored com RPS Ataque -4
+    defesa:
+      targetClass: 3
+      unitClass: 1
+      weaponCategory: 0
+      defenseBonus: 4
+      notes: a blindagem natural do veiculo aguenta o tranco
+      rpsDefenseText: Armored se defende de Vehicle com AntiInfantaria com RPS Defesa
+        +4

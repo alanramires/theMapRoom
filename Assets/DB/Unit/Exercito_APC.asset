@@ -26,14 +26,26 @@ MonoBehaviour:
   movement: 6
   movementCategory: 4
   militaryForce: 0
-  unitClass: 0
+  unitClass: 1
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
   skills:
   - {fileID: 11400000, guid: 8bfcf50a7b4285c4cad503493431fb4b, type: 2}
-  embarkedWeapons: []
+  embarkedWeapons:
+  - weapon: {fileID: 11400000, guid: aa41bb9c51c8efe4e84eef69531a1be3, type: 2}
+    squadAmmunition: 9
+    operationRangeMin: 1
+    operationRangeMax: 1
+    selectedTrajectory: 0
+    lastSyncedWeapon: {fileID: 11400000, guid: aa41bb9c51c8efe4e84eef69531a1be3, type: 2}
   embarkedSupplies: []
-  embarkedResources: []
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
   autonomia: 70
   cost: 26000
