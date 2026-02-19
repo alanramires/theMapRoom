@@ -37,6 +37,9 @@ public class TerrainTypeData : ScriptableObject
     [Tooltip("Custo basico de autonomia para entrar neste hex. Minimo 1.")]
     [Min(1)]
     public int basicAutonomyCost = 1;
+    [Header("DPQ")]
+    [Tooltip("Referencia de qualidade de posicao (DPQ) aplicada a este terreno.")]
+    public DPQData dpqData;
 
     [Header("Skill Rules")]
     [Tooltip("Se houver skills nesta lista, a unidade precisa ter pelo menos uma para entrar neste terreno.")]

@@ -31,8 +31,20 @@ MonoBehaviour:
   heightLevel: 3
   aditionalDomainsAllowed: []
   skills: []
-  embarkedWeapons: []
+  embarkedWeapons:
+  - weapon: {fileID: 11400000, guid: ae44443129eee5146848db79b494ba14, type: 2}
+    squadAmmunition: 4
+    operationRangeMin: 2
+    operationRangeMax: 3
+    selectedTrajectory: 1
+    lastSyncedWeapon: {fileID: 11400000, guid: ae44443129eee5146848db79b494ba14, type: 2}
   embarkedSupplies: []
-  embarkedResources: []
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
   autonomia: 50
   cost: 26000

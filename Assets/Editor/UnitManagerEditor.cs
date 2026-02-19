@@ -21,9 +21,9 @@ public class UnitManagerEditor : Editor
     private SerializedProperty maxAmmoProp;
     private SerializedProperty currentFuelProp;
     private SerializedProperty maxFuelProp;
+    private SerializedProperty embarkedWeaponsRuntimeProp;
     private SerializedProperty hasActedProp;
     private SerializedProperty matchControllerProp;
-    private SerializedProperty autoApplyOnStartProp;
     private SerializedProperty manualMoveAnimationSpeedProp;
     private SerializedProperty currentDomainProp;
     private SerializedProperty currentHeightLevelProp;
@@ -49,9 +49,9 @@ public class UnitManagerEditor : Editor
         maxAmmoProp = serializedObject.FindProperty("maxAmmo");
         currentFuelProp = serializedObject.FindProperty("currentFuel");
         maxFuelProp = serializedObject.FindProperty("maxFuel");
+        embarkedWeaponsRuntimeProp = serializedObject.FindProperty("embarkedWeaponsRuntime");
         hasActedProp = serializedObject.FindProperty("hasActed");
         matchControllerProp = serializedObject.FindProperty("matchController");
-        autoApplyOnStartProp = serializedObject.FindProperty("autoApplyOnStart");
         manualMoveAnimationSpeedProp = serializedObject.FindProperty("manualMoveAnimationSpeed");
         currentDomainProp = serializedObject.FindProperty("currentDomain");
         currentHeightLevelProp = serializedObject.FindProperty("currentHeightLevel");
@@ -103,10 +103,10 @@ public class UnitManagerEditor : Editor
         EditorGUILayout.PropertyField(maxAmmoProp, new GUIContent("Max Ammo"));
         EditorGUILayout.IntSlider(currentFuelProp, 0, Mathf.Max(1, maxFuelProp.intValue), new GUIContent("Current Fuel"));
         EditorGUILayout.PropertyField(maxFuelProp, new GUIContent("Max Fuel"));
+        DrawEmbarkedWeaponsRuntimeSection();
 
         EditorGUILayout.PropertyField(hasActedProp, new GUIContent("Has Acted"));
         EditorGUILayout.PropertyField(matchControllerProp, new GUIContent("Match Controller"));
-        EditorGUILayout.PropertyField(autoApplyOnStartProp);
         EditorGUILayout.Space(6f);
         EditorGUILayout.LabelField("Movement Animation", EditorStyles.boldLabel);
         if (manualMoveAnimationSpeedProp != null)
@@ -132,10 +132,80 @@ public class UnitManagerEditor : Editor
             unit.SnapToCellCenter();
         if (GUILayout.Button("Pull Cell From Transform"))
             unit.PullCellFromTransform();
-        if (GUILayout.Button("Sync Layer State From Data (Keep Current If Valid)"))
-            unit.SyncLayerStateFromData(forceNativeDefault: false);
-        if (GUILayout.Button("Sync Layer State From Data (Force Native Default)"))
-            unit.SyncLayerStateFromData(forceNativeDefault: true);
+    }
+
+    private void DrawEmbarkedWeaponsRuntimeSection()
+    {
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField("Embarked Weapons (Runtime)", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox("UnitData define os valores base. Aqui voce ajusta estado da instancia em campo (municao e alcance).", MessageType.None);
+        if (embarkedWeaponsRuntimeProp != null)
+            embarkedWeaponsRuntimeProp.isExpanded = true;
+
+        if (embarkedWeaponsRuntimeProp == null || !embarkedWeaponsRuntimeProp.isArray || embarkedWeaponsRuntimeProp.arraySize == 0)
+        {
+            EditorGUILayout.HelpBox("No embarked weapons on this instance.", MessageType.Info);
+            if (GUILayout.Button("Add Weapon Slot"))
+                embarkedWeaponsRuntimeProp.InsertArrayElementAtIndex(embarkedWeaponsRuntimeProp.arraySize);
+            return;
+        }
+
+        for (int i = 0; i < embarkedWeaponsRuntimeProp.arraySize; i++)
+        {
+            SerializedProperty entry = embarkedWeaponsRuntimeProp.GetArrayElementAtIndex(i);
+            if (entry == null)
+                continue;
+
+            SerializedProperty weaponProp = entry.FindPropertyRelative("weapon");
+            SerializedProperty ammoProp = entry.FindPropertyRelative("squadAmmunition");
+            SerializedProperty minProp = entry.FindPropertyRelative("operationRangeMin");
+            SerializedProperty maxProp = entry.FindPropertyRelative("operationRangeMax");
+
+            string weaponName = "(No Weapon)";
+            if (weaponProp != null && weaponProp.objectReferenceValue != null)
+            {
+                WeaponData weapon = weaponProp.objectReferenceValue as WeaponData;
+                if (weapon != null)
+                    weaponName = string.IsNullOrWhiteSpace(weapon.displayName) ? weapon.name : weapon.displayName;
+            }
+
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.LabelField($"Slot {i + 1}: {weaponName}", EditorStyles.boldLabel);
+
+            if (weaponProp != null)
+                EditorGUILayout.PropertyField(weaponProp, new GUIContent("Weapon"));
+
+            EditorGUILayout.LabelField("Squad Setup", EditorStyles.miniBoldLabel);
+            if (ammoProp != null)
+            {
+                EditorGUILayout.PropertyField(ammoProp, new GUIContent("Ammo / Attacks Remaining"));
+                ammoProp.intValue = Mathf.Max(0, ammoProp.intValue);
+            }
+
+            if (minProp != null)
+            {
+                EditorGUILayout.PropertyField(minProp, new GUIContent("Range Min"));
+                minProp.intValue = Mathf.Max(0, minProp.intValue);
+            }
+
+            if (maxProp != null)
+            {
+                EditorGUILayout.PropertyField(maxProp, new GUIContent("Range Max"));
+                int minValue = minProp != null ? minProp.intValue : 0;
+                maxProp.intValue = Mathf.Max(minValue, maxProp.intValue);
+            }
+
+            if (GUILayout.Button("Remove Slot"))
+            {
+                embarkedWeaponsRuntimeProp.DeleteArrayElementAtIndex(i);
+                EditorGUILayout.EndVertical();
+                break;
+            }
+            EditorGUILayout.EndVertical();
+        }
+
+        if (GUILayout.Button("Add Weapon Slot"))
+            embarkedWeaponsRuntimeProp.InsertArrayElementAtIndex(embarkedWeaponsRuntimeProp.arraySize);
     }
 
     private void DrawUnitIdPopup()

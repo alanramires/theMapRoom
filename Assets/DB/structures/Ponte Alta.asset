@@ -25,6 +25,7 @@ MonoBehaviour:
     heightLevel: 2
   alwaysAllowAirDomain: 1
   baseMovementCost: 1
+  dpqData: {fileID: 11400000, guid: 24e0fd1ecd7c6bf4eb8f3d8c215d14ef, type: 2}
   requiredSkillsToEnter: []
   skillCostOverrides: []
   canAlsoBeBuiltOnTheFollowDomains:

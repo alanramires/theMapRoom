@@ -18,10 +18,11 @@ MonoBehaviour:
   paletteTile: {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
   domain: 1
   heightLevel: 3
-  additionalLayerModes:
+  aditionalDomainsAllowed:
   - domain: 2
     heightLevel: 2
   alwaysAllowAirDomain: 1
   basicAutonomyCost: 1
+  dpqData: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
   requiredSkillsToEnter: []
   skillCostOverrides: []

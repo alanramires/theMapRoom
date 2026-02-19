@@ -20,4 +20,28 @@ MonoBehaviour:
   spriteRed: {fileID: 0}
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
-  maxHP: 40
+  baseMovementCost: 1
+  dpqData: {fileID: 11400000, guid: 8ccccc2f87fd0d64f941b0b356de2a68, type: 2}
+  requiredSkillsToEnter: []
+  skillCostOverrides: []
+  domain: 0
+  heightLevel: 3
+  aditionalDomainsAllowed: []
+  alwaysAllowAirDomain: 1
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
+  supplierResources: []
+  constructionConfiguration:
+    isPlayerHeadQuarter: 0
+    isCapturable: 1
+    capturePointsMax: 20
+    canProduceUnits: 0
+    offeredUnits: []
+    canProvideSupplies: 0
+    offeredSupplies: []
+    offeredServices: []

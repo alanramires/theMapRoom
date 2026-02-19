@@ -13,11 +13,52 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] [Range(0.04f, 0.4f)] private float moveStepDuration = 0.12f;
     [SerializeField] [Range(0f, 0.35f)] private float moveArcHeight = 0.05f;
     [SerializeField] private AnimationCurve moveStepCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    [Header("Mirando Preview Line")]
+    [Tooltip("Material usado na linha de preview de tiro durante o estado Mirando.")]
+    [SerializeField] private Material mirandoPreviewMaterial;
+    [Tooltip("Cor da linha de preview de tiro.")]
+    [SerializeField] private Color mirandoPreviewColor = new Color(1f, 0.65f, 0.2f, 0.95f);
+    [Tooltip("Largura da linha de preview de tiro.")]
+    [SerializeField] [Range(0.03f, 0.4f)] private float mirandoPreviewWidth = 0.12f;
+    [Tooltip("Velocidade do segmento animado (efeito sprinkler).")]
+    [SerializeField] [Range(0.2f, 8f)] private float mirandoPreviewSpeed = 3f;
+    [Tooltip("Comprimento do segmento animado da linha de preview.")]
+    [SerializeField] [Range(0.2f, 5f)] private float mirandoPreviewSegmentLength = 1.1f;
+    [Tooltip("Intensidade da curvatura da parabola para armas parabolic.")]
+    [SerializeField] [Range(0.2f, 4f)] private float mirandoParabolaBend = 1.2f;
+    [Tooltip("Quantidade de pontos amostrados na curva parabolica.")]
+    [SerializeField] [Range(8, 64)] private int mirandoParabolaSamples = 24;
+    [Tooltip("Sorting layer da linha de preview de tiro.")]
+    [SerializeField] private SortingLayerReference mirandoPreviewSortingLayer;
+    [SerializeField, HideInInspector] private bool mirandoPreviewSortingLayerInitialized;
+    [Tooltip("Sorting order da linha de preview de tiro.")]
+    [SerializeField] private int mirandoPreviewSortingOrder = 120;
 
     private Coroutine movementRoutine;
     private UnitManager selectedBlinkUnit;
 
     public bool IsAnimatingMovement => movementRoutine != null;
+    public Material MirandoPreviewMaterial => mirandoPreviewMaterial;
+    public Color MirandoPreviewColor => mirandoPreviewColor;
+    public float MirandoPreviewWidth => Mathf.Clamp(mirandoPreviewWidth, 0.03f, 0.4f);
+    public float MirandoPreviewSpeed => Mathf.Clamp(mirandoPreviewSpeed, 0.2f, 8f);
+    public float MirandoPreviewSegmentLength => Mathf.Clamp(mirandoPreviewSegmentLength, 0.2f, 5f);
+    public float MirandoParabolaBend => Mathf.Clamp(mirandoParabolaBend, 0.2f, 4f);
+    public int MirandoParabolaSamples => Mathf.Clamp(mirandoParabolaSamples, 8, 64);
+    public int MirandoPreviewSortingLayerId => mirandoPreviewSortingLayer.Id;
+    public int MirandoPreviewSortingOrder => mirandoPreviewSortingOrder;
+
+    private void Awake()
+    {
+        EnsureDefaults();
+    }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        EnsureDefaults();
+    }
+#endif
 
     private void Update()
     {
@@ -134,5 +175,14 @@ public class AnimationManager : MonoBehaviour
             return t;
 
         return moveStepCurve.Evaluate(t);
+    }
+
+    private void EnsureDefaults()
+    {
+        if (!mirandoPreviewSortingLayerInitialized)
+        {
+            mirandoPreviewSortingLayer = SortingLayerReference.FromName("SFX");
+            mirandoPreviewSortingLayerInitialized = true;
+        }
     }
 }

@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 3cbdb15f4b8dae542818cac2c9c864d9
+guid: df54d4b1d49c3f741ad6aadf81c50bf7
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 2213253203845866692
-    second: videoframe_5991_0
+      213: 2052667637988557920
+    second: white ring filled black target_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -46,12 +46,12 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 2
+  spriteMode: 1
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 100
+  spritePixelsToUnits: 1024
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: videoframe_5991_0
+      name: white ring filled black target_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 752
-        height: 416
+        width: 886
+        height: 1024
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 4c46a35001e07be10800000000000000
-      internalID: 2213253203845866692
+      spriteID: 0648f3c575a8c7c10800000000000000
+      internalID: 2052667637988557920
       vertices: []
       indices: 
       edges: []
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: 5e97eb03825dee720800000000000000
     internalID: 0
     vertices: []
     indices: 
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      videoframe_5991_0: 2213253203845866692
+      white ring filled black target_0: 2052667637988557920
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

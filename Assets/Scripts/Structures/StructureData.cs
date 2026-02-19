@@ -31,6 +31,9 @@ public class StructureData : ScriptableObject
     [Tooltip("Custo basico de movimento/autonomia para entrar neste hex de estrutura. Minimo 1.")]
     [Min(1)]
     public int baseMovementCost = 1;
+    [Header("DPQ")]
+    [Tooltip("Referencia de qualidade de posicao (DPQ) aplicada a esta estrutura.")]
+    public DPQData dpqData;
     [Tooltip("Se houver skills nesta lista, a unidade precisa ter pelo menos uma para entrar nesta estrutura.")]
     public List<SkillData> requiredSkillsToEnter = new List<SkillData>();
     [Tooltip("Overrides opcionais de custo de autonomia por skill.")]

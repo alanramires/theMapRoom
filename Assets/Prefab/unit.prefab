@@ -229,6 +229,7 @@ MonoBehaviour:
   maxAmmo: 3
   currentFuel: 99
   maxFuel: 99
+  embarkedWeaponsRuntime: []
   hasActed: 0
   appliedHasActed: 0
   appliedActiveTeamId: -2147483648
@@ -244,7 +245,6 @@ MonoBehaviour:
   actedGlowSize: 1.5
   actedGlowStrength: 1.25
   matchController: {fileID: 0}
-  autoApplyOnStart: 1
   manualMoveAnimationSpeed: 1
   currentDomain: 0
   currentHeightLevel: 3

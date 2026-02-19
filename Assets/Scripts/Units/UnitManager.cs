@@ -24,6 +24,8 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private int maxAmmo = 3;
     [SerializeField] private int currentFuel = 99;
     [SerializeField] private int maxFuel = 99;
+    [Header("Embarked Weapons Runtime")]
+    [SerializeField] private List<UnitEmbarkedWeapon> embarkedWeaponsRuntime = new List<UnitEmbarkedWeapon>();
     [SerializeField] private bool hasActed;
     [SerializeField, HideInInspector] private bool appliedHasActed;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
@@ -39,7 +41,6 @@ public class UnitManager : MonoBehaviour
     [SerializeField] [Range(0.1f, 6f)] private float actedGlowSize = 1.5f;
     [SerializeField] [Range(0f, 4f)] private float actedGlowStrength = 1.25f;
     [SerializeField] private MatchController matchController;
-    [SerializeField] private bool autoApplyOnStart = true;
     [Header("Movement Animation")]
     [SerializeField] [Range(0.1f, 4f)] private float manualMoveAnimationSpeed = 1f;
     [Header("Layer State")]
@@ -109,8 +110,6 @@ public class UnitManager : MonoBehaviour
     private void Start()
     {
         TryAutoAssignMatchController();
-        if (autoApplyOnStart)
-            ApplyFromDatabase();
         appliedHasActed = hasActed;
         appliedActiveTeamId = matchController != null ? matchController.ActiveTeamId : int.MinValue;
         RefreshActedVisual();
@@ -143,8 +142,7 @@ public class UnitManager : MonoBehaviour
             return;
 
         SyncPositionState();
-        if (!ApplyFromDatabase())
-            UpdateDynamicName();
+        UpdateDynamicName();
 
         RefreshActedVisual();
     }
@@ -204,6 +202,7 @@ public class UnitManager : MonoBehaviour
         maxFuel = Mathf.Max(1, data.autonomia);
         currentAmmo = Mathf.Clamp(currentAmmo, 0, GetMaxAmmo());
         currentFuel = Mathf.Clamp(currentFuel, 0, GetMaxFuel());
+        SyncEmbarkedWeaponsFromData(data);
         SyncCurrentLayerStateWithData(data, forceNativeDefault: true);
         RefreshSpriteForCurrentLayer(data);
 
@@ -415,9 +414,65 @@ public class UnitManager : MonoBehaviour
         return false;
     }
 
+    public bool TryGetUnitData(out UnitData data)
+    {
+        data = TryGetUnitData();
+        return data != null;
+    }
+
+    public IReadOnlyList<UnitEmbarkedWeapon> GetEmbarkedWeapons()
+    {
+        return embarkedWeaponsRuntime;
+    }
+
+    public bool TryConsumeEmbarkedWeaponAmmo(int embarkedWeaponIndex, int amount = 1)
+    {
+        if (amount <= 0)
+            amount = 1;
+
+        if (embarkedWeaponIndex < 0 || embarkedWeaponIndex >= embarkedWeaponsRuntime.Count)
+            return false;
+
+        UnitEmbarkedWeapon embarked = embarkedWeaponsRuntime[embarkedWeaponIndex];
+        if (embarked == null || embarked.squadAmmunition < amount)
+            return false;
+
+        embarked.squadAmmunition -= amount;
+        RefreshActedVisual();
+        return true;
+    }
+
     public void SyncLayerStateFromData(bool forceNativeDefault)
     {
         SyncCurrentLayerStateWithData(forceNativeDefault);
+    }
+
+    private void SyncEmbarkedWeaponsFromData(UnitData data)
+    {
+        if (embarkedWeaponsRuntime == null)
+            embarkedWeaponsRuntime = new List<UnitEmbarkedWeapon>();
+
+        embarkedWeaponsRuntime.Clear();
+        if (data == null || data.embarkedWeapons == null)
+            return;
+
+        for (int i = 0; i < data.embarkedWeapons.Count; i++)
+        {
+            UnitEmbarkedWeapon source = data.embarkedWeapons[i];
+            if (source == null || source.weapon == null)
+                continue;
+
+            UnitEmbarkedWeapon copy = new UnitEmbarkedWeapon
+            {
+                weapon = source.weapon,
+                squadAmmunition = Mathf.Max(0, source.squadAmmunition),
+                operationRangeMin = source.GetRangeMin(),
+                operationRangeMax = source.GetRangeMax(),
+                selectedTrajectory = source.selectedTrajectory
+            };
+            copy.EnsureValidSelectedTrajectory();
+            embarkedWeaponsRuntime.Add(copy);
+        }
     }
 
     private UnitLayerMode[] BuildLayerModesSnapshot()
@@ -951,18 +1006,6 @@ public class UnitManager : MonoBehaviour
     private void PullCellFromTransformContext()
     {
         PullCellFromTransform();
-    }
-
-    [ContextMenu("Sync Layer State From Data (Keep Current If Valid)")]
-    private void SyncLayerStateKeepCurrentContext()
-    {
-        SyncLayerStateFromData(forceNativeDefault: false);
-    }
-
-    [ContextMenu("Sync Layer State From Data (Force Native Default)")]
-    private void SyncLayerStateForceNativeContext()
-    {
-        SyncLayerStateFromData(forceNativeDefault: true);
     }
 
 #if UNITY_EDITOR

@@ -70,7 +70,15 @@ public partial class TurnStateManager
             animationManager?.ApplySelectionVisual(selectedUnit);
 
         if (onCompleteState == CursorState.UnitSelected)
+        {
             ClearCommittedMovement();
+            if (cursorController != null && selectedUnit != null)
+            {
+                Vector3Int selectedUnitCell = selectedUnit.CurrentCellPosition;
+                selectedUnitCell.z = 0;
+                cursorController.SetCell(selectedUnitCell, playMoveSfx: false);
+            }
+        }
         else if (onCompleteState == CursorState.MoveuAndando)
         {
             PrepareFuelCostForCommittedPath();
@@ -79,6 +87,15 @@ public partial class TurnStateManager
         }
 
         cursorState = onCompleteState;
+        if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
+            RefreshSensorsForCurrentState();
+        else if (cursorState == CursorState.UnitSelected)
+        {
+            ClearSensorResults();
+            PaintSelectedUnitMovementRange();
+        }
+        else
+            ClearSensorResults();
     }
 
     private void PlayMovementStartSfx(UnitManager unit)

@@ -21,6 +21,7 @@ MonoBehaviour:
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   baseMovementCost: 1
+  dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
   requiredSkillsToEnter: []
   skillCostOverrides: []
   domain: 0

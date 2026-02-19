@@ -17,7 +17,8 @@ public partial class TurnStateManager : MonoBehaviour
         Neutral = 0,
         UnitSelected = 1,
         MoveuAndando = 2,
-        MoveuParado = 3
+        MoveuParado = 3,
+        Mirando = 4
     }
 
     [Header("References")]
@@ -27,16 +28,21 @@ public partial class TurnStateManager : MonoBehaviour
     [SerializeField] private PathManager pathManager;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private Tilemap rangeMapTilemap;
+    [SerializeField] private Tilemap lineOfFireMapTilemap;
     [SerializeField] private Tilemap terrainTilemap;
     [SerializeField] private TileBase rangeOverlayTile;
+    [SerializeField] private TileBase lineOfFireOverlayTile;
 
     [Header("State")]
     [SerializeField] private CursorState cursorState = CursorState.Neutral;
     [SerializeField] private UnitManager selectedUnit;
     [SerializeField] [Range(0.05f, 1f)] private float movementRangeAlpha = 0.6f;
+    [SerializeField] [Range(0.05f, 1f)] private float lineOfFireAlpha = 0.45f;
 
     private readonly List<Vector3Int> paintedRangeCells = new List<Vector3Int>();
     private readonly HashSet<Vector3Int> paintedRangeLookup = new HashSet<Vector3Int>();
+    private readonly List<Vector3Int> paintedLineOfFireCells = new List<Vector3Int>();
+    private readonly HashSet<Vector3Int> paintedLineOfFireLookup = new HashSet<Vector3Int>();
     private readonly Dictionary<Vector3Int, List<Vector3Int>> movementPathsByCell = new Dictionary<Vector3Int, List<Vector3Int>>();
     private readonly List<Vector3Int> committedMovementPath = new List<Vector3Int>();
     private Vector3Int committedOriginCell;
@@ -110,6 +116,8 @@ public partial class TurnStateManager : MonoBehaviour
         if (selectedUnit == unit)
             return;
 
+        ClearSensorResults();
+
         if (selectedUnit != null)
             animationManager?.ClearSelectionVisual(selectedUnit);
 
@@ -125,6 +133,7 @@ public partial class TurnStateManager : MonoBehaviour
     {
         animationManager?.StopCurrentMovement();
         ClearCommittedPathVisual();
+        ClearSensorResults();
 
         if (keepPreparedFuelCost)
             CommitPreparedFuelCost();
@@ -164,6 +173,9 @@ public partial class TurnStateManager : MonoBehaviour
 
         if (rangeMapTilemap == null)
             rangeMapTilemap = FindRangeMapTilemap();
+
+        if (lineOfFireMapTilemap == null)
+            lineOfFireMapTilemap = FindLineOfFireMapTilemap();
     }
 
     private void ClearCommittedMovement()

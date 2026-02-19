@@ -21,8 +21,9 @@ MonoBehaviour:
   - domain: 1
     heightLevel: 3
   basicAttack: 10
+  weaponClass: 2
   operationRangeMin: 2
   operationRangeMax: 4
-  trajectories: 00000000
+  trajectories: 01000000
   sprite: {fileID: 0}
   ammunitionSprite: {fileID: 0}

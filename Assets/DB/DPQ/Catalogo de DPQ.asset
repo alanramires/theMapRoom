@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b13191c7aae949b4a84863127f55652e, type: 3}
+  m_Name: Catalogo de DPQ
+  m_EditorClassIdentifier: Assembly-CSharp::DPQDatabase
+  items:
+  - {fileID: 11400000, guid: 24e0fd1ecd7c6bf4eb8f3d8c215d14ef, type: 2}
+  - {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
+  - {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
+  - {fileID: 11400000, guid: 6a5f363f56705cf499d5c218e8050f29, type: 2}
+  - {fileID: 11400000, guid: 8ccccc2f87fd0d64f941b0b356de2a68, type: 2}

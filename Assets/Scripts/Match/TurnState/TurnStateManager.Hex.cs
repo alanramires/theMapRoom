@@ -7,6 +7,27 @@ public partial class TurnStateManager
         resolvedCell = currentCell + inputDelta;
         resolvedCell.z = 0;
 
+        if (cursorState == CursorState.Mirando)
+            return TryResolveMirandoCursorMove(inputDelta, out resolvedCell);
+
+        if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
+        {
+            if (selectedUnit == null)
+                return false;
+
+            Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+            unitCell.z = 0;
+
+            // Mantem o cursor ancorado na unidade; evita deslocamento livre nesses estados.
+            if (currentCell != unitCell)
+            {
+                resolvedCell = unitCell;
+                return true;
+            }
+
+            return false;
+        }
+
         if (cursorState != CursorState.UnitSelected)
             return true;
 

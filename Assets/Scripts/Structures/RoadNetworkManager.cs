@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 [ExecuteAlways]
 public class RoadNetworkManager : MonoBehaviour
@@ -32,6 +35,9 @@ public class RoadNetworkManager : MonoBehaviour
     private readonly Dictionary<Vector3Int, StructureData> structureByCell = new Dictionary<Vector3Int, StructureData>();
     private float nextLivePreviewTime;
     private int lastPreviewSignature = int.MinValue;
+#if UNITY_EDITOR
+    private bool validateRebuildQueued;
+#endif
 
     public Tilemap BoardTilemap => boardTilemap;
     public StructureDatabase StructureDatabase => structureDatabase;
@@ -81,6 +87,26 @@ public class RoadNetworkManager : MonoBehaviour
     {
         EnsureDefaults();
         TryAutoAssignBoardTilemap();
+        QueueValidateRebuild();
+    }
+
+    private void QueueValidateRebuild()
+    {
+        if (validateRebuildQueued)
+            return;
+
+        validateRebuildQueued = true;
+        EditorApplication.delayCall += PerformDelayedValidateRebuild;
+    }
+
+    private void PerformDelayedValidateRebuild()
+    {
+        EditorApplication.delayCall -= PerformDelayedValidateRebuild;
+        validateRebuildQueued = false;
+
+        if (this == null)
+            return;
+
         RebuildRoadVisuals();
     }
 #endif
@@ -127,8 +153,8 @@ public class RoadNetworkManager : MonoBehaviour
         }
 
         lastPreviewSignature = ComputePreviewSignature();
-        if (logInvalidRoadCells)
-            Debug.Log($"[RoadNetworkManager] Rotas desenhadas: {drawnRoutes}.", this);
+       /* if (logInvalidRoadCells)
+            Debug.Log($"[RoadNetworkManager] Rotas desenhadas: {drawnRoutes}.", this);*/
     }
 
     [ContextMenu("Clear Road Visuals")]

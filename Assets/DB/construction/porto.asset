@@ -21,6 +21,7 @@ MonoBehaviour:
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   baseMovementCost: 1
+  dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
   requiredSkillsToEnter: []
   skillCostOverrides: []
   domain: 0
@@ -31,6 +32,14 @@ MonoBehaviour:
   - domain: 1
     heightLevel: 2
   alwaysAllowAirDomain: 1
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
+  supplierResources: []
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isCapturable: 1
@@ -43,4 +52,3 @@ MonoBehaviour:
     - supply: {fileID: 0}
       quantity: 0
     offeredServices: []
-    resourceStocks: []

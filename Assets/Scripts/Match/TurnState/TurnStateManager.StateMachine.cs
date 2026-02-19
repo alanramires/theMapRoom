@@ -18,6 +18,8 @@ public partial class TurnStateManager
                 return HandleConfirmWhileMoveuAndando();
             case CursorState.MoveuParado:
                 return HandleConfirmWhileMoveuParado();
+            case CursorState.Mirando:
+                return HandleConfirmWhileMirando();
         }
 
         return ActionSfx.None;
@@ -39,6 +41,8 @@ public partial class TurnStateManager
                 return HandleCancelWhileMoveuAndando();
             case CursorState.MoveuParado:
                 return HandleCancelWhileMoveuParado();
+            case CursorState.Mirando:
+                return HandleCancelWhileMirando();
         }
 
         return ActionSfx.None;
@@ -64,7 +68,7 @@ public partial class TurnStateManager
 
         if (unit.HasActed)
         {
-            Debug.Log($"debug: aliado bloqueado por hasActed (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
+            Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
             return ActionSfx.Confirm;
         }
 
@@ -91,6 +95,7 @@ public partial class TurnStateManager
         if (cursorCell == currentUnitCell)
         {
             cursorState = CursorState.MoveuParado;
+            RefreshSensorsForCurrentState();
             Debug.Log("moveu no mesmo lugar");
             return ActionSfx.Confirm;
         }
@@ -107,16 +112,25 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileMoveuAndando()
     {
+        if (TryConfirmScannerAttack())
+            return ActionSfx.Confirm;
+
         return ActionSfx.None;
     }
 
     private ActionSfx HandleConfirmWhileMoveuParado()
     {
+        if (TryConfirmScannerAttack())
+            return ActionSfx.Confirm;
+
         return ActionSfx.None;
     }
 
     private ActionSfx HandleCancelWhileMoveuAndando()
     {
+        if (HandleScannerPromptCancel())
+            return ActionSfx.Cancel;
+
         if (selectedUnit == null || !hasCommittedMovement || committedMovementPath.Count < 2)
             return ActionSfx.Cancel;
 
@@ -127,7 +141,29 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileMoveuParado()
     {
+        if (HandleScannerPromptCancel())
+            return ActionSfx.Cancel;
+
         cursorState = CursorState.UnitSelected;
+        ClearSensorResults();
+        PaintSelectedUnitMovementRange();
+        return ActionSfx.Cancel;
+    }
+
+    private ActionSfx HandleConfirmWhileMirando()
+    {
+        if (TryConfirmScannerAttack())
+            return ActionSfx.Confirm;
+
+        return ActionSfx.None;
+    }
+
+    private ActionSfx HandleCancelWhileMirando()
+    {
+        if (HandleScannerPromptCancel())
+            return ActionSfx.Cancel;
+
+        ExitMirandoStateToMovement();
         return ActionSfx.Cancel;
     }
 }

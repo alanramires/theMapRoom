@@ -4,22 +4,10 @@ using UnityEngine;
 
 public static class UnitLayerTools
 {
-    private const string KeepCurrentMenuPath = "Tools/Units/Propagate Layer State (Keep Current If Valid)";
-    private const string ForceNativeMenuPath = "Tools/Units/Propagate Layer State (Force Native Default)";
+    private const string ApplyDataMenuPath = "Tools/Units/Propagate Unit Data (Apply From Database)";
 
-    [MenuItem(KeepCurrentMenuPath)]
-    private static void PropagateKeepCurrentIfValid()
-    {
-        PropagateLayerState(forceNativeDefault: false);
-    }
-
-    [MenuItem(ForceNativeMenuPath)]
-    private static void PropagateForceNativeDefault()
-    {
-        PropagateLayerState(forceNativeDefault: true);
-    }
-
-    private static void PropagateLayerState(bool forceNativeDefault)
+    [MenuItem(ApplyDataMenuPath)]
+    private static void PropagateUnitData()
     {
         UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         if (units == null || units.Length == 0)
@@ -35,15 +23,15 @@ public static class UnitLayerTools
             if (unit == null)
                 continue;
 
-            Undo.RecordObject(unit, "Propagate Unit Layer State");
-            unit.SyncLayerStateFromData(forceNativeDefault);
+            Undo.RecordObject(unit, "Propagate Unit Data");
+            if (!unit.ApplyFromDatabase())
+                continue;
+
             EditorUtility.SetDirty(unit);
             updated++;
         }
 
         EditorSceneManager.MarkAllScenesDirty();
-
-        string mode = forceNativeDefault ? "Force Native Default" : "Keep Current If Valid";
-        Debug.Log($"[UnitLayerTools] {updated} unidade(s) atualizadas. Modo: {mode}.");
+        Debug.Log($"[UnitLayerTools] {updated} unidade(s) sincronizadas com UnitData (armas embarcadas incluidas).");
     }
 }

@@ -25,6 +25,24 @@ public class CursorController : MonoBehaviour
     [SerializeField] private float firstRepeatDelay = 0.22f;
     [SerializeField] private float repeatRate = 0.08f;
 
+#if ENABLE_INPUT_SYSTEM
+    [Header("Input")]
+    [SerializeField] private InputActionAsset inputActionsAsset;
+    [SerializeField] private string playerMapName = "Player";
+    [SerializeField] private string uiMapName = "UI";
+    [SerializeField] private string moveActionName = "Move";
+    [SerializeField] private string submitActionName = "Submit";
+    [SerializeField] private string cancelActionName = "Cancel";
+    [SerializeField] private string cycleActionName = "Next";
+    [SerializeField] private string cycleModifierActionName = "Sprint";
+
+    private InputAction moveAction;
+    private InputAction submitAction;
+    private InputAction cancelAction;
+    private InputAction cycleAction;
+    private InputAction cycleModifierAction;
+#endif
+
     [Header("Camera Follow")]
     [SerializeField] private CameraController cameraController;
     [SerializeField] private bool adjustCameraOnMove = true;
@@ -65,6 +83,20 @@ public class CursorController : MonoBehaviour
     {
         TryAutoAssignReferences();
         SnapToCell(currentCell);
+    }
+
+    private void OnEnable()
+    {
+#if ENABLE_INPUT_SYSTEM
+        EnsureInputActionsBound();
+#endif
+    }
+
+    private void OnDisable()
+    {
+#if ENABLE_INPUT_SYSTEM
+        DisableBoundInputActions();
+#endif
     }
 
 #if UNITY_EDITOR
@@ -338,25 +370,33 @@ public class CursorController : MonoBehaviour
     private Vector3Int ReadDirectionInput()
     {
 #if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current == null)
-            return Vector3Int.zero;
+        EnsureInputActionsBound();
 
-        if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed)
+        Vector2 input = moveAction != null ? moveAction.ReadValue<Vector2>() : Vector2.zero;
+        if (input.sqrMagnitude > 0.0001f)
+        {
+            if (Mathf.Abs(input.y) >= Mathf.Abs(input.x))
+                return input.y > 0f ? new Vector3Int(0, 1, 0) : new Vector3Int(0, -1, 0);
+
+            return input.x > 0f ? new Vector3Int(1, 0, 0) : new Vector3Int(-1, 0, 0);
+        }
+
+        if (Keyboard.current.upArrowKey.isPressed)
             return new Vector3Int(0, 1, 0);
-        if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed)
+        if (Keyboard.current.downArrowKey.isPressed)
             return new Vector3Int(0, -1, 0);
-        if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed)
+        if (Keyboard.current.leftArrowKey.isPressed)
             return new Vector3Int(-1, 0, 0);
-        if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed)
+        if (Keyboard.current.rightArrowKey.isPressed)
             return new Vector3Int(1, 0, 0);
 #else
-        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow))
+        if (Input.GetKey(KeyCode.UpArrow))
             return new Vector3Int(0, 1, 0);
-        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow))
+        if (Input.GetKey(KeyCode.DownArrow))
             return new Vector3Int(0, -1, 0);
-        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow))
+        if (Input.GetKey(KeyCode.LeftArrow))
             return new Vector3Int(-1, 0, 0);
-        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow))
+        if (Input.GetKey(KeyCode.RightArrow))
             return new Vector3Int(1, 0, 0);
 #endif
 
@@ -492,6 +532,10 @@ public class CursorController : MonoBehaviour
     private bool WasConfirmPressedThisFrame()
     {
 #if ENABLE_INPUT_SYSTEM
+        EnsureInputActionsBound();
+        if (submitAction != null && submitAction.WasPerformedThisFrame())
+            return true;
+
         return Keyboard.current != null && (Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame);
 #else
         return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
@@ -501,6 +545,10 @@ public class CursorController : MonoBehaviour
     private bool WasCancelPressedThisFrame()
     {
 #if ENABLE_INPUT_SYSTEM
+        EnsureInputActionsBound();
+        if (cancelAction != null && cancelAction.WasPerformedThisFrame())
+            return true;
+
         return Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
 #else
         return Input.GetKeyDown(KeyCode.Escape);
@@ -510,10 +558,14 @@ public class CursorController : MonoBehaviour
     private bool WasCycleForwardPressedThisFrame()
     {
 #if ENABLE_INPUT_SYSTEM
+        EnsureInputActionsBound();
+        if (cycleAction != null && cycleAction.WasPerformedThisFrame())
+            return !IsCycleModifierPressed();
+
         if (Keyboard.current == null || !Keyboard.current.tabKey.wasPressedThisFrame)
             return false;
 
-        return !IsShiftPressed();
+        return !IsCycleModifierPressed();
 #else
         return Input.GetKeyDown(KeyCode.Tab) && !Input.GetKey(KeyCode.LeftShift) && !Input.GetKey(KeyCode.RightShift);
 #endif
@@ -522,19 +574,84 @@ public class CursorController : MonoBehaviour
     private bool WasCycleBackwardPressedThisFrame()
     {
 #if ENABLE_INPUT_SYSTEM
+        EnsureInputActionsBound();
+        if (cycleAction != null && cycleAction.WasPerformedThisFrame())
+            return IsCycleModifierPressed();
+
         if (Keyboard.current == null || !Keyboard.current.tabKey.wasPressedThisFrame)
             return false;
 
-        return IsShiftPressed();
+        return IsCycleModifierPressed();
 #else
         return Input.GetKeyDown(KeyCode.Tab) && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
 #endif
     }
 
 #if ENABLE_INPUT_SYSTEM
-    private static bool IsShiftPressed()
+    private bool IsCycleModifierPressed()
     {
+        if (cycleModifierAction != null)
+            return cycleModifierAction.IsPressed();
+
         return Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
+    }
+
+    private void EnsureInputActionsBound()
+    {
+        if (moveAction != null || submitAction != null || cancelAction != null || cycleAction != null)
+            return;
+
+        if (inputActionsAsset == null)
+        {
+            PlayerInput playerInput = GetComponent<PlayerInput>();
+            if (playerInput == null)
+                playerInput = FindAnyObjectByType<PlayerInput>();
+
+            if (playerInput != null)
+                inputActionsAsset = playerInput.actions;
+        }
+
+        if (inputActionsAsset == null)
+            return;
+
+        moveAction = inputActionsAsset.FindAction(playerMapName + "/" + moveActionName, false);
+        submitAction = inputActionsAsset.FindAction(uiMapName + "/" + submitActionName, false);
+        cancelAction = inputActionsAsset.FindAction(uiMapName + "/" + cancelActionName, false);
+        cycleAction = inputActionsAsset.FindAction(playerMapName + "/" + cycleActionName, false);
+        cycleModifierAction = inputActionsAsset.FindAction(playerMapName + "/" + cycleModifierActionName, false);
+
+        EnableActionIfNeeded(moveAction);
+        EnableActionIfNeeded(submitAction);
+        EnableActionIfNeeded(cancelAction);
+        EnableActionIfNeeded(cycleAction);
+        EnableActionIfNeeded(cycleModifierAction);
+    }
+
+    private void DisableBoundInputActions()
+    {
+        DisableActionIfNeeded(moveAction);
+        DisableActionIfNeeded(submitAction);
+        DisableActionIfNeeded(cancelAction);
+        DisableActionIfNeeded(cycleAction);
+        DisableActionIfNeeded(cycleModifierAction);
+
+        moveAction = null;
+        submitAction = null;
+        cancelAction = null;
+        cycleAction = null;
+        cycleModifierAction = null;
+    }
+
+    private static void EnableActionIfNeeded(InputAction action)
+    {
+        if (action != null && !action.enabled)
+            action.Enable();
+    }
+
+    private static void DisableActionIfNeeded(InputAction action)
+    {
+        if (action != null && action.enabled)
+            action.Disable();
     }
 #endif
 
