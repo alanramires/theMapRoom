@@ -4,6 +4,8 @@ using UnityEngine.Tilemaps;
 
 public static class UnitMovementPathRules
 {
+    private const int RoadBonusMinBaseMove = 4;
+
     public static Dictionary<Vector3Int, List<Vector3Int>> CalcularCaminhosValidos(
         Tilemap terrainTilemap,
         UnitManager unit,
@@ -18,6 +20,7 @@ public static class UnitMovementPathRules
         unit.SyncLayerStateFromData(forceNativeDefault: false);
         int maxMovementCost = Mathf.Max(0, maxSteps);
         int maxAutonomyCost = Mathf.Max(0, unit.CurrentFuel);
+        bool canUseRoadBonus = CanUseRoadFullMoveBonus(unit, maxMovementCost);
 
         Vector3Int origin = unit.CurrentCellPosition;
         origin.z = 0;
@@ -28,7 +31,7 @@ public static class UnitMovementPathRules
         Dictionary<PathNodeKey, PathNodeKey> cameFrom = new Dictionary<PathNodeKey, PathNodeKey>();
         List<Vector3Int> neighbors = new List<Vector3Int>(6);
 
-        PathNodeKey originKey = new PathNodeKey(origin, 0);
+        PathNodeKey originKey = new PathNodeKey(origin, 0, usedFreeRoadBonusStep: false, roadOnlyUntilBaseMove: true);
         frontier.Enqueue(originKey);
         autonomyCostByState[originKey] = 0;
         cameFrom[originKey] = originKey;
@@ -51,11 +54,30 @@ public static class UnitMovementPathRules
                 if (!CanTraverseCell(construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit))
                     continue;
                 int autonomyCostToEnter = GetAutonomyCostToEnterCell(construction, structure, terrainData, unit);
-                int nextStep = currentSteps + autonomyCostToEnter;
+                bool nextIsRoadBoost = cache.IsRoadBoostCell(next);
+
+                bool useFreeRoadBonusStep =
+                    canUseRoadBonus &&
+                    !currentKey.usedFreeRoadBonusStep &&
+                    currentKey.roadOnlyUntilBaseMove &&
+                    currentSteps == maxMovementCost &&
+                    nextIsRoadBoost;
+
+                int movementCostToEnter = useFreeRoadBonusStep ? 0 : autonomyCostToEnter;
+                int autonomyCostDelta = useFreeRoadBonusStep ? 0 : autonomyCostToEnter;
+                int nextStep = currentSteps + movementCostToEnter;
                 if (nextStep > maxMovementCost)
                     continue;
-                PathNodeKey nextKey = new PathNodeKey(next, nextStep);
-                int totalAutonomyCost = currentAutonomyCost + autonomyCostToEnter;
+                bool nextRoadOnlyUntilBaseMove = currentKey.roadOnlyUntilBaseMove;
+                if (currentSteps < maxMovementCost && !nextIsRoadBoost)
+                    nextRoadOnlyUntilBaseMove = false;
+
+                PathNodeKey nextKey = new PathNodeKey(
+                    next,
+                    nextStep,
+                    usedFreeRoadBonusStep: currentKey.usedFreeRoadBonusStep || useFreeRoadBonusStep,
+                    roadOnlyUntilBaseMove: nextRoadOnlyUntilBaseMove);
+                int totalAutonomyCost = currentAutonomyCost + autonomyCostDelta;
                 if (totalAutonomyCost > maxAutonomyCost)
                     continue;
 
@@ -107,9 +129,43 @@ public static class UnitMovementPathRules
             return 0;
 
         MovementQueryCache cache = new MovementQueryCache(terrainTilemap, terrainDatabase);
+        int baseMove = Mathf.Max(0, unit.GetMovementRange());
+        bool canUseRoadBonus = CanUseRoadFullMoveBonus(unit, baseMove);
+        bool freeRoadStepGranted = false;
+        int freeRoadStepIndex = -1;
+
+        if (canUseRoadBonus && path.Count > baseMove + 1)
+        {
+            bool fullMoveWasOnRoad = true;
+            for (int i = 1; i <= baseMove; i++)
+            {
+                Vector3Int roadCell = path[i];
+                roadCell.z = 0;
+                if (!cache.IsRoadBoostCell(roadCell))
+                {
+                    fullMoveWasOnRoad = false;
+                    break;
+                }
+            }
+
+            if (fullMoveWasOnRoad)
+            {
+                Vector3Int bonusCell = path[baseMove + 1];
+                bonusCell.z = 0;
+                if (cache.IsRoadBoostCell(bonusCell))
+                    freeRoadStepIndex = baseMove + 1;
+            }
+        }
+
         int total = 0;
         for (int i = 1; i < path.Count; i++)
         {
+            if (!freeRoadStepGranted && freeRoadStepIndex == i)
+            {
+                freeRoadStepGranted = true;
+                continue;
+            }
+
             Vector3Int cell = path[i];
             cell.z = 0;
 
@@ -120,6 +176,17 @@ public static class UnitMovementPathRules
         }
 
         return Mathf.Max(0, total);
+    }
+
+    private static bool CanUseRoadFullMoveBonus(UnitManager unit, int baseMove)
+    {
+        if (unit == null)
+            return false;
+
+        if (baseMove < RoadBonusMinBaseMove)
+            return false;
+
+        return unit.GetDomain() == Domain.Land && unit.GetHeightLevel() == HeightLevel.Surface;
     }
 
     private static bool CanTraverseCell(
@@ -494,16 +561,27 @@ public static class UnitMovementPathRules
     {
         public readonly Vector3Int cell;
         public readonly int steps;
+        public readonly bool usedFreeRoadBonusStep;
+        public readonly bool roadOnlyUntilBaseMove;
 
-        public PathNodeKey(Vector3Int cell, int steps)
+        public PathNodeKey(
+            Vector3Int cell,
+            int steps,
+            bool usedFreeRoadBonusStep,
+            bool roadOnlyUntilBaseMove)
         {
             this.cell = new Vector3Int(cell.x, cell.y, 0);
             this.steps = steps;
+            this.usedFreeRoadBonusStep = usedFreeRoadBonusStep;
+            this.roadOnlyUntilBaseMove = roadOnlyUntilBaseMove;
         }
 
         public bool Equals(PathNodeKey other)
         {
-            return cell == other.cell && steps == other.steps;
+            return cell == other.cell
+                   && steps == other.steps
+                   && usedFreeRoadBonusStep == other.usedFreeRoadBonusStep
+                   && roadOnlyUntilBaseMove == other.roadOnlyUntilBaseMove;
         }
 
         public override bool Equals(object obj)
@@ -515,7 +593,10 @@ public static class UnitMovementPathRules
         {
             unchecked
             {
-                return (cell.GetHashCode() * 397) ^ steps;
+                int hash = (cell.GetHashCode() * 397) ^ steps;
+                hash = (hash * 397) ^ (usedFreeRoadBonusStep ? 1 : 0);
+                hash = (hash * 397) ^ (roadOnlyUntilBaseMove ? 1 : 0);
+                return hash;
             }
         }
     }
@@ -616,6 +697,12 @@ public static class UnitMovementPathRules
 
             structureByCell[cell] = found;
             return found;
+        }
+
+        public bool IsRoadBoostCell(Vector3Int cell)
+        {
+            StructureData structure = GetStructureAtCell(cell);
+            return structure != null && structure.roadBoost;
         }
 
         public TerrainTypeData ResolveTerrainAtCell(Vector3Int cell)

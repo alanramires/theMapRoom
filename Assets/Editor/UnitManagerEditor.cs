@@ -1,5 +1,6 @@
 using UnityEditor;
 using UnityEngine;
+using UnityEditor.SceneManagement;
 
 [CustomEditor(typeof(UnitManager))]
 public class UnitManagerEditor : Editor
@@ -126,12 +127,113 @@ public class UnitManagerEditor : Editor
         serializedObject.ApplyModifiedProperties();
 
         UnitManager unit = (UnitManager)target;
+        DrawLayerStateCycleButtons(unit);
+
         if (GUILayout.Button("Apply From Database"))
             unit.ApplyFromDatabase();
         if (GUILayout.Button("Snap To Cell Center"))
             unit.SnapToCellCenter();
         if (GUILayout.Button("Pull Cell From Transform"))
             unit.PullCellFromTransform();
+    }
+
+    private void DrawLayerStateCycleButtons(UnitManager unit)
+    {
+        if (unit == null)
+            return;
+
+        System.Collections.Generic.List<UnitLayerMode> orderedModes = BuildOrderedLayerModes(unit);
+        int modeCount = orderedModes.Count;
+        int currentIndex = ResolveCurrentLayerModeIndex(unit, orderedModes);
+        bool canGoDown = currentIndex > 0;
+        bool canGoUp = currentIndex >= 0 && currentIndex < modeCount - 1;
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Layer State Controls", EditorStyles.miniBoldLabel);
+
+        EditorGUILayout.BeginHorizontal();
+        using (new EditorGUI.DisabledScope(modeCount <= 1 || !canGoDown))
+        {
+            if (GUILayout.Button("Descer Domain"))
+                StepLayerMode(unit, orderedModes, currentIndex, -1);
+        }
+
+        using (new EditorGUI.DisabledScope(modeCount <= 1 || !canGoUp))
+        {
+            if (GUILayout.Button("Subir Domain"))
+                StepLayerMode(unit, orderedModes, currentIndex, +1);
+        }
+        EditorGUILayout.EndHorizontal();
+
+        if (modeCount > 0)
+        {
+            UnitLayerMode current = orderedModes[Mathf.Clamp(currentIndex, 0, modeCount - 1)];
+            EditorGUILayout.HelpBox(
+                $"Layer atual: {current.domain}/{current.heightLevel} ({currentIndex + 1}/{modeCount})",
+                MessageType.None);
+        }
+    }
+
+    private static System.Collections.Generic.List<UnitLayerMode> BuildOrderedLayerModes(UnitManager unit)
+    {
+        var ordered = new System.Collections.Generic.List<UnitLayerMode>();
+        if (unit == null)
+            return ordered;
+
+        var modes = unit.GetAllLayerModes();
+        if (modes == null)
+            return ordered;
+
+        for (int i = 0; i < modes.Count; i++)
+            ordered.Add(modes[i]);
+
+        ordered.Sort((a, b) =>
+        {
+            int byHeight = ((int)a.heightLevel).CompareTo((int)b.heightLevel);
+            if (byHeight != 0)
+                return byHeight;
+
+            return ((int)a.domain).CompareTo((int)b.domain);
+        });
+
+        return ordered;
+    }
+
+    private static int ResolveCurrentLayerModeIndex(UnitManager unit, System.Collections.Generic.IReadOnlyList<UnitLayerMode> modes)
+    {
+        if (unit == null || modes == null || modes.Count == 0)
+            return 0;
+
+        UnitLayerMode current = unit.GetCurrentLayerMode();
+        for (int i = 0; i < modes.Count; i++)
+        {
+            if (modes[i].domain == current.domain && modes[i].heightLevel == current.heightLevel)
+                return i;
+        }
+
+        return 0;
+    }
+
+    private static void StepLayerMode(UnitManager unit, System.Collections.Generic.IReadOnlyList<UnitLayerMode> orderedModes, int currentIndex, int delta)
+    {
+        if (unit == null || orderedModes == null || orderedModes.Count <= 1)
+            return;
+
+        int clampedCurrent = Mathf.Clamp(currentIndex, 0, orderedModes.Count - 1);
+        int next = clampedCurrent + delta;
+        if (next < 0 || next >= orderedModes.Count)
+            return;
+
+        UnitLayerMode targetMode = orderedModes[next];
+
+        Undo.RecordObject(unit, "Cycle Unit Layer State");
+        if (!unit.TrySetCurrentLayerMode(targetMode.domain, targetMode.heightLevel))
+            return;
+
+        EditorUtility.SetDirty(unit);
+        PrefabUtility.RecordPrefabInstancePropertyModifications(unit);
+        if (unit.gameObject.scene.IsValid())
+            EditorSceneManager.MarkSceneDirty(unit.gameObject.scene);
     }
 
     private void DrawEmbarkedWeaponsRuntimeSection()

@@ -55,6 +55,8 @@ public class StructureData : ScriptableObject
     [Tooltip("Sobreposicao entre segmentos para evitar gaps visuais.")]
     [Range(0f, 0.3f)]
     public float segmentOverlap = 0.02f;
+    [Tooltip("Se true, esta estrutura habilita bonus de deslocamento em full move (ex.: estrada).")]
+    public bool roadBoost = false;
 
     [Header("Road Routes")]
     [Tooltip("Rotas de rodovia desta estrutura (centro-a-centro dos hexes).")]

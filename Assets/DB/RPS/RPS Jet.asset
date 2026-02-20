@@ -27,3 +27,17 @@ MonoBehaviour:
       defenseBonus: 2
       notes: Dog Fight
       rpsDefenseText: Jet se defende de Jet com AntiAerea com RPS Defesa +2
+  - ataque:
+      unitClass: 4
+      weaponCategory: 2
+      targetClass: 5
+      attackBonus: 2
+      notes: Dog fight
+      rpsAttackText: Jet com AntiAerea ataca Helicopter com RPS Ataque +2
+    defesa:
+      targetClass: 5
+      unitClass: 4
+      weaponCategory: 2
+      defenseBonus: -2
+      notes: Dog Fight
+      rpsDefenseText: Helicopter se defende de Jet com AntiAerea com RPS Defesa -2

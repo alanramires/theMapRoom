@@ -29,6 +29,7 @@ MonoBehaviour:
   roadColor: {r: 1, g: 1, b: 1, a: 1}
   roadWidth: 0.16
   segmentOverlap: 0.02
+  roadBoost: 1
   roadRoutes:
   - routeName: Rota 66
     cells:
@@ -133,3 +134,13 @@ MonoBehaviour:
     - {x: 31, y: -4, z: 0}
     - {x: 31, y: -5, z: 0}
     - {x: 32, y: -6, z: 0}
+  - routeName: Praiero
+    cells:
+    - {x: 32, y: -6, z: 0}
+    - {x: 31, y: -6, z: 0}
+    - {x: 30, y: -6, z: 0}
+    - {x: 29, y: -6, z: 0}
+    - {x: 28, y: -6, z: 0}
+    - {x: 27, y: -6, z: 0}
+    - {x: 26, y: -6, z: 0}
+    - {x: 25, y: -6, z: 0}
