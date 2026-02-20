@@ -27,7 +27,7 @@ MonoBehaviour:
   movementCategory: 1
   militaryForce: 1
   unitClass: 4
-  eliteLevel: 0
+  eliteLevel: 1
   domain: 3
   heightLevel: 5
   aditionalDomainsAllowed:
@@ -45,14 +45,15 @@ MonoBehaviour:
     spriteRed: {fileID: 0}
     spriteBlue: {fileID: 0}
     spriteYellow: {fileID: 0}
-  skills: []
+  skills:
+  - {fileID: 11400000, guid: eb4290ee629501742b1b461dc39c8799, type: 2}
   embarkedWeapons:
-  - weapon: {fileID: 11400000, guid: 5037c8f9867aebc4fac3243ad3a6ae67, type: 2}
+  - weapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}
     squadAmmunition: 5
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
-    lastSyncedWeapon: {fileID: 11400000, guid: 5037c8f9867aebc4fac3243ad3a6ae67, type: 2}
+    lastSyncedWeapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}
   - weapon: {fileID: 11400000, guid: 5430f79fb5141ce41a424bd96250ed1b, type: 2}
     squadAmmunition: 8
     operationRangeMin: 1

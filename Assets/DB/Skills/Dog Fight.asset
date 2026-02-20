@@ -24,6 +24,8 @@ MonoBehaviour:
   requiredWeaponCategory: 2
   requireSameUnitClass: 1
   eliteComparison: 1
-  minEliteDifference: 2
-  attackRpsModifier: 0
-  defenseRpsModifier: 0
+  minEliteDifference: 1
+  ownerAttackRpsModifier: 2
+  ownerDefenseRpsModifier: 5
+  opponentAttackRpsModifier: -2
+  opponentDefenseRpsModifier: -5
