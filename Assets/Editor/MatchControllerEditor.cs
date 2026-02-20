@@ -8,6 +8,7 @@ public class MatchControllerEditor : Editor
     private SerializedProperty activeTeamIdProp;
     private SerializedProperty playersProp;
     private SerializedProperty includeNeutralTeamProp;
+    private SerializedProperty fogOfWarProp;
     private SerializedProperty activePlayerListIndexProp;
 
     private void OnEnable()
@@ -16,12 +17,13 @@ public class MatchControllerEditor : Editor
         activeTeamIdProp = serializedObject.FindProperty("activeTeamId");
         playersProp = serializedObject.FindProperty("players");
         includeNeutralTeamProp = serializedObject.FindProperty("includeNeutralTeam");
+        fogOfWarProp = serializedObject.FindProperty("fogOfWar");
         activePlayerListIndexProp = serializedObject.FindProperty("activePlayerListIndex");
     }
 
     public override void OnInspectorGUI()
     {
-        if (currentTurnProp == null || activeTeamIdProp == null || playersProp == null || includeNeutralTeamProp == null || activePlayerListIndexProp == null)
+        if (currentTurnProp == null || activeTeamIdProp == null || playersProp == null || includeNeutralTeamProp == null || fogOfWarProp == null || activePlayerListIndexProp == null)
         {
             EditorGUILayout.HelpBox("MatchControllerEditor: propriedades nao encontradas. Usando inspector padrao.", MessageType.Warning);
             DrawDefaultInspector();
@@ -35,6 +37,7 @@ public class MatchControllerEditor : Editor
         EditorGUILayout.PropertyField(activeTeamIdProp, new GUIContent("Active Team ID"));
         EditorGUILayout.PropertyField(playersProp, new GUIContent("Players"), true);
         EditorGUILayout.PropertyField(includeNeutralTeamProp, new GUIContent("Include Neutral Team"));
+        EditorGUILayout.PropertyField(fogOfWarProp, new GUIContent("Fog of War"));
         using (new EditorGUI.DisabledScope(true))
             EditorGUILayout.PropertyField(activePlayerListIndexProp, new GUIContent("Active Player List Index"));
 

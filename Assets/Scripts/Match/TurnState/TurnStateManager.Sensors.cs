@@ -48,6 +48,8 @@ public partial class TurnStateManager
             boardMap,
             terrainDatabase,
             weaponPriorityData,
+            dpqAirHeightConfig,
+            IsFogOfWarEnabled(),
             movementMode,
             availableSensorActionCodes,
             cachedPodeMirarTargets);

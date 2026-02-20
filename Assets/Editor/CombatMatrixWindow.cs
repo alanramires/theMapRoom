@@ -19,6 +19,7 @@ public class CombatMatrixWindow : EditorWindow
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private WeaponPriorityData weaponPriorityData;
     [SerializeField] private DPQMatchupDatabase dpqMatchupDatabase;
+    [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
     [SerializeField] private RPSDatabase rpsDatabase;
     [SerializeField] private UnitManager attackerUnit;
     [SerializeField] private UnitManager defenderUnit;
@@ -40,7 +41,7 @@ public class CombatMatrixWindow : EditorWindow
     private string selectedCellLog = string.Empty;
     private GUIStyle baselineCellButtonStyle;
 
-    [MenuItem("Tools/Matriz de Combate")]
+    [MenuItem("Tools/Combat/Matriz de Combate")]
     public static void OpenWindow()
     {
         GetWindow<CombatMatrixWindow>("Matriz de Combate");
@@ -59,6 +60,7 @@ public class CombatMatrixWindow : EditorWindow
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
         weaponPriorityData = (WeaponPriorityData)EditorGUILayout.ObjectField("Weapon Priority Data", weaponPriorityData, typeof(WeaponPriorityData), false);
         dpqMatchupDatabase = (DPQMatchupDatabase)EditorGUILayout.ObjectField("DPQ Matchup DB", dpqMatchupDatabase, typeof(DPQMatchupDatabase), false);
+        dpqAirHeightConfig = (DPQAirHeightConfig)EditorGUILayout.ObjectField("DPQ Air Height", dpqAirHeightConfig, typeof(DPQAirHeightConfig), false);
         rpsDatabase = (RPSDatabase)EditorGUILayout.ObjectField("RPS Database", rpsDatabase, typeof(RPSDatabase), false);
         movementMode = (SensorMovementMode)EditorGUILayout.EnumPopup("Modo Sensor", movementMode);
         logToConsole = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
@@ -170,7 +172,8 @@ public class CombatMatrixWindow : EditorWindow
             movementMode,
             sensorValidResults,
             sensorInvalidResults,
-            weaponPriorityData);
+            weaponPriorityData,
+            dpqAirHeightConfig);
 
         for (int i = 0; i < sensorValidResults.Count; i++)
         {
@@ -280,6 +283,8 @@ public class CombatMatrixWindow : EditorWindow
 
         GameUnitClass attackerClass = ResolveUnitClass(attacker, out bool attackerClassFromData);
         GameUnitClass defenderClass = ResolveUnitClass(defender, out bool defenderClassFromData);
+        int attackerEliteLevel = ResolveEliteLevel(attacker);
+        int defenderEliteLevel = ResolveEliteLevel(defender);
         WeaponCategory attackerCategory = ResolveWeaponCategory(option.weapon);
         WeaponCategory defenderCategory = ResolveWeaponCategory(defenderCounterWeapon);
 
@@ -287,10 +292,19 @@ public class CombatMatrixWindow : EditorWindow
         RpsBonusInfo defenderAttackRps = defenderCanCounter
             ? ResolveAttackRps(defenderClass, defenderCategory, attackerClass)
             : RpsBonusInfo.None;
+        SkillRpsBonusInfo attackerSkillRps = ResolveSkillRps(attacker, defender, attackerCategory);
+        SkillRpsBonusInfo defenderSkillRps = defenderCanCounter
+            ? ResolveSkillRps(defender, attacker, defenderCategory)
+            : SkillRpsBonusInfo.NoneWithReason("sem revide");
 
-        int attackerAttackEffective = attackerHpBefore * Mathf.Max(0, attackerWeaponPower + attackerAttackRps.value);
+        int attackerAttackSkillTotal = attackerSkillRps.ownerAttackValue + defenderSkillRps.opponentAttackValue;
+        int defenderAttackSkillTotal = defenderSkillRps.ownerAttackValue + attackerSkillRps.opponentAttackValue;
+        int attackerDefenseSkillTotal = attackerSkillRps.ownerDefenseValue + defenderSkillRps.opponentDefenseValue;
+        int defenderDefenseSkillTotal = defenderSkillRps.ownerDefenseValue + attackerSkillRps.opponentDefenseValue;
+
+        int attackerAttackEffective = attackerHpBefore * Mathf.Max(0, attackerWeaponPower + attackerAttackRps.value + attackerAttackSkillTotal);
         int defenderAttackEffective = defenderCanCounter
-            ? defenderHpBefore * Mathf.Max(0, defenderWeaponPower + defenderAttackRps.value)
+            ? defenderHpBefore * Mathf.Max(0, defenderWeaponPower + defenderAttackRps.value + defenderAttackSkillTotal)
             : 0;
 
         int attackerBaseDefense = GetUnitBaseDefense(attacker);
@@ -301,8 +315,8 @@ public class CombatMatrixWindow : EditorWindow
             : RpsBonusInfo.None;
         RpsBonusInfo defenderDefenseRps = ResolveDefenseRps(defenderClass, attackerClass, attackerCategory);
 
-        int attackerEffectiveDefense = attackerBaseDefense + forcedAttackerDpq.defenseBonus + attackerDefenseRps.value;
-        int defenderEffectiveDefense = defenderBaseDefense + forcedDefenderDpq.defenseBonus + defenderDefenseRps.value;
+        int attackerEffectiveDefense = attackerBaseDefense + forcedAttackerDpq.defenseBonus + attackerDefenseRps.value + attackerDefenseSkillTotal;
+        int defenderEffectiveDefense = defenderBaseDefense + forcedDefenderDpq.defenseBonus + defenderDefenseRps.value + defenderDefenseSkillTotal;
 
         DPQCombatOutcome attackerOutcome = DPQCombatOutcome.Neutro;
         DPQCombatOutcome defenderOutcome = DPQCombatOutcome.Neutro;
@@ -326,6 +340,8 @@ public class CombatMatrixWindow : EditorWindow
         log.AppendLine($"Entrada: {SafeName(attacker)} -> {SafeName(defender)}");
         log.AppendLine($"Classe atacante usada no RPS: {attackerClass} {(attackerClassFromData ? "(UnitData)" : "(fallback)")}");
         log.AppendLine($"Classe defensor usada no RPS: {defenderClass} {(defenderClassFromData ? "(UnitData)" : "(fallback)")}");
+        log.AppendLine($"Elite atacante: {attackerEliteLevel}");
+        log.AppendLine($"Elite defensor: {defenderEliteLevel}");
         log.AppendLine($"Chave RPS ataque atacante: {attackerClass} + {attackerCategory} -> {defenderClass}");
         log.AppendLine($"Chave RPS ataque defensor: {defenderClass} + {defenderCategory} -> {attackerClass}");
         log.AppendLine($"Opcao selecionada (par): {selectedPairWeaponIndex + 1}/{Mathf.Max(1, currentPairOptions.Count)}");
@@ -341,15 +357,19 @@ public class CombatMatrixWindow : EditorWindow
         log.AppendLine($"Revide: {(defenderCanCounter ? "sim" : "nao")} | origem={defenderCounterLabel}");
         log.AppendLine();
         log.AppendLine("1) Ataque efetivo com RPS");
-        log.AppendLine($"- Atacante: HP({attackerHpBefore}) x (Arma({attackerWeaponPower}) + RPSAtaque({FormatSigned(attackerAttackRps.value)})) = {attackerAttackEffective}");
-        log.AppendLine($"- Defensor: HP({defenderHpBefore}) x (Arma({defenderWeaponPower}) + RPSAtaque({FormatSigned(defenderAttackRps.value)})) = {defenderAttackEffective}");
+        log.AppendLine($"- Atacante: HP({attackerHpBefore}) x (Arma({attackerWeaponPower}) + RPSAtaque({FormatSigned(attackerAttackRps.value)}) + EliteSkillAtaque({FormatSigned(attackerAttackSkillTotal)})) = {attackerAttackEffective}");
+        log.AppendLine($"- Defensor: HP({defenderHpBefore}) x (Arma({defenderWeaponPower}) + RPSAtaque({FormatSigned(defenderAttackRps.value)}) + EliteSkillAtaque({FormatSigned(defenderAttackSkillTotal)})) = {defenderAttackEffective}");
         log.AppendLine($"- RPS ataque atacante: {attackerAttackRps.summary}");
         log.AppendLine($"- RPS ataque defensor: {defenderAttackRps.summary}");
+        log.AppendLine($"- ELITE SKILL ataque atacante: proprio={FormatSigned(attackerSkillRps.ownerAttackValue)} | recebido={FormatSigned(defenderSkillRps.opponentAttackValue)} | total={FormatSigned(attackerAttackSkillTotal)}");
+        log.AppendLine($"- ELITE SKILL ataque defensor: proprio={FormatSigned(defenderSkillRps.ownerAttackValue)} | recebido={FormatSigned(attackerSkillRps.opponentAttackValue)} | total={FormatSigned(defenderAttackSkillTotal)}");
         log.AppendLine("2) Defesa efetiva com RPS");
-        log.AppendLine($"- Atacante: defesaUnidade({attackerBaseDefense}) + defesaDPQ({forcedAttackerDpq.defenseBonus}) + RPSDefesa({FormatSigned(attackerDefenseRps.value)}) = {attackerEffectiveDefense}");
-        log.AppendLine($"- Defensor: defesaUnidade({defenderBaseDefense}) + defesaDPQ({forcedDefenderDpq.defenseBonus}) + RPSDefesa({FormatSigned(defenderDefenseRps.value)}) = {defenderEffectiveDefense}");
+        log.AppendLine($"- Atacante: defesaUnidade({attackerBaseDefense}) + defesaDPQ({forcedAttackerDpq.defenseBonus}) + RPSDefesa({FormatSigned(attackerDefenseRps.value)}) + EliteSkillDefesa({FormatSigned(attackerDefenseSkillTotal)}) = {attackerEffectiveDefense}");
+        log.AppendLine($"- Defensor: defesaUnidade({defenderBaseDefense}) + defesaDPQ({forcedDefenderDpq.defenseBonus}) + RPSDefesa({FormatSigned(defenderDefenseRps.value)}) + EliteSkillDefesa({FormatSigned(defenderDefenseSkillTotal)}) = {defenderEffectiveDefense}");
         log.AppendLine($"- RPS defesa atacante: {attackerDefenseRps.summary}");
         log.AppendLine($"- RPS defesa defensor: {defenderDefenseRps.summary}");
+        log.AppendLine($"- ELITE SKILL defesa atacante: proprio={FormatSigned(attackerSkillRps.ownerDefenseValue)} | recebido={FormatSigned(defenderSkillRps.opponentDefenseValue)} | total={FormatSigned(attackerDefenseSkillTotal)}");
+        log.AppendLine($"- ELITE SKILL defesa defensor: proprio={FormatSigned(defenderSkillRps.ownerDefenseValue)} | recebido={FormatSigned(attackerSkillRps.opponentDefenseValue)} | total={FormatSigned(defenderDefenseSkillTotal)}");
         log.AppendLine("3) Matchup DPQ");
         log.AppendLine($"- Diferenca: {forcedAttackerDpq.points} - {forcedDefenderDpq.points} = {forcedAttackerDpq.points - forcedDefenderDpq.points}");
         log.AppendLine($"- Outcome atacante: {attackerOutcome}");
@@ -375,6 +395,8 @@ public class CombatMatrixWindow : EditorWindow
             dpqMatchupDatabase = FindFirstAsset<DPQMatchupDatabase>();
         if (rpsDatabase == null)
             rpsDatabase = FindFirstAsset<RPSDatabase>();
+        if (dpqAirHeightConfig == null)
+            dpqAirHeightConfig = FindFirstAsset<DPQAirHeightConfig>();
     }
 
     private static T FindFirstAsset<T>() where T : ScriptableObject
@@ -463,6 +485,13 @@ public class CombatMatrixWindow : EditorWindow
         return GameUnitClass.Infantry;
     }
 
+    private static int ResolveEliteLevel(UnitManager unit)
+    {
+        if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null)
+            return Mathf.Max(0, data.eliteLevel);
+        return 0;
+    }
+
     private static WeaponCategory ResolveWeaponCategory(WeaponData weapon)
     {
         return weapon != null ? weapon.WeaponCategory : WeaponCategory.AntiInfantaria;
@@ -498,6 +527,62 @@ public class CombatMatrixWindow : EditorWindow
         }
 
         return RpsBonusInfo.NoneWithReason("sem match");
+    }
+
+    private static SkillRpsBonusInfo ResolveSkillRps(UnitManager ownerUnit, UnitManager opponentUnit, WeaponCategory ownerWeaponCategory)
+    {
+        if (ownerUnit == null)
+            return SkillRpsBonusInfo.NoneWithReason("owner nulo");
+
+        if (!ownerUnit.TryGetUnitData(out UnitData ownerData) || ownerData == null)
+            return SkillRpsBonusInfo.NoneWithReason("owner sem UnitData");
+
+        if (ownerData.skills == null || ownerData.skills.Count == 0)
+            return SkillRpsBonusInfo.NoneWithReason("owner sem skills");
+
+        GameUnitClass ownerClass = ownerData.unitClass;
+        int ownerElite = Mathf.Max(0, ownerData.eliteLevel);
+
+        UnitData opponentData = null;
+        if (opponentUnit != null)
+            opponentUnit.TryGetUnitData(out opponentData);
+
+        GameUnitClass opponentClass = opponentData != null ? opponentData.unitClass : GameUnitClass.Infantry;
+        int opponentElite = opponentData != null ? Mathf.Max(0, opponentData.eliteLevel) : 0;
+
+        int totalOwnerAttack = 0;
+        int totalOwnerDefense = 0;
+        int totalOpponentAttack = 0;
+        int totalOpponentDefense = 0;
+
+        for (int i = 0; i < ownerData.skills.Count; i++)
+        {
+            SkillData skill = ownerData.skills[i];
+            if (skill == null)
+                continue;
+
+            if (!skill.TryGetCombatRpsModifiers(
+                ownerClass,
+                ownerElite,
+                ownerWeaponCategory,
+                opponentClass,
+                opponentElite,
+                out int ownerAtkMod,
+                out int ownerDefMod,
+                out int opponentAtkMod,
+                out int opponentDefMod,
+                out _))
+            {
+                continue;
+            }
+
+            totalOwnerAttack += ownerAtkMod;
+            totalOwnerDefense += ownerDefMod;
+            totalOpponentAttack += opponentAtkMod;
+            totalOpponentDefense += opponentDefMod;
+        }
+
+        return new SkillRpsBonusInfo(totalOwnerAttack, totalOwnerDefense, totalOpponentAttack, totalOpponentDefense);
     }
 
     private string BuildInvalidPairReport(UnitManager attacker, UnitManager defender, List<PodeMirarInvalidOption> invalidOptions)
@@ -696,6 +781,27 @@ public class CombatMatrixWindow : EditorWindow
         public static RpsBonusInfo NoneWithReason(string reason)
         {
             return new RpsBonusInfo(0, $"RPS +0 ({reason})");
+        }
+    }
+
+    private readonly struct SkillRpsBonusInfo
+    {
+        public static SkillRpsBonusInfo NoneWithReason(string reason)
+        {
+            return new SkillRpsBonusInfo(0, 0, 0, 0);
+        }
+
+        public readonly int ownerAttackValue;
+        public readonly int ownerDefenseValue;
+        public readonly int opponentAttackValue;
+        public readonly int opponentDefenseValue;
+
+        public SkillRpsBonusInfo(int ownerAttackValue, int ownerDefenseValue, int opponentAttackValue, int opponentDefenseValue)
+        {
+            this.ownerAttackValue = ownerAttackValue;
+            this.ownerDefenseValue = ownerDefenseValue;
+            this.opponentAttackValue = opponentAttackValue;
+            this.opponentDefenseValue = opponentDefenseValue;
         }
     }
 }

@@ -22,5 +22,24 @@ MonoBehaviour:
   alwaysAllowAirDomain: 1
   basicAutonomyCost: 1
   dpqData: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
+  ev: 0
+  blockLoS: 1
+  constructionVisionOverrides:
+  - construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
+    ev: 1
+    blockLoS: 1
+  - construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    ev: 1
+    blockLoS: 1
+  - construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+    ev: 1
+    blockLoS: 1
+  - construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
+    ev: 1
+    blockLoS: 1
+  - construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
+    ev: 1
+    blockLoS: 1
+  structureVisionOverrides: []
   requiredSkillsToEnter: []
   skillCostOverrides: []

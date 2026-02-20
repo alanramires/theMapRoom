@@ -58,3 +58,33 @@ MonoBehaviour:
       notes: a blindagem natural do veiculo aguenta o tranco
       rpsDefenseText: Armored se defende de Vehicle com AntiInfantaria com RPS Defesa
         +4
+  - ataque:
+      unitClass: 1
+      weaponCategory: 0
+      targetClass: 2
+      attackBonus: -4
+      notes: "Veiculos n\xE3o atacam bem artilharias"
+      rpsAttackText: Vehicle com AntiInfantaria ataca Artillery com RPS Ataque -4
+    defesa:
+      targetClass: 2
+      unitClass: 1
+      weaponCategory: 0
+      defenseBonus: 4
+      notes: "Artilheiros s\xE3o resistentes a balas"
+      rpsDefenseText: Artillery se defende de Vehicle com AntiInfantaria com RPS
+        Defesa +4
+  - ataque:
+      unitClass: 1
+      weaponCategory: 0
+      targetClass: 5
+      attackBonus: -5
+      notes: "Veiculos n\xE3o atacam bem artilharias"
+      rpsAttackText: Vehicle com AntiInfantaria ataca Helicopter com RPS Ataque -5
+    defesa:
+      targetClass: 5
+      unitClass: 1
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: "Artilheiros s\xE3o resistentes a balas"
+      rpsDefenseText: Helicopter se defende de Vehicle com AntiInfantaria com RPS
+        Defesa +5

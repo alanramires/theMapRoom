@@ -31,6 +31,9 @@ public class UnitData : ScriptableObject
     public MovementCategory movementCategory = MovementCategory.Marcha;
     public MilitaryForce militaryForce = MilitaryForce.Army;
     public GameUnitClass unitClass = GameUnitClass.Infantry;
+    [Header("Elite")]
+    [Tooltip("Nivel de elite da unidade (padrao: 0).")]
+    [Min(0)] public int eliteLevel = 0;
     [Header("Native Domain")]
     [Tooltip("Dominio/altura nativo da unidade.")]
     public Domain domain = Domain.Land;
@@ -77,6 +80,7 @@ public class UnitData : ScriptableObject
             supplierOperationDomains = new List<SupplierOperationDomain>();
         if (supplierServicesProvided == null)
             supplierServicesProvided = new List<ServiceData>();
+        eliteLevel = Mathf.Max(0, eliteLevel);
         maxUnitsServedPerTurn = Mathf.Max(0, maxUnitsServedPerTurn);
 
         for (int i = 0; i < embarkedWeapons.Count; i++)

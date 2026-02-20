@@ -6,7 +6,8 @@ public static class PodeMirarSensor
 {
     private const string InvalidReasonNoAmmo = "Falta de municao.";
     private const string InvalidReasonLayer = "Layer do alvo incompativel com a arma.";
-    private const string InvalidReasonBlocked = "Hex bloqueado na linha de tiro.";
+    private const string InvalidReasonLosBlocked = "Linha de visada bloqueada.";
+    private const string InvalidReasonStealth = "Alvo nao detectado (stealth placeholder).";
 
     private struct WeaponRangeCandidate
     {
@@ -23,7 +24,9 @@ public static class PodeMirarSensor
         SensorMovementMode movementMode,
         List<PodeMirarTargetOption> output,
         List<PodeMirarInvalidOption> invalidOutput = null,
-        WeaponPriorityData weaponPriorityData = null)
+        WeaponPriorityData weaponPriorityData = null,
+        DPQAirHeightConfig dpqAirHeightConfig = null,
+        bool fogOfWarEnabled = true)
     {
         if (output == null)
             return false;
@@ -129,6 +132,10 @@ public static class PodeMirarSensor
                         terrainDatabase,
                         origin,
                         targetCell,
+                        attacker,
+                        target,
+                        dpqAirHeightConfig,
+                        fogOfWarEnabled,
                         weapon,
                         out intermediateCells,
                         out blockedCell))
@@ -142,8 +149,25 @@ public static class PodeMirarSensor
                         distance,
                         attackerPositionLabel,
                         defenderPositionLabel,
-                        $"{InvalidReasonBlocked} ({blockedCell.x},{blockedCell.y})",
+                        $"{InvalidReasonLosBlocked} ({blockedCell.x},{blockedCell.y})",
                         blockedCell,
+                        intermediateCells);
+                    continue;
+                }
+
+                if (!IsTargetDetectableByAttacker(attacker, target))
+                {
+                    AppendInvalid(
+                        invalidOutput,
+                        attacker,
+                        target,
+                        weapon,
+                        weaponCandidate.index,
+                        distance,
+                        attackerPositionLabel,
+                        defenderPositionLabel,
+                        InvalidReasonStealth,
+                        Vector3Int.zero,
                         intermediateCells);
                     continue;
                 }
@@ -255,7 +279,9 @@ public static class PodeMirarSensor
         Tilemap boardTilemap,
         TerrainDatabase terrainDatabase,
         SensorMovementMode movementMode,
-        ICollection<Vector3Int> outputCells)
+        ICollection<Vector3Int> outputCells,
+        DPQAirHeightConfig dpqAirHeightConfig = null,
+        bool fogOfWarEnabled = true)
     {
         if (outputCells == null)
             return;
@@ -313,6 +339,9 @@ public static class PodeMirarSensor
                     terrainDatabase,
                     origin,
                     cell,
+                    attacker,
+                    dpqAirHeightConfig,
+                    fogOfWarEnabled,
                     candidate.embarked.selectedTrajectory,
                     weapon))
                 {
@@ -330,6 +359,9 @@ public static class PodeMirarSensor
         TerrainDatabase terrainDatabase,
         Vector3Int originCell,
         Vector3Int targetCell,
+        UnitManager attacker,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        bool fogOfWarEnabled,
         WeaponTrajectoryType trajectory,
         WeaponData weapon)
     {
@@ -350,6 +382,10 @@ public static class PodeMirarSensor
             terrainDatabase,
             originCell,
             targetCell,
+            attacker,
+            null,
+            dpqAirHeightConfig,
+            fogOfWarEnabled,
             weapon,
             out _,
             out _);
@@ -483,6 +519,10 @@ public static class PodeMirarSensor
         TerrainDatabase terrainDatabase,
         Vector3Int originCell,
         Vector3Int targetCell,
+        UnitManager attacker,
+        UnitManager defender,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        bool fogOfWarEnabled,
         WeaponData weapon,
         out List<Vector3Int> intermediateCells,
         out Vector3Int blockedCell)
@@ -491,6 +531,30 @@ public static class PodeMirarSensor
         blockedCell = Vector3Int.zero;
         if (tilemap == null || weapon == null)
             return false;
+
+        if (!TryResolveCellVision(
+                tilemap,
+                terrainDatabase,
+                originCell,
+                attacker,
+                dpqAirHeightConfig,
+                out int originEv,
+                out _))
+        {
+            originEv = 0;
+        }
+
+        if (!TryResolveCellVision(
+                tilemap,
+                terrainDatabase,
+                targetCell,
+                defender,
+                dpqAirHeightConfig,
+                out int targetEv,
+                out _))
+        {
+            targetEv = 0;
+        }
 
         List<Vector3Int> crossedCells = GetIntermediateCellsByCellLerp(originCell, targetCell);
         intermediateCells.AddRange(crossedCells);
@@ -502,6 +566,39 @@ public static class PodeMirarSensor
                 continue;
 
             if (!TerrainAllowsWeaponTrajectory(terrain, weapon))
+            {
+                blockedCell = cell;
+                return false;
+            }
+
+            if (!fogOfWarEnabled)
+                continue;
+
+            if (!TryResolveCellVision(
+                    tilemap,
+                    terrainDatabase,
+                    cell,
+                    null,
+                    dpqAirHeightConfig,
+                    out int cellEv,
+                    out bool cellBlocksLoS))
+            {
+                continue;
+            }
+
+            if (!cellBlocksLoS)
+                continue;
+
+            if (cellEv <= 0)
+                continue;
+
+            // Excecao suprema: alvo com EV pelo menos 2 acima do obstaculo nao e bloqueado por ele.
+            if ((targetEv - cellEv) >= 2)
+                continue;
+
+            float t = (i + 1f) / (crossedCells.Count + 1f);
+            float losHeightAtCell = Mathf.Lerp(originEv, targetEv, t);
+            if (cellEv > losHeightAtCell)
             {
                 blockedCell = cell;
                 return false;
@@ -706,5 +803,62 @@ public static class PodeMirarSensor
         }
 
         return "Terreno: (desconhecido)";
+    }
+
+    private static bool TryResolveCellVision(
+        Tilemap tilemap,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        UnitManager occupantUnit,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        out int ev,
+        out bool blockLoS)
+    {
+        ev = 0;
+        blockLoS = true;
+        if (!TryResolveTerrainAtCell(tilemap, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
+            return false;
+
+        ConstructionData constructionData = null;
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(tilemap, cell);
+        if (construction != null)
+        {
+            ConstructionDatabase db = construction.ConstructionDatabase;
+            string id = construction.ConstructionId;
+            if (db != null && !string.IsNullOrWhiteSpace(id) && db.TryGetById(id, out ConstructionData data) && data != null)
+                constructionData = data;
+        }
+
+        StructureData structureData = StructureOccupancyRules.GetStructureAtCell(tilemap, cell);
+
+        Domain domain = Domain.Land;
+        HeightLevel height = HeightLevel.Surface;
+        if (occupantUnit != null)
+        {
+            domain = occupantUnit.GetDomain();
+            height = occupantUnit.GetHeightLevel();
+        }
+
+        TerrainVisionResolver.Resolve(
+            terrain,
+            domain,
+            height,
+            dpqAirHeightConfig,
+            constructionData,
+            structureData,
+            out ev,
+            out blockLoS);
+
+        return true;
+    }
+
+    private static bool IsTargetDetectableByAttacker(UnitManager attacker, UnitManager target)
+    {
+        if (attacker == null || target == null)
+            return false;
+
+        // Placeholder para futura regra de stealth/deteccao.
+        // Ex.: F-117 em AirHigh pode estar visivel por LoS, mas invisivel sem detector adequado.
+        return true;
     }
 }

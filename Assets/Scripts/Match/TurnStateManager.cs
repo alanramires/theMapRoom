@@ -1,6 +1,9 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public partial class TurnStateManager : MonoBehaviour
 {
@@ -29,6 +32,7 @@ public partial class TurnStateManager : MonoBehaviour
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private WeaponPriorityData weaponPriorityData;
     [SerializeField] private DPQMatchupDatabase dpqMatchupDatabase;
+    [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
     [SerializeField] private RPSDatabase rpsDatabase;
     [SerializeField] private Tilemap rangeMapTilemap;
     [SerializeField] private Tilemap lineOfFireMapTilemap;
@@ -179,6 +183,11 @@ public partial class TurnStateManager : MonoBehaviour
 
         if (lineOfFireMapTilemap == null)
             lineOfFireMapTilemap = FindLineOfFireMapTilemap();
+
+#if UNITY_EDITOR
+        if (dpqAirHeightConfig == null)
+            dpqAirHeightConfig = FindFirstAssetEditor<DPQAirHeightConfig>();
+#endif
     }
 
     private void ClearCommittedMovement()
@@ -189,6 +198,30 @@ public partial class TurnStateManager : MonoBehaviour
         hasCommittedMovement = false;
         ClearCommittedPathVisual();
     }
+
+    private bool IsFogOfWarEnabled()
+    {
+        return matchController == null || matchController.FogOfWar;
+    }
+
+#if UNITY_EDITOR
+    private static T FindFirstAssetEditor<T>() where T : ScriptableObject
+    {
+        string[] guids = AssetDatabase.FindAssets($"t:{typeof(T).Name}");
+        if (guids == null || guids.Length == 0)
+            return null;
+
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            T asset = AssetDatabase.LoadAssetAtPath<T>(path);
+            if (asset != null)
+                return asset;
+        }
+
+        return null;
+    }
+#endif
 
     private int GetAvailableMovementSteps(UnitManager unit)
     {

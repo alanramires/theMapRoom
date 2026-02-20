@@ -22,6 +22,10 @@ MonoBehaviour:
   alwaysAllowAirDomain: 1
   basicAutonomyCost: 2
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
+  ev: 1
+  blockLoS: 1
+  constructionVisionOverrides: []
+  structureVisionOverrides: []
   requiredSkillsToEnter: []
   skillCostOverrides:
   - skill: {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}

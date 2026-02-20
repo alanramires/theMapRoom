@@ -27,7 +27,9 @@ public partial class TurnStateManager
             boardMap,
             terrainDatabase,
             movementMode,
-            validCells);
+            validCells,
+            dpqAirHeightConfig,
+            IsFogOfWarEnabled());
 
         Color teamColor = TeamUtils.GetColor(selectedUnit.TeamId);
         Color overlayColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(lineOfFireAlpha));
@@ -78,4 +80,3 @@ public partial class TurnStateManager
         return null;
     }
 }
-

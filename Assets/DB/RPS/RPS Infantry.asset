@@ -24,10 +24,10 @@ MonoBehaviour:
       targetClass: 0
       unitClass: 0
       weaponCategory: 0
-      defenseBonus: 1
+      defenseBonus: 2
       notes: "Soldados s\xE3o treinados para se defenderem"
       rpsDefenseText: Infantry se defende de Infantry com AntiInfantaria com RPS
-        Defesa +1
+        Defesa +2
   - ataque:
       unitClass: 0
       weaponCategory: 0
@@ -58,6 +58,37 @@ MonoBehaviour:
       notes: "Infantaria busca cobertura se jogando no ch\xE3o contra projeteis"
       rpsDefenseText: Armored se defende de Infantry com AntiInfantaria com RPS Defesa
         +2
+  - ataque:
+      unitClass: 0
+      weaponCategory: 0
+      targetClass: 2
+      attackBonus: -3
+      notes: "Rifles n\xE3o destroem artilharia"
+      rpsAttackText: Infantry com AntiInfantaria ataca Artillery com RPS Ataque -3
+    defesa:
+      targetClass: 2
+      unitClass: 0
+      weaponCategory: 0
+      defenseBonus: 0
+      notes: "Arilharia nem sente os proj\xE9teis"
+      rpsDefenseText: Artillery se defende de Infantry com AntiInfantaria com RPS
+        Defesa +0
+  - ataque:
+      unitClass: 0
+      weaponCategory: 0
+      targetClass: 5
+      attackBonus: -2
+      notes: "Rifles n\xE3o destroem artilharia"
+      rpsAttackText: Infantry com AntiInfantaria ataca Helicopter com RPS Ataque
+        -2
+    defesa:
+      targetClass: 5
+      unitClass: 0
+      weaponCategory: 0
+      defenseBonus: 2
+      notes: "Arilharia nem sente os proj\xE9teis"
+      rpsDefenseText: Helicopter se defende de Infantry com AntiInfantaria com RPS
+        Defesa +2
   - ataque:
       unitClass: 0
       weaponCategory: 1
@@ -103,3 +134,33 @@ MonoBehaviour:
       notes: "Infantaria busca cobertura se jogando no ch\xE3o contra projeteis"
       rpsDefenseText: Armored se defende de Infantry com AntiTanque com RPS Defesa
         +2
+  - ataque:
+      unitClass: 0
+      weaponCategory: 1
+      targetClass: 2
+      attackBonus: -2
+      notes: "Rifles n\xE3o destroem artilharia"
+      rpsAttackText: Infantry com AntiTanque ataca Artillery com RPS Ataque -2
+    defesa:
+      targetClass: 2
+      unitClass: 0
+      weaponCategory: 1
+      defenseBonus: 0
+      notes: "Arilharia nem sente os proj\xE9teis"
+      rpsDefenseText: Artillery se defende de Infantry com AntiTanque com RPS Defesa
+        +0
+  - ataque:
+      unitClass: 0
+      weaponCategory: 2
+      targetClass: 5
+      attackBonus: -1
+      notes: "Rifles n\xE3o destroem artilharia"
+      rpsAttackText: Infantry com AntiAerea ataca Helicopter com RPS Ataque -1
+    defesa:
+      targetClass: 5
+      unitClass: 0
+      weaponCategory: 2
+      defenseBonus: 1
+      notes: "Arilharia nem sente os proj\xE9teis"
+      rpsDefenseText: Helicopter se defende de Infantry com AntiAerea com RPS Defesa
+        +1

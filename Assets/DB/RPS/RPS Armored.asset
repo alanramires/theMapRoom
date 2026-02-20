@@ -60,6 +60,36 @@ MonoBehaviour:
         +5
   - ataque:
       unitClass: 3
+      weaponCategory: 0
+      targetClass: 5
+      attackBonus: -5
+      notes: "canhoes de tanque s\xE3o desbalanceado contra tropas"
+      rpsAttackText: Armored com AntiInfantaria ataca Helicopter com RPS Ataque -5
+    defesa:
+      targetClass: 5
+      unitClass: 3
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: "Infantaria se protegem bem contra canh\xF5es desbalanceados"
+      rpsDefenseText: Helicopter se defende de Armored com AntiInfantaria com RPS
+        Defesa +5
+  - ataque:
+      unitClass: 3
+      weaponCategory: 0
+      targetClass: 2
+      attackBonus: -5
+      notes: "canhoes de tanque s\xE3o desbalanceado contra tropas"
+      rpsAttackText: Armored com AntiInfantaria ataca Artillery com RPS Ataque -5
+    defesa:
+      targetClass: 2
+      unitClass: 3
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: "Infantaria se protegem bem contra canh\xF5es desbalanceados"
+      rpsDefenseText: Artillery se defende de Armored com AntiInfantaria com RPS
+        Defesa +5
+  - ataque:
+      unitClass: 3
       weaponCategory: 1
       targetClass: 0
       attackBonus: -5
@@ -103,3 +133,18 @@ MonoBehaviour:
       notes: "Infantaria se protegem bem contra canh\xF5es desbalanceados"
       rpsDefenseText: Armored se defende de Armored com AntiTanque com RPS Defesa
         +4
+  - ataque:
+      unitClass: 3
+      weaponCategory: 1
+      targetClass: 2
+      attackBonus: -2
+      notes: "canhoes de tanque s\xE3o desbalanceado contra tropas"
+      rpsAttackText: Armored com AntiTanque ataca Artillery com RPS Ataque -2
+    defesa:
+      targetClass: 2
+      unitClass: 3
+      weaponCategory: 1
+      defenseBonus: 2
+      notes: "Infantaria se protegem bem contra canh\xF5es desbalanceados"
+      rpsDefenseText: Artillery se defende de Armored com AntiTanque com RPS Defesa
+        +2

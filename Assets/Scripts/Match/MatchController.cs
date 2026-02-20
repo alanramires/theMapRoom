@@ -8,6 +8,7 @@ public class MatchController : MonoBehaviour
     [SerializeField] private int activeTeamId = (int)TeamId.Green;
     [SerializeField] private List<TeamId> players = new List<TeamId> { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
     [SerializeField] private bool includeNeutralTeam = false;
+    [SerializeField] private bool fogOfWar = true;
     [SerializeField] private int activePlayerListIndex = 0;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
 
@@ -16,6 +17,7 @@ public class MatchController : MonoBehaviour
     public TeamId ActiveTeam => ClampToTeamId(activeTeamId);
     public IReadOnlyList<TeamId> Players => players;
     public bool IncludeNeutralTeam => includeNeutralTeam;
+    public bool FogOfWar => fogOfWar;
     public int ActivePlayerListIndex => activePlayerListIndex;
 
     private void Awake()

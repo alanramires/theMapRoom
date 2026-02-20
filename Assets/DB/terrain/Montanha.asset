@@ -22,6 +22,10 @@ MonoBehaviour:
   alwaysAllowAirDomain: 1
   basicAutonomyCost: 99
   dpqData: {fileID: 11400000, guid: 6a5f363f56705cf499d5c218e8050f29, type: 2}
+  ev: 2
+  blockLoS: 1
+  constructionVisionOverrides: []
+  structureVisionOverrides: []
   requiredSkillsToEnter:
   - {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
   - {fileID: 11400000, guid: 8bfcf50a7b4285c4cad503493431fb4b, type: 2}

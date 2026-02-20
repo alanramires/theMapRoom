@@ -15,3 +15,9 @@ MonoBehaviour:
   airLowDpq: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
   airHighDpq: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
   fallbackDpq: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
+  airLowEv: 3
+  airHighEv: 4
+  fallbackEv: 0
+  airLowBlockLoS: 0
+  airHighBlockLoS: 0
+  fallbackBlockLoS: 0

@@ -10,6 +10,7 @@ public class CombatCalculatorWindow : EditorWindow
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private WeaponPriorityData weaponPriorityData;
     [SerializeField] private DPQMatchupDatabase dpqMatchupDatabase;
+    [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
     [SerializeField] private RPSDatabase rpsDatabase;
     [SerializeField] private UnitManager attackerUnit;
     [SerializeField] private UnitManager defenderUnit;
@@ -23,7 +24,7 @@ public class CombatCalculatorWindow : EditorWindow
     private readonly List<PodeMirarInvalidOption> sensorInvalidResults = new List<PodeMirarInvalidOption>();
     private readonly List<PodeMirarTargetOption> currentPairOptions = new List<PodeMirarTargetOption>();
 
-    [MenuItem("Tools/Calcular Combate")]
+    [MenuItem("Tools/Combat/Calcular Combate")]
     public static void OpenWindow()
     {
         GetWindow<CombatCalculatorWindow>("Calcular Combate");
@@ -43,6 +44,7 @@ public class CombatCalculatorWindow : EditorWindow
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
         weaponPriorityData = (WeaponPriorityData)EditorGUILayout.ObjectField("Weapon Priority Data", weaponPriorityData, typeof(WeaponPriorityData), false);
         dpqMatchupDatabase = (DPQMatchupDatabase)EditorGUILayout.ObjectField("DPQ Matchup DB", dpqMatchupDatabase, typeof(DPQMatchupDatabase), false);
+        dpqAirHeightConfig = (DPQAirHeightConfig)EditorGUILayout.ObjectField("DPQ Air Height", dpqAirHeightConfig, typeof(DPQAirHeightConfig), false);
         rpsDatabase = (RPSDatabase)EditorGUILayout.ObjectField("RPS Database", rpsDatabase, typeof(RPSDatabase), false);
         movementMode = (SensorMovementMode)EditorGUILayout.EnumPopup("Modo Sensor", movementMode);
         logToConsole = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
@@ -133,7 +135,8 @@ public class CombatCalculatorWindow : EditorWindow
             movementMode,
             sensorValidResults,
             sensorInvalidResults,
-            weaponPriorityData);
+            weaponPriorityData,
+            dpqAirHeightConfig);
 
         for (int i = 0; i < sensorValidResults.Count; i++)
         {
@@ -188,10 +191,14 @@ public class CombatCalculatorWindow : EditorWindow
             : 0;
         GameUnitClass attackerClass = ResolveUnitClass(attacker, out bool attackerClassFromData);
         GameUnitClass defenderClass = ResolveUnitClass(defender, out bool defenderClassFromData);
+        int attackerEliteLevel = ResolveEliteLevel(attacker);
+        int defenderEliteLevel = ResolveEliteLevel(defender);
         WeaponCategory attackerWeaponCategory = ResolveWeaponCategory(option.weapon);
         WeaponCategory defenderWeaponCategory = ResolveWeaponCategory(option.defenderCounterWeapon);
         sb.AppendLine($"Classe atacante usada no RPS: {attackerClass} {(attackerClassFromData ? "(UnitData)" : "(fallback)")}");
         sb.AppendLine($"Classe defensor usada no RPS: {defenderClass} {(defenderClassFromData ? "(UnitData)" : "(fallback)")}");
+        sb.AppendLine($"Elite atacante: {attackerEliteLevel}");
+        sb.AppendLine($"Elite defensor: {defenderEliteLevel}");
         sb.AppendLine($"Chave RPS ataque atacante: {attackerClass} + {attackerWeaponCategory} -> {defenderClass}");
         sb.AppendLine($"Chave RPS ataque defensor: {defenderClass} + {defenderWeaponCategory} -> {attackerClass}");
         sb.AppendLine();
@@ -200,17 +207,28 @@ public class CombatCalculatorWindow : EditorWindow
         RPSBonusInfo defenderAttackRps = option.defenderCanCounterAttack
             ? ResolveAttackRps(defenderClass, defenderWeaponCategory, attackerClass)
             : RPSBonusInfo.None;
+        SkillRPSBonusInfo attackerSkillRps = ResolveSkillRps(attacker, defender, attackerWeaponCategory);
+        SkillRPSBonusInfo defenderSkillRps = option.defenderCanCounterAttack
+            ? ResolveSkillRps(defender, attacker, defenderWeaponCategory)
+            : SkillRPSBonusInfo.NoneWithReason("sem revide");
 
-        int attackerAttackEffective = attackerHp * (attackerWeaponPower + attackerAttackRps.bonusValue);
+        int attackerAttackSkillTotal = attackerSkillRps.ownerAttackValue + defenderSkillRps.opponentAttackValue;
+        int defenderAttackSkillTotal = defenderSkillRps.ownerAttackValue + attackerSkillRps.opponentAttackValue;
+        int attackerDefenseSkillTotal = attackerSkillRps.ownerDefenseValue + defenderSkillRps.opponentDefenseValue;
+        int defenderDefenseSkillTotal = defenderSkillRps.ownerDefenseValue + attackerSkillRps.opponentDefenseValue;
+
+        int attackerAttackEffective = attackerHp * (attackerWeaponPower + attackerAttackRps.bonusValue + attackerAttackSkillTotal);
         int defenderAttackEffective = option.defenderCanCounterAttack
-            ? defenderHp * (defenderWeaponPower + defenderAttackRps.bonusValue)
+            ? defenderHp * (defenderWeaponPower + defenderAttackRps.bonusValue + defenderAttackSkillTotal)
             : 0;
 
         sb.AppendLine("1) Forca de ataque efetiva");
-        sb.AppendLine($"- Atacante: HP({attackerHp}) x (Arma({attackerWeaponPower}) + RPSAtaque({FormatSigned(attackerAttackRps.bonusValue)})) = {attackerAttackEffective}");
-        sb.AppendLine($"- Defensor: HP({defenderHp}) x (Arma({defenderWeaponPower}) + RPSAtaque({FormatSigned(defenderAttackRps.bonusValue)})) = {defenderAttackEffective}");
+        sb.AppendLine($"- Atacante: HP({attackerHp}) x (Arma({attackerWeaponPower}) + RPSAtaque({FormatSigned(attackerAttackRps.bonusValue)}) + EliteSkillAtaque({FormatSigned(attackerAttackSkillTotal)})) = {attackerAttackEffective}");
+        sb.AppendLine($"- Defensor: HP({defenderHp}) x (Arma({defenderWeaponPower}) + RPSAtaque({FormatSigned(defenderAttackRps.bonusValue)}) + EliteSkillAtaque({FormatSigned(defenderAttackSkillTotal)})) = {defenderAttackEffective}");
         sb.AppendLine($"- Detalhe RPS ataque atacante: {attackerAttackRps.summary}");
         sb.AppendLine($"- Detalhe RPS ataque defensor: {defenderAttackRps.summary}");
+        sb.AppendLine($"- ELITE SKILL ataque atacante: proprio={FormatSigned(attackerSkillRps.ownerAttackValue)} | recebido={FormatSigned(defenderSkillRps.opponentAttackValue)} | total={FormatSigned(attackerAttackSkillTotal)}");
+        sb.AppendLine($"- ELITE SKILL ataque defensor: proprio={FormatSigned(defenderSkillRps.ownerAttackValue)} | recebido={FormatSigned(attackerSkillRps.opponentAttackValue)} | total={FormatSigned(defenderAttackSkillTotal)}");
 
         PositionDpqInfo attackerDpq = ResolveDpqAtUnitPosition(attacker, option.attackerPositionLabel);
         PositionDpqInfo defenderDpq = ResolveDpqAtUnitPosition(defender, option.defenderPositionLabel);
@@ -229,13 +247,15 @@ public class CombatCalculatorWindow : EditorWindow
             : RPSBonusInfo.None;
         RPSBonusInfo defenderDefenseRps = ResolveDefenseRps(defenderClass, attackerClass, attackerWeaponCategory);
 
-        int attackerEffectiveDefense = attackerBaseDefense + attackerDpq.defenseBonus + attackerDefenseRps.bonusValue;
-        int defenderEffectiveDefense = defenderBaseDefense + defenderDpq.defenseBonus + defenderDefenseRps.bonusValue;
+        int attackerEffectiveDefense = attackerBaseDefense + attackerDpq.defenseBonus + attackerDefenseRps.bonusValue + attackerDefenseSkillTotal;
+        int defenderEffectiveDefense = defenderBaseDefense + defenderDpq.defenseBonus + defenderDefenseRps.bonusValue + defenderDefenseSkillTotal;
         sb.AppendLine("4) Forca de defesa efetiva");
-        sb.AppendLine($"- Atacante: defesaUnidade({attackerBaseDefense}) + defesaDPQ({attackerDpq.defenseBonus}) + RPSDefesa({FormatSigned(attackerDefenseRps.bonusValue)}) = {attackerEffectiveDefense}");
-        sb.AppendLine($"- Defensor: defesaUnidade({defenderBaseDefense}) + defesaDPQ({defenderDpq.defenseBonus}) + RPSDefesa({FormatSigned(defenderDefenseRps.bonusValue)}) = {defenderEffectiveDefense}");
+        sb.AppendLine($"- Atacante: defesaUnidade({attackerBaseDefense}) + defesaDPQ({attackerDpq.defenseBonus}) + RPSDefesa({FormatSigned(attackerDefenseRps.bonusValue)}) + EliteSkillDefesa({FormatSigned(attackerDefenseSkillTotal)}) = {attackerEffectiveDefense}");
+        sb.AppendLine($"- Defensor: defesaUnidade({defenderBaseDefense}) + defesaDPQ({defenderDpq.defenseBonus}) + RPSDefesa({FormatSigned(defenderDefenseRps.bonusValue)}) + EliteSkillDefesa({FormatSigned(defenderDefenseSkillTotal)}) = {defenderEffectiveDefense}");
         sb.AppendLine($"- Detalhe RPS defesa atacante: {attackerDefenseRps.summary}");
         sb.AppendLine($"- Detalhe RPS defesa defensor: {defenderDefenseRps.summary}");
+        sb.AppendLine($"- ELITE SKILL defesa atacante: proprio={FormatSigned(attackerSkillRps.ownerDefenseValue)} | recebido={FormatSigned(defenderSkillRps.opponentDefenseValue)} | total={FormatSigned(attackerDefenseSkillTotal)}");
+        sb.AppendLine($"- ELITE SKILL defesa defensor: proprio={FormatSigned(defenderSkillRps.ownerDefenseValue)} | recebido={FormatSigned(attackerSkillRps.opponentDefenseValue)} | total={FormatSigned(defenderDefenseSkillTotal)}");
 
         int dpqDifference = attackerDpq.points - defenderDpq.points;
         DPQCombatOutcome attackerOutcome = DPQCombatOutcome.Neutro;
@@ -297,17 +317,39 @@ public class CombatCalculatorWindow : EditorWindow
         Tilemap referenceTilemap = unit.BoardTilemap;
         Vector3Int cell = unit.CurrentCellPosition;
         cell.z = 0;
+        Domain activeDomain = unit.GetDomain();
+        HeightLevel activeHeight = unit.GetHeightLevel();
+
+        if (activeDomain == Domain.Air
+            && dpqAirHeightConfig != null
+            && dpqAirHeightConfig.TryGetFor(activeDomain, activeHeight, out DPQData airDpq)
+            && airDpq != null)
+        {
+            return BuildDpqInfo(airDpq, $"Camada ativa: {activeDomain}/{activeHeight}");
+        }
 
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(referenceTilemap, cell);
-        if (construction != null && TryGetConstructionDpq(construction, out DPQData constructionDpq))
+        if (construction != null
+            && ConstructionSupportsLayer(construction, activeDomain, activeHeight)
+            && TryGetConstructionDpq(construction, out DPQData constructionDpq))
+        {
             return BuildDpqInfo(constructionDpq, $"Construcao: {ResolveConstructionName(construction)}");
+        }
 
         StructureData structure = StructureOccupancyRules.GetStructureAtCell(referenceTilemap, cell);
-        if (structure != null && structure.dpqData != null)
+        if (structure != null
+            && StructureSupportsLayer(structure, activeDomain, activeHeight)
+            && structure.dpqData != null)
+        {
             return BuildDpqInfo(structure.dpqData, $"Estrutura: {ResolveStructureName(structure)}");
+        }
 
-        if (TryResolveTerrainAtCell(referenceTilemap, terrainDatabase, cell, out TerrainTypeData terrain) && terrain != null && terrain.dpqData != null)
+        if (TryResolveTerrainAtCellForLayer(referenceTilemap, terrainDatabase, cell, activeDomain, activeHeight, out TerrainTypeData terrain)
+            && terrain != null
+            && terrain.dpqData != null)
+        {
             return BuildDpqInfo(terrain.dpqData, $"Terreno: {ResolveTerrainName(terrain)}");
+        }
 
         return info;
     }
@@ -364,6 +406,13 @@ public class CombatCalculatorWindow : EditorWindow
         return 0;
     }
 
+    private static int ResolveEliteLevel(UnitManager unit)
+    {
+        if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null)
+            return Mathf.Max(0, data.eliteLevel);
+        return 0;
+    }
+
     private void AutoDetectContext()
     {
         if (turnStateManager == null)
@@ -374,6 +423,7 @@ public class CombatCalculatorWindow : EditorWindow
             SerializedObject so = new SerializedObject(turnStateManager);
             terrainDatabase = so.FindProperty("terrainDatabase")?.objectReferenceValue as TerrainDatabase;
             weaponPriorityData = so.FindProperty("weaponPriorityData")?.objectReferenceValue as WeaponPriorityData;
+            dpqAirHeightConfig = so.FindProperty("dpqAirHeightConfig")?.objectReferenceValue as DPQAirHeightConfig;
         }
 
         if (terrainDatabase == null)
@@ -383,6 +433,8 @@ public class CombatCalculatorWindow : EditorWindow
 
         if (dpqMatchupDatabase == null)
             dpqMatchupDatabase = FindFirstAsset<DPQMatchupDatabase>();
+        if (dpqAirHeightConfig == null)
+            dpqAirHeightConfig = FindFirstAsset<DPQAirHeightConfig>();
         if (rpsDatabase == null)
             rpsDatabase = FindFirstAsset<RPSDatabase>();
     }
@@ -404,23 +456,38 @@ public class CombatCalculatorWindow : EditorWindow
         return null;
     }
 
-    private static bool TryResolveTerrainAtCell(Tilemap terrainTilemap, TerrainDatabase terrainDb, Vector3Int cell, out TerrainTypeData terrain)
+    private static bool TryResolveTerrainAtCellForLayer(
+        Tilemap terrainTilemap,
+        TerrainDatabase terrainDb,
+        Vector3Int cell,
+        Domain activeDomain,
+        HeightLevel activeHeight,
+        out TerrainTypeData terrain)
     {
         terrain = null;
         if (terrainTilemap == null || terrainDb == null)
             return false;
 
         cell.z = 0;
+        TerrainTypeData fallback = null;
         TileBase tile = terrainTilemap.GetTile(cell);
         if (tile != null && terrainDb.TryGetByPaletteTile(tile, out TerrainTypeData byMainTile) && byMainTile != null)
         {
-            terrain = byMainTile;
-            return true;
+            if (TerrainSupportsLayer(byMainTile, activeDomain, activeHeight))
+            {
+                terrain = byMainTile;
+                return true;
+            }
+
+            fallback = byMainTile;
         }
 
         GridLayout grid = terrainTilemap.layoutGrid;
         if (grid == null)
-            return false;
+        {
+            terrain = fallback;
+            return terrain != null;
+        }
 
         Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
         for (int i = 0; i < maps.Length; i++)
@@ -435,12 +502,70 @@ public class CombatCalculatorWindow : EditorWindow
 
             if (terrainDb.TryGetByPaletteTile(other, out TerrainTypeData byGridTile) && byGridTile != null)
             {
-                terrain = byGridTile;
-                return true;
+                if (fallback == null)
+                    fallback = byGridTile;
+
+                if (TerrainSupportsLayer(byGridTile, activeDomain, activeHeight))
+                {
+                    terrain = byGridTile;
+                    return true;
+                }
             }
         }
 
+        terrain = fallback;
+        return terrain != null;
+    }
+
+    private static bool TerrainSupportsLayer(TerrainTypeData terrain, Domain domain, HeightLevel heightLevel)
+    {
+        if (terrain == null)
+            return false;
+        if (terrain.domain == domain && terrain.heightLevel == heightLevel)
+            return true;
+        if (domain == Domain.Air && terrain.alwaysAllowAirDomain)
+            return true;
+        if (terrain.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0; i < terrain.aditionalDomainsAllowed.Count; i++)
+        {
+            TerrainLayerMode mode = terrain.aditionalDomainsAllowed[i];
+            if (mode.domain == domain && mode.heightLevel == heightLevel)
+                return true;
+        }
+
         return false;
+    }
+
+    private static bool StructureSupportsLayer(StructureData structure, Domain domain, HeightLevel heightLevel)
+    {
+        if (structure == null)
+            return false;
+        if (structure.domain == domain && structure.heightLevel == heightLevel)
+            return true;
+        if (domain == Domain.Air && structure.alwaysAllowAirDomain)
+            return true;
+        if (structure.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
+        {
+            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
+            if (mode.domain == domain && mode.heightLevel == heightLevel)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool ConstructionSupportsLayer(ConstructionManager construction, Domain domain, HeightLevel heightLevel)
+    {
+        if (construction == null)
+            return false;
+        if (construction.SupportsLayerMode(domain, heightLevel))
+            return true;
+        return domain == Domain.Air && construction.AllowsAirDomain();
     }
 
     private static string ResolveConstructionName(ConstructionManager construction)
@@ -554,6 +679,62 @@ public class CombatCalculatorWindow : EditorWindow
         }
 
         return RPSBonusInfo.NoneWithReason("sem match");
+    }
+
+    private static SkillRPSBonusInfo ResolveSkillRps(UnitManager ownerUnit, UnitManager opponentUnit, WeaponCategory ownerWeaponCategory)
+    {
+        if (ownerUnit == null)
+            return SkillRPSBonusInfo.NoneWithReason("owner nulo");
+
+        if (!ownerUnit.TryGetUnitData(out UnitData ownerData) || ownerData == null)
+            return SkillRPSBonusInfo.NoneWithReason("owner sem UnitData");
+
+        if (ownerData.skills == null || ownerData.skills.Count == 0)
+            return SkillRPSBonusInfo.NoneWithReason("owner sem skills");
+
+        GameUnitClass ownerClass = ownerData.unitClass;
+        int ownerElite = Mathf.Max(0, ownerData.eliteLevel);
+
+        UnitData opponentData = null;
+        if (opponentUnit != null)
+            opponentUnit.TryGetUnitData(out opponentData);
+
+        GameUnitClass opponentClass = opponentData != null ? opponentData.unitClass : GameUnitClass.Infantry;
+        int opponentElite = opponentData != null ? Mathf.Max(0, opponentData.eliteLevel) : 0;
+
+        int totalOwnerAttack = 0;
+        int totalOwnerDefense = 0;
+        int totalOpponentAttack = 0;
+        int totalOpponentDefense = 0;
+
+        for (int i = 0; i < ownerData.skills.Count; i++)
+        {
+            SkillData skill = ownerData.skills[i];
+            if (skill == null)
+                continue;
+
+            if (!skill.TryGetCombatRpsModifiers(
+                ownerClass,
+                ownerElite,
+                ownerWeaponCategory,
+                opponentClass,
+                opponentElite,
+                out int ownerAtkMod,
+                out int ownerDefMod,
+                out int opponentAtkMod,
+                out int opponentDefMod,
+                out _))
+            {
+                continue;
+            }
+
+            totalOwnerAttack += ownerAtkMod;
+            totalOwnerDefense += ownerDefMod;
+            totalOpponentAttack += opponentAtkMod;
+            totalOpponentDefense += opponentDefMod;
+        }
+
+        return new SkillRPSBonusInfo(totalOwnerAttack, totalOwnerDefense, totalOpponentAttack, totalOpponentDefense);
     }
 
     private static Tilemap ResolveBoardTilemap(UnitManager attacker, UnitManager defender)
@@ -671,6 +852,27 @@ public class CombatCalculatorWindow : EditorWindow
         public static RPSBonusInfo NoneWithReason(string reason)
         {
             return new RPSBonusInfo(0, $"RPS +0 ({reason})");
+        }
+    }
+
+    private readonly struct SkillRPSBonusInfo
+    {
+        public readonly int ownerAttackValue;
+        public readonly int ownerDefenseValue;
+        public readonly int opponentAttackValue;
+        public readonly int opponentDefenseValue;
+
+        public SkillRPSBonusInfo(int ownerAttackValue, int ownerDefenseValue, int opponentAttackValue, int opponentDefenseValue)
+        {
+            this.ownerAttackValue = ownerAttackValue;
+            this.ownerDefenseValue = ownerDefenseValue;
+            this.opponentAttackValue = opponentAttackValue;
+            this.opponentDefenseValue = opponentDefenseValue;
+        }
+
+        public static SkillRPSBonusInfo NoneWithReason(string reason)
+        {
+            return new SkillRPSBonusInfo(0, 0, 0, 0);
         }
     }
 }

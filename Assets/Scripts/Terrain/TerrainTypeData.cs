@@ -3,6 +3,32 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Tilemaps;
 
+[System.Serializable]
+public class TerrainConstructionVisionOverride
+{
+    [Tooltip("Construcao alvo desta excecao de visao/LoS.")]
+    public ConstructionData construction;
+
+    [Tooltip("EV aplicado quando esta construcao estiver neste terreno.")]
+    public int ev = 0;
+
+    [Tooltip("Block LoS aplicado quando esta construcao estiver neste terreno.")]
+    public bool blockLoS = true;
+}
+
+[System.Serializable]
+public class TerrainStructureVisionOverride
+{
+    [Tooltip("Estrutura alvo desta excecao de visao/LoS.")]
+    public StructureData structure;
+
+    [Tooltip("EV aplicado quando esta estrutura estiver neste terreno.")]
+    public int ev = 0;
+
+    [Tooltip("Block LoS aplicado quando esta estrutura estiver neste terreno.")]
+    public bool blockLoS = true;
+}
+
 [CreateAssetMenu(menuName = "Game/Terrain/Terrain Data", fileName = "TerrainData_")]
 public class TerrainTypeData : ScriptableObject
 {
@@ -41,10 +67,66 @@ public class TerrainTypeData : ScriptableObject
     [Tooltip("Referencia de qualidade de posicao (DPQ) aplicada a este terreno.")]
     public DPQData dpqData;
 
+    [Header("Vision")]
+    [Tooltip("EV (elevacao de visada) base deste terreno.")]
+    public int ev = 0;
+
+    [Tooltip("Se true, este terreno bloqueia linha de visada por padrao.")]
+    public bool blockLoS = true;
+
+    [Header("Vision Exceptions")]
+    [Tooltip("Excecoes de EV/Block LoS para construcoes sobre este terreno.")]
+    public List<TerrainConstructionVisionOverride> constructionVisionOverrides = new List<TerrainConstructionVisionOverride>();
+
+    [Tooltip("Excecoes de EV/Block LoS para estruturas sobre este terreno.")]
+    public List<TerrainStructureVisionOverride> structureVisionOverrides = new List<TerrainStructureVisionOverride>();
+
     [Header("Skill Rules")]
     [Tooltip("Se houver skills nesta lista, a unidade precisa ter pelo menos uma para entrar neste terreno.")]
     public List<SkillData> requiredSkillsToEnter = new List<SkillData>();
 
     [Tooltip("Overrides opcionais de custo de autonomia por skill.")]
     public List<TerrainSkillCostOverride> skillCostOverrides = new List<TerrainSkillCostOverride>();
+
+    public bool TryGetConstructionVisionOverride(ConstructionData constructionData, out int overrideEv, out bool overrideBlockLoS)
+    {
+        overrideEv = 0;
+        overrideBlockLoS = true;
+        if (constructionData == null || constructionVisionOverrides == null)
+            return false;
+
+        for (int i = 0; i < constructionVisionOverrides.Count; i++)
+        {
+            TerrainConstructionVisionOverride item = constructionVisionOverrides[i];
+            if (item == null || item.construction != constructionData)
+                continue;
+
+            overrideEv = Mathf.Max(0, item.ev);
+            overrideBlockLoS = item.blockLoS;
+            return true;
+        }
+
+        return false;
+    }
+
+    public bool TryGetStructureVisionOverride(StructureData structureData, out int overrideEv, out bool overrideBlockLoS)
+    {
+        overrideEv = 0;
+        overrideBlockLoS = true;
+        if (structureData == null || structureVisionOverrides == null)
+            return false;
+
+        for (int i = 0; i < structureVisionOverrides.Count; i++)
+        {
+            TerrainStructureVisionOverride item = structureVisionOverrides[i];
+            if (item == null || item.structure != structureData)
+                continue;
+
+            overrideEv = Mathf.Max(0, item.ev);
+            overrideBlockLoS = item.blockLoS;
+            return true;
+        }
+
+        return false;
+    }
 }

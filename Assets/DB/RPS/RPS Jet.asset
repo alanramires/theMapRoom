@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30f693dd3e21f584ab270f075d9a517d, type: 3}
+  m_Name: RPS Jet
+  m_EditorClassIdentifier: Assembly-CSharp::RPSData
+  entries:
+  - ataque:
+      unitClass: 4
+      weaponCategory: 2
+      targetClass: 4
+      attackBonus: -2
+      notes: Dog fight
+      rpsAttackText: Jet com AntiAerea ataca Jet com RPS Ataque -2
+    defesa:
+      targetClass: 4
+      unitClass: 4
+      weaponCategory: 2
+      defenseBonus: 2
+      notes: Dog Fight
+      rpsDefenseText: Jet se defende de Jet com AntiAerea com RPS Defesa +2

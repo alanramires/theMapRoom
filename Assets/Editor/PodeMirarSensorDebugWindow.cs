@@ -9,6 +9,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private Tilemap overrideTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
+    [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
     [SerializeField] private Color rangeOverlayColor = new Color(0.2f, 0.8f, 1f, 0.45f);
     [SerializeField] private Color lineOfFireOverlayColor = new Color(1f, 0.35f, 0.35f, 0.45f);
     [SerializeField] private SensorMovementMode movementMode = SensorMovementMode.MoveuParado;
@@ -57,6 +58,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
         turnStateManager = (TurnStateManager)EditorGUILayout.ObjectField("TurnStateManager", turnStateManager, typeof(TurnStateManager), true);
         overrideTilemap = (Tilemap)EditorGUILayout.ObjectField("Tilemap (opcional)", overrideTilemap, typeof(Tilemap), true);
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
+        dpqAirHeightConfig = (DPQAirHeightConfig)EditorGUILayout.ObjectField("DPQ Air Height", dpqAirHeightConfig, typeof(DPQAirHeightConfig), false);
         movementMode = (SensorMovementMode)EditorGUILayout.EnumPopup("Modo", movementMode);
         logToConsole = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
 
@@ -142,7 +144,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
 
         Tilemap map = overrideTilemap != null ? overrideTilemap : selectedUnit.BoardTilemap;
         TerrainDatabase db = terrainDatabase != null ? terrainDatabase : FindFirstTerrainDatabaseAsset();
-        bool canAim = PodeMirarSensor.CollectTargets(selectedUnit, map, db, movementMode, results, invalidResults);
+        bool canAim = PodeMirarSensor.CollectTargets(selectedUnit, map, db, movementMode, results, invalidResults, null, dpqAirHeightConfig);
         statusMessage = canAim
             ? $"Sensor TRUE. {results.Count} opcao(oes) valida(s), {invalidResults.Count} invalida(s)."
             : $"Sensor FALSE. Nenhum alvo elegivel ({invalidResults.Count} invalido(s)).";
@@ -197,6 +199,8 @@ public class PodeMirarSensorDebugWindow : EditorWindow
         ResolveContextFromTurnStateManager();
         if (terrainDatabase == null)
             terrainDatabase = FindFirstTerrainDatabaseAsset();
+        if (dpqAirHeightConfig == null)
+            dpqAirHeightConfig = FindFirstAsset<DPQAirHeightConfig>();
     }
 
     private static Tilemap FindPreferredTilemap()
@@ -229,6 +233,23 @@ public class PodeMirarSensorDebugWindow : EditorWindow
             TerrainDatabase db = AssetDatabase.LoadAssetAtPath<TerrainDatabase>(path);
             if (db != null)
                 return db;
+        }
+
+        return null;
+    }
+
+    private static T FindFirstAsset<T>() where T : ScriptableObject
+    {
+        string[] guids = AssetDatabase.FindAssets($"t:{typeof(T).Name}");
+        if (guids == null || guids.Length == 0)
+            return null;
+
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            T asset = AssetDatabase.LoadAssetAtPath<T>(path);
+            if (asset != null)
+                return asset;
         }
 
         return null;
@@ -477,7 +498,8 @@ public class PodeMirarSensorDebugWindow : EditorWindow
             board,
             terrainDatabase,
             movementMode,
-            validCells);
+            validCells,
+            dpqAirHeightConfig);
 
         ClearPaintedLineOfFireMap();
         foreach (Vector3Int cell in validCells)
@@ -543,6 +565,8 @@ public class PodeMirarSensorDebugWindow : EditorWindow
         SerializedObject so = new SerializedObject(turnStateManager);
         if (terrainDatabase == null)
             terrainDatabase = so.FindProperty("terrainDatabase")?.objectReferenceValue as TerrainDatabase;
+        if (dpqAirHeightConfig == null)
+            dpqAirHeightConfig = so.FindProperty("dpqAirHeightConfig")?.objectReferenceValue as DPQAirHeightConfig;
     }
 
     private bool TryResolveRangeMapContext(out Tilemap map, out TileBase tile)
