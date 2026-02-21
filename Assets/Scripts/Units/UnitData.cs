@@ -45,6 +45,9 @@ public class UnitData : ScriptableObject
     [Header("Skills")]
     [Tooltip("Skills base da unidade. As instancias herdam essa lista ao aplicar o UnitData.")]
     public List<SkillData> skills = new List<SkillData>();
+    [Header("Autonomy")]
+    [Tooltip("Perfil de autonomia usado pelas regras da skill Operational Autonomy.")]
+    public AutonomyData autonomyData;
     [Header("Embarked Weapons")]
     [Tooltip("Armas embarcadas na unidade. A ordem da lista define prioridade (primaria, secundaria...). Pode ficar vazia para unidades desarmadas.")]
     public List<UnitEmbarkedWeapon> embarkedWeapons = new List<UnitEmbarkedWeapon>();
@@ -71,6 +74,8 @@ public class UnitData : ScriptableObject
     public List<ConstructionData> allowedEmbarkConstructions = new List<ConstructionData>();
     [Tooltip("Slots de transporte e regras de embarque.")]
     public List<UnitTransportSlotRule> transportSlots = new List<UnitTransportSlotRule>();
+    [Tooltip("Sprite opcional exibido quando este transportador estiver com unidades embarcadas. Se vazio, usa o sprite padrao da unidade.")]
+    public Sprite spriteTransport;
 
     public int autonomia = 99;
     public int cost = 100;

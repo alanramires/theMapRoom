@@ -9,8 +9,10 @@ public class MatchController : MonoBehaviour
     [SerializeField] private List<TeamId> players = new List<TeamId> { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
     [SerializeField] private bool includeNeutralTeam = false;
     [SerializeField] private bool fogOfWar = true;
+    [SerializeField] private AutonomyDatabase autonomyDatabase;
     [SerializeField] private int activePlayerListIndex = 0;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
+    [SerializeField, HideInInspector] private bool pendingTurnStartUpkeep;
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
@@ -18,6 +20,7 @@ public class MatchController : MonoBehaviour
     public IReadOnlyList<TeamId> Players => players;
     public bool IncludeNeutralTeam => includeNeutralTeam;
     public bool FogOfWar => fogOfWar;
+    public AutonomyDatabase AutonomyDatabase => autonomyDatabase;
     public int ActivePlayerListIndex => activePlayerListIndex;
 
     private void Awake()
@@ -79,11 +82,11 @@ public class MatchController : MonoBehaviour
                 return;
             }
 
-            SetActivePlayerByIndex(0);
+            SetActivePlayerByIndex(0, forceApply: true);
             return;
         }
 
-        SetActivePlayerByIndex(0);
+        SetActivePlayerByIndex(0, forceApply: true);
     }
 
     // Avanca para o proximo membro da lista. So incrementa currentTurn ao "fechar ciclo".
@@ -103,6 +106,7 @@ public class MatchController : MonoBehaviour
             int next = activePlayerListIndex + 1;
             if (next < players.Count)
             {
+                pendingTurnStartUpkeep = true;
                 SetActivePlayerByIndex(next);
                 return;
             }
@@ -116,13 +120,15 @@ public class MatchController : MonoBehaviour
 
             // Sem neutral: fecha ciclo de turno.
             currentTurn = Mathf.Max(0, currentTurn + 1);
-            SetActivePlayerByIndex(0);
+            pendingTurnStartUpkeep = true;
+            SetActivePlayerByIndex(0, forceApply: true);
             return;
         }
 
         // Estavamos em neutral (ou fora da lista): fecha ciclo de turno e volta para o primeiro player.
         currentTurn = Mathf.Max(0, currentTurn + 1);
-        SetActivePlayerByIndex(0);
+        pendingTurnStartUpkeep = true;
+        SetActivePlayerByIndex(0, forceApply: true);
     }
 
     private void NormalizeState()
@@ -192,7 +198,7 @@ public class MatchController : MonoBehaviour
         activePlayerListIndex = players.IndexOf(activeTeam);
     }
 
-    private void SetActivePlayerByIndex(int index)
+    private void SetActivePlayerByIndex(int index, bool forceApply = false)
     {
         if (players == null || players.Count == 0)
             return;
@@ -200,7 +206,7 @@ public class MatchController : MonoBehaviour
         index = Mathf.Clamp(index, 0, players.Count - 1);
         activePlayerListIndex = index;
         activeTeamId = (int)players[index];
-        ApplyActiveTeamIfChanged(force: false);
+        ApplyActiveTeamIfChanged(force: forceApply);
     }
 
     private void SetNeutralActiveTeam()
@@ -235,7 +241,16 @@ public class MatchController : MonoBehaviour
             if ((int)unit.TeamId != activeTeamId)
                 continue;
 
+            if (pendingTurnStartUpkeep)
+            {
+                int turnStartUpkeep = OperationalAutonomyRules.GetTurnStartAutonomyUpkeep(unit, autonomyDatabase);
+                if (turnStartUpkeep > 0)
+                    unit.SetCurrentFuel(Mathf.Max(0, unit.CurrentFuel - turnStartUpkeep));
+            }
+
             unit.ResetActed();
         }
+
+        pendingTurnStartUpkeep = false;
     }
 }

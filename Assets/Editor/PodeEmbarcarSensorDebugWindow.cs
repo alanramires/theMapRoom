@@ -18,6 +18,11 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
     private int selectedOptionIndex = -1;
     private string statusMessage = "Ready.";
     private Vector2 scroll;
+    private bool hasSelectedLine;
+    private Vector3Int selectedLineStartCell;
+    private Vector3Int selectedLineEndCell;
+    private Color selectedLineColor = Color.cyan;
+    private string selectedLineLabel = string.Empty;
 
     [MenuItem("Tools/Sensors/Pode Embarcar")]
     public static void OpenWindow()
@@ -28,6 +33,13 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
     private void OnEnable()
     {
         AutoDetectContext();
+        SceneView.duringSceneGui += OnSceneGUI;
+    }
+
+    private void OnDisable()
+    {
+        SceneView.duringSceneGui -= OnSceneGUI;
+        ClearSelectedLine();
     }
 
     private void OnGUI()
@@ -73,13 +85,18 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
                 EditorGUILayout.BeginVertical("box");
                 bool selected = selectedOptionIndex == i;
                 if (GUILayout.Toggle(selected, $"{i + 1}. {option.displayLabel}", "Button"))
+                {
                     selectedOptionIndex = i;
+                    SelectLineForDrawing(option);
+                }
 
                 string transporterName = option.transporterUnit != null ? option.transporterUnit.name : "(null)";
                 EditorGUILayout.LabelField("Transportador", transporterName);
                 EditorGUILayout.LabelField("Slot", option.transporterSlotIndex.ToString());
                 EditorGUILayout.LabelField("Custo de Entrada", option.enterCost.ToString());
                 EditorGUILayout.LabelField("Movimento Restante", option.remainingMovementBeforeEmbark.ToString());
+                if (GUILayout.Button("Desenhar Linha no Scene View"))
+                    SelectLineForDrawing(option);
                 EditorGUILayout.EndVertical();
             }
         }
@@ -113,6 +130,7 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
         options.Clear();
         invalidOptions.Clear();
         selectedOptionIndex = -1;
+        ClearSelectedLine();
 
         if (selectedPassenger == null)
         {
@@ -141,6 +159,12 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
             ? $"Sensor TRUE. {options.Count} transportador(es) valido(s), {invalidOptions.Count} invalido(s)."
             : $"Sensor FALSE. Nenhum transportador elegivel ({invalidOptions.Count} invalido(s)).";
 
+        if (options.Count > 0)
+        {
+            selectedOptionIndex = 0;
+            SelectLineForDrawing(options[0]);
+        }
+
         Debug.Log($"[PodeEmbarcarSensorDebug] Passageiro={selectedPassenger.name} | canEmbark={canEmbark} | validos={options.Count} | invalidos={invalidOptions.Count}");
         for (int i = 0; i < options.Count; i++)
         {
@@ -161,6 +185,61 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
             string transporterName = item.transporterUnit != null ? item.transporterUnit.name : "(nenhum)";
             Debug.Log($"[PodeEmbarcarSensorDebug][INVALIDO] {i + 1}. cell={item.evaluatedCell.x},{item.evaluatedCell.y} | transp={transporterName} | slot={item.transporterSlotIndex} | custo={item.enterCost} | movRest={item.remainingMovementBeforeEmbark} | motivo={item.reason}");
         }
+    }
+
+    private void SelectLineForDrawing(PodeEmbarcarOption option)
+    {
+        if (option == null || option.sourceUnit == null || option.transporterUnit == null)
+        {
+            ClearSelectedLine();
+            return;
+        }
+
+        selectedLineStartCell = option.sourceUnit.CurrentCellPosition;
+        selectedLineStartCell.z = 0;
+        selectedLineEndCell = option.transporterUnit.CurrentCellPosition;
+        selectedLineEndCell.z = 0;
+        selectedLineColor = option.enterCost > option.remainingMovementBeforeEmbark ? Color.red : Color.cyan;
+        selectedLineLabel = $"Embarque: {option.sourceUnit.name} -> {option.transporterUnit.name} (slot {option.transporterSlotIndex})";
+        hasSelectedLine = true;
+        SceneView.RepaintAll();
+    }
+
+    private void ClearSelectedLine()
+    {
+        hasSelectedLine = false;
+        selectedLineLabel = string.Empty;
+    }
+
+    private void OnSceneGUI(SceneView sceneView)
+    {
+        if (!hasSelectedLine)
+            return;
+
+        Tilemap map = ResolveDrawTilemap();
+        if (map == null)
+            return;
+
+        Vector3 start = map.GetCellCenterWorld(selectedLineStartCell);
+        Vector3 end = map.GetCellCenterWorld(selectedLineEndCell);
+
+        Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
+        Handles.color = selectedLineColor;
+        Handles.DrawAAPolyLine(4f, start, end);
+        Handles.SphereHandleCap(0, start, Quaternion.identity, 0.12f, EventType.Repaint);
+        Handles.SphereHandleCap(0, end, Quaternion.identity, 0.12f, EventType.Repaint);
+
+        Vector3 mid = Vector3.Lerp(start, end, 0.5f);
+        Handles.Label(mid + new Vector3(0.1f, 0.1f, 0f), selectedLineLabel);
+    }
+
+    private Tilemap ResolveDrawTilemap()
+    {
+        if (overrideTilemap != null)
+            return overrideTilemap;
+        if (selectedPassenger != null && selectedPassenger.BoardTilemap != null)
+            return selectedPassenger.BoardTilemap;
+        return FindPreferredTilemap();
     }
 
     private void DrawInvalidItem(int index, PodeEmbarcarInvalidOption item)

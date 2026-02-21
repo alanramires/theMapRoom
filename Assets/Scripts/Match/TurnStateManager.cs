@@ -290,6 +290,6 @@ public partial class TurnStateManager : MonoBehaviour
 
     private bool IsMovementAnimationRunning()
     {
-        return animationManager != null && animationManager.IsAnimatingMovement;
+        return (animationManager != null && animationManager.IsAnimatingMovement) || embarkExecutionInProgress;
     }
 }

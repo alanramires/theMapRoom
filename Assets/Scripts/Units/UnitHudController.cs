@@ -40,6 +40,14 @@ public class UnitHudController : MonoBehaviour
     [SerializeField] private float fuelMinScaleX = 0.05f;
     [SerializeField] private bool hideFuelWhenFull = false;
 
+    [Header("Altitude")]
+    [SerializeField] private SpriteRenderer altitudeRenderer;
+    [SerializeField] private Image altitudeImage;
+    [SerializeField] private Sprite altitudeHighSprite;
+    [SerializeField] private Sprite altitudeLowSprite;
+    [SerializeField] private Sprite altitudeSubmergedSprite;
+    [SerializeField] private Transform transportIndicatorRoot;
+
     [Header("Sorting")]
     [SerializeField] private bool applyHudSorting = true;
     [SerializeField] private string hudSortingLayerName = "SFX";
@@ -64,11 +72,34 @@ public class UnitHudController : MonoBehaviour
     }
 #endif
 
-    public void Apply(int currentHP, int maxHP, int currentAmmo, int maxAmmo, int currentFuel, int maxFuel, Color teamColor)
+    public void RefreshBindings()
     {
+        EnforceFuelDefaultColor();
+        AutoAssignCommonReferences();
+        DisableLegacyLockVisuals();
+        ApplySorting();
+    }
+
+    public void Apply(
+        int currentHP,
+        int maxHP,
+        int currentAmmo,
+        int maxAmmo,
+        int currentFuel,
+        int maxFuel,
+        Color teamColor,
+        Domain domain,
+        HeightLevel heightLevel,
+        bool showTransportIndicator)
+    {
+        if (altitudeImage == null && altitudeRenderer == null)
+            AutoAssignCommonReferences();
+
         RefreshHp(currentHP, maxHP);
         RefreshPips(ammoPips, currentAmmo, maxAmmo, teamColor);
         RefreshFuel(currentFuel, maxFuel, teamColor);
+        RefreshAltitude(domain, heightLevel);
+        RefreshTransportIndicator(showTransportIndicator);
     }
 
     private static void RefreshPips(PipGroup group, int current, int max, Color teamColor)
@@ -241,6 +272,67 @@ public class UnitHudController : MonoBehaviour
             if (fuelTextT != null)
                 fuelText = fuelTextT.GetComponent<TMP_Text>();
         }
+
+        Transform altitudeT = FindChildRecursive(transform, "altitude");
+        if (altitudeT != null)
+        {
+            if (altitudeImage == null)
+                altitudeImage = altitudeT.GetComponent<Image>();
+            if (altitudeRenderer == null)
+                altitudeRenderer = altitudeT.GetComponent<SpriteRenderer>();
+        }
+
+        if (transportIndicatorRoot == null)
+        {
+            transportIndicatorRoot = FindChildRecursive(transform, "transporte");
+            if (transportIndicatorRoot == null)
+                transportIndicatorRoot = FindChildRecursive(transform, "transport");
+        }
+
+        if (altitudeHighSprite == null)
+            altitudeHighSprite = FindSpriteByName("high altitude");
+        if (altitudeLowSprite == null)
+            altitudeLowSprite = FindSpriteByName("low altitude");
+        if (altitudeSubmergedSprite == null)
+            altitudeSubmergedSprite = FindSpriteByName("submerged");
+    }
+
+    private void RefreshAltitude(Domain domain, HeightLevel heightLevel)
+    {
+        bool shouldShow = true;
+        Sprite target = null;
+
+        if (heightLevel == HeightLevel.AirHigh)
+            target = altitudeHighSprite;
+        else if (heightLevel == HeightLevel.AirLow)
+            target = altitudeLowSprite;
+        else if (heightLevel == HeightLevel.Submerged || domain == Domain.Submarine)
+            target = altitudeSubmergedSprite;
+        else if (domain == Domain.Land && heightLevel == HeightLevel.Surface)
+            shouldShow = false;
+        else
+            shouldShow = false;
+
+        if (altitudeImage != null)
+        {
+            altitudeImage.sprite = target;
+            altitudeImage.enabled = shouldShow && target != null;
+        }
+
+        if (altitudeRenderer != null)
+        {
+            altitudeRenderer.sprite = target;
+            altitudeRenderer.enabled = shouldShow && target != null;
+        }
+    }
+
+    private void RefreshTransportIndicator(bool show)
+    {
+        if (transportIndicatorRoot == null)
+            return;
+
+        if (transportIndicatorRoot.gameObject.activeSelf != show)
+            transportIndicatorRoot.gameObject.SetActive(show);
     }
 
     private void DisableLegacyLockVisuals()
@@ -320,6 +412,26 @@ public class UnitHudController : MonoBehaviour
             Transform nested = FindChildRecursive(child, childName);
             if (nested != null)
                 return nested;
+        }
+
+        return null;
+    }
+
+    private static Sprite FindSpriteByName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        string normalized = name.Trim().ToLowerInvariant();
+        Sprite[] sprites = Resources.FindObjectsOfTypeAll<Sprite>();
+        for (int i = 0; i < sprites.Length; i++)
+        {
+            Sprite sprite = sprites[i];
+            if (sprite == null || string.IsNullOrWhiteSpace(sprite.name))
+                continue;
+
+            if (sprite.name.Trim().ToLowerInvariant() == normalized)
+                return sprite;
         }
 
         return null;

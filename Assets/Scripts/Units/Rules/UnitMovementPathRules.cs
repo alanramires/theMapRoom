@@ -53,7 +53,8 @@ public static class UnitMovementPathRules
                 bool hasAnyTile = cache.HasAnyPaintedTileAtCell(next);
                 if (!CanTraverseCell(construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit))
                     continue;
-                int autonomyCostToEnter = GetAutonomyCostToEnterCell(construction, structure, terrainData, unit);
+                int movementCostBase = GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier: false);
+                int autonomyCostToEnter = GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier: true);
                 bool nextIsRoadBoost = cache.IsRoadBoostCell(next);
 
                 bool useFreeRoadBonusStep =
@@ -63,7 +64,7 @@ public static class UnitMovementPathRules
                     currentSteps == maxMovementCost &&
                     nextIsRoadBoost;
 
-                int movementCostToEnter = useFreeRoadBonusStep ? 0 : autonomyCostToEnter;
+                int movementCostToEnter = useFreeRoadBonusStep ? 0 : movementCostBase;
                 int autonomyCostDelta = useFreeRoadBonusStep ? 0 : autonomyCostToEnter;
                 int nextStep = currentSteps + movementCostToEnter;
                 if (nextStep > maxMovementCost)
@@ -123,7 +124,8 @@ public static class UnitMovementPathRules
         Tilemap terrainTilemap,
         UnitManager unit,
         IReadOnlyList<Vector3Int> path,
-        TerrainDatabase terrainDatabase = null)
+        TerrainDatabase terrainDatabase = null,
+        bool applyOperationalAutonomyModifier = true)
     {
         if (terrainTilemap == null || unit == null || path == null || path.Count < 2)
             return 0;
@@ -172,7 +174,7 @@ public static class UnitMovementPathRules
             ConstructionManager construction = cache.GetConstructionAtCell(cell);
             StructureData structure = cache.GetStructureAtCell(cell);
             TerrainTypeData terrainData = cache.ResolveTerrainAtCell(cell);
-            total += GetAutonomyCostToEnterCell(construction, structure, terrainData, unit);
+            total += GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier);
         }
 
         return Mathf.Max(0, total);
@@ -183,6 +185,7 @@ public static class UnitMovementPathRules
         UnitManager unit,
         Vector3Int cell,
         TerrainDatabase terrainDatabase,
+        bool applyOperationalAutonomyModifier,
         out int cost)
     {
         cost = 0;
@@ -197,8 +200,18 @@ public static class UnitMovementPathRules
         if (!CanTraverseCell(construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit))
             return false;
 
-        cost = Mathf.Max(1, GetAutonomyCostToEnterCell(construction, structure, terrainData, unit));
+        cost = Mathf.Max(1, GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier));
         return true;
+    }
+
+    public static bool TryGetEnterCellCost(
+        Tilemap terrainTilemap,
+        UnitManager unit,
+        Vector3Int cell,
+        TerrainDatabase terrainDatabase,
+        out int cost)
+    {
+        return TryGetEnterCellCost(terrainTilemap, unit, cell, terrainDatabase, applyOperationalAutonomyModifier: true, out cost);
     }
 
     private static bool CanUseRoadFullMoveBonus(UnitManager unit, int baseMove)
@@ -403,21 +416,22 @@ public static class UnitMovementPathRules
         ConstructionManager construction,
         StructureData structure,
         TerrainTypeData terrainData,
-        UnitManager unit)
+        UnitManager unit,
+        bool applyOperationalAutonomyModifier)
     {
+        int baseCost;
         if (unit != null && unit.GetDomain() == Domain.Air)
-            return 1;
+            baseCost = 1;
+        else if (construction != null)
+            baseCost = GetAutonomyCostWithSkillOverrides(construction.GetBaseMovementCost(), construction.GetSkillCostOverrides(), unit);
+        else if (structure != null)
+            baseCost = GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, structure.skillCostOverrides, unit);
+        else if (terrainData != null)
+            baseCost = GetAutonomyCostWithSkillOverrides(terrainData.basicAutonomyCost, terrainData.skillCostOverrides, unit);
+        else
+            baseCost = 1;
 
-        if (construction != null)
-            return GetAutonomyCostWithSkillOverrides(construction.GetBaseMovementCost(), construction.GetSkillCostOverrides(), unit);
-
-        if (structure != null)
-            return GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, structure.skillCostOverrides, unit);
-
-        if (terrainData != null)
-            return GetAutonomyCostWithSkillOverrides(terrainData.basicAutonomyCost, terrainData.skillCostOverrides, unit);
-
-        return 1;
+        return OperationalAutonomyRules.ApplyMovementAutonomyCost(unit, baseCost, applyOperationalAutonomyModifier);
     }
 
     private static int GetAutonomyCostWithSkillOverrides(

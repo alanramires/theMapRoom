@@ -28,11 +28,11 @@ public static class UnitLayerTools
                 continue;
 
             Undo.RecordObject(unit, "Propagate Unit Data");
-            if (!unit.ApplyFromDatabase())
-                continue;
-
             if (PropagateHudLayoutForUnit(sourceHud, unit))
                 hudUpdated++;
+
+            if (!unit.ApplyFromDatabase())
+                continue;
 
             EditorUtility.SetDirty(unit);
             updated++;
@@ -74,6 +74,8 @@ public static class UnitLayerTools
 
         Undo.RecordObject(targetHud, "Propagate Unit HUD Layout");
         bool changed = CopyTransformTreeLayout(sourceHud.transform, targetHud.transform);
+        targetHud.RefreshBindings();
+        changed = true;
         if (!changed)
             return false;
 
@@ -95,7 +97,13 @@ public static class UnitLayerTools
             Transform sourceChild = sourceRoot.GetChild(i);
             Transform targetChild = FindDirectChildByName(targetRoot, sourceChild.name);
             if (targetChild == null)
-                continue;
+            {
+                Undo.RecordObject(targetRoot.gameObject, "Propagate HUD Missing Child");
+                GameObject created = Object.Instantiate(sourceChild.gameObject, targetRoot);
+                created.name = sourceChild.name;
+                targetChild = created.transform;
+                changed = true;
+            }
 
             changed |= CopyTransformTreeLayout(sourceChild, targetChild);
         }
@@ -177,7 +185,22 @@ public static class UnitLayerTools
             }
         }
 
+        changed |= CopyGameObjectState(source.gameObject, target.gameObject);
+
         return changed;
+    }
+
+    private static bool CopyGameObjectState(GameObject source, GameObject target)
+    {
+        if (source == null || target == null)
+            return false;
+
+        if (source.activeSelf == target.activeSelf)
+            return false;
+
+        Undo.RecordObject(target, "Propagate HUD Active State");
+        target.SetActive(source.activeSelf);
+        return true;
     }
 
     private static Transform FindDirectChildByName(Transform parent, string name)

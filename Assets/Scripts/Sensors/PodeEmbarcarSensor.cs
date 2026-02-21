@@ -74,7 +74,7 @@ public static class PodeEmbarcarSensor
                     continue;
                 }
 
-                int occupied = CountSlotOccupancy(map, transporter, slot);
+                int occupied = CountSlotOccupancy(transporter, slotIndex);
                 if (occupied >= Mathf.Max(1, slot.capacity))
                 {
                     AppendInvalid(invalidOutput, selectedUnit, transporter, cell, slotIndex, $"Slot lotado ({occupied}/{Mathf.Max(1, slot.capacity)}).", embarkCost, remainingMovementPoints);
@@ -88,7 +88,7 @@ public static class PodeEmbarcarSensor
                     sourceUnit = selectedUnit,
                     transporterUnit = transporter,
                     transporterSlotIndex = slotIndex,
-                    displayLabel = BuildLabel(transporter, slot, occupied, embarkCost, remainingMovementPoints),
+                    displayLabel = BuildLabel(transporter, slot, occupied, embarkCost, remainingMovementPoints, RequiresForcedLandingBeforeEmbark(transporter, map, terrainDatabase)),
                     enterCost = embarkCost,
                     remainingMovementBeforeEmbark = Mathf.Max(0, remainingMovementPoints)
                 });
@@ -113,6 +113,21 @@ public static class PodeEmbarcarSensor
         {
             reason = "Contexto de embarque invalido (mapa/transportador/dados).";
             return false;
+        }
+        if (transporter.GetDomain() == Domain.Air)
+        {
+            AircraftOperationDecision landingProbe = AircraftOperationRules.Evaluate(
+                transporter,
+                map,
+                terrainDatabase,
+                SensorMovementMode.MoveuParado);
+            if (!landingProbe.available || landingProbe.action != AircraftOperationAction.Land)
+            {
+                reason = string.IsNullOrWhiteSpace(landingProbe.reason)
+                    ? "Transportador aereo sem pouso forçado valido neste hex."
+                    : $"Transportador aereo sem pouso forçado valido: {landingProbe.reason}";
+                return false;
+            }
         }
 
         bool hasConstructionFilter = transporterData.allowedEmbarkConstructions != null && transporterData.allowedEmbarkConstructions.Count > 0;
@@ -165,11 +180,6 @@ public static class PodeEmbarcarSensor
         if ((int)sourceUnit.TeamId != (int)transporter.TeamId)
         {
             reason = "Transportador adjacente eh de outro time.";
-            return false;
-        }
-        if (transporter.GetDomain() == Domain.Air)
-        {
-            reason = "Embarque bloqueado: transportador em dominio aereo.";
             return false;
         }
         if (!transporter.TryGetUnitData(out transporterData) || transporterData == null)
@@ -250,47 +260,37 @@ public static class PodeEmbarcarSensor
         return true;
     }
 
-    private static int CountSlotOccupancy(Tilemap map, UnitManager transporter, UnitTransportSlotRule slot)
+    private static int CountSlotOccupancy(UnitManager transporter, int slotIndex)
     {
-        if (map == null || transporter == null || slot == null)
+        if (transporter == null || slotIndex < 0)
             return 0;
-
-        Vector3Int transporterCell = transporter.CurrentCellPosition;
-        transporterCell.z = 0;
-
-        int count = 0;
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
-        {
-            UnitManager unit = units[i];
-            if (unit == null || !unit.gameObject.activeInHierarchy || !unit.IsEmbarked || unit == transporter)
-                continue;
-
-            Vector3Int cell = unit.BoardTilemap == map
-                ? unit.CurrentCellPosition
-                : HexCoordinates.WorldToCell(map, unit.transform.position);
-            cell.z = 0;
-            if (cell != transporterCell)
-                continue;
-
-            if (!unit.TryGetUnitData(out UnitData data) || data == null)
-                continue;
-
-            if (slot.allowedClasses != null && slot.allowedClasses.Count > 0 && !slot.allowedClasses.Contains(data.unitClass))
-                continue;
-
-            count++;
-        }
-
-        return count;
+        return Mathf.Max(0, transporter.GetOccupiedTransportSeatCountForSlot(slotIndex));
     }
 
-    private static string BuildLabel(UnitManager transporter, UnitTransportSlotRule slot, int occupied, int enterCost, int remaining)
+    private static string BuildLabel(UnitManager transporter, UnitTransportSlotRule slot, int occupied, int enterCost, int remaining, bool requiresForcedLanding)
     {
         string transporterName = transporter != null ? transporter.name : "Transportador";
         string slotName = !string.IsNullOrWhiteSpace(slot.slotId) ? slot.slotId : "slot";
         int cap = Mathf.Max(1, slot.capacity);
-        return $"{transporterName} | {slotName} ({occupied}/{cap}) | custo={enterCost} | movRest={Mathf.Max(0, remaining)}";
+        string label = $"{transporterName} | {slotName} ({occupied}/{cap}) | custo={enterCost} | movRest={Mathf.Max(0, remaining)}";
+        if (requiresForcedLanding)
+            label += " | OBS: se escolhido, o transportador pousa antes do embarque";
+        return label;
+    }
+
+    private static bool RequiresForcedLandingBeforeEmbark(UnitManager transporter, Tilemap map, TerrainDatabase terrainDatabase)
+    {
+        if (transporter == null)
+            return false;
+        if (transporter.GetDomain() != Domain.Air)
+            return false;
+
+        AircraftOperationDecision decision = AircraftOperationRules.Evaluate(
+            transporter,
+            map,
+            terrainDatabase,
+            SensorMovementMode.MoveuParado);
+        return decision.available && decision.action == AircraftOperationAction.Land;
     }
 
     private static bool TryResolveTerrainAtCell(
@@ -353,7 +353,13 @@ public static class PodeEmbarcarSensor
         }
 
         transporterCell.z = 0;
-        if (UnitMovementPathRules.TryGetEnterCellCost(map, passenger, transporterCell, terrainDatabase, out int normalCost))
+        if (UnitMovementPathRules.TryGetEnterCellCost(
+                map,
+                passenger,
+                transporterCell,
+                terrainDatabase,
+                applyOperationalAutonomyModifier: false,
+                out int normalCost))
         {
             cost = Mathf.Max(1, normalCost);
             return true;

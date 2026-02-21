@@ -34,6 +34,7 @@ RectTransform:
   - {fileID: 6077523268826619472}
   - {fileID: 3389349782232182809}
   - {fileID: 5439601904325997685}
+  - {fileID: 1595307228634405672}
   - {fileID: 6341617830216810619}
   - {fileID: 5761048419433149052}
   - {fileID: 7229883133104849251}
@@ -253,6 +254,9 @@ MonoBehaviour:
   aircraftGrounded: 0
   aircraftEmbarkedInCarrier: 0
   aircraftOperationLockTurns: 0
+  transportedUnitSlots: []
+  embarkedTransporter: {fileID: 0}
+  embarkedTransporterSlotIndex: -1
 --- !u!1 &2120091812791158126
 GameObject:
   m_ObjectHideFlags: 0
@@ -378,6 +382,12 @@ MonoBehaviour:
   fuel25PercentColor: {r: 1, g: 0.3, b: 0.3, a: 1}
   fuelMinScaleX: 0.05
   hideFuelWhenFull: 0
+  altitudeRenderer: {fileID: 0}
+  altitudeImage: {fileID: 4413923802840657995}
+  altitudeHighSprite: {fileID: 21300000, guid: d69067b8a78952c44805e3ce8887994d, type: 3}
+  altitudeLowSprite: {fileID: 21300000, guid: 3505315c0b82f4a468bca8a040429274, type: 3}
+  altitudeSubmergedSprite: {fileID: 21300000, guid: 8b13116408a07fa468aabc08c23c5f85, type: 3}
+  transportIndicatorRoot: {fileID: 5439601904325997685}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 50
@@ -628,7 +638,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0.58000004, y: -2.4599998}
+  m_AnchoredPosition: {x: 0.51000005, y: -2.62}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2039043004018443911
@@ -731,6 +741,81 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!1 &4380616864542498514
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1595307228634405672}
+  - component: {fileID: 4245810897990352261}
+  - component: {fileID: 4413923802840657995}
+  m_Layer: 0
+  m_Name: altitude
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1595307228634405672
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4380616864542498514}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.1, y: 0.1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6912642489147322313}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 3.56, y: -3.9}
+  m_SizeDelta: {x: 15, y: 15}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &4245810897990352261
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4380616864542498514}
+  m_CullTransparentMesh: 1
+--- !u!114 &4413923802840657995
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4380616864542498514}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 8b13116408a07fa468aabc08c23c5f85, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &5855566386831445608
 GameObject:
   m_ObjectHideFlags: 0
@@ -915,7 +1000,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -0.77, y: -2.46}
+  m_AnchoredPosition: {x: -0.84, y: -2.62}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4853617338249748356

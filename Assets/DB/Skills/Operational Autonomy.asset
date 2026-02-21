@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aec5091123b209d4c8b513b772829f77, type: 3}
+  m_Name: Operational Autonomy
+  m_EditorClassIdentifier: Assembly-CSharp::SkillData
+  id: operationalAutonomy
+  displayName: Operational Autonomy
+  description: Modifica consumo de autonomia por hex conforme classe e aplica upkeep por
+    inicio de turno em altura aerea para aeronaves.
+  enableCombatRpsModifier: 0
+  filterOwnerClass: 0
+  requiredOwnerClass: 4
+  filterOpponentClass: 0
+  requiredOpponentClass: 4
+  filterWeaponCategory: 0
+  requiredWeaponCategory: 2
+  requireSameUnitClass: 0
+  eliteComparison: 0
+  minEliteDifference: 1
+  ownerAttackRpsModifier: 0
+  ownerDefenseRpsModifier: 0
+  opponentAttackRpsModifier: 0
+  opponentDefenseRpsModifier: 0

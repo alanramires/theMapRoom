@@ -11,12 +11,19 @@ public partial class TurnStateManager
     {
         AwaitingAction = 0,
         MirandoCycleTarget = 1,
-        MirandoConfirmTarget = 2
+        MirandoConfirmTarget = 2,
+        EmbarkCycleTarget = 3,
+        EmbarkConfirmTarget = 4
     }
 
     private ScannerPromptStep scannerPromptStep = ScannerPromptStep.AwaitingAction;
     private int scannerSelectedTargetIndex = -1;
+    private int scannerSelectedEmbarkIndex = -1;
+    private bool scannerSelectedEmbarkIsValid;
+    private bool embarkExecutionInProgress;
     private CursorState cursorStateBeforeMirando = CursorState.MoveuParado;
+    private CursorState lastLoggedCursorState = (CursorState)(-1);
+    private UnitManager lastLoggedSelectedUnit;
     private LineRenderer mirandoPreviewRenderer;
     private readonly List<Vector3> mirandoPreviewPathPoints = new List<Vector3>();
     private readonly List<Vector3> mirandoPreviewSegmentPoints = new List<Vector3>();
@@ -28,18 +35,142 @@ public partial class TurnStateManager
     private WeaponTrajectoryType mirandoPreviewLastTrajectory;
     private float mirandoPreviewLastBend;
     private int mirandoPreviewLastSamples;
+    private LineRenderer embarkPreviewRenderer;
+    private readonly List<Vector3> embarkPreviewPathPoints = new List<Vector3>();
+    private readonly List<Vector3> embarkPreviewSegmentPoints = new List<Vector3>();
+    private float embarkPreviewPathLength;
+    private float embarkPreviewHeadDistance;
+    private Color embarkPreviewColor = Color.white;
+    [SerializeField] private bool enableUnitSelectedLayerPreviewHotkeys = true;
 
     private void Update()
     {
+        TrackRuntimeDebugLogs();
+        ProcessUnitSelectedLayerPreviewInput();
         ProcessScannerPromptInput();
         UpdateMirandoPreviewAnimation();
+        UpdateEmbarkPreviewAnimation();
+    }
+
+    private void ProcessUnitSelectedLayerPreviewInput()
+    {
+        if (!enableUnitSelectedLayerPreviewHotkeys || !Application.isPlaying)
+            return;
+        if (IsMovementAnimationRunning())
+            return;
+        if (cursorState != CursorState.UnitSelected || selectedUnit == null)
+            return;
+
+        int delta = 0;
+        if (WasLetterPressedThisFrame('D'))
+            delta = -1;
+        else if (WasLetterPressedThisFrame('S'))
+            delta = +1;
+
+        if (delta == 0)
+            return;
+
+        if (!TryGetNextLayerModeForSelectedUnit(delta, out UnitLayerMode targetMode, out int shownIndex, out int totalModes))
+            return;
+
+        cursorController?.PlayConfirmSfx();
+        selectedUnit.TrySetCurrentLayerMode(targetMode.domain, targetMode.heightLevel);
+        selectedUnit.PullCellFromTransform();
+        if (cursorController != null)
+        {
+            Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+            unitCell.z = 0;
+            cursorController.SetCell(unitCell, playMoveSfx: false);
+        }
+        ClearSensorResults();
+        PaintSelectedUnitMovementRange();
+        Debug.Log($"[Layer Preview] {selectedUnit.name}: {targetMode.domain}/{targetMode.heightLevel} ({shownIndex}/{totalModes})");
+    }
+
+    private bool TryGetNextLayerModeForSelectedUnit(int delta, out UnitLayerMode targetMode, out int shownIndex, out int totalModes)
+    {
+        targetMode = default(UnitLayerMode);
+        shownIndex = 0;
+        totalModes = 0;
+        if (selectedUnit == null)
+            return false;
+
+        List<UnitLayerMode> orderedModes = BuildOrderedLayerModesForSelectedUnit(selectedUnit);
+        totalModes = orderedModes.Count;
+        if (totalModes <= 1)
+            return false;
+
+        UnitLayerMode currentMode = selectedUnit.GetCurrentLayerMode();
+        int currentIndex = 0;
+        for (int i = 0; i < orderedModes.Count; i++)
+        {
+            if (orderedModes[i].domain == currentMode.domain && orderedModes[i].heightLevel == currentMode.heightLevel)
+            {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        int nextIndex = currentIndex + delta;
+        if (nextIndex < 0 || nextIndex >= orderedModes.Count)
+            return false;
+
+        targetMode = orderedModes[nextIndex];
+        shownIndex = nextIndex + 1;
+        return true;
+    }
+
+    private static List<UnitLayerMode> BuildOrderedLayerModesForSelectedUnit(UnitManager unit)
+    {
+        List<UnitLayerMode> ordered = new List<UnitLayerMode>();
+        if (unit == null)
+            return ordered;
+
+        IReadOnlyList<UnitLayerMode> modes = unit.GetAllLayerModes();
+        if (modes == null)
+            return ordered;
+
+        for (int i = 0; i < modes.Count; i++)
+            ordered.Add(modes[i]);
+
+        ordered.Sort((a, b) =>
+        {
+            int byHeight = ((int)a.heightLevel).CompareTo((int)b.heightLevel);
+            if (byHeight != 0)
+                return byHeight;
+            return ((int)a.domain).CompareTo((int)b.domain);
+        });
+
+        return ordered;
+    }
+
+    private void TrackRuntimeDebugLogs()
+    {
+        if (!Application.isPlaying)
+            return;
+
+        bool stateChanged = lastLoggedCursorState != cursorState;
+        bool selectedChanged = lastLoggedSelectedUnit != selectedUnit;
+        if (!stateChanged && !selectedChanged)
+            return;
+
+        lastLoggedCursorState = cursorState;
+        lastLoggedSelectedUnit = selectedUnit;
+        string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
+        Debug.Log($"[TurnState] state={cursorState} | selected={selectedName}");
+
+        if ((cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado) && selectedUnit != null)
+            LogScannerPanel();
     }
 
     private void ResetScannerPromptState()
     {
         scannerPromptStep = ScannerPromptStep.AwaitingAction;
         scannerSelectedTargetIndex = -1;
+        scannerSelectedEmbarkIndex = -1;
+        scannerSelectedEmbarkIsValid = false;
         ClearMirandoPreview();
+        ClearEmbarkPreview();
     }
 
     private bool HandleScannerPromptCancel()
@@ -51,12 +182,36 @@ public partial class TurnStateManager
             return true;
         }
 
+        if ((cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado) &&
+            scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget)
+        {
+            scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+            FocusCurrentEmbarkTarget(logDetails: true);
+            return true;
+        }
+
+        if ((cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado) &&
+            scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget)
+        {
+            ResetScannerPromptState();
+            if (cursorState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
+                DrawCommittedPathVisual(committedMovementPath);
+            if (cursorController != null && selectedUnit != null)
+            {
+                Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+                unitCell.z = 0;
+                cursorController.SetCell(unitCell, playMoveSfx: false);
+            }
+            LogScannerPanel();
+            return true;
+        }
+
         return false;
     }
 
     private void ProcessScannerPromptInput()
     {
-        if (IsMovementAnimationRunning())
+        if (IsMovementAnimationRunning() || embarkExecutionInProgress)
             return;
 
         if (cursorState == CursorState.Mirando)
@@ -69,7 +224,6 @@ public partial class TurnStateManager
         {
             if (WasLetterPressedThisFrame('A'))
             {
-                cursorController?.PlayConfirmSfx();
                 HandleAimActionRequested();
                 return;
             }
@@ -95,6 +249,26 @@ public partial class TurnStateManager
             return;
         }
 
+        if (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget || scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget)
+        {
+            if (TryReadPressedNumber(out int number))
+            {
+                int index = number - 1;
+                if (index >= 0 && index < GetEmbarkEntryCount())
+                {
+                    cursorController?.PlayConfirmSfx();
+                    scannerSelectedEmbarkIndex = index;
+                    scannerPromptStep = ScannerPromptStep.EmbarkConfirmTarget;
+                    FocusCurrentEmbarkTarget(logDetails: true);
+                    if (TryGetSelectedValidEmbarkOption(out PodeEmbarcarOption selected, out int shownIndex))
+                    {
+                        string label = !string.IsNullOrWhiteSpace(selected.displayLabel) ? selected.displayLabel : "transportador";
+                        Debug.Log($"Confirma embarque {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
+                    }
+                }
+            }
+        }
+
     }
 
     private void HandleAimActionRequested()
@@ -107,6 +281,8 @@ public partial class TurnStateManager
             return;
         }
 
+        cursorController?.PlayConfirmSfx();
+        FocusFirstOptionForAction('A');
         EnterMirandoState();
     }
 
@@ -138,6 +314,7 @@ public partial class TurnStateManager
             return;
         }
 
+        cursorController?.PlayConfirmSfx();
         Debug.Log($"[Operacao Aerea] {decision.label} executado.");
 
         if (decision.consumesAction)
@@ -164,24 +341,554 @@ public partial class TurnStateManager
 
     private void HandleEmbarkActionRequested()
     {
-        bool canEmbark = availableSensorActionCodes.Contains('E') && cachedPodeEmbarcarTargets.Count > 0;
-        if (!canEmbark)
+        bool hasValid = cachedPodeEmbarcarTargets.Count > 0;
+        if (!hasValid)
         {
             Debug.Log("Pode Embarcar (\"E\"): nao ha transportador valido adjacente.");
             LogScannerPanel();
             return;
         }
 
-        string log = $"Pode Embarcar (\"E\"): {cachedPodeEmbarcarTargets.Count} opcao(oes) disponivel(is)\n";
-        for (int i = 0; i < cachedPodeEmbarcarTargets.Count; i++)
+        cursorController?.PlayConfirmSfx();
+        // Mesma regra do Mirando: ao entrar em um submenu de sensor, oculta o preview de movimento.
+        ClearCommittedPathVisual();
+        scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+        scannerSelectedEmbarkIndex = 0;
+        FocusCurrentEmbarkTarget(logDetails: true);
+        LogEmbarkSelectionPanel();
+    }
+
+    private void FocusFirstOptionForAction(char actionCode)
+    {
+        if (cursorController == null)
+            return;
+
+        switch (char.ToUpperInvariant(actionCode))
         {
-            PodeEmbarcarOption item = cachedPodeEmbarcarTargets[i];
-            string label = item != null ? item.displayLabel : "(opcao invalida)";
-            log += $"{i + 1}. {label}\n";
+            case 'A':
+            {
+                if (cachedPodeMirarTargets.Count <= 0)
+                    return;
+
+                PodeMirarTargetOption firstAim = cachedPodeMirarTargets[0];
+                if (firstAim == null || firstAim.targetUnit == null)
+                    return;
+
+                Vector3Int targetCell = firstAim.targetUnit.CurrentCellPosition;
+                targetCell.z = 0;
+                cursorController.SetCell(targetCell, playMoveSfx: false);
+                break;
+            }
+            case 'E':
+            {
+                if (cachedPodeEmbarcarTargets.Count <= 0)
+                    return;
+
+                PodeEmbarcarOption firstEmbark = cachedPodeEmbarcarTargets[0];
+                if (firstEmbark == null || firstEmbark.transporterUnit == null)
+                    return;
+
+                Vector3Int targetCell = firstEmbark.transporterUnit.CurrentCellPosition;
+                targetCell.z = 0;
+                cursorController.SetCell(targetCell, playMoveSfx: false);
+                break;
+            }
+        }
+    }
+
+    private bool TryConfirmScannerEmbark()
+    {
+        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            return false;
+
+        if (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget)
+        {
+            if (!TryGetSelectedValidEmbarkOption(out PodeEmbarcarOption selected, out int shownIndex))
+            {
+                Debug.Log("[Embarque] Selecao de embarque invalida.");
+                return true;
+            }
+
+            scannerPromptStep = ScannerPromptStep.EmbarkConfirmTarget;
+            // Mantem/atualiza a linha de preview durante a fase de confirmacao.
+            FocusCurrentEmbarkTarget(logDetails: false, moveCursor: false);
+            string label = !string.IsNullOrWhiteSpace(selected.displayLabel) ? selected.displayLabel : "transportador";
+            Debug.Log($"Confirma embarque {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
+            return true;
         }
 
-        log += "(Acao de embarque ainda nao implementada nesta etapa.)";
-        Debug.Log(log);
+        if (scannerPromptStep != ScannerPromptStep.EmbarkConfirmTarget)
+            return false;
+
+        if (!TryGetSelectedValidEmbarkOption(out PodeEmbarcarOption option, out _))
+        {
+            scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+            FocusCurrentEmbarkTarget(logDetails: true);
+            return true;
+        }
+
+        StartEmbarkExecutionFlow(option);
+        return true;
+    }
+
+    private bool TryGetSelectedValidEmbarkOption(out PodeEmbarcarOption option, out int shownIndex)
+    {
+        option = null;
+        shownIndex = scannerSelectedEmbarkIndex + 1;
+        if (scannerSelectedEmbarkIndex < 0 || scannerSelectedEmbarkIndex >= cachedPodeEmbarcarTargets.Count)
+            return false;
+
+        option = cachedPodeEmbarcarTargets[scannerSelectedEmbarkIndex];
+        return option != null;
+    }
+
+    private void StartEmbarkExecutionFlow(PodeEmbarcarOption option)
+    {
+        if (option == null)
+        {
+            Debug.Log("[Embarque] Opcao invalida.");
+            scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+            return;
+        }
+
+        UnitManager passenger = option.sourceUnit != null ? option.sourceUnit : selectedUnit;
+        UnitManager transporter = option.transporterUnit;
+        if (passenger == null || transporter == null || passenger != selectedUnit)
+        {
+            Debug.Log("[Embarque] Opcao desatualizada para a unidade selecionada.");
+            scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+            RefreshSensorsForCurrentState();
+            return;
+        }
+
+        embarkExecutionInProgress = true;
+        scannerPromptStep = ScannerPromptStep.EmbarkConfirmTarget;
+        StartCoroutine(ExecuteEmbarkSequence(option, passenger, transporter));
+    }
+
+    private System.Collections.IEnumerator ExecuteEmbarkSequence(PodeEmbarcarOption option, UnitManager passenger, UnitManager transporter)
+    {
+        Tilemap movementTilemap = terrainTilemap != null ? terrainTilemap : (passenger != null ? passenger.BoardTilemap : null);
+        bool passengerSortingRaised = false;
+        bool transporterSortingRaised = false;
+
+        if (passenger != null)
+        {
+            passenger.SetTemporarySortingOrder();
+            passengerSortingRaised = true;
+        }
+
+        try
+        {
+            if (transporter != null && transporter.GetDomain() == Domain.Air)
+            {
+                transporter.SetTemporarySortingOrder();
+                transporterSortingRaised = true;
+                if (!AircraftOperationRules.TryApplyOperation(
+                        transporter,
+                        movementTilemap,
+                        terrainDatabase,
+                        SensorMovementMode.MoveuParado,
+                        out AircraftOperationDecision landingDecision) ||
+                    landingDecision.action != AircraftOperationAction.Land)
+                {
+                    Debug.Log(string.IsNullOrWhiteSpace(landingDecision.reason)
+                        ? "[Embarque] Transportador aereo sem pouso valido."
+                        : $"[Embarque] {landingDecision.reason}");
+                    embarkExecutionInProgress = false;
+                    scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+                    RefreshSensorsForCurrentState();
+                    yield break;
+                }
+
+                // Feedback do "forced landing": usa o SFX de movimento da unidade que pousou.
+                PlayMovementStartSfx(transporter);
+                Debug.Log("[Embarque] Transportador pousou antes do embarque.");
+
+                float landingDuration = GetEmbarkForcedLandingDuration();
+                if (landingDuration > 0f)
+                    yield return new WaitForSeconds(landingDuration);
+
+                float postLandingDelay = GetEmbarkAfterForcedLandingDelay();
+                if (postLandingDelay > 0f)
+                    yield return new WaitForSeconds(postLandingDelay);
+            }
+
+            Vector3Int fromCell = passenger != null ? passenger.CurrentCellPosition : Vector3Int.zero;
+            fromCell.z = 0;
+            Vector3Int toCell = transporter != null ? transporter.CurrentCellPosition : Vector3Int.zero;
+            toCell.z = 0;
+            bool requiresMovement = fromCell != toCell;
+            Domain startDomain = passenger != null ? passenger.GetDomain() : Domain.Land;
+            HeightLevel startHeight = passenger != null ? passenger.GetHeightLevel() : HeightLevel.Surface;
+            bool startAirHigh = startDomain == Domain.Air && startHeight == HeightLevel.AirHigh;
+            bool startAirLow = startDomain == Domain.Air && startHeight == HeightLevel.AirLow;
+            ClearEmbarkPreview();
+
+            if (requiresMovement && animationManager != null && passenger != null)
+            {
+                bool movementFinished = false;
+                List<Vector3Int> path = new List<Vector3Int>(2) { fromCell, toCell };
+                float selectedStepDuration = startAirHigh
+                    ? GetEmbarkAirHighToGroundDuration()
+                    : (startAirLow ? GetEmbarkAirLowToGroundDuration() : GetEmbarkDefaultMoveStepDuration());
+                float effectiveStepDuration = GetEffectiveEmbarkMoveStepDuration(passenger, selectedStepDuration);
+
+                animationManager.PlayMovement(
+                    passenger,
+                    movementTilemap,
+                    path,
+                    playStartSfx: true,
+                    onAnimationStart: () => PlayMovementStartSfx(passenger),
+                    onAnimationFinished: () => movementFinished = true,
+                    onCellReached: null,
+                    stepDurationOverride: selectedStepDuration);
+
+                if (startAirHigh)
+                {
+                    bool lowApplied = false;
+                    bool groundApplied = false;
+                    float elapsed = 0f;
+                    float highToLowAt = Mathf.Clamp(effectiveStepDuration * animationManager.EmbarkHighToLowNormalizedTime, 0f, effectiveStepDuration);
+                    float lowToGroundAt = effectiveStepDuration;
+
+                    while (true)
+                    {
+                        elapsed += Time.deltaTime;
+                        if (!lowApplied && elapsed >= highToLowAt)
+                        {
+                            lowApplied = passenger.TrySetCurrentLayerMode(Domain.Air, HeightLevel.AirLow) || !passenger.SupportsLayerMode(Domain.Air, HeightLevel.AirLow);
+                        }
+
+                        if (!groundApplied && elapsed >= lowToGroundAt)
+                            groundApplied = passenger.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface);
+
+                        if (movementFinished && lowApplied && groundApplied)
+                            break;
+
+                        yield return null;
+                    }
+
+                    if (!groundApplied)
+                        passenger.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface);
+                }
+                else if (startAirLow)
+                {
+                    bool groundApplied = false;
+                    float elapsed = 0f;
+                    float lowToGroundAt = Mathf.Clamp(effectiveStepDuration * animationManager.EmbarkLowToGroundNormalizedTime, 0f, effectiveStepDuration);
+
+                    while (true)
+                    {
+                        elapsed += Time.deltaTime;
+                        if (!groundApplied && elapsed >= lowToGroundAt)
+                            groundApplied = passenger.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface);
+
+                        if (movementFinished && groundApplied)
+                            break;
+
+                        yield return null;
+                    }
+
+                    if (!groundApplied)
+                        passenger.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface);
+                }
+                else
+                {
+                    while (!movementFinished)
+                        yield return null;
+                }
+            }
+            else if (requiresMovement && passenger != null)
+            {
+                passenger.SetCurrentCellPosition(toCell, enforceFinalOccupancyRule: false);
+                float fallbackDuration = startAirHigh
+                    ? GetEmbarkAirHighToGroundDuration()
+                    : (startAirLow ? GetEmbarkAirLowToGroundDuration() : GetEmbarkDefaultMoveStepDuration());
+                if (fallbackDuration > 0f)
+                    yield return new WaitForSeconds(fallbackDuration);
+                if (startAirHigh || startAirLow)
+                    passenger.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface);
+            }
+
+            int embarkCost = ResolveEmbarkAutonomyCost(option, passenger, transporter);
+            int fuelBeforeEmbark = passenger != null ? passenger.CurrentFuel : 0;
+            int fuelAfterEmbark = Mathf.Max(0, fuelBeforeEmbark - embarkCost);
+            if (passenger != null && fuelAfterEmbark != fuelBeforeEmbark)
+                passenger.SetCurrentFuel(fuelAfterEmbark);
+
+            float postEmbarkDelay = GetEmbarkAfterMoveDelay();
+            if (postEmbarkDelay > 0f)
+                yield return new WaitForSeconds(postEmbarkDelay);
+
+            if (!TryExecuteEmbarkOptionNow(option, embarkCost, fuelBeforeEmbark, out string resultMessage))
+            {
+                if (passenger != null && passenger.CurrentFuel != fuelBeforeEmbark)
+                    passenger.SetCurrentFuel(fuelBeforeEmbark);
+                Debug.Log($"Pode Embarcar (\"E\"): {resultMessage}");
+                embarkExecutionInProgress = false;
+                scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+                RefreshSensorsForCurrentState();
+                yield break;
+            }
+
+            cursorController?.PlayLoadSfx();
+            Debug.Log(resultMessage);
+            embarkExecutionInProgress = false;
+            ResetScannerPromptState();
+        }
+        finally
+        {
+            if (passengerSortingRaised && passenger != null)
+                passenger.ClearTemporarySortingOrder();
+            if (transporterSortingRaised && transporter != null)
+                transporter.ClearTemporarySortingOrder();
+        }
+    }
+
+    private float GetEmbarkForcedLandingDuration()
+    {
+        return animationManager != null ? animationManager.EmbarkForcedLandingDuration : 0.25f;
+    }
+
+    private float GetEmbarkAfterForcedLandingDelay()
+    {
+        return animationManager != null ? animationManager.EmbarkAfterForcedLandingDelay : 0.10f;
+    }
+
+    private float GetEmbarkDefaultMoveStepDuration()
+    {
+        return animationManager != null ? animationManager.EmbarkDefaultMoveStepDuration : 0.12f;
+    }
+
+    private float GetEmbarkAfterMoveDelay()
+    {
+        return animationManager != null ? animationManager.EmbarkAfterMoveDelay : 0.15f;
+    }
+
+    private float GetEmbarkAirHighToGroundDuration()
+    {
+        return animationManager != null ? animationManager.EmbarkAirHighToGroundDuration : 0.10f;
+    }
+
+    private float GetEmbarkAirLowToGroundDuration()
+    {
+        return animationManager != null ? animationManager.EmbarkAirLowToGroundDuration : 0.05f;
+    }
+
+    private float GetEffectiveEmbarkMoveStepDuration(UnitManager passenger, float stepDuration)
+    {
+        if (animationManager != null)
+            return animationManager.GetEffectiveMoveStepDuration(passenger, stepDuration);
+
+        return Mathf.Max(0.04f, stepDuration);
+    }
+
+    private int ResolveEmbarkAutonomyCost(PodeEmbarcarOption option, UnitManager passenger, UnitManager transporter)
+    {
+        int embarkCost = option != null ? Mathf.Max(0, option.enterCost) : 0;
+        if (passenger == null || transporter == null)
+            return embarkCost;
+
+        Tilemap costTilemap = terrainTilemap != null ? terrainTilemap : passenger.BoardTilemap;
+        Vector3Int transporterCell = transporter.CurrentCellPosition;
+        transporterCell.z = 0;
+        if (costTilemap != null && UnitMovementPathRules.TryGetEnterCellCost(
+                costTilemap,
+                passenger,
+                transporterCell,
+                terrainDatabase,
+                applyOperationalAutonomyModifier: false,
+                out int resolvedCost))
+        {
+            embarkCost = Mathf.Max(0, resolvedCost);
+        }
+
+        return embarkCost;
+    }
+
+    private bool TryExecuteEmbarkOptionNow(PodeEmbarcarOption option, int embarkCost, int fuelBeforeEmbark, out string message)
+    {
+        message = "Falha ao executar embarque.";
+        if (option == null)
+        {
+            message = "Opcao de embarque invalida.";
+            return false;
+        }
+
+        UnitManager passenger = option.sourceUnit != null ? option.sourceUnit : selectedUnit;
+        UnitManager transporter = option.transporterUnit;
+        if (passenger == null || transporter == null || passenger != selectedUnit)
+        {
+            message = "Dados de passageiro/transportador invalidos.";
+            return false;
+        }
+
+        if (!transporter.TryEmbarkPassengerInSlot(passenger, option.transporterSlotIndex, out string embarkReason))
+        {
+            message = string.IsNullOrWhiteSpace(embarkReason) ? "Transportador sem vaga disponivel." : embarkReason;
+            return false;
+        }
+
+        bool finished = TryFinalizeSelectedUnitActionFromDebug();
+        if (!finished)
+        {
+            message = "Embarque executado, mas nao foi possivel finalizar a acao da unidade.";
+            return false;
+        }
+
+        transporter.MarkAsActed();
+
+        string label = !string.IsNullOrWhiteSpace(option.displayLabel) ? option.displayLabel : transporter.name;
+        message = $"Embarque concluido em: {label} | custo={embarkCost} | autonomia {fuelBeforeEmbark}->{passenger.CurrentFuel}";
+        return true;
+    }
+
+    private int GetEmbarkEntryCount()
+    {
+        return cachedPodeEmbarcarTargets.Count;
+    }
+
+    private void LogEmbarkSelectionPanel()
+    {
+        int total = GetEmbarkEntryCount();
+        if (total <= 0)
+        {
+            Debug.Log("Sem opcoes de embarque para listar.");
+            return;
+        }
+
+        string text = $"Transportadores validos para embarque: {total}\n";
+        text += "Digite 1..9 para selecionar opcao\n";
+        for (int i = 0; i < cachedPodeEmbarcarTargets.Count; i++)
+        {
+            PodeEmbarcarOption option = cachedPodeEmbarcarTargets[i];
+            if (option == null)
+                continue;
+
+            string label = !string.IsNullOrWhiteSpace(option.displayLabel) ? option.displayLabel : "transportador";
+            text += $"{i + 1}. [OK] {label}\n";
+        }
+
+        if (cachedPodeEmbarcarInvalidTargets.Count > 0)
+            text += $"Invalidos detectados pelo sensor (nao selecionaveis em gameplay): {cachedPodeEmbarcarInvalidTargets.Count}\n";
+
+        text += ">> Enter confirma opcao valida | ESC volta";
+        Debug.Log(text);
+    }
+
+    private void FocusCurrentEmbarkTarget(bool logDetails, bool moveCursor = true)
+    {
+        int total = GetEmbarkEntryCount();
+        if (total <= 0)
+        {
+            ClearEmbarkPreview();
+            return;
+        }
+
+        if (scannerSelectedEmbarkIndex < 0 || scannerSelectedEmbarkIndex >= total)
+            scannerSelectedEmbarkIndex = 0;
+
+        if (scannerSelectedEmbarkIndex < 0 || scannerSelectedEmbarkIndex >= cachedPodeEmbarcarTargets.Count)
+        {
+            ClearEmbarkPreview();
+            return;
+        }
+
+        scannerSelectedEmbarkIsValid = true;
+        PodeEmbarcarOption option = cachedPodeEmbarcarTargets[scannerSelectedEmbarkIndex];
+        if (moveCursor && cursorController != null && option != null && option.transporterUnit != null)
+        {
+            Vector3Int targetCell = option.transporterUnit.CurrentCellPosition;
+            targetCell.z = 0;
+            cursorController.SetCell(targetCell, playMoveSfx: false);
+        }
+        DrawEmbarkPreviewForValid(option);
+        if (logDetails)
+            LogCurrentEmbarkSelection(option, null, scannerSelectedEmbarkIndex + 1, total, isValid: true);
+    }
+
+    private void LogCurrentEmbarkSelection(
+        PodeEmbarcarOption validOption,
+        PodeEmbarcarInvalidOption invalidOption,
+        int shownIndex,
+        int total,
+        bool isValid)
+    {
+        if (isValid)
+        {
+            string label = validOption != null && !string.IsNullOrWhiteSpace(validOption.displayLabel)
+                ? validOption.displayLabel
+                : "transportador";
+            int cost = validOption != null ? Mathf.Max(0, validOption.enterCost) : 0;
+            Debug.Log(
+                $"[Embarque] Opcao {shownIndex}/{total} [VALIDA]\n" +
+                $"{label}\n" +
+                $"Linha: VERDE\n" +
+                $"Custo de autonomia: {cost}\n" +
+                "Botao Embarcar: habilitado\n" +
+                "Enter confirma. ESC volta.");
+            return;
+        }
+
+        string transporter = invalidOption != null && invalidOption.transporterUnit != null
+            ? invalidOption.transporterUnit.name
+            : (invalidOption != null ? $"hex {invalidOption.evaluatedCell.x},{invalidOption.evaluatedCell.y}" : "invalido");
+        string reason = invalidOption != null && !string.IsNullOrWhiteSpace(invalidOption.reason)
+            ? invalidOption.reason
+            : "motivo nao informado";
+        Debug.Log(
+            $"[Embarque] Opcao {shownIndex}/{total} [INVALIDA]\n" +
+            $"{transporter}\n" +
+            $"Motivo: {reason}\n" +
+            "Linha: VERMELHA\n" +
+            "Botao Embarcar: desabilitado");
+    }
+
+    private void DrawEmbarkPreviewForValid(PodeEmbarcarOption option)
+    {
+        if (option == null || selectedUnit == null)
+        {
+            ClearEmbarkPreview();
+            return;
+        }
+
+        UnitManager transporter = option.transporterUnit;
+        if (transporter == null)
+        {
+            ClearEmbarkPreview();
+            return;
+        }
+
+        Vector3 from = selectedUnit.transform.position;
+        Vector3 to = transporter.transform.position;
+        from.z = to.z;
+        Color color = GetMirandoPreviewColor();
+        RebuildEmbarkPreviewPath(from, to, color);
+    }
+
+    private void DrawEmbarkPreviewForInvalid(PodeEmbarcarInvalidOption invalid)
+    {
+        if (invalid == null || selectedUnit == null)
+        {
+            ClearEmbarkPreview();
+            return;
+        }
+
+        Vector3 from = selectedUnit.transform.position;
+        Vector3 to;
+        if (invalid.transporterUnit != null)
+            to = invalid.transporterUnit.transform.position;
+        else
+        {
+            Tilemap map = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
+            Vector3Int cell = invalid.evaluatedCell;
+            cell.z = 0;
+            to = map != null ? map.GetCellCenterWorld(cell) : from;
+        }
+
+        from.z = to.z;
+        RebuildEmbarkPreviewPath(from, to, new Color(1f, 0.2f, 0.2f, 0.95f));
     }
 
     private void LogTargetSelectionPanel()
@@ -380,6 +1087,45 @@ public partial class TurnStateManager
         }
 
         return false;
+    }
+
+    private bool TryResolveEmbarkCursorMove(Vector3Int inputDelta, out Vector3Int resolvedCell)
+    {
+        resolvedCell = cursorController != null ? cursorController.CurrentCell : Vector3Int.zero;
+        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            return false;
+        if (scannerPromptStep != ScannerPromptStep.EmbarkCycleTarget)
+            return false;
+        if (cachedPodeEmbarcarTargets.Count == 0)
+            return false;
+
+        int step = GetMirandoStepFromInput(inputDelta);
+        if (step == 0)
+            return false;
+
+        int count = cachedPodeEmbarcarTargets.Count;
+        if (count <= 1)
+            return false;
+
+        scannerSelectedEmbarkIndex = (scannerSelectedEmbarkIndex + step + count) % count;
+        FocusCurrentEmbarkTarget(logDetails: true);
+
+        if (scannerSelectedEmbarkIndex < 0 || scannerSelectedEmbarkIndex >= count)
+            return false;
+
+        PodeEmbarcarOption option = cachedPodeEmbarcarTargets[scannerSelectedEmbarkIndex];
+        if (option == null || option.transporterUnit == null)
+            return false;
+
+        resolvedCell = option.transporterUnit.CurrentCellPosition;
+        resolvedCell.z = 0;
+        return true;
+    }
+
+    private bool IsEmbarkPromptActive()
+    {
+        return scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget ||
+               scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget;
     }
 
     private void ExitMirandoStateToMovement()
@@ -661,6 +1407,158 @@ public partial class TurnStateManager
         mirandoPreviewRenderer.enabled = false;
     }
 
+    private void EnsureEmbarkPreviewRenderer()
+    {
+        if (embarkPreviewRenderer != null)
+            return;
+
+        GameObject go = new GameObject("EmbarkPreviewLine");
+        go.transform.SetParent(transform, false);
+        embarkPreviewRenderer = go.AddComponent<LineRenderer>();
+        embarkPreviewRenderer.useWorldSpace = true;
+        embarkPreviewRenderer.textureMode = LineTextureMode.Stretch;
+        embarkPreviewRenderer.numCapVertices = 2;
+        embarkPreviewRenderer.numCornerVertices = 2;
+        embarkPreviewRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        embarkPreviewRenderer.receiveShadows = false;
+        Material previewMaterial = GetMirandoPreviewMaterial();
+        embarkPreviewRenderer.material = previewMaterial != null ? previewMaterial : new Material(Shader.Find("Sprites/Default"));
+        int sortingLayerId = GetMirandoPreviewSortingLayerId();
+        if (sortingLayerId != 0)
+            embarkPreviewRenderer.sortingLayerID = sortingLayerId;
+        embarkPreviewRenderer.sortingOrder = GetMirandoPreviewSortingOrder();
+        embarkPreviewRenderer.enabled = false;
+    }
+
+    private void RebuildEmbarkPreviewPath(Vector3 from, Vector3 to, Color color)
+    {
+        embarkPreviewPathPoints.Clear();
+        embarkPreviewSegmentPoints.Clear();
+        embarkPreviewPathLength = 0f;
+        embarkPreviewHeadDistance = 0f;
+
+        from.z = to.z;
+        embarkPreviewPathPoints.Add(from);
+        embarkPreviewPathPoints.Add(to);
+        embarkPreviewPathLength = ComputePathLength(embarkPreviewPathPoints);
+        embarkPreviewColor = color;
+    }
+
+    private void UpdateEmbarkPreviewAnimation()
+    {
+        bool shouldShow =
+            (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget || scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget) &&
+            embarkPreviewPathLength > 0.0001f &&
+            embarkPreviewPathPoints.Count >= 2;
+        if (!shouldShow)
+        {
+            SetEmbarkPreviewVisible(false);
+            return;
+        }
+
+        EnsureEmbarkPreviewRenderer();
+        if (embarkPreviewRenderer == null)
+            return;
+
+        float speed = GetMirandoPreviewSpeed();
+        float segmentLen = GetMirandoPreviewSegmentLength();
+        float cycleLen = embarkPreviewPathLength + segmentLen;
+        embarkPreviewHeadDistance += speed * Time.deltaTime;
+        if (embarkPreviewHeadDistance > cycleLen)
+            embarkPreviewHeadDistance = 0f;
+
+        float startDist = Mathf.Max(0f, embarkPreviewHeadDistance - segmentLen);
+        float endDist = Mathf.Min(embarkPreviewHeadDistance, embarkPreviewPathLength);
+        if (endDist <= startDist + 0.0001f)
+        {
+            SetEmbarkPreviewVisible(false);
+            return;
+        }
+
+        BuildEmbarkPathSegmentPoints(startDist, endDist, embarkPreviewSegmentPoints);
+        if (embarkPreviewSegmentPoints.Count < 2)
+        {
+            SetEmbarkPreviewVisible(false);
+            return;
+        }
+
+        float width = GetMirandoPreviewWidth();
+        embarkPreviewRenderer.startWidth = width;
+        embarkPreviewRenderer.endWidth = width;
+        embarkPreviewRenderer.startColor = embarkPreviewColor;
+        embarkPreviewRenderer.endColor = embarkPreviewColor;
+        embarkPreviewRenderer.positionCount = embarkPreviewSegmentPoints.Count;
+        for (int i = 0; i < embarkPreviewSegmentPoints.Count; i++)
+            embarkPreviewRenderer.SetPosition(i, embarkPreviewSegmentPoints[i]);
+        SetEmbarkPreviewVisible(true);
+    }
+
+    private void BuildEmbarkPathSegmentPoints(float startDist, float endDist, List<Vector3> output)
+    {
+        output.Clear();
+        if (embarkPreviewPathPoints.Count < 2)
+            return;
+
+        float accumulated = 0f;
+        bool addedFirst = false;
+        for (int i = 1; i < embarkPreviewPathPoints.Count; i++)
+        {
+            Vector3 a = embarkPreviewPathPoints[i - 1];
+            Vector3 b = embarkPreviewPathPoints[i];
+            float segmentLen = Vector3.Distance(a, b);
+            if (segmentLen <= 0.0001f)
+                continue;
+
+            float segStart = accumulated;
+            float segEnd = accumulated + segmentLen;
+            if (segEnd < startDist)
+            {
+                accumulated = segEnd;
+                continue;
+            }
+
+            if (segStart > endDist)
+                break;
+
+            float localStart = Mathf.Clamp01((startDist - segStart) / segmentLen);
+            float localEnd = Mathf.Clamp01((endDist - segStart) / segmentLen);
+            if (!addedFirst)
+            {
+                output.Add(Vector3.Lerp(a, b, localStart));
+                addedFirst = true;
+            }
+
+            output.Add(Vector3.Lerp(a, b, localEnd));
+            accumulated = segEnd;
+            if (segEnd >= endDist)
+                break;
+        }
+    }
+
+    private void ClearEmbarkPreview()
+    {
+        embarkPreviewPathPoints.Clear();
+        embarkPreviewSegmentPoints.Clear();
+        embarkPreviewPathLength = 0f;
+        embarkPreviewHeadDistance = 0f;
+        SetEmbarkPreviewVisible(false);
+    }
+
+    private void SetEmbarkPreviewVisible(bool visible)
+    {
+        if (embarkPreviewRenderer == null)
+            return;
+
+        if (!visible)
+        {
+            embarkPreviewRenderer.positionCount = 0;
+            embarkPreviewRenderer.enabled = false;
+            return;
+        }
+
+        embarkPreviewRenderer.enabled = true;
+    }
+
     private void SetMirandoPreviewVisible(bool visible)
     {
         if (mirandoPreviewRenderer == null)
@@ -806,6 +1704,24 @@ public partial class TurnStateManager
                 return Keyboard.current != null && Keyboard.current.mKey.wasPressedThisFrame;
 #else
                 return Input.GetKeyDown(KeyCode.M);
+#endif
+            case 'L':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.lKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.L);
+#endif
+            case 'D':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.dKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.D);
+#endif
+            case 'S':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.sKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.S);
 #endif
             default:
                 return false;

@@ -9,6 +9,7 @@ public class MatchControllerEditor : Editor
     private SerializedProperty playersProp;
     private SerializedProperty includeNeutralTeamProp;
     private SerializedProperty fogOfWarProp;
+    private SerializedProperty autonomyDatabaseProp;
     private SerializedProperty activePlayerListIndexProp;
 
     private void OnEnable()
@@ -18,6 +19,7 @@ public class MatchControllerEditor : Editor
         playersProp = serializedObject.FindProperty("players");
         includeNeutralTeamProp = serializedObject.FindProperty("includeNeutralTeam");
         fogOfWarProp = serializedObject.FindProperty("fogOfWar");
+        autonomyDatabaseProp = serializedObject.FindProperty("autonomyDatabase");
         activePlayerListIndexProp = serializedObject.FindProperty("activePlayerListIndex");
     }
 
@@ -38,6 +40,8 @@ public class MatchControllerEditor : Editor
         EditorGUILayout.PropertyField(playersProp, new GUIContent("Players"), true);
         EditorGUILayout.PropertyField(includeNeutralTeamProp, new GUIContent("Include Neutral Team"));
         EditorGUILayout.PropertyField(fogOfWarProp, new GUIContent("Fog of War"));
+        if (autonomyDatabaseProp != null)
+            EditorGUILayout.PropertyField(autonomyDatabaseProp, new GUIContent("Autonomy Database"));
         using (new EditorGUI.DisabledScope(true))
             EditorGUILayout.PropertyField(activePlayerListIndexProp, new GUIContent("Active Player List Index"));
 

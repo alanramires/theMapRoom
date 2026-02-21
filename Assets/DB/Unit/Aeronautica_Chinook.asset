@@ -38,20 +38,6 @@ MonoBehaviour:
     spriteRed: {fileID: 0}
     spriteBlue: {fileID: 0}
     spriteYellow: {fileID: 0}
-  aircraftType: 2
-  preferredAirHeight: 4
-  canLandOnAirport: 1
-  canLandOnRoad: 1
-  roadLandingRequiresStopped: 0
-  canLandOnPlains: 1
-  canLandOnBeach: 0
-  plainsLandingRequiresVtol: 0
-  beachLandingRequiresVtosl: 0
-  canLandOnCarrier: 0
-  carrierLandingRequiresSkill: 0
-  improvisedTakeoffConsumesAction: 0
-  plainsTakeoffConsumesAction: 0
-  beachTakeoffConsumesAction: 0
   skills:
   - {fileID: 11400000, guid: 1b0f1eb9d5454df3a0e1b42f0c8d6aa1, type: 2}
   embarkedWeapons:
@@ -75,12 +61,15 @@ MonoBehaviour:
   transportSlots:
   - slotId: passageiros
     capacity: 2
-    allowedDomain: 0
-    allowedHeight: 3
-    filterAllowedClasses: 1
+    allowedLayerModes:
+    - domain: 0
+      heightLevel: 3
+    legacyAllowedDomain: 0
+    legacyAllowedHeight: 3
+    legacyAllowedLayerModes: []
     allowedClasses: 00000000
-    requireAllSkills: 0
     requiredSkills: []
     blockedSkills: []
+  spriteTransport: {fileID: 0}
   autonomia: 60
   cost: 26000

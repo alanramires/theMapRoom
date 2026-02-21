@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using UnityEngine.Serialization;
 
 [Serializable]
 public class UnitMoveAnimationSpeedOverride
@@ -14,6 +15,8 @@ public class UnitMoveAnimationSpeedOverride
 
 public class AnimationManager : MonoBehaviour
 {
+    public static AnimationManager Instance { get; private set; }
+
     [Header("Selection Visual")]
     [SerializeField] [Range(0.05f, 1f)] private float selectionBlinkActiveDuration = 0.16f;
     [SerializeField] [Range(0.05f, 1f)] private float selectionBlinkInactiveDuration = 0.16f;
@@ -23,6 +26,26 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] private AnimationCurve moveStepCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
     [Tooltip("Overrides de velocidade por UnitData. Se vazio/sem match, usa 1.")]
     [SerializeField] private List<UnitMoveAnimationSpeedOverride> unitMoveSpeedOverrides = new List<UnitMoveAnimationSpeedOverride>();
+    [Header("Embark Sequence Timing")]
+    [Tooltip("Tempo da animacao de pouso forcado do transportador antes do embarque.")]
+    [SerializeField] [Range(0f, 2f)] private float embarkForcedLandingDuration = 0.25f;
+    [Tooltip("Pausa entre o fim do pouso forcado e o inicio da animacao de embarque.")]
+    [SerializeField] [Range(0f, 2f)] private float embarkAfterForcedLandingDelay = 0.10f;
+    [Tooltip("Duracao do embarque padrao (somente deslize ate o transportador).")]
+    [FormerlySerializedAs("embarkMoveStepDuration")]
+    [SerializeField] [Range(0.04f, 0.8f)] private float embarkDefaultMoveStepDuration = 0.12f;
+    [Tooltip("Duracao total do embarque para passageiro em Air High ate Ground.")]
+    [FormerlySerializedAs("embarkAirHighToLowDuration")]
+    [SerializeField] [Range(0.04f, 2f)] private float embarkAirHighToGroundDuration = 0.10f;
+    [Tooltip("Duracao total do embarque para passageiro em Air Low ate Ground.")]
+    [SerializeField] [Range(0f, 2f)] private float embarkAirLowToGroundDuration = 0.05f;
+    [Tooltip("Pausa apos a animacao de embarque antes de concluir o ciclo.")]
+    [SerializeField] [Range(0f, 2f)] private float embarkAfterMoveDelay = 0.15f;
+    [Header("Embark Layer Transition Timing")]
+    [Tooltip("Tempo normalizado (0..1) para concluir AirHigh->AirLow durante embarque em voo alto.")]
+    [SerializeField] [Range(0.01f, 0.99f)] private float embarkHighToLowNormalizedTime = 0.50f;
+    [Tooltip("Tempo normalizado (0..1) para concluir AirLow->Ground durante embarque iniciando em AirLow.")]
+    [SerializeField] [Range(0.01f, 1f)] private float embarkLowToGroundNormalizedTime = 1.00f;
     [Header("Mirando Preview Line")]
     [Tooltip("Material usado na linha de preview de tiro durante o estado Mirando.")]
     [SerializeField] private Material mirandoPreviewMaterial;
@@ -57,10 +80,30 @@ public class AnimationManager : MonoBehaviour
     public int MirandoParabolaSamples => Mathf.Clamp(mirandoParabolaSamples, 8, 64);
     public int MirandoPreviewSortingLayerId => mirandoPreviewSortingLayer.Id;
     public int MirandoPreviewSortingOrder => mirandoPreviewSortingOrder;
+    public float EmbarkForcedLandingDuration => Mathf.Clamp(embarkForcedLandingDuration, 0f, 2f);
+    public float EmbarkAfterForcedLandingDelay => Mathf.Clamp(embarkAfterForcedLandingDelay, 0f, 2f);
+    public float EmbarkDefaultMoveStepDuration => Mathf.Clamp(embarkDefaultMoveStepDuration, 0.04f, 0.8f);
+    public float EmbarkAirHighToGroundDuration => Mathf.Clamp(embarkAirHighToGroundDuration, 0.04f, 2f);
+    public float EmbarkAirLowToGroundDuration => Mathf.Clamp(embarkAirLowToGroundDuration, 0f, 2f);
+    public float EmbarkAfterMoveDelay => Mathf.Clamp(embarkAfterMoveDelay, 0f, 2f);
+    public float EmbarkHighToLowNormalizedTime => Mathf.Clamp(embarkHighToLowNormalizedTime, 0.01f, 0.99f);
+    public float EmbarkLowToGroundNormalizedTime => Mathf.Clamp(embarkLowToGroundNormalizedTime, 0.01f, 1f);
 
     private void Awake()
     {
+        Instance = this;
         EnsureDefaults();
+    }
+
+    private void OnEnable()
+    {
+        Instance = this;
+    }
+
+    private void OnDisable()
+    {
+        if (Instance == this)
+            Instance = null;
     }
 
 #if UNITY_EDITOR
@@ -114,7 +157,8 @@ public class AnimationManager : MonoBehaviour
         bool playStartSfx,
         Action onAnimationStart,
         Action onAnimationFinished,
-        Action<Vector3Int> onCellReached)
+        Action<Vector3Int> onCellReached,
+        float stepDurationOverride = -1f)
     {
         if (unit == null || path == null || path.Count < 2)
             return;
@@ -127,7 +171,8 @@ public class AnimationManager : MonoBehaviour
             playStartSfx,
             onAnimationStart,
             onAnimationFinished,
-            onCellReached));
+            onCellReached,
+            stepDurationOverride));
     }
 
     private IEnumerator AnimateMovementRoutine(
@@ -137,7 +182,8 @@ public class AnimationManager : MonoBehaviour
         bool playStartSfx,
         Action onAnimationStart,
         Action onAnimationFinished,
-        Action<Vector3Int> onCellReached)
+        Action<Vector3Int> onCellReached,
+        float stepDurationOverride)
     {
         if (unit != null)
             unit.SetSelected(false);
@@ -147,7 +193,8 @@ public class AnimationManager : MonoBehaviour
 
         Tilemap effectiveTilemap = movementTilemap != null ? movementTilemap : unit.BoardTilemap;
         float manualSpeed = ResolveUnitMoveSpeed(unit);
-        float duration = Mathf.Max(0.04f, moveStepDuration / Mathf.Max(0.1f, manualSpeed));
+        float baseStepDuration = stepDurationOverride > 0f ? stepDurationOverride : moveStepDuration;
+        float duration = Mathf.Max(0.04f, baseStepDuration / Mathf.Max(0.1f, manualSpeed));
         float arc = Mathf.Max(0f, moveArcHeight);
         float preservedZ = unit.transform.position.z;
 
@@ -217,5 +264,12 @@ public class AnimationManager : MonoBehaviour
         }
 
         return 1f;
+    }
+
+    public float GetEffectiveMoveStepDuration(UnitManager unit, float stepDurationOverride = -1f)
+    {
+        float baseStepDuration = stepDurationOverride > 0f ? stepDurationOverride : moveStepDuration;
+        float manualSpeed = ResolveUnitMoveSpeed(unit);
+        return Mathf.Max(0.04f, baseStepDuration / Mathf.Max(0.1f, manualSpeed));
     }
 }

@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3f1e2c8af9a4e2ea8cf47e0bf83a07d, type: 3}
+  m_Name: Autonomy Database
+  m_EditorClassIdentifier: Assembly-CSharp::AutonomyDatabase
+  autonomies:
+  - {fileID: 11400000, guid: 0bcfd3f1dc5e42f3ba4f7be31a5de231, type: 2}
+  - {fileID: 11400000, guid: d52348f636f1466d95a6489891e176bf, type: 2}
+  - {fileID: 11400000, guid: 86f5ee654cae4d8ca9adadca74d0d9b8, type: 2}

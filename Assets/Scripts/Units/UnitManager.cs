@@ -32,6 +32,9 @@ public class UnitManager : MonoBehaviour
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField] private bool isEmbarked;
     [SerializeField] private bool isSelected;
+    [SerializeField, HideInInspector] private bool hasTemporarySortingOverride;
+    [SerializeField, HideInInspector] private int cachedSpriteSortingOrder;
+    [SerializeField, HideInInspector] private int cachedActedLockSortingOrder;
     [SerializeField] private bool enableSelectionBlink = true;
     [SerializeField] [Range(0.05f, 1f)] private float selectionBlinkInterval = 0.16f;
     [SerializeField] [Range(0.05f, 1f)] private float selectionBlinkActiveDuration = 0.16f;
@@ -50,6 +53,10 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private bool aircraftGrounded;
     [SerializeField] private bool aircraftEmbarkedInCarrier;
     [SerializeField] [Min(0)] private int aircraftOperationLockTurns;
+    [Header("Transport Runtime")]
+    [SerializeField] private List<UnitTransportSeatRuntime> transportedUnitSlots = new List<UnitTransportSeatRuntime>();
+    [SerializeField, HideInInspector] private UnitManager embarkedTransporter;
+    [SerializeField, HideInInspector] private int embarkedTransporterSlotIndex = -1;
 
     public TeamId TeamId => teamId;
     public Tilemap BoardTilemap => boardTilemap;
@@ -70,6 +77,9 @@ public class UnitManager : MonoBehaviour
     public bool IsAircraftGrounded => aircraftGrounded;
     public bool IsAircraftEmbarkedInCarrier => aircraftEmbarkedInCarrier;
     public int AircraftOperationLockTurns => Mathf.Max(0, aircraftOperationLockTurns);
+    public IReadOnlyList<UnitTransportSeatRuntime> TransportedUnitSlots => transportedUnitSlots;
+    public UnitManager EmbarkedTransporter => embarkedTransporter;
+    public int EmbarkedTransporterSlotIndex => embarkedTransporterSlotIndex;
 
     private static readonly int GlowColorId = Shader.PropertyToID("_GlowColor");
     private static readonly int GlowSizeId = Shader.PropertyToID("_GlowSize");
@@ -123,6 +133,7 @@ public class UnitManager : MonoBehaviour
     private void OnDisable()
     {
         StopSelectionBlinkRoutine();
+        ClearTemporarySortingOrder();
         SetSpriteVisible(true);
     }
 
@@ -208,6 +219,7 @@ public class UnitManager : MonoBehaviour
         currentAmmo = Mathf.Clamp(currentAmmo, 0, GetMaxAmmo());
         currentFuel = Mathf.Clamp(currentFuel, 0, GetMaxFuel());
         SyncEmbarkedWeaponsFromData(data);
+        SyncTransportRuntimeSlotsWithData(data);
         SyncCurrentLayerStateWithData(data, forceNativeDefault: true);
         RefreshSpriteForCurrentLayer(data);
 
@@ -240,6 +252,43 @@ public class UnitManager : MonoBehaviour
     {
         currentFuel = Mathf.Clamp(value, 0, GetMaxFuel());
         RefreshActedVisual();
+    }
+
+    public void SetTemporarySortingOrder(int forcedSortingOrder = 999)
+    {
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+
+        if (spriteRenderer == null)
+            return;
+
+        if (!hasTemporarySortingOverride)
+        {
+            cachedSpriteSortingOrder = spriteRenderer.sortingOrder;
+            cachedActedLockSortingOrder = actedLockRenderer != null ? actedLockRenderer.sortingOrder : 0;
+            hasTemporarySortingOverride = true;
+        }
+
+        spriteRenderer.sortingOrder = forcedSortingOrder;
+        if (actedLockRenderer != null)
+            actedLockRenderer.sortingOrder = forcedSortingOrder;
+    }
+
+    public void ClearTemporarySortingOrder()
+    {
+        if (!hasTemporarySortingOverride)
+            return;
+
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+
+        if (spriteRenderer != null)
+            spriteRenderer.sortingOrder = cachedSpriteSortingOrder;
+
+        if (actedLockRenderer != null)
+            actedLockRenderer.sortingOrder = cachedActedLockSortingOrder;
+
+        hasTemporarySortingOverride = false;
     }
 
     public void MarkAsActed()
@@ -521,9 +570,220 @@ public class UnitManager : MonoBehaviour
         return true;
     }
 
+    public int GetOccupiedTransportSeatCountForSlot(int slotIndex)
+    {
+        UnitData data = TryGetUnitData();
+        SyncTransportRuntimeSlotsWithData(data);
+
+        int count = 0;
+        for (int i = 0; i < transportedUnitSlots.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = transportedUnitSlots[i];
+            if (seat == null || seat.slotIndex != slotIndex || seat.embarkedUnit == null)
+                continue;
+
+            if (!seat.embarkedUnit.IsEmbarked)
+            {
+                seat.embarkedUnit = null;
+                continue;
+            }
+
+            count++;
+        }
+
+        return count;
+    }
+
+    public int GetCapacityForTransportSlot(int slotIndex)
+    {
+        UnitData data = TryGetUnitData();
+        if (data == null || data.transportSlots == null || slotIndex < 0 || slotIndex >= data.transportSlots.Count)
+            return 0;
+
+        return Mathf.Max(1, data.transportSlots[slotIndex].capacity);
+    }
+
+    public bool TryEmbarkPassengerInSlot(UnitManager passenger, int slotIndex, out string reason)
+    {
+        reason = string.Empty;
+        if (passenger == null)
+        {
+            reason = "Passageiro invalido.";
+            return false;
+        }
+
+        if (passenger == this)
+        {
+            reason = "Unidade nao pode embarcar em si mesma.";
+            return false;
+        }
+
+        if (!TryGetUnitData(out UnitData data) || data == null || !data.isTransporter)
+        {
+            reason = "Unidade alvo nao eh transportadora.";
+            return false;
+        }
+
+        if (data.transportSlots == null || slotIndex < 0 || slotIndex >= data.transportSlots.Count)
+        {
+            reason = "Slot de transporte invalido.";
+            return false;
+        }
+
+        SyncTransportRuntimeSlotsWithData(data);
+        UnitTransportSeatRuntime freeSeat = FindFirstFreeSeat(slotIndex);
+        if (freeSeat == null)
+        {
+            reason = "Slot lotado.";
+            return false;
+        }
+
+        UnitManager currentTransporter = passenger.EmbarkedTransporter;
+        if (passenger.IsEmbarked && currentTransporter != null)
+        {
+            if (currentTransporter != this)
+                currentTransporter.RemoveEmbarkedPassenger(passenger);
+            else
+                RemoveEmbarkedPassenger(passenger);
+        }
+
+        Vector3Int transporterCell = currentCellPosition;
+        transporterCell.z = 0;
+        passenger.SetCurrentCellPosition(transporterCell, enforceFinalOccupancyRule: false);
+        passenger.AssignEmbarkTransport(this, slotIndex);
+        if (!passenger.IsEmbarked)
+            passenger.SetEmbarked(true);
+        freeSeat.embarkedUnit = passenger;
+        RefreshSpriteForCurrentLayer(data);
+        RefreshActedVisual();
+        return true;
+    }
+
+    public bool TryEmbarkPassengerInSeat(UnitManager passenger, int slotIndex, int seatIndex, out string reason)
+    {
+        reason = string.Empty;
+        if (!TryGetUnitData(out UnitData data) || data == null || !data.isTransporter)
+        {
+            reason = "Unidade alvo nao eh transportadora.";
+            return false;
+        }
+
+        if (passenger == null)
+        {
+            reason = "Passageiro invalido.";
+            return false;
+        }
+
+        if (passenger == this)
+        {
+            reason = "Unidade nao pode embarcar em si mesma.";
+            return false;
+        }
+
+        if (data.transportSlots == null || slotIndex < 0 || slotIndex >= data.transportSlots.Count)
+        {
+            reason = "Slot de transporte invalido.";
+            return false;
+        }
+
+        SyncTransportRuntimeSlotsWithData(data);
+        UnitTransportSeatRuntime targetSeat = FindSeat(slotIndex, seatIndex);
+        if (targetSeat == null)
+        {
+            reason = "Vaga de transporte invalida.";
+            return false;
+        }
+
+        if (targetSeat.embarkedUnit != null && targetSeat.embarkedUnit != passenger)
+        {
+            reason = "Vaga ocupada.";
+            return false;
+        }
+
+        UnitManager currentTransporter = passenger.EmbarkedTransporter;
+        if (passenger.IsEmbarked && currentTransporter != null)
+        {
+            if (currentTransporter != this)
+                currentTransporter.RemoveEmbarkedPassenger(passenger);
+            else
+                RemoveEmbarkedPassenger(passenger);
+        }
+
+        Vector3Int transporterCell = currentCellPosition;
+        transporterCell.z = 0;
+        passenger.SetCurrentCellPosition(transporterCell, enforceFinalOccupancyRule: false);
+        passenger.AssignEmbarkTransport(this, slotIndex);
+        if (!passenger.IsEmbarked)
+            passenger.SetEmbarked(true);
+        targetSeat.embarkedUnit = passenger;
+        RefreshSpriteForCurrentLayer(data);
+        RefreshActedVisual();
+        return true;
+    }
+
+    public bool TryDisembarkPassengerFromSeat(int slotIndex, int seatIndex, out UnitManager passenger, out string reason)
+    {
+        passenger = null;
+        reason = string.Empty;
+
+        UnitData data = TryGetUnitData();
+        SyncTransportRuntimeSlotsWithData(data);
+        UnitTransportSeatRuntime seat = FindSeat(slotIndex, seatIndex);
+        if (seat == null)
+        {
+            reason = "Vaga de transporte invalida.";
+            return false;
+        }
+
+        passenger = seat.embarkedUnit;
+        if (passenger == null)
+        {
+            reason = "Vaga ja esta livre.";
+            return false;
+        }
+
+        seat.embarkedUnit = null;
+        passenger.SetEmbarked(false);
+        RefreshSpriteForCurrentLayer();
+        RefreshActedVisual();
+        return true;
+    }
+
+    public bool RemoveEmbarkedPassenger(UnitManager passenger)
+    {
+        if (passenger == null || transportedUnitSlots == null)
+            return false;
+
+        bool removed = false;
+        for (int i = 0; i < transportedUnitSlots.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = transportedUnitSlots[i];
+            if (seat == null || seat.embarkedUnit != passenger)
+                continue;
+
+            seat.embarkedUnit = null;
+            removed = true;
+        }
+
+        if (removed)
+        {
+            RefreshSpriteForCurrentLayer();
+            RefreshActedVisual();
+        }
+
+        return removed;
+    }
+
     public void SyncLayerStateFromData(bool forceNativeDefault)
     {
         SyncCurrentLayerStateWithData(forceNativeDefault);
+    }
+
+    public void RefreshTransportSlotsFromData()
+    {
+        SyncTransportRuntimeSlotsWithData(TryGetUnitData());
+        RefreshSpriteForCurrentLayer();
+        RefreshActedVisual();
     }
 
     private void SyncEmbarkedWeaponsFromData(UnitData data)
@@ -552,6 +812,101 @@ public class UnitManager : MonoBehaviour
             copy.EnsureValidSelectedTrajectory();
             embarkedWeaponsRuntime.Add(copy);
         }
+    }
+
+    private void SyncTransportRuntimeSlotsWithData(UnitData data)
+    {
+        if (transportedUnitSlots == null)
+            transportedUnitSlots = new List<UnitTransportSeatRuntime>();
+
+        if (data == null || !data.isTransporter || data.transportSlots == null || data.transportSlots.Count == 0)
+        {
+            transportedUnitSlots.Clear();
+            return;
+        }
+
+        Dictionary<string, UnitManager> existing = new Dictionary<string, UnitManager>();
+        for (int i = 0; i < transportedUnitSlots.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = transportedUnitSlots[i];
+            if (seat == null || seat.embarkedUnit == null)
+                continue;
+            if (!seat.embarkedUnit.IsEmbarked)
+                continue;
+
+            string key = BuildTransportSeatKey(seat.slotIndex, seat.seatIndex);
+            existing[key] = seat.embarkedUnit;
+        }
+
+        transportedUnitSlots.Clear();
+
+        for (int slotIndex = 0; slotIndex < data.transportSlots.Count; slotIndex++)
+        {
+            UnitTransportSlotRule slot = data.transportSlots[slotIndex];
+            if (slot == null)
+                continue;
+
+            int capacity = Mathf.Max(1, slot.capacity);
+            string slotId = !string.IsNullOrWhiteSpace(slot.slotId) ? slot.slotId : $"slot_{slotIndex}";
+            for (int seatIndex = 0; seatIndex < capacity; seatIndex++)
+            {
+                UnitTransportSeatRuntime runtimeSeat = new UnitTransportSeatRuntime
+                {
+                    slotIndex = slotIndex,
+                    slotId = slotId,
+                    seatIndex = seatIndex
+                };
+
+                string key = BuildTransportSeatKey(slotIndex, seatIndex);
+                if (existing.TryGetValue(key, out UnitManager passenger) && passenger != null && passenger.IsEmbarked)
+                    runtimeSeat.embarkedUnit = passenger;
+
+                transportedUnitSlots.Add(runtimeSeat);
+            }
+        }
+    }
+
+    private UnitTransportSeatRuntime FindFirstFreeSeat(int slotIndex)
+    {
+        if (transportedUnitSlots == null)
+            return null;
+
+        for (int i = 0; i < transportedUnitSlots.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = transportedUnitSlots[i];
+            if (seat == null || seat.slotIndex != slotIndex)
+                continue;
+
+            if (seat.embarkedUnit != null && !seat.embarkedUnit.IsEmbarked)
+                seat.embarkedUnit = null;
+
+            if (seat.embarkedUnit == null)
+                return seat;
+        }
+
+        return null;
+    }
+
+    private UnitTransportSeatRuntime FindSeat(int slotIndex, int seatIndex)
+    {
+        if (transportedUnitSlots == null)
+            return null;
+
+        for (int i = 0; i < transportedUnitSlots.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = transportedUnitSlots[i];
+            if (seat == null)
+                continue;
+            if (seat.slotIndex == slotIndex && seat.seatIndex == seatIndex)
+                return seat;
+        }
+
+        return null;
+    }
+
+    private static string BuildTransportSeatKey(int slotIndex, int seatIndex)
+    {
+        return slotIndex.ToString() + ":" + seatIndex.ToString();
     }
 
     private UnitLayerMode[] BuildLayerModesSnapshot()
@@ -655,7 +1010,8 @@ public class UnitManager : MonoBehaviour
         if (spriteRenderer == null || data == null)
             return;
 
-        Sprite baseTeamSprite = TeamUtils.GetTeamSprite(data, teamId);
+        bool preferTransportSprite = ShouldUseTransportSprite(data);
+        Sprite baseTeamSprite = TeamUtils.GetTeamSprite(data, teamId, preferTransportSprite);
         Sprite finalSprite = baseTeamSprite;
         if (currentLayerModeIndex > 0 && data.aditionalDomainsAllowed != null)
         {
@@ -673,6 +1029,34 @@ public class UnitManager : MonoBehaviour
             spriteRenderer.sprite = finalSprite;
 
         spriteRenderer.color = TeamUtils.GetColor(teamId);
+    }
+
+    private bool ShouldUseTransportSprite(UnitData data)
+    {
+        if (data == null || !data.isTransporter || data.spriteTransport == null)
+            return false;
+        return HasAnyEmbarkedPassenger(data);
+    }
+
+    private bool HasAnyEmbarkedPassenger(UnitData data)
+    {
+        if (data == null || !data.isTransporter || isEmbarked)
+            return false;
+
+        SyncTransportRuntimeSlotsWithData(data);
+        for (int i = 0; i < transportedUnitSlots.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = transportedUnitSlots[i];
+            if (seat == null || seat.embarkedUnit == null)
+                continue;
+
+            if (seat.embarkedUnit.IsEmbarked)
+                return true;
+
+            seat.embarkedUnit = null;
+        }
+
+        return false;
     }
 
     public void SetCurrentPosition(Vector3 position)
@@ -728,6 +1112,9 @@ public class UnitManager : MonoBehaviour
 
     public void SetEmbarked(bool embarked)
     {
+        if (isEmbarked == embarked)
+            return;
+
         isEmbarked = embarked;
         if (isEmbarked)
         {
@@ -740,10 +1127,26 @@ public class UnitManager : MonoBehaviour
             return;
         }
 
+        if (embarkedTransporter != null)
+            embarkedTransporter.RemoveEmbarkedPassenger(this);
+        ClearEmbarkTransport();
+
         SetSpriteVisible(true);
         if (unitHud != null)
             unitHud.gameObject.SetActive(true);
         RefreshActedVisual();
+    }
+
+    private void AssignEmbarkTransport(UnitManager transporter, int slotIndex)
+    {
+        embarkedTransporter = transporter;
+        embarkedTransporterSlotIndex = slotIndex;
+    }
+
+    private void ClearEmbarkTransport()
+    {
+        embarkedTransporter = null;
+        embarkedTransporterSlotIndex = -1;
     }
 
     public void SnapToCellCenter()
@@ -785,6 +1188,7 @@ public class UnitManager : MonoBehaviour
         currentAmmo = Mathf.Clamp(currentAmmo, 0, maxAmmo);
         currentFuel = Mathf.Clamp(currentFuel, 0, maxFuel);
 
+        SyncTransportRuntimeSlotsWithData(TryGetUnitData());
         SyncCurrentLayerStateWithData(forceNativeDefault: false);
         SyncAircraftRuntimeStateWithCurrentLayer();
     }
@@ -987,6 +1391,8 @@ public class UnitManager : MonoBehaviour
         TryAutoAssignMatchController();
         Color teamColor = TeamUtils.GetColor(teamId);
         bool isActiveTeamUnit = matchController != null && (int)teamId == matchController.ActiveTeamId;
+        UnitData unitData = TryGetUnitData();
+        bool showTransportIndicator = HasAnyEmbarkedPassenger(unitData);
 
         if (spriteRenderer == null)
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -1008,7 +1414,10 @@ public class UnitManager : MonoBehaviour
                     GetMaxAmmo(),
                     currentFuel,
                     GetMaxFuel(),
-                    teamColor
+                    teamColor,
+                    currentDomain,
+                    currentHeightLevel,
+                    showTransportIndicator
                 );
             }
 
@@ -1040,7 +1449,10 @@ public class UnitManager : MonoBehaviour
                 GetMaxAmmo(),
                 currentFuel,
                 GetMaxFuel(),
-                teamColor
+                teamColor,
+                currentDomain,
+                currentHeightLevel,
+                showTransportIndicator
             );
         }
 

@@ -12,6 +12,12 @@ public partial class TurnStateManager
 
         if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
         {
+            if (IsEmbarkPromptActive())
+                return TryResolveEmbarkCursorMove(inputDelta, out resolvedCell);
+
+            if (TryResolveEmbarkCursorMove(inputDelta, out resolvedCell))
+                return true;
+
             if (selectedUnit == null)
                 return false;
 

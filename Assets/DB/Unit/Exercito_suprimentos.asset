@@ -27,10 +27,12 @@ MonoBehaviour:
   movementCategory: 4
   militaryForce: 0
   unitClass: 1
+  eliteLevel: 0
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
-  skills: []
+  skills:
+  - {fileID: 11400000, guid: 759d9c0f4a06434f8f54d781709f8c7e, type: 2}
   embarkedWeapons: []
   embarkedSupplies: []
   isSupplier: 0
@@ -40,5 +42,22 @@ MonoBehaviour:
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  isTransporter: 1
+  allowedEmbarkTerrains: []
+  allowedEmbarkConstructions: []
+  transportSlots:
+  - slotId: reboque
+    capacity: 1
+    allowedLayerModes:
+    - domain: 0
+      heightLevel: 3
+    legacyAllowedDomain: 0
+    legacyAllowedHeight: 0
+    legacyAllowedLayerModes: []
+    allowedClasses: 
+    requiredSkills:
+    - {fileID: 11400000, guid: 5ef7a75e35294b68ac315145f98dcd17, type: 2}
+    blockedSkills: []
+  spriteTransport: {fileID: 21300000, guid: e25e62f91373702469b06ac486d35060, type: 3}
   autonomia: 60
-  cost: 26000
+  cost: 3500

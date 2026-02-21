@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 using UnityEditor.SceneManagement;
+using System.Collections.Generic;
 
 [CustomEditor(typeof(UnitManager))]
 public class UnitManagerEditor : Editor
@@ -22,6 +23,7 @@ public class UnitManagerEditor : Editor
     private SerializedProperty maxFuelProp;
     private SerializedProperty embarkedWeaponsRuntimeProp;
     private SerializedProperty hasActedProp;
+    private SerializedProperty isEmbarkedProp;
     private SerializedProperty matchControllerProp;
     private SerializedProperty currentDomainProp;
     private SerializedProperty currentHeightLevelProp;
@@ -50,6 +52,7 @@ public class UnitManagerEditor : Editor
         maxFuelProp = serializedObject.FindProperty("maxFuel");
         embarkedWeaponsRuntimeProp = serializedObject.FindProperty("embarkedWeaponsRuntime");
         hasActedProp = serializedObject.FindProperty("hasActed");
+        isEmbarkedProp = serializedObject.FindProperty("isEmbarked");
         matchControllerProp = serializedObject.FindProperty("matchController");
         currentDomainProp = serializedObject.FindProperty("currentDomain");
         currentHeightLevelProp = serializedObject.FindProperty("currentHeightLevel");
@@ -80,6 +83,8 @@ public class UnitManagerEditor : Editor
         EditorGUILayout.PropertyField(autoSnapWhenMovedInEditorProp, new GUIContent("Auto Snap When Moved In Editor"));
         EditorGUILayout.PropertyField(currentCellPositionProp, new GUIContent("Cell Position"));
         EditorGUILayout.PropertyField(hasActedProp, new GUIContent("Has Acted"));
+        if (isEmbarkedProp != null)
+            EditorGUILayout.PropertyField(isEmbarkedProp, new GUIContent("Is Embarked"));
 
         EditorGUILayout.PropertyField(teamIdProp, new GUIContent("Team ID"));
 
@@ -103,6 +108,7 @@ public class UnitManagerEditor : Editor
         EditorGUILayout.IntSlider(currentFuelProp, 0, Mathf.Max(1, maxFuelProp.intValue), new GUIContent("Current Fuel"));
         EditorGUILayout.PropertyField(maxFuelProp, new GUIContent("Max Fuel"));
         DrawEmbarkedWeaponsRuntimeSection();
+        DrawTransportRuntimeSection((UnitManager)target);
 
         EditorGUILayout.Space(6f);
         EditorGUILayout.LabelField("Layer State", EditorStyles.boldLabel);
@@ -137,6 +143,123 @@ public class UnitManagerEditor : Editor
             unit.PullCellFromTransform();
     }
 
+    private void DrawTransportRuntimeSection(UnitManager unit)
+    {
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField("Transport Runtime", EditorStyles.boldLabel);
+        if (unit == null)
+            return;
+
+        UnitData data = null;
+        bool hasData = unit.TryGetUnitData(out data) && data != null;
+        bool isTransporter = hasData && data.isTransporter && data.transportSlots != null && data.transportSlots.Count > 0;
+        if (!isTransporter)
+        {
+            EditorGUILayout.HelpBox("Unidade atual nao eh transportadora (ou sem slots configurados no UnitData).", MessageType.Info);
+            return;
+        }
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("Refresh Slots From Data"))
+            {
+                Undo.RecordObject(unit, "Refresh Transport Slots");
+                unit.RefreshTransportSlotsFromData();
+                MarkUnitAndSceneDirty(unit);
+                serializedObject.Update();
+            }
+
+            if (GUILayout.Button("Limpar Todas as Vagas"))
+            {
+                Undo.RecordObject(unit, "Clear Transport Seats");
+                bool changed = false;
+                IReadOnlyList<UnitTransportSeatRuntime> seats = unit.TransportedUnitSlots;
+                for (int i = 0; i < seats.Count; i++)
+                {
+                    UnitTransportSeatRuntime seat = seats[i];
+                    if (seat == null)
+                        continue;
+
+                    if (unit.TryDisembarkPassengerFromSeat(seat.slotIndex, seat.seatIndex, out _, out _))
+                        changed = true;
+                }
+
+                if (changed)
+                    MarkUnitAndSceneDirty(unit);
+                serializedObject.Update();
+            }
+        }
+
+        IReadOnlyList<UnitTransportSeatRuntime> runtimeSeats = unit.TransportedUnitSlots;
+        if (runtimeSeats == null || runtimeSeats.Count == 0)
+        {
+            EditorGUILayout.HelpBox("Sem vagas runtime. Clique em 'Refresh Slots From Data'.", MessageType.Warning);
+            return;
+        }
+
+        for (int i = 0; i < runtimeSeats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = runtimeSeats[i];
+            if (seat == null)
+                continue;
+
+            string seatLabel = $"{seat.slotId} | vaga {seat.seatIndex + 1}";
+            UnitManager occupied = seat.embarkedUnit;
+            string status = occupied != null ? $"ocupada ({occupied.name})" : "livre";
+
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.LabelField($"{seatLabel} - {status}", EditorStyles.boldLabel);
+            EditorGUI.BeginChangeCheck();
+            UnitManager desired = (UnitManager)EditorGUILayout.ObjectField("Passageiro", occupied, typeof(UnitManager), true);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(unit, "Assign Transport Seat");
+                if (occupied != null)
+                    Undo.RecordObject(occupied, "Assign Transport Seat");
+                if (desired != null && desired != occupied)
+                    Undo.RecordObject(desired, "Assign Transport Seat");
+
+                if (desired == null)
+                {
+                    if (!unit.TryDisembarkPassengerFromSeat(seat.slotIndex, seat.seatIndex, out UnitManager removed, out string reason))
+                    {
+                        if (!string.IsNullOrWhiteSpace(reason))
+                            Debug.LogWarning($"[UnitManagerEditor] Falha no desembarque manual: {reason}", unit);
+                    }
+                    else
+                    {
+                        MarkUnitAndSceneDirty(unit);
+                        if (removed != null)
+                            MarkUnitAndSceneDirty(removed);
+                    }
+                }
+                else
+                {
+                    UnitManager replaced = null;
+                    if (occupied != null && occupied != desired)
+                        unit.TryDisembarkPassengerFromSeat(seat.slotIndex, seat.seatIndex, out replaced, out _);
+
+                    if (!unit.TryEmbarkPassengerInSeat(desired, seat.slotIndex, seat.seatIndex, out string reason))
+                    {
+                        Debug.LogWarning($"[UnitManagerEditor] Falha no embarque manual: {reason}", unit);
+                    }
+                    else
+                    {
+                        MarkUnitAndSceneDirty(unit);
+                        if (desired != null)
+                            MarkUnitAndSceneDirty(desired);
+                        if (replaced != null)
+                            MarkUnitAndSceneDirty(replaced);
+                    }
+                }
+
+                serializedObject.Update();
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+    }
+
     private void DrawLayerStateCycleButtons(UnitManager unit)
     {
         if (unit == null)
@@ -154,16 +277,39 @@ public class UnitManagerEditor : Editor
         EditorGUILayout.BeginHorizontal();
         using (new EditorGUI.DisabledScope(modeCount <= 1 || !canGoDown))
         {
-            if (GUILayout.Button("Descer Domain"))
+            if (GUILayout.Button("Descer Domain (D)"))
                 StepLayerMode(unit, orderedModes, currentIndex, -1);
         }
 
         using (new EditorGUI.DisabledScope(modeCount <= 1 || !canGoUp))
         {
-            if (GUILayout.Button("Subir Domain"))
+            if (GUILayout.Button("Subir Domain (S)"))
                 StepLayerMode(unit, orderedModes, currentIndex, +1);
         }
         EditorGUILayout.EndHorizontal();
+
+        Event currentEvent = Event.current;
+        if (currentEvent != null &&
+            currentEvent.type == EventType.KeyDown &&
+            !currentEvent.alt &&
+            !currentEvent.control &&
+            !currentEvent.command &&
+            !currentEvent.shift &&
+            !EditorGUIUtility.editingTextField)
+        {
+            if (currentEvent.keyCode == KeyCode.D && modeCount > 1 && canGoDown)
+            {
+                StepLayerMode(unit, orderedModes, currentIndex, -1);
+                currentEvent.Use();
+                GUI.changed = true;
+            }
+            else if (currentEvent.keyCode == KeyCode.S && modeCount > 1 && canGoUp)
+            {
+                StepLayerMode(unit, orderedModes, currentIndex, +1);
+                currentEvent.Use();
+                GUI.changed = true;
+            }
+        }
 
         if (modeCount > 0)
         {
@@ -364,5 +510,16 @@ public class UnitManagerEditor : Editor
             return 0;
 
         return Mathf.Max(1, data.maxHP);
+    }
+
+    private static void MarkUnitAndSceneDirty(UnitManager unit)
+    {
+        if (unit == null)
+            return;
+
+        EditorUtility.SetDirty(unit);
+        PrefabUtility.RecordPrefabInstancePropertyModifications(unit);
+        if (unit.gameObject.scene.IsValid())
+            EditorSceneManager.MarkSceneDirty(unit.gameObject.scene);
     }
 }

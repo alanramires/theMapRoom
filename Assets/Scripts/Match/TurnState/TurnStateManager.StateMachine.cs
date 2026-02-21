@@ -164,6 +164,9 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileMoveuAndando()
     {
+        if (TryConfirmScannerEmbark())
+            return ActionSfx.Confirm;
+
         if (TryConfirmScannerAttack())
             return ActionSfx.Confirm;
 
@@ -172,6 +175,9 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileMoveuParado()
     {
+        if (TryConfirmScannerEmbark())
+            return ActionSfx.Confirm;
+
         if (TryConfirmScannerAttack())
             return ActionSfx.Confirm;
 

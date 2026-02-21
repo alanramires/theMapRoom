@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
   id: apache
   displayName: Apache
-  description: 
+  description: "Helicoptero de combate a\xE9reo e apoio aproximado CAS"
   spriteDefault: {fileID: 21300000, guid: e0ff29246df3f7e478a2fae93fbbaf2e, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
@@ -33,13 +33,14 @@ MonoBehaviour:
   aditionalDomainsAllowed:
   - domain: 0
     heightLevel: 3
-    spriteDefault: {fileID: 0}
+    spriteDefault: {fileID: 21300000, guid: cffe93a69a0417d4ba7b192151593e5d, type: 3}
     spriteGreen: {fileID: 0}
     spriteRed: {fileID: 0}
     spriteBlue: {fileID: 0}
     spriteYellow: {fileID: 0}
   skills:
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
+  autonomyData: {fileID: 11400000, guid: 86f5ee654cae4d8ca9adadca74d0d9b8, type: 2}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
     squadAmmunition: 8
@@ -65,5 +66,6 @@ MonoBehaviour:
   allowedEmbarkTerrains: []
   allowedEmbarkConstructions: []
   transportSlots: []
+  spriteTransport: {fileID: 0}
   autonomia: 70
   cost: 26000

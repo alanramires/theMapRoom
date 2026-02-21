@@ -44,10 +44,13 @@ public static class TeamUtils
         }
     }
 
-    public static Sprite GetTeamSprite(UnitData data, TeamId teamId)
+    public static Sprite GetTeamSprite(UnitData data, TeamId teamId, bool preferTransportSprite = false)
     {
         if (data == null)
             return null;
+
+        if (preferTransportSprite && data.spriteTransport != null)
+            return data.spriteTransport;
 
         switch (teamId)
         {

@@ -54,6 +54,7 @@ public class CursorController : MonoBehaviour
     [SerializeField] private AudioClip cancelSfx;
     [SerializeField] private AudioClip errorSfx;
     [SerializeField] private AudioClip doneSfx;
+    [SerializeField] private AudioClip loadSfx;
     [SerializeField] private AudioClip heliceMoveSfx;
     [SerializeField] private AudioClip jatoMoveSfx;
     [SerializeField] private AudioClip marchaMoveSfx;
@@ -464,6 +465,8 @@ public class CursorController : MonoBehaviour
 
         if (doneSfx == null)
             doneSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/done.MP3");
+        if (loadSfx == null)
+            loadSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/load.MP3");
 
         if (heliceMoveSfx == null)
             heliceMoveSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/move/helice.MP3");
@@ -726,6 +729,11 @@ public class CursorController : MonoBehaviour
     public void PlayDoneSfx()
     {
         PlayUiSfx(doneSfx);
+    }
+
+    public void PlayLoadSfx()
+    {
+        PlayUiSfx(loadSfx);
     }
 
     public void PlayConfirmSfx()

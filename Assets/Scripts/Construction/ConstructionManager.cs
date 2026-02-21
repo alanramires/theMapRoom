@@ -23,6 +23,8 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private int currentCapturePoints;
     [SerializeField] private TeamId originalOwnerTeamId = TeamId.Neutral;
     [SerializeField] private bool originalOwnerInitialized;
+    [Header("Runtime Visual")]
+    [SerializeField] [Range(0f, 1f)] private float occupiedByReadyUnitDarkenFactor = 0.4f;
 
     public TeamId TeamId => teamId;
     public Tilemap BoardTilemap => boardTilemap;
@@ -153,6 +155,14 @@ public class ConstructionManager : MonoBehaviour
     {
         if (autoApplyOnStart)
             ApplyFromDatabase();
+    }
+
+    private void Update()
+    {
+        if (!Application.isPlaying)
+            return;
+
+        RefreshOccupancyVisualTint();
     }
 
 #if UNITY_EDITOR
@@ -505,5 +515,35 @@ public class ConstructionManager : MonoBehaviour
 
         data = null;
         return false;
+    }
+
+    private void RefreshOccupancyVisualTint()
+    {
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (spriteRenderer == null)
+            return;
+
+        Color baseColor = TeamUtils.GetColor(teamId);
+        Color targetColor = baseColor;
+
+        Tilemap map = boardTilemap;
+        if (map == null)
+            TryAutoAssignBoardTilemap();
+        map = boardTilemap;
+
+        if (map != null)
+        {
+            UnitManager occupant = UnitOccupancyRules.GetUnitAtCell(map, currentCellPosition);
+            bool sameTeam = occupant != null && occupant.TeamId == teamId;
+            if (sameTeam && !occupant.HasActed)
+            {
+                float darken = Mathf.Clamp01(occupiedByReadyUnitDarkenFactor);
+                targetColor = new Color(baseColor.r * darken, baseColor.g * darken, baseColor.b * darken, baseColor.a);
+            }
+        }
+
+        if (spriteRenderer.color != targetColor)
+            spriteRenderer.color = targetColor;
     }
 }
