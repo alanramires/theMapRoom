@@ -38,7 +38,9 @@ MonoBehaviour:
     spriteRed: {fileID: 0}
     spriteBlue: {fileID: 0}
     spriteYellow: {fileID: 0}
-  skills: []
+  skills:
+  - {fileID: 11400000, guid: 1b0f1eb9d5454df3a0e1b42f0c8d6aa1, type: 2}
+  - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}
     squadAmmunition: 4
@@ -60,5 +62,9 @@ MonoBehaviour:
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  isTransporter: 0
+  allowedEmbarkTerrains: []
+  allowedEmbarkConstructions: []
+  transportSlots: []
   autonomia: 70
   cost: 26000

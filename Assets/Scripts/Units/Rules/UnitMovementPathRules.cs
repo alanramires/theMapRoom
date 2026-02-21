@@ -178,6 +178,29 @@ public static class UnitMovementPathRules
         return Mathf.Max(0, total);
     }
 
+    public static bool TryGetEnterCellCost(
+        Tilemap terrainTilemap,
+        UnitManager unit,
+        Vector3Int cell,
+        TerrainDatabase terrainDatabase,
+        out int cost)
+    {
+        cost = 0;
+        if (terrainTilemap == null || unit == null)
+            return false;
+
+        cell.z = 0;
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(terrainTilemap, cell);
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(terrainTilemap, cell);
+        TerrainTypeData terrainData = ResolveTerrainAtCell(terrainTilemap, terrainDatabase, cell);
+        bool hasAnyTile = HasAnyPaintedTileAtCell(terrainTilemap, cell);
+        if (!CanTraverseCell(construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit))
+            return false;
+
+        cost = Mathf.Max(1, GetAutonomyCostToEnterCell(construction, structure, terrainData, unit));
+        return true;
+    }
+
     private static bool CanUseRoadFullMoveBonus(UnitManager unit, int baseMove)
     {
         if (unit == null)

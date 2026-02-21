@@ -45,6 +45,17 @@ public class ConstructionData : ScriptableObject
     public List<TerrainLayerMode> aditionalDomainsAllowed = new List<TerrainLayerMode>();
     [Tooltip("Se true, dominio do ar e sempre permitido para esta construcao.")]
     public bool alwaysAllowAirDomain = true;
+    [Header("Aircraft Ops")]
+    [Tooltip("Permite pouso de aeronaves neste tipo de construcao.")]
+    public bool allowAircraftLanding = false;
+    [Tooltip("Classes de unidade permitidas para pouso. Se vazio, aceita Jet/Plane/Helicopter.")]
+    public List<GameUnitClass> landingAllowedClasses = new List<GameUnitClass>();
+    [Tooltip("Skills exigidas para pouso. Se vazio, nao exige skill.")]
+    public List<SkillData> landingRequiredSkills = new List<SkillData>();
+    [Tooltip("Permite decolagem de aeronaves neste tipo de construcao.")]
+    public bool allowAircraftTakeoff = false;
+    [Tooltip("Modos de movimento permitidos para decolagem. Se vazio, permite MoveuParado e MoveuAndando.")]
+    public List<SensorMovementMode> takeoffAllowedMovementModes = new List<SensorMovementMode>();
 
     [Header("Construction Supplier Settings")]
     public bool isSupplier = false;
@@ -79,6 +90,12 @@ public class ConstructionData : ScriptableObject
             supplierOperationDomains = new List<TerrainLayerMode>();
         if (supplierServicesProvided == null)
             supplierServicesProvided = new List<ServiceData>();
+        if (landingAllowedClasses == null)
+            landingAllowedClasses = new List<GameUnitClass>();
+        if (landingRequiredSkills == null)
+            landingRequiredSkills = new List<SkillData>();
+        if (takeoffAllowedMovementModes == null)
+            takeoffAllowedMovementModes = new List<SensorMovementMode>();
         if (supplierResources == null)
             supplierResources = new List<ConstructionSupplierResourceCapacity>();
         for (int i = 0; i < supplierResources.Count; i++)

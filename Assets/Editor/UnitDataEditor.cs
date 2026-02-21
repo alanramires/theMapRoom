@@ -61,6 +61,12 @@ public class UnitDataEditor : Editor
         serializedObject.ApplyModifiedProperties();
     }
 
+    private static void DrawIfExists(SerializedProperty property, string label)
+    {
+        if (property != null)
+            EditorGUILayout.PropertyField(property, new GUIContent(label), includeChildren: true);
+    }
+
     private void DrawLogisticsSection()
     {
         EditorGUILayout.LabelField("Logistics", EditorStyles.boldLabel);

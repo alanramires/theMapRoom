@@ -26,7 +26,8 @@ public class ConstructionDataEditor : Editor
         DrawIfExists(configProperty.FindPropertyRelative("isPlayerHeadQuarter"), "Is Player Head Quarter");
         DrawIfExists(configProperty.FindPropertyRelative("isCapturable"), "Is Capturable");
         DrawIfExists(configProperty.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
-        DrawIfExists(configProperty.FindPropertyRelative("canProduceUnits"), "Can Produce Units");
+        DrawIfExists(configProperty.FindPropertyRelative("capturedIncoming"), "Captured Incoming");
+        DrawIfExists(configProperty.FindPropertyRelative("canProduceAndSellUnits"), "Can Produce And Sell Units");
         DrawIfExists(configProperty.FindPropertyRelative("offeredUnits"), "Offered Units");
 
         EditorGUI.indentLevel--;

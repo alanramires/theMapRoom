@@ -57,6 +57,21 @@ public class StructureData : ScriptableObject
     public float segmentOverlap = 0.02f;
     [Tooltip("Se true, esta estrutura habilita bonus de deslocamento em full move (ex.: estrada).")]
     public bool roadBoost = false;
+    [Header("Aircraft Ops")]
+    [Tooltip("Permite pouso de aeronaves nesta estrutura (ex.: estrada, pista improvisada, conves).")]
+    public bool allowAircraftLanding = false;
+    [Tooltip("Classes de unidade permitidas para pouso. Se vazio, aceita Jet/Plane/Helicopter.")]
+    public List<GameUnitClass> landingAllowedClasses = new List<GameUnitClass>();
+    [Tooltip("Skills exigidas para pouso. Se vazio, nao exige skill.")]
+    public List<SkillData> landingRequiredSkills = new List<SkillData>();
+    [Tooltip("Permite decolagem de aeronaves nesta estrutura.")]
+    public bool allowAircraftTakeoff = false;
+    [Tooltip("Se a classe estiver nesta lista, pouso exige MoveuParado. Se nao estiver, pode pousar em MoveuParado/MoveuAndando.")]
+    public List<GameUnitClass> roadLandingRequiresStoppedClasses = new List<GameUnitClass>();
+    [Tooltip("Modos de movimento permitidos para decolagem. Se vazio, permite MoveuParado e MoveuAndando.")]
+    public List<SensorMovementMode> takeoffAllowedMovementModes = new List<SensorMovementMode>();
+    [Tooltip("Marca esta estrutura como conves de porta-avioes para regras especificas de embarque/lancamento.")]
+    public bool isCarrierDeck = false;
 
     [Header("Road Routes")]
     [Tooltip("Rotas de rodovia desta estrutura (centro-a-centro dos hexes).")]

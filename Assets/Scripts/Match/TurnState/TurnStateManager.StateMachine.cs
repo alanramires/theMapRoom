@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public partial class TurnStateManager
 {
@@ -100,6 +101,16 @@ public partial class TurnStateManager
             return ActionSfx.Confirm;
         }
 
+        if (selectedUnit.IsAircraftGrounded)
+        {
+            if (!TryPrepareAutomaticTakeoffForMovement(out string takeoffBlockReason))
+            {
+                if (!string.IsNullOrWhiteSpace(takeoffBlockReason))
+                    Debug.Log(takeoffBlockReason);
+                return ActionSfx.Error;
+            }
+        }
+
         if (!paintedRangeLookup.Contains(cursorCell))
             return ActionSfx.Error;
 
@@ -108,6 +119,47 @@ public partial class TurnStateManager
 
         BeginMovementToSelectedCell(path);
         return ActionSfx.Confirm;
+    }
+
+    private bool TryPrepareAutomaticTakeoffForMovement(out string blockReason)
+    {
+        blockReason = string.Empty;
+        if (selectedUnit == null || !selectedUnit.IsAircraftGrounded)
+            return true;
+
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
+        AircraftOperationDecision decision = AircraftOperationRules.Evaluate(
+            selectedUnit,
+            boardMap,
+            terrainDatabase,
+            SensorMovementMode.MoveuParado);
+        if (!decision.available || decision.action != AircraftOperationAction.Takeoff)
+        {
+            blockReason = string.IsNullOrWhiteSpace(decision.reason)
+                ? "Aeronave em solo sem decolagem valida neste hex."
+                : decision.reason;
+            return false;
+        }
+
+        if (decision.consumesAction)
+        {
+            blockReason = "Decolagem neste hex consome acao. Use \"E\" para decolar parado.";
+            return false;
+        }
+
+        if (!AircraftOperationRules.TryApplyOperation(
+                selectedUnit,
+                boardMap,
+                terrainDatabase,
+                SensorMovementMode.MoveuParado,
+                out _))
+        {
+            blockReason = "Falha ao preparar decolagem automatica.";
+            return false;
+        }
+
+        PaintSelectedUnitMovementRange();
+        return true;
     }
 
     private ActionSfx HandleConfirmWhileMoveuAndando()

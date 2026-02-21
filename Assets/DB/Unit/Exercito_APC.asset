@@ -27,9 +27,24 @@ MonoBehaviour:
   movementCategory: 4
   militaryForce: 0
   unitClass: 1
+  eliteLevel: 0
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
+  aircraftType: 0
+  preferredAirHeight: 4
+  canLandOnAirport: 0
+  canLandOnRoad: 0
+  roadLandingRequiresStopped: 0
+  canLandOnPlains: 0
+  canLandOnBeach: 0
+  plainsLandingRequiresVtol: 0
+  beachLandingRequiresVtosl: 0
+  canLandOnCarrier: 0
+  carrierLandingRequiresSkill: 0
+  improvisedTakeoffConsumesAction: 0
+  plainsTakeoffConsumesAction: 0
+  beachTakeoffConsumesAction: 0
   skills:
   - {fileID: 11400000, guid: 8bfcf50a7b4285c4cad503493431fb4b, type: 2}
   embarkedWeapons:
@@ -47,5 +62,16 @@ MonoBehaviour:
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  isTransporter: 1
+  transportSlots:
+  - slotId: passageiro
+    capacity: 1
+    allowedDomain: 0
+    allowedHeight: 3
+    filterAllowedClasses: 1
+    allowedClasses: 00000000
+    requireAllSkills: 0
+    requiredSkills: []
+    blockedSkills: []
   autonomia: 70
   cost: 26000

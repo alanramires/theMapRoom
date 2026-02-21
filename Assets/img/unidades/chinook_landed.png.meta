@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 8871564c8d45cb24c95990ddb38ec467
+guid: 1d81a6afd37530e4285ccdf9b9cbf574
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -1826991830925327225
-    second: tile 6_0
+      213: -4928844689381362106
+    second: chinook_landed_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: tile 6_0
+      name: chinook_landed_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 886
-        height: 1024
+        x: 98
+        y: 66
+        width: 830
+        height: 545
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 784c72e0c9835a6e0800000000000000
-      internalID: -1826991830925327225
+      spriteID: 6467a508ed9399bb0800000000000000
+      internalID: -4928844689381362106
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      tile 6_0: -1826991830925327225
+      chinook_landed_0: -4928844689381362106
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

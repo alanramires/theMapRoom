@@ -58,6 +58,17 @@ public class TerrainTypeData : ScriptableObject
     [Header("Flags")]
     [Tooltip("Se true, dominio do ar e sempre permitido (independente dos modos).")]
     public bool alwaysAllowAirDomain = true;
+    [Header("Aircraft Ops")]
+    [Tooltip("Permite pouso de aeronaves diretamente neste terreno.")]
+    public bool allowAircraftLanding = false;
+    [Tooltip("Classes de unidade permitidas para pouso. Se vazio, aceita Jet/Plane/Helicopter.")]
+    public List<GameUnitClass> landingAllowedClasses = new List<GameUnitClass>();
+    [Tooltip("Skills exigidas para pouso. Se vazio, nao exige skill.")]
+    public List<SkillData> landingRequiredSkills = new List<SkillData>();
+    [Tooltip("Permite decolagem de aeronaves diretamente deste terreno.")]
+    public bool allowAircraftTakeoff = false;
+    [Tooltip("Modos de movimento permitidos para decolagem. Se vazio, permite MoveuParado e MoveuAndando.")]
+    public List<SensorMovementMode> takeoffAllowedMovementModes = new List<SensorMovementMode>();
 
     [Header("Movement")]
     [Tooltip("Custo basico de autonomia para entrar neste hex. Minimo 1.")]

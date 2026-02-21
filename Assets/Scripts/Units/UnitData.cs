@@ -62,6 +62,15 @@ public class UnitData : ScriptableObject
     public List<SupplierOperationDomain> supplierOperationDomains = new List<SupplierOperationDomain>();
     [Tooltip("Servicos oferecidos por esta unidade de logistica.")]
     public List<ServiceData> supplierServicesProvided = new List<ServiceData>();
+    [Header("Transport")]
+    [Tooltip("Se true, esta unidade pode transportar outras unidades.")]
+    public bool isTransporter = false;
+    [Tooltip("Terrenos onde este transportador aceita embarque. Se vazio, nao restringe por terreno.")]
+    public List<TerrainTypeData> allowedEmbarkTerrains = new List<TerrainTypeData>();
+    [Tooltip("Construcoes onde este transportador aceita embarque. Se vazio, nao restringe por construcao.")]
+    public List<ConstructionData> allowedEmbarkConstructions = new List<ConstructionData>();
+    [Tooltip("Slots de transporte e regras de embarque.")]
+    public List<UnitTransportSlotRule> transportSlots = new List<UnitTransportSlotRule>();
 
     public int autonomia = 99;
     public int cost = 100;
@@ -80,6 +89,12 @@ public class UnitData : ScriptableObject
             supplierOperationDomains = new List<SupplierOperationDomain>();
         if (supplierServicesProvided == null)
             supplierServicesProvided = new List<ServiceData>();
+        if (transportSlots == null)
+            transportSlots = new List<UnitTransportSlotRule>();
+        if (allowedEmbarkTerrains == null)
+            allowedEmbarkTerrains = new List<TerrainTypeData>();
+        if (allowedEmbarkConstructions == null)
+            allowedEmbarkConstructions = new List<ConstructionData>();
         eliteLevel = Mathf.Max(0, eliteLevel);
         maxUnitsServedPerTurn = Mathf.Max(0, maxUnitsServedPerTurn);
 
@@ -92,6 +107,22 @@ public class UnitData : ScriptableObject
             embarkedWeapon.SyncFromWeaponDefaultsIfNeeded();
         }
 
+        for (int i = 0; i < transportSlots.Count; i++)
+        {
+            UnitTransportSlotRule slot = transportSlots[i];
+            if (slot == null)
+                continue;
+
+            slot.EnsureDefaults();
+        }
+
+    }
+
+    public bool IsAircraft()
+    {
+        return unitClass == GameUnitClass.Jet ||
+               unitClass == GameUnitClass.Plane ||
+               unitClass == GameUnitClass.Helicopter;
     }
 
     private void SyncArmorClassFromDefense()

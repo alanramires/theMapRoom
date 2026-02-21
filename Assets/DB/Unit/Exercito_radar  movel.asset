@@ -26,13 +26,24 @@ MonoBehaviour:
   movement: 4
   movementCategory: 4
   militaryForce: 0
-  unitClass: 0
+  unitClass: 1
+  eliteLevel: 0
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
   skills: []
   embarkedWeapons: []
   embarkedSupplies: []
-  embarkedResources: []
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
+  isTransporter: 0
+  allowedEmbarkTerrains: []
+  allowedEmbarkConstructions: []
+  transportSlots: []
   autonomia: 50
   cost: 26000

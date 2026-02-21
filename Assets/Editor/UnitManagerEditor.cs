@@ -18,18 +18,18 @@ public class UnitManagerEditor : Editor
     private SerializedProperty currentPositionProp;
     private SerializedProperty unitDisplayNameProp;
     private SerializedProperty currentHpProp;
-    private SerializedProperty currentAmmoProp;
-    private SerializedProperty maxAmmoProp;
     private SerializedProperty currentFuelProp;
     private SerializedProperty maxFuelProp;
     private SerializedProperty embarkedWeaponsRuntimeProp;
     private SerializedProperty hasActedProp;
     private SerializedProperty matchControllerProp;
-    private SerializedProperty manualMoveAnimationSpeedProp;
     private SerializedProperty currentDomainProp;
     private SerializedProperty currentHeightLevelProp;
     private SerializedProperty currentLayerModeIndexProp;
     private SerializedProperty layerStateInitializedProp;
+    private SerializedProperty aircraftGroundedProp;
+    private SerializedProperty aircraftEmbarkedInCarrierProp;
+    private SerializedProperty aircraftOperationLockTurnsProp;
 
     private void OnEnable()
     {
@@ -46,18 +46,18 @@ public class UnitManagerEditor : Editor
         currentPositionProp = serializedObject.FindProperty("currentPosition");
         unitDisplayNameProp = serializedObject.FindProperty("unitDisplayName");
         currentHpProp = serializedObject.FindProperty("currentHP");
-        currentAmmoProp = serializedObject.FindProperty("currentAmmo");
-        maxAmmoProp = serializedObject.FindProperty("maxAmmo");
         currentFuelProp = serializedObject.FindProperty("currentFuel");
         maxFuelProp = serializedObject.FindProperty("maxFuel");
         embarkedWeaponsRuntimeProp = serializedObject.FindProperty("embarkedWeaponsRuntime");
         hasActedProp = serializedObject.FindProperty("hasActed");
         matchControllerProp = serializedObject.FindProperty("matchController");
-        manualMoveAnimationSpeedProp = serializedObject.FindProperty("manualMoveAnimationSpeed");
         currentDomainProp = serializedObject.FindProperty("currentDomain");
         currentHeightLevelProp = serializedObject.FindProperty("currentHeightLevel");
         currentLayerModeIndexProp = serializedObject.FindProperty("currentLayerModeIndex");
         layerStateInitializedProp = serializedObject.FindProperty("layerStateInitialized");
+        aircraftGroundedProp = serializedObject.FindProperty("aircraftGrounded");
+        aircraftEmbarkedInCarrierProp = serializedObject.FindProperty("aircraftEmbarkedInCarrier");
+        aircraftOperationLockTurnsProp = serializedObject.FindProperty("aircraftOperationLockTurns");
     }
 
     public override void OnInspectorGUI()
@@ -74,10 +74,12 @@ public class UnitManagerEditor : Editor
         EditorGUILayout.PropertyField(spriteRendererProp);
         EditorGUILayout.PropertyField(unitHudProp, new GUIContent("Unit HUD"));
         EditorGUILayout.PropertyField(unitDatabaseProp);
+        EditorGUILayout.PropertyField(matchControllerProp, new GUIContent("Match Controller"));
         EditorGUILayout.PropertyField(boardTilemapProp, new GUIContent("Board Tilemap"));
         EditorGUILayout.PropertyField(snapToCellCenterProp, new GUIContent("Snap To Cell Center"));
         EditorGUILayout.PropertyField(autoSnapWhenMovedInEditorProp, new GUIContent("Auto Snap When Moved In Editor"));
         EditorGUILayout.PropertyField(currentCellPositionProp, new GUIContent("Cell Position"));
+        EditorGUILayout.PropertyField(hasActedProp, new GUIContent("Has Acted"));
 
         EditorGUILayout.PropertyField(teamIdProp, new GUIContent("Team ID"));
 
@@ -95,23 +97,12 @@ public class UnitManagerEditor : Editor
         else
             EditorGUILayout.PropertyField(currentHpProp, new GUIContent("Current HP"));
 
-        maxAmmoProp.intValue = Mathf.Max(1, maxAmmoProp.intValue);
         maxFuelProp.intValue = Mathf.Max(1, maxFuelProp.intValue);
-        currentAmmoProp.intValue = Mathf.Clamp(currentAmmoProp.intValue, 0, maxAmmoProp.intValue);
         currentFuelProp.intValue = Mathf.Clamp(currentFuelProp.intValue, 0, maxFuelProp.intValue);
 
-        EditorGUILayout.IntSlider(currentAmmoProp, 0, Mathf.Max(1, maxAmmoProp.intValue), new GUIContent("Current Ammo"));
-        EditorGUILayout.PropertyField(maxAmmoProp, new GUIContent("Max Ammo"));
         EditorGUILayout.IntSlider(currentFuelProp, 0, Mathf.Max(1, maxFuelProp.intValue), new GUIContent("Current Fuel"));
         EditorGUILayout.PropertyField(maxFuelProp, new GUIContent("Max Fuel"));
         DrawEmbarkedWeaponsRuntimeSection();
-
-        EditorGUILayout.PropertyField(hasActedProp, new GUIContent("Has Acted"));
-        EditorGUILayout.PropertyField(matchControllerProp, new GUIContent("Match Controller"));
-        EditorGUILayout.Space(6f);
-        EditorGUILayout.LabelField("Movement Animation", EditorStyles.boldLabel);
-        if (manualMoveAnimationSpeedProp != null)
-            EditorGUILayout.PropertyField(manualMoveAnimationSpeedProp, new GUIContent("Manual Move Animation Speed"));
 
         EditorGUILayout.Space(6f);
         EditorGUILayout.LabelField("Layer State", EditorStyles.boldLabel);
@@ -123,6 +114,15 @@ public class UnitManagerEditor : Editor
             EditorGUILayout.PropertyField(currentLayerModeIndexProp, new GUIContent("Current Layer Mode Index"));
         if (layerStateInitializedProp != null)
             EditorGUILayout.PropertyField(layerStateInitializedProp, new GUIContent("Layer State Initialized"));
+        using (new EditorGUI.DisabledScope(true))
+        {
+            if (aircraftGroundedProp != null)
+                EditorGUILayout.PropertyField(aircraftGroundedProp, new GUIContent("Aircraft Grounded"));
+            if (aircraftEmbarkedInCarrierProp != null)
+                EditorGUILayout.PropertyField(aircraftEmbarkedInCarrierProp, new GUIContent("Aircraft Embarked In Carrier"));
+            if (aircraftOperationLockTurnsProp != null)
+                EditorGUILayout.PropertyField(aircraftOperationLockTurnsProp, new GUIContent("Aircraft Operation Lock Turns"));
+        }
 
         serializedObject.ApplyModifiedProperties();
 

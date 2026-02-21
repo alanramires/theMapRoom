@@ -51,6 +51,7 @@ public partial class TurnStateManager : MonoBehaviour
     private readonly List<Vector3Int> paintedLineOfFireCells = new List<Vector3Int>();
     private readonly HashSet<Vector3Int> paintedLineOfFireLookup = new HashSet<Vector3Int>();
     private readonly Dictionary<Vector3Int, List<Vector3Int>> movementPathsByCell = new Dictionary<Vector3Int, List<Vector3Int>>();
+    private AircraftOperationDecision cachedAircraftOperationDecision;
     private readonly List<Vector3Int> committedMovementPath = new List<Vector3Int>();
     private Vector3Int committedOriginCell;
     private Vector3Int committedDestinationCell;

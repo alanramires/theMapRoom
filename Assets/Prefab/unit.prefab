@@ -33,6 +33,7 @@ RectTransform:
   m_Children:
   - {fileID: 6077523268826619472}
   - {fileID: 3389349782232182809}
+  - {fileID: 5439601904325997685}
   - {fileID: 6341617830216810619}
   - {fileID: 5761048419433149052}
   - {fileID: 7229883133104849251}
@@ -215,10 +216,12 @@ MonoBehaviour:
   unitHud: {fileID: 854866094058904647}
   actedLockRenderer: {fileID: 0}
   unitDatabase: {fileID: 11400000, guid: 2c4ccdfb13517e544b0864be9393a2c3, type: 2}
+  matchController: {fileID: 0}
   boardTilemap: {fileID: 0}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: 0, y: 0, z: 0}
+  hasActed: 0
   teamId: 0
   unitId: Soldado
   instanceId: 5
@@ -230,7 +233,6 @@ MonoBehaviour:
   currentFuel: 99
   maxFuel: 99
   embarkedWeaponsRuntime: []
-  hasActed: 0
   appliedHasActed: 0
   appliedActiveTeamId: 0
   isEmbarked: 0
@@ -244,12 +246,13 @@ MonoBehaviour:
   actedGlowColor: {r: 1, g: 1, b: 1, a: 1}
   actedGlowSize: 1.5
   actedGlowStrength: 1.25
-  matchController: {fileID: 0}
-  manualMoveAnimationSpeed: 1
   currentDomain: 0
   currentHeightLevel: 3
   currentLayerModeIndex: 0
   layerStateInitialized: 1
+  aircraftGrounded: 0
+  aircraftEmbarkedInCarrier: 0
+  aircraftOperationLockTurns: 0
 --- !u!1 &2120091812791158126
 GameObject:
   m_ObjectHideFlags: 0
@@ -379,6 +382,81 @@ MonoBehaviour:
   hudSortingLayerName: SFX
   hudSortingOrder: 50
   worldHudOrderOffsetPerElement: 1
+--- !u!1 &2439568719226469460
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5439601904325997685}
+  - component: {fileID: 7167272598839841554}
+  - component: {fileID: 5740209844412876780}
+  m_Layer: 0
+  m_Name: transporte
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &5439601904325997685
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2439568719226469460}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.1, y: 0.1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6912642489147322313}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_SizeDelta: {x: 15, y: 15}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &7167272598839841554
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2439568719226469460}
+  m_CullTransparentMesh: 1
+--- !u!114 &5740209844412876780
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2439568719226469460}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 7edc777644d881c439117179e7c7a51c, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &3303528472314862044
 GameObject:
   m_ObjectHideFlags: 0
@@ -550,7 +628,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0.32999992, y: -2.4}
+  m_AnchoredPosition: {x: 0.58000004, y: -2.4599998}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2039043004018443911
@@ -837,7 +915,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -0.87, y: -2.4}
+  m_AnchoredPosition: {x: -0.77, y: -2.46}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4853617338249748356

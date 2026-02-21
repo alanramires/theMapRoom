@@ -11,14 +11,17 @@ public static class SensorHandle
         DPQAirHeightConfig dpqAirHeightConfig,
         bool fogOfWarEnabled,
         SensorMovementMode movementMode,
+        int remainingMovementPoints,
         List<char> availableActionCodes,
-        List<PodeMirarTargetOption> podeMirarTargets)
+        List<PodeMirarTargetOption> podeMirarTargets,
+        List<PodeEmbarcarOption> podeEmbarcarTargets)
     {
-        if (availableActionCodes == null || podeMirarTargets == null)
+        if (availableActionCodes == null || podeMirarTargets == null || podeEmbarcarTargets == null)
             return false;
 
         availableActionCodes.Clear();
         podeMirarTargets.Clear();
+        podeEmbarcarTargets.Clear();
 
         if (selectedUnit == null)
             return false;
@@ -38,6 +41,13 @@ public static class SensorHandle
         if (canAim)
         {
             availableActionCodes.Add('A');
+            hasAnyAction = true;
+        }
+
+        bool canEmbark = PodeEmbarcarSensor.CollectOptions(selectedUnit, boardTilemap, terrainDatabase, remainingMovementPoints, podeEmbarcarTargets);
+        if (canEmbark)
+        {
+            availableActionCodes.Add('E');
             hasAnyAction = true;
         }
 

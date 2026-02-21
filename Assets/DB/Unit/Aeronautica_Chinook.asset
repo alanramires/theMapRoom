@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
   id: chinook
   displayName: Chinook
-  description: 
+  description: Helicoptero de Transporte de Tropas
   spriteDefault: {fileID: 21300000, guid: 135b068a83090ab4ca943296490afda1, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
@@ -27,17 +27,33 @@ MonoBehaviour:
   movementCategory: 0
   militaryForce: 0
   unitClass: 5
+  eliteLevel: 0
   domain: 3
   heightLevel: 4
   aditionalDomainsAllowed:
   - domain: 0
     heightLevel: 3
-    spriteDefault: {fileID: 0}
+    spriteDefault: {fileID: 21300000, guid: 1d81a6afd37530e4285ccdf9b9cbf574, type: 3}
     spriteGreen: {fileID: 0}
     spriteRed: {fileID: 0}
     spriteBlue: {fileID: 0}
     spriteYellow: {fileID: 0}
-  skills: []
+  aircraftType: 2
+  preferredAirHeight: 4
+  canLandOnAirport: 1
+  canLandOnRoad: 1
+  roadLandingRequiresStopped: 0
+  canLandOnPlains: 1
+  canLandOnBeach: 0
+  plainsLandingRequiresVtol: 0
+  beachLandingRequiresVtosl: 0
+  canLandOnCarrier: 0
+  carrierLandingRequiresSkill: 0
+  improvisedTakeoffConsumesAction: 0
+  plainsTakeoffConsumesAction: 0
+  beachTakeoffConsumesAction: 0
+  skills:
+  - {fileID: 11400000, guid: 1b0f1eb9d5454df3a0e1b42f0c8d6aa1, type: 2}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: 961b63e5103c5804f96d870b89696046, type: 2}
     squadAmmunition: 6
@@ -46,6 +62,25 @@ MonoBehaviour:
     selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: 961b63e5103c5804f96d870b89696046, type: 2}
   embarkedSupplies: []
-  embarkedResources: []
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
+  isTransporter: 1
+  allowedEmbarkTerrains: []
+  allowedEmbarkConstructions: []
+  transportSlots:
+  - slotId: passageiros
+    capacity: 2
+    allowedDomain: 0
+    allowedHeight: 3
+    filterAllowedClasses: 1
+    allowedClasses: 00000000
+    requireAllSkills: 0
+    requiredSkills: []
+    blockedSkills: []
   autonomia: 60
   cost: 26000

@@ -4,6 +4,14 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
+[Serializable]
+public class UnitMoveAnimationSpeedOverride
+{
+    [Tooltip("UnitData alvo do override de velocidade.")]
+    public UnitData unitData;
+    [Range(0.1f, 4f)] public float speed = 1f;
+}
+
 public class AnimationManager : MonoBehaviour
 {
     [Header("Selection Visual")]
@@ -13,6 +21,8 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] [Range(0.04f, 0.4f)] private float moveStepDuration = 0.12f;
     [SerializeField] [Range(0f, 0.35f)] private float moveArcHeight = 0.05f;
     [SerializeField] private AnimationCurve moveStepCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    [Tooltip("Overrides de velocidade por UnitData. Se vazio/sem match, usa 1.")]
+    [SerializeField] private List<UnitMoveAnimationSpeedOverride> unitMoveSpeedOverrides = new List<UnitMoveAnimationSpeedOverride>();
     [Header("Mirando Preview Line")]
     [Tooltip("Material usado na linha de preview de tiro durante o estado Mirando.")]
     [SerializeField] private Material mirandoPreviewMaterial;
@@ -136,7 +146,7 @@ public class AnimationManager : MonoBehaviour
             onAnimationStart?.Invoke();
 
         Tilemap effectiveTilemap = movementTilemap != null ? movementTilemap : unit.BoardTilemap;
-        float manualSpeed = unit != null ? unit.GetManualMoveAnimationSpeed() : 1f;
+        float manualSpeed = ResolveUnitMoveSpeed(unit);
         float duration = Mathf.Max(0.04f, moveStepDuration / Mathf.Max(0.1f, manualSpeed));
         float arc = Mathf.Max(0f, moveArcHeight);
         float preservedZ = unit.transform.position.z;
@@ -184,5 +194,28 @@ public class AnimationManager : MonoBehaviour
             mirandoPreviewSortingLayer = SortingLayerReference.FromName("SFX");
             mirandoPreviewSortingLayerInitialized = true;
         }
+    }
+
+    private float ResolveUnitMoveSpeed(UnitManager unit)
+    {
+        if (unit == null)
+            return 1f;
+
+        UnitData unitData = null;
+        unit.TryGetUnitData(out unitData);
+        if (unitData == null || unitMoveSpeedOverrides == null || unitMoveSpeedOverrides.Count == 0)
+            return 1f;
+
+        for (int i = 0; i < unitMoveSpeedOverrides.Count; i++)
+        {
+            UnitMoveAnimationSpeedOverride entry = unitMoveSpeedOverrides[i];
+            if (entry == null || entry.unitData == null)
+                continue;
+
+            if (entry.unitData == unitData)
+                return Mathf.Clamp(entry.speed, 0.1f, 4f);
+        }
+
+        return 1f;
     }
 }

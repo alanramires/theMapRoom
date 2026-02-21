@@ -21,6 +21,8 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private ConstructionSiteRuntime siteRuntime = new ConstructionSiteRuntime();
     [SerializeField, HideInInspector] private bool hasSiteRuntimeOverride;
     [SerializeField] private int currentCapturePoints;
+    [SerializeField] private TeamId originalOwnerTeamId = TeamId.Neutral;
+    [SerializeField] private bool originalOwnerInitialized;
 
     public TeamId TeamId => teamId;
     public Tilemap BoardTilemap => boardTilemap;
@@ -34,9 +36,10 @@ public class ConstructionManager : MonoBehaviour
     public bool IsCapturable => siteRuntime != null && siteRuntime.isCapturable;
     public int CapturePointsMax => siteRuntime != null ? siteRuntime.capturePointsMax : 0;
     public int CurrentCapturePoints => currentCapturePoints;
-    public bool CanProduceUnits => siteRuntime != null && siteRuntime.canProduceUnits;
+    public bool CanProduceUnits => CanProduceUnitsForTeam(teamId);
     public bool CanProvideSupplies => siteRuntime != null && siteRuntime.canProvideSupplies;
     public bool IsPlayerHeadQuarter => siteRuntime != null && siteRuntime.isPlayerHeadQuarter;
+    public int CapturedIncoming => siteRuntime != null ? Mathf.Max(0, siteRuntime.capturedIncoming) : 0;
     public IReadOnlyList<ServiceData> OfferedServices => siteRuntime != null && siteRuntime.offeredServices != null ? siteRuntime.offeredServices : System.Array.Empty<ServiceData>();
     public IReadOnlyList<UnitData> OfferedUnits => siteRuntime != null && siteRuntime.offeredUnits != null ? siteRuntime.offeredUnits : System.Array.Empty<UnitData>();
     public IReadOnlyList<ConstructionSupplyOffer> OfferedSupplies => siteRuntime != null && siteRuntime.offeredSupplies != null ? siteRuntime.offeredSupplies : System.Array.Empty<ConstructionSupplyOffer>();
@@ -87,6 +90,11 @@ public class ConstructionManager : MonoBehaviour
             return data.skillCostOverrides;
 
         return System.Array.Empty<TerrainSkillCostOverride>();
+    }
+
+    public bool TryResolveConstructionData(out ConstructionData data)
+    {
+        return TryGetConstructionData(out data);
     }
 
     public IReadOnlyList<TerrainLayerMode> GetAllLayerModes()
@@ -239,6 +247,11 @@ public class ConstructionManager : MonoBehaviour
     public void SetTeamId(TeamId team)
     {
         teamId = team;
+        if (!originalOwnerInitialized)
+        {
+            originalOwnerTeamId = team;
+            originalOwnerInitialized = true;
+        }
         if (!ApplyFromDatabase())
             UpdateDynamicName();
     }
@@ -330,6 +343,11 @@ public class ConstructionManager : MonoBehaviour
         if (siteRuntime == null)
             siteRuntime = new ConstructionSiteRuntime();
         siteRuntime.Sanitize();
+        if (!originalOwnerInitialized)
+        {
+            originalOwnerTeamId = teamId;
+            originalOwnerInitialized = true;
+        }
         EnsureCapturePointsInitialized();
     }
 
@@ -347,6 +365,34 @@ public class ConstructionManager : MonoBehaviour
 
         siteRuntime = data.constructionConfiguration.Clone();
         EnsureCapturePointsInitialized();
+    }
+
+    public bool CanProduceUnitsForTeam(TeamId buyerTeam)
+    {
+        if (siteRuntime == null || siteRuntime.canProduceAndSellUnits == null || siteRuntime.canProduceAndSellUnits.Count == 0)
+            return false;
+        if (buyerTeam == TeamId.Neutral)
+            return false;
+        if (buyerTeam != teamId)
+            return false;
+
+        bool hasFreeMarket = false;
+        bool hasOriginalOwner = false;
+        for (int i = 0; i < siteRuntime.canProduceAndSellUnits.Count; i++)
+        {
+            ConstructionUnitMarketRule rule = siteRuntime.canProduceAndSellUnits[i];
+            if (rule == ConstructionUnitMarketRule.FreeMarket)
+                hasFreeMarket = true;
+            else if (rule == ConstructionUnitMarketRule.OriginalOwner)
+                hasOriginalOwner = true;
+        }
+
+        if (hasFreeMarket)
+            return true;
+        if (hasOriginalOwner)
+            return buyerTeam == originalOwnerTeamId;
+
+        return false;
     }
 
     private void EnsureCapturePointsInitialized()

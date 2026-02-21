@@ -2,6 +2,13 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [System.Serializable]
+public enum ConstructionUnitMarketRule
+{
+    FreeMarket = 0,
+    OriginalOwner = 1
+}
+
+[System.Serializable]
 public class ConstructionSiteRuntime
 {
     [Header("Role")]
@@ -11,9 +18,11 @@ public class ConstructionSiteRuntime
     [Header("Capture")]
     public bool isCapturable = true;
     [Min(0)] public int capturePointsMax = 20;
+    [Min(0)] public int capturedIncoming = 1000;
 
     [Header("Production")]
-    public bool canProduceUnits = false;
+    [Tooltip("Regras de mercado para producao/venda de unidades. Se vazio, nao produz.")]
+    public List<ConstructionUnitMarketRule> canProduceAndSellUnits = new List<ConstructionUnitMarketRule>();
     [Tooltip("Unidades que esta construcao pode produzir nesta partida/mapa.")]
     public List<UnitData> offeredUnits = new List<UnitData>();
 
@@ -29,7 +38,10 @@ public class ConstructionSiteRuntime
     public void Sanitize()
     {
         capturePointsMax = Mathf.Max(0, capturePointsMax);
+        capturedIncoming = Mathf.Max(0, capturedIncoming);
 
+        if (canProduceAndSellUnits == null)
+            canProduceAndSellUnits = new List<ConstructionUnitMarketRule>();
         if (offeredUnits == null)
             offeredUnits = new List<UnitData>();
         if (offeredSupplies == null)
@@ -53,7 +65,8 @@ public class ConstructionSiteRuntime
             isPlayerHeadQuarter = isPlayerHeadQuarter,
             isCapturable = isCapturable,
             capturePointsMax = capturePointsMax,
-            canProduceUnits = canProduceUnits,
+            capturedIncoming = capturedIncoming,
+            canProduceAndSellUnits = canProduceAndSellUnits != null ? new List<ConstructionUnitMarketRule>(canProduceAndSellUnits) : new List<ConstructionUnitMarketRule>(),
             canProvideSupplies = canProvideSupplies,
             offeredUnits = offeredUnits != null ? new List<UnitData>(offeredUnits) : new List<UnitData>(),
             offeredServices = offeredServices != null ? new List<ServiceData>(offeredServices) : new List<ServiceData>(),

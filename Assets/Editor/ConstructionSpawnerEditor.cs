@@ -143,7 +143,8 @@ public class ConstructionSpawnerEditor : Editor
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("isPlayerHeadQuarter"), "Is Player Head Quarter");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("isCapturable"), "Is Capturable");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
-        DrawIfExists(siteRuntimeProp.FindPropertyRelative("canProduceUnits"), "Can Produce Units");
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("capturedIncoming"), "Captured Incoming");
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("canProduceAndSellUnits"), "Can Produce And Sell Units");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("offeredUnits"), "Offered Units");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("canProvideSupplies"), "Can Provide Supplies");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("offeredSupplies"), "Offered Supplies");

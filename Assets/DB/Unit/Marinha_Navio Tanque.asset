@@ -25,14 +25,25 @@ MonoBehaviour:
   armorClass: 1
   movement: 5
   movementCategory: 3
-  militaryForce: 0
-  unitClass: 0
+  militaryForce: 2
+  unitClass: 8
+  eliteLevel: 0
   domain: 1
   heightLevel: 3
   aditionalDomainsAllowed: []
   skills: []
   embarkedWeapons: []
   embarkedSupplies: []
-  embarkedResources: []
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
+  isTransporter: 0
+  allowedEmbarkTerrains: []
+  allowedEmbarkConstructions: []
+  transportSlots: []
   autonomia: 120
   cost: 26000

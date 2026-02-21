@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
   id: fragata
   displayName: Fragata
-  description: 
+  description: Navio de transporte militar e tambem AAA naval leve
   spriteDefault: {fileID: 21300000, guid: 5324b658b32ed07459481f31620710f1, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
@@ -25,8 +25,9 @@ MonoBehaviour:
   armorClass: 2
   movement: 5
   movementCategory: 3
-  militaryForce: 0
-  unitClass: 0
+  militaryForce: 2
+  unitClass: 8
+  eliteLevel: 0
   domain: 1
   heightLevel: 3
   aditionalDomainsAllowed: []
@@ -46,5 +47,23 @@ MonoBehaviour:
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  isTransporter: 1
+  allowedEmbarkTerrains:
+  - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
+  allowedEmbarkConstructions:
+  - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
+  transportSlots:
+  - slotId: container
+    capacity: 2
+    allowedLayerModes:
+    - domain: 0
+      heightLevel: 3
+    legacyAllowedDomain: 0
+    legacyAllowedHeight: 3
+    legacyAllowedLayerModes: []
+    allowedClasses: 
+    requiredSkills: []
+    blockedSkills:
+    - {fileID: 11400000, guid: 5ef7a75e35294b68ac315145f98dcd17, type: 2}
   autonomia: 90
   cost: 26000

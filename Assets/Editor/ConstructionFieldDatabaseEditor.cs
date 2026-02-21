@@ -68,7 +68,8 @@ public class ConstructionFieldDatabaseEditor : Editor
                 EditorGUILayout.PropertyField(configProp.FindPropertyRelative("isPlayerHeadQuarter"), new GUIContent("Is Player Head Quarter"));
                 EditorGUILayout.PropertyField(configProp.FindPropertyRelative("isCapturable"), new GUIContent("Is Capturable"));
                 EditorGUILayout.PropertyField(configProp.FindPropertyRelative("capturePointsMax"), new GUIContent("Capture Points Max"));
-                EditorGUILayout.PropertyField(configProp.FindPropertyRelative("canProduceUnits"), new GUIContent("Can Produce Units"));
+                EditorGUILayout.PropertyField(configProp.FindPropertyRelative("capturedIncoming"), new GUIContent("Captured Incoming"));
+                EditorGUILayout.PropertyField(configProp.FindPropertyRelative("canProduceAndSellUnits"), new GUIContent("Can Produce And Sell Units"));
                 EditorGUILayout.PropertyField(configProp.FindPropertyRelative("offeredUnits"), new GUIContent("Offered Units"), true);
                 EditorGUILayout.PropertyField(configProp.FindPropertyRelative("canProvideSupplies"), new GUIContent("Can Provide Supplies"));
                 EditorGUILayout.PropertyField(configProp.FindPropertyRelative("offeredSupplies"), new GUIContent("Offered Supplies"), true);

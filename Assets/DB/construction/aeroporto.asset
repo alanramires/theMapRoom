@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
   id: aeroporto
   displayName: Aeroporto
-  description: 
+  description: "Aeroporto: para manuten\xE7\xE3o de aeronaves, compras e reposi\xE7\xE3o"
   spriteDefault: {fileID: 21300000, guid: 07857946e0de29341b0026a9b52beb80, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
@@ -28,19 +28,37 @@ MonoBehaviour:
   heightLevel: 3
   aditionalDomainsAllowed: []
   alwaysAllowAirDomain: 1
-  isSupplier: 0
+  allowAircraftLanding: 1
+  landingAllowedClasses: 
+  landingRequiredSkills: []
+  allowAircraftTakeoff: 1
+  takeoffAllowedMovementModes: 
+  isSupplier: 1
   supplierTier: 0
-  maxUnitsServedPerTurn: 0
+  maxUnitsServedPerTurn: 1
   serviceRange: 0
   collectionRange: 0
-  supplierOperationDomains: []
-  supplierServicesProvided: []
-  supplierResources: []
+  supplierOperationDomains:
+  - domain: 0
+    heightLevel: 3
+  supplierServicesProvided:
+  - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+  - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  supplierResources:
+  - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+    maxCapacity: 0
+  - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+    maxCapacity: 0
+  - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+    maxCapacity: 0
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isCapturable: 1
-    capturePointsMax: 20
-    canProduceUnits: 1
+    capturePointsMax: 30
+    capturedIncoming: 1000
+    canProduceAndSellUnits: 
     offeredUnits:
     - {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
     - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}

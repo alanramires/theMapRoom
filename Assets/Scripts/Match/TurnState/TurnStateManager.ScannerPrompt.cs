@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -75,7 +76,13 @@ public partial class TurnStateManager
 
             if (WasLetterPressedThisFrame('E'))
             {
-                Debug.Log("Pode Embarcar (\"E\"): nao implementado ainda.");
+                HandleEmbarkActionRequested();
+                return;
+            }
+
+            if (WasLetterPressedThisFrame('L'))
+            {
+                HandleAircraftOperationRequested();
                 return;
             }
 
@@ -115,6 +122,66 @@ public partial class TurnStateManager
         }
 
         Debug.Log("[Acao] Apenas Mover (\"M\") indisponivel no estado atual.");
+    }
+
+    private void HandleAircraftOperationRequested()
+    {
+        SensorMovementMode movementMode = cursorState == CursorState.MoveuAndando
+            ? SensorMovementMode.MoveuAndando
+            : SensorMovementMode.MoveuParado;
+
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : (selectedUnit != null ? selectedUnit.BoardTilemap : null);
+        if (!AircraftOperationRules.TryApplyOperation(selectedUnit, boardMap, terrainDatabase, movementMode, out AircraftOperationDecision decision))
+        {
+            string reason = !string.IsNullOrWhiteSpace(decision.reason) ? decision.reason : "Sem operacao aerea valida.";
+            Debug.Log($"Operacao Aerea (\"L\"): {reason}");
+            return;
+        }
+
+        Debug.Log($"[Operacao Aerea] {decision.label} executado.");
+
+        if (decision.consumesAction)
+        {
+            bool finished = TryFinalizeSelectedUnitActionFromDebug();
+            if (finished)
+            {
+                cursorController?.PlayDoneSfx();
+                ResetScannerPromptState();
+                return;
+            }
+        }
+
+        cursorState = CursorState.UnitSelected;
+        ClearSensorResults();
+        PaintSelectedUnitMovementRange();
+        if (cursorController != null && selectedUnit != null)
+        {
+            Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+            unitCell.z = 0;
+            cursorController.SetCell(unitCell, playMoveSfx: false);
+        }
+    }
+
+    private void HandleEmbarkActionRequested()
+    {
+        bool canEmbark = availableSensorActionCodes.Contains('E') && cachedPodeEmbarcarTargets.Count > 0;
+        if (!canEmbark)
+        {
+            Debug.Log("Pode Embarcar (\"E\"): nao ha transportador valido adjacente.");
+            LogScannerPanel();
+            return;
+        }
+
+        string log = $"Pode Embarcar (\"E\"): {cachedPodeEmbarcarTargets.Count} opcao(oes) disponivel(is)\n";
+        for (int i = 0; i < cachedPodeEmbarcarTargets.Count; i++)
+        {
+            PodeEmbarcarOption item = cachedPodeEmbarcarTargets[i];
+            string label = item != null ? item.displayLabel : "(opcao invalida)";
+            log += $"{i + 1}. {label}\n";
+        }
+
+        log += "(Acao de embarque ainda nao implementada nesta etapa.)";
+        Debug.Log(log);
     }
 
     private void LogTargetSelectionPanel()

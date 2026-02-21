@@ -27,6 +27,7 @@ MonoBehaviour:
   movementCategory: 0
   militaryForce: 1
   unitClass: 0
+  eliteLevel: 0
   domain: 3
   heightLevel: 4
   aditionalDomainsAllowed:
@@ -37,9 +38,20 @@ MonoBehaviour:
     spriteRed: {fileID: 0}
     spriteBlue: {fileID: 0}
     spriteYellow: {fileID: 0}
-  skills: []
+  skills:
+  - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
   embarkedWeapons: []
   embarkedSupplies: []
-  embarkedResources: []
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
+  isTransporter: 0
+  allowedEmbarkTerrains: []
+  allowedEmbarkConstructions: []
+  transportSlots: []
   autonomia: 90
   cost: 26000

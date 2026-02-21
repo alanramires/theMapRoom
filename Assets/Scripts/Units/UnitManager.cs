@@ -10,10 +10,12 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private UnitHudController unitHud;
     [SerializeField] private SpriteRenderer actedLockRenderer;
     [SerializeField] private UnitDatabase unitDatabase;
+    [SerializeField] private MatchController matchController;
     [SerializeField] private Tilemap boardTilemap;
     [SerializeField] private bool snapToCellCenter = true;
     [SerializeField] private bool autoSnapWhenMovedInEditor = true;
     [SerializeField] private Vector3Int currentCellPosition = Vector3Int.zero;
+    [SerializeField] private bool hasActed;
     [SerializeField] private TeamId teamId = TeamId.Green;
     [SerializeField] private string unitId;
     [SerializeField] private int instanceId;
@@ -26,7 +28,6 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private int maxFuel = 99;
     [Header("Embarked Weapons Runtime")]
     [SerializeField] private List<UnitEmbarkedWeapon> embarkedWeaponsRuntime = new List<UnitEmbarkedWeapon>();
-    [SerializeField] private bool hasActed;
     [SerializeField, HideInInspector] private bool appliedHasActed;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField] private bool isEmbarked;
@@ -40,14 +41,15 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private Color actedGlowColor = Color.white;
     [SerializeField] [Range(0.1f, 6f)] private float actedGlowSize = 1.5f;
     [SerializeField] [Range(0f, 4f)] private float actedGlowStrength = 1.25f;
-    [SerializeField] private MatchController matchController;
-    [Header("Movement Animation")]
-    [SerializeField] [Range(0.1f, 4f)] private float manualMoveAnimationSpeed = 1f;
     [Header("Layer State")]
     [SerializeField] private Domain currentDomain = Domain.Land;
     [SerializeField] private HeightLevel currentHeightLevel = HeightLevel.Surface;
     [SerializeField] private int currentLayerModeIndex = 0;
     [SerializeField] private bool layerStateInitialized;
+    [Header("Aircraft Runtime")]
+    [SerializeField] private bool aircraftGrounded;
+    [SerializeField] private bool aircraftEmbarkedInCarrier;
+    [SerializeField] [Min(0)] private int aircraftOperationLockTurns;
 
     public TeamId TeamId => teamId;
     public Tilemap BoardTilemap => boardTilemap;
@@ -65,6 +67,9 @@ public class UnitManager : MonoBehaviour
     public bool IsEmbarked => isEmbarked;
     public bool IsSelected => isSelected;
     public UnitDatabase UnitDatabase => unitDatabase;
+    public bool IsAircraftGrounded => aircraftGrounded;
+    public bool IsAircraftEmbarkedInCarrier => aircraftEmbarkedInCarrier;
+    public int AircraftOperationLockTurns => Mathf.Max(0, aircraftOperationLockTurns);
 
     private static readonly int GlowColorId = Shader.PropertyToID("_GlowColor");
     private static readonly int GlowSizeId = Shader.PropertyToID("_GlowSize");
@@ -247,6 +252,8 @@ public class UnitManager : MonoBehaviour
     public void ResetActed()
     {
         hasActed = false;
+        if (aircraftOperationLockTurns > 0)
+            aircraftOperationLockTurns = Mathf.Max(0, aircraftOperationLockTurns - 1);
         appliedHasActed = hasActed;
         RefreshActedVisual();
     }
@@ -375,11 +382,6 @@ public class UnitManager : MonoBehaviour
         return MovementCategory.Marcha;
     }
 
-    public float GetManualMoveAnimationSpeed()
-    {
-        return Mathf.Max(0.1f, manualMoveAnimationSpeed);
-    }
-
     public HeightLevel GetHeightLevel()
     {
         return currentHeightLevel;
@@ -418,6 +420,83 @@ public class UnitManager : MonoBehaviour
     {
         data = TryGetUnitData();
         return data != null;
+    }
+
+    public AircraftType GetAircraftType()
+    {
+        UnitData data = TryGetUnitData();
+        if (data == null)
+            return AircraftType.None;
+
+        if (data.unitClass == GameUnitClass.Helicopter)
+            return AircraftType.Helicopter;
+        if (data.unitClass == GameUnitClass.Jet || data.unitClass == GameUnitClass.Plane)
+            return AircraftType.FixedWing;
+        return AircraftType.None;
+    }
+
+    public HeightLevel GetPreferredAirHeight()
+    {
+        UnitData data = TryGetUnitData();
+        if (data == null)
+            return HeightLevel.AirLow;
+
+        if (data.domain == Domain.Air && (data.heightLevel == HeightLevel.AirLow || data.heightLevel == HeightLevel.AirHigh))
+            return data.heightLevel;
+
+        if (data.aditionalDomainsAllowed != null)
+        {
+            for (int i = 0; i < data.aditionalDomainsAllowed.Count; i++)
+            {
+                UnitLayerMode mode = data.aditionalDomainsAllowed[i];
+                if (mode.domain == Domain.Air && (mode.heightLevel == HeightLevel.AirLow || mode.heightLevel == HeightLevel.AirHigh))
+                    return mode.heightLevel;
+            }
+        }
+
+        return HeightLevel.AirLow;
+    }
+
+    public bool HasSkillId(string skillId)
+    {
+        if (string.IsNullOrWhiteSpace(skillId))
+            return false;
+
+        UnitData data = TryGetUnitData();
+        if (data == null || data.skills == null)
+            return false;
+
+        string normalized = skillId.Trim();
+        for (int i = 0; i < data.skills.Count; i++)
+        {
+            SkillData owned = data.skills[i];
+            if (owned == null || string.IsNullOrWhiteSpace(owned.id))
+                continue;
+
+            if (string.Equals(owned.id.Trim(), normalized, System.StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    public void SetAircraftGrounded(bool grounded)
+    {
+        aircraftGrounded = grounded;
+        if (!grounded)
+            aircraftEmbarkedInCarrier = false;
+    }
+
+    public void SetAircraftEmbarkedInCarrier(bool embarkedInCarrier)
+    {
+        aircraftEmbarkedInCarrier = embarkedInCarrier;
+        if (aircraftEmbarkedInCarrier)
+            aircraftGrounded = true;
+    }
+
+    public void SetAircraftOperationLockTurns(int turns)
+    {
+        aircraftOperationLockTurns = Mathf.Max(0, turns);
     }
 
     public IReadOnlyList<UnitEmbarkedWeapon> GetEmbarkedWeapons()
@@ -549,6 +628,7 @@ public class UnitManager : MonoBehaviour
         currentDomain = mode.domain;
         currentHeightLevel = mode.heightLevel;
         layerStateInitialized = true;
+        SyncAircraftRuntimeStateWithCurrentLayer();
         RefreshSpriteForCurrentLayer();
         RefreshActedVisual();
     }
@@ -650,7 +730,20 @@ public class UnitManager : MonoBehaviour
     {
         isEmbarked = embarked;
         if (isEmbarked)
+        {
             SetSelected(false);
+            SetSpriteVisible(false);
+            if (unitHud != null)
+                unitHud.gameObject.SetActive(false);
+            if (actedLockRenderer != null)
+                actedLockRenderer.enabled = false;
+            return;
+        }
+
+        SetSpriteVisible(true);
+        if (unitHud != null)
+            unitHud.gameObject.SetActive(true);
+        RefreshActedVisual();
     }
 
     public void SnapToCellCenter()
@@ -693,6 +786,30 @@ public class UnitManager : MonoBehaviour
         currentFuel = Mathf.Clamp(currentFuel, 0, maxFuel);
 
         SyncCurrentLayerStateWithData(forceNativeDefault: false);
+        SyncAircraftRuntimeStateWithCurrentLayer();
+    }
+
+    private void SyncAircraftRuntimeStateWithCurrentLayer()
+    {
+        UnitData data = TryGetUnitData();
+        bool isAircraft = data != null && data.IsAircraft();
+        if (!isAircraft)
+        {
+            aircraftGrounded = false;
+            aircraftEmbarkedInCarrier = false;
+            aircraftOperationLockTurns = 0;
+            return;
+        }
+
+        if (currentDomain == Domain.Air)
+            aircraftGrounded = false;
+        else
+            aircraftGrounded = true;
+
+        if (!aircraftGrounded)
+            aircraftEmbarkedInCarrier = false;
+
+        aircraftOperationLockTurns = Mathf.Max(0, aircraftOperationLockTurns);
     }
 
     private void SyncPositionState()
