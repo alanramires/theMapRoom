@@ -44,6 +44,10 @@ public class UnitDataEditor : Editor
             "maxHP",
             "defense",
             "armorClass",
+            "movement",
+            "movementCategory",
+            "autonomia",
+            "cost",
             "embarkedWeapons",
             "embarkedSupplies",
             "isSupplier",
@@ -52,9 +56,23 @@ public class UnitDataEditor : Editor
             "serviceRange",
             "collectionRange",
             "supplierOperationDomains",
-            "supplierServicesProvided");
+            "supplierServicesProvided",
+            "isTransporter",
+            "spriteTransport",
+            "allowedEmbarkWhenTransporterAtTerrains",
+            "allowedEmbarkWhenTransporterAtTerrainStructures",
+            "allowedEmbarkWhenTransporterAtConstructions",
+            "allowedDisembarkWhenTransporterAtTerrains",
+            "allowedDisembarkWhenTransporterAtTerrainStructures",
+            "allowedDisembarkWhenTransporterAtConstructions",
+            "passengersCanDisembarkAndGoesToTerrains",
+            "passengersCanDisembarkAndGoesToTerrainStructures",
+            "passengersCanDisembarkAndGoesToConstructions",
+            "transportSlots");
         EditorGUILayout.Space();
         DrawEmbarkedWeaponsSection();
+        EditorGUILayout.Space();
+        DrawTransportSection();
         EditorGUILayout.Space();
         DrawLogisticsSection();
 
@@ -90,6 +108,23 @@ public class UnitDataEditor : Editor
         DrawEmbarkedSuppliesSection();
     }
 
+    private void DrawTransportSection()
+    {
+        EditorGUILayout.LabelField("Transport", EditorStyles.boldLabel);
+        DrawIfExists(serializedObject.FindProperty("isTransporter"), "Is Transporter");
+        DrawIfExists(serializedObject.FindProperty("spriteTransport"), "Sprite Transport");
+        DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtTerrains"), "Allowed Embark Terrain When Transporter At: Terrain");
+        DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtTerrainStructures"), "Allowed Embark Terrain When Transporter At: Terrain + Structure");
+        DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtConstructions"), "Allowed Embark Terrain When Transporter At: Constructions");
+        DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtTerrains"), "Allowed Disembark Terrain When Transporter At: Terrain");
+        DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtTerrainStructures"), "Allowed Disembark Terrain When Transporter At: Terrain + Structure");
+        DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtConstructions"), "Allowed Disembark Terrain When Transporter At: Constructions");
+        DrawIfExists(serializedObject.FindProperty("passengersCanDisembarkAndGoesToTerrains"), "Passengers Can Disembark And Goes To: Terrain");
+        DrawIfExists(serializedObject.FindProperty("passengersCanDisembarkAndGoesToTerrainStructures"), "Passengers Can Disembark And Goes To: Terrain + Structure");
+        DrawIfExists(serializedObject.FindProperty("passengersCanDisembarkAndGoesToConstructions"), "Passengers Can Disembark And Goes To: Constructions");
+        DrawIfExists(serializedObject.FindProperty("transportSlots"), "Transport Slots");
+    }
+
     private void DrawPrimaryIdentitySection()
     {
         SerializedProperty idProperty = serializedObject.FindProperty("id");
@@ -112,6 +147,10 @@ public class UnitDataEditor : Editor
         SerializedProperty maxHpProperty = serializedObject.FindProperty("maxHP");
         SerializedProperty defenseProperty = serializedObject.FindProperty("defense");
         SerializedProperty armorClassProperty = serializedObject.FindProperty("armorClass");
+        SerializedProperty movementProperty = serializedObject.FindProperty("movement");
+        SerializedProperty movementCategoryProperty = serializedObject.FindProperty("movementCategory");
+        SerializedProperty autonomiaProperty = serializedObject.FindProperty("autonomia");
+        SerializedProperty costProperty = serializedObject.FindProperty("cost");
 
         if (maxHpProperty != null)
             EditorGUILayout.PropertyField(maxHpProperty);
@@ -122,6 +161,14 @@ public class UnitDataEditor : Editor
             using (new EditorGUI.DisabledScope(true))
                 EditorGUILayout.PropertyField(armorClassProperty, new GUIContent("Armor Class (Auto by Defense)"));
         }
+        if (movementProperty != null)
+            EditorGUILayout.PropertyField(movementProperty);
+        if (movementCategoryProperty != null)
+            EditorGUILayout.PropertyField(movementCategoryProperty);
+        if (autonomiaProperty != null)
+            EditorGUILayout.PropertyField(autonomiaProperty);
+        if (costProperty != null)
+            EditorGUILayout.PropertyField(costProperty);
     }
 
     private void DrawEmbarkedSuppliesSection()

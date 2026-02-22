@@ -299,81 +299,16 @@ public partial class TurnStateManager
 
     private SkillRpsBonusInfo ResolveSkillRps(UnitManager ownerUnit, UnitManager opponentUnit, WeaponCategory ownerWeaponCategory)
     {
-        if (ownerUnit == null)
-            return SkillRpsBonusInfo.NoneWithReason("owner nulo");
+        CombatModifierSummary resolved = CombatModifierResolver.Resolve(ownerUnit, opponentUnit, ownerWeaponCategory);
+        if (resolved.appliedCount <= 0)
+            return SkillRpsBonusInfo.NoneWithReason(resolved.reason);
 
-        if (!ownerUnit.TryGetUnitData(out UnitData ownerData) || ownerData == null)
-            return SkillRpsBonusInfo.NoneWithReason("owner sem UnitData");
-
-        if (ownerData.skills == null || ownerData.skills.Count == 0)
-            return SkillRpsBonusInfo.NoneWithReason("owner sem skills");
-
-        GameUnitClass ownerClass = ownerData.unitClass;
-        int ownerElite = Mathf.Max(0, ownerData.eliteLevel);
-
-        UnitData opponentData = null;
-        if (opponentUnit != null)
-            opponentUnit.TryGetUnitData(out opponentData);
-
-        GameUnitClass opponentClass = opponentData != null ? opponentData.unitClass : GameUnitClass.Infantry;
-        int opponentElite = opponentData != null ? Mathf.Max(0, opponentData.eliteLevel) : 0;
-
-        int totalOwnerAttack = 0;
-        int totalOwnerDefense = 0;
-        int totalOpponentAttack = 0;
-        int totalOpponentDefense = 0;
-        StringBuilder summary = new StringBuilder();
-        int appliedCount = 0;
-
-        for (int i = 0; i < ownerData.skills.Count; i++)
-        {
-            SkillData skill = ownerData.skills[i];
-            if (skill == null)
-                continue;
-
-            if (!skill.TryGetCombatRpsModifiers(
-                ownerClass,
-                ownerElite,
-                ownerWeaponCategory,
-                opponentClass,
-                opponentElite,
-                out int ownerAtkMod,
-                out int ownerDefMod,
-                out int opponentAtkMod,
-                out int opponentDefMod,
-                out string reason))
-            {
-                continue;
-            }
-
-            totalOwnerAttack += ownerAtkMod;
-            totalOwnerDefense += ownerDefMod;
-            totalOpponentAttack += opponentAtkMod;
-            totalOpponentDefense += opponentDefMod;
-            appliedCount++;
-
-            if (summary.Length > 0)
-                summary.Append(" || ");
-
-            string skillName = !string.IsNullOrWhiteSpace(skill.displayName) ? skill.displayName : (!string.IsNullOrWhiteSpace(skill.id) ? skill.id : skill.name);
-            summary.Append(skillName);
-            summary.Append(": ownAtk ");
-            summary.Append(FormatSigned(ownerAtkMod));
-            summary.Append(", ownDef ");
-            summary.Append(FormatSigned(ownerDefMod));
-            summary.Append(", oppAtk ");
-            summary.Append(FormatSigned(opponentAtkMod));
-            summary.Append(", oppDef ");
-            summary.Append(FormatSigned(opponentDefMod));
-            summary.Append(" (");
-            summary.Append(reason);
-            summary.Append(")");
-        }
-
-        if (appliedCount == 0)
-            return SkillRpsBonusInfo.NoneWithReason("sem skill de combate aplicavel");
-
-        return new SkillRpsBonusInfo(totalOwnerAttack, totalOwnerDefense, totalOpponentAttack, totalOpponentDefense, $"skillsAplicadas={appliedCount} | {summary}");
+        return new SkillRpsBonusInfo(
+            resolved.ownerAttack,
+            resolved.ownerDefense,
+            resolved.opponentAttack,
+            resolved.opponentDefense,
+            $"modifiersAplicados={resolved.appliedCount} | {resolved.reason}");
     }
 
     private static bool TryGetConstructionDpq(ConstructionManager construction, out DPQData dpq)

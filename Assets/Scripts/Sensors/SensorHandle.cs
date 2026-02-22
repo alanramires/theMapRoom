@@ -15,15 +15,22 @@ public static class SensorHandle
         List<char> availableActionCodes,
         List<PodeMirarTargetOption> podeMirarTargets,
         List<PodeEmbarcarOption> podeEmbarcarTargets,
-        List<PodeEmbarcarInvalidOption> podeEmbarcarInvalidTargets = null)
+        List<PodeEmbarcarInvalidOption> podeEmbarcarInvalidTargets,
+        List<PodeDesembarcarOption> podeDesembarcarTargets,
+        List<PodeDesembarcarInvalidOption> podeDesembarcarInvalidTargets = null)
     {
-        if (availableActionCodes == null || podeMirarTargets == null || podeEmbarcarTargets == null)
+        if (availableActionCodes == null ||
+            podeMirarTargets == null ||
+            podeEmbarcarTargets == null ||
+            podeDesembarcarTargets == null)
             return false;
 
         availableActionCodes.Clear();
         podeMirarTargets.Clear();
         podeEmbarcarTargets.Clear();
         podeEmbarcarInvalidTargets?.Clear();
+        podeDesembarcarTargets.Clear();
+        podeDesembarcarInvalidTargets?.Clear();
 
         if (selectedUnit == null)
             return false;
@@ -58,6 +65,15 @@ public static class SensorHandle
             availableActionCodes.Add('E');
             hasAnyAction = true;
         }
+
+        bool canDisembark = PodeDesembarcarSensor.CollectOptions(
+            selectedUnit,
+            boardTilemap,
+            terrainDatabase,
+            podeDesembarcarTargets,
+            podeDesembarcarInvalidTargets);
+        if (canDisembark)
+            hasAnyAction = true;
 
         return hasAnyAction;
     }

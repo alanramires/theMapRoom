@@ -19,7 +19,6 @@ public partial class TurnStateManager
     private ScannerPromptStep scannerPromptStep = ScannerPromptStep.AwaitingAction;
     private int scannerSelectedTargetIndex = -1;
     private int scannerSelectedEmbarkIndex = -1;
-    private bool scannerSelectedEmbarkIsValid;
     private bool embarkExecutionInProgress;
     private CursorState cursorStateBeforeMirando = CursorState.MoveuParado;
     private CursorState lastLoggedCursorState = (CursorState)(-1);
@@ -41,107 +40,13 @@ public partial class TurnStateManager
     private float embarkPreviewPathLength;
     private float embarkPreviewHeadDistance;
     private Color embarkPreviewColor = Color.white;
-    [SerializeField] private bool enableUnitSelectedLayerPreviewHotkeys = true;
 
     private void Update()
     {
         TrackRuntimeDebugLogs();
-        ProcessUnitSelectedLayerPreviewInput();
         ProcessScannerPromptInput();
         UpdateMirandoPreviewAnimation();
         UpdateEmbarkPreviewAnimation();
-    }
-
-    private void ProcessUnitSelectedLayerPreviewInput()
-    {
-        if (!enableUnitSelectedLayerPreviewHotkeys || !Application.isPlaying)
-            return;
-        if (IsMovementAnimationRunning())
-            return;
-        if (cursorState != CursorState.UnitSelected || selectedUnit == null)
-            return;
-
-        int delta = 0;
-        if (WasLetterPressedThisFrame('D'))
-            delta = -1;
-        else if (WasLetterPressedThisFrame('S'))
-            delta = +1;
-
-        if (delta == 0)
-            return;
-
-        if (!TryGetNextLayerModeForSelectedUnit(delta, out UnitLayerMode targetMode, out int shownIndex, out int totalModes))
-            return;
-
-        cursorController?.PlayConfirmSfx();
-        selectedUnit.TrySetCurrentLayerMode(targetMode.domain, targetMode.heightLevel);
-        selectedUnit.PullCellFromTransform();
-        if (cursorController != null)
-        {
-            Vector3Int unitCell = selectedUnit.CurrentCellPosition;
-            unitCell.z = 0;
-            cursorController.SetCell(unitCell, playMoveSfx: false);
-        }
-        ClearSensorResults();
-        PaintSelectedUnitMovementRange();
-        Debug.Log($"[Layer Preview] {selectedUnit.name}: {targetMode.domain}/{targetMode.heightLevel} ({shownIndex}/{totalModes})");
-    }
-
-    private bool TryGetNextLayerModeForSelectedUnit(int delta, out UnitLayerMode targetMode, out int shownIndex, out int totalModes)
-    {
-        targetMode = default(UnitLayerMode);
-        shownIndex = 0;
-        totalModes = 0;
-        if (selectedUnit == null)
-            return false;
-
-        List<UnitLayerMode> orderedModes = BuildOrderedLayerModesForSelectedUnit(selectedUnit);
-        totalModes = orderedModes.Count;
-        if (totalModes <= 1)
-            return false;
-
-        UnitLayerMode currentMode = selectedUnit.GetCurrentLayerMode();
-        int currentIndex = 0;
-        for (int i = 0; i < orderedModes.Count; i++)
-        {
-            if (orderedModes[i].domain == currentMode.domain && orderedModes[i].heightLevel == currentMode.heightLevel)
-            {
-                currentIndex = i;
-                break;
-            }
-        }
-
-        int nextIndex = currentIndex + delta;
-        if (nextIndex < 0 || nextIndex >= orderedModes.Count)
-            return false;
-
-        targetMode = orderedModes[nextIndex];
-        shownIndex = nextIndex + 1;
-        return true;
-    }
-
-    private static List<UnitLayerMode> BuildOrderedLayerModesForSelectedUnit(UnitManager unit)
-    {
-        List<UnitLayerMode> ordered = new List<UnitLayerMode>();
-        if (unit == null)
-            return ordered;
-
-        IReadOnlyList<UnitLayerMode> modes = unit.GetAllLayerModes();
-        if (modes == null)
-            return ordered;
-
-        for (int i = 0; i < modes.Count; i++)
-            ordered.Add(modes[i]);
-
-        ordered.Sort((a, b) =>
-        {
-            int byHeight = ((int)a.heightLevel).CompareTo((int)b.heightLevel);
-            if (byHeight != 0)
-                return byHeight;
-            return ((int)a.domain).CompareTo((int)b.domain);
-        });
-
-        return ordered;
     }
 
     private void TrackRuntimeDebugLogs()
@@ -168,7 +73,6 @@ public partial class TurnStateManager
         scannerPromptStep = ScannerPromptStep.AwaitingAction;
         scannerSelectedTargetIndex = -1;
         scannerSelectedEmbarkIndex = -1;
-        scannerSelectedEmbarkIsValid = false;
         ClearMirandoPreview();
         ClearEmbarkPreview();
     }
@@ -795,7 +699,6 @@ public partial class TurnStateManager
             return;
         }
 
-        scannerSelectedEmbarkIsValid = true;
         PodeEmbarcarOption option = cachedPodeEmbarcarTargets[scannerSelectedEmbarkIndex];
         if (moveCursor && cursorController != null && option != null && option.transporterUnit != null)
         {
@@ -1710,18 +1613,6 @@ public partial class TurnStateManager
                 return Keyboard.current != null && Keyboard.current.lKey.wasPressedThisFrame;
 #else
                 return Input.GetKeyDown(KeyCode.L);
-#endif
-            case 'D':
-#if ENABLE_INPUT_SYSTEM
-                return Keyboard.current != null && Keyboard.current.dKey.wasPressedThisFrame;
-#else
-                return Input.GetKeyDown(KeyCode.D);
-#endif
-            case 'S':
-#if ENABLE_INPUT_SYSTEM
-                return Keyboard.current != null && Keyboard.current.sKey.wasPressedThisFrame;
-#else
-                return Input.GetKeyDown(KeyCode.S);
 #endif
             default:
                 return false;

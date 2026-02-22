@@ -130,12 +130,13 @@ public static class PodeEmbarcarSensor
             }
         }
 
-        bool hasConstructionFilter = transporterData.allowedEmbarkConstructions != null && transporterData.allowedEmbarkConstructions.Count > 0;
-        bool hasTerrainFilter = transporterData.allowedEmbarkTerrains != null && transporterData.allowedEmbarkTerrains.Count > 0;
+        bool hasConstructionFilter = transporterData.allowedEmbarkWhenTransporterAtConstructions != null && transporterData.allowedEmbarkWhenTransporterAtConstructions.Count > 0;
+        bool hasStructureFilter = transporterData.allowedEmbarkWhenTransporterAtTerrainStructures != null && transporterData.allowedEmbarkWhenTransporterAtTerrainStructures.Count > 0;
+        bool hasTerrainFilter = transporterData.allowedEmbarkWhenTransporterAtTerrains != null && transporterData.allowedEmbarkWhenTransporterAtTerrains.Count > 0;
         Vector3Int cell = transporter.CurrentCellPosition;
         cell.z = 0;
 
-        if (!hasConstructionFilter && !hasTerrainFilter)
+        if (!hasConstructionFilter && !hasStructureFilter && !hasTerrainFilter)
         {
             if (TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrainByCell) && terrainByCell != null)
             {
@@ -150,22 +151,93 @@ public static class PodeEmbarcarSensor
             return false;
         }
 
-        bool constructionMatch = false;
-        if (hasConstructionFilter)
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(map, cell);
+        if (construction != null && construction.TryResolveConstructionData(out ConstructionData constructionData) && constructionData != null)
         {
-            ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(map, cell);
-            if (construction != null && construction.TryResolveConstructionData(out ConstructionData constructionData) && constructionData != null)
-                constructionMatch = transporterData.allowedEmbarkConstructions.Contains(constructionData);
+            if (hasConstructionFilter)
+            {
+                if (transporterData.allowedEmbarkWhenTransporterAtConstructions.Contains(constructionData))
+                    return true;
+
+                reason = "Construcao do hex nao permitida para embarque deste transportador.";
+                return false;
+            }
+
+            // Lista vazia = sem restricao por construcao.
+            return true;
         }
 
-        bool terrainMatch = false;
-        if (hasTerrainFilter && TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) && terrain != null)
-            terrainMatch = transporterData.allowedEmbarkTerrains.Contains(terrain);
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(map, cell);
+        if (structure != null)
+        {
+            if (!hasStructureFilter)
+            {
+                reason = "Estrutura do hex nao permitida para embarque deste transportador.";
+                return false;
+            }
 
-        bool allowed = constructionMatch || terrainMatch;
-        if (!allowed)
-            reason = "Contexto nao permitido (transportador fora dos terrenos/construcoes de embarque).";
-        return allowed;
+            if (!TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrainAtStructure) || terrainAtStructure == null)
+            {
+                reason = "Estrutura encontrada, mas sem terreno base valido no hex.";
+                return false;
+            }
+
+            PairRuleMatchResult pairResult = EvaluateEmbarkStructureTerrainPair(
+                transporterData.allowedEmbarkWhenTransporterAtTerrainStructures,
+                structure,
+                terrainAtStructure);
+            if (pairResult == PairRuleMatchResult.Blocked)
+            {
+                reason = "Par estrutura+terreno base bloqueado para embarque deste transportador.";
+                return false;
+            }
+
+            if (pairResult != PairRuleMatchResult.Allowed)
+            {
+                reason = "Par estrutura+terreno base nao permitido para embarque deste transportador.";
+                return false;
+            }
+
+            return true;
+        }
+
+        if (hasTerrainFilter &&
+            TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) &&
+            terrain != null &&
+            transporterData.allowedEmbarkWhenTransporterAtTerrains.Contains(terrain))
+        {
+            return true;
+        }
+
+        reason = "Contexto nao permitido (fora de terreno/estrutura/construcao permitidos para embarque).";
+        return false;
+    }
+
+    private static PairRuleMatchResult EvaluateEmbarkStructureTerrainPair(
+        List<TransportStructureTerrainRule> rules,
+        StructureData structure,
+        TerrainTypeData baseTerrain)
+    {
+        if (rules == null || structure == null || baseTerrain == null)
+            return PairRuleMatchResult.NotListed;
+
+        for (int i = 0; i < rules.Count; i++)
+        {
+            TransportStructureTerrainRule rule = rules[i];
+            if (rule == null || rule.structure == null || rule.baseTerrain == null)
+                continue;
+            if (rule.structure == structure && rule.baseTerrain == baseTerrain)
+                return rule.isBlocked ? PairRuleMatchResult.Blocked : PairRuleMatchResult.Allowed;
+        }
+
+        return PairRuleMatchResult.NotListed;
+    }
+
+    private enum PairRuleMatchResult
+    {
+        NotListed = 0,
+        Allowed = 1,
+        Blocked = 2
     }
 
     private static bool IsValidTransporter(UnitManager sourceUnit, UnitManager transporter, out UnitData transporterData, out string reason)

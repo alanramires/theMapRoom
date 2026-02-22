@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -118,11 +119,46 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
         {
             if (GUILayout.Button("Embarcar"))
             {
-                PodeEmbarcarOption option = selectedOptionIndex >= 0 && selectedOptionIndex < options.Count ? options[selectedOptionIndex] : null;
-                string label = option != null ? option.displayLabel : "(opcao invalida)";
-                Debug.Log($"[PodeEmbarcarSensorDebug] Embarcar selecionado: {label}. (Execucao de embarque ainda nao implementada)");
+                TryEmbarkSelectedOption();
             }
         }
+    }
+
+    private void TryEmbarkSelectedOption()
+    {
+        if (selectedOptionIndex < 0 || selectedOptionIndex >= options.Count)
+        {
+            statusMessage = "Opcao de embarque invalida.";
+            return;
+        }
+
+        PodeEmbarcarOption option = options[selectedOptionIndex];
+        if (option == null || option.sourceUnit == null || option.transporterUnit == null)
+        {
+            statusMessage = "Opcao de embarque desatualizada.";
+            return;
+        }
+
+        Undo.RecordObject(option.sourceUnit, "Pode Embarcar (Debug)");
+        Undo.RecordObject(option.transporterUnit, "Pode Embarcar (Debug)");
+
+        if (!option.transporterUnit.TryEmbarkPassengerInSlot(option.sourceUnit, option.transporterSlotIndex, out string reason))
+        {
+            statusMessage = string.IsNullOrWhiteSpace(reason) ? "Falha ao executar embarque." : reason;
+            Debug.Log($"[PodeEmbarcarSensorDebug] Falha ao embarcar: {statusMessage}");
+            return;
+        }
+
+        EditorUtility.SetDirty(option.sourceUnit);
+        EditorUtility.SetDirty(option.transporterUnit);
+        EditorSceneManager.MarkSceneDirty(option.sourceUnit.gameObject.scene);
+
+        string passengerName = option.sourceUnit != null ? option.sourceUnit.name : "passageiro";
+        string transporterName = option.transporterUnit != null ? option.transporterUnit.name : "transportador";
+        statusMessage = $"Embarque concluido: {passengerName} -> {transporterName} (slot {option.transporterSlotIndex}).";
+        Debug.Log($"[PodeEmbarcarSensorDebug] {statusMessage}");
+
+        RunSimulation();
     }
 
     private void RunSimulation()

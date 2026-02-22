@@ -2,6 +2,16 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using System.Collections.Generic;
 
+[System.Serializable]
+public class ConstructionLandingSkillRule
+{
+    [Tooltip("Skill exigida para pouso/decolagem nesta construcao.")]
+    public SkillData skill;
+
+    [Tooltip("Modo de decolagem aplicado quando esta skill for a regra usada nesta construcao.")]
+    public TakeoffProcedure takeoffMode = TakeoffProcedure.InstantToPreferredHeight;
+}
+
 [CreateAssetMenu(menuName = "Game/Construction/Construction Data", fileName = "ConstructionData_")]
 public class ConstructionData : ScriptableObject
 {
@@ -46,16 +56,17 @@ public class ConstructionData : ScriptableObject
     [Tooltip("Se true, dominio do ar e sempre permitido para esta construcao.")]
     public bool alwaysAllowAirDomain = true;
     [Header("Aircraft Ops")]
-    [Tooltip("Permite pouso de aeronaves neste tipo de construcao.")]
-    public bool allowAircraftLanding = false;
-    [Tooltip("Classes de unidade permitidas para pouso. Se vazio, aceita Jet/Plane/Helicopter.")]
-    public List<GameUnitClass> landingAllowedClasses = new List<GameUnitClass>();
-    [Tooltip("Skills exigidas para pouso. Se vazio, nao exige skill.")]
-    public List<SkillData> landingRequiredSkills = new List<SkillData>();
-    [Tooltip("Permite decolagem de aeronaves neste tipo de construcao.")]
-    public bool allowAircraftTakeoff = false;
-    [Tooltip("Modos de movimento permitidos para decolagem. Se vazio, permite MoveuParado e MoveuAndando.")]
-    public List<SensorMovementMode> takeoffAllowedMovementModes = new List<SensorMovementMode>();
+    [FormerlySerializedAs("allowAircraftLanding")]
+    [FormerlySerializedAs("allowAircraftTakeoff")]
+    [Tooltip("Permite pouso e decolagem de aeronaves neste tipo de construcao.")]
+    public bool allowAircraftTakeoffAndLanding = false;
+    [FormerlySerializedAs("landingRequiredSkills")]
+    [Tooltip("Campo legado de skills exigidas para pouso/decolagem (mantido para migracao).")]
+    public List<SkillData> legacyRequiredLandingSkills = new List<SkillData>();
+    [Tooltip("Skills exigidas para pouso/decolagem e seu modo de decolagem neste contexto.")]
+    public List<ConstructionLandingSkillRule> requiredLandingSkillRules = new List<ConstructionLandingSkillRule>();
+    [Tooltip("Se true, basta ter pelo menos 1 skill da lista para pousar/decolar nesta construcao. Se false, exige todas.")]
+    public bool requireAtLeastOneLandingSkill = false;
 
     [Header("Construction Supplier Settings")]
     public bool isSupplier = false;
@@ -90,12 +101,34 @@ public class ConstructionData : ScriptableObject
             supplierOperationDomains = new List<TerrainLayerMode>();
         if (supplierServicesProvided == null)
             supplierServicesProvided = new List<ServiceData>();
-        if (landingAllowedClasses == null)
-            landingAllowedClasses = new List<GameUnitClass>();
-        if (landingRequiredSkills == null)
-            landingRequiredSkills = new List<SkillData>();
-        if (takeoffAllowedMovementModes == null)
-            takeoffAllowedMovementModes = new List<SensorMovementMode>();
+        if (legacyRequiredLandingSkills == null)
+            legacyRequiredLandingSkills = new List<SkillData>();
+        if (requiredLandingSkillRules == null)
+            requiredLandingSkillRules = new List<ConstructionLandingSkillRule>();
+
+        for (int i = requiredLandingSkillRules.Count - 1; i >= 0; i--)
+        {
+            ConstructionLandingSkillRule entry = requiredLandingSkillRules[i];
+            if (entry == null)
+                requiredLandingSkillRules.RemoveAt(i);
+            else if (!System.Enum.IsDefined(typeof(TakeoffProcedure), entry.takeoffMode))
+                entry.takeoffMode = TakeoffProcedure.InstantToPreferredHeight;
+        }
+
+        if (requiredLandingSkillRules.Count == 0 && legacyRequiredLandingSkills.Count > 0)
+        {
+            for (int i = 0; i < legacyRequiredLandingSkills.Count; i++)
+            {
+                SkillData skill = legacyRequiredLandingSkills[i];
+                if (skill == null)
+                    continue;
+                requiredLandingSkillRules.Add(new ConstructionLandingSkillRule
+                {
+                    skill = skill,
+                    takeoffMode = TakeoffProcedure.InstantToPreferredHeight
+                });
+            }
+        }
         if (supplierResources == null)
             supplierResources = new List<ConstructionSupplierResourceCapacity>();
         for (int i = 0; i < supplierResources.Count; i++)

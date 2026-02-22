@@ -59,16 +59,21 @@ public class TerrainTypeData : ScriptableObject
     [Tooltip("Se true, dominio do ar e sempre permitido (independente dos modos).")]
     public bool alwaysAllowAirDomain = true;
     [Header("Aircraft Ops")]
-    [Tooltip("Permite pouso de aeronaves diretamente neste terreno.")]
-    public bool allowAircraftLanding = false;
-    [Tooltip("Classes de unidade permitidas para pouso. Se vazio, aceita Jet/Plane/Helicopter.")]
-    public List<GameUnitClass> landingAllowedClasses = new List<GameUnitClass>();
+    [FormerlySerializedAs("allowAircraftLanding")]
+    [FormerlySerializedAs("allowAircraftTakeoff")]
+    [Tooltip("Permite pouso e decolagem de aeronaves diretamente neste terreno.")]
+    public bool allowAircraftTakeoffAndLanding = false;
+    [FormerlySerializedAs("landingAllowedClasses")]
+    [Tooltip("Classes de pouso permitidas para pouso. Se vazio, nao restringe.")]
+    public List<LandingClass> allowedLandingClasses = new List<LandingClass>();
+    [FormerlySerializedAs("landingRequiredSkills")]
     [Tooltip("Skills exigidas para pouso. Se vazio, nao exige skill.")]
-    public List<SkillData> landingRequiredSkills = new List<SkillData>();
-    [Tooltip("Permite decolagem de aeronaves diretamente deste terreno.")]
-    public bool allowAircraftTakeoff = false;
-    [Tooltip("Modos de movimento permitidos para decolagem. Se vazio, permite MoveuParado e MoveuAndando.")]
-    public List<SensorMovementMode> takeoffAllowedMovementModes = new List<SensorMovementMode>();
+    public List<SkillData> requiredLandingSkills = new List<SkillData>();
+    [Tooltip("Se true, basta ter pelo menos 1 skill da lista para pousar/decolar neste terreno. Se false, exige todas.")]
+    public bool requireAtLeastOneLandingSkill = false;
+    [FormerlySerializedAs("takeoffAllowedMovementModes")]
+    [Tooltip("Modos de decolagem permitidos. Se vazio, nao restringe.")]
+    public List<TakeoffMode> allowedTakeoffModes = new List<TakeoffMode>();
 
     [Header("Movement")]
     [Tooltip("Custo basico de autonomia para entrar neste hex. Minimo 1.")]

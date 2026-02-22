@@ -8,11 +8,34 @@ public class ConstructionDataEditor : Editor
     {
         serializedObject.Update();
 
-        DrawPropertiesExcluding(serializedObject, "m_Script", "constructionConfiguration");
+        DrawPropertiesExcluding(
+            serializedObject,
+            "m_Script",
+            "constructionConfiguration",
+            "allowAircraftTakeoffAndLanding",
+            "legacyRequiredLandingSkills",
+            "requiredLandingSkillRules",
+            "requireAtLeastOneLandingSkill");
+        EditorGUILayout.Space();
+        DrawAircraftOpsSection(serializedObject);
         EditorGUILayout.Space();
         DrawConstructionConfigurationExpanded(serializedObject.FindProperty("constructionConfiguration"));
 
         serializedObject.ApplyModifiedProperties();
+    }
+
+    private static void DrawAircraftOpsSection(SerializedObject so)
+    {
+        EditorGUILayout.LabelField("Aircraft Ops", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Regras de Air Ops (Construction):\n" +
+            "- Allow Aicrafft Take Off and Landing: habilita pouso e decolagem neste contexto.\n" +
+            "- Required Landing Skills: para cada skill voce define o take off mode usado neste contexto.",
+            MessageType.Info);
+        SerializedProperty allowProp = so.FindProperty("allowAircraftTakeoffAndLanding");
+        DrawIfExists(allowProp, "Allow Aicrafft Take Off and Landing");
+        DrawIfExists(so.FindProperty("requiredLandingSkillRules"), "Required Landing Skills");
+        DrawIfExists(so.FindProperty("requireAtLeastOneLandingSkill"), "Pelo menos 1 skill");
     }
 
     private static void DrawConstructionConfigurationExpanded(SerializedProperty configProperty)
@@ -38,4 +61,5 @@ public class ConstructionDataEditor : Editor
         if (prop != null)
             EditorGUILayout.PropertyField(prop, new GUIContent(label), includeChildren: true);
     }
+
 }

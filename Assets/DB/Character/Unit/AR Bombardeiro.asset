@@ -1,0 +1,74 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
+  m_Name: AR Bombardeiro
+  m_EditorClassIdentifier: Assembly-CSharp::UnitData
+  id: bombardeiro
+  displayName: Bombardeiro
+  description: 
+  spriteDefault: {fileID: 21300000, guid: 7a1965bdd345f0848a06ce310b8df52c, type: 3}
+  spriteGreen: {fileID: 0}
+  spriteRed: {fileID: 0}
+  spriteBlue: {fileID: 0}
+  spriteYellow: {fileID: 0}
+  maxHP: 10
+  defense: 13
+  armorClass: 1
+  movement: 7
+  movementCategory: 1
+  militaryForce: 1
+  unitClass: 6
+  eliteLevel: 0
+  combatModifiers: []
+  domain: 3
+  heightLevel: 5
+  aditionalDomainsAllowed:
+  - domain: 0
+    heightLevel: 3
+    spriteDefault: {fileID: 0}
+    spriteGreen: {fileID: 0}
+    spriteRed: {fileID: 0}
+    spriteBlue: {fileID: 0}
+    spriteYellow: {fileID: 0}
+  skills:
+  - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
+  - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
+  autonomyData: {fileID: 11400000, guid: d52348f636f1466d95a6489891e176bf, type: 2}
+  embarkedWeapons:
+  - weapon: {fileID: 11400000, guid: 86a03ca38b95e2a4db570315170881be, type: 2}
+    squadAmmunition: 5
+    operationRangeMin: 1
+    operationRangeMax: 1
+    selectedTrajectory: 0
+    lastSyncedWeapon: {fileID: 11400000, guid: 86a03ca38b95e2a4db570315170881be, type: 2}
+  embarkedSupplies: []
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
+  isTransporter: 0
+  spriteTransport: {fileID: 0}
+  allowedEmbarkWhenTransporterAtTerrains: []
+  allowedEmbarkWhenTransporterAtTerrainStructures: []
+  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtTerrains: []
+  allowedDisembarkWhenTransporterAtTerrainStructures: []
+  allowedDisembarkWhenTransporterAtConstructions: []
+  passengersCanDisembarkAndGoesToTerrains: []
+  passengersCanDisembarkAndGoesToTerrainStructures: []
+  passengersCanDisembarkAndGoesToConstructions: []
+  transportSlots: []
+  autonomia: 90
+  cost: 22000

@@ -34,6 +34,8 @@ public partial class TurnStateManager
             Vector3Int cell = pair.Key;
             if (terrainTilemap.GetTile(cell) == null)
                 continue;
+            if (!IsRangeCellAllowedByTakeoffOptions(cell, pair.Value))
+                continue;
 
             rangeMapTilemap.SetTile(cell, rangeOverlayTile);
             rangeMapTilemap.SetTileFlags(cell, TileFlags.None);

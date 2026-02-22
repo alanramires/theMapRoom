@@ -19,7 +19,7 @@ Orquestrador:
 
 ## Status macro (metade para release de sensores)
 
-- Sensores implementados hoje: `PodeMirar`, `PodeEmbarcar`
+- Sensores implementados hoje: `PodeMirar`, `PodeEmbarcar`, `PodeDesembarcar` (placeholder de acao)
 - Fluxo especial ja existente (nao sensor): `OperacaoAerea (L)`
 - Metade: painel e contrato de "validos + invalidos com motivo"
 - Proximo lote: `Desembarcar`, `Capturar`, `Reparar`, `Fundir`, `Suprir`, `Transferir`, `ServicosCidade`, `MoverSomente`
@@ -96,6 +96,12 @@ Debug:
 
 ## 3) PodeDesembarcar
 
+Arquivos:
+
+- `Assets/Scripts/Sensors/PodeDesembarcarSensor.cs`
+- `Assets/Scripts/Sensors/PodeDesembarcarOption.cs`
+- `Assets/Scripts/Sensors/PodeDesembarcarInvalidOption.cs`
+
 Objetivo:
 
 - listar transportadores com carga apta a desembarcar
@@ -107,10 +113,16 @@ Checklist de validacao (pode desembarcar?):
 - ao menos uma unidade na carga com estado desembarcavel
 - tile de destino propicio para a unidade descarregada
 - bloqueios de ocupacao, dominio e custo de movimento respeitados
+- filtro de contexto do transportador: `allowedDisembarkTerrains` / `allowedDisembarkConstructions`
+- custo de desembarque: apenas hex com custo `<= 1` (sem multiplicador de Operational Autonomy)
 
 Status:
 
-- roadmap (proximo lote)
+- sensor implementado em modo de leitura (acao de desembarque ainda desabilitada)
+
+Debug:
+
+- `Tools/Sensors/Pode Desembarcar`
 
 ---
 

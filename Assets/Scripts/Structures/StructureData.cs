@@ -2,6 +2,37 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
+[System.Serializable]
+public class StructureLandingSkillRule
+{
+    [Tooltip("Skill exigida para pouso/decolagem neste par Estrutura+Terreno.")]
+    public SkillData skill;
+
+    [Tooltip("Modo de decolagem aplicado quando esta skill for a regra usada neste par.")]
+    public TakeoffProcedure takeoffMode = TakeoffProcedure.InstantToPreferredHeight;
+}
+
+[System.Serializable]
+public class StructureAirOpsTerrainRule
+{
+    [Tooltip("Terreno base desta regra em par com a estrutura.")]
+    public TerrainTypeData terrainData;
+
+    [FormerlySerializedAs("isRoadRunway")]
+    [Tooltip("Se true, este par Estrutura+Terreno permite pouso e decolagem.")]
+    public bool allowTakeoffAndLanding = false;
+
+    [FormerlySerializedAs("landingRequiredSkills")]
+    [HideInInspector]
+    [Tooltip("Campo legado de skills exigidas para pouso/decolagem neste par (mantido para migracao).")]
+    public List<SkillData> legacyRequiredLandingSkills = new List<SkillData>();
+    [Tooltip("Skills exigidas para pouso/decolagem e seu modo de decolagem neste par.")]
+    public List<StructureLandingSkillRule> requiredLandingSkillRules = new List<StructureLandingSkillRule>();
+
+    [Tooltip("Se true, basta ter pelo menos 1 skill da lista para pousar/decolar neste par. Se false, exige todas.")]
+    public bool requireAtLeastOneLandingSkill = false;
+}
+
 [CreateAssetMenu(menuName = "Game/Structures/Structure Data", fileName = "StructureData_")]
 public class StructureData : ScriptableObject
 {
@@ -31,6 +62,7 @@ public class StructureData : ScriptableObject
     [Tooltip("Custo basico de movimento/autonomia para entrar neste hex de estrutura. Minimo 1.")]
     [Min(1)]
     public int baseMovementCost = 1;
+
     [Header("DPQ")]
     [Tooltip("Referencia de qualidade de posicao (DPQ) aplicada a esta estrutura.")]
     public DPQData dpqData;
@@ -57,25 +89,56 @@ public class StructureData : ScriptableObject
     public float segmentOverlap = 0.02f;
     [Tooltip("Se true, esta estrutura habilita bonus de deslocamento em full move (ex.: estrada).")]
     public bool roadBoost = false;
-    [Header("Aircraft Ops")]
-    [Tooltip("Permite pouso de aeronaves nesta estrutura (ex.: estrada, pista improvisada, conves).")]
-    public bool allowAircraftLanding = false;
-    [Tooltip("Classes de unidade permitidas para pouso. Se vazio, aceita Jet/Plane/Helicopter.")]
-    public List<GameUnitClass> landingAllowedClasses = new List<GameUnitClass>();
-    [Tooltip("Skills exigidas para pouso. Se vazio, nao exige skill.")]
-    public List<SkillData> landingRequiredSkills = new List<SkillData>();
-    [Tooltip("Permite decolagem de aeronaves nesta estrutura.")]
-    public bool allowAircraftTakeoff = false;
-    [Tooltip("Se a classe estiver nesta lista, pouso exige MoveuParado. Se nao estiver, pode pousar em MoveuParado/MoveuAndando.")]
-    public List<GameUnitClass> roadLandingRequiresStoppedClasses = new List<GameUnitClass>();
-    [Tooltip("Modos de movimento permitidos para decolagem. Se vazio, permite MoveuParado e MoveuAndando.")]
-    public List<SensorMovementMode> takeoffAllowedMovementModes = new List<SensorMovementMode>();
-    [Tooltip("Marca esta estrutura como conves de porta-avioes para regras especificas de embarque/lancamento.")]
-    public bool isCarrierDeck = false;
+
+    [Header("Aircraft Ops (Structure + Terrain Pair)")]
+    [Tooltip("Mapa de pares Estrutura+Terreno para air ops. Cada elemento define se o par atua como RoadRunway e skills exigidas.")]
+    public List<StructureAirOpsTerrainRule> aircraftOpsByTerrain = new List<StructureAirOpsTerrainRule>();
 
     [Header("Road Routes")]
     [Tooltip("Rotas de rodovia desta estrutura (centro-a-centro dos hexes).")]
     public List<RoadRouteDefinition> roadRoutes = new List<RoadRouteDefinition>();
+
+    private void OnValidate()
+    {
+        if (aircraftOpsByTerrain == null)
+            aircraftOpsByTerrain = new List<StructureAirOpsTerrainRule>();
+
+        for (int i = 0; i < aircraftOpsByTerrain.Count; i++)
+        {
+            StructureAirOpsTerrainRule pairRule = aircraftOpsByTerrain[i];
+            if (pairRule == null)
+                continue;
+
+            if (pairRule.legacyRequiredLandingSkills == null)
+                pairRule.legacyRequiredLandingSkills = new List<SkillData>();
+            if (pairRule.requiredLandingSkillRules == null)
+                pairRule.requiredLandingSkillRules = new List<StructureLandingSkillRule>();
+
+            for (int j = pairRule.requiredLandingSkillRules.Count - 1; j >= 0; j--)
+            {
+                StructureLandingSkillRule entry = pairRule.requiredLandingSkillRules[j];
+                if (entry == null)
+                    pairRule.requiredLandingSkillRules.RemoveAt(j);
+                else if (!System.Enum.IsDefined(typeof(TakeoffProcedure), entry.takeoffMode))
+                    entry.takeoffMode = TakeoffProcedure.InstantToPreferredHeight;
+            }
+
+            if (pairRule.requiredLandingSkillRules.Count == 0 && pairRule.legacyRequiredLandingSkills.Count > 0)
+            {
+                for (int j = 0; j < pairRule.legacyRequiredLandingSkills.Count; j++)
+                {
+                    SkillData skill = pairRule.legacyRequiredLandingSkills[j];
+                    if (skill == null)
+                        continue;
+                    pairRule.requiredLandingSkillRules.Add(new StructureLandingSkillRule
+                    {
+                        skill = skill,
+                        takeoffMode = TakeoffProcedure.InstantToPreferredHeight
+                    });
+                }
+            }
+        }
+    }
 
     public bool SupportsBuildOn(Domain domainToBuildOn, HeightLevel heightLevelToBuildOn)
     {

@@ -2,6 +2,17 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
+[System.Serializable]
+public class TransportStructureTerrainRule
+{
+    [Tooltip("Estrutura exigida neste contexto (ex.: estrada).")]
+    public StructureData structure;
+    [Tooltip("Terreno base exigido junto com a estrutura (ex.: planicie).")]
+    public TerrainTypeData baseTerrain;
+    [Tooltip("Se true, este par esta explicitamente bloqueado para a regra.")]
+    public bool isBlocked = false;
+}
+
 [CreateAssetMenu(menuName = "Game/Units/Unit Data", fileName = "UnitData_")]
 public class UnitData : ScriptableObject
 {
@@ -34,6 +45,8 @@ public class UnitData : ScriptableObject
     [Header("Elite")]
     [Tooltip("Nivel de elite da unidade (padrao: 0).")]
     [Min(0)] public int eliteLevel = 0;
+    [Tooltip("Modificadores de RPS de combate aplicados por esta unidade.")]
+    public List<CombatModifierData> combatModifiers = new List<CombatModifierData>();
     [Header("Native Domain")]
     [Tooltip("Dominio/altura nativo da unidade.")]
     public Domain domain = Domain.Land;
@@ -68,14 +81,37 @@ public class UnitData : ScriptableObject
     [Header("Transport")]
     [Tooltip("Se true, esta unidade pode transportar outras unidades.")]
     public bool isTransporter = false;
-    [Tooltip("Terrenos onde este transportador aceita embarque. Se vazio, nao restringe por terreno.")]
-    public List<TerrainTypeData> allowedEmbarkTerrains = new List<TerrainTypeData>();
-    [Tooltip("Construcoes onde este transportador aceita embarque. Se vazio, nao restringe por construcao.")]
-    public List<ConstructionData> allowedEmbarkConstructions = new List<ConstructionData>();
-    [Tooltip("Slots de transporte e regras de embarque.")]
-    public List<UnitTransportSlotRule> transportSlots = new List<UnitTransportSlotRule>();
     [Tooltip("Sprite opcional exibido quando este transportador estiver com unidades embarcadas. Se vazio, usa o sprite padrao da unidade.")]
     public Sprite spriteTransport;
+    [Header("Allowed Embark Terrain When Transporter At")]
+    [FormerlySerializedAs("allowedEmbarkTerrains")]
+    [Tooltip("Terrain: Terrenos validos para o HEX atual do transportador no embarque. Vazio = sem restricao por terreno.")]
+    public List<TerrainTypeData> allowedEmbarkWhenTransporterAtTerrains = new List<TerrainTypeData>();
+    [FormerlySerializedAs("allowedEmbarkStructures")]
+    [Tooltip("Terrain + Structure: Pares estrutura+terreno base validos para o HEX atual do transportador no embarque.")]
+    public List<TransportStructureTerrainRule> allowedEmbarkWhenTransporterAtTerrainStructures = new List<TransportStructureTerrainRule>();
+    [FormerlySerializedAs("allowedEmbarkConstructions")]
+    [Tooltip("Constructions: Construcoes validas para o HEX atual do transportador no embarque. Vazio = sem restricao por construcao.")]
+    public List<ConstructionData> allowedEmbarkWhenTransporterAtConstructions = new List<ConstructionData>();
+    [Header("Allowed Disembark Terrain When Transporter At")]
+    [FormerlySerializedAs("allowedDisembarkTerrains")]
+    [Tooltip("Terrain: Terrenos validos para o HEX atual do transportador no desembarque. Vazio = sem restricao por terreno.")]
+    public List<TerrainTypeData> allowedDisembarkWhenTransporterAtTerrains = new List<TerrainTypeData>();
+    [FormerlySerializedAs("allowedDisembarkStructures")]
+    [Tooltip("Terrain + Structure: Pares estrutura+terreno base validos para o HEX atual do transportador no desembarque.")]
+    public List<TransportStructureTerrainRule> allowedDisembarkWhenTransporterAtTerrainStructures = new List<TransportStructureTerrainRule>();
+    [FormerlySerializedAs("allowedDisembarkConstructions")]
+    [Tooltip("Constructions: Construcoes validas para o HEX atual do transportador no desembarque. Vazio = sem restricao por construcao.")]
+    public List<ConstructionData> allowedDisembarkWhenTransporterAtConstructions = new List<ConstructionData>();
+    [Header("Passengers Can Disembark And Goes To")]
+    [Tooltip("Terrain: Terrenos validos para o HEX de destino do passageiro no desembarque. Vazio = sem restricao por terreno.")]
+    public List<TerrainTypeData> passengersCanDisembarkAndGoesToTerrains = new List<TerrainTypeData>();
+    [Tooltip("Terrain + Structure: Pares estrutura+terreno base validos para o HEX de destino do passageiro no desembarque.")]
+    public List<TransportStructureTerrainRule> passengersCanDisembarkAndGoesToTerrainStructures = new List<TransportStructureTerrainRule>();
+    [Tooltip("Constructions: Construcoes validas para o HEX de destino do passageiro no desembarque. Vazio = sem restricao por construcao.")]
+    public List<ConstructionData> passengersCanDisembarkAndGoesToConstructions = new List<ConstructionData>();
+    [Tooltip("Slots de transporte e regras de embarque.")]
+    public List<UnitTransportSlotRule> transportSlots = new List<UnitTransportSlotRule>();
 
     public int autonomia = 99;
     public int cost = 100;
@@ -94,12 +130,28 @@ public class UnitData : ScriptableObject
             supplierOperationDomains = new List<SupplierOperationDomain>();
         if (supplierServicesProvided == null)
             supplierServicesProvided = new List<ServiceData>();
+        if (combatModifiers == null)
+            combatModifiers = new List<CombatModifierData>();
         if (transportSlots == null)
             transportSlots = new List<UnitTransportSlotRule>();
-        if (allowedEmbarkTerrains == null)
-            allowedEmbarkTerrains = new List<TerrainTypeData>();
-        if (allowedEmbarkConstructions == null)
-            allowedEmbarkConstructions = new List<ConstructionData>();
+        if (allowedEmbarkWhenTransporterAtTerrains == null)
+            allowedEmbarkWhenTransporterAtTerrains = new List<TerrainTypeData>();
+        if (allowedEmbarkWhenTransporterAtTerrainStructures == null)
+            allowedEmbarkWhenTransporterAtTerrainStructures = new List<TransportStructureTerrainRule>();
+        if (allowedEmbarkWhenTransporterAtConstructions == null)
+            allowedEmbarkWhenTransporterAtConstructions = new List<ConstructionData>();
+        if (allowedDisembarkWhenTransporterAtTerrains == null)
+            allowedDisembarkWhenTransporterAtTerrains = new List<TerrainTypeData>();
+        if (allowedDisembarkWhenTransporterAtTerrainStructures == null)
+            allowedDisembarkWhenTransporterAtTerrainStructures = new List<TransportStructureTerrainRule>();
+        if (allowedDisembarkWhenTransporterAtConstructions == null)
+            allowedDisembarkWhenTransporterAtConstructions = new List<ConstructionData>();
+        if (passengersCanDisembarkAndGoesToTerrains == null)
+            passengersCanDisembarkAndGoesToTerrains = new List<TerrainTypeData>();
+        if (passengersCanDisembarkAndGoesToTerrainStructures == null)
+            passengersCanDisembarkAndGoesToTerrainStructures = new List<TransportStructureTerrainRule>();
+        if (passengersCanDisembarkAndGoesToConstructions == null)
+            passengersCanDisembarkAndGoesToConstructions = new List<ConstructionData>();
         eliteLevel = Mathf.Max(0, eliteLevel);
         maxUnitsServedPerTurn = Mathf.Max(0, maxUnitsServedPerTurn);
 

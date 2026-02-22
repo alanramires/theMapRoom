@@ -73,6 +73,10 @@ public partial class TurnStateManager
             return ActionSfx.Confirm;
         }
 
+        TryPrepareTemporaryTakeoffStateForSelection(unit, out string takeoffInfo);
+        if (!string.IsNullOrWhiteSpace(takeoffInfo))
+            Debug.Log($"[Pode Decolar] {takeoffInfo}");
+
         SetSelectedUnit(unit);
         cursorState = CursorState.UnitSelected;
         return ActionSfx.Confirm;
@@ -95,6 +99,12 @@ public partial class TurnStateManager
         currentUnitCell.z = 0;
         if (cursorCell == currentUnitCell)
         {
+            if (!IsTakeoffMoveDistanceAllowed(0))
+            {
+                Debug.Log("Decolagem neste contexto nao permite permanecer em 0 hex.");
+                return ActionSfx.Error;
+            }
+
             cursorState = CursorState.MoveuParado;
             RefreshSensorsForCurrentState();
             Debug.Log("moveu no mesmo lugar");
@@ -116,6 +126,11 @@ public partial class TurnStateManager
 
         if (!TryGetSelectedUnitPath(cursorCell, out List<Vector3Int> path))
             return ActionSfx.Error;
+        if (!IsTakeoffMoveDistanceAllowed(path.Count - 1))
+        {
+            Debug.Log("Distancia invalida para o modo de decolagem disponivel neste contexto.");
+            return ActionSfx.Error;
+        }
 
         BeginMovementToSelectedCell(path);
         return ActionSfx.Confirm;
@@ -125,6 +140,9 @@ public partial class TurnStateManager
     {
         blockReason = string.Empty;
         if (selectedUnit == null || !selectedUnit.IsAircraftGrounded)
+            return true;
+        if (hasTemporaryTakeoffSelectionState &&
+            (temporaryTakeoffMoveOptions.Contains(0) || temporaryTakeoffMoveOptions.Contains(1)))
             return true;
 
         Tilemap boardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;

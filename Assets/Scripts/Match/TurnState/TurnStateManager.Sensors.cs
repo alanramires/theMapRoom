@@ -8,11 +8,15 @@ public partial class TurnStateManager
     private readonly List<PodeMirarTargetOption> cachedPodeMirarTargets = new List<PodeMirarTargetOption>();
     private readonly List<PodeEmbarcarOption> cachedPodeEmbarcarTargets = new List<PodeEmbarcarOption>();
     private readonly List<PodeEmbarcarInvalidOption> cachedPodeEmbarcarInvalidTargets = new List<PodeEmbarcarInvalidOption>();
+    private readonly List<PodeDesembarcarOption> cachedPodeDesembarcarTargets = new List<PodeDesembarcarOption>();
+    private readonly List<PodeDesembarcarInvalidOption> cachedPodeDesembarcarInvalidTargets = new List<PodeDesembarcarInvalidOption>();
 
     public IReadOnlyList<char> AvailableSensorActionCodes => availableSensorActionCodes;
     public IReadOnlyList<PodeMirarTargetOption> CachedPodeMirarTargets => cachedPodeMirarTargets;
     public IReadOnlyList<PodeEmbarcarOption> CachedPodeEmbarcarTargets => cachedPodeEmbarcarTargets;
     public IReadOnlyList<PodeEmbarcarInvalidOption> CachedPodeEmbarcarInvalidTargets => cachedPodeEmbarcarInvalidTargets;
+    public IReadOnlyList<PodeDesembarcarOption> CachedPodeDesembarcarTargets => cachedPodeDesembarcarTargets;
+    public IReadOnlyList<PodeDesembarcarInvalidOption> CachedPodeDesembarcarInvalidTargets => cachedPodeDesembarcarInvalidTargets;
 
     private void RefreshSensorsForCurrentState()
     {
@@ -62,7 +66,9 @@ public partial class TurnStateManager
             availableSensorActionCodes,
             cachedPodeMirarTargets,
             cachedPodeEmbarcarTargets,
-            cachedPodeEmbarcarInvalidTargets);
+            cachedPodeEmbarcarInvalidTargets,
+            cachedPodeDesembarcarTargets,
+            cachedPodeDesembarcarInvalidTargets);
 
         // Normaliza os codigos de acao com base nos resultados efetivos dos sensores.
         availableSensorActionCodes.Remove('A');
@@ -104,6 +110,8 @@ public partial class TurnStateManager
         cachedPodeMirarTargets.Clear();
         cachedPodeEmbarcarTargets.Clear();
         cachedPodeEmbarcarInvalidTargets.Clear();
+        cachedPodeDesembarcarTargets.Clear();
+        cachedPodeDesembarcarInvalidTargets.Clear();
         cachedAircraftOperationDecision = default;
         ClearLineOfFireArea();
     }
@@ -136,17 +144,20 @@ public partial class TurnStateManager
     {
         bool podeMirar = availableSensorActionCodes.Contains('A');
         bool podeEmbarcar = availableSensorActionCodes.Contains('E');
+        bool podeDesembarcar = false; // placeholder: ainda nao habilitado como acao de gameplay.
         bool podeOperacaoAerea = availableSensorActionCodes.Contains('L');
 
         Debug.Log(
             $"[Sensors] state={cursorState} | A={(podeMirar ? "sim" : "nao")} ({cachedPodeMirarTargets.Count}) | " +
             $"E={(podeEmbarcar ? "sim" : "nao")} ({cachedPodeEmbarcarTargets.Count}) | " +
+            $"D={(podeDesembarcar ? "sim" : "nao")} ({cachedPodeDesembarcarTargets.Count}) | " +
             $"L={(podeOperacaoAerea ? "sim" : "nao")}");
 
         string painel =
             "Resultado dos Scanners | " +
             $"Pode Mirar (\"A\"): {(podeMirar ? "sim" : "nao")} | " +
             $"Pode Embarcar (\"E\"): {(podeEmbarcar ? "sim" : "nao")} | " +
+            $"Pode Desembarcar (\"D\"): nao (placeholder) | " +
             $"Operacao Aerea (\"L\"): {(podeOperacaoAerea ? "sim" : "nao")} | " +
             "Apenas Mover (\"M\") | " +
             "Desfazer Movimento (ESC) | " +
@@ -161,6 +172,10 @@ public partial class TurnStateManager
             painel += $"\nE opcoes: {cachedPodeEmbarcarTargets.Count}";
         if (cachedPodeEmbarcarInvalidTargets.Count > 0)
             painel += $"\nE invalidos: {cachedPodeEmbarcarInvalidTargets.Count}";
+        if (cachedPodeDesembarcarTargets.Count > 0)
+            painel += $"\nD opcoes (placeholder): {cachedPodeDesembarcarTargets.Count}";
+        if (cachedPodeDesembarcarInvalidTargets.Count > 0)
+            painel += $"\nD invalidos (placeholder): {cachedPodeDesembarcarInvalidTargets.Count}";
         if (!podeEmbarcar && cachedPodeEmbarcarInvalidTargets.Count > 0)
         {
             int detailCount = Mathf.Min(4, cachedPodeEmbarcarInvalidTargets.Count);
@@ -176,6 +191,21 @@ public partial class TurnStateManager
                     : $"hex {invalid.evaluatedCell.x},{invalid.evaluatedCell.y}";
                 string reason = !string.IsNullOrWhiteSpace(invalid.reason) ? invalid.reason : "motivo nao informado";
                 painel += $"\n- {transporterName}: {reason}";
+            }
+        }
+        if (cachedPodeDesembarcarInvalidTargets.Count > 0)
+        {
+            int detailCount = Mathf.Min(4, cachedPodeDesembarcarInvalidTargets.Count);
+            painel += "\nD motivos (amostra):";
+            for (int i = 0; i < detailCount; i++)
+            {
+                PodeDesembarcarInvalidOption invalid = cachedPodeDesembarcarInvalidTargets[i];
+                if (invalid == null)
+                    continue;
+
+                string passengerName = invalid.passengerUnit != null ? invalid.passengerUnit.name : "(sem passageiro)";
+                string reason = !string.IsNullOrWhiteSpace(invalid.reason) ? invalid.reason : "motivo nao informado";
+                painel += $"\n- {passengerName} @ {invalid.evaluatedCell.x},{invalid.evaluatedCell.y}: {reason}";
             }
         }
 

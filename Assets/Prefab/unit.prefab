@@ -238,6 +238,9 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   isEmbarked: 0
   isSelected: 0
+  hasTemporarySortingOverride: 0
+  cachedSpriteSortingOrder: 0
+  cachedActedLockSortingOrder: 0
   enableSelectionBlink: 1
   selectionBlinkInterval: 0.16
   selectionBlinkActiveDuration: 0.16

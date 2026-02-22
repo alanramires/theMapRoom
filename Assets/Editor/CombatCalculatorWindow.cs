@@ -683,58 +683,15 @@ public class CombatCalculatorWindow : EditorWindow
 
     private static SkillRPSBonusInfo ResolveSkillRps(UnitManager ownerUnit, UnitManager opponentUnit, WeaponCategory ownerWeaponCategory)
     {
-        if (ownerUnit == null)
-            return SkillRPSBonusInfo.NoneWithReason("owner nulo");
+        CombatModifierSummary resolved = CombatModifierResolver.Resolve(ownerUnit, opponentUnit, ownerWeaponCategory);
+        if (resolved.appliedCount <= 0)
+            return SkillRPSBonusInfo.NoneWithReason(resolved.reason);
 
-        if (!ownerUnit.TryGetUnitData(out UnitData ownerData) || ownerData == null)
-            return SkillRPSBonusInfo.NoneWithReason("owner sem UnitData");
-
-        if (ownerData.skills == null || ownerData.skills.Count == 0)
-            return SkillRPSBonusInfo.NoneWithReason("owner sem skills");
-
-        GameUnitClass ownerClass = ownerData.unitClass;
-        int ownerElite = Mathf.Max(0, ownerData.eliteLevel);
-
-        UnitData opponentData = null;
-        if (opponentUnit != null)
-            opponentUnit.TryGetUnitData(out opponentData);
-
-        GameUnitClass opponentClass = opponentData != null ? opponentData.unitClass : GameUnitClass.Infantry;
-        int opponentElite = opponentData != null ? Mathf.Max(0, opponentData.eliteLevel) : 0;
-
-        int totalOwnerAttack = 0;
-        int totalOwnerDefense = 0;
-        int totalOpponentAttack = 0;
-        int totalOpponentDefense = 0;
-
-        for (int i = 0; i < ownerData.skills.Count; i++)
-        {
-            SkillData skill = ownerData.skills[i];
-            if (skill == null)
-                continue;
-
-            if (!skill.TryGetCombatRpsModifiers(
-                ownerClass,
-                ownerElite,
-                ownerWeaponCategory,
-                opponentClass,
-                opponentElite,
-                out int ownerAtkMod,
-                out int ownerDefMod,
-                out int opponentAtkMod,
-                out int opponentDefMod,
-                out _))
-            {
-                continue;
-            }
-
-            totalOwnerAttack += ownerAtkMod;
-            totalOwnerDefense += ownerDefMod;
-            totalOpponentAttack += opponentAtkMod;
-            totalOpponentDefense += opponentDefMod;
-        }
-
-        return new SkillRPSBonusInfo(totalOwnerAttack, totalOwnerDefense, totalOpponentAttack, totalOpponentDefense);
+        return new SkillRPSBonusInfo(
+            resolved.ownerAttack,
+            resolved.ownerDefense,
+            resolved.opponentAttack,
+            resolved.opponentDefense);
     }
 
     private static Tilemap ResolveBoardTilemap(UnitManager attacker, UnitManager defender)

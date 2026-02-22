@@ -58,6 +58,17 @@ public partial class TurnStateManager : MonoBehaviour
     private bool hasCommittedMovement;
     private int preparedFuelCost;
     private bool hasPreparedFuelCost;
+    private bool hasTemporaryTakeoffSelectionState;
+    private UnitManager temporaryTakeoffUnit;
+    private Domain temporaryTakeoffOriginalDomain = Domain.Land;
+    private HeightLevel temporaryTakeoffOriginalHeight = HeightLevel.Surface;
+    private bool temporaryTakeoffOriginalGrounded = true;
+    private bool temporaryTakeoffOriginalEmbarkedInCarrier;
+    private readonly List<int> temporaryTakeoffMoveOptions = new List<int>();
+    private bool hasAutoPromotionEntryLayer;
+    private UnitManager autoPromotionUnit;
+    private Domain autoPromotionEntryDomain = Domain.Land;
+    private HeightLevel autoPromotionEntryHeight = HeightLevel.Surface;
 
     public CursorState CurrentCursorState => cursorState;
     public UnitManager SelectedUnit => selectedUnit;
@@ -151,10 +162,165 @@ public partial class TurnStateManager : MonoBehaviour
         if (selectedUnit != null)
             animationManager?.ClearSelectionVisual(selectedUnit);
 
+        if (keepPreparedFuelCost)
+            CommitTemporaryTakeoffSelectionState();
+        else
+            RestoreTemporaryTakeoffSelectionStateIfAny();
+
         selectedUnit = null;
         cursorState = CursorState.Neutral;
         ClearMovementRange();
         ClearCommittedMovement();
+    }
+
+    private void CommitTemporaryTakeoffSelectionState()
+    {
+        hasTemporaryTakeoffSelectionState = false;
+        temporaryTakeoffUnit = null;
+        temporaryTakeoffMoveOptions.Clear();
+        hasAutoPromotionEntryLayer = false;
+        autoPromotionUnit = null;
+    }
+
+    private void RestoreTemporaryTakeoffSelectionStateIfAny()
+    {
+        if (hasTemporaryTakeoffSelectionState && temporaryTakeoffUnit != null)
+        {
+            temporaryTakeoffUnit.TrySetCurrentLayerMode(temporaryTakeoffOriginalDomain, temporaryTakeoffOriginalHeight);
+            temporaryTakeoffUnit.SetAircraftGrounded(temporaryTakeoffOriginalGrounded);
+            temporaryTakeoffUnit.SetAircraftEmbarkedInCarrier(temporaryTakeoffOriginalEmbarkedInCarrier);
+        }
+
+        if (hasAutoPromotionEntryLayer && autoPromotionUnit != null)
+            autoPromotionUnit.TrySetCurrentLayerMode(autoPromotionEntryDomain, autoPromotionEntryHeight);
+
+        hasTemporaryTakeoffSelectionState = false;
+        temporaryTakeoffUnit = null;
+        temporaryTakeoffMoveOptions.Clear();
+        hasAutoPromotionEntryLayer = false;
+        autoPromotionUnit = null;
+    }
+
+    private bool TryPrepareTemporaryTakeoffStateForSelection(UnitManager unit, out string reason)
+    {
+        reason = string.Empty;
+        CommitTemporaryTakeoffSelectionState();
+
+        if (unit == null)
+            return false;
+
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : unit.BoardTilemap;
+        PodeDecolarReport takeoffReport = PodeDecolarSensor.Evaluate(unit, boardMap, terrainDatabase);
+        if (takeoffReport == null || takeoffReport.takeoffMoveOptions == null || takeoffReport.takeoffMoveOptions.Count == 0)
+        {
+            reason = takeoffReport != null ? takeoffReport.explicacao : string.Empty;
+            return false;
+        }
+
+        if (takeoffReport.takeoffMoveOptions.Count == 1 && takeoffReport.takeoffMoveOptions[0] == -1)
+        {
+            TryPromoteAirborneUnitToPreferredHeight(unit, out reason);
+            return false;
+        }
+
+        if (!takeoffReport.status)
+        {
+            reason = takeoffReport.explicacao;
+            return false;
+        }
+
+        Domain originalDomain = unit.GetDomain();
+        HeightLevel originalHeight = unit.GetHeightLevel();
+        bool originalGrounded = unit.IsAircraftGrounded;
+        bool originalEmbarkedInCarrier = unit.IsAircraftEmbarkedInCarrier;
+
+        bool fullMoveTakeoff = takeoffReport.takeoffMoveOptions.Contains(9);
+        HeightLevel targetHeight = fullMoveTakeoff ? unit.GetPreferredAirHeight() : HeightLevel.AirLow;
+        if (!unit.TrySetCurrentLayerMode(Domain.Air, targetHeight))
+        {
+            reason = "Falha ao aplicar decolagem temporaria para selecao.";
+            return false;
+        }
+
+        temporaryTakeoffUnit = unit;
+        temporaryTakeoffOriginalDomain = originalDomain;
+        temporaryTakeoffOriginalHeight = originalHeight;
+        temporaryTakeoffOriginalGrounded = originalGrounded;
+        temporaryTakeoffOriginalEmbarkedInCarrier = originalEmbarkedInCarrier;
+        hasTemporaryTakeoffSelectionState = true;
+        temporaryTakeoffMoveOptions.Clear();
+        temporaryTakeoffMoveOptions.AddRange(takeoffReport.takeoffMoveOptions);
+
+        unit.SetAircraftGrounded(false);
+        unit.SetAircraftEmbarkedInCarrier(false);
+        reason = takeoffReport.explicacao;
+        return true;
+    }
+
+    private bool TryPromoteAirborneUnitToPreferredHeight(UnitManager unit, out string info)
+    {
+        info = string.Empty;
+        if (unit == null)
+            return false;
+        if (unit.GetDomain() != Domain.Air || unit.IsAircraftGrounded)
+            return false;
+
+        Domain startDomain = unit.GetDomain();
+        HeightLevel startHeight = unit.GetHeightLevel();
+        HeightLevel preferred = unit.GetPreferredAirHeight();
+        if (startHeight == preferred)
+        {
+            info = "Aeronave em voo ja esta na altitude nativa.";
+            return false;
+        }
+
+        if (!unit.TrySetCurrentLayerMode(Domain.Air, preferred))
+            return false;
+
+        hasAutoPromotionEntryLayer = true;
+        autoPromotionUnit = unit;
+        autoPromotionEntryDomain = startDomain;
+        autoPromotionEntryHeight = startHeight;
+        info = $"Aeronave em voo ajustada para altitude nativa ({preferred}).";
+        return true;
+    }
+
+    private bool IsTakeoffMoveDistanceAllowed(int movementSteps)
+    {
+        if (!hasTemporaryTakeoffSelectionState || temporaryTakeoffMoveOptions.Count == 0)
+            return true;
+
+        movementSteps = Mathf.Max(0, movementSteps);
+        if (temporaryTakeoffMoveOptions.Contains(9))
+            return movementSteps == 0 || movementSteps >= 1;
+
+        return temporaryTakeoffMoveOptions.Contains(movementSteps);
+    }
+
+    private bool IsRangeCellAllowedByTakeoffOptions(Vector3Int cell, IReadOnlyList<Vector3Int> path)
+    {
+        if (!hasTemporaryTakeoffSelectionState || temporaryTakeoffMoveOptions.Count == 0 || selectedUnit == null)
+            return true;
+
+        if (temporaryTakeoffMoveOptions.Contains(-1) || temporaryTakeoffMoveOptions.Contains(9))
+            return true;
+
+        int movementHexes = (path != null && path.Count > 0) ? Mathf.Max(0, path.Count - 1) : 0;
+        if (temporaryTakeoffMoveOptions.Contains(0) && temporaryTakeoffMoveOptions.Contains(1))
+            return movementHexes <= 1;
+        if (temporaryTakeoffMoveOptions.Contains(0))
+            return movementHexes == 0;
+        if (temporaryTakeoffMoveOptions.Contains(1))
+            return movementHexes == 1;
+
+        return true;
+    }
+
+    private bool TryGetAutoPromotionEntryLayer(out Domain domain, out HeightLevel height)
+    {
+        domain = autoPromotionEntryDomain;
+        height = autoPromotionEntryHeight;
+        return hasAutoPromotionEntryLayer;
     }
 
     private void TryAutoAssignReferences()
