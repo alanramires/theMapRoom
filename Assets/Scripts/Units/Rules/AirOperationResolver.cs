@@ -592,6 +592,9 @@ public static class AirOperationResolver
         if (data == null)
             return HeightLevel.AirLow;
 
+        if (data.useExplicitPreferredAirHeight)
+            return data.preferredAirHeight == HeightLevel.AirHigh ? HeightLevel.AirHigh : HeightLevel.AirLow;
+
         if (data.domain == Domain.Air && (data.heightLevel == HeightLevel.AirLow || data.heightLevel == HeightLevel.AirHigh))
             return data.heightLevel;
 

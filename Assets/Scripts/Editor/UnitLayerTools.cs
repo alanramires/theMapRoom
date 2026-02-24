@@ -5,17 +5,19 @@ using UnityEngine.SceneManagement;
 
 public static class UnitLayerTools
 {
+    private const int DefaultObservationRange = 3;
     private const string ApplyDataMenuPath = "Tools/Units/Propagate Unit Data (Apply From Database)";
     private const string UnitPrefabPath = "Assets/Prefab/unit.prefab";
 
     [MenuItem(ApplyDataMenuPath)]
     private static void PropagateUnitData()
     {
+        int migratedUnitDataAssets = PropagateUnitDataAssetDefaults();
         UnitHudController sourceHud = LoadSourceHudFromPrefab();
         UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         if (units == null || units.Length == 0)
         {
-            Debug.Log("[UnitLayerTools] Nenhuma unidade encontrada na cena.");
+            Debug.Log($"[UnitLayerTools] Nenhuma unidade encontrada na cena. UnitData migrados (visao): {migratedUnitDataAssets}.");
             return;
         }
 
@@ -39,7 +41,36 @@ public static class UnitLayerTools
         }
 
         EditorSceneManager.MarkAllScenesDirty();
-        Debug.Log($"[UnitLayerTools] {updated} unidade(s) sincronizadas com UnitData. Layout HUD propagado em {hudUpdated} unidade(s).");
+        Debug.Log($"[UnitLayerTools] {updated} unidade(s) sincronizadas com UnitData (inclui preferencias Air/Naval). Layout HUD propagado em {hudUpdated} unidade(s). UnitData migrados (visao): {migratedUnitDataAssets}.");
+    }
+
+    private static int PropagateUnitDataAssetDefaults()
+    {
+        string[] guids = AssetDatabase.FindAssets("t:UnitData");
+        if (guids == null || guids.Length == 0)
+            return 0;
+
+        int migrated = 0;
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            if (string.IsNullOrWhiteSpace(path))
+                continue;
+
+            UnitData data = AssetDatabase.LoadAssetAtPath<UnitData>(path);
+            if (data == null || data.visao > 0)
+                continue;
+
+            Undo.RecordObject(data, "Propagate UnitData Observation Range");
+            data.visao = DefaultObservationRange;
+            EditorUtility.SetDirty(data);
+            migrated++;
+        }
+
+        if (migrated > 0)
+            AssetDatabase.SaveAssets();
+
+        return migrated;
     }
 
     private static UnitHudController LoadSourceHudFromPrefab()

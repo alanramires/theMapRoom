@@ -5,14 +5,23 @@ using UnityEngine.Tilemaps;
 
 public class PodeMirarSensorDebugWindow : EditorWindow
 {
+    private struct ObserverLineSegment
+    {
+        public Vector3Int startCell;
+        public Vector3Int endCell;
+        public string label;
+    }
+
     [SerializeField] private UnitManager selectedUnit;
     [SerializeField] private TurnStateManager turnStateManager;
+    [SerializeField] private MatchController matchController;
     [SerializeField] private Tilemap overrideTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
     [SerializeField] private Color rangeOverlayColor = new Color(0.2f, 0.8f, 1f, 0.45f);
     [SerializeField] private Color lineOfFireOverlayColor = new Color(1f, 0.35f, 0.35f, 0.45f);
     [SerializeField] private SensorMovementMode movementMode = SensorMovementMode.MoveuParado;
+    [SerializeField] private bool useGameplaySensorContext = true;
     [SerializeField] private bool logToConsole = true;
 
     private readonly List<PodeMirarTargetOption> results = new List<PodeMirarTargetOption>();
@@ -25,6 +34,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
     private List<Vector3Int> selectedLineIntermediateCells = new List<Vector3Int>();
     private Color selectedLineColor = Color.green;
     private string selectedLineLabel = string.Empty;
+    private readonly List<ObserverLineSegment> selectedObserverLines = new List<ObserverLineSegment>();
     private bool isRangeMapPainted;
     private bool isLineOfFireMapPainted;
     private readonly List<Vector3Int> paintedRangeCells = new List<Vector3Int>();
@@ -56,10 +66,12 @@ public class PodeMirarSensorDebugWindow : EditorWindow
 
         selectedUnit = (UnitManager)EditorGUILayout.ObjectField("Unidade", selectedUnit, typeof(UnitManager), true);
         turnStateManager = (TurnStateManager)EditorGUILayout.ObjectField("TurnStateManager", turnStateManager, typeof(TurnStateManager), true);
+        matchController = (MatchController)EditorGUILayout.ObjectField("MatchController", matchController, typeof(MatchController), true);
         overrideTilemap = (Tilemap)EditorGUILayout.ObjectField("Tilemap (opcional)", overrideTilemap, typeof(Tilemap), true);
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
         dpqAirHeightConfig = (DPQAirHeightConfig)EditorGUILayout.ObjectField("DPQ Air Height", dpqAirHeightConfig, typeof(DPQAirHeightConfig), false);
         movementMode = (SensorMovementMode)EditorGUILayout.EnumPopup("Modo", movementMode);
+        useGameplaySensorContext = EditorGUILayout.ToggleLeft("Usar contexto do gameplay (TurnState + Game Setup)", useGameplaySensorContext);
         logToConsole = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
 
         EditorGUILayout.BeginHorizontal();
@@ -144,7 +156,55 @@ public class PodeMirarSensorDebugWindow : EditorWindow
 
         Tilemap map = overrideTilemap != null ? overrideTilemap : selectedUnit.BoardTilemap;
         TerrainDatabase db = terrainDatabase != null ? terrainDatabase : FindFirstTerrainDatabaseAsset();
-        bool canAim = PodeMirarSensor.CollectTargets(selectedUnit, map, db, movementMode, results, invalidResults, null, dpqAirHeightConfig);
+        SensorMovementMode effectiveMode = movementMode;
+        bool enableLdt = true;
+        bool enableLos = true;
+        bool enableSpotter = true;
+        bool enableStealth = true;
+        if (useGameplaySensorContext)
+        {
+            if (turnStateManager != null)
+            {
+                switch (turnStateManager.CurrentCursorState)
+                {
+                    case TurnStateManager.CursorState.MoveuAndando:
+                        effectiveMode = SensorMovementMode.MoveuAndando;
+                        break;
+                    case TurnStateManager.CursorState.MoveuParado:
+                    case TurnStateManager.CursorState.Mirando:
+                    case TurnStateManager.CursorState.Pousando:
+                    case TurnStateManager.CursorState.Embarcando:
+                    case TurnStateManager.CursorState.Desembarcando:
+                    case TurnStateManager.CursorState.UnitSelected:
+                    case TurnStateManager.CursorState.Neutral:
+                    default:
+                        effectiveMode = SensorMovementMode.MoveuParado;
+                        break;
+                }
+            }
+
+            if (matchController != null)
+            {
+                enableLdt = matchController.EnableLdtValidation;
+                enableLos = matchController.EnableLosValidation;
+                enableSpotter = matchController.EnableSpotter;
+                enableStealth = matchController.EnableStealthValidation;
+            }
+        }
+
+        bool canAim = PodeMirarSensor.CollectTargets(
+            selectedUnit,
+            map,
+            db,
+            effectiveMode,
+            results,
+            invalidResults,
+            null,
+            dpqAirHeightConfig,
+            enableLdt,
+            enableLos,
+            enableSpotter,
+            enableStealth);
         statusMessage = canAim
             ? $"Sensor TRUE. {results.Count} opcao(oes) valida(s), {invalidResults.Count} invalida(s)."
             : $"Sensor FALSE. Nenhum alvo elegivel ({invalidResults.Count} invalido(s)).";
@@ -152,7 +212,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
         if (!logToConsole)
             return;
 
-        Debug.Log($"[PodeMirarSensorDebug] Unit={selectedUnit.name}, Mode={movementMode}, CanAim={canAim}, Validos={results.Count}, Invalidos={invalidResults.Count}");
+        Debug.Log($"[PodeMirarSensorDebug] Unit={selectedUnit.name}, Mode={effectiveMode}, GameSetup(LdT={enableLdt},LoS={enableLos},Spotter={enableSpotter},Stealth={enableStealth}), CanAim={canAim}, Validos={results.Count}, Invalidos={invalidResults.Count}");
         for (int i = 0; i < results.Count; i++)
         {
             PodeMirarTargetOption item = results[i];
@@ -168,8 +228,10 @@ public class PodeMirarSensorDebugWindow : EditorWindow
             string counterWeapon = item.defenderCounterWeapon != null
                 ? (!string.IsNullOrWhiteSpace(item.defenderCounterWeapon.displayName) ? item.defenderCounterWeapon.displayName : item.defenderCounterWeapon.name)
                 : "-";
+            string observerName = item.forwardObserverUnit != null ? item.forwardObserverUnit.name : "-";
+            string observerReason = !string.IsNullOrWhiteSpace(item.forwardObserverReason) ? item.forwardObserverReason : "-";
 
-            Debug.Log($"[PodeMirarSensorDebug][VALIDO] {i + 1}. {attackerName} -> {targetName} | arma={weaponName} | dist={item.distance} | posAtacante={item.attackerPositionLabel} | posDefensor={item.defenderPositionLabel} | alvoLayer={targetLayer} | revide={item.defenderCanCounterAttack} | armaRevide={counterWeapon} | distRevide={item.defenderCounterDistance} | linha={FormatCells(item.lineOfFireIntermediateCells)}");
+            Debug.Log($"[PodeMirarSensorDebug][VALIDO] {i + 1}. {attackerName} -> {targetName} | arma={weaponName} | dist={item.distance} | posAtacante={item.attackerPositionLabel} | posDefensor={item.defenderPositionLabel} | alvoLayer={targetLayer} | spotter={(item.usedForwardObserver ? "sim" : "nao")} | observer={observerName} | motivoObserver={observerReason} | revide={item.defenderCanCounterAttack} | armaRevide={counterWeapon} | distRevide={item.defenderCounterDistance} | linha={FormatCells(item.lineOfFireIntermediateCells)}");
         }
 
         for (int i = 0; i < invalidResults.Count; i++)
@@ -192,6 +254,8 @@ public class PodeMirarSensorDebugWindow : EditorWindow
     {
         if (turnStateManager == null)
             turnStateManager = Object.FindAnyObjectByType<TurnStateManager>();
+        if (matchController == null)
+            matchController = Object.FindAnyObjectByType<MatchController>();
 
         if (overrideTilemap == null)
             overrideTilemap = FindPreferredTilemap();
@@ -306,11 +370,15 @@ public class PodeMirarSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Defensor revida ?", item.defenderCanCounterAttack ? "Sim" : "Nao");
         EditorGUILayout.LabelField("Com que arma", counterWeapon);
         EditorGUILayout.LabelField("Distancia (revide)", item.defenderCanCounterAttack ? item.defenderCounterDistance.ToString() : "-");
+        EditorGUILayout.LabelField("Usou Forward Observer", item.usedForwardObserver ? "Sim" : "Nao");
+        EditorGUILayout.LabelField("Forward Observer", item.forwardObserverUnit != null ? item.forwardObserverUnit.name : "-");
+        if (!string.IsNullOrWhiteSpace(item.forwardObserverReason))
+            EditorGUILayout.LabelField("Motivo (Observer)", item.forwardObserverReason);
         if (!item.defenderCanCounterAttack)
             EditorGUILayout.LabelField("Motivo sem revide", string.IsNullOrWhiteSpace(item.defenderCounterReason) ? "-" : item.defenderCounterReason);
         EditorGUILayout.LabelField("Linha (hexes intermediarios)", FormatCells(item.lineOfFireIntermediateCells));
         if (GUILayout.Button("Desenhar Linha no Scene View"))
-            SelectLineForDrawing(item.attackerUnit, item.targetUnit, item.lineOfFireIntermediateCells, Color.green, $"VAL: {attackerName} -> {targetName}");
+            SelectLineForDrawing(item.attackerUnit, item.targetUnit, item.lineOfFireIntermediateCells, Color.green, $"VAL: {attackerName} -> {targetName}", item.forwardObserverCandidates);
         EditorGUILayout.EndVertical();
     }
 
@@ -358,7 +426,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
         return sb.ToString();
     }
 
-    private void SelectLineForDrawing(UnitManager attacker, UnitManager target, List<Vector3Int> intermediateCells, Color color, string label)
+    private void SelectLineForDrawing(UnitManager attacker, UnitManager target, List<Vector3Int> intermediateCells, Color color, string label, List<UnitManager> observerUnits = null)
     {
         if (attacker == null || target == null)
             return;
@@ -370,6 +438,28 @@ public class PodeMirarSensorDebugWindow : EditorWindow
         selectedLineIntermediateCells = intermediateCells != null ? new List<Vector3Int>(intermediateCells) : new List<Vector3Int>();
         selectedLineColor = color;
         selectedLineLabel = label;
+        selectedObserverLines.Clear();
+        if (observerUnits != null)
+        {
+            HashSet<UnitManager> uniqueObservers = new HashSet<UnitManager>(observerUnits);
+            foreach (UnitManager observer in uniqueObservers)
+            {
+                if (observer == null || !observer.gameObject.activeInHierarchy)
+                    continue;
+
+                Vector3Int observerCell = observer.CurrentCellPosition;
+                observerCell.z = 0;
+                if (observerCell == selectedLineEndCell)
+                    continue;
+
+                selectedObserverLines.Add(new ObserverLineSegment
+                {
+                    startCell = observerCell,
+                    endCell = selectedLineEndCell,
+                    label = $"OBS: {observer.name} -> alvo"
+                });
+            }
+        }
         hasSelectedLine = true;
         SceneView.RepaintAll();
     }
@@ -400,6 +490,18 @@ public class PodeMirarSensorDebugWindow : EditorWindow
 
         Vector3 mid = Vector3.Lerp(start, end, 0.5f);
         Handles.Label(mid + new Vector3(0.1f, 0.1f, 0f), selectedLineLabel);
+
+        Handles.color = new Color(1f, 0.8f, 0.1f, 1f);
+        for (int i = 0; i < selectedObserverLines.Count; i++)
+        {
+            ObserverLineSegment observerLine = selectedObserverLines[i];
+            Vector3 obsStart = map.GetCellCenterWorld(observerLine.startCell);
+            Vector3 obsEnd = map.GetCellCenterWorld(observerLine.endCell);
+            Handles.DrawDottedLine(obsStart, obsEnd, 4f);
+            Handles.SphereHandleCap(0, obsStart, Quaternion.identity, 0.10f, EventType.Repaint);
+            Vector3 obsMid = Vector3.Lerp(obsStart, obsEnd, 0.5f);
+            Handles.Label(obsMid + new Vector3(0.08f, -0.08f, 0f), observerLine.label);
+        }
     }
 
     private Tilemap ResolveDrawTilemap()
@@ -563,6 +665,8 @@ public class PodeMirarSensorDebugWindow : EditorWindow
             return;
 
         SerializedObject so = new SerializedObject(turnStateManager);
+        if (matchController == null)
+            matchController = so.FindProperty("matchController")?.objectReferenceValue as MatchController;
         if (terrainDatabase == null)
             terrainDatabase = so.FindProperty("terrainDatabase")?.objectReferenceValue as TerrainDatabase;
         if (dpqAirHeightConfig == null)

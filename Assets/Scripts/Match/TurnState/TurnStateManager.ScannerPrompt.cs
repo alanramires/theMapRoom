@@ -13,17 +13,78 @@ public partial class TurnStateManager
         MirandoCycleTarget = 1,
         MirandoConfirmTarget = 2,
         EmbarkCycleTarget = 3,
-        EmbarkConfirmTarget = 4
+        EmbarkConfirmTarget = 4,
+        LandingCycleOption = 5,
+        LandingConfirmOption = 6
+    }
+
+    private enum LandingOptionAction
+    {
+        None = 0,
+        DescendToAirLow = 1,
+        AscendToAirHigh = 2,
+        Land = 3,
+        DomainTransition = 4
+    }
+
+    private readonly struct LandingOption
+    {
+        public readonly LandingOptionAction action;
+        public readonly string label;
+        public readonly Domain fromDomain;
+        public readonly HeightLevel fromHeightLevel;
+        public readonly Domain toDomain;
+        public readonly HeightLevel toHeightLevel;
+
+        public LandingOption(LandingOptionAction action, string label)
+        {
+            this.action = action;
+            this.label = label ?? string.Empty;
+            fromDomain = Domain.Land;
+            fromHeightLevel = HeightLevel.Surface;
+            toDomain = Domain.Land;
+            toHeightLevel = HeightLevel.Surface;
+        }
+
+        public LandingOption(
+            LandingOptionAction action,
+            string label,
+            Domain fromDomain,
+            HeightLevel fromHeightLevel,
+            Domain toDomain,
+            HeightLevel toHeightLevel)
+        {
+            this.action = action;
+            this.label = label ?? string.Empty;
+            this.fromDomain = fromDomain;
+            this.fromHeightLevel = fromHeightLevel;
+            this.toDomain = toDomain;
+            this.toHeightLevel = toHeightLevel;
+        }
+    }
+
+    private sealed class MirandoSpotterPreviewTrack
+    {
+        public readonly List<LineRenderer> renderers = new List<LineRenderer>();
+        public readonly List<Vector3> pathPoints = new List<Vector3>();
+        public readonly List<Vector3> tempSegmentPoints = new List<Vector3>();
+        public float pathLength;
+        public float headDistance;
     }
 
     private ScannerPromptStep scannerPromptStep = ScannerPromptStep.AwaitingAction;
     private int scannerSelectedTargetIndex = -1;
     private int scannerSelectedEmbarkIndex = -1;
+    private int scannerSelectedLandingIndex = -1;
     private bool embarkExecutionInProgress;
+    private bool landingExecutionInProgress;
     private CursorState cursorStateBeforeMirando = CursorState.MoveuParado;
+    private CursorState cursorStateBeforeEmbarcando = CursorState.MoveuParado;
+    private CursorState cursorStateBeforePousando = CursorState.MoveuParado;
     private CursorState lastLoggedCursorState = (CursorState)(-1);
+    private ScannerPromptStep lastLoggedScannerPromptStep = (ScannerPromptStep)(-1);
     private UnitManager lastLoggedSelectedUnit;
-    private LineRenderer mirandoPreviewRenderer;
+    private readonly List<LineRenderer> mirandoPreviewRenderers = new List<LineRenderer>();
     private readonly List<Vector3> mirandoPreviewPathPoints = new List<Vector3>();
     private readonly List<Vector3> mirandoPreviewSegmentPoints = new List<Vector3>();
     private float mirandoPreviewPathLength;
@@ -34,12 +95,15 @@ public partial class TurnStateManager
     private WeaponTrajectoryType mirandoPreviewLastTrajectory;
     private float mirandoPreviewLastBend;
     private int mirandoPreviewLastSamples;
+    private readonly List<MirandoSpotterPreviewTrack> mirandoSpotterPreviewTracks = new List<MirandoSpotterPreviewTrack>();
     private LineRenderer embarkPreviewRenderer;
     private readonly List<Vector3> embarkPreviewPathPoints = new List<Vector3>();
     private readonly List<Vector3> embarkPreviewSegmentPoints = new List<Vector3>();
     private float embarkPreviewPathLength;
     private float embarkPreviewHeadDistance;
     private Color embarkPreviewColor = Color.white;
+    private readonly List<LandingOption> cachedLandingOptions = new List<LandingOption>();
+    private string landingOptionUnavailableReason = string.Empty;
 
     private void Update()
     {
@@ -55,17 +119,24 @@ public partial class TurnStateManager
             return;
 
         bool stateChanged = lastLoggedCursorState != cursorState;
+        bool substepChanged = lastLoggedScannerPromptStep != scannerPromptStep;
         bool selectedChanged = lastLoggedSelectedUnit != selectedUnit;
-        if (!stateChanged && !selectedChanged)
+        if (!stateChanged && !selectedChanged && !substepChanged)
             return;
 
+        ScannerPromptStep previousSubstep = lastLoggedScannerPromptStep;
         lastLoggedCursorState = cursorState;
+        lastLoggedScannerPromptStep = scannerPromptStep;
         lastLoggedSelectedUnit = selectedUnit;
         string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
         Debug.Log($"[TurnState] state={cursorState} | selected={selectedName}");
+        if (substepChanged)
+        {
+            bool rollback = previousSubstep != (ScannerPromptStep)(-1) && (int)scannerPromptStep < (int)previousSubstep;
+            string rollbackTag = rollback ? " [roll back]" : string.Empty;
+            Debug.Log($"[TurnState]{rollbackTag} substep={previousSubstep} -> {scannerPromptStep} | state={cursorState}");
+        }
 
-        if ((cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado) && selectedUnit != null)
-            LogScannerPanel();
     }
 
     private void ResetScannerPromptState()
@@ -73,6 +144,8 @@ public partial class TurnStateManager
         scannerPromptStep = ScannerPromptStep.AwaitingAction;
         scannerSelectedTargetIndex = -1;
         scannerSelectedEmbarkIndex = -1;
+        scannerSelectedLandingIndex = -1;
+        cachedLandingOptions.Clear();
         ClearMirandoPreview();
         ClearEmbarkPreview();
     }
@@ -86,7 +159,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        if ((cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado) &&
+        if (cursorState == CursorState.Embarcando &&
             scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget)
         {
             scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
@@ -94,19 +167,31 @@ public partial class TurnStateManager
             return true;
         }
 
-        if ((cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado) &&
+        if (cursorState == CursorState.Embarcando &&
             scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget)
         {
-            ResetScannerPromptState();
-            if (cursorState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
-                DrawCommittedPathVisual(committedMovementPath);
-            if (cursorController != null && selectedUnit != null)
+            ExitEmbarkStateToMovement();
+            return true;
+        }
+
+        if (cursorState == CursorState.Pousando &&
+            scannerPromptStep == ScannerPromptStep.LandingConfirmOption)
+        {
+            if (cachedLandingOptions.Count <= 1)
             {
-                Vector3Int unitCell = selectedUnit.CurrentCellPosition;
-                unitCell.z = 0;
-                cursorController.SetCell(unitCell, playMoveSfx: false);
+                ExitLandingStateToMovement();
+                return true;
             }
-            LogScannerPanel();
+
+            scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+            LogLandingSelectionPanel();
+            return true;
+        }
+
+        if (cursorState == CursorState.Pousando &&
+            scannerPromptStep == ScannerPromptStep.LandingCycleOption)
+        {
+            ExitLandingStateToMovement();
             return true;
         }
 
@@ -115,17 +200,23 @@ public partial class TurnStateManager
 
     private void ProcessScannerPromptInput()
     {
-        if (IsMovementAnimationRunning() || embarkExecutionInProgress)
+        if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress)
             return;
 
         if (cursorState == CursorState.Mirando)
             return;
 
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        bool isMovementScannerState = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
+        bool isLandingScannerState = cursorState == CursorState.Pousando;
+        bool isEmbarkScannerState = cursorState == CursorState.Embarcando;
+        if (!isMovementScannerState && !isLandingScannerState && !isEmbarkScannerState)
             return;
 
         if (scannerPromptStep == ScannerPromptStep.AwaitingAction)
         {
+            if (!isMovementScannerState)
+                return;
+
             if (WasLetterPressedThisFrame('A'))
             {
                 HandleAimActionRequested();
@@ -140,7 +231,7 @@ public partial class TurnStateManager
 
             if (WasLetterPressedThisFrame('L'))
             {
-                HandleAircraftOperationRequested();
+                HandleLandingSensorRequested();
                 return;
             }
 
@@ -153,7 +244,8 @@ public partial class TurnStateManager
             return;
         }
 
-        if (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget || scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget)
+        if (cursorState == CursorState.Embarcando &&
+            (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget || scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget))
         {
             if (TryReadPressedNumber(out int number))
             {
@@ -170,6 +262,16 @@ public partial class TurnStateManager
                         Debug.Log($"Confirma embarque {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
                     }
                 }
+            }
+        }
+
+        if (cursorState == CursorState.Pousando &&
+            scannerPromptStep == ScannerPromptStep.LandingCycleOption)
+        {
+            if (TryReadPressedNumber(out int number))
+            {
+                int index = number - 1;
+                PromptLandingOptionConfirmation(index, playConfirmSfx: true);
             }
         }
 
@@ -204,47 +306,47 @@ public partial class TurnStateManager
         Debug.Log("[Acao] Apenas Mover (\"M\") indisponivel no estado atual.");
     }
 
-    private void HandleAircraftOperationRequested()
+    private void HandleLandingSensorRequested()
     {
-        SensorMovementMode movementMode = cursorState == CursorState.MoveuAndando
-            ? SensorMovementMode.MoveuAndando
-            : SensorMovementMode.MoveuParado;
+        if (selectedUnit == null)
+            return;
+        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            return;
 
-        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : (selectedUnit != null ? selectedUnit.BoardTilemap : null);
-        if (!AircraftOperationRules.TryApplyOperation(selectedUnit, boardMap, terrainDatabase, movementMode, out AircraftOperationDecision decision))
+        BuildLandingOptionsFromCurrentState();
+
+        if (cachedLandingOptions.Count == 0)
         {
-            string reason = !string.IsNullOrWhiteSpace(decision.reason) ? decision.reason : "Sem operacao aerea valida.";
-            Debug.Log($"Operacao Aerea (\"L\"): {reason}");
+            string reason = !string.IsNullOrWhiteSpace(landingOptionUnavailableReason)
+                ? landingOptionUnavailableReason
+                : "Sem opcoes de mudanca de camada neste contexto.";
+            Debug.Log($"Pode Mudar de Altitude (\"L\"): {reason}");
+            LogScannerPanel();
             return;
         }
 
-        cursorController?.PlayConfirmSfx();
-        Debug.Log($"[Operacao Aerea] {decision.label} executado.");
-
-        if (decision.consumesAction)
+        cursorStateBeforePousando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+        SetCursorState(CursorState.Pousando, "HandleLandingSensorRequested");
+        ClearCommittedPathVisual();
+        scannerSelectedLandingIndex = 0;
+        if (cachedLandingOptions.Count == 1)
         {
-            bool finished = TryFinalizeSelectedUnitActionFromDebug();
-            if (finished)
-            {
-                cursorController?.PlayDoneSfx();
-                ResetScannerPromptState();
-                return;
-            }
+            // Auto-select when there is a single possible landing action.
+            PromptLandingOptionConfirmation(0, playConfirmSfx: true);
         }
-
-        cursorState = CursorState.UnitSelected;
-        ClearSensorResults();
-        PaintSelectedUnitMovementRange();
-        if (cursorController != null && selectedUnit != null)
+        else
         {
-            Vector3Int unitCell = selectedUnit.CurrentCellPosition;
-            unitCell.z = 0;
-            cursorController.SetCell(unitCell, playMoveSfx: false);
+            scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+            cursorController?.PlayConfirmSfx();
+            LogLandingSelectionPanel();
         }
     }
 
     private void HandleEmbarkActionRequested()
     {
+        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            return;
+
         bool hasValid = cachedPodeEmbarcarTargets.Count > 0;
         if (!hasValid)
         {
@@ -255,11 +357,53 @@ public partial class TurnStateManager
 
         cursorController?.PlayConfirmSfx();
         // Mesma regra do Mirando: ao entrar em um submenu de sensor, oculta o preview de movimento.
+        cursorStateBeforeEmbarcando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+        SetCursorState(CursorState.Embarcando, "HandleEmbarkActionRequested");
         ClearCommittedPathVisual();
         scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
         scannerSelectedEmbarkIndex = 0;
         FocusCurrentEmbarkTarget(logDetails: true);
         LogEmbarkSelectionPanel();
+    }
+
+    private void LogLandingSelectionPanel()
+    {
+        if (cachedLandingOptions.Count <= 0)
+        {
+            Debug.Log("[Landing] Sem opcoes.");
+            return;
+        }
+
+        if (scannerSelectedLandingIndex < 0 || scannerSelectedLandingIndex >= cachedLandingOptions.Count)
+            scannerSelectedLandingIndex = 0;
+
+        string text = $"Opcoes de Altitude/Camada: {cachedLandingOptions.Count}\n";
+        text += "Digite 1..9 ou use setas para selecionar.\n";
+        for (int i = 0; i < cachedLandingOptions.Count; i++)
+        {
+            string marker = i == scannerSelectedLandingIndex ? ">" : " ";
+            text += $"{marker} {i + 1}. {cachedLandingOptions[i].label}\n";
+        }
+
+        if (scannerPromptStep == ScannerPromptStep.LandingConfirmOption && scannerSelectedLandingIndex >= 0 && scannerSelectedLandingIndex < cachedLandingOptions.Count)
+            text += $"Confirma \"{cachedLandingOptions[scannerSelectedLandingIndex].label}\"? (Enter=sim, ESC=nao)\n";
+        else
+            text += "Enter confirma opcao selecionada | ESC volta\n";
+
+        bool hasLandOption = false;
+        for (int i = 0; i < cachedLandingOptions.Count; i++)
+        {
+            if (cachedLandingOptions[i].action == LandingOptionAction.Land)
+            {
+                hasLandOption = true;
+                break;
+            }
+        }
+
+        if (!hasLandOption && !string.IsNullOrWhiteSpace(landingOptionUnavailableReason))
+            text += $"Mudanca de camada indisponivel: {landingOptionUnavailableReason}\n";
+
+        Debug.Log(text);
     }
 
     private void FocusFirstOptionForAction(char actionCode)
@@ -300,9 +444,720 @@ public partial class TurnStateManager
         }
     }
 
+    private bool TryConfirmScannerLanding()
+    {
+        if (cursorState != CursorState.Pousando)
+            return false;
+
+        if (scannerPromptStep == ScannerPromptStep.LandingCycleOption)
+        {
+            if (cachedLandingOptions.Count <= 0)
+                return true;
+
+            if (scannerSelectedLandingIndex < 0 || scannerSelectedLandingIndex >= cachedLandingOptions.Count)
+                scannerSelectedLandingIndex = 0;
+
+            PromptLandingOptionConfirmation(scannerSelectedLandingIndex, playConfirmSfx: true);
+            return true;
+        }
+
+        if (scannerPromptStep != ScannerPromptStep.LandingConfirmOption)
+            return false;
+
+        if (scannerSelectedLandingIndex < 0 || scannerSelectedLandingIndex >= cachedLandingOptions.Count)
+        {
+            scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+            scannerSelectedLandingIndex = 0;
+            LogLandingSelectionPanel();
+            return true;
+        }
+
+        LandingOption picked = cachedLandingOptions[scannerSelectedLandingIndex];
+        Debug.Log($"[LayerOperation] Confirmado: {picked.fromDomain}/{picked.fromHeightLevel} -> {picked.toDomain}/{picked.toHeightLevel} (action={picked.action})");
+        landingExecutionInProgress = true;
+        StartCoroutine(ExecuteLandingOptionSequence(picked));
+        return true;
+    }
+
+    private void PromptLandingOptionConfirmation(int index, bool playConfirmSfx)
+    {
+        if (cachedLandingOptions.Count <= 0)
+            return;
+        if (index < 0 || index >= cachedLandingOptions.Count)
+            return;
+
+        scannerSelectedLandingIndex = index;
+        scannerPromptStep = ScannerPromptStep.LandingConfirmOption;
+        if (playConfirmSfx)
+            cursorController?.PlayConfirmSfx();
+
+        LandingOption option = cachedLandingOptions[scannerSelectedLandingIndex];
+        Debug.Log($"Confirma \"{option.label}\"? (Enter=sim, ESC=nao)");
+    }
+
+    private System.Collections.IEnumerator ExecuteLandingOptionSequence(LandingOption option)
+    {
+        try
+        {
+            if (selectedUnit == null)
+            {
+                scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+                yield break;
+            }
+
+            Tilemap boardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
+            switch (option.action)
+            {
+                case LandingOptionAction.DescendToAirLow:
+                {
+                    if (!selectedUnit.TrySetCurrentLayerMode(Domain.Air, HeightLevel.AirLow))
+                    {
+                        Debug.Log("[Landing] Falha ao aplicar transicao para Air/Low.");
+                        scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+                        LogLandingSelectionPanel();
+                        yield break;
+                    }
+
+                    cursorController?.PlayConfirmSfx();
+
+                    // Descer de Air/High para Air/Low consome a acao da unidade e encerra turno.
+                    bool finished = TryFinalizeSelectedUnitActionFromDebug();
+                    if (finished)
+                    {
+                        cursorController?.PlayDoneSfx();
+                        ResetScannerPromptState();
+                        yield break;
+                    }
+
+                    ExitLandingStateToMovement(rollback: false);
+                    RefreshSensorsForCurrentState();
+                    break;
+                }
+                case LandingOptionAction.AscendToAirHigh:
+                {
+                    PlayMovementStartSfx(selectedUnit);
+                    float duration = GetEmbarkAirHighToGroundDuration() * Mathf.Clamp01(GetEmbarkHighToLowNormalizedTime());
+                    if (duration > 0f)
+                        yield return new WaitForSeconds(duration);
+                    selectedUnit.TrySetCurrentLayerMode(Domain.Air, HeightLevel.AirHigh);
+                    cursorController?.PlayConfirmSfx();
+                    bool ascendFinished = TryFinalizeSelectedUnitActionFromDebug();
+                    if (ascendFinished)
+                    {
+                        cursorController?.PlayDoneSfx();
+                        ResetScannerPromptState();
+                        yield break;
+                    }
+                    ExitLandingStateToMovement(rollback: false);
+                    RefreshSensorsForCurrentState();
+                    break;
+                }
+                case LandingOptionAction.Land:
+                {
+                    bool isAirToGroundLanding =
+                        option.fromDomain == Domain.Air &&
+                        option.toDomain == Domain.Land &&
+                        option.toHeightLevel == HeightLevel.Surface;
+                    if (!isAirToGroundLanding)
+                    {
+                        Debug.Log("[Landing] Opcao Land fora de Air->Land detectada. Aplicando como transicao de camada.");
+                        PlayMovementStartSfx(selectedUnit);
+                        float transitionDuration = GetLayerOperationTransitionDuration();
+                        if (transitionDuration > 0f)
+                            yield return new WaitForSeconds(transitionDuration);
+
+                        if (!TryApplyDomainTransitionOption(option, boardMap))
+                        {
+                            scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+                            LogLandingSelectionPanel();
+                            yield break;
+                        }
+
+                        float postTransitionDelay = GetLayerOperationAfterTransitionDelay();
+                        if (postTransitionDelay > 0f)
+                            yield return new WaitForSeconds(postTransitionDelay);
+
+                        cursorController?.PlayConfirmSfx();
+                        bool domainTransitionFinished = TryFinalizeSelectedUnitActionFromDebug();
+                        if (domainTransitionFinished)
+                        {
+                            cursorController?.PlayDoneSfx();
+                            ResetScannerPromptState();
+                            yield break;
+                        }
+
+                        ExitLandingStateToMovement(rollback: false);
+                        RefreshSensorsForCurrentState();
+                        break;
+                    }
+
+                    SensorMovementMode movementMode = ResolveLandingMovementMode();
+                    AircraftOperationDecision decision = AircraftOperationRules.Evaluate(
+                        selectedUnit,
+                        boardMap,
+                        terrainDatabase,
+                        movementMode);
+                    if (!decision.available || decision.action != AircraftOperationAction.Land)
+                    {
+                        string reason = !string.IsNullOrWhiteSpace(decision.reason) ? decision.reason : "Pouso indisponivel.";
+                        Debug.Log($"[Landing] {reason}");
+                        scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+                        LogLandingSelectionPanel();
+                        yield break;
+                    }
+
+                    PlayMovementStartSfx(selectedUnit);
+                    bool startAirHigh = selectedUnit.GetDomain() == Domain.Air && selectedUnit.GetHeightLevel() == HeightLevel.AirHigh;
+                    bool startAirLow = selectedUnit.GetDomain() == Domain.Air && selectedUnit.GetHeightLevel() == HeightLevel.AirLow;
+
+                    // Sequencia temporal igual ao padrao de embarque:
+                    // AirHigh -> (tempo normalizado) -> AirLow -> (fim do tempo) -> Land/Surface.
+                    float landingDuration;
+                    if (startAirHigh)
+                    {
+                        float totalHighToGround = GetEmbarkAirHighToGroundDuration();
+                        float highToLowAt = Mathf.Clamp(totalHighToGround * GetEmbarkHighToLowNormalizedTime(), 0f, totalHighToGround);
+                        if (highToLowAt > 0f)
+                            yield return new WaitForSeconds(highToLowAt);
+
+                        // Fallback defensivo: se nao existir modo Air/Low, segue para Ground ao fim da janela.
+                        selectedUnit.TrySetCurrentLayerMode(Domain.Air, HeightLevel.AirLow);
+                        float remainingToGround = Mathf.Max(0f, totalHighToGround - highToLowAt);
+                        if (remainingToGround > 0f)
+                            yield return new WaitForSeconds(remainingToGround);
+
+                        landingDuration = GetEmbarkAirLowToGroundDuration();
+                    }
+                    else if (startAirLow)
+                    {
+                        float totalLowToGround = GetEmbarkAirLowToGroundDuration();
+                        float lowToGroundAt = Mathf.Clamp(totalLowToGround * GetEmbarkLowToGroundNormalizedTime(), 0f, totalLowToGround);
+                        if (lowToGroundAt > 0f)
+                            yield return new WaitForSeconds(lowToGroundAt);
+                        landingDuration = Mathf.Max(0f, totalLowToGround - lowToGroundAt);
+                    }
+                    else
+                    {
+                        landingDuration = GetEmbarkForcedLandingDuration();
+                    }
+
+                    if (!selectedUnit.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface))
+                    {
+                        Debug.Log("[Landing] Falha ao aplicar pouso (Land/Surface).");
+                        scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+                        LogLandingSelectionPanel();
+                        yield break;
+                    }
+
+                    if (selectedUnit.HasSkillId("vtol"))
+                    {
+                        float vtolFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(selectedUnit) : 0f;
+                        landingDuration = Mathf.Max(landingDuration, vtolFxDuration);
+                    }
+                    if (landingDuration > 0f)
+                        yield return new WaitForSeconds(landingDuration);
+
+                    float postLandingDelay = GetEmbarkAfterForcedLandingDelay();
+                    if (postLandingDelay > 0f)
+                        yield return new WaitForSeconds(postLandingDelay);
+
+                    cursorController?.PlayConfirmSfx();
+                    bool finished = TryFinalizeSelectedUnitActionFromDebug();
+                    if (finished)
+                    {
+                        cursorController?.PlayDoneSfx();
+                        ResetScannerPromptState();
+                        yield break;
+                    }
+
+                    SetCursorState(CursorState.UnitSelected, "ExecuteLandingOptionSequence: landing without action consume");
+                    ClearSensorResults();
+                    PaintSelectedUnitMovementRange();
+                    if (cursorController != null && selectedUnit != null)
+                    {
+                        Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+                        unitCell.z = 0;
+                        cursorController.SetCell(unitCell, playMoveSfx: false);
+                    }
+                    break;
+                }
+                case LandingOptionAction.DomainTransition:
+                {
+                    PlayMovementStartSfx(selectedUnit);
+                    float transitionDuration = GetLayerOperationTransitionDuration();
+                    if (transitionDuration > 0f)
+                        yield return new WaitForSeconds(transitionDuration);
+
+                    if (!TryApplyDomainTransitionOption(option, boardMap))
+                    {
+                        scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+                        LogLandingSelectionPanel();
+                        yield break;
+                    }
+
+                    float postTransitionDelay = GetLayerOperationAfterTransitionDelay();
+                    if (postTransitionDelay > 0f)
+                        yield return new WaitForSeconds(postTransitionDelay);
+
+                    cursorController?.PlayConfirmSfx();
+                    bool finished = TryFinalizeSelectedUnitActionFromDebug();
+                    if (finished)
+                    {
+                        cursorController?.PlayDoneSfx();
+                        ResetScannerPromptState();
+                        yield break;
+                    }
+
+                    ExitLandingStateToMovement(rollback: false);
+                    RefreshSensorsForCurrentState();
+                    break;
+                }
+            }
+
+            if (cursorState == CursorState.Pousando)
+            {
+                BuildLandingOptionsFromCurrentState();
+                scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+                LogLandingSelectionPanel();
+            }
+        }
+        finally
+        {
+            landingExecutionInProgress = false;
+        }
+    }
+
+    private void BuildLandingOptionsFromCurrentState()
+    {
+        cachedLandingOptions.Clear();
+        landingOptionUnavailableReason = string.Empty;
+        scannerSelectedLandingIndex = -1;
+        if (selectedUnit == null)
+            return;
+
+        SensorMovementMode movementMode = ResolveLandingMovementMode();
+        if (TryCollectLayerOperationOptions(selectedUnit, movementMode, cachedLandingOptions, out string reason))
+        {
+            scannerSelectedLandingIndex = 0;
+            return;
+        }
+
+        landingOptionUnavailableReason = reason;
+    }
+
+    private bool TryCollectLayerOperationOptions(
+        UnitManager unit,
+        SensorMovementMode movementMode,
+        List<LandingOption> output,
+        out string unavailableReason)
+    {
+        unavailableReason = string.Empty;
+        if (output == null)
+            return false;
+
+        output.Clear();
+        if (unit == null)
+            return false;
+
+        if (ShouldBlockLayerOperationBecauseTakeoffIsRestricted(unit, out string takeoffRestrictionReason))
+        {
+            unavailableReason = takeoffRestrictionReason;
+            return false;
+        }
+
+        IReadOnlyList<UnitLayerMode> modes = unit.GetAllLayerModes();
+        if (modes == null || modes.Count <= 1)
+        {
+            unavailableReason = "Unidade sem camadas alternativas para trocar.";
+            return false;
+        }
+
+        Domain currentDomain = unit.GetDomain();
+        HeightLevel currentHeight = unit.GetHeightLevel();
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : unit.BoardTilemap;
+        Vector3Int unitCell = ResolveLayerOperationCell(unit, movementMode);
+        for (int i = 0; i < modes.Count; i++)
+        {
+            UnitLayerMode mode = modes[i];
+            if (mode.domain == currentDomain && mode.heightLevel == currentHeight)
+                continue;
+
+            if (!CanUseLayerModeAtCurrentCell(unit, boardMap, terrainDatabase, unitCell, mode.domain, mode.heightLevel, out string blockReason))
+            {
+                if (string.IsNullOrWhiteSpace(unavailableReason))
+                    unavailableReason = blockReason;
+                continue;
+            }
+
+            bool isAirToGroundLanding = ShouldUseLandingActionForTransition(currentDomain, currentHeight, mode.domain, mode.heightLevel);
+            LandingOptionAction action = isAirToGroundLanding
+                ? LandingOptionAction.Land
+                : LandingOptionAction.DomainTransition;
+
+            if (isAirToGroundLanding)
+            {
+                AircraftOperationDecision decision = AircraftOperationRules.Evaluate(
+                    unit,
+                    boardMap,
+                    terrainDatabase,
+                    movementMode);
+                if (!decision.available || decision.action != AircraftOperationAction.Land)
+                {
+                    if (string.IsNullOrWhiteSpace(unavailableReason))
+                        unavailableReason = !string.IsNullOrWhiteSpace(decision.reason)
+                            ? decision.reason
+                            : "Pouso indisponivel neste hex.";
+                    continue;
+                }
+            }
+
+            output.Add(new LandingOption(
+                action,
+                BuildLayerOperationLabel(currentDomain, currentHeight, mode.domain, mode.heightLevel),
+                currentDomain,
+                currentHeight,
+                mode.domain,
+                mode.heightLevel));
+        }
+
+        if (output.Count > 0)
+            return true;
+
+        unavailableReason = "Sem transicoes disponiveis para a camada atual.";
+        return false;
+    }
+
+    private bool ShouldBlockLayerOperationBecauseTakeoffIsRestricted(UnitManager unit, out string reason)
+    {
+        reason = string.Empty;
+        if (unit == null)
+            return false;
+        if (!hasTemporaryTakeoffSelectionState || temporaryTakeoffUnit != unit)
+            return false;
+        if (temporaryTakeoffMoveOptions == null || temporaryTakeoffMoveOptions.Count == 0)
+            return false;
+
+        bool hasFullTakeoff = temporaryTakeoffMoveOptions.Contains(9);
+        if (hasFullTakeoff)
+            return false;
+
+        // Regra solicitada: quando Pode Decolar estiver em 0, 1 ou [0,1], L deve ficar indisponivel.
+        bool onlyShortTakeoffOptions = true;
+        for (int i = 0; i < temporaryTakeoffMoveOptions.Count; i++)
+        {
+            int option = temporaryTakeoffMoveOptions[i];
+            if (option != 0 && option != 1)
+            {
+                onlyShortTakeoffOptions = false;
+                break;
+            }
+        }
+
+        if (!onlyShortTakeoffOptions)
+            return false;
+
+        reason = "L indisponivel: decolagem restrita (0/1).";
+        return true;
+    }
+
+    private Vector3Int ResolveLayerOperationCell(UnitManager unit, SensorMovementMode movementMode)
+    {
+        if (unit == null)
+            return Vector3Int.zero;
+
+        if (movementMode == SensorMovementMode.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
+        {
+            Vector3Int committedCell = committedMovementPath[committedMovementPath.Count - 1];
+            committedCell.z = 0;
+            return committedCell;
+        }
+
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+        return cell;
+    }
+
+    private static bool CanUseLayerModeAtCurrentCell(
+        UnitManager unit,
+        Tilemap boardMap,
+        TerrainDatabase terrainDb,
+        Vector3Int cell,
+        Domain targetDomain,
+        HeightLevel targetHeight,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (unit == null || boardMap == null)
+        {
+            reason = "Contexto de mapa/unidade invalido.";
+            return false;
+        }
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cell);
+        if (construction != null)
+        {
+            if (!construction.SupportsLayerMode(targetDomain, targetHeight))
+            {
+                reason = $"Construcao no hex nao suporta {targetDomain}/{targetHeight}.";
+                return false;
+            }
+
+            if (!UnitPassesSkillRequirement(unit, construction.GetRequiredSkillsToEnter()))
+            {
+                reason = "Unidade nao possui skill exigida pela construcao para trocar de camada.";
+                return false;
+            }
+
+            return true;
+        }
+
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardMap, cell);
+        if (structure != null)
+        {
+            if (!StructureSupportsLayerMode(structure, targetDomain, targetHeight))
+            {
+                reason = $"Estrutura no hex nao suporta {targetDomain}/{targetHeight}.";
+                return false;
+            }
+
+            if (!UnitPassesSkillRequirement(unit, structure.requiredSkillsToEnter))
+            {
+                reason = "Unidade nao possui skill exigida pela estrutura para trocar de camada.";
+                return false;
+            }
+
+            if (!TryResolveTerrainAtCell(boardMap, terrainDb, cell, out TerrainTypeData terrainWithStructure) || terrainWithStructure == null)
+            {
+                reason = "Terreno do hex nao encontrado para validar camada com estrutura.";
+                return false;
+            }
+
+            if (!TerrainSupportsLayerMode(terrainWithStructure, targetDomain, targetHeight))
+            {
+                reason = $"Terreno no hex (com estrutura) nao suporta {targetDomain}/{targetHeight}.";
+                return false;
+            }
+
+            if (!UnitPassesSkillRequirement(unit, terrainWithStructure.requiredSkillsToEnter))
+            {
+                reason = "Unidade nao possui skill exigida pelo terreno para trocar de camada.";
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!TryResolveTerrainAtCell(boardMap, terrainDb, cell, out TerrainTypeData terrain) || terrain == null)
+        {
+            reason = "Terreno do hex nao encontrado para validar camada.";
+            return false;
+        }
+
+        if (!TerrainSupportsLayerMode(terrain, targetDomain, targetHeight))
+        {
+            reason = $"Terreno no hex nao suporta {targetDomain}/{targetHeight}.";
+            return false;
+        }
+
+        if (!UnitPassesSkillRequirement(unit, terrain.requiredSkillsToEnter))
+        {
+            reason = "Unidade nao possui skill exigida pelo terreno para trocar de camada.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool UnitPassesSkillRequirement(UnitManager unit, IReadOnlyList<SkillData> requiredSkills)
+    {
+        if (requiredSkills == null || requiredSkills.Count == 0)
+            return true;
+        if (unit == null)
+            return false;
+
+        for (int i = 0; i < requiredSkills.Count; i++)
+        {
+            SkillData requiredSkill = requiredSkills[i];
+            if (requiredSkill == null)
+                continue;
+
+            if (unit.HasSkill(requiredSkill))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool TerrainSupportsLayerMode(TerrainTypeData terrain, Domain domain, HeightLevel heightLevel)
+    {
+        if (terrain == null)
+            return false;
+
+        if (terrain.domain == domain && terrain.heightLevel == heightLevel)
+            return true;
+
+        if (domain == Domain.Air && terrain.alwaysAllowAirDomain)
+            return true;
+
+        if (terrain.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0; i < terrain.aditionalDomainsAllowed.Count; i++)
+        {
+            TerrainLayerMode mode = terrain.aditionalDomainsAllowed[i];
+            if (mode.domain == domain && mode.heightLevel == heightLevel)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool StructureSupportsLayerMode(StructureData structure, Domain domain, HeightLevel heightLevel)
+    {
+        if (structure == null)
+            return false;
+
+        if (structure.domain == domain && structure.heightLevel == heightLevel)
+            return true;
+
+        if (domain == Domain.Air && structure.alwaysAllowAirDomain)
+            return true;
+
+        if (structure.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
+        {
+            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
+            if (mode.domain == domain && mode.heightLevel == heightLevel)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveTerrainAtCell(
+        Tilemap terrainTilemap,
+        TerrainDatabase terrainDb,
+        Vector3Int cell,
+        out TerrainTypeData terrain)
+    {
+        terrain = null;
+        if (terrainTilemap == null || terrainDb == null)
+            return false;
+
+        cell.z = 0;
+        TileBase tile = terrainTilemap.GetTile(cell);
+        if (tile != null && terrainDb.TryGetByPaletteTile(tile, out TerrainTypeData byMainTile) && byMainTile != null)
+        {
+            terrain = byMainTile;
+            return true;
+        }
+
+        GridLayout grid = terrainTilemap.layoutGrid;
+        if (grid == null)
+            return false;
+
+        Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (map == null)
+                continue;
+
+            TileBase other = map.GetTile(cell);
+            if (other == null)
+                continue;
+
+            if (terrainDb.TryGetByPaletteTile(other, out TerrainTypeData byGridTile) && byGridTile != null)
+            {
+                terrain = byGridTile;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryApplyDomainTransitionOption(LandingOption option, Tilemap boardMap)
+    {
+        if (selectedUnit == null)
+            return false;
+
+        Domain beforeDomain = selectedUnit.GetDomain();
+        HeightLevel beforeHeight = selectedUnit.GetHeightLevel();
+
+        if (option.action == LandingOptionAction.Land &&
+            selectedUnit.GetDomain() == Domain.Air &&
+            option.toDomain == Domain.Land &&
+            option.toHeightLevel == HeightLevel.Surface)
+        {
+            SensorMovementMode movementMode = ResolveLandingMovementMode();
+            if (!AircraftOperationRules.TryApplyOperation(
+                    selectedUnit,
+                    boardMap,
+                    terrainDatabase,
+                    movementMode,
+                    out AircraftOperationDecision decision))
+            {
+                string reason = !string.IsNullOrWhiteSpace(decision.reason)
+                    ? decision.reason
+                    : "Falha ao aplicar pouso.";
+                Debug.Log($"[LayerOperation] {reason}");
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!selectedUnit.TrySetCurrentLayerMode(option.toDomain, option.toHeightLevel))
+        {
+            Debug.Log(
+                $"[LayerOperation] Falha ao aplicar camada destino {option.toDomain}/{option.toHeightLevel} " +
+                $"(atual={beforeDomain}/{beforeHeight}).");
+            return false;
+        }
+
+        Debug.Log(
+            $"[LayerOperation] Aplicado: {beforeDomain}/{beforeHeight} -> " +
+            $"{selectedUnit.GetDomain()}/{selectedUnit.GetHeightLevel()}.");
+        return true;
+    }
+
+    private static bool ShouldUseLandingActionForTransition(
+        Domain fromDomain,
+        HeightLevel fromHeightLevel,
+        Domain toDomain,
+        HeightLevel toHeightLevel)
+    {
+        return fromDomain == Domain.Air &&
+               toDomain == Domain.Land &&
+               toHeightLevel == HeightLevel.Surface;
+    }
+
+    private static string BuildLayerOperationLabel(
+        Domain fromDomain,
+        HeightLevel fromHeightLevel,
+        Domain toDomain,
+        HeightLevel toHeightLevel)
+    {
+        if (fromDomain == Domain.Air && fromHeightLevel == HeightLevel.AirHigh &&
+            toDomain == Domain.Air && toHeightLevel == HeightLevel.AirLow)
+            return "Descer para Air/Low";
+
+        if (fromDomain == Domain.Air && fromHeightLevel == HeightLevel.AirLow &&
+            toDomain == Domain.Air && toHeightLevel == HeightLevel.AirHigh)
+            return "Subir para Air/High";
+
+        if (fromDomain == Domain.Air && toDomain == Domain.Land && toHeightLevel == HeightLevel.Surface)
+            return "Pousar";
+
+        return $"Mudar para {toDomain}/{toHeightLevel}";
+    }
+
     private bool TryConfirmScannerEmbark()
     {
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (cursorState != CursorState.Embarcando)
             return false;
 
         if (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget)
@@ -361,6 +1216,7 @@ public partial class TurnStateManager
         {
             Debug.Log("[Embarque] Opcao desatualizada para a unidade selecionada.");
             scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+            ExitEmbarkStateToMovement();
             RefreshSensorsForCurrentState();
             return;
         }
@@ -388,19 +1244,19 @@ public partial class TurnStateManager
             {
                 transporter.SetTemporarySortingOrder();
                 transporterSortingRaised = true;
-                if (!AircraftOperationRules.TryApplyOperation(
-                        transporter,
-                        movementTilemap,
-                        terrainDatabase,
-                        SensorMovementMode.MoveuParado,
-                        out AircraftOperationDecision landingDecision) ||
-                    landingDecision.action != AircraftOperationAction.Land)
+                AircraftOperationDecision landingDecision = AircraftOperationRules.Evaluate(
+                    transporter,
+                    movementTilemap,
+                    terrainDatabase,
+                    SensorMovementMode.MoveuParado);
+                if (!landingDecision.available || landingDecision.action != AircraftOperationAction.Land)
                 {
                     Debug.Log(string.IsNullOrWhiteSpace(landingDecision.reason)
                         ? "[Embarque] Transportador aereo sem pouso valido."
                         : $"[Embarque] {landingDecision.reason}");
                     embarkExecutionInProgress = false;
                     scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+                    ExitEmbarkStateToMovement();
                     RefreshSensorsForCurrentState();
                     yield break;
                 }
@@ -409,7 +1265,36 @@ public partial class TurnStateManager
                 PlayMovementStartSfx(transporter);
                 Debug.Log("[Embarque] Transportador pousou antes do embarque.");
 
-                float landingDuration = GetEmbarkForcedLandingDuration();
+                bool transporterStartHigh = transporter.GetDomain() == Domain.Air && transporter.GetHeightLevel() == HeightLevel.AirHigh;
+                bool transporterStartLow = transporter.GetDomain() == Domain.Air && transporter.GetHeightLevel() == HeightLevel.AirLow;
+
+                if (transporterStartHigh)
+                {
+                    float highToLowDuration = GetEmbarkAirHighToGroundDuration() * Mathf.Clamp01(GetEmbarkHighToLowNormalizedTime());
+                    if (highToLowDuration > 0f)
+                        yield return new WaitForSeconds(highToLowDuration);
+                    transporter.TrySetCurrentLayerMode(Domain.Air, HeightLevel.AirLow);
+                    transporterStartLow = transporter.GetDomain() == Domain.Air && transporter.GetHeightLevel() == HeightLevel.AirLow;
+                }
+
+                float landingDuration = transporterStartLow
+                    ? GetEmbarkAirLowToGroundDuration()
+                    : GetEmbarkForcedLandingDuration();
+                if (!transporter.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface))
+                {
+                    Debug.Log("[Embarque] Falha ao concluir pouso do transportador (Land/Surface).");
+                    embarkExecutionInProgress = false;
+                    scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+                    ExitEmbarkStateToMovement();
+                    RefreshSensorsForCurrentState();
+                    yield break;
+                }
+
+                if (transporter.HasSkillId("vtol"))
+                {
+                    float vtolFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(transporter) : 0f;
+                    landingDuration = Mathf.Max(landingDuration, vtolFxDuration);
+                }
                 if (landingDuration > 0f)
                     yield return new WaitForSeconds(landingDuration);
 
@@ -532,6 +1417,7 @@ public partial class TurnStateManager
                 Debug.Log($"Pode Embarcar (\"E\"): {resultMessage}");
                 embarkExecutionInProgress = false;
                 scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+                ExitEmbarkStateToMovement();
                 RefreshSensorsForCurrentState();
                 yield break;
             }
@@ -578,6 +1464,26 @@ public partial class TurnStateManager
     private float GetEmbarkAirLowToGroundDuration()
     {
         return animationManager != null ? animationManager.EmbarkAirLowToGroundDuration : 0.05f;
+    }
+
+    private float GetLayerOperationTransitionDuration()
+    {
+        return GetEmbarkDefaultMoveStepDuration();
+    }
+
+    private float GetLayerOperationAfterTransitionDelay()
+    {
+        return GetEmbarkAfterMoveDelay();
+    }
+
+    private float GetEmbarkHighToLowNormalizedTime()
+    {
+        return animationManager != null ? animationManager.EmbarkHighToLowNormalizedTime : 0.50f;
+    }
+
+    private float GetEmbarkLowToGroundNormalizedTime()
+    {
+        return animationManager != null ? animationManager.EmbarkLowToGroundNormalizedTime : 1.00f;
     }
 
     private float GetEffectiveEmbarkMoveStepDuration(UnitManager passenger, float stepDuration)
@@ -897,12 +1803,12 @@ public partial class TurnStateManager
     private void EnterMirandoState()
     {
         if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
-            cursorStateBeforeMirando = cursorState;
+            cursorStateBeforeMirando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
 
         // Ao sair do fluxo de movimento para mirar, oculta o rastro legado do caminho comprometido.
         ClearCommittedPathVisual();
 
-        cursorState = CursorState.Mirando;
+        SetCursorState(CursorState.Mirando, "EnterMirandoState");
         scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
         scannerSelectedTargetIndex = 0;
 
@@ -915,6 +1821,7 @@ public partial class TurnStateManager
         if (cachedPodeMirarTargets.Count == 0)
         {
             SetMirandoPreviewVisible(false);
+            SetMirandoSpotterPreviewsVisible(false);
             return;
         }
 
@@ -926,6 +1833,7 @@ public partial class TurnStateManager
             MoveCursorToTarget(option);
         RebuildMirandoPreviewPath(option);
         SetMirandoPreviewVisible(cursorState == CursorState.Mirando);
+        SetMirandoSpotterPreviewsVisible(cursorState == CursorState.Mirando);
         if (logDetails)
             LogCurrentMirandoTarget(option, scannerSelectedTargetIndex + 1, cachedPodeMirarTargets.Count);
     }
@@ -939,15 +1847,57 @@ public partial class TurnStateManager
         string attackWeapon = option.weapon != null ? option.weapon.displayName : "arma";
         string counterText = option.defenderCanCounterAttack ? "sim" : $"nao ({option.defenderCounterReason})";
         string label = !string.IsNullOrWhiteSpace(option.displayLabel) ? option.displayLabel : target.name;
+        string evPathText = FormatEvPath(option.lineOfFireEvPath);
+        string lineHexesText = FormatHexPath(option.lineOfFireIntermediateCells);
 
         Debug.Log(
             $"[Mirando] Alvo {shownIndex}/{total}\n" +
             $"Label: {label}\n" +
             $"Unidade: {target.name}\n" +
+            $"Distancia: {option.distance}\n" +
             $"HP: {target.CurrentHP}\n" +
             $"Arma atacante: {attackWeapon}\n" +
+            $"Posicao atacante: {option.attackerPositionLabel}\n" +
+            $"Posicao defensor: {option.defenderPositionLabel}\n" +
+            $"EV path: {evPathText}\n" +
+            $"Linha (hex intermediario): {lineHexesText}\n" +
             $"Revide: {counterText}\n" +
             "Use setas para trocar alvo. Enter confirma. ESC volta.");
+    }
+
+    private static string FormatHexPath(IReadOnlyList<Vector3Int> cells)
+    {
+        if (cells == null || cells.Count == 0)
+            return "(sem intermediarios)";
+
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        sb.Append('(');
+        for (int i = 0; i < cells.Count; i++)
+        {
+            if (i > 0)
+                sb.Append(", ");
+            Vector3Int c = cells[i];
+            sb.Append(c.x).Append('/').Append(c.y);
+        }
+        sb.Append(')');
+        return sb.ToString();
+    }
+
+    private static string FormatEvPath(IReadOnlyList<float> evPath)
+    {
+        if (evPath == null || evPath.Count == 0)
+            return "(n/a)";
+
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        sb.Append('(');
+        for (int i = 0; i < evPath.Count; i++)
+        {
+            if (i > 0)
+                sb.Append(", ");
+            sb.Append(evPath[i].ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        sb.Append(')');
+        return sb.ToString();
     }
 
     private static int GetMirandoStepFromInput(Vector3Int inputDelta)
@@ -995,7 +1945,7 @@ public partial class TurnStateManager
     private bool TryResolveEmbarkCursorMove(Vector3Int inputDelta, out Vector3Int resolvedCell)
     {
         resolvedCell = cursorController != null ? cursorController.CurrentCell : Vector3Int.zero;
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (cursorState != CursorState.Embarcando)
             return false;
         if (scannerPromptStep != ScannerPromptStep.EmbarkCycleTarget)
             return false;
@@ -1025,10 +1975,90 @@ public partial class TurnStateManager
         return true;
     }
 
+    private bool TryResolveLandingCursorMove(Vector3Int inputDelta, out Vector3Int resolvedCell)
+    {
+        resolvedCell = cursorController != null ? cursorController.CurrentCell : Vector3Int.zero;
+        if (cursorState != CursorState.Pousando)
+            return false;
+        if (scannerPromptStep != ScannerPromptStep.LandingCycleOption)
+            return false;
+        if (cachedLandingOptions.Count <= 1)
+            return false;
+
+        int step = GetMirandoStepFromInput(inputDelta);
+        if (step == 0)
+            return false;
+
+        int count = cachedLandingOptions.Count;
+        scannerSelectedLandingIndex = (scannerSelectedLandingIndex + step + count) % count;
+        LogLandingSelectionPanel();
+        return true;
+    }
+
     private bool IsEmbarkPromptActive()
     {
-        return scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget ||
-               scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget;
+        return cursorState == CursorState.Embarcando &&
+               (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget ||
+                scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget);
+    }
+
+    private bool IsLandingPromptActive()
+    {
+        return cursorState == CursorState.Pousando &&
+               (scannerPromptStep == ScannerPromptStep.LandingCycleOption ||
+                scannerPromptStep == ScannerPromptStep.LandingConfirmOption);
+    }
+
+    private SensorMovementMode ResolveLandingMovementMode()
+    {
+        if (cursorStateBeforePousando == CursorState.MoveuAndando)
+            return SensorMovementMode.MoveuAndando;
+
+        return SensorMovementMode.MoveuParado;
+    }
+
+    private void ExitLandingStateToMovement(bool rollback = true)
+    {
+        if (cursorState != CursorState.Pousando)
+            return;
+
+        CursorState targetMovementState = cursorStateBeforePousando == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+        SetCursorState(targetMovementState, "ExitLandingStateToMovement", rollback: rollback);
+        if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
+            DrawCommittedPathVisual(committedMovementPath);
+        if (cursorController != null && selectedUnit != null)
+        {
+            Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+            unitCell.z = 0;
+            cursorController.SetCell(unitCell, playMoveSfx: false);
+        }
+
+        scannerPromptStep = ScannerPromptStep.AwaitingAction;
+        scannerSelectedLandingIndex = -1;
+        cachedLandingOptions.Clear();
+        LogScannerPanel();
+    }
+
+    private void ExitEmbarkStateToMovement()
+    {
+        if (cursorState != CursorState.Embarcando)
+            return;
+
+        CursorState targetMovementState = cursorStateBeforeEmbarcando == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+        SetCursorState(targetMovementState, "ExitEmbarkStateToMovement", rollback: true);
+        if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
+            DrawCommittedPathVisual(committedMovementPath);
+        if (cursorController != null && selectedUnit != null)
+        {
+            Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+            unitCell.z = 0;
+            cursorController.SetCell(unitCell, playMoveSfx: false);
+        }
+
+        scannerPromptStep = ScannerPromptStep.AwaitingAction;
+        scannerSelectedEmbarkIndex = -1;
+        ClearEmbarkPreview();
+        LogScannerPanel();
     }
 
     private void ExitMirandoStateToMovement()
@@ -1036,8 +2066,9 @@ public partial class TurnStateManager
         if (cursorState != CursorState.Mirando)
             return;
 
-        cursorState = cursorStateBeforeMirando == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        if (cursorState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
+        CursorState targetMovementState = cursorStateBeforeMirando == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+        SetCursorState(targetMovementState, "ExitMirandoStateToMovement", rollback: true);
+        if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
         if (cursorController != null && selectedUnit != null)
         {
@@ -1062,11 +2093,13 @@ public partial class TurnStateManager
         if (!shouldShow)
         {
             SetMirandoPreviewVisible(false);
+            SetMirandoSpotterPreviewsVisible(false);
             return;
         }
 
-        EnsureMirandoPreviewRenderer();
-        if (mirandoPreviewRenderer == null)
+        int segmentQuantities = Mathf.Max(1, GetMirandoPreviewSegmentQuantities());
+        EnsureMirandoPreviewRenderers(segmentQuantities);
+        if (mirandoPreviewRenderers.Count <= 0)
             return;
 
         float speed = GetMirandoPreviewSpeed();
@@ -1094,13 +2127,47 @@ public partial class TurnStateManager
         SetMirandoPreviewVisible(true);
         float previewWidth = GetMirandoPreviewWidth();
         Color previewColor = GetMirandoPreviewColor();
-        mirandoPreviewRenderer.startWidth = previewWidth;
-        mirandoPreviewRenderer.endWidth = previewWidth;
-        mirandoPreviewRenderer.startColor = previewColor;
-        mirandoPreviewRenderer.endColor = previewColor;
-        mirandoPreviewRenderer.positionCount = mirandoPreviewSegmentPoints.Count;
-        for (int i = 0; i < mirandoPreviewSegmentPoints.Count; i++)
-            mirandoPreviewRenderer.SetPosition(i, mirandoPreviewSegmentPoints[i]);
+        float spacing = cycleLen / segmentQuantities;
+        for (int segmentIndex = 0; segmentIndex < segmentQuantities; segmentIndex++)
+        {
+            LineRenderer renderer = mirandoPreviewRenderers[segmentIndex];
+            if (renderer == null)
+                continue;
+
+            float segmentHeadDistance = mirandoPreviewHeadDistance - (spacing * segmentIndex);
+            while (segmentHeadDistance < 0f)
+                segmentHeadDistance += cycleLen;
+            while (segmentHeadDistance > cycleLen)
+                segmentHeadDistance -= cycleLen;
+
+            float segmentStartDist = Mathf.Max(0f, segmentHeadDistance - segmentLen);
+            float segmentEndDist = Mathf.Min(segmentHeadDistance, mirandoPreviewPathLength);
+            if (segmentEndDist <= segmentStartDist + 0.0001f)
+            {
+                renderer.positionCount = 0;
+                renderer.enabled = false;
+                continue;
+            }
+
+            BuildPathSegmentPoints(segmentStartDist, segmentEndDist, mirandoPreviewSegmentPoints);
+            if (mirandoPreviewSegmentPoints.Count < 2)
+            {
+                renderer.positionCount = 0;
+                renderer.enabled = false;
+                continue;
+            }
+
+            renderer.startWidth = previewWidth;
+            renderer.endWidth = previewWidth;
+            renderer.startColor = previewColor;
+            renderer.endColor = previewColor;
+            renderer.positionCount = mirandoPreviewSegmentPoints.Count;
+            for (int i = 0; i < mirandoPreviewSegmentPoints.Count; i++)
+                renderer.SetPosition(i, mirandoPreviewSegmentPoints[i]);
+            renderer.enabled = true;
+        }
+
+        UpdateMirandoSpotterPreviewAnimation();
     }
 
     private void RebuildMirandoPreviewPath(PodeMirarTargetOption option)
@@ -1113,6 +2180,7 @@ public partial class TurnStateManager
         if (option == null || option.attackerUnit == null || option.targetUnit == null)
         {
             SetMirandoPreviewVisible(false);
+            RebuildMirandoSpotterPreviewPaths(null);
             return;
         }
 
@@ -1131,6 +2199,7 @@ public partial class TurnStateManager
         }
 
         mirandoPreviewPathLength = ComputePathLength(mirandoPreviewPathPoints);
+        RebuildMirandoSpotterPreviewPaths(option);
         if (mirandoPreviewPathLength <= 0.0001f)
             SetMirandoPreviewVisible(false);
     }
@@ -1287,27 +2356,261 @@ public partial class TurnStateManager
         }
     }
 
-    private void EnsureMirandoPreviewRenderer()
+    private void RebuildMirandoSpotterPreviewPaths(PodeMirarTargetOption option)
     {
-        if (mirandoPreviewRenderer != null)
+        ClearMirandoSpotterPreviewData();
+        if (option == null || option.targetUnit == null || option.forwardObserverCandidates == null || option.forwardObserverCandidates.Count == 0)
             return;
 
-        GameObject go = new GameObject("MirandoPreviewLine");
+        HashSet<UnitManager> uniqueObservers = new HashSet<UnitManager>();
+        for (int i = 0; i < option.forwardObserverCandidates.Count; i++)
+        {
+            UnitManager observer = option.forwardObserverCandidates[i];
+            if (observer == null || !observer.gameObject.activeInHierarchy)
+                continue;
+            if (!uniqueObservers.Add(observer))
+                continue;
+
+            Vector3 observerPos = observer.transform.position;
+            Vector3 targetPos = option.targetUnit.transform.position;
+            observerPos.z = targetPos.z;
+            if (Vector3.Distance(observerPos, targetPos) <= 0.0001f)
+                continue;
+
+            MirandoSpotterPreviewTrack track = EnsureMirandoSpotterPreviewTrack(mirandoSpotterPreviewTracks.Count);
+            if (track == null)
+                continue;
+
+            track.pathPoints.Clear();
+            track.tempSegmentPoints.Clear();
+            track.pathPoints.Add(observerPos);
+            track.pathPoints.Add(targetPos);
+            track.pathLength = ComputePathLength(track.pathPoints);
+            track.headDistance = 0f;
+        }
+
+        if (mirandoSpotterPreviewTracks.Count > 0)
+            SetMirandoSpotterPreviewsVisible(cursorState == CursorState.Mirando);
+    }
+
+    private void UpdateMirandoSpotterPreviewAnimation()
+    {
+        if (mirandoSpotterPreviewTracks.Count == 0)
+            return;
+
+        int segmentQuantities = Mathf.Max(1, GetMirandoSpotterSegmentQuantities());
+        float spotterMultiplier = GetMirandoSpotterPreviewMultiplier();
+        float speed = Mathf.Max(0.2f, GetMirandoSpotterSegmentSpeed());
+        float segmentLen = Mathf.Max(0.08f, GetMirandoPreviewSegmentLength() * spotterMultiplier);
+        float width = Mathf.Max(0.02f, GetMirandoPreviewWidth() * spotterMultiplier);
+        Color baseColor = GetMirandoPreviewColor();
+        Color spotterColor = new Color(baseColor.r, baseColor.g, baseColor.b, Mathf.Clamp01(baseColor.a * 0.75f));
+
+        for (int i = 0; i < mirandoSpotterPreviewTracks.Count; i++)
+        {
+            MirandoSpotterPreviewTrack track = mirandoSpotterPreviewTracks[i];
+            if (track == null || track.pathLength <= 0.0001f || track.pathPoints.Count < 2)
+            {
+                HideMirandoSpotterTrackRenderers(track);
+                continue;
+            }
+
+            EnsureMirandoSpotterPreviewRenderers(track, i, segmentQuantities);
+            if (track.renderers.Count == 0)
+                continue;
+
+            float cycleLen = track.pathLength + segmentLen;
+            track.headDistance += speed * Time.deltaTime;
+            if (track.headDistance > cycleLen)
+                track.headDistance = 0f;
+
+            float spacing = cycleLen / segmentQuantities;
+            for (int segmentIndex = 0; segmentIndex < segmentQuantities; segmentIndex++)
+            {
+                if (segmentIndex >= track.renderers.Count)
+                    break;
+
+                LineRenderer renderer = track.renderers[segmentIndex];
+                if (renderer == null)
+                    continue;
+
+                float segmentHeadDistance = track.headDistance - (spacing * segmentIndex);
+                while (segmentHeadDistance < 0f)
+                    segmentHeadDistance += cycleLen;
+                while (segmentHeadDistance > cycleLen)
+                    segmentHeadDistance -= cycleLen;
+
+                float startDist = Mathf.Max(0f, segmentHeadDistance - segmentLen);
+                float endDist = Mathf.Min(segmentHeadDistance, track.pathLength);
+                if (endDist <= startDist + 0.0001f)
+                {
+                    renderer.positionCount = 0;
+                    renderer.enabled = false;
+                    continue;
+                }
+
+                BuildPathSegmentPointsFrom(track.pathPoints, startDist, endDist, track.tempSegmentPoints);
+                if (track.tempSegmentPoints.Count < 2)
+                {
+                    renderer.positionCount = 0;
+                    renderer.enabled = false;
+                    continue;
+                }
+
+                renderer.startWidth = width;
+                renderer.endWidth = width;
+                renderer.startColor = spotterColor;
+                renderer.endColor = spotterColor;
+                renderer.positionCount = track.tempSegmentPoints.Count;
+                for (int p = 0; p < track.tempSegmentPoints.Count; p++)
+                    renderer.SetPosition(p, track.tempSegmentPoints[p]);
+                renderer.enabled = true;
+            }
+
+            for (int extra = segmentQuantities; extra < track.renderers.Count; extra++)
+            {
+                LineRenderer extraRenderer = track.renderers[extra];
+                if (extraRenderer == null)
+                    continue;
+                extraRenderer.positionCount = 0;
+                extraRenderer.enabled = false;
+            }
+        }
+    }
+
+    private void BuildPathSegmentPointsFrom(List<Vector3> pathPoints, float startDist, float endDist, List<Vector3> output)
+    {
+        output.Clear();
+        if (pathPoints == null || pathPoints.Count < 2)
+            return;
+
+        float accumulated = 0f;
+        bool addedFirst = false;
+        for (int i = 1; i < pathPoints.Count; i++)
+        {
+            Vector3 a = pathPoints[i - 1];
+            Vector3 b = pathPoints[i];
+            float segmentLen = Vector3.Distance(a, b);
+            if (segmentLen <= 0.0001f)
+                continue;
+
+            float segStart = accumulated;
+            float segEnd = accumulated + segmentLen;
+            if (segEnd < startDist)
+            {
+                accumulated = segEnd;
+                continue;
+            }
+
+            if (segStart > endDist)
+                break;
+
+            float localStart = Mathf.Clamp01((startDist - segStart) / segmentLen);
+            float localEnd = Mathf.Clamp01((endDist - segStart) / segmentLen);
+            if (!addedFirst)
+            {
+                output.Add(Vector3.Lerp(a, b, localStart));
+                addedFirst = true;
+            }
+
+            output.Add(Vector3.Lerp(a, b, localEnd));
+            accumulated = segEnd;
+            if (segEnd >= endDist)
+                break;
+        }
+    }
+
+    private void EnsureMirandoPreviewRenderers(int count)
+    {
+        int desired = Mathf.Max(1, count);
+        while (mirandoPreviewRenderers.Count < desired)
+        {
+            LineRenderer renderer = CreateMirandoPreviewRenderer(mirandoPreviewRenderers.Count);
+            mirandoPreviewRenderers.Add(renderer);
+        }
+    }
+
+    private LineRenderer CreateMirandoPreviewRenderer(int index)
+    {
+        string rendererName = index <= 0 ? "MirandoPreviewLine" : $"MirandoPreviewLine_{index + 1}";
+        GameObject go = new GameObject(rendererName);
         go.transform.SetParent(transform, false);
-        mirandoPreviewRenderer = go.AddComponent<LineRenderer>();
-        mirandoPreviewRenderer.useWorldSpace = true;
-        mirandoPreviewRenderer.textureMode = LineTextureMode.Stretch;
-        mirandoPreviewRenderer.numCapVertices = 2;
-        mirandoPreviewRenderer.numCornerVertices = 2;
-        mirandoPreviewRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        mirandoPreviewRenderer.receiveShadows = false;
+        LineRenderer renderer = go.AddComponent<LineRenderer>();
+        renderer.useWorldSpace = true;
+        renderer.textureMode = LineTextureMode.Stretch;
+        renderer.numCapVertices = 2;
+        renderer.numCornerVertices = 2;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
         Material previewMaterial = GetMirandoPreviewMaterial();
-        mirandoPreviewRenderer.material = previewMaterial != null ? previewMaterial : new Material(Shader.Find("Sprites/Default"));
+        renderer.material = previewMaterial != null ? previewMaterial : new Material(Shader.Find("Sprites/Default"));
         int sortingLayerId = GetMirandoPreviewSortingLayerId();
         if (sortingLayerId != 0)
-            mirandoPreviewRenderer.sortingLayerID = sortingLayerId;
-        mirandoPreviewRenderer.sortingOrder = GetMirandoPreviewSortingOrder();
-        mirandoPreviewRenderer.enabled = false;
+            renderer.sortingLayerID = sortingLayerId;
+        renderer.sortingOrder = GetMirandoPreviewSortingOrder();
+        renderer.enabled = false;
+        return renderer;
+    }
+
+    private MirandoSpotterPreviewTrack EnsureMirandoSpotterPreviewTrack(int index)
+    {
+        while (mirandoSpotterPreviewTracks.Count <= index)
+        {
+            MirandoSpotterPreviewTrack track = new MirandoSpotterPreviewTrack();
+            mirandoSpotterPreviewTracks.Add(track);
+        }
+
+        return mirandoSpotterPreviewTracks[index];
+    }
+
+    private void EnsureMirandoSpotterPreviewRenderers(MirandoSpotterPreviewTrack track, int trackIndex, int count)
+    {
+        if (track == null)
+            return;
+
+        int desired = Mathf.Max(1, count);
+        while (track.renderers.Count < desired)
+        {
+            LineRenderer renderer = CreateMirandoSpotterPreviewRenderer(trackIndex, track.renderers.Count);
+            track.renderers.Add(renderer);
+        }
+    }
+
+    private LineRenderer CreateMirandoSpotterPreviewRenderer(int trackIndex, int segmentIndex)
+    {
+        string rendererName = $"MirandoSpotterPreviewLine_{trackIndex + 1}_{segmentIndex + 1}";
+        GameObject go = new GameObject(rendererName);
+        go.transform.SetParent(transform, false);
+        LineRenderer renderer = go.AddComponent<LineRenderer>();
+        renderer.useWorldSpace = true;
+        renderer.textureMode = LineTextureMode.Stretch;
+        renderer.numCapVertices = 2;
+        renderer.numCornerVertices = 2;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
+        Material previewMaterial = GetMirandoPreviewMaterial();
+        renderer.material = previewMaterial != null ? previewMaterial : new Material(Shader.Find("Sprites/Default"));
+        int sortingLayerId = GetMirandoPreviewSortingLayerId();
+        if (sortingLayerId != 0)
+            renderer.sortingLayerID = sortingLayerId;
+        renderer.sortingOrder = Mathf.Max(0, GetMirandoPreviewSortingOrder() - 1);
+        renderer.enabled = false;
+        return renderer;
+    }
+
+    private void HideMirandoSpotterTrackRenderers(MirandoSpotterPreviewTrack track)
+    {
+        if (track == null || track.renderers == null)
+            return;
+
+        for (int i = 0; i < track.renderers.Count; i++)
+        {
+            LineRenderer renderer = track.renderers[i];
+            if (renderer == null)
+                continue;
+            renderer.positionCount = 0;
+            renderer.enabled = false;
+        }
     }
 
     private void EnsureEmbarkPreviewRenderer()
@@ -1350,6 +2653,7 @@ public partial class TurnStateManager
     private void UpdateEmbarkPreviewAnimation()
     {
         bool shouldShow =
+            cursorState == CursorState.Embarcando &&
             (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget || scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget) &&
             embarkPreviewPathLength > 0.0001f &&
             embarkPreviewPathPoints.Count >= 2;
@@ -1464,17 +2768,74 @@ public partial class TurnStateManager
 
     private void SetMirandoPreviewVisible(bool visible)
     {
-        if (mirandoPreviewRenderer == null)
-            return;
-
-        if (!visible)
+        for (int i = 0; i < mirandoPreviewRenderers.Count; i++)
         {
-            mirandoPreviewRenderer.positionCount = 0;
-            mirandoPreviewRenderer.enabled = false;
-            return;
-        }
+            LineRenderer renderer = mirandoPreviewRenderers[i];
+            if (renderer == null)
+                continue;
 
-        mirandoPreviewRenderer.enabled = true;
+            if (!visible)
+            {
+                renderer.positionCount = 0;
+                renderer.enabled = false;
+                continue;
+            }
+
+            renderer.enabled = true;
+        }
+    }
+
+    private void SetMirandoSpotterPreviewsVisible(bool visible)
+    {
+        for (int i = 0; i < mirandoSpotterPreviewTracks.Count; i++)
+        {
+            MirandoSpotterPreviewTrack track = mirandoSpotterPreviewTracks[i];
+            if (track == null || track.renderers == null || track.renderers.Count == 0)
+                continue;
+
+            for (int r = 0; r < track.renderers.Count; r++)
+            {
+                LineRenderer renderer = track.renderers[r];
+                if (renderer == null)
+                    continue;
+
+                if (!visible)
+                {
+                    renderer.positionCount = 0;
+                    renderer.enabled = false;
+                    continue;
+                }
+
+                if (track.pathLength > 0.0001f && track.pathPoints.Count >= 2)
+                    renderer.enabled = true;
+            }
+        }
+    }
+
+    private void ClearMirandoSpotterPreviewData()
+    {
+        for (int i = 0; i < mirandoSpotterPreviewTracks.Count; i++)
+        {
+            MirandoSpotterPreviewTrack track = mirandoSpotterPreviewTracks[i];
+            if (track == null)
+                continue;
+
+            track.pathPoints.Clear();
+            track.tempSegmentPoints.Clear();
+            track.pathLength = 0f;
+            track.headDistance = 0f;
+            if (track.renderers != null)
+            {
+                for (int r = 0; r < track.renderers.Count; r++)
+                {
+                    LineRenderer renderer = track.renderers[r];
+                    if (renderer == null)
+                        continue;
+                    renderer.positionCount = 0;
+                    renderer.enabled = false;
+                }
+            }
+        }
     }
 
     private void ClearMirandoPreview()
@@ -1485,6 +2846,8 @@ public partial class TurnStateManager
         mirandoPreviewHeadDistance = 0f;
         mirandoPreviewSignatureValid = false;
         SetMirandoPreviewVisible(false);
+        ClearMirandoSpotterPreviewData();
+        SetMirandoSpotterPreviewsVisible(false);
     }
 
     private Material GetMirandoPreviewMaterial()
@@ -1517,6 +2880,26 @@ public partial class TurnStateManager
     private float GetMirandoPreviewSegmentLength()
     {
         return animationManager != null ? animationManager.MirandoPreviewSegmentLength : 1.1f;
+    }
+
+    private int GetMirandoPreviewSegmentQuantities()
+    {
+        return animationManager != null ? animationManager.MirandoPreviewSegmentQuantities : 1;
+    }
+
+    private float GetMirandoSpotterPreviewMultiplier()
+    {
+        return animationManager != null ? animationManager.MirandoSpotterPreviewMultiplier : 0.55f;
+    }
+
+    private int GetMirandoSpotterSegmentQuantities()
+    {
+        return animationManager != null ? animationManager.MirandoSpotterSegmentQuantities : 1;
+    }
+
+    private float GetMirandoSpotterSegmentSpeed()
+    {
+        return animationManager != null ? animationManager.MirandoSpotterSegmentSpeed : 3f;
     }
 
     private float GetMirandoParabolaBend()

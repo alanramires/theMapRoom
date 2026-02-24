@@ -67,6 +67,9 @@ public class ConstructionData : ScriptableObject
     public List<ConstructionLandingSkillRule> requiredLandingSkillRules = new List<ConstructionLandingSkillRule>();
     [Tooltip("Se true, basta ter pelo menos 1 skill da lista para pousar/decolar nesta construcao. Se false, exige todas.")]
     public bool requireAtLeastOneLandingSkill = false;
+    [Header("Naval Ops")]
+    [Tooltip("Unidades nesses dominios/alturas encerram movimento no dominio nativo desta construcao.")]
+    public List<TerrainLayerMode> forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
 
     [Header("Construction Supplier Settings")]
     public bool isSupplier = false;
@@ -105,6 +108,8 @@ public class ConstructionData : ScriptableObject
             legacyRequiredLandingSkills = new List<SkillData>();
         if (requiredLandingSkillRules == null)
             requiredLandingSkillRules = new List<ConstructionLandingSkillRule>();
+        if (forceEndMovementOnTerrainDomainForDomains == null)
+            forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
 
         for (int i = requiredLandingSkillRules.Count - 1; i >= 0; i--)
         {

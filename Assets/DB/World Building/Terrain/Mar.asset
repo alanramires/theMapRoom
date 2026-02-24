@@ -22,7 +22,19 @@ MonoBehaviour:
   - domain: 2
     heightLevel: 2
   alwaysAllowAirDomain: 1
+  allowAircraftTakeoffAndLanding: 1
+  allowedLandingClasses: 
+  requiredLandingSkills:
+  - {fileID: 11400000, guid: e6032267446372a4b9de350d17b18418, type: 2}
+  requireAtLeastOneLandingSkill: 0
+  allowedTakeoffModes: 
+  forceEndMovementOnTerrainDomainForDomains: []
   basicAutonomyCost: 1
   dpqData: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
+  ev: 0
+  shooterInheritsTerrainEv: 0
+  blockLoS: 1
+  constructionVisionOverrides: []
+  structureVisionOverrides: []
   requiredSkillsToEnter: []
   skillCostOverrides: []

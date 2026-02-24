@@ -39,6 +39,22 @@ public class PodeMirarTargetOption
     [Tooltip("Hexes intermediarios analisados na linha de tiro (debug).")]
     public List<Vector3Int> lineOfFireIntermediateCells = new List<Vector3Int>();
 
+    [Tooltip("Perfil EV da linha (origem -> intermediarios -> alvo), para debug de LoS.")]
+    public List<float> lineOfFireEvPath = new List<float>();
+
+    [Header("Spotter")]
+    [Tooltip("Se este alvo valido dependeu de forward observer.")]
+    public bool usedForwardObserver;
+
+    [Tooltip("Unidade que atuou como forward observer.")]
+    public UnitManager forwardObserverUnit;
+
+    [Tooltip("Descricao de como o observer foi aplicado nesta validacao.")]
+    public string forwardObserverReason;
+
+    [Tooltip("Lista de todos os observers validos para este alvo no momento da avaliacao.")]
+    public List<UnitManager> forwardObserverCandidates = new List<UnitManager>();
+
     [Header("Revide")]
     [Tooltip("Se o defensor consegue revidar este ataque.")]
     public bool defenderCanCounterAttack;

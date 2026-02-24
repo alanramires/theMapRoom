@@ -21,7 +21,10 @@ public partial class TurnStateManager : MonoBehaviour
         UnitSelected = 1,
         MoveuAndando = 2,
         MoveuParado = 3,
-        Mirando = 4
+        Mirando = 5,
+        Pousando = 6,
+        Embarcando = 7,
+        Desembarcando = 8
     }
 
     [Header("References")]
@@ -69,9 +72,29 @@ public partial class TurnStateManager : MonoBehaviour
     private UnitManager autoPromotionUnit;
     private Domain autoPromotionEntryDomain = Domain.Land;
     private HeightLevel autoPromotionEntryHeight = HeightLevel.Surface;
+    private bool hasForcedLayerRollbackSnapshot;
+    private Domain forcedLayerRollbackDomain = Domain.Land;
+    private HeightLevel forcedLayerRollbackHeight = HeightLevel.Surface;
 
     public CursorState CurrentCursorState => cursorState;
     public UnitManager SelectedUnit => selectedUnit;
+
+    private void LogStateStep(string step, bool rollback = false)
+    {
+        string rollbackTag = rollback ? " [roll back]" : string.Empty;
+        string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
+        Debug.Log($"[TurnState]{rollbackTag} state={cursorState} | step={step} | selected={selectedName}");
+    }
+
+    private void SetCursorState(CursorState nextState, string reason, bool rollback = false)
+    {
+        CursorState previous = cursorState;
+        cursorState = nextState;
+
+        string rollbackTag = rollback ? " [roll back]" : string.Empty;
+        string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
+        Debug.Log($"[TurnState]{rollbackTag} transition={previous} -> {nextState} | reason={reason} | selected={selectedName}");
+    }
 
     public bool TryFinalizeSelectedUnitActionFromDebug()
     {
@@ -168,7 +191,7 @@ public partial class TurnStateManager : MonoBehaviour
             RestoreTemporaryTakeoffSelectionStateIfAny();
 
         selectedUnit = null;
-        cursorState = CursorState.Neutral;
+        SetCursorState(CursorState.Neutral, "ClearSelectionAndReturnToNeutral", rollback: !keepPreparedFuelCost);
         ClearMovementRange();
         ClearCommittedMovement();
     }
@@ -363,12 +386,8 @@ public partial class TurnStateManager : MonoBehaviour
         committedOriginCell = Vector3Int.zero;
         committedDestinationCell = Vector3Int.zero;
         hasCommittedMovement = false;
+        hasForcedLayerRollbackSnapshot = false;
         ClearCommittedPathVisual();
-    }
-
-    private bool IsFogOfWarEnabled()
-    {
-        return matchController == null || matchController.FogOfWar;
     }
 
 #if UNITY_EDITOR

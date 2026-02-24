@@ -9,11 +9,15 @@ public static class SensorHandle
         TerrainDatabase terrainDatabase,
         WeaponPriorityData weaponPriorityData,
         DPQAirHeightConfig dpqAirHeightConfig,
-        bool fogOfWarEnabled,
+        bool enableLdtValidation,
+        bool enableLosValidation,
+        bool enableSpotter,
+        bool enableStealthValidation,
         SensorMovementMode movementMode,
         int remainingMovementPoints,
         List<char> availableActionCodes,
         List<PodeMirarTargetOption> podeMirarTargets,
+        List<PodeMirarInvalidOption> podeMirarInvalidTargets,
         List<PodeEmbarcarOption> podeEmbarcarTargets,
         List<PodeEmbarcarInvalidOption> podeEmbarcarInvalidTargets,
         List<PodeDesembarcarOption> podeDesembarcarTargets,
@@ -27,6 +31,7 @@ public static class SensorHandle
 
         availableActionCodes.Clear();
         podeMirarTargets.Clear();
+        podeMirarInvalidTargets?.Clear();
         podeEmbarcarTargets.Clear();
         podeEmbarcarInvalidTargets?.Clear();
         podeDesembarcarTargets.Clear();
@@ -43,10 +48,13 @@ public static class SensorHandle
             terrainDatabase,
             movementMode,
             podeMirarTargets,
-            null,
+            podeMirarInvalidTargets,
             weaponPriorityData,
             dpqAirHeightConfig,
-            fogOfWarEnabled);
+            enableLdtValidation,
+            enableLosValidation,
+            enableSpotter,
+            enableStealthValidation);
         if (canAim)
         {
             availableActionCodes.Add('A');

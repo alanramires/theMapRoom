@@ -13,13 +13,18 @@ public class TerrainTypeDataEditor : Editor
             "m_Script",
             "allowAircraftTakeoffAndLanding",
             "requiredLandingSkills",
-            "requireAtLeastOneLandingSkill");
+            "requireAtLeastOneLandingSkill",
+            "forceEndMovementOnTerrainDomainForDomains");
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Aircraft Ops", EditorStyles.boldLabel);
         DrawIfExists(serializedObject.FindProperty("allowAircraftTakeoffAndLanding"), "Allow Aicrafft Take Off and Landing");
         DrawIfExists(serializedObject.FindProperty("requiredLandingSkills"), "Required Landing Skills");
         DrawIfExists(serializedObject.FindProperty("requireAtLeastOneLandingSkill"), "Pelo menos 1 skill");
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Naval Ops", EditorStyles.boldLabel);
+        DrawIfExists(serializedObject.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domains End Their Movement On The Terrain Domain");
 
         serializedObject.ApplyModifiedProperties();
     }

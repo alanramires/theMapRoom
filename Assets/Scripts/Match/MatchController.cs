@@ -3,12 +3,28 @@ using System.Collections.Generic;
 
 public class MatchController : MonoBehaviour
 {
+    public enum GameSetupPreset
+    {
+        GameBoyClassic = 0,
+        FisicaBasica = 1,
+        AMontanhaAvacalha = 2,
+        NeblinaLeve = 3,
+        FogOfWarTotal = 4
+    }
+
     [Header("Match State (MVP)")]
     [SerializeField] private int currentTurn = 0;
     [SerializeField] private int activeTeamId = (int)TeamId.Green;
     [SerializeField] private List<TeamId> players = new List<TeamId> { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
     [SerializeField] private bool includeNeutralTeam = false;
-    [SerializeField] private bool fogOfWar = true;
+    // Placeholder para futura pintura de visibilidade no mapa (nao governa regras de combate no momento).
+    [SerializeField, HideInInspector] private bool fogOfWar = true;
+    [Header("Gameplay Setup")]
+    [SerializeField] private GameSetupPreset gameSetup = GameSetupPreset.FogOfWarTotal;
+    [SerializeField] private bool enableLdtValidation = true;
+    [SerializeField] private bool enableLosValidation = true;
+    [SerializeField] private bool enableSpotter = true;
+    [SerializeField] private bool enableStealthValidation = true;
     [SerializeField] private AutonomyDatabase autonomyDatabase;
     [SerializeField] private int activePlayerListIndex = 0;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
@@ -19,12 +35,17 @@ public class MatchController : MonoBehaviour
     public TeamId ActiveTeam => ClampToTeamId(activeTeamId);
     public IReadOnlyList<TeamId> Players => players;
     public bool IncludeNeutralTeam => includeNeutralTeam;
-    public bool FogOfWar => fogOfWar;
+    public GameSetupPreset GameSetup => gameSetup;
+    public bool EnableLdtValidation => enableLdtValidation;
+    public bool EnableLosValidation => enableLosValidation;
+    public bool EnableSpotter => enableSpotter;
+    public bool EnableStealthValidation => enableStealthValidation;
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;
     public int ActivePlayerListIndex => activePlayerListIndex;
 
     private void Awake()
     {
+        ApplyGameSetupPreset();
         NormalizeState();
         ApplyActiveTeamIfChanged(force: true);
     }
@@ -32,6 +53,7 @@ public class MatchController : MonoBehaviour
 #if UNITY_EDITOR
     private void OnValidate()
     {
+        ApplyGameSetupPreset();
         NormalizeState();
         ApplyActiveTeamIfChanged(force: false);
     }
@@ -48,6 +70,12 @@ public class MatchController : MonoBehaviour
     public void SetCurrentTurn(int turn)
     {
         currentTurn = Mathf.Max(0, turn);
+    }
+
+    public void SetGameSetupPreset(GameSetupPreset preset)
+    {
+        gameSetup = preset;
+        ApplyGameSetupPreset();
     }
 
     public void SetActiveTeamId(int teamId)
@@ -155,6 +183,44 @@ public class MatchController : MonoBehaviour
 
         if (activePlayerListIndex < 0)
             SetActivePlayerByIndex(0);
+    }
+
+    private void ApplyGameSetupPreset()
+    {
+        switch (gameSetup)
+        {
+            case GameSetupPreset.GameBoyClassic:
+                enableLdtValidation = false;
+                enableLosValidation = false;
+                enableSpotter = false;
+                enableStealthValidation = false;
+                break;
+            case GameSetupPreset.FisicaBasica:
+                enableLdtValidation = true;
+                enableLosValidation = false;
+                enableSpotter = false;
+                enableStealthValidation = false;
+                break;
+            case GameSetupPreset.AMontanhaAvacalha:
+                enableLdtValidation = true;
+                enableLosValidation = true;
+                enableSpotter = false;
+                enableStealthValidation = false;
+                break;
+            case GameSetupPreset.NeblinaLeve:
+                enableLdtValidation = true;
+                enableLosValidation = true;
+                enableSpotter = true;
+                enableStealthValidation = false;
+                break;
+            case GameSetupPreset.FogOfWarTotal:
+            default:
+                enableLdtValidation = true;
+                enableLosValidation = true;
+                enableSpotter = true;
+                enableStealthValidation = true;
+                break;
+        }
     }
 
     private static TeamId ClampToTeamId(int value)

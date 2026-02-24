@@ -26,6 +26,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private int maxAmmo = 3;
     [SerializeField] private int currentFuel = 99;
     [SerializeField] private int maxFuel = 99;
+    [SerializeField, Min(1)] private int visao = 3;
     [Header("Embarked Weapons Runtime")]
     [SerializeField] private List<UnitEmbarkedWeapon> embarkedWeaponsRuntime = new List<UnitEmbarkedWeapon>();
     [SerializeField, HideInInspector] private bool appliedHasActed;
@@ -49,10 +50,10 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private HeightLevel currentHeightLevel = HeightLevel.Surface;
     [SerializeField] private int currentLayerModeIndex = 0;
     [SerializeField] private bool layerStateInitialized;
-    [Header("Aircraft Runtime")]
-    [SerializeField] private bool aircraftGrounded;
-    [SerializeField] private bool aircraftEmbarkedInCarrier;
-    [SerializeField] [Min(0)] private int aircraftOperationLockTurns;
+    [SerializeField] private bool useExplicitPreferredAirHeightRuntime;
+    [SerializeField] private HeightLevel preferredAirHeightRuntime = HeightLevel.AirLow;
+    [SerializeField] private bool useExplicitPreferredNavalHeightRuntime;
+    [SerializeField] private HeightLevel preferredNavalHeightRuntime = HeightLevel.Submerged;
     [Header("Transport Runtime")]
     [SerializeField] private List<UnitTransportSeatRuntime> transportedUnitSlots = new List<UnitTransportSeatRuntime>();
     [SerializeField, HideInInspector] private UnitManager embarkedTransporter;
@@ -70,13 +71,14 @@ public class UnitManager : MonoBehaviour
     public int MaxAmmo => maxAmmo;
     public int CurrentFuel => currentFuel;
     public int MaxFuel => maxFuel;
+    public int Visao => Mathf.Max(1, visao);
     public bool HasActed => hasActed;
     public bool IsEmbarked => isEmbarked;
     public bool IsSelected => isSelected;
     public UnitDatabase UnitDatabase => unitDatabase;
-    public bool IsAircraftGrounded => aircraftGrounded;
-    public bool IsAircraftEmbarkedInCarrier => aircraftEmbarkedInCarrier;
-    public int AircraftOperationLockTurns => Mathf.Max(0, aircraftOperationLockTurns);
+    public bool IsAircraftGrounded => GetAircraftType() != AircraftType.None && currentDomain != Domain.Air;
+    public bool IsAircraftEmbarkedInCarrier => isEmbarked;
+    public int AircraftOperationLockTurns => 0;
     public IReadOnlyList<UnitTransportSeatRuntime> TransportedUnitSlots => transportedUnitSlots;
     public UnitManager EmbarkedTransporter => embarkedTransporter;
     public int EmbarkedTransporterSlotIndex => embarkedTransporterSlotIndex;
@@ -216,11 +218,13 @@ public class UnitManager : MonoBehaviour
             currentHP = data.maxHP;
 
         maxFuel = Mathf.Max(1, data.autonomia);
+        visao = Mathf.Max(1, data.visao);
         currentAmmo = Mathf.Clamp(currentAmmo, 0, GetMaxAmmo());
         currentFuel = Mathf.Clamp(currentFuel, 0, GetMaxFuel());
         SyncEmbarkedWeaponsFromData(data);
         SyncTransportRuntimeSlotsWithData(data);
         SyncCurrentLayerStateWithData(data, forceNativeDefault: true);
+        SyncPreferredLayerPreferencesFromData(data);
         RefreshSpriteForCurrentLayer(data);
 
         currentPosition = transform.position;
@@ -301,8 +305,6 @@ public class UnitManager : MonoBehaviour
     public void ResetActed()
     {
         hasActed = false;
-        if (aircraftOperationLockTurns > 0)
-            aircraftOperationLockTurns = Mathf.Max(0, aircraftOperationLockTurns - 1);
         appliedHasActed = hasActed;
         RefreshActedVisual();
     }
@@ -423,6 +425,69 @@ public class UnitManager : MonoBehaviour
         return false;
     }
 
+    // Debug utility: allows forcing a runtime layer state even when that exact
+    // mode is not declared on UnitData (useful for gameplay investigation).
+    public bool ForceLayerStateForDebug(Domain domain, HeightLevel heightLevel)
+    {
+        currentDomain = domain;
+        currentHeightLevel = heightLevel;
+        layerStateInitialized = true;
+
+        currentLayerModeIndex = ResolveLayerModeIndex(domain, heightLevel);
+        SyncAircraftRuntimeStateWithCurrentLayer();
+        RefreshSpriteForCurrentLayer();
+        RefreshActedVisual();
+        return true;
+    }
+
+    // Debug step order used by editor buttons while playing:
+    // Land/Surface -> Air/Low -> Air/High (up) and reverse (down).
+    public bool TryStepLayerStateForDebug(int delta)
+    {
+        if (delta == 0)
+            return false;
+
+        Domain targetDomain = currentDomain;
+        HeightLevel targetHeight = currentHeightLevel;
+
+        if (delta < 0)
+        {
+            if (currentDomain == Domain.Air && currentHeightLevel == HeightLevel.AirHigh)
+            {
+                targetDomain = Domain.Air;
+                targetHeight = HeightLevel.AirLow;
+            }
+            else if (currentDomain == Domain.Air && currentHeightLevel == HeightLevel.AirLow)
+            {
+                targetDomain = Domain.Land;
+                targetHeight = HeightLevel.Surface;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        else
+        {
+            if (currentDomain != Domain.Air)
+            {
+                targetDomain = Domain.Air;
+                targetHeight = HeightLevel.AirLow;
+            }
+            else if (currentHeightLevel == HeightLevel.AirLow)
+            {
+                targetDomain = Domain.Air;
+                targetHeight = HeightLevel.AirHigh;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        return ForceLayerStateForDebug(targetDomain, targetHeight);
+    }
+
     public MovementCategory GetMovementCategory()
     {
         if (unitDatabase != null && !string.IsNullOrWhiteSpace(unitId) && unitDatabase.TryGetById(unitId, out UnitData data))
@@ -486,6 +551,9 @@ public class UnitManager : MonoBehaviour
 
     public HeightLevel GetPreferredAirHeight()
     {
+        if (useExplicitPreferredAirHeightRuntime)
+            return preferredAirHeightRuntime == HeightLevel.AirHigh ? HeightLevel.AirHigh : HeightLevel.AirLow;
+
         UnitData data = TryGetUnitData();
         if (data == null)
             return HeightLevel.AirLow;
@@ -504,6 +572,21 @@ public class UnitManager : MonoBehaviour
         }
 
         return HeightLevel.AirLow;
+    }
+
+    public bool TryGetPreferredNavalLayerMode(out Domain domain, out HeightLevel heightLevel)
+    {
+        domain = Domain.Naval;
+        heightLevel = HeightLevel.Surface;
+
+        if (!useExplicitPreferredNavalHeightRuntime)
+            return false;
+
+        heightLevel = preferredNavalHeightRuntime == HeightLevel.Submerged
+            ? HeightLevel.Submerged
+            : HeightLevel.Surface;
+        domain = heightLevel == HeightLevel.Submerged ? Domain.Submarine : Domain.Naval;
+        return true;
     }
 
     public bool HasSkillId(string skillId)
@@ -531,21 +614,25 @@ public class UnitManager : MonoBehaviour
 
     public void SetAircraftGrounded(bool grounded)
     {
-        aircraftGrounded = grounded;
-        if (!grounded)
-            aircraftEmbarkedInCarrier = false;
+        if (grounded)
+        {
+            if (currentDomain == Domain.Air || currentHeightLevel != HeightLevel.Surface)
+                TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface);
+            return;
+        }
+
+        if (currentDomain != Domain.Air)
+            TrySetCurrentLayerMode(Domain.Air, GetPreferredAirHeight());
     }
 
     public void SetAircraftEmbarkedInCarrier(bool embarkedInCarrier)
     {
-        aircraftEmbarkedInCarrier = embarkedInCarrier;
-        if (aircraftEmbarkedInCarrier)
-            aircraftGrounded = true;
+        SetEmbarked(embarkedInCarrier);
     }
 
     public void SetAircraftOperationLockTurns(int turns)
     {
-        aircraftOperationLockTurns = Mathf.Max(0, turns);
+        // Deprecated runtime flag: kept for API compatibility.
     }
 
     public IReadOnlyList<UnitEmbarkedWeapon> GetEmbarkedWeapons()
@@ -977,6 +1064,18 @@ public class UnitManager : MonoBehaviour
         return modes;
     }
 
+    private int ResolveLayerModeIndex(Domain domain, HeightLevel heightLevel)
+    {
+        UnitLayerMode[] modes = BuildLayerModesSnapshot();
+        for (int i = 0; i < modes.Length; i++)
+        {
+            if (modes[i].domain == domain && modes[i].heightLevel == heightLevel)
+                return i;
+        }
+
+        return 0;
+    }
+
     private void SetCurrentLayerState(int modeIndex, UnitLayerMode mode)
     {
         currentLayerModeIndex = Mathf.Max(0, modeIndex);
@@ -1185,35 +1284,36 @@ public class UnitManager : MonoBehaviour
 
         maxAmmo = Mathf.Max(1, maxAmmo);
         maxFuel = Mathf.Max(1, maxFuel);
+        visao = Mathf.Max(1, visao);
         currentAmmo = Mathf.Clamp(currentAmmo, 0, maxAmmo);
         currentFuel = Mathf.Clamp(currentFuel, 0, maxFuel);
 
         SyncTransportRuntimeSlotsWithData(TryGetUnitData());
+        SyncPreferredLayerPreferencesFromData(TryGetUnitData());
         SyncCurrentLayerStateWithData(forceNativeDefault: false);
         SyncAircraftRuntimeStateWithCurrentLayer();
     }
 
-    private void SyncAircraftRuntimeStateWithCurrentLayer()
+    private void SyncPreferredLayerPreferencesFromData(UnitData data)
     {
-        UnitData data = TryGetUnitData();
-        bool isAircraft = data != null && data.IsAircraft();
-        if (!isAircraft)
+        if (data == null)
         {
-            aircraftGrounded = false;
-            aircraftEmbarkedInCarrier = false;
-            aircraftOperationLockTurns = 0;
+            useExplicitPreferredAirHeightRuntime = false;
+            preferredAirHeightRuntime = HeightLevel.AirLow;
+            useExplicitPreferredNavalHeightRuntime = false;
+            preferredNavalHeightRuntime = HeightLevel.Submerged;
             return;
         }
 
-        if (currentDomain == Domain.Air)
-            aircraftGrounded = false;
-        else
-            aircraftGrounded = true;
+        useExplicitPreferredAirHeightRuntime = data.useExplicitPreferredAirHeight;
+        preferredAirHeightRuntime = data.preferredAirHeight == HeightLevel.AirHigh ? HeightLevel.AirHigh : HeightLevel.AirLow;
+        useExplicitPreferredNavalHeightRuntime = data.useExplicitPreferredNavalHeight;
+        preferredNavalHeightRuntime = data.preferredNavalHeight == HeightLevel.Surface ? HeightLevel.Surface : HeightLevel.Submerged;
+    }
 
-        if (!aircraftGrounded)
-            aircraftEmbarkedInCarrier = false;
-
-        aircraftOperationLockTurns = Mathf.Max(0, aircraftOperationLockTurns);
+    private void SyncAircraftRuntimeStateWithCurrentLayer()
+    {
+        // Aircraft runtime now derives from layer state + IsEmbarked.
     }
 
     private void SyncPositionState()

@@ -6,8 +6,11 @@ public static class PodeMirarSensor
 {
     private const string InvalidReasonNoAmmo = "Falta de municao.";
     private const string InvalidReasonLayer = "Layer do alvo incompativel com a arma.";
+    private const string InvalidReasonLdtBlocked = "Linha de tiro invalida para os dominios no trajeto (LdT).";
     private const string InvalidReasonLosBlocked = "Linha de visada bloqueada.";
+    private const string InvalidReasonNoForwardObserver = "Sem observador avancado (alcance visual 3 hex).";
     private const string InvalidReasonStealth = "Alvo nao detectado (stealth placeholder).";
+    private const int DefaultObservationRangeHexes = 3;
 
     private struct WeaponRangeCandidate
     {
@@ -26,7 +29,10 @@ public static class PodeMirarSensor
         List<PodeMirarInvalidOption> invalidOutput = null,
         WeaponPriorityData weaponPriorityData = null,
         DPQAirHeightConfig dpqAirHeightConfig = null,
-        bool fogOfWarEnabled = true)
+        bool enableLdtValidation = true,
+        bool enableLosValidation = true,
+        bool enableSpotter = true,
+        bool enableStealthValidation = true)
     {
         if (output == null)
             return false;
@@ -84,7 +90,24 @@ public static class PodeMirarSensor
             {
                 WeaponRangeCandidate weaponCandidate = candidates[j];
                 if (distance < weaponCandidate.minRange || distance > weaponCandidate.maxRange)
+                {
+                    string rangeReason =
+                        $"Fora de alcance da arma (dist={distance}, range={weaponCandidate.minRange}-{weaponCandidate.maxRange}).";
+                    AppendInvalid(
+                        invalidOutput,
+                        attacker,
+                        target,
+                        weaponCandidate.embarked != null ? weaponCandidate.embarked.weapon : null,
+                        weaponCandidate.index,
+                        distance,
+                        attackerPositionLabel,
+                        defenderPositionLabel,
+                        rangeReason,
+                        Vector3Int.zero,
+                        null,
+                        null);
                     continue;
+                }
 
                 WeaponData weapon = weaponCandidate.embarked.weapon;
                 if (weapon == null)
@@ -103,6 +126,7 @@ public static class PodeMirarSensor
                         defenderPositionLabel,
                         InvalidReasonNoAmmo,
                         Vector3Int.zero,
+                        null,
                         null);
                     continue;
                 }
@@ -120,42 +144,181 @@ public static class PodeMirarSensor
                         defenderPositionLabel,
                         InvalidReasonLayer,
                         Vector3Int.zero,
+                        null,
                         null);
                     continue;
                 }
 
                 List<Vector3Int> intermediateCells = null;
+                List<float> evPath = null;
                 Vector3Int blockedCell = Vector3Int.zero;
-                if (weaponCandidate.embarked.selectedTrajectory == WeaponTrajectoryType.Straight &&
-                    !HasValidStraightLineOfFire(
-                        map,
-                        terrainDatabase,
-                        origin,
-                        targetCell,
-                        attacker,
-                        target,
-                        dpqAirHeightConfig,
-                        fogOfWarEnabled,
-                        weapon,
-                        out intermediateCells,
-                        out blockedCell))
+                bool usedForwardObserver = false;
+                UnitManager forwardObserver = null;
+                string forwardObserverReason = string.Empty;
+                List<UnitManager> forwardObserverCandidates = null;
+                if (weaponCandidate.embarked.selectedTrajectory == WeaponTrajectoryType.Straight)
                 {
-                    AppendInvalid(
-                        invalidOutput,
-                        attacker,
-                        target,
-                        weapon,
-                        weaponCandidate.index,
-                        distance,
-                        attackerPositionLabel,
-                        defenderPositionLabel,
-                        $"{InvalidReasonLosBlocked} ({blockedCell.x},{blockedCell.y})",
-                        blockedCell,
-                        intermediateCells);
-                    continue;
+                    bool hasDirectLos = HasValidStraightLineOfFire(
+                            map,
+                            terrainDatabase,
+                            origin,
+                            targetCell,
+                            attacker,
+                            target,
+                            dpqAirHeightConfig,
+                            weapon,
+                            out intermediateCells,
+                            out evPath,
+                            out blockedCell,
+                            enableLdtValidation,
+                            enableLosValidation);
+                    if (!hasDirectLos)
+                    {
+                        if (enableLosValidation && enableSpotter && TryFindForwardObserverForIndirectFire(
+                                attacker,
+                                target,
+                                map,
+                                terrainDatabase,
+                                dpqAirHeightConfig,
+                                out UnitManager blockerBypassObserver,
+                                enableLosValidation))
+                        {
+                            hasDirectLos = true;
+                            usedForwardObserver = blockerBypassObserver != null;
+                            forwardObserver = blockerBypassObserver;
+                            if (usedForwardObserver)
+                                forwardObserverReason = "Forward observer confirmou LoS apesar de bloqueio direto.";
+                        }
+
+                        if (!hasDirectLos)
+                        {
+                            string invalidReason = enableLosValidation
+                                ? $"{InvalidReasonLosBlocked} ({blockedCell.x},{blockedCell.y}) | {InvalidReasonNoForwardObserver}"
+                                : InvalidReasonLdtBlocked;
+                            AppendInvalid(
+                                invalidOutput,
+                                attacker,
+                                target,
+                                weapon,
+                                weaponCandidate.index,
+                                distance,
+                                attackerPositionLabel,
+                                defenderPositionLabel,
+                                invalidReason,
+                                blockedCell,
+                                intermediateCells,
+                                evPath);
+                            continue;
+                        }
+                    }
+
+                    int attackerObservationRange = GetObservationRangeHexes(attacker);
+                    bool requiresForwardObserver = distance > 1 && enableLosValidation && enableSpotter && distance > attackerObservationRange;
+                    if (requiresForwardObserver)
+                    {
+                        if (!TryFindForwardObserverForIndirectFire(
+                                attacker,
+                                target,
+                                map,
+                                terrainDatabase,
+                                dpqAirHeightConfig,
+                                out UnitManager longRangeObserver,
+                                enableLosValidation))
+                        {
+                            AppendInvalid(
+                                invalidOutput,
+                                attacker,
+                                target,
+                                weapon,
+                                weaponCandidate.index,
+                                distance,
+                                attackerPositionLabel,
+                                defenderPositionLabel,
+                                InvalidReasonNoForwardObserver,
+                                Vector3Int.zero,
+                                null,
+                                null);
+                            continue;
+                        }
+                        usedForwardObserver = longRangeObserver != null;
+                        forwardObserver = longRangeObserver;
+                        if (usedForwardObserver)
+                            forwardObserverReason = $"Forward observer confirmou alvo fora da visao do atacante ({attackerObservationRange} hex).";
+                    }
+                }
+                else
+                {
+                    // Fogo indireto simplificado:
+                    // 1) Usa LdT da arma parabólica (alcance/domínio já validados acima).
+                    // 2) Exige observador avançado aliado em até 3 hexes do alvo com LoS válida até ele.
+                    bool allowParabolic = true;
+                    if (enableLosValidation)
+                    {
+                        if (enableSpotter)
+                        {
+                            bool shooterSeesTarget = false;
+                            int attackerObservationRange = GetObservationRangeHexes(attacker);
+                            if (distance <= 1)
+                            {
+                                shooterSeesTarget = true;
+                            }
+                            else if (distance <= attackerObservationRange)
+                            {
+                                shooterSeesTarget = HasValidStraightObservationLine(
+                                    map,
+                                    terrainDatabase,
+                                    origin,
+                                    targetCell,
+                                    attacker,
+                                    target,
+                                    dpqAirHeightConfig,
+                                    out _,
+                                    out _,
+                                    out _,
+                                    enableLosValidation);
+                            }
+
+                            if (!shooterSeesTarget)
+                            {
+                                allowParabolic = TryFindForwardObserverForIndirectFire(
+                                    attacker,
+                                    target,
+                                    map,
+                                    terrainDatabase,
+                                    dpqAirHeightConfig,
+                                    out UnitManager indirectObserver,
+                                    enableLosValidation);
+                                if (allowParabolic && indirectObserver != null)
+                                {
+                                    usedForwardObserver = true;
+                                    forwardObserver = indirectObserver;
+                                    forwardObserverReason = "Forward observer confirmou alvo para tiro parabolico.";
+                                }
+                            }
+                        }
+                        // LoS=true + Spotter=false: mantém comportamento "parabólico ignora LoS".
+                    }
+
+                    if (!allowParabolic)
+                    {
+                        AppendInvalid(
+                            invalidOutput,
+                            attacker,
+                            target,
+                            weapon,
+                            weaponCandidate.index,
+                            distance,
+                            attackerPositionLabel,
+                            defenderPositionLabel,
+                            InvalidReasonNoForwardObserver,
+                            Vector3Int.zero,
+                            null,
+                            null);
+                        continue;
+                    }
                 }
 
-                if (!IsTargetDetectableByAttacker(attacker, target))
+                if (enableStealthValidation && !IsTargetDetectableByAttacker(attacker, target))
                 {
                     AppendInvalid(
                         invalidOutput,
@@ -168,7 +331,8 @@ public static class PodeMirarSensor
                         defenderPositionLabel,
                         InvalidReasonStealth,
                         Vector3Int.zero,
-                        intermediateCells);
+                        intermediateCells,
+                        evPath);
                     continue;
                 }
 
@@ -182,6 +346,9 @@ public static class PodeMirarSensor
                 GameUnitClass targetClass = ResolveUnitClass(target);
                 WeaponCategory weaponCategory = weapon.WeaponCategory;
                 bool preferredTarget = EvaluateWeaponPriority(weaponPriorityData, weaponCategory, targetClass);
+                if (usedForwardObserver)
+                    forwardObserverCandidates = CollectForwardObserversForTarget(attacker, target, map, terrainDatabase, dpqAirHeightConfig, enableLosValidation);
+
                 output.Add(new PodeMirarTargetOption
                 {
                     attackerUnit = attacker,
@@ -198,7 +365,12 @@ public static class PodeMirarSensor
                     defenderCounterEmbarkedWeaponIndex = counterIndex,
                     defenderCounterDistance = canCounter ? distance : 0,
                     defenderCounterReason = canCounter ? string.Empty : counterReason,
-                    lineOfFireIntermediateCells = intermediateCells ?? new List<Vector3Int>()
+                    lineOfFireIntermediateCells = intermediateCells ?? new List<Vector3Int>(),
+                    lineOfFireEvPath = evPath ?? new List<float>(),
+                    usedForwardObserver = usedForwardObserver,
+                    forwardObserverUnit = forwardObserver,
+                    forwardObserverReason = forwardObserverReason,
+                    forwardObserverCandidates = forwardObserverCandidates ?? new List<UnitManager>()
                 });
             }
         }
@@ -281,7 +453,9 @@ public static class PodeMirarSensor
         SensorMovementMode movementMode,
         ICollection<Vector3Int> outputCells,
         DPQAirHeightConfig dpqAirHeightConfig = null,
-        bool fogOfWarEnabled = true)
+        bool enableLdtValidation = true,
+        bool enableLosValidation = true,
+        bool enableSpotter = true)
     {
         if (outputCells == null)
             return;
@@ -341,9 +515,12 @@ public static class PodeMirarSensor
                     cell,
                     attacker,
                     dpqAirHeightConfig,
-                    fogOfWarEnabled,
                     candidate.embarked.selectedTrajectory,
-                    weapon))
+                    weapon,
+                    enableLdtValidation,
+                    enableLosValidation,
+                    enableSpotter,
+                    pair.Value))
                 {
                     continue;
                 }
@@ -361,23 +538,29 @@ public static class PodeMirarSensor
         Vector3Int targetCell,
         UnitManager attacker,
         DPQAirHeightConfig dpqAirHeightConfig,
-        bool fogOfWarEnabled,
         WeaponTrajectoryType trajectory,
-        WeaponData weapon)
+        WeaponData weapon,
+        bool enableLdtValidation,
+        bool enableLosValidation,
+        bool enableSpotter,
+        int distanceFromAttacker)
     {
         if (map == null || weapon == null)
             return false;
 
         // "Alvo virtual": o dominio/camada do hex de destino precisa ser compativel com a arma.
-        if (!TryResolveTerrainAtCell(map, terrainDatabase, targetCell, out TerrainTypeData destinationTerrain) || destinationTerrain == null)
-            return false;
-        if (!TerrainAllowsWeaponTrajectory(destinationTerrain, weapon))
-            return false;
+        if (enableLdtValidation)
+        {
+            if (!TryResolveTerrainAtCell(map, terrainDatabase, targetCell, out TerrainTypeData destinationTerrain) || destinationTerrain == null)
+                return false;
+            if (!TerrainAllowsWeaponTrajectory(destinationTerrain, weapon))
+                return false;
+        }
 
-        if (trajectory != WeaponTrajectoryType.Straight)
+        if (!enableLosValidation)
             return true;
 
-        return HasValidStraightLineOfFire(
+        bool hasDirectLine = trajectory != WeaponTrajectoryType.Straight || HasValidStraightLineOfFire(
             map,
             terrainDatabase,
             originCell,
@@ -385,10 +568,29 @@ public static class PodeMirarSensor
             attacker,
             null,
             dpqAirHeightConfig,
-            fogOfWarEnabled,
             weapon,
             out _,
-            out _);
+            out _,
+            out _,
+            enableLdtValidation,
+            enableLosValidation);
+        if (!hasDirectLine)
+            return false;
+
+        int attackerObservationRange = GetObservationRangeHexes(attacker);
+        if (distanceFromAttacker <= 1)
+            return true;
+
+        if (!enableSpotter || distanceFromAttacker <= attackerObservationRange)
+            return true;
+
+        return TryFindForwardObserverForVirtualCell(
+            attacker,
+            targetCell,
+            map,
+            terrainDatabase,
+            dpqAirHeightConfig,
+            enableLosValidation);
     }
 
     private static bool TryBuildCandidate(UnitEmbarkedWeapon embarked, int index, SensorMovementMode movementMode, out WeaponRangeCandidate candidate, bool requireAmmo)
@@ -428,6 +630,147 @@ public static class PodeMirarSensor
         return true;
     }
 
+    private static bool TryFindForwardObserverForIndirectFire(
+        UnitManager attacker,
+        UnitManager target,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        out UnitManager observer,
+        bool enableLosValidation)
+    {
+        observer = null;
+        List<UnitManager> observers = CollectForwardObserversForTarget(
+            attacker,
+            target,
+            map,
+            terrainDatabase,
+            dpqAirHeightConfig,
+            enableLosValidation);
+        if (observers.Count <= 0)
+            return false;
+
+        observer = observers[0];
+        return true;
+    }
+
+    private static bool TryFindForwardObserverForVirtualCell(
+        UnitManager attacker,
+        Vector3Int targetCell,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        bool enableLosValidation)
+    {
+        if (attacker == null || map == null)
+            return false;
+
+        targetCell.z = 0;
+        int maxObserverRange = GetTeamMaxObservationRangeHexes(attacker);
+        Dictionary<Vector3Int, int> localAroundTarget = BuildDistanceMap(map, targetCell, maxObserverRange);
+        if (localAroundTarget.Count == 0)
+            return false;
+
+        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager ally = units[i];
+            if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
+                continue;
+            if (ally.TeamId != attacker.TeamId)
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            if (!localAroundTarget.TryGetValue(allyCell, out int allyDistanceToTarget))
+                continue;
+
+            int allyObservationRange = GetObservationRangeHexes(ally);
+            if (allyDistanceToTarget > allyObservationRange)
+                continue;
+
+            if (HasValidStraightObservationLine(
+                    map,
+                    terrainDatabase,
+                    allyCell,
+                    targetCell,
+                    ally,
+                    null,
+                    dpqAirHeightConfig,
+                    out _,
+                    out _,
+                    out _,
+                    enableLosValidation))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static List<UnitManager> CollectForwardObserversForTarget(
+        UnitManager attacker,
+        UnitManager target,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        bool enableLosValidation)
+    {
+        List<UnitManager> observers = new List<UnitManager>();
+        if (attacker == null || target == null || map == null)
+            return observers;
+
+        Vector3Int targetCell = target.CurrentCellPosition;
+        targetCell.z = 0;
+        int maxObserverRange = GetTeamMaxObservationRangeHexes(attacker);
+        Dictionary<Vector3Int, int> localAroundTarget = BuildDistanceMap(map, targetCell, maxObserverRange);
+        if (localAroundTarget.Count == 0)
+            return observers;
+
+        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager ally = units[i];
+            if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
+                continue;
+            if (ally.TeamId != attacker.TeamId)
+                continue;
+            if (ally == target)
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            if (!localAroundTarget.TryGetValue(allyCell, out int allyDistanceToTarget))
+                continue;
+
+            int allyObservationRange = GetObservationRangeHexes(ally);
+            if (allyDistanceToTarget > allyObservationRange)
+                continue;
+
+            if (!HasValidStraightObservationLine(
+                    map,
+                    terrainDatabase,
+                    allyCell,
+                    targetCell,
+                    ally,
+                    target,
+                    dpqAirHeightConfig,
+                    out _,
+                    out _,
+                    out _,
+                    enableLosValidation))
+            {
+                continue;
+            }
+
+            if (!observers.Contains(ally))
+                observers.Add(ally);
+        }
+
+        return observers;
+    }
+
     private static bool IsEnemyTargetCandidate(UnitManager attacker, UnitManager target)
     {
         if (attacker == null || target == null)
@@ -440,6 +783,37 @@ public static class PodeMirarSensor
             return false;
 
         return attacker.TeamId != target.TeamId;
+    }
+
+    private static int GetObservationRangeHexes(UnitManager unit)
+    {
+        if (unit != null)
+            return Mathf.Max(1, unit.Visao);
+
+        return DefaultObservationRangeHexes;
+    }
+
+    private static int GetTeamMaxObservationRangeHexes(UnitManager referenceUnit)
+    {
+        if (referenceUnit == null)
+            return DefaultObservationRangeHexes;
+
+        int maxRange = GetObservationRangeHexes(referenceUnit);
+        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager ally = units[i];
+            if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
+                continue;
+            if (ally.TeamId != referenceUnit.TeamId)
+                continue;
+
+            int allyRange = GetObservationRangeHexes(ally);
+            if (allyRange > maxRange)
+                maxRange = allyRange;
+        }
+
+        return Mathf.Max(1, maxRange);
     }
 
     private static bool TryResolveCounterAttack(
@@ -522,12 +896,15 @@ public static class PodeMirarSensor
         UnitManager attacker,
         UnitManager defender,
         DPQAirHeightConfig dpqAirHeightConfig,
-        bool fogOfWarEnabled,
         WeaponData weapon,
         out List<Vector3Int> intermediateCells,
-        out Vector3Int blockedCell)
+        out List<float> evPath,
+        out Vector3Int blockedCell,
+        bool enableLdtValidation,
+        bool enableLosValidation)
     {
         intermediateCells = new List<Vector3Int>();
+        evPath = new List<float>();
         blockedCell = Vector3Int.zero;
         if (tilemap == null || weapon == null)
             return false;
@@ -543,6 +920,7 @@ public static class PodeMirarSensor
         {
             originEv = 0;
         }
+        originEv = ResolveOriginEvForLos(tilemap, terrainDatabase, originCell, attacker, dpqAirHeightConfig, originEv);
 
         if (!TryResolveCellVision(
                 tilemap,
@@ -556,22 +934,26 @@ public static class PodeMirarSensor
             targetEv = 0;
         }
 
-        List<Vector3Int> crossedCells = GetIntermediateCellsByCellLerp(originCell, targetCell);
+        evPath.Add(originEv);
+        List<Vector3Int> crossedCells = GetIntermediateCellsByCellLerp(tilemap, originCell, targetCell);
         intermediateCells.AddRange(crossedCells);
         for (int i = 0; i < crossedCells.Count; i++)
         {
             Vector3Int cell = crossedCells[i];
+            float t = (i + 1f) / (crossedCells.Count + 1f);
+            float losHeightAtCell = Mathf.Lerp(originEv, targetEv, t);
+            evPath.Add(losHeightAtCell);
 
             if (!TryResolveTerrainAtCell(tilemap, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
                 continue;
 
-            if (!TerrainAllowsWeaponTrajectory(terrain, weapon))
+            if (enableLdtValidation && !TerrainAllowsWeaponTrajectory(terrain, weapon))
             {
                 blockedCell = cell;
                 return false;
             }
 
-            if (!fogOfWarEnabled)
+            if (!enableLosValidation)
                 continue;
 
             if (!TryResolveCellVision(
@@ -595,9 +977,6 @@ public static class PodeMirarSensor
             // Excecao suprema: alvo com EV pelo menos 2 acima do obstaculo nao e bloqueado por ele.
             if ((targetEv - cellEv) >= 2)
                 continue;
-
-            float t = (i + 1f) / (crossedCells.Count + 1f);
-            float losHeightAtCell = Mathf.Lerp(originEv, targetEv, t);
             if (cellEv > losHeightAtCell)
             {
                 blockedCell = cell;
@@ -605,7 +984,133 @@ public static class PodeMirarSensor
             }
         }
 
+        evPath.Add(targetEv);
         return true;
+    }
+
+    private static bool HasValidStraightObservationLine(
+        Tilemap tilemap,
+        TerrainDatabase terrainDatabase,
+        Vector3Int originCell,
+        Vector3Int targetCell,
+        UnitManager observer,
+        UnitManager target,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        out List<Vector3Int> intermediateCells,
+        out List<float> evPath,
+        out Vector3Int blockedCell,
+        bool enableLosValidation)
+    {
+        intermediateCells = new List<Vector3Int>();
+        evPath = new List<float>();
+        blockedCell = Vector3Int.zero;
+        if (tilemap == null)
+            return false;
+
+        if (!TryResolveCellVision(
+                tilemap,
+                terrainDatabase,
+                originCell,
+                observer,
+                dpqAirHeightConfig,
+                out int originEv,
+                out _))
+        {
+            originEv = 0;
+        }
+        originEv = ResolveOriginEvForLos(tilemap, terrainDatabase, originCell, observer, dpqAirHeightConfig, originEv);
+
+        if (!TryResolveCellVision(
+                tilemap,
+                terrainDatabase,
+                targetCell,
+                target,
+                dpqAirHeightConfig,
+                out int targetEv,
+                out _))
+        {
+            targetEv = 0;
+        }
+
+        evPath.Add(originEv);
+        List<Vector3Int> crossedCells = GetIntermediateCellsByCellLerp(tilemap, originCell, targetCell);
+        intermediateCells.AddRange(crossedCells);
+        for (int i = 0; i < crossedCells.Count; i++)
+        {
+            Vector3Int cell = crossedCells[i];
+            float t = (i + 1f) / (crossedCells.Count + 1f);
+            float losHeightAtCell = Mathf.Lerp(originEv, targetEv, t);
+            evPath.Add(losHeightAtCell);
+
+            if (!enableLosValidation)
+                continue;
+
+            if (!TryResolveCellVision(
+                    tilemap,
+                    terrainDatabase,
+                    cell,
+                    null,
+                    dpqAirHeightConfig,
+                    out int cellEv,
+                    out bool cellBlocksLoS))
+            {
+                continue;
+            }
+
+            if (!cellBlocksLoS || cellEv <= 0)
+                continue;
+
+            if ((targetEv - cellEv) >= 2)
+                continue;
+
+            if (cellEv > losHeightAtCell)
+            {
+                blockedCell = cell;
+                return false;
+            }
+        }
+
+        evPath.Add(targetEv);
+        return true;
+    }
+
+    private static int ResolveOriginEvForLos(
+        Tilemap tilemap,
+        TerrainDatabase terrainDatabase,
+        Vector3Int originCell,
+        UnitManager attacker,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        int fallbackEv)
+    {
+        if (attacker == null)
+            return Mathf.Max(0, fallbackEv);
+
+        Domain domain = attacker.GetDomain();
+        HeightLevel height = attacker.GetHeightLevel();
+        if (domain == Domain.Air)
+        {
+            if (dpqAirHeightConfig != null &&
+                dpqAirHeightConfig.TryGetVisionFor(domain, height, out int airEv, out _))
+            {
+                return Mathf.Max(0, airEv);
+            }
+
+            return Mathf.Max(0, fallbackEv);
+        }
+
+        // Regra de origem da LoS: unidades no chao partem do EV de sua camada (Surface = 0),
+        // a menos que o terreno marque explicitamente que o atirador herda EV do terreno.
+        originCell.z = 0;
+        if (tilemap != null &&
+            terrainDatabase != null &&
+            TryResolveTerrainAtCell(tilemap, terrainDatabase, originCell, out TerrainTypeData originTerrain) &&
+            originTerrain != null &&
+            originTerrain.shooterInheritsTerrainEv)
+        {
+            return Mathf.Max(0, originTerrain.ev);
+        }
+
+        return 0;
     }
 
     private static bool TerrainAllowsWeaponTrajectory(TerrainTypeData terrain, WeaponData weapon)
@@ -632,7 +1137,7 @@ public static class PodeMirarSensor
         return false;
     }
 
-    private static List<Vector3Int> GetIntermediateCellsByCellLerp(Vector3Int originCell, Vector3Int targetCell)
+    private static List<Vector3Int> GetIntermediateCellsByCellLerp(Tilemap tilemap, Vector3Int originCell, Vector3Int targetCell)
     {
         List<Vector3Int> cells = new List<Vector3Int>();
 
@@ -644,12 +1149,24 @@ public static class PodeMirarSensor
         if (steps <= 1)
             return cells;
 
+        if (tilemap == null)
+            return cells;
+
+        Vector3 originWorld = tilemap.GetCellCenterWorld(originCell);
+        Vector3 targetWorld = tilemap.GetCellCenterWorld(targetCell);
+        int sampleCount = steps * 4; // supersampling leve para reduzir aliasing em bordas.
+        if (sampleCount <= 1)
+            sampleCount = steps;
+
         HashSet<Vector3Int> seen = new HashSet<Vector3Int>();
-        for (int i = 1; i < steps; i++)
+        for (int i = 1; i < sampleCount; i++)
         {
-            int x = Mathf.RoundToInt(originCell.x + (dx * (float)i / steps));
-            int y = Mathf.RoundToInt(originCell.y + (dy * (float)i / steps));
-            Vector3Int cell = new Vector3Int(x, y, 0);
+            float t = i / (float)sampleCount;
+            Vector3 sampleWorld = Vector3.Lerp(originWorld, targetWorld, t);
+            Vector3Int cell = tilemap.WorldToCell(sampleWorld);
+            cell.z = 0;
+            if (cell == originCell || cell == targetCell)
+                continue;
             if (seen.Add(cell))
                 cells.Add(cell);
         }
@@ -747,7 +1264,8 @@ public static class PodeMirarSensor
         string defenderPositionLabel,
         string reason,
         Vector3Int blockedCell,
-        List<Vector3Int> lineOfFireIntermediateCells)
+        List<Vector3Int> lineOfFireIntermediateCells,
+        List<float> lineOfFireEvPath)
     {
         if (output == null)
             return;
@@ -765,7 +1283,10 @@ public static class PodeMirarSensor
             blockedCell = blockedCell,
             lineOfFireIntermediateCells = lineOfFireIntermediateCells != null
                 ? new List<Vector3Int>(lineOfFireIntermediateCells)
-                : new List<Vector3Int>()
+                : new List<Vector3Int>(),
+            lineOfFireEvPath = lineOfFireEvPath != null
+                ? new List<float>(lineOfFireEvPath)
+                : new List<float>()
         });
     }
 
@@ -775,6 +1296,23 @@ public static class PodeMirarSensor
             return "-";
 
         cell.z = 0;
+        Domain domain = unit.GetDomain();
+        HeightLevel height = unit.GetHeightLevel();
+        bool isGroundLayer = domain == Domain.Land && height == HeightLevel.Surface;
+        string layerLabel = $"{domain}/{height}";
+
+        if (!isGroundLayer)
+        {
+            if (TryResolveTerrainAtCell(referenceTilemap, terrainDatabase, cell, out TerrainTypeData airTerrain) && airTerrain != null)
+            {
+                string terrainName = !string.IsNullOrWhiteSpace(airTerrain.displayName)
+                    ? airTerrain.displayName
+                    : (!string.IsNullOrWhiteSpace(airTerrain.id) ? airTerrain.id : airTerrain.name);
+                return $"Layer: {layerLabel} | Sobre: {terrainName}";
+            }
+
+            return $"Layer: {layerLabel}";
+        }
 
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(referenceTilemap, cell);
         if (construction != null)

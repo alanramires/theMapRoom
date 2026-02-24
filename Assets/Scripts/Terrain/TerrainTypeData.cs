@@ -74,6 +74,9 @@ public class TerrainTypeData : ScriptableObject
     [FormerlySerializedAs("takeoffAllowedMovementModes")]
     [Tooltip("Modos de decolagem permitidos. Se vazio, nao restringe.")]
     public List<TakeoffMode> allowedTakeoffModes = new List<TakeoffMode>();
+    [Header("Naval Ops")]
+    [Tooltip("Unidades nesses dominios/alturas encerram movimento no dominio nativo deste terreno.")]
+    public List<TerrainLayerMode> forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
 
     [Header("Movement")]
     [Tooltip("Custo basico de autonomia para entrar neste hex. Minimo 1.")]
@@ -86,6 +89,9 @@ public class TerrainTypeData : ScriptableObject
     [Header("Vision")]
     [Tooltip("EV (elevacao de visada) base deste terreno.")]
     public int ev = 0;
+
+    [Tooltip("Se true, unidades atiradoras neste terreno herdam o EV do terreno como EV inicial da LoS.")]
+    public bool shooterInheritsTerrainEv = false;
 
     [Tooltip("Se true, este terreno bloqueia linha de visada por padrao.")]
     public bool blockLoS = true;
@@ -144,5 +150,27 @@ public class TerrainTypeData : ScriptableObject
         }
 
         return false;
+    }
+
+    private void OnValidate()
+    {
+        if (aditionalDomainsAllowed == null)
+            aditionalDomainsAllowed = new List<TerrainLayerMode>();
+        if (allowedLandingClasses == null)
+            allowedLandingClasses = new List<LandingClass>();
+        if (requiredLandingSkills == null)
+            requiredLandingSkills = new List<SkillData>();
+        if (allowedTakeoffModes == null)
+            allowedTakeoffModes = new List<TakeoffMode>();
+        if (forceEndMovementOnTerrainDomainForDomains == null)
+            forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
+        if (constructionVisionOverrides == null)
+            constructionVisionOverrides = new List<TerrainConstructionVisionOverride>();
+        if (structureVisionOverrides == null)
+            structureVisionOverrides = new List<TerrainStructureVisionOverride>();
+        if (requiredSkillsToEnter == null)
+            requiredSkillsToEnter = new List<SkillData>();
+        if (skillCostOverrides == null)
+            skillCostOverrides = new List<TerrainSkillCostOverride>();
     }
 }

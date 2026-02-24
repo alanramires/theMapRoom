@@ -34,4 +34,7 @@ public class PodeMirarInvalidOption
 
     [Tooltip("Hexes intermediarios analisados na linha de tiro (debug).")]
     public List<Vector3Int> lineOfFireIntermediateCells = new List<Vector3Int>();
+
+    [Tooltip("Perfil EV da linha (origem -> intermediarios -> alvo), para debug de LoS.")]
+    public List<float> lineOfFireEvPath = new List<float>();
 }

@@ -233,6 +233,7 @@ MonoBehaviour:
   maxAmmo: 3
   currentFuel: 99
   maxFuel: 99
+  visao: 3
   embarkedWeaponsRuntime: []
   appliedHasActed: 0
   appliedActiveTeamId: 0
@@ -254,9 +255,10 @@ MonoBehaviour:
   currentHeightLevel: 3
   currentLayerModeIndex: 0
   layerStateInitialized: 1
-  aircraftGrounded: 0
-  aircraftEmbarkedInCarrier: 0
-  aircraftOperationLockTurns: 0
+  useExplicitPreferredAirHeightRuntime: 0
+  preferredAirHeightRuntime: 4
+  useExplicitPreferredNavalHeightRuntime: 0
+  preferredNavalHeightRuntime: 2
   transportedUnitSlots: []
   embarkedTransporter: {fileID: 0}
   embarkedTransporterSlotIndex: -1

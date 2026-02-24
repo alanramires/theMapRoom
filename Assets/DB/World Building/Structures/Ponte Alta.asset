@@ -38,20 +38,13 @@ MonoBehaviour:
   roadBoost: 0
   aircraftOpsByTerrain:
   - terrainData: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
-    isRoadRunway: 0
-    requiredLandingSkills: []
-  - terrainData: {fileID: 11400000, guid: f8bd8dc9dbe197d4f828ad72d3d90df6, type: 2}
-    isRoadRunway: 0
-    requiredLandingSkills: []
-  - terrainData: {fileID: 11400000, guid: 47664243e1e61d84aa1c496ae463bd9c, type: 2}
-    isRoadRunway: 0
-    requiredLandingSkills: []
-  - terrainData: {fileID: 11400000, guid: 75d32a51167ec98409039b6f5d4d287f, type: 2}
-    isRoadRunway: 0
-    requiredLandingSkills: []
-  - terrainData: {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
-    isRoadRunway: 0
-    requiredLandingSkills: []
+    allowTakeoffAndLanding: 0
+    legacyRequiredLandingSkills: []
+    requiredLandingSkillRules: []
+    requireAtLeastOneLandingSkill: 0
+  forceEndMovementOnTerrainDomainForDomains:
+  - domain: 2
+    heightLevel: 2
   roadRoutes:
   - routeName: Ponte Hudson
     cells:
@@ -59,3 +52,11 @@ MonoBehaviour:
     - {x: 8, y: -9, z: 0}
     - {x: 9, y: -10, z: 0}
     - {x: 9, y: -11, z: 0}
+  - routeName: Ponte do rio que cai
+    cells:
+    - {x: 22, y: 9, z: 0}
+    - {x: 23, y: 8, z: 0}
+    - {x: 23, y: 7, z: 0}
+    - {x: 24, y: 6, z: 0}
+    - {x: 24, y: 5, z: 0}
+    - {x: 25, y: 4, z: 0}

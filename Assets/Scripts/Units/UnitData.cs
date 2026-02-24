@@ -39,6 +39,7 @@ public class UnitData : ScriptableObject
     public int defense = 0;
     [SerializeField, HideInInspector] private ArmorClass armorClass = ArmorClass.Light;
     public int movement = 3;
+    [Min(1)] public int visao = 3;
     public MovementCategory movementCategory = MovementCategory.Marcha;
     public MilitaryForce militaryForce = MilitaryForce.Army;
     public GameUnitClass unitClass = GameUnitClass.Infantry;
@@ -55,6 +56,16 @@ public class UnitData : ScriptableObject
     [FormerlySerializedAs("additionalLayerModes")]
     [Tooltip("Modos alternativos de dominio/altura (ex.: Submarine/Submerged tambem pode Naval/Surface).")]
     public List<UnitLayerMode> aditionalDomainsAllowed = new List<UnitLayerMode>();
+    [Header("Air Preference")]
+    [Tooltip("Se ligado, usa a altura abaixo como preferencial para auto-promocao/decolagem em vez de derivar do dominio nativo.")]
+    public bool useExplicitPreferredAirHeight = false;
+    [Tooltip("Altura aerea preferencial quando o override acima estiver ligado.")]
+    public HeightLevel preferredAirHeight = HeightLevel.AirLow;
+    [Header("Naval Preference")]
+    [Tooltip("Se ligado, usa a altura naval abaixo como preferencial para auto-ajuste em transicoes de camada naval.")]
+    public bool useExplicitPreferredNavalHeight = false;
+    [Tooltip("Altura naval preferencial quando o override acima estiver ligado.")]
+    public HeightLevel preferredNavalHeight = HeightLevel.Submerged;
     [Header("Skills")]
     [Tooltip("Skills base da unidade. As instancias herdam essa lista ao aplicar o UnitData.")]
     public List<SkillData> skills = new List<SkillData>();
@@ -153,7 +164,12 @@ public class UnitData : ScriptableObject
         if (passengersCanDisembarkAndGoesToConstructions == null)
             passengersCanDisembarkAndGoesToConstructions = new List<ConstructionData>();
         eliteLevel = Mathf.Max(0, eliteLevel);
+        visao = Mathf.Max(1, visao);
         maxUnitsServedPerTurn = Mathf.Max(0, maxUnitsServedPerTurn);
+        if (preferredAirHeight != HeightLevel.AirLow && preferredAirHeight != HeightLevel.AirHigh)
+            preferredAirHeight = HeightLevel.AirLow;
+        if (preferredNavalHeight != HeightLevel.Surface && preferredNavalHeight != HeightLevel.Submerged)
+            preferredNavalHeight = HeightLevel.Submerged;
 
         for (int i = 0; i < embarkedWeapons.Count; i++)
         {

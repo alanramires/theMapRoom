@@ -15,13 +15,25 @@ public class ConstructionDataEditor : Editor
             "allowAircraftTakeoffAndLanding",
             "legacyRequiredLandingSkills",
             "requiredLandingSkillRules",
-            "requireAtLeastOneLandingSkill");
+            "requireAtLeastOneLandingSkill",
+            "forceEndMovementOnTerrainDomainForDomains");
         EditorGUILayout.Space();
         DrawAircraftOpsSection(serializedObject);
+        EditorGUILayout.Space();
+        DrawNavalOpsSection(serializedObject);
         EditorGUILayout.Space();
         DrawConstructionConfigurationExpanded(serializedObject.FindProperty("constructionConfiguration"));
 
         serializedObject.ApplyModifiedProperties();
+    }
+
+    private static void DrawNavalOpsSection(SerializedObject so)
+    {
+        EditorGUILayout.LabelField("Naval Ops", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Unidades nesses dominios/alturas encerram movimento no dominio nativo da construcao.",
+            MessageType.Info);
+        DrawIfExists(so.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domains End Their Movement On The Terrain Domain");
     }
 
     private static void DrawAircraftOpsSection(SerializedObject so)

@@ -6,6 +6,7 @@ public partial class TurnStateManager
 {
     public ActionSfx HandleConfirm()
     {
+        LogStateStep("HandleConfirm");
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
 
@@ -21,6 +22,12 @@ public partial class TurnStateManager
                 return HandleConfirmWhileMoveuParado();
             case CursorState.Mirando:
                 return HandleConfirmWhileMirando();
+            case CursorState.Pousando:
+                return HandleConfirmWhilePousando();
+            case CursorState.Embarcando:
+                return HandleConfirmWhileEmbarcando();
+            case CursorState.Desembarcando:
+                return HandleConfirmWhileDesembarcando();
         }
 
         return ActionSfx.None;
@@ -28,6 +35,7 @@ public partial class TurnStateManager
 
     public ActionSfx HandleCancel()
     {
+        LogStateStep("HandleCancel", rollback: true);
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
 
@@ -44,6 +52,12 @@ public partial class TurnStateManager
                 return HandleCancelWhileMoveuParado();
             case CursorState.Mirando:
                 return HandleCancelWhileMirando();
+            case CursorState.Pousando:
+                return HandleCancelWhilePousando();
+            case CursorState.Embarcando:
+                return HandleCancelWhileEmbarcando();
+            case CursorState.Desembarcando:
+                return HandleCancelWhileDesembarcando();
         }
 
         return ActionSfx.None;
@@ -51,6 +65,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileNeutral()
     {
+        LogStateStep("HandleConfirmWhileNeutral");
         if (cursorController == null)
             return ActionSfx.None;
 
@@ -78,12 +93,13 @@ public partial class TurnStateManager
             Debug.Log($"[Pode Decolar] {takeoffInfo}");
 
         SetSelectedUnit(unit);
-        cursorState = CursorState.UnitSelected;
+        SetCursorState(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
         return ActionSfx.Confirm;
     }
 
     private ActionSfx HandleConfirmWhileUnitSelected()
     {
+        LogStateStep("HandleConfirmWhileUnitSelected");
         if (cursorController == null || selectedUnit == null)
             return ActionSfx.None;
 
@@ -105,8 +121,7 @@ public partial class TurnStateManager
                 return ActionSfx.Error;
             }
 
-            cursorState = CursorState.MoveuParado;
-            RefreshSensorsForCurrentState();
+            EnterSensorsState(CursorState.MoveuParado);
             Debug.Log("moveu no mesmo lugar");
             return ActionSfx.Confirm;
         }
@@ -182,45 +197,62 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileMoveuAndando()
     {
-        if (TryConfirmScannerEmbark())
-            return ActionSfx.Confirm;
-
-        if (TryConfirmScannerAttack())
-            return ActionSfx.Confirm;
-
+        LogStateStep("HandleConfirmWhileMoveuAndando");
         return ActionSfx.None;
     }
 
     private ActionSfx HandleConfirmWhileMoveuParado()
     {
-        if (TryConfirmScannerEmbark())
-            return ActionSfx.Confirm;
-
-        if (TryConfirmScannerAttack())
-            return ActionSfx.Confirm;
-
+        LogStateStep("HandleConfirmWhileMoveuParado");
         return ActionSfx.None;
     }
 
     private ActionSfx HandleCancelWhileMoveuAndando()
     {
+        LogStateStep("HandleCancelWhileMoveuAndando", rollback: true);
+        Debug.Log(
+            $"[Rollback] ESC em fluxo andado (state={cursorState}) | hasCommittedMovement={hasCommittedMovement} | " +
+            $"pathCount={committedMovementPath.Count} | selected={(selectedUnit != null ? selectedUnit.name : "(none)")}");
+
         if (HandleScannerPromptCancel())
+        {
+            Debug.Log("[Rollback] ESC consumido por submenu/scanner prompt.");
+            return ActionSfx.Cancel;
+        }
+
+        if (selectedUnit == null)
             return ActionSfx.Cancel;
 
-        if (selectedUnit == null || !hasCommittedMovement || committedMovementPath.Count < 2)
+        if (!hasCommittedMovement || committedMovementPath.Count < 2)
+        {
+            Debug.Log("[Rollback] Sem caminho comprometido valido. Fallback para UnitSelected.");
+            SetCursorState(CursorState.UnitSelected, "HandleCancelWhileMoveuAndando: fallback without committed path", rollback: true);
+            ClearSensorResults();
+            PaintSelectedUnitMovementRange();
             return ActionSfx.Cancel;
+        }
 
         RestorePreparedFuelCostIfAny();
-        BeginRollbackToSelection();
+        if (!BeginRollbackToSelection())
+        {
+            Debug.Log("[Rollback] Falha ao iniciar animacao de rollback. Fallback para UnitSelected.");
+            SetCursorState(CursorState.UnitSelected, "HandleCancelWhileMoveuAndando: rollback animation failed", rollback: true);
+            ClearCommittedMovement();
+            ClearSensorResults();
+            PaintSelectedUnitMovementRange();
+        }
+        else
+        {
+            Debug.Log("[Rollback] Animacao de rollback iniciada.");
+        }
         return ActionSfx.Cancel;
     }
 
     private ActionSfx HandleCancelWhileMoveuParado()
     {
-        if (HandleScannerPromptCancel())
-            return ActionSfx.Cancel;
-
-        cursorState = CursorState.UnitSelected;
+        LogStateStep("HandleCancelWhileMoveuParado", rollback: true);
+        RestoreForcedLayerAfterRollbackIfNeeded();
+        SetCursorState(CursorState.UnitSelected, "HandleCancelWhileMoveuParado", rollback: true);
         ClearSensorResults();
         PaintSelectedUnitMovementRange();
         return ActionSfx.Cancel;
@@ -228,6 +260,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileMirando()
     {
+        LogStateStep("HandleConfirmWhileMirando");
         if (TryConfirmScannerAttack())
             return ActionSfx.Confirm;
 
@@ -236,10 +269,63 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileMirando()
     {
+        LogStateStep("HandleCancelWhileMirando", rollback: true);
         if (HandleScannerPromptCancel())
             return ActionSfx.Cancel;
 
         ExitMirandoStateToMovement();
+        return ActionSfx.Cancel;
+    }
+
+    private ActionSfx HandleConfirmWhilePousando()
+    {
+        LogStateStep("HandleConfirmWhilePousando");
+        if (TryConfirmScannerLanding())
+            return ActionSfx.Confirm;
+
+        return ActionSfx.None;
+    }
+
+    private ActionSfx HandleCancelWhilePousando()
+    {
+        LogStateStep("HandleCancelWhilePousando", rollback: true);
+        if (HandleScannerPromptCancel())
+            return ActionSfx.Cancel;
+
+        ExitLandingStateToMovement();
+        return ActionSfx.Cancel;
+    }
+
+    private ActionSfx HandleConfirmWhileEmbarcando()
+    {
+        LogStateStep("HandleConfirmWhileEmbarcando");
+        if (TryConfirmScannerEmbark())
+            return ActionSfx.Confirm;
+
+        return ActionSfx.None;
+    }
+
+    private ActionSfx HandleCancelWhileEmbarcando()
+    {
+        LogStateStep("HandleCancelWhileEmbarcando", rollback: true);
+        if (HandleScannerPromptCancel())
+            return ActionSfx.Cancel;
+
+        ExitEmbarkStateToMovement();
+        return ActionSfx.Cancel;
+    }
+
+    private ActionSfx HandleConfirmWhileDesembarcando()
+    {
+        LogStateStep("HandleConfirmWhileDesembarcando");
+        return ActionSfx.None;
+    }
+
+    private ActionSfx HandleCancelWhileDesembarcando()
+    {
+        LogStateStep("HandleCancelWhileDesembarcando", rollback: true);
+        SetCursorState(CursorState.MoveuParado, "HandleCancelWhileDesembarcando", rollback: true);
+        RefreshSensorsForCurrentState();
         return ActionSfx.Cancel;
     }
 }

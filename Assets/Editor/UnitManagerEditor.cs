@@ -21,6 +21,7 @@ public class UnitManagerEditor : Editor
     private SerializedProperty currentHpProp;
     private SerializedProperty currentFuelProp;
     private SerializedProperty maxFuelProp;
+    private SerializedProperty visaoProp;
     private SerializedProperty embarkedWeaponsRuntimeProp;
     private SerializedProperty hasActedProp;
     private SerializedProperty isEmbarkedProp;
@@ -29,9 +30,10 @@ public class UnitManagerEditor : Editor
     private SerializedProperty currentHeightLevelProp;
     private SerializedProperty currentLayerModeIndexProp;
     private SerializedProperty layerStateInitializedProp;
-    private SerializedProperty aircraftGroundedProp;
-    private SerializedProperty aircraftEmbarkedInCarrierProp;
-    private SerializedProperty aircraftOperationLockTurnsProp;
+    private SerializedProperty useExplicitPreferredAirHeightRuntimeProp;
+    private SerializedProperty preferredAirHeightRuntimeProp;
+    private SerializedProperty useExplicitPreferredNavalHeightRuntimeProp;
+    private SerializedProperty preferredNavalHeightRuntimeProp;
 
     private void OnEnable()
     {
@@ -50,6 +52,7 @@ public class UnitManagerEditor : Editor
         currentHpProp = serializedObject.FindProperty("currentHP");
         currentFuelProp = serializedObject.FindProperty("currentFuel");
         maxFuelProp = serializedObject.FindProperty("maxFuel");
+        visaoProp = serializedObject.FindProperty("visao");
         embarkedWeaponsRuntimeProp = serializedObject.FindProperty("embarkedWeaponsRuntime");
         hasActedProp = serializedObject.FindProperty("hasActed");
         isEmbarkedProp = serializedObject.FindProperty("isEmbarked");
@@ -58,9 +61,10 @@ public class UnitManagerEditor : Editor
         currentHeightLevelProp = serializedObject.FindProperty("currentHeightLevel");
         currentLayerModeIndexProp = serializedObject.FindProperty("currentLayerModeIndex");
         layerStateInitializedProp = serializedObject.FindProperty("layerStateInitialized");
-        aircraftGroundedProp = serializedObject.FindProperty("aircraftGrounded");
-        aircraftEmbarkedInCarrierProp = serializedObject.FindProperty("aircraftEmbarkedInCarrier");
-        aircraftOperationLockTurnsProp = serializedObject.FindProperty("aircraftOperationLockTurns");
+        useExplicitPreferredAirHeightRuntimeProp = serializedObject.FindProperty("useExplicitPreferredAirHeightRuntime");
+        preferredAirHeightRuntimeProp = serializedObject.FindProperty("preferredAirHeightRuntime");
+        useExplicitPreferredNavalHeightRuntimeProp = serializedObject.FindProperty("useExplicitPreferredNavalHeightRuntime");
+        preferredNavalHeightRuntimeProp = serializedObject.FindProperty("preferredNavalHeightRuntime");
     }
 
     public override void OnInspectorGUI()
@@ -73,6 +77,7 @@ public class UnitManagerEditor : Editor
         }
 
         serializedObject.Update();
+        UnitManager unit = (UnitManager)target;
 
         EditorGUILayout.PropertyField(spriteRendererProp);
         EditorGUILayout.PropertyField(unitHudProp, new GUIContent("Unit HUD"));
@@ -107,6 +112,8 @@ public class UnitManagerEditor : Editor
 
         EditorGUILayout.IntSlider(currentFuelProp, 0, Mathf.Max(1, maxFuelProp.intValue), new GUIContent("Current Fuel"));
         EditorGUILayout.PropertyField(maxFuelProp, new GUIContent("Max Fuel"));
+        if (visaoProp != null)
+            EditorGUILayout.IntSlider(visaoProp, 1, 12, new GUIContent("Visao (hex)"));
         DrawEmbarkedWeaponsRuntimeSection();
         DrawTransportRuntimeSection((UnitManager)target);
 
@@ -122,17 +129,31 @@ public class UnitManagerEditor : Editor
             EditorGUILayout.PropertyField(layerStateInitializedProp, new GUIContent("Layer State Initialized"));
         using (new EditorGUI.DisabledScope(true))
         {
-            if (aircraftGroundedProp != null)
-                EditorGUILayout.PropertyField(aircraftGroundedProp, new GUIContent("Aircraft Grounded"));
-            if (aircraftEmbarkedInCarrierProp != null)
-                EditorGUILayout.PropertyField(aircraftEmbarkedInCarrierProp, new GUIContent("Aircraft Embarked In Carrier"));
-            if (aircraftOperationLockTurnsProp != null)
-                EditorGUILayout.PropertyField(aircraftOperationLockTurnsProp, new GUIContent("Aircraft Operation Lock Turns"));
+            EditorGUILayout.Toggle("Aircraft Grounded", unit.IsAircraftGrounded);
+            EditorGUILayout.Toggle("Aircraft Embarked In Carrier", unit.IsAircraftEmbarkedInCarrier);
+            EditorGUILayout.IntField("Aircraft Operation Lock Turns", unit.AircraftOperationLockTurns);
+            EditorGUILayout.EnumPopup("Preferred Air Height (Resolved)", unit.GetPreferredAirHeight());
+            if (useExplicitPreferredAirHeightRuntimeProp != null)
+                EditorGUILayout.PropertyField(useExplicitPreferredAirHeightRuntimeProp, new GUIContent("Use Explicit Preferred Air Height (Runtime)"));
+            if (preferredAirHeightRuntimeProp != null)
+                EditorGUILayout.PropertyField(preferredAirHeightRuntimeProp, new GUIContent("Preferred Air Height (Runtime)"));
+            if (useExplicitPreferredNavalHeightRuntimeProp != null)
+                EditorGUILayout.PropertyField(useExplicitPreferredNavalHeightRuntimeProp, new GUIContent("Use Explicit Preferred Naval Height (Runtime)"));
+            if (preferredNavalHeightRuntimeProp != null)
+                EditorGUILayout.PropertyField(preferredNavalHeightRuntimeProp, new GUIContent("Preferred Naval Height (Runtime)"));
+        }
+
+        UnitData resolvedData = null;
+        if (unit.TryGetUnitData(out resolvedData) && resolvedData != null)
+        {
+            string prefSource = resolvedData.useExplicitPreferredAirHeight
+                ? $"Override UnitData: {resolvedData.preferredAirHeight}"
+                : "Derivado automaticamente de Domain/Height + Additional Domains.";
+            EditorGUILayout.HelpBox($"Preferencia aerea: {prefSource}", MessageType.None);
         }
 
         serializedObject.ApplyModifiedProperties();
 
-        UnitManager unit = (UnitManager)target;
         DrawLayerStateCycleButtons(unit);
 
         if (GUILayout.Button("Apply From Database"))
@@ -270,21 +291,25 @@ public class UnitManagerEditor : Editor
         int currentIndex = ResolveCurrentLayerModeIndex(unit, orderedModes);
         bool canGoDown = currentIndex > 0;
         bool canGoUp = currentIndex >= 0 && currentIndex < modeCount - 1;
+        bool canDebugGoDown = Application.isPlaying && CanStepLayerStateForDebug(unit, -1);
+        bool canDebugGoUp = Application.isPlaying && CanStepLayerStateForDebug(unit, +1);
+        bool allowDown = (modeCount > 1 && canGoDown) || canDebugGoDown;
+        bool allowUp = (modeCount > 1 && canGoUp) || canDebugGoUp;
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Layer State Controls", EditorStyles.miniBoldLabel);
 
         EditorGUILayout.BeginHorizontal();
-        using (new EditorGUI.DisabledScope(modeCount <= 1 || !canGoDown))
+        using (new EditorGUI.DisabledScope(!allowDown))
         {
             if (GUILayout.Button("Descer Domain (D)"))
-                StepLayerMode(unit, orderedModes, currentIndex, -1);
+                TryStepLayerModeWithDebugFallback(unit, orderedModes, currentIndex, -1);
         }
 
-        using (new EditorGUI.DisabledScope(modeCount <= 1 || !canGoUp))
+        using (new EditorGUI.DisabledScope(!allowUp))
         {
             if (GUILayout.Button("Subir Domain (S)"))
-                StepLayerMode(unit, orderedModes, currentIndex, +1);
+                TryStepLayerModeWithDebugFallback(unit, orderedModes, currentIndex, +1);
         }
         EditorGUILayout.EndHorizontal();
 
@@ -297,15 +322,15 @@ public class UnitManagerEditor : Editor
             !currentEvent.shift &&
             !EditorGUIUtility.editingTextField)
         {
-            if (currentEvent.keyCode == KeyCode.D && modeCount > 1 && canGoDown)
+            if (currentEvent.keyCode == KeyCode.D && allowDown)
             {
-                StepLayerMode(unit, orderedModes, currentIndex, -1);
+                TryStepLayerModeWithDebugFallback(unit, orderedModes, currentIndex, -1);
                 currentEvent.Use();
                 GUI.changed = true;
             }
-            else if (currentEvent.keyCode == KeyCode.S && modeCount > 1 && canGoUp)
+            else if (currentEvent.keyCode == KeyCode.S && allowUp)
             {
-                StepLayerMode(unit, orderedModes, currentIndex, +1);
+                TryStepLayerModeWithDebugFallback(unit, orderedModes, currentIndex, +1);
                 currentEvent.Use();
                 GUI.changed = true;
             }
@@ -318,6 +343,53 @@ public class UnitManagerEditor : Editor
                 $"Layer atual: {current.domain}/{current.heightLevel} ({currentIndex + 1}/{modeCount})",
                 MessageType.None);
         }
+    }
+
+    private static bool CanStepLayerStateForDebug(UnitManager unit, int delta)
+    {
+        if (unit == null || unit.GetAircraftType() == AircraftType.None || delta == 0)
+            return false;
+
+        Domain domain = unit.GetDomain();
+        HeightLevel height = unit.GetHeightLevel();
+
+        if (delta < 0)
+            return domain == Domain.Air && (height == HeightLevel.AirHigh || height == HeightLevel.AirLow);
+
+        return domain != Domain.Air || height == HeightLevel.AirLow;
+    }
+
+    private static void TryStepLayerModeWithDebugFallback(UnitManager unit, System.Collections.Generic.IReadOnlyList<UnitLayerMode> orderedModes, int currentIndex, int delta)
+    {
+        if (unit == null || delta == 0)
+            return;
+
+        bool applied = false;
+        if (orderedModes != null && orderedModes.Count > 1)
+        {
+            int clampedCurrent = Mathf.Clamp(currentIndex, 0, orderedModes.Count - 1);
+            int next = clampedCurrent + delta;
+            if (next >= 0 && next < orderedModes.Count)
+            {
+                UnitLayerMode targetMode = orderedModes[next];
+                Undo.RecordObject(unit, "Cycle Unit Layer State");
+                applied = unit.TrySetCurrentLayerMode(targetMode.domain, targetMode.heightLevel);
+            }
+        }
+
+        if (!applied && Application.isPlaying && CanStepLayerStateForDebug(unit, delta))
+        {
+            Undo.RecordObject(unit, "Cycle Unit Layer State (Debug)");
+            applied = unit.TryStepLayerStateForDebug(delta);
+        }
+
+        if (!applied)
+            return;
+
+        EditorUtility.SetDirty(unit);
+        PrefabUtility.RecordPrefabInstancePropertyModifications(unit);
+        if (unit.gameObject.scene.IsValid())
+            EditorSceneManager.MarkSceneDirty(unit.gameObject.scene);
     }
 
     private static System.Collections.Generic.List<UnitLayerMode> BuildOrderedLayerModes(UnitManager unit)

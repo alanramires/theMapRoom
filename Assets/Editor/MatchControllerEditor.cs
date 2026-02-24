@@ -8,7 +8,11 @@ public class MatchControllerEditor : Editor
     private SerializedProperty activeTeamIdProp;
     private SerializedProperty playersProp;
     private SerializedProperty includeNeutralTeamProp;
-    private SerializedProperty fogOfWarProp;
+    private SerializedProperty gameSetupProp;
+    private SerializedProperty enableLdtValidationProp;
+    private SerializedProperty enableLosValidationProp;
+    private SerializedProperty enableSpotterProp;
+    private SerializedProperty enableStealthValidationProp;
     private SerializedProperty autonomyDatabaseProp;
     private SerializedProperty activePlayerListIndexProp;
 
@@ -18,14 +22,18 @@ public class MatchControllerEditor : Editor
         activeTeamIdProp = serializedObject.FindProperty("activeTeamId");
         playersProp = serializedObject.FindProperty("players");
         includeNeutralTeamProp = serializedObject.FindProperty("includeNeutralTeam");
-        fogOfWarProp = serializedObject.FindProperty("fogOfWar");
+        gameSetupProp = serializedObject.FindProperty("gameSetup");
+        enableLdtValidationProp = serializedObject.FindProperty("enableLdtValidation");
+        enableLosValidationProp = serializedObject.FindProperty("enableLosValidation");
+        enableSpotterProp = serializedObject.FindProperty("enableSpotter");
+        enableStealthValidationProp = serializedObject.FindProperty("enableStealthValidation");
         autonomyDatabaseProp = serializedObject.FindProperty("autonomyDatabase");
         activePlayerListIndexProp = serializedObject.FindProperty("activePlayerListIndex");
     }
 
     public override void OnInspectorGUI()
     {
-        if (currentTurnProp == null || activeTeamIdProp == null || playersProp == null || includeNeutralTeamProp == null || fogOfWarProp == null || activePlayerListIndexProp == null)
+        if (currentTurnProp == null || activeTeamIdProp == null || playersProp == null || includeNeutralTeamProp == null || activePlayerListIndexProp == null)
         {
             EditorGUILayout.HelpBox("MatchControllerEditor: propriedades nao encontradas. Usando inspector padrao.", MessageType.Warning);
             DrawDefaultInspector();
@@ -39,7 +47,19 @@ public class MatchControllerEditor : Editor
         EditorGUILayout.PropertyField(activeTeamIdProp, new GUIContent("Active Team ID"));
         EditorGUILayout.PropertyField(playersProp, new GUIContent("Players"), true);
         EditorGUILayout.PropertyField(includeNeutralTeamProp, new GUIContent("Include Neutral Team"));
-        EditorGUILayout.PropertyField(fogOfWarProp, new GUIContent("Fog of War"));
+        if (gameSetupProp != null)
+            EditorGUILayout.PropertyField(gameSetupProp, new GUIContent("Game Setup"));
+        using (new EditorGUI.DisabledScope(true))
+        {
+            if (enableLdtValidationProp != null)
+                EditorGUILayout.PropertyField(enableLdtValidationProp, new GUIContent("LdT"));
+            if (enableLosValidationProp != null)
+                EditorGUILayout.PropertyField(enableLosValidationProp, new GUIContent("LoS"));
+            if (enableSpotterProp != null)
+                EditorGUILayout.PropertyField(enableSpotterProp, new GUIContent("Spotter"));
+            if (enableStealthValidationProp != null)
+                EditorGUILayout.PropertyField(enableStealthValidationProp, new GUIContent("Stealth"));
+        }
         if (autonomyDatabaseProp != null)
             EditorGUILayout.PropertyField(autonomyDatabaseProp, new GUIContent("Autonomy Database"));
         using (new EditorGUI.DisabledScope(true))

@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using UnityEngine.Serialization;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 [Serializable]
 public class UnitMoveAnimationSpeedOverride
@@ -57,6 +60,14 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] [Range(0.2f, 8f)] private float mirandoPreviewSpeed = 3f;
     [Tooltip("Comprimento do segmento animado da linha de preview.")]
     [SerializeField] [Range(0.2f, 5f)] private float mirandoPreviewSegmentLength = 1.1f;
+    [Tooltip("Quantidade de segmentos animados simultaneos no preview de Mirando.")]
+    [SerializeField] [Range(1, 8)] private int mirandoPreviewSegmentQuantities = 1;
+    [Tooltip("Multiplicador do preview de spotter em Mirando (largura e comprimento do traco).")]
+    [SerializeField] [Range(0.2f, 2f)] private float mirandoSpotterPreviewMultiplier = 0.55f;
+    [Tooltip("Quantidade de segmentos animados simultaneos para cada linha de spotter no preview de Mirando.")]
+    [SerializeField] [Range(1, 8)] private int mirandoSpotterSegmentQuantities = 1;
+    [Tooltip("Velocidade dos segmentos animados das linhas de spotter no preview de Mirando.")]
+    [SerializeField] [Range(0.2f, 8f)] private float mirandoSpotterSegmentSpeed = 3f;
     [Tooltip("Intensidade da curvatura da parabola para armas parabolic.")]
     [SerializeField] [Range(0.2f, 4f)] private float mirandoParabolaBend = 1.2f;
     [Tooltip("Quantidade de pontos amostrados na curva parabolica.")]
@@ -66,6 +77,17 @@ public class AnimationManager : MonoBehaviour
     [SerializeField, HideInInspector] private bool mirandoPreviewSortingLayerInitialized;
     [Tooltip("Sorting order da linha de preview de tiro.")]
     [SerializeField] private int mirandoPreviewSortingOrder = 120;
+    [Header("VTOL Landing FX")]
+    [Tooltip("Frames da animacao de poeira de pouso VTOL (em ordem).")]
+    [SerializeField] private Sprite[] vtolLandingFrames;
+    [Tooltip("Duracao por frame da animacao de pouso VTOL.")]
+    [SerializeField] [Range(0.02f, 0.2f)] private float vtolLandingFrameDuration = 0.06f;
+    [Tooltip("Somente unidades com pelo menos uma skill desta lista podem tocar o FX de pouso VTOL.")]
+    [SerializeField] private List<SkillData> vtolLandingFxAllowedSkills = new List<SkillData>();
+    [SerializeField] private SortingLayerReference vtolLandingSortingLayer;
+    [SerializeField, HideInInspector] private bool vtolLandingSortingLayerInitialized;
+    [SerializeField] private int vtolLandingSortingOrder = 135;
+    [SerializeField] [Range(0.2f, 4f)] private float vtolLandingScale = 1f;
 
     private Coroutine movementRoutine;
     private UnitManager selectedBlinkUnit;
@@ -76,6 +98,10 @@ public class AnimationManager : MonoBehaviour
     public float MirandoPreviewWidth => Mathf.Clamp(mirandoPreviewWidth, 0.03f, 0.4f);
     public float MirandoPreviewSpeed => Mathf.Clamp(mirandoPreviewSpeed, 0.2f, 8f);
     public float MirandoPreviewSegmentLength => Mathf.Clamp(mirandoPreviewSegmentLength, 0.2f, 5f);
+    public int MirandoPreviewSegmentQuantities => Mathf.Clamp(mirandoPreviewSegmentQuantities, 1, 8);
+    public float MirandoSpotterPreviewMultiplier => Mathf.Clamp(mirandoSpotterPreviewMultiplier, 0.2f, 2f);
+    public int MirandoSpotterSegmentQuantities => Mathf.Clamp(mirandoSpotterSegmentQuantities, 1, 8);
+    public float MirandoSpotterSegmentSpeed => Mathf.Clamp(mirandoSpotterSegmentSpeed, 0.2f, 8f);
     public float MirandoParabolaBend => Mathf.Clamp(mirandoParabolaBend, 0.2f, 4f);
     public int MirandoParabolaSamples => Mathf.Clamp(mirandoParabolaSamples, 8, 64);
     public int MirandoPreviewSortingLayerId => mirandoPreviewSortingLayer.Id;
@@ -241,6 +267,16 @@ public class AnimationManager : MonoBehaviour
             mirandoPreviewSortingLayer = SortingLayerReference.FromName("SFX");
             mirandoPreviewSortingLayerInitialized = true;
         }
+
+        if (!vtolLandingSortingLayerInitialized)
+        {
+            vtolLandingSortingLayer = SortingLayerReference.FromName("SFX");
+            vtolLandingSortingLayerInitialized = true;
+        }
+
+#if UNITY_EDITOR
+        TryAutoAssignVtolLandingFramesInEditor();
+#endif
     }
 
     private float ResolveUnitMoveSpeed(UnitManager unit)
@@ -272,4 +308,74 @@ public class AnimationManager : MonoBehaviour
         float manualSpeed = ResolveUnitMoveSpeed(unit);
         return Mathf.Max(0.04f, baseStepDuration / Mathf.Max(0.1f, manualSpeed));
     }
+
+    public float PlayVtolLandingEffect(UnitManager unit)
+    {
+        if (unit == null || vtolLandingFrames == null || vtolLandingFrames.Length == 0)
+            return 0f;
+        if (unit.IsEmbarked)
+            return 0f;
+        if (!UnitMatchesVtolLandingFxSkillList(unit))
+            return 0f;
+
+        GameObject fx = new GameObject("VTOL Landing FX");
+        fx.transform.position = unit.transform.position;
+        fx.transform.localScale = Vector3.one * Mathf.Max(0.2f, vtolLandingScale);
+
+        SpriteRenderer sr = fx.AddComponent<SpriteRenderer>();
+        sr.sortingLayerID = vtolLandingSortingLayer.Id;
+        sr.sortingOrder = vtolLandingSortingOrder;
+
+        SpriteSequenceFx sequence = fx.AddComponent<SpriteSequenceFx>();
+        sequence.Configure(vtolLandingFrames, vtolLandingFrameDuration, autoDestroy: true);
+        return sequence.TotalDuration;
+    }
+
+    private bool UnitMatchesVtolLandingFxSkillList(UnitManager unit)
+    {
+        if (unit == null)
+            return false;
+        if (vtolLandingFxAllowedSkills == null || vtolLandingFxAllowedSkills.Count == 0)
+            return false;
+
+        for (int i = 0; i < vtolLandingFxAllowedSkills.Count; i++)
+        {
+            SkillData skill = vtolLandingFxAllowedSkills[i];
+            if (skill == null)
+                continue;
+            if (unit.HasSkill(skill))
+                return true;
+        }
+
+        return false;
+    }
+
+#if UNITY_EDITOR
+    private void TryAutoAssignVtolLandingFramesInEditor()
+    {
+        if (vtolLandingFrames != null && vtolLandingFrames.Length > 0)
+            return;
+
+        string[] paths = new[]
+        {
+            "Assets/img/animations/VTOL Landing/vtol_01.png",
+            "Assets/img/animations/VTOL Landing/vtol_02.png",
+            "Assets/img/animations/VTOL Landing/vtol_03.png",
+            "Assets/img/animations/VTOL Landing/vtol_04.png",
+            "Assets/img/animations/VTOL Landing/vtol_05.png",
+            "Assets/img/animations/VTOL Landing/vtol_06.png"
+        };
+
+        List<Sprite> loaded = new List<Sprite>(paths.Length);
+        for (int i = 0; i < paths.Length; i++)
+        {
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(paths[i]);
+            if (sprite != null)
+                loaded.Add(sprite);
+        }
+
+        if (loaded.Count > 0)
+            vtolLandingFrames = loaded.ToArray();
+    }
+#endif
 }

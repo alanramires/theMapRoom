@@ -93,6 +93,9 @@ public class StructureData : ScriptableObject
     [Header("Aircraft Ops (Structure + Terrain Pair)")]
     [Tooltip("Mapa de pares Estrutura+Terreno para air ops. Cada elemento define se o par atua como RoadRunway e skills exigidas.")]
     public List<StructureAirOpsTerrainRule> aircraftOpsByTerrain = new List<StructureAirOpsTerrainRule>();
+    [Header("Naval Ops")]
+    [Tooltip("Unidades nesses dominios/alturas encerram movimento no dominio nativo do terreno quando estiverem neste par Estrutura+Terreno.")]
+    public List<TerrainLayerMode> forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
 
     [Header("Road Routes")]
     [Tooltip("Rotas de rodovia desta estrutura (centro-a-centro dos hexes).")]
@@ -102,6 +105,8 @@ public class StructureData : ScriptableObject
     {
         if (aircraftOpsByTerrain == null)
             aircraftOpsByTerrain = new List<StructureAirOpsTerrainRule>();
+        if (forceEndMovementOnTerrainDomainForDomains == null)
+            forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
 
         for (int i = 0; i < aircraftOpsByTerrain.Count; i++)
         {

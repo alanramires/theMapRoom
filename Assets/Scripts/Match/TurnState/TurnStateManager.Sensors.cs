@@ -6,6 +6,7 @@ public partial class TurnStateManager
 {
     private readonly List<char> availableSensorActionCodes = new List<char>();
     private readonly List<PodeMirarTargetOption> cachedPodeMirarTargets = new List<PodeMirarTargetOption>();
+    private readonly List<PodeMirarInvalidOption> cachedPodeMirarInvalidTargets = new List<PodeMirarInvalidOption>();
     private readonly List<PodeEmbarcarOption> cachedPodeEmbarcarTargets = new List<PodeEmbarcarOption>();
     private readonly List<PodeEmbarcarInvalidOption> cachedPodeEmbarcarInvalidTargets = new List<PodeEmbarcarInvalidOption>();
     private readonly List<PodeDesembarcarOption> cachedPodeDesembarcarTargets = new List<PodeDesembarcarOption>();
@@ -13,6 +14,7 @@ public partial class TurnStateManager
 
     public IReadOnlyList<char> AvailableSensorActionCodes => availableSensorActionCodes;
     public IReadOnlyList<PodeMirarTargetOption> CachedPodeMirarTargets => cachedPodeMirarTargets;
+    public IReadOnlyList<PodeMirarInvalidOption> CachedPodeMirarInvalidTargets => cachedPodeMirarInvalidTargets;
     public IReadOnlyList<PodeEmbarcarOption> CachedPodeEmbarcarTargets => cachedPodeEmbarcarTargets;
     public IReadOnlyList<PodeEmbarcarInvalidOption> CachedPodeEmbarcarInvalidTargets => cachedPodeEmbarcarInvalidTargets;
     public IReadOnlyList<PodeDesembarcarOption> CachedPodeDesembarcarTargets => cachedPodeDesembarcarTargets;
@@ -26,12 +28,9 @@ public partial class TurnStateManager
             return;
         }
 
-        SensorMovementMode movementMode;
-        if (cursorState == CursorState.MoveuAndando)
-            movementMode = SensorMovementMode.MoveuAndando;
-        else if (cursorState == CursorState.MoveuParado)
-            movementMode = SensorMovementMode.MoveuParado;
-        else
+        landingOptionUnavailableReason = string.Empty;
+
+        if (!TryResolveSensorMovementModeForCurrentState(out SensorMovementMode movementMode))
         {
             ClearSensorResults();
             return;
@@ -60,11 +59,15 @@ public partial class TurnStateManager
             terrainDatabase,
             weaponPriorityData,
             dpqAirHeightConfig,
-            IsFogOfWarEnabled(),
+            matchController != null ? matchController.EnableLdtValidation : true,
+            matchController != null ? matchController.EnableLosValidation : true,
+            matchController != null ? matchController.EnableSpotter : true,
+            matchController != null ? matchController.EnableStealthValidation : true,
             movementMode,
             remainingMovementPoints,
             availableSensorActionCodes,
             cachedPodeMirarTargets,
+            cachedPodeMirarInvalidTargets,
             cachedPodeEmbarcarTargets,
             cachedPodeEmbarcarInvalidTargets,
             cachedPodeDesembarcarTargets,
@@ -84,19 +87,25 @@ public partial class TurnStateManager
             boardMap,
             terrainDatabase,
             movementMode);
-        if (cachedAircraftOperationDecision.available && !availableSensorActionCodes.Contains('L'))
+        List<LandingOption> layerOperationOptions = new List<LandingOption>();
+        bool hasLayerOperation = TryCollectLayerOperationOptions(selectedUnit, movementMode, layerOperationOptions, out string layerOperationReason);
+        if (hasLayerOperation && !availableSensorActionCodes.Contains('L'))
             availableSensorActionCodes.Add('L');
+        else if (!string.IsNullOrWhiteSpace(layerOperationReason))
+            landingOptionUnavailableReason = layerOperationReason;
 
         if (selectedUnit.AircraftOperationLockTurns > 0)
         {
             availableSensorActionCodes.Remove('A');
             cachedPodeMirarTargets.Clear();
+            cachedPodeMirarInvalidTargets.Clear();
         }
 
         if (selectedUnit.IsAircraftGrounded || selectedUnit.IsAircraftEmbarkedInCarrier)
         {
             availableSensorActionCodes.Remove('A');
             cachedPodeMirarTargets.Clear();
+            cachedPodeMirarInvalidTargets.Clear();
         }
 
         ResetScannerPromptState();
@@ -108,10 +117,12 @@ public partial class TurnStateManager
         ResetScannerPromptState();
         availableSensorActionCodes.Clear();
         cachedPodeMirarTargets.Clear();
+        cachedPodeMirarInvalidTargets.Clear();
         cachedPodeEmbarcarTargets.Clear();
         cachedPodeEmbarcarInvalidTargets.Clear();
         cachedPodeDesembarcarTargets.Clear();
         cachedPodeDesembarcarInvalidTargets.Clear();
+        landingOptionUnavailableReason = string.Empty;
         cachedAircraftOperationDecision = default;
         ClearLineOfFireArea();
     }
@@ -140,31 +151,75 @@ public partial class TurnStateManager
         return baseMove;
     }
 
+    private bool TryResolveSensorMovementModeForCurrentState(out SensorMovementMode mode)
+    {
+        if (cursorState == CursorState.MoveuAndando)
+        {
+            mode = SensorMovementMode.MoveuAndando;
+            return true;
+        }
+
+        if (cursorState == CursorState.MoveuParado)
+        {
+            mode = SensorMovementMode.MoveuParado;
+            return true;
+        }
+
+        if (cursorState == CursorState.Pousando)
+        {
+            mode = cursorStateBeforePousando == CursorState.MoveuAndando
+                ? SensorMovementMode.MoveuAndando
+                : SensorMovementMode.MoveuParado;
+            return true;
+        }
+
+        if (cursorState == CursorState.Embarcando)
+        {
+            mode = cursorStateBeforeEmbarcando == CursorState.MoveuAndando
+                ? SensorMovementMode.MoveuAndando
+                : SensorMovementMode.MoveuParado;
+            return true;
+        }
+
+        if (cursorState == CursorState.Desembarcando)
+        {
+            mode = SensorMovementMode.MoveuParado;
+            return true;
+        }
+
+        mode = SensorMovementMode.MoveuParado;
+        return false;
+    }
+
     private void LogScannerPanel()
     {
         bool podeMirar = availableSensorActionCodes.Contains('A');
         bool podeEmbarcar = availableSensorActionCodes.Contains('E');
         bool podeDesembarcar = false; // placeholder: ainda nao habilitado como acao de gameplay.
-        bool podeOperacaoAerea = availableSensorActionCodes.Contains('L');
+        bool podeMudarAltitude = availableSensorActionCodes.Contains('L');
 
         Debug.Log(
             $"[Sensors] state={cursorState} | A={(podeMirar ? "sim" : "nao")} ({cachedPodeMirarTargets.Count}) | " +
             $"E={(podeEmbarcar ? "sim" : "nao")} ({cachedPodeEmbarcarTargets.Count}) | " +
             $"D={(podeDesembarcar ? "sim" : "nao")} ({cachedPodeDesembarcarTargets.Count}) | " +
-            $"L={(podeOperacaoAerea ? "sim" : "nao")}");
+            $"L={(podeMudarAltitude ? "sim" : "nao")}");
 
         string painel =
             "Resultado dos Scanners | " +
             $"Pode Mirar (\"A\"): {(podeMirar ? "sim" : "nao")} | " +
             $"Pode Embarcar (\"E\"): {(podeEmbarcar ? "sim" : "nao")} | " +
             $"Pode Desembarcar (\"D\"): nao (placeholder) | " +
-            $"Operacao Aerea (\"L\"): {(podeOperacaoAerea ? "sim" : "nao")} | " +
+            $"Pode Mudar de Altitude (\"L\"): {(podeMudarAltitude ? "sim" : "nao")} | " +
             "Apenas Mover (\"M\") | " +
             "Desfazer Movimento (ESC) | " +
             ">> digite a acao desejada";
 
-        if (cachedAircraftOperationDecision.available)
+        if (podeMudarAltitude)
+            painel += "\nL: Mudar Altitude";
+        else if (cachedAircraftOperationDecision.available)
             painel += $"\nL: {cachedAircraftOperationDecision.label}";
+        else if (!string.IsNullOrWhiteSpace(landingOptionUnavailableReason))
+            painel += $"\nL indisponivel: {landingOptionUnavailableReason}";
         else if (!string.IsNullOrWhiteSpace(cachedAircraftOperationDecision.reason))
             painel += $"\nL indisponivel: {cachedAircraftOperationDecision.reason}";
 
@@ -208,7 +263,26 @@ public partial class TurnStateManager
                 painel += $"\n- {passengerName} @ {invalid.evaluatedCell.x},{invalid.evaluatedCell.y}: {reason}";
             }
         }
+        if (!podeMirar && cachedPodeMirarInvalidTargets.Count > 0)
+        {
+            int detailCount = Mathf.Min(6, cachedPodeMirarInvalidTargets.Count);
+            painel += "\nA motivos (amostra):";
+            for (int i = 0; i < detailCount; i++)
+            {
+                PodeMirarInvalidOption invalid = cachedPodeMirarInvalidTargets[i];
+                if (invalid == null)
+                    continue;
+
+                string targetName = invalid.targetUnit != null ? invalid.targetUnit.name : "(alvo desconhecido)";
+                string weaponName = invalid.weapon != null
+                    ? (!string.IsNullOrWhiteSpace(invalid.weapon.displayName) ? invalid.weapon.displayName : invalid.weapon.name)
+                    : "(arma desconhecida)";
+                string reason = !string.IsNullOrWhiteSpace(invalid.reason) ? invalid.reason : "motivo nao informado";
+                painel += $"\n- {targetName} | {weaponName} | dist={invalid.distance}: {reason}";
+            }
+        }
 
         Debug.Log(painel);
     }
+
 }

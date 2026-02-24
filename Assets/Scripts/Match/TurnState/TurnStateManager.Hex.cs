@@ -10,8 +10,25 @@ public partial class TurnStateManager
         if (cursorState == CursorState.Mirando)
             return TryResolveMirandoCursorMove(inputDelta, out resolvedCell);
 
+        if (cursorState == CursorState.Pousando)
+        {
+            if (IsLandingPromptActive())
+                return TryResolveLandingCursorMove(inputDelta, out resolvedCell);
+            return false;
+        }
+
+        if (cursorState == CursorState.Embarcando)
+        {
+            if (IsEmbarkPromptActive())
+                return TryResolveEmbarkCursorMove(inputDelta, out resolvedCell);
+            return false;
+        }
+
         if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
         {
+            if (IsLandingPromptActive())
+                return TryResolveLandingCursorMove(inputDelta, out resolvedCell);
+
             if (IsEmbarkPromptActive())
                 return TryResolveEmbarkCursorMove(inputDelta, out resolvedCell);
 

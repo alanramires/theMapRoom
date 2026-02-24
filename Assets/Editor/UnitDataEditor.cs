@@ -34,6 +34,8 @@ public class UnitDataEditor : Editor
 
         DrawPrimaryIdentitySection();
         DrawTopAttributesSection();
+        DrawAirPreferenceSection();
+        DrawNavalPreferenceSection();
         DrawPropertiesExcluding(
             serializedObject,
             "m_Script",
@@ -48,6 +50,10 @@ public class UnitDataEditor : Editor
             "movementCategory",
             "autonomia",
             "cost",
+            "useExplicitPreferredAirHeight",
+            "preferredAirHeight",
+            "useExplicitPreferredNavalHeight",
+            "preferredNavalHeight",
             "embarkedWeapons",
             "embarkedSupplies",
             "isSupplier",
@@ -77,6 +83,62 @@ public class UnitDataEditor : Editor
         DrawLogisticsSection();
 
         serializedObject.ApplyModifiedProperties();
+    }
+
+    private void DrawAirPreferenceSection()
+    {
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Air Preference", EditorStyles.boldLabel);
+
+        SerializedProperty useExplicitProp = serializedObject.FindProperty("useExplicitPreferredAirHeight");
+        SerializedProperty preferredAirHeightProp = serializedObject.FindProperty("preferredAirHeight");
+        SerializedProperty domainProp = serializedObject.FindProperty("domain");
+        SerializedProperty heightProp = serializedObject.FindProperty("heightLevel");
+
+        if (useExplicitProp != null)
+            EditorGUILayout.PropertyField(useExplicitProp, new GUIContent("Use Explicit Preferred Air Height"));
+
+        using (new EditorGUI.DisabledScope(useExplicitProp == null || !useExplicitProp.boolValue))
+        {
+            if (preferredAirHeightProp != null)
+                EditorGUILayout.PropertyField(preferredAirHeightProp, new GUIContent("Preferred Air Height"));
+        }
+
+        if (domainProp != null && heightProp != null)
+        {
+            Domain domain = (Domain)domainProp.intValue;
+            HeightLevel height = (HeightLevel)heightProp.intValue;
+            string fallback = domain == Domain.Air
+                ? $"Derivado do dominio nativo: {domain}/{height}"
+                : "Derivado de modos adicionais com Domain.Air (fallback Air/Low)";
+            EditorGUILayout.HelpBox(useExplicitProp != null && useExplicitProp.boolValue
+                ? "Override ativo: a altura preferencial aerea usa o campo acima."
+                : fallback, MessageType.None);
+        }
+    }
+
+    private void DrawNavalPreferenceSection()
+    {
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Naval Preference", EditorStyles.boldLabel);
+
+        SerializedProperty useExplicitProp = serializedObject.FindProperty("useExplicitPreferredNavalHeight");
+        SerializedProperty preferredNavalHeightProp = serializedObject.FindProperty("preferredNavalHeight");
+
+        if (useExplicitProp != null)
+            EditorGUILayout.PropertyField(useExplicitProp, new GUIContent("Use Explicit Preferred Naval Height"));
+
+        using (new EditorGUI.DisabledScope(useExplicitProp == null || !useExplicitProp.boolValue))
+        {
+            if (preferredNavalHeightProp != null)
+                EditorGUILayout.PropertyField(preferredNavalHeightProp, new GUIContent("Preferred Naval Height"));
+        }
+
+        EditorGUILayout.HelpBox(
+            useExplicitProp != null && useExplicitProp.boolValue
+                ? "Quando valido no hex final e sem force de emerge, o sistema tenta auto-ajustar para a altura naval preferencial antes dos sensores."
+                : "Override naval desativado.",
+            MessageType.None);
     }
 
     private static void DrawIfExists(SerializedProperty property, string label)

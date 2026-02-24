@@ -29,7 +29,9 @@ public partial class TurnStateManager
             movementMode,
             validCells,
             dpqAirHeightConfig,
-            IsFogOfWarEnabled());
+            matchController != null ? matchController.EnableLdtValidation : true,
+            matchController != null ? matchController.EnableLosValidation : true,
+            matchController != null ? matchController.EnableSpotter : true);
 
         Color teamColor = TeamUtils.GetColor(selectedUnit.TeamId);
         Color overlayColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(lineOfFireAlpha));

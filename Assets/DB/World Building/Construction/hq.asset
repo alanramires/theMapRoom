@@ -29,9 +29,12 @@ MonoBehaviour:
   aditionalDomainsAllowed: []
   alwaysAllowAirDomain: 1
   allowAircraftTakeoffAndLanding: 1
-  requiredLandingSkills:
-  - {fileID: 11400000, guid: 1b0f1eb9d5454df3a0e1b42f0c8d6aa1, type: 2}
-  - {fileID: 11400000, guid: 8d5ec3fba2fd43139e8619b6f2b23eb9, type: 2}
+  legacyRequiredLandingSkills: []
+  requiredLandingSkillRules:
+  - skill: {fileID: 11400000, guid: 1b0f1eb9d5454df3a0e1b42f0c8d6aa1, type: 2}
+    takeoffMode: 0
+  - skill: {fileID: 11400000, guid: 8d5ec3fba2fd43139e8619b6f2b23eb9, type: 2}
+    takeoffMode: 2
   requireAtLeastOneLandingSkill: 1
   isSupplier: 0
   supplierTier: 0

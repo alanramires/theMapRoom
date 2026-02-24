@@ -11,7 +11,8 @@ public class StructureDataEditor : Editor
         DrawPropertiesExcluding(
             serializedObject,
             "m_Script",
-            "aircraftOpsByTerrain");
+            "aircraftOpsByTerrain",
+            "forceEndMovementOnTerrainDomainForDomains");
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Aircraft Ops", EditorStyles.boldLabel);
@@ -25,6 +26,13 @@ public class StructureDataEditor : Editor
             MessageType.Info);
 
         DrawIfExists(serializedObject.FindProperty("aircraftOpsByTerrain"), "Aircraft Ops By Terrain");
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Naval Ops", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "No par Estrutura+Terreno, unidades nesses dominios/alturas encerram movimento no dominio do terreno base.",
+            MessageType.Info);
+        DrawIfExists(serializedObject.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domains End Their Movement On The Terrain Domain");
 
         serializedObject.ApplyModifiedProperties();
     }

@@ -34,7 +34,14 @@ MonoBehaviour:
   aditionalDomainsAllowed:
   - domain: 0
     heightLevel: 3
-    spriteDefault: {fileID: 0}
+    spriteDefault: {fileID: 21300000, guid: b912eff212a67fc4b8ff48aa7012fc0a, type: 3}
+    spriteGreen: {fileID: 0}
+    spriteRed: {fileID: 0}
+    spriteBlue: {fileID: 0}
+    spriteYellow: {fileID: 0}
+  - domain: 3
+    heightLevel: 4
+    spriteDefault: {fileID: 21300000, guid: 98e69eb17447393488dafcfd695800e0, type: 3}
     spriteGreen: {fileID: 0}
     spriteRed: {fileID: 0}
     spriteBlue: {fileID: 0}
