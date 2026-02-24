@@ -24,7 +24,8 @@ public partial class TurnStateManager : MonoBehaviour
         Mirando = 5,
         Pousando = 6,
         Embarcando = 7,
-        Desembarcando = 8
+        Desembarcando = 8,
+        ShoppingAndServices = 9
     }
 
     [Header("References")]
@@ -32,6 +33,7 @@ public partial class TurnStateManager : MonoBehaviour
     [SerializeField] private CursorController cursorController;
     [SerializeField] private AnimationManager animationManager;
     [SerializeField] private PathManager pathManager;
+    [SerializeField] private UnitSpawner unitSpawner;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private WeaponPriorityData weaponPriorityData;
     [SerializeField] private DPQMatchupDatabase dpqMatchupDatabase;
@@ -79,6 +81,8 @@ public partial class TurnStateManager : MonoBehaviour
     private bool hasForcedLayerRollbackSnapshot;
     private Domain forcedLayerRollbackDomain = Domain.Land;
     private HeightLevel forcedLayerRollbackHeight = HeightLevel.Surface;
+    private ConstructionManager shoppingConstruction;
+    private readonly List<UnitData> shoppingUnitsForSale = new List<UnitData>();
 
     public CursorState CurrentCursorState => cursorState;
     public UnitManager SelectedUnit => selectedUnit;
@@ -180,6 +184,8 @@ public partial class TurnStateManager : MonoBehaviour
         animationManager?.StopCurrentMovement();
         ClearCommittedPathVisual();
         ClearSensorResults();
+        shoppingConstruction = null;
+        shoppingUnitsForSale.Clear();
 
         if (keepPreparedFuelCost)
             CommitPreparedFuelCost();
@@ -369,6 +375,9 @@ public partial class TurnStateManager : MonoBehaviour
             pathManager = go.AddComponent<PathManager>();
         }
 
+        if (unitSpawner == null)
+            unitSpawner = FindAnyObjectByType<UnitSpawner>();
+
         if (terrainTilemap == null && cursorController != null)
             terrainTilemap = cursorController.BoardTilemap;
 
@@ -492,6 +501,6 @@ public partial class TurnStateManager : MonoBehaviour
 
     private bool IsMovementAnimationRunning()
     {
-        return (animationManager != null && animationManager.IsAnimatingMovement) || embarkExecutionInProgress;
+        return (animationManager != null && animationManager.IsAnimatingMovement) || embarkExecutionInProgress || disembarkExecutionInProgress;
     }
 }

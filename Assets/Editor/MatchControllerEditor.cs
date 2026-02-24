@@ -15,6 +15,11 @@ public class MatchControllerEditor : Editor
     private SerializedProperty enableStealthValidationProp;
     private SerializedProperty autonomyDatabaseProp;
     private SerializedProperty activePlayerListIndexProp;
+    private SerializedProperty matchMusicAudioManagerProp;
+    private SerializedProperty advanceTurnSfxProp;
+    private SerializedProperty advanceTurnPreDelayProp;
+    private SerializedProperty advanceTurnPostDelayProp;
+    private SerializedProperty advanceTurnSfxVolumeProp;
 
     private void OnEnable()
     {
@@ -29,6 +34,11 @@ public class MatchControllerEditor : Editor
         enableStealthValidationProp = serializedObject.FindProperty("enableStealthValidation");
         autonomyDatabaseProp = serializedObject.FindProperty("autonomyDatabase");
         activePlayerListIndexProp = serializedObject.FindProperty("activePlayerListIndex");
+        matchMusicAudioManagerProp = serializedObject.FindProperty("matchMusicAudioManager");
+        advanceTurnSfxProp = serializedObject.FindProperty("advanceTurnSfx");
+        advanceTurnPreDelayProp = serializedObject.FindProperty("advanceTurnPreDelay");
+        advanceTurnPostDelayProp = serializedObject.FindProperty("advanceTurnPostDelay");
+        advanceTurnSfxVolumeProp = serializedObject.FindProperty("advanceTurnSfxVolume");
     }
 
     public override void OnInspectorGUI()
@@ -64,6 +74,19 @@ public class MatchControllerEditor : Editor
             EditorGUILayout.PropertyField(autonomyDatabaseProp, new GUIContent("Autonomy Database"));
         using (new EditorGUI.DisabledScope(true))
             EditorGUILayout.PropertyField(activePlayerListIndexProp, new GUIContent("Active Player List Index"));
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Turn Transition", EditorStyles.boldLabel);
+        if (matchMusicAudioManagerProp != null)
+            EditorGUILayout.PropertyField(matchMusicAudioManagerProp, new GUIContent("Match Music Audio Manager"));
+        if (advanceTurnSfxProp != null)
+            EditorGUILayout.PropertyField(advanceTurnSfxProp, new GUIContent("Advance Turn Sfx"));
+        if (advanceTurnPreDelayProp != null)
+            EditorGUILayout.PropertyField(advanceTurnPreDelayProp, new GUIContent("Advance Turn Pre Delay"));
+        if (advanceTurnPostDelayProp != null)
+            EditorGUILayout.PropertyField(advanceTurnPostDelayProp, new GUIContent("Advance Turn Post Delay"));
+        if (advanceTurnSfxVolumeProp != null)
+            EditorGUILayout.PropertyField(advanceTurnSfxVolumeProp, new GUIContent("Advance Turn Sfx Volume"));
 
         serializedObject.ApplyModifiedProperties();
 

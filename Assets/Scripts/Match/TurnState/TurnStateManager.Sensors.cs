@@ -82,6 +82,10 @@ public partial class TurnStateManager
         if (cachedPodeEmbarcarTargets.Count > 0)
             availableSensorActionCodes.Add('E');
 
+        availableSensorActionCodes.Remove('D');
+        if (cachedPodeDesembarcarTargets.Count > 0)
+            availableSensorActionCodes.Add('D');
+
         cachedAircraftOperationDecision = AircraftOperationRules.Evaluate(
             selectedUnit,
             boardMap,
@@ -195,7 +199,7 @@ public partial class TurnStateManager
     {
         bool podeMirar = availableSensorActionCodes.Contains('A');
         bool podeEmbarcar = availableSensorActionCodes.Contains('E');
-        bool podeDesembarcar = false; // placeholder: ainda nao habilitado como acao de gameplay.
+        bool podeDesembarcar = availableSensorActionCodes.Contains('D');
         bool podeMudarAltitude = availableSensorActionCodes.Contains('L');
 
         Debug.Log(
@@ -208,7 +212,7 @@ public partial class TurnStateManager
             "Resultado dos Scanners | " +
             $"Pode Mirar (\"A\"): {(podeMirar ? "sim" : "nao")} | " +
             $"Pode Embarcar (\"E\"): {(podeEmbarcar ? "sim" : "nao")} | " +
-            $"Pode Desembarcar (\"D\"): nao (placeholder) | " +
+            $"Pode Desembarcar (\"D\"): {(podeDesembarcar ? "sim" : "nao")} | " +
             $"Pode Mudar de Altitude (\"L\"): {(podeMudarAltitude ? "sim" : "nao")} | " +
             "Apenas Mover (\"M\") | " +
             "Desfazer Movimento (ESC) | " +
@@ -228,7 +232,7 @@ public partial class TurnStateManager
         if (cachedPodeEmbarcarInvalidTargets.Count > 0)
             painel += $"\nE invalidos: {cachedPodeEmbarcarInvalidTargets.Count}";
         if (cachedPodeDesembarcarTargets.Count > 0)
-            painel += $"\nD opcoes (placeholder): {cachedPodeDesembarcarTargets.Count}";
+            painel += $"\nD opcoes: {cachedPodeDesembarcarTargets.Count}";
         if (cachedPodeDesembarcarInvalidTargets.Count > 0)
             painel += $"\nD invalidos (placeholder): {cachedPodeDesembarcarInvalidTargets.Count}";
         if (!podeEmbarcar && cachedPodeEmbarcarInvalidTargets.Count > 0)

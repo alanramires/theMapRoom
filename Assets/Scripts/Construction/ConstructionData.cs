@@ -15,6 +15,8 @@ public class ConstructionLandingSkillRule
 [CreateAssetMenu(menuName = "Game/Construction/Construction Data", fileName = "ConstructionData_")]
 public class ConstructionData : ScriptableObject
 {
+    private const int InfiniteSupplyOfferQuantity = int.MaxValue;
+
     [Header("Identity")]
     [Tooltip("ID unico usado para spawn e lookup.")]
     public string id;
@@ -141,12 +143,91 @@ public class ConstructionData : ScriptableObject
             ConstructionSupplierResourceCapacity entry = supplierResources[i];
             if (entry == null)
                 continue;
-            entry.maxCapacity = Mathf.Max(0, entry.maxCapacity);
+            if (entry.maxCapacity < -1)
+                entry.maxCapacity = -1;
         }
 
         if (constructionConfiguration == null)
             constructionConfiguration = new ConstructionSiteRuntime();
 
+        SyncSupplierSettingsToConstructionConfiguration();
         constructionConfiguration.Sanitize();
+    }
+
+    public void SyncSupplierSettingsToConstructionConfiguration()
+    {
+        if (constructionConfiguration == null)
+            constructionConfiguration = new ConstructionSiteRuntime();
+
+        if (!isSupplier)
+            return;
+
+        constructionConfiguration.canProvideSupplies = true;
+        constructionConfiguration.offeredServices = BuildDistinctServiceList(supplierServicesProvided);
+        constructionConfiguration.offeredSupplies = BuildSupplyOffersFromResources(supplierResources);
+    }
+
+    private static List<ServiceData> BuildDistinctServiceList(List<ServiceData> source)
+    {
+        List<ServiceData> result = new List<ServiceData>();
+        if (source == null)
+            return result;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            ServiceData service = source[i];
+            if (service == null || result.Contains(service))
+                continue;
+
+            result.Add(service);
+        }
+
+        return result;
+    }
+
+    private static List<ConstructionSupplyOffer> BuildSupplyOffersFromResources(List<ConstructionSupplierResourceCapacity> source)
+    {
+        List<ConstructionSupplyOffer> result = new List<ConstructionSupplyOffer>();
+        if (source == null)
+            return result;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            ConstructionSupplierResourceCapacity entry = source[i];
+            if (entry == null || entry.supply == null)
+                continue;
+
+            int quantity = entry.maxCapacity < 0 ? InfiniteSupplyOfferQuantity : Mathf.Max(0, entry.maxCapacity);
+            int existingIndex = FindSupplyOfferIndex(result, entry.supply);
+            if (existingIndex >= 0)
+            {
+                ConstructionSupplyOffer existing = result[existingIndex];
+                existing.quantity = Mathf.Max(existing.quantity, quantity);
+                continue;
+            }
+
+            result.Add(new ConstructionSupplyOffer
+            {
+                supply = entry.supply,
+                quantity = quantity
+            });
+        }
+
+        return result;
+    }
+
+    private static int FindSupplyOfferIndex(List<ConstructionSupplyOffer> offers, SupplyData supply)
+    {
+        if (offers == null || supply == null)
+            return -1;
+
+        for (int i = 0; i < offers.Count; i++)
+        {
+            ConstructionSupplyOffer offer = offers[i];
+            if (offer != null && offer.supply == supply)
+                return i;
+        }
+
+        return -1;
     }
 }

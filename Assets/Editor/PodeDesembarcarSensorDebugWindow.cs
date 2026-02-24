@@ -5,12 +5,24 @@ using UnityEngine.Tilemaps;
 
 public class PodeDesembarcarSensorDebugWindow : EditorWindow
 {
+    private sealed class DebugDisembarkOrder
+    {
+        public UnitManager passenger;
+        public int slotIndex;
+        public int seatIndex;
+        public Vector3Int targetCell;
+        public string label;
+    }
+
     [SerializeField] private UnitManager selectedTransporter;
+    [SerializeField] private UnitManager selectedPassenger;
     [SerializeField] private Tilemap overrideTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
+    [SerializeField] private TurnStateManager selectedTurnStateManager;
 
     private readonly List<PodeDesembarcarOption> options = new List<PodeDesembarcarOption>();
     private readonly List<PodeDesembarcarInvalidOption> invalidOptions = new List<PodeDesembarcarInvalidOption>();
+    private readonly List<DebugDisembarkOrder> debugOrders = new List<DebugDisembarkOrder>();
     private PodeDesembarcarReport latestReport;
     private int selectedOptionIndex = -1;
     private int selectedInvalidOptionIndex = -1;
@@ -21,6 +33,11 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
     private Vector3Int selectedLineEndCell;
     private Color selectedLineColor = Color.cyan;
     private string selectedLineLabel = string.Empty;
+    private string disembarkMessage = "Nenhuma ordem em fila.";
+    private readonly List<UnitManager> embarkedPassengers = new List<UnitManager>();
+    private readonly List<string> embarkedPassengerLabels = new List<string>();
+    private UnitManager cachedPassengerTransporter;
+    private int selectedPassengerIndex = -1;
 
     [MenuItem("Tools/Sensors/Pode Desembarcar")]
     public static void OpenWindow()
@@ -53,6 +70,8 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
         selectedTransporter = (UnitManager)EditorGUILayout.ObjectField("Transportador", selectedTransporter, typeof(UnitManager), true);
         overrideTilemap = (Tilemap)EditorGUILayout.ObjectField("Tilemap (opcional)", overrideTilemap, typeof(Tilemap), true);
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
+        RefreshEmbarkedPassengersIfNeeded();
+        DrawPassengerSelector();
 
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Usar Selecionado"))
@@ -61,6 +80,8 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
             AutoDetectContext();
         if (GUILayout.Button("Simular"))
             RunSimulation();
+        if (GUILayout.Button("Limpar Ordens"))
+            ClearDebugOrders("Fila limpa.");
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.Space(6f);
@@ -71,6 +92,8 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
             EditorGUILayout.HelpBox($"Linha selecionada: {selectedLineLabel}", MessageType.None);
 
         scroll = EditorGUILayout.BeginScrollView(scroll);
+        DrawDebugDisembarkOrderSection();
+        EditorGUILayout.Space(8f);
         DrawLandingSection();
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField($"Locais validos de desembarque ({options.Count})", EditorStyles.boldLabel);
@@ -96,15 +119,11 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
                 DrawInvalidItem(i, invalidOptions[i]);
         }
         EditorGUILayout.EndScrollView();
-
-        using (new EditorGUI.DisabledScope(true))
-        {
-            GUILayout.Button("Desembarcar (placeholder)");
-        }
     }
 
     private void RunSimulation()
     {
+        RefreshEmbarkedPassengersIfNeeded(force: true);
         options.Clear();
         invalidOptions.Clear();
         selectedOptionIndex = -1;
@@ -116,6 +135,8 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
             statusMessage = "Selecione um transportador valido.";
             return;
         }
+        if (!TryResolveSelectedPassengerForSimulation(out UnitManager passengerToSimulate))
+            return;
 
         Tilemap map = ResolveTilemap();
         if (map == null)
@@ -135,15 +156,45 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
             options.Clear();
             invalidOptions.Clear();
             if (latestReport.locaisValidosDeDesembarque != null)
-                options.AddRange(latestReport.locaisValidosDeDesembarque);
+            {
+                for (int i = 0; i < latestReport.locaisValidosDeDesembarque.Count; i++)
+                {
+                    PodeDesembarcarOption item = latestReport.locaisValidosDeDesembarque[i];
+                    if (item == null || item.passengerUnit != passengerToSimulate)
+                        continue;
+                    if (IsCellReservedByOtherPassenger(item.disembarkCell, passengerToSimulate))
+                    {
+                        invalidOptions.Add(new PodeDesembarcarInvalidOption
+                        {
+                            passengerUnit = item.passengerUnit,
+                            transporterSlotIndex = item.transporterSlotIndex,
+                            transporterSeatIndex = item.transporterSeatIndex,
+                            evaluatedCell = item.disembarkCell,
+                            enterCost = item.enterCost,
+                            reason = "Hex reservado por ordem de desembarque ja definida."
+                        });
+                        continue;
+                    }
+
+                    options.Add(item);
+                }
+            }
             if (latestReport.locaisInvalidosDeDesembarque != null)
-                invalidOptions.AddRange(latestReport.locaisInvalidosDeDesembarque);
-            canDisembark = latestReport.canDisembark;
+            {
+                for (int i = 0; i < latestReport.locaisInvalidosDeDesembarque.Count; i++)
+                {
+                    PodeDesembarcarInvalidOption item = latestReport.locaisInvalidosDeDesembarque[i];
+                    if (item == null || item.passengerUnit != passengerToSimulate)
+                        continue;
+                    invalidOptions.Add(item);
+                }
+            }
+            canDisembark = options.Count > 0;
         }
 
         statusMessage = canDisembark
-            ? $"Sensor TRUE. {options.Count} local(is) valido(s), {invalidOptions.Count} invalido(s)."
-            : $"Sensor FALSE. Nenhum local elegivel ({invalidOptions.Count} invalido(s)).";
+            ? $"Sensor TRUE para {passengerToSimulate.name}. {options.Count} local(is) valido(s), {invalidOptions.Count} invalido(s)."
+            : $"Sensor FALSE para {passengerToSimulate.name}. Nenhum local elegivel ({invalidOptions.Count} invalido(s)).";
 
         if (options.Count > 0)
         {
@@ -151,7 +202,7 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
             SelectLineForDrawing(options[0]);
         }
 
-        Debug.Log($"[PodeDesembarcarSensorDebug] Transportador={selectedTransporter.name} | canDisembark={canDisembark} | validos={options.Count} | invalidos={invalidOptions.Count}");
+        Debug.Log($"[PodeDesembarcarSensorDebug] Transportador={selectedTransporter.name} | passageiro={passengerToSimulate.name} | canDisembark={canDisembark} | validos={options.Count} | invalidos={invalidOptions.Count}");
         for (int i = 0; i < options.Count; i++)
         {
             PodeDesembarcarOption item = options[i];
@@ -186,12 +237,16 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Hex destino", $"{item.disembarkCell.x},{item.disembarkCell.y}");
         EditorGUILayout.LabelField("Custo", item.enterCost.ToString());
         EditorGUILayout.LabelField("Detalhe", string.IsNullOrWhiteSpace(item.displayLabel) ? "-" : item.displayLabel);
+        EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Desenhar Linha no Scene View"))
         {
             selectedOptionIndex = index;
             selectedInvalidOptionIndex = -1;
             SelectLineForDrawing(item);
         }
+        if (GUILayout.Button("Adicionar na Ordem"))
+            TryAddDebugOrder(item);
+        EditorGUILayout.EndHorizontal();
         EditorGUILayout.EndVertical();
     }
 
@@ -336,6 +391,46 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Explicacao", string.IsNullOrWhiteSpace(landing.explanation) ? "-" : landing.explanation);
     }
 
+    private void DrawDebugDisembarkOrderSection()
+    {
+        EditorGUILayout.LabelField($"Fila de Desembarque (Debug) ({debugOrders.Count})", EditorStyles.boldLabel);
+        if (debugOrders.Count == 0)
+        {
+            EditorGUILayout.HelpBox("Fila vazia. Clique em \"Adicionar na Ordem\" em um local valido.", MessageType.Info);
+        }
+        else
+        {
+            for (int i = 0; i < debugOrders.Count; i++)
+            {
+                DebugDisembarkOrder order = debugOrders[i];
+                if (order == null)
+                    continue;
+
+                EditorGUILayout.BeginVertical("box");
+                EditorGUILayout.LabelField($"{i + 1}. {order.label}");
+                EditorGUILayout.LabelField("Slot/Vaga", $"{order.slotIndex}/{order.seatIndex}");
+                EditorGUILayout.LabelField("Hex destino", $"{order.targetCell.x},{order.targetCell.y}");
+                if (GUILayout.Button("Remover Ordem"))
+                {
+                    debugOrders.RemoveAt(i);
+                    disembarkMessage = "Ordem removida.";
+                    GUIUtility.ExitGUI();
+                }
+                EditorGUILayout.EndVertical();
+            }
+        }
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Gerar 1 ordem por passageiro"))
+            BuildAutoOrdersFromOptions();
+        using (new EditorGUI.DisabledScope(selectedTransporter == null || debugOrders.Count == 0))
+        {
+            if (GUILayout.Button("Desembarcar (DEBUG SKIP)"))
+                ExecuteDebugDisembarkSkip();
+        }
+        EditorGUILayout.EndHorizontal();
+    }
+
     private Tilemap ResolveTilemap()
     {
         if (overrideTilemap != null)
@@ -353,6 +448,9 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
             overrideTilemap = FindPreferredTilemap();
         if (terrainDatabase == null)
             terrainDatabase = FindFirstTerrainDatabaseAsset();
+        if (selectedTurnStateManager == null)
+            selectedTurnStateManager = FindTurnStateManagerInScene();
+        RefreshEmbarkedPassengersIfNeeded();
     }
 
     private void TryUseCurrentSelection()
@@ -364,7 +462,10 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
         if (unit == null)
             unit = Selection.activeGameObject.GetComponentInParent<UnitManager>();
         if (unit != null)
+        {
             selectedTransporter = unit;
+            RefreshEmbarkedPassengersIfNeeded(force: true);
+        }
     }
 
     private static Tilemap FindPreferredTilemap()
@@ -398,5 +499,336 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
         }
 
         return null;
+    }
+
+    private static TurnStateManager FindTurnStateManagerInScene()
+    {
+        TurnStateManager[] managers = Object.FindObjectsByType<TurnStateManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        if (managers == null || managers.Length == 0)
+            return null;
+        return managers[0];
+    }
+
+    private void TryAddDebugOrder(PodeDesembarcarOption option)
+    {
+        if (option == null || option.passengerUnit == null)
+        {
+            disembarkMessage = "Opcao invalida para fila.";
+            return;
+        }
+
+        if (IsPassengerAlreadyQueued(option.transporterSlotIndex, option.transporterSeatIndex))
+        {
+            disembarkMessage = $"Passageiro ja esta na fila (slot {option.transporterSlotIndex}/{option.transporterSeatIndex}).";
+            return;
+        }
+
+        Vector3Int targetCell = option.disembarkCell;
+        targetCell.z = 0;
+        if (IsTargetCellAlreadyQueued(targetCell))
+        {
+            disembarkMessage = $"Hex {targetCell.x},{targetCell.y} ja reservado por outra ordem.";
+            return;
+        }
+
+        string passengerName = option.passengerUnit != null ? option.passengerUnit.name : "passageiro";
+        debugOrders.Add(new DebugDisembarkOrder
+        {
+            passenger = option.passengerUnit,
+            slotIndex = option.transporterSlotIndex,
+            seatIndex = option.transporterSeatIndex,
+            targetCell = targetCell,
+            label = $"{passengerName} -> ({targetCell.x},{targetCell.y})"
+        });
+        disembarkMessage = $"Ordem adicionada: {passengerName}.";
+
+        options.Clear();
+        invalidOptions.Clear();
+        selectedOptionIndex = -1;
+        selectedInvalidOptionIndex = -1;
+        ClearSelectedLine();
+    }
+
+    private void ClearDebugOrders(string message)
+    {
+        debugOrders.Clear();
+        disembarkMessage = message;
+    }
+
+    private void BuildAutoOrdersFromOptions()
+    {
+        ClearDebugOrders("Fila reconstruida automaticamente.");
+        for (int i = 0; i < options.Count; i++)
+        {
+            PodeDesembarcarOption option = options[i];
+            if (option == null || option.passengerUnit == null)
+                continue;
+            if (IsPassengerAlreadyQueued(option.transporterSlotIndex, option.transporterSeatIndex))
+                continue;
+
+            Vector3Int target = option.disembarkCell;
+            target.z = 0;
+            if (IsTargetCellAlreadyQueued(target))
+                continue;
+
+            TryAddDebugOrder(option);
+        }
+    }
+
+    private bool IsPassengerAlreadyQueued(int slotIndex, int seatIndex)
+    {
+        for (int i = 0; i < debugOrders.Count; i++)
+        {
+            DebugDisembarkOrder order = debugOrders[i];
+            if (order == null)
+                continue;
+            if (order.slotIndex == slotIndex && order.seatIndex == seatIndex)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsPassengerAlreadyQueued(UnitManager passenger)
+    {
+        if (passenger == null)
+            return false;
+
+        for (int i = 0; i < debugOrders.Count; i++)
+        {
+            DebugDisembarkOrder order = debugOrders[i];
+            if (order == null || order.passenger == null)
+                continue;
+            if (order.passenger == passenger)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsTargetCellAlreadyQueued(Vector3Int cell)
+    {
+        cell.z = 0;
+        for (int i = 0; i < debugOrders.Count; i++)
+        {
+            DebugDisembarkOrder order = debugOrders[i];
+            if (order == null)
+                continue;
+
+            Vector3Int queued = order.targetCell;
+            queued.z = 0;
+            if (queued == cell)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsCellReservedByOtherPassenger(Vector3Int cell, UnitManager passenger)
+    {
+        cell.z = 0;
+        for (int i = 0; i < debugOrders.Count; i++)
+        {
+            DebugDisembarkOrder order = debugOrders[i];
+            if (order == null || order.passenger == null)
+                continue;
+            if (order.passenger == passenger)
+                continue;
+
+            Vector3Int reserved = order.targetCell;
+            reserved.z = 0;
+            if (reserved == cell)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void ExecuteDebugDisembarkSkip()
+    {
+        if (selectedTransporter == null || debugOrders.Count == 0)
+        {
+            disembarkMessage = "Nada para desembarcar.";
+            return;
+        }
+
+        int successCount = 0;
+        for (int i = 0; i < debugOrders.Count; i++)
+        {
+            DebugDisembarkOrder order = debugOrders[i];
+            if (order == null)
+                continue;
+
+            if (!selectedTransporter.TryDisembarkPassengerFromSeat(order.slotIndex, order.seatIndex, out UnitManager passenger, out string reason))
+            {
+                Debug.LogWarning($"[PodeDesembarcarSensorDebug][EXEC] Falha slot={order.slotIndex}/{order.seatIndex}: {reason}");
+                continue;
+            }
+
+            if (passenger == null)
+                continue;
+
+            Vector3Int target = order.targetCell;
+            target.z = 0;
+            passenger.SetCurrentCellPosition(target, enforceFinalOccupancyRule: true);
+            passenger.MarkAsActed();
+            successCount++;
+            Debug.Log($"[PodeDesembarcarSensorDebug][EXEC] {passenger.name} -> ({target.x},{target.y})");
+        }
+
+        if (successCount > 0)
+            selectedTransporter.MarkAsActed();
+
+        if (Application.isPlaying &&
+            selectedTurnStateManager != null &&
+            selectedTurnStateManager.SelectedUnit == selectedTransporter)
+        {
+            selectedTurnStateManager.TryFinalizeSelectedUnitActionFromDebug();
+        }
+
+        disembarkMessage = successCount > 0
+            ? $"Desembarque debug concluido. {successCount} unidade(s) desembarcada(s)."
+            : "Nenhuma unidade foi desembarcada.";
+        debugOrders.Clear();
+        RunSimulation();
+    }
+
+    private void DrawPassengerSelector()
+    {
+        EditorGUILayout.LabelField("Passageiros Embarcados", EditorStyles.boldLabel);
+        if (selectedTransporter == null)
+        {
+            EditorGUILayout.HelpBox("Selecione um transportador para listar passageiros.", MessageType.Info);
+            return;
+        }
+
+        if (embarkedPassengers.Count == 0)
+        {
+            EditorGUILayout.HelpBox("Transportador sem passageiros embarcados.", MessageType.Info);
+            return;
+        }
+
+        List<int> selectableIndices = new List<int>();
+        List<string> selectableLabels = new List<string>();
+        for (int i = 0; i < embarkedPassengers.Count; i++)
+        {
+            UnitManager passenger = embarkedPassengers[i];
+            if (passenger == null || IsPassengerAlreadyQueued(passenger))
+                continue;
+
+            selectableIndices.Add(i);
+            selectableLabels.Add(embarkedPassengerLabels[i]);
+        }
+
+        if (selectableIndices.Count == 0)
+        {
+            selectedPassenger = null;
+            selectedPassengerIndex = -1;
+            EditorGUILayout.HelpBox("Todos os passageiros embarcados ja estao na fila de ordens.", MessageType.Info);
+            return;
+        }
+
+        int currentPopupIndex = 0;
+        if (selectedPassenger != null)
+        {
+            int selectedEmbarkedIndex = embarkedPassengers.IndexOf(selectedPassenger);
+            int mapped = selectableIndices.IndexOf(selectedEmbarkedIndex);
+            if (mapped >= 0)
+                currentPopupIndex = mapped;
+        }
+
+        int newPopupIndex = EditorGUILayout.Popup("Passageiro p/ Simular", currentPopupIndex, selectableLabels.ToArray());
+        if (newPopupIndex < 0 || newPopupIndex >= selectableIndices.Count)
+            newPopupIndex = 0;
+
+        int newEmbarkedIndex = selectableIndices[newPopupIndex];
+        if (newEmbarkedIndex != selectedPassengerIndex)
+        {
+            selectedPassengerIndex = newEmbarkedIndex;
+            selectedPassenger = embarkedPassengers[newEmbarkedIndex];
+        }
+
+        string selectedLabel = selectedPassenger != null ? selectedPassenger.name : "(nenhum)";
+        EditorGUILayout.LabelField("Selecionado", selectedLabel);
+    }
+
+    private void RefreshEmbarkedPassengersIfNeeded(bool force = false)
+    {
+        if (!force && cachedPassengerTransporter == selectedTransporter)
+            return;
+
+        UnitManager previousSelectedPassenger = selectedPassenger;
+        bool transporterChanged = cachedPassengerTransporter != selectedTransporter;
+        if (transporterChanged && debugOrders.Count > 0)
+            ClearDebugOrders("Transportador alterado. Fila limpa.");
+
+        cachedPassengerTransporter = selectedTransporter;
+        embarkedPassengers.Clear();
+        embarkedPassengerLabels.Clear();
+        selectedPassenger = null;
+        selectedPassengerIndex = -1;
+
+        if (selectedTransporter == null)
+            return;
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats = selectedTransporter.TransportedUnitSlots;
+        if (seats == null)
+            return;
+
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            if (seat == null || seat.embarkedUnit == null || !seat.embarkedUnit.IsEmbarked)
+                continue;
+
+            embarkedPassengers.Add(seat.embarkedUnit);
+            embarkedPassengerLabels.Add(seat.embarkedUnit.name);
+        }
+
+        if (embarkedPassengers.Count > 0)
+        {
+            int preservedIndex = previousSelectedPassenger != null
+                ? embarkedPassengers.IndexOf(previousSelectedPassenger)
+                : -1;
+            if (preservedIndex < 0)
+                preservedIndex = 0;
+
+            selectedPassengerIndex = preservedIndex;
+            selectedPassenger = embarkedPassengers[preservedIndex];
+        }
+    }
+
+    private bool TryResolveSelectedPassengerForSimulation(out UnitManager passenger)
+    {
+        passenger = null;
+        RefreshEmbarkedPassengersIfNeeded();
+        if (embarkedPassengers.Count <= 0)
+        {
+            statusMessage = "Transportador sem passageiros embarcados.";
+            return false;
+        }
+
+        if (selectedPassenger == null || !embarkedPassengers.Contains(selectedPassenger))
+        {
+            if (embarkedPassengers.Count == 1)
+            {
+                selectedPassenger = embarkedPassengers[0];
+                selectedPassengerIndex = 0;
+            }
+            else
+            {
+                statusMessage = "Escolha o passageiro na lista para rodar a simulacao.";
+                return false;
+            }
+        }
+
+        if (IsPassengerAlreadyQueued(selectedPassenger))
+        {
+            statusMessage = "Passageiro selecionado ja tem ordem. Escolha outro.";
+            return false;
+        }
+
+        passenger = selectedPassenger;
+        return passenger != null;
     }
 }

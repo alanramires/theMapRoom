@@ -16,7 +16,10 @@ public partial class TurnStateManager
         EmbarkCycleTarget = 3,
         EmbarkConfirmTarget = 4,
         LandingCycleOption = 5,
-        LandingConfirmOption = 6
+        LandingConfirmOption = 6,
+        DisembarkPassengerSelect = 7,
+        DisembarkLandingSelect = 8,
+        DisembarkConfirm = 9
     }
 
     private enum LandingOptionAction
@@ -124,6 +127,7 @@ public partial class TurnStateManager
     private void Update()
     {
         TrackRuntimeDebugLogs();
+        ProcessConstructionShoppingInput();
         ProcessScannerPromptInput();
         UpdateMirandoPreviewAnimation();
         UpdateEmbarkPreviewAnimation();
@@ -163,6 +167,13 @@ public partial class TurnStateManager
         scannerSelectedLandingIndex = -1;
         combatExecutionInProgress = false;
         cachedLandingOptions.Clear();
+        disembarkPassengerEntries.Clear();
+        disembarkQueuedOrders.Clear();
+        disembarkLandingOptions.Clear();
+        disembarkLandingByCell.Clear();
+        disembarkSelectedPassengerIndex = -1;
+        disembarkSelectedLandingCellValid = false;
+        disembarkLandingAutoEntered = false;
         ClearMirandoPreview();
         ClearEmbarkPreview();
     }
@@ -221,6 +232,36 @@ public partial class TurnStateManager
             return true;
         }
 
+        if (cursorState == CursorState.Desembarcando &&
+            scannerPromptStep == ScannerPromptStep.DisembarkConfirm)
+        {
+            ReturnToDisembarkLandingSelect();
+            return true;
+        }
+
+        if (cursorState == CursorState.Desembarcando &&
+            scannerPromptStep == ScannerPromptStep.DisembarkLandingSelect)
+        {
+            if (disembarkLandingAutoEntered)
+            {
+                ExitDisembarkStateToMovement();
+                return true;
+            }
+
+            ReturnToDisembarkPassengerSelect();
+            return true;
+        }
+
+        if (cursorState == CursorState.Desembarcando &&
+            scannerPromptStep == ScannerPromptStep.DisembarkPassengerSelect)
+        {
+            if (TryUndoLastQueuedDisembarkOrderAndReturnToLanding())
+                return true;
+
+            ExitDisembarkStateToMovement();
+            return true;
+        }
+
         return false;
     }
 
@@ -235,6 +276,13 @@ public partial class TurnStateManager
         bool isMovementScannerState = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
         bool isLandingScannerState = cursorState == CursorState.Pousando;
         bool isEmbarkScannerState = cursorState == CursorState.Embarcando;
+        bool isDisembarkScannerState = cursorState == CursorState.Desembarcando;
+        if (isDisembarkScannerState)
+        {
+            ProcessDisembarkPromptInput();
+            return;
+        }
+
         if (!isMovementScannerState && !isLandingScannerState && !isEmbarkScannerState)
             return;
 
@@ -252,6 +300,12 @@ public partial class TurnStateManager
             if (WasLetterPressedThisFrame('E'))
             {
                 HandleEmbarkActionRequested();
+                return;
+            }
+
+            if (WasLetterPressedThisFrame('D'))
+            {
+                HandleDisembarkActionRequested();
                 return;
             }
 
@@ -388,6 +442,19 @@ public partial class TurnStateManager
         ClearCommittedPathVisual();
         scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
         scannerSelectedEmbarkIndex = 0;
+
+        if (cachedPodeEmbarcarTargets.Count == 1)
+        {
+            scannerPromptStep = ScannerPromptStep.EmbarkConfirmTarget;
+            FocusCurrentEmbarkTarget(logDetails: false, moveCursor: true);
+            if (TryGetSelectedValidEmbarkOption(out PodeEmbarcarOption selected, out int shownIndex))
+            {
+                string label = !string.IsNullOrWhiteSpace(selected.displayLabel) ? selected.displayLabel : "transportador";
+                Debug.Log($"Confirma embarque {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
+            }
+            return;
+        }
+
         FocusCurrentEmbarkTarget(logDetails: true);
         LogEmbarkSelectionPanel();
     }
@@ -1831,6 +1898,9 @@ public partial class TurnStateManager
         CombatResolutionResult combat)
     {
         combatExecutionInProgress = true;
+        // Esconde a linha de mira antes de iniciar audio/projeteis do combate.
+        SetMirandoPreviewVisible(false);
+        SetMirandoSpotterPreviewsVisible(false);
         UnitManager attacker = option != null ? option.attackerUnit : null;
         UnitManager defender = option != null ? option.targetUnit : null;
 
@@ -2255,9 +2325,19 @@ public partial class TurnStateManager
             scannerSelectedTargetIndex = 0;
 
         scannerPromptStep = ScannerPromptStep.MirandoConfirmTarget;
-        SetMirandoPreviewVisible(false);
-        SetMirandoSpotterPreviewsVisible(false);
         PodeMirarTargetOption picked = cachedPodeMirarTargets[scannerSelectedTargetIndex];
+        bool singleTarget = cachedPodeMirarTargets.Count == 1;
+        if (singleTarget)
+        {
+            RebuildMirandoPreviewPath(picked);
+            SetMirandoPreviewVisible(true);
+            SetMirandoSpotterPreviewsVisible(true);
+        }
+        else
+        {
+            SetMirandoPreviewVisible(false);
+            SetMirandoSpotterPreviewsVisible(false);
+        }
         LogAttackConfirmationPrompt(picked, scannerSelectedTargetIndex + 1);
     }
 
@@ -2531,11 +2611,20 @@ public partial class TurnStateManager
             cursorState == CursorState.Mirando &&
             scannerPromptStep == ScannerPromptStep.MirandoCycleTarget;
 
-        if (isMirandoCycle)
+        bool isMirandoConfirmSingleTarget =
+            cursorState == CursorState.Mirando &&
+            scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget &&
+            cachedPodeMirarTargets.Count == 1;
+
+        bool canRenderMirandoPreview =
+            !combatExecutionInProgress &&
+            (isMirandoCycle || isMirandoConfirmSingleTarget);
+
+        if (canRenderMirandoPreview)
             TryRefreshMirandoPreviewPathIfNeeded();
 
         bool shouldShow =
-            isMirandoCycle &&
+            canRenderMirandoPreview &&
             mirandoPreviewPathLength > 0.0001f &&
             mirandoPreviewPathPoints.Count >= 2;
 
@@ -3445,6 +3534,12 @@ public partial class TurnStateManager
                 return Keyboard.current != null && Keyboard.current.lKey.wasPressedThisFrame;
 #else
                 return Input.GetKeyDown(KeyCode.L);
+#endif
+            case 'D':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.dKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.D);
 #endif
             default:
                 return false;

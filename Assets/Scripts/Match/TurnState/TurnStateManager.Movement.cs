@@ -252,8 +252,8 @@ public partial class TurnStateManager
                 reason = $"ForceEndMovement (Construction={construction.name})";
                 return true;
             }
-
-            return false;
+            // Se a construcao existir mas nao forcar neste contexto, faz fallback
+            // para Structure+Terrain e depois Terrain.
         }
 
         StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardMap, cell);

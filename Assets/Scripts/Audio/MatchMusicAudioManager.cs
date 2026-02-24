@@ -37,6 +37,11 @@ public class MatchMusicAudioManager : MonoBehaviour
     private int currentFreeIndex = -1;
     private int observedTeamId = int.MinValue;
     private bool isPausedByUser;
+    private bool pausedByTurnTransition;
+    private bool suppressPlaybackForTurnTransition;
+    public bool IsPausedByUser => isPausedByUser;
+    public bool IsPlaying => audioSource != null && audioSource.isPlaying;
+    public bool IsFreeMode => playbackMode == MusicPlaybackMode.Free;
 
     private void Awake()
     {
@@ -54,7 +59,7 @@ public class MatchMusicAudioManager : MonoBehaviour
     private void Update()
     {
         HandleToggleShortcut();
-        if (isPausedByUser)
+        if (isPausedByUser || suppressPlaybackForTurnTransition)
             return;
 
         EnsurePlayback();
@@ -101,6 +106,51 @@ public class MatchMusicAudioManager : MonoBehaviour
 
         isPausedByUser = false;
         StartPlaybackForCurrentMode(forceRestart: audioSource.clip == null);
+    }
+
+    public void StopForTurnTransition()
+    {
+        if (audioSource == null || !audioSource.isPlaying)
+            return;
+
+        audioSource.Stop();
+    }
+
+    public void BeginTurnTransition()
+    {
+        suppressPlaybackForTurnTransition = true;
+    }
+
+    public void EndTurnTransition()
+    {
+        suppressPlaybackForTurnTransition = false;
+    }
+
+    public void PauseForTurnTransition()
+    {
+        if (audioSource == null || !audioSource.isPlaying)
+            return;
+
+        audioSource.Pause();
+        pausedByTurnTransition = true;
+    }
+
+    public void ResumeAfterTurnTransition()
+    {
+        if (audioSource == null || !pausedByTurnTransition)
+            return;
+
+        audioSource.UnPause();
+        pausedByTurnTransition = false;
+        suppressPlaybackForTurnTransition = false;
+    }
+
+    public void RestartCurrentModePlayback()
+    {
+        isPausedByUser = false;
+        pausedByTurnTransition = false;
+        suppressPlaybackForTurnTransition = false;
+        StartPlaybackForCurrentMode(forceRestart: true);
     }
 
     private void EnsurePlayback()

@@ -111,6 +111,13 @@ public class CursorController : MonoBehaviour
 
     private void Update()
     {
+        TryAutoAssignMatchController();
+        if (matchController != null && matchController.IsTurnTransitionInProgress)
+        {
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
         HandleCycleUnitInput();
         HandleActionInput();
         HandleNeutralLeftClickTeleport();
@@ -510,6 +517,19 @@ public class CursorController : MonoBehaviour
 
     private void HandleActionInput()
     {
+        if (WasAdvanceTurnPressedThisFrame())
+        {
+            if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+                return;
+
+            TryAutoAssignMatchController();
+            if (matchController != null)
+            {
+                matchController.AdvanceTurnWithTransition();
+            }
+            return;
+        }
+
         if (WasConfirmPressedThisFrame() && TryTeleportToActiveTeamHeadQuarterOnNeutral())
             return;
 
@@ -542,7 +562,7 @@ public class CursorController : MonoBehaviour
     {
         if (turnStateManager == null || turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             return false;
-        if (HasAnyUnitUnderCursor())
+        if (HasAnyUnitUnderCursor() || HasAnyConstructionUnderCursor())
             return false;
 
         TryAutoAssignMatchController();
@@ -588,6 +608,24 @@ public class CursorController : MonoBehaviour
                 continue;
 
             Vector3Int cell = unit.CurrentCellPosition;
+            cell.z = 0;
+            if (cell == currentCell)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool HasAnyConstructionUnderCursor()
+    {
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+
+            Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;
             if (cell == currentCell)
                 return true;
@@ -672,6 +710,15 @@ public class CursorController : MonoBehaviour
         return IsCycleModifierPressed();
 #else
         return Input.GetKeyDown(KeyCode.Tab) && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
+#endif
+    }
+
+    private bool WasAdvanceTurnPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.T);
 #endif
     }
 

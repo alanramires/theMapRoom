@@ -908,7 +908,7 @@ public class UnitManager : MonoBehaviour
         }
     }
 
-    private void SyncTransportRuntimeSlotsWithData(UnitData data)
+    private void SyncTransportRuntimeSlotsWithData(UnitData data, bool preserveSeatPassengers = false)
     {
         if (transportedUnitSlots == null)
             transportedUnitSlots = new List<UnitTransportSeatRuntime>();
@@ -925,7 +925,7 @@ public class UnitManager : MonoBehaviour
             UnitTransportSeatRuntime seat = transportedUnitSlots[i];
             if (seat == null || seat.embarkedUnit == null)
                 continue;
-            if (!seat.embarkedUnit.IsEmbarked)
+            if (!preserveSeatPassengers && !seat.embarkedUnit.IsEmbarked)
                 continue;
 
             string key = BuildTransportSeatKey(seat.slotIndex, seat.seatIndex);
@@ -1149,7 +1149,7 @@ public class UnitManager : MonoBehaviour
         if (data == null || !data.isTransporter || isEmbarked)
             return false;
 
-        SyncTransportRuntimeSlotsWithData(data);
+        SyncTransportRuntimeSlotsWithData(data, preserveSeatPassengers: !Application.isPlaying);
         for (int i = 0; i < transportedUnitSlots.Count; i++)
         {
             UnitTransportSeatRuntime seat = transportedUnitSlots[i];
@@ -1159,7 +1159,8 @@ public class UnitManager : MonoBehaviour
             if (seat.embarkedUnit.IsEmbarked)
                 return true;
 
-            seat.embarkedUnit = null;
+            if (Application.isPlaying)
+                seat.embarkedUnit = null;
         }
 
         return false;
@@ -1295,10 +1296,40 @@ public class UnitManager : MonoBehaviour
         currentAmmo = Mathf.Clamp(currentAmmo, 0, maxAmmo);
         currentFuel = Mathf.Clamp(currentFuel, 0, maxFuel);
 
-        SyncTransportRuntimeSlotsWithData(TryGetUnitData());
+        UnitData data = TryGetUnitData();
+        SyncTransportRuntimeSlotsWithData(data, preserveSeatPassengers: !Application.isPlaying);
+        RestoreEditorEmbarkedStateFromSeats(data);
         SyncPreferredLayerPreferencesFromData(TryGetUnitData());
         SyncCurrentLayerStateWithData(forceNativeDefault: false);
         SyncAircraftRuntimeStateWithCurrentLayer();
+    }
+
+    private void RestoreEditorEmbarkedStateFromSeats(UnitData data)
+    {
+#if UNITY_EDITOR
+        if (Application.isPlaying)
+            return;
+        if (data == null || !data.isTransporter || isEmbarked)
+            return;
+
+        for (int i = 0; i < transportedUnitSlots.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = transportedUnitSlots[i];
+            if (seat == null || seat.embarkedUnit == null || seat.embarkedUnit == this)
+                continue;
+
+            UnitManager passenger = seat.embarkedUnit;
+            passenger.isEmbarked = true;
+            passenger.AssignEmbarkTransport(this, seat.slotIndex);
+            passenger.SetSelected(false);
+            passenger.SetSpriteVisible(false);
+            if (passenger.unitHud != null)
+                passenger.unitHud.gameObject.SetActive(false);
+            if (passenger.actedLockRenderer != null)
+                passenger.actedLockRenderer.enabled = false;
+            passenger.RefreshActedVisual();
+        }
+#endif
     }
 
     private void SyncPreferredLayerPreferencesFromData(UnitData data)

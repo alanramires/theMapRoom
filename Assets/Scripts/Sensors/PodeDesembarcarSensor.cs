@@ -282,10 +282,32 @@ public static class PodeDesembarcarSensor
             return true;
         }
 
+        if (!CanPassengerAircraftUseTakeoffRuleForDisembark(
+                transporter,
+                transporterData,
+                passenger,
+                map,
+                terrainDatabase,
+                transporter.CurrentCellPosition,
+                out string takeoffReason))
+        {
+            reason = takeoffReason;
+            return false;
+        }
+
         if (!IsContextAllowedByPassengerDisembarkDestinationRules(map, terrainDatabase, targetCell, transporterData, out string contextReason))
         {
             reason = contextReason;
             return false;
+        }
+
+        // Aeronave desembarcante segue regra de decolagem (0/1/full) e sai em Air/Low.
+        // Nao deve ser bloqueada por custo de entrada terrestre do hex de destino.
+        if (passenger.TryGetUnitData(out UnitData passengerData) && passengerData != null && passengerData.IsAircraft())
+        {
+            enterCost = 1;
+            reason = string.Empty;
+            return true;
         }
 
         if (!UnitMovementPathRules.TryGetEnterCellCost(
@@ -308,6 +330,61 @@ public static class PodeDesembarcarSensor
 
         enterCost = 1;
         return true;
+    }
+
+    private static bool CanPassengerAircraftUseTakeoffRuleForDisembark(
+        UnitManager transporter,
+        UnitData transporterData,
+        UnitManager passenger,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        Vector3Int transporterCell,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (passenger == null || map == null)
+        {
+            reason = "Contexto invalido para validar decolagem do passageiro.";
+            return false;
+        }
+
+        if (!passenger.TryGetUnitData(out UnitData passengerData) || passengerData == null || !passengerData.IsAircraft())
+            return true;
+
+        // Caça/aviao saindo de carrier naval deve seguir regra especial de 1 hex
+        // já tratada no sensor de desembarque (CanCarrierAirPassengerDisembarkAnywhere).
+        if (CanCarrierAirPassengerDisembarkAnywhere(transporter, transporterData, passenger))
+            return true;
+
+        transporterCell.z = 0;
+        AirOperationTileContext tileContext = AirOperationResolver.ResolveContext(map, terrainDatabase, transporterCell);
+        if (!AirOperationResolver.TryGetTakeoffPlan(
+                passenger,
+                tileContext,
+                SensorMovementMode.MoveuParado,
+                out AirTakeoffPlan plan,
+                out string takeoffPlanReason))
+        {
+            reason = string.IsNullOrWhiteSpace(takeoffPlanReason)
+                ? "Aeronave nao pode decolar deste hex para desembarque."
+                : $"Aeronave nao pode decolar deste hex: {takeoffPlanReason}";
+            return false;
+        }
+
+        bool canFullMove = plan.procedure == TakeoffProcedure.InstantToPreferredHeight;
+        bool can0 = plan.rollMinHex == 0;
+        bool can1 = plan.rollMaxHex >= 1;
+        if (canFullMove || can1)
+            return true;
+
+        if (can0)
+        {
+            reason = "Aeronave neste hex permite apenas decolagem 0; desembarque exige saida de 1 hex.";
+            return false;
+        }
+
+        reason = "Aeronave sem regra de decolagem valida (0/1/[0,1]) para desembarque.";
+        return false;
     }
 
     private static bool CanCarrierAirPassengerDisembarkAnywhere(

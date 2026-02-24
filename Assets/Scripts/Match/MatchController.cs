@@ -1,5 +1,9 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Collections;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class MatchController : MonoBehaviour
 {
@@ -27,6 +31,12 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enableStealthValidation = true;
     [SerializeField] private AutonomyDatabase autonomyDatabase;
     [SerializeField] private CursorController cursorController;
+    [Header("Turn Transition")]
+    [SerializeField] private MatchMusicAudioManager matchMusicAudioManager;
+    [SerializeField] private AudioClip advanceTurnSfx;
+    [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.5f;
+    [SerializeField] [Range(0f, 2f)] private float advanceTurnPostDelay = 0.2f;
+    [SerializeField] [Range(0f, 1f)] private float advanceTurnSfxVolume = 1f;
     [SerializeField] private int activePlayerListIndex = 0;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField, HideInInspector] private bool pendingTurnStartUpkeep;
@@ -43,12 +53,15 @@ public class MatchController : MonoBehaviour
     public bool EnableStealthValidation => enableStealthValidation;
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;
     public int ActivePlayerListIndex => activePlayerListIndex;
+    public bool IsTurnTransitionInProgress => advanceTurnTransitionRoutine != null;
+    private Coroutine advanceTurnTransitionRoutine;
 
     private void Awake()
     {
         ApplyGameSetupPreset();
         NormalizeState();
         TryAutoAssignCursorController();
+        TryAutoAssignTurnTransitionReferences();
         ApplyActiveTeamIfChanged(force: true);
     }
 
@@ -58,6 +71,7 @@ public class MatchController : MonoBehaviour
         ApplyGameSetupPreset();
         NormalizeState();
         TryAutoAssignCursorController();
+        TryAutoAssignTurnTransitionReferences();
         ApplyActiveTeamIfChanged(force: false);
     }
 #endif
@@ -68,6 +82,7 @@ public class MatchController : MonoBehaviour
             return;
 
         TryAutoAssignCursorController();
+        TryAutoAssignTurnTransitionReferences();
         ApplyActiveTeamIfChanged(force: false);
     }
 
@@ -161,6 +176,60 @@ public class MatchController : MonoBehaviour
         currentTurn = Mathf.Max(0, currentTurn + 1);
         pendingTurnStartUpkeep = true;
         SetActivePlayerByIndex(0, forceApply: true);
+    }
+
+    public void AdvanceTurnWithTransition()
+    {
+        if (!Application.isPlaying)
+        {
+            AdvanceTurn();
+            return;
+        }
+
+        if (advanceTurnTransitionRoutine != null)
+            StopCoroutine(advanceTurnTransitionRoutine);
+
+        advanceTurnTransitionRoutine = StartCoroutine(AdvanceTurnTransitionRoutine());
+    }
+
+    private IEnumerator AdvanceTurnTransitionRoutine()
+    {
+        bool wasMusicPlaying = matchMusicAudioManager != null && matchMusicAudioManager.IsPlaying;
+        bool wasPausedByUser = matchMusicAudioManager != null && matchMusicAudioManager.IsPausedByUser;
+        bool usePauseResume = matchMusicAudioManager != null && matchMusicAudioManager.IsFreeMode;
+        if (matchMusicAudioManager != null)
+            matchMusicAudioManager.BeginTurnTransition();
+
+        if (wasMusicPlaying && matchMusicAudioManager != null)
+        {
+            if (usePauseResume)
+                matchMusicAudioManager.PauseForTurnTransition();
+            else
+                matchMusicAudioManager.StopForTurnTransition();
+        }
+
+        PlayAdvanceTurnSfx();
+        if (advanceTurnPreDelay > 0f)
+            yield return new WaitForSeconds(advanceTurnPreDelay);
+
+        AdvanceTurn();
+
+        if (advanceTurnPostDelay > 0f)
+            yield return new WaitForSeconds(advanceTurnPostDelay);
+
+        if (wasMusicPlaying && !wasPausedByUser && matchMusicAudioManager != null)
+        {
+            if (usePauseResume)
+                matchMusicAudioManager.ResumeAfterTurnTransition();
+            else
+                matchMusicAudioManager.RestartCurrentModePlayback();
+        }
+        else if (matchMusicAudioManager != null)
+        {
+            matchMusicAudioManager.EndTurnTransition();
+        }
+
+        advanceTurnTransitionRoutine = null;
     }
 
     private void NormalizeState()
@@ -329,6 +398,26 @@ public class MatchController : MonoBehaviour
     {
         if (cursorController == null)
             cursorController = FindAnyObjectByType<CursorController>();
+    }
+
+    private void TryAutoAssignTurnTransitionReferences()
+    {
+        if (matchMusicAudioManager == null)
+            matchMusicAudioManager = FindAnyObjectByType<MatchMusicAudioManager>();
+
+#if UNITY_EDITOR
+        if (advanceTurnSfx == null)
+            advanceTurnSfx = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/ending the turn.MP3");
+#endif
+    }
+
+    private void PlayAdvanceTurnSfx()
+    {
+        if (advanceTurnSfx == null)
+            return;
+
+        float volume = Mathf.Clamp01(advanceTurnSfxVolume);
+        AudioSource.PlayClipAtPoint(advanceTurnSfx, transform.position, volume);
     }
 
     private void TeleportCursorToActiveTeamHeadQuarterSilently()

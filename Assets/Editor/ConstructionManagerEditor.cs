@@ -17,6 +17,10 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty constructionDisplayNameProp;
     private SerializedProperty currentHpProp;
     private SerializedProperty autoApplyOnStartProp;
+    private SerializedProperty siteRuntimeProp;
+    private SerializedProperty hasSiteRuntimeOverrideProp;
+    private SerializedProperty currentCapturePointsProp;
+    private SerializedProperty originalOwnerTeamIdProp;
 
     private void OnEnable()
     {
@@ -33,6 +37,10 @@ public class ConstructionManagerEditor : Editor
         constructionDisplayNameProp = serializedObject.FindProperty("constructionDisplayName");
         currentHpProp = serializedObject.FindProperty("currentHP");
         autoApplyOnStartProp = serializedObject.FindProperty("autoApplyOnStart");
+        siteRuntimeProp = serializedObject.FindProperty("siteRuntime");
+        hasSiteRuntimeOverrideProp = serializedObject.FindProperty("hasSiteRuntimeOverride");
+        currentCapturePointsProp = serializedObject.FindProperty("currentCapturePoints");
+        originalOwnerTeamIdProp = serializedObject.FindProperty("originalOwnerTeamId");
     }
 
     public override void OnInspectorGUI()
@@ -62,13 +70,45 @@ public class ConstructionManagerEditor : Editor
         EditorGUILayout.PropertyField(currentPositionProp, new GUIContent("Current Position"));
         EditorGUILayout.PropertyField(constructionDisplayNameProp, new GUIContent("Construction Display Name"));
         EditorGUILayout.PropertyField(currentHpProp, new GUIContent("Current HP"));
+        if (currentCapturePointsProp != null)
+            EditorGUILayout.PropertyField(currentCapturePointsProp, new GUIContent("Current Capture Points"));
+        if (originalOwnerTeamIdProp != null)
+            EditorGUILayout.PropertyField(originalOwnerTeamIdProp, new GUIContent("Original Owner Team"));
+
+        if (hasSiteRuntimeOverrideProp != null)
+        {
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.PropertyField(hasSiteRuntimeOverrideProp, new GUIContent("Has Site Runtime Override"));
+        }
+
+        if (siteRuntimeProp != null)
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Site Runtime (Live)", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("Edicoes aqui sao da instancia em campo. Ao editar, a instancia passa a usar override local.", MessageType.Info);
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(siteRuntimeProp, includeChildren: true);
+            if (EditorGUI.EndChangeCheck() && hasSiteRuntimeOverrideProp != null)
+                hasSiteRuntimeOverrideProp.boolValue = true;
+        }
 
         EditorGUILayout.PropertyField(autoApplyOnStartProp);
         serializedObject.ApplyModifiedProperties();
 
         ConstructionManager construction = (ConstructionManager)target;
+
         if (GUILayout.Button("Apply From Database"))
             construction.ApplyFromDatabase();
+        if (GUILayout.Button("Reset Instance Override (Use Database Defaults)"))
+        {
+            SerializedObject so = new SerializedObject(construction);
+            SerializedProperty overrideProp = so.FindProperty("hasSiteRuntimeOverride");
+            if (overrideProp != null)
+                overrideProp.boolValue = false;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            construction.ApplyFromDatabase();
+            EditorUtility.SetDirty(construction);
+        }
         if (GUILayout.Button("Snap To Cell Center"))
             construction.SnapToCellCenter();
         if (GUILayout.Button("Pull Cell From Transform"))

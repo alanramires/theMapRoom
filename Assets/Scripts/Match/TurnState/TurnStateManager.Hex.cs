@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public partial class TurnStateManager
 {
@@ -7,8 +8,17 @@ public partial class TurnStateManager
         resolvedCell = currentCell + inputDelta;
         resolvedCell.z = 0;
 
+        if (cursorState == CursorState.ShoppingAndServices)
+        {
+            resolvedCell = currentCell;
+            return false;
+        }
+
         if (cursorState == CursorState.Mirando)
             return TryResolveMirandoCursorMove(inputDelta, out resolvedCell);
+
+        if (cursorState == CursorState.Desembarcando)
+            return TryResolveDisembarkCursorMove(currentCell, inputDelta, out resolvedCell);
 
         if (cursorState == CursorState.Pousando)
         {
@@ -79,5 +89,17 @@ public partial class TurnStateManager
     private UnitManager FindUnitAtCell(Vector3Int cell)
     {
         return HexOccupancyQuery.FindUnitAtCell(cell);
+    }
+
+    private ConstructionManager FindConstructionAtCell(Vector3Int cell)
+    {
+        Tilemap referenceTilemap = terrainTilemap != null
+            ? terrainTilemap
+            : (cursorController != null ? cursorController.BoardTilemap : null);
+
+        if (referenceTilemap == null)
+            return null;
+
+        return ConstructionOccupancyRules.GetConstructionAtCell(referenceTilemap, cell);
     }
 }

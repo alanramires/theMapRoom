@@ -56,6 +56,9 @@ public class ConstructionDataEditor : Editor
             return;
 
         EditorGUILayout.LabelField("Construction Configuration", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Quando Is Supplier estiver ativo, Services/Resources de Supplier Settings sao sincronizados automaticamente para Offered Services/Offered Supplies. Offered Units continua 100% manual por construcao.",
+            MessageType.Info);
         EditorGUI.indentLevel++;
 
         DrawIfExists(configProperty.FindPropertyRelative("isPlayerHeadQuarter"), "Is Player Head Quarter");

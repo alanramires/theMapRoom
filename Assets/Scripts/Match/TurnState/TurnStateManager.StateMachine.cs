@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -28,6 +29,8 @@ public partial class TurnStateManager
                 return HandleConfirmWhileEmbarcando();
             case CursorState.Desembarcando:
                 return HandleConfirmWhileDesembarcando();
+            case CursorState.ShoppingAndServices:
+                return HandleConfirmWhileShoppingAndServices();
         }
 
         return ActionSfx.None;
@@ -58,6 +61,8 @@ public partial class TurnStateManager
                 return HandleCancelWhileEmbarcando();
             case CursorState.Desembarcando:
                 return HandleCancelWhileDesembarcando();
+            case CursorState.ShoppingAndServices:
+                return HandleCancelWhileShoppingAndServices();
         }
 
         return ActionSfx.None;
@@ -71,30 +76,131 @@ public partial class TurnStateManager
 
         Vector3Int cursorCell = cursorController.CurrentCell;
         UnitManager unit = FindUnitAtCell(cursorCell);
-        if (unit == null)
+        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+
+        if (unit != null)
+        {
+            bool isAlly = (int)unit.TeamId == activeTeam;
+            if (!isAlly)
+            {
+                LogEnemyUnitInspection(unit, activeTeam);
+                return ActionSfx.Confirm;
+            }
+
+            if (unit.HasActed)
+            {
+                Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
+                return ActionSfx.Confirm;
+            }
+
+            TryPrepareTemporaryTakeoffStateForSelection(unit, out string takeoffInfo);
+            if (!string.IsNullOrWhiteSpace(takeoffInfo))
+                Debug.Log($"[Pode Decolar] {takeoffInfo}");
+
+            SetSelectedUnit(unit);
+            SetCursorState(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
+            return ActionSfx.Confirm;
+        }
+
+        ConstructionManager construction = FindConstructionAtCell(cursorCell);
+        if (construction == null)
             return ActionSfx.None;
 
-        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
-        bool isAlly = (int)unit.TeamId == activeTeam;
-        if (!isAlly)
+        bool isConstructionAlly = (int)construction.TeamId == activeTeam;
+        if (!isConstructionAlly)
         {
-            Debug.Log($"debug: inspecionando inimigo (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
+            LogEnemyConstructionInspection(construction, activeTeam);
             return ActionSfx.Confirm;
         }
 
-        if (unit.HasActed)
-        {
-            Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
+        if (TryEnterConstructionShoppingState(construction, activeTeam))
             return ActionSfx.Confirm;
-        }
 
-        TryPrepareTemporaryTakeoffStateForSelection(unit, out string takeoffInfo);
-        if (!string.IsNullOrWhiteSpace(takeoffInfo))
-            Debug.Log($"[Pode Decolar] {takeoffInfo}");
-
-        SetSelectedUnit(unit);
-        SetCursorState(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
+        LogAllyConstructionInspection(construction, activeTeam);
         return ActionSfx.Confirm;
+    }
+
+    private static void LogEnemyUnitInspection(UnitManager unit, int activeTeam)
+    {
+        if (unit == null)
+            return;
+
+        StringBuilder sb = new StringBuilder();
+        string unitName = !string.IsNullOrWhiteSpace(unit.UnitDisplayName)
+            ? unit.UnitDisplayName
+            : (!string.IsNullOrWhiteSpace(unit.UnitId) ? unit.UnitId : unit.name);
+
+        sb.Append("[Inspecao Inimigo] Unidade: ");
+        sb.Append(unitName);
+        sb.Append(" | Team: ");
+        sb.Append(TeamUtils.GetName(unit.TeamId));
+        sb.Append(" (");
+        sb.Append((int)unit.TeamId);
+        sb.Append(")");
+        sb.Append(" | ActiveTeam: ");
+        sb.Append(activeTeam);
+
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+        if (weapons == null || weapons.Count == 0)
+        {
+            sb.Append(" | Armas: nenhuma configurada");
+            Debug.Log(sb.ToString());
+            return;
+        }
+
+        sb.Append(" | Armas: ");
+        bool addedAnyWeapon = false;
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = weapons[i];
+            if (embarked == null)
+                continue;
+
+            string weaponName = embarked.weapon != null
+                ? (!string.IsNullOrWhiteSpace(embarked.weapon.displayName) ? embarked.weapon.displayName : embarked.weapon.id)
+                : $"arma_{i + 1}";
+
+            if (addedAnyWeapon)
+                sb.Append("; ");
+
+            sb.Append(weaponName);
+            sb.Append(" ammo=");
+            sb.Append(Mathf.Max(0, embarked.squadAmmunition));
+            addedAnyWeapon = true;
+        }
+
+        if (!addedAnyWeapon)
+            sb.Append("nenhuma configurada");
+
+        Debug.Log(sb.ToString());
+    }
+
+    private static void LogEnemyConstructionInspection(ConstructionManager construction, int activeTeam)
+    {
+        if (construction == null)
+            return;
+
+        string constructionName = !string.IsNullOrWhiteSpace(construction.ConstructionDisplayName)
+            ? construction.ConstructionDisplayName
+            : (!string.IsNullOrWhiteSpace(construction.ConstructionId) ? construction.ConstructionId : construction.name);
+
+        Debug.Log(
+            $"[Inspecao Inimigo] Construcao: {constructionName} | Team: {TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId}) | " +
+            $"Capture: {construction.CurrentCapturePoints}/{construction.CapturePointsMax} | ActiveTeam: {activeTeam}");
+    }
+
+    private static void LogAllyConstructionInspection(ConstructionManager construction, int activeTeam)
+    {
+        if (construction == null)
+            return;
+
+        string constructionName = !string.IsNullOrWhiteSpace(construction.ConstructionDisplayName)
+            ? construction.ConstructionDisplayName
+            : (!string.IsNullOrWhiteSpace(construction.ConstructionId) ? construction.ConstructionId : construction.name);
+
+        Debug.Log(
+            $"[Inspecao Aliada] Construcao: {constructionName} | Team: {TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId}) | " +
+            $"Capture: {construction.CurrentCapturePoints}/{construction.CapturePointsMax} | ActiveTeam: {activeTeam} | Sem unidades a venda.");
     }
 
     private ActionSfx HandleConfirmWhileUnitSelected()
@@ -318,14 +424,36 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileDesembarcando()
     {
         LogStateStep("HandleConfirmWhileDesembarcando");
+        if (TryConfirmScannerDisembark())
+        {
+            if (ConsumeDisembarkSuppressDefaultConfirmSfxOnce())
+                return ActionSfx.None;
+            return ActionSfx.Confirm;
+        }
+        return ActionSfx.None;
+    }
+
+    private ActionSfx HandleConfirmWhileShoppingAndServices()
+    {
+        LogStateStep("HandleConfirmWhileShoppingAndServices");
+        LogConstructionShoppingPanel();
         return ActionSfx.None;
     }
 
     private ActionSfx HandleCancelWhileDesembarcando()
     {
         LogStateStep("HandleCancelWhileDesembarcando", rollback: true);
-        SetCursorState(CursorState.MoveuParado, "HandleCancelWhileDesembarcando", rollback: true);
-        RefreshSensorsForCurrentState();
+        if (HandleScannerPromptCancel())
+            return ActionSfx.Cancel;
+
+        ExitDisembarkStateToMovement();
+        return ActionSfx.Cancel;
+    }
+
+    private ActionSfx HandleCancelWhileShoppingAndServices()
+    {
+        LogStateStep("HandleCancelWhileShoppingAndServices", rollback: true);
+        ExitConstructionShoppingStateToNeutral(rollback: true);
         return ActionSfx.Cancel;
     }
 }

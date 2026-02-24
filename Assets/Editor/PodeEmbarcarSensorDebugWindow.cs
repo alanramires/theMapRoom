@@ -85,7 +85,8 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
 
                 EditorGUILayout.BeginVertical("box");
                 bool selected = selectedOptionIndex == i;
-                if (GUILayout.Toggle(selected, $"{i + 1}. {option.displayLabel}", "Button"))
+                bool toggled = GUILayout.Toggle(selected, $"{i + 1}. {option.displayLabel}", "Button");
+                if (toggled && selectedOptionIndex != i)
                 {
                     selectedOptionIndex = i;
                     SelectLineForDrawing(option);
@@ -97,7 +98,10 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
                 EditorGUILayout.LabelField("Custo de Entrada", option.enterCost.ToString());
                 EditorGUILayout.LabelField("Movimento Restante", option.remainingMovementBeforeEmbark.ToString());
                 if (GUILayout.Button("Desenhar Linha no Scene View"))
+                {
+                    selectedOptionIndex = i;
                     SelectLineForDrawing(option);
+                }
                 EditorGUILayout.EndVertical();
             }
         }

@@ -10,5 +10,6 @@ public enum ConstructionSupplierRangeMode
 public class ConstructionSupplierResourceCapacity
 {
     public SupplyData supply;
-    [Min(0)] public int maxCapacity = 0;
+    [Tooltip("Capacidade maxima deste supply. Use -1 para infinito.")]
+    [Min(-1)] public int maxCapacity = 0;
 }

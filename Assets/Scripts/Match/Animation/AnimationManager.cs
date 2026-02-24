@@ -49,6 +49,34 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] [Range(0.01f, 0.99f)] private float embarkHighToLowNormalizedTime = 0.50f;
     [Tooltip("Tempo normalizado (0..1) para concluir AirLow->Ground durante embarque iniciando em AirLow.")]
     [SerializeField] [Range(0.01f, 1f)] private float embarkLowToGroundNormalizedTime = 1.00f;
+    [Header("Disembark Sequence Timing")]
+    [Tooltip("Tempo da animacao de pouso forcado do transportador antes do desembarque.")]
+    [SerializeField] [Range(0f, 2f)] private float disembarkForcedLandingDuration = 0.25f;
+    [Tooltip("Pausa apos o pouso forcado do transportador antes do desembarque.")]
+    [SerializeField] [Range(0f, 2f)] private float disembarkAfterForcedLandingDelay = 0.10f;
+    [Tooltip("Pausa antes de spawnar os passageiros em cima do transportador.")]
+    [SerializeField] [Range(0f, 2f)] private float disembarkBeforeSpawnDelay = 0.10f;
+    [Tooltip("Pausa apos spawnar os passageiros antes de mover para os hexes destino.")]
+    [SerializeField] [Range(0f, 2f)] private float disembarkAfterSpawnDelay = 0.15f;
+    [Tooltip("Intervalo entre o spawn de um passageiro e o proximo (quando houver mais de um).")]
+    [SerializeField] [Range(0f, 2f)] private float disembarkSpawnStepDelay = 0.08f;
+    [Tooltip("Pausa apos o passageiro terminar o movimento antes de confirmar o desembarque dele.")]
+    [SerializeField] [Range(0f, 2f)] private float disembarkAfterPassengerMoveDelay = 0.10f;
+    [Tooltip("Pausa apos tocar load/encerrar um passageiro antes de iniciar o proximo.")]
+    [SerializeField] [Range(0f, 2f)] private float disembarkAfterPassengerLoadDelay = 0.12f;
+    [Tooltip("Pausa apos os movimentos de desembarque antes de finalizar a acao.")]
+    [SerializeField] [Range(0f, 2f)] private float disembarkAfterMoveDelay = 0.15f;
+    [Tooltip("Pausa apos encerrar o transportador antes de liberar o cursor/estado.")]
+    [SerializeField] [Range(0f, 2f)] private float disembarkAfterTransporterDoneDelay = 0.10f;
+    [Tooltip("Duracao total do pouso para transportador em Air High ate Ground no desembarque.")]
+    [SerializeField] [Range(0.04f, 2f)] private float disembarkAirHighToGroundDuration = 0.10f;
+    [Tooltip("Duracao total do pouso para transportador em Air Low ate Ground no desembarque.")]
+    [SerializeField] [Range(0f, 2f)] private float disembarkAirLowToGroundDuration = 0.05f;
+    [Header("Disembark Layer Transition Timing")]
+    [Tooltip("Tempo normalizado (0..1) para concluir AirHigh->AirLow durante pouso para desembarque.")]
+    [SerializeField] [Range(0.01f, 0.99f)] private float disembarkHighToLowNormalizedTime = 0.50f;
+    [Tooltip("Tempo normalizado (0..1) para concluir AirLow->Ground durante pouso para desembarque.")]
+    [SerializeField] [Range(0.01f, 1f)] private float disembarkLowToGroundNormalizedTime = 1.00f;
     [Header("Mirando Preview Line")]
     [Tooltip("Material usado na linha de preview de tiro durante o estado Mirando.")]
     [SerializeField] private Material mirandoPreviewMaterial;
@@ -184,6 +212,19 @@ public class AnimationManager : MonoBehaviour
     public float EmbarkAfterMoveDelay => Mathf.Clamp(embarkAfterMoveDelay, 0f, 2f);
     public float EmbarkHighToLowNormalizedTime => Mathf.Clamp(embarkHighToLowNormalizedTime, 0.01f, 0.99f);
     public float EmbarkLowToGroundNormalizedTime => Mathf.Clamp(embarkLowToGroundNormalizedTime, 0.01f, 1f);
+    public float DisembarkForcedLandingDuration => Mathf.Clamp(disembarkForcedLandingDuration, 0f, 2f);
+    public float DisembarkAfterForcedLandingDelay => Mathf.Clamp(disembarkAfterForcedLandingDelay, 0f, 2f);
+    public float DisembarkBeforeSpawnDelay => Mathf.Clamp(disembarkBeforeSpawnDelay, 0f, 2f);
+    public float DisembarkAfterSpawnDelay => Mathf.Clamp(disembarkAfterSpawnDelay, 0f, 2f);
+    public float DisembarkSpawnStepDelay => Mathf.Clamp(disembarkSpawnStepDelay, 0f, 2f);
+    public float DisembarkAfterPassengerMoveDelay => Mathf.Clamp(disembarkAfterPassengerMoveDelay, 0f, 2f);
+    public float DisembarkAfterPassengerLoadDelay => Mathf.Clamp(disembarkAfterPassengerLoadDelay, 0f, 2f);
+    public float DisembarkAfterMoveDelay => Mathf.Clamp(disembarkAfterMoveDelay, 0f, 2f);
+    public float DisembarkAfterTransporterDoneDelay => Mathf.Clamp(disembarkAfterTransporterDoneDelay, 0f, 2f);
+    public float DisembarkAirHighToGroundDuration => Mathf.Clamp(disembarkAirHighToGroundDuration, 0.04f, 2f);
+    public float DisembarkAirLowToGroundDuration => Mathf.Clamp(disembarkAirLowToGroundDuration, 0f, 2f);
+    public float DisembarkHighToLowNormalizedTime => Mathf.Clamp(disembarkHighToLowNormalizedTime, 0.01f, 0.99f);
+    public float DisembarkLowToGroundNormalizedTime => Mathf.Clamp(disembarkLowToGroundNormalizedTime, 0.01f, 1f);
 
     private void Awake()
     {
