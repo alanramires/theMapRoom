@@ -42,6 +42,10 @@ public partial class TurnStateManager : MonoBehaviour
     [SerializeField] private Tilemap terrainTilemap;
     [SerializeField] private TileBase rangeOverlayTile;
     [SerializeField] private TileBase lineOfFireOverlayTile;
+    [Header("Combat Audio")]
+    [SerializeField] private AudioClip meleeAttackSfx;
+    [SerializeField] private AudioClip rangedAttackSfx;
+    [SerializeField] [Range(0f, 1f)] private float combatSfxVolume = 1f;
 
     [Header("State")]
     [SerializeField] private CursorState cursorState = CursorState.Neutral;
@@ -377,6 +381,19 @@ public partial class TurnStateManager : MonoBehaviour
 #if UNITY_EDITOR
         if (dpqAirHeightConfig == null)
             dpqAirHeightConfig = FindFirstAssetEditor<DPQAirHeightConfig>();
+        if (terrainDatabase == null)
+            terrainDatabase = FindFirstAssetEditor<TerrainDatabase>();
+        if (weaponPriorityData == null)
+            weaponPriorityData = FindFirstAssetEditor<WeaponPriorityData>();
+        if (dpqMatchupDatabase == null)
+            dpqMatchupDatabase = FindFirstAssetEditor<DPQMatchupDatabase>();
+        if (rpsDatabase == null)
+            rpsDatabase = FindFirstAssetEditor<RPSDatabase>();
+
+        if (meleeAttackSfx == null)
+            meleeAttackSfx = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/combat/melee attack.mp3");
+        if (rangedAttackSfx == null)
+            rangedAttackSfx = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/combat/ranged attack.mp3");
 #endif
     }
 

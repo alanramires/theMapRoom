@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -72,12 +73,27 @@ public partial class TurnStateManager
         public float headDistance;
     }
 
+    private readonly struct DeathTarget
+    {
+        public readonly UnitManager unit;
+        public readonly Vector3Int cell;
+        public readonly Vector3 worldPos;
+
+        public DeathTarget(UnitManager unit, Vector3Int cell, Vector3 worldPos)
+        {
+            this.unit = unit;
+            this.cell = cell;
+            this.worldPos = worldPos;
+        }
+    }
+
     private ScannerPromptStep scannerPromptStep = ScannerPromptStep.AwaitingAction;
     private int scannerSelectedTargetIndex = -1;
     private int scannerSelectedEmbarkIndex = -1;
     private int scannerSelectedLandingIndex = -1;
     private bool embarkExecutionInProgress;
     private bool landingExecutionInProgress;
+    private bool combatExecutionInProgress;
     private CursorState cursorStateBeforeMirando = CursorState.MoveuParado;
     private CursorState cursorStateBeforeEmbarcando = CursorState.MoveuParado;
     private CursorState cursorStateBeforePousando = CursorState.MoveuParado;
@@ -145,6 +161,7 @@ public partial class TurnStateManager
         scannerSelectedTargetIndex = -1;
         scannerSelectedEmbarkIndex = -1;
         scannerSelectedLandingIndex = -1;
+        combatExecutionInProgress = false;
         cachedLandingOptions.Clear();
         ClearMirandoPreview();
         ClearEmbarkPreview();
@@ -152,8 +169,17 @@ public partial class TurnStateManager
 
     private bool HandleScannerPromptCancel()
     {
+        if (combatExecutionInProgress)
+            return true;
+
         if (cursorState == CursorState.Mirando && scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget)
         {
+            if (cachedPodeMirarTargets.Count <= 1)
+            {
+                ExitMirandoStateToMovement();
+                return true;
+            }
+
             scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
             FocusCurrentMirandoTarget(logDetails: true);
             return true;
@@ -200,7 +226,7 @@ public partial class TurnStateManager
 
     private void ProcessScannerPromptInput()
     {
-        if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress)
+        if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress || combatExecutionInProgress)
             return;
 
         if (cursorState == CursorState.Mirando)
@@ -1748,15 +1774,15 @@ public partial class TurnStateManager
     {
         if (cursorState != CursorState.Mirando)
             return false;
+        if (combatExecutionInProgress)
+            return true;
 
         if (scannerPromptStep == ScannerPromptStep.MirandoCycleTarget)
         {
             if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= cachedPodeMirarTargets.Count)
                 return true;
 
-            scannerPromptStep = ScannerPromptStep.MirandoConfirmTarget;
-            PodeMirarTargetOption picked = cachedPodeMirarTargets[scannerSelectedTargetIndex];
-            LogAttackConfirmationPrompt(picked, scannerSelectedTargetIndex + 1);
+            EnterMirandoConfirmStep();
             return true;
         }
 
@@ -1794,10 +1820,406 @@ public partial class TurnStateManager
             return true;
         }
 
-        cursorController?.PlayDoneSfx();
-        TryFinalizeSelectedUnitActionFromDebug();
-        ResetScannerPromptState();
+        WeaponTrajectoryType trajectory = ResolveSelectedTrajectory(option);
+        StartCoroutine(ExecuteConfirmedAttackSequence(option, trajectory, combat));
         return true;
+    }
+
+    private IEnumerator ExecuteConfirmedAttackSequence(
+        PodeMirarTargetOption option,
+        WeaponTrajectoryType attackerTrajectory,
+        CombatResolutionResult combat)
+    {
+        combatExecutionInProgress = true;
+        UnitManager attacker = option != null ? option.attackerUnit : null;
+        UnitManager defender = option != null ? option.targetUnit : null;
+
+        float audioDuration = PlayCombatAttackSfx(attackerTrajectory, defender);
+        float waitDuration = audioDuration;
+
+        if (attackerTrajectory == WeaponTrajectoryType.Parabolic && animationManager != null && defender != null)
+        {
+            float effectDuration = animationManager.PlayRangedAttackDefenderEffect(defender, audioDuration);
+            waitDuration = Mathf.Max(waitDuration, effectDuration);
+        }
+
+        if (waitDuration > 0f)
+            yield return new WaitForSeconds(waitDuration);
+
+        yield return ExecuteCombatProjectileExchange(option, attackerTrajectory, combat.counterExecuted);
+        ApplyPendingCombatHp(combat);
+        yield return ExecuteDeathResolutionIfNeeded(combat);
+
+        combatExecutionInProgress = false;
+        cursorController?.PlayDoneSfx();
+        if (!TryFinalizeSelectedUnitActionFromDebug())
+            ClearSelectionAndReturnToNeutral(keepPreparedFuelCost: true);
+        ResetScannerPromptState();
+    }
+
+    private IEnumerator ExecuteCombatProjectileExchange(
+        PodeMirarTargetOption option,
+        WeaponTrajectoryType attackerTrajectory,
+        bool counterExecuted)
+    {
+        if (option == null)
+            yield break;
+
+        UnitManager attacker = option.attackerUnit;
+        UnitManager defender = option.targetUnit;
+        if (attacker == null || defender == null)
+            yield break;
+
+        WeaponTrajectoryType counterTrajectory = counterExecuted
+            ? ResolveTrajectoryForShot(defender, option.defenderCounterEmbarkedWeaponIndex, option.defenderCounterWeapon)
+            : WeaponTrajectoryType.Straight;
+
+        bool canBump =
+            counterExecuted &&
+            attackerTrajectory == WeaponTrajectoryType.Straight &&
+            counterTrajectory == WeaponTrajectoryType.Straight;
+        if (canBump && animationManager != null)
+        {
+            float bumpDuration = animationManager.PlayCombatBumpTogether(attacker, defender);
+            if (bumpDuration > 0f)
+                yield return new WaitForSeconds(bumpDuration);
+        }
+        else if (attackerTrajectory == WeaponTrajectoryType.Straight && animationManager != null)
+        {
+            float bumpDuration = animationManager.PlayCombatBumpTowards(attacker, defender);
+            if (bumpDuration > 0f)
+                yield return new WaitForSeconds(bumpDuration);
+        }
+
+        float attackerShotDuration = PlayWeaponShot(attacker, defender, option.weapon, attackerTrajectory);
+        if (attackerShotDuration > 0f)
+            yield return new WaitForSeconds(attackerShotDuration);
+        float defenderHitFxDuration = animationManager != null ? animationManager.PlayTakingHitEffect(defender) : 0f;
+        if (defenderHitFxDuration > 0f)
+            yield return new WaitForSeconds(defenderHitFxDuration);
+
+        if (!counterExecuted)
+            yield break;
+
+        float counterDelay = animationManager != null ? animationManager.CombatCounterShotDelay : 0.1f;
+        if (counterDelay > 0f)
+            yield return new WaitForSeconds(counterDelay);
+
+        if (!canBump && counterTrajectory == WeaponTrajectoryType.Straight && animationManager != null)
+        {
+            float counterBumpDuration = animationManager.PlayCombatBumpTowards(defender, attacker);
+            if (counterBumpDuration > 0f)
+                yield return new WaitForSeconds(counterBumpDuration);
+        }
+
+        float counterShotDuration = PlayWeaponShot(defender, attacker, option.defenderCounterWeapon, counterTrajectory);
+        if (counterShotDuration > 0f)
+            yield return new WaitForSeconds(counterShotDuration);
+        float attackerHitFxDuration = animationManager != null ? animationManager.PlayTakingHitEffect(attacker) : 0f;
+        if (attackerHitFxDuration > 0f)
+            yield return new WaitForSeconds(attackerHitFxDuration);
+    }
+
+    private float PlayCombatAttackSfx(WeaponTrajectoryType trajectory, UnitManager defender)
+    {
+        AudioClip clip = trajectory == WeaponTrajectoryType.Parabolic ? rangedAttackSfx : meleeAttackSfx;
+        if (clip == null)
+            return 0f;
+
+        Vector3 worldPos = selectedUnit != null
+            ? selectedUnit.transform.position
+            : (defender != null ? defender.transform.position : Vector3.zero);
+        AudioSource.PlayClipAtPoint(clip, worldPos, Mathf.Clamp01(combatSfxVolume));
+        return clip.length;
+    }
+
+    private float PlayWeaponShot(UnitManager shooter, UnitManager target, WeaponData weapon, WeaponTrajectoryType trajectory)
+    {
+        if (shooter == null || target == null)
+            return 0f;
+
+        if (weapon != null && weapon.fireSfx != null)
+            AudioSource.PlayClipAtPoint(weapon.fireSfx, shooter.transform.position, Mathf.Clamp01(weapon.fireSfxVolume));
+
+        if (animationManager == null)
+            return 0f;
+        return animationManager.PlayWeaponProjectile(shooter, target, weapon, trajectory);
+    }
+
+    private WeaponTrajectoryType ResolveTrajectoryForShot(UnitManager owner, int embarkedWeaponIndex, WeaponData fallbackWeapon)
+    {
+        if (owner != null)
+        {
+            IReadOnlyList<UnitEmbarkedWeapon> weapons = owner.GetEmbarkedWeapons();
+            if (weapons != null && embarkedWeaponIndex >= 0 && embarkedWeaponIndex < weapons.Count)
+            {
+                UnitEmbarkedWeapon embarked = weapons[embarkedWeaponIndex];
+                if (embarked != null)
+                    return embarked.selectedTrajectory;
+            }
+        }
+
+        if (fallbackWeapon != null && fallbackWeapon.SupportsTrajectory(WeaponTrajectoryType.Parabolic))
+            return WeaponTrajectoryType.Parabolic;
+
+        return WeaponTrajectoryType.Straight;
+    }
+
+    private void ApplyPendingCombatHp(CombatResolutionResult combat)
+    {
+        if (!combat.success)
+            return;
+
+        if (combat.defenderUnit != null)
+        {
+            int defenderHpBefore = Mathf.Max(0, combat.defenderUnit.CurrentHP);
+            int defenderHpAfter = Mathf.Max(0, combat.defenderHpAfter);
+            combat.defenderUnit.SetCurrentHP(defenderHpAfter);
+            ApplyEmbarkedCascadeFromDirectHit(combat.defenderUnit, defenderHpBefore, defenderHpAfter);
+        }
+
+        if (combat.attackerUnit != null)
+        {
+            int attackerHpBefore = Mathf.Max(0, combat.attackerUnit.CurrentHP);
+            int attackerHpAfter = Mathf.Max(0, combat.attackerHpAfter);
+            combat.attackerUnit.SetCurrentHP(attackerHpAfter);
+            ApplyEmbarkedCascadeFromDirectHit(combat.attackerUnit, attackerHpBefore, attackerHpAfter);
+        }
+    }
+
+    private void ApplyEmbarkedCascadeFromDirectHit(UnitManager directlyHitUnit, int hpBefore, int hpAfter)
+    {
+        if (directlyHitUnit == null)
+            return;
+
+        hpBefore = Mathf.Max(0, hpBefore);
+        hpAfter = Mathf.Clamp(hpAfter, 0, hpBefore);
+        if (hpBefore <= 0)
+            return;
+
+        if (hpAfter <= 0)
+        {
+            // Combatente direto morto: ele nao deve sumir aqui.
+            // Somente embarcados (e sub-embarcados) somem sem animacao individual.
+            KillEmbarkedChildrenChain(directlyHitUnit);
+            return;
+        }
+
+        int damageTaken = hpBefore - hpAfter;
+        if (damageTaken <= 0)
+            return;
+
+        float ratio = Mathf.Clamp01((float)damageTaken / hpBefore);
+        ApplyRatioDamageToEmbarkedRecursive(directlyHitUnit, ratio);
+    }
+
+    private void ApplyRatioDamageToEmbarkedRecursive(UnitManager transporter, float ratio)
+    {
+        if (transporter == null || ratio <= 0f)
+            return;
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
+        if (seats == null || seats.Count == 0)
+            return;
+
+        HashSet<UnitManager> processed = new HashSet<UnitManager>();
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            UnitManager child = seat != null ? seat.embarkedUnit : null;
+            if (child == null || !processed.Add(child))
+                continue;
+
+            int childBefore = Mathf.Max(0, child.CurrentHP);
+            if (childBefore <= 0)
+            {
+                KillEntireEmbarkedChain(child);
+                continue;
+            }
+
+            int propagatedDamage = Mathf.RoundToInt(childBefore * ratio);
+            if (propagatedDamage <= 0)
+                propagatedDamage = 1;
+
+            int childAfter = Mathf.Max(0, childBefore - propagatedDamage);
+            child.SetCurrentHP(childAfter);
+
+            if (childAfter <= 0)
+            {
+                KillEntireEmbarkedChain(child);
+                continue;
+            }
+
+            ApplyRatioDamageToEmbarkedRecursive(child, ratio);
+        }
+    }
+
+    private void KillEntireEmbarkedChain(UnitManager root, bool detachSelf = true)
+    {
+        if (root == null)
+            return;
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats = root.TransportedUnitSlots;
+        if (seats != null && seats.Count > 0)
+        {
+            List<UnitManager> children = new List<UnitManager>(seats.Count);
+            HashSet<UnitManager> unique = new HashSet<UnitManager>();
+            for (int i = 0; i < seats.Count; i++)
+            {
+                UnitTransportSeatRuntime seat = seats[i];
+                UnitManager child = seat != null ? seat.embarkedUnit : null;
+                if (child == null || !unique.Add(child))
+                    continue;
+                children.Add(child);
+            }
+
+            for (int i = 0; i < children.Count; i++)
+                KillEntireEmbarkedChain(children[i], detachSelf: true);
+        }
+
+        root.SetCurrentHP(0);
+
+        if (detachSelf && root.EmbarkedTransporter != null)
+            root.EmbarkedTransporter.RemoveEmbarkedPassenger(root);
+
+        if (root.IsEmbarked)
+            root.SetEmbarked(false);
+
+        root.gameObject.SetActive(false);
+    }
+
+    private void KillEmbarkedChildrenChain(UnitManager transporter)
+    {
+        if (transporter == null)
+            return;
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
+        if (seats == null || seats.Count == 0)
+            return;
+
+        List<UnitManager> children = new List<UnitManager>(seats.Count);
+        HashSet<UnitManager> unique = new HashSet<UnitManager>();
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            UnitManager child = seat != null ? seat.embarkedUnit : null;
+            if (child == null || !unique.Add(child))
+                continue;
+            children.Add(child);
+        }
+
+        for (int i = 0; i < children.Count; i++)
+            KillEntireEmbarkedChain(children[i], detachSelf: true);
+    }
+
+    private IEnumerator ExecuteDeathResolutionIfNeeded(CombatResolutionResult combat)
+    {
+        List<DeathTarget> deaths = BuildDeathTargets(combat);
+        if (deaths.Count == 0)
+            yield break;
+
+        for (int i = 0; i < deaths.Count; i++)
+        {
+            DeathTarget target = deaths[i];
+            UnitManager unit = target.unit;
+            if (unit == null)
+                continue;
+
+            float deathStartDelay = animationManager != null ? animationManager.CombatDeathStartDelay : 0f;
+            if (deathStartDelay > 0f)
+                yield return new WaitForSeconds(deathStartDelay);
+
+            if (cursorController != null)
+            {
+                Vector3Int cell = target.cell;
+                cell.z = 0;
+                cursorController.SetCell(cell, playMoveSfx: true);
+            }
+
+            SpriteRenderer[] renderers = CollectDeathBlinkRenderers(unit);
+            if (renderers != null && renderers.Length > 0)
+                yield return CoBlinkRenderersFast(renderers);
+
+            if (renderers != null)
+            {
+                for (int r = 0; r < renderers.Length; r++)
+                {
+                    if (renderers[r] != null)
+                        renderers[r].enabled = false;
+                }
+            }
+
+            // A unidade deve desaparecer antes da explosao.
+            if (unit != null)
+                unit.gameObject.SetActive(false);
+
+            float explosionDuration = animationManager != null
+                ? animationManager.PlayExplosionEffectAt(target.worldPos)
+                : 0f;
+            if (explosionDuration > 0f)
+                yield return new WaitForSeconds(explosionDuration);
+            else
+                yield return new WaitForSeconds(0.12f);
+
+            yield return new WaitForSeconds(0.05f);
+        }
+    }
+
+    private static List<DeathTarget> BuildDeathTargets(CombatResolutionResult combat)
+    {
+        List<DeathTarget> list = new List<DeathTarget>(2);
+
+        if (combat.attackerUnit != null && combat.attackerHpAfter <= 0 && combat.attackerUnit.gameObject.activeInHierarchy)
+        {
+            Vector3Int cell = combat.attackerUnit.CurrentCellPosition;
+            cell.z = 0;
+            list.Add(new DeathTarget(combat.attackerUnit, cell, combat.attackerUnit.transform.position));
+        }
+
+        if (combat.defenderUnit != null && combat.defenderHpAfter <= 0 && combat.defenderUnit.gameObject.activeInHierarchy)
+        {
+            Vector3Int cell = combat.defenderUnit.CurrentCellPosition;
+            cell.z = 0;
+            list.Add(new DeathTarget(combat.defenderUnit, cell, combat.defenderUnit.transform.position));
+        }
+
+        return list;
+    }
+
+    private static IEnumerator CoBlinkRenderersFast(SpriteRenderer[] renderers)
+    {
+        if (renderers == null || renderers.Length == 0)
+            yield break;
+
+        float interval = 0.12f;
+        const float minInterval = 0.03f;
+        const int blinks = 10;
+        bool visible = true;
+
+        for (int i = 0; i < blinks; i++)
+        {
+            visible = !visible;
+            for (int r = 0; r < renderers.Length; r++)
+            {
+                if (renderers[r] != null)
+                    renderers[r].enabled = visible;
+            }
+
+            yield return new WaitForSecondsRealtime(interval);
+            interval = Mathf.Max(minInterval, interval * 0.80f);
+        }
+    }
+
+    private static SpriteRenderer[] CollectDeathBlinkRenderers(UnitManager unit)
+    {
+        if (unit == null)
+            return null;
+
+        SpriteRenderer main = unit.GetMainSpriteRenderer();
+        if (main != null)
+            return new[] { main };
+
+        return unit.GetComponentsInChildren<SpriteRenderer>(true);
     }
 
     private void EnterMirandoState()
@@ -1812,8 +2234,31 @@ public partial class TurnStateManager
         scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
         scannerSelectedTargetIndex = 0;
 
+        if (cachedPodeMirarTargets.Count <= 1)
+        {
+            if (cachedPodeMirarTargets.Count == 1)
+                FocusCurrentMirandoTarget(logDetails: true);
+            EnterMirandoConfirmStep();
+            return;
+        }
+
         LogTargetSelectionPanel();
         FocusCurrentMirandoTarget(logDetails: true);
+    }
+
+    private void EnterMirandoConfirmStep()
+    {
+        if (cachedPodeMirarTargets.Count <= 0)
+            return;
+
+        if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= cachedPodeMirarTargets.Count)
+            scannerSelectedTargetIndex = 0;
+
+        scannerPromptStep = ScannerPromptStep.MirandoConfirmTarget;
+        SetMirandoPreviewVisible(false);
+        SetMirandoSpotterPreviewsVisible(false);
+        PodeMirarTargetOption picked = cachedPodeMirarTargets[scannerSelectedTargetIndex];
+        LogAttackConfirmationPrompt(picked, scannerSelectedTargetIndex + 1);
     }
 
     private void FocusCurrentMirandoTarget(bool logDetails, bool moveCursor = true)
@@ -2082,11 +2527,15 @@ public partial class TurnStateManager
 
     private void UpdateMirandoPreviewAnimation()
     {
-        if (cursorState == CursorState.Mirando)
+        bool isMirandoCycle =
+            cursorState == CursorState.Mirando &&
+            scannerPromptStep == ScannerPromptStep.MirandoCycleTarget;
+
+        if (isMirandoCycle)
             TryRefreshMirandoPreviewPathIfNeeded();
 
         bool shouldShow =
-            cursorState == CursorState.Mirando &&
+            isMirandoCycle &&
             mirandoPreviewPathLength > 0.0001f &&
             mirandoPreviewPathPoints.Count >= 2;
 

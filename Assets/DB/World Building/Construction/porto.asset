@@ -58,7 +58,9 @@ MonoBehaviour:
     capturedIncoming: 1000
     canProduceAndSellUnits: 
     offeredUnits:
-    - {fileID: 0}
+    - {fileID: 11400000, guid: ed1abcbe546e36d4faf0bc05a5338687, type: 2}
+    - {fileID: 11400000, guid: 59c2875292c8d004690a6847461bedb0, type: 2}
+    - {fileID: 11400000, guid: b4eaf3943a963694c82f0fd32248224c, type: 2}
     canProvideSupplies: 0
     offeredSupplies:
     - supply: {fileID: 0}

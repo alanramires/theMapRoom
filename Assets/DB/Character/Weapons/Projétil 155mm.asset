@@ -27,4 +27,8 @@ MonoBehaviour:
   operationRangeMax: 4
   trajectories: 01000000
   sprite: {fileID: 0}
-  ammunitionSprite: {fileID: 0}
+  ammunitionSprite: {fileID: 21300000, guid: 2131b678a1e33d94d965d79a2fa25d5f, type: 3}
+  useExplicitProjectileScale: 0
+  projectileScale: 1
+  fireSfx: {fileID: 8300000, guid: 813ce5e455b54764ca7062ed024d25cb, type: 3}
+  fireSfxVolume: 1

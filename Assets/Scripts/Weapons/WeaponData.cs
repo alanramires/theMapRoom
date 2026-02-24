@@ -57,6 +57,18 @@ public class WeaponData : ScriptableObject
     [Header("Ammunition Sprite")]
     [Tooltip("Sprite do token/projetil da municao em voo no tabuleiro.")]
     public Sprite ammunitionSprite;
+    [Tooltip("Usa escala explicita para o projetil desta arma.")]
+    public bool useExplicitProjectileScale;
+    [Tooltip("Escala explicita do projetil quando o override estiver ativo.")]
+    [Range(0.05f, 3f)]
+    public float projectileScale = 1f;
+
+    [Header("Audio")]
+    [Tooltip("Som do disparo desta arma (toca junto com o projetil em voo).")]
+    public AudioClip fireSfx;
+    [Tooltip("Volume do som de disparo da arma.")]
+    [Range(0f, 1f)]
+    public float fireSfxVolume = 1f;
 
     public WeaponClass WeaponClass => weaponClass;
     public WeaponCategory WeaponCategory => weaponCategory;
@@ -71,6 +83,8 @@ public class WeaponData : ScriptableObject
         if (operationRangeMax < operationRangeMin)
             operationRangeMax = operationRangeMin;
         EnsureDefaultTrajectory();
+        fireSfxVolume = Mathf.Clamp01(fireSfxVolume);
+        projectileScale = Mathf.Clamp(projectileScale, 0.05f, 3f);
     }
 
     public bool SupportsOperationOn(Domain operationDomain, HeightLevel operationHeightLevel)

@@ -26,6 +26,7 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enableSpotter = true;
     [SerializeField] private bool enableStealthValidation = true;
     [SerializeField] private AutonomyDatabase autonomyDatabase;
+    [SerializeField] private CursorController cursorController;
     [SerializeField] private int activePlayerListIndex = 0;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField, HideInInspector] private bool pendingTurnStartUpkeep;
@@ -47,6 +48,7 @@ public class MatchController : MonoBehaviour
     {
         ApplyGameSetupPreset();
         NormalizeState();
+        TryAutoAssignCursorController();
         ApplyActiveTeamIfChanged(force: true);
     }
 
@@ -55,6 +57,7 @@ public class MatchController : MonoBehaviour
     {
         ApplyGameSetupPreset();
         NormalizeState();
+        TryAutoAssignCursorController();
         ApplyActiveTeamIfChanged(force: false);
     }
 #endif
@@ -64,6 +67,7 @@ public class MatchController : MonoBehaviour
         if (!Application.isPlaying)
             return;
 
+        TryAutoAssignCursorController();
         ApplyActiveTeamIfChanged(force: false);
     }
 
@@ -289,6 +293,7 @@ public class MatchController : MonoBehaviour
 
         appliedActiveTeamId = activeTeamId;
         ReleaseUnitsForActiveTeam();
+        TeleportCursorToActiveTeamHeadQuarterSilently();
     }
 
     private void ReleaseUnitsForActiveTeam()
@@ -318,5 +323,65 @@ public class MatchController : MonoBehaviour
         }
 
         pendingTurnStartUpkeep = false;
+    }
+
+    private void TryAutoAssignCursorController()
+    {
+        if (cursorController == null)
+            cursorController = FindAnyObjectByType<CursorController>();
+    }
+
+    private void TeleportCursorToActiveTeamHeadQuarterSilently()
+    {
+        if (!Application.isPlaying)
+            return;
+        if (activeTeamId < 0)
+            return;
+        if (cursorController == null)
+            return;
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        ConstructionManager bestHq = null;
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager c = constructions[i];
+            if (c == null || !c.gameObject.activeInHierarchy)
+                continue;
+            if (!IsHeadQuarterConstruction(c))
+                continue;
+            if ((int)c.TeamId != activeTeamId)
+                continue;
+
+            if (bestHq == null || c.InstanceId < bestHq.InstanceId)
+                bestHq = c;
+        }
+
+        if (bestHq == null)
+            return;
+
+        Vector3Int hqCell = bestHq.CurrentCellPosition;
+        hqCell.z = 0;
+        cursorController.SetCell(hqCell, playMoveSfx: false);
+    }
+
+    private static bool IsHeadQuarterConstruction(ConstructionManager construction)
+    {
+        if (construction == null)
+            return false;
+
+        if (construction.IsPlayerHeadQuarter)
+            return true;
+
+        string constructionId = construction.ConstructionId;
+        if (!string.IsNullOrWhiteSpace(constructionId) &&
+            string.Equals(constructionId.Trim(), "hq", System.StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        string displayName = construction.ConstructionDisplayName;
+        if (!string.IsNullOrWhiteSpace(displayName) &&
+            displayName.IndexOf("hq", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        return false;
     }
 }

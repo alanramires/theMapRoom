@@ -258,6 +258,13 @@ public class UnitManager : MonoBehaviour
         RefreshActedVisual();
     }
 
+    public SpriteRenderer GetMainSpriteRenderer()
+    {
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        return spriteRenderer;
+    }
+
     public void SetTemporarySortingOrder(int forcedSortingOrder = 999)
     {
         if (spriteRenderer == null)

@@ -20,9 +20,15 @@ MonoBehaviour:
   aditionalDomainsAllowed:
   - domain: 3
     heightLevel: 4
-  basicAttack: 4
+  basicAttack: 40
+  weaponCategory: 0
+  weaponClass: 2
   operationRangeMin: 1
   operationRangeMax: 1
   trajectories: 00000000
-  sprite: {fileID: 0}
-  ammunitionSprite: {fileID: 0}
+  sprite: {fileID: 21300000, guid: 725fc1f38ef986344ba9e0e48ba51b02, type: 3}
+  ammunitionSprite: {fileID: 21300000, guid: a993bf2ba4691474485ad2c3d951ab1b, type: 3}
+  useExplicitProjectileScale: 0
+  projectileScale: 1
+  fireSfx: {fileID: 8300000, guid: 667f36bffff152744ade28212447b73f, type: 3}
+  fireSfxVolume: 1

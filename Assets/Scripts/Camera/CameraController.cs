@@ -360,6 +360,11 @@ public class CameraController : MonoBehaviour
 
     public void AdjustCameraForCursor(Vector3 cursorWorldPos)
     {
+        if (_cam == null)
+            _cam = GetComponent<Camera>();
+        if (_cam == null)
+            return;
+
         float halfH = _cam.orthographicSize;
         float halfW = halfH * _cam.aspect;
 

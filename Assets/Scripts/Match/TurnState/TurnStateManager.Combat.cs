@@ -7,11 +7,28 @@ public partial class TurnStateManager
     private readonly struct CombatResolutionResult
     {
         public readonly bool success;
+        public readonly bool counterExecuted;
+        public readonly UnitManager attackerUnit;
+        public readonly UnitManager defenderUnit;
+        public readonly int attackerHpAfter;
+        public readonly int defenderHpAfter;
         public readonly string trace;
 
-        public CombatResolutionResult(bool success, string trace)
+        public CombatResolutionResult(
+            bool success,
+            bool counterExecuted,
+            UnitManager attackerUnit,
+            UnitManager defenderUnit,
+            int attackerHpAfter,
+            int defenderHpAfter,
+            string trace)
         {
             this.success = success;
+            this.counterExecuted = counterExecuted;
+            this.attackerUnit = attackerUnit;
+            this.defenderUnit = defenderUnit;
+            this.attackerHpAfter = attackerHpAfter;
+            this.defenderHpAfter = defenderHpAfter;
             this.trace = trace;
         }
     }
@@ -24,7 +41,7 @@ public partial class TurnStateManager
         if (option == null)
         {
             trace.AppendLine("1) Falha: opcao nula.");
-            return new CombatResolutionResult(false, trace.ToString());
+            return new CombatResolutionResult(false, false, null, null, 0, 0, trace.ToString());
         }
 
         UnitManager attacker = option.attackerUnit;
@@ -32,7 +49,7 @@ public partial class TurnStateManager
         if (attacker == null || defender == null)
         {
             trace.AppendLine("1) Falha: atacante ou defensor nulo.");
-            return new CombatResolutionResult(false, trace.ToString());
+            return new CombatResolutionResult(false, false, attacker, defender, 0, 0, trace.ToString());
         }
 
         string attackWeaponName = ResolveWeaponName(option.weapon, "arma");
@@ -43,6 +60,10 @@ public partial class TurnStateManager
         trace.AppendLine("1) Entrada");
         trace.AppendLine($"- Atacante: {attacker.name}");
         trace.AppendLine($"- Defensor: {defender.name}");
+        trace.AppendLine($"- DB RPS: {(rpsDatabase != null ? "ok" : "null")}");
+        trace.AppendLine($"- DB DPQ Matchup: {(dpqMatchupDatabase != null ? "ok" : "null")}");
+        trace.AppendLine($"- DB DPQ Air Height: {(dpqAirHeightConfig != null ? "ok" : "null")}");
+        trace.AppendLine($"- DB Terrain: {(terrainDatabase != null ? "ok" : "null")}");
         trace.AppendLine($"- Indice arma embarcada atacante: {option.embarkedWeaponIndex}");
         trace.AppendLine($"- Arma atacante: {attackWeaponName}");
         trace.AppendLine($"- Categoria arma atacante: {ResolveWeaponCategory(option.weapon)}");
@@ -69,7 +90,7 @@ public partial class TurnStateManager
         if (!attackerConsumed)
         {
             trace.AppendLine("4) Encerrado: combate nao resolvido (falha ao consumir municao do atacante).");
-            return new CombatResolutionResult(false, trace.ToString());
+            return new CombatResolutionResult(false, false, attacker, defender, attackerHpBefore, defenderHpBefore, trace.ToString());
         }
 
         bool defenderConsumed = false;
@@ -191,16 +212,14 @@ public partial class TurnStateManager
 
         int defenderHpAfter = Mathf.Max(0, defenderHpBefore - appliedOnDefender);
         int attackerHpAfter = Mathf.Max(0, attackerHpBefore - appliedOnAttacker);
-        defender.SetCurrentHP(defenderHpAfter);
-        attacker.SetCurrentHP(attackerHpAfter);
 
-        trace.AppendLine("10) Arredondamento + Aplicacao");
+        trace.AppendLine("10) Arredondamento + Aplicacao (postergada)");
         trace.AppendLine($"- Regra defensor: {BuildRoundingExplanation(attackerAttackEffective, defenderSafeDefense, attackerOutcome, roundedOnDefender)}");
         trace.AppendLine($"- Regra atacante: {BuildRoundingExplanation(defenderAttackEffective, attackerSafeDefense, defenderOutcome, roundedOnAttacker)}");
         trace.AppendLine($"- Elim no defensor: rounded={roundedOnDefender} -> aplicado={appliedOnDefender}");
         trace.AppendLine($"- Elim no atacante: rounded={roundedOnAttacker} -> aplicado={appliedOnAttacker}");
-        trace.AppendLine($"- HP defensor: {defenderHpBefore} -> {defenderHpAfter}");
-        trace.AppendLine($"- HP atacante: {attackerHpBefore} -> {attackerHpAfter}");
+        trace.AppendLine($"- HP defensor (pendente): {defenderHpBefore} -> {defenderHpAfter}");
+        trace.AppendLine($"- HP atacante (pendente): {attackerHpBefore} -> {attackerHpAfter}");
 
         bool hasAttackerAmmoAfter = TryGetEmbarkedAmmo(attacker, option.embarkedWeaponIndex, out int attackerAmmoAfter);
         bool hasDefenderAmmoAfter = TryGetEmbarkedAmmo(defender, option.defenderCounterEmbarkedWeaponIndex, out int defenderAmmoAfter);
@@ -209,7 +228,7 @@ public partial class TurnStateManager
         trace.AppendLine($"- Muni defensor depois: {(hasDefenderAmmoAfter ? defenderAmmoAfter.ToString() : "indisponivel")}");
         trace.AppendLine($"- Revide executado: {(counterExecuted ? "sim" : "nao")}");
 
-        return new CombatResolutionResult(true, trace.ToString());
+        return new CombatResolutionResult(true, counterExecuted, attacker, defender, attackerHpAfter, defenderHpAfter, trace.ToString());
     }
 
     private PositionDpqInfo ResolveDpqAtUnitPosition(UnitManager unit, string sensorPositionLabel)

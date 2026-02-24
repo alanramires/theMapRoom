@@ -36,6 +36,7 @@ MonoBehaviour:
   - skill: {fileID: 11400000, guid: 8d5ec3fba2fd43139e8619b6f2b23eb9, type: 2}
     takeoffMode: 2
   requireAtLeastOneLandingSkill: 1
+  forceEndMovementOnTerrainDomainForDomains: []
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0
@@ -47,10 +48,12 @@ MonoBehaviour:
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isCapturable: 1
-    capturePointsMax: 20
-    capturedIncoming: 1000
-    canProduceAndSellUnits: 
-    offeredUnits: []
+    capturePointsMax: 40
+    capturedIncoming: 2000
+    canProduceAndSellUnits: 01000000
+    offeredUnits:
+    - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+    - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     canProvideSupplies: 0
     offeredSupplies: []
     offeredServices: []

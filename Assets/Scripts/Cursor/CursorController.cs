@@ -53,6 +53,7 @@ public class CursorController : MonoBehaviour
     [SerializeField] private AudioClip confirmSfx;
     [SerializeField] private AudioClip cancelSfx;
     [SerializeField] private AudioClip errorSfx;
+    [SerializeField] private AudioClip beepSfx;
     [SerializeField] private AudioClip doneSfx;
     [SerializeField] private AudioClip loadSfx;
     [SerializeField] private AudioClip heliceMoveSfx;
@@ -462,6 +463,8 @@ public class CursorController : MonoBehaviour
 
         if (errorSfx == null)
             errorSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/error.MP3");
+        if (beepSfx == null)
+            beepSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/beep.MP3");
 
         if (doneSfx == null)
             doneSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/done.MP3");
@@ -507,6 +510,9 @@ public class CursorController : MonoBehaviour
 
     private void HandleActionInput()
     {
+        if (WasConfirmPressedThisFrame() && TryTeleportToActiveTeamHeadQuarterOnNeutral())
+            return;
+
         if (WasConfirmPressedThisFrame())
         {
             if (lastConfirmFrameProcessed == Time.frameCount)
@@ -530,6 +536,85 @@ public class CursorController : MonoBehaviour
                 : TurnStateManager.ActionSfx.Cancel;
             PlayActionFeedback(feedback);
         }
+    }
+
+    private bool TryTeleportToActiveTeamHeadQuarterOnNeutral()
+    {
+        if (turnStateManager == null || turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return false;
+        if (HasAnyUnitUnderCursor())
+            return false;
+
+        TryAutoAssignMatchController();
+        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        if (activeTeam < 0)
+            return false;
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        ConstructionManager bestHq = null;
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager c = constructions[i];
+            if (c == null || !c.gameObject.activeInHierarchy)
+                continue;
+            if (!IsHeadQuarterConstruction(c))
+                continue;
+            if ((int)c.TeamId != activeTeam)
+                continue;
+
+            if (bestHq == null || c.InstanceId < bestHq.InstanceId)
+                bestHq = c;
+        }
+
+        if (bestHq == null)
+            return false;
+
+        Vector3Int hqCell = bestHq.CurrentCellPosition;
+        hqCell.z = 0;
+        if (!SetCell(hqCell, playMoveSfx: false))
+            return false;
+
+        PlayUiSfx(beepSfx);
+        return true;
+    }
+
+    private bool HasAnyUnitUnderCursor()
+    {
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+
+            Vector3Int cell = unit.CurrentCellPosition;
+            cell.z = 0;
+            if (cell == currentCell)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsHeadQuarterConstruction(ConstructionManager construction)
+    {
+        if (construction == null)
+            return false;
+
+        if (construction.IsPlayerHeadQuarter)
+            return true;
+
+        string constructionId = construction.ConstructionId;
+        if (!string.IsNullOrWhiteSpace(constructionId) &&
+            string.Equals(constructionId.Trim(), "hq", System.StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        string displayName = construction.ConstructionDisplayName;
+        if (!string.IsNullOrWhiteSpace(displayName) &&
+            displayName.IndexOf("hq", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        return false;
     }
 
     private bool WasConfirmPressedThisFrame()
