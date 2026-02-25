@@ -77,6 +77,15 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] [Range(0.01f, 0.99f)] private float disembarkHighToLowNormalizedTime = 0.50f;
     [Tooltip("Tempo normalizado (0..1) para concluir AirLow->Ground durante pouso para desembarque.")]
     [SerializeField] [Range(0.01f, 1f)] private float disembarkLowToGroundNormalizedTime = 1.00f;
+    [Header("Capture Sequence Timing")]
+    [Tooltip("Pausa entre confirmar captura e tocar capturing SFX.")]
+    [SerializeField] [Range(0f, 2f)] private float capturePreSfxDelay = 0.12f;
+    [Tooltip("Pausa apos capturing SFX antes de aplicar o dano de captura.")]
+    [SerializeField] [Range(0f, 2f)] private float capturePostCapturingSfxDelay = 0.12f;
+    [Tooltip("Pausa apos done SFX no fluxo sem captura total.")]
+    [SerializeField] [Range(0f, 2f)] private float capturePostDoneSfxDelay = 0.05f;
+    [Tooltip("Pausa apos captured SFX no fluxo de captura total.")]
+    [SerializeField] [Range(0f, 2f)] private float capturePostCapturedSfxDelay = 0.10f;
     [Header("Mirando Preview Line")]
     [Tooltip("Material usado na linha de preview de tiro durante o estado Mirando.")]
     [SerializeField] private Material mirandoPreviewMaterial;
@@ -225,6 +234,10 @@ public class AnimationManager : MonoBehaviour
     public float DisembarkAirLowToGroundDuration => Mathf.Clamp(disembarkAirLowToGroundDuration, 0f, 2f);
     public float DisembarkHighToLowNormalizedTime => Mathf.Clamp(disembarkHighToLowNormalizedTime, 0.01f, 0.99f);
     public float DisembarkLowToGroundNormalizedTime => Mathf.Clamp(disembarkLowToGroundNormalizedTime, 0.01f, 1f);
+    public float CapturePreSfxDelay => Mathf.Clamp(capturePreSfxDelay, 0f, 2f);
+    public float CapturePostCapturingSfxDelay => Mathf.Clamp(capturePostCapturingSfxDelay, 0f, 2f);
+    public float CapturePostDoneSfxDelay => Mathf.Clamp(capturePostDoneSfxDelay, 0f, 2f);
+    public float CapturePostCapturedSfxDelay => Mathf.Clamp(capturePostCapturedSfxDelay, 0f, 2f);
 
     private void Awake()
     {

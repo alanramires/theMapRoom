@@ -42,7 +42,9 @@ MonoBehaviour:
     - skill: {fileID: 11400000, guid: 1b0f1eb9d5454df3a0e1b42f0c8d6aa1, type: 2}
       takeoffMode: 0
     requireAtLeastOneLandingSkill: 1
-  forceEndMovementOnTerrainDomainForDomains: []
+  forceEndMovementOnTerrainDomainForDomains:
+  - domain: 2
+    heightLevel: 2
   roadRoutes:
   - routeName: Rota 66
     cells:
@@ -69,7 +71,6 @@ MonoBehaviour:
     - {x: 7, y: -6, z: 0}
     - {x: 7, y: -7, z: 0}
     - {x: 8, y: -8, z: 0}
-    - {x: 9, y: -8, z: 0}
   - routeName: Caminho do Aeroporto
     cells:
     - {x: 0, y: 0, z: 0}

@@ -21,6 +21,8 @@ public partial class TurnStateManager
                 return HandleConfirmWhileMoveuAndando();
             case CursorState.MoveuParado:
                 return HandleConfirmWhileMoveuParado();
+            case CursorState.Capturando:
+                return HandleConfirmWhileCapturando();
             case CursorState.Mirando:
                 return HandleConfirmWhileMirando();
             case CursorState.Pousando:
@@ -53,6 +55,8 @@ public partial class TurnStateManager
                 return HandleCancelWhileMoveuAndando();
             case CursorState.MoveuParado:
                 return HandleCancelWhileMoveuParado();
+            case CursorState.Capturando:
+                return HandleCancelWhileCapturando();
             case CursorState.Mirando:
                 return HandleCancelWhileMirando();
             case CursorState.Pousando:
@@ -313,6 +317,12 @@ public partial class TurnStateManager
         return ActionSfx.None;
     }
 
+    private ActionSfx HandleConfirmWhileCapturando()
+    {
+        LogStateStep("HandleConfirmWhileCapturando");
+        return ActionSfx.None;
+    }
+
     private ActionSfx HandleCancelWhileMoveuAndando()
     {
         LogStateStep("HandleCancelWhileMoveuAndando", rollback: true);
@@ -362,6 +372,12 @@ public partial class TurnStateManager
         ClearSensorResults();
         PaintSelectedUnitMovementRange();
         return ActionSfx.Cancel;
+    }
+
+    private ActionSfx HandleCancelWhileCapturando()
+    {
+        LogStateStep("HandleCancelWhileCapturando", rollback: true);
+        return ActionSfx.None;
     }
 
     private ActionSfx HandleConfirmWhileMirando()

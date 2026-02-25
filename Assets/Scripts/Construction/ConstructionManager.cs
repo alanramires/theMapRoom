@@ -16,7 +16,6 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private int instanceId;
     [SerializeField] private Vector3 currentPosition = Vector3.zero;
     [SerializeField] private string constructionDisplayName;
-    [SerializeField] private int currentHP;
     [SerializeField] private bool autoApplyOnStart = true;
     [SerializeField] private ConstructionSiteRuntime siteRuntime = new ConstructionSiteRuntime();
     [SerializeField, HideInInspector] private bool hasSiteRuntimeOverride;
@@ -25,6 +24,7 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private bool originalOwnerInitialized;
     [Header("Runtime Visual")]
     [SerializeField] [Range(0f, 1f)] private float occupiedByReadyUnitDarkenFactor = 0.4f;
+    [SerializeField] private ConstructionHudController hudController;
 
     public TeamId TeamId => teamId;
     public Tilemap BoardTilemap => boardTilemap;
@@ -33,7 +33,6 @@ public class ConstructionManager : MonoBehaviour
     public int InstanceId => instanceId;
     public Vector3 CurrentPosition => currentPosition;
     public string ConstructionDisplayName => constructionDisplayName;
-    public int CurrentHP => currentHP;
     public ConstructionDatabase ConstructionDatabase => constructionDatabase;
     public bool IsCapturable => siteRuntime != null && siteRuntime.isCapturable;
     public int CapturePointsMax => siteRuntime != null ? siteRuntime.capturePointsMax : 0;
@@ -131,6 +130,7 @@ public class ConstructionManager : MonoBehaviour
         EnsureDefaults();
         TryAutoAssignBoardTilemap();
         SyncPositionState();
+        RefreshHud();
     }
 
     private void LateUpdate()
@@ -155,6 +155,8 @@ public class ConstructionManager : MonoBehaviour
     {
         if (autoApplyOnStart)
             ApplyFromDatabase();
+
+        RefreshHud();
     }
 
     private void Update()
@@ -163,6 +165,7 @@ public class ConstructionManager : MonoBehaviour
             return;
 
         RefreshOccupancyVisualTint();
+        RefreshHud();
     }
 
 #if UNITY_EDITOR
@@ -183,6 +186,7 @@ public class ConstructionManager : MonoBehaviour
         SyncPositionState();
         if (!ApplyFromDatabase())
             UpdateDynamicName();
+        RefreshHud();
     }
 #endif
 
@@ -226,24 +230,11 @@ public class ConstructionManager : MonoBehaviour
             spriteRenderer.color = TeamUtils.GetColor(teamId);
         }
 
-        if (currentHP < 0)
-            currentHP = 0;
-
         ApplyDefaultSiteRuntime(data);
         EnsureCapturePointsInitialized();
         currentPosition = transform.position;
         UpdateDynamicName();
-    }
-
-    public void SetCurrentHP(int value)
-    {
-        int max = GetMaxHP();
-        currentHP = Mathf.Clamp(value, 0, max);
-    }
-
-    public int GetMaxHP()
-    {
-        return Mathf.Max(1, currentHP);
+        RefreshHud();
     }
 
     public void SetCurrentPosition(Vector3 position)
@@ -264,6 +255,7 @@ public class ConstructionManager : MonoBehaviour
         }
         if (!ApplyFromDatabase())
             UpdateDynamicName();
+        RefreshHud();
     }
 
     public void AssignSpawnInstanceId(int id)
@@ -294,11 +286,13 @@ public class ConstructionManager : MonoBehaviour
             siteRuntime = new ConstructionSiteRuntime();
             siteRuntime.Sanitize();
             hasSiteRuntimeOverride = false;
+            RefreshHud();
             return;
         }
 
         siteRuntime = runtime.Clone();
         hasSiteRuntimeOverride = true;
+        RefreshHud();
     }
 
     public ConstructionSiteRuntime GetSiteRuntimeSnapshot()
@@ -314,6 +308,7 @@ public class ConstructionManager : MonoBehaviour
     {
         int max = Mathf.Max(0, CapturePointsMax);
         currentCapturePoints = Mathf.Clamp(value, 0, max);
+        RefreshHud();
     }
 
     public void SnapToCellCenter()
@@ -358,6 +353,26 @@ public class ConstructionManager : MonoBehaviour
             originalOwnerTeamId = teamId;
             originalOwnerInitialized = true;
         }
+
+        if (hudController == null)
+            hudController = GetComponentInChildren<ConstructionHudController>(true);
+        if (hudController == null)
+        {
+            Transform[] children = GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < children.Length; i++)
+            {
+                Transform child = children[i];
+                if (child == null || !string.Equals(child.name, "Construction HUD", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                hudController = child.GetComponent<ConstructionHudController>();
+                if (hudController == null)
+                    hudController = child.gameObject.AddComponent<ConstructionHudController>();
+                break;
+            }
+        }
+        if (hudController != null)
+            hudController.RefreshBindings();
         EnsureCapturePointsInitialized();
     }
 
@@ -527,23 +542,57 @@ public class ConstructionManager : MonoBehaviour
         Color baseColor = TeamUtils.GetColor(teamId);
         Color targetColor = baseColor;
 
-        Tilemap map = boardTilemap;
-        if (map == null)
-            TryAutoAssignBoardTilemap();
-        map = boardTilemap;
-
-        if (map != null)
+        UnitManager occupant = TryGetOccupantOnTop();
+        bool sameTeam = occupant != null && occupant.TeamId == teamId;
+        if (sameTeam && !occupant.HasActed)
         {
-            UnitManager occupant = UnitOccupancyRules.GetUnitAtCell(map, currentCellPosition);
-            bool sameTeam = occupant != null && occupant.TeamId == teamId;
-            if (sameTeam && !occupant.HasActed)
-            {
-                float darken = Mathf.Clamp01(occupiedByReadyUnitDarkenFactor);
-                targetColor = new Color(baseColor.r * darken, baseColor.g * darken, baseColor.b * darken, baseColor.a);
-            }
+            float darken = Mathf.Clamp01(occupiedByReadyUnitDarkenFactor);
+            targetColor = new Color(baseColor.r * darken, baseColor.g * darken, baseColor.b * darken, baseColor.a);
         }
 
         if (spriteRenderer.color != targetColor)
             spriteRenderer.color = targetColor;
+    }
+
+    private void RefreshHud()
+    {
+        if (hudController == null)
+            hudController = GetComponentInChildren<ConstructionHudController>(true);
+        if (hudController == null)
+            return;
+
+        bool hasUnitOnTop = TryGetOccupantOnTop() != null;
+
+        hudController.Apply(currentCapturePoints, CapturePointsMax, IsCapturable, teamId, hasUnitOnTop);
+    }
+
+    private UnitManager TryGetOccupantOnTop()
+    {
+        Tilemap map = boardTilemap;
+        if (map == null)
+            TryAutoAssignBoardTilemap();
+        map = boardTilemap;
+        if (map != null)
+        {
+            UnitManager byCell = UnitOccupancyRules.GetUnitAtCell(map, currentCellPosition);
+            if (byCell != null)
+                return byCell;
+        }
+
+        // Fallback para cenarios com referencias de tilemap inconsistentes na cena.
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+
+            Vector3Int unitCell = unit.CurrentCellPosition;
+            unitCell.z = 0;
+            if (unitCell == currentCellPosition)
+                return unit;
+        }
+
+        return null;
     }
 }

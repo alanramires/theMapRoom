@@ -37,14 +37,26 @@ MonoBehaviour:
     takeoffMode: 2
   requireAtLeastOneLandingSkill: 1
   forceEndMovementOnTerrainDomainForDomains: []
-  isSupplier: 0
+  isSupplier: 1
   supplierTier: 0
-  maxUnitsServedPerTurn: 0
+  maxUnitsServedPerTurn: 1
   serviceRange: 0
   collectionRange: 0
-  supplierOperationDomains: []
-  supplierServicesProvided: []
-  supplierResources: []
+  supplierOperationDomains:
+  - domain: 0
+    heightLevel: 3
+  supplierServicesProvided:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  supplierResources:
+  - supply: {fileID: 0}
+    maxCapacity: 0
+  - supply: {fileID: 0}
+    maxCapacity: 0
+  - supply: {fileID: 0}
+    maxCapacity: 0
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isCapturable: 1
@@ -54,6 +66,6 @@ MonoBehaviour:
     offeredUnits:
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
-    canProvideSupplies: 0
+    canProvideSupplies: 1
     offeredSupplies: []
     offeredServices: []

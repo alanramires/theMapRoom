@@ -267,7 +267,7 @@ public partial class TurnStateManager
 
     private void ProcessScannerPromptInput()
     {
-        if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress || combatExecutionInProgress)
+        if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress || combatExecutionInProgress || captureExecutionInProgress)
             return;
 
         if (cursorState == CursorState.Mirando)
@@ -306,6 +306,12 @@ public partial class TurnStateManager
             if (WasLetterPressedThisFrame('D'))
             {
                 HandleDisembarkActionRequested();
+                return;
+            }
+
+            if (WasLetterPressedThisFrame('C'))
+            {
+                HandleCaptureActionRequested();
                 return;
             }
 
@@ -3516,6 +3522,12 @@ public partial class TurnStateManager
                 return Keyboard.current != null && Keyboard.current.aKey.wasPressedThisFrame;
 #else
                 return Input.GetKeyDown(KeyCode.A);
+#endif
+            case 'C':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.cKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.C);
 #endif
             case 'E':
 #if ENABLE_INPUT_SYSTEM

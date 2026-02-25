@@ -14,6 +14,12 @@ public partial class TurnStateManager
             return false;
         }
 
+        if (cursorState == CursorState.Capturando)
+        {
+            resolvedCell = currentCell;
+            return false;
+        }
+
         if (cursorState == CursorState.Mirando)
             return TryResolveMirandoCursorMove(inputDelta, out resolvedCell);
 

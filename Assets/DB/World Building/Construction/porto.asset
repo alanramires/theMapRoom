@@ -43,14 +43,28 @@ MonoBehaviour:
   forceEndMovementOnTerrainDomainForDomains:
   - domain: 2
     heightLevel: 2
-  isSupplier: 0
+  isSupplier: 1
   supplierTier: 0
-  maxUnitsServedPerTurn: 0
+  maxUnitsServedPerTurn: 1
   serviceRange: 0
   collectionRange: 0
-  supplierOperationDomains: []
-  supplierServicesProvided: []
-  supplierResources: []
+  supplierOperationDomains:
+  - domain: 0
+    heightLevel: 3
+  - domain: 1
+    heightLevel: 3
+  supplierServicesProvided:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  supplierResources:
+  - supply: {fileID: 0}
+    maxCapacity: 0
+  - supply: {fileID: 0}
+    maxCapacity: 0
+  - supply: {fileID: 0}
+    maxCapacity: 0
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isCapturable: 1
@@ -61,8 +75,6 @@ MonoBehaviour:
     - {fileID: 11400000, guid: ed1abcbe546e36d4faf0bc05a5338687, type: 2}
     - {fileID: 11400000, guid: 59c2875292c8d004690a6847461bedb0, type: 2}
     - {fileID: 11400000, guid: b4eaf3943a963694c82f0fd32248224c, type: 2}
-    canProvideSupplies: 0
-    offeredSupplies:
-    - supply: {fileID: 0}
-      quantity: 0
+    canProvideSupplies: 1
+    offeredSupplies: []
     offeredServices: []

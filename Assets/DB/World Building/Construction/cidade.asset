@@ -64,8 +64,18 @@ MonoBehaviour:
     isCapturable: 1
     capturePointsMax: 20
     capturedIncoming: 500
-    canProduceAndSellUnits: 
+    canProduceAndSellUnits: 00000000
     offeredUnits: []
-    canProvideSupplies: 0
-    offeredSupplies: []
-    offeredServices: []
+    canProvideSupplies: 1
+    offeredSupplies:
+    - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+      quantity: 200
+    - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+      quantity: 500
+    - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+      quantity: 200
+    offeredServices:
+    - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+    - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+    - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+    - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}

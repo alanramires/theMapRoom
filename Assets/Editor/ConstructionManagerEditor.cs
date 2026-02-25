@@ -15,7 +15,6 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty instanceIdProp;
     private SerializedProperty currentPositionProp;
     private SerializedProperty constructionDisplayNameProp;
-    private SerializedProperty currentHpProp;
     private SerializedProperty autoApplyOnStartProp;
     private SerializedProperty siteRuntimeProp;
     private SerializedProperty hasSiteRuntimeOverrideProp;
@@ -35,7 +34,6 @@ public class ConstructionManagerEditor : Editor
         instanceIdProp = serializedObject.FindProperty("instanceId");
         currentPositionProp = serializedObject.FindProperty("currentPosition");
         constructionDisplayNameProp = serializedObject.FindProperty("constructionDisplayName");
-        currentHpProp = serializedObject.FindProperty("currentHP");
         autoApplyOnStartProp = serializedObject.FindProperty("autoApplyOnStart");
         siteRuntimeProp = serializedObject.FindProperty("siteRuntime");
         hasSiteRuntimeOverrideProp = serializedObject.FindProperty("hasSiteRuntimeOverride");
@@ -69,9 +67,9 @@ public class ConstructionManagerEditor : Editor
 
         EditorGUILayout.PropertyField(currentPositionProp, new GUIContent("Current Position"));
         EditorGUILayout.PropertyField(constructionDisplayNameProp, new GUIContent("Construction Display Name"));
-        EditorGUILayout.PropertyField(currentHpProp, new GUIContent("Current HP"));
-        if (currentCapturePointsProp != null)
-            EditorGUILayout.PropertyField(currentCapturePointsProp, new GUIContent("Current Capture Points"));
+
+        DrawCaptureEditorBlock();
+
         if (originalOwnerTeamIdProp != null)
             EditorGUILayout.PropertyField(originalOwnerTeamIdProp, new GUIContent("Original Owner Team"));
 
@@ -155,6 +153,45 @@ public class ConstructionManagerEditor : Editor
         int newIndex = EditorGUILayout.Popup("Construction ID", Mathf.Max(0, currentIndex), labels);
         if (newIndex >= 0 && newIndex < count && db.Constructions[newIndex] != null)
             constructionIdProp.stringValue = db.Constructions[newIndex].id;
+    }
+
+    private void DrawCaptureEditorBlock()
+    {
+        if (currentCapturePointsProp == null)
+            return;
+
+        int captureMax = ResolveCaptureMaxFromSiteRuntime();
+        captureMax = Mathf.Max(0, captureMax);
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Capture", EditorStyles.boldLabel);
+
+        using (new EditorGUI.DisabledScope(true))
+            EditorGUILayout.IntField("Capture Points Max", captureMax);
+
+        if (captureMax <= 0)
+        {
+            EditorGUILayout.IntField("Current Capture Points", 0);
+            currentCapturePointsProp.intValue = 0;
+            return;
+        }
+
+        int clampedCurrent = Mathf.Clamp(currentCapturePointsProp.intValue, 0, captureMax);
+        int newValue = EditorGUILayout.IntSlider("Current Capture Points", clampedCurrent, 0, captureMax);
+        if (newValue != currentCapturePointsProp.intValue)
+            currentCapturePointsProp.intValue = newValue;
+    }
+
+    private int ResolveCaptureMaxFromSiteRuntime()
+    {
+        if (siteRuntimeProp == null)
+            return 0;
+
+        SerializedProperty captureMaxProp = siteRuntimeProp.FindPropertyRelative("capturePointsMax");
+        if (captureMaxProp == null)
+            return 0;
+
+        return captureMaxProp.intValue;
     }
 
 }

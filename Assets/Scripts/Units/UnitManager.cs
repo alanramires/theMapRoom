@@ -1324,13 +1324,41 @@ public class UnitManager : MonoBehaviour
             passenger.SetSelected(false);
             passenger.SetSpriteVisible(false);
             if (passenger.unitHud != null)
-                passenger.unitHud.gameObject.SetActive(false);
+                passenger.HideHudForEditorEmbarkedPreview();
             if (passenger.actedLockRenderer != null)
                 passenger.actedLockRenderer.enabled = false;
             passenger.RefreshActedVisual();
         }
 #endif
     }
+
+#if UNITY_EDITOR
+    private void HideHudForEditorEmbarkedPreview()
+    {
+        if (unitHud == null)
+            return;
+
+        Canvas canvas = unitHud.GetComponentInChildren<Canvas>(true);
+        if (canvas != null)
+            canvas.enabled = false;
+
+        SpriteRenderer[] renderers = unitHud.GetComponentsInChildren<SpriteRenderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            SpriteRenderer r = renderers[i];
+            if (r != null)
+                r.enabled = false;
+        }
+
+        UnityEngine.UI.Image[] images = unitHud.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+        for (int i = 0; i < images.Length; i++)
+        {
+            UnityEngine.UI.Image img = images[i];
+            if (img != null)
+                img.enabled = false;
+        }
+    }
+#endif
 
     private void SyncPreferredLayerPreferencesFromData(UnitData data)
     {

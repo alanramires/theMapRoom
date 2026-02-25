@@ -54,11 +54,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   supplierResources:
   - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-    maxCapacity: 0
+    maxCapacity: -1
   - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-    maxCapacity: 0
+    maxCapacity: -1
   - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-    maxCapacity: 0
+    maxCapacity: -1
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isCapturable: 1
@@ -74,12 +74,17 @@ MonoBehaviour:
     - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
     - {fileID: 11400000, guid: b7f859c456bfb334fafe58f296fddc6b, type: 2}
     - {fileID: 11400000, guid: f818fb00e3afbc64baa48f18f9d88465, type: 2}
+    - {fileID: 11400000, guid: 9d52bdec098eb9047906b57709b8d578, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
-    - supply: {fileID: 0}
-      quantity: 0
-    - supply: {fileID: 0}
-      quantity: 0
-    - supply: {fileID: 0}
-      quantity: 0
-    offeredServices: []
+    - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+      quantity: 2147483647
+    - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+      quantity: 2147483647
+    - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+      quantity: 2147483647
+    offeredServices:
+    - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+    - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+    - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+    - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}

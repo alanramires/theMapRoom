@@ -21,6 +21,7 @@ public partial class TurnStateManager : MonoBehaviour
         UnitSelected = 1,
         MoveuAndando = 2,
         MoveuParado = 3,
+        Capturando = 4,
         Mirando = 5,
         Pousando = 6,
         Embarcando = 7,
@@ -48,6 +49,11 @@ public partial class TurnStateManager : MonoBehaviour
     [SerializeField] private AudioClip meleeAttackSfx;
     [SerializeField] private AudioClip rangedAttackSfx;
     [SerializeField] [Range(0f, 1f)] private float combatSfxVolume = 1f;
+    [Header("State Audio")]
+    [SerializeField] private AudioSource stateAudioSource;
+    [SerializeField] private AudioClip capturingSfx;
+    [SerializeField] private AudioClip capturedSfx;
+    [SerializeField] [Range(0f, 1f)] private float stateSfxVolume = 1f;
 
     [Header("State")]
     [SerializeField] private CursorState cursorState = CursorState.Neutral;
@@ -83,6 +89,7 @@ public partial class TurnStateManager : MonoBehaviour
     private HeightLevel forcedLayerRollbackHeight = HeightLevel.Surface;
     private ConstructionManager shoppingConstruction;
     private readonly List<UnitData> shoppingUnitsForSale = new List<UnitData>();
+    private bool captureExecutionInProgress;
 
     public CursorState CurrentCursorState => cursorState;
     public UnitManager SelectedUnit => selectedUnit;
@@ -387,6 +394,15 @@ public partial class TurnStateManager : MonoBehaviour
         if (lineOfFireMapTilemap == null)
             lineOfFireMapTilemap = FindLineOfFireMapTilemap();
 
+        if (stateAudioSource == null)
+            stateAudioSource = GetComponent<AudioSource>();
+        if (stateAudioSource == null)
+            stateAudioSource = gameObject.AddComponent<AudioSource>();
+        stateAudioSource.playOnAwake = false;
+        stateAudioSource.loop = false;
+        stateAudioSource.spatialBlend = 0f;
+        stateAudioSource.volume = Mathf.Clamp01(stateSfxVolume);
+
 #if UNITY_EDITOR
         if (dpqAirHeightConfig == null)
             dpqAirHeightConfig = FindFirstAssetEditor<DPQAirHeightConfig>();
@@ -403,6 +419,10 @@ public partial class TurnStateManager : MonoBehaviour
             meleeAttackSfx = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/combat/melee attack.mp3");
         if (rangedAttackSfx == null)
             rangedAttackSfx = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/combat/ranged attack.mp3");
+        if (capturingSfx == null)
+            capturingSfx = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/state/capturing.MP3");
+        if (capturedSfx == null)
+            capturedSfx = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/state/captured.MP3");
 #endif
     }
 
