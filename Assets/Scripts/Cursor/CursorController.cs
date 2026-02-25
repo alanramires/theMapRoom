@@ -873,6 +873,11 @@ public class CursorController : MonoBehaviour
         PlayUiSfx(confirmSfx);
     }
 
+    public void PlayBeepSfx()
+    {
+        PlayUiSfx(beepSfx);
+    }
+
     public void PlayUnitMovementSfx(MovementCategory category)
     {
         AudioClip clip = GetUnitMovementClipFor(category);

@@ -14,8 +14,9 @@ public class PodePousarWindow : EditorWindow
 
     private PodePousarReport latestReport;
     private string statusMessage = "Ready.";
+    private Vector2 windowScroll;
 
-    [MenuItem("Tools/Pode Mudar de Altitude")]
+    [MenuItem("Tools/Operações Aereas/Pode Mudar de Altitude")]
     public static void OpenWindow()
     {
         GetWindow<PodePousarWindow>("Pode Mudar de Altitude");
@@ -28,6 +29,7 @@ public class PodePousarWindow : EditorWindow
 
     private void OnGUI()
     {
+        windowScroll = EditorGUILayout.BeginScrollView(windowScroll);
         EditorGUILayout.LabelField("Sensor Pode Mudar de Altitude", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Sensor generico de mudanca de altitude/camada. Disponivel para qualquer unidade com mais de uma camada operacional.",
@@ -70,6 +72,7 @@ public class PodePousarWindow : EditorWindow
         {
             GUILayout.Button("Confirmar (in-game: tecla L)");
         }
+        EditorGUILayout.EndScrollView();
     }
 
     private void RunSimulation()

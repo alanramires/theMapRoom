@@ -20,6 +20,7 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
     private Vector3Int selectedMarkerCell;
     private Color selectedMarkerColor = Color.yellow;
     private string selectedMarkerLabel = string.Empty;
+    private Vector2 windowScroll;
 
     [MenuItem("Tools/Sensors/Pode Capturar")]
     public static void OpenWindow()
@@ -41,6 +42,7 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
 
     private void OnGUI()
     {
+        windowScroll = EditorGUILayout.BeginScrollView(windowScroll);
         EditorGUILayout.LabelField("Sensor Pode Capturar", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Regras:\n" +
@@ -76,6 +78,7 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
             if (GUILayout.Button("Capturar (Debug)"))
                 ExecuteDebugCapture();
         }
+        EditorGUILayout.EndScrollView();
     }
 
     private void DrawSimulationResult()

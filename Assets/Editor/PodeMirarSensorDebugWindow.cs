@@ -27,6 +27,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
     private readonly List<PodeMirarTargetOption> results = new List<PodeMirarTargetOption>();
     private readonly List<PodeMirarInvalidOption> invalidResults = new List<PodeMirarInvalidOption>();
     private Vector2 scroll;
+    private Vector2 windowScroll;
     private string statusMessage = "Ready.";
     private bool hasSelectedLine;
     private Vector3Int selectedLineStartCell;
@@ -40,10 +41,10 @@ public class PodeMirarSensorDebugWindow : EditorWindow
     private readonly List<Vector3Int> paintedRangeCells = new List<Vector3Int>();
     private readonly List<Vector3Int> paintedLineOfFireCells = new List<Vector3Int>();
 
-    [MenuItem("Tools/Sensors/Simular Pode Mirar")]
+    [MenuItem("Tools/Combat/Pode Mirar")]
     public static void OpenWindow()
     {
-        GetWindow<PodeMirarSensorDebugWindow>("Simular Pode Mirar");
+        GetWindow<PodeMirarSensorDebugWindow>("Pode Mirar");
     }
 
     private void OnEnable()
@@ -61,6 +62,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
 
     private void OnGUI()
     {
+        windowScroll = EditorGUILayout.BeginScrollView(windowScroll);
         EditorGUILayout.LabelField("Sensor Debug", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox("Selecione uma unidade em campo, escolha o modo de movimento e rode a simulacao do sensor Pode Mirar.", MessageType.Info);
 
@@ -127,6 +129,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
                 DrawInvalidResultItem(i, invalidResults[i]);
             }
         }
+        EditorGUILayout.EndScrollView();
         EditorGUILayout.EndScrollView();
     }
 

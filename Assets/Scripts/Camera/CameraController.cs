@@ -15,7 +15,8 @@ public class CameraController : MonoBehaviour
 
     [Header("Zoom")]
     public float zoomSpeed = 8f;            // sensibilidade do scroll
-    public float minOrthoSize = 3f; // menor valor de orthographicSize (mais zoom in)
+    public float defaultOrthoSize = 2f; // valor padrao/confortavel para alternar via tecla M
+    public float minOrthoSize = 2f; // menor valor de orthographicSize (mais zoom in)
     public float maxOrthoSize = 30f; // maior valor de orthographicSize (mais zoom out)
     public bool limitZoomToBounds = true; // limita o zoom maximo para que a camera nunca mostre area fora dos bounds (definidos por clampCollider ou pelos tiles pintados)
 
@@ -39,6 +40,7 @@ public class CameraController : MonoBehaviour
     private Bounds _paintedWorldBounds;
     private bool _hasBounds;
     private Coroutine _focusRoutine;
+    private CursorController _cursorController;
 
     private Vector3 _dragStartWorld;
     private bool _dragging;
@@ -46,6 +48,7 @@ public class CameraController : MonoBehaviour
     void Awake()
     {
         _cam = GetComponent<Camera>();
+        _cursorController = FindAnyObjectByType<CursorController>();
         if (!_cam.orthographic)
             Debug.LogWarning("[CameraController] Sua camera nao esta Orthographic.");
     }
@@ -59,9 +62,34 @@ public class CameraController : MonoBehaviour
 
     void Update()
     {
+        HandleQuickZoomToggle();
         HandleZoom();
         HandlePan();
         ClampCamera();
+    }
+
+    void HandleQuickZoomToggle()
+    {
+        if (!WasQuickZoomTogglePressedThisFrame()) return;
+
+        if (_cursorController == null)
+            _cursorController = FindAnyObjectByType<CursorController>();
+
+        bool hasCursorAnchor = _cursorController != null;
+        Vector3 cursorWorldBefore = hasCursorAnchor ? _cursorController.transform.position : Vector3.zero;
+
+        float effectiveMax = GetEffectiveMaxOrthoSize();
+        float clampedDefault = Mathf.Clamp(defaultOrthoSize, minOrthoSize, effectiveMax);
+        float clampedFar = Mathf.Clamp(maxOrthoSize, minOrthoSize, effectiveMax);
+
+        float current = _cam.orthographicSize;
+        bool nearFar = Mathf.Abs(current - clampedFar) <= 0.01f;
+        _cam.orthographicSize = nearFar ? clampedDefault : clampedFar;
+
+        if (hasCursorAnchor)
+            FocusOn(cursorWorldBefore, instant: true);
+
+        PlayQuickZoomToggleSfx();
     }
 
     void HandleZoom()
@@ -191,6 +219,24 @@ public class CameraController : MonoBehaviour
 #else
         return Input.mousePosition;
 #endif
+    }
+
+    bool WasQuickZoomTogglePressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.mKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.M);
+#endif
+    }
+
+    void PlayQuickZoomToggleSfx()
+    {
+        if (_cursorController == null)
+            _cursorController = FindAnyObjectByType<CursorController>();
+
+        if (_cursorController != null)
+            _cursorController.PlayBeepSfx();
     }
 
     [ContextMenu("Recalculate Painted Bounds")]

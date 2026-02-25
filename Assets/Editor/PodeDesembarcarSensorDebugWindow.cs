@@ -28,6 +28,7 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
     private int selectedInvalidOptionIndex = -1;
     private string statusMessage = "Ready.";
     private Vector2 scroll;
+    private Vector2 windowScroll;
     private bool hasSelectedLine;
     private Vector3Int selectedLineStartCell;
     private Vector3Int selectedLineEndCell;
@@ -39,7 +40,7 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
     private UnitManager cachedPassengerTransporter;
     private int selectedPassengerIndex = -1;
 
-    [MenuItem("Tools/Sensors/Pode Desembarcar")]
+    [MenuItem("Tools/Transporte/Pode Desembarcar")]
     public static void OpenWindow()
     {
         GetWindow<PodeDesembarcarSensorDebugWindow>("Pode Desembarcar");
@@ -59,6 +60,7 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
 
     private void OnGUI()
     {
+        windowScroll = EditorGUILayout.BeginScrollView(windowScroll);
         EditorGUILayout.LabelField("Sensor Pode Desembarcar", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Escaneia hexagonos vizinhos para desembarque usando as regras novas:\n" +
@@ -118,6 +120,7 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
             for (int i = 0; i < invalidOptions.Count; i++)
                 DrawInvalidItem(i, invalidOptions[i]);
         }
+        EditorGUILayout.EndScrollView();
         EditorGUILayout.EndScrollView();
     }
 
@@ -671,19 +674,8 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
             Vector3Int target = order.targetCell;
             target.z = 0;
             passenger.SetCurrentCellPosition(target, enforceFinalOccupancyRule: true);
-            passenger.MarkAsActed();
             successCount++;
             Debug.Log($"[PodeDesembarcarSensorDebug][EXEC] {passenger.name} -> ({target.x},{target.y})");
-        }
-
-        if (successCount > 0)
-            selectedTransporter.MarkAsActed();
-
-        if (Application.isPlaying &&
-            selectedTurnStateManager != null &&
-            selectedTurnStateManager.SelectedUnit == selectedTransporter)
-        {
-            selectedTurnStateManager.TryFinalizeSelectedUnitActionFromDebug();
         }
 
         disembarkMessage = successCount > 0

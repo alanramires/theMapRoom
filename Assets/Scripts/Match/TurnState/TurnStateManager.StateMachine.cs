@@ -31,6 +31,8 @@ public partial class TurnStateManager
                 return HandleConfirmWhileEmbarcando();
             case CursorState.Desembarcando:
                 return HandleConfirmWhileDesembarcando();
+            case CursorState.Fundindo:
+                return HandleConfirmWhileFundindo();
             case CursorState.ShoppingAndServices:
                 return HandleConfirmWhileShoppingAndServices();
         }
@@ -65,6 +67,8 @@ public partial class TurnStateManager
                 return HandleCancelWhileEmbarcando();
             case CursorState.Desembarcando:
                 return HandleCancelWhileDesembarcando();
+            case CursorState.Fundindo:
+                return HandleCancelWhileFundindo();
             case CursorState.ShoppingAndServices:
                 return HandleCancelWhileShoppingAndServices();
         }
@@ -463,6 +467,28 @@ public partial class TurnStateManager
             return ActionSfx.Cancel;
 
         ExitDisembarkStateToMovement();
+        return ActionSfx.Cancel;
+    }
+
+    private ActionSfx HandleConfirmWhileFundindo()
+    {
+        LogStateStep("HandleConfirmWhileFundindo");
+        if (TryConfirmScannerMerge())
+        {
+            if (ConsumeMergeSuppressDefaultConfirmSfxOnce())
+                return ActionSfx.None;
+            return ActionSfx.Confirm;
+        }
+        return ActionSfx.None;
+    }
+
+    private ActionSfx HandleCancelWhileFundindo()
+    {
+        LogStateStep("HandleCancelWhileFundindo", rollback: true);
+        if (HandleScannerPromptCancel())
+            return ActionSfx.Cancel;
+
+        ExitMergeStateToMovement();
         return ActionSfx.Cancel;
     }
 

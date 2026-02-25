@@ -10,8 +10,9 @@ public class PodeDecolarWindow : EditorWindow
 
     private PodeDecolarReport latestReport;
     private string statusMessage = "Ready.";
+    private Vector2 windowScroll;
 
-    [MenuItem("Tools/Pode Decolar")]
+    [MenuItem("Tools/Operações Aereas/Pode Decolar")]
     public static void OpenWindow()
     {
         GetWindow<PodeDecolarWindow>("Pode Decolar");
@@ -24,6 +25,7 @@ public class PodeDecolarWindow : EditorWindow
 
     private void OnGUI()
     {
+        windowScroll = EditorGUILayout.BeginScrollView(windowScroll);
         EditorGUILayout.LabelField("Sensor Pode Decolar", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Avalia decolagem da unidade selecionada antes da escolha de movimento. " +
@@ -74,6 +76,7 @@ public class PodeDecolarWindow : EditorWindow
         {
             GUILayout.Button("Decolar full move");
         }
+        EditorGUILayout.EndScrollView();
     }
 
     private void RunSimulation()

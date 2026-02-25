@@ -26,7 +26,8 @@ public partial class TurnStateManager : MonoBehaviour
         Pousando = 6,
         Embarcando = 7,
         Desembarcando = 8,
-        ShoppingAndServices = 9
+        Fundindo = 9,
+        ShoppingAndServices = 10
     }
 
     [Header("References")]

@@ -26,6 +26,9 @@ public partial class TurnStateManager
         if (cursorState == CursorState.Desembarcando)
             return TryResolveDisembarkCursorMove(currentCell, inputDelta, out resolvedCell);
 
+        if (cursorState == CursorState.Fundindo)
+            return TryResolveMergeCursorMove(currentCell, inputDelta, out resolvedCell);
+
         if (cursorState == CursorState.Pousando)
         {
             if (IsLandingPromptActive())

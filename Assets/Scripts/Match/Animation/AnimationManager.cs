@@ -114,6 +114,24 @@ public class AnimationManager : MonoBehaviour
     [SerializeField, HideInInspector] private bool mirandoPreviewSortingLayerInitialized;
     [Tooltip("Sorting order da linha de preview de tiro.")]
     [SerializeField] private int mirandoPreviewSortingOrder = 120;
+    [Header("Merge Queue Preview Line")]
+    [Tooltip("Multiplicador da linha de fusao (largura e comprimento do traco).")]
+    [SerializeField] [Range(0.2f, 2f)] private float mergeQueuePreviewMultiplier = 0.55f;
+    [Tooltip("Quantidade de segmentos animados simultaneos na linha de fusao.")]
+    [SerializeField] [Range(1, 8)] private int mergeQueuePreviewSegmentQuantities = 1;
+    [Tooltip("Velocidade dos segmentos animados da linha de fusao.")]
+    [SerializeField] [Range(0.2f, 8f)] private float mergeQueuePreviewSegmentSpeed = 3f;
+    [Tooltip("Multiplicador de intervalo entre segmentos da linha de fusao (1 = padrao).")]
+    [SerializeField] [Range(0.2f, 3f)] private float mergeQueuePreviewSegmentSpacingMultiplier = 1f;
+    [Header("Merge Sequence Timing")]
+    [Tooltip("Duracao base de cada passo de movimento da unidade que vai fundir.")]
+    [SerializeField] [Range(0.04f, 2f)] private float mergeMoveStepDuration = 0.20f;
+    [Tooltip("Pausa apos o cursor saltar para o proximo doador antes de iniciar o movimento.")]
+    [SerializeField] [Range(0f, 2f)] private float mergeCursorHopDelay = 0.06f;
+    [Tooltip("Pausa apos o movimento do doador antes de tocar load/desaparecer.")]
+    [SerializeField] [Range(0f, 2f)] private float mergeAfterParticipantMoveDelay = 0.10f;
+    [Tooltip("Pausa apos load/desaparecer de um doador antes do proximo.")]
+    [SerializeField] [Range(0f, 2f)] private float mergeAfterParticipantLoadDelay = 0.12f;
     [Header("VTOL Landing FX")]
     [Tooltip("Frames da animacao de poeira de pouso VTOL (em ordem).")]
     [SerializeField] private Sprite[] vtolLandingFrames;
@@ -209,6 +227,14 @@ public class AnimationManager : MonoBehaviour
     public float MirandoSpotterPreviewMultiplier => Mathf.Clamp(mirandoSpotterPreviewMultiplier, 0.2f, 2f);
     public int MirandoSpotterSegmentQuantities => Mathf.Clamp(mirandoSpotterSegmentQuantities, 1, 8);
     public float MirandoSpotterSegmentSpeed => Mathf.Clamp(mirandoSpotterSegmentSpeed, 0.2f, 8f);
+    public float MergeQueuePreviewMultiplier => Mathf.Clamp(mergeQueuePreviewMultiplier, 0.2f, 2f);
+    public int MergeQueuePreviewSegmentQuantities => Mathf.Clamp(mergeQueuePreviewSegmentQuantities, 1, 8);
+    public float MergeQueuePreviewSegmentSpeed => Mathf.Clamp(mergeQueuePreviewSegmentSpeed, 0.2f, 8f);
+    public float MergeQueuePreviewSegmentSpacingMultiplier => Mathf.Clamp(mergeQueuePreviewSegmentSpacingMultiplier, 0.2f, 3f);
+    public float MergeMoveStepDuration => Mathf.Clamp(mergeMoveStepDuration, 0.04f, 2f);
+    public float MergeCursorHopDelay => Mathf.Clamp(mergeCursorHopDelay, 0f, 2f);
+    public float MergeAfterParticipantMoveDelay => Mathf.Clamp(mergeAfterParticipantMoveDelay, 0f, 2f);
+    public float MergeAfterParticipantLoadDelay => Mathf.Clamp(mergeAfterParticipantLoadDelay, 0f, 2f);
     public float MirandoParabolaBend => Mathf.Clamp(mirandoParabolaBend, 0.2f, 4f);
     public int MirandoParabolaSamples => Mathf.Clamp(mirandoParabolaSamples, 8, 64);
     public int MirandoPreviewSortingLayerId => mirandoPreviewSortingLayer.Id;

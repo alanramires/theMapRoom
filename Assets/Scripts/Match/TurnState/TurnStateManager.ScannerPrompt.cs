@@ -19,7 +19,10 @@ public partial class TurnStateManager
         LandingConfirmOption = 6,
         DisembarkPassengerSelect = 7,
         DisembarkLandingSelect = 8,
-        DisembarkConfirm = 9
+        DisembarkConfirm = 9,
+        MergeParticipantSelect = 10,
+        MergeTargetSelect = 11,
+        MergeConfirm = 12
     }
 
     private enum LandingOptionAction
@@ -97,6 +100,7 @@ public partial class TurnStateManager
     private bool embarkExecutionInProgress;
     private bool landingExecutionInProgress;
     private bool combatExecutionInProgress;
+    private bool mergeExecutionInProgress;
     private CursorState cursorStateBeforeMirando = CursorState.MoveuParado;
     private CursorState cursorStateBeforeEmbarcando = CursorState.MoveuParado;
     private CursorState cursorStateBeforePousando = CursorState.MoveuParado;
@@ -131,6 +135,7 @@ public partial class TurnStateManager
         ProcessScannerPromptInput();
         UpdateMirandoPreviewAnimation();
         UpdateEmbarkPreviewAnimation();
+        UpdateMergeQueuePreviewAnimation();
     }
 
     private void TrackRuntimeDebugLogs()
@@ -174,6 +179,7 @@ public partial class TurnStateManager
         disembarkSelectedPassengerIndex = -1;
         disembarkSelectedLandingCellValid = false;
         disembarkLandingAutoEntered = false;
+        ResetMergeRuntimeState();
         ClearMirandoPreview();
         ClearEmbarkPreview();
     }
@@ -262,12 +268,35 @@ public partial class TurnStateManager
             return true;
         }
 
+        if (cursorState == CursorState.Fundindo &&
+            scannerPromptStep == ScannerPromptStep.MergeConfirm)
+        {
+            if (mergeTargetAutoEntered)
+            {
+                ExitMergeStateToMovement();
+                return true;
+            }
+
+            ReturnToMergeParticipantSelect();
+            return true;
+        }
+
+        if (cursorState == CursorState.Fundindo &&
+            scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
+        {
+            if (TryUndoLastQueuedMergeOrderAndReturnToTarget())
+                return true;
+
+            ExitMergeStateToMovement();
+            return true;
+        }
+
         return false;
     }
 
     private void ProcessScannerPromptInput()
     {
-        if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress || combatExecutionInProgress || captureExecutionInProgress)
+        if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress || combatExecutionInProgress || captureExecutionInProgress || mergeExecutionInProgress)
             return;
 
         if (cursorState == CursorState.Mirando)
@@ -277,9 +306,16 @@ public partial class TurnStateManager
         bool isLandingScannerState = cursorState == CursorState.Pousando;
         bool isEmbarkScannerState = cursorState == CursorState.Embarcando;
         bool isDisembarkScannerState = cursorState == CursorState.Desembarcando;
+        bool isMergeScannerState = cursorState == CursorState.Fundindo;
         if (isDisembarkScannerState)
         {
             ProcessDisembarkPromptInput();
+            return;
+        }
+
+        if (isMergeScannerState)
+        {
+            ProcessMergePromptInput();
             return;
         }
 
@@ -312,6 +348,12 @@ public partial class TurnStateManager
             if (WasLetterPressedThisFrame('C'))
             {
                 HandleCaptureActionRequested();
+                return;
+            }
+
+            if (WasLetterPressedThisFrame('F'))
+            {
+                HandleMergeActionRequested();
                 return;
             }
 
@@ -390,6 +432,22 @@ public partial class TurnStateManager
         }
 
         Debug.Log("[Acao] Apenas Mover (\"M\") indisponivel no estado atual.");
+    }
+
+    private void HandleMergeActionRequested()
+    {
+        bool canMerge = availableSensorActionCodes.Contains('F');
+        if (!canMerge)
+        {
+            string reason = !string.IsNullOrWhiteSpace(cachedPodeFundirReason)
+                ? cachedPodeFundirReason
+                : "nao ha unidades adjacentes do mesmo tipo.";
+            Debug.Log($"Pode Fundir (\"F\"): {reason}");
+            LogScannerPanel();
+            return;
+        }
+
+        EnterMergeStateFromSensors();
     }
 
     private void HandleLandingSensorRequested()
@@ -3446,6 +3504,46 @@ public partial class TurnStateManager
         return animationManager != null ? animationManager.MirandoSpotterSegmentSpeed : 3f;
     }
 
+    private float GetMergeQueuePreviewMultiplier()
+    {
+        return animationManager != null ? animationManager.MergeQueuePreviewMultiplier : 0.55f;
+    }
+
+    private int GetMergeQueuePreviewSegmentQuantities()
+    {
+        return animationManager != null ? animationManager.MergeQueuePreviewSegmentQuantities : 1;
+    }
+
+    private float GetMergeQueuePreviewSegmentSpeed()
+    {
+        return animationManager != null ? animationManager.MergeQueuePreviewSegmentSpeed : 3f;
+    }
+
+    private float GetMergeQueuePreviewSegmentSpacingMultiplier()
+    {
+        return animationManager != null ? animationManager.MergeQueuePreviewSegmentSpacingMultiplier : 1f;
+    }
+
+    private float GetMergeMoveStepDuration()
+    {
+        return animationManager != null ? animationManager.MergeMoveStepDuration : 0.20f;
+    }
+
+    private float GetMergeCursorHopDelay()
+    {
+        return animationManager != null ? animationManager.MergeCursorHopDelay : 0.06f;
+    }
+
+    private float GetMergeAfterParticipantMoveDelay()
+    {
+        return animationManager != null ? animationManager.MergeAfterParticipantMoveDelay : 0.10f;
+    }
+
+    private float GetMergeAfterParticipantLoadDelay()
+    {
+        return animationManager != null ? animationManager.MergeAfterParticipantLoadDelay : 0.12f;
+    }
+
     private float GetMirandoParabolaBend()
     {
         return animationManager != null ? animationManager.MirandoParabolaBend : 1.2f;
@@ -3552,6 +3650,12 @@ public partial class TurnStateManager
                 return Keyboard.current != null && Keyboard.current.dKey.wasPressedThisFrame;
 #else
                 return Input.GetKeyDown(KeyCode.D);
+#endif
+            case 'F':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.F);
 #endif
             default:
                 return false;

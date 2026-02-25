@@ -19,13 +19,14 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
     private int selectedOptionIndex = -1;
     private string statusMessage = "Ready.";
     private Vector2 scroll;
+    private Vector2 windowScroll;
     private bool hasSelectedLine;
     private Vector3Int selectedLineStartCell;
     private Vector3Int selectedLineEndCell;
     private Color selectedLineColor = Color.cyan;
     private string selectedLineLabel = string.Empty;
 
-    [MenuItem("Tools/Sensors/Pode Embarcar")]
+    [MenuItem("Tools/Transporte/Pode Embarcar")]
     public static void OpenWindow()
     {
         GetWindow<PodeEmbarcarSensorDebugWindow>("Pode Embarcar");
@@ -45,6 +46,7 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
 
     private void OnGUI()
     {
+        windowScroll = EditorGUILayout.BeginScrollView(windowScroll);
         EditorGUILayout.LabelField("Sensor Pode Embarcar", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox("Usa a unidade selecionada como passageiro e escaneia transportadores adjacentes (range 1).", MessageType.Info);
 
@@ -126,6 +128,7 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
                 TryEmbarkSelectedOption();
             }
         }
+        EditorGUILayout.EndScrollView();
     }
 
     private void TryEmbarkSelectedOption()
