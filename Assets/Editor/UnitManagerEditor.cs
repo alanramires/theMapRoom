@@ -23,6 +23,8 @@ public class UnitManagerEditor : Editor
     private SerializedProperty maxFuelProp;
     private SerializedProperty visaoProp;
     private SerializedProperty embarkedWeaponsRuntimeProp;
+    private SerializedProperty embarkedResourcesRuntimeProp;
+    private SerializedProperty embarkedServicesRuntimeProp;
     private SerializedProperty hasActedProp;
     private SerializedProperty isEmbarkedProp;
     private SerializedProperty matchControllerProp;
@@ -54,6 +56,8 @@ public class UnitManagerEditor : Editor
         maxFuelProp = serializedObject.FindProperty("maxFuel");
         visaoProp = serializedObject.FindProperty("visao");
         embarkedWeaponsRuntimeProp = serializedObject.FindProperty("embarkedWeaponsRuntime");
+        embarkedResourcesRuntimeProp = serializedObject.FindProperty("embarkedResourcesRuntime");
+        embarkedServicesRuntimeProp = serializedObject.FindProperty("embarkedServicesRuntime");
         hasActedProp = serializedObject.FindProperty("hasActed");
         isEmbarkedProp = serializedObject.FindProperty("isEmbarked");
         matchControllerProp = serializedObject.FindProperty("matchController");
@@ -115,6 +119,7 @@ public class UnitManagerEditor : Editor
         if (visaoProp != null)
             EditorGUILayout.IntSlider(visaoProp, 1, 12, new GUIContent("Visao (hex)"));
         DrawEmbarkedWeaponsRuntimeSection();
+        DrawSupplierRuntimeSection(unit);
         DrawTransportRuntimeSection((UnitManager)target);
 
         EditorGUILayout.Space(6f);
@@ -279,6 +284,28 @@ public class UnitManagerEditor : Editor
 
             EditorGUILayout.EndVertical();
         }
+    }
+
+    private void DrawSupplierRuntimeSection(UnitManager unit)
+    {
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField("Supplier Runtime", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox("Embarked Supplies e Embarked Services podem ser ajustados por instancia (runtime/debug).", MessageType.None);
+
+        if (unit == null)
+            return;
+
+        UnitData data = null;
+        bool hasData = unit.TryGetUnitData(out data) && data != null;
+        bool isSupplier = hasData && data.isSupplier;
+        if (!isSupplier)
+        {
+            EditorGUILayout.HelpBox("Unidade atual nao esta marcada como supplier no UnitData.", MessageType.Info);
+            return;
+        }
+
+        DrawEmbarkedResourcesRuntimeSection();
+        DrawEmbarkedServicesRuntimeSection();
     }
 
     private void DrawLayerStateCycleButtons(UnitManager unit)
@@ -526,6 +553,118 @@ public class UnitManagerEditor : Editor
 
         if (GUILayout.Button("Add Weapon Slot"))
             embarkedWeaponsRuntimeProp.InsertArrayElementAtIndex(embarkedWeaponsRuntimeProp.arraySize);
+    }
+
+    private void DrawEmbarkedResourcesRuntimeSection()
+    {
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Embarked Supplies (Runtime)", EditorStyles.boldLabel);
+
+        if (embarkedResourcesRuntimeProp == null || !embarkedResourcesRuntimeProp.isArray)
+        {
+            EditorGUILayout.HelpBox("Lista de recursos nao encontrada no UnitManager.", MessageType.Warning);
+            return;
+        }
+
+        if (embarkedResourcesRuntimeProp.arraySize == 0)
+        {
+            EditorGUILayout.HelpBox("No embarked supplies on this instance.", MessageType.Info);
+            if (GUILayout.Button("Add Supply Slot"))
+                embarkedResourcesRuntimeProp.InsertArrayElementAtIndex(embarkedResourcesRuntimeProp.arraySize);
+            return;
+        }
+
+        for (int i = 0; i < embarkedResourcesRuntimeProp.arraySize; i++)
+        {
+            SerializedProperty entry = embarkedResourcesRuntimeProp.GetArrayElementAtIndex(i);
+            if (entry == null)
+                continue;
+
+            SerializedProperty supplyProp = entry.FindPropertyRelative("supply");
+            SerializedProperty amountProp = entry.FindPropertyRelative("amount");
+
+            string supplyName = "(No Supply)";
+            if (supplyProp != null && supplyProp.objectReferenceValue != null)
+            {
+                SupplyData supply = supplyProp.objectReferenceValue as SupplyData;
+                if (supply != null)
+                    supplyName = string.IsNullOrWhiteSpace(supply.displayName) ? supply.name : supply.displayName;
+            }
+
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.LabelField($"Slot {i + 1}: {supplyName}", EditorStyles.boldLabel);
+
+            if (supplyProp != null)
+                EditorGUILayout.PropertyField(supplyProp, new GUIContent("Supply"));
+            if (amountProp != null)
+            {
+                EditorGUILayout.PropertyField(amountProp, new GUIContent("Amount"));
+                amountProp.intValue = Mathf.Max(0, amountProp.intValue);
+            }
+
+            if (GUILayout.Button("Remove Slot"))
+            {
+                embarkedResourcesRuntimeProp.DeleteArrayElementAtIndex(i);
+                EditorGUILayout.EndVertical();
+                break;
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        if (GUILayout.Button("Add Supply Slot"))
+            embarkedResourcesRuntimeProp.InsertArrayElementAtIndex(embarkedResourcesRuntimeProp.arraySize);
+    }
+
+    private void DrawEmbarkedServicesRuntimeSection()
+    {
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Embarked Services (Runtime)", EditorStyles.boldLabel);
+
+        if (embarkedServicesRuntimeProp == null || !embarkedServicesRuntimeProp.isArray)
+        {
+            EditorGUILayout.HelpBox("Lista de servicos nao encontrada no UnitManager.", MessageType.Warning);
+            return;
+        }
+
+        if (embarkedServicesRuntimeProp.arraySize == 0)
+        {
+            EditorGUILayout.HelpBox("No embarked services on this instance.", MessageType.Info);
+            if (GUILayout.Button("Add Service Slot"))
+                embarkedServicesRuntimeProp.InsertArrayElementAtIndex(embarkedServicesRuntimeProp.arraySize);
+            return;
+        }
+
+        for (int i = 0; i < embarkedServicesRuntimeProp.arraySize; i++)
+        {
+            SerializedProperty serviceProp = embarkedServicesRuntimeProp.GetArrayElementAtIndex(i);
+            if (serviceProp == null)
+                continue;
+
+            string serviceName = "(No Service)";
+            if (serviceProp.objectReferenceValue != null)
+            {
+                ServiceData service = serviceProp.objectReferenceValue as ServiceData;
+                if (service != null)
+                    serviceName = string.IsNullOrWhiteSpace(service.displayName) ? service.name : service.displayName;
+            }
+
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.LabelField($"Slot {i + 1}: {serviceName}", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(serviceProp, new GUIContent("Service"));
+
+            if (GUILayout.Button("Remove Slot"))
+            {
+                embarkedServicesRuntimeProp.DeleteArrayElementAtIndex(i);
+                EditorGUILayout.EndVertical();
+                break;
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        if (GUILayout.Button("Add Service Slot"))
+            embarkedServicesRuntimeProp.InsertArrayElementAtIndex(embarkedServicesRuntimeProp.arraySize);
     }
 
     private void DrawUnitIdPopup()

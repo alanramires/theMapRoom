@@ -35,6 +35,8 @@ public partial class TurnStateManager
                 return HandleConfirmWhileFundindo();
             case CursorState.ShoppingAndServices:
                 return HandleConfirmWhileShoppingAndServices();
+            case CursorState.Suprindo:
+                return HandleConfirmWhileSuprindo();
         }
 
         return ActionSfx.None;
@@ -71,6 +73,8 @@ public partial class TurnStateManager
                 return HandleCancelWhileFundindo();
             case CursorState.ShoppingAndServices:
                 return HandleCancelWhileShoppingAndServices();
+            case CursorState.Suprindo:
+                return HandleCancelWhileSuprindo();
         }
 
         return ActionSfx.None;
@@ -496,6 +500,29 @@ public partial class TurnStateManager
     {
         LogStateStep("HandleCancelWhileShoppingAndServices", rollback: true);
         ExitConstructionShoppingStateToNeutral(rollback: true);
+        return ActionSfx.Cancel;
+    }
+
+    private ActionSfx HandleConfirmWhileSuprindo()
+    {
+        LogStateStep("HandleConfirmWhileSuprindo");
+        if (TryConfirmScannerSupply())
+        {
+            if (ConsumeSupplySuppressDefaultConfirmSfxOnce())
+                return ActionSfx.None;
+            return ActionSfx.Confirm;
+        }
+
+        return ActionSfx.None;
+    }
+
+    private ActionSfx HandleCancelWhileSuprindo()
+    {
+        LogStateStep("HandleCancelWhileSuprindo", rollback: true);
+        if (HandleScannerPromptCancel())
+            return ActionSfx.Cancel;
+
+        ExitSupplyStateToMovement();
         return ActionSfx.Cancel;
     }
 }

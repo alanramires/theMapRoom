@@ -29,6 +29,9 @@ public class UnitManager : MonoBehaviour
     [SerializeField, Min(1)] private int visao = 3;
     [Header("Embarked Weapons Runtime")]
     [SerializeField] private List<UnitEmbarkedWeapon> embarkedWeaponsRuntime = new List<UnitEmbarkedWeapon>();
+    [Header("Supplier Runtime")]
+    [SerializeField] private List<UnitEmbarkedSupply> embarkedResourcesRuntime = new List<UnitEmbarkedSupply>();
+    [SerializeField] private List<ServiceData> embarkedServicesRuntime = new List<ServiceData>();
     [SerializeField, HideInInspector] private bool appliedHasActed;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField] private bool isEmbarked;
@@ -222,6 +225,7 @@ public class UnitManager : MonoBehaviour
         currentAmmo = Mathf.Clamp(currentAmmo, 0, GetMaxAmmo());
         currentFuel = Mathf.Clamp(currentFuel, 0, GetMaxFuel());
         SyncEmbarkedWeaponsFromData(data);
+        SyncSupplierRuntimeFromData(data);
         SyncTransportRuntimeSlotsWithData(data);
         SyncCurrentLayerStateWithData(data, forceNativeDefault: true);
         SyncPreferredLayerPreferencesFromData(data);
@@ -647,6 +651,16 @@ public class UnitManager : MonoBehaviour
         return embarkedWeaponsRuntime;
     }
 
+    public IReadOnlyList<UnitEmbarkedSupply> GetEmbarkedResources()
+    {
+        return embarkedResourcesRuntime;
+    }
+
+    public IReadOnlyList<ServiceData> GetEmbarkedServices()
+    {
+        return embarkedServicesRuntime;
+    }
+
     public bool TryConsumeEmbarkedWeaponAmmo(int embarkedWeaponIndex, int amount = 1)
     {
         if (amount <= 0)
@@ -880,6 +894,12 @@ public class UnitManager : MonoBehaviour
         RefreshActedVisual();
     }
 
+    public void RefreshSupplierRuntimeFromData()
+    {
+        SyncSupplierRuntimeFromData(TryGetUnitData());
+        RefreshActedVisual();
+    }
+
     private void SyncEmbarkedWeaponsFromData(UnitData data)
     {
         if (embarkedWeaponsRuntime == null)
@@ -905,6 +925,53 @@ public class UnitManager : MonoBehaviour
             };
             copy.EnsureValidSelectedTrajectory();
             embarkedWeaponsRuntime.Add(copy);
+        }
+    }
+
+    private void SyncSupplierRuntimeFromData(UnitData data)
+    {
+        if (embarkedResourcesRuntime == null)
+            embarkedResourcesRuntime = new List<UnitEmbarkedSupply>();
+        if (embarkedServicesRuntime == null)
+            embarkedServicesRuntime = new List<ServiceData>();
+
+        if (data == null || !data.isSupplier)
+        {
+            embarkedResourcesRuntime.Clear();
+            embarkedServicesRuntime.Clear();
+            return;
+        }
+
+        embarkedResourcesRuntime.Clear();
+        List<UnitEmbarkedSupply> sourceResources = data.supplierResources;
+
+        if (sourceResources != null)
+        {
+            for (int i = 0; i < sourceResources.Count; i++)
+            {
+                UnitEmbarkedSupply source = sourceResources[i];
+                if (source == null || source.supply == null)
+                    continue;
+
+                UnitEmbarkedSupply copy = new UnitEmbarkedSupply
+                {
+                    supply = source.supply,
+                    amount = Mathf.Max(0, source.amount)
+                };
+                embarkedResourcesRuntime.Add(copy);
+            }
+        }
+
+        embarkedServicesRuntime.Clear();
+        if (data.supplierServicesProvided == null)
+            return;
+
+        for (int i = 0; i < data.supplierServicesProvided.Count; i++)
+        {
+            ServiceData service = data.supplierServicesProvided[i];
+            if (service == null || embarkedServicesRuntime.Contains(service))
+                continue;
+            embarkedServicesRuntime.Add(service);
         }
     }
 
@@ -1295,6 +1362,10 @@ public class UnitManager : MonoBehaviour
         visao = Mathf.Max(1, visao);
         currentAmmo = Mathf.Clamp(currentAmmo, 0, maxAmmo);
         currentFuel = Mathf.Clamp(currentFuel, 0, maxFuel);
+        if (embarkedResourcesRuntime == null)
+            embarkedResourcesRuntime = new List<UnitEmbarkedSupply>();
+        if (embarkedServicesRuntime == null)
+            embarkedServicesRuntime = new List<ServiceData>();
 
         UnitData data = TryGetUnitData();
         SyncTransportRuntimeSlotsWithData(data, preserveSeatPassengers: !Application.isPlaying);

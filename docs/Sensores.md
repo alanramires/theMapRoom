@@ -6,9 +6,20 @@ Documento de referencia e roadmap dos sensores taticos do scanner.
 
 No fluxo de scanner, as acoes disponiveis hoje sao:
 
-- `A`: ataque (`PodeMirar`)
-- `E`: embarque (`PodeEmbarcar`)
-- `L`: operacao aerea (pouso/decolagem; nao e sensor classico, mas entra no mesmo painel)
+passar turno ["T"]
+mini/mapa e mapa ["M"]
+
+pode decolar  (sem atalho de teclado, é mais um check)
+pode mudar de altitude (inclui nivelar voo, emergir e submergir) ["L"]
+pode mirar e combater ["A"]
+pode embarcar ["E"]
+pode desembarcar ["D"]
+pode capturar/reconquistar ["C"]
+pode fundir com multiplos ["F"]
+
+e agora inicia a logistica
+pode surpir unidades com serviços  ["S"]
+pode transferir recursos ["R"]
 
 Orquestrador:
 

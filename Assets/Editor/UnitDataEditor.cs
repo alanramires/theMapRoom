@@ -6,7 +6,6 @@ using UnityEngine;
 public class UnitDataEditor : Editor
 {
     private SerializedProperty embarkedWeaponsProperty;
-    private SerializedProperty embarkedSuppliesProperty;
     private SerializedProperty isSupplierProperty;
     private SerializedProperty supplierTierProperty;
     private SerializedProperty maxUnitsServedPerTurnProperty;
@@ -14,11 +13,11 @@ public class UnitDataEditor : Editor
     private SerializedProperty collectionRangeProperty;
     private SerializedProperty supplierOperationDomainsProperty;
     private SerializedProperty supplierServicesProvidedProperty;
+    private SerializedProperty supplierResourcesProperty;
 
     private void OnEnable()
     {
         embarkedWeaponsProperty = serializedObject.FindProperty("embarkedWeapons");
-        embarkedSuppliesProperty = serializedObject.FindProperty("embarkedSupplies");
         isSupplierProperty = serializedObject.FindProperty("isSupplier");
         supplierTierProperty = serializedObject.FindProperty("supplierTier");
         maxUnitsServedPerTurnProperty = serializedObject.FindProperty("maxUnitsServedPerTurn");
@@ -26,6 +25,7 @@ public class UnitDataEditor : Editor
         collectionRangeProperty = serializedObject.FindProperty("collectionRange");
         supplierOperationDomainsProperty = serializedObject.FindProperty("supplierOperationDomains");
         supplierServicesProvidedProperty = serializedObject.FindProperty("supplierServicesProvided");
+        supplierResourcesProperty = serializedObject.FindProperty("supplierResources");
     }
 
     public override void OnInspectorGUI()
@@ -55,7 +55,6 @@ public class UnitDataEditor : Editor
             "useExplicitPreferredNavalHeight",
             "preferredNavalHeight",
             "embarkedWeapons",
-            "embarkedSupplies",
             "isSupplier",
             "supplierTier",
             "maxUnitsServedPerTurn",
@@ -63,6 +62,7 @@ public class UnitDataEditor : Editor
             "collectionRange",
             "supplierOperationDomains",
             "supplierServicesProvided",
+            "supplierResources",
             "isTransporter",
             "spriteTransport",
             "allowedEmbarkWhenTransporterAtTerrains",
@@ -161,13 +161,20 @@ public class UnitDataEditor : Editor
         if (collectionRangeProperty != null)
             EditorGUILayout.PropertyField(collectionRangeProperty, new GUIContent("Collection Range"));
 
-        if (supplierOperationDomainsProperty != null)
-            EditorGUILayout.PropertyField(supplierOperationDomainsProperty, new GUIContent("Supplier Operation Domain"), includeChildren: true);
-        if (supplierServicesProvidedProperty != null)
-            EditorGUILayout.PropertyField(supplierServicesProvidedProperty, new GUIContent("Supplier Services Provided"), includeChildren: true);
-
-        EditorGUILayout.Space();
-        DrawEmbarkedSuppliesSection();
+        bool isSupplier = isSupplierProperty != null && isSupplierProperty.boolValue;
+        if (isSupplier)
+        {
+            if (supplierOperationDomainsProperty != null)
+                EditorGUILayout.PropertyField(supplierOperationDomainsProperty, new GUIContent("Supplier Operation Domain"), includeChildren: true);
+            if (supplierServicesProvidedProperty != null)
+                EditorGUILayout.PropertyField(supplierServicesProvidedProperty, new GUIContent("Supplier Services Provided"), includeChildren: true);
+            if (supplierResourcesProperty != null)
+                EditorGUILayout.PropertyField(supplierResourcesProperty, new GUIContent("Supplier Services Supplies (Default)"), includeChildren: true);
+        }
+        else
+        {
+            EditorGUILayout.HelpBox("Ative Is Supplier para configurar Supplier Services e Supplier Resources.", MessageType.Info);
+        }
     }
 
     private void DrawTransportSection()
@@ -202,6 +209,14 @@ public class UnitDataEditor : Editor
             EditorGUILayout.PropertyField(militaryForceProperty);
         if (unitClassProperty != null)
             EditorGUILayout.PropertyField(unitClassProperty);
+
+        if (unitClassProperty != null)
+        {
+            GameUnitClass cls = (GameUnitClass)unitClassProperty.enumValueIndex;
+            bool isAircraftDerived = cls == GameUnitClass.Jet || cls == GameUnitClass.Plane || cls == GameUnitClass.Helicopter;
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.Toggle("Is Aircraft (Derived)", isAircraftDerived);
+        }
     }
 
     private void DrawTopAttributesSection()
@@ -231,57 +246,6 @@ public class UnitDataEditor : Editor
             EditorGUILayout.PropertyField(autonomiaProperty);
         if (costProperty != null)
             EditorGUILayout.PropertyField(costProperty);
-    }
-
-    private void DrawEmbarkedSuppliesSection()
-    {
-        EditorGUILayout.LabelField("Embarked Supplies", EditorStyles.boldLabel);
-        SupplyDatabase database = ResolveSupplyDatabaseFromProject();
-        List<SupplyData> catalog = BuildSupplyCatalog(database);
-        if (database == null)
-            EditorGUILayout.HelpBox("No SupplyDatabase found in project. Create one to drive supply slots.", MessageType.Warning);
-
-        if (embarkedSuppliesProperty == null)
-            return;
-
-        for (int i = 0; i < embarkedSuppliesProperty.arraySize; i++)
-        {
-            SerializedProperty element = embarkedSuppliesProperty.GetArrayElementAtIndex(i);
-            if (element == null)
-                continue;
-
-            SerializedProperty supplyProperty = element.FindPropertyRelative("supply");
-            SerializedProperty amountProperty = element.FindPropertyRelative("amount");
-
-            EditorGUILayout.BeginVertical("box");
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"Supply Slot {i + 1}", EditorStyles.boldLabel);
-            if (GUILayout.Button("Remove", GUILayout.Width(70f)))
-            {
-                embarkedSuppliesProperty.DeleteArrayElementAtIndex(i);
-                EditorGUILayout.EndHorizontal();
-                EditorGUILayout.EndVertical();
-                break;
-            }
-            EditorGUILayout.EndHorizontal();
-
-            DrawSupplyPopup(supplyProperty, catalog);
-            if (amountProperty != null)
-                EditorGUILayout.PropertyField(amountProperty, new GUIContent("Amount"));
-
-            SupplyData selectedSupply = supplyProperty != null ? supplyProperty.objectReferenceValue as SupplyData : null;
-            if (selectedSupply != null)
-            {
-                string functions = BuildSupplyFunctionText(selectedSupply);
-                EditorGUILayout.HelpBox($"Functions: {functions}", MessageType.Info);
-            }
-
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(2f);
-        }
-
-        if (GUILayout.Button("Add Supply Slot"))
-            embarkedSuppliesProperty.InsertArrayElementAtIndex(embarkedSuppliesProperty.arraySize);
     }
 
     private void DrawEmbarkedWeaponsSection()

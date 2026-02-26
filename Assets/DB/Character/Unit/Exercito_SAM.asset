@@ -46,7 +46,6 @@ MonoBehaviour:
     operationRangeMax: 4
     selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: e58612c9a6796da4eb35f981486fa0e4, type: 2}
-  embarkedSupplies: []
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0
@@ -54,6 +53,7 @@ MonoBehaviour:
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  supplierResources: []
   isTransporter: 0
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
@@ -67,4 +67,4 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
   autonomia: 40
-  cost: 26000
+  cost: 12000

@@ -17,6 +17,10 @@ MonoBehaviour:
   description: "Servi\xE7o de Reabastecimento e Recupera\xE7\xE3o de Autonomia"
   spriteDefault: {fileID: 21300000, guid: 0d5da139a3219074191fb5a7061cee49, type: 3}
   serviceType: 0
+  isService: 1
+  recuperaHp: 0
+  recuperaAutonomia: 1
+  recuperaMunicao: 0
   percentCost: 10
   suppliesUsed:
   - {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}

@@ -482,11 +482,8 @@ public partial class TurnStateManager
                 yield break;
             }
 
-            if (transporter.HasSkillId("vtol"))
-            {
-                float vtolFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(transporter) : 0f;
-                landingDuration = Mathf.Max(landingDuration, vtolFxDuration);
-            }
+            float vtolFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(transporter) : 0f;
+            landingDuration = Mathf.Max(landingDuration, vtolFxDuration);
             if (landingDuration > 0f)
                 yield return new WaitForSeconds(landingDuration);
 

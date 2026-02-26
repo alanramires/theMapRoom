@@ -24,6 +24,7 @@ MonoBehaviour:
   defense: 13
   armorClass: 1
   movement: 7
+  visao: 3
   movementCategory: 1
   militaryForce: 1
   unitClass: 6
@@ -46,18 +47,21 @@ MonoBehaviour:
     spriteRed: {fileID: 0}
     spriteBlue: {fileID: 0}
     spriteYellow: {fileID: 0}
+  useExplicitPreferredAirHeight: 0
+  preferredAirHeight: 4
+  useExplicitPreferredNavalHeight: 0
+  preferredNavalHeight: 2
   skills:
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
   - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
   autonomyData: {fileID: 11400000, guid: d52348f636f1466d95a6489891e176bf, type: 2}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: 86a03ca38b95e2a4db570315170881be, type: 2}
-    squadAmmunition: 5
+    squadAmmunition: 6
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: 86a03ca38b95e2a4db570315170881be, type: 2}
-  embarkedSupplies: []
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0
@@ -65,6 +69,7 @@ MonoBehaviour:
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  supplierResources: []
   isTransporter: 0
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []

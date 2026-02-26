@@ -44,16 +44,16 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 1
   preferredNavalHeight: 2
-  skills: []
+  skills:
+  - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
   autonomyData: {fileID: 0}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: afbb31a3d8a2c3645bf90df243540a74, type: 2}
-    squadAmmunition: 4
+    squadAmmunition: 6
     operationRangeMin: 1
     operationRangeMax: 3
     selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: afbb31a3d8a2c3645bf90df243540a74, type: 2}
-  embarkedSupplies: []
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0
@@ -61,6 +61,7 @@ MonoBehaviour:
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  supplierResources: []
   isTransporter: 0
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
@@ -74,4 +75,4 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
   autonomia: 90
-  cost: 26000
+  cost: 24000

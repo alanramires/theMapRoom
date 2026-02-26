@@ -75,9 +75,6 @@ public class UnitData : ScriptableObject
     [Header("Embarked Weapons")]
     [Tooltip("Armas embarcadas na unidade. A ordem da lista define prioridade (primaria, secundaria...). Pode ficar vazia para unidades desarmadas.")]
     public List<UnitEmbarkedWeapon> embarkedWeapons = new List<UnitEmbarkedWeapon>();
-    [Header("Embarked Supplies")]
-    [Tooltip("Suprimentos embarcados na unidade. Pode ficar vazia para unidades sem carga logistica.")]
-    public List<UnitEmbarkedSupply> embarkedSupplies = new List<UnitEmbarkedSupply>();
 
     [Header("Logistics")]
     public bool isSupplier = false;
@@ -89,6 +86,10 @@ public class UnitData : ScriptableObject
     public List<SupplierOperationDomain> supplierOperationDomains = new List<SupplierOperationDomain>();
     [Tooltip("Servicos oferecidos por esta unidade de logistica.")]
     public List<ServiceData> supplierServicesProvided = new List<ServiceData>();
+    [FormerlySerializedAs("embarkedResources")]
+    [FormerlySerializedAs("embarkedSupplies")]
+    [Tooltip("Recursos/logistica padrao de fabrica desta unidade fornecedora (Supply + quantidade).")]
+    public List<UnitEmbarkedSupply> supplierResources = new List<UnitEmbarkedSupply>();
     [Header("Transport")]
     [Tooltip("Se true, esta unidade pode transportar outras unidades.")]
     public bool isTransporter = false;
@@ -135,12 +136,12 @@ public class UnitData : ScriptableObject
 
         if (embarkedWeapons == null)
             embarkedWeapons = new List<UnitEmbarkedWeapon>();
-        if (embarkedSupplies == null)
-            embarkedSupplies = new List<UnitEmbarkedSupply>();
         if (supplierOperationDomains == null)
             supplierOperationDomains = new List<SupplierOperationDomain>();
         if (supplierServicesProvided == null)
             supplierServicesProvided = new List<ServiceData>();
+        if (supplierResources == null)
+            supplierResources = new List<UnitEmbarkedSupply>();
         if (combatModifiers == null)
             combatModifiers = new List<CombatModifierData>();
         if (transportSlots == null)
@@ -178,6 +179,14 @@ public class UnitData : ScriptableObject
                 continue;
 
             embarkedWeapon.SyncFromWeaponDefaultsIfNeeded();
+        }
+
+        for (int i = 0; i < supplierResources.Count; i++)
+        {
+            UnitEmbarkedSupply embarkedResource = supplierResources[i];
+            if (embarkedResource == null)
+                continue;
+            embarkedResource.amount = Mathf.Max(0, embarkedResource.amount);
         }
 
         for (int i = 0; i < transportSlots.Count; i++)

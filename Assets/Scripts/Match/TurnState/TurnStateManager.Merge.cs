@@ -369,6 +369,8 @@ public partial class TurnStateManager
 
         Dictionary<WeaponData, int> projectilesByWeapon = BuildMergeWeaponProjectileTotals(receiver, participants);
         int missingWeaponSlots = ApplyMergedWeaponAmmunitionToBaseUnit(receiver, projectilesByWeapon, resultHp);
+        Dictionary<SupplyData, int> supplyStepsByType = BuildMergeSupplyStepTotals(receiver, participants);
+        int missingSupplySlots = ApplyMergedSupplyAmountsToBaseUnit(receiver, supplyStepsByType, resultHp);
 
         float mergeStepDuration = GetMergeMoveStepDuration();
         float cursorHopDelay = GetMergeCursorHopDelay();
@@ -453,6 +455,8 @@ public partial class TurnStateManager
 
         if (missingWeaponSlots > 0)
             Debug.Log($"[Fusao] Aviso: {missingWeaponSlots} tipo(s) de arma sem slot na unidade resultante.");
+        if (missingSupplySlots > 0)
+            Debug.Log($"[Fusao] Aviso: {missingSupplySlots} tipo(s) de suprimento sem slot na unidade resultante.");
 
         receiver.MarkAsActed();
         cursorController?.PlayDoneSfx();
@@ -1431,5 +1435,76 @@ public partial class TurnStateManager
         }
 
         return projectilesByWeapon.Count;
+    }
+
+    private static Dictionary<SupplyData, int> BuildMergeSupplyStepTotals(UnitManager baseUnit, List<UnitManager> participants)
+    {
+        Dictionary<SupplyData, int> totals = new Dictionary<SupplyData, int>();
+        AccumulateUnitSupplySteps(baseUnit, baseUnit != null ? Mathf.Max(0, baseUnit.CurrentHP) : 0, totals);
+
+        if (participants != null)
+        {
+            for (int i = 0; i < participants.Count; i++)
+            {
+                UnitManager participant = participants[i];
+                if (participant == null)
+                    continue;
+                AccumulateUnitSupplySteps(participant, Mathf.Max(0, participant.CurrentHP), totals);
+            }
+        }
+
+        return totals;
+    }
+
+    private static void AccumulateUnitSupplySteps(UnitManager unit, int hp, Dictionary<SupplyData, int> totals)
+    {
+        if (unit == null || totals == null)
+            return;
+
+        IReadOnlyList<UnitEmbarkedSupply> supplies = unit.GetEmbarkedResources();
+        if (supplies == null)
+            return;
+
+        int safeHp = Mathf.Max(0, hp);
+        for (int i = 0; i < supplies.Count; i++)
+        {
+            UnitEmbarkedSupply embarked = supplies[i];
+            if (embarked == null || embarked.supply == null)
+                continue;
+
+            int amount = Mathf.Max(0, embarked.amount);
+            int steps = amount * safeHp;
+            if (steps <= 0)
+                continue;
+
+            if (totals.TryGetValue(embarked.supply, out int current))
+                totals[embarked.supply] = current + steps;
+            else
+                totals.Add(embarked.supply, steps);
+        }
+    }
+
+    private static int ApplyMergedSupplyAmountsToBaseUnit(UnitManager baseUnit, Dictionary<SupplyData, int> supplyStepsByType, int resultHp)
+    {
+        if (baseUnit == null || supplyStepsByType == null)
+            return 0;
+
+        IReadOnlyList<UnitEmbarkedSupply> baseSupplies = baseUnit.GetEmbarkedResources();
+        if (baseSupplies == null)
+            return supplyStepsByType.Count;
+
+        for (int i = 0; i < baseSupplies.Count; i++)
+        {
+            UnitEmbarkedSupply embarked = baseSupplies[i];
+            if (embarked == null || embarked.supply == null)
+                continue;
+            if (!supplyStepsByType.TryGetValue(embarked.supply, out int totalSteps))
+                continue;
+
+            embarked.amount = resultHp > 0 ? Mathf.Max(0, totalSteps / resultHp) : 0;
+            supplyStepsByType.Remove(embarked.supply);
+        }
+
+        return supplyStepsByType.Count;
     }
 }

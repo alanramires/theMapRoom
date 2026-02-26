@@ -21,17 +21,24 @@ MonoBehaviour:
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   maxHP: 10
-  defense: 15
+  defense: 16
   armorClass: 2
   movement: 5
+  visao: 3
   movementCategory: 3
   militaryForce: 2
   unitClass: 8
   eliteLevel: 0
+  combatModifiers: []
   domain: 1
   heightLevel: 3
   aditionalDomainsAllowed: []
+  useExplicitPreferredAirHeight: 0
+  preferredAirHeight: 4
+  useExplicitPreferredNavalHeight: 0
+  preferredNavalHeight: 2
   skills: []
+  autonomyData: {fileID: 0}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: 46370e96009019b419b5b8e75e0e590d, type: 2}
     squadAmmunition: 4
@@ -45,7 +52,6 @@ MonoBehaviour:
     operationRangeMax: 4
     selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: e58612c9a6796da4eb35f981486fa0e4, type: 2}
-  embarkedSupplies: []
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0
@@ -53,9 +59,18 @@ MonoBehaviour:
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  supplierResources: []
   isTransporter: 0
-  allowedEmbarkTerrains: []
-  allowedEmbarkConstructions: []
+  spriteTransport: {fileID: 0}
+  allowedEmbarkWhenTransporterAtTerrains: []
+  allowedEmbarkWhenTransporterAtTerrainStructures: []
+  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtTerrains: []
+  allowedDisembarkWhenTransporterAtTerrainStructures: []
+  allowedDisembarkWhenTransporterAtConstructions: []
+  passengersCanDisembarkAndGoesToTerrains: []
+  passengersCanDisembarkAndGoesToTerrainStructures: []
+  passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
   autonomia: 90
-  cost: 26000
+  cost: 30000

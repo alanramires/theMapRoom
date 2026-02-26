@@ -23,6 +23,7 @@ public static class UnitLayerTools
 
         int updated = 0;
         int hudUpdated = 0;
+        int failed = 0;
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
@@ -34,14 +35,30 @@ public static class UnitLayerTools
                 hudUpdated++;
 
             if (!unit.ApplyFromDatabase())
+            {
+                failed++;
+                string reason;
+                if (unit.UnitDatabase == null)
+                    reason = "UnitDatabase ausente na instancia.";
+                else if (string.IsNullOrWhiteSpace(unit.UnitId))
+                    reason = "UnitId vazio na instancia.";
+                else
+                    reason = $"UnitId '{unit.UnitId}' nao encontrado no UnitDatabase da instancia.";
+
+                Debug.LogWarning($"[UnitLayerTools] Falha ao propagar '{unit.name}': {reason}", unit);
                 continue;
+            }
+
+            // Garante explicitamente a copia de Supplier Services Supplies (UnitData)
+            // para Embarked Supplies runtime da instancia em campo.
+            unit.RefreshSupplierRuntimeFromData();
 
             EditorUtility.SetDirty(unit);
             updated++;
         }
 
         EditorSceneManager.MarkAllScenesDirty();
-        Debug.Log($"[UnitLayerTools] {updated} unidade(s) sincronizadas com UnitData (inclui preferencias Air/Naval). Layout HUD propagado em {hudUpdated} unidade(s). UnitData migrados (visao): {migratedUnitDataAssets}.");
+        Debug.Log($"[UnitLayerTools] {updated} unidade(s) sincronizadas com UnitData (inclui preferencias Air/Naval e embarked resources/services). Falhas: {failed}. Layout HUD propagado em {hudUpdated} unidade(s). UnitData migrados (visao): {migratedUnitDataAssets}.");
     }
 
     private static int PropagateUnitDataAssetDefaults()

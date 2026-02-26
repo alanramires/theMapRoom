@@ -17,6 +17,10 @@ MonoBehaviour:
   description: "Servi\xE7o de Rearmamento de Muni\xE7\xE3o / Ataques de Esquadr\xE3o"
   spriteDefault: {fileID: 21300000, guid: e3ede48e128f1554ca30a49b9223a6b5, type: 3}
   serviceType: 0
+  isService: 1
+  recuperaHp: 0
+  recuperaAutonomia: 0
+  recuperaMunicao: 1
   percentCost: 25
   suppliesUsed:
   - {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}

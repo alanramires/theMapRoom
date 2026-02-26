@@ -24,6 +24,7 @@ MonoBehaviour:
   defense: 12
   armorClass: 1
   movement: 7
+  visao: 3
   movementCategory: 1
   militaryForce: 1
   unitClass: 6
@@ -46,21 +47,30 @@ MonoBehaviour:
     spriteRed: {fileID: 0}
     spriteBlue: {fileID: 0}
     spriteYellow: {fileID: 0}
+  useExplicitPreferredAirHeight: 0
+  preferredAirHeight: 4
+  useExplicitPreferredNavalHeight: 0
+  preferredNavalHeight: 2
   skills:
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
   - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
-  autonomyData: {fileID: 11400000, guid: d52348f636f1466d95a6489891e176bf, type: 2}
+  autonomyData: {fileID: 11400000, guid: 4570edfd95d40d0438c040f364e8ec07, type: 2}
   embarkedWeapons: []
-  embarkedSupplies:
+  isSupplier: 1
+  supplierTier: 1
+  maxUnitsServedPerTurn: 2
+  serviceRange: 1
+  collectionRange: 0
+  supplierOperationDomains:
+  - domain: 3
+    heightLevel: 4
+  - domain: 3
+    heightLevel: 5
+  supplierServicesProvided:
+  - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  supplierResources:
   - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
     amount: 150
-  isSupplier: 0
-  supplierTier: 0
-  maxUnitsServedPerTurn: 0
-  serviceRange: 0
-  collectionRange: 0
-  supplierOperationDomains: []
-  supplierServicesProvided: []
   isTransporter: 0
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
@@ -74,4 +84,4 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
   autonomia: 120
-  cost: 14500
+  cost: 12500

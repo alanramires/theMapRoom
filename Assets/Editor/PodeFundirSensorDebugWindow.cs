@@ -391,6 +391,8 @@ public class PodeFundirSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField($"Autonomia: {baseAutonomy}  ({baseSteps} passos: {baseHp}x{baseAutonomy})");
         EditorGUILayout.LabelField("Armas embarcadas");
         DrawUnitWeaponsContribution(selectedUnit, baseHp);
+        EditorGUILayout.LabelField("Suprimentos embarcados");
+        DrawUnitSuppliesContribution(selectedUnit, baseHp);
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Unidades participantes");
 
@@ -415,6 +417,8 @@ public class PodeFundirSensorDebugWindow : EditorWindow
                 EditorGUILayout.LabelField($"Autonomia: {autonomy}  ({steps} passos: {hp}x{autonomy})");
                 EditorGUILayout.LabelField("Armas embarcadas");
                 DrawUnitWeaponsContribution(order.candidate, hp);
+                EditorGUILayout.LabelField("Suprimentos embarcados");
+                DrawUnitSuppliesContribution(order.candidate, hp);
                 EditorGUILayout.Space(2f);
             }
         }
@@ -425,11 +429,13 @@ public class PodeFundirSensorDebugWindow : EditorWindow
         float exactAutonomy = resultHp > 0 ? (float)totalSteps / resultHp : 0f;
         EditorGUILayout.LabelField($"HP: {resultHp}");
         if (resultHp > 0)
-            EditorGUILayout.LabelField($"Autonomia: {resultAutonomy}  ({baseSteps}+{participantsSteps} / {resultHp} = {exactAutonomy:0.##} = {resultAutonomy})");
+        EditorGUILayout.LabelField($"Autonomia: {resultAutonomy}  ({baseSteps}+{participantsSteps} / {resultHp} = {exactAutonomy:0.##} = {resultAutonomy})");
         else
             EditorGUILayout.LabelField($"Autonomia: {resultAutonomy}  (HP resultante zero)");
         EditorGUILayout.LabelField("Armas embarcadas");
         DrawMergedWeaponsContribution(selectedUnit, mergeQueue, resultHp);
+        EditorGUILayout.LabelField("Suprimentos embarcados");
+        DrawMergedSuppliesContribution(selectedUnit, mergeQueue, resultHp);
         Tilemap map = ResolveTilemap();
         FusionLayerPlan layerPlan = ResolveFusionLayerPlan(selectedUnit, mergeQueue, map, terrainDatabase, out string observation);
         EditorGUILayout.HelpBox($"OBS: {observation}", MessageType.Info);
@@ -495,19 +501,21 @@ public class PodeFundirSensorDebugWindow : EditorWindow
             return;
 
         Dictionary<WeaponData, int> projectilesByWeapon = BuildMergeWeaponProjectileTotals(selectedUnit, mergeQueue);
+        Dictionary<SupplyData, int> supplyStepsByType = BuildMergeSupplyStepTotals(selectedUnit, mergeQueue);
 
         Undo.RecordObject(selectedUnit, "Pode Fundir (Debug)");
         selectedUnit.SetCurrentHP(resultHp);
         selectedUnit.SetCurrentFuel(resultAutonomy);
 
         int skippedWeapons = ApplyMergedWeaponAmmunitionToBaseUnit(selectedUnit, projectilesByWeapon, resultHp);
+        int skippedSupplies = ApplyMergedSupplyAmountsToBaseUnit(selectedUnit, supplyStepsByType, resultHp);
 
         EditorUtility.SetDirty(selectedUnit);
         if (selectedUnit.gameObject != null && selectedUnit.gameObject.scene.IsValid())
             EditorSceneManager.MarkSceneDirty(selectedUnit.gameObject.scene);
 
-        statusMessage = skippedWeapons > 0
-            ? $"Fusao debug aplicada: {selectedUnit.name} HP {selectedUnit.CurrentHP}, Autonomia {selectedUnit.CurrentFuel}. Armas sem slot na unidade base: {skippedWeapons}."
+        statusMessage = (skippedWeapons > 0 || skippedSupplies > 0)
+            ? $"Fusao debug aplicada: {selectedUnit.name} HP {selectedUnit.CurrentHP}, Autonomia {selectedUnit.CurrentFuel}. Armas sem slot: {skippedWeapons}. Suprimentos sem slot: {skippedSupplies}."
             : $"Fusao debug aplicada: {selectedUnit.name} agora tem HP {selectedUnit.CurrentHP} e Autonomia {selectedUnit.CurrentFuel}.";
         mergeQueueMessage = "Participantes mantidos no mapa (sem remocao, conforme solicitado).";
         Repaint();
@@ -561,6 +569,57 @@ public class PodeFundirSensorDebugWindow : EditorWindow
                 EditorGUILayout.LabelField($"{ResolveWeaponName(weapon)}: {resultAmmo}  ({totalProjectiles} / {resultHp} = {exact:0.##} = {resultAmmo})");
             else
                 EditorGUILayout.LabelField($"{ResolveWeaponName(weapon)}: {resultAmmo}  (HP resultante zero)");
+        }
+    }
+
+    private static void DrawUnitSuppliesContribution(UnitManager unit, int hp)
+    {
+        IReadOnlyList<UnitEmbarkedSupply> supplies = unit != null ? unit.GetEmbarkedResources() : null;
+        if (supplies == null || supplies.Count == 0)
+        {
+            EditorGUILayout.LabelField("(nenhum)");
+            return;
+        }
+
+        bool any = false;
+        for (int i = 0; i < supplies.Count; i++)
+        {
+            UnitEmbarkedSupply embarked = supplies[i];
+            if (embarked == null || embarked.supply == null)
+                continue;
+
+            any = true;
+            int amount = Mathf.Max(0, embarked.amount);
+            int steps = amount * Mathf.Max(0, hp);
+            EditorGUILayout.LabelField($"{ResolveSupplyName(embarked.supply)}: {amount}  ({steps}: {amount}x{hp})");
+        }
+
+        if (!any)
+            EditorGUILayout.LabelField("(nenhum)");
+    }
+
+    private static void DrawMergedSuppliesContribution(UnitManager baseUnit, List<DebugMergeOrder> queue, int resultHp)
+    {
+        Dictionary<SupplyData, int> totals = BuildMergeSupplyStepTotals(baseUnit, queue);
+        if (totals.Count == 0)
+        {
+            EditorGUILayout.LabelField("(nenhum)");
+            return;
+        }
+
+        List<SupplyData> order = BuildMergedSupplyDisplayOrder(baseUnit, queue, totals);
+        for (int i = 0; i < order.Count; i++)
+        {
+            SupplyData supply = order[i];
+            if (supply == null || !totals.TryGetValue(supply, out int totalSteps))
+                continue;
+
+            int resultAmount = resultHp > 0 ? Mathf.Max(0, totalSteps / resultHp) : 0;
+            float exact = resultHp > 0 ? (float)totalSteps / resultHp : 0f;
+            if (resultHp > 0)
+                EditorGUILayout.LabelField($"{ResolveSupplyName(supply)}: {resultAmount}  ({totalSteps} / {resultHp} = {exact:0.##} = {resultAmount})");
+            else
+                EditorGUILayout.LabelField($"{ResolveSupplyName(supply)}: {resultAmount}  (HP resultante zero)");
         }
     }
 
@@ -687,6 +746,126 @@ public class PodeFundirSensorDebugWindow : EditorWindow
         return projectilesByWeapon.Count;
     }
 
+    private static Dictionary<SupplyData, int> BuildMergeSupplyStepTotals(UnitManager baseUnit, List<DebugMergeOrder> queue)
+    {
+        Dictionary<SupplyData, int> totals = new Dictionary<SupplyData, int>();
+        AccumulateUnitSupplySteps(baseUnit, baseUnit != null ? Mathf.Max(0, baseUnit.CurrentHP) : 0, totals);
+
+        if (queue != null)
+        {
+            for (int i = 0; i < queue.Count; i++)
+            {
+                DebugMergeOrder order = queue[i];
+                if (order == null || order.candidate == null)
+                    continue;
+                AccumulateUnitSupplySteps(order.candidate, Mathf.Max(0, order.candidate.CurrentHP), totals);
+            }
+        }
+
+        return totals;
+    }
+
+    private static void AccumulateUnitSupplySteps(UnitManager unit, int hp, Dictionary<SupplyData, int> totals)
+    {
+        if (unit == null || totals == null)
+            return;
+
+        IReadOnlyList<UnitEmbarkedSupply> supplies = unit.GetEmbarkedResources();
+        if (supplies == null)
+            return;
+
+        int safeHp = Mathf.Max(0, hp);
+        for (int i = 0; i < supplies.Count; i++)
+        {
+            UnitEmbarkedSupply embarked = supplies[i];
+            if (embarked == null || embarked.supply == null)
+                continue;
+
+            int amount = Mathf.Max(0, embarked.amount);
+            int steps = amount * safeHp;
+            if (steps <= 0)
+                continue;
+
+            if (totals.TryGetValue(embarked.supply, out int current))
+                totals[embarked.supply] = current + steps;
+            else
+                totals.Add(embarked.supply, steps);
+        }
+    }
+
+    private static List<SupplyData> BuildMergedSupplyDisplayOrder(UnitManager baseUnit, List<DebugMergeOrder> queue, Dictionary<SupplyData, int> totals)
+    {
+        List<SupplyData> order = new List<SupplyData>();
+        if (totals == null)
+            return order;
+
+        AppendSupplyOrderFromUnit(baseUnit, totals, order);
+        if (queue != null)
+        {
+            for (int i = 0; i < queue.Count; i++)
+            {
+                DebugMergeOrder item = queue[i];
+                if (item == null || item.candidate == null)
+                    continue;
+                AppendSupplyOrderFromUnit(item.candidate, totals, order);
+            }
+        }
+
+        foreach (SupplyData supply in totals.Keys)
+        {
+            if (supply != null && !order.Contains(supply))
+                order.Add(supply);
+        }
+
+        return order;
+    }
+
+    private static void AppendSupplyOrderFromUnit(UnitManager unit, Dictionary<SupplyData, int> totals, List<SupplyData> order)
+    {
+        if (unit == null || totals == null || order == null)
+            return;
+
+        IReadOnlyList<UnitEmbarkedSupply> supplies = unit.GetEmbarkedResources();
+        if (supplies == null)
+            return;
+
+        for (int i = 0; i < supplies.Count; i++)
+        {
+            UnitEmbarkedSupply embarked = supplies[i];
+            if (embarked == null || embarked.supply == null)
+                continue;
+            if (!totals.ContainsKey(embarked.supply))
+                continue;
+            if (order.Contains(embarked.supply))
+                continue;
+            order.Add(embarked.supply);
+        }
+    }
+
+    private static int ApplyMergedSupplyAmountsToBaseUnit(UnitManager baseUnit, Dictionary<SupplyData, int> supplyStepsByType, int resultHp)
+    {
+        if (baseUnit == null || supplyStepsByType == null)
+            return 0;
+
+        IReadOnlyList<UnitEmbarkedSupply> baseSupplies = baseUnit.GetEmbarkedResources();
+        if (baseSupplies == null)
+            return supplyStepsByType.Count;
+
+        for (int i = 0; i < baseSupplies.Count; i++)
+        {
+            UnitEmbarkedSupply embarked = baseSupplies[i];
+            if (embarked == null || embarked.supply == null)
+                continue;
+            if (!supplyStepsByType.TryGetValue(embarked.supply, out int totalSteps))
+                continue;
+
+            embarked.amount = resultHp > 0 ? Mathf.Max(0, totalSteps / resultHp) : 0;
+            supplyStepsByType.Remove(embarked.supply);
+        }
+
+        return supplyStepsByType.Count;
+    }
+
     private static string ResolveWeaponName(WeaponData weapon)
     {
         if (weapon == null)
@@ -697,6 +876,17 @@ public class PodeFundirSensorDebugWindow : EditorWindow
         if (!string.IsNullOrWhiteSpace(weapon.id))
             return weapon.id.Trim();
         return weapon.name;
+    }
+
+    private static string ResolveSupplyName(SupplyData supply)
+    {
+        if (supply == null)
+            return "(suprimento desconhecido)";
+        if (!string.IsNullOrWhiteSpace(supply.displayName))
+            return supply.displayName.Trim();
+        if (!string.IsNullOrWhiteSpace(supply.id))
+            return supply.id.Trim();
+        return supply.name;
     }
 
     private bool IsCandidateQueued(UnitManager candidate)

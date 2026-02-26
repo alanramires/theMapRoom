@@ -22,6 +22,16 @@ public class ServiceData : ScriptableObject
     [Header("Service Type")]
     [Tooltip("Combat: reparar/reabastecer/rearmar. Transfer: transferir estoque.")]
     public ServiceType serviceType = ServiceType.Combat;
+    [Tooltip("Marca se este item eh um servico prestado em campo. Desative para operacoes de movimentacao de estoque.")]
+    public bool isService = true;
+    [Tooltip("Servico recupera HP da unidade alvo.")]
+    public bool recuperaHp;
+    [Tooltip("Servico recupera autonomia da unidade alvo.")]
+    public bool recuperaAutonomia;
+    [Tooltip("Servico recupera municao da unidade alvo.")]
+    public bool recuperaMunicao;
+    [Tooltip("Quando ativo, este servico so pode ser aplicado entre unidades/construcoes supridoras.")]
+    public bool apenasEntreSupridores;
 
     [Header("Economy")]
     [Range(0, 100)]

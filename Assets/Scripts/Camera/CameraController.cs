@@ -41,6 +41,7 @@ public class CameraController : MonoBehaviour
     private bool _hasBounds;
     private Coroutine _focusRoutine;
     private CursorController _cursorController;
+    private TurnStateManager _turnStateManager;
 
     private Vector3 _dragStartWorld;
     private bool _dragging;
@@ -49,6 +50,7 @@ public class CameraController : MonoBehaviour
     {
         _cam = GetComponent<Camera>();
         _cursorController = FindAnyObjectByType<CursorController>();
+        _turnStateManager = FindAnyObjectByType<TurnStateManager>();
         if (!_cam.orthographic)
             Debug.LogWarning("[CameraController] Sua camera nao esta Orthographic.");
     }
@@ -71,6 +73,7 @@ public class CameraController : MonoBehaviour
     void HandleQuickZoomToggle()
     {
         if (!WasQuickZoomTogglePressedThisFrame()) return;
+        if (!IsQuickZoomToggleAllowed()) return;
 
         if (_cursorController == null)
             _cursorController = FindAnyObjectByType<CursorController>();
@@ -228,6 +231,17 @@ public class CameraController : MonoBehaviour
 #else
         return Input.GetKeyDown(KeyCode.M);
 #endif
+    }
+
+    bool IsQuickZoomToggleAllowed()
+    {
+        if (_turnStateManager == null)
+            _turnStateManager = FindAnyObjectByType<TurnStateManager>();
+
+        if (_turnStateManager == null)
+            return true;
+
+        return _turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral;
     }
 
     void PlayQuickZoomToggleSfx()

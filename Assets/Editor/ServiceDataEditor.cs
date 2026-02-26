@@ -13,6 +13,11 @@ public class ServiceDataEditor : Editor
         SerializedProperty descriptionProp = serializedObject.FindProperty("description");
         SerializedProperty spriteDefaultProp = serializedObject.FindProperty("spriteDefault");
         SerializedProperty serviceTypeProp = serializedObject.FindProperty("serviceType");
+        SerializedProperty isServiceProp = serializedObject.FindProperty("isService");
+        SerializedProperty recuperaHpProp = serializedObject.FindProperty("recuperaHp");
+        SerializedProperty recuperaAutonomiaProp = serializedObject.FindProperty("recuperaAutonomia");
+        SerializedProperty recuperaMunicaoProp = serializedObject.FindProperty("recuperaMunicao");
+        SerializedProperty apenasEntreSupridoresProp = serializedObject.FindProperty("apenasEntreSupridores");
         SerializedProperty percentCostProp = serializedObject.FindProperty("percentCost");
         SerializedProperty suppliesUsedProp = serializedObject.FindProperty("suppliesUsed");
         SerializedProperty serviceEfficiencyProp = serializedObject.FindProperty("serviceEfficiency");
@@ -28,6 +33,16 @@ public class ServiceDataEditor : Editor
             EditorGUILayout.PropertyField(spriteDefaultProp);
         if (serviceTypeProp != null)
             EditorGUILayout.PropertyField(serviceTypeProp);
+        if (isServiceProp != null)
+            EditorGUILayout.PropertyField(isServiceProp, new GUIContent("Is Service"));
+        if (recuperaHpProp != null)
+            EditorGUILayout.PropertyField(recuperaHpProp, new GUIContent("Recupera HP"));
+        if (recuperaAutonomiaProp != null)
+            EditorGUILayout.PropertyField(recuperaAutonomiaProp, new GUIContent("Recupera Autonomia"));
+        if (recuperaMunicaoProp != null)
+            EditorGUILayout.PropertyField(recuperaMunicaoProp, new GUIContent("Recupera Municao"));
+        if (apenasEntreSupridoresProp != null)
+            EditorGUILayout.PropertyField(apenasEntreSupridoresProp, new GUIContent("Apenas Entre Supridores"));
         if (percentCostProp != null)
             EditorGUILayout.PropertyField(percentCostProp, new GUIContent("Economy Percent Cost"));
         if (suppliesUsedProp != null)

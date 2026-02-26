@@ -21,28 +21,24 @@ MonoBehaviour:
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   maxHP: 10
-  defense: 14
-  armorClass: 1
+  defense: 15
+  armorClass: 2
   movement: 5
+  visao: 3
   movementCategory: 3
   militaryForce: 2
   unitClass: 8
   eliteLevel: 0
+  combatModifiers: []
   domain: 1
   heightLevel: 3
   aditionalDomainsAllowed: []
+  useExplicitPreferredAirHeight: 0
+  preferredAirHeight: 4
+  useExplicitPreferredNavalHeight: 0
+  preferredNavalHeight: 2
   skills: []
   autonomyData: {fileID: 0}
-  landingClass: 0
-  takeoffMode: 0
-  landingProcedure: 0
-  takeoffProcedure: 0
-  takeoffEndHeight: 4
-  takeoffRollMinHex: 0
-  takeoffRollMaxHex: 0
-  carrierCapable: 0
-  requiresStationaryToLand: 0
-  requiresStationaryToTakeoff: 0
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: e58612c9a6796da4eb35f981486fa0e4, type: 2}
     squadAmmunition: 4
@@ -50,43 +46,40 @@ MonoBehaviour:
     operationRangeMax: 4
     selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: e58612c9a6796da4eb35f981486fa0e4, type: 2}
-  embarkedSupplies:
-  - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-    amount: 200
-  - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-    amount: 500
-  - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-    amount: 200
   isSupplier: 1
-  supplierTier: 0
+  supplierTier: 1
   maxUnitsServedPerTurn: 2
   serviceRange: 0
   collectionRange: 1
-  supplierOperationDomains:
-  - domain: 0
-    heightLevel: 3
-  - domain: 1
-    heightLevel: 3
-  - domain: 3
-    heightLevel: 4
-  - domain: 3
-    heightLevel: 5
+  supplierOperationDomains: []
   supplierServicesProvided:
-  - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
   - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  supplierResources:
+  - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+    amount: 500
+  - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+    amount: 140
+  - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+    amount: 80
   isTransporter: 1
-  allowedEmbarkTerrains:
+  spriteTransport: {fileID: 0}
+  allowedEmbarkWhenTransporterAtTerrains:
   - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
   - {fileID: 11400000, guid: 47664243e1e61d84aa1c496ae463bd9c, type: 2}
-  allowedEmbarkConstructions:
+  allowedEmbarkWhenTransporterAtTerrainStructures: []
+  allowedEmbarkWhenTransporterAtConstructions:
   - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-  allowedDisembarkTerrains:
+  allowedDisembarkWhenTransporterAtTerrains:
   - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
   - {fileID: 11400000, guid: 47664243e1e61d84aa1c496ae463bd9c, type: 2}
-  allowedDisembarkConstructions:
+  allowedDisembarkWhenTransporterAtTerrainStructures: []
+  allowedDisembarkWhenTransporterAtConstructions:
   - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
+  passengersCanDisembarkAndGoesToTerrains: []
+  passengersCanDisembarkAndGoesToTerrainStructures: []
+  passengersCanDisembarkAndGoesToConstructions: []
   transportSlots:
   - slotId: hangar
     capacity: 2
@@ -102,6 +95,5 @@ MonoBehaviour:
     requiredSkills:
     - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
     blockedSkills: []
-  spriteTransport: {fileID: 0}
   autonomia: 90
   cost: 20000

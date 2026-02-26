@@ -188,6 +188,24 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] private SortingLayerReference combatProjectileSortingLayer;
     [SerializeField, HideInInspector] private bool combatProjectileSortingLayerInitialized;
     [SerializeField] private int combatProjectileSortingOrder = 210;
+    [Header("Supply Sequence Timing")]
+    [Tooltip("Pausa curta apos mover o cursor para permitir foco visual antes da animacao de suprimento.")]
+    [SerializeField] [Range(0f, 0.5f)] private float supplyCursorFocusDelay = 0.10f;
+    [Tooltip("Intervalo entre cada item de servico surgindo na animacao de suprimento.")]
+    [SerializeField] [Range(0f, 1f)] private float supplySpawnInterval = 0.12f;
+    [Tooltip("Padding apos o tempo de voo do item antes de aplicar o servico no alvo.")]
+    [SerializeField] [Range(0f, 1f)] private float supplyFlightPadding = 0.05f;
+    [Tooltip("Pausa apos concluir um alvo (load + hasActed) antes de ir para o proximo.")]
+    [SerializeField] [Range(0f, 1f)] private float supplyPostTargetDelay = 0.18f;
+    [Tooltip("Pausa final do supridor antes de tocar done e encerrar a acao.")]
+    [SerializeField] [Range(0f, 2f)] private float supplySupplierFinalDelay = 0.25f;
+    [Header("Supply Projectile FX")]
+    [Tooltip("Velocidade do item voando no suprimento (units/s).")]
+    [SerializeField] [Range(0.2f, 20f)] private float supplyProjectileSpeed = 5f;
+    [Tooltip("Duracao minima do voo do item de suprimento.")]
+    [SerializeField] [Range(0.03f, 2f)] private float supplyProjectileMinDuration = 0.12f;
+    [Tooltip("Escala do sprite do item de suprimento.")]
+    [SerializeField] [Range(0.05f, 3f)] private float supplyProjectileScale = 0.8f;
     [Header("Combat Death Sequence")]
     [Tooltip("Atraso antes de iniciar a sequencia de morte/explosao apos fim dos tiros.")]
     [SerializeField] [Range(0f, 2f)] private float combatDeathStartDelay = 0.20f;
@@ -239,6 +257,14 @@ public class AnimationManager : MonoBehaviour
     public int MirandoParabolaSamples => Mathf.Clamp(mirandoParabolaSamples, 8, 64);
     public int MirandoPreviewSortingLayerId => mirandoPreviewSortingLayer.Id;
     public int MirandoPreviewSortingOrder => mirandoPreviewSortingOrder;
+    public float SupplyCursorFocusDelay => Mathf.Clamp(supplyCursorFocusDelay, 0f, 0.5f);
+    public float SupplySpawnInterval => Mathf.Clamp(supplySpawnInterval, 0f, 1f);
+    public float SupplyFlightPadding => Mathf.Clamp(supplyFlightPadding, 0f, 1f);
+    public float SupplyPostTargetDelay => Mathf.Clamp(supplyPostTargetDelay, 0f, 1f);
+    public float SupplySupplierFinalDelay => Mathf.Clamp(supplySupplierFinalDelay, 0f, 2f);
+    public float SupplyProjectileSpeed => Mathf.Clamp(supplyProjectileSpeed, 0.2f, 20f);
+    public float SupplyProjectileMinDuration => Mathf.Clamp(supplyProjectileMinDuration, 0.03f, 2f);
+    public float SupplyProjectileScale => Mathf.Clamp(supplyProjectileScale, 0.05f, 3f);
     public float EmbarkForcedLandingDuration => Mathf.Clamp(embarkForcedLandingDuration, 0f, 2f);
     public float EmbarkAfterForcedLandingDelay => Mathf.Clamp(embarkAfterForcedLandingDelay, 0f, 2f);
     public float EmbarkDefaultMoveStepDuration => Mathf.Clamp(embarkDefaultMoveStepDuration, 0.04f, 0.8f);
@@ -671,6 +697,17 @@ public class AnimationManager : MonoBehaviour
             projectileScale = Mathf.Clamp(weapon.projectileScale, 0.05f, 3f);
 
         StartCoroutine(AnimateWeaponProjectileRoutine(from, to, sprite, trajectory, duration, projectileScale));
+        return duration;
+    }
+
+    public float PlayServiceProjectileStraight(Vector3 from, Vector3 to, Sprite sprite)
+    {
+        float distance = Vector2.Distance(new Vector2(from.x, from.y), new Vector2(to.x, to.y));
+        float speed = SupplyProjectileSpeed;
+        float duration = Mathf.Max(SupplyProjectileMinDuration, distance / speed);
+        Sprite resolved = sprite != null ? sprite : GetWhiteSprite();
+        float projectileScale = SupplyProjectileScale;
+        StartCoroutine(AnimateWeaponProjectileRoutine(from, to, resolved, WeaponTrajectoryType.Straight, duration, projectileScale));
         return duration;
     }
 

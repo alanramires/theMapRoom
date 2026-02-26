@@ -11,10 +11,13 @@ public partial class TurnStateManager
     private readonly List<PodeEmbarcarInvalidOption> cachedPodeEmbarcarInvalidTargets = new List<PodeEmbarcarInvalidOption>();
     private readonly List<PodeDesembarcarOption> cachedPodeDesembarcarTargets = new List<PodeDesembarcarOption>();
     private readonly List<PodeDesembarcarInvalidOption> cachedPodeDesembarcarInvalidTargets = new List<PodeDesembarcarInvalidOption>();
+    private readonly List<PodeSuprirOption> cachedPodeSuprirTargets = new List<PodeSuprirOption>();
+    private readonly List<PodeSuprirInvalidOption> cachedPodeSuprirInvalidTargets = new List<PodeSuprirInvalidOption>();
     private ConstructionManager cachedPodeCapturarConstruction;
     private string cachedPodeCapturarReason = string.Empty;
     private int cachedPodeFundirAdjacentCount;
     private string cachedPodeFundirReason = string.Empty;
+    private string cachedPodeSuprirReason = string.Empty;
 
     public IReadOnlyList<char> AvailableSensorActionCodes => availableSensorActionCodes;
     public IReadOnlyList<PodeMirarTargetOption> CachedPodeMirarTargets => cachedPodeMirarTargets;
@@ -23,6 +26,8 @@ public partial class TurnStateManager
     public IReadOnlyList<PodeEmbarcarInvalidOption> CachedPodeEmbarcarInvalidTargets => cachedPodeEmbarcarInvalidTargets;
     public IReadOnlyList<PodeDesembarcarOption> CachedPodeDesembarcarTargets => cachedPodeDesembarcarTargets;
     public IReadOnlyList<PodeDesembarcarInvalidOption> CachedPodeDesembarcarInvalidTargets => cachedPodeDesembarcarInvalidTargets;
+    public IReadOnlyList<PodeSuprirOption> CachedPodeSuprirTargets => cachedPodeSuprirTargets;
+    public IReadOnlyList<PodeSuprirInvalidOption> CachedPodeSuprirInvalidTargets => cachedPodeSuprirInvalidTargets;
 
     private void RefreshSensorsForCurrentState()
     {
@@ -121,6 +126,17 @@ public partial class TurnStateManager
         if (canMerge)
             availableSensorActionCodes.Add('F');
 
+        bool canSupply = PodeSuprirSensor.CollectOptions(
+            selectedUnit,
+            boardMap,
+            terrainDatabase,
+            cachedPodeSuprirTargets,
+            out cachedPodeSuprirReason,
+            cachedPodeSuprirInvalidTargets);
+        availableSensorActionCodes.Remove('S');
+        if (canSupply)
+            availableSensorActionCodes.Add('S');
+
         if (selectedUnit.AircraftOperationLockTurns > 0)
         {
             availableSensorActionCodes.Remove('A');
@@ -149,10 +165,13 @@ public partial class TurnStateManager
         cachedPodeEmbarcarInvalidTargets.Clear();
         cachedPodeDesembarcarTargets.Clear();
         cachedPodeDesembarcarInvalidTargets.Clear();
+        cachedPodeSuprirTargets.Clear();
+        cachedPodeSuprirInvalidTargets.Clear();
         cachedPodeCapturarConstruction = null;
         cachedPodeCapturarReason = string.Empty;
         cachedPodeFundirAdjacentCount = 0;
         cachedPodeFundirReason = string.Empty;
+        cachedPodeSuprirReason = string.Empty;
         landingOptionUnavailableReason = string.Empty;
         cachedAircraftOperationDecision = default;
         ClearLineOfFireArea();
@@ -230,6 +249,7 @@ public partial class TurnStateManager
         bool podeMudarAltitude = availableSensorActionCodes.Contains('L');
         bool podeCapturar = availableSensorActionCodes.Contains('C');
         bool podeFundir = availableSensorActionCodes.Contains('F');
+        bool podeSuprir = availableSensorActionCodes.Contains('S');
 
         Debug.Log(
             $"[Sensors] state={cursorState} | A={(podeMirar ? "sim" : "nao")} ({cachedPodeMirarTargets.Count}) | " +
@@ -237,6 +257,7 @@ public partial class TurnStateManager
             $"D={(podeDesembarcar ? "sim" : "nao")} ({cachedPodeDesembarcarTargets.Count}) | " +
             $"C={(podeCapturar ? "sim" : "nao")} | " +
             $"F={(podeFundir ? "sim" : "nao")} ({cachedPodeFundirAdjacentCount}) | " +
+            $"S={(podeSuprir ? "sim" : "nao")} ({cachedPodeSuprirTargets.Count}) | " +
             $"L={(podeMudarAltitude ? "sim" : "nao")}");
 
         string painel =
@@ -246,6 +267,7 @@ public partial class TurnStateManager
             $"Pode Desembarcar (\"D\"): {(podeDesembarcar ? "sim" : "nao")} | " +
             $"Pode Capturar (\"C\"): {(podeCapturar ? "sim" : "nao")} | " +
             $"Pode Fundir (\"F\"): {(podeFundir ? "sim" : "nao")} | " +
+            $"Pode Suprir (\"S\"): {(podeSuprir ? "sim" : "nao")} | " +
             $"Pode Mudar de Altitude (\"L\"): {(podeMudarAltitude ? "sim" : "nao")} | " +
             "Apenas Mover (\"M\") | " +
             "Desfazer Movimento (ESC) | " +
@@ -324,6 +346,10 @@ public partial class TurnStateManager
             painel += $"\nF elegiveis adjacentes (mesmo tipo): {cachedPodeFundirAdjacentCount}";
         else if (!string.IsNullOrWhiteSpace(cachedPodeFundirReason))
             painel += $"\nF indisponivel: {cachedPodeFundirReason}";
+        if (podeSuprir)
+            painel += $"\nS alvos validos: {cachedPodeSuprirTargets.Count}";
+        else if (!string.IsNullOrWhiteSpace(cachedPodeSuprirReason))
+            painel += $"\nS indisponivel: {cachedPodeSuprirReason}";
 
         Debug.Log(painel);
     }

@@ -235,6 +235,8 @@ MonoBehaviour:
   maxFuel: 99
   visao: 3
   embarkedWeaponsRuntime: []
+  embarkedResourcesRuntime: []
+  embarkedServicesRuntime: []
   appliedHasActed: 0
   appliedActiveTeamId: 0
   isEmbarked: 0

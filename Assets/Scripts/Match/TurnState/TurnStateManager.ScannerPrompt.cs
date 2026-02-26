@@ -136,6 +136,7 @@ public partial class TurnStateManager
         UpdateMirandoPreviewAnimation();
         UpdateEmbarkPreviewAnimation();
         UpdateMergeQueuePreviewAnimation();
+        UpdateSupplyQueuePreviewAnimation();
     }
 
     private void TrackRuntimeDebugLogs()
@@ -180,6 +181,7 @@ public partial class TurnStateManager
         disembarkSelectedLandingCellValid = false;
         disembarkLandingAutoEntered = false;
         ResetMergeRuntimeState();
+        ResetSupplyRuntimeState();
         ClearMirandoPreview();
         ClearEmbarkPreview();
     }
@@ -291,12 +293,35 @@ public partial class TurnStateManager
             return true;
         }
 
+        if (cursorState == CursorState.Suprindo &&
+            scannerPromptStep == ScannerPromptStep.MergeConfirm)
+        {
+            if (supplyTargetAutoEntered)
+            {
+                ExitSupplyStateToMovement();
+                return true;
+            }
+
+            ReturnToSupplyCandidateSelect();
+            return true;
+        }
+
+        if (cursorState == CursorState.Suprindo &&
+            scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
+        {
+            if (TryUndoLastQueuedSupplyOrderAndReturnToTarget())
+                return true;
+
+            ExitSupplyStateToMovement();
+            return true;
+        }
+
         return false;
     }
 
     private void ProcessScannerPromptInput()
     {
-        if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress || combatExecutionInProgress || captureExecutionInProgress || mergeExecutionInProgress)
+        if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress || combatExecutionInProgress || captureExecutionInProgress || mergeExecutionInProgress || supplyExecutionInProgress)
             return;
 
         if (cursorState == CursorState.Mirando)
@@ -307,6 +332,7 @@ public partial class TurnStateManager
         bool isEmbarkScannerState = cursorState == CursorState.Embarcando;
         bool isDisembarkScannerState = cursorState == CursorState.Desembarcando;
         bool isMergeScannerState = cursorState == CursorState.Fundindo;
+        bool isSupplyScannerState = cursorState == CursorState.Suprindo;
         if (isDisembarkScannerState)
         {
             ProcessDisembarkPromptInput();
@@ -316,6 +342,12 @@ public partial class TurnStateManager
         if (isMergeScannerState)
         {
             ProcessMergePromptInput();
+            return;
+        }
+
+        if (isSupplyScannerState)
+        {
+            ProcessSupplyPromptInput();
             return;
         }
 
@@ -354,6 +386,12 @@ public partial class TurnStateManager
             if (WasLetterPressedThisFrame('F'))
             {
                 HandleMergeActionRequested();
+                return;
+            }
+
+            if (WasLetterPressedThisFrame('S'))
+            {
+                HandleSupplyActionRequested();
                 return;
             }
 
@@ -806,11 +844,8 @@ public partial class TurnStateManager
                         yield break;
                     }
 
-                    if (selectedUnit.HasSkillId("vtol"))
-                    {
-                        float vtolFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(selectedUnit) : 0f;
-                        landingDuration = Mathf.Max(landingDuration, vtolFxDuration);
-                    }
+                    float vtolFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(selectedUnit) : 0f;
+                    landingDuration = Mathf.Max(landingDuration, vtolFxDuration);
                     if (landingDuration > 0f)
                         yield return new WaitForSeconds(landingDuration);
 
@@ -1447,11 +1482,8 @@ public partial class TurnStateManager
                     yield break;
                 }
 
-                if (transporter.HasSkillId("vtol"))
-                {
-                    float vtolFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(transporter) : 0f;
-                    landingDuration = Mathf.Max(landingDuration, vtolFxDuration);
-                }
+                float vtolFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(transporter) : 0f;
+                landingDuration = Mathf.Max(landingDuration, vtolFxDuration);
                 if (landingDuration > 0f)
                     yield return new WaitForSeconds(landingDuration);
 
@@ -3255,8 +3287,8 @@ public partial class TurnStateManager
     private void UpdateEmbarkPreviewAnimation()
     {
         bool shouldShow =
-            cursorState == CursorState.Embarcando &&
-            (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget || scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget) &&
+            (cursorState == CursorState.Embarcando &&
+             (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget || scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget)) &&
             embarkPreviewPathLength > 0.0001f &&
             embarkPreviewPathPoints.Count >= 2;
         if (!shouldShow)
@@ -3656,6 +3688,12 @@ public partial class TurnStateManager
                 return Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame;
 #else
                 return Input.GetKeyDown(KeyCode.F);
+#endif
+            case 'S':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.sKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.S);
 #endif
             default:
                 return false;
