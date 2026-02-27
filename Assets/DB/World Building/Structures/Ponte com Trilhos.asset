@@ -47,4 +47,14 @@ MonoBehaviour:
   forceEndMovementOnTerrainDomainForDomains:
   - domain: 2
     heightLevel: 2
-  roadRoutes: []
+  roadRoutes:
+  - routeName: Ponte do Trem Norte
+    cells:
+    - {x: 8, y: 5, z: 0}
+    - {x: 9, y: 6, z: 0}
+    - {x: 9, y: 7, z: 0}
+    - {x: 10, y: 8, z: 0}
+    - {x: 10, y: 9, z: 0}
+    - {x: 11, y: 9, z: 0}
+    - {x: 12, y: 9, z: 0}
+    - {x: 13, y: 9, z: 0}

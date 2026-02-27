@@ -85,6 +85,14 @@ public class ConstructionManager : MonoBehaviour
         return System.Array.Empty<SkillData>();
     }
 
+    public IReadOnlyList<SkillData> GetBlockedSkillsToEnter()
+    {
+        if (TryGetConstructionData(out ConstructionData data) && data.blockedSkills != null)
+            return data.blockedSkills;
+
+        return System.Array.Empty<SkillData>();
+    }
+
     public IReadOnlyList<TerrainSkillCostOverride> GetSkillCostOverrides()
     {
         if (TryGetConstructionData(out ConstructionData data) && data.skillCostOverrides != null)
@@ -161,8 +169,10 @@ public class ConstructionManager : MonoBehaviour
 
     private void Update()
     {
-        if (!Application.isPlaying)
+#if UNITY_EDITOR
+        if (!Application.isPlaying && IsEditingPrefabContext())
             return;
+#endif
 
         RefreshOccupancyVisualTint();
         RefreshHud();
@@ -587,7 +597,13 @@ public class ConstructionManager : MonoBehaviour
             if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
                 continue;
 
+            // In editor, CurrentCellPosition can lag behind if the unit was moved manually.
+            // Recompute by world position to keep occupancy tint/HUD consistent with in-game behavior.
             Vector3Int unitCell = unit.CurrentCellPosition;
+            Tilemap unitMap = unit.BoardTilemap != null ? unit.BoardTilemap : map;
+            if (unitMap != null)
+                unitCell = HexCoordinates.WorldToCell(unitMap, unit.transform.position);
+
             unitCell.z = 0;
             if (unitCell == currentCellPosition)
                 return unit;

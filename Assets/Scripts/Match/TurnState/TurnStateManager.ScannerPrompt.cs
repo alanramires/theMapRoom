@@ -395,6 +395,12 @@ public partial class TurnStateManager
                 return;
             }
 
+            if (WasLetterPressedThisFrame('T'))
+            {
+                HandleTransferActionRequested();
+                return;
+            }
+
             if (WasLetterPressedThisFrame('L'))
             {
                 HandleLandingSensorRequested();
@@ -1112,7 +1118,8 @@ public partial class TurnStateManager
                 return false;
             }
 
-            if (!UnitPassesSkillRequirement(unit, structure.requiredSkillsToEnter))
+            bool usesAdditionalStructureMode = StructureSupportsAdditionalLayerMode(structure, targetDomain, targetHeight);
+            if (!usesAdditionalStructureMode && !UnitPassesSkillRequirement(unit, structure.requiredSkillsToEnter))
             {
                 reason = "Unidade nao possui skill exigida pela estrutura para trocar de camada.";
                 return false;
@@ -1216,6 +1223,21 @@ public partial class TurnStateManager
             return true;
 
         if (structure.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
+        {
+            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
+            if (mode.domain == domain && mode.heightLevel == heightLevel)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool StructureSupportsAdditionalLayerMode(StructureData structure, Domain domain, HeightLevel heightLevel)
+    {
+        if (structure == null || structure.aditionalDomainsAllowed == null)
             return false;
 
         for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
@@ -3694,6 +3716,12 @@ public partial class TurnStateManager
                 return Keyboard.current != null && Keyboard.current.sKey.wasPressedThisFrame;
 #else
                 return Input.GetKeyDown(KeyCode.S);
+#endif
+            case 'T':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.T);
 #endif
             default:
                 return false;

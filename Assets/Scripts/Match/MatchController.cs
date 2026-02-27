@@ -389,6 +389,7 @@ public class MatchController : MonoBehaviour
             }
 
             unit.ResetActed();
+            unit.ClearReceivedSuppliesThisTurn();
         }
 
         pendingTurnStartUpkeep = false;

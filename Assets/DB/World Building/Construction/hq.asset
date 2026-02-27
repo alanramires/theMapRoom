@@ -23,6 +23,7 @@ MonoBehaviour:
   baseMovementCost: 1
   dpqData: {fileID: 11400000, guid: 8ccccc2f87fd0d64f941b0b356de2a68, type: 2}
   requiredSkillsToEnter: []
+  blockedSkills: []
   skillCostOverrides: []
   domain: 0
   heightLevel: 3

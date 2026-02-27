@@ -37,7 +37,8 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
-  skills: []
+  skills:
+  - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
   autonomyData: {fileID: 0}
   embarkedWeapons: []
   isSupplier: 1

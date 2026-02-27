@@ -82,8 +82,16 @@ public static class PodeSuprirSensor
         Vector3Int origin = supplier.CurrentCellPosition;
         origin.z = 0;
 
-        bool adjacentRange = supplierData.serviceRange == SupplierRangeMode.Adjacent1Hex;
-        List<UnitManager> targetsInRange = CollectTargetsInSupplyRange(supplier, boardMap, origin, adjacentRange, embarkedOnlyRange);
+        bool adjacentRange = supplierData.serviceRange == SupplierRangeMode.Adjacent1Hex
+            || supplierData.serviceRange == SupplierRangeMode.Hybrid0Or1Hex;
+        bool includeOriginCell = supplierData.serviceRange == SupplierRangeMode.Hybrid0Or1Hex;
+        List<UnitManager> targetsInRange = CollectTargetsInSupplyRange(
+            supplier,
+            boardMap,
+            origin,
+            adjacentRange,
+            embarkedOnlyRange,
+            includeOriginCell);
 
         for (int i = 0; i < targetsInRange.Count; i++)
         {
@@ -98,6 +106,12 @@ public static class PodeSuprirSensor
             if ((int)target.TeamId != (int)supplier.TeamId)
             {
                 AppendInvalid(invalidOutput, supplier, target, cell, "Unidade alvo de outro time.");
+                continue;
+            }
+
+            if (target.ReceivedSuppliesThisTurn)
+            {
+                AppendInvalid(invalidOutput, supplier, target, cell, "Unidade ja recebeu suprimentos nesta rodada.");
                 continue;
             }
 
@@ -139,7 +153,9 @@ public static class PodeSuprirSensor
         {
             reason = embarkedOnlyRange
                 ? "Sem unidades embarcadas validas para suprir."
-                : "Sem candidatos adjacentes validos para suprir.";
+                : (includeOriginCell
+                    ? "Sem candidatos validos no mesmo hex ou adjacentes para suprir."
+                    : "Sem candidatos adjacentes validos para suprir.");
             return false;
         }
 
@@ -151,7 +167,8 @@ public static class PodeSuprirSensor
         Tilemap boardMap,
         Vector3Int originCell,
         bool adjacentRange,
-        bool embarkedOnlyRange)
+        bool embarkedOnlyRange,
+        bool includeOriginCell = false)
     {
         var result = new List<UnitManager>();
         if (supplier == null)
@@ -197,6 +214,21 @@ public static class PodeSuprirSensor
             }
 
             return result;
+        }
+
+        if (includeOriginCell)
+        {
+            for (int i = 0; i < units.Length; i++)
+            {
+                UnitManager target = units[i];
+                if (target == null || target == supplier)
+                    continue;
+
+                Vector3Int cell = target.CurrentCellPosition;
+                cell.z = 0;
+                if (cell == originCell && !result.Contains(target))
+                    result.Add(target);
+            }
         }
         List<Vector3Int> neighbors = new List<Vector3Int>(6);
         UnitMovementPathRules.GetImmediateHexNeighbors(boardMap, originCell, neighbors);
@@ -250,6 +282,12 @@ public static class PodeSuprirSensor
         if (supplier == null || supplierData == null || target == null || services == null || services.Count == 0)
         {
             reason = "Contexto de suprimento invalido.";
+            return false;
+        }
+
+        if (target.ReceivedSuppliesThisTurn)
+        {
+            reason = "Unidade ja recebeu suprimentos nesta rodada.";
             return false;
         }
 
@@ -660,7 +698,8 @@ public static class PodeSuprirSensor
                 return false;
             }
 
-            if (!UnitPassesAnyRequiredSkill(unit, structure.requiredSkillsToEnter))
+            bool usesAdditionalStructureMode = StructureSupportsAdditionalLayerModeForSupply(structure, targetDomain, targetHeight);
+            if (!usesAdditionalStructureMode && !UnitPassesAnyRequiredSkill(unit, structure.requiredSkillsToEnter))
             {
                 reason = "skill exigida pela estrutura ausente";
                 return false;
@@ -762,6 +801,21 @@ public static class PodeSuprirSensor
             if (mode.domain == domain && mode.heightLevel == heightLevel)
                 return true;
         }
+        return false;
+    }
+
+    private static bool StructureSupportsAdditionalLayerModeForSupply(StructureData structure, Domain domain, HeightLevel heightLevel)
+    {
+        if (structure == null || structure.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
+        {
+            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
+            if (mode.domain == domain && mode.heightLevel == heightLevel)
+                return true;
+        }
+
         return false;
     }
 

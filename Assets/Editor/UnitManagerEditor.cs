@@ -206,8 +206,12 @@ public class UnitManagerEditor : Editor
                     if (seat == null)
                         continue;
 
-                    if (unit.TryDisembarkPassengerFromSeat(seat.slotIndex, seat.seatIndex, out _, out _))
+                    if (unit.TryDisembarkPassengerFromSeat(seat.slotIndex, seat.seatIndex, out UnitManager removed, out _))
+                    {
                         changed = true;
+                        if (removed != null)
+                            MarkUnitAndSceneDirty(removed);
+                    }
                 }
 
                 if (changed)
@@ -304,7 +308,7 @@ public class UnitManagerEditor : Editor
             return;
         }
 
-        DrawEmbarkedResourcesRuntimeSection();
+        DrawEmbarkedResourcesRuntimeSection(data);
         DrawEmbarkedServicesRuntimeSection();
     }
 
@@ -555,7 +559,7 @@ public class UnitManagerEditor : Editor
             embarkedWeaponsRuntimeProp.InsertArrayElementAtIndex(embarkedWeaponsRuntimeProp.arraySize);
     }
 
-    private void DrawEmbarkedResourcesRuntimeSection()
+    private void DrawEmbarkedResourcesRuntimeSection(UnitData unitData)
     {
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Embarked Supplies (Runtime)", EditorStyles.boldLabel);
@@ -601,6 +605,10 @@ public class UnitManagerEditor : Editor
                 EditorGUILayout.PropertyField(amountProp, new GUIContent("Amount"));
                 amountProp.intValue = Mathf.Max(0, amountProp.intValue);
             }
+            SupplyData selectedSupply = supplyProp != null ? supplyProp.objectReferenceValue as SupplyData : null;
+            int maxAmount = ResolveRuntimeSupplyMaxAmount(unitData, selectedSupply);
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.IntField("Max Amount (UnitData)", maxAmount);
 
             if (GUILayout.Button("Remove Slot"))
             {
@@ -614,6 +622,23 @@ public class UnitManagerEditor : Editor
 
         if (GUILayout.Button("Add Supply Slot"))
             embarkedResourcesRuntimeProp.InsertArrayElementAtIndex(embarkedResourcesRuntimeProp.arraySize);
+    }
+
+    private static int ResolveRuntimeSupplyMaxAmount(UnitData unitData, SupplyData supply)
+    {
+        if (unitData == null || supply == null || unitData.supplierResources == null)
+            return 0;
+
+        int total = 0;
+        for (int i = 0; i < unitData.supplierResources.Count; i++)
+        {
+            UnitEmbarkedSupply entry = unitData.supplierResources[i];
+            if (entry == null || entry.supply != supply)
+                continue;
+            total += Mathf.Max(0, entry.amount);
+        }
+
+        return Mathf.Max(0, total);
     }
 
     private void DrawEmbarkedServicesRuntimeSection()

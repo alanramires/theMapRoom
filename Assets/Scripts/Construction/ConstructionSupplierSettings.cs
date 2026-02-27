@@ -3,7 +3,8 @@ using UnityEngine;
 public enum ConstructionSupplierRangeMode
 {
     OverlappingOnly = 0,
-    Adjacent1Hex = 1
+    Adjacent1Hex = 1,
+    Hybrid0Or1Hex = 2
 }
 
 [System.Serializable]

@@ -52,6 +52,8 @@ public class UnitHudController : MonoBehaviour
     [SerializeField] private bool applyHudSorting = true;
     [SerializeField] private string hudSortingLayerName = "SFX";
     [SerializeField] private int hudSortingOrder = 50;
+    [SerializeField] private bool followParentSpriteSortingLayer = true;
+    [SerializeField] private int orderAboveParentSprite = 100;
     [SerializeField] private int worldHudOrderOffsetPerElement = 1;
 
     private void Awake()
@@ -370,12 +372,23 @@ public class UnitHudController : MonoBehaviour
             layerId = SortingLayer.NameToID("Default");
         }
 
+        if (followParentSpriteSortingLayer)
+        {
+            SpriteRenderer parentSprite = GetComponentInParent<SpriteRenderer>();
+            if (parentSprite != null)
+            {
+                layerId = parentSprite.sortingLayerID;
+                int minAboveParent = parentSprite.sortingOrder + Mathf.Max(1, orderAboveParentSprite);
+                order = Mathf.Max(order, minAboveParent);
+            }
+        }
+
         Canvas canvas = GetComponentInChildren<Canvas>(true);
         if (canvas != null)
         {
             canvas.overrideSorting = true;
             canvas.sortingLayerID = layerId;
-            canvas.sortingOrder = hudSortingOrder;
+            canvas.sortingOrder = order;
         }
 
         if (ammoPips != null && ammoPips.worldPips != null)

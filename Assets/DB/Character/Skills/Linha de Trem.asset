@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aec5091123b209d4c8b513b772829f77, type: 3}
   m_Name: Linha de Trem
   m_EditorClassIdentifier: Assembly-CSharp::SkillData
-  id: 
-  displayName: 
-  description: 
+  id: linhaDeTrem
+  displayName: Linha de Trem
+  description: Skill necessaria para andar em trilhos

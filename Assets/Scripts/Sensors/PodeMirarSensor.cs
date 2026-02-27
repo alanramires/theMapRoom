@@ -172,9 +172,27 @@ public static class PodeMirarSensor
                             out blockedCell,
                             enableLdtValidation,
                             enableLosValidation);
+                    bool hasValidLdtPath = true;
+                    if (!hasDirectLos && enableLdtValidation)
+                    {
+                        hasValidLdtPath = HasValidStraightLineOfFire(
+                            map,
+                            terrainDatabase,
+                            origin,
+                            targetCell,
+                            attacker,
+                            target,
+                            dpqAirHeightConfig,
+                            weapon,
+                            out _,
+                            out _,
+                            out _,
+                            enableLdtValidation: true,
+                            enableLosValidation: false);
+                    }
                     if (!hasDirectLos)
                     {
-                        if (enableLosValidation && enableSpotter && TryFindForwardObserverForIndirectFire(
+                        if (hasValidLdtPath && enableLosValidation && enableSpotter && TryFindForwardObserverForIndirectFire(
                                 attacker,
                                 target,
                                 map,
@@ -192,9 +210,19 @@ public static class PodeMirarSensor
 
                         if (!hasDirectLos)
                         {
-                            string invalidReason = enableLosValidation
-                                ? $"{InvalidReasonLosBlocked} ({blockedCell.x},{blockedCell.y}) | {InvalidReasonNoForwardObserver}"
-                                : InvalidReasonLdtBlocked;
+                            string invalidReason;
+                            if (!hasValidLdtPath)
+                            {
+                                invalidReason = InvalidReasonLdtBlocked;
+                            }
+                            else if (enableLosValidation)
+                            {
+                                invalidReason = $"{InvalidReasonLosBlocked} ({blockedCell.x},{blockedCell.y}) | {InvalidReasonNoForwardObserver}";
+                            }
+                            else
+                            {
+                                invalidReason = InvalidReasonLdtBlocked;
+                            }
                             AppendInvalid(
                                 invalidOutput,
                                 attacker,

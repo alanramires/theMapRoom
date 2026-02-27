@@ -16,6 +16,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private bool autoSnapWhenMovedInEditor = true;
     [SerializeField] private Vector3Int currentCellPosition = Vector3Int.zero;
     [SerializeField] private bool hasActed;
+    [SerializeField] private bool receivedSuppliesThisTurn;
     [SerializeField] private TeamId teamId = TeamId.Green;
     [SerializeField] private string unitId;
     [SerializeField] private int instanceId;
@@ -76,6 +77,7 @@ public class UnitManager : MonoBehaviour
     public int MaxFuel => maxFuel;
     public int Visao => Mathf.Max(1, visao);
     public bool HasActed => hasActed;
+    public bool ReceivedSuppliesThisTurn => receivedSuppliesThisTurn;
     public bool IsEmbarked => isEmbarked;
     public bool IsSelected => isSelected;
     public UnitDatabase UnitDatabase => unitDatabase;
@@ -318,6 +320,25 @@ public class UnitManager : MonoBehaviour
         hasActed = false;
         appliedHasActed = hasActed;
         RefreshActedVisual();
+    }
+
+    public void MarkReceivedSuppliesThisTurn()
+    {
+        SetReceivedSuppliesThisTurn(true);
+    }
+
+    public void ClearReceivedSuppliesThisTurn()
+    {
+        SetReceivedSuppliesThisTurn(false);
+    }
+
+    public void SetReceivedSuppliesThisTurn(bool value)
+    {
+        if (receivedSuppliesThisTurn == value)
+            return;
+
+        receivedSuppliesThisTurn = value;
+        UpdateDynamicName();
     }
 
     public void SetSelected(bool selected)
@@ -1294,8 +1315,7 @@ public class UnitManager : MonoBehaviour
         {
             SetSelected(false);
             SetSpriteVisible(false);
-            if (unitHud != null)
-                unitHud.gameObject.SetActive(false);
+            SetHudVisible(false);
             if (actedLockRenderer != null)
                 actedLockRenderer.enabled = false;
             return;
@@ -1306,8 +1326,7 @@ public class UnitManager : MonoBehaviour
         ClearEmbarkTransport();
 
         SetSpriteVisible(true);
-        if (unitHud != null)
-            unitHud.gameObject.SetActive(true);
+        SetHudVisible(true);
         RefreshActedVisual();
     }
 
@@ -1406,30 +1425,17 @@ public class UnitManager : MonoBehaviour
 #if UNITY_EDITOR
     private void HideHudForEditorEmbarkedPreview()
     {
+        SetHudVisible(false);
+    }
+#endif
+
+    private void SetHudVisible(bool visible)
+    {
         if (unitHud == null)
             return;
 
-        Canvas canvas = unitHud.GetComponentInChildren<Canvas>(true);
-        if (canvas != null)
-            canvas.enabled = false;
-
-        SpriteRenderer[] renderers = unitHud.GetComponentsInChildren<SpriteRenderer>(true);
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            SpriteRenderer r = renderers[i];
-            if (r != null)
-                r.enabled = false;
-        }
-
-        UnityEngine.UI.Image[] images = unitHud.GetComponentsInChildren<UnityEngine.UI.Image>(true);
-        for (int i = 0; i < images.Length; i++)
-        {
-            UnityEngine.UI.Image img = images[i];
-            if (img != null)
-                img.enabled = false;
-        }
+        unitHud.gameObject.SetActive(visible);
     }
-#endif
 
     private void SyncPreferredLayerPreferencesFromData(UnitData data)
     {
@@ -1521,7 +1527,8 @@ public class UnitManager : MonoBehaviour
         baseName = baseName.Replace(" ", string.Empty);
         int team = (int)teamId;
         int uid = instanceId > 0 ? instanceId : 0;
-        gameObject.name = $"{baseName}_T{team}_U{uid}";
+        string receivedShortcut = receivedSuppliesThisTurn ? "_X" : string.Empty;
+        gameObject.name = $"{baseName}_T{team}_U{uid}{receivedShortcut}";
     }
 
     private void TryAutoAssignLockRenderer()

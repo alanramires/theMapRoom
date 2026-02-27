@@ -247,9 +247,13 @@ public partial class TurnStateManager
             if (construction.TryResolveConstructionData(out ConstructionData constructionData) &&
                 MatchesAnyLayerMode(constructionData != null ? constructionData.forceEndMovementOnTerrainDomainForDomains : null, currentDomain, currentHeight))
             {
-                targetDomain = construction.GetDomain();
-                targetHeight = construction.GetHeightLevel();
-                reason = $"ForceEndMovement (Construction={construction.name})";
+                if (!TryResolveForcedEmergeLayerTarget(currentDomain, currentHeight, out targetDomain, out targetHeight))
+                {
+                    // Fallback de compatibilidade para contextos legados que ainda dependem do dominio nativo.
+                    targetDomain = construction.GetDomain();
+                    targetHeight = construction.GetHeightLevel();
+                }
+                reason = $"ForceEmerge (Construction={construction.name})";
                 return true;
             }
             // Se a construcao existir mas nao forcar neste contexto, faz fallback
@@ -268,9 +272,13 @@ public partial class TurnStateManager
             if (!hasTerrain)
                 return false;
 
-            targetDomain = terrain.domain;
-            targetHeight = terrain.heightLevel;
-            reason = $"ForceEndMovement (Structure+Terrain={structure.displayName}+{terrain.displayName})";
+            if (!TryResolveForcedEmergeLayerTarget(currentDomain, currentHeight, out targetDomain, out targetHeight))
+            {
+                // Fallback de compatibilidade para contextos legados que ainda dependem do dominio nativo.
+                targetDomain = terrain.domain;
+                targetHeight = terrain.heightLevel;
+            }
+            reason = $"ForceEmerge (Structure+Terrain={structure.displayName}+{terrain.displayName})";
             return true;
         }
 
@@ -280,10 +288,33 @@ public partial class TurnStateManager
         if (!MatchesAnyLayerMode(terrain.forceEndMovementOnTerrainDomainForDomains, currentDomain, currentHeight))
             return false;
 
-        targetDomain = terrain.domain;
-        targetHeight = terrain.heightLevel;
-        reason = $"ForceEndMovement (Terrain={terrain.displayName})";
+        if (!TryResolveForcedEmergeLayerTarget(currentDomain, currentHeight, out targetDomain, out targetHeight))
+        {
+            // Fallback de compatibilidade para contextos legados que ainda dependem do dominio nativo.
+            targetDomain = terrain.domain;
+            targetHeight = terrain.heightLevel;
+        }
+        reason = $"ForceEmerge (Terrain={terrain.displayName})";
         return true;
+    }
+
+    private static bool TryResolveForcedEmergeLayerTarget(
+        Domain currentDomain,
+        HeightLevel currentHeight,
+        out Domain targetDomain,
+        out HeightLevel targetHeight)
+    {
+        // "Forced to emerge": unidade submersa sobe para Naval/Surface.
+        if (currentDomain == Domain.Submarine || currentHeight == HeightLevel.Submerged)
+        {
+            targetDomain = Domain.Naval;
+            targetHeight = HeightLevel.Surface;
+            return true;
+        }
+
+        targetDomain = currentDomain;
+        targetHeight = currentHeight;
+        return false;
     }
 
     private static bool MatchesAnyLayerMode(IReadOnlyList<TerrainLayerMode> modes, Domain domain, HeightLevel heightLevel)

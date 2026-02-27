@@ -9,6 +9,8 @@ public class ConstructionHudController : MonoBehaviour
 {
     [Header("Captured")]
     [SerializeField] private Transform capturedContainer;
+    [SerializeField] private Image capturedBarImage;
+    [SerializeField] private SpriteRenderer capturedBarRenderer;
     [SerializeField] private Image capturedFillImage;
     [SerializeField] private SpriteRenderer capturedFillRenderer;
     [SerializeField] private TMP_Text capturedText;
@@ -43,6 +45,7 @@ public class ConstructionHudController : MonoBehaviour
     private void Awake()
     {
         AutoAssignReferences();
+        EnsureCaptureVisualOrder();
         EnsureFlameCaches();
         ApplySorting();
     }
@@ -56,6 +59,7 @@ public class ConstructionHudController : MonoBehaviour
     private void OnValidate()
     {
         AutoAssignReferences();
+        EnsureCaptureVisualOrder();
         EnsureFlameCaches();
         ApplySorting();
     }
@@ -64,12 +68,15 @@ public class ConstructionHudController : MonoBehaviour
     public void RefreshBindings()
     {
         AutoAssignReferences();
+        EnsureCaptureVisualOrder();
         EnsureFlameCaches();
         ApplySorting();
     }
 
     public void Apply(int currentCapture, int maxCapture, bool isCapturable, TeamId ownerTeam, bool hideCaptureBarBecauseOccupied)
     {
+        AutoAssignReferences();
+        EnsureCaptureVisualOrder();
         int safeMax = Mathf.Max(0, maxCapture);
         int clampedCurrent = Mathf.Clamp(currentCapture, 0, safeMax);
         float ratio = safeMax > 0 ? Mathf.Clamp01((float)clampedCurrent / safeMax) : 0f;
@@ -78,9 +85,25 @@ public class ConstructionHudController : MonoBehaviour
         if (capturedContainer != null && capturedContainer.gameObject.activeSelf != showContainer)
             capturedContainer.gameObject.SetActive(showContainer);
 
+        if (capturedBarImage != null)
+        {
+            if (capturedBarImage.gameObject.activeSelf != showContainer)
+                capturedBarImage.gameObject.SetActive(showContainer);
+            capturedBarImage.enabled = showContainer;
+        }
+
+        if (capturedBarRenderer != null)
+        {
+            if (capturedBarRenderer.gameObject.activeSelf != showContainer)
+                capturedBarRenderer.gameObject.SetActive(showContainer);
+            capturedBarRenderer.enabled = showContainer;
+        }
+
         if (capturedText != null)
         {
             capturedText.text = $"{clampedCurrent}/{safeMax}";
+            if (capturedText.gameObject.activeSelf != showContainer)
+                capturedText.gameObject.SetActive(showContainer);
             capturedText.enabled = showContainer;
         }
 
@@ -90,6 +113,8 @@ public class ConstructionHudController : MonoBehaviour
         {
             capturedFillImage.fillAmount = ratio;
             capturedFillImage.color = capturedColor;
+            if (capturedFillImage.gameObject.activeSelf != showContainer)
+                capturedFillImage.gameObject.SetActive(showContainer);
             capturedFillImage.enabled = showContainer;
         }
 
@@ -99,6 +124,8 @@ public class ConstructionHudController : MonoBehaviour
             s.x = Mathf.Max(0.001f, ratio);
             capturedFillRenderer.transform.localScale = s;
             capturedFillRenderer.color = capturedColor;
+            if (capturedFillRenderer.gameObject.activeSelf != showContainer)
+                capturedFillRenderer.gameObject.SetActive(showContainer);
             capturedFillRenderer.enabled = showContainer;
         }
 
@@ -237,28 +264,74 @@ public class ConstructionHudController : MonoBehaviour
 
     private void AutoAssignReferences()
     {
-        if (!IsChildOfThisHud(capturedContainer))
+        // Prefer explicit capture HUD names to avoid binding to wrong images/text after propagate operations.
+        Transform explicitCaptureBar = FindChildRecursive(transform, "capture_bar")
+            ?? FindChildRecursive(transform, "captured_container")
+            ?? FindChildRecursive(transform, "capture_container");
+        Transform explicitCaptureFill = FindChildRecursive(transform, "capture")
+            ?? FindChildRecursive(transform, "captured");
+        Transform explicitCaptureText = FindChildRecursive(transform, "capture_text")
+            ?? FindChildRecursive(transform, "captured_text");
+
+        if (explicitCaptureBar != null)
+            capturedContainer = explicitCaptureBar;
+        else if (!IsChildOfThisHud(capturedContainer))
             capturedContainer = FindChildRecursive(transform, "captured_container") ?? FindChildRecursive(transform, "capture_container");
+
+        if (!IsChildOfThisHud(capturedBarImage != null ? capturedBarImage.transform : null))
+        {
+            if (explicitCaptureBar != null)
+                capturedBarImage = explicitCaptureBar.GetComponent<Image>();
+            if (capturedBarImage == null && capturedContainer != null)
+                capturedBarImage = capturedContainer.GetComponent<Image>();
+        }
+
+        if (!IsChildOfThisHud(capturedBarRenderer != null ? capturedBarRenderer.transform : null))
+        {
+            if (explicitCaptureBar != null)
+                capturedBarRenderer = explicitCaptureBar.GetComponent<SpriteRenderer>();
+            if (capturedBarRenderer == null && capturedContainer != null)
+                capturedBarRenderer = capturedContainer.GetComponent<SpriteRenderer>();
+        }
+
+        if (explicitCaptureFill != null)
+        {
+            capturedFillImage = explicitCaptureFill.GetComponent<Image>();
+            capturedFillRenderer = explicitCaptureFill.GetComponent<SpriteRenderer>();
+        }
 
         if (!IsChildOfThisHud(capturedFillImage != null ? capturedFillImage.transform : null))
         {
             Transform captured = FindChildRecursive(transform, "captured") ?? FindChildRecursive(transform, "capture");
+            if (captured == null && capturedContainer != null)
+                captured = capturedContainer;
             if (captured != null)
                 capturedFillImage = captured.GetComponent<Image>();
+            if (capturedFillImage == null && capturedContainer != null)
+                capturedFillImage = capturedContainer.GetComponentInChildren<Image>(includeInactive: true);
         }
 
         if (!IsChildOfThisHud(capturedFillRenderer != null ? capturedFillRenderer.transform : null))
         {
             Transform captured = FindChildRecursive(transform, "captured") ?? FindChildRecursive(transform, "capture");
+            if (captured == null && capturedContainer != null)
+                captured = capturedContainer;
             if (captured != null)
                 capturedFillRenderer = captured.GetComponent<SpriteRenderer>();
+            if (capturedFillRenderer == null && capturedContainer != null)
+                capturedFillRenderer = capturedContainer.GetComponentInChildren<SpriteRenderer>(includeInactive: true);
         }
+
+        if (explicitCaptureText != null)
+            capturedText = explicitCaptureText.GetComponent<TMP_Text>();
 
         if (!IsChildOfThisHud(capturedText != null ? capturedText.transform : null))
         {
             Transform text = FindChildRecursive(transform, "captured_text") ?? FindChildRecursive(transform, "capture_text");
             if (text != null)
                 capturedText = text.GetComponent<TMP_Text>();
+            if (capturedText == null && capturedContainer != null)
+                capturedText = capturedContainer.GetComponentInChildren<TMP_Text>(includeInactive: true);
         }
 
         if (!IsChildOfThisHud(fire1))
@@ -267,6 +340,24 @@ public class ConstructionHudController : MonoBehaviour
             fire2 = FindChildRecursive(transform, "fire2");
         if (!IsChildOfThisHud(fire3))
             fire3 = FindChildRecursive(transform, "fire3");
+    }
+
+    private void EnsureCaptureVisualOrder()
+    {
+        RectTransform bar = capturedContainer as RectTransform;
+        RectTransform fill = capturedFillImage != null ? capturedFillImage.rectTransform : null;
+        RectTransform textRect = capturedText != null ? capturedText.rectTransform : null;
+        if (bar == null || fill == null || textRect == null)
+            return;
+
+        Transform parent = bar.parent;
+        if (parent == null || fill.parent != parent || textRect.parent != parent)
+            return;
+
+        int first = Mathf.Min(bar.GetSiblingIndex(), Mathf.Min(fill.GetSiblingIndex(), textRect.GetSiblingIndex()));
+        bar.SetSiblingIndex(first);
+        fill.SetSiblingIndex(first + 1);
+        textRect.SetSiblingIndex(first + 2);
     }
 
     private bool IsChildOfThisHud(Transform candidate)

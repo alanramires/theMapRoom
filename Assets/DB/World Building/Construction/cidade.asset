@@ -23,12 +23,11 @@ MonoBehaviour:
   baseMovementCost: 1
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
   requiredSkillsToEnter: []
+  blockedSkills: []
   skillCostOverrides: []
   domain: 0
   heightLevel: 3
-  aditionalDomainsAllowed:
-  - domain: 1
-    heightLevel: 3
+  aditionalDomainsAllowed: []
   alwaysAllowAirDomain: 1
   allowAircraftTakeoffAndLanding: 1
   legacyRequiredLandingSkills: []

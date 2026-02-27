@@ -105,11 +105,6 @@ public class StructureData : ScriptableObject
     [Tooltip("Rotas de rodovia desta estrutura (centro-a-centro dos hexes).")]
     public List<RoadRouteDefinition> roadRoutes = new List<RoadRouteDefinition>();
 
-    [Tooltip("Marca esta estrutura como trilho (Rail) para unidades com skill de linha de trem.")]
-    public bool isRail = false;
-    [Tooltip("Se true, bloqueia o uso de trilho por unidades com skill de linha de trem neste hex.")]
-    public bool structureBlocksRail = false;
-
     private void OnValidate()
     {
         if (requiredSkillsToEnter == null)

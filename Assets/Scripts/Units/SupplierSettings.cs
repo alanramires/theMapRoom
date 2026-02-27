@@ -11,7 +11,8 @@ public enum SupplierTier
 public enum SupplierRangeMode
 {
     EmbarkedOnly = 0,
-    Adjacent1Hex = 1
+    Adjacent1Hex = 1,
+    Hybrid0Or1Hex = 2
 }
 
 [System.Serializable]

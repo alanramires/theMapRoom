@@ -13,11 +13,14 @@ public partial class TurnStateManager
     private readonly List<PodeDesembarcarInvalidOption> cachedPodeDesembarcarInvalidTargets = new List<PodeDesembarcarInvalidOption>();
     private readonly List<PodeSuprirOption> cachedPodeSuprirTargets = new List<PodeSuprirOption>();
     private readonly List<PodeSuprirInvalidOption> cachedPodeSuprirInvalidTargets = new List<PodeSuprirInvalidOption>();
+    private readonly List<PodeTransferirOption> cachedPodeTransferirTargets = new List<PodeTransferirOption>();
+    private readonly List<PodeTransferirInvalidOption> cachedPodeTransferirInvalidTargets = new List<PodeTransferirInvalidOption>();
     private ConstructionManager cachedPodeCapturarConstruction;
     private string cachedPodeCapturarReason = string.Empty;
     private int cachedPodeFundirAdjacentCount;
     private string cachedPodeFundirReason = string.Empty;
     private string cachedPodeSuprirReason = string.Empty;
+    private string cachedPodeTransferirReason = string.Empty;
 
     public IReadOnlyList<char> AvailableSensorActionCodes => availableSensorActionCodes;
     public IReadOnlyList<PodeMirarTargetOption> CachedPodeMirarTargets => cachedPodeMirarTargets;
@@ -28,6 +31,8 @@ public partial class TurnStateManager
     public IReadOnlyList<PodeDesembarcarInvalidOption> CachedPodeDesembarcarInvalidTargets => cachedPodeDesembarcarInvalidTargets;
     public IReadOnlyList<PodeSuprirOption> CachedPodeSuprirTargets => cachedPodeSuprirTargets;
     public IReadOnlyList<PodeSuprirInvalidOption> CachedPodeSuprirInvalidTargets => cachedPodeSuprirInvalidTargets;
+    public IReadOnlyList<PodeTransferirOption> CachedPodeTransferirTargets => cachedPodeTransferirTargets;
+    public IReadOnlyList<PodeTransferirInvalidOption> CachedPodeTransferirInvalidTargets => cachedPodeTransferirInvalidTargets;
 
     private void RefreshSensorsForCurrentState()
     {
@@ -137,6 +142,16 @@ public partial class TurnStateManager
         if (canSupply)
             availableSensorActionCodes.Add('S');
 
+        bool canTransfer = PodeTransferirSensor.CollectOptions(
+            selectedUnit,
+            boardMap,
+            cachedPodeTransferirTargets,
+            out cachedPodeTransferirReason,
+            cachedPodeTransferirInvalidTargets);
+        availableSensorActionCodes.Remove('T');
+        if (canTransfer)
+            availableSensorActionCodes.Add('T');
+
         if (selectedUnit.AircraftOperationLockTurns > 0)
         {
             availableSensorActionCodes.Remove('A');
@@ -167,11 +182,14 @@ public partial class TurnStateManager
         cachedPodeDesembarcarInvalidTargets.Clear();
         cachedPodeSuprirTargets.Clear();
         cachedPodeSuprirInvalidTargets.Clear();
+        cachedPodeTransferirTargets.Clear();
+        cachedPodeTransferirInvalidTargets.Clear();
         cachedPodeCapturarConstruction = null;
         cachedPodeCapturarReason = string.Empty;
         cachedPodeFundirAdjacentCount = 0;
         cachedPodeFundirReason = string.Empty;
         cachedPodeSuprirReason = string.Empty;
+        cachedPodeTransferirReason = string.Empty;
         landingOptionUnavailableReason = string.Empty;
         cachedAircraftOperationDecision = default;
         ClearLineOfFireArea();
@@ -250,6 +268,7 @@ public partial class TurnStateManager
         bool podeCapturar = availableSensorActionCodes.Contains('C');
         bool podeFundir = availableSensorActionCodes.Contains('F');
         bool podeSuprir = availableSensorActionCodes.Contains('S');
+        bool podeTransferir = availableSensorActionCodes.Contains('T');
 
         Debug.Log(
             $"[Sensors] state={cursorState} | A={(podeMirar ? "sim" : "nao")} ({cachedPodeMirarTargets.Count}) | " +
@@ -258,6 +277,7 @@ public partial class TurnStateManager
             $"C={(podeCapturar ? "sim" : "nao")} | " +
             $"F={(podeFundir ? "sim" : "nao")} ({cachedPodeFundirAdjacentCount}) | " +
             $"S={(podeSuprir ? "sim" : "nao")} ({cachedPodeSuprirTargets.Count}) | " +
+            $"T={(podeTransferir ? "sim" : "nao")} ({cachedPodeTransferirTargets.Count}) | " +
             $"L={(podeMudarAltitude ? "sim" : "nao")}");
 
         string painel =
@@ -268,6 +288,7 @@ public partial class TurnStateManager
             $"Pode Capturar (\"C\"): {(podeCapturar ? "sim" : "nao")} | " +
             $"Pode Fundir (\"F\"): {(podeFundir ? "sim" : "nao")} | " +
             $"Pode Suprir (\"S\"): {(podeSuprir ? "sim" : "nao")} | " +
+            $"Pode Transferir (\"T\"): {(podeTransferir ? "sim" : "nao")} | " +
             $"Pode Mudar de Altitude (\"L\"): {(podeMudarAltitude ? "sim" : "nao")} | " +
             "Apenas Mover (\"M\") | " +
             "Desfazer Movimento (ESC) | " +
@@ -350,6 +371,10 @@ public partial class TurnStateManager
             painel += $"\nS alvos validos: {cachedPodeSuprirTargets.Count}";
         else if (!string.IsNullOrWhiteSpace(cachedPodeSuprirReason))
             painel += $"\nS indisponivel: {cachedPodeSuprirReason}";
+        if (podeTransferir)
+            painel += $"\nT opcoes validas: {cachedPodeTransferirTargets.Count}";
+        else if (!string.IsNullOrWhiteSpace(cachedPodeTransferirReason))
+            painel += $"\nT indisponivel: {cachedPodeTransferirReason}";
 
         Debug.Log(painel);
     }

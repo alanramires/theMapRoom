@@ -32,7 +32,7 @@ public class StructureDataEditor : Editor
         EditorGUILayout.HelpBox(
             "No par Estrutura+Terreno, unidades nesses dominios/alturas encerram movimento no dominio do terreno base.",
             MessageType.Info);
-        DrawIfExists(serializedObject.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domains End Their Movement On The Terrain Domain");
+        DrawIfExists(serializedObject.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domain Are Forced To Emerge");
 
         serializedObject.ApplyModifiedProperties();
     }

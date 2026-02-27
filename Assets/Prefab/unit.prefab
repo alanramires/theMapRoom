@@ -66,7 +66,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 519888321
-  m_SortingOrder: 50
+  m_SortingOrder: 500
   m_TargetDisplay: 0
 --- !u!114 &7181572522360844851
 MonoBehaviour:
@@ -337,7 +337,7 @@ MonoBehaviour:
   transportIndicatorRoot: {fileID: 5439601904325997685}
   applyHudSorting: 1
   hudSortingLayerName: SFX
-  hudSortingOrder: 50
+  hudSortingOrder: 500
   worldHudOrderOffsetPerElement: 1
 --- !u!1 &2439568719226469460
 GameObject:

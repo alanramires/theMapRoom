@@ -68,6 +68,14 @@ public static class ConstructionDataTools
             if (PropagateHudLayoutForConstruction(constructionPrefab, construction))
                 hudUpdated++;
 
+            ConstructionHudController hud = construction.GetComponentInChildren<ConstructionHudController>(true);
+            if (hud != null)
+            {
+                Undo.RecordObject(hud, "Propagate Construction HUD Refresh Bindings");
+                hud.RefreshBindings();
+                EditorUtility.SetDirty(hud);
+            }
+
             construction.SetCurrentCapturePoints(construction.CapturePointsMax);
             EditorUtility.SetDirty(construction);
             updated++;
@@ -92,6 +100,7 @@ public static class ConstructionDataTools
         bool changed = false;
         Transform sourceRoot = sourcePrefab.transform;
         Transform targetRoot = targetGo.transform;
+        HashSet<string> allowedHudRootNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (int i = 0; i < sourceRoot.childCount; i++)
         {
@@ -99,6 +108,7 @@ public static class ConstructionDataTools
             if (!IsHudRoot(sourceChild))
                 continue;
 
+            allowedHudRootNames.Add(sourceChild.name);
             Transform targetChild = FindDirectChildByName(targetRoot, sourceChild.name);
             if (targetChild == null)
             {
@@ -110,6 +120,20 @@ public static class ConstructionDataTools
             }
 
             changed |= CopyTransformTreeLayout(sourceChild, targetChild);
+        }
+
+        // Clean stale HUD roots left by older scene instances.
+        for (int i = targetRoot.childCount - 1; i >= 0; i--)
+        {
+            Transform child = targetRoot.GetChild(i);
+            if (child == null || !IsHudRoot(child))
+                continue;
+
+            if (allowedHudRootNames.Contains(child.name))
+                continue;
+
+            Undo.DestroyObjectImmediate(child.gameObject);
+            changed = true;
         }
 
         if (!changed)
@@ -157,6 +181,21 @@ public static class ConstructionDataTools
             }
 
             changed |= CopyTransformTreeLayout(sourceChild, targetChild);
+        }
+
+        // Remove stale direct children not present in source tree (old propagated leftovers).
+        for (int i = targetRoot.childCount - 1; i >= 0; i--)
+        {
+            Transform targetChild = targetRoot.GetChild(i);
+            if (targetChild == null)
+                continue;
+
+            Transform sourceChild = FindDirectChildByName(sourceRoot, targetChild.name);
+            if (sourceChild != null)
+                continue;
+
+            Undo.DestroyObjectImmediate(targetChild.gameObject);
+            changed = true;
         }
 
         return changed;

@@ -17,7 +17,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
     initialTeamId: 0
     cellPosition: {x: 1, y: 0, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 10
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -33,7 +33,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialTeamId: 2
     cellPosition: {x: 28, y: 5, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -49,7 +49,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialTeamId: 3
     cellPosition: {x: 13, y: -10, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -65,7 +65,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
     initialTeamId: 3
     cellPosition: {x: 13, y: -9, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -81,7 +81,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialTeamId: 0
     cellPosition: {x: -1, y: 1, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -97,7 +97,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
     initialTeamId: -1
     cellPosition: {x: 9, y: -8, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -113,7 +113,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
     initialTeamId: 2
     cellPosition: {x: 30, y: 2, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -129,7 +129,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
     initialTeamId: -1
     cellPosition: {x: 12, y: -11, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -145,7 +145,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
     initialTeamId: 1
     cellPosition: {x: 29, y: -2, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -161,7 +161,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
     initialTeamId: 1
     cellPosition: {x: 24, y: -4, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -177,7 +177,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
     initialTeamId: -1
     cellPosition: {x: 7, y: -3, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -193,7 +193,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialTeamId: 0
     cellPosition: {x: 0, y: 1, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 2
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -205,11 +205,11 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Cidade_T-1_C21
+  - id: Cidade_T0_C21
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
     initialTeamId: -1
     cellPosition: {x: 7, y: 2, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -225,7 +225,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
     initialTeamId: 0
     cellPosition: {x: -1, y: 0, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -241,7 +241,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialTeamId: 2
     cellPosition: {x: 30, y: 5, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -257,7 +257,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
     initialTeamId: 0
     cellPosition: {x: 24, y: -7, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -273,7 +273,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
     initialTeamId: 2
     cellPosition: {x: 29, y: 5, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 40
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -289,7 +289,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
     initialTeamId: 1
     cellPosition: {x: 29, y: -3, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 40
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -321,7 +321,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
     initialTeamId: 2
     cellPosition: {x: 26, y: 3, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -337,7 +337,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialTeamId: 1
     cellPosition: {x: 28, y: -3, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -353,7 +353,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
     initialTeamId: 2
     cellPosition: {x: 30, y: 3, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -369,7 +369,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
     initialTeamId: 0
     cellPosition: {x: 0, y: 0, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 40
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -385,7 +385,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
     initialTeamId: -1
     cellPosition: {x: 36, y: 8, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -401,7 +401,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
     initialTeamId: 3
     cellPosition: {x: 15, y: -12, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -417,7 +417,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
     initialTeamId: 0
     cellPosition: {x: 2, y: 2, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 5
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -433,7 +433,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
     initialTeamId: -1
     cellPosition: {x: 35, y: 9, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -449,7 +449,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
     initialTeamId: 0
     cellPosition: {x: 5, y: -8, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -465,7 +465,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialTeamId: 1
     cellPosition: {x: 30, y: -3, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -481,7 +481,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialTeamId: -1
     cellPosition: {x: -6, y: 7, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -497,7 +497,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
     initialTeamId: 3
     cellPosition: {x: 14, y: -11, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 40
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -513,7 +513,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialTeamId: 3
     cellPosition: {x: 14, y: -10, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -529,7 +529,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialTeamId: 0
     cellPosition: {x: 4, y: 4, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -545,7 +545,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
     initialTeamId: -1
     cellPosition: {x: 36, y: 10, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -561,7 +561,7 @@ MonoBehaviour:
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
     initialTeamId: -1
     cellPosition: {x: -11, y: 5, z: 0}
-    initialCapturePoints: 0
+    initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -573,11 +573,11 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Cidade_T-1_C47
+  - id: Cidade_T2_C16
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialTeamId: 2
     cellPosition: {x: -11, y: -6, z: 0}
-    initialCapturePoints: -1
+    initialCapturePoints: 14
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -694,6 +694,112 @@ MonoBehaviour:
         quantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: Cidade_T0_C45
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: -1
+    cellPosition: {x: 22, y: 9, z: 0}
+    initialCapturePoints: 20
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      canProduceAndSellUnits: 00000000
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: Aeroporto_T0_C28
+    construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
+    initialTeamId: 0
+    cellPosition: {x: 18, y: 10, z: 0}
+    initialCapturePoints: 30
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      canProduceAndSellUnits: 00000000
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: HQ_T0_C47
+    construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
+    initialTeamId: 0
+    cellPosition: {x: 10, y: 7, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 1
+      isCapturable: 1
+      capturePointsMax: 40
+      capturedIncoming: 2000
+      canProduceAndSellUnits: 01000000
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  - id: Barracks_T0_C48
+    construction: {fileID: 11400000, guid: 5572b2429e4e3fb43a7e49289c1fac2e, type: 2}
+    initialTeamId: 0
+    cellPosition: {x: 8, y: 5, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      canProduceAndSellUnits: 00000000
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}

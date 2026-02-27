@@ -22,8 +22,7 @@ MonoBehaviour:
   alwaysAllowAirDomain: 1
   baseMovementCost: 1
   dpqData: {fileID: 11400000, guid: 24e0fd1ecd7c6bf4eb8f3d8c215d14ef, type: 2}
-  requiredSkillsToEnter:
-  - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
+  requiredSkillsToEnter: []
   blockedSkills: []
   skillCostOverrides: []
   canAlsoBeBuiltOnTheFollowDomains: []
@@ -47,4 +46,29 @@ MonoBehaviour:
   forceEndMovementOnTerrainDomainForDomains:
   - domain: 2
     heightLevel: 2
-  roadRoutes: []
+  roadRoutes:
+  - routeName: Ferrovia Norte
+    cells:
+    - {x: 0, y: 1, z: 0}
+    - {x: 1, y: 1, z: 0}
+    - {x: 2, y: 1, z: 0}
+    - {x: 3, y: 1, z: 0}
+    - {x: 4, y: 1, z: 0}
+    - {x: 5, y: 1, z: 0}
+    - {x: 6, y: 1, z: 0}
+    - {x: 7, y: 2, z: 0}
+    - {x: 7, y: 3, z: 0}
+    - {x: 8, y: 4, z: 0}
+    - {x: 8, y: 5, z: 0}
+  - routeName: Ferrovia da Ilha Norte
+    cells:
+    - {x: 13, y: 9, z: 0}
+    - {x: 14, y: 9, z: 0}
+    - {x: 15, y: 9, z: 0}
+    - {x: 16, y: 9, z: 0}
+    - {x: 17, y: 9, z: 0}
+    - {x: 18, y: 9, z: 0}
+    - {x: 19, y: 9, z: 0}
+    - {x: 20, y: 9, z: 0}
+    - {x: 21, y: 9, z: 0}
+    - {x: 22, y: 9, z: 0}

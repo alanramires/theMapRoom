@@ -24,7 +24,7 @@ public class TerrainTypeDataEditor : Editor
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Naval Ops", EditorStyles.boldLabel);
-        DrawIfExists(serializedObject.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domains End Their Movement On The Terrain Domain");
+        DrawIfExists(serializedObject.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domain Are Forced To Emerge");
 
         serializedObject.ApplyModifiedProperties();
     }

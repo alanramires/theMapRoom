@@ -33,7 +33,7 @@ public class ConstructionDataEditor : Editor
         EditorGUILayout.HelpBox(
             "Unidades nesses dominios/alturas encerram movimento no dominio nativo da construcao.",
             MessageType.Info);
-        DrawIfExists(so.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domains End Their Movement On The Terrain Domain");
+        DrawIfExists(so.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domain Are Forced To Emerge");
     }
 
     private static void DrawAircraftOpsSection(SerializedObject so)

@@ -81,9 +81,9 @@ public class ConstructionData : ScriptableObject
     public bool isSupplier = false;
     public SupplierTier supplierTier = SupplierTier.Hub;
     [Min(0)] public int maxUnitsServedPerTurn = 0;
-    [Tooltip("OverlappingOnly por padrao. Use Adjacent1Hex para casos como porto atendendo navios atracados.")]
+    [Tooltip("OverlappingOnly por padrao. Use Adjacent1Hex (so 1 hex) ou Hybrid0Or1Hex (mesmo hex + 1 hex).")]
     public ConstructionSupplierRangeMode serviceRange = ConstructionSupplierRangeMode.OverlappingOnly;
-    [Tooltip("OverlappingOnly por padrao.")]
+    [Tooltip("OverlappingOnly por padrao. Tambem suporta Adjacent1Hex e Hybrid0Or1Hex.")]
     public ConstructionSupplierRangeMode collectionRange = ConstructionSupplierRangeMode.OverlappingOnly;
 
     [Header("Construction Supplier Operation Domain")]

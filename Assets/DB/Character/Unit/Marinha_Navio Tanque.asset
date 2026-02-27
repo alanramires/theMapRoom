@@ -42,9 +42,9 @@ MonoBehaviour:
   embarkedWeapons: []
   isSupplier: 1
   supplierTier: 0
-  maxUnitsServedPerTurn: 2
+  maxUnitsServedPerTurn: 1
   serviceRange: 1
-  collectionRange: 0
+  collectionRange: 2
   supplierOperationDomains:
   - domain: 1
     heightLevel: 3

@@ -716,9 +716,9 @@ public class CursorController : MonoBehaviour
     private bool WasAdvanceTurnPressedThisFrame()
     {
 #if ENABLE_INPUT_SYSTEM
-        return Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame;
+        return Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame;
 #else
-        return Input.GetKeyDown(KeyCode.T);
+        return Input.GetKeyDown(KeyCode.R);
 #endif
     }
 

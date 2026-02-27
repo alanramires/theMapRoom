@@ -73,6 +73,9 @@ public partial class TurnStateManager
             }
         }
 
+        if (any)
+            target.MarkReceivedSuppliesThisTurn();
+
         return any;
     }
 

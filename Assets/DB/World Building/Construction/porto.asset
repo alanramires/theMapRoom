@@ -23,6 +23,7 @@ MonoBehaviour:
   baseMovementCost: 1
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
   requiredSkillsToEnter: []
+  blockedSkills: []
   skillCostOverrides: []
   domain: 0
   heightLevel: 3
@@ -54,17 +55,17 @@ MonoBehaviour:
   - domain: 1
     heightLevel: 3
   supplierServicesProvided:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+  - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   supplierResources:
-  - supply: {fileID: 0}
-    maxCapacity: 0
-  - supply: {fileID: 0}
-    maxCapacity: 0
-  - supply: {fileID: 0}
-    maxCapacity: 0
+  - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+    maxCapacity: -1
+  - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+    maxCapacity: -1
+  - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+    maxCapacity: -1
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isCapturable: 1
@@ -76,5 +77,15 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 59c2875292c8d004690a6847461bedb0, type: 2}
     - {fileID: 11400000, guid: b4eaf3943a963694c82f0fd32248224c, type: 2}
     canProvideSupplies: 1
-    offeredSupplies: []
-    offeredServices: []
+    offeredSupplies:
+    - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+      quantity: 2147483647
+    - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+      quantity: 2147483647
+    - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+      quantity: 2147483647
+    offeredServices:
+    - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+    - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+    - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+    - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}

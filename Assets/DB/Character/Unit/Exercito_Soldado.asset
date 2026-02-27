@@ -23,19 +23,51 @@ MonoBehaviour:
   spriteYellow: {fileID: 0}
   maxHP: 10
   defense: 10
+  armorClass: 0
   movement: 3
+  visao: 3
   movementCategory: 2
+  militaryForce: 0
+  unitClass: 0
+  eliteLevel: 0
+  combatModifiers: []
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
+  useExplicitPreferredAirHeight: 0
+  preferredAirHeight: 4
+  useExplicitPreferredNavalHeight: 0
+  preferredNavalHeight: 2
   skills:
   - {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
   - {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
+  autonomyData: {fileID: 0}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: ef5934c037728ac4093d260f60e5fb03, type: 2}
     squadAmmunition: 9
     operationRangeMin: 1
     operationRangeMax: 1
+    selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: ef5934c037728ac4093d260f60e5fb03, type: 2}
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
+  supplierResources: []
+  isTransporter: 0
+  spriteTransport: {fileID: 0}
+  allowedEmbarkWhenTransporterAtTerrains: []
+  allowedEmbarkWhenTransporterAtTerrainStructures: []
+  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtTerrains: []
+  allowedDisembarkWhenTransporterAtTerrainStructures: []
+  allowedDisembarkWhenTransporterAtConstructions: []
+  passengersCanDisembarkAndGoesToTerrains: []
+  passengersCanDisembarkAndGoesToTerrainStructures: []
+  passengersCanDisembarkAndGoesToConstructions: []
+  transportSlots: []
   autonomia: 99
   cost: 1000
