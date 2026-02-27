@@ -5,6 +5,7 @@ using UnityEngine.Tilemaps;
 public static class UnitMovementPathRules
 {
     private const int RoadBonusMinBaseMove = 4;
+    private const string RailSkillId = "Linha de Trem";
 
     public static Dictionary<Vector3Int, List<Vector3Int>> CalcularCaminhosValidos(
         Tilemap terrainTilemap,
@@ -235,6 +236,11 @@ public static class UnitMovementPathRules
     {
         if (unit == null)
             return false;
+
+        // Regra especial: unidade com skill de linha de trem so anda em hex com estrutura Rail
+        // e sem bloqueio explicito de trilho, independentemente da hierarquia padrao.
+        if (unit.HasSkillId(RailSkillId))
+            return structure != null && structure.isRail && !structure.structureBlocksRail;
 
         Domain currentDomain = unit.GetDomain();
         HeightLevel currentHeight = unit.GetHeightLevel();

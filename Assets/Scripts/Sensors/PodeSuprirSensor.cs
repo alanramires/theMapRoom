@@ -37,7 +37,8 @@ public static class PodeSuprirSensor
             return false;
         }
 
-        if (!SupportsOperationDomain(supplierData, supplier.GetDomain(), supplier.GetHeightLevel()))
+        bool embarkedOnlyRange = supplierData.serviceRange == SupplierRangeMode.EmbarkedOnly;
+        if (!embarkedOnlyRange && !SupportsOperationDomain(supplierData, supplier.GetDomain(), supplier.GetHeightLevel()))
         {
             reason =
                 $"Supplier fora do Supplier Operation Domain atual ({supplier.GetDomain()}/{supplier.GetHeightLevel()}). " +
@@ -82,12 +83,13 @@ public static class PodeSuprirSensor
         origin.z = 0;
 
         bool adjacentRange = supplierData.serviceRange == SupplierRangeMode.Adjacent1Hex;
-        List<UnitManager> targetsInRange = CollectTargetsInSupplyRange(supplier, boardMap, origin, adjacentRange);
+        List<UnitManager> targetsInRange = CollectTargetsInSupplyRange(supplier, boardMap, origin, adjacentRange, embarkedOnlyRange);
 
         for (int i = 0; i < targetsInRange.Count; i++)
         {
             UnitManager target = targetsInRange[i];
-            if (target == null || target == supplier || !target.gameObject.activeInHierarchy || target.IsEmbarked)
+            bool isEmbarkedPassenger = target != null && target.IsEmbarked && target.EmbarkedTransporter == supplier;
+            if (target == null || target == supplier || (!target.gameObject.activeInHierarchy && !isEmbarkedPassenger))
                 continue;
 
             Vector3Int cell = target.CurrentCellPosition;
@@ -135,7 +137,9 @@ public static class PodeSuprirSensor
 
         if (output.Count <= 0)
         {
-            reason = "Sem candidatos adjacentes validos para suprir.";
+            reason = embarkedOnlyRange
+                ? "Sem unidades embarcadas validas para suprir."
+                : "Sem candidatos adjacentes validos para suprir.";
             return false;
         }
 
@@ -146,11 +150,32 @@ public static class PodeSuprirSensor
         UnitManager supplier,
         Tilemap boardMap,
         Vector3Int originCell,
-        bool adjacentRange)
+        bool adjacentRange,
+        bool embarkedOnlyRange)
     {
         var result = new List<UnitManager>();
         if (supplier == null)
             return result;
+
+        if (embarkedOnlyRange)
+        {
+            IReadOnlyList<UnitTransportSeatRuntime> seats = supplier.TransportedUnitSlots;
+            if (seats == null || seats.Count <= 0)
+                return result;
+
+            for (int i = 0; i < seats.Count; i++)
+            {
+                UnitTransportSeatRuntime seat = seats[i];
+                UnitManager passenger = seat != null ? seat.embarkedUnit : null;
+                if (passenger == null || !passenger.IsEmbarked || passenger.EmbarkedTransporter != supplier)
+                    continue;
+                if (result.Contains(passenger))
+                    continue;
+                result.Add(passenger);
+            }
+
+            return result;
+        }
 
         UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         if (units == null || units.Length <= 0)
@@ -228,24 +253,33 @@ public static class PodeSuprirSensor
             return false;
         }
 
-        bool domainCompatible = IsDomainCompatibleForSupply(
-            supplier,
-            supplierData,
-            target,
-            boardMap,
-            terrainDatabase,
-            out forceLandBeforeSupply,
-            out forceTakeoffBeforeSupply,
-            out forceSurfaceBeforeSupply,
-            out plannedServiceDomain,
-            out plannedServiceHeight,
-            out string domainReason);
-        if (!domainCompatible)
+        bool isEmbarkedPassenger = target.IsEmbarked && target.EmbarkedTransporter == supplier;
+        if (!isEmbarkedPassenger)
         {
-            reason = string.IsNullOrWhiteSpace(domainReason)
-                ? "Dominio/altura incompativeis para suprimento."
-                : domainReason;
-            return false;
+            bool domainCompatible = IsDomainCompatibleForSupply(
+                supplier,
+                supplierData,
+                target,
+                boardMap,
+                terrainDatabase,
+                out forceLandBeforeSupply,
+                out forceTakeoffBeforeSupply,
+                out forceSurfaceBeforeSupply,
+                out plannedServiceDomain,
+                out plannedServiceHeight,
+                out string domainReason);
+            if (!domainCompatible)
+            {
+                reason = string.IsNullOrWhiteSpace(domainReason)
+                    ? "Dominio/altura incompativeis para suprimento."
+                    : domainReason;
+                return false;
+            }
+        }
+        else
+        {
+            plannedServiceDomain = supplier.GetDomain();
+            plannedServiceHeight = supplier.GetHeightLevel();
         }
 
         bool hasAnyNeedMatch = false;

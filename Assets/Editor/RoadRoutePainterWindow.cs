@@ -7,6 +7,7 @@ public class RoadRoutePainterWindow : EditorWindow
 {
     private RoadNetworkManager roadNetworkManager;
     private StructureData structureData;
+    private int selectedStructureIndex = -1;
     private int selectedRouteIndex;
     private bool isPainting;
     private bool autoConnectAB = true;
@@ -43,7 +44,7 @@ public class RoadRoutePainterWindow : EditorWindow
 
         EditorGUILayout.LabelField("References", EditorStyles.boldLabel);
         roadNetworkManager = (RoadNetworkManager)EditorGUILayout.ObjectField("Road Manager", roadNetworkManager, typeof(RoadNetworkManager), true);
-        structureData = (StructureData)EditorGUILayout.ObjectField("Structure Data", structureData, typeof(StructureData), false);
+        DrawStructureSelectorFromDatabase();
 
         EditorGUILayout.BeginHorizontal();
         GUILayout.FlexibleSpace();
@@ -59,12 +60,20 @@ public class RoadRoutePainterWindow : EditorWindow
             return;
         }
 
+        if (roadNetworkManager.StructureDatabase == null || roadNetworkManager.StructureDatabase.Structures == null || roadNetworkManager.StructureDatabase.Structures.Count == 0)
+        {
+            EditorGUILayout.HelpBox("RoadNetworkManager precisa de StructureDatabase com itens para selecionar.", MessageType.Warning);
+            DrawTogglePaintButton(disabled: true);
+            EditorGUILayout.EndScrollView();
+            return;
+        }
+
         if (roadNetworkManager.BoardTilemap == null)
             EditorGUILayout.HelpBox("RoadNetworkManager precisa de Board Tilemap.", MessageType.Warning);
 
         if (structureData == null)
         {
-            EditorGUILayout.HelpBox("Escolha um StructureData para editar as rotas.", MessageType.Info);
+            EditorGUILayout.HelpBox("Escolha uma Structure no catalogo para editar as rotas.", MessageType.Info);
             DrawTogglePaintButton(disabled: true);
             EditorGUILayout.EndScrollView();
             return;
@@ -510,6 +519,7 @@ public class RoadRoutePainterWindow : EditorWindow
         if (resolved != null)
         {
             structureData = resolved;
+            SyncSelectedStructureIndexFromCurrent();
             return;
         }
 
@@ -522,6 +532,7 @@ public class RoadRoutePainterWindow : EditorWindow
                 continue;
 
             structureData = candidate;
+            selectedStructureIndex = -1;
             return;
         }
     }
@@ -573,5 +584,85 @@ public class RoadRoutePainterWindow : EditorWindow
         }
 
         return false;
+    }
+
+    private void DrawStructureSelectorFromDatabase()
+    {
+        StructureDatabase db = roadNetworkManager != null ? roadNetworkManager.StructureDatabase : null;
+        IReadOnlyList<StructureData> structures = db != null ? db.Structures : null;
+        if (structures == null || structures.Count == 0)
+        {
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.Popup("Structure", 0, new[] { "<sem StructureDatabase>" });
+            }
+            return;
+        }
+
+        SyncSelectedStructureIndexFromCurrent();
+        string[] labels = BuildStructureLabels(structures);
+        selectedStructureIndex = Mathf.Clamp(selectedStructureIndex, 0, labels.Length - 1);
+        int newIndex = EditorGUILayout.Popup("Structure", selectedStructureIndex, labels);
+        if (newIndex == selectedStructureIndex)
+            return;
+
+        selectedStructureIndex = newIndex;
+        structureData = structures[selectedStructureIndex];
+        selectedRouteIndex = 0;
+    }
+
+    private void SyncSelectedStructureIndexFromCurrent()
+    {
+        StructureDatabase db = roadNetworkManager != null ? roadNetworkManager.StructureDatabase : null;
+        IReadOnlyList<StructureData> structures = db != null ? db.Structures : null;
+        if (structures == null || structures.Count == 0)
+        {
+            selectedStructureIndex = -1;
+            return;
+        }
+
+        int index = -1;
+        if (structureData != null)
+        {
+            for (int i = 0; i < structures.Count; i++)
+            {
+                if (structures[i] == structureData)
+                {
+                    index = i;
+                    break;
+                }
+            }
+        }
+
+        if (index < 0)
+        {
+            index = 0;
+            structureData = structures[0];
+        }
+
+        selectedStructureIndex = index;
+    }
+
+    private static string[] BuildStructureLabels(IReadOnlyList<StructureData> structures)
+    {
+        if (structures == null || structures.Count == 0)
+            return new[] { "<sem estruturas>" };
+
+        string[] labels = new string[structures.Count];
+        for (int i = 0; i < structures.Count; i++)
+        {
+            StructureData s = structures[i];
+            if (s == null)
+            {
+                labels[i] = "<null>";
+                continue;
+            }
+
+            string id = string.IsNullOrWhiteSpace(s.id) ? "sem-id" : s.id;
+            string name = string.IsNullOrWhiteSpace(s.displayName) ? id : s.displayName;
+            labels[i] = $"{id} ({name})";
+        }
+
+        return labels;
     }
 }

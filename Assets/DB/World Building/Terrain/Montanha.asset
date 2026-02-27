@@ -36,6 +36,8 @@ MonoBehaviour:
   requiredSkillsToEnter:
   - {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
   - {fileID: 11400000, guid: 8bfcf50a7b4285c4cad503493431fb4b, type: 2}
+  blockedSkills:
+  - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
   skillCostOverrides:
   - skill: {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
     autonomyCost: 2

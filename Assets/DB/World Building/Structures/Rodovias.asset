@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StructureData
   id: road
   displayName: Rodovia
-  description: 
+  description: rodovia para veiculos +1 se full move
   priorityOrder: 3
   domain: 0
   heightLevel: 3
@@ -23,6 +23,8 @@ MonoBehaviour:
   baseMovementCost: 1
   dpqData: {fileID: 11400000, guid: 24e0fd1ecd7c6bf4eb8f3d8c215d14ef, type: 2}
   requiredSkillsToEnter: []
+  blockedSkills:
+  - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
   skillCostOverrides: []
   canAlsoBeBuiltOnTheFollowDomains: []
   roadSegmentSprite: {fileID: 21300000, guid: 03650c0a2457e5046b8234d0bc968b5a, type: 3}

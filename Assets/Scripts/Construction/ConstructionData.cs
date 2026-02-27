@@ -42,8 +42,12 @@ public class ConstructionData : ScriptableObject
     [Header("DPQ")]
     [Tooltip("Referencia de qualidade de posicao (DPQ) aplicada a esta construcao.")]
     public DPQData dpqData;
+
+    [Header("Skill Rules")]
     [Tooltip("Se houver skills nesta lista, a unidade precisa ter pelo menos uma para entrar nesta construcao.")]
     public List<SkillData> requiredSkillsToEnter = new List<SkillData>();
+    [Tooltip("Se a unidade possuir qualquer skill desta lista, entrada nesta construcao e bloqueada.")]
+    public List<SkillData> blockedSkills = new List<SkillData>();
     [Tooltip("Overrides opcionais de custo de autonomia por skill.")]
     public List<TerrainSkillCostOverride> skillCostOverrides = new List<TerrainSkillCostOverride>();
 
@@ -108,6 +112,12 @@ public class ConstructionData : ScriptableObject
             supplierServicesProvided = new List<ServiceData>();
         if (legacyRequiredLandingSkills == null)
             legacyRequiredLandingSkills = new List<SkillData>();
+        if (requiredSkillsToEnter == null)
+            requiredSkillsToEnter = new List<SkillData>();
+        if (blockedSkills == null)
+            blockedSkills = new List<SkillData>();
+        if (skillCostOverrides == null)
+            skillCostOverrides = new List<TerrainSkillCostOverride>();
         if (requiredLandingSkillRules == null)
             requiredLandingSkillRules = new List<ConstructionLandingSkillRule>();
         if (forceEndMovementOnTerrainDomainForDomains == null)

@@ -2,9 +2,17 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using UnityEngine.UI;
+using TMPro;
 
 public partial class TurnStateManager
 {
+    private struct SupplyEmbarkedPreviewState
+    {
+        public Domain domain;
+        public HeightLevel height;
+    }
+
     private sealed class SupplyCandidateEntry
     {
         public PodeSuprirOption option;
@@ -40,6 +48,7 @@ public partial class TurnStateManager
     private float supplyPreviewHeadDistance;
     private CursorState cursorStateBeforeSuprindo = CursorState.MoveuParado;
     private static readonly List<ServiceData> tempSingleService = new List<ServiceData>(1);
+    private readonly Dictionary<UnitManager, SupplyEmbarkedPreviewState> supplyEmbarkedPreviewStates = new Dictionary<UnitManager, SupplyEmbarkedPreviewState>();
 
     private enum SupplyServiceLayerPlan
     {
@@ -107,6 +116,7 @@ public partial class TurnStateManager
         cursorController?.PlayConfirmSfx();
         cursorController?.SetCell(picked.cell, playMoveSfx: false);
         UpdateSupplyPreviewFromCurrentContext();
+        RefreshSupplyEmbarkedSelectionVisuals(queuedOnly: false);
         Debug.Log($"[Suprimento] Candidato selecionado: {picked.selectionNumber}. {picked.label} | Enter para continuar.");
     }
 
@@ -129,6 +139,7 @@ public partial class TurnStateManager
             supplyTargetAutoEntered = false;
             cursorController?.PlayConfirmSfx();
             UpdateSupplyPreviewFromCurrentContext();
+            RefreshSupplyEmbarkedSelectionVisuals(queuedOnly: false);
             LogSupplyConfirmPrompt(selected);
             return true;
         }
@@ -169,6 +180,7 @@ public partial class TurnStateManager
         supplySuppressDefaultConfirmSfxOnce = true;
         cursorController?.PlayLoadSfx();
         RebuildSupplyQueuePreviewTracks();
+        RefreshSupplyEmbarkedSelectionVisuals(queuedOnly: false);
 
         if (queueLimit > 0 && supplyQueuedOrders.Count >= queueLimit)
         {
@@ -200,6 +212,7 @@ public partial class TurnStateManager
             cursorController.SetCell(supplyCandidateEntries[supplySelectedCandidateIndex].cell, playMoveSfx: false);
 
         UpdateSupplyPreviewFromCurrentContext();
+        RefreshSupplyEmbarkedSelectionVisuals(queuedOnly: false);
 
         if (supplyCandidateEntries.Count <= 0)
         {
@@ -218,6 +231,7 @@ public partial class TurnStateManager
             if (cursorController != null)
                 cursorController.SetCell(supplyCandidateEntries[0].cell, playMoveSfx: false);
             UpdateSupplyPreviewFromCurrentContext();
+            RefreshSupplyEmbarkedSelectionVisuals(queuedOnly: false);
             LogSupplyConfirmPrompt(supplyCandidateEntries[0]);
             return;
         }
@@ -233,6 +247,7 @@ public partial class TurnStateManager
         if (supplySelectedCandidateIndex < 0 || supplySelectedCandidateIndex >= supplyCandidateEntries.Count)
             supplySelectedCandidateIndex = supplyCandidateEntries.Count > 0 ? 0 : -1;
         UpdateSupplyPreviewFromCurrentContext();
+        RefreshSupplyEmbarkedSelectionVisuals(queuedOnly: false);
         LogSupplyCandidateSelectionPanel();
     }
 
@@ -294,6 +309,19 @@ public partial class TurnStateManager
         // Ao iniciar a execucao, remove qualquer preview de confirmacao/fila.
         SetSupplyPreviewVisible(false);
         SetSupplyQueuedPreviewVisible(false);
+        RestoreSupplyEmbarkedSelectionVisuals();
+        bool hasEmbarkedQueued = false;
+        for (int i = 0; i < supplyQueuedOrders.Count; i++)
+        {
+            UnitManager target = supplyQueuedOrders[i] != null ? supplyQueuedOrders[i].targetUnit : null;
+            if (target != null && target.IsEmbarked && target.EmbarkedTransporter == selectedUnit)
+            {
+                hasEmbarkedQueued = true;
+                break;
+            }
+        }
+        if (hasEmbarkedQueued)
+            SetSupplySupplierHudVisible(false);
         if (cursorController != null && selectedUnit != null)
             cursorController.SetCell(selectedUnit.CurrentCellPosition, playMoveSfx: true);
         StartCoroutine(ExecuteQueuedSupplyOrdersSequence());
@@ -363,11 +391,26 @@ public partial class TurnStateManager
                 continue;
 
             UnitManager target = order.targetUnit;
-            if (!target.gameObject.activeInHierarchy || target.IsEmbarked || (int)target.TeamId != (int)supplier.TeamId)
+            bool isEmbarkedPassenger = target.IsEmbarked && target.EmbarkedTransporter == supplier;
+            if ((!target.gameObject.activeInHierarchy && !isEmbarkedPassenger) || (target.IsEmbarked && !isEmbarkedPassenger) || (int)target.TeamId != (int)supplier.TeamId)
                 continue;
 
+            if (isEmbarkedPassenger)
+                HideAllSupplyEmbarkedPreviewExcept(target);
+
+            if (isEmbarkedPassenger && !supplyEmbarkedPreviewStates.ContainsKey(target))
+            {
+                SupplyEmbarkedPreviewState state = new SupplyEmbarkedPreviewState
+                {
+                    domain = target.GetDomain(),
+                    height = target.GetHeightLevel()
+                };
+                supplyEmbarkedPreviewStates[target] = state;
+                ShowEmbarkedPassengerForSupply(target, supplier);
+            }
+
             Tilemap boardMap = terrainTilemap != null ? terrainTilemap : target.BoardTilemap;
-            Vector3Int targetCell = target.CurrentCellPosition;
+            Vector3Int targetCell = isEmbarkedPassenger ? supplier.CurrentCellPosition : target.CurrentCellPosition;
             targetCell.z = 0;
             if (cursorController != null)
                 cursorController.SetCell(targetCell, playMoveSfx: true);
@@ -375,7 +418,7 @@ public partial class TurnStateManager
             if (cursorFocusDelay > 0f)
                 yield return new WaitForSeconds(cursorFocusDelay);
 
-            if (order.forceLandBeforeSupply || order.forceTakeoffBeforeSupply)
+            if (!isEmbarkedPassenger && (order.forceLandBeforeSupply || order.forceTakeoffBeforeSupply))
             {
                 if (!CanUseLayerModeAtCurrentCell(target, boardMap, terrainDatabase, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
                 {
@@ -384,7 +427,7 @@ public partial class TurnStateManager
                 }
                 yield return ApplySupplyLayerTransitionIfNeeded(target, order.plannedServiceDomain, order.plannedServiceHeight);
             }
-            if (order.forceSurfaceBeforeSupply)
+            if (!isEmbarkedPassenger && order.forceSurfaceBeforeSupply)
             {
                 if (!CanUseLayerModeAtCurrentCell(target, boardMap, terrainDatabase, targetCell, Domain.Naval, HeightLevel.Surface, out string surfaceReason))
                 {
@@ -393,7 +436,7 @@ public partial class TurnStateManager
                 }
                 yield return ApplySupplyLayerTransitionIfNeeded(target, Domain.Naval, HeightLevel.Surface);
             }
-            if (TryGetSupplyLayerFromPlan(layerPlan, out Domain targetServiceDomain, out HeightLevel targetServiceHeight))
+            if (!isEmbarkedPassenger && TryGetSupplyLayerFromPlan(layerPlan, out Domain targetServiceDomain, out HeightLevel targetServiceHeight))
             {
                 if (!CanUseLayerModeAtCurrentCell(target, boardMap, terrainDatabase, targetCell, targetServiceDomain, targetServiceHeight, out string queueLayerReason))
                 {
@@ -458,6 +501,12 @@ public partial class TurnStateManager
             float postTargetDelay = GetSupplyPostTargetDelay();
             if (postTargetDelay > 0f)
                 yield return new WaitForSeconds(postTargetDelay);
+
+            if (isEmbarkedPassenger && supplyEmbarkedPreviewStates.TryGetValue(target, out SupplyEmbarkedPreviewState servedState))
+            {
+                HideEmbarkedPassengerAfterSupply(target, servedState.domain, servedState.height);
+                supplyEmbarkedPreviewStates.Remove(target);
+            }
         }
 
         if (servedTargets <= 0)
@@ -647,6 +696,7 @@ public partial class TurnStateManager
         supplyPreviewSegmentPoints.Clear();
         supplyPreviewPathLength = 0f;
         supplyPreviewHeadDistance = 0f;
+        RestoreSupplyEmbarkedSelectionVisuals();
         ClearMovementRange(keepCommittedMovement: true);
         SetSupplyPreviewVisible(false);
         SetSupplyQueuedPreviewVisible(false);
@@ -665,10 +715,17 @@ public partial class TurnStateManager
             PodeSuprirOption option = cachedPodeSuprirTargets[i];
             if (option == null || option.targetUnit == null || IsSupplyTargetAlreadyQueued(option.targetUnit))
                 continue;
-            if (!option.targetUnit.gameObject.activeInHierarchy || option.targetUnit.IsEmbarked)
+            bool isEmbarkedPassenger = selectedUnit != null
+                && option.targetUnit.IsEmbarked
+                && option.targetUnit.EmbarkedTransporter == selectedUnit;
+            if (!option.targetUnit.gameObject.activeInHierarchy && !isEmbarkedPassenger)
+                continue;
+            if (option.targetUnit.IsEmbarked && !isEmbarkedPassenger)
                 continue;
 
-            Vector3Int cell = option.targetUnit.CurrentCellPosition;
+            Vector3Int cell = isEmbarkedPassenger && selectedUnit != null
+                ? selectedUnit.CurrentCellPosition
+                : option.targetUnit.CurrentCellPosition;
             cell.z = 0;
             number++;
             supplyCandidateEntries.Add(new SupplyCandidateEntry
@@ -677,7 +734,9 @@ public partial class TurnStateManager
                 targetUnit = option.targetUnit,
                 selectionNumber = number,
                 cell = cell,
-                label = $"{option.targetUnit.name} ({cell.x},{cell.y})"
+                label = isEmbarkedPassenger
+                    ? $"{option.targetUnit.name} [EMB] ({cell.x},{cell.y})"
+                    : $"{option.targetUnit.name} ({cell.x},{cell.y})"
             });
             supplyCandidateIndexByCell[cell] = supplyCandidateEntries.Count - 1;
         }
@@ -732,6 +791,7 @@ public partial class TurnStateManager
         supplySelectedCandidateIndex = nextIndex;
         resolvedCell = next.cell;
         UpdateSupplyPreviewFromCurrentContext();
+        RefreshSupplyEmbarkedSelectionVisuals(queuedOnly: false);
         return true;
     }
 
@@ -1270,5 +1330,204 @@ public partial class TurnStateManager
             return false;
         supplySuppressDefaultConfirmSfxOnce = false;
         return true;
+    }
+
+    private void RefreshSupplyEmbarkedSelectionVisuals(bool queuedOnly)
+    {
+        UnitManager supplier = selectedUnit;
+        if (cursorState != CursorState.Suprindo || supplier == null)
+        {
+            RestoreSupplyEmbarkedSelectionVisuals();
+            return;
+        }
+
+        HashSet<UnitManager> desired = new HashSet<UnitManager>();
+        if (queuedOnly)
+        {
+            for (int i = 0; i < supplyQueuedOrders.Count; i++)
+            {
+                UnitManager target = supplyQueuedOrders[i] != null ? supplyQueuedOrders[i].targetUnit : null;
+                if (target != null && target.IsEmbarked && target.EmbarkedTransporter == supplier)
+                    desired.Add(target);
+            }
+        }
+        else
+        {
+            UnitManager selectedTarget = null;
+            if (TryGetSelectedSupplyCandidate(out SupplyCandidateEntry selectedEntry))
+                selectedTarget = selectedEntry.targetUnit;
+
+            if (selectedTarget != null && selectedTarget.IsEmbarked && selectedTarget.EmbarkedTransporter == supplier)
+                desired.Add(selectedTarget);
+        }
+
+        List<UnitManager> toRemove = new List<UnitManager>();
+        foreach (KeyValuePair<UnitManager, SupplyEmbarkedPreviewState> pair in supplyEmbarkedPreviewStates)
+        {
+            if (pair.Key == null || desired.Contains(pair.Key))
+                continue;
+            HideEmbarkedPassengerAfterSupply(pair.Key, pair.Value.domain, pair.Value.height);
+            toRemove.Add(pair.Key);
+        }
+        for (int i = 0; i < toRemove.Count; i++)
+            supplyEmbarkedPreviewStates.Remove(toRemove[i]);
+
+        foreach (UnitManager passenger in desired)
+        {
+            if (passenger == null || supplyEmbarkedPreviewStates.ContainsKey(passenger))
+                continue;
+            SupplyEmbarkedPreviewState state = new SupplyEmbarkedPreviewState
+            {
+                domain = passenger.GetDomain(),
+                height = passenger.GetHeightLevel()
+            };
+            supplyEmbarkedPreviewStates[passenger] = state;
+            ShowEmbarkedPassengerForSupply(passenger, supplier);
+        }
+
+        SetSupplySupplierHudVisible(supplyEmbarkedPreviewStates.Count <= 0);
+    }
+
+    private void RestoreSupplyEmbarkedSelectionVisuals()
+    {
+        foreach (KeyValuePair<UnitManager, SupplyEmbarkedPreviewState> pair in supplyEmbarkedPreviewStates)
+        {
+            if (pair.Key == null)
+                continue;
+            HideEmbarkedPassengerAfterSupply(pair.Key, pair.Value.domain, pair.Value.height);
+        }
+        supplyEmbarkedPreviewStates.Clear();
+        SetSupplySupplierHudVisible(true);
+    }
+
+    private void SetSupplySupplierHudVisible(bool visible)
+    {
+        if (selectedUnit == null)
+            return;
+        UnitHudController supplierHud = selectedUnit.GetComponentInChildren<UnitHudController>(true);
+        if (supplierHud != null)
+            supplierHud.gameObject.SetActive(visible);
+    }
+
+    private void HideAllSupplyEmbarkedPreviewExcept(UnitManager keepVisible)
+    {
+        if (supplyEmbarkedPreviewStates.Count <= 0)
+            return;
+
+        List<UnitManager> toHide = new List<UnitManager>();
+        foreach (KeyValuePair<UnitManager, SupplyEmbarkedPreviewState> pair in supplyEmbarkedPreviewStates)
+        {
+            UnitManager passenger = pair.Key;
+            if (passenger == null || passenger == keepVisible)
+                continue;
+
+            HideEmbarkedPassengerAfterSupply(passenger, pair.Value.domain, pair.Value.height);
+            toHide.Add(passenger);
+        }
+
+        for (int i = 0; i < toHide.Count; i++)
+            supplyEmbarkedPreviewStates.Remove(toHide[i]);
+    }
+
+    private static void ShowEmbarkedPassengerForSupply(UnitManager passenger, UnitManager supplier)
+    {
+        if (passenger == null || supplier == null || !passenger.IsEmbarked || passenger.EmbarkedTransporter != supplier)
+            return;
+
+        Vector3Int supplierCell = supplier.CurrentCellPosition;
+        supplierCell.z = 0;
+        passenger.SetCurrentCellPosition(supplierCell, enforceFinalOccupancyRule: false);
+        passenger.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface);
+
+        int supplierSorting = 999;
+        SpriteRenderer supplierSprite = supplier.GetMainSpriteRenderer();
+        if (supplierSprite != null)
+            supplierSorting = supplierSprite.sortingOrder;
+        passenger.SetTemporarySortingOrder(supplierSorting + 1);
+
+        SpriteRenderer passengerSprite = passenger.GetComponentInChildren<SpriteRenderer>(true);
+        if (passengerSprite != null)
+            passengerSprite.enabled = true;
+
+        UnitHudController passengerHud = passenger.GetComponentInChildren<UnitHudController>(true);
+        if (passengerHud != null)
+        {
+            passengerHud.gameObject.SetActive(true);
+
+            Canvas[] canvases = passengerHud.GetComponentsInChildren<Canvas>(true);
+            for (int i = 0; i < canvases.Length; i++)
+            {
+                if (canvases[i] != null)
+                    canvases[i].enabled = true;
+            }
+
+            Image[] images = passengerHud.GetComponentsInChildren<Image>(true);
+            for (int i = 0; i < images.Length; i++)
+            {
+                if (images[i] != null)
+                    images[i].enabled = true;
+            }
+
+            TMP_Text[] texts = passengerHud.GetComponentsInChildren<TMP_Text>(true);
+            for (int i = 0; i < texts.Length; i++)
+            {
+                if (texts[i] != null)
+                    texts[i].enabled = true;
+            }
+
+            Transform fuelContainer = FindChildRecursive(passengerHud.transform, "fuel_container");
+            if (fuelContainer != null)
+                fuelContainer.gameObject.SetActive(true);
+
+            passengerHud.RefreshBindings();
+            passengerHud.Apply(
+                passenger.CurrentHP,
+                passenger.GetMaxHP(),
+                passenger.CurrentAmmo,
+                passenger.GetMaxAmmo(),
+                passenger.CurrentFuel,
+                passenger.MaxFuel,
+                TeamUtils.GetColor(passenger.TeamId),
+                passenger.GetDomain(),
+                passenger.GetHeightLevel(),
+                showTransportIndicator: false);
+        }
+    }
+
+    private static Transform FindChildRecursive(Transform parent, string childName)
+    {
+        if (parent == null || string.IsNullOrWhiteSpace(childName))
+            return null;
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            if (child != null && string.Equals(child.name, childName, System.StringComparison.OrdinalIgnoreCase))
+                return child;
+
+            Transform nested = FindChildRecursive(child, childName);
+            if (nested != null)
+                return nested;
+        }
+
+        return null;
+    }
+
+    private static void HideEmbarkedPassengerAfterSupply(UnitManager passenger, Domain previousDomain, HeightLevel previousHeight)
+    {
+        if (passenger == null || !passenger.IsEmbarked)
+            return;
+
+        passenger.TrySetCurrentLayerMode(previousDomain, previousHeight);
+
+        SpriteRenderer passengerSprite = passenger.GetComponentInChildren<SpriteRenderer>(true);
+        if (passengerSprite != null)
+            passengerSprite.enabled = false;
+
+        UnitHudController passengerHud = passenger.GetComponentInChildren<UnitHudController>(true);
+        if (passengerHud != null)
+            passengerHud.gameObject.SetActive(false);
+
+        passenger.ClearTemporarySortingOrder();
     }
 }

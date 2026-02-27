@@ -15,3 +15,5 @@ MonoBehaviour:
   structures:
   - {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
   - {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}
+  - {fileID: 11400000, guid: e0adc11a0eac5bc42811605fe2a45f9f, type: 2}
+  - {fileID: 11400000, guid: 32bd7b500bf78b64a95d16600a68909d, type: 2}

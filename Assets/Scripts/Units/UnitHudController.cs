@@ -295,6 +295,7 @@ public class UnitHudController : MonoBehaviour
             altitudeLowSprite = FindSpriteByName("low altitude");
         if (altitudeSubmergedSprite == null)
             altitudeSubmergedSprite = FindSpriteByName("submerged");
+
     }
 
     private void RefreshAltitude(Domain domain, HeightLevel heightLevel)

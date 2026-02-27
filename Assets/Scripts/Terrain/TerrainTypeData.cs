@@ -106,6 +106,8 @@ public class TerrainTypeData : ScriptableObject
     [Header("Skill Rules")]
     [Tooltip("Se houver skills nesta lista, a unidade precisa ter pelo menos uma para entrar neste terreno.")]
     public List<SkillData> requiredSkillsToEnter = new List<SkillData>();
+    [Tooltip("Se a unidade possuir qualquer skill desta lista, entrada neste terreno e bloqueada.")]
+    public List<SkillData> blockedSkills = new List<SkillData>();
 
     [Tooltip("Overrides opcionais de custo de autonomia por skill.")]
     public List<TerrainSkillCostOverride> skillCostOverrides = new List<TerrainSkillCostOverride>();
@@ -170,6 +172,8 @@ public class TerrainTypeData : ScriptableObject
             structureVisionOverrides = new List<TerrainStructureVisionOverride>();
         if (requiredSkillsToEnter == null)
             requiredSkillsToEnter = new List<SkillData>();
+        if (blockedSkills == null)
+            blockedSkills = new List<SkillData>();
         if (skillCostOverrides == null)
             skillCostOverrides = new List<TerrainSkillCostOverride>();
     }
