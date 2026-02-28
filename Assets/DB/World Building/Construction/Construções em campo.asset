@@ -205,22 +205,6 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Aeroporto_T0_C11
-    construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 0
-    cellPosition: {x: -1, y: 0, z: 0}
-    initialCapturePoints: 30
-    useConstructionConfigurationOverride: 0
-    constructionConfiguration:
-      isPlayerHeadQuarter: 0
-      isCapturable: 0
-      capturePointsMax: 0
-      capturedIncoming: 0
-      canProduceAndSellUnits: 
-      offeredUnits: []
-      canProvideSupplies: 0
-      offeredSupplies: []
-      offeredServices: []
   - id: "F\xE1brica_T2_C34"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialTeamId: 2
@@ -338,22 +322,6 @@ MonoBehaviour:
     initialTeamId: 2
     cellPosition: {x: 30, y: 3, z: 0}
     initialCapturePoints: 30
-    useConstructionConfigurationOverride: 0
-    constructionConfiguration:
-      isPlayerHeadQuarter: 0
-      isCapturable: 0
-      capturePointsMax: 0
-      capturedIncoming: 0
-      canProduceAndSellUnits: 
-      offeredUnits: []
-      canProvideSupplies: 0
-      offeredSupplies: []
-      offeredServices: []
-  - id: HQ_T0_C1
-    construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 0
-    cellPosition: {x: 0, y: 0, z: 0}
-    initialCapturePoints: 40
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
@@ -862,6 +830,69 @@ MonoBehaviour:
         quantity: 500
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: HQ_T0_C52
+    construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
+    initialTeamId: 0
+    cellPosition: {x: 0, y: 0, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 1
+      isCapturable: 1
+      capturePointsMax: 40
+      capturedIncoming: 2000
+      canProduceAndSellUnits: 01000000
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  - id: Aeroporto_T0_C53
+    construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
+    initialTeamId: 0
+    cellPosition: {x: -1, y: 0, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1000
+      canProduceAndSellUnits: 01000000
+      offeredUnits:
+      - {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
+      - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
+      - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+      - {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
+      - {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
+      - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
+      - {fileID: 11400000, guid: b7f859c456bfb334fafe58f296fddc6b, type: 2}
+      - {fileID: 11400000, guid: f818fb00e3afbc64baa48f18f9d88465, type: 2}
+      - {fileID: 11400000, guid: 9d52bdec098eb9047906b57709b8d578, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}

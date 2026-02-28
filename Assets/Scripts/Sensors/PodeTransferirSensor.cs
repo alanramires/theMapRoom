@@ -790,9 +790,13 @@ public static class PodeTransferirSensor
             if (offer == null || offer.supply == null)
                 continue;
 
-            long amount = System.Math.Max(0L, offer.quantity);
+            long amount = construction.HasInfiniteSuppliesFor(offer.supply)
+                ? InfiniteConstructionSupplyQuantity
+                : System.Math.Max(0L, offer.quantity);
             if (map.TryGetValue(offer.supply, out long existing))
-                map[offer.supply] = existing + amount;
+                map[offer.supply] = existing >= InfiniteConstructionSupplyQuantity || amount >= InfiniteConstructionSupplyQuantity
+                    ? InfiniteConstructionSupplyQuantity
+                    : existing + amount;
             else
                 map[offer.supply] = amount;
         }
@@ -814,6 +818,8 @@ public static class PodeTransferirSensor
     {
         if (construction == null || !construction.CanProvideSupplies)
             return 0;
+        if (construction.HasInfiniteSuppliesFor())
+            return int.MaxValue;
 
         IReadOnlyList<ConstructionSupplyOffer> offers = construction.OfferedSupplies;
         if (offers == null)
@@ -837,29 +843,7 @@ public static class PodeTransferirSensor
     {
         if (construction == null)
             return false;
-
-        if (construction.TryResolveConstructionData(out ConstructionData constructionData) && constructionData != null && constructionData.supplierResources != null)
-        {
-            for (int i = 0; i < constructionData.supplierResources.Count; i++)
-            {
-                ConstructionSupplierResourceCapacity entry = constructionData.supplierResources[i];
-                if (entry != null && entry.maxCapacity < 0)
-                    return true;
-            }
-        }
-
-        IReadOnlyList<ConstructionSupplyOffer> offers = construction.OfferedSupplies;
-        if (offers == null)
-            return false;
-
-        for (int i = 0; i < offers.Count; i++)
-        {
-            ConstructionSupplyOffer offer = offers[i];
-            if (offer != null && offer.quantity >= InfiniteConstructionSupplyQuantity)
-                return true;
-        }
-
-        return false;
+        return construction.HasInfiniteSuppliesFor();
     }
 
     private static void AppendInvalid(

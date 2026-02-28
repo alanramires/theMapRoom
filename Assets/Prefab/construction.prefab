@@ -730,7 +730,8 @@ MonoBehaviour:
     isCapturable: 1
     capturePointsMax: 40
     capturedIncoming: 2000
-    canProduceAndSellUnits: 01000000
+    sellingRule: 1
+    legacyCanProduceAndSellUnits: 
     offeredUnits:
     - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
@@ -751,6 +752,8 @@ MonoBehaviour:
   currentCapturePoints: 40
   originalOwnerTeamId: 0
   originalOwnerInitialized: 1
+  firstOwnerTeamId: 0
+  firstOwnerInitialized: 1
   occupiedByReadyUnitDarkenFactor: 0.4
   hudController: {fileID: 1370441032517419065}
 --- !u!1 &8405094446092215197

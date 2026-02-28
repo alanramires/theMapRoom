@@ -1,11 +1,14 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 [System.Serializable]
 public enum ConstructionUnitMarketRule
 {
     FreeMarket = 0,
-    OriginalOwner = 1
+    OriginalOwner = 1,
+    FirstOwner = 2,
+    Disabled = 3
 }
 
 [System.Serializable]
@@ -21,8 +24,11 @@ public class ConstructionSiteRuntime
     [Min(0)] public int capturedIncoming = 1000;
 
     [Header("Production")]
-    [Tooltip("Regras de mercado para producao/venda de unidades. Se vazio, nao produz.")]
-    public List<ConstructionUnitMarketRule> canProduceAndSellUnits = new List<ConstructionUnitMarketRule>();
+    [Tooltip("Regra de venda de unidades desta construcao.")]
+    public ConstructionUnitMarketRule sellingRule = ConstructionUnitMarketRule.FreeMarket;
+    [FormerlySerializedAs("canProduceAndSellUnits")]
+    [SerializeField, HideInInspector]
+    private List<ConstructionUnitMarketRule> legacyCanProduceAndSellUnits = new List<ConstructionUnitMarketRule>();
     [Tooltip("Unidades que esta construcao pode produzir nesta partida/mapa.")]
     public List<UnitData> offeredUnits = new List<UnitData>();
 
@@ -40,8 +46,7 @@ public class ConstructionSiteRuntime
         capturePointsMax = Mathf.Max(0, capturePointsMax);
         capturedIncoming = Mathf.Max(0, capturedIncoming);
 
-        if (canProduceAndSellUnits == null)
-            canProduceAndSellUnits = new List<ConstructionUnitMarketRule>();
+        MigrateLegacySellingRulesIfNeeded();
         if (offeredUnits == null)
             offeredUnits = new List<UnitData>();
         if (offeredSupplies == null)
@@ -66,7 +71,7 @@ public class ConstructionSiteRuntime
             isCapturable = isCapturable,
             capturePointsMax = capturePointsMax,
             capturedIncoming = capturedIncoming,
-            canProduceAndSellUnits = canProduceAndSellUnits != null ? new List<ConstructionUnitMarketRule>(canProduceAndSellUnits) : new List<ConstructionUnitMarketRule>(),
+            sellingRule = sellingRule,
             canProvideSupplies = canProvideSupplies,
             offeredUnits = offeredUnits != null ? new List<UnitData>(offeredUnits) : new List<UnitData>(),
             offeredServices = offeredServices != null ? new List<ServiceData>(offeredServices) : new List<ServiceData>(),
@@ -96,5 +101,29 @@ public class ConstructionSiteRuntime
         }
 
         return result;
+    }
+
+    private void MigrateLegacySellingRulesIfNeeded()
+    {
+        if (legacyCanProduceAndSellUnits == null || legacyCanProduceAndSellUnits.Count == 0)
+            return;
+
+        bool hasFreeMarket = false;
+        bool hasOriginalOwner = false;
+        for (int i = 0; i < legacyCanProduceAndSellUnits.Count; i++)
+        {
+            ConstructionUnitMarketRule rule = legacyCanProduceAndSellUnits[i];
+            if (rule == ConstructionUnitMarketRule.FreeMarket)
+                hasFreeMarket = true;
+            else if (rule == ConstructionUnitMarketRule.OriginalOwner)
+                hasOriginalOwner = true;
+        }
+
+        if (hasFreeMarket)
+            sellingRule = ConstructionUnitMarketRule.FreeMarket;
+        else if (hasOriginalOwner)
+            sellingRule = ConstructionUnitMarketRule.OriginalOwner;
+
+        legacyCanProduceAndSellUnits.Clear();
     }
 }

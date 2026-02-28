@@ -12,6 +12,7 @@ public class StructureDataEditor : Editor
             serializedObject,
             "m_Script",
             "aircraftOpsByTerrain",
+            "roadRoutes",
             "forceEndMovementOnTerrainDomainForDomains");
 
         EditorGUILayout.Space();
@@ -33,6 +34,13 @@ public class StructureDataEditor : Editor
             "No par Estrutura+Terreno, unidades nesses dominios/alturas encerram movimento no dominio do terreno base.",
             MessageType.Info);
         DrawIfExists(serializedObject.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domain Are Forced To Emerge");
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Road Routes", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "As rotas de estrada deste mapa agora sao centralizadas no StructureDatabase (catalogo), nao no StructureData.\n" +
+            "Use: Tools > Logistica > Road Route Painter para editar.",
+            MessageType.Info);
 
         serializedObject.ApplyModifiedProperties();
     }

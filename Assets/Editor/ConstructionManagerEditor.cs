@@ -19,7 +19,10 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty siteRuntimeProp;
     private SerializedProperty hasSiteRuntimeOverrideProp;
     private SerializedProperty currentCapturePointsProp;
+    private SerializedProperty hasInfiniteSuppliesOverrideProp;
     private SerializedProperty originalOwnerTeamIdProp;
+    private SerializedProperty firstOwnerTeamIdProp;
+    private SerializedProperty firstOwnerInitializedProp;
 
     private void OnEnable()
     {
@@ -38,7 +41,10 @@ public class ConstructionManagerEditor : Editor
         siteRuntimeProp = serializedObject.FindProperty("siteRuntime");
         hasSiteRuntimeOverrideProp = serializedObject.FindProperty("hasSiteRuntimeOverride");
         currentCapturePointsProp = serializedObject.FindProperty("currentCapturePoints");
+        hasInfiniteSuppliesOverrideProp = serializedObject.FindProperty("hasInfiniteSuppliesOverride");
         originalOwnerTeamIdProp = serializedObject.FindProperty("originalOwnerTeamId");
+        firstOwnerTeamIdProp = serializedObject.FindProperty("firstOwnerTeamId");
+        firstOwnerInitializedProp = serializedObject.FindProperty("firstOwnerInitialized");
     }
 
     public override void OnInspectorGUI()
@@ -72,6 +78,10 @@ public class ConstructionManagerEditor : Editor
 
         if (originalOwnerTeamIdProp != null)
             EditorGUILayout.PropertyField(originalOwnerTeamIdProp, new GUIContent("Original Owner Team"));
+        if (firstOwnerInitializedProp != null)
+            EditorGUILayout.PropertyField(firstOwnerInitializedProp, new GUIContent("First Owner Initialized"));
+        if (firstOwnerTeamIdProp != null)
+            EditorGUILayout.PropertyField(firstOwnerTeamIdProp, new GUIContent("First Owner Team"));
 
         if (hasSiteRuntimeOverrideProp != null)
         {
@@ -85,7 +95,7 @@ public class ConstructionManagerEditor : Editor
             EditorGUILayout.LabelField("Site Runtime (Live)", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox("Edicoes aqui sao da instancia em campo. Ao editar, a instancia passa a usar override local.", MessageType.Info);
             EditorGUI.BeginChangeCheck();
-            EditorGUILayout.PropertyField(siteRuntimeProp, includeChildren: true);
+            DrawSiteRuntime(siteRuntimeProp, hasInfiniteSuppliesOverrideProp);
             if (EditorGUI.EndChangeCheck() && hasSiteRuntimeOverrideProp != null)
                 hasSiteRuntimeOverrideProp.boolValue = true;
         }
@@ -192,6 +202,43 @@ public class ConstructionManagerEditor : Editor
             return 0;
 
         return captureMaxProp.intValue;
+    }
+
+    private static void DrawSiteRuntime(SerializedProperty siteRuntime, SerializedProperty infiniteOverrideProp)
+    {
+        if (siteRuntime == null)
+            return;
+
+        EditorGUI.indentLevel++;
+        DrawIfExists(siteRuntime.FindPropertyRelative("isPlayerHeadQuarter"), "Is Player Head Quarter");
+
+        EditorGUILayout.Space(2f);
+        EditorGUILayout.LabelField("Capture", EditorStyles.boldLabel);
+        DrawIfExists(siteRuntime.FindPropertyRelative("isCapturable"), "Is Capturable");
+        DrawIfExists(siteRuntime.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
+        DrawIfExists(siteRuntime.FindPropertyRelative("capturedIncoming"), "Captured Incoming");
+
+        EditorGUILayout.Space(2f);
+        EditorGUILayout.LabelField("Production", EditorStyles.boldLabel);
+        DrawIfExists(siteRuntime.FindPropertyRelative("sellingRule"), "Selling Rules");
+        DrawIfExists(siteRuntime.FindPropertyRelative("offeredUnits"), "Offered Units");
+
+        EditorGUILayout.Space(2f);
+        EditorGUILayout.LabelField("Supplies", EditorStyles.boldLabel);
+        DrawIfExists(siteRuntime.FindPropertyRelative("canProvideSupplies"), "Can Provide Supplies");
+        DrawIfExists(infiniteOverrideProp, "Has Infinite Supplies (Override)");
+        DrawIfExists(siteRuntime.FindPropertyRelative("offeredSupplies"), "Offered Supplies");
+
+        EditorGUILayout.Space(2f);
+        EditorGUILayout.LabelField("Services", EditorStyles.boldLabel);
+        DrawIfExists(siteRuntime.FindPropertyRelative("offeredServices"), "Offered Services");
+        EditorGUI.indentLevel--;
+    }
+
+    private static void DrawIfExists(SerializedProperty prop, string label)
+    {
+        if (prop != null)
+            EditorGUILayout.PropertyField(prop, new GUIContent(label), includeChildren: true);
     }
 
 }

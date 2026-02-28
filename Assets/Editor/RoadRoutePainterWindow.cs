@@ -7,8 +7,10 @@ public class RoadRoutePainterWindow : EditorWindow
 {
     private RoadNetworkManager roadNetworkManager;
     private StructureData structureData;
+    private StructureDatabase routeDatabaseFilter;
     private int selectedStructureIndex = -1;
     private int selectedRouteIndex;
+    private readonly List<int> filteredRouteIndices = new List<int>();
     private bool isPainting;
     private bool autoConnectAB = true;
     private Vector2 scroll;
@@ -84,11 +86,13 @@ public class RoadRoutePainterWindow : EditorWindow
             EditorGUILayout.HelpBox("Este StructureData nao esta no StructureDatabase do RoadNetworkManager. O preview de sprite no Scene nao sera desenhado.", MessageType.Warning);
         }
 
+        EnsureRouteFilterDefaults();
         EnsureRouteSelectionInBounds();
 
         EditorGUILayout.Space(6f);
         DrawRouteSelector();
         DrawRouteNameEditor();
+        DrawRouteOwnerDatabaseEditor();
         DrawRouteActions();
 
         EditorGUILayout.Space(8f);
@@ -102,10 +106,37 @@ public class RoadRoutePainterWindow : EditorWindow
 
     private void DrawRouteSelector()
     {
-        List<RoadRouteDefinition> routes = structureData.roadRoutes ?? (structureData.roadRoutes = new List<RoadRouteDefinition>());
-        string[] labels = BuildRouteLabels(routes);
-        selectedRouteIndex = Mathf.Clamp(selectedRouteIndex, 0, Mathf.Max(0, labels.Length - 1));
-        selectedRouteIndex = EditorGUILayout.Popup("Route", selectedRouteIndex, labels);
+        List<RoadRouteDefinition> routes = GetEditableRoutes(createIfMissing: true);
+        if (routes == null)
+        {
+            selectedRouteIndex = -1;
+            EditorGUILayout.Popup("Route", 0, new[] { "<no routes store>" });
+            return;
+        }
+
+        EditorGUILayout.BeginHorizontal();
+        routeDatabaseFilter = (StructureDatabase)EditorGUILayout.ObjectField("Route DB Filter", routeDatabaseFilter, typeof(StructureDatabase), false);
+        using (new EditorGUI.DisabledScope(roadNetworkManager == null || roadNetworkManager.StructureDatabase == null))
+        {
+            if (GUILayout.Button("Use Road Manager DB", GUILayout.Width(150f)))
+                routeDatabaseFilter = roadNetworkManager.StructureDatabase;
+        }
+        EditorGUILayout.EndHorizontal();
+
+        RebuildFilteredRouteIndices(routes);
+        if (filteredRouteIndices.Count == 0)
+        {
+            selectedRouteIndex = -1;
+            EditorGUILayout.Popup("Route", 0, new[] { "<no routes in filter>" });
+            return;
+        }
+
+        EnsureRouteSelectionInBounds();
+        int selectedVisibleIndex = GetSelectedVisibleRouteIndex();
+        string[] labels = BuildRouteLabels(routes, filteredRouteIndices);
+        int newVisibleIndex = EditorGUILayout.Popup("Route", selectedVisibleIndex, labels);
+        if (newVisibleIndex >= 0 && newVisibleIndex < filteredRouteIndices.Count)
+            selectedRouteIndex = filteredRouteIndices[newVisibleIndex];
     }
 
     private void DrawRouteActions()
@@ -141,7 +172,7 @@ public class RoadRoutePainterWindow : EditorWindow
         if (!HasValidSelectedRoute())
             return;
 
-        RoadRouteDefinition route = structureData.roadRoutes[selectedRouteIndex];
+        RoadRouteDefinition route = GetSelectedRoute();
         if (route == null)
             return;
 
@@ -150,10 +181,54 @@ public class RoadRoutePainterWindow : EditorWindow
         if (newName == currentName)
             return;
 
-        Undo.RecordObject(structureData, "Rename Road Route");
+        StructureDatabase db = GetContextDatabase();
+        if (db == null)
+            return;
+
+        Undo.RecordObject(db, "Rename Road Route");
         route.routeName = newName;
-        EditorUtility.SetDirty(structureData);
+        EditorUtility.SetDirty(db);
         roadNetworkManager?.RebuildRoadVisuals();
+    }
+
+    private void DrawRouteOwnerDatabaseEditor()
+    {
+        if (!HasValidSelectedRoute())
+            return;
+
+        RoadRouteDefinition route = GetSelectedRoute();
+        if (route == null)
+            return;
+
+        StructureDatabase managerDb = roadNetworkManager != null ? roadNetworkManager.StructureDatabase : null;
+        StructureDatabase current = route.ownerDatabase;
+        StructureDatabase chosen = (StructureDatabase)EditorGUILayout.ObjectField("Route Database", current, typeof(StructureDatabase), false);
+        if (chosen != current)
+        {
+            StructureDatabase db = GetContextDatabase();
+            if (db == null)
+                return;
+
+            Undo.RecordObject(db, "Set Road Route Owner Database");
+            route.ownerDatabase = chosen;
+            EditorUtility.SetDirty(db);
+            roadNetworkManager?.RebuildRoadVisuals();
+        }
+
+        using (new EditorGUI.DisabledScope(managerDb == null))
+        {
+            if (GUILayout.Button("Use Road Manager Database"))
+            {
+                StructureDatabase db = GetContextDatabase();
+                if (db == null)
+                    return;
+
+                Undo.RecordObject(db, "Set Road Route Owner Database");
+                route.ownerDatabase = managerDb;
+                EditorUtility.SetDirty(db);
+                roadNetworkManager?.RebuildRoadVisuals();
+            }
+        }
     }
 
     private void DrawTogglePaintButton(bool disabled)
@@ -187,7 +262,7 @@ public class RoadRoutePainterWindow : EditorWindow
         if (e.button != 0 && e.button != 1)
             return;
 
-        RoadRouteDefinition route = structureData.roadRoutes[selectedRouteIndex];
+        RoadRouteDefinition route = GetSelectedRoute();
         if (route == null)
             return;
 
@@ -221,7 +296,11 @@ public class RoadRoutePainterWindow : EditorWindow
             return;
         }
 
-        Undo.RecordObject(structureData, "Paint Road Route Cell");
+        StructureDatabase dbForUndo = GetContextDatabase();
+        if (dbForUndo == null)
+            return;
+
+        Undo.RecordObject(dbForUndo, "Paint Road Route Cell");
         if (route.cells.Count == 0)
         {
             route.cells.Add(cell);
@@ -243,7 +322,7 @@ public class RoadRoutePainterWindow : EditorWindow
             route.cells.Add(cell);
         }
 
-        EditorUtility.SetDirty(structureData);
+        EditorUtility.SetDirty(dbForUndo);
         roadNetworkManager.RebuildRoadVisuals();
         e.Use();
     }
@@ -253,7 +332,7 @@ public class RoadRoutePainterWindow : EditorWindow
         if (!HasValidSelectedRoute())
             return;
 
-        RoadRouteDefinition route = structureData.roadRoutes[selectedRouteIndex];
+        RoadRouteDefinition route = GetSelectedRoute();
         if (route == null || route.cells == null || route.cells.Count == 0)
             return;
 
@@ -328,19 +407,27 @@ public class RoadRoutePainterWindow : EditorWindow
         if (structureData == null)
             return;
 
-        Undo.RecordObject(structureData, "Create Road Route");
-        if (structureData.roadRoutes == null)
-            structureData.roadRoutes = new List<RoadRouteDefinition>();
+        StructureDatabase db = GetContextDatabase();
+        if (db == null)
+            return;
+
+        Undo.RecordObject(db, "Create Road Route");
+        List<RoadRouteDefinition> routes = GetEditableRoutes(createIfMissing: true);
+        if (routes == null)
+            return;
 
         RoadRouteDefinition route = new RoadRouteDefinition
         {
-            routeName = $"Route {structureData.roadRoutes.Count + 1}",
+            routeName = $"Route {routes.Count + 1}",
+            ownerDatabase = routeDatabaseFilter != null
+                ? routeDatabaseFilter
+                : (roadNetworkManager != null ? roadNetworkManager.StructureDatabase : null),
             cells = new List<Vector3Int>()
         };
 
-        structureData.roadRoutes.Add(route);
-        selectedRouteIndex = Mathf.Max(0, structureData.roadRoutes.Count - 1);
-        EditorUtility.SetDirty(structureData);
+        routes.Add(route);
+        selectedRouteIndex = Mathf.Max(0, routes.Count - 1);
+        EditorUtility.SetDirty(db);
         roadNetworkManager?.RebuildRoadVisuals();
     }
 
@@ -349,9 +436,17 @@ public class RoadRoutePainterWindow : EditorWindow
         if (!HasValidSelectedRoute())
             return;
 
-        Undo.RecordObject(structureData, "Clear Road Route");
-        structureData.roadRoutes[selectedRouteIndex].cells.Clear();
-        EditorUtility.SetDirty(structureData);
+        RoadRouteDefinition route = GetSelectedRoute();
+        if (route == null)
+            return;
+
+        StructureDatabase db = GetContextDatabase();
+        if (db == null)
+            return;
+
+        Undo.RecordObject(db, "Clear Road Route");
+        route.cells.Clear();
+        EditorUtility.SetDirty(db);
         roadNetworkManager?.RebuildRoadVisuals();
     }
 
@@ -360,13 +455,17 @@ public class RoadRoutePainterWindow : EditorWindow
         if (!HasValidSelectedRoute())
             return;
 
-        RoadRouteDefinition route = structureData.roadRoutes[selectedRouteIndex];
+        RoadRouteDefinition route = GetSelectedRoute();
         if (route == null || route.cells == null || route.cells.Count == 0)
             return;
 
-        Undo.RecordObject(structureData, "Remove Road Route Point");
+        StructureDatabase db = GetContextDatabase();
+        if (db == null)
+            return;
+
+        Undo.RecordObject(db, "Remove Road Route Point");
         route.cells.RemoveAt(route.cells.Count - 1);
-        EditorUtility.SetDirty(structureData);
+        EditorUtility.SetDirty(db);
         roadNetworkManager?.RebuildRoadVisuals();
     }
 
@@ -375,51 +474,74 @@ public class RoadRoutePainterWindow : EditorWindow
         if (!HasValidSelectedRoute())
             return;
 
-        Undo.RecordObject(structureData, "Delete Road Route");
-        structureData.roadRoutes.RemoveAt(selectedRouteIndex);
-        selectedRouteIndex = Mathf.Clamp(selectedRouteIndex, 0, Mathf.Max(0, structureData.roadRoutes.Count - 1));
-        EditorUtility.SetDirty(structureData);
+        StructureDatabase db = GetContextDatabase();
+        List<RoadRouteDefinition> routes = GetEditableRoutes(createIfMissing: false);
+        if (db == null || routes == null)
+            return;
+
+        Undo.RecordObject(db, "Delete Road Route");
+        int selectedIndex = selectedRouteIndex;
+        routes.RemoveAt(selectedIndex);
+        selectedRouteIndex = selectedIndex;
+        EnsureRouteSelectionInBounds();
+        EditorUtility.SetDirty(db);
         roadNetworkManager?.RebuildRoadVisuals();
     }
 
     private bool HasValidSelectedRoute()
     {
         return structureData != null
-            && structureData.roadRoutes != null
-            && structureData.roadRoutes.Count > 0
+            && GetEditableRoutes(createIfMissing: false) != null
+            && GetEditableRoutes(createIfMissing: false).Count > 0
             && selectedRouteIndex >= 0
-            && selectedRouteIndex < structureData.roadRoutes.Count;
+            && selectedRouteIndex < GetEditableRoutes(createIfMissing: false).Count
+            && filteredRouteIndices.Contains(selectedRouteIndex);
     }
 
     private void EnsureRouteSelectionInBounds()
     {
         if (structureData == null)
         {
-            selectedRouteIndex = 0;
+            selectedRouteIndex = -1;
+            filteredRouteIndices.Clear();
             return;
         }
 
-        if (structureData.roadRoutes == null || structureData.roadRoutes.Count == 0)
+        List<RoadRouteDefinition> routes = GetEditableRoutes(createIfMissing: false);
+        if (routes == null || routes.Count == 0)
         {
-            selectedRouteIndex = 0;
+            selectedRouteIndex = -1;
+            filteredRouteIndices.Clear();
             return;
         }
 
-        selectedRouteIndex = Mathf.Clamp(selectedRouteIndex, 0, structureData.roadRoutes.Count - 1);
+        RebuildFilteredRouteIndices(routes);
+        if (filteredRouteIndices.Count == 0)
+        {
+            selectedRouteIndex = -1;
+            return;
+        }
+
+        if (!filteredRouteIndices.Contains(selectedRouteIndex))
+            selectedRouteIndex = filteredRouteIndices[0];
     }
 
-    private static string[] BuildRouteLabels(IReadOnlyList<RoadRouteDefinition> routes)
+    private static string[] BuildRouteLabels(IReadOnlyList<RoadRouteDefinition> routes, IReadOnlyList<int> visibleIndices)
     {
-        if (routes == null || routes.Count == 0)
+        if (routes == null || routes.Count == 0 || visibleIndices == null || visibleIndices.Count == 0)
             return new[] { "<no routes>" };
 
-        string[] labels = new string[routes.Count];
-        for (int i = 0; i < routes.Count; i++)
+        string[] labels = new string[visibleIndices.Count];
+        for (int i = 0; i < visibleIndices.Count; i++)
         {
-            RoadRouteDefinition route = routes[i];
-            string name = route != null && !string.IsNullOrWhiteSpace(route.routeName) ? route.routeName : $"Route {i + 1}";
+            int routeIndex = visibleIndices[i];
+            RoadRouteDefinition route = routeIndex >= 0 && routeIndex < routes.Count ? routes[routeIndex] : null;
+            string name = route != null && !string.IsNullOrWhiteSpace(route.routeName) ? route.routeName : $"Route {routeIndex + 1}";
             int count = route != null && route.cells != null ? route.cells.Count : 0;
-            labels[i] = $"{name} ({count} pts)";
+            string dbSuffix = string.Empty;
+            if (route != null && route.ownerDatabase != null)
+                dbSuffix = $" [{route.ownerDatabase.name}]";
+            labels[i] = $"{name} ({count} pts){dbSuffix}";
         }
 
         return labels;
@@ -553,7 +675,8 @@ public class RoadRoutePainterWindow : EditorWindow
             if (candidate == null)
                 continue;
 
-            if (candidate.roadRoutes != null && candidate.roadRoutes.Count > 0)
+            if (roadNetworkManager.StructureDatabase.HasAnyRoadRoutesForStructure(candidate) ||
+                (candidate.roadRoutes != null && candidate.roadRoutes.Count > 0))
                 return candidate;
         }
 
@@ -608,7 +731,8 @@ public class RoadRoutePainterWindow : EditorWindow
 
         selectedStructureIndex = newIndex;
         structureData = structures[selectedStructureIndex];
-        selectedRouteIndex = 0;
+        selectedRouteIndex = -1;
+        EnsureRouteSelectionInBounds();
     }
 
     private void SyncSelectedStructureIndexFromCurrent()
@@ -664,5 +788,118 @@ public class RoadRoutePainterWindow : EditorWindow
         }
 
         return labels;
+    }
+
+    private void EnsureRouteFilterDefaults()
+    {
+        if (routeDatabaseFilter != null)
+            return;
+
+        if (roadNetworkManager != null && roadNetworkManager.StructureDatabase != null)
+            routeDatabaseFilter = roadNetworkManager.StructureDatabase;
+    }
+
+    private void RebuildFilteredRouteIndices(IReadOnlyList<RoadRouteDefinition> routes)
+    {
+        filteredRouteIndices.Clear();
+        if (routes == null)
+            return;
+
+        for (int i = 0; i < routes.Count; i++)
+        {
+            RoadRouteDefinition route = routes[i];
+            if (route == null)
+                continue;
+
+            if (routeDatabaseFilter != null && route.ownerDatabase != routeDatabaseFilter)
+                continue;
+
+            filteredRouteIndices.Add(i);
+        }
+    }
+
+    private int GetSelectedVisibleRouteIndex()
+    {
+        for (int i = 0; i < filteredRouteIndices.Count; i++)
+        {
+            if (filteredRouteIndices[i] == selectedRouteIndex)
+                return i;
+        }
+
+        if (filteredRouteIndices.Count > 0)
+        {
+            selectedRouteIndex = filteredRouteIndices[0];
+            return 0;
+        }
+
+        return 0;
+    }
+
+    private RoadRouteDefinition GetSelectedRoute()
+    {
+        if (!HasValidSelectedRoute())
+            return null;
+
+        List<RoadRouteDefinition> routes = GetEditableRoutes(createIfMissing: false);
+        if (routes == null || selectedRouteIndex < 0 || selectedRouteIndex >= routes.Count)
+            return null;
+
+        return routes[selectedRouteIndex];
+    }
+
+    private StructureDatabase GetContextDatabase()
+    {
+        return roadNetworkManager != null ? roadNetworkManager.StructureDatabase : null;
+    }
+
+    private List<RoadRouteDefinition> GetEditableRoutes(bool createIfMissing)
+    {
+        if (structureData == null)
+            return null;
+
+        StructureDatabase db = GetContextDatabase();
+        if (db == null)
+            return null;
+
+        IReadOnlyList<RoadRouteDefinition> existing = db.GetRoadRoutes(structureData);
+        if (existing is List<RoadRouteDefinition> existingList)
+            return existingList;
+
+        if (!createIfMissing)
+            return structureData.roadRoutes;
+
+        List<RoadRouteDefinition> created = db.GetOrCreateRoadRoutes(structureData);
+        if (created == null)
+            return null;
+
+        // Migra legado automaticamente na primeira edicao pelo painter.
+        if (created.Count == 0 && structureData.roadRoutes != null && structureData.roadRoutes.Count > 0)
+        {
+            for (int i = 0; i < structureData.roadRoutes.Count; i++)
+            {
+                RoadRouteDefinition legacy = structureData.roadRoutes[i];
+                if (legacy == null)
+                    continue;
+                if (legacy.ownerDatabase != db)
+                    continue;
+
+                created.Add(CloneRoute(legacy));
+            }
+        }
+
+        return created;
+    }
+
+    private static RoadRouteDefinition CloneRoute(RoadRouteDefinition source)
+    {
+        if (source == null)
+            return null;
+
+        return new RoadRouteDefinition
+        {
+            routeName = source.routeName,
+            ownerDatabase = source.ownerDatabase,
+            cells = source.cells != null ? new List<Vector3Int>(source.cells) : new List<Vector3Int>()
+        };
     }
 }

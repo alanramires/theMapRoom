@@ -8,7 +8,7 @@ public class ConstructionPainterWindow : EditorWindow
 {
     private ConstructionSpawner constructionSpawner;
     private ConstructionDatabase constructionDatabase;
-    [SerializeField] private ConstructionFieldDatabase constructionFieldDatabase;
+    private MatchController matchController;
     private TeamId selectedTeamId = TeamId.Green;
     private int selectedConstructionIndex;
     private bool isPainting;
@@ -56,7 +56,7 @@ public class ConstructionPainterWindow : EditorWindow
         EditorGUILayout.LabelField("References", EditorStyles.boldLabel);
         constructionSpawner = (ConstructionSpawner)EditorGUILayout.ObjectField("Construction Spawner", constructionSpawner, typeof(ConstructionSpawner), true);
         constructionDatabase = (ConstructionDatabase)EditorGUILayout.ObjectField("Construction Database", constructionDatabase, typeof(ConstructionDatabase), false);
-        constructionFieldDatabase = (ConstructionFieldDatabase)EditorGUILayout.ObjectField("Construction Field Database", constructionFieldDatabase, typeof(ConstructionFieldDatabase), false);
+        matchController = (MatchController)EditorGUILayout.ObjectField("Match Controller", matchController, typeof(MatchController), true);
 
         EditorGUILayout.BeginHorizontal();
         GUILayout.FlexibleSpace();
@@ -85,12 +85,12 @@ public class ConstructionPainterWindow : EditorWindow
         }
 
         EditorGUILayout.Space(6f);
-        selectedTeamId = (TeamId)EditorGUILayout.EnumPopup("Team ID", selectedTeamId);
+        DrawTeamSelectorFromMatchController();
         DrawConstructionSelector();
         TryGetSelectedConstruction(out ConstructionData selectedConstruction);
         SyncBrushWithSelection(selectedConstruction);
         replaceExisting = EditorGUILayout.ToggleLeft("Replace Existing Construction On Cell", replaceExisting);
-        persistToFieldDatabase = EditorGUILayout.ToggleLeft("Persist To Construction Field Database", persistToFieldDatabase);
+        persistToFieldDatabase = EditorGUILayout.ToggleLeft("Persist To Construction Database Field Entries", persistToFieldDatabase);
 
         EditorGUILayout.Space(6f);
         EditorGUILayout.LabelField("Instance Configuration", EditorStyles.boldLabel);
@@ -209,7 +209,7 @@ public class ConstructionPainterWindow : EditorWindow
         {
             ApplySpawnOverrides(spawned);
 
-            if (persistToFieldDatabase && constructionFieldDatabase != null)
+            if (persistToFieldDatabase && constructionDatabase != null)
                 UpsertFieldEntry(cell, selectedConstruction, spawned.GetComponent<ConstructionManager>());
 
             Undo.RegisterCreatedObjectUndo(spawned, "Paint Construction");
@@ -246,7 +246,7 @@ public class ConstructionPainterWindow : EditorWindow
                 EditorSceneManager.MarkSceneDirty(scene);
         }
 
-        if (persistToFieldDatabase && constructionFieldDatabase != null)
+        if (persistToFieldDatabase && constructionDatabase != null)
             RemoveFieldEntryAtCell(cell);
     }
 
@@ -269,18 +269,18 @@ public class ConstructionPainterWindow : EditorWindow
                 constructionSpawner = spawners[0];
         }
 
-        if (!force && constructionDatabase != null && constructionFieldDatabase != null)
+        if (!force && constructionDatabase != null && matchController != null)
             return;
 
         if (constructionSpawner != null)
         {
             SerializedObject so = new SerializedObject(constructionSpawner);
             SerializedProperty dbProp = so.FindProperty("constructionDatabase");
-            SerializedProperty fieldDbProp = so.FindProperty("constructionFieldDatabase");
+            SerializedProperty matchProp = so.FindProperty("matchController");
             if (dbProp != null && dbProp.objectReferenceValue is ConstructionDatabase dbFromSpawner)
                 constructionDatabase = dbFromSpawner;
-            if (fieldDbProp != null && fieldDbProp.objectReferenceValue is ConstructionFieldDatabase fieldDbFromSpawner)
-                constructionFieldDatabase = fieldDbFromSpawner;
+            if (matchProp != null && matchProp.objectReferenceValue is MatchController matchFromSpawner)
+                matchController = matchFromSpawner;
         }
 
         if (constructionDatabase == null)
@@ -298,20 +298,9 @@ public class ConstructionPainterWindow : EditorWindow
             }
         }
 
-        if (constructionFieldDatabase == null)
-        {
-            string[] fieldGuids = AssetDatabase.FindAssets("t:ConstructionFieldDatabase");
-            for (int i = 0; i < fieldGuids.Length; i++)
-            {
-                string path = AssetDatabase.GUIDToAssetPath(fieldGuids[i]);
-                ConstructionFieldDatabase candidate = AssetDatabase.LoadAssetAtPath<ConstructionFieldDatabase>(path);
-                if (candidate == null)
-                    continue;
+        if (matchController == null)
+            matchController = Object.FindAnyObjectByType<MatchController>();
 
-                constructionFieldDatabase = candidate;
-                break;
-            }
-        }
     }
 
     private void EnsureBrushDefaults()
@@ -346,7 +335,7 @@ public class ConstructionPainterWindow : EditorWindow
     private void ApplyNoProductionPreset()
     {
         EnsureBrushDefaults();
-        brushSiteRuntime.canProduceAndSellUnits = new List<ConstructionUnitMarketRule>();
+        brushSiteRuntime.sellingRule = ConstructionUnitMarketRule.Disabled;
         brushSiteRuntime.offeredUnits = new List<UnitData>();
         brushSiteRuntime.Sanitize();
     }
@@ -371,15 +360,15 @@ public class ConstructionPainterWindow : EditorWindow
 
     private void UpsertFieldEntry(Vector3Int cell, ConstructionData selectedConstruction, ConstructionManager spawnedManager)
     {
-        if (constructionFieldDatabase == null || selectedConstruction == null)
+        if (constructionDatabase == null || selectedConstruction == null)
             return;
 
-        Undo.RecordObject(constructionFieldDatabase, "Paint Construction Field Entry");
+        Undo.RecordObject(constructionDatabase, "Paint Construction Field Entry");
 
-        SerializedObject fieldDbSerialized = new SerializedObject(constructionFieldDatabase);
+        SerializedObject fieldDbSerialized = new SerializedObject(constructionDatabase);
         fieldDbSerialized.Update();
 
-        SerializedProperty entriesProp = fieldDbSerialized.FindProperty("entries");
+        SerializedProperty entriesProp = fieldDbSerialized.FindProperty("fieldEntries");
         if (entriesProp == null)
             return;
 
@@ -419,7 +408,7 @@ public class ConstructionPainterWindow : EditorWindow
             CopySiteRuntimeToProperty(brushSiteRuntime, configProp);
 
         fieldDbSerialized.ApplyModifiedProperties();
-        EditorUtility.SetDirty(constructionFieldDatabase);
+        EditorUtility.SetDirty(constructionDatabase);
     }
 
     private static string BuildFieldEntryId(ConstructionData selectedConstruction, TeamId teamId, ConstructionManager manager)
@@ -438,15 +427,15 @@ public class ConstructionPainterWindow : EditorWindow
 
     private void RemoveFieldEntryAtCell(Vector3Int cell)
     {
-        if (constructionFieldDatabase == null)
+        if (constructionDatabase == null)
             return;
 
-        Undo.RecordObject(constructionFieldDatabase, "Remove Construction Field Entry");
+        Undo.RecordObject(constructionDatabase, "Remove Construction Field Entry");
 
-        SerializedObject fieldDbSerialized = new SerializedObject(constructionFieldDatabase);
+        SerializedObject fieldDbSerialized = new SerializedObject(constructionDatabase);
         fieldDbSerialized.Update();
 
-        SerializedProperty entriesProp = fieldDbSerialized.FindProperty("entries");
+        SerializedProperty entriesProp = fieldDbSerialized.FindProperty("fieldEntries");
         if (entriesProp == null)
             return;
 
@@ -456,7 +445,7 @@ public class ConstructionPainterWindow : EditorWindow
 
         entriesProp.DeleteArrayElementAtIndex(index);
         fieldDbSerialized.ApplyModifiedProperties();
-        EditorUtility.SetDirty(constructionFieldDatabase);
+        EditorUtility.SetDirty(constructionDatabase);
     }
 
     private static int FindEntryIndexByCell(SerializedProperty entriesProp, Vector3Int cell)
@@ -496,7 +485,7 @@ public class ConstructionPainterWindow : EditorWindow
         SetInt(destination, "capturePointsMax", copy.capturePointsMax);
         SetInt(destination, "capturedIncoming", copy.capturedIncoming);
         SetBool(destination, "canProvideSupplies", copy.canProvideSupplies);
-        CopyEnumList(destination.FindPropertyRelative("canProduceAndSellUnits"), copy.canProduceAndSellUnits);
+        SetEnum(destination, "sellingRule", (int)copy.sellingRule);
         CopyObjectList(destination.FindPropertyRelative("offeredUnits"), copy.offeredUnits);
         CopyObjectList(destination.FindPropertyRelative("offeredServices"), copy.offeredServices);
         CopySupplyList(destination.FindPropertyRelative("offeredSupplies"), copy.offeredSupplies);
@@ -516,14 +505,11 @@ public class ConstructionPainterWindow : EditorWindow
             prop.intValue = value;
     }
 
-    private static void CopyEnumList(SerializedProperty destination, List<ConstructionUnitMarketRule> values)
+    private static void SetEnum(SerializedProperty parent, string name, int enumValueIndex)
     {
-        if (destination == null)
-            return;
-
-        destination.arraySize = values != null ? values.Count : 0;
-        for (int i = 0; i < destination.arraySize; i++)
-            destination.GetArrayElementAtIndex(i).enumValueIndex = (int)values[i];
+        SerializedProperty prop = parent.FindPropertyRelative(name);
+        if (prop != null)
+            prop.enumValueIndex = enumValueIndex;
     }
 
     private static void CopyObjectList<T>(SerializedProperty destination, List<T> values) where T : Object
@@ -557,6 +543,68 @@ public class ConstructionPainterWindow : EditorWindow
             if (quantityProp != null)
                 quantityProp.intValue = offer != null ? Mathf.Max(0, offer.quantity) : 0;
         }
+
+    }
+
+    private void DrawTeamSelectorFromMatchController()
+    {
+        List<TeamId> allowed = BuildAllowedTeams();
+        if (allowed == null || allowed.Count == 0)
+        {
+            selectedTeamId = (TeamId)EditorGUILayout.EnumPopup("Team ID", selectedTeamId);
+            return;
+        }
+
+        int selectedIndex = 0;
+        string[] labels = new string[allowed.Count];
+        for (int i = 0; i < allowed.Count; i++)
+        {
+            TeamId team = allowed[i];
+            labels[i] = team == TeamId.Neutral
+                ? "Neutral (-1)"
+                : $"{TeamUtils.GetName(team)} ({(int)team})";
+
+            if (team == selectedTeamId)
+                selectedIndex = i;
+        }
+
+        int newIndex = EditorGUILayout.Popup("Team ID", selectedIndex, labels);
+        if (newIndex >= 0 && newIndex < allowed.Count)
+            selectedTeamId = allowed[newIndex];
+
+        if (matchController != null)
+        {
+            EditorGUILayout.HelpBox(
+                "Times filtrados pelo MatchController.Players. Neutral permanece disponivel para pintar unidades/construcoes neutras.",
+                MessageType.None);
+        }
+    }
+
+    private List<TeamId> BuildAllowedTeams()
+    {
+        var result = new List<TeamId> { TeamId.Neutral };
+
+        IReadOnlyList<TeamId> players = matchController != null ? matchController.Players : null;
+        if (players == null || players.Count == 0)
+        {
+            if (matchController == null)
+                return result;
+
+            return result;
+        }
+
+        var seen = new HashSet<TeamId> { TeamId.Neutral };
+        for (int i = 0; i < players.Count; i++)
+        {
+            TeamId team = players[i];
+            if (team == TeamId.Neutral || seen.Contains(team))
+                continue;
+
+            seen.Add(team);
+            result.Add(team);
+        }
+
+        return result;
     }
 
     private static void DrawConstructionConfigurationExpanded(SerializedProperty siteRuntimeProp, string label)
@@ -571,7 +619,7 @@ public class ConstructionPainterWindow : EditorWindow
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("isCapturable"), "Is Capturable");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("capturedIncoming"), "Captured Incoming");
-        DrawIfExists(siteRuntimeProp.FindPropertyRelative("canProduceAndSellUnits"), "Can Produce And Sell Units");
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("sellingRule"), "Selling Rules");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("offeredUnits"), "Offered Units");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("canProvideSupplies"), "Can Provide Supplies");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("offeredSupplies"), "Offered Supplies");

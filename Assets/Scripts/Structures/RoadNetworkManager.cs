@@ -26,6 +26,8 @@ public class RoadNetworkManager : MonoBehaviour
     [Tooltip("Se true, so desenha rota em celulas cujo terreno suporte Land/Surface.")]
     [SerializeField] private bool enforceLandSurfaceCells = true;
     [SerializeField] private bool logInvalidRoadCells = true;
+    [Tooltip("Se ativo, desenha apenas rotas cujo ownerDatabase combine com o StructureDatabase deste manager (ou rotas legadas sem ownerDatabase).")]
+    [SerializeField] private bool filterRoutesByOwnerDatabase = true;
     [Header("Live Preview")]
     [SerializeField] private bool livePreviewInEditor = true;
     [SerializeField] private bool livePreviewInPlayMode = false;
@@ -128,13 +130,16 @@ public class RoadNetworkManager : MonoBehaviour
         for (int s = 0; s < structures.Count; s++)
         {
             StructureData structure = structures[s];
-            if (structure == null || structure.roadRoutes == null)
+            IReadOnlyList<RoadRouteDefinition> routes = GetRoutesForStructure(structure);
+            if (structure == null || routes == null)
                 continue;
 
-            for (int r = 0; r < structure.roadRoutes.Count; r++)
+            for (int r = 0; r < routes.Count; r++)
             {
-                RoadRouteDefinition route = structure.roadRoutes[r];
+                RoadRouteDefinition route = routes[r];
                 if (route == null || route.cells == null || route.cells.Count < 2)
+                    continue;
+                if (!IsRouteAllowedForCurrentDatabase(route))
                     continue;
                 if (!IsRouteValid(structure, route))
                 {
@@ -286,6 +291,20 @@ public class RoadNetworkManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    private bool IsRouteAllowedForCurrentDatabase(RoadRouteDefinition route)
+    {
+        if (!filterRoutesByOwnerDatabase)
+            return true;
+        if (route == null)
+            return false;
+
+        // Compatibilidade com rotas antigas (sem ownerDatabase definido).
+        if (route.ownerDatabase == null)
+            return true;
+
+        return route.ownerDatabase == structureDatabase;
     }
 
     public bool IsRoadCellValid(Vector3Int cell)
@@ -577,12 +596,13 @@ public class RoadNetworkManager : MonoBehaviour
         for (int s = 0; s < structures.Count; s++)
         {
             StructureData structure = structures[s];
-            if (structure == null || structure.roadRoutes == null)
+            IReadOnlyList<RoadRouteDefinition> routes = GetRoutesForStructure(structure);
+            if (structure == null || routes == null)
                 continue;
 
-            for (int r = 0; r < structure.roadRoutes.Count; r++)
+            for (int r = 0; r < routes.Count; r++)
             {
-                RoadRouteDefinition route = structure.roadRoutes[r];
+                RoadRouteDefinition route = routes[r];
                 if (route == null || route.cells == null)
                     continue;
 
@@ -663,13 +683,14 @@ public class RoadNetworkManager : MonoBehaviour
                 hash = hash * 31 + structure.roadColor.GetHashCode();
                 hash = hash * 31 + (int)(structure.roadWidth * 1000f);
                 hash = hash * 31 + (int)(structure.segmentOverlap * 1000f);
-                hash = hash * 31 + (structure.roadRoutes != null ? structure.roadRoutes.Count : 0);
-                if (structure.roadRoutes == null)
+                IReadOnlyList<RoadRouteDefinition> routes = GetRoutesForStructure(structure);
+                hash = hash * 31 + (routes != null ? routes.Count : 0);
+                if (routes == null)
                     continue;
 
-                for (int r = 0; r < structure.roadRoutes.Count; r++)
+                for (int r = 0; r < routes.Count; r++)
                 {
-                    RoadRouteDefinition route = structure.roadRoutes[r];
+                    RoadRouteDefinition route = routes[r];
                     if (route == null || route.cells == null)
                     {
                         hash = hash * 31;
@@ -685,5 +706,21 @@ public class RoadNetworkManager : MonoBehaviour
 
             return hash;
         }
+    }
+
+    private IReadOnlyList<RoadRouteDefinition> GetRoutesForStructure(StructureData structure)
+    {
+        if (structure == null)
+            return null;
+
+        if (structureDatabase != null)
+        {
+            IReadOnlyList<RoadRouteDefinition> dbRoutes = structureDatabase.GetRoadRoutes(structure);
+            if (dbRoutes != null)
+                return dbRoutes;
+        }
+
+        // Fallback legado: rotas antigas salvas no StructureData.
+        return structure.roadRoutes;
     }
 }

@@ -333,24 +333,10 @@ public class ConstructionFieldDatabaseEditor : Editor
         if (left.capturePointsMax != right.capturePointsMax) return false;
         if (left.capturedIncoming != right.capturedIncoming) return false;
         if (left.canProvideSupplies != right.canProvideSupplies) return false;
-        if (!EqualsEnumList(left.canProduceAndSellUnits, right.canProduceAndSellUnits)) return false;
+        if (left.sellingRule != right.sellingRule) return false;
         if (!EqualsObjectList(left.offeredUnits, right.offeredUnits)) return false;
         if (!EqualsObjectList(left.offeredServices, right.offeredServices)) return false;
         if (!EqualsSupplyList(left.offeredSupplies, right.offeredSupplies)) return false;
-        return true;
-    }
-
-    private static bool EqualsEnumList(List<ConstructionUnitMarketRule> a, List<ConstructionUnitMarketRule> b)
-    {
-        if (a == null || b == null)
-            return (a == null || a.Count == 0) && (b == null || b.Count == 0);
-        if (a.Count != b.Count)
-            return false;
-        for (int i = 0; i < a.Count; i++)
-        {
-            if (a[i] != b[i])
-                return false;
-        }
         return true;
     }
 
@@ -452,7 +438,7 @@ public class ConstructionFieldDatabaseEditor : Editor
         SetInt(destination, "capturePointsMax", copy.capturePointsMax);
         SetInt(destination, "capturedIncoming", copy.capturedIncoming);
         SetBool(destination, "canProvideSupplies", copy.canProvideSupplies);
-        CopyEnumList(destination.FindPropertyRelative("canProduceAndSellUnits"), copy.canProduceAndSellUnits);
+        SetEnum(destination, "sellingRule", (int)copy.sellingRule);
         CopyObjectList(destination.FindPropertyRelative("offeredUnits"), copy.offeredUnits);
         CopyObjectList(destination.FindPropertyRelative("offeredServices"), copy.offeredServices);
         CopySupplyList(destination.FindPropertyRelative("offeredSupplies"), copy.offeredSupplies);
@@ -472,14 +458,11 @@ public class ConstructionFieldDatabaseEditor : Editor
             prop.intValue = value;
     }
 
-    private static void CopyEnumList(SerializedProperty destination, List<ConstructionUnitMarketRule> values)
+    private static void SetEnum(SerializedProperty parent, string name, int enumValueIndex)
     {
-        if (destination == null)
-            return;
-
-        destination.arraySize = values != null ? values.Count : 0;
-        for (int i = 0; i < destination.arraySize; i++)
-            destination.GetArrayElementAtIndex(i).enumValueIndex = (int)values[i];
+        SerializedProperty prop = parent.FindPropertyRelative(name);
+        if (prop != null)
+            prop.enumValueIndex = enumValueIndex;
     }
 
     private static void CopyObjectList<T>(SerializedProperty destination, List<T> values) where T : Object
@@ -526,7 +509,7 @@ public class ConstructionFieldDatabaseEditor : Editor
         EditorGUILayout.PropertyField(configProp.FindPropertyRelative("isCapturable"), new GUIContent("Is Capturable"));
         EditorGUILayout.PropertyField(configProp.FindPropertyRelative("capturePointsMax"), new GUIContent("Capture Points Max"));
         EditorGUILayout.PropertyField(configProp.FindPropertyRelative("capturedIncoming"), new GUIContent("Captured Incoming"));
-        EditorGUILayout.PropertyField(configProp.FindPropertyRelative("canProduceAndSellUnits"), new GUIContent("Can Produce And Sell Units"));
+        EditorGUILayout.PropertyField(configProp.FindPropertyRelative("sellingRule"), new GUIContent("Selling Rules"));
         EditorGUILayout.PropertyField(configProp.FindPropertyRelative("offeredUnits"), new GUIContent("Offered Units"), true);
         EditorGUILayout.PropertyField(configProp.FindPropertyRelative("canProvideSupplies"), new GUIContent("Can Provide Supplies"));
         EditorGUILayout.PropertyField(configProp.FindPropertyRelative("offeredSupplies"), new GUIContent("Offered Supplies"), true);

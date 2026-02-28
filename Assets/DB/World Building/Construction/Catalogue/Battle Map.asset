@@ -1,0 +1,438 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 90a59b8798b242347a6d84ef73ea39f4, type: 3}
+  m_Name: Battle Map
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionDatabase
+  constructions:
+  - {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
+  - {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+  - {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+  fieldEntries:
+  - id: HQ_T0_C1
+    construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
+    initialTeamId: 0
+    cellPosition: {x: -4, y: 5, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 1
+      isCapturable: 1
+      capturePointsMax: 40
+      capturedIncoming: 2000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  - id: "F\xE1brica_T0_C2"
+    construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+    initialTeamId: 0
+    cellPosition: {x: -5, y: 5, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: "F\xE1brica_T0_C3"
+    construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+    initialTeamId: 0
+    cellPosition: {x: -3, y: 6, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: Cidade_T-1_C4
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: -1
+    cellPosition: {x: -2, y: 4, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 1
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      sellingRule: 2
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: Cidade_T0_C7
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: 0
+    cellPosition: {x: 2, y: 3, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: Cidade_T-1_C8
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: -1
+    cellPosition: {x: 4, y: 0, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: Cidade_T-1_C9
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: -1
+    cellPosition: {x: 1, y: -1, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: Cidade_T-1_C10
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: -1
+    cellPosition: {x: -3, y: 0, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: Cidade_T-1_C11
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: -1
+    cellPosition: {x: -2, y: -5, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: Cidade_T-1_C12
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: -1
+    cellPosition: {x: 3, y: -4, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: HQ_T1_C13
+    construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
+    initialTeamId: 1
+    cellPosition: {x: 4, y: -5, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 1
+      isCapturable: 1
+      capturePointsMax: 40
+      capturedIncoming: 2000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  - id: "F\xE1brica_T1_C14"
+    construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+    initialTeamId: 1
+    cellPosition: {x: 5, y: -5, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: "F\xE1brica_T1_C15"
+    construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+    initialTeamId: 1
+    cellPosition: {x: 4, y: -6, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: HQ_T-1_C17
+    construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
+    initialTeamId: -1
+    cellPosition: {x: -4, y: 3, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 1
+      isCapturable: 1
+      capturePointsMax: 40
+      capturedIncoming: 2000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  - id: Cidade_T-1_C19
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: -1
+    cellPosition: {x: -8, y: 3, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}

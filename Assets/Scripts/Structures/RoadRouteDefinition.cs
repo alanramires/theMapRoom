@@ -7,6 +7,9 @@ public class RoadRouteDefinition
     [Tooltip("Nome da rodovia/rota (ex.: BR-101).")]
     public string routeName = "Nova Rodovia";
 
+    [Tooltip("Database dono desta rota. Se null, a rota eh tratada como global/legado.")]
+    public StructureDatabase ownerDatabase;
+
     [Tooltip("Lista ordenada de hexes por onde a rodovia passa.")]
     public List<Vector3Int> cells = new List<Vector3Int>();
 }

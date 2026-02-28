@@ -20,8 +20,11 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private ConstructionSiteRuntime siteRuntime = new ConstructionSiteRuntime();
     [SerializeField, HideInInspector] private bool hasSiteRuntimeOverride;
     [SerializeField] private int currentCapturePoints;
+    [SerializeField] private bool hasInfiniteSuppliesOverride;
     [SerializeField] private TeamId originalOwnerTeamId = TeamId.Neutral;
     [SerializeField] private bool originalOwnerInitialized;
+    [SerializeField] private TeamId firstOwnerTeamId = TeamId.Neutral;
+    [SerializeField] private bool firstOwnerInitialized;
     [Header("Runtime Visual")]
     [SerializeField] [Range(0f, 1f)] private float occupiedByReadyUnitDarkenFactor = 0.4f;
     [SerializeField] private ConstructionHudController hudController;
@@ -39,11 +42,14 @@ public class ConstructionManager : MonoBehaviour
     public int CurrentCapturePoints => currentCapturePoints;
     public bool CanProduceUnits => CanProduceUnitsForTeam(teamId);
     public bool CanProvideSupplies => siteRuntime != null && siteRuntime.canProvideSupplies;
+    public bool HasInfiniteSuppliesOverride => hasInfiniteSuppliesOverride;
     public bool IsPlayerHeadQuarter => siteRuntime != null && siteRuntime.isPlayerHeadQuarter;
     public int CapturedIncoming => siteRuntime != null ? Mathf.Max(0, siteRuntime.capturedIncoming) : 0;
     public IReadOnlyList<ServiceData> OfferedServices => siteRuntime != null && siteRuntime.offeredServices != null ? siteRuntime.offeredServices : System.Array.Empty<ServiceData>();
     public IReadOnlyList<UnitData> OfferedUnits => siteRuntime != null && siteRuntime.offeredUnits != null ? siteRuntime.offeredUnits : System.Array.Empty<UnitData>();
     public IReadOnlyList<ConstructionSupplyOffer> OfferedSupplies => siteRuntime != null && siteRuntime.offeredSupplies != null ? siteRuntime.offeredSupplies : System.Array.Empty<ConstructionSupplyOffer>();
+    public TeamId FirstOwnerTeamId => firstOwnerTeamId;
+    public bool HasFirstOwner => firstOwnerInitialized;
 
     public Domain GetDomain()
     {
@@ -263,6 +269,35 @@ public class ConstructionManager : MonoBehaviour
             originalOwnerTeamId = team;
             originalOwnerInitialized = true;
         }
+
+        if (!firstOwnerInitialized && team != TeamId.Neutral)
+        {
+            firstOwnerTeamId = team;
+            firstOwnerInitialized = true;
+        }
+
+        if (!ApplyFromDatabase())
+            UpdateDynamicName();
+        RefreshHud();
+    }
+
+    public void InitializeOwnershipForSpawn(TeamId initialTeam)
+    {
+        teamId = initialTeam;
+        originalOwnerTeamId = initialTeam;
+        originalOwnerInitialized = true;
+
+        if (initialTeam == TeamId.Neutral)
+        {
+            firstOwnerTeamId = TeamId.Neutral;
+            firstOwnerInitialized = false;
+        }
+        else
+        {
+            firstOwnerTeamId = initialTeam;
+            firstOwnerInitialized = true;
+        }
+
         if (!ApplyFromDatabase())
             UpdateDynamicName();
         RefreshHud();
@@ -321,6 +356,66 @@ public class ConstructionManager : MonoBehaviour
         RefreshHud();
     }
 
+    public bool HasInfiniteSuppliesFor(SupplyData supply = null)
+    {
+        if (hasInfiniteSuppliesOverride)
+        {
+            if (supply == null)
+                return true;
+            return ContainsOfferedSupply(supply);
+        }
+
+        if (TryResolveConstructionData(out ConstructionData constructionData) && constructionData != null && constructionData.supplierResources != null)
+        {
+            for (int i = 0; i < constructionData.supplierResources.Count; i++)
+            {
+                ConstructionSupplierResourceCapacity entry = constructionData.supplierResources[i];
+                if (entry == null || entry.supply == null)
+                    continue;
+                if (supply != null && entry.supply != supply)
+                    continue;
+                if (entry.maxCapacity < 0)
+                    return true;
+            }
+        }
+
+        IReadOnlyList<ConstructionSupplyOffer> offers = OfferedSupplies;
+        if (offers == null)
+            return false;
+
+        for (int i = 0; i < offers.Count; i++)
+        {
+            ConstructionSupplyOffer offer = offers[i];
+            if (offer == null || offer.supply == null)
+                continue;
+            if (supply != null && offer.supply != supply)
+                continue;
+            if (offer.quantity >= int.MaxValue)
+                return true;
+        }
+
+        return false;
+    }
+
+    public bool ContainsOfferedSupply(SupplyData supply)
+    {
+        if (supply == null)
+            return false;
+
+        IReadOnlyList<ConstructionSupplyOffer> offers = OfferedSupplies;
+        if (offers == null)
+            return false;
+
+        for (int i = 0; i < offers.Count; i++)
+        {
+            ConstructionSupplyOffer offer = offers[i];
+            if (offer != null && offer.supply == supply)
+                return true;
+        }
+
+        return false;
+    }
+
     public void SnapToCellCenter()
     {
         if (boardTilemap == null)
@@ -358,12 +453,6 @@ public class ConstructionManager : MonoBehaviour
         if (siteRuntime == null)
             siteRuntime = new ConstructionSiteRuntime();
         siteRuntime.Sanitize();
-        if (!originalOwnerInitialized)
-        {
-            originalOwnerTeamId = teamId;
-            originalOwnerInitialized = true;
-        }
-
         if (hudController == null)
             hudController = GetComponentInChildren<ConstructionHudController>(true);
         if (hudController == null)
@@ -404,30 +493,28 @@ public class ConstructionManager : MonoBehaviour
 
     public bool CanProduceUnitsForTeam(TeamId buyerTeam)
     {
-        if (siteRuntime == null || siteRuntime.canProduceAndSellUnits == null || siteRuntime.canProduceAndSellUnits.Count == 0)
+        if (siteRuntime == null)
             return false;
         if (buyerTeam == TeamId.Neutral)
             return false;
         if (buyerTeam != teamId)
             return false;
+        if (siteRuntime.offeredUnits == null || siteRuntime.offeredUnits.Count <= 0)
+            return false;
 
-        bool hasFreeMarket = false;
-        bool hasOriginalOwner = false;
-        for (int i = 0; i < siteRuntime.canProduceAndSellUnits.Count; i++)
+        switch (siteRuntime.sellingRule)
         {
-            ConstructionUnitMarketRule rule = siteRuntime.canProduceAndSellUnits[i];
-            if (rule == ConstructionUnitMarketRule.FreeMarket)
-                hasFreeMarket = true;
-            else if (rule == ConstructionUnitMarketRule.OriginalOwner)
-                hasOriginalOwner = true;
+            case ConstructionUnitMarketRule.Disabled:
+                return false;
+            case ConstructionUnitMarketRule.FreeMarket:
+                return true;
+            case ConstructionUnitMarketRule.OriginalOwner:
+                return buyerTeam == originalOwnerTeamId;
+            case ConstructionUnitMarketRule.FirstOwner:
+                return firstOwnerInitialized && buyerTeam == firstOwnerTeamId;
+            default:
+                return false;
         }
-
-        if (hasFreeMarket)
-            return true;
-        if (hasOriginalOwner)
-            return buyerTeam == originalOwnerTeamId;
-
-        return false;
     }
 
     private void EnsureCapturePointsInitialized()

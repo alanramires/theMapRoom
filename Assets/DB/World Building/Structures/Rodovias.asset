@@ -49,6 +49,7 @@ MonoBehaviour:
     heightLevel: 2
   roadRoutes:
   - routeName: Rota 66
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
     - {x: 0, y: 0, z: 0}
     - {x: 0, y: 1, z: 0}
@@ -58,6 +59,7 @@ MonoBehaviour:
     - {x: 3, y: 3, z: 0}
     - {x: 4, y: 4, z: 0}
   - routeName: Avenida afonso pena
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
     - {x: 0, y: 0, z: 0}
     - {x: 1, y: 0, z: 0}
@@ -74,6 +76,7 @@ MonoBehaviour:
     - {x: 7, y: -7, z: 0}
     - {x: 8, y: -8, z: 0}
   - routeName: Caminho do Aeroporto
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
     - {x: 0, y: 0, z: 0}
     - {x: -1, y: 0, z: 0}
@@ -90,6 +93,7 @@ MonoBehaviour:
     - {x: -10, y: 5, z: 0}
     - {x: -11, y: 5, z: 0}
   - routeName: Estrada Mirabel
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
     - {x: -6, y: 7, z: 0}
     - {x: -5, y: 7, z: 0}
@@ -119,16 +123,19 @@ MonoBehaviour:
     - {x: 7, y: -4, z: 0}
     - {x: 6, y: -4, z: 0}
   - routeName: "Tunel Rebou\xE7as"
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
     - {x: -4, y: 5, z: 0}
     - {x: -3, y: 6, z: 0}
     - {x: -3, y: 7, z: 0}
   - routeName: Mountain Route
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
     - {x: 8, y: 2, z: 0}
     - {x: 7, y: 1, z: 0}
     - {x: 8, y: 0, z: 0}
   - routeName: Estrada do Lago
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
     - {x: 9, y: -11, z: 0}
     - {x: 10, y: -11, z: 0}
@@ -137,6 +144,7 @@ MonoBehaviour:
     - {x: 13, y: -11, z: 0}
     - {x: 14, y: -11, z: 0}
   - routeName: Ilha Road
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
     - {x: 29, y: 5, z: 0}
     - {x: 30, y: 4, z: 0}
@@ -176,6 +184,7 @@ MonoBehaviour:
     - {x: 26, y: 4, z: 0}
     - {x: 27, y: 4, z: 0}
   - routeName: Ilha Paraiso Norte
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
     - {x: 13, y: 10, z: 0}
     - {x: 14, y: 10, z: 0}
@@ -191,3 +200,50 @@ MonoBehaviour:
     - {x: 24, y: 10, z: 0}
     - {x: 23, y: 9, z: 0}
     - {x: 22, y: 9, z: 0}
+  - routeName: Em circulo
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
+    cells:
+    - {x: 0, y: 0, z: 0}
+    - {x: -1, y: -1, z: 0}
+    - {x: -2, y: -1, z: 0}
+    - {x: -1, y: -2, z: 0}
+    - {x: 0, y: -2, z: 0}
+    - {x: 0, y: -1, z: 0}
+    - {x: -1, y: -1, z: 0}
+  - routeName: Battle Road
+    ownerDatabase: {fileID: 11400000, guid: eb2a8b82254e58549b459bbf6f7b37f7, type: 2}
+    cells:
+    - {x: -4, y: 5, z: 0}
+    - {x: -5, y: 5, z: 0}
+    - {x: -5, y: 4, z: 0}
+    - {x: -5, y: 3, z: 0}
+    - {x: -5, y: 2, z: 0}
+    - {x: -6, y: 1, z: 0}
+    - {x: -5, y: 0, z: 0}
+    - {x: -5, y: -1, z: 0}
+    - {x: -4, y: -2, z: 0}
+    - {x: -5, y: -3, z: 0}
+    - {x: -4, y: -4, z: 0}
+    - {x: -3, y: -4, z: 0}
+    - {x: -2, y: -4, z: 0}
+    - {x: -1, y: -4, z: 0}
+    - {x: 0, y: -4, z: 0}
+    - {x: 0, y: -5, z: 0}
+    - {x: 1, y: -5, z: 0}
+    - {x: 2, y: -6, z: 0}
+    - {x: 3, y: -6, z: 0}
+    - {x: 4, y: -6, z: 0}
+    - {x: 4, y: -5, z: 0}
+    - {x: 4, y: -4, z: 0}
+    - {x: 3, y: -3, z: 0}
+    - {x: 3, y: -2, z: 0}
+    - {x: 2, y: -2, z: 0}
+    - {x: 1, y: -1, z: 0}
+    - {x: 0, y: -1, z: 0}
+    - {x: -1, y: -1, z: 0}
+    - {x: -1, y: 0, z: 0}
+    - {x: -2, y: 1, z: 0}
+    - {x: -2, y: 2, z: 0}
+    - {x: -3, y: 3, z: 0}
+    - {x: -3, y: 4, z: 0}
+    - {x: -4, y: 5, z: 0}

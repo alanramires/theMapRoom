@@ -688,6 +688,8 @@ public class ServicoDoComandoDebugWindow : EditorWindow
     {
         if (sourceConstruction == null || supply == null)
             return 0;
+        if (sourceConstruction.HasInfiniteSuppliesFor(supply))
+            return int.MaxValue;
 
         IReadOnlyList<ConstructionSupplyOffer> offers = sourceConstruction.OfferedSupplies;
         if (offers == null)
@@ -732,6 +734,8 @@ public class ServicoDoComandoDebugWindow : EditorWindow
     {
         if (sourceConstruction == null || supply == null || amount <= 0)
             return false;
+        if (sourceConstruction.HasInfiniteSuppliesFor(supply))
+            return sourceConstruction.ContainsOfferedSupply(supply);
 
         IReadOnlyList<ConstructionSupplyOffer> offers = sourceConstruction.OfferedSupplies;
         if (offers == null)

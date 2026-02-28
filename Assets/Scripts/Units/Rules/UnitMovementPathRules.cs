@@ -868,12 +868,18 @@ public static class UnitMovementPathRules
                 for (int s = 0; s < structures.Count; s++)
                 {
                     StructureData structure = structures[s];
-                    if (structure == null || structure.roadRoutes == null)
+                    if (structure == null)
                         continue;
 
-                    for (int r = 0; r < structure.roadRoutes.Count; r++)
+                    IReadOnlyList<RoadRouteDefinition> routes = db.GetRoadRoutes(structure);
+                    if (routes == null)
+                        routes = structure.roadRoutes;
+                    if (routes == null)
+                        continue;
+
+                    for (int r = 0; r < routes.Count; r++)
                     {
-                        RoadRouteDefinition route = structure.roadRoutes[r];
+                        RoadRouteDefinition route = routes[r];
                         if (route == null || route.cells == null)
                             continue;
 

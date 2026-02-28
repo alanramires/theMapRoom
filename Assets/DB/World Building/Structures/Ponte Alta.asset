@@ -49,12 +49,14 @@ MonoBehaviour:
     heightLevel: 2
   roadRoutes:
   - routeName: Ponte Hudson
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
     - {x: 8, y: -8, z: 0}
     - {x: 8, y: -9, z: 0}
     - {x: 9, y: -10, z: 0}
     - {x: 9, y: -11, z: 0}
   - routeName: Ponte do rio que cai
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
     - {x: 22, y: 9, z: 0}
     - {x: 23, y: 8, z: 0}

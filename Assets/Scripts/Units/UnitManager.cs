@@ -782,6 +782,8 @@ public class UnitManager : MonoBehaviour
         passenger.AssignEmbarkTransport(this, slotIndex);
         if (!passenger.IsEmbarked)
             passenger.SetEmbarked(true);
+        else
+            passenger.SyncHierarchyForEmbarkedState();
         freeSeat.embarkedUnit = passenger;
         RefreshSpriteForCurrentLayer(data);
         RefreshActedVisual();
@@ -844,6 +846,8 @@ public class UnitManager : MonoBehaviour
         passenger.AssignEmbarkTransport(this, slotIndex);
         if (!passenger.IsEmbarked)
             passenger.SetEmbarked(true);
+        else
+            passenger.SyncHierarchyForEmbarkedState();
         targetSeat.embarkedUnit = passenger;
         RefreshSpriteForCurrentLayer(data);
         RefreshActedVisual();
@@ -1316,6 +1320,7 @@ public class UnitManager : MonoBehaviour
             SetSelected(false);
             SetSpriteVisible(false);
             SetHudVisible(false);
+            SyncHierarchyForEmbarkedState();
             if (actedLockRenderer != null)
                 actedLockRenderer.enabled = false;
             return;
@@ -1324,6 +1329,7 @@ public class UnitManager : MonoBehaviour
         if (embarkedTransporter != null)
             embarkedTransporter.RemoveEmbarkedPassenger(this);
         ClearEmbarkTransport();
+        SyncHierarchyForEmbarkedState();
 
         SetSpriteVisible(true);
         SetHudVisible(true);
@@ -1334,12 +1340,28 @@ public class UnitManager : MonoBehaviour
     {
         embarkedTransporter = transporter;
         embarkedTransporterSlotIndex = slotIndex;
+        if (isEmbarked)
+            SyncHierarchyForEmbarkedState();
     }
 
     private void ClearEmbarkTransport()
     {
         embarkedTransporter = null;
         embarkedTransporterSlotIndex = -1;
+    }
+
+    private void SyncHierarchyForEmbarkedState()
+    {
+        if (isEmbarked && embarkedTransporter != null)
+        {
+            Transform targetParent = embarkedTransporter.transform;
+            if (transform.parent != targetParent)
+                transform.SetParent(targetParent, true);
+            return;
+        }
+
+        if (transform.parent != null)
+            transform.SetParent(null, true);
     }
 
     public void SnapToCellCenter()
@@ -1411,6 +1433,7 @@ public class UnitManager : MonoBehaviour
             UnitManager passenger = seat.embarkedUnit;
             passenger.isEmbarked = true;
             passenger.AssignEmbarkTransport(this, seat.slotIndex);
+            passenger.SyncHierarchyForEmbarkedState();
             passenger.SetSelected(false);
             passenger.SetSpriteVisible(false);
             if (passenger.unitHud != null)

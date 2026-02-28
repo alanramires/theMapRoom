@@ -52,7 +52,7 @@ public class ConstructionSpawnerEditor : Editor
 
         EditorGUILayout.LabelField("Data", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(constructionDatabaseProp);
-        EditorGUILayout.PropertyField(constructionFieldDatabaseProp, new GUIContent("Construction Field Database"));
+        EditorGUILayout.PropertyField(constructionFieldDatabaseProp, new GUIContent("Construction Field Database (Legacy Optional)"));
         EditorGUILayout.PropertyField(matchControllerProp, new GUIContent("Match Controller"));
         EditorGUILayout.PropertyField(currentIdProp, new GUIContent("Current ID"));
         EditorGUILayout.PropertyField(constructionPrefabProp);
@@ -73,9 +73,10 @@ public class ConstructionSpawnerEditor : Editor
         bool spawnMapClicked = GUILayout.Button("Spawn Map List Now");
 
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Field Database Spawn", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(spawnFieldDatabaseOnStartProp, new GUIContent("Spawn Field Database On Start"));
-        bool spawnFieldDbClicked = GUILayout.Button("Spawn Field Database Now");
+        EditorGUILayout.LabelField("Field Spawn", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox("Usa ConstructionDatabase.fieldEntries. Se vazio, usa Construction Field Database legado.", MessageType.Info);
+        EditorGUILayout.PropertyField(spawnFieldDatabaseOnStartProp, new GUIContent("Spawn Field Entries On Start"));
+        bool spawnFieldDbClicked = GUILayout.Button("Spawn Field Entries Now");
 
         serializedObject.ApplyModifiedProperties();
 
@@ -144,7 +145,7 @@ public class ConstructionSpawnerEditor : Editor
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("isCapturable"), "Is Capturable");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("capturedIncoming"), "Captured Incoming");
-        DrawIfExists(siteRuntimeProp.FindPropertyRelative("canProduceAndSellUnits"), "Can Produce And Sell Units");
+        DrawIfExists(siteRuntimeProp.FindPropertyRelative("sellingRule"), "Selling Rules");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("offeredUnits"), "Offered Units");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("canProvideSupplies"), "Can Provide Supplies");
         DrawIfExists(siteRuntimeProp.FindPropertyRelative("offeredSupplies"), "Offered Supplies");

@@ -101,7 +101,7 @@ public class ConstructionSpawner : MonoBehaviour
 
         manager.AssignSpawnInstanceId(GetNextId());
         manager.SetBoardTilemap(boardTilemap);
-        manager.SetTeamId(teamId);
+        manager.InitializeOwnershipForSpawn(teamId);
         manager.Setup(constructionDatabase, data.id);
         if (boardTilemap != null)
             manager.SetCurrentCellPosition(HexCoordinates.WorldToCell(boardTilemap, position));
@@ -186,10 +186,16 @@ public class ConstructionSpawner : MonoBehaviour
 
         if (fieldDatabaseSpawnExecuted && !force)
             return;
-        if (constructionFieldDatabase == null || constructionFieldDatabase.Entries == null)
+
+        IReadOnlyList<ConstructionFieldEntry> entries = null;
+        if (constructionDatabase != null && constructionDatabase.FieldEntries != null && constructionDatabase.FieldEntries.Count > 0)
+            entries = constructionDatabase.FieldEntries;
+        else if (constructionFieldDatabase != null && constructionFieldDatabase.Entries != null)
+            entries = constructionFieldDatabase.Entries;
+
+        if (entries == null)
             return;
 
-        IReadOnlyList<ConstructionFieldEntry> entries = constructionFieldDatabase.Entries;
         for (int i = 0; i < entries.Count; i++)
         {
             ConstructionFieldEntry entry = entries[i];

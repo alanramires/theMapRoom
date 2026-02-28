@@ -6,10 +6,13 @@ public class ConstructionDatabase : ScriptableObject
 {
     [Tooltip("Lista manual das construcoes que realmente fazem parte do jogo/mapa.")]
     [SerializeField] private List<ConstructionData> constructions = new List<ConstructionData>();
+    [Tooltip("Construcoes instanciadas neste mapa (layout de campo) centralizadas no proprio catalogo.")]
+    [SerializeField] private List<ConstructionFieldEntry> fieldEntries = new List<ConstructionFieldEntry>();
 
     private readonly Dictionary<string, ConstructionData> byId = new Dictionary<string, ConstructionData>();
 
     public IReadOnlyList<ConstructionData> Constructions => constructions;
+    public IReadOnlyList<ConstructionFieldEntry> FieldEntries => fieldEntries;
 
     private void OnEnable()
     {
@@ -55,6 +58,8 @@ public class ConstructionDatabase : ScriptableObject
     private void RebuildLookup()
     {
         byId.Clear();
+        if (fieldEntries == null)
+            fieldEntries = new List<ConstructionFieldEntry>();
 
         for (int i = 0; i < constructions.Count; i++)
         {
@@ -70,6 +75,20 @@ public class ConstructionDatabase : ScriptableObject
             }
 
             byId.Add(key, def);
+        }
+
+        for (int i = 0; i < fieldEntries.Count; i++)
+        {
+            ConstructionFieldEntry entry = fieldEntries[i];
+            if (entry == null)
+                continue;
+
+            if (entry.initialCapturePoints < -1)
+                entry.initialCapturePoints = -1;
+
+            if (entry.constructionConfiguration == null)
+                entry.constructionConfiguration = new ConstructionSiteRuntime();
+            entry.constructionConfiguration.Sanitize();
         }
     }
 }

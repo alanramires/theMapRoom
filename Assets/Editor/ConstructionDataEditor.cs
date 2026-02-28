@@ -65,7 +65,7 @@ public class ConstructionDataEditor : Editor
         DrawIfExists(configProperty.FindPropertyRelative("isCapturable"), "Is Capturable");
         DrawIfExists(configProperty.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
         DrawIfExists(configProperty.FindPropertyRelative("capturedIncoming"), "Captured Incoming");
-        DrawIfExists(configProperty.FindPropertyRelative("canProduceAndSellUnits"), "Can Produce And Sell Units");
+        DrawIfExists(configProperty.FindPropertyRelative("sellingRule"), "Selling Rules");
         DrawIfExists(configProperty.FindPropertyRelative("offeredUnits"), "Offered Units");
 
         EditorGUI.indentLevel--;
