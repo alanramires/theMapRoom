@@ -81,33 +81,59 @@ public partial class TurnStateManager
 
     private static int ApplyHpService(UnitManager supplier, UnitManager target, ServiceData service)
     {
+        string supplierName = supplier != null ? supplier.name : "(supplier-null)";
+        string targetName = target != null ? target.name : "(target-null)";
+        string serviceLabel = ResolveServiceLabel(service);
+
         int missing = Mathf.Max(0, target.GetMaxHP() - target.CurrentHP);
         if (missing <= 0)
+        {
+            Debug.Log($"[HpRepair] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | sem reparo (HP cheio: {target.CurrentHP}/{target.GetMaxHP()})");
             return 0;
+        }
 
         int cap = service.serviceLimitPerUnitPerTurn > 0
             ? Mathf.Min(missing, service.serviceLimitPerUnitPerTurn)
             : missing;
         if (cap <= 0)
+        {
+            Debug.Log($"[HpRepair] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | sem reparo (cap=0, limite por turno={service.serviceLimitPerUnitPerTurn})");
             return 0;
+        }
 
         int pointsPerSupply = ResolvePointsPerSupply(service, ResolveArmorClass(target));
         if (pointsPerSupply <= 0)
+        {
+            Debug.Log($"[HpRepair] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | sem reparo (eficiencia HP <= 0 para classe)");
             return 0;
+        }
 
         if (!TryResolveSupplyForService(supplier, service, out SupplyData supply, out int stock))
+        {
+            Debug.Log($"[HpRepair] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | sem reparo (sem estoque de suprimento para o servico)");
             return 0;
+        }
 
-        int maxByStock = stock * pointsPerSupply;
+        int maxByStock = SafeMultiplyToIntMax(stock, pointsPerSupply);
         int recovered = Mathf.Min(cap, maxByStock);
         if (recovered <= 0)
+        {
+            Debug.Log($"[HpRepair] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | sem reparo (recuperacao calculada=0; stock={stock}, pontosPorSup={pointsPerSupply}, maxByStock={maxByStock})");
             return 0;
+        }
 
         int supplies = Mathf.CeilToInt(recovered / (float)pointsPerSupply);
         if (!TryConsumeSupplyFromSupplier(supplier, supply, supplies))
+        {
+            Debug.Log($"[HpRepair] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | sem reparo (falha ao consumir suprimento; qtdNec={supplies})");
             return 0;
+        }
 
+        int beforeHp = target.CurrentHP;
         target.SetCurrentHP(target.CurrentHP + recovered);
+        int afterHp = target.CurrentHP;
+        int actualGain = Mathf.Max(0, afterHp - beforeHp);
+        Debug.Log($"[HpRepair] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | {beforeHp}->{afterHp} (+{actualGain})");
         return recovered;
     }
 
@@ -130,7 +156,7 @@ public partial class TurnStateManager
         if (!TryResolveSupplyForService(supplier, service, out SupplyData supply, out int stock))
             return 0;
 
-        int maxByStock = stock * pointsPerSupply;
+        int maxByStock = SafeMultiplyToIntMax(stock, pointsPerSupply);
         int recovered = Mathf.Min(cap, maxByStock);
         if (recovered <= 0)
             return 0;
@@ -161,6 +187,13 @@ public partial class TurnStateManager
             ? service.serviceLimitPerUnitPerTurn
             : int.MaxValue;
         int recoveredTotal = 0;
+        bool hasMissingAmmo = false;
+        bool hasPositiveEfficiency = false;
+        bool hasStockForAmmo = false;
+        bool consumeFailed = false;
+        string supplierName = supplier != null ? supplier.name : "(supplier-null)";
+        string targetName = target != null ? target.name : "(target-null)";
+        string serviceLabel = ResolveServiceLabel(service);
 
         for (int i = 0; i < count && serviceBudget > 0; i++)
         {
@@ -170,9 +203,11 @@ public partial class TurnStateManager
                 continue;
 
             int maxAmmo = Mathf.Max(0, baseline.squadAmmunition);
-            int missing = Mathf.Max(0, maxAmmo - runtime.squadAmmunition);
+            int beforeAmmo = Mathf.Max(0, runtime.squadAmmunition);
+            int missing = Mathf.Max(0, maxAmmo - beforeAmmo);
             if (missing <= 0)
                 continue;
+            hasMissingAmmo = true;
 
             int cap = Mathf.Min(missing, serviceBudget);
             if (cap <= 0)
@@ -181,22 +216,48 @@ public partial class TurnStateManager
             int pointsPerSupply = ResolvePointsPerSupply(service, ResolveWeaponClass(baseline.weapon));
             if (pointsPerSupply <= 0)
                 continue;
+            hasPositiveEfficiency = true;
 
             if (!TryResolveSupplyForService(supplier, service, out SupplyData supply, out int stock))
                 break;
+            hasStockForAmmo = true;
 
-            int maxByStock = stock * pointsPerSupply;
+            int maxByStock = SafeMultiplyToIntMax(stock, pointsPerSupply);
             int recovered = Mathf.Min(cap, maxByStock);
             if (recovered <= 0)
                 continue;
 
             int supplies = Mathf.CeilToInt(recovered / (float)pointsPerSupply);
             if (!TryConsumeSupplyFromSupplier(supplier, supply, supplies))
+            {
+                consumeFailed = true;
                 continue;
+            }
 
-            runtime.squadAmmunition = Mathf.Clamp(runtime.squadAmmunition + recovered, 0, maxAmmo);
+            runtime.squadAmmunition = Mathf.Clamp(beforeAmmo + recovered, 0, maxAmmo);
+            int afterAmmo = runtime.squadAmmunition;
+            int actualGain = Mathf.Max(0, afterAmmo - beforeAmmo);
+            if (actualGain > 0)
+            {
+                string weaponLabel = ResolveWeaponLabel(baseline.weapon);
+                Debug.Log($"[AmmoGain] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | arma={weaponLabel} | {beforeAmmo}->{afterAmmo} (+{actualGain})");
+            }
             recoveredTotal += recovered;
             serviceBudget -= recovered;
+        }
+
+        if (recoveredTotal <= 0)
+        {
+            string reason = !hasMissingAmmo
+                ? "todas as armas ja estao com municao cheia"
+                : !hasPositiveEfficiency
+                    ? "eficiencia de municao <= 0 para as classes das armas com falta"
+                    : !hasStockForAmmo
+                        ? "sem estoque de suprimento para municao"
+                        : consumeFailed
+                            ? "falha ao consumir suprimento de municao"
+                            : "sem ganho calculado por limites/cap";
+            Debug.Log($"[AmmoGain] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | sem rearm ({reason})");
         }
 
         return recoveredTotal;
@@ -316,6 +377,28 @@ public partial class TurnStateManager
             default:
                 return ArmorWeaponClass.Light;
         }
+    }
+
+    private static string ResolveWeaponLabel(WeaponData weapon)
+    {
+        if (weapon == null)
+            return "(arma)";
+        if (!string.IsNullOrWhiteSpace(weapon.displayName))
+            return weapon.displayName;
+        if (!string.IsNullOrWhiteSpace(weapon.id))
+            return weapon.id;
+        return weapon.name;
+    }
+
+    private static int SafeMultiplyToIntMax(int a, int b)
+    {
+        if (a <= 0 || b <= 0)
+            return 0;
+
+        long product = (long)a * b;
+        if (product >= int.MaxValue)
+            return int.MaxValue;
+        return (int)product;
     }
 
     private static List<ServiceData> BuildDistinctServiceList(IReadOnlyList<ServiceData> services)

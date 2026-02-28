@@ -26,6 +26,7 @@ public class UnitManagerEditor : Editor
     private SerializedProperty embarkedResourcesRuntimeProp;
     private SerializedProperty embarkedServicesRuntimeProp;
     private SerializedProperty hasActedProp;
+    private SerializedProperty receivedSuppliesThisTurnProp;
     private SerializedProperty isEmbarkedProp;
     private SerializedProperty matchControllerProp;
     private SerializedProperty currentDomainProp;
@@ -59,6 +60,7 @@ public class UnitManagerEditor : Editor
         embarkedResourcesRuntimeProp = serializedObject.FindProperty("embarkedResourcesRuntime");
         embarkedServicesRuntimeProp = serializedObject.FindProperty("embarkedServicesRuntime");
         hasActedProp = serializedObject.FindProperty("hasActed");
+        receivedSuppliesThisTurnProp = serializedObject.FindProperty("receivedSuppliesThisTurn");
         isEmbarkedProp = serializedObject.FindProperty("isEmbarked");
         matchControllerProp = serializedObject.FindProperty("matchController");
         currentDomainProp = serializedObject.FindProperty("currentDomain");
@@ -91,7 +93,12 @@ public class UnitManagerEditor : Editor
         EditorGUILayout.PropertyField(snapToCellCenterProp, new GUIContent("Snap To Cell Center"));
         EditorGUILayout.PropertyField(autoSnapWhenMovedInEditorProp, new GUIContent("Auto Snap When Moved In Editor"));
         EditorGUILayout.PropertyField(currentCellPositionProp, new GUIContent("Cell Position"));
-        EditorGUILayout.PropertyField(hasActedProp, new GUIContent("Has Acted"));
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.PropertyField(hasActedProp, new GUIContent("Has Acted"));
+            if (receivedSuppliesThisTurnProp != null)
+                EditorGUILayout.PropertyField(receivedSuppliesThisTurnProp, new GUIContent("Received Supply This Turn"));
+        }
         if (isEmbarkedProp != null)
             EditorGUILayout.PropertyField(isEmbarkedProp, new GUIContent("Is Embarked"));
 
@@ -490,6 +497,9 @@ public class UnitManagerEditor : Editor
         EditorGUILayout.Space(6f);
         EditorGUILayout.LabelField("Embarked Weapons (Runtime)", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox("UnitData define os valores base. Aqui voce ajusta estado da instancia em campo (municao e alcance).", MessageType.None);
+        UnitManager unit = target as UnitManager;
+        UnitData unitData = null;
+        bool hasUnitData = unit != null && unit.TryGetUnitData(out unitData) && unitData != null;
         if (embarkedWeaponsRuntimeProp != null)
             embarkedWeaponsRuntimeProp.isExpanded = true;
 
@@ -533,6 +543,12 @@ public class UnitManagerEditor : Editor
                 ammoProp.intValue = Mathf.Max(0, ammoProp.intValue);
             }
 
+            int maxAttacks = ResolveRuntimeWeaponMaxAttacks(unitData, i);
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.IntField(hasUnitData ? "Ammo / Attacks Max (UnitData)" : "Ammo / Attacks Max", maxAttacks);
+            }
+
             if (minProp != null)
             {
                 EditorGUILayout.PropertyField(minProp, new GUIContent("Range Min"));
@@ -557,6 +573,20 @@ public class UnitManagerEditor : Editor
 
         if (GUILayout.Button("Add Weapon Slot"))
             embarkedWeaponsRuntimeProp.InsertArrayElementAtIndex(embarkedWeaponsRuntimeProp.arraySize);
+    }
+
+    private static int ResolveRuntimeWeaponMaxAttacks(UnitData unitData, int runtimeWeaponIndex)
+    {
+        if (unitData == null || unitData.embarkedWeapons == null)
+            return 0;
+        if (runtimeWeaponIndex < 0 || runtimeWeaponIndex >= unitData.embarkedWeapons.Count)
+            return 0;
+
+        UnitEmbarkedWeapon baseline = unitData.embarkedWeapons[runtimeWeaponIndex];
+        if (baseline == null)
+            return 0;
+
+        return Mathf.Max(0, baseline.squadAmmunition);
     }
 
     private void DrawEmbarkedResourcesRuntimeSection(UnitData unitData)

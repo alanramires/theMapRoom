@@ -484,7 +484,7 @@ public static class PodeSuprirSensor
         return false;
     }
 
-    private static bool IsAirFamilyUnit(UnitManager unit)
+    public static bool IsAirFamilyUnit(UnitManager unit)
     {
         if (unit == null)
             return false;
@@ -500,12 +500,12 @@ public static class PodeSuprirSensor
         return data.IsAircraft();
     }
 
-    private static HeightLevel ResolveTakeoffServiceHeight(UnitManager unit)
+    public static HeightLevel ResolveTakeoffServiceHeight(UnitManager unit)
     {
         return HeightLevel.AirLow;
     }
 
-    private static bool SupportsOperationDomain(UnitData supplierData, Domain domain, HeightLevel height)
+    public static bool SupportsOperationDomain(UnitData supplierData, Domain domain, HeightLevel height)
     {
         if (supplierData == null || supplierData.supplierOperationDomains == null)
             return false;
@@ -520,7 +520,7 @@ public static class PodeSuprirSensor
         return false;
     }
 
-    private static bool UnitNeedsService(UnitManager target, ServiceData service)
+    public static bool UnitNeedsService(UnitManager target, ServiceData service)
     {
         if (target == null || service == null)
             return false;
@@ -535,7 +535,7 @@ public static class PodeSuprirSensor
         return false;
     }
 
-    private static bool HasAnyMissingAmmo(UnitManager unit)
+    public static bool HasAnyMissingAmmo(UnitManager unit)
     {
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return false;
@@ -561,7 +561,7 @@ public static class PodeSuprirSensor
         return false;
     }
 
-    private static bool HasSupplyForService(ServiceData service, Dictionary<SupplyData, int> stock)
+    public static bool HasSupplyForService(ServiceData service, Dictionary<SupplyData, int> stock)
     {
         if (service == null || stock == null)
             return false;
@@ -632,7 +632,7 @@ public static class PodeSuprirSensor
         return list;
     }
 
-    private static bool IsSupplier(UnitManager unit)
+    public static bool IsSupplier(UnitManager unit)
     {
         return unit != null && unit.TryGetUnitData(out UnitData data) && data != null && data.isSupplier;
     }
@@ -655,7 +655,7 @@ public static class PodeSuprirSensor
         return false;
     }
 
-    private static bool CanUseLayerModeAtCurrentCellForSupply(
+    public static bool CanUseLayerModeAtCurrentCellForSupply(
         UnitManager unit,
         Tilemap boardMap,
         TerrainDatabase terrainDb,

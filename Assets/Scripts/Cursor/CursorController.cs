@@ -118,6 +118,12 @@ public class CursorController : MonoBehaviour
             return;
         }
 
+        if (turnStateManager != null && turnStateManager.IsPlayerCursorLockedByCommandService)
+        {
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
         HandleCycleUnitInput();
         HandleActionInput();
         HandleNeutralLeftClickTeleport();

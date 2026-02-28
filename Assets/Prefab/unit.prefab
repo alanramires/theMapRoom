@@ -223,6 +223,7 @@ MonoBehaviour:
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: 0, y: 0, z: 0}
   hasActed: 0
+  receivedSuppliesThisTurn: 0
   teamId: 0
   unitId: Soldado
   instanceId: 5
@@ -338,6 +339,8 @@ MonoBehaviour:
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 500
+  followParentSpriteSortingLayer: 1
+  orderAboveParentSprite: 100
   worldHudOrderOffsetPerElement: 1
 --- !u!1 &2439568719226469460
 GameObject:

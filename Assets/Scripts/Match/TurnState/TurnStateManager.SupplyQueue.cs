@@ -471,10 +471,20 @@ public partial class TurnStateManager
 
                 tempSingleService.Clear();
                 tempSingleService.Add(service);
+                int hpBeforeApply = Mathf.Max(0, target.CurrentHP);
                 bool changed = ApplyServicesToTarget(supplier, target, tempSingleService, out int hpStep, out int fuelStep, out int ammoStep);
                 tempSingleService.Clear();
                 if (!changed)
                     continue;
+
+                int hpAfterApply = Mathf.Clamp(target.CurrentHP, 0, target.GetMaxHP());
+                int actualHpGain = Mathf.Max(0, hpAfterApply - hpBeforeApply);
+                if (actualHpGain > 0)
+                {
+                    int desiredHp = Mathf.Clamp(hpBeforeApply + actualHpGain, 0, target.GetMaxHP());
+                    target.SetCurrentHP(hpBeforeApply);
+                    yield return AnimateHpRecoverFill(target, hpBeforeApply, desiredHp);
+                }
 
                 if (fuelStep > 0)
                 {
@@ -484,7 +494,7 @@ public partial class TurnStateManager
                     startFuel = desiredFuel;
                 }
 
-                hpGain += hpStep;
+                hpGain += actualHpGain;
                 fuelGain += fuelStep;
                 ammoGain += ammoStep;
             }
@@ -607,16 +617,182 @@ public partial class TurnStateManager
         if (target == null)
             yield break;
 
+        EnsureFuelHudReadyForAnimation(target);
+        RefreshUnitHudImmediate(target);
+
         int start = Mathf.Clamp(fromFuel, 0, target.MaxFuel);
         int end = Mathf.Clamp(toFuel, 0, target.MaxFuel);
         if (end <= start)
             yield break;
 
-        for (int value = start + 1; value <= end; value++)
+        int gain = end - start;
+        Debug.Log($"[FuelAnim] Inicio {target.name}: {start}->{end} (+{gain})");
+
+        // Evita animacao "instantanea" em ganhos pequenos (+1/+2), que parecia aleatoria.
+        float duration = Mathf.Clamp(gain * 0.035f, 0.25f, 1.20f);
+        float elapsed = 0f;
+        int lastApplied = start;
+
+        while (elapsed < duration)
         {
-            target.SetCurrentFuel(value);
+            elapsed += Mathf.Max(0.0001f, Time.deltaTime);
+            float t = Mathf.Clamp01(elapsed / duration);
+            int value = Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(start, end, t)), start, end);
+            if (value <= lastApplied)
+            {
+                yield return null;
+                continue;
+            }
+
+            for (int step = lastApplied + 1; step <= value; step++)
+            {
+                target.SetCurrentFuel(step);
+                RefreshUnitHudImmediate(target);
+            }
+
+            lastApplied = value;
             yield return null;
         }
+
+        if (lastApplied < end)
+        {
+            target.SetCurrentFuel(end);
+            RefreshUnitHudImmediate(target);
+        }
+
+        // Segura um frame extra no estado final antes de passar para o proximo alvo.
+        yield return null;
+        Debug.Log($"[FuelAnim] Fim {target.name}: {target.CurrentFuel}/{target.MaxFuel}");
+    }
+
+    private static IEnumerator AnimateHpRecoverFill(UnitManager target, int fromHp, int toHp)
+    {
+        if (target == null)
+            yield break;
+
+        EnsureFuelHudReadyForAnimation(target);
+
+        int start = Mathf.Clamp(fromHp, 0, target.GetMaxHP());
+        int end = Mathf.Clamp(toHp, 0, target.GetMaxHP());
+        if (end <= start)
+            yield break;
+
+        float duration = Mathf.Clamp((end - start) * 0.04f, 0.20f, 0.85f);
+        float elapsed = 0f;
+        int lastApplied = start;
+
+        while (elapsed < duration)
+        {
+            elapsed += Mathf.Max(0.0001f, Time.deltaTime);
+            float t = Mathf.Clamp01(elapsed / duration);
+            int value = Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(start, end, t)), start, end);
+            if (value <= lastApplied)
+            {
+                yield return null;
+                continue;
+            }
+
+            for (int step = lastApplied + 1; step <= value; step++)
+            {
+                target.SetCurrentHP(step);
+                RefreshUnitHudImmediate(target);
+            }
+
+            lastApplied = value;
+            yield return null;
+        }
+
+        if (lastApplied < end)
+        {
+            target.SetCurrentHP(end);
+            RefreshUnitHudImmediate(target);
+        }
+    }
+
+    private static void RefreshUnitHudImmediate(UnitManager unit)
+    {
+        if (unit == null)
+            return;
+
+        UnitHudController hud = unit.GetComponentInChildren<UnitHudController>(true);
+        if (hud == null)
+            return;
+
+        hud.RefreshBindings();
+        hud.Apply(
+            unit.CurrentHP,
+            unit.GetMaxHP(),
+            unit.CurrentAmmo,
+            unit.GetMaxAmmo(),
+            unit.CurrentFuel,
+            unit.MaxFuel,
+            TeamUtils.GetColor(unit.TeamId),
+            unit.GetDomain(),
+            unit.GetHeightLevel(),
+            showTransportIndicator: false);
+    }
+
+    private static void EnsureFuelHudReadyForAnimation(UnitManager unit)
+    {
+        if (unit == null)
+            return;
+
+        UnitHudController hud = unit.GetComponentInChildren<UnitHudController>(true);
+        if (hud == null)
+            return;
+
+        bool reactivatedHud = false;
+        if (!hud.gameObject.activeSelf)
+        {
+            hud.gameObject.SetActive(true);
+            reactivatedHud = true;
+        }
+
+        bool reenabledCanvas = false;
+        Canvas[] canvases = hud.GetComponentsInChildren<Canvas>(true);
+        for (int i = 0; i < canvases.Length; i++)
+        {
+            Canvas canvas = canvases[i];
+            if (canvas == null || canvas.enabled)
+                continue;
+            canvas.enabled = true;
+            reenabledCanvas = true;
+        }
+
+        bool reenabledImages = false;
+        Image[] images = hud.GetComponentsInChildren<Image>(true);
+        for (int i = 0; i < images.Length; i++)
+        {
+            Image image = images[i];
+            if (image == null || image.enabled)
+                continue;
+            image.enabled = true;
+            reenabledImages = true;
+        }
+
+        bool reenabledTexts = false;
+        TMPro.TMP_Text[] texts = hud.GetComponentsInChildren<TMPro.TMP_Text>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            TMPro.TMP_Text text = texts[i];
+            if (text == null || text.enabled)
+                continue;
+            text.enabled = true;
+            reenabledTexts = true;
+        }
+
+        Transform fuelContainer = FindChildRecursive(hud.transform, "fuel_container");
+        bool reactivatedFuelContainer = false;
+        if (fuelContainer != null && !fuelContainer.gameObject.activeSelf)
+        {
+            fuelContainer.gameObject.SetActive(true);
+            reactivatedFuelContainer = true;
+        }
+
+        bool structuralActivation = reactivatedHud || reactivatedFuelContainer;
+        bool visualReenable = reenabledCanvas || reenabledImages || reenabledTexts;
+        if (structuralActivation || (unit.IsEmbarked && visualReenable))
+            Debug.Log($"[FuelAnim] Reativado HUD para animacao: unidade={unit.name} | hud={(reactivatedHud ? "on" : "ok")} | fuel_container={(reactivatedFuelContainer ? "on" : "ok")} | canvas={(reenabledCanvas ? "on" : "ok")} | img={(reenabledImages ? "on" : "ok")} | txt={(reenabledTexts ? "on" : "ok")}");
     }
 
     private float GetSupplySpawnInterval()
@@ -1445,9 +1621,7 @@ public partial class TurnStateManager
             supplierSorting = supplierSprite.sortingOrder;
         passenger.SetTemporarySortingOrder(supplierSorting + 1);
 
-        SpriteRenderer passengerSprite = passenger.GetComponentInChildren<SpriteRenderer>(true);
-        if (passengerSprite != null)
-            passengerSprite.enabled = true;
+        SetUnitSpriteRenderersVisible(passenger, true);
 
         UnitHudController passengerHud = passenger.GetComponentInChildren<UnitHudController>(true);
         if (passengerHud != null)
@@ -1520,14 +1694,39 @@ public partial class TurnStateManager
 
         passenger.TrySetCurrentLayerMode(previousDomain, previousHeight);
 
-        SpriteRenderer passengerSprite = passenger.GetComponentInChildren<SpriteRenderer>(true);
-        if (passengerSprite != null)
-            passengerSprite.enabled = false;
+        SetUnitSpriteRenderersVisible(passenger, false);
 
         UnitHudController passengerHud = passenger.GetComponentInChildren<UnitHudController>(true);
         if (passengerHud != null)
             passengerHud.gameObject.SetActive(false);
 
         passenger.ClearTemporarySortingOrder();
+    }
+
+    private static void SetUnitSpriteRenderersVisible(UnitManager unit, bool visible)
+    {
+        if (unit == null)
+            return;
+
+        SpriteRenderer main = unit.GetMainSpriteRenderer();
+        if (main != null)
+            main.enabled = visible;
+
+        UnitHudController hud = unit.GetComponentInChildren<UnitHudController>(true);
+        Transform hudRoot = hud != null ? hud.transform : null;
+
+        SpriteRenderer[] renderers = unit.GetComponentsInChildren<SpriteRenderer>(true);
+        if (renderers == null || renderers.Length <= 0)
+            return;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            SpriteRenderer renderer = renderers[i];
+            if (renderer == null)
+                continue;
+            if (hudRoot != null && renderer.transform != null && renderer.transform.IsChildOf(hudRoot))
+                continue;
+            renderer.enabled = visible;
+        }
     }
 }

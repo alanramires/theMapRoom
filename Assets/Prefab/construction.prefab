@@ -106,6 +106,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionHudController
   capturedContainer: {fileID: 7893660431705947177}
+  capturedBarImage: {fileID: 7709078720324722114}
+  capturedBarRenderer: {fileID: 0}
   capturedFillImage: {fileID: 147008767434542520}
   capturedFillRenderer: {fileID: 0}
   capturedText: {fileID: 3023922847829364039}

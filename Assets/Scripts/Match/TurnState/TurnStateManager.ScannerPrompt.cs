@@ -133,6 +133,7 @@ public partial class TurnStateManager
         TrackRuntimeDebugLogs();
         ProcessConstructionShoppingInput();
         ProcessScannerPromptInput();
+        ProcessCommandServiceHotkeyInput();
         UpdateMirandoPreviewAnimation();
         UpdateEmbarkPreviewAnimation();
         UpdateMergeQueuePreviewAnimation();
@@ -3722,6 +3723,12 @@ public partial class TurnStateManager
                 return Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame;
 #else
                 return Input.GetKeyDown(KeyCode.T);
+#endif
+            case 'X':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.xKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.X);
 #endif
             default:
                 return false;
