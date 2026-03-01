@@ -83,6 +83,15 @@ public class UnitSpawner : MonoBehaviour
         return Spawn(data, TeamId.Green, position, rotation);
     }
 
+    public bool TryGetUnitData(string unitId, out UnitData data)
+    {
+        data = null;
+        if (unitDatabase == null || string.IsNullOrWhiteSpace(unitId))
+            return false;
+
+        return unitDatabase.TryGetById(unitId, out data);
+    }
+
     public GameObject Spawn(UnitData data, TeamId teamId, Vector3 position, Quaternion rotation)
     {
         if (data == null)
@@ -248,6 +257,12 @@ public class UnitSpawner : MonoBehaviour
         int id = currentId;
         currentId++;
         return id;
+    }
+
+    public void EnsureNextIdAbove(int usedId)
+    {
+        if (currentId <= usedId)
+            currentId = usedId + 1;
     }
 
     private int GetTargetSortingLayerId()

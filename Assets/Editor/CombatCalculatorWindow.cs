@@ -207,10 +207,9 @@ public class CombatCalculatorWindow : EditorWindow
         RPSBonusInfo defenderAttackRps = option.defenderCanCounterAttack
             ? ResolveAttackRps(defenderClass, defenderWeaponCategory, attackerClass)
             : RPSBonusInfo.None;
-        SkillRPSBonusInfo attackerSkillRps = ResolveSkillRps(attacker, defender, attackerWeaponCategory);
-        SkillRPSBonusInfo defenderSkillRps = option.defenderCanCounterAttack
-            ? ResolveSkillRps(defender, attacker, defenderWeaponCategory)
-            : SkillRPSBonusInfo.NoneWithReason("sem revide");
+        WeaponCategory defenderWeaponCategoryForSkill = option.defenderCanCounterAttack ? defenderWeaponCategory : attackerWeaponCategory;
+        SkillRPSBonusInfo attackerSkillRps = ResolveSkillRps(attacker, defender, attackerWeaponCategory, defenderWeaponCategoryForSkill);
+        SkillRPSBonusInfo defenderSkillRps = ResolveSkillRps(defender, attacker, defenderWeaponCategoryForSkill, attackerWeaponCategory);
 
         int attackerAttackSkillTotal = attackerSkillRps.ownerAttackValue + defenderSkillRps.opponentAttackValue;
         int defenderAttackSkillTotal = defenderSkillRps.ownerAttackValue + attackerSkillRps.opponentAttackValue;
@@ -681,9 +680,13 @@ public class CombatCalculatorWindow : EditorWindow
         return RPSBonusInfo.NoneWithReason("sem match");
     }
 
-    private static SkillRPSBonusInfo ResolveSkillRps(UnitManager ownerUnit, UnitManager opponentUnit, WeaponCategory ownerWeaponCategory)
+    private static SkillRPSBonusInfo ResolveSkillRps(
+        UnitManager ownerUnit,
+        UnitManager opponentUnit,
+        WeaponCategory ownerWeaponCategory,
+        WeaponCategory opponentWeaponCategory)
     {
-        CombatModifierSummary resolved = CombatModifierResolver.Resolve(ownerUnit, opponentUnit, ownerWeaponCategory);
+        CombatModifierSummary resolved = CombatModifierResolver.Resolve(ownerUnit, opponentUnit, ownerWeaponCategory, opponentWeaponCategory);
         if (resolved.appliedCount <= 0)
             return SkillRPSBonusInfo.NoneWithReason(resolved.reason);
 

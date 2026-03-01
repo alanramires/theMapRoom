@@ -368,6 +368,7 @@ public static class PodeMirarSensor
                     target,
                     attacker,
                     distance,
+                    weaponPriorityData,
                     out WeaponData counterWeapon,
                     out int counterIndex,
                     out string counterReason);
@@ -848,6 +849,7 @@ public static class PodeMirarSensor
         UnitManager defender,
         UnitManager attacker,
         int distance,
+        WeaponPriorityData weaponPriorityData,
         out WeaponData counterWeapon,
         out int counterEmbarkedIndex,
         out string reason)
@@ -879,6 +881,9 @@ public static class PodeMirarSensor
         bool hasMinRangeOne = false;
         bool hasAmmo = false;
         bool hasLayerCompatible = false;
+        int fallbackIndex = -1;
+        WeaponData fallbackWeapon = null;
+        GameUnitClass attackerClass = ResolveUnitClass(attacker);
 
         for (int i = 0; i < defenderWeapons.Count; i++)
         {
@@ -899,8 +904,26 @@ public static class PodeMirarSensor
                 continue;
             hasLayerCompatible = true;
 
-            counterWeapon = embarked.weapon;
-            counterEmbarkedIndex = i;
+            // Guarda primeira arma valida como fallback.
+            if (fallbackWeapon == null)
+            {
+                fallbackWeapon = embarked.weapon;
+                fallbackIndex = i;
+            }
+
+            // Prioriza arma com alvo preferencial para a classe do atacante.
+            if (EvaluateWeaponPriority(weaponPriorityData, embarked.weapon.WeaponCategory, attackerClass))
+            {
+                counterWeapon = embarked.weapon;
+                counterEmbarkedIndex = i;
+                return true;
+            }
+        }
+
+        if (fallbackWeapon != null)
+        {
+            counterWeapon = fallbackWeapon;
+            counterEmbarkedIndex = fallbackIndex;
             return true;
         }
 

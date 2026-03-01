@@ -14,6 +14,7 @@ public class WeaponDataEditor : Editor
             "m_Script",
             "id",
             "displayName",
+            "apelido",
             "description",
             "basicAttack",
             "weaponCategory",
@@ -26,6 +27,7 @@ public class WeaponDataEditor : Editor
     {
         SerializedProperty idProperty = serializedObject.FindProperty("id");
         SerializedProperty displayNameProperty = serializedObject.FindProperty("displayName");
+        SerializedProperty apelidoProperty = serializedObject.FindProperty("apelido");
         SerializedProperty descriptionProperty = serializedObject.FindProperty("description");
         SerializedProperty basicAttackProperty = serializedObject.FindProperty("basicAttack");
         SerializedProperty weaponCategoryProperty = serializedObject.FindProperty("weaponCategory");
@@ -35,6 +37,8 @@ public class WeaponDataEditor : Editor
             EditorGUILayout.PropertyField(idProperty);
         if (displayNameProperty != null)
             EditorGUILayout.PropertyField(displayNameProperty);
+        if (apelidoProperty != null)
+            EditorGUILayout.PropertyField(apelidoProperty);
         if (descriptionProperty != null)
             EditorGUILayout.PropertyField(descriptionProperty);
         if (basicAttackProperty != null)

@@ -15,7 +15,7 @@ public class CameraController : MonoBehaviour
 
     [Header("Zoom")]
     public float zoomSpeed = 8f;            // sensibilidade do scroll
-    public float defaultOrthoSize = 2f; // valor padrao/confortavel para alternar via tecla M
+    public float defaultOrthoSize = 2f; // valor padrao/confortavel para alternar via tecla N
     public float minOrthoSize = 2f; // menor valor de orthographicSize (mais zoom in)
     public float maxOrthoSize = 30f; // maior valor de orthographicSize (mais zoom out)
     public bool limitZoomToBounds = true; // limita o zoom maximo para que a camera nunca mostre area fora dos bounds (definidos por clampCollider ou pelos tiles pintados)
@@ -83,14 +83,24 @@ public class CameraController : MonoBehaviour
 
         float effectiveMax = GetEffectiveMaxOrthoSize();
         float clampedDefault = Mathf.Clamp(defaultOrthoSize, minOrthoSize, effectiveMax);
-        float clampedFar = Mathf.Clamp(maxOrthoSize, minOrthoSize, effectiveMax);
+        float clampedFar = GetQuickZoomFarOrthoSize();
 
         float current = _cam.orthographicSize;
         bool nearFar = Mathf.Abs(current - clampedFar) <= 0.01f;
         _cam.orthographicSize = nearFar ? clampedDefault : clampedFar;
 
-        if (hasCursorAnchor)
-            FocusOn(cursorWorldBefore, instant: true);
+        if (nearFar)
+        {
+            if (hasCursorAnchor)
+                FocusOn(cursorWorldBefore, instant: true);
+        }
+        else
+        {
+            if (_hasBounds)
+                FocusOn(_paintedWorldBounds.center, instant: true);
+            else if (hasCursorAnchor)
+                FocusOn(cursorWorldBefore, instant: true);
+        }
 
         PlayQuickZoomToggleSfx();
     }
@@ -227,21 +237,15 @@ public class CameraController : MonoBehaviour
     bool WasQuickZoomTogglePressedThisFrame()
     {
 #if ENABLE_INPUT_SYSTEM
-        return Keyboard.current != null && Keyboard.current.mKey.wasPressedThisFrame;
+        return Keyboard.current != null && Keyboard.current.nKey.wasPressedThisFrame;
 #else
-        return Input.GetKeyDown(KeyCode.M);
+        return Input.GetKeyDown(KeyCode.N);
 #endif
     }
 
     bool IsQuickZoomToggleAllowed()
     {
-        if (_turnStateManager == null)
-            _turnStateManager = FindAnyObjectByType<TurnStateManager>();
-
-        if (_turnStateManager == null)
-            return true;
-
-        return _turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral;
+        return true;
     }
 
     void PlayQuickZoomToggleSfx()
@@ -375,6 +379,19 @@ public class CameraController : MonoBehaviour
 
         if (boundMax <= 0f) return minOrthoSize;
         return Mathf.Max(minOrthoSize, Mathf.Min(effectiveMax, boundMax));
+    }
+
+    float GetQuickZoomFarOrthoSize()
+    {
+        // No quick zoom, prioriza enquadrar o mapa inteiro na tela (com bordas vazias quando necessario).
+        if (!_hasBounds)
+            return Mathf.Clamp(maxOrthoSize, minOrthoSize, maxOrthoSize);
+
+        float byHeightToContain = _paintedWorldBounds.extents.y;
+        float byWidthToContain = _paintedWorldBounds.extents.x / Mathf.Max(0.0001f, _cam.aspect);
+        float fitAll = Mathf.Max(byHeightToContain, byWidthToContain);
+
+        return Mathf.Clamp(fitAll, minOrthoSize, maxOrthoSize);
     }
 
     public void FocusOn(Vector3 worldPosition, bool instant = false)

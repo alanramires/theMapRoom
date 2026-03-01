@@ -4,6 +4,13 @@ using UnityEngine;
 [CustomEditor(typeof(ConstructionManager))]
 public class ConstructionManagerEditor : Editor
 {
+    private enum ForceCopyFilter
+    {
+        Army,
+        Navy,
+        Aeronautic
+    }
+
     private SerializedProperty spriteRendererProp;
     private SerializedProperty constructionDatabaseProp;
     private SerializedProperty boardTilemapProp;
@@ -23,6 +30,7 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty originalOwnerTeamIdProp;
     private SerializedProperty firstOwnerTeamIdProp;
     private SerializedProperty firstOwnerInitializedProp;
+    private ForceCopyFilter forceCopyFilter = ForceCopyFilter.Army;
 
     private void OnEnable()
     {
@@ -95,7 +103,7 @@ public class ConstructionManagerEditor : Editor
             EditorGUILayout.LabelField("Site Runtime (Live)", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox("Edicoes aqui sao da instancia em campo. Ao editar, a instancia passa a usar override local.", MessageType.Info);
             EditorGUI.BeginChangeCheck();
-            DrawSiteRuntime(siteRuntimeProp, hasInfiniteSuppliesOverrideProp);
+            DrawSiteRuntime(siteRuntimeProp, hasInfiniteSuppliesOverrideProp, hasSiteRuntimeOverrideProp);
             if (EditorGUI.EndChangeCheck() && hasSiteRuntimeOverrideProp != null)
                 hasSiteRuntimeOverrideProp.boolValue = true;
         }
@@ -204,7 +212,7 @@ public class ConstructionManagerEditor : Editor
         return captureMaxProp.intValue;
     }
 
-    private static void DrawSiteRuntime(SerializedProperty siteRuntime, SerializedProperty infiniteOverrideProp)
+    private void DrawSiteRuntime(SerializedProperty siteRuntime, SerializedProperty infiniteOverrideProp, SerializedProperty runtimeOverrideProp)
     {
         if (siteRuntime == null)
             return;
@@ -221,7 +229,9 @@ public class ConstructionManagerEditor : Editor
         EditorGUILayout.Space(2f);
         EditorGUILayout.LabelField("Production", EditorStyles.boldLabel);
         DrawIfExists(siteRuntime.FindPropertyRelative("sellingRule"), "Selling Rules");
-        DrawIfExists(siteRuntime.FindPropertyRelative("offeredUnits"), "Offered Units");
+        SerializedProperty offeredUnitsProp = siteRuntime.FindPropertyRelative("offeredUnits");
+        DrawIfExists(offeredUnitsProp, "Offered Units");
+        DrawOfferedUnitsQuickFill(offeredUnitsProp, runtimeOverrideProp);
 
         EditorGUILayout.Space(2f);
         EditorGUILayout.LabelField("Supplies", EditorStyles.boldLabel);
@@ -233,6 +243,87 @@ public class ConstructionManagerEditor : Editor
         EditorGUILayout.LabelField("Services", EditorStyles.boldLabel);
         DrawIfExists(siteRuntime.FindPropertyRelative("offeredServices"), "Offered Services");
         EditorGUI.indentLevel--;
+    }
+
+    private void DrawOfferedUnitsQuickFill(SerializedProperty offeredUnitsProp, SerializedProperty runtimeOverrideProp)
+    {
+        if (offeredUnitsProp == null)
+            return;
+
+        EditorGUILayout.Space(2f);
+        EditorGUILayout.LabelField("Quick Fill Offered Units", EditorStyles.miniBoldLabel);
+        forceCopyFilter = (ForceCopyFilter)EditorGUILayout.EnumPopup("Copy Units Of", forceCopyFilter);
+
+        UnitDatabase db = ResolveUnitDatabaseFromScene();
+        using (new EditorGUI.DisabledScope(db == null))
+        {
+            if (GUILayout.Button("Copy From Current Unit Database"))
+            {
+                int copied = CopyOfferedUnitsByForce(offeredUnitsProp, db, forceCopyFilter);
+                if (runtimeOverrideProp != null)
+                    runtimeOverrideProp.boolValue = true;
+                Debug.Log($"[ConstructionManagerEditor] Offered Units atualizadas: {copied} unidade(s) copiadas ({forceCopyFilter}).");
+            }
+        }
+
+        if (db == null)
+            EditorGUILayout.HelpBox("Unit Database nao encontrada na cena. Verifique se existe UnitSpawner com UnitDatabase configurado.", MessageType.Warning);
+        else
+            EditorGUILayout.ObjectField("Current Unit Database", db, typeof(UnitDatabase), false);
+    }
+
+    private static UnitDatabase ResolveUnitDatabaseFromScene()
+    {
+        UnitSpawner[] spawners = Object.FindObjectsByType<UnitSpawner>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < spawners.Length; i++)
+        {
+            UnitSpawner spawner = spawners[i];
+            if (spawner == null)
+                continue;
+
+            SerializedObject so = new SerializedObject(spawner);
+            SerializedProperty dbProp = so.FindProperty("unitDatabase");
+            if (dbProp == null)
+                continue;
+
+            UnitDatabase db = dbProp.objectReferenceValue as UnitDatabase;
+            if (db != null)
+                return db;
+        }
+
+        return null;
+    }
+
+    private static int CopyOfferedUnitsByForce(SerializedProperty offeredUnitsProp, UnitDatabase db, ForceCopyFilter filter)
+    {
+        if (offeredUnitsProp == null || db == null || db.Units == null)
+            return 0;
+
+        MilitaryForce wanted = MilitaryForce.Army;
+        if (filter == ForceCopyFilter.Navy)
+            wanted = MilitaryForce.Navy;
+        else if (filter == ForceCopyFilter.Aeronautic)
+            wanted = MilitaryForce.Aeronautic;
+
+        offeredUnitsProp.arraySize = 0;
+        int copied = 0;
+        for (int i = 0; i < db.Units.Count; i++)
+        {
+            UnitData unit = db.Units[i];
+            if (unit == null || unit.militaryForce != wanted)
+                continue;
+
+            int index = offeredUnitsProp.arraySize;
+            offeredUnitsProp.InsertArrayElementAtIndex(index);
+            SerializedProperty elem = offeredUnitsProp.GetArrayElementAtIndex(index);
+            if (elem != null)
+            {
+                elem.objectReferenceValue = unit;
+                copied++;
+            }
+        }
+
+        return copied;
     }
 
     private static void DrawIfExists(SerializedProperty prop, string label)

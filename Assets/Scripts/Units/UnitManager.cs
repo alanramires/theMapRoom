@@ -1,7 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using UnityEngine.UI;
 
 [ExecuteAlways]
 public class UnitManager : MonoBehaviour
@@ -1227,6 +1229,7 @@ public class UnitManager : MonoBehaviour
             spriteRenderer.sprite = finalSprite;
 
         spriteRenderer.color = TeamUtils.GetColor(teamId);
+        ApplyTeamVisualFlipFromMatchController();
     }
 
     private bool ShouldUseTransportSprite(UnitData data)
@@ -1277,6 +1280,16 @@ public class UnitManager : MonoBehaviour
         RefreshActedVisual();
     }
 
+    public void ApplyTeamVisualFlipX(bool flipX)
+    {
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (spriteRenderer == null)
+            return;
+
+        spriteRenderer.flipX = flipX;
+    }
+
     public void AssignSpawnInstanceId(int id)
     {
         if (id <= 0)
@@ -1320,6 +1333,7 @@ public class UnitManager : MonoBehaviour
             SetSelected(false);
             SetSpriteVisible(false);
             SetHudVisible(false);
+            SetOwnedUiVisualsVisible(false);
             SyncHierarchyForEmbarkedState();
             if (actedLockRenderer != null)
                 actedLockRenderer.enabled = false;
@@ -1333,6 +1347,7 @@ public class UnitManager : MonoBehaviour
 
         SetSpriteVisible(true);
         SetHudVisible(true);
+        SetOwnedUiVisualsVisible(true);
         RefreshActedVisual();
     }
 
@@ -1455,6 +1470,9 @@ public class UnitManager : MonoBehaviour
     private void SetHudVisible(bool visible)
     {
         if (unitHud == null)
+            TryAutoAssignHud();
+
+        if (unitHud == null)
             return;
 
         unitHud.gameObject.SetActive(visible);
@@ -1531,6 +1549,15 @@ public class UnitManager : MonoBehaviour
             matchController = FindAnyObjectByType<MatchController>();
     }
 
+    private void ApplyTeamVisualFlipFromMatchController()
+    {
+        TryAutoAssignMatchController();
+        if (matchController == null)
+            return;
+
+        ApplyTeamVisualFlipX(matchController.GetTeamFlipX(teamId));
+    }
+
     private static bool IsFinite(Vector3 v)
     {
         return float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
@@ -1571,7 +1598,20 @@ public class UnitManager : MonoBehaviour
         if (unitHud != null)
             return;
 
-        unitHud = GetComponentInChildren<UnitHudController>();
+        UnitHudController[] candidates = GetComponentsInChildren<UnitHudController>(true);
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            UnitHudController candidate = candidates[i];
+            if (candidate == null)
+                continue;
+
+            UnitManager owner = candidate.GetComponentInParent<UnitManager>();
+            if (owner == this)
+            {
+                unitHud = candidate;
+                return;
+            }
+        }
     }
 
     private void CacheSpriteMaterial()
@@ -1654,6 +1694,17 @@ public class UnitManager : MonoBehaviour
         if (IsEditingPrefabContext())
             return;
 #endif
+
+        if (isEmbarked)
+        {
+            SetActedGlowEnabled(false);
+            SetSpriteVisible(false);
+            SetHudVisible(false);
+            SetOwnedUiVisualsVisible(false);
+            if (actedLockRenderer != null)
+                actedLockRenderer.enabled = false;
+            return;
+        }
 
         TryAutoAssignMatchController();
         Color teamColor = TeamUtils.GetColor(teamId);
@@ -1780,8 +1831,79 @@ public class UnitManager : MonoBehaviour
         if (spriteRenderer == null)
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
 
-        if (spriteRenderer != null)
+        // Passenger embarked must stay visually hidden even if other
+        // systems request visibility (selection cleanup, blink stop, etc).
+        if (isEmbarked && visible)
+            visible = false;
+
+        if (spriteRenderer != null && spriteRenderer.GetComponentInParent<UnitManager>() == this)
             spriteRenderer.enabled = visible;
+
+        SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>(true);
+        if (renderers == null || renderers.Length == 0)
+            return;
+
+        Transform hudRoot = unitHud != null ? unitHud.transform : null;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            SpriteRenderer renderer = renderers[i];
+            if (renderer == null)
+                continue;
+
+            UnitManager owner = renderer.GetComponentInParent<UnitManager>();
+            if (owner != this)
+                continue;
+
+            if (hudRoot != null && renderer.transform.IsChildOf(hudRoot))
+                continue;
+
+            renderer.enabled = visible;
+        }
+    }
+
+    private void SetOwnedUiVisualsVisible(bool visible)
+    {
+        Canvas[] canvases = GetComponentsInChildren<Canvas>(true);
+        for (int i = 0; i < canvases.Length; i++)
+        {
+            Canvas canvas = canvases[i];
+            if (canvas == null)
+                continue;
+
+            UnitManager owner = canvas.GetComponentInParent<UnitManager>();
+            if (owner != this)
+                continue;
+
+            canvas.enabled = visible;
+        }
+
+        Graphic[] graphics = GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            Graphic graphic = graphics[i];
+            if (graphic == null)
+                continue;
+
+            UnitManager owner = graphic.GetComponentInParent<UnitManager>();
+            if (owner != this)
+                continue;
+
+            graphic.enabled = visible;
+        }
+
+        TMP_Text[] texts = GetComponentsInChildren<TMP_Text>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            TMP_Text text = texts[i];
+            if (text == null)
+                continue;
+
+            UnitManager owner = text.GetComponentInParent<UnitManager>();
+            if (owner != this)
+                continue;
+
+            text.enabled = visible;
+        }
     }
 
     [ContextMenu("Apply From Database")]

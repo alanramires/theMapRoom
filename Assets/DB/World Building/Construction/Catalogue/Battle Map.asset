@@ -109,7 +109,7 @@ MonoBehaviour:
     initialTeamId: -1
     cellPosition: {x: -2, y: 4, z: 0}
     initialCapturePoints: -1
-    useConstructionConfigurationOverride: 1
+    useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
       isCapturable: 1

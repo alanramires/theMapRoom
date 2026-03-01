@@ -28,6 +28,7 @@ public class ConstructionManager : MonoBehaviour
     [Header("Runtime Visual")]
     [SerializeField] [Range(0f, 1f)] private float occupiedByReadyUnitDarkenFactor = 0.4f;
     [SerializeField] private ConstructionHudController hudController;
+    [SerializeField] private MatchController matchController;
 
     public TeamId TeamId => teamId;
     public Tilemap BoardTilemap => boardTilemap;
@@ -48,6 +49,8 @@ public class ConstructionManager : MonoBehaviour
     public IReadOnlyList<ServiceData> OfferedServices => siteRuntime != null && siteRuntime.offeredServices != null ? siteRuntime.offeredServices : System.Array.Empty<ServiceData>();
     public IReadOnlyList<UnitData> OfferedUnits => siteRuntime != null && siteRuntime.offeredUnits != null ? siteRuntime.offeredUnits : System.Array.Empty<UnitData>();
     public IReadOnlyList<ConstructionSupplyOffer> OfferedSupplies => siteRuntime != null && siteRuntime.offeredSupplies != null ? siteRuntime.offeredSupplies : System.Array.Empty<ConstructionSupplyOffer>();
+    public TeamId OriginalOwnerTeamId => originalOwnerTeamId;
+    public bool HasOriginalOwner => originalOwnerInitialized;
     public TeamId FirstOwnerTeamId => firstOwnerTeamId;
     public bool HasFirstOwner => firstOwnerInitialized;
 
@@ -142,6 +145,7 @@ public class ConstructionManager : MonoBehaviour
     private void Awake()
     {
         EnsureDefaults();
+        TryAutoAssignMatchController();
         TryAutoAssignBoardTilemap();
         SyncPositionState();
         RefreshHud();
@@ -167,6 +171,7 @@ public class ConstructionManager : MonoBehaviour
 
     private void Start()
     {
+        TryAutoAssignMatchController();
         if (autoApplyOnStart)
             ApplyFromDatabase();
 
@@ -194,6 +199,7 @@ public class ConstructionManager : MonoBehaviour
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
 
         EnsureDefaults();
+        TryAutoAssignMatchController();
         TryAutoAssignBoardTilemap();
 
         if (IsEditingPrefabContext())
@@ -244,6 +250,7 @@ public class ConstructionManager : MonoBehaviour
                 spriteRenderer.sprite = chosen;
 
             spriteRenderer.color = TeamUtils.GetColor(teamId);
+            ApplyTeamVisualFlipFromMatchController();
         }
 
         ApplyDefaultSiteRuntime(data);
@@ -281,6 +288,16 @@ public class ConstructionManager : MonoBehaviour
         RefreshHud();
     }
 
+    public void ApplyTeamVisualFlipX(bool flipX)
+    {
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (spriteRenderer == null)
+            return;
+
+        spriteRenderer.flipX = flipX;
+    }
+
     public void InitializeOwnershipForSpawn(TeamId initialTeam)
     {
         teamId = initialTeam;
@@ -297,6 +314,19 @@ public class ConstructionManager : MonoBehaviour
             firstOwnerTeamId = initialTeam;
             firstOwnerInitialized = true;
         }
+
+        if (!ApplyFromDatabase())
+            UpdateDynamicName();
+        RefreshHud();
+    }
+
+    public void ApplyOwnershipState(TeamId currentTeam, TeamId originalOwner, bool hasOriginalOwner, TeamId firstOwner, bool hasFirstOwner)
+    {
+        teamId = currentTeam;
+        originalOwnerTeamId = originalOwner;
+        originalOwnerInitialized = hasOriginalOwner;
+        firstOwnerTeamId = firstOwner;
+        firstOwnerInitialized = hasFirstOwner;
 
         if (!ApplyFromDatabase())
             UpdateDynamicName();
@@ -353,6 +383,12 @@ public class ConstructionManager : MonoBehaviour
     {
         int max = Mathf.Max(0, CapturePointsMax);
         currentCapturePoints = Mathf.Clamp(value, 0, max);
+        RefreshHud();
+    }
+
+    public void SetInfiniteSuppliesOverride(bool value)
+    {
+        hasInfiniteSuppliesOverride = value;
         RefreshHud();
     }
 
@@ -627,6 +663,21 @@ public class ConstructionManager : MonoBehaviour
 
         data = null;
         return false;
+    }
+
+    private void TryAutoAssignMatchController()
+    {
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+    }
+
+    private void ApplyTeamVisualFlipFromMatchController()
+    {
+        TryAutoAssignMatchController();
+        if (matchController == null)
+            return;
+
+        ApplyTeamVisualFlipX(matchController.GetTeamFlipX(teamId));
     }
 
     private void RefreshOccupancyVisualTint()

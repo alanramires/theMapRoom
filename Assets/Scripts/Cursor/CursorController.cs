@@ -56,6 +56,12 @@ public class CursorController : MonoBehaviour
     [SerializeField] private AudioClip beepSfx;
     [SerializeField] private AudioClip doneSfx;
     [SerializeField] private AudioClip loadSfx;
+    [SerializeField] private AudioClip meleeAttackSfx;
+    [SerializeField] private AudioClip rangedAttackSfx;
+    [SerializeField] private AudioClip capturingSfx;
+    [SerializeField] private AudioClip capturedSfx;
+    [SerializeField] private AudioClip explosionSfx;
+    [SerializeField] private AudioClip endingTurnSfx;
     [SerializeField] private AudioClip heliceMoveSfx;
     [SerializeField] private AudioClip jatoMoveSfx;
     [SerializeField] private AudioClip marchaMoveSfx;
@@ -67,6 +73,14 @@ public class CursorController : MonoBehaviour
     [SerializeField] private float uiSfxVolume = 1f;
     [Range(0f, 1f)]
     [SerializeField] private float unitMoveSfxVolume = 1f;
+    [Range(0f, 1f)]
+    [SerializeField] private float combatSfxVolume = 1f;
+    [Range(0f, 1f)]
+    [SerializeField] private float stateSfxVolume = 1f;
+    [Range(0f, 1f)]
+    [SerializeField] private float explosionSfxVolume = 1f;
+    [Range(0f, 1f)]
+    [SerializeField] private float endingTurnSfxVolume = 1f;
 
     [Header("State")]
     [SerializeField] private TurnStateManager turnStateManager;
@@ -483,6 +497,20 @@ public class CursorController : MonoBehaviour
             doneSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/done.MP3");
         if (loadSfx == null)
             loadSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/load.MP3");
+        if (meleeAttackSfx == null)
+            meleeAttackSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/combat/melee attack.mp3");
+        if (rangedAttackSfx == null)
+            rangedAttackSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/combat/ranged attack.mp3");
+        if (capturingSfx == null)
+            capturingSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/state/capturing.MP3");
+        if (capturedSfx == null)
+            capturedSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/state/captured.MP3");
+        if (explosionSfx == null)
+            explosionSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/combat/explosion.MP3");
+        if (explosionSfx == null)
+            explosionSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/combat/explosion.mp3");
+        if (endingTurnSfx == null)
+            endingTurnSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/ending the turn.MP3");
 
         if (heliceMoveSfx == null)
             heliceMoveSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/move/helice.MP3");
@@ -884,6 +912,66 @@ public class CursorController : MonoBehaviour
         PlayUiSfx(beepSfx);
     }
 
+    public void PlayErrorSfx()
+    {
+        PlayUiSfx(errorSfx);
+    }
+
+    public float PlayCombatAttackSfx(WeaponTrajectoryType trajectory, float volumeScale = 1f)
+    {
+        AudioClip clip = trajectory == WeaponTrajectoryType.Parabolic ? rangedAttackSfx : meleeAttackSfx;
+        if (clip == null)
+            return 0f;
+
+        PlayClipWithPitch(clip, Mathf.Clamp01(combatSfxVolume * Mathf.Clamp01(volumeScale)), 1f);
+        return clip.length;
+    }
+
+    public void PlayWeaponFireSfx(WeaponData weapon, float volumeScale = 1f)
+    {
+        if (weapon == null || weapon.fireSfx == null)
+            return;
+
+        float volume = Mathf.Clamp01(combatSfxVolume * Mathf.Clamp01(volumeScale) * Mathf.Clamp01(weapon.fireSfxVolume));
+        PlayClipWithPitch(weapon.fireSfx, volume, 1f);
+    }
+
+    public float PlayCapturingSfx(float pitch = 1f, float volumeScale = 1f)
+    {
+        if (capturingSfx == null)
+            return 0f;
+
+        PlayClipWithPitch(capturingSfx, Mathf.Clamp01(stateSfxVolume * Mathf.Clamp01(volumeScale)), pitch);
+        return capturingSfx.length;
+    }
+
+    public float PlayCapturedSfx(float pitch = 1f, float volumeScale = 1f)
+    {
+        if (capturedSfx == null)
+            return 0f;
+
+        PlayClipWithPitch(capturedSfx, Mathf.Clamp01(stateSfxVolume * Mathf.Clamp01(volumeScale)), pitch);
+        return capturedSfx.length;
+    }
+
+    public float PlayExplosionSfx(float volumeScale = 1f)
+    {
+        if (explosionSfx == null)
+            return 0f;
+
+        PlayClipWithPitch(explosionSfx, Mathf.Clamp01(explosionSfxVolume * Mathf.Clamp01(volumeScale)), 1f);
+        return explosionSfx.length;
+    }
+
+    public float PlayEndingTurnSfx(float volumeScale = 1f)
+    {
+        if (endingTurnSfx == null)
+            return 0f;
+
+        PlayClipWithPitch(endingTurnSfx, Mathf.Clamp01(endingTurnSfxVolume * Mathf.Clamp01(volumeScale)), 1f);
+        return endingTurnSfx.length;
+    }
+
     public void PlayUnitMovementSfx(MovementCategory category)
     {
         AudioClip clip = GetUnitMovementClipFor(category);
@@ -915,6 +1003,28 @@ public class CursorController : MonoBehaviour
             default:
                 return marchaMoveSfx;
         }
+    }
+
+    private void PlayClipWithPitch(AudioClip clip, float volume, float pitch)
+    {
+        if (clip == null)
+            return;
+
+        float safeVolume = Mathf.Clamp01(volume);
+        if (safeVolume <= 0f)
+            return;
+
+        float safePitch = Mathf.Clamp(pitch, 0.1f, 3f);
+        if (audioSource == null)
+        {
+            AudioSource.PlayClipAtPoint(clip, transform.position, safeVolume);
+            return;
+        }
+
+        float basePitch = audioSource.pitch;
+        audioSource.pitch = safePitch;
+        audioSource.PlayOneShot(clip, safeVolume);
+        audioSource.pitch = basePitch;
     }
 
 }

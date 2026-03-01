@@ -29,7 +29,11 @@ public readonly struct CombatModifierSummary
 
 public static class CombatModifierResolver
 {
-    public static CombatModifierSummary Resolve(UnitManager ownerUnit, UnitManager opponentUnit, WeaponCategory ownerWeaponCategory)
+    public static CombatModifierSummary Resolve(
+        UnitManager ownerUnit,
+        UnitManager opponentUnit,
+        WeaponCategory ownerWeaponCategory,
+        WeaponCategory opponentWeaponCategory)
     {
         if (ownerUnit == null)
             return new CombatModifierSummary(0, 0, 0, 0, 0, "owner nulo");
@@ -65,6 +69,7 @@ public static class CombatModifierResolver
             if (!modifier.TryGetCombatRpsModifiers(
                 ownerElite,
                 ownerWeaponCategory,
+                opponentWeaponCategory,
                 opponentClass,
                 opponentElite,
                 out int ownerAtkMod,
@@ -112,5 +117,11 @@ public static class CombatModifierResolver
             totalOpponentDefense,
             appliedCount,
             summary.ToString());
+    }
+
+    // Backward compatibility for callers that still provide a single category context.
+    public static CombatModifierSummary Resolve(UnitManager ownerUnit, UnitManager opponentUnit, WeaponCategory ownerWeaponCategory)
+    {
+        return Resolve(ownerUnit, opponentUnit, ownerWeaponCategory, ownerWeaponCategory);
     }
 }

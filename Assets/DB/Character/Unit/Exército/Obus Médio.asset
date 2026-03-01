@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
+  m_Name: "Obus M\xE9dio"
+  m_EditorClassIdentifier: Assembly-CSharp::UnitData
+  id: obusMedio
+  displayName: "Obuseiro M\xF3vel"
+  apelido: OM
+  description: 
+  spriteDefault: {fileID: 21300000, guid: 380f58649d92e934fa83b684653a7435, type: 3}
+  spriteGreen: {fileID: 0}
+  spriteRed: {fileID: 0}
+  spriteBlue: {fileID: 0}
+  spriteYellow: {fileID: 0}
+  maxHP: 10
+  defense: 14
+  armorClass: 1
+  movement: 4
+  visao: 3
+  movementCategory: 4
+  militaryForce: 0
+  unitClass: 2
+  eliteLevel: 1
+  combatModifiers:
+  - {fileID: 11400000, guid: 8f009e4781fd97c4384dbdc6c19ce234, type: 2}
+  - {fileID: 11400000, guid: a85d4249a06a33349ab391872875ed9a, type: 2}
+  - {fileID: 11400000, guid: cae64e256d2ce3b459cbc9e546b4402c, type: 2}
+  - {fileID: 11400000, guid: 43b464b15f9886a44aed4c53ad9d7091, type: 2}
+  domain: 0
+  heightLevel: 3
+  aditionalDomainsAllowed: []
+  useExplicitPreferredAirHeight: 0
+  preferredAirHeight: 4
+  useExplicitPreferredNavalHeight: 0
+  preferredNavalHeight: 2
+  skills: []
+  autonomyData: {fileID: 0}
+  embarkedWeapons:
+  - weapon: {fileID: 11400000, guid: ae44443129eee5146848db79b494ba14, type: 2}
+    squadAmmunition: 6
+    operationRangeMin: 2
+    operationRangeMax: 3
+    selectedTrajectory: 1
+    lastSyncedWeapon: {fileID: 11400000, guid: ae44443129eee5146848db79b494ba14, type: 2}
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
+  supplierResources: []
+  isTransporter: 0
+  spriteTransport: {fileID: 0}
+  allowedEmbarkWhenTransporterAtTerrains: []
+  allowedEmbarkWhenTransporterAtTerrainStructures: []
+  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtTerrains: []
+  allowedDisembarkWhenTransporterAtTerrainStructures: []
+  allowedDisembarkWhenTransporterAtConstructions: []
+  passengersCanDisembarkAndGoesToTerrains: []
+  passengersCanDisembarkAndGoesToTerrainStructures: []
+  passengersCanDisembarkAndGoesToConstructions: []
+  transportSlots: []
+  autonomia: 50
+  cost: 14500

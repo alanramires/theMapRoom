@@ -1,4 +1,4 @@
-# Elite e RPS Skill
+﻿# Elite e RPS Skill
 
 Este documento descreve como funciona a camada de elite no combate e como ela modifica o RPS base.
 
@@ -6,9 +6,9 @@ Este documento descreve como funciona a camada de elite no combate e como ela mo
 
 O sistema de combate continua usando a matriz RPS normal (`RPSData`/`RPSDatabase`) como base.
 
-Por cima disso, uma `SkillData` pode aplicar modificadores extras condicionais (ex.: `Dog Fight`) usando:
+Por cima disso, um `CombatModifierData` pode aplicar modificadores extras condicionais (ex.: `Dog Fight`) usando:
 
-- classe da unidade dona da skill
+- classe da unidade dona do modifier
 - classe do oponente
 - categoria da arma
 - comparacao de `eliteLevel`
@@ -22,24 +22,18 @@ Esses modificadores extras sao chamados aqui de **Elite Skill**.
 Arquivo: `Assets/Scripts/Units/UnitData.cs`
 
 - `eliteLevel` (default `0`)
-- `skills` (lista de skills da unidade)
+- `combatModifiers` (lista de modifiers da unidade)
 
-Exemplo:
-- Caca A: `eliteLevel = 1`, skill `Dog Fight`
-- Caca B: `eliteLevel = 0`, sem skill (ou com outra)
+## CombatModifierData
 
-## SkillData
+Arquivo: `Assets/Scripts/Combat/CombatModifierData.cs`
 
-Arquivo: `Assets/Scripts/Skills/SkillData.cs`
+Campos principais:
 
-Campos principais da camada de combate:
-
-- `enableCombatRpsModifier`
+- `modifierType` (`Attack` ou `Defense`)
 - filtros:
-  - `filterOwnerClass` + `requiredOwnerClass`
-  - `filterOpponentClass` + `requiredOpponentClass`
-  - `filterWeaponCategory` + `requiredWeaponCategory`
-  - `requireSameUnitClass`
+  - `requiredOpponentClass`
+  - `requiredWeaponCategory`
 - regra de elite:
   - `eliteComparison`
   - `minEliteDifference`
@@ -51,35 +45,48 @@ Campos principais da camada de combate:
 
 ## Regra de ativacao por elite
 
-Exemplo com `eliteComparison = AttackerGreater`:
+Exemplo com `eliteComparison = Owner > Opponent`:
 
 - ativa se `eliteOwner - eliteOpponent >= minEliteDifference`
 - com `minEliteDifference = 1`:
   - `2 vs 1`: ativa
   - `1 vs 0`: ativa
   - `2 vs 0`: ativa
-- com `minEliteDifference = 2`:
-  - `2 vs 0`: ativa
-  - `2 vs 1`: nao ativa
-  - `1 vs 0`: nao ativa
 
 ## Formula no combate
 
-Cada lado recebe RPS base + Elite Skill.
+Use esta notacao:
 
-## Ataque
+- `FA_calc`: ataque calculado sem elite (arma + RPS + fatores base)
+- `FD_calc`: defesa calculada sem elite (defesa base + DPQ + RPS)
+- `FA_elite`: soma dos modificadores de ataque de elite
+- `FD_elite`: soma dos modificadores de defesa de elite
 
-- Atacante:
-  - `RPSAtaqueFinal = RPSAtaqueBase + (ownerAttack do atacante) + (opponentAttack vindo da skill do defensor)`
-- Defensor:
-  - `RPSAtaqueFinal = RPSAtaqueBase + (ownerAttack do defensor) + (opponentAttack vindo da skill do atacante)`
+## Duas formulas de eliminacao (explicitas)
 
-## Defesa
+### 1) Defensores Eliminados
 
-- Atacante:
-  - `RPSDefesaFinal = RPSDefesaBase + (ownerDefense do atacante) + (opponentDefense vindo da skill do defensor)`
-- Defensor:
-  - `RPSDefesaFinal = RPSDefesaBase + (ownerDefense do defensor) + (opponentDefense vindo da skill do atacante)`
+`Defensores Eliminados = [HP Atacante x (FA base da Arma do Atacante + FA RPS do Atacante + FA Elite Atacante)] / (FD base Defensor + FD DPQ do Defensor + FD RPS Defensor + FD Elite Defensor)`
+
+### 2) Atacantes Eliminados
+
+`Atacantes Eliminados = [HP Defensor x (FA base da Arma do Defensor + FA RPS do Defensor + FA Elite Defensor)] / (FD base Atacante + FD DPQ do Atacante + FD RPS Atacante + FD Elite Atacante)`
+
+### Composicao dos termos de Elite
+
+- `FA Elite Atacante = ownerAttack(Atacante) + opponentAttack(Defensor)`
+- `FD Elite Defensor = ownerDefense(Defensor) + opponentDefense(Atacante)`
+- `FA Elite Defensor = ownerAttack(Defensor) + opponentAttack(Atacante)`
+- `FD Elite Atacante = ownerDefense(Atacante) + opponentDefense(Defensor)`
+
+## Os 4 pontos onde elite entra
+
+1. No dividendo de `ELIM_D`: `FA_elite_A`
+2. No divisor de `ELIM_D`: `FD_elite_D`
+3. No dividendo de `ELIM_A`: `FA_elite_D`
+4. No divisor de `ELIM_A`: `FD_elite_A`
+
+Resumo: elite entra nos 2 dividendos e nos 2 divisores.
 
 ## Onde isso ja esta aplicado
 
@@ -88,10 +95,12 @@ Cada lado recebe RPS base + Elite Skill.
 - Ferramentas de editor:
   - `Assets/Editor/CombatMatrixWindow.cs`
   - `Assets/Editor/CombatCalculatorWindow.cs`
+  - `Assets/Editor/Combat/CombatLargeMatrixWindow.cs`
 
 Menu:
 - `Tools/Combat/Matriz de Combate`
 - `Tools/Combat/Calcular Combate`
+- `Tools/Combat/Grande Matriz de Lutas`
 
 ## Logs para validacao
 
@@ -104,7 +113,6 @@ No trace de combate e nas ferramentas, verifique:
 
 Se aparecer tudo `+0`, normalmente e um destes pontos:
 
-1. a unidade nao tem a skill atribuida em `UnitData.skills`
-2. `enableCombatRpsModifier` esta desligado
-3. algum filtro nao bate (classe/categoria)
-4. regra de elite nao atende (`eliteComparison`/`minEliteDifference`)
+1. a unidade nao tem modifier atribuido em `UnitData.combatModifiers`
+2. algum filtro nao bate (classe/categoria)
+3. regra de elite nao atende (`eliteComparison`/`minEliteDifference`)

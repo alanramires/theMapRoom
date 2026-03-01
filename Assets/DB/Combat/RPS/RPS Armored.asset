@@ -17,9 +17,9 @@ MonoBehaviour:
       unitClass: 3
       weaponCategory: 0
       targetClass: 0
-      attackBonus: -2
+      attackBonus: -1
       notes: 
-      rpsAttackText: Armored com AntiInfantaria ataca Infantry com RPS Ataque -2
+      rpsAttackText: Armored com AntiInfantaria ataca Infantry com RPS Ataque -1
     defesa:
       targetClass: 0
       unitClass: 3
@@ -107,17 +107,17 @@ MonoBehaviour:
       unitClass: 3
       weaponCategory: 1
       targetClass: 1
-      attackBonus: 0
+      attackBonus: 1
       notes: "canhoes de tanque s\xE3o desbalanceado contra tropas"
-      rpsAttackText: Armored com AntiTanque ataca Vehicle com RPS Ataque +0
+      rpsAttackText: Armored com AntiTanque ataca Vehicle com RPS Ataque +1
     defesa:
       targetClass: 1
       unitClass: 3
       weaponCategory: 1
-      defenseBonus: -2
+      defenseBonus: 0
       notes: "Infantaria se protegem bem contra canh\xF5es desbalanceados"
       rpsDefenseText: Vehicle se defende de Armored com AntiTanque com RPS Defesa
-        -2
+        +0
   - ataque:
       unitClass: 3
       weaponCategory: 1

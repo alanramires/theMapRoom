@@ -31,21 +31,6 @@ MonoBehaviour:
   - ataque:
       unitClass: 2
       weaponCategory: 1
-      targetClass: 1
-      attackBonus: -2
-      notes: 
-      rpsAttackText: Artillery com AntiTanque ataca Vehicle com RPS Ataque -2
-    defesa:
-      targetClass: 1
-      unitClass: 2
-      weaponCategory: 1
-      defenseBonus: 2
-      notes: 
-      rpsDefenseText: Vehicle se defende de Artillery com AntiTanque com RPS Defesa
-        +2
-  - ataque:
-      unitClass: 2
-      weaponCategory: 1
       targetClass: 3
       attackBonus: -1
       notes: 
@@ -58,6 +43,21 @@ MonoBehaviour:
       notes: 
       rpsDefenseText: Armored se defende de Artillery com AntiTanque com RPS Defesa
         +1
+  - ataque:
+      unitClass: 2
+      weaponCategory: 1
+      targetClass: 1
+      attackBonus: -2
+      notes: 
+      rpsAttackText: Artillery com AntiTanque ataca Vehicle com RPS Ataque -2
+    defesa:
+      targetClass: 1
+      unitClass: 2
+      weaponCategory: 1
+      defenseBonus: 2
+      notes: 
+      rpsDefenseText: Vehicle se defende de Artillery com AntiTanque com RPS Defesa
+        +2
   - ataque:
       unitClass: 2
       weaponCategory: 1

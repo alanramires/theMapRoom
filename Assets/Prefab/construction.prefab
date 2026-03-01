@@ -750,12 +750,14 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   hasSiteRuntimeOverride: 0
   currentCapturePoints: 40
+  hasInfiniteSuppliesOverride: 0
   originalOwnerTeamId: 0
   originalOwnerInitialized: 1
   firstOwnerTeamId: 0
   firstOwnerInitialized: 1
   occupiedByReadyUnitDarkenFactor: 0.4
   hudController: {fileID: 1370441032517419065}
+  matchController: {fileID: 0}
 --- !u!1 &8405094446092215197
 GameObject:
   m_ObjectHideFlags: 0

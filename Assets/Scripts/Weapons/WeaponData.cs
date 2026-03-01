@@ -17,6 +17,8 @@ public class WeaponData : ScriptableObject
 
     [Tooltip("Nome mostrado na UI/debug.")]
     public string displayName;
+    [Tooltip("Apelido curto para tabelas/matrizes (ex.: MG, AT, AA).")]
+    public string apelido;
 
     [TextArea]
     public string description;

@@ -129,33 +129,55 @@ public partial class TurnStateManager
         RpsBonusInfo defenderAttackRps = counterExecuted
             ? ResolveAttackRps(defenderClass, defenderWeaponCategory, attackerClass)
             : RpsBonusInfo.None;
-        SkillRpsBonusInfo attackerSkillRps = ResolveSkillRps(attacker, defender, attackerWeaponCategory);
-        SkillRpsBonusInfo defenderSkillRps = counterExecuted
-            ? ResolveSkillRps(defender, attacker, defenderWeaponCategory)
-            : SkillRpsBonusInfo.NoneWithReason("sem revide");
+        WeaponCategory defenderWeaponCategoryForSkill = counterExecuted ? defenderWeaponCategory : attackerWeaponCategory;
+        SkillRpsBonusInfo attackerSkillRps = ResolveSkillRps(
+            attacker,
+            defender,
+            attackerWeaponCategory,
+            defenderWeaponCategoryForSkill);
+        SkillRpsBonusInfo defenderSkillRps = ResolveSkillRps(
+            defender,
+            attacker,
+            defenderWeaponCategoryForSkill,
+            attackerWeaponCategory);
+        // Defesa do alvo deve considerar modifiers do proprio defensor mesmo sem revide,
+        // usando a categoria da arma que ele esta recebendo.
+        SkillRpsBonusInfo defenderDefenseSkillRps = ResolveSkillRps(
+            defender,
+            attacker,
+            defenderWeaponCategoryForSkill,
+            attackerWeaponCategory);
 
         int attackerAttackSkillTotal = attackerSkillRps.ownerAttackValue + defenderSkillRps.opponentAttackValue;
         int defenderAttackSkillTotal = defenderSkillRps.ownerAttackValue + attackerSkillRps.opponentAttackValue;
         int attackerDefenseSkillTotal = attackerSkillRps.ownerDefenseValue + defenderSkillRps.opponentDefenseValue;
-        int defenderDefenseSkillTotal = defenderSkillRps.ownerDefenseValue + attackerSkillRps.opponentDefenseValue;
+        int defenderDefenseSkillTotal = defenderDefenseSkillRps.ownerDefenseValue + attackerSkillRps.opponentDefenseValue;
 
         int attackerTotalAttackRps = attackerAttackRps.value + attackerAttackSkillTotal;
         int defenderTotalAttackRps = defenderAttackRps.value + defenderAttackSkillTotal;
 
-        int attackerAttackEffective = attackerHpBefore * Mathf.Max(0, attackerWeaponPower + attackerTotalAttackRps);
+        int attackerAttackTermRaw = attackerWeaponPower + attackerTotalAttackRps;
+        int attackerAttackTermApplied = Mathf.Max(1, attackerAttackTermRaw); // Disparo valido: piso de FA = 1.
+        int defenderAttackTermRaw = defenderWeaponPower + defenderTotalAttackRps;
+        int defenderAttackTermApplied = counterExecuted
+            ? Mathf.Max(1, defenderAttackTermRaw) // Revide valido: piso de FA = 1.
+            : 0;
+
+        int attackerAttackEffective = attackerHpBefore * attackerAttackTermApplied;
         int defenderAttackEffective = counterExecuted
-            ? defenderHpBefore * Mathf.Max(0, defenderWeaponPower + defenderTotalAttackRps)
+            ? defenderHpBefore * defenderAttackTermApplied
             : 0;
 
         trace.AppendLine("5) Forca de ataque efetiva");
-        trace.AppendLine($"- Atacante: HP({attackerHpBefore}) x (Arma({attackerWeaponPower}) + RPSAtaqueBase({FormatSigned(attackerAttackRps.value)}) + EliteSkillAtaqueProprio({FormatSigned(attackerSkillRps.ownerAttackValue)}) + EliteSkillAtaqueRecebido({FormatSigned(defenderSkillRps.opponentAttackValue)})) = {attackerAttackEffective}");
-        trace.AppendLine($"- Defensor: HP({defenderHpBefore}) x (Arma({defenderWeaponPower}) + RPSAtaqueBase({FormatSigned(defenderAttackRps.value)}) + EliteSkillAtaqueProprio({FormatSigned(defenderSkillRps.ownerAttackValue)}) + EliteSkillAtaqueRecebido({FormatSigned(attackerSkillRps.opponentAttackValue)})) = {defenderAttackEffective}");
+        trace.AppendLine($"- Atacante: HP({attackerHpBefore}) x max(1, Arma({attackerWeaponPower}) + RPSAtaqueBase({FormatSigned(attackerAttackRps.value)}) + EliteSkillAtaqueProprio({FormatSigned(attackerSkillRps.ownerAttackValue)}) + EliteSkillAtaqueRecebido({FormatSigned(defenderSkillRps.opponentAttackValue)})) = {attackerAttackEffective} (termo bruto={attackerAttackTermRaw}, aplicado={attackerAttackTermApplied})");
+        trace.AppendLine($"- Defensor: HP({defenderHpBefore}) x {(counterExecuted ? "max(1, " : string.Empty)}Arma({defenderWeaponPower}) + RPSAtaqueBase({FormatSigned(defenderAttackRps.value)}) + EliteSkillAtaqueProprio({FormatSigned(defenderSkillRps.ownerAttackValue)}) + EliteSkillAtaqueRecebido({FormatSigned(attackerSkillRps.opponentAttackValue)}){(counterExecuted ? ")" : string.Empty)} = {defenderAttackEffective} (termo bruto={defenderAttackTermRaw}, aplicado={defenderAttackTermApplied})");
         trace.AppendLine($"- Detalhe RPS ataque atacante: {attackerAttackRps.summary}");
         trace.AppendLine($"- Detalhe RPS ataque defensor: {defenderAttackRps.summary}");
         trace.AppendLine($"- ELITE SKILL ataque atacante: proprio={FormatSigned(attackerSkillRps.ownerAttackValue)} | recebido={FormatSigned(defenderSkillRps.opponentAttackValue)} | total={FormatSigned(attackerAttackSkillTotal)}");
         trace.AppendLine($"- ELITE SKILL ataque defensor: proprio={FormatSigned(defenderSkillRps.ownerAttackValue)} | recebido={FormatSigned(attackerSkillRps.opponentAttackValue)} | total={FormatSigned(defenderAttackSkillTotal)}");
         trace.AppendLine($"- Detalhe skill lado atacante: {attackerSkillRps.summary}");
         trace.AppendLine($"- Detalhe skill lado defensor: {defenderSkillRps.summary}");
+        trace.AppendLine($"- Detalhe skill defesa do defensor (vs arma atacante): {defenderDefenseSkillRps.summary}");
 
         PositionDpqInfo attackerDpq = ResolveDpqAtUnitPosition(attacker, option.attackerPositionLabel);
         PositionDpqInfo defenderDpq = ResolveDpqAtUnitPosition(defender, option.defenderPositionLabel);
@@ -175,11 +197,11 @@ public partial class TurnStateManager
 
         trace.AppendLine("7) Forca de defesa efetiva");
         trace.AppendLine($"- Atacante: defesaUnidade({attackerBaseDefense}) + defesaDPQ({attackerDpq.defenseBonus}) + RPSDefesaBase({FormatSigned(attackerDefenseRps.value)}) + EliteSkillDefesaProprio({FormatSigned(attackerSkillRps.ownerDefenseValue)}) + EliteSkillDefesaRecebido({FormatSigned(defenderSkillRps.opponentDefenseValue)}) = {attackerEffectiveDefense}");
-        trace.AppendLine($"- Defensor: defesaUnidade({defenderBaseDefense}) + defesaDPQ({defenderDpq.defenseBonus}) + RPSDefesaBase({FormatSigned(defenderDefenseRps.value)}) + EliteSkillDefesaProprio({FormatSigned(defenderSkillRps.ownerDefenseValue)}) + EliteSkillDefesaRecebido({FormatSigned(attackerSkillRps.opponentDefenseValue)}) = {defenderEffectiveDefense}");
+        trace.AppendLine($"- Defensor: defesaUnidade({defenderBaseDefense}) + defesaDPQ({defenderDpq.defenseBonus}) + RPSDefesaBase({FormatSigned(defenderDefenseRps.value)}) + EliteSkillDefesaProprio({FormatSigned(defenderDefenseSkillRps.ownerDefenseValue)}) + EliteSkillDefesaRecebido({FormatSigned(attackerSkillRps.opponentDefenseValue)}) = {defenderEffectiveDefense}");
         trace.AppendLine($"- Detalhe RPS defesa atacante: {attackerDefenseRps.summary}");
         trace.AppendLine($"- Detalhe RPS defesa defensor: {defenderDefenseRps.summary}");
         trace.AppendLine($"- ELITE SKILL defesa atacante: proprio={FormatSigned(attackerSkillRps.ownerDefenseValue)} | recebido={FormatSigned(defenderSkillRps.opponentDefenseValue)} | total={FormatSigned(attackerDefenseSkillTotal)}");
-        trace.AppendLine($"- ELITE SKILL defesa defensor: proprio={FormatSigned(defenderSkillRps.ownerDefenseValue)} | recebido={FormatSigned(attackerSkillRps.opponentDefenseValue)} | total={FormatSigned(defenderDefenseSkillTotal)}");
+        trace.AppendLine($"- ELITE SKILL defesa defensor: proprio={FormatSigned(defenderDefenseSkillRps.ownerDefenseValue)} | recebido={FormatSigned(attackerSkillRps.opponentDefenseValue)} | total={FormatSigned(defenderDefenseSkillTotal)}");
 
         int dpqDifference = attackerDpq.points - defenderDpq.points;
         DPQCombatOutcome attackerOutcome = DPQCombatOutcome.Neutro;
@@ -316,9 +338,13 @@ public partial class TurnStateManager
         return RpsBonusInfo.NoneWithReason("sem match");
     }
 
-    private SkillRpsBonusInfo ResolveSkillRps(UnitManager ownerUnit, UnitManager opponentUnit, WeaponCategory ownerWeaponCategory)
+    private SkillRpsBonusInfo ResolveSkillRps(
+        UnitManager ownerUnit,
+        UnitManager opponentUnit,
+        WeaponCategory ownerWeaponCategory,
+        WeaponCategory opponentWeaponCategory)
     {
-        CombatModifierSummary resolved = CombatModifierResolver.Resolve(ownerUnit, opponentUnit, ownerWeaponCategory);
+        CombatModifierSummary resolved = CombatModifierResolver.Resolve(ownerUnit, opponentUnit, ownerWeaponCategory, opponentWeaponCategory);
         if (resolved.appliedCount <= 0)
             return SkillRpsBonusInfo.NoneWithReason(resolved.reason);
 

@@ -7,6 +7,13 @@ using UnityEditor;
 
 public class MatchController : MonoBehaviour
 {
+    [System.Serializable]
+    private struct TeamFlipConfig
+    {
+        public TeamId teamId;
+        public bool flipX;
+    }
+
     public enum GameSetupPreset
     {
         GameBoyClassic = 0,
@@ -21,6 +28,14 @@ public class MatchController : MonoBehaviour
     [SerializeField] private int activeTeamId = (int)TeamId.Green;
     [SerializeField] private List<TeamId> players = new List<TeamId> { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
     [SerializeField] private bool includeNeutralTeam = false;
+    [SerializeField] private List<TeamFlipConfig> teamFlipConfigs = new List<TeamFlipConfig>
+    {
+        new TeamFlipConfig { teamId = TeamId.Neutral, flipX = false },
+        new TeamFlipConfig { teamId = TeamId.Green, flipX = false },
+        new TeamFlipConfig { teamId = TeamId.Red, flipX = true },
+        new TeamFlipConfig { teamId = TeamId.Blue, flipX = false },
+        new TeamFlipConfig { teamId = TeamId.Yellow, flipX = true }
+    };
     // Placeholder para futura pintura de visibilidade no mapa (nao governa regras de combate no momento).
     [SerializeField, HideInInspector] private bool fogOfWar = true;
     [Header("Gameplay Setup")]
@@ -33,10 +48,8 @@ public class MatchController : MonoBehaviour
     [SerializeField] private CursorController cursorController;
     [Header("Turn Transition")]
     [SerializeField] private MatchMusicAudioManager matchMusicAudioManager;
-    [SerializeField] private AudioClip advanceTurnSfx;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.5f;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPostDelay = 0.2f;
-    [SerializeField] [Range(0f, 1f)] private float advanceTurnSfxVolume = 1f;
     [SerializeField] private int activePlayerListIndex = 0;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField, HideInInspector] private bool pendingTurnStartUpkeep;
@@ -56,13 +69,32 @@ public class MatchController : MonoBehaviour
     public bool IsTurnTransitionInProgress => advanceTurnTransitionRoutine != null;
     private Coroutine advanceTurnTransitionRoutine;
 
+    public bool GetTeamFlipX(TeamId teamId)
+    {
+        if (teamId == TeamId.Neutral)
+            return false;
+
+        if (teamFlipConfigs != null)
+        {
+            for (int i = 0; i < teamFlipConfigs.Count; i++)
+            {
+                if (teamFlipConfigs[i].teamId == teamId)
+                    return teamFlipConfigs[i].flipX;
+            }
+        }
+
+        return false;
+    }
+
     private void Awake()
     {
         ApplyGameSetupPreset();
         NormalizeState();
+        NormalizeTeamFlipConfigs();
         TryAutoAssignCursorController();
         TryAutoAssignTurnTransitionReferences();
         ApplyActiveTeamIfChanged(force: true);
+        ApplyTeamFlipSettingsToSceneObjects();
     }
 
 #if UNITY_EDITOR
@@ -70,9 +102,11 @@ public class MatchController : MonoBehaviour
     {
         ApplyGameSetupPreset();
         NormalizeState();
+        NormalizeTeamFlipConfigs();
         TryAutoAssignCursorController();
         TryAutoAssignTurnTransitionReferences();
         ApplyActiveTeamIfChanged(force: false);
+        ApplyTeamFlipSettingsToSceneObjects();
     }
 #endif
 
@@ -309,20 +343,44 @@ public class MatchController : MonoBehaviour
     {
         if (players == null)
             players = new List<TeamId>();
+    }
 
-        HashSet<TeamId> seen = new HashSet<TeamId>();
-        for (int i = players.Count - 1; i >= 0; i--)
+    private void NormalizeTeamFlipConfigs()
+    {
+        if (teamFlipConfigs == null)
+            teamFlipConfigs = new List<TeamFlipConfig>();
+
+        EnsureTeamFlipEntry(TeamId.Neutral, false);
+        EnsureTeamFlipEntry(TeamId.Green, false);
+        EnsureTeamFlipEntry(TeamId.Red, true);
+        EnsureTeamFlipEntry(TeamId.Blue, false);
+        EnsureTeamFlipEntry(TeamId.Yellow, true);
+    }
+
+    private void EnsureTeamFlipEntry(TeamId teamId, bool defaultFlip)
+    {
+        for (int i = 0; i < teamFlipConfigs.Count; i++)
         {
-            TeamId team = players[i];
-            if (team == TeamId.Neutral)
-            {
-                players.RemoveAt(i);
+            if (teamFlipConfigs[i].teamId != teamId)
                 continue;
+
+            if (teamId == TeamId.Neutral && teamFlipConfigs[i].flipX)
+            {
+                TeamFlipConfig cfg = teamFlipConfigs[i];
+                cfg.flipX = false;
+                teamFlipConfigs[i] = cfg;
             }
 
-            if (!seen.Add(team))
-                players.RemoveAt(i);
+            // Remove duplicatas mantendo o primeiro.
+            for (int j = teamFlipConfigs.Count - 1; j > i; j--)
+            {
+                if (teamFlipConfigs[j].teamId == teamId)
+                    teamFlipConfigs.RemoveAt(j);
+            }
+            return;
         }
+
+        teamFlipConfigs.Add(new TeamFlipConfig { teamId = teamId, flipX = defaultFlip });
     }
 
     private void SyncActivePlayerIndexFromActiveTeam()
@@ -365,6 +423,29 @@ public class MatchController : MonoBehaviour
         TeleportCursorToActiveTeamHeadQuarterSilently();
     }
 
+    private void ApplyTeamFlipSettingsToSceneObjects()
+    {
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null)
+                continue;
+
+            unit.ApplyTeamVisualFlipX(GetTeamFlipX(unit.TeamId));
+        }
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null)
+                continue;
+
+            construction.ApplyTeamVisualFlipX(GetTeamFlipX(construction.TeamId));
+        }
+    }
+
     private void ReleaseUnitsForActiveTeam()
     {
         if (!Application.isPlaying)
@@ -405,20 +486,11 @@ public class MatchController : MonoBehaviour
     {
         if (matchMusicAudioManager == null)
             matchMusicAudioManager = FindAnyObjectByType<MatchMusicAudioManager>();
-
-#if UNITY_EDITOR
-        if (advanceTurnSfx == null)
-            advanceTurnSfx = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/ending the turn.MP3");
-#endif
     }
 
     private void PlayAdvanceTurnSfx()
     {
-        if (advanceTurnSfx == null)
-            return;
-
-        float volume = Mathf.Clamp01(advanceTurnSfxVolume);
-        AudioSource.PlayClipAtPoint(advanceTurnSfx, transform.position, volume);
+        cursorController?.PlayEndingTurnSfx(1f);
     }
 
     private void TeleportCursorToActiveTeamHeadQuarterSilently()

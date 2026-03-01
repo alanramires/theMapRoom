@@ -1,6 +1,9 @@
 using System.Text;
 using System.Collections.Generic;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 public partial class TurnStateManager
 {
@@ -54,7 +57,7 @@ public partial class TurnStateManager
             return;
         }
 
-        if (!TryReadPressedNumber(out int number))
+        if (!TryReadShoppingPressedNumber(out int number))
             return;
 
         int index = number - 1;
@@ -116,8 +119,47 @@ public partial class TurnStateManager
             sb.AppendLine();
         }
 
-        sb.Append("Pressione 1-9 para comprar, ESC para cancelar.");
+        sb.Append("Atalhos: 1-9, 0=10, Shift+1=11, Shift+2=12 ... Shift+9=19. ESC cancela.");
         Debug.Log(sb.ToString());
+    }
+
+    private static bool TryReadShoppingPressedNumber(out int number)
+    {
+        number = 0;
+
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            bool shift = (Keyboard.current.leftShiftKey != null && Keyboard.current.leftShiftKey.isPressed) ||
+                         (Keyboard.current.rightShiftKey != null && Keyboard.current.rightShiftKey.isPressed);
+
+            if (Keyboard.current.digit0Key.wasPressedThisFrame || Keyboard.current.numpad0Key.wasPressedThisFrame) { number = 10; return true; }
+            if (Keyboard.current.digit1Key.wasPressedThisFrame || Keyboard.current.numpad1Key.wasPressedThisFrame) { number = shift ? 11 : 1; return true; }
+            if (Keyboard.current.digit2Key.wasPressedThisFrame || Keyboard.current.numpad2Key.wasPressedThisFrame) { number = shift ? 12 : 2; return true; }
+            if (Keyboard.current.digit3Key.wasPressedThisFrame || Keyboard.current.numpad3Key.wasPressedThisFrame) { number = shift ? 13 : 3; return true; }
+            if (Keyboard.current.digit4Key.wasPressedThisFrame || Keyboard.current.numpad4Key.wasPressedThisFrame) { number = shift ? 14 : 4; return true; }
+            if (Keyboard.current.digit5Key.wasPressedThisFrame || Keyboard.current.numpad5Key.wasPressedThisFrame) { number = shift ? 15 : 5; return true; }
+            if (Keyboard.current.digit6Key.wasPressedThisFrame || Keyboard.current.numpad6Key.wasPressedThisFrame) { number = shift ? 16 : 6; return true; }
+            if (Keyboard.current.digit7Key.wasPressedThisFrame || Keyboard.current.numpad7Key.wasPressedThisFrame) { number = shift ? 17 : 7; return true; }
+            if (Keyboard.current.digit8Key.wasPressedThisFrame || Keyboard.current.numpad8Key.wasPressedThisFrame) { number = shift ? 18 : 8; return true; }
+            if (Keyboard.current.digit9Key.wasPressedThisFrame || Keyboard.current.numpad9Key.wasPressedThisFrame) { number = shift ? 19 : 9; return true; }
+        }
+#else
+        bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+
+        if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Keypad0)) { number = 10; return true; }
+        if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1)) { number = shift ? 11 : 1; return true; }
+        if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2)) { number = shift ? 12 : 2; return true; }
+        if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3)) { number = shift ? 13 : 3; return true; }
+        if (Input.GetKeyDown(KeyCode.Alpha4) || Input.GetKeyDown(KeyCode.Keypad4)) { number = shift ? 14 : 4; return true; }
+        if (Input.GetKeyDown(KeyCode.Alpha5) || Input.GetKeyDown(KeyCode.Keypad5)) { number = shift ? 15 : 5; return true; }
+        if (Input.GetKeyDown(KeyCode.Alpha6) || Input.GetKeyDown(KeyCode.Keypad6)) { number = shift ? 16 : 6; return true; }
+        if (Input.GetKeyDown(KeyCode.Alpha7) || Input.GetKeyDown(KeyCode.Keypad7)) { number = shift ? 17 : 7; return true; }
+        if (Input.GetKeyDown(KeyCode.Alpha8) || Input.GetKeyDown(KeyCode.Keypad8)) { number = shift ? 18 : 8; return true; }
+        if (Input.GetKeyDown(KeyCode.Alpha9) || Input.GetKeyDown(KeyCode.Keypad9)) { number = shift ? 19 : 9; return true; }
+#endif
+
+        return false;
     }
 
     private static string ResolveUnitName(UnitData unit)

@@ -292,10 +292,9 @@ public class CombatMatrixWindow : EditorWindow
         RpsBonusInfo defenderAttackRps = defenderCanCounter
             ? ResolveAttackRps(defenderClass, defenderCategory, attackerClass)
             : RpsBonusInfo.None;
-        SkillRpsBonusInfo attackerSkillRps = ResolveSkillRps(attacker, defender, attackerCategory);
-        SkillRpsBonusInfo defenderSkillRps = defenderCanCounter
-            ? ResolveSkillRps(defender, attacker, defenderCategory)
-            : SkillRpsBonusInfo.NoneWithReason("sem revide");
+        WeaponCategory defenderCategoryForSkill = defenderCanCounter ? defenderCategory : attackerCategory;
+        SkillRpsBonusInfo attackerSkillRps = ResolveSkillRps(attacker, defender, attackerCategory, defenderCategoryForSkill);
+        SkillRpsBonusInfo defenderSkillRps = ResolveSkillRps(defender, attacker, defenderCategoryForSkill, attackerCategory);
 
         int attackerAttackSkillTotal = attackerSkillRps.ownerAttackValue + defenderSkillRps.opponentAttackValue;
         int defenderAttackSkillTotal = defenderSkillRps.ownerAttackValue + attackerSkillRps.opponentAttackValue;
@@ -529,9 +528,13 @@ public class CombatMatrixWindow : EditorWindow
         return RpsBonusInfo.NoneWithReason("sem match");
     }
 
-    private static SkillRpsBonusInfo ResolveSkillRps(UnitManager ownerUnit, UnitManager opponentUnit, WeaponCategory ownerWeaponCategory)
+    private static SkillRpsBonusInfo ResolveSkillRps(
+        UnitManager ownerUnit,
+        UnitManager opponentUnit,
+        WeaponCategory ownerWeaponCategory,
+        WeaponCategory opponentWeaponCategory)
     {
-        CombatModifierSummary resolved = CombatModifierResolver.Resolve(ownerUnit, opponentUnit, ownerWeaponCategory);
+        CombatModifierSummary resolved = CombatModifierResolver.Resolve(ownerUnit, opponentUnit, ownerWeaponCategory, opponentWeaponCategory);
         if (resolved.appliedCount <= 0)
             return SkillRpsBonusInfo.NoneWithReason(resolved.reason);
 

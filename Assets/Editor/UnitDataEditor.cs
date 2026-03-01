@@ -41,6 +41,7 @@ public class UnitDataEditor : Editor
             "m_Script",
             "id",
             "displayName",
+            "apelido",
             "militaryForce",
             "unitClass",
             "maxHP",
@@ -198,6 +199,7 @@ public class UnitDataEditor : Editor
     {
         SerializedProperty idProperty = serializedObject.FindProperty("id");
         SerializedProperty displayNameProperty = serializedObject.FindProperty("displayName");
+        SerializedProperty apelidoProperty = serializedObject.FindProperty("apelido");
         SerializedProperty militaryForceProperty = serializedObject.FindProperty("militaryForce");
         SerializedProperty unitClassProperty = serializedObject.FindProperty("unitClass");
 
@@ -205,6 +207,8 @@ public class UnitDataEditor : Editor
             EditorGUILayout.PropertyField(idProperty);
         if (displayNameProperty != null)
             EditorGUILayout.PropertyField(displayNameProperty);
+        if (apelidoProperty != null)
+            EditorGUILayout.PropertyField(apelidoProperty);
         if (militaryForceProperty != null)
             EditorGUILayout.PropertyField(militaryForceProperty);
         if (unitClassProperty != null)

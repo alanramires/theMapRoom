@@ -19,6 +19,7 @@ public class UnitMoveAnimationSpeedOverride
 public class AnimationManager : MonoBehaviour
 {
     public static AnimationManager Instance { get; private set; }
+    [SerializeField] private CursorController cursorController;
 
     [Header("Selection Visual")]
     [SerializeField] [Range(0.05f, 1f)] private float selectionBlinkActiveDuration = 0.16f;
@@ -107,6 +108,10 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] [Range(0.2f, 8f)] private float mirandoSpotterSegmentSpeed = 3f;
     [Tooltip("Intensidade da curvatura da parabola para armas parabolic.")]
     [SerializeField] [Range(0.2f, 4f)] private float mirandoParabolaBend = 1.2f;
+    [Tooltip("Curvatura minima para tiros quase verticais (evita arco exagerado).")]
+    [SerializeField] [Range(0.01f, 0.3f)] private float mirandoParabolaMinVerticalBend = 0.05f;
+    [Tooltip("Peso angular da parabola: 1 = linear, >1 achata mais em vertical, <1 curva mais em diagonal.")]
+    [SerializeField] [Range(0.2f, 3f)] private float mirandoParabolaHorizontalBendWeight = 0.85f;
     [Tooltip("Quantidade de pontos amostrados na curva parabolica.")]
     [SerializeField] [Range(8, 64)] private int mirandoParabolaSamples = 24;
     [Tooltip("Sorting layer da linha de preview de tiro.")]
@@ -167,9 +172,6 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] private Sprite[] explosionFrames;
     [Tooltip("Duracao por frame da animacao de explosao.")]
     [SerializeField] [Range(0.02f, 0.2f)] private float explosionFrameDuration = 0.06f;
-    [Tooltip("SFX tocado junto da explosao.")]
-    [SerializeField] private AudioClip explosionSfx;
-    [SerializeField] [Range(0f, 1f)] private float explosionSfxVolume = 1f;
     [SerializeField] private SortingLayerReference explosionSortingLayer;
     [SerializeField, HideInInspector] private bool explosionSortingLayerInitialized;
     [SerializeField] private int explosionSortingOrder = 145;
@@ -254,6 +256,8 @@ public class AnimationManager : MonoBehaviour
     public float MergeAfterParticipantMoveDelay => Mathf.Clamp(mergeAfterParticipantMoveDelay, 0f, 2f);
     public float MergeAfterParticipantLoadDelay => Mathf.Clamp(mergeAfterParticipantLoadDelay, 0f, 2f);
     public float MirandoParabolaBend => Mathf.Clamp(mirandoParabolaBend, 0.2f, 4f);
+    public float MirandoParabolaMinVerticalBend => Mathf.Clamp(mirandoParabolaMinVerticalBend, 0.01f, 0.3f);
+    public float MirandoParabolaHorizontalBendWeight => Mathf.Clamp(mirandoParabolaHorizontalBendWeight, 0.2f, 3f);
     public int MirandoParabolaSamples => Mathf.Clamp(mirandoParabolaSamples, 8, 64);
     public int MirandoPreviewSortingLayerId => mirandoPreviewSortingLayer.Id;
     public int MirandoPreviewSortingOrder => mirandoPreviewSortingOrder;
@@ -438,6 +442,9 @@ public class AnimationManager : MonoBehaviour
 
     private void EnsureDefaults()
     {
+        if (cursorController == null)
+            cursorController = FindAnyObjectByType<CursorController>();
+
         if (!mirandoPreviewSortingLayerInitialized)
         {
             mirandoPreviewSortingLayer = SortingLayerReference.FromName("SFX");
@@ -572,14 +579,7 @@ public class AnimationManager : MonoBehaviour
 
     public float PlayExplosionEffectAt(Vector3 worldPosition)
     {
-        float sfxDuration = 0f;
-        if (explosionSfx != null)
-        {
-            // Explosao deve sempre ser audivel no fluxo de combate (2D).
-            Vector3 sfxPos = Camera.main != null ? Camera.main.transform.position : worldPosition;
-            AudioSource.PlayClipAtPoint(explosionSfx, sfxPos, Mathf.Clamp01(explosionSfxVolume));
-            sfxDuration = explosionSfx.length;
-        }
+        float sfxDuration = cursorController != null ? cursorController.PlayExplosionSfx(1f) : 0f;
 
         if (explosionFrames == null || explosionFrames.Length == 0)
             return sfxDuration;
@@ -868,9 +868,19 @@ public class AnimationManager : MonoBehaviour
         Vector2 dir = flat.normalized;
         Vector2 clockwiseNormal = new Vector2(dir.y, -dir.x);
         Vector2 antiClockwiseNormal = new Vector2(-dir.y, dir.x);
-        bool targetIsRight = to.x >= from.x;
-        Vector2 normal = targetIsRight ? antiClockwiseNormal : clockwiseNormal;
-        float bend = Mathf.Clamp(combatProjectileParabolaBend, 0.2f, Mathf.Max(0.2f, flat.magnitude));
+        // Desempate estavel para alvo quase vertical: sempre anti-horario.
+        const float verticalTieEpsilon = 0.01f;
+        float dx = to.x - from.x;
+        bool isVerticalTie = Mathf.Abs(dx) <= verticalTieEpsilon;
+        Vector2 normal = isVerticalTie
+            ? antiClockwiseNormal
+            : (dx > 0f ? antiClockwiseNormal : clockwiseNormal);
+        float distance = flat.magnitude;
+        float maxBend = Mathf.Clamp(combatProjectileParabolaBend, 0.2f, Mathf.Max(0.2f, distance));
+        float horizontalFactor = Mathf.Clamp01(Mathf.Abs(dir.x)); // 1=horizontal, 0=vertical
+        float horizontalWeight = Mathf.Pow(horizontalFactor, MirandoParabolaHorizontalBendWeight);
+        float minBend = Mathf.Clamp(MirandoParabolaMinVerticalBend, 0.01f, 0.3f);
+        float bend = Mathf.Lerp(minBend, maxBend, horizontalWeight);
         return (from + to) * 0.5f + new Vector3(normal.x, normal.y, 0f) * bend;
     }
 
@@ -1032,26 +1042,6 @@ public class AnimationManager : MonoBehaviour
 
     private void TryAutoAssignExplosionFramesInEditor()
     {
-        if (explosionSfx == null)
-        {
-            explosionSfx = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/combat/explosion.MP3");
-            if (explosionSfx == null)
-                explosionSfx = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/combat/explosion.mp3");
-            if (explosionSfx == null)
-            {
-                string[] audioGuids = AssetDatabase.FindAssets("explosion t:AudioClip", new[] { "Assets/audio/combat" });
-                for (int i = 0; i < audioGuids.Length; i++)
-                {
-                    string path = AssetDatabase.GUIDToAssetPath(audioGuids[i]);
-                    AudioClip clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
-                    if (clip == null)
-                        continue;
-                    explosionSfx = clip;
-                    break;
-                }
-            }
-        }
-
         if (explosionFrames != null && explosionFrames.Length > 0)
             return;
 

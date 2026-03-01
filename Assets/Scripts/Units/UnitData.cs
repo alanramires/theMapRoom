@@ -22,6 +22,8 @@ public class UnitData : ScriptableObject
 
     [Tooltip("Nome mostrado na UI.")]
     public string displayName;
+    [Tooltip("Apelido curto para tabelas/matrizes (ex.: SD, BZ).")]
+    public string apelido;
 
     [TextArea]
     public string description;

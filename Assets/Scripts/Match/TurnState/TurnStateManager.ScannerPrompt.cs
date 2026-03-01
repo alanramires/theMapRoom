@@ -2111,15 +2111,10 @@ public partial class TurnStateManager
 
     private float PlayCombatAttackSfx(WeaponTrajectoryType trajectory, UnitManager defender)
     {
-        AudioClip clip = trajectory == WeaponTrajectoryType.Parabolic ? rangedAttackSfx : meleeAttackSfx;
-        if (clip == null)
-            return 0f;
+        if (cursorController != null)
+            return cursorController.PlayCombatAttackSfx(trajectory, 1f);
 
-        Vector3 worldPos = selectedUnit != null
-            ? selectedUnit.transform.position
-            : (defender != null ? defender.transform.position : Vector3.zero);
-        AudioSource.PlayClipAtPoint(clip, worldPos, Mathf.Clamp01(combatSfxVolume));
-        return clip.length;
+        return 0f;
     }
 
     private float PlayWeaponShot(UnitManager shooter, UnitManager target, WeaponData weapon, WeaponTrajectoryType trajectory)
@@ -2127,8 +2122,7 @@ public partial class TurnStateManager
         if (shooter == null || target == null)
             return 0f;
 
-        if (weapon != null && weapon.fireSfx != null)
-            AudioSource.PlayClipAtPoint(weapon.fireSfx, shooter.transform.position, Mathf.Clamp01(weapon.fireSfxVolume));
+        cursorController?.PlayWeaponFireSfx(weapon, 1f);
 
         if (animationManager == null)
             return 0f;
@@ -2939,11 +2933,19 @@ public partial class TurnStateManager
         Vector2 dir = flat.normalized;
         Vector2 clockwiseNormal = new Vector2(dir.y, -dir.x);
         Vector2 antiClockwiseNormal = new Vector2(-dir.y, dir.x);
-        bool targetIsRight = to.x >= from.x;
-        Vector2 normal = targetIsRight ? antiClockwiseNormal : clockwiseNormal;
+        const float verticalTieEpsilon = 0.01f;
+        float dx = to.x - from.x;
+        bool isVerticalTie = Mathf.Abs(dx) <= verticalTieEpsilon;
+        Vector2 normal = isVerticalTie
+            ? antiClockwiseNormal
+            : (dx > 0f ? antiClockwiseNormal : clockwiseNormal);
 
         float distance = flat.magnitude;
-        float bend = Mathf.Clamp(GetMirandoParabolaBend(), 0.2f, Mathf.Max(0.2f, distance));
+        float maxBend = Mathf.Clamp(GetMirandoParabolaBend(), 0.2f, Mathf.Max(0.2f, distance));
+        float horizontalFactor = Mathf.Clamp01(Mathf.Abs(dir.x)); // 1=horizontal, 0=vertical
+        float horizontalWeight = Mathf.Pow(horizontalFactor, GetMirandoParabolaHorizontalBendWeight());
+        float minBend = Mathf.Clamp(GetMirandoParabolaMinVerticalBend(), 0.01f, 0.3f); // quase reta no vertical
+        float bend = Mathf.Lerp(minBend, maxBend, horizontalWeight);
         Vector3 control = (from + to) * 0.5f + new Vector3(normal.x, normal.y, 0f) * bend;
 
         int samples = GetMirandoParabolaSamples();
@@ -3602,6 +3604,16 @@ public partial class TurnStateManager
     private float GetMirandoParabolaBend()
     {
         return animationManager != null ? animationManager.MirandoParabolaBend : 1.2f;
+    }
+
+    private float GetMirandoParabolaMinVerticalBend()
+    {
+        return animationManager != null ? animationManager.MirandoParabolaMinVerticalBend : 0.05f;
+    }
+
+    private float GetMirandoParabolaHorizontalBendWeight()
+    {
+        return animationManager != null ? animationManager.MirandoParabolaHorizontalBendWeight : 0.85f;
     }
 
     private int GetMirandoParabolaSamples()

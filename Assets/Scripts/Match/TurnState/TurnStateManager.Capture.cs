@@ -60,7 +60,7 @@ public partial class TurnStateManager
 
         if (preSfxDelay > 0f)
             yield return new WaitForSeconds(preSfxDelay);
-        PlayStateSfx(capturingSfx, capturePitch);
+        cursorController?.PlayCapturingSfx(capturePitch, 1f);
         if (postCapturingSfxDelay > 0f)
             yield return new WaitForSeconds(postCapturingSfxDelay);
 
@@ -105,7 +105,7 @@ public partial class TurnStateManager
 
         if (concluded)
         {
-            PlayStateSfx(capturedSfx, 1f);
+            cursorController?.PlayCapturedSfx(1f, 1f);
             if (postCapturedSfxDelay > 0f)
                 yield return new WaitForSeconds(postCapturedSfxDelay);
 
@@ -146,17 +146,4 @@ public partial class TurnStateManager
         ClearSelectionAndReturnToNeutral(keepPreparedFuelCost: true);
     }
 
-    private void PlayStateSfx(AudioClip clip, float pitch)
-    {
-        if (clip == null)
-            return;
-
-        if (stateAudioSource == null)
-            return;
-
-        float basePitch = stateAudioSource.pitch;
-        stateAudioSource.pitch = Mathf.Clamp(pitch, 0.1f, 3f);
-        stateAudioSource.PlayOneShot(clip, Mathf.Clamp01(stateSfxVolume));
-        stateAudioSource.pitch = basePitch;
-    }
 }

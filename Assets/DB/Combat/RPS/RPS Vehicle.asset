@@ -47,17 +47,17 @@ MonoBehaviour:
       unitClass: 1
       weaponCategory: 0
       targetClass: 3
-      attackBonus: -4
+      attackBonus: -5
       notes: "Veiculos n\xE3o atacam bem a si mesmos usando metralhadora de combate"
-      rpsAttackText: Vehicle com AntiInfantaria ataca Armored com RPS Ataque -4
+      rpsAttackText: Vehicle com AntiInfantaria ataca Armored com RPS Ataque -5
     defesa:
       targetClass: 3
       unitClass: 1
       weaponCategory: 0
-      defenseBonus: 4
+      defenseBonus: 5
       notes: a blindagem natural do veiculo aguenta o tranco
       rpsDefenseText: Armored se defende de Vehicle com AntiInfantaria com RPS Defesa
-        +4
+        +5
   - ataque:
       unitClass: 1
       weaponCategory: 0

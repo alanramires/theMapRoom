@@ -86,6 +86,7 @@ public partial class TurnStateManager
             cachedPodeEmbarcarInvalidTargets,
             cachedPodeDesembarcarTargets,
             cachedPodeDesembarcarInvalidTargets);
+        CollapseMirarTargetsByTargetUnit(cachedPodeMirarTargets);
 
         // Normaliza os codigos de acao com base nos resultados efetivos dos sensores.
         availableSensorActionCodes.Remove('A');
@@ -168,6 +169,35 @@ public partial class TurnStateManager
 
         ResetScannerPromptState();
         LogScannerPanel();
+    }
+
+    private static void CollapseMirarTargetsByTargetUnit(List<PodeMirarTargetOption> options)
+    {
+        if (options == null || options.Count <= 1)
+            return;
+
+        List<PodeMirarTargetOption> filtered = new List<PodeMirarTargetOption>(options.Count);
+        HashSet<UnitManager> seenTargets = new HashSet<UnitManager>();
+
+        for (int i = 0; i < options.Count; i++)
+        {
+            PodeMirarTargetOption option = options[i];
+            if (option == null)
+                continue;
+
+            UnitManager target = option.targetUnit;
+            if (target == null)
+            {
+                filtered.Add(option);
+                continue;
+            }
+
+            if (seenTargets.Add(target))
+                filtered.Add(option);
+        }
+
+        options.Clear();
+        options.AddRange(filtered);
     }
 
     private void ClearSensorResults()

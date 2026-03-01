@@ -111,6 +111,15 @@ public class ConstructionSpawner : MonoBehaviour
         return instance;
     }
 
+    public bool TryGetConstructionData(string constructionId, out ConstructionData data)
+    {
+        data = null;
+        if (constructionDatabase == null || string.IsNullOrWhiteSpace(constructionId))
+            return false;
+
+        return constructionDatabase.TryGetById(constructionId, out data);
+    }
+
     public GameObject SpawnAtCell(string constructionId, TeamId teamId, Vector3Int cell)
     {
         if (boardTilemap == null)
@@ -271,6 +280,12 @@ public class ConstructionSpawner : MonoBehaviour
         int id = currentId;
         currentId++;
         return id;
+    }
+
+    public void EnsureNextIdAbove(int usedId)
+    {
+        if (currentId <= usedId)
+            currentId = usedId + 1;
     }
 
     private int GetTargetSortingLayerId()
