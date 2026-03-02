@@ -62,8 +62,9 @@ MonoBehaviour:
     isPlayerHeadQuarter: 0
     isCapturable: 1
     capturePointsMax: 20
-    capturedIncoming: 500
-    canProduceAndSellUnits: 00000000
+    capturedIncoming: 1000
+    sellingRule: 0
+    legacyCanProduceAndSellUnits: 
     offeredUnits: []
     canProvideSupplies: 1
     offeredSupplies:

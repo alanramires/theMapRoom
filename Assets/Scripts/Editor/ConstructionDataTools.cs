@@ -30,6 +30,8 @@ public static class ConstructionDataTools
             if (construction == null)
                 continue;
 
+            List<UnitData> preservedOfferedUnits = SnapshotOfferedUnits(construction);
+
             if (!construction.TryResolveConstructionData(out ConstructionData data) || data == null)
             {
                 skipped++;
@@ -65,6 +67,8 @@ public static class ConstructionDataTools
                 continue;
             }
 
+            RestoreOfferedUnits(construction, preservedOfferedUnits);
+
             if (PropagateHudLayoutForConstruction(constructionPrefab, construction))
                 hudUpdated++;
 
@@ -85,6 +89,54 @@ public static class ConstructionDataTools
             EditorSceneManager.MarkAllScenesDirty();
 
         Debug.Log($"[ConstructionDataTools] {updated} construcao(oes) atualizada(s). HUD propagado em {hudUpdated} instancia(s). Ignoradas: {skipped}.");
+    }
+
+    private static List<UnitData> SnapshotOfferedUnits(ConstructionManager construction)
+    {
+        List<UnitData> snapshot = new List<UnitData>();
+        if (construction == null)
+            return snapshot;
+
+        IReadOnlyList<UnitData> offered = construction.OfferedUnits;
+        if (offered == null || offered.Count <= 0)
+            return snapshot;
+
+        for (int i = 0; i < offered.Count; i++)
+        {
+            UnitData unit = offered[i];
+            if (unit != null)
+                snapshot.Add(unit);
+        }
+
+        return snapshot;
+    }
+
+    private static void RestoreOfferedUnits(ConstructionManager construction, List<UnitData> preservedOfferedUnits)
+    {
+        if (construction == null)
+            return;
+
+        SerializedObject so = new SerializedObject(construction);
+        SerializedProperty offeredUnitsProp = so.FindProperty("siteRuntime").FindPropertyRelative("offeredUnits");
+        if (offeredUnitsProp == null)
+            return;
+
+        offeredUnitsProp.arraySize = 0;
+        if (preservedOfferedUnits != null)
+        {
+            for (int i = 0; i < preservedOfferedUnits.Count; i++)
+            {
+                UnitData unit = preservedOfferedUnits[i];
+                if (unit == null)
+                    continue;
+
+                int index = offeredUnitsProp.arraySize;
+                offeredUnitsProp.InsertArrayElementAtIndex(index);
+                offeredUnitsProp.GetArrayElementAtIndex(index).objectReferenceValue = unit;
+            }
+        }
+
+        so.ApplyModifiedPropertiesWithoutUndo();
     }
 
     private static bool PropagateHudLayoutForConstruction(GameObject sourcePrefab, ConstructionManager construction)

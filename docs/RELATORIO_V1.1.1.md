@@ -1,44 +1,29 @@
-﻿# Relatorio de Atualizacao - v1.1.1
+# Relatorio de Atualizacao - v1.1.1
 
-## Em uma frase
-A v1.1.1 foi uma versao grande de consolidacao: quick save/load, correcoes de fluxo de turno e recalibracao de dados de combate.
+## Como a experiencia comeca
+Quando voce seleciona uma unidade, o jogo agora responde de forma mais clara e previsivel. As opcoes de acao aparecem com menos ruido, e as opcoes de sensores entram no fluxo de forma natural: primeiro voce entende o que a unidade pode fazer naquele momento, depois decide se vale escanear, avancar ou encerrar a acao.
 
-## O que isso trouxe na pratica
-- Partidas longas ficaram mais seguras com save/load rapido em runtime (F8/F9).
-- Menos quebra de fluxo em combate, captura, sensores e compras em construcao.
-- Catalogos de unidade/arma e dados de combate ficaram mais consistentes para balanceamento.
-- Ferramentas de editor foram reforcadas para acelerar calibracao e manutencao.
+Na pratica, isso reduz aquela sensacao de "menu brigando com menu". O turno fica mais legivel, com menos interrupcoes e menos chance de perder tempo por causa de transicoes confusas.
 
-## Principais melhorias
-1. Save/Load completo de partida
-- Novo `SaveGameManager` com save em JSON por slot.
-- Restauracao de estado de turno, time ativo, unidades, construcoes e ownership.
-- Suporte a estados de embarque, ammo/fuel/HP e runtime de ofertas/servicos/suprimentos.
+## O que mudou para quem joga
+- O fluxo de turno ficou mais estavel em momentos criticos: combate, captura, compra em construcao e uso de sensores.
+- A partida longa ficou mais segura com quick save/load em runtime (F8 para salvar, F9 para carregar).
+- A navegacao entre escolhas ficou mais consistente, com menos risco de ficar preso em estados intermediarios.
 
-2. Estabilidade do TurnState
-- Ajustes em `TurnStateManager` (capture, combat, shopping, scanner prompt e sensors).
-- Fluxo de compra em construcao mais robusto, com atalhos numericos e validacoes melhores.
-- Menor chance de ficar preso em estados intermediarios apos acao/animacao.
+## Impacto no dia a dia do projeto
+- Dados de unidades e armas foram revisados para melhorar coerencia de combate e balanceamento.
+- Catalogos e conteudo por mapa ficaram mais organizados, facilitando manutencao.
+- Ferramentas de editor receberam ajustes para acelerar calibracao e reduzir retrabalho.
 
-3. Dados e balanceamento
-- Revisao ampla de assets de unidades (exercito, aeronautica, marinha) e armas por categoria.
-- Ajustes em matriz RPS e traits Elite para coerencia de combate.
-- Atualizacao de catalogos por mapa e organizacao de conteudo para manter consistencia entre cenas.
-
-4. Ferramentas e suporte de producao
-- Novas/atualizadas janelas de editor para matriz grande de combate e calculos par-a-par.
-- Melhorias em editores de modificadores e dados para reduzir retrabalho de tuning.
-- Atualizacao de documentacao tecnica de apoio (matriz e calibracao).
-
-## Regras importantes
-- `Quick Save/Load`: F8 salva e F9 carrega no slot rapido configurado.
-- `Cross-scene load`: por padrao, pode bloquear load de save gerado em outra cena.
-- `Force load when busy`: opcional para forcar load fora do estado ideal.
+## Regras importantes (resumo)
+- `Quick Save/Load`: F8 salva e F9 carrega no slot rapido.
+- `Cross-scene load`: por padrao, o jogo pode bloquear load de save criado em outra cena.
+- `Force load when busy`: opcao para forcar carregamento fora do estado ideal.
 
 ## Bloco tecnico curto
-- Arquivo novo-chave: `Assets/Scripts/Save/SaveGameManager.cs`.
-- Arquivos de fluxo alterados: `TurnStateManager.*`, `MatchController`, `ConstructionManager`, `UnitManager`, `UnitSpawner`, `ConstructionSpawner`.
-- Escopo total do commit: 211 arquivos alterados, com foco em save/load, bug fixes de runtime, dados de combate e ferramentas de editor.
+- Novo componente de save/load: `Assets/Scripts/Save/SaveGameManager.cs`.
+- Ajustes de fluxo em arquivos centrais de turno e partida (`TurnStateManager`, `MatchController`, `ConstructionManager`, entre outros).
+- Escopo da versao: consolidacao ampla com foco em confiabilidade de runtime, save/load e dados de combate.
 
 ## Resultado
-A v1.1.1 nao foi so um patch pequeno: ela melhora confiabilidade de partida, reduz friccao de testes e fortalece a base para as proximas iteracoes de gameplay e balanceamento.
+A v1.1.1 fortalece o que mais importa para jogar e testar: menos friccao no turno, mais seguranca durante a partida e uma base mais estavel para evoluir gameplay e balanceamento.

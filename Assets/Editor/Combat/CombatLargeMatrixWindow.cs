@@ -272,6 +272,8 @@ public class CombatLargeMatrixWindow : EditorWindow
             attacker,
             embarked.weapon,
             defender,
+            defenderHp,
+            defender.maxHP,
             defender.defense,
             attackerOutcome,
             bestCounter.isValid ? bestCounter.weapon : embarked.weapon,
@@ -288,6 +290,8 @@ public class CombatLargeMatrixWindow : EditorWindow
                 defender,
                 bestCounter.weapon,
                 attacker,
+                attackerHp,
+                attacker.maxHP,
                 attacker.defense,
                 defenderOutcome,
                 embarked.weapon,
@@ -302,6 +306,16 @@ public class CombatLargeMatrixWindow : EditorWindow
             details.AppendLine("    inv -");
             details.AppendLine("    inv detalhe: sem dano de retorno, mas modifiers de elite de ambos os lados foram aplicados no ataque principal.");
         }
+
+        int defenderDamageCapByAttackerHp = Mathf.Max(0, attackerHp);
+        int attackerDamageCapByDefenderHp = Mathf.Max(0, defenderHp);
+        bool defenderDamageContainedByHpLock = damageToDefender > defenderDamageCapByAttackerHp;
+        bool attackerDamageContainedByHpLock = damageToAttacker > attackerDamageCapByDefenderHp;
+        damageToDefender = Mathf.Min(damageToDefender, defenderDamageCapByAttackerHp);
+        damageToAttacker = Mathf.Min(damageToAttacker, attackerDamageCapByDefenderHp);
+
+        details.AppendLine($"Trava HP no defensor: limite={defenderDamageCapByAttackerHp} | contido={(defenderDamageContainedByHpLock ? "sim" : "nao")}");
+        details.AppendLine($"Trava HP no atacante: limite={attackerDamageCapByDefenderHp} | contido={(attackerDamageContainedByHpLock ? "sim" : "nao")}");
 
         int attackerHpAfter = Mathf.Max(0, attackerHp - damageToAttacker);
         int defenderHpAfter = Mathf.Max(0, defenderHp - damageToDefender);
@@ -411,6 +425,8 @@ public class CombatLargeMatrixWindow : EditorWindow
         UnitData attackerData,
         WeaponData attackerWeapon,
         UnitData defenderData,
+        int defenderCurrentHp,
+        int defenderMaxHp,
         int defenderBaseDefense,
         DPQCombatOutcome outcome,
         WeaponData defenderWeaponContextForSkill)
@@ -420,6 +436,8 @@ public class CombatLargeMatrixWindow : EditorWindow
             attackerData,
             attackerWeapon,
             defenderData,
+            defenderCurrentHp,
+            defenderMaxHp,
             defenderBaseDefense,
             outcome,
             defenderWeaponContextForSkill,
@@ -431,6 +449,8 @@ public class CombatLargeMatrixWindow : EditorWindow
         UnitData attackerData,
         WeaponData attackerWeapon,
         UnitData defenderData,
+        int defenderCurrentHp,
+        int defenderMaxHp,
         int defenderBaseDefense,
         DPQCombatOutcome outcome,
         WeaponData defenderWeaponContextForSkill,
@@ -470,14 +490,19 @@ public class CombatLargeMatrixWindow : EditorWindow
         int attackSkillTotal = attackerSkill.ownerAttack + defenderSkill.opponentAttack;
         int defenseSkillTotal = defenderSkill.ownerDefense + attackerSkill.opponentDefense;
 
-        int attackEffective = attackerHp * Mathf.Max(0, attackerWeapon.basicAttack + attackRps + attackSkillTotal);
-        int defenderEffectiveDefense = Mathf.Max(1, defenderBaseDefense + defenseRps + defenseSkillTotal); // DPQ padrao = defesa 0
+        int attackTermRaw = attackerWeapon.basicAttack + attackRps + attackSkillTotal;
+        int attackTermApplied = Mathf.Max(1, attackTermRaw);
+        int attackEffective = attackerHp * attackTermApplied;
+        int woundedPenalty = ResolveWoundedDefensePenalty(defenderCurrentHp, defenderMaxHp);
+        int defenderEffectiveDefense = Mathf.Max(1, defenderBaseDefense + defenseRps + defenseSkillTotal + woundedPenalty); // DPQ padrao = defesa 0
         int rounded = DPQCombatMath.DivideAndRound(attackEffective, defenderEffectiveDefense, outcome);
         int damage = Mathf.Max(0, rounded);
 
         breakdown = new DamageBreakdown(
             attackerHp,
             attackerWeapon.basicAttack,
+            attackTermRaw,
+            attackTermApplied,
             attackRps,
             attackerSkill.ownerAttack,
             defenderSkill.opponentAttack,
@@ -487,6 +512,7 @@ public class CombatLargeMatrixWindow : EditorWindow
             defenseRps,
             defenderSkill.ownerDefense,
             attackerSkill.opponentDefense,
+            woundedPenalty,
             defenderEffectiveDefense,
             outcome,
             damage);
@@ -497,9 +523,20 @@ public class CombatLargeMatrixWindow : EditorWindow
     private static void AppendFormulaSection(StringBuilder details, string sectionLabel, DamageBreakdown breakdown)
     {
         details.AppendLine($"    [{sectionLabel}]");
-        details.AppendLine($"    FA atacante = QTD({breakdown.attackerHp}) x (FA arma({breakdown.weaponPower}) + FA RPS({FormatSigned(breakdown.attackRps)}) + FA Elite Owner({FormatSigned(breakdown.attackerOwnerAttack)}) + FA Elite Opponent({FormatSigned(breakdown.defenderOpponentAttack)})) = {breakdown.attackEffective}");
-        details.AppendLine($"    FD defensor = FD base({breakdown.defenderBaseDefense}) + FD DPQ({breakdown.dpqDefense}) + FD RPS({FormatSigned(breakdown.defenseRps)}) + FD Elite Owner({FormatSigned(breakdown.defenderOwnerDefense)}) + FD Elite Opponent({FormatSigned(breakdown.attackerOpponentDefense)}) = {breakdown.defenderEffectiveDefense}");
+        details.AppendLine($"    FA atacante = QTD({breakdown.attackerHp}) x max(1, FA arma({breakdown.weaponPower}) + FA RPS({FormatSigned(breakdown.attackRps)}) + FA Elite Owner({FormatSigned(breakdown.attackerOwnerAttack)}) + FA Elite Opponent({FormatSigned(breakdown.defenderOpponentAttack)})) = {breakdown.attackEffective} (termo bruto={breakdown.attackTermRaw}, aplicado={breakdown.attackTermApplied})");
+        details.AppendLine($"    FD defensor = FD base({breakdown.defenderBaseDefense}) + FD DPQ({breakdown.dpqDefense}) + FD RPS({FormatSigned(breakdown.defenseRps)}) + FD Elite Owner({FormatSigned(breakdown.defenderOwnerDefense)}) + FD Elite Opponent({FormatSigned(breakdown.attackerOpponentDefense)}) + UnidadeFerida({FormatSigned(breakdown.woundedPenalty)}) = {breakdown.defenderEffectiveDefense}");
         details.AppendLine($"    Dano = RoundOutcome({breakdown.attackEffective}/{Mathf.Max(1, breakdown.defenderEffectiveDefense)}, {breakdown.outcome}) => {breakdown.damageApplied}");
+    }
+
+    private static int ResolveWoundedDefensePenalty(int currentHp, int maxHp)
+    {
+        int safeMaxHp = Mathf.Max(1, maxHp);
+        int safeCurrentHp = Mathf.Clamp(currentHp, 0, safeMaxHp);
+        if (safeCurrentHp >= safeMaxHp)
+            return 0;
+        if (safeCurrentHp <= 5)
+            return -2;
+        return -1;
     }
 
     private static string FormatSigned(int value)
@@ -702,10 +739,12 @@ public class CombatLargeMatrixWindow : EditorWindow
 
     private readonly struct DamageBreakdown
     {
-        public static DamageBreakdown None => new DamageBreakdown(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, DPQCombatOutcome.Neutro, 0);
+        public static DamageBreakdown None => new DamageBreakdown(0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, DPQCombatOutcome.Neutro, 0);
 
         public readonly int attackerHp;
         public readonly int weaponPower;
+        public readonly int attackTermRaw;
+        public readonly int attackTermApplied;
         public readonly int attackRps;
         public readonly int attackerOwnerAttack;
         public readonly int defenderOpponentAttack;
@@ -715,6 +754,7 @@ public class CombatLargeMatrixWindow : EditorWindow
         public readonly int defenseRps;
         public readonly int defenderOwnerDefense;
         public readonly int attackerOpponentDefense;
+        public readonly int woundedPenalty;
         public readonly int defenderEffectiveDefense;
         public readonly DPQCombatOutcome outcome;
         public readonly int damageApplied;
@@ -722,6 +762,8 @@ public class CombatLargeMatrixWindow : EditorWindow
         public DamageBreakdown(
             int attackerHp,
             int weaponPower,
+            int attackTermRaw,
+            int attackTermApplied,
             int attackRps,
             int attackerOwnerAttack,
             int defenderOpponentAttack,
@@ -731,12 +773,15 @@ public class CombatLargeMatrixWindow : EditorWindow
             int defenseRps,
             int defenderOwnerDefense,
             int attackerOpponentDefense,
+            int woundedPenalty,
             int defenderEffectiveDefense,
             DPQCombatOutcome outcome,
             int damageApplied)
         {
             this.attackerHp = attackerHp;
             this.weaponPower = weaponPower;
+            this.attackTermRaw = attackTermRaw;
+            this.attackTermApplied = attackTermApplied;
             this.attackRps = attackRps;
             this.attackerOwnerAttack = attackerOwnerAttack;
             this.defenderOpponentAttack = defenderOpponentAttack;
@@ -746,6 +791,7 @@ public class CombatLargeMatrixWindow : EditorWindow
             this.defenseRps = defenseRps;
             this.defenderOwnerDefense = defenderOwnerDefense;
             this.attackerOpponentDefense = attackerOpponentDefense;
+            this.woundedPenalty = woundedPenalty;
             this.defenderEffectiveDefense = defenderEffectiveDefense;
             this.outcome = outcome;
             this.damageApplied = damageApplied;

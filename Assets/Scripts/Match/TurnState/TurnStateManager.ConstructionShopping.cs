@@ -82,6 +82,20 @@ public partial class TurnStateManager
 
         int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
         TeamId spawnTeam = activeTeam >= 0 ? (TeamId)activeTeam : shoppingConstruction.TeamId;
+        int unitCost = matchController != null
+            ? matchController.ResolveEconomyCost(unit.cost)
+            : Mathf.Max(0, unit.cost);
+        if (matchController != null)
+        {
+            int currentMoney = matchController.GetActualMoney(spawnTeam);
+            if (currentMoney < unitCost)
+            {
+                cursorController?.PlayErrorSfx();
+                Debug.LogError($"[Shopping] Dinheiro insuficiente para comprar {ResolveUnitName(unit)}. Custo=${unitCost}, saldo=${currentMoney}.");
+                return;
+            }
+        }
+
         Vector3Int spawnCell = shoppingConstruction.CurrentCellPosition;
         spawnCell.z = 0;
 
@@ -92,8 +106,17 @@ public partial class TurnStateManager
             return;
         }
 
+        if (matchController != null && !matchController.TrySpendActualMoney(spawnTeam, unitCost, out int remainingMoney))
+        {
+            // Protecao contra corrida/estado inesperado: se falhou no debito, desfaz spawn.
+            Destroy(spawned);
+            cursorController?.PlayErrorSfx();
+            Debug.LogError($"[Shopping] Falha ao debitar custo da unidade {ResolveUnitName(unit)}. Saldo atual=${remainingMoney}, custo=${unitCost}.");
+            return;
+        }
+
         cursorController?.PlayDoneSfx();
-        Debug.Log($"[Shopping] Compra concluida: {ResolveUnitName(unit)} por ${Mathf.Max(0, unit.cost)} em {ResolveConstructionName(shoppingConstruction)}.");
+        Debug.Log($"[Shopping] Compra concluida: {ResolveUnitName(unit)} por ${unitCost} em {ResolveConstructionName(shoppingConstruction)}.");
         ExitConstructionShoppingStateToNeutral(rollback: false);
     }
 

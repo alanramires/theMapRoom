@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
   id: suprimentos
   displayName: Suprimentos
-  apelido: SP
+  apelido: ST
   description: 
   spriteDefault: {fileID: 21300000, guid: 7bb9e34a5859e51449deab8a27150dd5, type: 3}
   spriteGreen: {fileID: 0}

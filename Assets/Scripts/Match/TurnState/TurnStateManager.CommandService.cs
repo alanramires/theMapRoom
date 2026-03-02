@@ -114,10 +114,15 @@ public partial class TurnStateManager
         int recoveredHp = 0;
         int recoveredFuel = 0;
         int recoveredAmmo = 0;
+        int totalMoneySpent = 0;
         List<CommandServiceTargetReport> detailedReport = new List<CommandServiceTargetReport>();
+        bool stopByEconomy = false;
 
         for (int i = 0; i < commandServiceQueuedOrders.Count; i++)
         {
+            if (stopByEconomy)
+                break;
+
             ServicoDoComandoOption order = commandServiceQueuedOrders[i];
             if (order == null || order.targetUnit == null)
                 continue;
@@ -208,6 +213,59 @@ public partial class TurnStateManager
                     ? sourceConstruction.OfferedServices
                     : sourceSupplierUnit.GetEmbarkedServices();
                 List<ServiceData> services = BuildDistinctServiceList(offered);
+                if (matchController != null)
+                {
+                    int availableMoney = matchController.GetActualMoney(target.TeamId);
+                    bool canAffordAnyServiceForTarget = false;
+                    for (int s = 0; s < services.Count; s++)
+                    {
+                        ServiceData service = services[s];
+                        if (service == null || !service.isService)
+                            continue;
+                        if (service.apenasEntreSupridores && !IsSupplier(target))
+                            continue;
+                        if (!UnitNeedsServiceForSupplyExecution(target, service))
+                            continue;
+                        bool hasServiceStock = fromConstruction
+                            ? ServiceHasAvailableSuppliesNow(sourceConstruction, service)
+                            : ServiceHasAvailableSuppliesNow(sourceSupplierUnit, service);
+                        if (!hasServiceStock)
+                            continue;
+                        bool willActuallyApply = fromConstruction
+                            ? CanServiceApplyNow(sourceConstruction, target, service)
+                            : CanServiceApplyNow(sourceSupplierUnit, target, service);
+                        if (!willActuallyApply)
+                            continue;
+
+                        int hpPlannedGain;
+                        int fuelPlannedGain;
+                        int ammoPlannedGain;
+                        if (fromConstruction)
+                            EstimateServiceGainsFromConstruction(sourceConstruction, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain);
+                        else
+                            EstimateServiceGainsFromSupplier(sourceSupplierUnit, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain);
+
+                        if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
+                            continue;
+
+                        int projectedCost = matchController.ResolveEconomyCost(
+                            ComputeServiceMoneyCost(target, service, hpPlannedGain, fuelPlannedGain, ammoPlannedGain));
+                        if (projectedCost <= availableMoney)
+                        {
+                            canAffordAnyServiceForTarget = true;
+                            break;
+                        }
+                    }
+
+                    if (!canAffordAnyServiceForTarget)
+                    {
+                        stopByEconomy = true;
+                        cursorController?.PlayErrorSfx();
+                        Debug.Log($"[ServicoComando] Interrompido: saldo insuficiente para continuar no alvo {target.name} (saldo atual=${Mathf.Max(0, availableMoney)}).");
+                        break;
+                    }
+                }
+
                 int hpGain = 0;
                 int fuelGain = 0;
                 int ammoGain = 0;
@@ -235,6 +293,32 @@ public partial class TurnStateManager
                         : CanServiceApplyNow(sourceSupplierUnit, target, service);
                     if (!willActuallyApply)
                         continue;
+
+                    int hpPlannedGain;
+                    int fuelPlannedGain;
+                    int ammoPlannedGain;
+                    if (fromConstruction)
+                        EstimateServiceGainsFromConstruction(sourceConstruction, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain);
+                    else
+                        EstimateServiceGainsFromSupplier(sourceSupplierUnit, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain);
+
+                    if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
+                        continue;
+                    if (!TryPayServiceCostForExecution(
+                            target.TeamId,
+                            target,
+                            service,
+                            hpPlannedGain,
+                            fuelPlannedGain,
+                            ammoPlannedGain,
+                            "ServicoComando",
+                            out int serviceMoneySpent))
+                    {
+                        stopByEconomy = true;
+                        Debug.Log("[ServicoComando] Execucao interrompida por saldo insuficiente.");
+                        break;
+                    }
+                    totalMoneySpent += Mathf.Max(0, serviceMoneySpent);
 
                     Vector3 sourceWorld = fromConstruction
                         ? sourceConstruction.transform.position
@@ -301,6 +385,9 @@ public partial class TurnStateManager
                     targetReport.serviceLines.Add(line);
                 }
 
+                if (stopByEconomy)
+                    break;
+
                 if (hpGain <= 0 && fuelGain <= 0 && ammoGain <= 0)
                 {
                     Debug.Log($"[ServicoComando][Fila] {target.name}: sem ganhos aplicados (HP/AUT/MUN).");
@@ -361,7 +448,7 @@ public partial class TurnStateManager
             yield break;
         }
 
-        Debug.Log($"[ServicoComando] alvos atendidos={servedTargets} | HP +{recoveredHp} | autonomia +{recoveredFuel} | municao +{recoveredAmmo}");
+        Debug.Log($"[ServicoComando] alvos atendidos={servedTargets} | HP +{recoveredHp} | autonomia +{recoveredFuel} | municao +{recoveredAmmo} | custo ${Mathf.Max(0, totalMoneySpent)}");
         Debug.Log(BuildCommandServiceDetailedReportLog(detailedReport));
         cursorController?.PlayLoadSfx();
         commandServiceExecutionInProgress = false;

@@ -8,7 +8,7 @@ public class MatchControllerEditor : Editor
     private SerializedProperty activeTeamIdProp;
     private SerializedProperty playersProp;
     private SerializedProperty includeNeutralTeamProp;
-    private SerializedProperty teamFlipConfigsProp;
+    private SerializedProperty economyEnabledProp;
     private SerializedProperty gameSetupProp;
     private SerializedProperty enableLdtValidationProp;
     private SerializedProperty enableLosValidationProp;
@@ -17,10 +17,8 @@ public class MatchControllerEditor : Editor
     private SerializedProperty autonomyDatabaseProp;
     private SerializedProperty activePlayerListIndexProp;
     private SerializedProperty matchMusicAudioManagerProp;
-    private SerializedProperty advanceTurnSfxProp;
     private SerializedProperty advanceTurnPreDelayProp;
     private SerializedProperty advanceTurnPostDelayProp;
-    private SerializedProperty advanceTurnSfxVolumeProp;
 
     private void OnEnable()
     {
@@ -28,7 +26,7 @@ public class MatchControllerEditor : Editor
         activeTeamIdProp = serializedObject.FindProperty("activeTeamId");
         playersProp = serializedObject.FindProperty("players");
         includeNeutralTeamProp = serializedObject.FindProperty("includeNeutralTeam");
-        teamFlipConfigsProp = serializedObject.FindProperty("teamFlipConfigs");
+        economyEnabledProp = serializedObject.FindProperty("economyEnabled");
         gameSetupProp = serializedObject.FindProperty("gameSetup");
         enableLdtValidationProp = serializedObject.FindProperty("enableLdtValidation");
         enableLosValidationProp = serializedObject.FindProperty("enableLosValidation");
@@ -37,14 +35,16 @@ public class MatchControllerEditor : Editor
         autonomyDatabaseProp = serializedObject.FindProperty("autonomyDatabase");
         activePlayerListIndexProp = serializedObject.FindProperty("activePlayerListIndex");
         matchMusicAudioManagerProp = serializedObject.FindProperty("matchMusicAudioManager");
-        advanceTurnSfxProp = serializedObject.FindProperty("advanceTurnSfx");
         advanceTurnPreDelayProp = serializedObject.FindProperty("advanceTurnPreDelay");
         advanceTurnPostDelayProp = serializedObject.FindProperty("advanceTurnPostDelay");
-        advanceTurnSfxVolumeProp = serializedObject.FindProperty("advanceTurnSfxVolume");
     }
 
     public override void OnInspectorGUI()
     {
+        MatchController match = (MatchController)target;
+        if (match != null)
+            match.RefreshIncomeFromConstructionsNow();
+
         if (currentTurnProp == null || activeTeamIdProp == null || playersProp == null || includeNeutralTeamProp == null || activePlayerListIndexProp == null)
         {
             EditorGUILayout.HelpBox("MatchControllerEditor: propriedades nao encontradas. Usando inspector padrao.", MessageType.Warning);
@@ -57,9 +57,11 @@ public class MatchControllerEditor : Editor
         EditorGUILayout.LabelField("Match State", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(currentTurnProp, new GUIContent("Current Turn"));
         EditorGUILayout.PropertyField(activeTeamIdProp, new GUIContent("Active Team ID"));
-        DrawPlayersWithFlipX();
+        DrawPlayersList();
         DrawPlayersRecoveryTools();
         EditorGUILayout.PropertyField(includeNeutralTeamProp, new GUIContent("Include Neutral Team"));
+        if (economyEnabledProp != null)
+            EditorGUILayout.PropertyField(economyEnabledProp, new GUIContent("Economy Enabled"));
         if (gameSetupProp != null)
             EditorGUILayout.PropertyField(gameSetupProp, new GUIContent("Game Setup"));
         using (new EditorGUI.DisabledScope(true))
@@ -82,18 +84,12 @@ public class MatchControllerEditor : Editor
         EditorGUILayout.LabelField("Turn Transition", EditorStyles.boldLabel);
         if (matchMusicAudioManagerProp != null)
             EditorGUILayout.PropertyField(matchMusicAudioManagerProp, new GUIContent("Match Music Audio Manager"));
-        if (advanceTurnSfxProp != null)
-            EditorGUILayout.PropertyField(advanceTurnSfxProp, new GUIContent("Advance Turn Sfx"));
         if (advanceTurnPreDelayProp != null)
             EditorGUILayout.PropertyField(advanceTurnPreDelayProp, new GUIContent("Advance Turn Pre Delay"));
         if (advanceTurnPostDelayProp != null)
             EditorGUILayout.PropertyField(advanceTurnPostDelayProp, new GUIContent("Advance Turn Post Delay"));
-        if (advanceTurnSfxVolumeProp != null)
-            EditorGUILayout.PropertyField(advanceTurnSfxVolumeProp, new GUIContent("Advance Turn Sfx Volume"));
 
         serializedObject.ApplyModifiedProperties();
-
-        MatchController match = (MatchController)target;
 
         EditorGUILayout.Space();
         EditorGUILayout.HelpBox("Advance Turn: avanca para o proximo player da lista. So incrementa Current Turn ao fechar ciclo.\nSe Include Neutral Team estiver ativo, passa por Neutral antes de fechar ciclo.", MessageType.Info);
@@ -113,74 +109,73 @@ public class MatchControllerEditor : Editor
         }
 
         TeamId active = match.ActiveTeam;
-        string cursorLabel = active == TeamId.Neutral
-            ? "Neutral"
-            : $"{active} (Team {(int)active})";
+        string cursorLabel = active == TeamId.Neutral ? "Neutral" : $"{active} (Team {(int)active})";
         EditorGUILayout.LabelField("Cursor", cursorLabel);
     }
 
-    private void DrawPlayersWithFlipX()
+    public override bool RequiresConstantRepaint()
     {
-        if (playersProp == null || teamFlipConfigsProp == null)
+        return true;
+    }
+
+    private void DrawPlayersList()
+    {
+        if (playersProp == null)
             return;
 
         EditorGUILayout.Space(4f);
-        EditorGUILayout.LabelField("Players", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Team Control", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField($"Players ({playersProp.arraySize})", EditorStyles.miniBoldLabel);
+        if (GUILayout.Button("Add Player", GUILayout.Width(90f)))
+            AddPlayer(TeamId.Green);
+        EditorGUILayout.EndHorizontal();
 
-        if (playersProp.arraySize == 0)
+        for (int i = 0; i < playersProp.arraySize; i++)
         {
-            EditorGUILayout.HelpBox("Sem players na lista atual.", MessageType.None);
-        }
-        else
-        {
+            SerializedProperty player = playersProp.GetArrayElementAtIndex(i);
+            if (player == null)
+                continue;
+
+            SerializedProperty teamProp = player.FindPropertyRelative("teamId");
+            SerializedProperty flipXProp = player.FindPropertyRelative("flipX");
+            SerializedProperty startMoneyProp = player.FindPropertyRelative("startMoney");
+            SerializedProperty actualMoneyProp = player.FindPropertyRelative("actualMoney");
+            SerializedProperty incomePerTurnProp = player.FindPropertyRelative("incomePerTurn");
+
             EditorGUILayout.BeginVertical("box");
-            for (int i = 0; i < playersProp.arraySize; i++)
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField($"Element {i}", EditorStyles.miniBoldLabel);
+            if (GUILayout.Button("Remove", GUILayout.Width(70f)))
             {
-                SerializedProperty playerProp = playersProp.GetArrayElementAtIndex(i);
-                if (playerProp == null)
-                    continue;
-
-                TeamId team = GetTeamFromEnumProp(playerProp);
-                int configIndex = EnsureTeamFlipConfigEntry(team);
-                SerializedProperty configProp = configIndex >= 0 ? teamFlipConfigsProp.GetArrayElementAtIndex(configIndex) : null;
-                SerializedProperty flipXProp = configProp != null ? configProp.FindPropertyRelative("flipX") : null;
-
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField($"Element {i}", GUILayout.Width(64f));
-                TeamId newTeam = (TeamId)EditorGUILayout.EnumPopup(team, GUILayout.MinWidth(140f));
-                if (newTeam != team)
-                {
-                    SetTeamToEnumProp(playerProp, newTeam);
-                    team = newTeam;
-                    configIndex = EnsureTeamFlipConfigEntry(team);
-                    configProp = configIndex >= 0 ? teamFlipConfigsProp.GetArrayElementAtIndex(configIndex) : null;
-                    flipXProp = configProp != null ? configProp.FindPropertyRelative("flipX") : null;
-                }
-
-                bool flipX = flipXProp != null && flipXProp.boolValue;
-                bool newFlipX = EditorGUILayout.ToggleLeft("Flip X", flipX, GUILayout.Width(70f));
-                if (flipXProp != null)
-                    flipXProp.boolValue = newFlipX;
-
-                if (GUILayout.Button("-", GUILayout.Width(22f)))
-                {
-                    playersProp.DeleteArrayElementAtIndex(i);
-                    break;
-                }
+                playersProp.DeleteArrayElementAtIndex(i);
                 EditorGUILayout.EndHorizontal();
+                EditorGUILayout.EndVertical();
+                break;
             }
+            EditorGUILayout.EndHorizontal();
+
+            if (teamProp != null)
+                EditorGUILayout.PropertyField(teamProp, new GUIContent("Team"));
+            if (flipXProp != null)
+                EditorGUILayout.PropertyField(flipXProp, new GUIContent("Flip X"));
+            if (startMoneyProp != null)
+            {
+                startMoneyProp.intValue = Mathf.Max(0, EditorGUILayout.IntField("Start Money", startMoneyProp.intValue));
+            }
+
+            using (new EditorGUI.DisabledScope(true))
+            {
+                if (actualMoneyProp != null)
+                    EditorGUILayout.IntField("Actual Money", Mathf.Max(0, actualMoneyProp.intValue));
+                if (incomePerTurnProp != null)
+                    EditorGUILayout.IntField("Income Per Turn", Mathf.Max(0, incomePerTurnProp.intValue));
+            }
+
             EditorGUILayout.EndVertical();
         }
 
-        if (GUILayout.Button("Add Player"))
-        {
-            int newIndex = playersProp.arraySize;
-            playersProp.InsertArrayElementAtIndex(newIndex);
-            SerializedProperty newProp = playersProp.GetArrayElementAtIndex(newIndex);
-            if (newProp != null)
-                SetTeamToEnumProp(newProp, TeamId.Green);
-            EnsureTeamFlipConfigEntry(TeamId.Green);
-        }
+        EditorGUILayout.HelpBox("Actual Money e Income Per Turn sao automáticos e somente leitura.", MessageType.None);
     }
 
     private void DrawPlayersRecoveryTools()
@@ -235,42 +230,36 @@ public class MatchControllerEditor : Editor
         int idx = playersProp.arraySize;
         playersProp.InsertArrayElementAtIndex(idx);
         SerializedProperty p = playersProp.GetArrayElementAtIndex(idx);
-        if (p != null)
-            SetTeamToEnumProp(p, team);
-        EnsureTeamFlipConfigEntry(team);
+        if (p == null)
+            return;
+
+        SetTeamToEnumProp(GetPlayerTeamProperty(p), team);
+        SerializedProperty flipXProp = p.FindPropertyRelative("flipX");
+        SerializedProperty startMoneyProp = p.FindPropertyRelative("startMoney");
+        SerializedProperty actualMoneyProp = p.FindPropertyRelative("actualMoney");
+        SerializedProperty incomePerTurnProp = p.FindPropertyRelative("incomePerTurn");
+        SerializedProperty startMoneyAppliedProp = p.FindPropertyRelative("startMoneyApplied");
+
+        if (flipXProp != null) flipXProp.boolValue = team == TeamId.Red || team == TeamId.Yellow;
+        if (startMoneyProp != null) startMoneyProp.intValue = 0;
+        if (actualMoneyProp != null) actualMoneyProp.intValue = 0;
+        if (incomePerTurnProp != null) incomePerTurnProp.intValue = 0;
+        if (startMoneyAppliedProp != null) startMoneyAppliedProp.boolValue = false;
     }
 
-
-    private int EnsureTeamFlipConfigEntry(TeamId team)
+    private static SerializedProperty GetPlayerTeamProperty(SerializedProperty playerElementProp)
     {
-        if (teamFlipConfigsProp == null)
-            return -1;
+        if (playerElementProp == null)
+            return null;
 
-        for (int i = 0; i < teamFlipConfigsProp.arraySize; i++)
+        if (playerElementProp.propertyType == SerializedPropertyType.Generic)
         {
-            SerializedProperty configProp = teamFlipConfigsProp.GetArrayElementAtIndex(i);
-            if (configProp == null)
-                continue;
-
-            SerializedProperty teamIdProp = configProp.FindPropertyRelative("teamId");
-            if (teamIdProp != null && GetTeamFromEnumProp(teamIdProp) == team)
-                return i;
+            SerializedProperty nested = playerElementProp.FindPropertyRelative("teamId");
+            if (nested != null)
+                return nested;
         }
 
-        int newIndex = teamFlipConfigsProp.arraySize;
-        teamFlipConfigsProp.InsertArrayElementAtIndex(newIndex);
-        SerializedProperty newProp = teamFlipConfigsProp.GetArrayElementAtIndex(newIndex);
-        if (newProp == null)
-            return -1;
-
-        SerializedProperty newTeamId = newProp.FindPropertyRelative("teamId");
-        SerializedProperty newFlipX = newProp.FindPropertyRelative("flipX");
-        if (newTeamId != null)
-            SetTeamToEnumProp(newTeamId, team);
-        if (newFlipX != null)
-            newFlipX.boolValue = false;
-
-        return newIndex;
+        return playerElementProp;
     }
 
     private static TeamId GetTeamFromEnumProp(SerializedProperty prop)
@@ -282,11 +271,8 @@ public class MatchControllerEditor : Editor
         {
             string[] names = prop.enumNames;
             int idx = Mathf.Clamp(prop.enumValueIndex, 0, names.Length - 1);
-            if (idx >= 0 && idx < names.Length)
-            {
-                if (System.Enum.TryParse(names[idx], out TeamId parsed))
-                    return parsed;
-            }
+            if (idx >= 0 && idx < names.Length && System.Enum.TryParse(names[idx], out TeamId parsed))
+                return parsed;
         }
 
         return (TeamId)prop.intValue;

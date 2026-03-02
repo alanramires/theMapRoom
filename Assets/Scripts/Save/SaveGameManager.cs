@@ -15,12 +15,26 @@ public class SaveGameManager : MonoBehaviour
     [Serializable]
     private class SaveGameData
     {
-        public int version = 1;
+        public int version = 2;
         public string sceneName;
         public int currentTurn;
         public int activeTeamId;
+        public bool includeNeutralTeam;
+        public bool economyEnabled = true;
+        public List<MatchPlayerSaveData> players = new List<MatchPlayerSaveData>();
         public List<UnitSaveData> units = new List<UnitSaveData>();
         public List<ConstructionSaveData> constructions = new List<ConstructionSaveData>();
+    }
+
+    [Serializable]
+    private class MatchPlayerSaveData
+    {
+        public int teamId;
+        public bool flipX;
+        public int startMoney;
+        public int actualMoney;
+        public int incomePerTurn;
+        public bool startMoneyApplied;
     }
 
     [Serializable]
@@ -359,8 +373,13 @@ public class SaveGameManager : MonoBehaviour
             stage = "restore-match";
             if (matchController != null)
             {
+                RestoreMatchPlayers(data);
+                matchController.SetEconomyEnabled(data.economyEnabled);
                 matchController.SetCurrentTurn(data.currentTurn);
                 matchController.SetActiveTeamId(data.activeTeamId);
+                // Reaplica economia/flip apos SetActiveTeamId para evitar side effects
+                // de credito no inicio do turno sobrescrever o snapshot salvo.
+                RestoreMatchPlayers(data);
             }
 
             // Reaplica estado de acted apos MatchController liberar equipe ativa.
@@ -400,8 +419,35 @@ public class SaveGameManager : MonoBehaviour
         {
             sceneName = activeScene.name,
             currentTurn = matchController != null ? matchController.CurrentTurn : 0,
-            activeTeamId = matchController != null ? matchController.ActiveTeamId : (int)TeamId.Green
+            activeTeamId = matchController != null ? matchController.ActiveTeamId : (int)TeamId.Green,
+            includeNeutralTeam = matchController != null && matchController.IncludeNeutralTeam,
+            economyEnabled = matchController == null || matchController.EconomyEnabled
         };
+
+        if (matchController != null)
+        {
+            List<int> teamIds = new List<int>();
+            List<bool> flipXs = new List<bool>();
+            List<int> startMoneys = new List<int>();
+            List<int> actualMoneys = new List<int>();
+            List<int> incomePerTurns = new List<int>();
+            List<bool> startMoneyAppliedFlags = new List<bool>();
+            matchController.ExportPlayersState(teamIds, flipXs, startMoneys, actualMoneys, incomePerTurns, startMoneyAppliedFlags);
+
+            int count = teamIds.Count;
+            for (int i = 0; i < count; i++)
+            {
+                data.players.Add(new MatchPlayerSaveData
+                {
+                    teamId = teamIds[i],
+                    flipX = i < flipXs.Count && flipXs[i],
+                    startMoney = i < startMoneys.Count ? Mathf.Max(0, startMoneys[i]) : 0,
+                    actualMoney = i < actualMoneys.Count ? Mathf.Max(0, actualMoneys[i]) : 0,
+                    incomePerTurn = i < incomePerTurns.Count ? Mathf.Max(0, incomePerTurns[i]) : 0,
+                    startMoneyApplied = i < startMoneyAppliedFlags.Count && startMoneyAppliedFlags[i]
+                });
+            }
+        }
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
@@ -477,6 +523,44 @@ public class SaveGameManager : MonoBehaviour
         }
 
         return data;
+    }
+
+    private void RestoreMatchPlayers(SaveGameData data)
+    {
+        if (matchController == null || data == null)
+            return;
+        if (data.players == null || data.players.Count == 0)
+            return;
+
+        List<int> teamIds = new List<int>(data.players.Count);
+        List<bool> flipXs = new List<bool>(data.players.Count);
+        List<int> startMoneys = new List<int>(data.players.Count);
+        List<int> actualMoneys = new List<int>(data.players.Count);
+        List<int> incomePerTurns = new List<int>(data.players.Count);
+        List<bool> startMoneyAppliedFlags = new List<bool>(data.players.Count);
+
+        for (int i = 0; i < data.players.Count; i++)
+        {
+            MatchPlayerSaveData player = data.players[i];
+            if (player == null)
+                continue;
+
+            teamIds.Add(player.teamId);
+            flipXs.Add(player.flipX);
+            startMoneys.Add(Mathf.Max(0, player.startMoney));
+            actualMoneys.Add(Mathf.Max(0, player.actualMoney));
+            incomePerTurns.Add(Mathf.Max(0, player.incomePerTurn));
+            startMoneyAppliedFlags.Add(player.startMoneyApplied);
+        }
+
+        matchController.ImportPlayersState(
+            teamIds,
+            flipXs,
+            startMoneys,
+            actualMoneys,
+            incomePerTurns,
+            startMoneyAppliedFlags,
+            data.includeNeutralTeam);
     }
 
     private void ClearCurrentRuntime()

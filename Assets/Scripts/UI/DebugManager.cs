@@ -11,6 +11,7 @@ public class DebugManager : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private TurnStateManager turnStateManager;
+    [SerializeField] private MatchController matchController;
     [SerializeField] private CursorController cursorController;
     [SerializeField] private Button sendButton;
     [Tooltip("Arraste o objeto do input (raiz ou filho).")]
@@ -50,6 +51,8 @@ public class DebugManager : MonoBehaviour
 
         if (cursorController == null)
             cursorController = FindAnyObjectByType<CursorController>();
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
 
         if (sendButton == null)
             sendButton = GetComponentInChildren<Button>();
@@ -126,6 +129,22 @@ public class DebugManager : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
+        else if (TryParseSetConstructionTeamCommand(command, out int constructionTeam))
+        {
+            executed = turnStateManager.TrySetConstructionTeamUnderCursorFromDebug(constructionTeam, out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (TryParseSetCapturePointsCommand(command, out int capturePoints))
+        {
+            executed = turnStateManager.TrySetConstructionCapturePointsUnderCursorFromDebug(capturePoints, out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
         else if (command == "REARM UNIT")
         {
             executed = turnStateManager.TryReplenishUnitEmbarkedAmmoUnderCursorFromDebug(out string message);
@@ -149,6 +168,58 @@ public class DebugManager : MonoBehaviour
                 cursorController?.PlayLoadSfx();
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
+        }
+        else if (TryParseSetMoneyCommand(rawCommand, out int? moneyTeamOverride, out int moneyValue))
+        {
+            if (matchController == null)
+            {
+                Debug.Log("[Debug Command] MatchController nao encontrado.");
+            }
+            else if (moneyTeamOverride.HasValue)
+            {
+                TeamId team = (TeamId)Mathf.Clamp(moneyTeamOverride.Value, 0, 3);
+                executed = matchController.TrySetActualMoney(team, moneyValue);
+                if (executed)
+                {
+                    cursorController?.PlayDoneSfx();
+                    Debug.Log($"[Debug Command] Actual money do team {(int)team} atualizado para ${Mathf.Max(0, moneyValue)}.");
+                }
+                else
+                {
+                    Debug.Log($"[Debug Command] Team {(int)team} nao encontrado na lista de players.");
+                }
+            }
+            else
+            {
+                TeamId resolvedTeam = matchController.ActiveTeam;
+                if (resolvedTeam == TeamId.Neutral)
+                    resolvedTeam = TeamId.Green;
+
+                executed = matchController.TrySetActualMoney(resolvedTeam, moneyValue);
+                if (executed)
+                {
+                    cursorController?.PlayDoneSfx();
+                    Debug.Log($"[Debug Command] Actual money do team ativo ({(int)resolvedTeam}) atualizado para ${Mathf.Max(0, moneyValue)}.");
+                }
+                else
+                {
+                    Debug.Log($"[Debug Command] Team ativo ({(int)resolvedTeam}) nao encontrado na lista de players.");
+                }
+            }
+        }
+        else if (TryParseSetEconomyCommand(rawCommand, out bool economyEnabled))
+        {
+            if (matchController == null)
+            {
+                Debug.Log("[Debug Command] MatchController nao encontrado.");
+            }
+            else
+            {
+                matchController.SetEconomyEnabled(economyEnabled);
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log($"[Debug Command] Economy {(economyEnabled ? "ON" : "OFF")}.");
+            }
         }
         else
         {
@@ -281,7 +352,7 @@ public class DebugManager : MonoBehaviour
         if (string.IsNullOrWhiteSpace(normalizedCommand))
             return false;
 
-        const string indexedPrefix = "SET AMMO#";
+        const string indexedPrefix = "SET AMMO:";
         if (normalizedCommand.StartsWith(indexedPrefix))
         {
             string remainder = normalizedCommand.Substring(indexedPrefix.Length).Trim();
@@ -311,6 +382,40 @@ public class DebugManager : MonoBehaviour
 
         weaponIndex = 1; // Sem indice explicito, assume arma #1.
         return true;
+    }
+
+    private static bool TryParseSetConstructionTeamCommand(string normalizedCommand, out int teamValue)
+    {
+        teamValue = 0;
+        if (string.IsNullOrWhiteSpace(normalizedCommand))
+            return false;
+
+        const string prefix = "SET CONSTRUCTION TEAM ";
+        if (!normalizedCommand.StartsWith(prefix))
+            return false;
+
+        string valueToken = normalizedCommand.Substring(prefix.Length).Trim();
+        if (string.IsNullOrWhiteSpace(valueToken))
+            return false;
+
+        return int.TryParse(valueToken, out teamValue);
+    }
+
+    private static bool TryParseSetCapturePointsCommand(string normalizedCommand, out int capturePointsValue)
+    {
+        capturePointsValue = 0;
+        if (string.IsNullOrWhiteSpace(normalizedCommand))
+            return false;
+
+        const string prefix = "SET CAPTURE POINTS ";
+        if (!normalizedCommand.StartsWith(prefix))
+            return false;
+
+        string valueToken = normalizedCommand.Substring(prefix.Length).Trim();
+        if (string.IsNullOrWhiteSpace(valueToken))
+            return false;
+
+        return int.TryParse(valueToken, out capturePointsValue);
     }
 
     private static bool TryParseSpawnCommand(string rawCommand, out int? teamOverride, out string unitToken)
@@ -348,6 +453,77 @@ public class DebugManager : MonoBehaviour
 
         unitToken = trimmed.Substring(prefix.Length).Trim();
         return !string.IsNullOrWhiteSpace(unitToken);
+    }
+
+    private static bool TryParseSetMoneyCommand(string rawCommand, out int? teamOverride, out int moneyValue)
+    {
+        teamOverride = null;
+        moneyValue = 0;
+        if (string.IsNullOrWhiteSpace(rawCommand))
+            return false;
+
+        string trimmed = rawCommand.Trim();
+        const string prefixWithTeam = "set money:";
+        if (trimmed.StartsWith(prefixWithTeam, System.StringComparison.OrdinalIgnoreCase))
+        {
+            string remainder = trimmed.Substring(prefixWithTeam.Length).Trim();
+            int firstSpace = remainder.IndexOf(' ');
+            if (firstSpace <= 0)
+                return false;
+
+            string teamToken = remainder.Substring(0, firstSpace).Trim();
+            string valueToken = remainder.Substring(firstSpace + 1).Trim();
+            if (!int.TryParse(teamToken, out int parsedTeam))
+                return false;
+            if (parsedTeam < 0 || parsedTeam > 3)
+                return false;
+            if (!int.TryParse(valueToken, out moneyValue))
+                return false;
+
+            teamOverride = parsedTeam;
+            return true;
+        }
+
+        const string prefixNoTeam = "set money ";
+        if (!trimmed.StartsWith(prefixNoTeam, System.StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string valueOnly = trimmed.Substring(prefixNoTeam.Length).Trim();
+        return int.TryParse(valueOnly, out moneyValue);
+    }
+
+    private static bool TryParseSetEconomyCommand(string rawCommand, out bool economyEnabled)
+    {
+        economyEnabled = true;
+        if (string.IsNullOrWhiteSpace(rawCommand))
+            return false;
+
+        string trimmed = rawCommand.Trim();
+        const string prefix = "set economy ";
+        if (!trimmed.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string token = trimmed.Substring(prefix.Length).Trim();
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+
+        if (string.Equals(token, "on", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(token, "true", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(token, "1", System.StringComparison.OrdinalIgnoreCase))
+        {
+            economyEnabled = true;
+            return true;
+        }
+
+        if (string.Equals(token, "off", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(token, "false", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(token, "0", System.StringComparison.OrdinalIgnoreCase))
+        {
+            economyEnabled = false;
+            return true;
+        }
+
+        return false;
     }
 
     private string GetInputText()

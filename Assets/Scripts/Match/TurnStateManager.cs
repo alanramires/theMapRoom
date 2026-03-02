@@ -368,6 +368,40 @@ public partial class TurnStateManager : MonoBehaviour
         return true;
     }
 
+    public bool TrySetConstructionTeamUnderCursorFromDebug(int teamValue, out string message)
+    {
+        message = string.Empty;
+        if (!TryGetConstructionUnderCursorForDebug(out ConstructionManager target, out Vector3Int cursorCell, out message))
+            return false;
+
+        if (teamValue < (int)TeamId.Neutral || teamValue > (int)TeamId.Yellow)
+        {
+            message = $"Team invalido: {teamValue}. Use entre {(int)TeamId.Neutral} e {(int)TeamId.Yellow}.";
+            return false;
+        }
+
+        TeamId before = target.TeamId;
+        TeamId next = (TeamId)teamValue;
+        target.SetTeamId(next);
+        message = $"Construcao atualizada: {target.name} team {TeamUtils.GetName(before)} -> {TeamUtils.GetName(next)} em ({cursorCell.x},{cursorCell.y},0).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TrySetConstructionCapturePointsUnderCursorFromDebug(int capturePointsValue, out string message)
+    {
+        message = string.Empty;
+        if (!TryGetConstructionUnderCursorForDebug(out ConstructionManager target, out Vector3Int cursorCell, out message))
+            return false;
+
+        int before = target.CurrentCapturePoints;
+        int max = Mathf.Max(0, target.CapturePointsMax);
+        target.SetCurrentCapturePoints(capturePointsValue);
+        message = $"Capture points atualizados: {target.name} {before}->{target.CurrentCapturePoints}/{max} (req={capturePointsValue}) em ({cursorCell.x},{cursorCell.y},0).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
     public bool TryGetSelectedUnitPath(Vector3Int destinationCell, out List<Vector3Int> path)
     {
         destinationCell.z = 0;
@@ -665,6 +699,52 @@ public partial class TurnStateManager : MonoBehaviour
         if (target == null)
         {
             message = $"Nenhuma unidade no cursor ({cursorCell.x},{cursorCell.y},0).";
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryGetConstructionUnderCursorForDebug(out ConstructionManager target, out Vector3Int cursorCell, out string message)
+    {
+        target = null;
+        cursorCell = Vector3Int.zero;
+        message = string.Empty;
+
+        if (cursorController == null)
+        {
+            message = "CursorController nao encontrado.";
+            return false;
+        }
+
+        cursorCell = cursorController.CurrentCell;
+        cursorCell.z = 0;
+
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : cursorController.BoardTilemap;
+        if (boardMap != null)
+            target = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cursorCell);
+
+        if (target == null)
+        {
+            ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < constructions.Length; i++)
+            {
+                ConstructionManager construction = constructions[i];
+                if (construction == null)
+                    continue;
+                Vector3Int constructionCell = construction.CurrentCellPosition;
+                constructionCell.z = 0;
+                if (constructionCell == cursorCell)
+                {
+                    target = construction;
+                    break;
+                }
+            }
+        }
+
+        if (target == null)
+        {
+            message = $"Nenhuma construcao no cursor ({cursorCell.x},{cursorCell.y},0).";
             return false;
         }
 

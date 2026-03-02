@@ -186,7 +186,8 @@ public class CombatCalculatorWindow : EditorWindow
         int attackerHp = Mathf.Max(0, attacker.CurrentHP);
         int defenderHp = Mathf.Max(0, defender.CurrentHP);
         int attackerWeaponPower = option.weapon != null ? Mathf.Max(0, option.weapon.basicAttack) : 0;
-        int defenderWeaponPower = option.defenderCanCounterAttack && option.defenderCounterWeapon != null
+        bool counterExecuted = option.defenderCanCounterAttack && option.defenderCounterWeapon != null;
+        int defenderWeaponPower = counterExecuted && option.defenderCounterWeapon != null
             ? Mathf.Max(0, option.defenderCounterWeapon.basicAttack)
             : 0;
         GameUnitClass attackerClass = ResolveUnitClass(attacker, out bool attackerClassFromData);
@@ -204,26 +205,32 @@ public class CombatCalculatorWindow : EditorWindow
         sb.AppendLine();
 
         RPSBonusInfo attackerAttackRps = ResolveAttackRps(attackerClass, attackerWeaponCategory, defenderClass);
-        RPSBonusInfo defenderAttackRps = option.defenderCanCounterAttack
+        RPSBonusInfo defenderAttackRps = counterExecuted
             ? ResolveAttackRps(defenderClass, defenderWeaponCategory, attackerClass)
             : RPSBonusInfo.None;
-        WeaponCategory defenderWeaponCategoryForSkill = option.defenderCanCounterAttack ? defenderWeaponCategory : attackerWeaponCategory;
+        WeaponCategory defenderWeaponCategoryForSkill = counterExecuted ? defenderWeaponCategory : attackerWeaponCategory;
         SkillRPSBonusInfo attackerSkillRps = ResolveSkillRps(attacker, defender, attackerWeaponCategory, defenderWeaponCategoryForSkill);
         SkillRPSBonusInfo defenderSkillRps = ResolveSkillRps(defender, attacker, defenderWeaponCategoryForSkill, attackerWeaponCategory);
+        SkillRPSBonusInfo defenderDefenseSkillRps = ResolveSkillRps(defender, attacker, defenderWeaponCategoryForSkill, attackerWeaponCategory);
 
         int attackerAttackSkillTotal = attackerSkillRps.ownerAttackValue + defenderSkillRps.opponentAttackValue;
         int defenderAttackSkillTotal = defenderSkillRps.ownerAttackValue + attackerSkillRps.opponentAttackValue;
         int attackerDefenseSkillTotal = attackerSkillRps.ownerDefenseValue + defenderSkillRps.opponentDefenseValue;
-        int defenderDefenseSkillTotal = defenderSkillRps.ownerDefenseValue + attackerSkillRps.opponentDefenseValue;
+        int defenderDefenseSkillTotal = defenderDefenseSkillRps.ownerDefenseValue + attackerSkillRps.opponentDefenseValue;
 
-        int attackerAttackEffective = attackerHp * (attackerWeaponPower + attackerAttackRps.bonusValue + attackerAttackSkillTotal);
-        int defenderAttackEffective = option.defenderCanCounterAttack
-            ? defenderHp * (defenderWeaponPower + defenderAttackRps.bonusValue + defenderAttackSkillTotal)
+        int attackerAttackTermRaw = attackerWeaponPower + attackerAttackRps.bonusValue + attackerAttackSkillTotal;
+        int defenderAttackTermRaw = defenderWeaponPower + defenderAttackRps.bonusValue + defenderAttackSkillTotal;
+        int attackerAttackTermApplied = Mathf.Max(1, attackerAttackTermRaw);
+        int defenderAttackTermApplied = counterExecuted ? Mathf.Max(1, defenderAttackTermRaw) : 0;
+
+        int attackerAttackEffective = attackerHp * attackerAttackTermApplied;
+        int defenderAttackEffective = counterExecuted
+            ? defenderHp * defenderAttackTermApplied
             : 0;
 
         sb.AppendLine("1) Forca de ataque efetiva");
-        sb.AppendLine($"- Atacante: HP({attackerHp}) x (Arma({attackerWeaponPower}) + RPSAtaque({FormatSigned(attackerAttackRps.bonusValue)}) + EliteSkillAtaque({FormatSigned(attackerAttackSkillTotal)})) = {attackerAttackEffective}");
-        sb.AppendLine($"- Defensor: HP({defenderHp}) x (Arma({defenderWeaponPower}) + RPSAtaque({FormatSigned(defenderAttackRps.bonusValue)}) + EliteSkillAtaque({FormatSigned(defenderAttackSkillTotal)})) = {defenderAttackEffective}");
+        sb.AppendLine($"- Atacante: HP({attackerHp}) x max(1, Arma({attackerWeaponPower}) + RPSAtaque({FormatSigned(attackerAttackRps.bonusValue)}) + EliteSkillAtaque({FormatSigned(attackerAttackSkillTotal)})) = {attackerAttackEffective} (termo bruto={attackerAttackTermRaw}, aplicado={attackerAttackTermApplied})");
+        sb.AppendLine($"- Defensor: HP({defenderHp}) x {(counterExecuted ? "max(1, " : string.Empty)}Arma({defenderWeaponPower}) + RPSAtaque({FormatSigned(defenderAttackRps.bonusValue)}) + EliteSkillAtaque({FormatSigned(defenderAttackSkillTotal)}){(counterExecuted ? ")" : string.Empty)} = {defenderAttackEffective} (termo bruto={defenderAttackTermRaw}, aplicado={defenderAttackTermApplied})");
         sb.AppendLine($"- Detalhe RPS ataque atacante: {attackerAttackRps.summary}");
         sb.AppendLine($"- Detalhe RPS ataque defensor: {defenderAttackRps.summary}");
         sb.AppendLine($"- ELITE SKILL ataque atacante: proprio={FormatSigned(attackerSkillRps.ownerAttackValue)} | recebido={FormatSigned(defenderSkillRps.opponentAttackValue)} | total={FormatSigned(attackerAttackSkillTotal)}");
@@ -246,15 +253,17 @@ public class CombatCalculatorWindow : EditorWindow
             : RPSBonusInfo.None;
         RPSBonusInfo defenderDefenseRps = ResolveDefenseRps(defenderClass, attackerClass, attackerWeaponCategory);
 
-        int attackerEffectiveDefense = attackerBaseDefense + attackerDpq.defenseBonus + attackerDefenseRps.bonusValue + attackerDefenseSkillTotal;
-        int defenderEffectiveDefense = defenderBaseDefense + defenderDpq.defenseBonus + defenderDefenseRps.bonusValue + defenderDefenseSkillTotal;
+        int attackerWoundedPenalty = ResolveWoundedDefensePenalty(attacker);
+        int defenderWoundedPenalty = ResolveWoundedDefensePenalty(defender);
+        int attackerEffectiveDefense = attackerBaseDefense + attackerDpq.defenseBonus + attackerDefenseRps.bonusValue + attackerDefenseSkillTotal + attackerWoundedPenalty;
+        int defenderEffectiveDefense = defenderBaseDefense + defenderDpq.defenseBonus + defenderDefenseRps.bonusValue + defenderDefenseSkillTotal + defenderWoundedPenalty;
         sb.AppendLine("4) Forca de defesa efetiva");
-        sb.AppendLine($"- Atacante: defesaUnidade({attackerBaseDefense}) + defesaDPQ({attackerDpq.defenseBonus}) + RPSDefesa({FormatSigned(attackerDefenseRps.bonusValue)}) + EliteSkillDefesa({FormatSigned(attackerDefenseSkillTotal)}) = {attackerEffectiveDefense}");
-        sb.AppendLine($"- Defensor: defesaUnidade({defenderBaseDefense}) + defesaDPQ({defenderDpq.defenseBonus}) + RPSDefesa({FormatSigned(defenderDefenseRps.bonusValue)}) + EliteSkillDefesa({FormatSigned(defenderDefenseSkillTotal)}) = {defenderEffectiveDefense}");
+        sb.AppendLine($"- Atacante: defesaUnidade({attackerBaseDefense}) + defesaDPQ({attackerDpq.defenseBonus}) + RPSDefesa({FormatSigned(attackerDefenseRps.bonusValue)}) + EliteSkillDefesa({FormatSigned(attackerDefenseSkillTotal)}) + UnidadeFerida({FormatSigned(attackerWoundedPenalty)}) = {attackerEffectiveDefense}");
+        sb.AppendLine($"- Defensor: defesaUnidade({defenderBaseDefense}) + defesaDPQ({defenderDpq.defenseBonus}) + RPSDefesa({FormatSigned(defenderDefenseRps.bonusValue)}) + EliteSkillDefesa({FormatSigned(defenderDefenseSkillTotal)}) + UnidadeFerida({FormatSigned(defenderWoundedPenalty)}) = {defenderEffectiveDefense}");
         sb.AppendLine($"- Detalhe RPS defesa atacante: {attackerDefenseRps.summary}");
         sb.AppendLine($"- Detalhe RPS defesa defensor: {defenderDefenseRps.summary}");
         sb.AppendLine($"- ELITE SKILL defesa atacante: proprio={FormatSigned(attackerSkillRps.ownerDefenseValue)} | recebido={FormatSigned(defenderSkillRps.opponentDefenseValue)} | total={FormatSigned(attackerDefenseSkillTotal)}");
-        sb.AppendLine($"- ELITE SKILL defesa defensor: proprio={FormatSigned(defenderSkillRps.ownerDefenseValue)} | recebido={FormatSigned(attackerSkillRps.opponentDefenseValue)} | total={FormatSigned(defenderDefenseSkillTotal)}");
+        sb.AppendLine($"- ELITE SKILL defesa defensor: proprio={FormatSigned(defenderDefenseSkillRps.ownerDefenseValue)} | recebido={FormatSigned(attackerSkillRps.opponentDefenseValue)} | total={FormatSigned(defenderDefenseSkillTotal)}");
 
         int dpqDifference = attackerDpq.points - defenderDpq.points;
         DPQCombatOutcome attackerOutcome = DPQCombatOutcome.Neutro;
@@ -270,30 +279,36 @@ public class CombatCalculatorWindow : EditorWindow
         int defenderSafeDefense = Mathf.Max(1, defenderEffectiveDefense);
         int attackerSafeDefense = Mathf.Max(1, attackerEffectiveDefense);
         float rawEliminationOnDefender = defenderSafeDefense > 0 ? (float)attackerAttackEffective / defenderSafeDefense : 0f;
-        float rawEliminationOnAttacker = option.defenderCanCounterAttack && attackerSafeDefense > 0
+        float rawEliminationOnAttacker = counterExecuted && attackerSafeDefense > 0
             ? (float)defenderAttackEffective / attackerSafeDefense
             : 0f;
 
         sb.AppendLine("6) Primeira conta de eliminacao");
-        sb.AppendLine($"- Tipo: {(option.defenderCanCounterAttack ? "simultanea" : "unilateral")}");
+        sb.AppendLine($"- Tipo: {(counterExecuted ? "simultanea" : "unilateral")}");
         sb.AppendLine($"- No defensor (bruto): {attackerAttackEffective} / {defenderSafeDefense} = {rawEliminationOnDefender:0.###}");
         sb.AppendLine($"- No atacante (bruto): {defenderAttackEffective} / {attackerSafeDefense} = {rawEliminationOnAttacker:0.###}");
 
         int roundedOnDefender = DPQCombatMath.DivideAndRound(attackerAttackEffective, defenderSafeDefense, attackerOutcome);
-        int roundedOnAttacker = option.defenderCanCounterAttack
+        int roundedOnAttacker = counterExecuted
             ? DPQCombatMath.DivideAndRound(defenderAttackEffective, attackerSafeDefense, defenderOutcome)
             : 0;
 
         int appliedOnDefender = Mathf.Max(0, roundedOnDefender);
         int appliedOnAttacker = Mathf.Max(0, roundedOnAttacker);
+        int defenderDamageCapByAttackerHp = Mathf.Max(0, attackerHp);
+        int attackerDamageCapByDefenderHp = Mathf.Max(0, defenderHp);
+        bool defenderDamageContainedByHpLock = appliedOnDefender > defenderDamageCapByAttackerHp;
+        bool attackerDamageContainedByHpLock = appliedOnAttacker > attackerDamageCapByDefenderHp;
+        appliedOnDefender = Mathf.Min(appliedOnDefender, defenderDamageCapByAttackerHp);
+        appliedOnAttacker = Mathf.Min(appliedOnAttacker, attackerDamageCapByDefenderHp);
         int projectedDefenderHp = Mathf.Max(0, defenderHp - appliedOnDefender);
         int projectedAttackerHp = Mathf.Max(0, attackerHp - appliedOnAttacker);
 
         sb.AppendLine("7) Arredondamentos e aplicacao inicial");
         sb.AppendLine($"- Regra defensor: {BuildRoundingExplanation(attackerAttackEffective, defenderSafeDefense, attackerOutcome, roundedOnDefender)}");
         sb.AppendLine($"- Regra atacante: {BuildRoundingExplanation(defenderAttackEffective, attackerSafeDefense, defenderOutcome, roundedOnAttacker)}");
-        sb.AppendLine($"- Elim no defensor: rounded={roundedOnDefender} -> aplicado={appliedOnDefender}");
-        sb.AppendLine($"- Elim no atacante: rounded={roundedOnAttacker} -> aplicado={appliedOnAttacker}");
+        sb.AppendLine($"- Elim no defensor: rounded={roundedOnDefender} -> aplicado={appliedOnDefender} (trava={defenderDamageCapByAttackerHp}, contido pela trava de hp={(defenderDamageContainedByHpLock ? "sim" : "nao")})");
+        sb.AppendLine($"- Elim no atacante: rounded={roundedOnAttacker} -> aplicado={appliedOnAttacker} (trava={attackerDamageCapByDefenderHp}, contido pela trava de hp={(attackerDamageContainedByHpLock ? "sim" : "nao")})");
         sb.AppendLine($"- HP projetado defensor: {defenderHp} -> {projectedDefenderHp}");
         sb.AppendLine($"- HP projetado atacante: {attackerHp} -> {projectedAttackerHp}");
 
@@ -403,6 +418,20 @@ public class CombatCalculatorWindow : EditorWindow
             return data.defense;
 
         return 0;
+    }
+
+    private static int ResolveWoundedDefensePenalty(UnitManager unit)
+    {
+        if (unit == null)
+            return 0;
+
+        int maxHp = Mathf.Max(1, unit.GetMaxHP());
+        int currentHp = Mathf.Clamp(unit.CurrentHP, 0, maxHp);
+        if (currentHp >= maxHp)
+            return 0;
+        if (currentHp <= 5)
+            return -2;
+        return -1;
     }
 
     private static int ResolveEliteLevel(UnitManager unit)

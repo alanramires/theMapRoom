@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 39925e498f2ce7c478518a40953b6bae, type: 3}
   m_Name: Infantry Killer
   m_EditorClassIdentifier: Assembly-CSharp::CombatModifierData
-  id: infantry Killer
+  id: infantryKiller
   displayName: Infantrry Killer
   description: 
   modifierType: 0
@@ -20,7 +20,7 @@ MonoBehaviour:
   requiredWeaponCategory: 0
   eliteComparison: 1
   minEliteDifference: 1
-  ownerAttackRpsModifier: 1
+  ownerAttackRpsModifier: 2
   ownerDefenseRpsModifier: 3
-  opponentAttackRpsModifier: -3
-  opponentDefenseRpsModifier: -3
+  opponentAttackRpsModifier: 0
+  opponentDefenseRpsModifier: 0

@@ -201,6 +201,9 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] [Range(0f, 1f)] private float supplyPostTargetDelay = 0.18f;
     [Tooltip("Pausa final do supridor antes de tocar done e encerrar a acao.")]
     [SerializeField] [Range(0f, 2f)] private float supplySupplierFinalDelay = 0.25f;
+    [Header("Money UI Timing")]
+    [Tooltip("Duracao do fade do texto de atualizacao de dinheiro (text_update).")]
+    [SerializeField] [Range(0.05f, 5f)] private float moneyUpdateFadeDuration = 1.2f;
     [Header("Supply Projectile FX")]
     [Tooltip("Velocidade do item voando no suprimento (units/s).")]
     [SerializeField] [Range(0.2f, 20f)] private float supplyProjectileSpeed = 5f;
@@ -266,6 +269,7 @@ public class AnimationManager : MonoBehaviour
     public float SupplyFlightPadding => Mathf.Clamp(supplyFlightPadding, 0f, 1f);
     public float SupplyPostTargetDelay => Mathf.Clamp(supplyPostTargetDelay, 0f, 1f);
     public float SupplySupplierFinalDelay => Mathf.Clamp(supplySupplierFinalDelay, 0f, 2f);
+    public float MoneyUpdateFadeDuration => Mathf.Clamp(moneyUpdateFadeDuration, 0.05f, 5f);
     public float SupplyProjectileSpeed => Mathf.Clamp(supplyProjectileSpeed, 0.2f, 20f);
     public float SupplyProjectileMinDuration => Mathf.Clamp(supplyProjectileMinDuration, 0.03f, 2f);
     public float SupplyProjectileScale => Mathf.Clamp(supplyProjectileScale, 0.05f, 3f);

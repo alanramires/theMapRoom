@@ -62,8 +62,9 @@ MonoBehaviour:
     isPlayerHeadQuarter: 1
     isCapturable: 1
     capturePointsMax: 40
-    capturedIncoming: 2000
-    canProduceAndSellUnits: 01000000
+    capturedIncoming: 3000
+    sellingRule: 1
+    legacyCanProduceAndSellUnits: 
     offeredUnits:
     - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}

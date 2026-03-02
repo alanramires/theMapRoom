@@ -1,6 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
+using System;
+using UnityEngine.Serialization;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -8,10 +10,14 @@ using UnityEditor;
 public class MatchController : MonoBehaviour
 {
     [System.Serializable]
-    private struct TeamFlipConfig
+    private struct PlayerEntry
     {
         public TeamId teamId;
         public bool flipX;
+        [Min(0)] public int startMoney;
+        [Min(0)] public int actualMoney;
+        [Min(0)] public int incomePerTurn;
+        [SerializeField, HideInInspector] public bool startMoneyApplied;
     }
 
     public enum GameSetupPreset
@@ -26,16 +32,16 @@ public class MatchController : MonoBehaviour
     [Header("Match State (MVP)")]
     [SerializeField] private int currentTurn = 0;
     [SerializeField] private int activeTeamId = (int)TeamId.Green;
-    [SerializeField] private List<TeamId> players = new List<TeamId> { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
-    [SerializeField] private bool includeNeutralTeam = false;
-    [SerializeField] private List<TeamFlipConfig> teamFlipConfigs = new List<TeamFlipConfig>
+    [FormerlySerializedAs("playerEconomy")]
+    [SerializeField] private List<PlayerEntry> players = new List<PlayerEntry>
     {
-        new TeamFlipConfig { teamId = TeamId.Neutral, flipX = false },
-        new TeamFlipConfig { teamId = TeamId.Green, flipX = false },
-        new TeamFlipConfig { teamId = TeamId.Red, flipX = true },
-        new TeamFlipConfig { teamId = TeamId.Blue, flipX = false },
-        new TeamFlipConfig { teamId = TeamId.Yellow, flipX = true }
+        new PlayerEntry { teamId = TeamId.Green, flipX = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
+        new PlayerEntry { teamId = TeamId.Red, flipX = true, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
+        new PlayerEntry { teamId = TeamId.Blue, flipX = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
+        new PlayerEntry { teamId = TeamId.Yellow, flipX = true, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false }
     };
+    [SerializeField] private bool includeNeutralTeam = false;
+    [SerializeField] private bool economyEnabled = true;
     // Placeholder para futura pintura de visibilidade no mapa (nao governa regras de combate no momento).
     [SerializeField, HideInInspector] private bool fogOfWar = true;
     [Header("Gameplay Setup")]
@@ -53,12 +59,30 @@ public class MatchController : MonoBehaviour
     [SerializeField] private int activePlayerListIndex = 0;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField, HideInInspector] private bool pendingTurnStartUpkeep;
+    [SerializeField, HideInInspector] private bool pendingTurnStartEconomy = true;
+    [SerializeField, HideInInspector] private int cachedConstructionIncomeSignature;
+    [SerializeField, HideInInspector] private int cachedConstructionIncomeCount;
+    [System.NonSerialized] private readonly List<TeamId> playersView = new List<TeamId>();
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
     public TeamId ActiveTeam => ClampToTeamId(activeTeamId);
-    public IReadOnlyList<TeamId> Players => players;
+    public IReadOnlyList<TeamId> Players
+    {
+        get
+        {
+            playersView.Clear();
+            if (players != null)
+            {
+                for (int i = 0; i < players.Count; i++)
+                    playersView.Add(players[i].teamId);
+            }
+
+            return playersView;
+        }
+    }
     public bool IncludeNeutralTeam => includeNeutralTeam;
+    public bool EconomyEnabled => economyEnabled;
     public GameSetupPreset GameSetup => gameSetup;
     public bool EnableLdtValidation => enableLdtValidation;
     public bool EnableLosValidation => enableLosValidation;
@@ -69,28 +93,178 @@ public class MatchController : MonoBehaviour
     public bool IsTurnTransitionInProgress => advanceTurnTransitionRoutine != null;
     private Coroutine advanceTurnTransitionRoutine;
 
+    public int GetActualMoney(TeamId team)
+    {
+        int playerIndex = FindPlayerEconomyIndex(team);
+        if (playerIndex < 0)
+            return 0;
+
+        return Mathf.Max(0, players[playerIndex].actualMoney);
+    }
+
+    public bool TrySpendActualMoney(TeamId team, int amount, out int remainingMoney)
+    {
+        remainingMoney = 0;
+        int spend = Mathf.Max(0, amount);
+        int playerIndex = FindPlayerEconomyIndex(team);
+        if (playerIndex < 0)
+            return false;
+
+        PlayerEntry entry = players[playerIndex];
+        int current = Mathf.Max(0, entry.actualMoney);
+        if (current < spend)
+        {
+            remainingMoney = current;
+            return false;
+        }
+
+        entry.actualMoney = current - spend;
+        players[playerIndex] = entry;
+        remainingMoney = entry.actualMoney;
+        return true;
+    }
+
+    public void SetEconomyEnabled(bool enabled)
+    {
+        economyEnabled = enabled;
+    }
+
+    public int ResolveEconomyCost(int baseCost)
+    {
+        return economyEnabled ? Mathf.Max(0, baseCost) : 0;
+    }
+
+    public bool TrySetActualMoney(TeamId team, int value)
+    {
+        int playerIndex = FindPlayerEconomyIndex(team);
+        if (playerIndex < 0)
+            return false;
+
+        PlayerEntry entry = players[playerIndex];
+        entry.actualMoney = Mathf.Max(0, value);
+        players[playerIndex] = entry;
+        return true;
+    }
+
+    public bool TrySetActualMoneyFirstPlayer(int value, out TeamId team)
+    {
+        team = TeamId.Neutral;
+        if (players == null || players.Count == 0)
+            return false;
+
+        PlayerEntry entry = players[0];
+        entry.actualMoney = Mathf.Max(0, value);
+        players[0] = entry;
+        team = entry.teamId;
+        return true;
+    }
+
+    public void ExportPlayersState(
+        List<int> teamIds,
+        List<bool> flipXs,
+        List<int> startMoneys,
+        List<int> actualMoneys,
+        List<int> incomePerTurns,
+        List<bool> startMoneyAppliedFlags)
+    {
+        if (teamIds == null || flipXs == null || startMoneys == null || actualMoneys == null || incomePerTurns == null || startMoneyAppliedFlags == null)
+            return;
+
+        teamIds.Clear();
+        flipXs.Clear();
+        startMoneys.Clear();
+        actualMoneys.Clear();
+        incomePerTurns.Clear();
+        startMoneyAppliedFlags.Clear();
+
+        if (players == null)
+            return;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            PlayerEntry entry = players[i];
+            teamIds.Add((int)entry.teamId);
+            flipXs.Add(entry.flipX);
+            startMoneys.Add(Mathf.Max(0, entry.startMoney));
+            actualMoneys.Add(Mathf.Max(0, entry.actualMoney));
+            incomePerTurns.Add(Mathf.Max(0, entry.incomePerTurn));
+            startMoneyAppliedFlags.Add(entry.startMoneyApplied);
+        }
+    }
+
+    public void ImportPlayersState(
+        IList<int> teamIds,
+        IList<bool> flipXs,
+        IList<int> startMoneys,
+        IList<int> actualMoneys,
+        IList<int> incomePerTurns,
+        IList<bool> startMoneyAppliedFlags,
+        bool includeNeutral)
+    {
+        includeNeutralTeam = includeNeutral;
+        if (players == null)
+            players = new List<PlayerEntry>();
+        else
+            players.Clear();
+
+        int count = teamIds != null ? teamIds.Count : 0;
+        for (int i = 0; i < count; i++)
+        {
+            TeamId team = ClampToTeamId(teamIds[i]);
+            if (team == TeamId.Neutral)
+                continue;
+
+            PlayerEntry entry = new PlayerEntry
+            {
+                teamId = team,
+                flipX = GetValueOrDefault(flipXs, i, GetDefaultFlipX(team)),
+                startMoney = Mathf.Max(0, GetValueOrDefault(startMoneys, i, 0)),
+                actualMoney = Mathf.Max(0, GetValueOrDefault(actualMoneys, i, 0)),
+                incomePerTurn = Mathf.Max(0, GetValueOrDefault(incomePerTurns, i, 0)),
+                startMoneyApplied = GetValueOrDefault(startMoneyAppliedFlags, i, false)
+            };
+            players.Add(entry);
+        }
+
+        NormalizePlayersList();
+        SyncActivePlayerIndexFromActiveTeam();
+        ApplyTeamFlipSettingsToSceneObjects();
+    }
+
+    public void RefreshIncomeFromConstructionsNow()
+    {
+        ComputeConstructionIncomeSignature(out int signature, out int count);
+        cachedConstructionIncomeSignature = signature;
+        cachedConstructionIncomeCount = count;
+        RecalculateIncomePerTurnForAllPlayers();
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+            EditorUtility.SetDirty(this);
+#endif
+    }
+
     public bool GetTeamFlipX(TeamId teamId)
     {
         if (teamId == TeamId.Neutral)
             return false;
 
-        if (teamFlipConfigs != null)
+        if (players != null)
         {
-            for (int i = 0; i < teamFlipConfigs.Count; i++)
+            for (int i = 0; i < players.Count; i++)
             {
-                if (teamFlipConfigs[i].teamId == teamId)
-                    return teamFlipConfigs[i].flipX;
+                if (players[i].teamId == teamId)
+                    return players[i].flipX;
             }
         }
 
-        return false;
+        return GetDefaultFlipX(teamId);
     }
 
     private void Awake()
     {
         ApplyGameSetupPreset();
         NormalizeState();
-        NormalizeTeamFlipConfigs();
+        TryRefreshIncomeFromConstructions(markDirtyInEditor: false);
         TryAutoAssignCursorController();
         TryAutoAssignTurnTransitionReferences();
         ApplyActiveTeamIfChanged(force: true);
@@ -102,7 +276,7 @@ public class MatchController : MonoBehaviour
     {
         ApplyGameSetupPreset();
         NormalizeState();
-        NormalizeTeamFlipConfigs();
+        TryRefreshIncomeFromConstructions(markDirtyInEditor: true);
         TryAutoAssignCursorController();
         TryAutoAssignTurnTransitionReferences();
         ApplyActiveTeamIfChanged(force: false);
@@ -112,6 +286,8 @@ public class MatchController : MonoBehaviour
 
     private void Update()
     {
+        TryRefreshIncomeFromConstructions(markDirtyInEditor: !Application.isPlaying);
+
         if (!Application.isPlaying)
             return;
 
@@ -188,6 +364,7 @@ public class MatchController : MonoBehaviour
             if (next < players.Count)
             {
                 pendingTurnStartUpkeep = true;
+                pendingTurnStartEconomy = true;
                 SetActivePlayerByIndex(next);
                 return;
             }
@@ -202,6 +379,7 @@ public class MatchController : MonoBehaviour
             // Sem neutral: fecha ciclo de turno.
             currentTurn = Mathf.Max(0, currentTurn + 1);
             pendingTurnStartUpkeep = true;
+            pendingTurnStartEconomy = true;
             SetActivePlayerByIndex(0, forceApply: true);
             return;
         }
@@ -209,6 +387,7 @@ public class MatchController : MonoBehaviour
         // Estavamos em neutral (ou fora da lista): fecha ciclo de turno e volta para o primeiro player.
         currentTurn = Mathf.Max(0, currentTurn + 1);
         pendingTurnStartUpkeep = true;
+        pendingTurnStartEconomy = true;
         SetActivePlayerByIndex(0, forceApply: true);
     }
 
@@ -271,6 +450,7 @@ public class MatchController : MonoBehaviour
         currentTurn = Mathf.Max(0, currentTurn);
         activeTeamId = Mathf.Clamp(activeTeamId, -1, 3);
         NormalizePlayersList();
+        RecalculateIncomePerTurnForAllPlayers();
         SyncActivePlayerIndexFromActiveTeam();
 
         if (players.Count == 0)
@@ -342,45 +522,22 @@ public class MatchController : MonoBehaviour
     private void NormalizePlayersList()
     {
         if (players == null)
-            players = new List<TeamId>();
-    }
+            players = new List<PlayerEntry>();
 
-    private void NormalizeTeamFlipConfigs()
-    {
-        if (teamFlipConfigs == null)
-            teamFlipConfigs = new List<TeamFlipConfig>();
-
-        EnsureTeamFlipEntry(TeamId.Neutral, false);
-        EnsureTeamFlipEntry(TeamId.Green, false);
-        EnsureTeamFlipEntry(TeamId.Red, true);
-        EnsureTeamFlipEntry(TeamId.Blue, false);
-        EnsureTeamFlipEntry(TeamId.Yellow, true);
-    }
-
-    private void EnsureTeamFlipEntry(TeamId teamId, bool defaultFlip)
-    {
-        for (int i = 0; i < teamFlipConfigs.Count; i++)
+        for (int i = players.Count - 1; i >= 0; i--)
         {
-            if (teamFlipConfigs[i].teamId != teamId)
+            PlayerEntry entry = players[i];
+            if (entry.teamId == TeamId.Neutral)
+            {
+                players.RemoveAt(i);
                 continue;
-
-            if (teamId == TeamId.Neutral && teamFlipConfigs[i].flipX)
-            {
-                TeamFlipConfig cfg = teamFlipConfigs[i];
-                cfg.flipX = false;
-                teamFlipConfigs[i] = cfg;
             }
 
-            // Remove duplicatas mantendo o primeiro.
-            for (int j = teamFlipConfigs.Count - 1; j > i; j--)
-            {
-                if (teamFlipConfigs[j].teamId == teamId)
-                    teamFlipConfigs.RemoveAt(j);
-            }
-            return;
+            entry.startMoney = Mathf.Max(0, entry.startMoney);
+            entry.actualMoney = Mathf.Max(0, entry.actualMoney);
+            entry.incomePerTurn = Mathf.Max(0, entry.incomePerTurn);
+            players[i] = entry;
         }
-
-        teamFlipConfigs.Add(new TeamFlipConfig { teamId = teamId, flipX = defaultFlip });
     }
 
     private void SyncActivePlayerIndexFromActiveTeam()
@@ -392,7 +549,7 @@ public class MatchController : MonoBehaviour
         }
 
         TeamId activeTeam = ClampToTeamId(activeTeamId);
-        activePlayerListIndex = players.IndexOf(activeTeam);
+        activePlayerListIndex = FindPlayerIndexByTeam(activeTeam);
     }
 
     private void SetActivePlayerByIndex(int index, bool forceApply = false)
@@ -402,7 +559,7 @@ public class MatchController : MonoBehaviour
 
         index = Mathf.Clamp(index, 0, players.Count - 1);
         activePlayerListIndex = index;
-        activeTeamId = (int)players[index];
+        activeTeamId = (int)players[index].teamId;
         ApplyActiveTeamIfChanged(force: forceApply);
     }
 
@@ -453,6 +610,8 @@ public class MatchController : MonoBehaviour
         if (activeTeamId < 0)
             return;
 
+        ApplyEconomyAtTurnStartForActiveTeam();
+
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
         {
@@ -474,6 +633,145 @@ public class MatchController : MonoBehaviour
         }
 
         pendingTurnStartUpkeep = false;
+    }
+
+    private int FindPlayerEconomyIndex(TeamId teamId)
+    {
+        if (players == null)
+            return -1;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i].teamId == teamId)
+                return i;
+        }
+
+        return -1;
+    }
+
+    private void RecalculateIncomePerTurnForAllPlayers()
+    {
+        if (players == null || players.Count == 0)
+            return;
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < players.Count; i++)
+        {
+            PlayerEntry entry = players[i];
+            int income = 0;
+            for (int c = 0; c < constructions.Length; c++)
+            {
+                ConstructionManager construction = constructions[c];
+                if (construction == null)
+                    continue;
+                if (construction.TeamId != entry.teamId)
+                    continue;
+
+                income += Mathf.Max(0, construction.CapturedIncoming);
+            }
+
+            entry.incomePerTurn = Mathf.Max(0, income);
+            players[i] = entry;
+        }
+    }
+
+    private void ApplyEconomyAtTurnStartForActiveTeam()
+    {
+        if (!pendingTurnStartEconomy)
+            return;
+        if (players == null || players.Count == 0)
+        {
+            pendingTurnStartEconomy = false;
+            return;
+        }
+
+        TeamId team = ClampToTeamId(activeTeamId);
+        int playerIndex = FindPlayerEconomyIndex(team);
+        if (playerIndex < 0)
+        {
+            pendingTurnStartEconomy = false;
+            return;
+        }
+
+        RecalculateIncomePerTurnForAllPlayers();
+
+        PlayerEntry entry = players[playerIndex];
+        int credit = Mathf.Max(0, entry.incomePerTurn);
+        if (!entry.startMoneyApplied)
+        {
+            credit += Mathf.Max(0, entry.startMoney);
+            entry.startMoneyApplied = true;
+        }
+
+        if (credit > 0)
+            entry.actualMoney = Mathf.Max(0, entry.actualMoney + credit);
+
+        players[playerIndex] = entry;
+        pendingTurnStartEconomy = false;
+    }
+
+    private int FindPlayerIndexByTeam(TeamId team)
+    {
+        if (players == null || players.Count == 0)
+            return -1;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i].teamId == team)
+                return i;
+        }
+
+        return -1;
+    }
+
+    private static bool GetDefaultFlipX(TeamId teamId)
+    {
+        return teamId == TeamId.Red || teamId == TeamId.Yellow;
+    }
+
+    private void TryRefreshIncomeFromConstructions(bool markDirtyInEditor)
+    {
+        ComputeConstructionIncomeSignature(out int signature, out int count);
+        if (signature == cachedConstructionIncomeSignature && count == cachedConstructionIncomeCount)
+            return;
+
+        cachedConstructionIncomeSignature = signature;
+        cachedConstructionIncomeCount = count;
+        RecalculateIncomePerTurnForAllPlayers();
+
+#if UNITY_EDITOR
+        if (markDirtyInEditor && !Application.isPlaying)
+            EditorUtility.SetDirty(this);
+#endif
+    }
+
+    private static void ComputeConstructionIncomeSignature(out int signature, out int count)
+    {
+        signature = 17;
+        count = 0;
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null)
+                continue;
+
+            unchecked
+            {
+                signature = (signature * 31) + (int)construction.TeamId;
+                signature = (signature * 31) + Mathf.Max(0, construction.CapturedIncoming);
+                signature = (signature * 31) + construction.InstanceId;
+            }
+
+            count++;
+        }
+    }
+
+    private static T GetValueOrDefault<T>(IList<T> list, int index, T defaultValue)
+    {
+        if (list == null || index < 0 || index >= list.Count)
+            return defaultValue;
+        return list[index];
     }
 
     private void TryAutoAssignCursorController()

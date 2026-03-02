@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using UnityEngine.UI;
@@ -461,6 +462,22 @@ public partial class TurnStateManager
                     continue;
                 if (!ServiceHasAvailableSuppliesNow(supplier, service))
                     continue;
+
+                EstimateServiceGainsFromSupplier(supplier, target, service, out int hpPlannedGain, out int fuelPlannedGain, out int ammoPlannedGain);
+                if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
+                    continue;
+                if (!TryPayServiceCostForExecution(
+                        supplier.TeamId,
+                        target,
+                        service,
+                        hpPlannedGain,
+                        fuelPlannedGain,
+                        ammoPlannedGain,
+                        "Suprimento",
+                        out _))
+                {
+                    continue;
+                }
 
                 float flightDuration = PlaySupplyServiceProjectile(supplier, target, service);
                 float spawnInterval = GetSupplySpawnInterval();
@@ -1497,7 +1514,81 @@ public partial class TurnStateManager
     {
         if (entry == null || entry.targetUnit == null)
             return;
-        Debug.Log($"[Suprimento] Confirmar adicionar {entry.targetUnit.name} na fila? (Enter=sim, ESC=voltar)");
+
+        StringBuilder sb = new StringBuilder();
+        sb.Append($"[Suprimento] Confirmar adicionar {entry.targetUnit.name} na fila? (Enter=sim, ESC=voltar)");
+
+        if (selectedUnit != null)
+        {
+            List<UnitManager> executionOrder = new List<UnitManager>();
+            for (int i = 0; i < supplyQueuedOrders.Count; i++)
+            {
+                UnitManager queuedTarget = supplyQueuedOrders[i] != null ? supplyQueuedOrders[i].targetUnit : null;
+                if (queuedTarget == null || executionOrder.Contains(queuedTarget))
+                    continue;
+                executionOrder.Add(queuedTarget);
+            }
+
+            if (!executionOrder.Contains(entry.targetUnit))
+                executionOrder.Add(entry.targetUnit);
+
+            if (executionOrder.Count > 0)
+            {
+                int totalEstimatedCost = 0;
+                sb.Append("\nOrdem de execucao (custo estimado):");
+                for (int i = 0; i < executionOrder.Count; i++)
+                {
+                    UnitManager target = executionOrder[i];
+                    int estimatedCost = EstimateSupplyTargetMoneyCostForLog(selectedUnit, target);
+                    totalEstimatedCost += Mathf.Max(0, estimatedCost);
+                    sb.Append("\n");
+                    sb.Append(i + 1);
+                    sb.Append(". ");
+                    sb.Append(target != null ? target.name : "(null)");
+                    sb.Append(" => $");
+                    sb.Append(Mathf.Max(0, estimatedCost));
+                }
+
+                sb.Append("\nTotal estimado: $");
+                sb.Append(Mathf.Max(0, totalEstimatedCost));
+            }
+        }
+
+        Debug.Log(sb.ToString());
+    }
+
+    private int EstimateSupplyTargetMoneyCostForLog(UnitManager supplier, UnitManager target)
+    {
+        if (supplier == null || target == null)
+            return 0;
+
+        List<ServiceData> services = BuildDistinctServiceList(supplier.GetEmbarkedServices());
+        if (services == null || services.Count == 0)
+            return 0;
+
+        int total = 0;
+        for (int i = 0; i < services.Count; i++)
+        {
+            ServiceData service = services[i];
+            if (service == null || !service.isService)
+                continue;
+            if (service.apenasEntreSupridores && !IsSupplier(target))
+                continue;
+            if (!UnitNeedsServiceForSupplyExecution(target, service))
+                continue;
+            if (!ServiceHasAvailableSuppliesNow(supplier, service))
+                continue;
+
+            EstimateServiceGainsFromSupplier(supplier, target, service, out int hpPlannedGain, out int fuelPlannedGain, out int ammoPlannedGain);
+            if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
+                continue;
+
+            int baseCost = ComputeServiceMoneyCost(target, service, hpPlannedGain, fuelPlannedGain, ammoPlannedGain);
+            int finalCost = matchController != null ? matchController.ResolveEconomyCost(baseCost) : Mathf.Max(0, baseCost);
+            total += Mathf.Max(0, finalCost);
+        }
+
+        return Mathf.Max(0, total);
     }
 
     private bool ConsumeSupplySuppressDefaultConfirmSfxOnce()
