@@ -126,6 +126,12 @@ public class CursorController : MonoBehaviour
     private void Update()
     {
         TryAutoAssignMatchController();
+        if (UiInputBlocker.IsTextInputFocused())
+        {
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
         if (matchController != null && matchController.IsTurnTransitionInProgress)
         {
             heldDirection = Vector3Int.zero;

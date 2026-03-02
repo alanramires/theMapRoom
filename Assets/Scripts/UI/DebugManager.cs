@@ -1,6 +1,11 @@
 using System.Reflection;
+using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 public class DebugManager : MonoBehaviour
 {
@@ -13,18 +18,22 @@ public class DebugManager : MonoBehaviour
 
     private Component resolvedCommandInputField;
     private PropertyInfo cachedTextProperty;
+    private InputField resolvedLegacyInputField;
+    private TMP_InputField resolvedTmpInputField;
 
     private void Awake()
     {
         TryAutoAssignReferences();
         if (sendButton != null)
             sendButton.onClick.AddListener(HandleSendClicked);
+        RegisterInputSubmitListeners();
     }
 
     private void OnDestroy()
     {
         if (sendButton != null)
             sendButton.onClick.RemoveListener(HandleSendClicked);
+        UnregisterInputSubmitListeners();
     }
 
 #if UNITY_EDITOR
@@ -54,26 +63,291 @@ public class DebugManager : MonoBehaviour
             else
                 resolvedCommandInputField = FindAnyInputLikeComponentInChildren();
         }
+
+        resolvedLegacyInputField = resolvedCommandInputField as InputField;
+        resolvedTmpInputField = resolvedCommandInputField as TMP_InputField;
     }
 
     private void HandleSendClicked()
     {
-        string command = GetInputText();
-        if (string.IsNullOrWhiteSpace(command))
-            return;
-
-        command = command.Trim().ToUpperInvariant();
-        if (command != "M")
+        string rawCommand = GetInputText();
+        if (string.IsNullOrWhiteSpace(rawCommand))
             return;
 
         if (turnStateManager == null)
             return;
 
-        if (!turnStateManager.TryFinalizeSelectedUnitActionFromDebug())
+        string command = NormalizeCommand(rawCommand);
+        bool executed = false;
+
+        if (command == "DESTROY UNIT")
+        {
+            executed = turnStateManager.TryDestroyUnitUnderCursorFromDebug(out string message);
+            if (!executed && !string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (command == "WAKE UNIT")
+        {
+            executed = turnStateManager.TryWakeUnitUnderCursorFromDebug(out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (TryParseSetHpCommand(command, out int hpValue))
+        {
+            executed = turnStateManager.TrySetUnitHpUnderCursorFromDebug(hpValue, out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (TryParseSetAutonomyCommand(command, out int autonomyValue))
+        {
+            executed = turnStateManager.TrySetUnitAutonomyUnderCursorFromDebug(autonomyValue, out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (command == "REFUEL UNIT")
+        {
+            executed = turnStateManager.TryRefuelUnitAutonomyUnderCursorFromDebug(out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (TryParseSetAmmoCommand(command, out int ammoWeaponIndex, out int ammoValue))
+        {
+            executed = turnStateManager.TrySetUnitEmbarkedAmmoUnderCursorFromDebug(ammoWeaponIndex, ammoValue, out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (command == "REARM UNIT")
+        {
+            executed = turnStateManager.TryReplenishUnitEmbarkedAmmoUnderCursorFromDebug(out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (command == "REPAIR UNIT")
+        {
+            executed = turnStateManager.TryRepairUnitUnderCursorFromDebug(out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (TryParseSpawnCommand(rawCommand, out int? teamOverride, out string unitToken))
+        {
+            executed = turnStateManager.TrySpawnUnitUnderCursorFromDebug(unitToken, teamOverride, out string message);
+            if (executed)
+                cursorController?.PlayLoadSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else
+        {
+            Debug.Log($"[Debug Command] Comando desconhecido: \"{rawCommand}\"");
+        }
+
+        if (executed)
+            SetInputText(string.Empty);
+    }
+
+    private void RegisterInputSubmitListeners()
+    {
+        if (resolvedLegacyInputField != null)
+            resolvedLegacyInputField.onEndEdit.AddListener(HandleLegacyInputEndEdit);
+
+        if (resolvedTmpInputField != null)
+        {
+            resolvedTmpInputField.onSubmit.AddListener(HandleTmpInputSubmit);
+            resolvedTmpInputField.onEndEdit.AddListener(HandleTmpInputEndEdit);
+        }
+    }
+
+    private void UnregisterInputSubmitListeners()
+    {
+        if (resolvedLegacyInputField != null)
+            resolvedLegacyInputField.onEndEdit.RemoveListener(HandleLegacyInputEndEdit);
+
+        if (resolvedTmpInputField != null)
+        {
+            resolvedTmpInputField.onSubmit.RemoveListener(HandleTmpInputSubmit);
+            resolvedTmpInputField.onEndEdit.RemoveListener(HandleTmpInputEndEdit);
+        }
+    }
+
+    private void HandleLegacyInputEndEdit(string _)
+    {
+        if (!IsEnterPressedThisFrame())
             return;
 
-        cursorController?.PlayDoneSfx();
-        SetInputText(string.Empty);
+        HandleSendClicked();
+    }
+
+    private void HandleTmpInputSubmit(string _)
+    {
+        HandleSendClicked();
+    }
+
+    private void HandleTmpInputEndEdit(string _)
+    {
+        if (!IsEnterPressedThisFrame())
+            return;
+
+        HandleSendClicked();
+    }
+
+    private static bool IsEnterPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current == null)
+            return false;
+
+        return Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
+#endif
+    }
+
+    private static string NormalizeCommand(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        string[] pieces = value.Trim().Split(' ');
+        System.Text.StringBuilder sb = new System.Text.StringBuilder(value.Length);
+        for (int i = 0; i < pieces.Length; i++)
+        {
+            string piece = pieces[i];
+            if (string.IsNullOrWhiteSpace(piece))
+                continue;
+
+            if (sb.Length > 0)
+                sb.Append(' ');
+            sb.Append(piece.Trim().ToUpperInvariant());
+        }
+
+        return sb.ToString();
+    }
+
+    private static bool TryParseSetHpCommand(string normalizedCommand, out int hpValue)
+    {
+        hpValue = 0;
+        if (string.IsNullOrWhiteSpace(normalizedCommand))
+            return false;
+        if (!normalizedCommand.StartsWith("SET HP "))
+            return false;
+
+        string valueToken = normalizedCommand.Substring("SET HP ".Length).Trim();
+        if (string.IsNullOrWhiteSpace(valueToken))
+            return false;
+
+        return int.TryParse(valueToken, out hpValue);
+    }
+
+    private static bool TryParseSetAutonomyCommand(string normalizedCommand, out int autonomyValue)
+    {
+        autonomyValue = 0;
+        if (string.IsNullOrWhiteSpace(normalizedCommand))
+            return false;
+
+        const string prefixA = "SET AUTONOMY ";
+        const string prefixB = "SET AUTONOMI ";
+        string valueToken = string.Empty;
+        if (normalizedCommand.StartsWith(prefixA))
+            valueToken = normalizedCommand.Substring(prefixA.Length).Trim();
+        else if (normalizedCommand.StartsWith(prefixB))
+            valueToken = normalizedCommand.Substring(prefixB.Length).Trim();
+        else
+            return false;
+
+        if (string.IsNullOrWhiteSpace(valueToken))
+            return false;
+
+        return int.TryParse(valueToken, out autonomyValue);
+    }
+
+    private static bool TryParseSetAmmoCommand(string normalizedCommand, out int weaponIndex, out int ammoValue)
+    {
+        weaponIndex = 0;
+        ammoValue = 0;
+        if (string.IsNullOrWhiteSpace(normalizedCommand))
+            return false;
+
+        const string indexedPrefix = "SET AMMO#";
+        if (normalizedCommand.StartsWith(indexedPrefix))
+        {
+            string remainder = normalizedCommand.Substring(indexedPrefix.Length).Trim();
+            if (string.IsNullOrWhiteSpace(remainder))
+                return false;
+
+            int split = remainder.IndexOf(' ');
+            if (split <= 0)
+                return false;
+
+            string weaponToken = remainder.Substring(0, split).Trim();
+            string valueToken = remainder.Substring(split + 1).Trim();
+            if (!int.TryParse(weaponToken, out weaponIndex))
+                return false;
+            if (!int.TryParse(valueToken, out ammoValue))
+                return false;
+            return weaponIndex > 0;
+        }
+
+        const string defaultPrefix = "SET AMMO ";
+        if (!normalizedCommand.StartsWith(defaultPrefix))
+            return false;
+
+        string defaultValueToken = normalizedCommand.Substring(defaultPrefix.Length).Trim();
+        if (!int.TryParse(defaultValueToken, out ammoValue))
+            return false;
+
+        weaponIndex = 1; // Sem indice explicito, assume arma #1.
+        return true;
+    }
+
+    private static bool TryParseSpawnCommand(string rawCommand, out int? teamOverride, out string unitToken)
+    {
+        teamOverride = null;
+        unitToken = string.Empty;
+        if (string.IsNullOrWhiteSpace(rawCommand))
+            return false;
+
+        string trimmed = rawCommand.Trim();
+        if (trimmed.StartsWith("spawn:", System.StringComparison.OrdinalIgnoreCase))
+        {
+            string remainder = trimmed.Substring("spawn:".Length).Trim();
+            if (string.IsNullOrWhiteSpace(remainder))
+                return false;
+
+            int firstSpace = remainder.IndexOf(' ');
+            if (firstSpace <= 0)
+                return false;
+
+            string teamToken = remainder.Substring(0, firstSpace).Trim();
+            if (!int.TryParse(teamToken, out int parsedTeam))
+                return false;
+            if (parsedTeam < 0 || parsedTeam > 3)
+                return false;
+
+            teamOverride = parsedTeam;
+            unitToken = remainder.Substring(firstSpace + 1).Trim();
+            return !string.IsNullOrWhiteSpace(unitToken);
+        }
+
+        const string prefix = "spawn ";
+        if (!trimmed.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        unitToken = trimmed.Substring(prefix.Length).Trim();
+        return !string.IsNullOrWhiteSpace(unitToken);
     }
 
     private string GetInputText()
@@ -174,5 +448,29 @@ public class DebugManager : MonoBehaviour
         }
 
         return null;
+    }
+}
+
+public static class UiInputBlocker
+{
+    public static bool IsTextInputFocused()
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null)
+            return false;
+
+        GameObject selected = eventSystem.currentSelectedGameObject;
+        if (selected == null)
+            return false;
+
+        InputField legacyInput = selected.GetComponentInParent<InputField>();
+        if (legacyInput != null && legacyInput.isFocused)
+            return true;
+
+        TMP_InputField tmpInput = selected.GetComponentInParent<TMP_InputField>();
+        if (tmpInput != null && tmpInput.isFocused)
+            return true;
+
+        return false;
     }
 }

@@ -79,6 +79,30 @@ public partial class TurnStateManager
         public float headDistance;
     }
 
+    private readonly struct MirandoSelectionEntry
+    {
+        public readonly bool isValid;
+        public readonly PodeMirarTargetOption validOption;
+        public readonly PodeMirarInvalidOption invalidOption;
+
+        public MirandoSelectionEntry(PodeMirarTargetOption option)
+        {
+            isValid = true;
+            validOption = option;
+            invalidOption = null;
+        }
+
+        public MirandoSelectionEntry(PodeMirarInvalidOption option)
+        {
+            isValid = false;
+            validOption = null;
+            invalidOption = option;
+        }
+
+        public UnitManager AttackerUnit => isValid ? validOption != null ? validOption.attackerUnit : null : invalidOption != null ? invalidOption.attackerUnit : null;
+        public UnitManager TargetUnit => isValid ? validOption != null ? validOption.targetUnit : null : invalidOption != null ? invalidOption.targetUnit : null;
+    }
+
     private readonly struct DeathTarget
     {
         public readonly UnitManager unit;
@@ -110,8 +134,11 @@ public partial class TurnStateManager
     private readonly List<LineRenderer> mirandoPreviewRenderers = new List<LineRenderer>();
     private readonly List<Vector3> mirandoPreviewPathPoints = new List<Vector3>();
     private readonly List<Vector3> mirandoPreviewSegmentPoints = new List<Vector3>();
+    private readonly List<MirandoSelectionEntry> cachedMirandoSelectionEntries = new List<MirandoSelectionEntry>();
+    private readonly Dictionary<SpriteRenderer, Color> mirandoInvalidTintOriginalColors = new Dictionary<SpriteRenderer, Color>();
     private float mirandoPreviewPathLength;
     private float mirandoPreviewHeadDistance;
+    private bool mirandoPreviewUseInvalidColor;
     private bool mirandoPreviewSignatureValid;
     private Vector3 mirandoPreviewLastFrom;
     private Vector3 mirandoPreviewLastTo;
@@ -174,6 +201,7 @@ public partial class TurnStateManager
         scannerSelectedLandingIndex = -1;
         combatExecutionInProgress = false;
         cachedLandingOptions.Clear();
+        cachedMirandoSelectionEntries.Clear();
         disembarkPassengerEntries.Clear();
         disembarkQueuedOrders.Clear();
         disembarkLandingOptions.Clear();
@@ -194,7 +222,7 @@ public partial class TurnStateManager
 
         if (cursorState == CursorState.Mirando && scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget)
         {
-            if (cachedPodeMirarTargets.Count <= 1)
+            if (GetMirandoEntryCount() <= 1)
             {
                 ExitMirandoStateToMovement();
                 return true;
@@ -453,9 +481,17 @@ public partial class TurnStateManager
     private void HandleAimActionRequested()
     {
         bool canAim = availableSensorActionCodes.Contains('A');
-        if (!canAim || cachedPodeMirarTargets.Count == 0)
+        if (!canAim)
         {
             Debug.Log("Pode Mirar (\"A\"): nao ha alvos validos agora.");
+            LogScannerPanel();
+            return;
+        }
+
+        BuildMirandoSelectionEntries();
+        if (GetMirandoEntryCount() == 0)
+        {
+            Debug.Log("Pode Mirar (\"A\"): nao ha alvos para listar.");
             LogScannerPanel();
             return;
         }
@@ -617,14 +653,14 @@ public partial class TurnStateManager
         {
             case 'A':
             {
-                if (cachedPodeMirarTargets.Count <= 0)
+                if (GetMirandoEntryCount() <= 0)
                     return;
 
-                PodeMirarTargetOption firstAim = cachedPodeMirarTargets[0];
-                if (firstAim == null || firstAim.targetUnit == null)
+                MirandoSelectionEntry firstAim = cachedMirandoSelectionEntries[0];
+                if (firstAim.TargetUnit == null)
                     return;
 
-                Vector3Int targetCell = firstAim.targetUnit.CurrentCellPosition;
+                Vector3Int targetCell = firstAim.TargetUnit.CurrentCellPosition;
                 targetCell.z = 0;
                 cursorController.SetCell(targetCell, playMoveSfx: false);
                 break;
@@ -1914,44 +1950,67 @@ public partial class TurnStateManager
 
     private void LogTargetSelectionPanel()
     {
-        if (cachedPodeMirarTargets.Count == 0)
+        int total = GetMirandoEntryCount();
+        if (total == 0)
         {
-            Debug.Log("Sem alvos validos para mirar.");
+            Debug.Log("Sem alvos para mirar.");
             return;
         }
 
-        string text = $"Alvos validos retornados pelo sensor: {cachedPodeMirarTargets.Count}\n";
-        text += "Mirando: setas alternam entre alvos validos\n";
-        for (int i = 0; i < cachedPodeMirarTargets.Count; i++)
+        int validCount = cachedPodeMirarTargets.Count;
+        int invalidCount = Mathf.Max(0, total - validCount);
+        string text = $"Alvos de mira: {total} (validos={validCount}, invalidos={invalidCount})\n";
+        text += "Mirando: setas alternam entre alvos validos e invalidos\n";
+        for (int i = 0; i < total; i++)
         {
-            PodeMirarTargetOption option = cachedPodeMirarTargets[i];
-            string label = option != null && !string.IsNullOrWhiteSpace(option.displayLabel)
-                ? option.displayLabel
-                : (option != null && option.targetUnit != null ? option.targetUnit.name : "alvo");
+            MirandoSelectionEntry entry = cachedMirandoSelectionEntries[i];
+            if (entry.isValid)
+            {
+                PodeMirarTargetOption option = entry.validOption;
+                string label = option != null && !string.IsNullOrWhiteSpace(option.displayLabel)
+                    ? option.displayLabel
+                    : (option != null && option.targetUnit != null ? option.targetUnit.name : "alvo");
 
-            string revide = option != null && option.defenderCanCounterAttack ? "sim" : "nao";
-            text += $"{i + 1}. {label} | revide: {revide}\n";
+                string revide = option != null && option.defenderCanCounterAttack ? "sim" : "nao";
+                text += $"{i + 1}. [OK] {label} | revide: {revide}\n";
+            }
+            else
+            {
+                PodeMirarInvalidOption invalid = entry.invalidOption;
+                string label = invalid != null && invalid.targetUnit != null ? invalid.targetUnit.name : "alvo invalido";
+                string reason = invalid != null && !string.IsNullOrWhiteSpace(invalid.reason) ? invalid.reason : "motivo nao informado";
+                text += $"{i + 1}. [X] {label} | {reason}\n";
+            }
         }
 
-        text += ">> Enter confirma | ESC volta";
+        text += ">> Enter confirma alvo valido | ESC volta";
         Debug.Log(text);
     }
 
-    private void LogAttackConfirmationPrompt(PodeMirarTargetOption option, int shownIndex)
+    private void LogAttackConfirmationPrompt(MirandoSelectionEntry entry, int shownIndex)
     {
-        string label = option != null && !string.IsNullOrWhiteSpace(option.displayLabel)
-            ? option.displayLabel
-            : (option != null && option.targetUnit != null ? option.targetUnit.name : $"alvo {shownIndex}");
+        if (entry.isValid)
+        {
+            PodeMirarTargetOption option = entry.validOption;
+            string label = option != null && !string.IsNullOrWhiteSpace(option.displayLabel)
+                ? option.displayLabel
+                : (option != null && option.targetUnit != null ? option.targetUnit.name : $"alvo {shownIndex}");
+            Debug.Log($"Confirma alvo {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
+            return;
+        }
 
-        Debug.Log($"Confirma alvo {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
+        PodeMirarInvalidOption invalid = entry.invalidOption;
+        string invalidLabel = invalid != null && invalid.targetUnit != null ? invalid.targetUnit.name : $"alvo {shownIndex}";
+        string reason = invalid != null && !string.IsNullOrWhiteSpace(invalid.reason) ? invalid.reason : "motivo nao informado";
+        Debug.Log($"Alvo {shownIndex} invalido: {invalidLabel}\nMotivo: {reason}\n(Enter=toca erro, ESC=voltar para ciclar)");
     }
 
-    private void MoveCursorToTarget(PodeMirarTargetOption option)
+    private void MoveCursorToTarget(UnitManager targetUnit)
     {
-        if (option == null || option.targetUnit == null || cursorController == null)
+        if (targetUnit == null || cursorController == null)
             return;
 
-        Vector3Int targetCell = option.targetUnit.CurrentCellPosition;
+        Vector3Int targetCell = targetUnit.CurrentCellPosition;
         targetCell.z = 0;
         cursorController.SetCell(targetCell, playMoveSfx: false);
     }
@@ -1965,8 +2024,19 @@ public partial class TurnStateManager
 
         if (scannerPromptStep == ScannerPromptStep.MirandoCycleTarget)
         {
-            if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= cachedPodeMirarTargets.Count)
+            if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= GetMirandoEntryCount())
                 return true;
+
+            MirandoSelectionEntry cycleEntry = cachedMirandoSelectionEntries[scannerSelectedTargetIndex];
+            if (!cycleEntry.isValid)
+            {
+                string reason = cycleEntry.invalidOption != null && !string.IsNullOrWhiteSpace(cycleEntry.invalidOption.reason)
+                    ? cycleEntry.invalidOption.reason
+                    : "alvo invalido para este ataque.";
+                Debug.Log($"[Mirando] Alvo invalido. {reason}");
+                cursorController?.PlayErrorSfx();
+                return false;
+            }
 
             EnterMirandoConfirmStep();
             return true;
@@ -1975,7 +2045,7 @@ public partial class TurnStateManager
         if (scannerPromptStep != ScannerPromptStep.MirandoConfirmTarget)
             return false;
 
-        if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= cachedPodeMirarTargets.Count)
+        if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= GetMirandoEntryCount())
         {
             scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
             scannerSelectedTargetIndex = 0;
@@ -1984,7 +2054,18 @@ public partial class TurnStateManager
             return true;
         }
 
-        PodeMirarTargetOption option = cachedPodeMirarTargets[scannerSelectedTargetIndex];
+        MirandoSelectionEntry entry = cachedMirandoSelectionEntries[scannerSelectedTargetIndex];
+        if (!entry.isValid)
+        {
+            string reason = entry.invalidOption != null && !string.IsNullOrWhiteSpace(entry.invalidOption.reason)
+                ? entry.invalidOption.reason
+                : "alvo invalido para este ataque.";
+            Debug.Log($"[Mirando] Alvo invalido. {reason}");
+            cursorController?.PlayErrorSfx();
+            return false;
+        }
+
+        PodeMirarTargetOption option = entry.validOption;
         if (option == null || option.attackerUnit == null || option.targetUnit == null)
         {
             Debug.Log("Falha ao confirmar ataque: opcao invalida.");
@@ -2304,48 +2385,52 @@ public partial class TurnStateManager
         for (int i = 0; i < deaths.Count; i++)
         {
             DeathTarget target = deaths[i];
-            UnitManager unit = target.unit;
-            if (unit == null)
-                continue;
+            yield return ExecuteUnitDeathPresentation(target.unit, target.cell, target.worldPos, applyStartDelay: true);
+        }
+    }
 
+    private IEnumerator ExecuteUnitDeathPresentation(UnitManager unit, Vector3Int focusCell, Vector3 worldPos, bool applyStartDelay)
+    {
+        if (unit == null || !unit.gameObject.activeInHierarchy)
+            yield break;
+
+        if (applyStartDelay)
+        {
             float deathStartDelay = animationManager != null ? animationManager.CombatDeathStartDelay : 0f;
             if (deathStartDelay > 0f)
                 yield return new WaitForSeconds(deathStartDelay);
-
-            if (cursorController != null)
-            {
-                Vector3Int cell = target.cell;
-                cell.z = 0;
-                cursorController.SetCell(cell, playMoveSfx: true);
-            }
-
-            SpriteRenderer[] renderers = CollectDeathBlinkRenderers(unit);
-            if (renderers != null && renderers.Length > 0)
-                yield return CoBlinkRenderersFast(renderers);
-
-            if (renderers != null)
-            {
-                for (int r = 0; r < renderers.Length; r++)
-                {
-                    if (renderers[r] != null)
-                        renderers[r].enabled = false;
-                }
-            }
-
-            // A unidade deve desaparecer antes da explosao.
-            if (unit != null)
-                unit.gameObject.SetActive(false);
-
-            float explosionDuration = animationManager != null
-                ? animationManager.PlayExplosionEffectAt(target.worldPos)
-                : 0f;
-            if (explosionDuration > 0f)
-                yield return new WaitForSeconds(explosionDuration);
-            else
-                yield return new WaitForSeconds(0.12f);
-
-            yield return new WaitForSeconds(0.05f);
         }
+
+        if (cursorController != null)
+        {
+            focusCell.z = 0;
+            cursorController.SetCell(focusCell, playMoveSfx: true);
+        }
+
+        SpriteRenderer[] renderers = CollectDeathBlinkRenderers(unit);
+        if (renderers != null && renderers.Length > 0)
+            yield return CoBlinkRenderersFast(renderers);
+
+        if (renderers != null)
+        {
+            for (int r = 0; r < renderers.Length; r++)
+            {
+                if (renderers[r] != null)
+                    renderers[r].enabled = false;
+            }
+        }
+
+        unit.gameObject.SetActive(false);
+
+        float explosionDuration = animationManager != null
+            ? animationManager.PlayExplosionEffectAt(worldPos)
+            : 0f;
+        if (explosionDuration > 0f)
+            yield return new WaitForSeconds(explosionDuration);
+        else
+            yield return new WaitForSeconds(0.12f);
+
+        yield return new WaitForSeconds(0.05f);
     }
 
     private static List<DeathTarget> BuildDeathTargets(CombatResolutionResult combat)
@@ -2410,6 +2495,10 @@ public partial class TurnStateManager
         if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
             cursorStateBeforeMirando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
 
+        BuildMirandoSelectionEntries();
+        if (GetMirandoEntryCount() <= 0)
+            return;
+
         // Ao sair do fluxo de movimento para mirar, oculta o rastro legado do caminho comprometido.
         ClearCommittedPathVisual();
 
@@ -2417,11 +2506,21 @@ public partial class TurnStateManager
         scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
         scannerSelectedTargetIndex = 0;
 
-        if (cachedPodeMirarTargets.Count <= 1)
+        if (GetMirandoEntryCount() <= 1)
         {
-            if (cachedPodeMirarTargets.Count == 1)
+            if (GetMirandoEntryCount() == 1)
                 FocusCurrentMirandoTarget(logDetails: true);
-            EnterMirandoConfirmStep();
+
+            if (GetMirandoEntryCount() == 1 &&
+                TryGetCurrentMirandoEntry(out MirandoSelectionEntry singleEntry) &&
+                singleEntry.isValid)
+            {
+                EnterMirandoConfirmStep();
+            }
+            else
+            {
+                LogTargetSelectionPanel();
+            }
             return;
         }
 
@@ -2431,20 +2530,20 @@ public partial class TurnStateManager
 
     private void EnterMirandoConfirmStep()
     {
-        if (cachedPodeMirarTargets.Count <= 0)
+        if (GetMirandoEntryCount() <= 0)
             return;
 
-        if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= cachedPodeMirarTargets.Count)
+        if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= GetMirandoEntryCount())
             scannerSelectedTargetIndex = 0;
 
         scannerPromptStep = ScannerPromptStep.MirandoConfirmTarget;
-        PodeMirarTargetOption picked = cachedPodeMirarTargets[scannerSelectedTargetIndex];
-        bool singleTarget = cachedPodeMirarTargets.Count == 1;
+        MirandoSelectionEntry picked = cachedMirandoSelectionEntries[scannerSelectedTargetIndex];
+        bool singleTarget = GetMirandoEntryCount() == 1;
         if (singleTarget)
         {
             RebuildMirandoPreviewPath(picked);
-            SetMirandoPreviewVisible(true);
-            SetMirandoSpotterPreviewsVisible(true);
+            SetMirandoPreviewVisible(cursorState == CursorState.Mirando);
+            SetMirandoSpotterPreviewsVisible(cursorState == CursorState.Mirando && picked.isValid);
         }
         else
         {
@@ -2456,51 +2555,147 @@ public partial class TurnStateManager
 
     private void FocusCurrentMirandoTarget(bool logDetails, bool moveCursor = true)
     {
-        if (cachedPodeMirarTargets.Count == 0)
+        if (GetMirandoEntryCount() == 0)
         {
             SetMirandoPreviewVisible(false);
             SetMirandoSpotterPreviewsVisible(false);
             return;
         }
 
-        if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= cachedPodeMirarTargets.Count)
+        if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= GetMirandoEntryCount())
             scannerSelectedTargetIndex = 0;
 
-        PodeMirarTargetOption option = cachedPodeMirarTargets[scannerSelectedTargetIndex];
+        MirandoSelectionEntry option = cachedMirandoSelectionEntries[scannerSelectedTargetIndex];
         if (moveCursor)
-            MoveCursorToTarget(option);
+            MoveCursorToTarget(option.TargetUnit);
         RebuildMirandoPreviewPath(option);
         SetMirandoPreviewVisible(cursorState == CursorState.Mirando);
-        SetMirandoSpotterPreviewsVisible(cursorState == CursorState.Mirando);
+        SetMirandoSpotterPreviewsVisible(cursorState == CursorState.Mirando && option.isValid);
         if (logDetails)
-            LogCurrentMirandoTarget(option, scannerSelectedTargetIndex + 1, cachedPodeMirarTargets.Count);
+            LogCurrentMirandoTarget(option, scannerSelectedTargetIndex + 1, GetMirandoEntryCount());
     }
 
-    private void LogCurrentMirandoTarget(PodeMirarTargetOption option, int shownIndex, int total)
+    private void LogCurrentMirandoTarget(MirandoSelectionEntry entry, int shownIndex, int total)
     {
-        if (option == null || option.targetUnit == null)
+        if (entry.isValid)
+        {
+            PodeMirarTargetOption option = entry.validOption;
+            if (option == null || option.targetUnit == null)
+                return;
+
+            UnitManager target = option.targetUnit;
+            string attackWeapon = option.weapon != null ? option.weapon.displayName : "arma";
+            string counterText = option.defenderCanCounterAttack ? "sim" : $"nao ({option.defenderCounterReason})";
+            string label = !string.IsNullOrWhiteSpace(option.displayLabel) ? option.displayLabel : target.name;
+            string evPathText = FormatEvPath(option.lineOfFireEvPath);
+            string lineHexesText = FormatHexPath(option.lineOfFireIntermediateCells);
+
+            Debug.Log(
+                $"[Mirando] Alvo {shownIndex}/{total} [VALIDO]\n" +
+                $"Label: {label}\n" +
+                $"Unidade: {target.name}\n" +
+                $"Distancia: {option.distance}\n" +
+                $"HP: {target.CurrentHP}\n" +
+                $"Arma atacante: {attackWeapon}\n" +
+                $"Posicao atacante: {option.attackerPositionLabel}\n" +
+                $"Posicao defensor: {option.defenderPositionLabel}\n" +
+                $"EV path: {evPathText}\n" +
+                $"Linha (hex intermediario): {lineHexesText}\n" +
+                $"Revide: {counterText}\n" +
+                "Use setas para trocar alvo. Enter confirma. ESC volta.");
+            return;
+        }
+
+        PodeMirarInvalidOption invalid = entry.invalidOption;
+        if (invalid == null || invalid.targetUnit == null)
             return;
 
-        UnitManager target = option.targetUnit;
-        string attackWeapon = option.weapon != null ? option.weapon.displayName : "arma";
-        string counterText = option.defenderCanCounterAttack ? "sim" : $"nao ({option.defenderCounterReason})";
-        string label = !string.IsNullOrWhiteSpace(option.displayLabel) ? option.displayLabel : target.name;
-        string evPathText = FormatEvPath(option.lineOfFireEvPath);
-        string lineHexesText = FormatHexPath(option.lineOfFireIntermediateCells);
-
+        string weapon = invalid.weapon != null ? invalid.weapon.displayName : "arma";
+        string reason = !string.IsNullOrWhiteSpace(invalid.reason) ? invalid.reason : "motivo nao informado";
+        string evPathInvalid = FormatEvPath(invalid.lineOfFireEvPath);
+        string lineHexesInvalid = FormatHexPath(invalid.lineOfFireIntermediateCells);
         Debug.Log(
-            $"[Mirando] Alvo {shownIndex}/{total}\n" +
-            $"Label: {label}\n" +
-            $"Unidade: {target.name}\n" +
-            $"Distancia: {option.distance}\n" +
-            $"HP: {target.CurrentHP}\n" +
-            $"Arma atacante: {attackWeapon}\n" +
-            $"Posicao atacante: {option.attackerPositionLabel}\n" +
-            $"Posicao defensor: {option.defenderPositionLabel}\n" +
-            $"EV path: {evPathText}\n" +
-            $"Linha (hex intermediario): {lineHexesText}\n" +
-            $"Revide: {counterText}\n" +
-            "Use setas para trocar alvo. Enter confirma. ESC volta.");
+            $"[Mirando] Alvo {shownIndex}/{total} [INVALIDO]\n" +
+            $"Unidade: {invalid.targetUnit.name}\n" +
+            $"Distancia: {invalid.distance}\n" +
+            $"Arma avaliada: {weapon}\n" +
+            $"Posicao atacante: {invalid.attackerPositionLabel}\n" +
+            $"Posicao defensor: {invalid.defenderPositionLabel}\n" +
+            $"EV path: {evPathInvalid}\n" +
+            $"Linha (hex intermediario): {lineHexesInvalid}\n" +
+            $"Motivo: {reason}\n" +
+            "Linha de tiro: CINZA ESCURO\n" +
+            "Enter nao confirma este alvo.");
+    }
+
+    private int GetMirandoEntryCount()
+    {
+        return cachedMirandoSelectionEntries.Count;
+    }
+
+    private void BuildMirandoSelectionEntries()
+    {
+        cachedMirandoSelectionEntries.Clear();
+        RestoreMirandoInvalidUnitTint();
+
+        HashSet<UnitManager> validTargets = new HashSet<UnitManager>();
+        for (int i = 0; i < cachedPodeMirarTargets.Count; i++)
+        {
+            PodeMirarTargetOption valid = cachedPodeMirarTargets[i];
+            if (valid == null || valid.targetUnit == null)
+                continue;
+
+            cachedMirandoSelectionEntries.Add(new MirandoSelectionEntry(valid));
+            validTargets.Add(valid.targetUnit);
+        }
+
+        for (int i = 0; i < cachedPodeMirarInvalidTargets.Count; i++)
+        {
+            PodeMirarInvalidOption invalid = cachedPodeMirarInvalidTargets[i];
+            if (invalid == null || invalid.targetUnit == null)
+                continue;
+            if (validTargets.Contains(invalid.targetUnit))
+                continue;
+
+            cachedMirandoSelectionEntries.Add(new MirandoSelectionEntry(invalid));
+        }
+
+        ApplyMirandoInvalidUnitTint();
+    }
+
+    private void ApplyMirandoInvalidUnitTint()
+    {
+        for (int i = 0; i < cachedMirandoSelectionEntries.Count; i++)
+        {
+            MirandoSelectionEntry entry = cachedMirandoSelectionEntries[i];
+            if (entry.isValid || entry.TargetUnit == null)
+                continue;
+
+            SpriteRenderer[] renderers = entry.TargetUnit.GetComponentsInChildren<SpriteRenderer>(true);
+            for (int r = 0; r < renderers.Length; r++)
+            {
+                SpriteRenderer renderer = renderers[r];
+                if (renderer == null)
+                    continue;
+
+                if (!mirandoInvalidTintOriginalColors.ContainsKey(renderer))
+                    mirandoInvalidTintOriginalColors[renderer] = renderer.color;
+
+                Color baseColor = mirandoInvalidTintOriginalColors[renderer];
+                renderer.color = new Color(baseColor.r * 0.35f, baseColor.g * 0.35f, baseColor.b * 0.35f, baseColor.a);
+            }
+        }
+    }
+
+    private void RestoreMirandoInvalidUnitTint()
+    {
+        foreach (KeyValuePair<SpriteRenderer, Color> pair in mirandoInvalidTintOriginalColors)
+        {
+            if (pair.Key != null)
+                pair.Key.color = pair.Value;
+        }
+
+        mirandoInvalidTintOriginalColors.Clear();
     }
 
     private static string FormatHexPath(IReadOnlyList<Vector3Int> cells)
@@ -2550,7 +2745,7 @@ public partial class TurnStateManager
     private bool TryResolveMirandoCursorMove(Vector3Int inputDelta, out Vector3Int resolvedCell)
     {
         resolvedCell = cursorController != null ? cursorController.CurrentCell : Vector3Int.zero;
-        if (cursorState != CursorState.Mirando || cachedPodeMirarTargets.Count == 0)
+        if (cursorState != CursorState.Mirando || GetMirandoEntryCount() == 0)
             return false;
         if (scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget)
             return false;
@@ -2559,7 +2754,7 @@ public partial class TurnStateManager
         if (step == 0)
             return false;
 
-        int count = cachedPodeMirarTargets.Count;
+        int count = GetMirandoEntryCount();
         if (count <= 1)
             return false;
 
@@ -2568,7 +2763,7 @@ public partial class TurnStateManager
 
         if (scannerSelectedTargetIndex >= 0 && scannerSelectedTargetIndex < count)
         {
-            UnitManager target = cachedPodeMirarTargets[scannerSelectedTargetIndex].targetUnit;
+            UnitManager target = cachedMirandoSelectionEntries[scannerSelectedTargetIndex].TargetUnit;
             if (target != null)
             {
                 resolvedCell = target.CurrentCellPosition;
@@ -2727,7 +2922,7 @@ public partial class TurnStateManager
         bool isMirandoConfirmSingleTarget =
             cursorState == CursorState.Mirando &&
             scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget &&
-            cachedPodeMirarTargets.Count == 1;
+            GetMirandoEntryCount() == 1;
 
         bool canRenderMirandoPreview =
             !combatExecutionInProgress &&
@@ -2777,7 +2972,7 @@ public partial class TurnStateManager
 
         SetMirandoPreviewVisible(true);
         float previewWidth = GetMirandoPreviewWidth();
-        Color previewColor = GetMirandoPreviewColor();
+        Color previewColor = GetCurrentMirandoPreviewColor();
         float spacing = cycleLen / segmentQuantities;
         for (int segmentIndex = 0; segmentIndex < segmentQuantities; segmentIndex++)
         {
@@ -2821,25 +3016,58 @@ public partial class TurnStateManager
         UpdateMirandoSpotterPreviewAnimation();
     }
 
+    private void RebuildMirandoPreviewPath(MirandoSelectionEntry entry)
+    {
+        if (entry.isValid)
+            RebuildMirandoPreviewPath(entry.validOption);
+        else
+            RebuildMirandoPreviewPath(entry.invalidOption);
+    }
+
     private void RebuildMirandoPreviewPath(PodeMirarTargetOption option)
+    {
+        RebuildMirandoPreviewPathInternal(
+            option != null ? option.attackerUnit : null,
+            option != null ? option.targetUnit : null,
+            ResolveSelectedTrajectory(option),
+            option,
+            useInvalidVisual: false);
+    }
+
+    private void RebuildMirandoPreviewPath(PodeMirarInvalidOption option)
+    {
+        RebuildMirandoPreviewPathInternal(
+            option != null ? option.attackerUnit : null,
+            option != null ? option.targetUnit : null,
+            ResolveSelectedTrajectory(option),
+            null,
+            useInvalidVisual: true);
+    }
+
+    private void RebuildMirandoPreviewPathInternal(
+        UnitManager attacker,
+        UnitManager target,
+        WeaponTrajectoryType trajectory,
+        PodeMirarTargetOption validOptionForSpotter,
+        bool useInvalidVisual)
     {
         mirandoPreviewPathPoints.Clear();
         mirandoPreviewPathLength = 0f;
         mirandoPreviewHeadDistance = 0f;
         mirandoPreviewSignatureValid = false;
+        mirandoPreviewUseInvalidColor = useInvalidVisual;
 
-        if (option == null || option.attackerUnit == null || option.targetUnit == null)
+        if (attacker == null || target == null)
         {
             SetMirandoPreviewVisible(false);
             RebuildMirandoSpotterPreviewPaths(null);
             return;
         }
 
-        Vector3 attackerPos = option.attackerUnit.transform.position;
-        Vector3 targetPos = option.targetUnit.transform.position;
+        Vector3 attackerPos = attacker.transform.position;
+        Vector3 targetPos = target.transform.position;
         attackerPos.z = targetPos.z;
 
-        WeaponTrajectoryType trajectory = ResolveSelectedTrajectory(option);
         CacheMirandoPreviewSignature(attackerPos, targetPos, trajectory);
         if (trajectory == WeaponTrajectoryType.Parabolic)
             BuildParabolicPath(attackerPos, targetPos, mirandoPreviewPathPoints);
@@ -2850,21 +3078,25 @@ public partial class TurnStateManager
         }
 
         mirandoPreviewPathLength = ComputePathLength(mirandoPreviewPathPoints);
-        RebuildMirandoSpotterPreviewPaths(option);
+        RebuildMirandoSpotterPreviewPaths(validOptionForSpotter);
         if (mirandoPreviewPathLength <= 0.0001f)
             SetMirandoPreviewVisible(false);
     }
 
     private void TryRefreshMirandoPreviewPathIfNeeded()
     {
-        PodeMirarTargetOption option = GetCurrentMirandoOption();
-        if (option == null || option.attackerUnit == null || option.targetUnit == null)
+        if (!TryGetCurrentMirandoEntry(out MirandoSelectionEntry entry))
             return;
 
-        Vector3 from = option.attackerUnit.transform.position;
-        Vector3 to = option.targetUnit.transform.position;
+        UnitManager attacker = entry.AttackerUnit;
+        UnitManager target = entry.TargetUnit;
+        if (attacker == null || target == null)
+            return;
+
+        Vector3 from = attacker.transform.position;
+        Vector3 to = target.transform.position;
         from.z = to.z;
-        WeaponTrajectoryType trajectory = ResolveSelectedTrajectory(option);
+        WeaponTrajectoryType trajectory = ResolveSelectedTrajectory(entry);
         float bend = GetMirandoParabolaBend();
         int samples = GetMirandoParabolaSamples();
 
@@ -2879,15 +3111,17 @@ public partial class TurnStateManager
         if (!changed)
             return;
 
-        RebuildMirandoPreviewPath(option);
+        RebuildMirandoPreviewPath(entry);
     }
 
-    private PodeMirarTargetOption GetCurrentMirandoOption()
+    private bool TryGetCurrentMirandoEntry(out MirandoSelectionEntry entry)
     {
-        if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= cachedPodeMirarTargets.Count)
-            return null;
+        entry = default;
+        if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= GetMirandoEntryCount())
+            return false;
 
-        return cachedPodeMirarTargets[scannerSelectedTargetIndex];
+        entry = cachedMirandoSelectionEntries[scannerSelectedTargetIndex];
+        return true;
     }
 
     private void CacheMirandoPreviewSignature(Vector3 from, Vector3 to, WeaponTrajectoryType trajectory)
@@ -2900,23 +3134,27 @@ public partial class TurnStateManager
         mirandoPreviewLastSamples = GetMirandoParabolaSamples();
     }
 
+    private WeaponTrajectoryType ResolveSelectedTrajectory(MirandoSelectionEntry entry)
+    {
+        return entry.isValid
+            ? ResolveSelectedTrajectory(entry.validOption)
+            : ResolveSelectedTrajectory(entry.invalidOption);
+    }
+
     private WeaponTrajectoryType ResolveSelectedTrajectory(PodeMirarTargetOption option)
     {
-        if (option == null || option.attackerUnit == null)
+        if (option == null)
             return WeaponTrajectoryType.Straight;
 
-        IReadOnlyList<UnitEmbarkedWeapon> weapons = option.attackerUnit.GetEmbarkedWeapons();
-        if (weapons != null && option.embarkedWeaponIndex >= 0 && option.embarkedWeaponIndex < weapons.Count)
-        {
-            UnitEmbarkedWeapon embarked = weapons[option.embarkedWeaponIndex];
-            if (embarked != null)
-                return embarked.selectedTrajectory;
-        }
+        return ResolveTrajectoryForShot(option.attackerUnit, option.embarkedWeaponIndex, option.weapon);
+    }
 
-        if (option.weapon != null && option.weapon.SupportsTrajectory(WeaponTrajectoryType.Parabolic))
-            return WeaponTrajectoryType.Parabolic;
+    private WeaponTrajectoryType ResolveSelectedTrajectory(PodeMirarInvalidOption option)
+    {
+        if (option == null)
+            return WeaponTrajectoryType.Straight;
 
-        return WeaponTrajectoryType.Straight;
+        return ResolveTrajectoryForShot(option.attackerUnit, option.embarkedWeaponIndex, option.weapon);
     }
 
     private void BuildParabolicPath(Vector3 from, Vector3 to, List<Vector3> output)
@@ -3062,7 +3300,7 @@ public partial class TurnStateManager
         float speed = Mathf.Max(0.2f, GetMirandoSpotterSegmentSpeed());
         float segmentLen = Mathf.Max(0.08f, GetMirandoPreviewSegmentLength() * spotterMultiplier);
         float width = Mathf.Max(0.02f, GetMirandoPreviewWidth() * spotterMultiplier);
-        Color baseColor = GetMirandoPreviewColor();
+        Color baseColor = GetCurrentMirandoPreviewColor();
         Color spotterColor = new Color(baseColor.r, baseColor.g, baseColor.b, Mathf.Clamp01(baseColor.a * 0.75f));
 
         for (int i = 0; i < mirandoSpotterPreviewTracks.Count; i++)
@@ -3503,10 +3741,12 @@ public partial class TurnStateManager
         mirandoPreviewSegmentPoints.Clear();
         mirandoPreviewPathLength = 0f;
         mirandoPreviewHeadDistance = 0f;
+        mirandoPreviewUseInvalidColor = false;
         mirandoPreviewSignatureValid = false;
         SetMirandoPreviewVisible(false);
         ClearMirandoSpotterPreviewData();
         SetMirandoSpotterPreviewsVisible(false);
+        RestoreMirandoInvalidUnitTint();
     }
 
     private Material GetMirandoPreviewMaterial()
@@ -3524,6 +3764,14 @@ public partial class TurnStateManager
         Color teamColor = TeamUtils.GetColor(team.Value);
         teamColor.a = fallback.a;
         return teamColor;
+    }
+
+    private Color GetCurrentMirandoPreviewColor()
+    {
+        if (mirandoPreviewUseInvalidColor)
+            return new Color(0.18f, 0.18f, 0.18f, 0.95f);
+
+        return GetMirandoPreviewColor();
     }
 
     private float GetMirandoPreviewWidth()
@@ -3633,11 +3881,11 @@ public partial class TurnStateManager
 
     private TeamId? ResolveMirandoAttackerTeam()
     {
-        if (scannerSelectedTargetIndex >= 0 && scannerSelectedTargetIndex < cachedPodeMirarTargets.Count)
+        if (TryGetCurrentMirandoEntry(out MirandoSelectionEntry entry))
         {
-            PodeMirarTargetOption option = cachedPodeMirarTargets[scannerSelectedTargetIndex];
-            if (option != null && option.attackerUnit != null)
-                return option.attackerUnit.TeamId;
+            UnitManager attacker = entry.AttackerUnit;
+            if (attacker != null)
+                return attacker.TeamId;
         }
 
         if (selectedUnit != null)

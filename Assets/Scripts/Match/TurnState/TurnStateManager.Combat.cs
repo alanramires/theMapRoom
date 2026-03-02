@@ -192,12 +192,14 @@ public partial class TurnStateManager
             ? ResolveDefenseRps(attackerClass, defenderClass, defenderWeaponCategory)
             : RpsBonusInfo.None;
         RpsBonusInfo defenderDefenseRps = ResolveDefenseRps(defenderClass, attackerClass, attackerWeaponCategory);
-        int attackerEffectiveDefense = attackerBaseDefense + attackerDpq.defenseBonus + attackerDefenseRps.value + attackerDefenseSkillTotal;
-        int defenderEffectiveDefense = defenderBaseDefense + defenderDpq.defenseBonus + defenderDefenseRps.value + defenderDefenseSkillTotal;
+        int attackerWoundedPenalty = ResolveWoundedDefensePenalty(attacker);
+        int defenderWoundedPenalty = ResolveWoundedDefensePenalty(defender);
+        int attackerEffectiveDefense = attackerBaseDefense + attackerDpq.defenseBonus + attackerDefenseRps.value + attackerDefenseSkillTotal + attackerWoundedPenalty;
+        int defenderEffectiveDefense = defenderBaseDefense + defenderDpq.defenseBonus + defenderDefenseRps.value + defenderDefenseSkillTotal + defenderWoundedPenalty;
 
         trace.AppendLine("7) Forca de defesa efetiva");
-        trace.AppendLine($"- Atacante: defesaUnidade({attackerBaseDefense}) + defesaDPQ({attackerDpq.defenseBonus}) + RPSDefesaBase({FormatSigned(attackerDefenseRps.value)}) + EliteSkillDefesaProprio({FormatSigned(attackerSkillRps.ownerDefenseValue)}) + EliteSkillDefesaRecebido({FormatSigned(defenderSkillRps.opponentDefenseValue)}) = {attackerEffectiveDefense}");
-        trace.AppendLine($"- Defensor: defesaUnidade({defenderBaseDefense}) + defesaDPQ({defenderDpq.defenseBonus}) + RPSDefesaBase({FormatSigned(defenderDefenseRps.value)}) + EliteSkillDefesaProprio({FormatSigned(defenderDefenseSkillRps.ownerDefenseValue)}) + EliteSkillDefesaRecebido({FormatSigned(attackerSkillRps.opponentDefenseValue)}) = {defenderEffectiveDefense}");
+        trace.AppendLine($"- Atacante: defesaUnidade({attackerBaseDefense}) + defesaDPQ({attackerDpq.defenseBonus}) + RPSDefesaBase({FormatSigned(attackerDefenseRps.value)}) + EliteSkillDefesaProprio({FormatSigned(attackerSkillRps.ownerDefenseValue)}) + EliteSkillDefesaRecebido({FormatSigned(defenderSkillRps.opponentDefenseValue)}) + UnidadeFerida({FormatSigned(attackerWoundedPenalty)}) = {attackerEffectiveDefense}");
+        trace.AppendLine($"- Defensor: defesaUnidade({defenderBaseDefense}) + defesaDPQ({defenderDpq.defenseBonus}) + RPSDefesaBase({FormatSigned(defenderDefenseRps.value)}) + EliteSkillDefesaProprio({FormatSigned(defenderDefenseSkillRps.ownerDefenseValue)}) + EliteSkillDefesaRecebido({FormatSigned(attackerSkillRps.opponentDefenseValue)}) + UnidadeFerida({FormatSigned(defenderWoundedPenalty)}) = {defenderEffectiveDefense}");
         trace.AppendLine($"- Detalhe RPS defesa atacante: {attackerDefenseRps.summary}");
         trace.AppendLine($"- Detalhe RPS defesa defensor: {defenderDefenseRps.summary}");
         trace.AppendLine($"- ELITE SKILL defesa atacante: proprio={FormatSigned(attackerSkillRps.ownerDefenseValue)} | recebido={FormatSigned(defenderSkillRps.opponentDefenseValue)} | total={FormatSigned(attackerDefenseSkillTotal)}");
@@ -547,6 +549,20 @@ public partial class TurnStateManager
         if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null)
             return data.defense;
         return 0;
+    }
+
+    private static int ResolveWoundedDefensePenalty(UnitManager unit)
+    {
+        if (unit == null)
+            return 0;
+
+        int maxHp = Mathf.Max(1, unit.GetMaxHP());
+        int currentHp = Mathf.Clamp(unit.CurrentHP, 0, maxHp);
+        if (currentHp >= maxHp)
+            return 0;
+        if (currentHp <= 5)
+            return -2;
+        return -1;
     }
 
     private static GameUnitClass ResolveUnitClass(UnitManager unit)

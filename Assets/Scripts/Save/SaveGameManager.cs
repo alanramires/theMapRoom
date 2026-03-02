@@ -118,6 +118,9 @@ public class SaveGameManager : MonoBehaviour
         if (!Application.isPlaying || !enableHotkeys || loadInProgress)
             return;
 
+        if (UiInputBlocker.IsTextInputFocused())
+            return;
+
         if (WasKeyPressedThisFrame(quickSaveKey))
             Save();
 

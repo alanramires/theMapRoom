@@ -82,6 +82,7 @@ public partial class TurnStateManager
             message = $"Servico do Comando (\"X\"): {reason}{suffix}";
             if (emitLogs)
                 Debug.Log(message);
+            cursorController?.PlayLoadSfx();
             return false;
         }
 

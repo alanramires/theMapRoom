@@ -1,84 +1,59 @@
 # The Map Room v1
 
-## Visao geral
+## Visao geral (atualizado ate v1.1.1)
 
 The Map Room e um jogo tatico por turnos em grade hexagonal, com combate orientado a dados e foco em legibilidade de simulacao.
 
-O estado atual prioriza:
+No estado atual, o v1 ja cobre:
 
-- previsibilidade de combate (formulas e trace)
-- tuning rapido por ferramentas de editor
-- separacao clara entre dados (assets) e regra (scripts)
-- regras de embarque e operacao aerea dirigidas por contexto de mapa
+- combate previsivel com rastreabilidade de calculo (RPS + Elite + DPQ + revide)
+- sensores taticos com retorno de valido/invalido e motivo
+- operacoes de mobilidade (embarque e operacao aerea) por contexto de mapa
+- economia de construcoes com regras de producao/venda por ownership
+- save/load de partida em runtime (incluindo quick save/load)
+- base de dados e ferramentas de editor para tuning rapido
 
 ## Loop principal (estado atual)
 
 1. Selecionar unidade e movimentar.
-2. Rodar sensores taticos (ex.: `PodeMirar`, `PodeEmbarcar`, `L` para operacao aerea).
-3. Escolher acao (combater, embarcar, pousar/decolar, apenas mover).
-4. Resolver combate com:
-   - RPS base
-   - Skill de elite (quando ativa)
-   - DPQ de posicao
-   - revide do defensor (quando valido)
-5. Aplicar dano e encerrar acao.
+2. Rodar sensores taticos (ex.: `PodeMirar`, `PodeEmbarcar`, operacao aerea).
+3. Escolher acao (combater, embarcar, pousar/decolar, capturar, comprar ou apenas mover).
+4. Resolver acao com regras de estado de turno (`TurnState`) e validacoes de contexto.
+5. Aplicar resultados no runtime (dano, ammo/fuel/HP, ownership, recursos) e encerrar acao.
+6. Opcional: salvar/carregar para continuidade de partidas longas (`F8`/`F9` no fluxo rapido).
 
 ## Sistemas implementados
 
-## 1) Sensor de combate (`PodeMirar`)
+## 1) Sensores de acao taticos
 
-Arquivos:
+Arquivos principais:
 
 - `Assets/Scripts/Sensors/PodeMirarSensor.cs`
-- `Assets/Scripts/Sensors/PodeMirarTargetOption.cs`
-- `Assets/Scripts/Sensors/PodeMirarInvalidOption.cs`
-
-Entregas:
-
-- valida alcance, dominio/altura e operacao da arma
-- valida LoS/LdT conforme trajetoria
-- calcula opcoes validas/invalidas com motivo
-- calcula possibilidade de revide e arma de revide
-
-## 2) Sensor de embarque (`PodeEmbarcar`)
-
-Arquivos:
-
 - `Assets/Scripts/Sensors/PodeEmbarcarSensor.cs`
-- `Assets/Scripts/Sensors/PodeEmbarcarOption.cs`
-- `Assets/Scripts/Sensors/PodeEmbarcarInvalidOption.cs`
 - `Assets/Editor/PodeEmbarcarSensorDebugWindow.cs`
 
-Entregas:
+Capacidades:
 
-- varredura de transportadores adjacentes (range 1)
-- validacao por contexto do transportador:
-  - `allowedEmbarkTerrains`
-  - `allowedEmbarkConstructions`
-  - fallback por dominio/altura do hex quando listas vazias
-- bloqueio de transportador em dominio aereo
-- validacao de slot por:
-  - camadas permitidas (lista de domain/height)
-  - classe permitida
-  - skills obrigatorias/bloqueadas
-  - capacidade
-- retorno de validos e invalidos com motivo detalhado
+- validacao de alcance, dominio/altura, arma e contexto de acao
+- lista de opcoes validas e invalidas com motivo detalhado
+- validacao de revide no combate
+- validacao de embarque por terreno/construcao, slots e restricoes de unidade
 
-## 2) LoS e LdT por regra de terreno/camada
+## 2) LoS e LdT por terreno/camada
 
 Referencias:
 
 - `docs/regras de LoS e LdT.md`
-- `Assets/Scripts/Sensors/PodeMirarSensor.cs`
 - `Assets/Scripts/Terrain/TerrainVisionResolver.cs`
+- `Assets/Scripts/Sensors/PodeMirarSensor.cs`
 
 Estado atual:
 
-- `Straight`: usa bloqueio por percurso e EV/BlockLoS
-- `Parabolic`: validacao de destino + checks basicos (sem percurso completo)
+- `Straight`: bloqueio por percurso e EV/BlockLoS
+- `Parabolic`: validacao de destino com checks basicos
 - override de ar por `DPQAirHeightConfig` (`AirLow`/`AirHigh`)
 
-## 3) Combate (runtime)
+## 3) Combate em runtime
 
 Arquivo central:
 
@@ -87,11 +62,114 @@ Arquivo central:
 Pontos chave:
 
 - consumo de municao de atacante e revide
-- RPS de ataque e defesa por classe/categoria
-- soma de modificadores de elite via skill
-- defesa efetiva com DPQ
-- matchup DPQ para arredondamento do dano
-- trace completo no log
+- RPS por classe/categoria de arma
+- modificadores de elite por skill
+- defesa efetiva e arredondamento de dano por DPQ
+- trace de combate no log para calibracao
+
+## 4) RPS e Elite por dados
+
+Arquivos:
+
+- `Assets/Scripts/RPS/RPSData.cs`
+- `Assets/Scripts/RPS/RPSDatabase.cs`
+- `Assets/Scripts/Skills/SkillData.cs`
+- `Assets/Scripts/Units/UnitData.cs`
+
+Caracteristicas:
+
+- match exato por chave de classe e categoria
+- fallback sem match com bonus `+0`
+- `eliteLevel` por unidade e regras condicionais de modificador
+
+## 5) Operacoes aereas (`Landing/Takeoff`)
+
+Arquivos:
+
+- `Assets/Scripts/Units/Rules/AircraftOperationRules.cs`
+- `Assets/Scripts/Construction/ConstructionData.cs`
+- `Assets/Scripts/Structures/StructureData.cs`
+- `Assets/Scripts/Terrain/TerrainTypeData.cs`
+
+Caracteristicas:
+
+- pouso/decolagem definidos por contexto do hex (construcao/estrutura/terreno)
+- regras por classe aerea e skills requeridas
+- suporte a variacoes futuras sem hardcode acoplado em `UnitData`
+
+## 6) Construcoes, captura e regras de mercado
+
+Arquivos:
+
+- `Assets/Scripts/Construction/ConstructionSiteRuntime.cs`
+- `Assets/Scripts/Construction/ConstructionManager.cs`
+
+Regras de venda/producao suportadas:
+
+- `FreeMarket`
+- `OriginalOwner`
+- `FirstOwner`
+- `Disabled`
+
+Estado atual:
+
+- ownership e venda/producao respondem ao estado da partida
+- suporte a configuracoes por instancia (incluindo overrides)
+- captura e economia integradas ao fluxo do `TurnState`
+
+## 7) Save/Load de partida (v1.1.1)
+
+Arquivo-chave:
+
+- `Assets/Scripts/Save/SaveGameManager.cs`
+
+Capacidades:
+
+- save por slot em JSON
+- restauracao de turno, time ativo, unidades, construcoes e ownership
+- restauracao de estado de embarque, ammo/fuel/HP e runtime de ofertas/servicos/suprimentos
+- quick save/load com atalhos (`F8` salva, `F9` carrega)
+
+## 8) Fluxo de turno e robustez de runtime
+
+Arquivos impactados:
+
+- `TurnStateManager.*`
+- `MatchController`
+- `ConstructionManager`
+- `UnitManager`
+
+Melhorias recentes:
+
+- menos chance de travar em estado intermediario apos acao/animacao
+- compras em construcao com validacoes e atalhos mais robustos
+- melhor estabilidade para combate, captura, sensores e shopping
+
+## 9) Ferramentas de editor para calibracao
+
+Menu:
+
+- `Tools/Combat/Calcular Combate`
+- `Tools/Combat/Matriz de Combate`
+
+Arquivos:
+
+- `Assets/Editor/CombatCalculatorWindow.cs`
+- `Assets/Editor/CombatMatrixWindow.cs`
+
+Estado atual:
+
+- alinhadas ao runtime de combate
+- suporte a analise par-a-par e matriz maior de balanceamento
+- reducao de retrabalho no tuning de dados
+
+## 10) Organizacao por mapa e catalogos (v1.1.0+)
+
+Estado atual:
+
+- dados de mapa menos acoplados entre cenas
+- estruturas/rotas e field de construcoes centralizados nas bases corretas
+- suporte mais limpo para multiplos mapas sem misturar catalogos
 
 ## Ordem oficial de altitude (HeightLevel)
 
@@ -107,135 +185,27 @@ Regra de projeto:
 - manter essa ordem numerica como base para comparacoes de camada/altura
 - evitar alterar esses valores sem migracao explicita dos sistemas dependentes
 
-## 4) RPS base por dados
-
-Arquivos:
-
-- `Assets/Scripts/RPS/RPSData.cs`
-- `Assets/Scripts/RPS/RPSDatabase.cs`
-- `Assets/DB/RPS/*`
-
-Caracteristica:
-
-- match exato por chave de classe e categoria de arma
-- sem match => bonus `+0`
-
-## 5) Elite Skill (inflexao de combate)
-
-Arquivos:
-
-- `Assets/Scripts/Skills/SkillData.cs`
-- `Assets/Scripts/Units/UnitData.cs`
-- `docs/Elite.md`
-
-Capacidades:
-
-- `eliteLevel` por unidade (default `0`)
-- skill condicional por classe/categoria/comparacao de elite
-- 4 modificadores independentes:
-  - owner attack
-  - owner defense
-  - opponent attack
-- opponent defense
-
-## 6) Operacoes aereas (`Landing/Takeoff`)
-
-Arquivos:
-
-- `Assets/Scripts/Units/Rules/AircraftOperationRules.cs`
-- `Assets/Scripts/Construction/ConstructionData.cs`
-- `Assets/Scripts/Structures/StructureData.cs`
-- `Assets/Scripts/Terrain/TerrainTypeData.cs`
-
-Caracteristicas:
-
-- regras de pouso/decolagem movidas para contexto do hex (construcao/estrutura/terreno)
-- unidade aerea definida por classe (`Jet`, `Plane`, `Helicopter`)
-- permissao de pouso por:
-  - classes permitidas
-  - skills requeridas
-- permissao de decolagem por:
-  - modos permitidos (`MoveuParado`, `MoveuAndando`)
-- suporte a pista improvisada e variacoes futuras sem hardcode em `UnitData`
-
-## 7) Construction Configuration (captura e mercado)
-
-Arquivos:
-
-- `Assets/Scripts/Construction/ConstructionSiteRuntime.cs`
-- `Assets/Scripts/Construction/ConstructionManager.cs`
-- `Assets/Editor/ConstructionDataEditor.cs`
-- `Assets/Editor/ConstructionFieldDatabaseEditor.cs`
-- `Assets/Editor/ConstructionSpawnerEditor.cs`
-
-Campos novos:
-
-- `capturedIncoming` (default `1000`)
-- `canProduceAndSellUnits` (lista de regras):
-  - `FreeMarket`
-  - `OriginalOwner`
-
-Comportamento:
-
-- `FreeMarket`: vende/produz para o dono atual (exceto neutro)
-- `OriginalOwner`: vende/produz apenas para o dono original
-
-## 8) Ferramentas de simulacao (editor)
-
-Menu:
-
-- `Tools/Combat/Calcular Combate`
-- `Tools/Combat/Matriz de Combate`
-
-Arquivos:
-
-- `Assets/Editor/CombatCalculatorWindow.cs`
-- `Assets/Editor/CombatMatrixWindow.cs`
-
-Estado atual:
-
-- alinhadas com runtime (RPS + Elite + DPQ)
-- exibem elite de atacante/defensor no log
-- matriz 5x5 de DPQ com baseline (`DPQ_Padrao x DPQ_Padrao`)
-
-## 9) Ajustes recentes de dados e inspector
-
-1. `UnitManager` inspector:
-- `Has Acted` reposicionado para cima
-- `Match Controller` reposicionado junto dos controllers/databases
-- `Current Ammo` e `Max Ammo` removidos da UI da instancia
-
-2. Animacao de movimento:
-- velocidade custom por unidade movida para `AnimationManager`
-- override por par `UnitData/speed`
-- sem match, velocidade padrao `1`
-
-3. Slots de transporte:
-- removidos booleans redundantes de filtro
-- modos permitidos em lista dedicada (`TransportSlotLayerMode`)
-
 ## Diferencial do v1
 
-O projeto ja tem um nucleo de combate tatico funcional com boa observabilidade e regras de movimento/embarque mais robustas:
+O v1 ja tem um nucleo tatico funcional, observavel e iteravel:
 
-- log detalhado para debug de balanceamento
-- simuladores para validar matchup sem depender de play completo
-- sensores com lista de invalidacao e motivo
-- estrutura de dados pronta para evoluir faccoes, classes, counters e operacoes de mobilidade
+- log detalhado para diagnostico de balanceamento
+- simuladores e janelas de editor alinhados com runtime
+- sensores com justificativa de invalidacao
+- estrutura de dados pronta para crescer em faccoes, classes, counters e mobilidade
+- continuidade de teste/play com save/load integrado
 
 ## Limites atuais (conhecidos)
 
-- parte de LoS/LdT ainda difere por tipo de trajetoria (`Straight` vs `Parabolic`)
-- balanceamento ainda em tuning iterativo de assets
-- cena de teste e dados de combate seguem em evolucao frequente
-- `supplierResources.maxCapacity` ainda nao esta conectado ao runtime logistico
+- LoS/LdT ainda difere entre trajetorias (`Straight` vs `Parabolic`)
+- balanceamento segue em tuning iterativo de assets
+- parte do runtime logistico ainda depende de integracoes pendentes
+- cena de teste e catalogos continuam em evolucao frequente
 
 ## Documentos de apoio
 
 - `docs/Combat.md`
 - `docs/Elite.md`
-- `docs/Sensor PodeMirar.md`
 - `docs/regras de LoS e LdT.md`
-- `docs/RELATORIO_V1.0.4.md`
-- `docs/RELATORIO_V1.0.6.md`
-- `docs/RELATORIO_V1.0.7.md`
+- `docs/RELATORIO_V1.1.0.md`
+- `docs/RELATORIO_V1.1.1.md`

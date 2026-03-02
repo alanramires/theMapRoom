@@ -72,6 +72,7 @@ public class CameraController : MonoBehaviour
 
     void HandleQuickZoomToggle()
     {
+        if (UiInputBlocker.IsTextInputFocused()) return;
         if (!WasQuickZoomTogglePressedThisFrame()) return;
         if (!IsQuickZoomToggleAllowed()) return;
 

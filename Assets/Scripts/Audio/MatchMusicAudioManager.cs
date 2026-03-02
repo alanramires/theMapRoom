@@ -280,6 +280,9 @@ public class MatchMusicAudioManager : MonoBehaviour
 
     private void HandleToggleShortcut()
     {
+        if (UiInputBlocker.IsTextInputFocused())
+            return;
+
         if (!WasToggleKeyPressedThisFrame())
             return;
 

@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -114,6 +115,256 @@ public partial class TurnStateManager : MonoBehaviour
         CommitPreparedFuelCost();
         selectedUnit.MarkAsActed();
         ClearSelectionAndReturnToNeutral(keepPreparedFuelCost: true);
+        return true;
+    }
+
+    public bool TryDestroyUnitUnderCursorFromDebug(out string message)
+    {
+        message = string.Empty;
+
+        if (IsMovementAnimationRunning())
+        {
+            message = "Nao e possivel destruir unidade durante animacao de movimento.";
+            return false;
+        }
+
+        if (cursorController == null)
+        {
+            message = "CursorController nao encontrado.";
+            return false;
+        }
+
+        Vector3Int cursorCell = cursorController.CurrentCell;
+        UnitManager target = FindUnitAtCell(cursorCell);
+        if (target == null)
+        {
+            message = $"Nenhuma unidade no cursor ({cursorCell.x},{cursorCell.y},0).";
+            return false;
+        }
+
+        if (selectedUnit != null || cursorState != CursorState.Neutral)
+            ClearSelectionAndReturnToNeutral();
+
+        string targetName = ResolveDebugUnitName(target);
+        StartCoroutine(ExecuteDebugDestroyUnitWithPresentation(target));
+        message = $"Destruindo unidade: {targetName} em ({cursorCell.x},{cursorCell.y},0).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TryWakeUnitUnderCursorFromDebug(out string message)
+    {
+        message = string.Empty;
+
+        if (cursorController == null)
+        {
+            message = "CursorController nao encontrado.";
+            return false;
+        }
+
+        Vector3Int cursorCell = cursorController.CurrentCell;
+        UnitManager target = FindUnitAtCell(cursorCell);
+        if (target == null)
+        {
+            message = $"Nenhuma unidade no cursor ({cursorCell.x},{cursorCell.y},0).";
+            return false;
+        }
+
+        if (!target.HasActed)
+        {
+            message = $"{ResolveDebugUnitName(target)} ja esta pronta para agir.";
+            return false;
+        }
+
+        target.ResetActed();
+        message = $"Unidade reativada: {ResolveDebugUnitName(target)} em ({cursorCell.x},{cursorCell.y},0).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TrySetUnitHpUnderCursorFromDebug(int hpValue, out string message)
+    {
+        message = string.Empty;
+
+        if (cursorController == null)
+        {
+            message = "CursorController nao encontrado.";
+            return false;
+        }
+
+        Vector3Int cursorCell = cursorController.CurrentCell;
+        UnitManager target = FindUnitAtCell(cursorCell);
+        if (target == null)
+        {
+            message = $"Nenhuma unidade no cursor ({cursorCell.x},{cursorCell.y},0).";
+            return false;
+        }
+
+        int maxHp = Mathf.Max(1, target.GetMaxHP());
+        int clampedHp = Mathf.Clamp(hpValue, 0, maxHp);
+        int beforeHp = target.CurrentHP;
+        target.SetCurrentHP(clampedHp);
+
+        message = $"HP atualizado: {ResolveDebugUnitName(target)} {beforeHp}->{target.CurrentHP} (req={hpValue}, max={maxHp}).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TrySetUnitAutonomyUnderCursorFromDebug(int autonomyValue, out string message)
+    {
+        message = string.Empty;
+        if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out message))
+            return false;
+
+        int beforeFuel = target.CurrentFuel;
+        target.SetCurrentFuel(autonomyValue);
+        message = $"Autonomia atualizada: {ResolveDebugUnitName(target)} {beforeFuel}->{target.CurrentFuel}/{target.GetMaxFuel()} em ({cursorCell.x},{cursorCell.y},0).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TryRefuelUnitAutonomyUnderCursorFromDebug(out string message)
+    {
+        message = string.Empty;
+        if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out message))
+            return false;
+
+        int beforeFuel = target.CurrentFuel;
+        int maxFuel = target.GetMaxFuel();
+        target.SetCurrentFuel(maxFuel);
+        message = $"Autonomia recarregada: {ResolveDebugUnitName(target)} {beforeFuel}->{target.CurrentFuel}/{maxFuel} em ({cursorCell.x},{cursorCell.y},0).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TryRepairUnitUnderCursorFromDebug(out string message)
+    {
+        message = string.Empty;
+        if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out message))
+            return false;
+
+        int beforeHp = target.CurrentHP;
+        int maxHp = target.GetMaxHP();
+        target.SetCurrentHP(maxHp);
+        message = $"Unidade reparada: {ResolveDebugUnitName(target)} {beforeHp}->{target.CurrentHP}/{maxHp} em ({cursorCell.x},{cursorCell.y},0).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TrySetUnitEmbarkedAmmoUnderCursorFromDebug(int weaponOneBasedIndex, int ammoValue, out string message)
+    {
+        message = string.Empty;
+        if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out message))
+            return false;
+
+        int weaponIndex = weaponOneBasedIndex - 1;
+        if (weaponIndex < 0)
+        {
+            message = "Indice de arma invalido. Use ammo#1, ammo#2, ...";
+            return false;
+        }
+
+        IReadOnlyList<UnitEmbarkedWeapon> runtimeWeapons = target.GetEmbarkedWeapons();
+        if (runtimeWeapons == null || weaponIndex >= runtimeWeapons.Count || runtimeWeapons[weaponIndex] == null)
+        {
+            message = $"{ResolveDebugUnitName(target)} nao possui arma #{weaponOneBasedIndex}.";
+            return false;
+        }
+
+        if (!TryResolveEmbarkedWeaponMaxAmmo(target, weaponIndex, out int maxAmmo))
+        {
+            message = $"Nao foi possivel resolver municao maxima da arma #{weaponOneBasedIndex} para {ResolveDebugUnitName(target)}.";
+            return false;
+        }
+
+        UnitEmbarkedWeapon runtimeWeapon = runtimeWeapons[weaponIndex];
+        int before = Mathf.Max(0, runtimeWeapon.squadAmmunition);
+        runtimeWeapon.squadAmmunition = Mathf.Clamp(ammoValue, 0, maxAmmo);
+        message = $"Muni arma#{weaponOneBasedIndex} atualizada: {ResolveDebugUnitName(target)} {before}->{runtimeWeapon.squadAmmunition}/{maxAmmo} em ({cursorCell.x},{cursorCell.y},0).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TryReplenishUnitEmbarkedAmmoUnderCursorFromDebug(out string message)
+    {
+        message = string.Empty;
+        if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out message))
+            return false;
+
+        IReadOnlyList<UnitEmbarkedWeapon> runtimeWeapons = target.GetEmbarkedWeapons();
+        if (runtimeWeapons == null || runtimeWeapons.Count <= 0)
+        {
+            message = $"{ResolveDebugUnitName(target)} nao possui armas embarcadas.";
+            return false;
+        }
+
+        int changed = 0;
+        for (int i = 0; i < runtimeWeapons.Count; i++)
+        {
+            UnitEmbarkedWeapon runtimeWeapon = runtimeWeapons[i];
+            if (runtimeWeapon == null)
+                continue;
+            if (!TryResolveEmbarkedWeaponMaxAmmo(target, i, out int maxAmmo))
+                continue;
+
+            int before = Mathf.Max(0, runtimeWeapon.squadAmmunition);
+            runtimeWeapon.squadAmmunition = maxAmmo;
+            if (runtimeWeapon.squadAmmunition != before)
+                changed++;
+        }
+
+        message = $"Muni recarregada: {ResolveDebugUnitName(target)} | armas atualizadas={changed} em ({cursorCell.x},{cursorCell.y},0).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TrySpawnUnitUnderCursorFromDebug(string unitToken, int? teamOverride, out string message)
+    {
+        message = string.Empty;
+
+        if (cursorController == null)
+        {
+            message = "CursorController nao encontrado.";
+            return false;
+        }
+
+        if (unitSpawner == null)
+        {
+            message = "UnitSpawner nao encontrado.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(unitToken))
+        {
+            message = "Informe uma unidade. Ex.: spawn SD";
+            return false;
+        }
+
+        if (!unitSpawner.TryResolveUnitDataByToken(unitToken, out UnitData unitData, out string resolveReason) || unitData == null)
+        {
+            message = string.IsNullOrWhiteSpace(resolveReason)
+                ? $"Unidade nao encontrada para \"{unitToken}\"."
+                : resolveReason;
+            return false;
+        }
+
+        Vector3Int cursorCell = cursorController.CurrentCell;
+        cursorCell.z = 0;
+        int activeTeam = matchController != null ? matchController.ActiveTeamId : (int)TeamId.Green;
+        int resolvedTeam = teamOverride.HasValue ? teamOverride.Value : activeTeam;
+        TeamId teamId = (resolvedTeam >= (int)TeamId.Green && resolvedTeam <= (int)TeamId.Yellow)
+            ? (TeamId)resolvedTeam
+            : TeamId.Green;
+
+        GameObject spawned = unitSpawner.SpawnAtCell(unitData, teamId, cursorCell);
+        if (spawned == null)
+        {
+            message = $"Falha ao spawnar {ResolveDebugUnitDataName(unitData)} em ({cursorCell.x},{cursorCell.y},0). Hex pode estar ocupado.";
+            return false;
+        }
+
+        message = $"Spawnado: {ResolveDebugUnitDataName(unitData)} em ({cursorCell.x},{cursorCell.y},0) para team {TeamUtils.GetName(teamId)}.";
+        Debug.Log($"[Debug Command] {message}");
         return true;
     }
 
@@ -356,6 +607,85 @@ public partial class TurnStateManager : MonoBehaviour
         domain = autoPromotionEntryDomain;
         height = autoPromotionEntryHeight;
         return hasAutoPromotionEntryLayer;
+    }
+
+    private IEnumerator ExecuteDebugDestroyUnitWithPresentation(UnitManager target)
+    {
+        if (target == null || !target.gameObject.activeInHierarchy)
+            yield break;
+
+        Vector3Int targetCell = target.CurrentCellPosition;
+        targetCell.z = 0;
+        Vector3 worldPos = target.transform.position;
+
+        target.SetCurrentHP(0);
+        KillEmbarkedChildrenChain(target);
+        yield return ExecuteUnitDeathPresentation(target, targetCell, worldPos, applyStartDelay: false);
+    }
+
+    private static string ResolveDebugUnitName(UnitManager unit)
+    {
+        if (unit == null)
+            return "(null)";
+        if (!string.IsNullOrWhiteSpace(unit.UnitDisplayName))
+            return unit.UnitDisplayName;
+        if (!string.IsNullOrWhiteSpace(unit.UnitId))
+            return unit.UnitId;
+        return unit.name;
+    }
+
+    private static string ResolveDebugUnitDataName(UnitData data)
+    {
+        if (data == null)
+            return "(null)";
+        if (!string.IsNullOrWhiteSpace(data.displayName))
+            return data.displayName;
+        if (!string.IsNullOrWhiteSpace(data.apelido))
+            return data.apelido;
+        if (!string.IsNullOrWhiteSpace(data.id))
+            return data.id;
+        return data.name;
+    }
+
+    private bool TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out string message)
+    {
+        target = null;
+        cursorCell = Vector3Int.zero;
+        message = string.Empty;
+
+        if (cursorController == null)
+        {
+            message = "CursorController nao encontrado.";
+            return false;
+        }
+
+        cursorCell = cursorController.CurrentCell;
+        cursorCell.z = 0;
+        target = FindUnitAtCell(cursorCell);
+        if (target == null)
+        {
+            message = $"Nenhuma unidade no cursor ({cursorCell.x},{cursorCell.y},0).";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryResolveEmbarkedWeaponMaxAmmo(UnitManager unit, int weaponIndex, out int maxAmmo)
+    {
+        maxAmmo = 0;
+        if (unit == null || weaponIndex < 0)
+            return false;
+
+        if (!unit.TryGetUnitData(out UnitData data) || data == null || data.embarkedWeapons == null || weaponIndex >= data.embarkedWeapons.Count)
+            return false;
+
+        UnitEmbarkedWeapon baseline = data.embarkedWeapons[weaponIndex];
+        if (baseline == null)
+            return false;
+
+        maxAmmo = Mathf.Max(0, baseline.squadAmmunition);
+        return true;
     }
 
     private void TryAutoAssignReferences()

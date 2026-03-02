@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using System.Collections.Generic;
+using System.Text;
 
 public class UnitSpawner : MonoBehaviour
 {
@@ -90,6 +91,114 @@ public class UnitSpawner : MonoBehaviour
             return false;
 
         return unitDatabase.TryGetById(unitId, out data);
+    }
+
+    public bool TryResolveUnitDataByToken(string token, out UnitData data, out string reason)
+    {
+        data = null;
+        reason = string.Empty;
+
+        if (unitDatabase == null)
+        {
+            reason = "UnitDatabase nao configurado no UnitSpawner.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            reason = "Token de unidade vazio.";
+            return false;
+        }
+
+        string key = NormalizeToken(token);
+        if (key.Length <= 0)
+        {
+            reason = "Token de unidade invalido.";
+            return false;
+        }
+
+        // 1) Match exato por id (lookup oficial).
+        if (unitDatabase.TryGetById(token.Trim(), out UnitData byId) && byId != null)
+        {
+            data = byId;
+            return true;
+        }
+
+        // 2) Match exato por apelido/displayName/id normalizados.
+        List<UnitData> exact = new List<UnitData>();
+        IReadOnlyList<UnitData> units = unitDatabase.Units;
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitData candidate = units[i];
+            if (candidate == null)
+                continue;
+
+            if (NormalizeToken(candidate.id) == key ||
+                NormalizeToken(candidate.displayName) == key ||
+                NormalizeToken(candidate.apelido) == key)
+            {
+                exact.Add(candidate);
+            }
+        }
+
+        if (exact.Count == 1)
+        {
+            data = exact[0];
+            return true;
+        }
+
+        // 3) Match parcial por id/displayName/apelido.
+        List<UnitData> partial = new List<UnitData>();
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitData candidate = units[i];
+            if (candidate == null)
+                continue;
+
+            string id = NormalizeToken(candidate.id);
+            string display = NormalizeToken(candidate.displayName);
+            string nick = NormalizeToken(candidate.apelido);
+
+            bool hit = (id.Length > 0 && id.Contains(key)) ||
+                       (display.Length > 0 && display.Contains(key)) ||
+                       (nick.Length > 0 && nick.Contains(key));
+            if (hit)
+                partial.Add(candidate);
+        }
+
+        if (partial.Count == 1)
+        {
+            data = partial[0];
+            return true;
+        }
+
+        List<UnitData> matches = exact.Count > 0 ? exact : partial;
+        if (matches.Count <= 0)
+        {
+            reason = $"Nenhuma unidade encontrada para \"{token}\".";
+            return false;
+        }
+
+        StringBuilder options = new StringBuilder();
+        int limit = Mathf.Min(5, matches.Count);
+        for (int i = 0; i < limit; i++)
+        {
+            UnitData candidate = matches[i];
+            if (candidate == null)
+                continue;
+
+            if (options.Length > 0)
+                options.Append(", ");
+
+            string label = !string.IsNullOrWhiteSpace(candidate.apelido)
+                ? candidate.apelido
+                : (!string.IsNullOrWhiteSpace(candidate.displayName) ? candidate.displayName : candidate.id);
+            options.Append(label);
+        }
+
+        string suffix = matches.Count > limit ? ", ..." : string.Empty;
+        reason = $"Token ambiguo \"{token}\". Sugestoes: {options}{suffix}";
+        return false;
     }
 
     public GameObject Spawn(UnitData data, TeamId teamId, Vector3 position, Quaternion rotation)
@@ -304,5 +413,23 @@ public class UnitSpawner : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static string NormalizeToken(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        string trimmed = value.Trim();
+        StringBuilder sb = new StringBuilder(trimmed.Length);
+        for (int i = 0; i < trimmed.Length; i++)
+        {
+            char c = char.ToUpperInvariant(trimmed[i]);
+            if (char.IsWhiteSpace(c) || c == '_' || c == '-')
+                continue;
+            sb.Append(c);
+        }
+
+        return sb.ToString();
     }
 }
