@@ -225,6 +225,7 @@ public partial class TurnStateManager
         UnitManager unit = FindUnitAtCell(cursorCell);
         if (unit != null && unit != selectedUnit)
         {
+            PushPanelUnitMessage("Hex ocupado", 2.4f);
             Debug.Log("unidade selecionada, escolha um local valido para movimento");
             return ActionSfx.Error;
         }

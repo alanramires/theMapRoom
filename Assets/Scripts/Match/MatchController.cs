@@ -50,6 +50,7 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enableLosValidation = true;
     [SerializeField] private bool enableSpotter = true;
     [SerializeField] private bool enableStealthValidation = true;
+    [SerializeField, Min(1)] private int maxUnitsPerTeam = 40;
     [SerializeField] private AutonomyDatabase autonomyDatabase;
     [SerializeField] private CursorController cursorController;
     [Header("Turn Transition")]
@@ -88,6 +89,7 @@ public class MatchController : MonoBehaviour
     public bool EnableLosValidation => enableLosValidation;
     public bool EnableSpotter => enableSpotter;
     public bool EnableStealthValidation => enableStealthValidation;
+    public int MaxUnitsPerTeam => Mathf.Max(1, maxUnitsPerTeam);
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;
     public int ActivePlayerListIndex => activePlayerListIndex;
     public bool IsTurnTransitionInProgress => advanceTurnTransitionRoutine != null;
@@ -100,6 +102,15 @@ public class MatchController : MonoBehaviour
             return 0;
 
         return Mathf.Max(0, players[playerIndex].actualMoney);
+    }
+
+    public int GetIncomePerTurn(TeamId team)
+    {
+        int playerIndex = FindPlayerEconomyIndex(team);
+        if (playerIndex < 0)
+            return 0;
+
+        return Mathf.Max(0, players[playerIndex].incomePerTurn);
     }
 
     public bool TrySpendActualMoney(TeamId team, int amount, out int remainingMoney)
@@ -157,6 +168,34 @@ public class MatchController : MonoBehaviour
         players[0] = entry;
         team = entry.teamId;
         return true;
+    }
+
+    public void GetTeamUnitCounts(TeamId teamId, out int totalInField, out int readyToAct)
+    {
+        totalInField = 0;
+        readyToAct = 0;
+        if (teamId == TeamId.Neutral)
+            return;
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy)
+                continue;
+            if (unit.TeamId != teamId)
+                continue;
+
+            totalInField++;
+            if (!unit.HasActed)
+                readyToAct++;
+        }
+    }
+
+    public bool HasReachedMaxUnitsPerTeam(TeamId teamId)
+    {
+        GetTeamUnitCounts(teamId, out int totalInField, out _);
+        return totalInField >= MaxUnitsPerTeam;
     }
 
     public void ExportPlayersState(
@@ -449,6 +488,7 @@ public class MatchController : MonoBehaviour
     {
         currentTurn = Mathf.Max(0, currentTurn);
         activeTeamId = Mathf.Clamp(activeTeamId, -1, 3);
+        maxUnitsPerTeam = Mathf.Max(1, maxUnitsPerTeam);
         NormalizePlayersList();
         RecalculateIncomePerTurnForAllPlayers();
         SyncActivePlayerIndexFromActiveTeam();
@@ -704,7 +744,10 @@ public class MatchController : MonoBehaviour
         }
 
         if (credit > 0)
+        {
             entry.actualMoney = Mathf.Max(0, entry.actualMoney + credit);
+            PanelMoneyController.PushContextualUpdate(team, entry.actualMoney, "Incoming", credit);
+        }
 
         players[playerIndex] = entry;
         pendingTurnStartEconomy = false;

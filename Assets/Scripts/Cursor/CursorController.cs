@@ -91,6 +91,7 @@ public class CursorController : MonoBehaviour
     private float nextRepeatTime;
     private static int lastConfirmFrameProcessed = -1;
     private static int lastCancelFrameProcessed = -1;
+    private bool pendingEndTurnConfirmation;
 
     public Vector3Int CurrentCell => currentCell;
     public Tilemap BoardTilemap => boardTilemap;
@@ -113,6 +114,7 @@ public class CursorController : MonoBehaviour
 #if ENABLE_INPUT_SYSTEM
         DisableBoundInputActions();
 #endif
+        ClearPendingEndTurnConfirmation();
     }
 
 #if UNITY_EDITOR
@@ -147,6 +149,12 @@ public class CursorController : MonoBehaviour
         HandleCycleUnitInput();
         HandleActionInput();
         HandleNeutralLeftClickTeleport();
+
+        if (pendingEndTurnConfirmation)
+        {
+            heldDirection = Vector3Int.zero;
+            return;
+        }
 
         Vector3Int inputDir = ReadDirectionInput();
         if (inputDir == Vector3Int.zero)
@@ -188,7 +196,10 @@ public class CursorController : MonoBehaviour
             return;
 
         if (!TryCycleToReadyUnit(direction))
+        {
+            PanelUnitController.TrySetTransientText("Sem unidades prontas", 2.2f);
             PlayUiSfx(errorSfx);
+        }
     }
 
     private bool TryCycleToReadyUnit(int direction)
@@ -557,20 +568,36 @@ public class CursorController : MonoBehaviour
 
     private void HandleActionInput()
     {
+        if (pendingEndTurnConfirmation)
+        {
+            if (WasConfirmPressedThisFrame())
+            {
+                ConfirmPendingEndTurn();
+                return;
+            }
+
+            if (WasCancelPressedThisFrame())
+            {
+                CancelPendingEndTurn();
+                return;
+            }
+
+            // Enquanto aguarda confirmacao de fim de turno, bloqueia outros atalhos.
+            return;
+        }
+
         if (WasAdvanceTurnPressedThisFrame())
         {
             if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
                 return;
 
-            TryAutoAssignMatchController();
-            if (matchController != null)
-            {
-                matchController.AdvanceTurnWithTransition();
-            }
+            pendingEndTurnConfirmation = true;
+            PanelUnitController.TrySetExternalText("End Turn :: Confirm");
+            PlayConfirmSfx();
             return;
         }
 
-        if (WasConfirmPressedThisFrame() && TryTeleportToActiveTeamHeadQuarterOnNeutral())
+        if (WasTeleportToHeadQuarterPressedThisFrame() && TryTeleportToActiveTeamHeadQuarterOnNeutral())
             return;
 
         if (WasConfirmPressedThisFrame())
@@ -598,11 +625,39 @@ public class CursorController : MonoBehaviour
         }
     }
 
+    private void ConfirmPendingEndTurn()
+    {
+        TryAutoAssignMatchController();
+        if (matchController == null)
+        {
+            ClearPendingEndTurnConfirmation();
+            return;
+        }
+
+        ClearPendingEndTurnConfirmation();
+        matchController.AdvanceTurnWithTransition();
+    }
+
+    private void CancelPendingEndTurn()
+    {
+        ClearPendingEndTurnConfirmation();
+        PlayActionFeedback(TurnStateManager.ActionSfx.Cancel);
+    }
+
+    private void ClearPendingEndTurnConfirmation()
+    {
+        if (!pendingEndTurnConfirmation)
+            return;
+
+        pendingEndTurnConfirmation = false;
+        PanelUnitController.ClearExternalText();
+    }
+
     private bool TryTeleportToActiveTeamHeadQuarterOnNeutral()
     {
         if (turnStateManager == null || turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             return false;
-        if (HasAnyUnitUnderCursor() || HasAnyConstructionUnderCursor())
+        if (HasAnyConstructionUnderCursor())
             return false;
 
         TryAutoAssignMatchController();
@@ -762,6 +817,15 @@ public class CursorController : MonoBehaviour
 #endif
     }
 
+    private bool WasTeleportToHeadQuarterPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.homeKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.Home);
+#endif
+    }
+
 #if ENABLE_INPUT_SYSTEM
     private bool IsCycleModifierPressed()
     {
@@ -872,6 +936,9 @@ public class CursorController : MonoBehaviour
     {
         if (clip == null)
             return;
+
+        if (clip == errorSfx && !PanelUnitController.HasActiveExternalText())
+            PanelUnitController.TrySetTransientText("Invalid action", 2f);
 
         if (audioSource == null)
         {

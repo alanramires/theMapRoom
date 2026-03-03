@@ -10,6 +10,7 @@ public class ServiceDataEditor : Editor
 
         SerializedProperty idProp = serializedObject.FindProperty("id");
         SerializedProperty displayNameProp = serializedObject.FindProperty("displayName");
+        SerializedProperty apelidoProp = serializedObject.FindProperty("apelido");
         SerializedProperty descriptionProp = serializedObject.FindProperty("description");
         SerializedProperty spriteDefaultProp = serializedObject.FindProperty("spriteDefault");
         SerializedProperty serviceTypeProp = serializedObject.FindProperty("serviceType");
@@ -27,6 +28,25 @@ public class ServiceDataEditor : Editor
             EditorGUILayout.PropertyField(idProp);
         if (displayNameProp != null)
             EditorGUILayout.PropertyField(displayNameProp);
+        if (apelidoProp != null)
+        {
+            EditorGUILayout.PropertyField(apelidoProp, new GUIContent("Apelido"));
+        }
+        else
+        {
+            ServiceData data = target as ServiceData;
+            if (data != null)
+            {
+                EditorGUI.BeginChangeCheck();
+                string nextApelido = EditorGUILayout.TextField("Apelido", data.apelido);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(data, "Edit Service Apelido");
+                    data.apelido = nextApelido;
+                    EditorUtility.SetDirty(data);
+                }
+            }
+        }
         if (descriptionProp != null)
             EditorGUILayout.PropertyField(descriptionProp);
         if (spriteDefaultProp != null)

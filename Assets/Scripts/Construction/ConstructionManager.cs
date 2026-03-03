@@ -709,9 +709,19 @@ public class ConstructionManager : MonoBehaviour
         if (hudController == null)
             return;
 
-        bool hasUnitOnTop = TryGetOccupantOnTop() != null;
+        UnitManager occupant = TryGetOccupantOnTop();
+        bool hasUnitOnTop = occupant != null;
+        bool showFlagThreatOutline = occupant != null
+            && occupant.TeamId != teamId
+            && currentCapturePoints <= Mathf.Max(0, occupant.CurrentHP);
 
-        hudController.Apply(currentCapturePoints, CapturePointsMax, IsCapturable, teamId, hasUnitOnTop);
+        hudController.Apply(
+            currentCapturePoints,
+            CapturePointsMax,
+            IsCapturable,
+            teamId,
+            hasUnitOnTop,
+            showFlagThreatOutline);
     }
 
     private UnitManager TryGetOccupantOnTop()

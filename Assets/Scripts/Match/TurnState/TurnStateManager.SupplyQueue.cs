@@ -1673,7 +1673,40 @@ public partial class TurnStateManager
             return;
         UnitHudController supplierHud = selectedUnit.GetComponentInChildren<UnitHudController>(true);
         if (supplierHud != null)
+        {
             supplierHud.gameObject.SetActive(visible);
+            if (visible)
+            {
+                bool showTransportIndicator = false;
+                IReadOnlyList<UnitTransportSeatRuntime> seats = selectedUnit.TransportedUnitSlots;
+                if (seats != null)
+                {
+                    for (int i = 0; i < seats.Count; i++)
+                    {
+                        UnitTransportSeatRuntime seat = seats[i];
+                        UnitManager passenger = seat != null ? seat.embarkedUnit : null;
+                        if (passenger != null && passenger.IsEmbarked && passenger.EmbarkedTransporter == selectedUnit)
+                        {
+                            showTransportIndicator = true;
+                            break;
+                        }
+                    }
+                }
+
+                supplierHud.RefreshBindings();
+                supplierHud.Apply(
+                    selectedUnit.CurrentHP,
+                    selectedUnit.GetMaxHP(),
+                    selectedUnit.CurrentAmmo,
+                    selectedUnit.GetMaxAmmo(),
+                    selectedUnit.CurrentFuel,
+                    selectedUnit.MaxFuel,
+                    TeamUtils.GetColor(selectedUnit.TeamId),
+                    selectedUnit.GetDomain(),
+                    selectedUnit.GetHeightLevel(),
+                    showTransportIndicator);
+            }
+        }
     }
 
     private void HideAllSupplyEmbarkedPreviewExcept(UnitManager keepVisible)

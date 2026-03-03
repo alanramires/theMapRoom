@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 [AddComponentMenu("The Map Room/Construction/Construction Hud Controller")]
- [DisallowMultipleComponent]
+[DisallowMultipleComponent]
 public class ConstructionHudController : MonoBehaviour
 {
     [Header("Captured")]
@@ -20,47 +20,40 @@ public class ConstructionHudController : MonoBehaviour
     [SerializeField] private Color captured50PercentColor = new Color(1f, 0.85f, 0.35f, 1f);
     [SerializeField] private Color captured25PercentColor = new Color(1f, 0.3f, 0.3f, 1f);
 
-    [Header("Flames")]
-    [SerializeField] private Transform fire1;
-    [SerializeField] private Transform fire2;
-    [SerializeField] private Transform fire3;
-    [SerializeField] [Range(0f, 1f)] private float flamesWhenNotCapturableAlpha = 0f;
-    [SerializeField] [Range(0.1f, 8f)] private float flamesSpeed = 2.2f;
-    [SerializeField] [Range(0f, 0.25f)] private float flamesScaleAmplitude = 0.08f;
-    [SerializeField] [Range(0f, 0.3f)] private float flamesPulseAmplitude = 0.12f;
+    [Header("Flag Capture")]
+    [SerializeField] private Transform flagIcon;
+    [SerializeField] private TMP_Text flagText;
+    [SerializeField] private Color flagThreatOutlineColor = new Color(1f, 0.2f, 0.2f, 1f);
+    [SerializeField] [Range(0f, 1f)] private float flagThreatOutlineAlphaMin = 0.12f;
+    [SerializeField] [Range(0f, 1f)] private float flagThreatOutlineAlphaMax = 0.42f;
+    [SerializeField] [Range(0.5f, 3f)] private float flagThreatPulseMinDuration = 0.8f;
+    [SerializeField] [Range(0.5f, 3f)] private float flagThreatPulseMaxDuration = 1.2f;
+    [SerializeField] private Vector2 flagThreatOutlineDistance = new Vector2(1f, -1f);
 
     [Header("Sorting")]
     [SerializeField] private bool applyHudSorting = true;
     [SerializeField] private string hudSortingLayerName = "SFX";
     [SerializeField] private int hudSortingOrder = 60;
 
-    private float flameTime;
-    private Transform[] flameTransforms;
-    private Vector3[] flameBaseScales;
-    private SpriteRenderer[] flameSpriteRenderers;
-    private Image[] flameImages;
-    private float[] flameBaseAlphas;
-    private bool flameCacheInitialized;
+    private Outline flagThreatOutline;
+    private bool shouldShowFlagThreatOutline;
+    private float flagThreatPulseTimer;
+    private float flagThreatPulseDuration = 1f;
 
     private void Awake()
     {
         AutoAssignReferences();
+        EnsureFlagThreatOutline();
         EnsureCaptureVisualOrder();
-        EnsureFlameCaches();
         ApplySorting();
-    }
-
-    private void LateUpdate()
-    {
-        AnimateFlames();
     }
 
 #if UNITY_EDITOR
     private void OnValidate()
     {
         AutoAssignReferences();
+        EnsureFlagThreatOutline();
         EnsureCaptureVisualOrder();
-        EnsureFlameCaches();
         ApplySorting();
     }
 #endif
@@ -68,15 +61,22 @@ public class ConstructionHudController : MonoBehaviour
     public void RefreshBindings()
     {
         AutoAssignReferences();
+        EnsureFlagThreatOutline();
         EnsureCaptureVisualOrder();
-        EnsureFlameCaches();
         ApplySorting();
     }
 
-    public void Apply(int currentCapture, int maxCapture, bool isCapturable, TeamId ownerTeam, bool hideCaptureBarBecauseOccupied)
+    private void Update()
+    {
+        RefreshFlagThreatOutlinePulse();
+    }
+
+    public void Apply(int currentCapture, int maxCapture, bool isCapturable, TeamId ownerTeam, bool hideCaptureBarBecauseOccupied, bool showFlagThreatOutline = false)
     {
         AutoAssignReferences();
+        EnsureFlagThreatOutline();
         EnsureCaptureVisualOrder();
+
         int safeMax = Mathf.Max(0, maxCapture);
         int clampedCurrent = Mathf.Clamp(currentCapture, 0, safeMax);
         float ratio = safeMax > 0 ? Mathf.Clamp01((float)clampedCurrent / safeMax) : 0f;
@@ -120,151 +120,36 @@ public class ConstructionHudController : MonoBehaviour
 
         if (capturedFillRenderer != null)
         {
-            Vector3 s = capturedFillRenderer.transform.localScale;
-            s.x = Mathf.Max(0.001f, ratio);
-            capturedFillRenderer.transform.localScale = s;
+            Vector3 scale = capturedFillRenderer.transform.localScale;
+            scale.x = Mathf.Max(0.001f, ratio);
+            capturedFillRenderer.transform.localScale = scale;
             capturedFillRenderer.color = capturedColor;
             if (capturedFillRenderer.gameObject.activeSelf != showContainer)
                 capturedFillRenderer.gameObject.SetActive(showContainer);
             capturedFillRenderer.enabled = showContainer;
         }
 
-        float alpha1 = 0f;
-        float alpha2 = 0f;
-        float alpha3 = 0f;
-        if (isCapturable && safeMax > 0 && clampedCurrent < safeMax)
+        bool showFlagIcon = clampedCurrent != safeMax;
+        bool showFlagText = showFlagIcon && hideCaptureBarBecauseOccupied;
+
+        if (flagIcon != null && flagIcon.gameObject.activeSelf != showFlagIcon)
+            flagIcon.gameObject.SetActive(showFlagIcon);
+
+        shouldShowFlagThreatOutline = showFlagIcon && showFlagThreatOutline;
+        if (!shouldShowFlagThreatOutline)
+            ResetFlagThreatOutlineVisual();
+
+        if (flagText != null)
         {
-            // Qualquer discrepancia de captura ja exibe pelo menos 1 fogo.
-            alpha1 = 1f;
-            if (ratio < 0.50f) alpha2 = 1f;
-            if (ratio < 0.25f) alpha3 = 1f;
+            flagText.text = $"{clampedCurrent}";
+            if (flagText.gameObject.activeSelf != showFlagText)
+                flagText.gameObject.SetActive(showFlagText);
+            flagText.enabled = showFlagText;
         }
-        else if (!isCapturable)
-        {
-            float fallback = Mathf.Clamp01(flamesWhenNotCapturableAlpha);
-            alpha1 = fallback;
-            alpha2 = fallback;
-            alpha3 = fallback;
-        }
-
-        ApplyFlamesBaseAlpha(alpha1, alpha2, alpha3);
-    }
-
-    private void AnimateFlames()
-    {
-        EnsureFlameCaches();
-        if (flameTransforms == null || flameTransforms.Length == 0)
-            return;
-
-        flameTime += Time.deltaTime * Mathf.Max(0.1f, flamesSpeed);
-
-        for (int i = 0; i < flameTransforms.Length; i++)
-        {
-            Transform flame = flameTransforms[i];
-            if (flame == null)
-                continue;
-
-            float phase = flameTime + (i * 1.1f);
-            float scalePulse = 1f + (Mathf.Sin(phase) * flamesScaleAmplitude);
-            Vector3 baseScale = i < flameBaseScales.Length ? flameBaseScales[i] : Vector3.one;
-            Vector3 scaled = baseScale * scalePulse;
-            if (!IsFinite(scaled))
-                scaled = SafeScale(baseScale);
-            flame.localScale = scaled;
-
-            float alphaPulse = 1f + (Mathf.Sin(phase * 1.3f) * flamesPulseAmplitude);
-            alphaPulse = Mathf.Clamp(alphaPulse, 0f, 1.2f);
-
-            if (i < flameSpriteRenderers.Length && flameSpriteRenderers[i] != null)
-            {
-                Color c = flameSpriteRenderers[i].color;
-                float baseAlpha = (flameBaseAlphas != null && i < flameBaseAlphas.Length) ? flameBaseAlphas[i] : c.a;
-                c.a = Mathf.Clamp01(baseAlpha * alphaPulse);
-                flameSpriteRenderers[i].color = c;
-            }
-
-            if (i < flameImages.Length && flameImages[i] != null)
-            {
-                Color c = flameImages[i].color;
-                float baseAlpha = (flameBaseAlphas != null && i < flameBaseAlphas.Length) ? flameBaseAlphas[i] : c.a;
-                c.a = Mathf.Clamp01(baseAlpha * alphaPulse);
-                flameImages[i].color = c;
-            }
-        }
-    }
-
-    private void ApplyFlamesBaseAlpha(float alpha1, float alpha2, float alpha3)
-    {
-        EnsureFlameCaches();
-        float[] alphas = { Mathf.Clamp01(alpha1), Mathf.Clamp01(alpha2), Mathf.Clamp01(alpha3) };
-        for (int i = 0; i < flameSpriteRenderers.Length; i++)
-        {
-            SpriteRenderer r = flameSpriteRenderers[i];
-            if (r == null)
-                continue;
-            Color c = r.color;
-            c.a = i < alphas.Length ? alphas[i] : 0f;
-            r.color = c;
-            if (flameBaseAlphas != null && i < flameBaseAlphas.Length)
-                flameBaseAlphas[i] = c.a;
-        }
-
-        for (int i = 0; i < flameImages.Length; i++)
-        {
-            Image img = flameImages[i];
-            if (img == null)
-                continue;
-            Color c = img.color;
-            c.a = i < alphas.Length ? alphas[i] : 0f;
-            img.color = c;
-            if (flameBaseAlphas != null && i < flameBaseAlphas.Length)
-                flameBaseAlphas[i] = c.a;
-        }
-    }
-
-    private void EnsureFlameCaches()
-    {
-        Transform f1 = fire1;
-        Transform f2 = fire2;
-        Transform f3 = fire3;
-        bool sameRefs =
-            flameTransforms != null &&
-            flameTransforms.Length == 3 &&
-            flameTransforms[0] == f1 &&
-            flameTransforms[1] == f2 &&
-            flameTransforms[2] == f3;
-        if (flameCacheInitialized && sameRefs)
-            return;
-
-        flameTransforms = new[] { f1, f2, f3 };
-        flameBaseScales = new Vector3[3];
-        flameSpriteRenderers = new SpriteRenderer[3];
-        flameImages = new Image[3];
-        flameBaseAlphas = new float[3];
-
-        for (int i = 0; i < flameTransforms.Length; i++)
-        {
-            Transform flame = flameTransforms[i];
-            if (flame == null)
-            {
-                flameBaseScales[i] = Vector3.one;
-                continue;
-            }
-
-            flameBaseScales[i] = SafeScale(flame.localScale);
-            flameSpriteRenderers[i] = flame.GetComponent<SpriteRenderer>();
-            flameImages[i] = flame.GetComponent<Image>();
-            float spriteAlpha = flameSpriteRenderers[i] != null ? flameSpriteRenderers[i].color.a : 1f;
-            float imageAlpha = flameImages[i] != null ? flameImages[i].color.a : 1f;
-            flameBaseAlphas[i] = Mathf.Clamp01(Mathf.Max(spriteAlpha, imageAlpha));
-        }
-
-        flameCacheInitialized = true;
     }
 
     private void AutoAssignReferences()
     {
-        // Prefer explicit capture HUD names to avoid binding to wrong images/text after propagate operations.
         Transform explicitCaptureBar = FindChildRecursive(transform, "capture_bar")
             ?? FindChildRecursive(transform, "captured_container")
             ?? FindChildRecursive(transform, "capture_container");
@@ -334,12 +219,74 @@ public class ConstructionHudController : MonoBehaviour
                 capturedText = capturedContainer.GetComponentInChildren<TMP_Text>(includeInactive: true);
         }
 
-        if (!IsChildOfThisHud(fire1))
-            fire1 = FindChildRecursive(transform, "fire1");
-        if (!IsChildOfThisHud(fire2))
-            fire2 = FindChildRecursive(transform, "fire2");
-        if (!IsChildOfThisHud(fire3))
-            fire3 = FindChildRecursive(transform, "fire3");
+        if (!IsChildOfThisHud(flagIcon))
+            flagIcon = FindChildRecursive(transform, "flag_icon");
+
+        if (!IsChildOfThisHud(flagText != null ? flagText.transform : null))
+        {
+            Transform flagTextTransform = FindChildRecursive(transform, "flag_text");
+            if (flagTextTransform != null)
+                flagText = flagTextTransform.GetComponent<TMP_Text>();
+        }
+    }
+
+    private void EnsureFlagThreatOutline()
+    {
+        if (flagIcon == null)
+        {
+            flagThreatOutline = null;
+            return;
+        }
+
+        if (flagThreatOutline == null || flagThreatOutline.transform != flagIcon)
+            flagThreatOutline = flagIcon.GetComponent<Outline>();
+
+        if (flagThreatOutline == null)
+            flagThreatOutline = flagIcon.gameObject.AddComponent<Outline>();
+
+        flagThreatOutline.effectDistance = flagThreatOutlineDistance;
+        flagThreatOutline.useGraphicAlpha = true;
+        if (!shouldShowFlagThreatOutline)
+            flagThreatOutline.enabled = false;
+    }
+
+    private void RefreshFlagThreatOutlinePulse()
+    {
+        if (!shouldShowFlagThreatOutline || flagThreatOutline == null || flagIcon == null || !flagIcon.gameObject.activeInHierarchy)
+        {
+            ResetFlagThreatOutlineVisual();
+            return;
+        }
+
+        if (flagThreatPulseDuration <= 0.0001f)
+            flagThreatPulseDuration = UnityEngine.Random.Range(flagThreatPulseMinDuration, flagThreatPulseMaxDuration);
+
+        flagThreatPulseTimer += Time.deltaTime;
+        while (flagThreatPulseTimer >= flagThreatPulseDuration)
+        {
+            flagThreatPulseTimer -= flagThreatPulseDuration;
+            flagThreatPulseDuration = UnityEngine.Random.Range(flagThreatPulseMinDuration, flagThreatPulseMaxDuration);
+        }
+
+        float t = Mathf.PingPong(flagThreatPulseTimer / Mathf.Max(0.001f, flagThreatPulseDuration), 1f);
+        float alpha = Mathf.Lerp(flagThreatOutlineAlphaMin, flagThreatOutlineAlphaMax, t);
+        Color c = flagThreatOutlineColor;
+        c.a = alpha;
+
+        flagThreatOutline.effectColor = c;
+        if (!flagThreatOutline.enabled)
+            flagThreatOutline.enabled = true;
+    }
+
+    private void ResetFlagThreatOutlineVisual()
+    {
+        flagThreatPulseTimer = 0f;
+        flagThreatPulseDuration = Mathf.Max(0.01f, UnityEngine.Random.Range(flagThreatPulseMinDuration, flagThreatPulseMaxDuration));
+
+        if (flagThreatOutline == null)
+            return;
+
+        flagThreatOutline.enabled = false;
     }
 
     private void EnsureCaptureVisualOrder()
@@ -400,20 +347,6 @@ public class ConstructionHudController : MonoBehaviour
         }
 
         return null;
-    }
-
-    private static bool IsFinite(Vector3 v)
-    {
-        return float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
-    }
-
-    private static Vector3 SafeScale(Vector3 candidate)
-    {
-        Vector3 v = candidate;
-        if (!float.IsFinite(v.x) || Mathf.Abs(v.x) > 1000f) v.x = 1f;
-        if (!float.IsFinite(v.y) || Mathf.Abs(v.y) > 1000f) v.y = 1f;
-        if (!float.IsFinite(v.z) || Mathf.Abs(v.z) > 1000f) v.z = 1f;
-        return v;
     }
 
     private Color GetCapturedColorByRatio(float ratio, TeamId ownerTeam)

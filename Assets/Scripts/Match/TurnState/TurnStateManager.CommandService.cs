@@ -16,6 +16,9 @@ public partial class TurnStateManager
 
     private readonly List<ServicoDoComandoOption> commandServiceQueuedOrders = new List<ServicoDoComandoOption>();
     private readonly List<ServicoDoComandoInvalidOption> commandServiceInvalidOrders = new List<ServicoDoComandoInvalidOption>();
+    private readonly HashSet<int> commandServiceServedUnitInstanceIds = new HashSet<int>();
+    private int commandServiceServedCacheTurn = int.MinValue;
+    private int commandServiceServedCacheTeamId = int.MinValue;
     private bool commandServiceExecutionInProgress;
     public bool IsPlayerCursorLockedByCommandService => commandServiceExecutionInProgress;
 
@@ -48,6 +51,7 @@ public partial class TurnStateManager
             message = "Servico do Comando indisponivel durante outra execucao.";
             if (emitLogs)
                 Debug.Log(message);
+            PushPanelUnitMessage("Servico do comando: indisponivel");
             return false;
         }
 
@@ -56,6 +60,7 @@ public partial class TurnStateManager
             message = $"Servico do Comando (\"X\") exige cursor em Neutral (atual: {cursorState}).";
             if (emitLogs)
                 Debug.Log(message);
+            PushPanelUnitMessage("Servico do comando: use no Neutral");
             return false;
         }
 
@@ -66,8 +71,11 @@ public partial class TurnStateManager
             message = "Servico do Comando (\"X\"): sem time ativo valido.";
             if (emitLogs)
                 Debug.Log(message);
+            PushPanelUnitMessage("Servico do comando: time invalido");
             return false;
         }
+
+        RefreshCommandServiceServedCacheScope();
 
         bool canRun = ServicoDoComandoSensor.CollectOptions(
             (TeamId)activeTeamId,
@@ -76,12 +84,34 @@ public partial class TurnStateManager
             commandServiceQueuedOrders,
             out string reason,
             commandServiceInvalidOrders);
+
+        for (int i = commandServiceQueuedOrders.Count - 1; i >= 0; i--)
+        {
+            ServicoDoComandoOption order = commandServiceQueuedOrders[i];
+            UnitManager target = order != null ? order.targetUnit : null;
+            if (target == null)
+            {
+                commandServiceQueuedOrders.RemoveAt(i);
+                continue;
+            }
+
+            if (target.ReceivedSuppliesThisTurn || WasUnitServedByCommandThisTurn(target))
+                commandServiceQueuedOrders.RemoveAt(i);
+        }
+
+        if (commandServiceQueuedOrders.Count <= 0 &&
+            (canRun || string.IsNullOrWhiteSpace(reason)))
+        {
+            reason = "Todas as unidades elegiveis ja receberam servico nesta rodada.";
+        }
+
         if (!canRun || commandServiceQueuedOrders.Count <= 0)
         {
             string suffix = commandServiceInvalidOrders.Count > 0 ? $" | invalidos={commandServiceInvalidOrders.Count}" : string.Empty;
             message = $"Servico do Comando (\"X\"): {reason}{suffix}";
             if (emitLogs)
                 Debug.Log(message);
+            PushPanelUnitMessage("Servico do comando: sem candidatos", 2.6f);
             cursorController?.PlayLoadSfx();
             return false;
         }
@@ -89,12 +119,14 @@ public partial class TurnStateManager
         message = $"Servico do Comando (\"X\"): iniciando ordem com {commandServiceQueuedOrders.Count} unidade(s).";
         if (emitLogs)
             Debug.Log(message);
+        PushPanelUnitMessage("Servico do comando: executando", 2.2f);
         StartCoroutine(ExecuteCommandServiceOrderSequence());
         return true;
     }
 
     private IEnumerator ExecuteCommandServiceOrderSequence()
     {
+        RefreshCommandServiceServedCacheScope();
         commandServiceExecutionInProgress = true;
         RestoreSupplyEmbarkedSelectionVisuals();
 
@@ -126,7 +158,7 @@ public partial class TurnStateManager
             ServicoDoComandoOption order = commandServiceQueuedOrders[i];
             if (order == null || order.targetUnit == null)
                 continue;
-            if (order.targetUnit.ReceivedSuppliesThisTurn)
+            if (order.targetUnit.ReceivedSuppliesThisTurn || WasUnitServedByCommandThisTurn(order.targetUnit))
                 continue;
 
             UnitManager target = order.targetUnit;
@@ -172,9 +204,14 @@ public partial class TurnStateManager
                     supplyEmbarkedPreviewStates[target] = state;
                     ShowEmbarkedPassengerForSupply(target, sourceSupplierUnit);
                 }
-                SetSupplierHudVisibleForCommandSource(sourceSupplierUnit, false);
-                supplierHudHiddenForEmbarked = true;
-                Debug.Log($"ocultando HUD do {sourceSupplierUnit.name}");
+                // So oculta HUD do fornecedor quando a fonte real do servico eh a unidade supplier.
+                // Em servico vindo de construcao, manter HUD do transportador evita estado visual preso.
+                if (fromSupplierUnit && !fromConstruction)
+                {
+                    SetSupplierHudVisibleForCommandSource(sourceSupplierUnit, false);
+                    supplierHudHiddenForEmbarked = true;
+                    Debug.Log($"ocultando HUD do {sourceSupplierUnit.name}");
+                }
                 targetCell = sourceSupplierUnit.CurrentCellPosition;
                 targetCell.z = 0;
             }
@@ -396,6 +433,8 @@ public partial class TurnStateManager
                 if (fuelGain <= 0)
                     Debug.Log($"[ServicoComando][Fila] {target.name}: sem ganho de AUT no alvo (HP +{hpGain} | AUT +{fuelGain} | MUN +{ammoGain}).");
 
+                MarkUnitServedByCommandThisTurn(target);
+
                 bool embarkedHiddenAfterService = false;
                 if (isEmbarkedPassenger && supplyEmbarkedPreviewStates.TryGetValue(target, out SupplyEmbarkedPreviewState servedStateAfterService))
                 {
@@ -443,15 +482,51 @@ public partial class TurnStateManager
         if (servedTargets <= 0)
         {
             Debug.Log("[ServicoComando] Nenhum alvo recebeu servico (necessidade/estoque).");
+            PushPanelUnitMessage("Servico do comando: sem candidatos", 2.6f);
             cursorController?.PlayLoadSfx();
             commandServiceExecutionInProgress = false;
             yield break;
         }
 
         Debug.Log($"[ServicoComando] alvos atendidos={servedTargets} | HP +{recoveredHp} | autonomia +{recoveredFuel} | municao +{recoveredAmmo} | custo ${Mathf.Max(0, totalMoneySpent)}");
+        PushPanelUnitMessage($"Servico comando: {servedTargets} alvos | ${Mathf.Max(0, totalMoneySpent)}", 3.2f);
         Debug.Log(BuildCommandServiceDetailedReportLog(detailedReport));
         cursorController?.PlayLoadSfx();
         commandServiceExecutionInProgress = false;
+    }
+
+    private void RefreshCommandServiceServedCacheScope()
+    {
+        int currentTurn = matchController != null ? matchController.CurrentTurn : int.MinValue;
+        int currentTeam = matchController != null ? matchController.ActiveTeamId : int.MinValue;
+        if (commandServiceServedCacheTurn == currentTurn && commandServiceServedCacheTeamId == currentTeam)
+            return;
+
+        commandServiceServedCacheTurn = currentTurn;
+        commandServiceServedCacheTeamId = currentTeam;
+        commandServiceServedUnitInstanceIds.Clear();
+    }
+
+    private bool WasUnitServedByCommandThisTurn(UnitManager unit)
+    {
+        if (unit == null)
+            return false;
+
+        int id = unit.InstanceId;
+        return id > 0 && commandServiceServedUnitInstanceIds.Contains(id);
+    }
+
+    private void MarkUnitServedByCommandThisTurn(UnitManager unit)
+    {
+        if (unit == null)
+            return;
+
+        int id = unit.InstanceId;
+        if (id > 0)
+            commandServiceServedUnitInstanceIds.Add(id);
+
+        if (!unit.ReceivedSuppliesThisTurn)
+            unit.MarkReceivedSuppliesThisTurn();
     }
 
     private void ForceHideEmbarkedPassengersExcept(UnitManager supplier, UnitManager keepVisible)
@@ -494,8 +569,48 @@ public partial class TurnStateManager
             return;
 
         UnitHudController supplierHud = supplier.GetComponentInChildren<UnitHudController>(true);
-        if (supplierHud != null)
-            supplierHud.gameObject.SetActive(visible);
+        if (supplierHud == null)
+            return;
+
+        supplierHud.gameObject.SetActive(visible);
+        if (!visible)
+            return;
+
+        // Reaplica o estado do HUD ao restaurar o transportador para garantir
+        // que o indicador "T" reflita corretamente passageiros embarcados.
+        bool showTransportIndicator = HasEmbarkedPassengersForTransportIndicator(supplier);
+        supplierHud.RefreshBindings();
+        supplierHud.Apply(
+            supplier.CurrentHP,
+            supplier.GetMaxHP(),
+            supplier.CurrentAmmo,
+            supplier.GetMaxAmmo(),
+            supplier.CurrentFuel,
+            supplier.MaxFuel,
+            TeamUtils.GetColor(supplier.TeamId),
+            supplier.GetDomain(),
+            supplier.GetHeightLevel(),
+            showTransportIndicator);
+    }
+
+    private static bool HasEmbarkedPassengersForTransportIndicator(UnitManager supplier)
+    {
+        if (supplier == null)
+            return false;
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats = supplier.TransportedUnitSlots;
+        if (seats == null || seats.Count <= 0)
+            return false;
+
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            UnitManager passenger = seat != null ? seat.embarkedUnit : null;
+            if (passenger != null && passenger.IsEmbarked && passenger.EmbarkedTransporter == supplier)
+                return true;
+        }
+
+        return false;
     }
 
     private static string BuildCommandServiceDetailedReportLog(List<CommandServiceTargetReport> rows)
@@ -539,6 +654,19 @@ public partial class TurnStateManager
     {
         if (service == null)
             return "(servico)";
+        if (!string.IsNullOrWhiteSpace(service.displayName))
+            return service.displayName;
+        if (!string.IsNullOrWhiteSpace(service.id))
+            return service.id;
+        return service.name;
+    }
+
+    private static string ResolveServiceUpdateLabel(ServiceData service)
+    {
+        if (service == null)
+            return "(servico)";
+        if (!string.IsNullOrWhiteSpace(service.apelido))
+            return service.apelido;
         if (!string.IsNullOrWhiteSpace(service.displayName))
             return service.displayName;
         if (!string.IsNullOrWhiteSpace(service.id))

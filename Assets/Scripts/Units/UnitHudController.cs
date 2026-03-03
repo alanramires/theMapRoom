@@ -40,6 +40,21 @@ public class UnitHudController : MonoBehaviour
     [SerializeField] private float fuelMinScaleX = 0.05f;
     [SerializeField] private bool hideFuelWhenFull = false;
 
+    [Header("Weapon Ammo UI")]
+    [SerializeField] private Transform wContainer;
+    [SerializeField] private SpriteRenderer wFillRenderer;
+    [SerializeField] private Image wFillImage;
+    [SerializeField] private TMP_Text wText;
+    [SerializeField] private Transform w1Container;
+    [SerializeField] private SpriteRenderer w1FillRenderer;
+    [SerializeField] private Image w1FillImage;
+    [SerializeField] private TMP_Text w1Text;
+    [SerializeField] private Transform w2Container;
+    [SerializeField] private SpriteRenderer w2FillRenderer;
+    [SerializeField] private Image w2FillImage;
+    [SerializeField] private TMP_Text w2Text;
+    [SerializeField] private float weaponAmmoMinScaleX = 0f;
+
     [Header("Altitude")]
     [SerializeField] private SpriteRenderer altitudeRenderer;
     [SerializeField] private Image altitudeImage;
@@ -55,6 +70,13 @@ public class UnitHudController : MonoBehaviour
     [SerializeField] private bool followParentSpriteSortingLayer = true;
     [SerializeField] private int orderAboveParentSprite = 100;
     [SerializeField] private int worldHudOrderOffsetPerElement = 1;
+    private UnitManager ownerUnit;
+    private bool wBaseScaleCached;
+    private bool w1BaseScaleCached;
+    private bool w2BaseScaleCached;
+    private Vector3 wBaseScale = Vector3.one;
+    private Vector3 w1BaseScale = Vector3.one;
+    private Vector3 w2BaseScale = Vector3.one;
 
     private void Awake()
     {
@@ -100,6 +122,7 @@ public class UnitHudController : MonoBehaviour
         RefreshHp(currentHP, maxHP);
         RefreshPips(ammoPips, currentAmmo, maxAmmo, teamColor);
         RefreshFuel(currentFuel, maxFuel, teamColor);
+        RefreshWeaponAmmoVisuals();
         RefreshAltitude(domain, heightLevel);
         RefreshTransportIndicator(showTransportIndicator);
     }
@@ -275,6 +298,69 @@ public class UnitHudController : MonoBehaviour
                 fuelText = fuelTextT.GetComponent<TMP_Text>();
         }
 
+        if (wContainer == null)
+            wContainer = FindChildRecursive(transform, "w_container");
+        if (wFillRenderer == null)
+        {
+            Transform wFillT = FindChildRecursive(transform, "w");
+            if (wFillT != null)
+                wFillRenderer = wFillT.GetComponent<SpriteRenderer>();
+        }
+        if (wFillImage == null)
+        {
+            Transform wFillT = FindChildRecursive(transform, "w");
+            if (wFillT != null)
+                wFillImage = wFillT.GetComponent<Image>();
+        }
+        if (wText == null)
+        {
+            Transform wTextT = FindChildRecursive(transform, "w_text");
+            if (wTextT != null)
+                wText = wTextT.GetComponent<TMP_Text>();
+        }
+
+        if (w1Container == null)
+            w1Container = FindChildRecursive(transform, "w1_container");
+        if (w1FillRenderer == null)
+        {
+            Transform w1FillT = FindChildRecursive(transform, "w1");
+            if (w1FillT != null)
+                w1FillRenderer = w1FillT.GetComponent<SpriteRenderer>();
+        }
+        if (w1FillImage == null)
+        {
+            Transform w1FillT = FindChildRecursive(transform, "w1");
+            if (w1FillT != null)
+                w1FillImage = w1FillT.GetComponent<Image>();
+        }
+        if (w1Text == null)
+        {
+            Transform w1TextT = FindChildRecursive(transform, "w1_text");
+            if (w1TextT != null)
+                w1Text = w1TextT.GetComponent<TMP_Text>();
+        }
+
+        if (w2Container == null)
+            w2Container = FindChildRecursive(transform, "w2_container");
+        if (w2FillRenderer == null)
+        {
+            Transform w2FillT = FindChildRecursive(transform, "w2");
+            if (w2FillT != null)
+                w2FillRenderer = w2FillT.GetComponent<SpriteRenderer>();
+        }
+        if (w2FillImage == null)
+        {
+            Transform w2FillT = FindChildRecursive(transform, "w2");
+            if (w2FillT != null)
+                w2FillImage = w2FillT.GetComponent<Image>();
+        }
+        if (w2Text == null)
+        {
+            Transform w2TextT = FindChildRecursive(transform, "w2_text");
+            if (w2TextT != null)
+                w2Text = w2TextT.GetComponent<TMP_Text>();
+        }
+
         Transform altitudeT = FindChildRecursive(transform, "altitude");
         if (altitudeT != null)
         {
@@ -298,6 +384,144 @@ public class UnitHudController : MonoBehaviour
         if (altitudeSubmergedSprite == null)
             altitudeSubmergedSprite = FindSpriteByName("submerged");
 
+    }
+
+    private void RefreshWeaponAmmoVisuals()
+    {
+        if (ownerUnit == null)
+            ownerUnit = GetComponentInParent<UnitManager>();
+
+        int weaponCount = GetConfiguredWeaponAmmoInfo(
+            out int current0, out int max0,
+            out int current1, out int max1);
+
+        if (weaponCount <= 0)
+        {
+            SetWeaponSlotVisible(wContainer, wFillRenderer, wFillImage, wText, false);
+            SetWeaponSlotVisible(w1Container, w1FillRenderer, w1FillImage, w1Text, false);
+            SetWeaponSlotVisible(w2Container, w2FillRenderer, w2FillImage, w2Text, false);
+            return;
+        }
+
+        if (weaponCount == 1)
+        {
+            SetWeaponSlotVisible(wContainer, wFillRenderer, wFillImage, wText, true);
+            SetWeaponSlotVisible(w1Container, w1FillRenderer, w1FillImage, w1Text, false);
+            SetWeaponSlotVisible(w2Container, w2FillRenderer, w2FillImage, w2Text, false);
+            ApplyWeaponSlotAmmo(current0, max0, wFillRenderer, wFillImage, wText, ref wBaseScaleCached, ref wBaseScale);
+            return;
+        }
+
+        SetWeaponSlotVisible(wContainer, wFillRenderer, wFillImage, wText, false);
+        SetWeaponSlotVisible(w1Container, w1FillRenderer, w1FillImage, w1Text, true);
+        SetWeaponSlotVisible(w2Container, w2FillRenderer, w2FillImage, w2Text, true);
+        ApplyWeaponSlotAmmo(current0, max0, w1FillRenderer, w1FillImage, w1Text, ref w1BaseScaleCached, ref w1BaseScale);
+        ApplyWeaponSlotAmmo(current1, max1, w2FillRenderer, w2FillImage, w2Text, ref w2BaseScaleCached, ref w2BaseScale);
+    }
+
+    private int GetConfiguredWeaponAmmoInfo(
+        out int current0, out int max0,
+        out int current1, out int max1)
+    {
+        current0 = 0;
+        max0 = 0;
+        current1 = 0;
+        max1 = 0;
+
+        if (ownerUnit == null)
+            return 0;
+
+        IReadOnlyList<UnitEmbarkedWeapon> runtime = ownerUnit.GetEmbarkedWeapons();
+        if (runtime == null || runtime.Count <= 0)
+            return 0;
+
+        List<UnitEmbarkedWeapon> baseline = null;
+        if (ownerUnit.TryGetUnitData(out UnitData data) && data != null)
+            baseline = data.embarkedWeapons;
+
+        int maxEntries = Mathf.Max(runtime.Count, baseline != null ? baseline.Count : 0);
+        int configured = 0;
+        for (int i = 0; i < maxEntries; i++)
+        {
+            UnitEmbarkedWeapon runtimeWeapon = i < runtime.Count ? runtime[i] : null;
+            UnitEmbarkedWeapon baselineWeapon = (baseline != null && i < baseline.Count) ? baseline[i] : null;
+            bool hasWeapon = (runtimeWeapon != null && runtimeWeapon.weapon != null) ||
+                             (baselineWeapon != null && baselineWeapon.weapon != null);
+            if (!hasWeapon)
+                continue;
+
+            int current = runtimeWeapon != null ? Mathf.Max(0, runtimeWeapon.squadAmmunition) : 0;
+            int max = baselineWeapon != null ? Mathf.Max(0, baselineWeapon.squadAmmunition) : current;
+            max = Mathf.Max(max, current);
+
+            if (configured == 0)
+            {
+                current0 = current;
+                max0 = max;
+            }
+            else if (configured == 1)
+            {
+                current1 = current;
+                max1 = max;
+            }
+
+            configured++;
+            if (configured >= 2)
+                break;
+        }
+
+        return configured;
+    }
+
+    private void SetWeaponSlotVisible(Transform container, SpriteRenderer fillRenderer, Image fillImage, TMP_Text text, bool visible)
+    {
+        if (container != null)
+        {
+            if (container.gameObject.activeSelf != visible)
+                container.gameObject.SetActive(visible);
+            return;
+        }
+
+        if (fillRenderer != null)
+            fillRenderer.enabled = visible;
+        if (fillImage != null)
+            fillImage.enabled = visible;
+        if (text != null)
+            text.enabled = visible;
+    }
+
+    private void ApplyWeaponSlotAmmo(
+        int currentAmmo,
+        int maxAmmo,
+        SpriteRenderer fillRenderer,
+        Image fillImage,
+        TMP_Text text,
+        ref bool baseScaleCached,
+        ref Vector3 baseScale)
+    {
+        int safeCurrent = Mathf.Max(0, currentAmmo);
+        int safeMax = Mathf.Max(1, maxAmmo);
+        float ratio = Mathf.Clamp01((float)safeCurrent / safeMax);
+
+        if (text != null)
+            text.text = $"{safeCurrent}";
+
+        if (fillImage != null)
+            fillImage.fillAmount = ratio;
+
+        if (fillRenderer != null)
+        {
+            if (!baseScaleCached)
+            {
+                baseScale = fillRenderer.transform.localScale;
+                baseScaleCached = true;
+            }
+
+            Vector3 scale = baseScale;
+            float baseX = Mathf.Abs(baseScale.x) <= 0.0001f ? 1f : baseScale.x;
+            scale.x = Mathf.Sign(baseX) * Mathf.Max(weaponAmmoMinScaleX, Mathf.Abs(baseX) * ratio);
+            fillRenderer.transform.localScale = scale;
+        }
     }
 
     private void RefreshAltitude(Domain domain, HeightLevel heightLevel)
@@ -416,14 +640,18 @@ public class UnitHudController : MonoBehaviour
     {
         if (parent == null)
             return null;
+        string target = string.IsNullOrWhiteSpace(childName) ? string.Empty : childName.Trim();
+        if (target.Length == 0)
+            return null;
 
         for (int i = 0; i < parent.childCount; i++)
         {
             Transform child = parent.GetChild(i);
-            if (string.Equals(child.name, childName, System.StringComparison.OrdinalIgnoreCase))
+            string current = child != null && !string.IsNullOrWhiteSpace(child.name) ? child.name.Trim() : string.Empty;
+            if (string.Equals(current, target, System.StringComparison.OrdinalIgnoreCase))
                 return child;
 
-            Transform nested = FindChildRecursive(child, childName);
+            Transform nested = FindChildRecursive(child, target);
             if (nested != null)
                 return nested;
         }

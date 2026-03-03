@@ -301,6 +301,15 @@ public static class PodeDesembarcarSensor
             return false;
         }
 
+        if (terrainDatabase != null &&
+            TryResolveTerrainAtCell(map, terrainDatabase, targetCell, out TerrainTypeData targetTerrain) &&
+            targetTerrain != null &&
+            !targetTerrain.allowDisembark)
+        {
+            reason = $"Terreno '{ResolveTerrainLabel(targetTerrain)}' nao permite desembarque.";
+            return false;
+        }
+
         // Aeronave desembarcante segue regra de decolagem (0/1/full) e sai em Air/Low.
         // Nao deve ser bloqueada por custo de entrada terrestre do hex de destino.
         if (passenger.TryGetUnitData(out UnitData passengerData) && passengerData != null && passengerData.IsAircraft())
@@ -739,6 +748,17 @@ public static class PodeDesembarcarSensor
             enterCost = enterCost,
             reason = reason
         });
+    }
+
+    private static string ResolveTerrainLabel(TerrainTypeData terrain)
+    {
+        if (terrain == null)
+            return "(terreno)";
+        if (!string.IsNullOrWhiteSpace(terrain.displayName))
+            return terrain.displayName;
+        if (!string.IsNullOrWhiteSpace(terrain.id))
+            return terrain.id;
+        return terrain.name;
     }
 
     private enum PairRuleMatchResult

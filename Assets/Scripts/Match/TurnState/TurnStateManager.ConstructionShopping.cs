@@ -82,6 +82,13 @@ public partial class TurnStateManager
 
         int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
         TeamId spawnTeam = activeTeam >= 0 ? (TeamId)activeTeam : shoppingConstruction.TeamId;
+        if (matchController != null && matchController.HasReachedMaxUnitsPerTeam(spawnTeam))
+        {
+            cursorController?.PlayErrorSfx();
+            Debug.LogError($"[Shopping] Limite de unidades atingido para {TeamUtils.GetName(spawnTeam)} ({matchController.MaxUnitsPerTeam}).");
+            return;
+        }
+
         int unitCost = matchController != null
             ? matchController.ResolveEconomyCost(unit.cost)
             : Mathf.Max(0, unit.cost);
@@ -90,8 +97,9 @@ public partial class TurnStateManager
             int currentMoney = matchController.GetActualMoney(spawnTeam);
             if (currentMoney < unitCost)
             {
+                PushPanelUnitMessage("Sem dinheiro suficiente", 2.6f);
                 cursorController?.PlayErrorSfx();
-                Debug.LogError($"[Shopping] Dinheiro insuficiente para comprar {ResolveUnitName(unit)}. Custo=${unitCost}, saldo=${currentMoney}.");
+                Debug.LogWarning($"[Shopping] Dinheiro insuficiente para comprar {ResolveUnitName(unit)}. Custo=${unitCost}, saldo=${currentMoney}.");
                 return;
             }
         }
@@ -106,7 +114,8 @@ public partial class TurnStateManager
             return;
         }
 
-        if (matchController != null && !matchController.TrySpendActualMoney(spawnTeam, unitCost, out int remainingMoney))
+        int remainingMoney = matchController != null ? matchController.GetActualMoney(spawnTeam) : 0;
+        if (matchController != null && !matchController.TrySpendActualMoney(spawnTeam, unitCost, out remainingMoney))
         {
             // Protecao contra corrida/estado inesperado: se falhou no debito, desfaz spawn.
             Destroy(spawned);
@@ -114,6 +123,9 @@ public partial class TurnStateManager
             Debug.LogError($"[Shopping] Falha ao debitar custo da unidade {ResolveUnitName(unit)}. Saldo atual=${remainingMoney}, custo=${unitCost}.");
             return;
         }
+
+        if (matchController != null)
+            PanelMoneyController.PushContextualUpdate(spawnTeam, remainingMoney, ResolveUnitName(unit), -unitCost);
 
         cursorController?.PlayDoneSfx();
         Debug.Log($"[Shopping] Compra concluida: {ResolveUnitName(unit)} por ${unitCost} em {ResolveConstructionName(shoppingConstruction)}.");

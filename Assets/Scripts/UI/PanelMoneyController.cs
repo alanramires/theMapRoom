@@ -1,19 +1,28 @@
 using System.Text;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 
 public class PanelMoneyController : MonoBehaviour
 {
+    private struct PendingMoneyUpdate
+    {
+        public TeamId team;
+        public int resultingMoney;
+        public string label;
+        public int delta;
+    }
+
+    private static PanelMoneyController instance;
+    private static readonly List<PendingMoneyUpdate> pendingMoneyUpdates = new List<PendingMoneyUpdate>();
+
     [Header("References")]
     [SerializeField] private MatchController matchController;
     [SerializeField] private AnimationManager animationManager;
     [SerializeField] private TMP_Text textMoney;
-    [SerializeField] private Text legacyTextMoney;
     [SerializeField] private TMP_Text textUpdate;
-    [SerializeField] private Text legacyTextUpdate;
+    [SerializeField] private TMP_Text textIncoming;
 
     [Header("Display")]
     [SerializeField] private string prefix = "$ ";
@@ -23,15 +32,55 @@ public class PanelMoneyController : MonoBehaviour
 
     private string lastRenderedValue = string.Empty;
     private Color lastRenderedColor = new Color(float.NaN, float.NaN, float.NaN, float.NaN);
+    private string lastRenderedIncoming = string.Empty;
     private readonly Dictionary<TeamId, int> knownMoneyByTeam = new Dictionary<TeamId, int>();
     private Coroutine moneyUpdateRoutine;
 
+    public static void PushContextualUpdate(TeamId team, int resultingMoney, string label, int delta)
+    {
+        if (instance == null)
+        {
+            pendingMoneyUpdates.Add(new PendingMoneyUpdate
+            {
+                team = team,
+                resultingMoney = resultingMoney,
+                label = label,
+                delta = delta
+            });
+            return;
+        }
+
+        instance.PushContextualUpdateInternal(team, resultingMoney, label, delta);
+    }
+
     private void Awake()
     {
+        instance = this;
         TryAutoAssignReferences();
         SeedKnownMoneySnapshot();
         SetUpdateTextVisible(false);
         RefreshMoneyText(force: true);
+        ConsumePendingMoneyUpdates();
+    }
+
+    private void OnDestroy()
+    {
+        if (instance == this)
+            instance = null;
+    }
+
+    private void ConsumePendingMoneyUpdates()
+    {
+        if (pendingMoneyUpdates.Count <= 0)
+            return;
+
+        for (int i = 0; i < pendingMoneyUpdates.Count; i++)
+        {
+            PendingMoneyUpdate pending = pendingMoneyUpdates[i];
+            PushContextualUpdateInternal(pending.team, pending.resultingMoney, pending.label, pending.delta);
+        }
+
+        pendingMoneyUpdates.Clear();
     }
 
     private void Update()
@@ -60,20 +109,13 @@ public class PanelMoneyController : MonoBehaviour
         if (textMoney == null)
             textMoney = FindMoneyTextByName();
 
-        if (legacyTextMoney == null)
-            legacyTextMoney = FindMoneyLegacyTextByName();
-
         if (textUpdate == null)
             textUpdate = FindMoneyUpdateTextByName();
-
-        if (legacyTextUpdate == null)
-            legacyTextUpdate = FindMoneyUpdateLegacyTextByName();
+        if (textIncoming == null)
+            textIncoming = FindMoneyIncomingTextByName();
 
         if (textMoney == null)
             textMoney = GetComponentInChildren<TMP_Text>(true);
-
-        if (legacyTextMoney == null)
-            legacyTextMoney = GetComponentInChildren<Text>(true);
     }
 
     private TMP_Text FindMoneyTextByName()
@@ -84,14 +126,6 @@ public class PanelMoneyController : MonoBehaviour
         return named.GetComponent<TMP_Text>();
     }
 
-    private Text FindMoneyLegacyTextByName()
-    {
-        Transform named = FindChildRecursive(transform, "text_money");
-        if (named == null)
-            return null;
-        return named.GetComponent<Text>();
-    }
-
     private TMP_Text FindMoneyUpdateTextByName()
     {
         Transform named = FindChildRecursive(transform, "text_update");
@@ -100,35 +134,42 @@ public class PanelMoneyController : MonoBehaviour
         return named.GetComponent<TMP_Text>();
     }
 
-    private Text FindMoneyUpdateLegacyTextByName()
+    private TMP_Text FindMoneyIncomingTextByName()
     {
-        Transform named = FindChildRecursive(transform, "text_update");
+        Transform named = FindChildRecursive(transform, "text_incoming");
         if (named == null)
             return null;
-        return named.GetComponent<Text>();
+        return named.GetComponent<TMP_Text>();
     }
 
     private void RefreshMoneyText(bool force)
     {
         TeamId activeTeam = TeamId.Neutral;
         int money = 0;
+        int incoming = 0;
         if (matchController != null)
         {
             activeTeam = matchController.ActiveTeam;
             if (activeTeam != TeamId.Neutral)
+            {
                 money = Mathf.Max(0, matchController.GetActualMoney(activeTeam));
+                incoming = Mathf.Max(0, matchController.GetIncomePerTurn(activeTeam));
+            }
         }
 
         string nextValue = $"{prefix}{FormatWithThousandsDots(money)}";
+        string nextIncoming = $"{incoming} / turn";
         Color nextColor = ResolveTextColor(activeTeam);
 
-        if (!force && nextValue == lastRenderedValue && nextColor == lastRenderedColor)
+        if (!force && nextValue == lastRenderedValue && nextColor == lastRenderedColor && nextIncoming == lastRenderedIncoming)
             return;
 
         ApplyTextValue(nextValue);
+        ApplyIncomingTextValue(nextIncoming);
         ApplyTextColor(nextColor);
         lastRenderedValue = nextValue;
         lastRenderedColor = nextColor;
+        lastRenderedIncoming = nextIncoming;
     }
 
     private Color ResolveTextColor(TeamId activeTeam)
@@ -140,18 +181,18 @@ public class PanelMoneyController : MonoBehaviour
     {
         if (textMoney != null)
             textMoney.text = value;
-
-        if (legacyTextMoney != null)
-            legacyTextMoney.text = value;
     }
 
     private void ApplyTextColor(Color value)
     {
         if (textMoney != null)
             textMoney.color = value;
+    }
 
-        if (legacyTextMoney != null)
-            legacyTextMoney.color = value;
+    private void ApplyIncomingTextValue(string value)
+    {
+        if (textIncoming != null)
+            textIncoming.text = value;
     }
 
     private void TryEmitMoneyDeltaForActiveTeam()
@@ -172,7 +213,7 @@ public class PanelMoneyController : MonoBehaviour
 
         int delta = currentMoney - previousMoney;
         if (delta != 0)
-            ShowMoneyDelta(delta);
+            ShowMoneyUpdate(string.Empty, delta);
 
         knownMoneyByTeam[activeTeam] = currentMoney;
     }
@@ -190,13 +231,32 @@ public class PanelMoneyController : MonoBehaviour
         }
     }
 
-    private void ShowMoneyDelta(int delta)
+    private void PushContextualUpdateInternal(TeamId team, int resultingMoney, string label, int delta)
+    {
+        TeamId clampedTeam = team;
+        if (clampedTeam < TeamId.Neutral || clampedTeam > TeamId.Yellow)
+            clampedTeam = TeamId.Neutral;
+
+        knownMoneyByTeam[clampedTeam] = Mathf.Max(0, resultingMoney);
+
+        if (matchController == null || matchController.ActiveTeam != clampedTeam)
+            return;
+        if (delta == 0)
+            return;
+
+        ShowMoneyUpdate(label, delta);
+    }
+
+    private void ShowMoneyUpdate(string label, int delta)
     {
         InterruptMoneyUpdateFade();
 
         string sign = delta > 0 ? "+" : "-";
         int absDelta = Mathf.Abs(delta);
-        string text = $"{sign}$ {FormatWithThousandsDots(absDelta)}";
+        string amount = $"{sign}$ {FormatWithThousandsDots(absDelta)}";
+        string text = string.IsNullOrWhiteSpace(label)
+            ? amount
+            : $"{label} {amount}";
         Color color = delta > 0 ? moneyGainColor : moneyLossColor;
 
         if (textUpdate != null)
@@ -204,13 +264,6 @@ public class PanelMoneyController : MonoBehaviour
             textUpdate.text = text;
             textUpdate.color = color;
             textUpdate.enabled = true;
-        }
-
-        if (legacyTextUpdate != null)
-        {
-            legacyTextUpdate.text = text;
-            legacyTextUpdate.color = color;
-            legacyTextUpdate.enabled = true;
         }
 
         SetUpdateTextVisible(true);
@@ -267,8 +320,6 @@ public class PanelMoneyController : MonoBehaviour
         Color withAlpha = new Color(baseColor.r, baseColor.g, baseColor.b, alpha);
         if (textUpdate != null)
             textUpdate.color = withAlpha;
-        if (legacyTextUpdate != null)
-            legacyTextUpdate.color = withAlpha;
     }
 
     private void SetUpdateTextVisible(bool visible)
@@ -278,8 +329,6 @@ public class PanelMoneyController : MonoBehaviour
 
         if (textUpdate != null)
             textUpdate.enabled = visible;
-        if (legacyTextUpdate != null)
-            legacyTextUpdate.enabled = visible;
     }
 
     private static string FormatWithThousandsDots(int value)

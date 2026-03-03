@@ -447,6 +447,7 @@ public partial class TurnStateManager
         if (matchController.TrySpendActualMoney(team, finalCost, out int remaining))
         {
             chargedCost = finalCost;
+            PanelMoneyController.PushContextualUpdate(team, remaining, ResolveServiceUpdateLabel(service), -finalCost);
             return true;
         }
 

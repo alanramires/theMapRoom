@@ -58,6 +58,8 @@ public class TerrainTypeData : ScriptableObject
     [Header("Flags")]
     [Tooltip("Se true, dominio do ar e sempre permitido (independente dos modos).")]
     public bool alwaysAllowAirDomain = true;
+    [Tooltip("Se false, unidades nao podem desembarcar neste terreno.")]
+    public bool allowDisembark = true;
     [Header("Aircraft Ops")]
     [FormerlySerializedAs("allowAircraftLanding")]
     [FormerlySerializedAs("allowAircraftTakeoff")]

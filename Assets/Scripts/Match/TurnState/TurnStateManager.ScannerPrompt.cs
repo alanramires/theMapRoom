@@ -2034,6 +2034,7 @@ public partial class TurnStateManager
                     ? cycleEntry.invalidOption.reason
                     : "alvo invalido para este ataque.";
                 Debug.Log($"[Mirando] Alvo invalido. {reason}");
+                PushPanelUnitMessage("Aim: alvo invalido", 2.6f);
                 cursorController?.PlayErrorSfx();
                 return false;
             }
@@ -2061,6 +2062,7 @@ public partial class TurnStateManager
                 ? entry.invalidOption.reason
                 : "alvo invalido para este ataque.";
             Debug.Log($"[Mirando] Alvo invalido. {reason}");
+            PushPanelUnitMessage("Aim: alvo invalido", 2.6f);
             cursorController?.PlayErrorSfx();
             return false;
         }
@@ -2069,6 +2071,7 @@ public partial class TurnStateManager
         if (option == null || option.attackerUnit == null || option.targetUnit == null)
         {
             Debug.Log("Falha ao confirmar ataque: opcao invalida.");
+            PushPanelUnitMessage("Aim: falha ao confirmar", 2.4f);
             scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
             scannerSelectedTargetIndex = 0;
             FocusCurrentMirandoTarget(logDetails: true);
@@ -2081,6 +2084,7 @@ public partial class TurnStateManager
         if (!combat.success)
         {
             Debug.Log("[Combate] Falha ao resolver combate. Retornando para selecao de alvo.");
+            PushPanelUnitMessage("Combate: falha ao resolver", 2.6f);
             scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
             FocusCurrentMirandoTarget(logDetails: true);
             LogTargetSelectionPanel();

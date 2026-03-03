@@ -14,6 +14,8 @@ public class ServiceData : ScriptableObject
     [Header("Identity")]
     public string id;
     public string displayName;
+    [Tooltip("Apelido curto para tabelas/matrizes (ex.: RPR, RST).")]
+    public string apelido;
     [TextArea] public string description;
 
     [Header("Visuals")]

@@ -40,6 +40,7 @@ public static class ServicoDoComandoSensor
 
         Dictionary<Vector3Int, List<UnitManager>> unitsByCell = BuildUnitsByCell(units);
         CollectConstructionSupplierOptions(activeTeam, map, terrainDatabase, unitsByCell, output, invalidOutput);
+        CollectConstructionSupplierEmbarkedOptions(activeTeam, map, terrainDatabase, units, output, invalidOutput);
         CollectTransportSupplierOptions(activeTeam, units, output, invalidOutput);
 
         output.Sort((a, b) =>
@@ -365,6 +366,128 @@ public static class ServicoDoComandoSensor
                     displayLabel = $"{target.name} @ {cell.x},{cell.y} via {ResolveSupplierUnitLabel(supplier)} (embarcada)",
                     plannedServices = CollectPlannedServiceLabels(target, services, stock)
                 });
+            }
+        }
+    }
+
+    private static void CollectConstructionSupplierEmbarkedOptions(
+        TeamId activeTeam,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        UnitManager[] units,
+        List<ServicoDoComandoOption> output,
+        List<ServicoDoComandoInvalidOption> invalidOutput)
+    {
+        if (units == null || units.Length <= 0)
+            return;
+
+        ConstructionManager[] constructions = Object.FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        if (constructions == null || constructions.Length <= 0)
+            return;
+
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || (int)construction.TeamId != (int)activeTeam)
+                continue;
+            if (!construction.TryResolveConstructionData(out ConstructionData data) || data == null || !data.isSupplier)
+                continue;
+            if (!construction.CanProvideSupplies)
+                continue;
+
+            List<ServiceData> services = GetDistinctServicesFromConstruction(construction);
+            if (services.Count <= 0)
+                continue;
+            if (!HasAtLeastOneOperationalServiceWithStock(construction, services))
+                continue;
+
+            int limit = Mathf.Max(0, data.maxUnitsServedPerTurn);
+            if (limit <= 0)
+                continue;
+
+            Dictionary<SupplyData, int> stock = BuildStockMap(construction);
+            if (stock.Count <= 0)
+                continue;
+
+            Vector3Int constructionCell = construction.CurrentCellPosition;
+            constructionCell.z = 0;
+
+            for (int u = 0; u < units.Length; u++)
+            {
+                UnitManager transporter = units[u];
+                if (transporter == null || !transporter.gameObject.activeInHierarchy || transporter.IsEmbarked)
+                    continue;
+                if ((int)transporter.TeamId != (int)activeTeam)
+                    continue;
+
+                Vector3Int transporterCell = transporter.CurrentCellPosition;
+                transporterCell.z = 0;
+                if (transporterCell != constructionCell)
+                    continue;
+
+                // Evita duplicar opcoes que ja entram pela trilha de transportador supridor.
+                if (transporter.TryGetUnitData(out UnitData transporterData) &&
+                    transporterData != null &&
+                    transporterData.isSupplier)
+                    continue;
+
+                IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
+                if (seats == null || seats.Count <= 0)
+                    continue;
+
+                for (int s = 0; s < seats.Count; s++)
+                {
+                    UnitTransportSeatRuntime seat = seats[s];
+                    UnitManager target = seat != null ? seat.embarkedUnit : null;
+                    if (target == null || !target.IsEmbarked || target.EmbarkedTransporter != transporter)
+                        continue;
+
+                    if ((int)target.TeamId != (int)activeTeam)
+                    {
+                        AppendInvalid(invalidOutput, construction, transporter, target, constructionCell, "Unidade embarcada de outro time.");
+                        continue;
+                    }
+
+                    if (target.ReceivedSuppliesThisTurn)
+                    {
+                        AppendInvalid(invalidOutput, construction, transporter, target, constructionCell, "Unidade embarcada ja recebeu suprimentos nesta rodada.");
+                        continue;
+                    }
+
+                    if (!TryEvaluateConstructionCandidate(
+                            construction,
+                            data,
+                            target,
+                            map,
+                            terrainDatabase,
+                            services,
+                            stock,
+                            out bool forceLand,
+                            out bool forceTakeoff,
+                            out bool forceSurface,
+                            out Domain plannedDomain,
+                            out HeightLevel plannedHeight,
+                            out string invalidReason))
+                    {
+                        AppendInvalid(invalidOutput, construction, transporter, target, constructionCell, invalidReason);
+                        continue;
+                    }
+
+                    output.Add(new ServicoDoComandoOption
+                    {
+                        sourceConstruction = construction,
+                        sourceSupplierUnit = transporter,
+                        targetUnit = target,
+                        targetCell = constructionCell,
+                        forceLandBeforeSupply = forceLand,
+                        forceTakeoffBeforeSupply = forceTakeoff,
+                        forceSurfaceBeforeSupply = forceSurface,
+                        plannedServiceDomain = plannedDomain,
+                        plannedServiceHeight = plannedHeight,
+                        displayLabel = $"{target.name} @ {constructionCell.x},{constructionCell.y} via {ResolveConstructionLabel(construction)} (embarcada em {ResolveSupplierUnitLabel(transporter)})",
+                        plannedServices = CollectPlannedServiceLabels(target, services, stock)
+                    });
+                }
             }
         }
     }

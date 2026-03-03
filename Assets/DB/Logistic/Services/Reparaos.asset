@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionServiceData
   id: Reparar
   displayName: Reparar
+  apelido: Repair
   description: "Servi\xE7o de Reparar HP"
   spriteDefault: {fileID: 21300000, guid: e63563dade3ad474cad4bee67791a294, type: 3}
   serviceType: 0
@@ -21,6 +22,7 @@ MonoBehaviour:
   recuperaHp: 1
   recuperaAutonomia: 0
   recuperaMunicao: 0
+  apenasEntreSupridores: 0
   percentCost: 65
   suppliesUsed:
   - {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}

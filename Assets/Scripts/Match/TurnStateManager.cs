@@ -89,12 +89,33 @@ public partial class TurnStateManager : MonoBehaviour
 
     public CursorState CurrentCursorState => cursorState;
     public UnitManager SelectedUnit => selectedUnit;
+    public bool IsScannerActionExecutionInProgress =>
+        embarkExecutionInProgress
+        || landingExecutionInProgress
+        || combatExecutionInProgress
+        || captureExecutionInProgress
+        || mergeExecutionInProgress
+        || supplyExecutionInProgress
+        || disembarkExecutionInProgress;
 
     private void LogStateStep(string step, bool rollback = false)
     {
         string rollbackTag = rollback ? " [roll back]" : string.Empty;
         string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
         Debug.Log($"[TurnState]{rollbackTag} state={cursorState} | step={step} | selected={selectedName}");
+    }
+
+    private static void PushPanelUnitMessage(string text, float durationSeconds = 2.8f)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+
+        string normalized = text.Replace('\n', ' ').Replace('\r', ' ').Trim();
+        const int maxLen = 64;
+        if (normalized.Length > maxLen)
+            normalized = normalized.Substring(0, maxLen - 1).TrimEnd() + "…";
+
+        PanelUnitController.TrySetTransientText(normalized, durationSeconds);
     }
 
     private void SetCursorState(CursorState nextState, string reason, bool rollback = false)

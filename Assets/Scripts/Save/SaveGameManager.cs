@@ -162,6 +162,7 @@ public class SaveGameManager : MonoBehaviour
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? Application.persistentDataPath);
             File.WriteAllText(path, json);
             cursorController?.PlayLoadSfx();
+            PanelUnitController.TrySetTransientText("Game saved", 2.2f);
             Debug.Log($"[SaveGame] jogo salvo em: {path}");
         }
         catch (Exception ex)
@@ -401,6 +402,7 @@ public class SaveGameManager : MonoBehaviour
             cursorController?.PlayBeepSfx();
             if (verboseLogs)
                 Debug.Log($"[SaveGame] Load concluido: {data.units?.Count ?? 0} unidades, {data.constructions?.Count ?? 0} construcoes.");
+            PanelUnitController.TrySetTransientText("Game loaded", 2.2f);
         }
         catch (Exception ex)
         {

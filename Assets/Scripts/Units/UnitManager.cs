@@ -1476,6 +1476,31 @@ public class UnitManager : MonoBehaviour
             return;
 
         unitHud.gameObject.SetActive(visible);
+        if (visible)
+            RefreshHudWidgetsOnly();
+    }
+
+    private void RefreshHudWidgetsOnly()
+    {
+        if (unitHud == null || isEmbarked)
+            return;
+
+        TryAutoAssignMatchController();
+        UnitData unitData = TryGetUnitData();
+        bool showTransportIndicator = HasAnyEmbarkedPassenger(unitData);
+        Color teamColor = TeamUtils.GetColor(teamId);
+        unitHud.RefreshBindings();
+        unitHud.Apply(
+            currentHP,
+            GetMaxHP(),
+            currentAmmo,
+            GetMaxAmmo(),
+            currentFuel,
+            GetMaxFuel(),
+            teamColor,
+            currentDomain,
+            currentHeightLevel,
+            showTransportIndicator);
     }
 
     private void SyncPreferredLayerPreferencesFromData(UnitData data)
