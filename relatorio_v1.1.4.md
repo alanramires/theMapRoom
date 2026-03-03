@@ -1,11 +1,11 @@
-# Relatorio de Atualizacao - v1.1.4
+﻿# Relatorio de Atualizacao - v1.1.4
 
 ## Em uma frase
-Atualizacao focada em painéis de HUD/feedback em campo e melhoria de mensagens de estado para reduzir dependencia de log.
+Atualizacao focada em paineis de HUD/feedback em campo e melhoria de mensagens de estado para reduzir dependencia de log.
 
 ## O que isso trouxe na pratica
 - Fluxo de turno e acoes com mais feedback visual direto no jogo (sem depender do console).
-- Painéis de suporte para unidade, helper e hotkeys com comportamento mais consistente.
+- Paineis de suporte para unidade, helper e hotkeys com comportamento mais consistente.
 - Melhor leitura de erro/estado em acoes como compra, mira, servico de comando, ciclo de unidades, save/load.
 
 ## Principais melhorias
@@ -18,7 +18,7 @@ Atualizacao focada em painéis de HUD/feedback em campo e melhoria de mensagens 
 - Resultado: reduz erro operacional de encerrar turno sem intencao e melhora legibilidade do estado de confirmacao.
 
 3. HUD auxiliar e consistencia de UI
-- Evolucao de `panel_helper`, controle de visibilidade de painéis e ajustes de cor/ancoragem para leitura em campo.
+- Evolucao de `panel_helper`, controle de visibilidade de paineis e ajustes de cor/ancoragem para leitura em campo.
 - Resultado: interface mais previsivel durante sensores, shopping, disembark e debug tatico.
 
 ## Regras importantes (opcional)
