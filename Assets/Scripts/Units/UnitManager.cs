@@ -29,6 +29,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private int maxAmmo = 3;
     [SerializeField] private int currentFuel = 99;
     [SerializeField] private int maxFuel = 99;
+    [SerializeField, Min(0)] private int remainingMovementPoints;
     [SerializeField, Min(1)] private int visao = 3;
     [Header("Embarked Weapons Runtime")]
     [SerializeField] private List<UnitEmbarkedWeapon> embarkedWeaponsRuntime = new List<UnitEmbarkedWeapon>();
@@ -77,6 +78,8 @@ public class UnitManager : MonoBehaviour
     public int MaxAmmo => maxAmmo;
     public int CurrentFuel => currentFuel;
     public int MaxFuel => maxFuel;
+    public int MaxMovementPoints => Mathf.Max(0, GetMovementRange());
+    public int RemainingMovementPoints => Mathf.Clamp(remainingMovementPoints, 0, MaxMovementPoints);
     public int Visao => Mathf.Max(1, visao);
     public bool HasActed => hasActed;
     public bool ReceivedSuppliesThisTurn => receivedSuppliesThisTurn;
@@ -228,6 +231,10 @@ public class UnitManager : MonoBehaviour
         visao = Mathf.Max(1, data.visao);
         currentAmmo = Mathf.Clamp(currentAmmo, 0, GetMaxAmmo());
         currentFuel = Mathf.Clamp(currentFuel, 0, GetMaxFuel());
+        if (!hasActed)
+            remainingMovementPoints = Mathf.Max(0, data.movement);
+        else
+            remainingMovementPoints = Mathf.Clamp(remainingMovementPoints, 0, Mathf.Max(0, data.movement));
         SyncEmbarkedWeaponsFromData(data);
         SyncSupplierRuntimeFromData(data);
         SyncTransportRuntimeSlotsWithData(data);
@@ -320,7 +327,29 @@ public class UnitManager : MonoBehaviour
     public void ResetActed()
     {
         hasActed = false;
+        ResetRemainingMovement();
         appliedHasActed = hasActed;
+        RefreshActedVisual();
+    }
+
+    public void SetRemainingMovementPoints(int value)
+    {
+        remainingMovementPoints = Mathf.Clamp(value, 0, GetMovementRange());
+        RefreshActedVisual();
+    }
+
+    public void ConsumeMovementPoints(int movementCost)
+    {
+        int clampedCost = Mathf.Max(0, movementCost);
+        int maxMovement = Mathf.Max(0, GetMovementRange());
+        int currentRemaining = Mathf.Clamp(remainingMovementPoints, 0, maxMovement);
+        remainingMovementPoints = Mathf.Clamp(currentRemaining - clampedCost, 0, maxMovement);
+        RefreshActedVisual();
+    }
+
+    public void ResetRemainingMovement()
+    {
+        remainingMovementPoints = Mathf.Max(0, GetMovementRange());
         RefreshActedVisual();
     }
 
@@ -1424,6 +1453,11 @@ public class UnitManager : MonoBehaviour
             embarkedServicesRuntime = new List<ServiceData>();
 
         UnitData data = TryGetUnitData();
+        int maxMovement = data != null ? Mathf.Max(0, data.movement) : Mathf.Max(0, remainingMovementPoints);
+        if (!hasActed)
+            remainingMovementPoints = maxMovement;
+        else
+            remainingMovementPoints = Mathf.Clamp(remainingMovementPoints, 0, maxMovement);
         SyncTransportRuntimeSlotsWithData(data, preserveSeatPassengers: !Application.isPlaying);
         RestoreEditorEmbarkedStateFromSeats(data);
         SyncPreferredLayerPreferencesFromData(TryGetUnitData());

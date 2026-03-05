@@ -1,0 +1,1044 @@
+{
+    "version": 2,
+    "sceneName": "Battle Map Test",
+    "currentTurn": 31,
+    "activeTeamId": 1,
+    "includeNeutralTeam": false,
+    "economyEnabled": true,
+    "players": [
+        {
+            "teamId": 0,
+            "flipX": false,
+            "startMoney": 0,
+            "actualMoney": 8362,
+            "incomePerTurn": 6000,
+            "startMoneyApplied": true
+        },
+        {
+            "teamId": 1,
+            "flipX": true,
+            "startMoney": 0,
+            "actualMoney": 19540,
+            "incomePerTurn": 13000,
+            "startMoneyApplied": true
+        }
+    ],
+    "units": [
+        {
+            "instanceId": 152,
+            "unitId": "tanqueA",
+            "teamId": 1,
+            "cellX": 3,
+            "cellY": -4,
+            "worldX": 2.5979297161102297,
+            "worldY": -3.0,
+            "currentHP": 10,
+            "currentAmmo": 3,
+            "currentFuel": 70,
+            "hasActed": false,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                6,
+                9
+            ]
+        },
+        {
+            "instanceId": 99,
+            "unitId": "suprimentos",
+            "teamId": 1,
+            "cellX": -3,
+            "cellY": 5,
+            "worldX": -2.1649413108825685,
+            "worldY": 3.75,
+            "currentHP": 10,
+            "currentAmmo": 3,
+            "currentFuel": 44,
+            "hasActed": false,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": []
+        },
+        {
+            "instanceId": 148,
+            "unitId": "astrosII",
+            "teamId": 1,
+            "cellX": -2,
+            "cellY": 1,
+            "worldX": -1.2989648580551148,
+            "worldY": 0.75,
+            "currentHP": 10,
+            "currentAmmo": 3,
+            "currentFuel": 46,
+            "hasActed": false,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                4
+            ]
+        },
+        {
+            "instanceId": 94,
+            "unitId": "artCampanha",
+            "teamId": 1,
+            "cellX": -2,
+            "cellY": 4,
+            "worldX": -1.7319531440734864,
+            "worldY": 3.0,
+            "currentHP": 10,
+            "currentAmmo": 3,
+            "currentFuel": 10,
+            "hasActed": true,
+            "receivedSuppliesThisTurn": true,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                2
+            ]
+        },
+        {
+            "instanceId": 137,
+            "unitId": "tanqueA",
+            "teamId": 1,
+            "cellX": -5,
+            "cellY": 4,
+            "worldX": -4.329882621765137,
+            "worldY": 3.0,
+            "currentHP": 6,
+            "currentAmmo": 3,
+            "currentFuel": 65,
+            "hasActed": false,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                3,
+                9
+            ]
+        },
+        {
+            "instanceId": 117,
+            "unitId": "Soldado",
+            "teamId": 1,
+            "cellX": -4,
+            "cellY": 5,
+            "worldX": -3.0309181213378908,
+            "worldY": 3.75,
+            "currentHP": 10,
+            "currentAmmo": 3,
+            "currentFuel": 97,
+            "hasActed": true,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                9
+            ]
+        },
+        {
+            "instanceId": 69,
+            "unitId": "obusMedio",
+            "teamId": 1,
+            "cellX": -3,
+            "cellY": 3,
+            "worldX": -2.1649413108825685,
+            "worldY": 2.25,
+            "currentHP": 7,
+            "currentAmmo": 3,
+            "currentFuel": 49,
+            "hasActed": false,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                4
+            ]
+        },
+        {
+            "instanceId": 147,
+            "unitId": "apc",
+            "teamId": 1,
+            "cellX": 0,
+            "cellY": 0,
+            "worldX": 0.0,
+            "worldY": 0.0,
+            "currentHP": 10,
+            "currentAmmo": 3,
+            "currentFuel": 64,
+            "hasActed": false,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                9
+            ]
+        },
+        {
+            "instanceId": 149,
+            "unitId": "Bazooka",
+            "teamId": 1,
+            "cellX": -2,
+            "cellY": 0,
+            "worldX": -1.7319531440734864,
+            "worldY": 0.0,
+            "currentHP": 10,
+            "currentAmmo": 3,
+            "currentFuel": 67,
+            "hasActed": true,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                3,
+                3
+            ]
+        },
+        {
+            "instanceId": 131,
+            "unitId": "Soldado",
+            "teamId": 1,
+            "cellX": -3,
+            "cellY": 6,
+            "worldX": -2.5979294776916506,
+            "worldY": 4.5,
+            "currentHP": 5,
+            "currentAmmo": 3,
+            "currentFuel": 95,
+            "hasActed": true,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                8
+            ]
+        },
+        {
+            "instanceId": 144,
+            "unitId": "tanqueA",
+            "teamId": 1,
+            "cellX": -4,
+            "cellY": 4,
+            "worldX": -3.4639062881469728,
+            "worldY": 3.0,
+            "currentHP": 8,
+            "currentAmmo": 3,
+            "currentFuel": 58,
+            "hasActed": false,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                5,
+                8
+            ]
+        },
+        {
+            "instanceId": 132,
+            "unitId": "Soldado",
+            "teamId": 1,
+            "cellX": -2,
+            "cellY": 6,
+            "worldX": -1.7319532632827759,
+            "worldY": 4.5,
+            "currentHP": 9,
+            "currentAmmo": 3,
+            "currentFuel": 83,
+            "hasActed": true,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                6
+            ]
+        },
+        {
+            "instanceId": 130,
+            "unitId": "Soldado",
+            "teamId": 1,
+            "cellX": -2,
+            "cellY": 3,
+            "worldX": -1.2989648580551148,
+            "worldY": 2.25,
+            "currentHP": 8,
+            "currentAmmo": 3,
+            "currentFuel": 96,
+            "hasActed": false,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                8
+            ]
+        },
+        {
+            "instanceId": 150,
+            "unitId": "Soldado",
+            "teamId": 1,
+            "cellX": 1,
+            "cellY": -1,
+            "worldX": 1.2989648580551148,
+            "worldY": -0.75,
+            "currentHP": 10,
+            "currentAmmo": 3,
+            "currentFuel": 99,
+            "hasActed": false,
+            "receivedSuppliesThisTurn": true,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                9
+            ]
+        },
+        {
+            "instanceId": 133,
+            "unitId": "Soldado",
+            "teamId": 1,
+            "cellX": -5,
+            "cellY": 5,
+            "worldX": -3.8968944549560549,
+            "worldY": 3.75,
+            "currentHP": 8,
+            "currentAmmo": 3,
+            "currentFuel": 84,
+            "hasActed": true,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                8
+            ]
+        },
+        {
+            "instanceId": 100,
+            "unitId": "Soldado",
+            "teamId": 1,
+            "cellX": -3,
+            "cellY": 1,
+            "worldX": -2.1649413108825685,
+            "worldY": 0.75,
+            "currentHP": 4,
+            "currentAmmo": 3,
+            "currentFuel": 86,
+            "hasActed": true,
+            "receivedSuppliesThisTurn": false,
+            "isEmbarked": false,
+            "transporterInstanceId": 0,
+            "transporterSlotIndex": -1,
+            "domain": 0,
+            "heightLevel": 3,
+            "embarkedWeaponAmmo": [
+                4
+            ]
+        }
+    ],
+    "constructions": [
+        {
+            "instanceId": 7,
+            "constructionId": "cidade",
+            "teamId": 1,
+            "cellX": 2,
+            "cellY": 3,
+            "worldX": 2.1649413108825685,
+            "worldY": 2.25,
+            "currentCapturePoints": 20,
+            "originalOwnerTeamId": 0,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 0,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": true,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": false,
+                "isCapturable": true,
+                "capturePointsMax": 20,
+                "capturedIncoming": 1000,
+                "sellingRule": 0,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [],
+                "offeredServiceIds": [
+                    "reabastecimento",
+                    "rearmamento",
+                    "Reparar",
+                    "transfer"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 200
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 500
+                    },
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 200
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 13,
+            "constructionId": "hq",
+            "teamId": 1,
+            "cellX": 4,
+            "cellY": -5,
+            "worldX": 3.8968944549560549,
+            "worldY": -3.75,
+            "currentCapturePoints": 40,
+            "originalOwnerTeamId": 1,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 1,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": false,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": true,
+                "isCapturable": true,
+                "capturePointsMax": 40,
+                "capturedIncoming": 3000,
+                "sellingRule": 1,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [
+                    "Soldado",
+                    "Bazooka",
+                    "tanqueA",
+                    "tanque B",
+                    "artCampanha",
+                    "obusMedio",
+                    "obusLeve",
+                    "astrosII",
+                    "apc",
+                    "suprimentos"
+                ],
+                "offeredServiceIds": [
+                    "transfer",
+                    "Reparar",
+                    "rearmamento",
+                    "reabastecimento"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 2147483647
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 10,
+            "constructionId": "cidade",
+            "teamId": 1,
+            "cellX": -3,
+            "cellY": 0,
+            "worldX": -2.5979294776916506,
+            "worldY": 0.0,
+            "currentCapturePoints": 19,
+            "originalOwnerTeamId": -1,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 0,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": true,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": false,
+                "isCapturable": true,
+                "capturePointsMax": 20,
+                "capturedIncoming": 1000,
+                "sellingRule": 0,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [],
+                "offeredServiceIds": [
+                    "reabastecimento",
+                    "rearmamento",
+                    "Reparar",
+                    "transfer"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 200
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 500
+                    },
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 200
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 4,
+            "constructionId": "cidade",
+            "teamId": 1,
+            "cellX": -2,
+            "cellY": 4,
+            "worldX": -1.7319532632827759,
+            "worldY": 3.0,
+            "currentCapturePoints": 20,
+            "originalOwnerTeamId": -1,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 0,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": true,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": false,
+                "isCapturable": true,
+                "capturePointsMax": 20,
+                "capturedIncoming": 1000,
+                "sellingRule": 0,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [
+                    "Soldado",
+                    "Bazooka",
+                    "tanqueA",
+                    "tanque B",
+                    "artCampanha",
+                    "obusMedio",
+                    "obusLeve",
+                    "astrosII",
+                    "apc",
+                    "suprimentos"
+                ],
+                "offeredServiceIds": [
+                    "reabastecimento",
+                    "rearmamento",
+                    "Reparar",
+                    "transfer"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 200
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 500
+                    },
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 200
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 8,
+            "constructionId": "cidade",
+            "teamId": 1,
+            "cellX": 4,
+            "cellY": 0,
+            "worldX": 3.4639062881469728,
+            "worldY": 0.0,
+            "currentCapturePoints": 20,
+            "originalOwnerTeamId": -1,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 1,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": true,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": false,
+                "isCapturable": true,
+                "capturePointsMax": 20,
+                "capturedIncoming": 1000,
+                "sellingRule": 0,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [],
+                "offeredServiceIds": [
+                    "reabastecimento",
+                    "rearmamento",
+                    "Reparar",
+                    "transfer"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 200
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 500
+                    },
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 200
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 1,
+            "constructionId": "hq",
+            "teamId": 0,
+            "cellX": -4,
+            "cellY": 5,
+            "worldX": -3.0309181213378908,
+            "worldY": 3.75,
+            "currentCapturePoints": 10,
+            "originalOwnerTeamId": 0,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 0,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": false,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": true,
+                "isCapturable": true,
+                "capturePointsMax": 40,
+                "capturedIncoming": 3000,
+                "sellingRule": 1,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [
+                    "Soldado",
+                    "Bazooka",
+                    "tanqueA",
+                    "tanque B",
+                    "artCampanha",
+                    "obusMedio",
+                    "obusLeve",
+                    "astrosII",
+                    "apc",
+                    "suprimentos"
+                ],
+                "offeredServiceIds": [
+                    "transfer",
+                    "Reparar",
+                    "rearmamento",
+                    "reabastecimento"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 2147483647
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 2,
+            "constructionId": "fabrica",
+            "teamId": 0,
+            "cellX": -5,
+            "cellY": 5,
+            "worldX": -3.8968944549560549,
+            "worldY": 3.75,
+            "currentCapturePoints": 14,
+            "originalOwnerTeamId": 0,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 0,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": false,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": false,
+                "isCapturable": true,
+                "capturePointsMax": 30,
+                "capturedIncoming": 1500,
+                "sellingRule": 1,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [
+                    "Soldado",
+                    "Bazooka",
+                    "tanqueA",
+                    "tanque B",
+                    "artCampanha",
+                    "obusMedio",
+                    "obusLeve",
+                    "astrosII",
+                    "apc",
+                    "suprimentos"
+                ],
+                "offeredServiceIds": [
+                    "reabastecimento",
+                    "rearmamento",
+                    "Reparar",
+                    "transfer"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 2147483647
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 12,
+            "constructionId": "cidade",
+            "teamId": 1,
+            "cellX": 3,
+            "cellY": -4,
+            "worldX": 2.5979297161102297,
+            "worldY": -3.0,
+            "currentCapturePoints": 20,
+            "originalOwnerTeamId": -1,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 1,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": true,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": false,
+                "isCapturable": true,
+                "capturePointsMax": 20,
+                "capturedIncoming": 1000,
+                "sellingRule": 0,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [
+                    "Soldado",
+                    "Bazooka",
+                    "tanqueA",
+                    "tanque B",
+                    "artCampanha",
+                    "obusMedio",
+                    "obusLeve",
+                    "astrosII",
+                    "apc",
+                    "suprimentos"
+                ],
+                "offeredServiceIds": [
+                    "reabastecimento",
+                    "rearmamento",
+                    "Reparar",
+                    "transfer"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 200
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 500
+                    },
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 200
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 15,
+            "constructionId": "fabrica",
+            "teamId": 1,
+            "cellX": 4,
+            "cellY": -6,
+            "worldX": 3.4639062881469728,
+            "worldY": -4.5,
+            "currentCapturePoints": 30,
+            "originalOwnerTeamId": 1,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 1,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": false,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": false,
+                "isCapturable": true,
+                "capturePointsMax": 30,
+                "capturedIncoming": 1500,
+                "sellingRule": 1,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [
+                    "Soldado",
+                    "Bazooka",
+                    "tanqueA",
+                    "tanque B",
+                    "artCampanha",
+                    "obusMedio",
+                    "obusLeve",
+                    "astrosII",
+                    "apc",
+                    "suprimentos"
+                ],
+                "offeredServiceIds": [
+                    "reabastecimento",
+                    "rearmamento",
+                    "Reparar",
+                    "transfer"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 2147483647
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 3,
+            "constructionId": "fabrica",
+            "teamId": 0,
+            "cellX": -3,
+            "cellY": 6,
+            "worldX": -2.5979294776916506,
+            "worldY": 4.5,
+            "currentCapturePoints": 25,
+            "originalOwnerTeamId": 0,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 0,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": false,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": false,
+                "isCapturable": true,
+                "capturePointsMax": 30,
+                "capturedIncoming": 1500,
+                "sellingRule": 1,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [
+                    "Soldado",
+                    "Bazooka",
+                    "tanqueA",
+                    "tanque B",
+                    "artCampanha",
+                    "obusMedio",
+                    "obusLeve",
+                    "astrosII",
+                    "apc",
+                    "suprimentos"
+                ],
+                "offeredServiceIds": [
+                    "reabastecimento",
+                    "rearmamento",
+                    "Reparar",
+                    "transfer"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 2147483647
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 9,
+            "constructionId": "cidade",
+            "teamId": 1,
+            "cellX": 1,
+            "cellY": -1,
+            "worldX": 1.2989648580551148,
+            "worldY": -0.75,
+            "currentCapturePoints": 20,
+            "originalOwnerTeamId": -1,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 1,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": true,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": false,
+                "isCapturable": true,
+                "capturePointsMax": 20,
+                "capturedIncoming": 1000,
+                "sellingRule": 0,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [],
+                "offeredServiceIds": [
+                    "reabastecimento",
+                    "rearmamento",
+                    "Reparar",
+                    "transfer"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 200
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 500
+                    },
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 200
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 11,
+            "constructionId": "cidade",
+            "teamId": 1,
+            "cellX": -2,
+            "cellY": -5,
+            "worldX": -1.2989648580551148,
+            "worldY": -3.75,
+            "currentCapturePoints": 20,
+            "originalOwnerTeamId": -1,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 1,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": true,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": false,
+                "isCapturable": true,
+                "capturePointsMax": 20,
+                "capturedIncoming": 1000,
+                "sellingRule": 0,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [],
+                "offeredServiceIds": [
+                    "reabastecimento",
+                    "rearmamento",
+                    "Reparar",
+                    "transfer"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 200
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 500
+                    },
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 200
+                    }
+                ]
+            }
+        },
+        {
+            "instanceId": 14,
+            "constructionId": "fabrica",
+            "teamId": 1,
+            "cellX": 5,
+            "cellY": -5,
+            "worldX": 4.762870788574219,
+            "worldY": -3.75,
+            "currentCapturePoints": 30,
+            "originalOwnerTeamId": 1,
+            "hasOriginalOwner": true,
+            "firstOwnerTeamId": 1,
+            "hasFirstOwner": true,
+            "hasInfiniteSuppliesOverride": false,
+            "siteRuntime": {
+                "isPlayerHeadQuarter": false,
+                "isCapturable": true,
+                "capturePointsMax": 30,
+                "capturedIncoming": 1500,
+                "sellingRule": 1,
+                "canProvideSupplies": true,
+                "offeredUnitIds": [
+                    "Soldado",
+                    "Bazooka",
+                    "tanqueA",
+                    "tanque B",
+                    "artCampanha",
+                    "obusMedio",
+                    "obusLeve",
+                    "astrosII",
+                    "apc",
+                    "suprimentos"
+                ],
+                "offeredServiceIds": [
+                    "reabastecimento",
+                    "rearmamento",
+                    "Reparar",
+                    "transfer"
+                ],
+                "offeredSupplies": [
+                    {
+                        "supplyId": "caixaMunicao",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "gasolina",
+                        "quantity": 2147483647
+                    },
+                    {
+                        "supplyId": "pecas",
+                        "quantity": 2147483647
+                    }
+                ]
+            }
+        }
+    ]
+}

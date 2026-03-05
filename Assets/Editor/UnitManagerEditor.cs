@@ -21,6 +21,7 @@ public class UnitManagerEditor : Editor
     private SerializedProperty currentHpProp;
     private SerializedProperty currentFuelProp;
     private SerializedProperty maxFuelProp;
+    private SerializedProperty remainingMovementPointsProp;
     private SerializedProperty visaoProp;
     private SerializedProperty embarkedWeaponsRuntimeProp;
     private SerializedProperty embarkedResourcesRuntimeProp;
@@ -55,6 +56,7 @@ public class UnitManagerEditor : Editor
         currentHpProp = serializedObject.FindProperty("currentHP");
         currentFuelProp = serializedObject.FindProperty("currentFuel");
         maxFuelProp = serializedObject.FindProperty("maxFuel");
+        remainingMovementPointsProp = serializedObject.FindProperty("remainingMovementPoints");
         visaoProp = serializedObject.FindProperty("visao");
         embarkedWeaponsRuntimeProp = serializedObject.FindProperty("embarkedWeaponsRuntime");
         embarkedResourcesRuntimeProp = serializedObject.FindProperty("embarkedResourcesRuntime");
@@ -99,6 +101,21 @@ public class UnitManagerEditor : Editor
             if (receivedSuppliesThisTurnProp != null)
                 EditorGUILayout.PropertyField(receivedSuppliesThisTurnProp, new GUIContent("Received Supply This Turn"));
         }
+        using (new EditorGUI.DisabledScope(true))
+        {
+            EditorGUILayout.IntField("Movement Max", Mathf.Max(0, unit.MaxMovementPoints));
+        }
+        if (remainingMovementPointsProp != null)
+        {
+            int maxMovement = Mathf.Max(0, unit.MaxMovementPoints);
+            remainingMovementPointsProp.intValue = EditorGUILayout.IntSlider(
+                "Movement Remaining",
+                remainingMovementPointsProp.intValue,
+                0,
+                maxMovement);
+        }
+        else
+            EditorGUILayout.IntField("Movement Remaining", 0);
         if (isEmbarkedProp != null)
             EditorGUILayout.PropertyField(isEmbarkedProp, new GUIContent("Is Embarked"));
 

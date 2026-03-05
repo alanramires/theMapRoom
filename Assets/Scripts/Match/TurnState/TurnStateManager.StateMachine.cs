@@ -358,6 +358,7 @@ public partial class TurnStateManager
         }
 
         RestorePreparedFuelCostIfAny();
+        RestorePreparedMovementCostIfAny();
         if (!BeginRollbackToSelection())
         {
             Debug.Log("[Rollback] Falha ao iniciar animacao de rollback. Fallback para UnitSelected.");

@@ -1,14 +1,19 @@
-using TMPro;
+﻿using TMPro;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
-public class PanelUnitController : MonoBehaviour
+public class PanelDialogController : MonoBehaviour
 {
-    private static PanelUnitController instance;
+    private static PanelDialogController instance;
 
     [Header("References")]
     [SerializeField] private MatchController matchController;
     [SerializeField] private TurnStateManager turnStateManager;
+    [SerializeField] private DialogDatabase dialogDatabase;
     [SerializeField] private GameObject panelUnit;
     [SerializeField] private TMP_Text textUnit;
 
@@ -57,14 +62,20 @@ public class PanelUnitController : MonoBehaviour
             turnStateManager = FindAnyObjectByType<TurnStateManager>();
 
         if (panelUnit == null)
-            panelUnit = FindNamedObject("panel_unit") ?? FindNamedObject("unit_panel");
+            panelUnit = FindNamedObject("panel_dialog") ?? FindNamedObject("panel_unit") ?? FindNamedObject("unit_panel");
         if (panelUnit == null)
             panelUnit = gameObject;
 
         if (textUnit == null)
             textUnit = FindNamedTmpText("text_unit")
                 ?? FindNamedTmpText("txt_unit")
-                ?? FindNamedTmpText("unit_text");
+                ?? FindNamedTmpText("unit_text")
+                ?? FindNamedTmpText("text_dialog");
+
+#if UNITY_EDITOR
+        if (dialogDatabase == null)
+            dialogDatabase = FindFirstAssetEditor<DialogDatabase>();
+#endif
     }
 
     private void Refresh(bool force)
@@ -117,7 +128,17 @@ public class PanelUnitController : MonoBehaviour
     private string BuildStateText(string unitName, TurnStateManager.CursorState state)
     {
         if (state == TurnStateManager.CursorState.MoveuAndando || state == TurnStateManager.CursorState.MoveuParado)
-            return $"{unitName} :: Moving";
+        {
+            return ResolvePanelMessage(
+                "panel_dialog.state.moving",
+                "<unit> :: <state>",
+                new Dictionary<string, string>
+                {
+                    { "unit", unitName },
+                    { "state", ResolvePanelMessage("panel_dialog.label.moving", "Moving") },
+                    { "sensor", string.Empty }
+                });
+        }
 
         string sensor = ResolveSensorName(state);
         if (string.IsNullOrWhiteSpace(sensor))
@@ -125,8 +146,24 @@ public class PanelUnitController : MonoBehaviour
 
         bool isConfirm = IsSensorConfirmPhase(state);
         return isConfirm
-            ? $"{unitName} :: {sensor} Confirm"
-            : $"{unitName} :: {sensor}";
+            ? ResolvePanelMessage(
+                "panel_dialog.state.sensor_confirm",
+                "<unit> :: <sensor> Confirm",
+                new Dictionary<string, string>
+                {
+                    { "unit", unitName },
+                    { "sensor", sensor },
+                    { "state", string.Empty }
+                })
+            : ResolvePanelMessage(
+                "panel_dialog.state.sensor",
+                "<unit> :: <sensor>",
+                new Dictionary<string, string>
+                {
+                    { "unit", unitName },
+                    { "sensor", sensor },
+                    { "state", string.Empty }
+                });
     }
 
     private string ResolveSensorName(TurnStateManager.CursorState state)
@@ -134,19 +171,19 @@ public class PanelUnitController : MonoBehaviour
         switch (state)
         {
             case TurnStateManager.CursorState.Mirando:
-                return "Aim";
+                return ResolvePanelMessage("panel_dialog.sensor.aim", "Aim");
             case TurnStateManager.CursorState.Capturando:
-                return "Capture";
+                return ResolvePanelMessage("panel_dialog.sensor.capture", "Capture");
             case TurnStateManager.CursorState.Embarcando:
-                return "Embark";
+                return ResolvePanelMessage("panel_dialog.sensor.embark", "Embark");
             case TurnStateManager.CursorState.Desembarcando:
-                return "Disembark";
+                return ResolvePanelMessage("panel_dialog.sensor.disembark", "Disembark");
             case TurnStateManager.CursorState.Pousando:
-                return "Landing";
+                return ResolvePanelMessage("panel_dialog.sensor.landing", "Landing");
             case TurnStateManager.CursorState.Fundindo:
-                return "Merge";
+                return ResolvePanelMessage("panel_dialog.sensor.merge", "Merge");
             case TurnStateManager.CursorState.Suprindo:
-                return "Supply";
+                return ResolvePanelMessage("panel_dialog.sensor.supply", "Supply");
             default:
                 return string.Empty;
         }
@@ -271,6 +308,22 @@ public class PanelUnitController : MonoBehaviour
         return true;
     }
 
+    public static string ResolveDialogMessage(string id, string fallback)
+    {
+        if (instance == null)
+            return fallback ?? string.Empty;
+
+        return instance.ResolvePanelMessage(id, fallback);
+    }
+
+    public static string ResolveDialogMessage(string id, string fallback, IReadOnlyDictionary<string, string> tokens)
+    {
+        if (instance == null)
+            return ApplyInlineTokens(fallback ?? string.Empty, tokens);
+
+        return instance.ResolvePanelMessage(id, fallback, tokens);
+    }
+
     private void SetExternalText(string text)
     {
         SetExternalText(text, 0f, timed: false);
@@ -313,6 +366,58 @@ public class PanelUnitController : MonoBehaviour
             panelUnit.SetActive(visible);
     }
 
+    private string ResolvePanelMessage(string id, string fallback)
+    {
+        if (dialogDatabase == null)
+            return fallback ?? string.Empty;
+
+        return dialogDatabase.Resolve(id, fallback);
+    }
+
+    private string ResolvePanelMessage(string id, string fallback, IReadOnlyDictionary<string, string> tokens)
+    {
+        if (dialogDatabase == null)
+            return ApplyInlineTokens(fallback ?? string.Empty, tokens);
+
+        return dialogDatabase.Resolve(id, fallback, tokens);
+    }
+
+    private static string ApplyInlineTokens(string template, IReadOnlyDictionary<string, string> tokens)
+    {
+        if (string.IsNullOrEmpty(template) || tokens == null || tokens.Count == 0)
+            return template ?? string.Empty;
+
+        string output = template;
+        foreach (KeyValuePair<string, string> pair in tokens)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key))
+                continue;
+
+            output = output.Replace($"<{pair.Key.Trim()}>", pair.Value ?? string.Empty);
+        }
+
+        return output;
+    }
+
+#if UNITY_EDITOR
+    private static T FindFirstAssetEditor<T>() where T : ScriptableObject
+    {
+        string[] guids = AssetDatabase.FindAssets($"t:{typeof(T).Name}");
+        if (guids == null || guids.Length == 0)
+            return null;
+
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            T asset = AssetDatabase.LoadAssetAtPath<T>(path);
+            if (asset != null)
+                return asset;
+        }
+
+        return null;
+    }
+#endif
+
     private GameObject FindNamedObject(string name)
     {
         Transform local = FindChildRecursive(transform, name);
@@ -352,3 +457,5 @@ public class PanelUnitController : MonoBehaviour
         return null;
     }
 }
+
+

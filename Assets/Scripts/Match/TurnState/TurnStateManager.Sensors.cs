@@ -15,6 +15,8 @@ public partial class TurnStateManager
     private readonly List<PodeSuprirInvalidOption> cachedPodeSuprirInvalidTargets = new List<PodeSuprirInvalidOption>();
     private readonly List<PodeTransferirOption> cachedPodeTransferirTargets = new List<PodeTransferirOption>();
     private readonly List<PodeTransferirInvalidOption> cachedPodeTransferirInvalidTargets = new List<PodeTransferirInvalidOption>();
+    private readonly List<PodeFundirOption> cachedPodeFundirTargets = new List<PodeFundirOption>();
+    private readonly List<PodeFundirInvalidOption> cachedPodeFundirInvalidTargets = new List<PodeFundirInvalidOption>();
     private ConstructionManager cachedPodeCapturarConstruction;
     private string cachedPodeCapturarReason = string.Empty;
     private int cachedPodeFundirAdjacentCount;
@@ -123,11 +125,16 @@ public partial class TurnStateManager
         if (canCapture)
             availableSensorActionCodes.Add('C');
 
-        bool canMerge = PodeFundirSensor.TryEvaluate(
+        bool canMerge = PodeFundirSensor.CollectOptions(
             selectedUnit,
             boardMap,
-            out cachedPodeFundirAdjacentCount,
-            out cachedPodeFundirReason);
+            terrainDatabase,
+            cachedPodeFundirTargets,
+            out cachedPodeFundirReason,
+            cachedPodeFundirInvalidTargets);
+        cachedPodeFundirAdjacentCount = cachedPodeFundirTargets.Count;
+        if (!canMerge)
+            cachedPodeFundirReason = string.IsNullOrWhiteSpace(cachedPodeFundirReason) ? "Sem candidatos para fusao." : cachedPodeFundirReason;
         availableSensorActionCodes.Remove('F');
         if (canMerge)
             availableSensorActionCodes.Add('F');
@@ -218,6 +225,8 @@ public partial class TurnStateManager
         cachedPodeCapturarReason = string.Empty;
         cachedPodeFundirAdjacentCount = 0;
         cachedPodeFundirReason = string.Empty;
+        cachedPodeFundirTargets.Clear();
+        cachedPodeFundirInvalidTargets.Clear();
         cachedPodeSuprirReason = string.Empty;
         cachedPodeTransferirReason = string.Empty;
         landingOptionUnavailableReason = string.Empty;
@@ -230,23 +239,7 @@ public partial class TurnStateManager
         if (selectedUnit == null)
             return 0;
 
-        int baseMove = Mathf.Max(0, selectedUnit.GetMovementRange());
-        if (movementMode == SensorMovementMode.MoveuParado)
-            return baseMove;
-
-        if (movementMode == SensorMovementMode.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
-        {
-            Tilemap boardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
-            int spent = UnitMovementPathRules.CalculateAutonomyCostForPath(
-                boardMap,
-                selectedUnit,
-                committedMovementPath,
-                terrainDatabase,
-                applyOperationalAutonomyModifier: false);
-            return Mathf.Max(0, baseMove - Mathf.Max(0, spent));
-        }
-
-        return baseMove;
+        return Mathf.Max(0, selectedUnit.RemainingMovementPoints);
     }
 
     private bool TryResolveSensorMovementModeForCurrentState(out SensorMovementMode mode)

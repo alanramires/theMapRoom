@@ -20,6 +20,11 @@ public partial class TurnStateManager
         public int selectionNumber;
         public Vector3Int cell;
         public string label;
+        public bool isValid;
+        public string invalidReasonId;
+        public string invalidReason;
+        public int requiredMovementCost;
+        public int remainingMovement;
     }
 
     private sealed class MergeQueuePreviewTrack
@@ -46,12 +51,29 @@ public partial class TurnStateManager
     private bool mergeSuppressDefaultConfirmSfxOnce;
     private CursorState cursorStateBeforeFundindo = CursorState.MoveuParado;
 
+    private void LogMergeDebug(string message)
+    {
+        Debug.Log($"[FusaoDBG] state={cursorState} step={scannerPromptStep} | {message}");
+    }
+
+    private string DescribeMergeCandidate(MergeCandidateEntry entry)
+    {
+        if (entry == null || entry.unit == null)
+            return "(null)";
+        string status = entry.isValid ? "VALID" : "INVALID";
+        string reason = !entry.isValid ? $" reason=\"{ResolveMergeInvalidReason(entry)}\"" : string.Empty;
+        return $"{entry.selectionNumber}:{ResolveUnitRuntimeName(entry.unit)}@{entry.cell.x},{entry.cell.y} {status} rem={entry.remainingMovement} cost={entry.requiredMovementCost}{reason}";
+    }
+
     private void EnterMergeStateFromSensors()
     {
         if (selectedUnit == null)
             return;
         if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
             return;
+
+        LogMergeDebug($"EnterMergeStateFromSensors selected={ResolveUnitRuntimeName(selectedUnit)} cursorBefore={cursorStateBeforeFundindo}");
+        EnsureMergeSensorSnapshot();
 
         cursorController?.PlayConfirmSfx();
         cursorStateBeforeFundindo = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
@@ -71,11 +93,16 @@ public partial class TurnStateManager
         {
             if (!TryReadPressedDigitIncludingZero(out int number))
                 return;
+            LogMergeDebug($"DigitInput number={number}");
+
+            EnsureMergeSensorSnapshot();
+            RebuildMergeCandidateEntries();
 
             if (number == 0)
             {
                 if (mergeQueuedUnits.Count > 0)
                 {
+                    LogMergeDebug("Digit 0 -> StartMergeExecution");
                     StartMergeExecution();
                     return;
                 }
@@ -100,15 +127,28 @@ public partial class TurnStateManager
             if (picked == null || index < 0 || index >= mergeCandidateEntries.Count)
             {
                 Debug.Log($"[Fusao] Participante invalido: {number}. Escolha uma das opcoes listadas.");
+                LogMergeDebug($"InvalidPick number={number} candidates={mergeCandidateEntries.Count}");
                 return;
             }
 
             mergeSelectedCandidateIndex = index;
-            cursorController?.PlayConfirmSfx();
             Vector3Int pickedCell = picked.cell;
             pickedCell.z = 0;
             cursorController?.SetCell(pickedCell, playMoveSfx: false);
-            Debug.Log($"[Fusao] Candidato selecionado: {picked.selectionNumber}. {picked.label} | Enter para continuar.");
+            if (picked.isValid)
+            {
+                cursorController?.PlayConfirmSfx();
+                Debug.Log($"[Fusao] Candidato selecionado: {picked.selectionNumber}. {picked.label} | Enter para continuar.");
+                LogMergeDebug($"Selected {DescribeMergeCandidate(picked)}");
+            }
+            else
+            {
+                cursorController?.PlayErrorSfx();
+                string reason = ResolveMergeInvalidReason(picked);
+                PushPanelUnitMessage(reason, 2.8f);
+                Debug.Log($"[Fusao] Candidato selecionado (invalido): {picked.selectionNumber}. {picked.label} | Motivo: {ResolveMergeInvalidReason(picked)}");
+                LogMergeDebug($"SelectedInvalid {DescribeMergeCandidate(picked)}");
+            }
         }
     }
 
@@ -116,14 +156,30 @@ public partial class TurnStateManager
     {
         if (cursorState != CursorState.Fundindo)
             return false;
+        LogMergeDebug("TryConfirmScannerMerge");
+        EnsureMergeSensorSnapshot();
+        RebuildMergeCandidateEntries();
+        if (mergeSelectedCandidateIndex < 0)
+            SyncMergeSelectedCandidateFromCursor();
 
         if (scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
         {
-            if (mergeSelectedCandidateIndex < 0)
-                SyncMergeSelectedCandidateFromCursor();
             if (!TryGetSelectedMergeCandidate(out MergeCandidateEntry selected))
             {
                 Debug.Log("[Fusao] Selecione um candidato valido por numero ou cursor antes de confirmar.");
+                LogMergeDebug("ConfirmSelectStep -> no selected candidate");
+                return true;
+            }
+            LogMergeDebug($"ConfirmSelectStep candidate={DescribeMergeCandidate(selected)}");
+            if (!TryValidateMergeCandidateWithFreshSensor(selected.unit, out string selectedReason))
+            {
+                string reason = !string.IsNullOrWhiteSpace(selectedReason)
+                    ? selectedReason
+                    : ResolveMergeInvalidReason(selected);
+                cursorController?.PlayErrorSfx();
+                PushPanelUnitMessage(reason, 2.8f);
+                Debug.Log($"[Fusao] Candidato invalido: {ResolveUnitRuntimeName(selected.unit)}. Motivo: {reason}");
+                LogMergeDebug($"ConfirmBlocked candidate={ResolveUnitRuntimeName(selected.unit)} reason=\"{reason}\"");
                 return true;
             }
 
@@ -131,6 +187,7 @@ public partial class TurnStateManager
             mergeTargetAutoEntered = false;
             cursorController?.PlayConfirmSfx();
             LogMergeConfirmPrompt(selected);
+            LogMergeDebug($"ConfirmSelectStep -> enter confirm target={DescribeMergeCandidate(selected)}");
             return true;
         }
 
@@ -139,6 +196,20 @@ public partial class TurnStateManager
 
         if (!TryGetSelectedMergeCandidate(out MergeCandidateEntry target) || target.unit == null)
         {
+            LogMergeDebug("ConfirmQueueStep -> selected target missing, returning to participant select");
+            ReturnToMergeParticipantSelect();
+            return true;
+        }
+        LogMergeDebug($"ConfirmQueueStep candidate={DescribeMergeCandidate(target)}");
+        if (!TryValidateMergeCandidateWithFreshSensor(target.unit, out string targetReason))
+        {
+            string reason = !string.IsNullOrWhiteSpace(targetReason)
+                ? targetReason
+                : ResolveMergeInvalidReason(target);
+            cursorController?.PlayErrorSfx();
+            PushPanelUnitMessage(reason, 2.8f);
+            Debug.Log($"[Fusao] Confirmacao bloqueada. Candidato invalido: {ResolveUnitRuntimeName(target.unit)} | {reason}");
+            LogMergeDebug($"ConfirmQueueStep blocked candidate={ResolveUnitRuntimeName(target.unit)} reason=\"{reason}\"");
             ReturnToMergeParticipantSelect();
             return true;
         }
@@ -151,13 +222,16 @@ public partial class TurnStateManager
         }
 
         mergeQueuedUnits.Add(target.unit);
+        LogMergeDebug($"Queued candidate={ResolveUnitRuntimeName(target.unit)} queueCount={mergeQueuedUnits.Count}");
         mergeSuppressDefaultConfirmSfxOnce = true;
         cursorController?.PlayLoadSfx();
         RebuildMergeQueuePreviewTracks();
 
         int remaining = CountRemainingMergeCandidates();
+        LogMergeDebug($"AfterQueue remainingValidCandidates={remaining}");
         if (remaining <= 0)
         {
+            LogMergeDebug("No remaining valid candidates -> StartMergeExecution");
             StartMergeExecution();
             return true;
         }
@@ -169,6 +243,7 @@ public partial class TurnStateManager
 
     private void EnterMergeParticipantSelectStep()
     {
+        LogMergeDebug("EnterMergeParticipantSelectStep");
         ClearMergeTargetOptionsAndPaint();
         RebuildMergeCandidateEntries();
         PaintMergeCandidateOptions();
@@ -185,6 +260,7 @@ public partial class TurnStateManager
 
         if (mergeCandidateEntries.Count <= 0)
         {
+            LogMergeDebug("No candidates in participant select");
             if (mergeQueuedUnits.Count > 0)
                 StartMergeExecution();
             else
@@ -192,7 +268,7 @@ public partial class TurnStateManager
             return;
         }
 
-        if (mergeCandidateEntries.Count == 1 && mergeQueuedUnits.Count <= 0)
+        if (mergeCandidateEntries.Count == 1 && mergeQueuedUnits.Count <= 0 && mergeCandidateEntries[0] != null && mergeCandidateEntries[0].isValid)
         {
             mergeSelectedCandidateIndex = 0;
             mergeTargetAutoEntered = true;
@@ -212,6 +288,7 @@ public partial class TurnStateManager
 
     private void ReturnToMergeParticipantSelect()
     {
+        LogMergeDebug("ReturnToMergeParticipantSelect");
         scannerPromptStep = ScannerPromptStep.MergeParticipantSelect;
         ClearMergeTargetOptionsAndPaint();
         RebuildMergeCandidateEntries();
@@ -272,6 +349,11 @@ public partial class TurnStateManager
         }
 
         ResetMergeRuntimeState();
+        // Returning to movement requires scanner prompt in neutral action step.
+        scannerPromptStep = ScannerPromptStep.AwaitingAction;
+        scannerSelectedTargetIndex = -1;
+        scannerSelectedEmbarkIndex = -1;
+        scannerSelectedLandingIndex = -1;
         LogScannerPanel();
     }
 
@@ -279,8 +361,10 @@ public partial class TurnStateManager
     {
         if (mergeExecutionInProgress)
             return;
+        LogMergeDebug($"StartMergeExecution queueCount={mergeQueuedUnits.Count}");
         if (selectedUnit == null || mergeQueuedUnits.Count <= 0)
         {
+            LogMergeDebug("StartMergeExecution aborted -> ExitMergeStateToMovement");
             ExitMergeStateToMovement();
             return;
         }
@@ -293,12 +377,14 @@ public partial class TurnStateManager
             cursorController.SetCell(receiverCell, playMoveSfx: false);
         }
 
+        // Set immediately so UI/inputs stop in the same frame merge starts.
+        mergeExecutionInProgress = true;
         StartCoroutine(ExecuteQueuedMergeOrdersSequence());
     }
 
     private IEnumerator ExecuteQueuedMergeOrdersSequence()
     {
-        mergeExecutionInProgress = true;
+        LogMergeDebug("ExecuteQueuedMergeOrdersSequence begin");
         UnitManager receiver = selectedUnit;
         Tilemap boardMap = terrainTilemap != null ? terrainTilemap : (receiver != null ? receiver.BoardTilemap : null);
         if (receiver == null || boardMap == null)
@@ -319,10 +405,12 @@ public partial class TurnStateManager
 
         if (participants.Count <= 0)
         {
+            LogMergeDebug("ExecuteQueuedMergeOrdersSequence no participants");
             mergeExecutionInProgress = false;
             ExitMergeStateToMovement();
             yield break;
         }
+        LogMergeDebug($"ExecuteQueuedMergeOrdersSequence participants={participants.Count}");
 
         List<UnitManager> mergeMembers = BuildMergeMembersForLayerPlan(receiver, participants);
         MergeLayerPlan layerPlan = ResolveMergeLayerPlanForExecution(mergeMembers, boardMap);
@@ -452,6 +540,7 @@ public partial class TurnStateManager
 
         receiver.SetCurrentHP(resultHp);
         receiver.SetCurrentFuel(resultAutonomy);
+        receiver.SetRemainingMovementPoints(0);
 
         if (missingWeaponSlots > 0)
             Debug.Log($"[Fusao] Aviso: {missingWeaponSlots} tipo(s) de arma sem slot na unidade resultante.");
@@ -464,9 +553,12 @@ public partial class TurnStateManager
         bool finalized = TryFinalizeSelectedUnitActionFromDebug();
         if (!finalized)
             ClearSelectionAndReturnToNeutral(keepPreparedFuelCost: true);
+        if (receiver != null)
+            receiver.SetRemainingMovementPoints(0);
 
         ResetMergeRuntimeState();
         mergeExecutionInProgress = false;
+        LogMergeDebug("ExecuteQueuedMergeOrdersSequence end");
     }
 
     private MergeLayerPlan ResolveMergeLayerPlanForExecution(List<UnitManager> members, Tilemap boardMap)
@@ -710,26 +802,62 @@ public partial class TurnStateManager
         if (map == null)
             return;
 
-        List<UnitManager> neighbors = new List<UnitManager>(6);
-        CollectMergeEligibleNeighbors(selectedUnit, map, neighbors);
+        EnsureMergeSensorSnapshot();
+        IReadOnlyList<PodeFundirOption> validOptions = cachedPodeFundirTargets;
+        IReadOnlyList<PodeFundirInvalidOption> invalidOptions = cachedPodeFundirInvalidTargets;
+        LogMergeDebug($"RebuildMergeCandidateEntries sensorValid={validOptions.Count} sensorInvalid={invalidOptions.Count}");
+
         int number = 0;
-        for (int i = 0; i < neighbors.Count; i++)
+        for (int i = 0; i < validOptions.Count; i++)
         {
-            UnitManager unit = neighbors[i];
+            PodeFundirOption option = validOptions[i];
+            UnitManager unit = option != null ? option.candidateUnit : null;
             if (unit == null || IsMergeUnitAlreadyQueued(unit))
                 continue;
 
             number++;
-            Vector3Int cell = unit.CurrentCellPosition;
+            Vector3Int cell = option.candidateCell;
             cell.z = 0;
             mergeCandidateEntries.Add(new MergeCandidateEntry
             {
                 unit = unit,
                 selectionNumber = number,
                 cell = cell,
-                label = $"{ResolveUnitRuntimeName(unit)} ({cell.x},{cell.y})"
+                label = $"{ResolveUnitRuntimeName(unit)} ({cell.x},{cell.y})",
+                isValid = true,
+                invalidReasonId = string.Empty,
+                invalidReason = string.Empty,
+                requiredMovementCost = option.requiredMovementCost,
+                remainingMovement = option.remainingMovement
             });
             mergeCandidateIndexByCell[cell] = mergeCandidateEntries.Count - 1;
+            LogMergeDebug($"CandidateAdded VALID {DescribeMergeCandidate(mergeCandidateEntries[mergeCandidateEntries.Count - 1])}");
+        }
+
+        for (int i = 0; i < invalidOptions.Count; i++)
+        {
+            PodeFundirInvalidOption invalid = invalidOptions[i];
+            UnitManager unit = invalid != null ? invalid.candidateUnit : null;
+            if (unit == null || IsMergeUnitAlreadyQueued(unit))
+                continue;
+
+            number++;
+            Vector3Int cell = invalid.candidateCell;
+            cell.z = 0;
+            mergeCandidateEntries.Add(new MergeCandidateEntry
+            {
+                unit = unit,
+                selectionNumber = number,
+                cell = cell,
+                label = $"{ResolveUnitRuntimeName(unit)} ({cell.x},{cell.y})",
+                isValid = false,
+                invalidReasonId = invalid.reasonId,
+                invalidReason = invalid.reason,
+                requiredMovementCost = invalid.requiredMovementCost,
+                remainingMovement = invalid.remainingMovement
+            });
+            mergeCandidateIndexByCell[cell] = mergeCandidateEntries.Count - 1;
+            LogMergeDebug($"CandidateAdded INVALID {DescribeMergeCandidate(mergeCandidateEntries[mergeCandidateEntries.Count - 1])}");
         }
     }
 
@@ -740,7 +868,8 @@ public partial class TurnStateManager
             return;
 
         Color teamColor = TeamUtils.GetColor(selectedUnit.TeamId);
-        Color overlayColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(movementRangeAlpha));
+        Color overlayColorValid = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(movementRangeAlpha));
+        Color overlayColorInvalid = new Color(0.45f, 0.45f, 0.45f, Mathf.Clamp01(movementRangeAlpha * 0.9f));
         for (int i = 0; i < mergeCandidateEntries.Count; i++)
         {
             MergeCandidateEntry candidate = mergeCandidateEntries[i];
@@ -751,7 +880,7 @@ public partial class TurnStateManager
             cell.z = 0;
             rangeMapTilemap.SetTile(cell, rangeOverlayTile);
             rangeMapTilemap.SetTileFlags(cell, TileFlags.None);
-            rangeMapTilemap.SetColor(cell, overlayColor);
+            rangeMapTilemap.SetColor(cell, candidate.isValid ? overlayColorValid : overlayColorInvalid);
             paintedRangeCells.Add(cell);
             paintedRangeLookup.Add(cell);
         }
@@ -895,23 +1024,15 @@ public partial class TurnStateManager
     private int CountRemainingMergeCandidates()
     {
         int count = 0;
-        if (selectedUnit == null)
-            return 0;
-
-        Tilemap map = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
-        if (map == null)
-            return 0;
-
-        List<UnitManager> neighbors = new List<UnitManager>(6);
-        CollectMergeEligibleNeighbors(selectedUnit, map, neighbors);
-        for (int i = 0; i < neighbors.Count; i++)
+        for (int i = 0; i < mergeCandidateEntries.Count; i++)
         {
-            UnitManager unit = neighbors[i];
-            if (unit == null || IsMergeUnitAlreadyQueued(unit))
+            MergeCandidateEntry entry = mergeCandidateEntries[i];
+            if (entry == null || entry.unit == null || IsMergeUnitAlreadyQueued(entry.unit))
+                continue;
+            if (!entry.isValid)
                 continue;
             count++;
         }
-
         return count;
     }
 
@@ -931,7 +1052,20 @@ public partial class TurnStateManager
 
     private void LogMergeParticipantSelectionPanel()
     {
-        string text = $"[Fusao] Candidatos elegiveis: {mergeCandidateEntries.Count}\n";
+        int validCount = 0;
+        int invalidCount = 0;
+        for (int i = 0; i < mergeCandidateEntries.Count; i++)
+        {
+            MergeCandidateEntry entry = mergeCandidateEntries[i];
+            if (entry == null)
+                continue;
+            if (entry.isValid)
+                validCount++;
+            else
+                invalidCount++;
+        }
+
+        string text = $"[Fusao] Candidatos: total={mergeCandidateEntries.Count} | validos={validCount} | invalidos={invalidCount}\n";
         text += "Use numero (1..9) ou mova o cursor entre os hexes pintados.\n";
         text += "Enter confirma o candidato atual e avanca para o proximo substep.\n";
         if (mergeQueuedUnits.Count > 0)
@@ -945,7 +1079,16 @@ public partial class TurnStateManager
         }
 
         for (int i = 0; i < mergeCandidateEntries.Count; i++)
-            text += $"{mergeCandidateEntries[i].selectionNumber}. {mergeCandidateEntries[i].label}\n";
+        {
+            MergeCandidateEntry entry = mergeCandidateEntries[i];
+            if (entry == null)
+                continue;
+
+            if (entry.isValid)
+                text += $"{entry.selectionNumber}. {entry.label}\n";
+            else
+                text += $"{entry.selectionNumber}. {entry.label} [invalido: {ResolveMergeInvalidReason(entry)}]\n";
+        }
 
         Debug.Log(text);
     }
@@ -955,7 +1098,170 @@ public partial class TurnStateManager
         if (entry == null || entry.unit == null)
             return;
 
+        if (!entry.isValid)
+        {
+            string reason = ResolveMergeInvalidReason(entry);
+            Debug.Log($"[Fusao] Candidato invalido: {ResolveUnitRuntimeName(entry.unit)}. Motivo: {reason}");
+            return;
+        }
+
         Debug.Log($"[Fusao] Confirmar adicionar {ResolveUnitRuntimeName(entry.unit)} na fila? (Enter=sim, ESC=voltar)");
+    }
+
+    private string ResolveMergeInvalidReason(MergeCandidateEntry entry)
+    {
+        if (entry == null)
+            return "Candidato invalido para fusao.";
+
+        string fallback = !string.IsNullOrWhiteSpace(entry.invalidReason)
+            ? entry.invalidReason
+            : "Candidato invalido para fusao.";
+
+        if (string.IsNullOrWhiteSpace(entry.invalidReasonId))
+            return fallback;
+
+        Dictionary<string, string> tokens = new Dictionary<string, string>
+        {
+            { "remaining", Mathf.Max(0, entry.remainingMovement).ToString() },
+            { "required", Mathf.Max(0, entry.requiredMovementCost).ToString() },
+            { "cost", Mathf.Max(0, entry.requiredMovementCost).ToString() },
+            { "unit", entry.unit != null ? ResolveUnitRuntimeName(entry.unit) : string.Empty }
+        };
+        return PanelDialogController.ResolveDialogMessage(entry.invalidReasonId, fallback, tokens);
+    }
+
+    private bool IsMergeCandidateCurrentlyValidBySensor(UnitManager candidate)
+    {
+        if (candidate == null || cachedPodeFundirTargets == null)
+            return false;
+
+        for (int i = 0; i < cachedPodeFundirTargets.Count; i++)
+        {
+            PodeFundirOption option = cachedPodeFundirTargets[i];
+            if (option == null || option.candidateUnit == null)
+                continue;
+            if (option.candidateUnit == candidate)
+                return true;
+        }
+
+        return false;
+    }
+
+    private string ResolveMergeInvalidReasonFromSensor(UnitManager candidate, string fallback)
+    {
+        if (candidate == null || cachedPodeFundirInvalidTargets == null)
+            return fallback;
+
+        for (int i = 0; i < cachedPodeFundirInvalidTargets.Count; i++)
+        {
+            PodeFundirInvalidOption invalid = cachedPodeFundirInvalidTargets[i];
+            if (invalid == null || invalid.candidateUnit == null)
+                continue;
+            if (invalid.candidateUnit != candidate)
+                continue;
+            return ResolveMergeInvalidReason(invalid, fallback);
+        }
+
+        return fallback;
+    }
+
+    private string ResolveMergeInvalidReason(PodeFundirInvalidOption invalid, string fallback)
+    {
+        if (invalid == null)
+            return string.IsNullOrWhiteSpace(fallback) ? "Candidato invalido para fusao." : fallback;
+
+        string localFallback = !string.IsNullOrWhiteSpace(invalid.reason)
+            ? invalid.reason
+            : (string.IsNullOrWhiteSpace(fallback) ? "Candidato invalido para fusao." : fallback);
+
+        if (string.IsNullOrWhiteSpace(invalid.reasonId))
+            return localFallback;
+
+        Dictionary<string, string> tokens = new Dictionary<string, string>
+        {
+            { "remaining", Mathf.Max(0, invalid.remainingMovement).ToString() },
+            { "required", Mathf.Max(0, invalid.requiredMovementCost).ToString() },
+            { "cost", Mathf.Max(0, invalid.requiredMovementCost).ToString() },
+            { "unit", invalid.candidateUnit != null ? ResolveUnitRuntimeName(invalid.candidateUnit) : string.Empty }
+        };
+        return PanelDialogController.ResolveDialogMessage(invalid.reasonId, localFallback, tokens);
+    }
+
+    private bool TryValidateMergeCandidateWithFreshSensor(UnitManager candidate, out string reason)
+    {
+        reason = string.Empty;
+        if (candidate == null || selectedUnit == null)
+        {
+            reason = "Contexto de fusao invalido.";
+            return false;
+        }
+
+        Tilemap map = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
+        if (map == null)
+        {
+            reason = "Tilemap indisponivel para fusao.";
+            return false;
+        }
+
+        List<PodeFundirOption> validNow = new List<PodeFundirOption>();
+        List<PodeFundirInvalidOption> invalidNow = new List<PodeFundirInvalidOption>();
+        PodeFundirSensor.CollectOptions(
+            selectedUnit,
+            map,
+            terrainDatabase,
+            validNow,
+            out string sensorReason,
+            invalidNow);
+        LogMergeDebug($"FreshSensorCheck candidate={ResolveUnitRuntimeName(candidate)} validNow={validNow.Count} invalidNow={invalidNow.Count} sensorReason=\"{sensorReason}\"");
+
+        for (int i = 0; i < validNow.Count; i++)
+        {
+            PodeFundirOption option = validNow[i];
+            if (option == null || option.candidateUnit == null)
+                continue;
+            if (option.candidateUnit == candidate)
+            {
+                LogMergeDebug($"FreshSensorCheck RESULT VALID candidate={ResolveUnitRuntimeName(candidate)} rem={option.remainingMovement} cost={option.requiredMovementCost}");
+                return true;
+            }
+        }
+
+        for (int i = 0; i < invalidNow.Count; i++)
+        {
+            PodeFundirInvalidOption invalid = invalidNow[i];
+            if (invalid == null || invalid.candidateUnit == null)
+                continue;
+            if (invalid.candidateUnit != candidate)
+                continue;
+            reason = ResolveMergeInvalidReason(invalid, sensorReason);
+            LogMergeDebug($"FreshSensorCheck RESULT INVALID candidate={ResolveUnitRuntimeName(candidate)} reason=\"{reason}\" rem={invalid.remainingMovement} cost={invalid.requiredMovementCost}");
+            return false;
+        }
+
+        reason = string.IsNullOrWhiteSpace(sensorReason) ? "Candidato nao retornado como valido pelo sensor." : sensorReason;
+        LogMergeDebug($"FreshSensorCheck RESULT MISSING candidate={ResolveUnitRuntimeName(candidate)} reason=\"{reason}\"");
+        return false;
+    }
+
+    private void EnsureMergeSensorSnapshot()
+    {
+        if (selectedUnit == null)
+            return;
+
+        Tilemap map = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
+        if (map == null)
+            return;
+
+        cachedPodeFundirTargets.Clear();
+        cachedPodeFundirInvalidTargets.Clear();
+        PodeFundirSensor.CollectOptions(
+            selectedUnit,
+            map,
+            terrainDatabase,
+            cachedPodeFundirTargets,
+            out cachedPodeFundirReason,
+            cachedPodeFundirInvalidTargets);
+        cachedPodeFundirAdjacentCount = cachedPodeFundirTargets.Count;
     }
 
     private void RebuildMergeQueuePreviewTracks()
@@ -1013,7 +1319,9 @@ public partial class TurnStateManager
     private void UpdateMergeQueuePreviewAnimation()
     {
         bool shouldShow = cursorState == CursorState.Fundindo &&
-                          (mergeQueuedUnits.Count > 0 || scannerPromptStep == ScannerPromptStep.MergeConfirm);
+                          (mergeQueuedUnits.Count > 0 ||
+                           scannerPromptStep == ScannerPromptStep.MergeConfirm ||
+                           scannerPromptStep == ScannerPromptStep.MergeParticipantSelect);
         if (!shouldShow)
         {
             SetMergeQueuePreviewVisible(false);
@@ -1144,14 +1452,15 @@ public partial class TurnStateManager
         float speed,
         float segmentLen,
         float width,
-        Color color,
+        Color baseColor,
         float spacingMultiplier)
     {
         MergeCandidateEntry selected = null;
         bool hasSelectedCandidate = TryGetSelectedMergeCandidate(out selected);
+        bool isMergeSelectionStep = scannerPromptStep == ScannerPromptStep.MergeParticipantSelect || scannerPromptStep == ScannerPromptStep.MergeConfirm;
         bool showConfirmPreview =
             cursorState == CursorState.Fundindo &&
-            scannerPromptStep == ScannerPromptStep.MergeConfirm &&
+            isMergeSelectionStep &&
             hasSelectedCandidate &&
             selected != null &&
             selected.unit != null &&
@@ -1181,6 +1490,10 @@ public partial class TurnStateManager
         if (mergeConfirmPreviewTrack.donor != donor)
             mergeConfirmPreviewTrack.headDistance = 0f;
         mergeConfirmPreviewTrack.donor = donor;
+
+        Color previewColor = selected.isValid
+            ? baseColor
+            : new Color(0.55f, 0.55f, 0.55f, Mathf.Clamp01(baseColor.a * 0.95f));
 
         Vector3 from = donor.transform.position;
         Vector3 to = selectedUnit.transform.position;
@@ -1242,8 +1555,8 @@ public partial class TurnStateManager
 
             renderer.startWidth = width;
             renderer.endWidth = width;
-            renderer.startColor = color;
-            renderer.endColor = color;
+            renderer.startColor = previewColor;
+            renderer.endColor = previewColor;
             renderer.positionCount = mergeConfirmPreviewTrack.tempSegmentPoints.Count;
             for (int p = 0; p < mergeConfirmPreviewTrack.tempSegmentPoints.Count; p++)
                 renderer.SetPosition(p, mergeConfirmPreviewTrack.tempSegmentPoints[p]);
@@ -1271,6 +1584,25 @@ public partial class TurnStateManager
             for (int r = 0; r < track.renderers.Count; r++)
             {
                 LineRenderer renderer = track.renderers[r];
+                if (renderer == null)
+                    continue;
+
+                if (!visible)
+                {
+                    renderer.positionCount = 0;
+                    renderer.enabled = false;
+                    continue;
+                }
+
+                renderer.enabled = true;
+            }
+        }
+
+        if (mergeConfirmPreviewTrack.renderers != null)
+        {
+            for (int r = 0; r < mergeConfirmPreviewTrack.renderers.Count; r++)
+            {
+                LineRenderer renderer = mergeConfirmPreviewTrack.renderers[r];
                 if (renderer == null)
                     continue;
 
@@ -1320,50 +1652,6 @@ public partial class TurnStateManager
 
         mergeSuppressDefaultConfirmSfxOnce = false;
         return true;
-    }
-
-    private static void CollectMergeEligibleNeighbors(UnitManager source, Tilemap map, List<UnitManager> output)
-    {
-        if (output == null)
-            return;
-
-        output.Clear();
-        if (source == null || map == null)
-            return;
-
-        Vector3Int origin = source.CurrentCellPosition;
-        origin.z = 0;
-        List<Vector3Int> neighbors = new List<Vector3Int>(6);
-        UnitMovementPathRules.GetImmediateHexNeighbors(map, origin, neighbors);
-        for (int i = 0; i < neighbors.Count; i++)
-        {
-            Vector3Int cell = neighbors[i];
-            cell.z = 0;
-            UnitManager other = UnitOccupancyRules.GetUnitAtCell(map, cell, source);
-            if (other == null || other == source || other.IsEmbarked || !other.gameObject.activeInHierarchy)
-                continue;
-            if (!AreMergeUnitsSameTypeAndTeam(source, other))
-                continue;
-            output.Add(other);
-        }
-    }
-
-    private static bool AreMergeUnitsSameTypeAndTeam(UnitManager source, UnitManager other)
-    {
-        if (source == null || other == null)
-            return false;
-        if ((int)source.TeamId != (int)other.TeamId)
-            return false;
-
-        string sourceId = source.UnitId;
-        string otherId = other.UnitId;
-        if (!string.IsNullOrWhiteSpace(sourceId) && !string.IsNullOrWhiteSpace(otherId))
-            return string.Equals(sourceId.Trim(), otherId.Trim(), System.StringComparison.OrdinalIgnoreCase);
-
-        if (source.TryGetUnitData(out UnitData sourceData) && other.TryGetUnitData(out UnitData otherData))
-            return sourceData != null && otherData != null && sourceData == otherData;
-
-        return false;
     }
 
     private static Dictionary<WeaponData, int> BuildMergeWeaponProjectileTotals(UnitManager baseUnit, List<UnitManager> participants)

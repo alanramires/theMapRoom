@@ -293,6 +293,11 @@ public partial class TurnStateManager
             cursorController.SetCell(selectedUnit.CurrentCellPosition, playMoveSfx: false);
 
         ResetSupplyRuntimeState();
+        // Returning to movement requires scanner prompt in neutral action step.
+        scannerPromptStep = ScannerPromptStep.AwaitingAction;
+        scannerSelectedTargetIndex = -1;
+        scannerSelectedEmbarkIndex = -1;
+        scannerSelectedLandingIndex = -1;
         LogScannerPanel();
     }
 

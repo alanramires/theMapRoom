@@ -117,6 +117,7 @@ public partial class TurnStateManager
         else if (onCompleteState == CursorState.MoveuAndando)
         {
             PrepareFuelCostForCommittedPath();
+            PrepareMovementCostForCommittedPath();
             DrawCommittedPathVisual(committedMovementPath);
             Debug.Log($"moveu para {committedDestinationCell.x},{committedDestinationCell.y}");
             EnterSensorsState(CursorState.MoveuAndando);

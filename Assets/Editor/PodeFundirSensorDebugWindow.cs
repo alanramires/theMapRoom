@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -26,6 +26,8 @@ public class PodeFundirSensorDebugWindow : EditorWindow
         public UnitManager unit;
         public string reason;
         public Vector3Int cell;
+        public int remainingMovement;
+        public int requiredMovementCost;
     }
 
     [SerializeField] private UnitManager selectedUnit;
@@ -42,6 +44,7 @@ public class PodeFundirSensorDebugWindow : EditorWindow
     private int eligibleCount;
     private Vector2 windowScroll;
     private int selectedNeighborIndex = -1;
+    private int selectedIneligibleIndex = -1;
     private bool hasSelectedLine;
     private Vector3Int selectedLineStartCell;
     private Vector3Int selectedLineEndCell;
@@ -75,7 +78,8 @@ public class PodeFundirSensorDebugWindow : EditorWindow
             "1) Unidade selecionada\n" +
             "2) Nao embarcada\n" +
             "3) Pelo menos 1 unidade adjacente (1 hex) do mesmo tipo e mesmo time\n" +
-            "4) Camada NAO bloqueia elegibilidade no sensor (troca de dominio/camada fica para a etapa de fusao/animação)",
+            "4) Candidato precisa alcancar o hex do receptor com movimento restante (caminhos validos)\n" +
+            "5) Camada NAO bloqueia elegibilidade no sensor (troca de dominio/camada fica para a etapa de fusao/animação)",
             MessageType.Info);
 
         selectedUnit = (UnitManager)EditorGUILayout.ObjectField("Unidade", selectedUnit, typeof(UnitManager), true);
@@ -139,17 +143,20 @@ public class PodeFundirSensorDebugWindow : EditorWindow
             if (toggled && selectedNeighborIndex != i)
             {
                 selectedNeighborIndex = i;
+                selectedIneligibleIndex = -1;
                 SelectLineForDrawing(unit);
             }
             EditorGUILayout.LabelField("UnitId", string.IsNullOrWhiteSpace(unit.UnitId) ? "-" : unit.UnitId);
             EditorGUILayout.LabelField("HP", unit.CurrentHP.ToString());
             EditorGUILayout.LabelField("Camada", $"{unit.GetDomain()}/{unit.GetHeightLevel()}");
+            EditorGUILayout.LabelField("Movimento restante", unit.RemainingMovementPoints.ToString());
             Vector3Int cell = unit.CurrentCellPosition;
             EditorGUILayout.LabelField("Hex", $"{cell.x},{cell.y}");
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Desenhar Linha no Scene View"))
             {
                 selectedNeighborIndex = i;
+                selectedIneligibleIndex = -1;
                 SelectLineForDrawing(unit);
             }
             if (GUILayout.Button("Adicionar na Fila"))
@@ -175,12 +182,28 @@ public class PodeFundirSensorDebugWindow : EditorWindow
                 continue;
 
             EditorGUILayout.BeginVertical("box");
-            EditorGUILayout.LabelField($"{i + 1}. {item.unit.name}", EditorStyles.boldLabel);
+            bool isSelected = selectedIneligibleIndex == i;
+            bool toggled = GUILayout.Toggle(isSelected, $"{i + 1}. {item.unit.name}", "Button");
+            if (toggled && selectedIneligibleIndex != i)
+            {
+                selectedIneligibleIndex = i;
+                selectedNeighborIndex = -1;
+                SelectIneligibleLineForDrawing(item);
+            }
             EditorGUILayout.LabelField("UnitId", string.IsNullOrWhiteSpace(item.unit.UnitId) ? "-" : item.unit.UnitId);
             EditorGUILayout.LabelField("HP", item.unit.CurrentHP.ToString());
             EditorGUILayout.LabelField("Camada", $"{item.unit.GetDomain()}/{item.unit.GetHeightLevel()}");
+            EditorGUILayout.LabelField("Movimento restante", item.remainingMovement.ToString());
+            if (item.requiredMovementCost > 0)
+                EditorGUILayout.LabelField("Custo para receptor", item.requiredMovementCost.ToString());
             EditorGUILayout.LabelField("Hex", $"{item.cell.x},{item.cell.y}");
             EditorGUILayout.LabelField("Motivo", string.IsNullOrWhiteSpace(item.reason) ? "-" : item.reason);
+            if (GUILayout.Button("Desenhar Linha Vermelha"))
+            {
+                selectedIneligibleIndex = i;
+                selectedNeighborIndex = -1;
+                SelectIneligibleLineForDrawing(item);
+            }
             EditorGUILayout.EndVertical();
         }
     }
@@ -190,6 +213,7 @@ public class PodeFundirSensorDebugWindow : EditorWindow
         eligibleNeighbors.Clear();
         ineligibleNeighbors.Clear();
         selectedNeighborIndex = -1;
+        selectedIneligibleIndex = -1;
         ClearSelectedLine();
         canMerge = false;
         eligibleCount = 0;
@@ -223,77 +247,6 @@ public class PodeFundirSensorDebugWindow : EditorWindow
         Debug.Log(
             $"[PodeFundirSensorDebug] unit={(selectedUnit != null ? selectedUnit.name : "(null)")} | " +
             $"canMerge={canMerge} | eligible={eligibleCount} | reason={sensorReason}");
-    }
-
-    private void CollectEligibleNeighbors(UnitManager source, Tilemap map, List<UnitManager> output, List<DebugIneligibleNeighbor> invalidOutput)
-    {
-        if (output == null)
-            return;
-
-        output.Clear();
-        invalidOutput?.Clear();
-        if (source == null || map == null)
-            return;
-
-        Vector3Int origin = source.CurrentCellPosition;
-        origin.z = 0;
-        List<Vector3Int> neighbors = new List<Vector3Int>(6);
-        UnitMovementPathRules.GetImmediateHexNeighbors(map, origin, neighbors);
-        for (int i = 0; i < neighbors.Count; i++)
-        {
-            Vector3Int cell = neighbors[i];
-            cell.z = 0;
-            UnitManager other = UnitOccupancyRules.GetUnitAtCell(map, cell, source);
-            if (other == null || other == source)
-                continue;
-
-            string reason = GetIneligibleReason(source, other);
-            if (!string.IsNullOrWhiteSpace(reason))
-            {
-                invalidOutput?.Add(new DebugIneligibleNeighbor
-                {
-                    unit = other,
-                    reason = reason,
-                    cell = cell
-                });
-                continue;
-            }
-            output.Add(other);
-        }
-    }
-
-    private static string GetIneligibleReason(UnitManager source, UnitManager other)
-    {
-        if (source == null || other == null)
-            return "Contexto invalido.";
-        if (!other.gameObject.activeInHierarchy)
-            return "Unidade inativa.";
-        if (other.IsEmbarked)
-            return "Unidade embarcada.";
-        if ((int)other.TeamId != (int)source.TeamId)
-            return "Unidade de outro time.";
-        if (!IsSameTypeAndTeam(source, other))
-            return "Tipo de unidade diferente.";
-
-        return string.Empty;
-    }
-
-    private static bool IsSameTypeAndTeam(UnitManager source, UnitManager other)
-    {
-        if (source == null || other == null)
-            return false;
-        if ((int)other.TeamId != (int)source.TeamId)
-            return false;
-
-        string sourceId = source.UnitId;
-        string otherId = other.UnitId;
-        if (!string.IsNullOrWhiteSpace(sourceId) && !string.IsNullOrWhiteSpace(otherId))
-            return string.Equals(sourceId.Trim(), otherId.Trim(), System.StringComparison.OrdinalIgnoreCase);
-
-        if (source.TryGetUnitData(out UnitData sourceData) && other.TryGetUnitData(out UnitData otherData))
-            return sourceData != null && otherData != null && sourceData == otherData;
-
-        return false;
     }
 
     private void TryUseCurrentSelection()
@@ -980,6 +933,7 @@ public class PodeFundirSensorDebugWindow : EditorWindow
         eligibleNeighbors.Clear();
         ineligibleNeighbors.Clear();
         selectedNeighborIndex = -1;
+        selectedIneligibleIndex = -1;
 
         if (selectedUnit == null || map == null)
         {
@@ -990,7 +944,40 @@ public class PodeFundirSensorDebugWindow : EditorWindow
             return;
         }
 
-        CollectEligibleNeighbors(selectedUnit, map, eligibleNeighbors, ineligibleNeighbors);
+        List<PodeFundirOption> validOptions = new List<PodeFundirOption>();
+        List<PodeFundirInvalidOption> invalidOptions = new List<PodeFundirInvalidOption>();
+        bool sensorStatus = PodeFundirSensor.CollectOptions(
+            selectedUnit,
+            map,
+            terrainDatabase,
+            validOptions,
+            out string sensorCollectedReason,
+            invalidOptions);
+
+        for (int i = 0; i < validOptions.Count; i++)
+        {
+            PodeFundirOption option = validOptions[i];
+            if (option == null || option.candidateUnit == null)
+                continue;
+            eligibleNeighbors.Add(option.candidateUnit);
+        }
+
+        for (int i = 0; i < invalidOptions.Count; i++)
+        {
+            PodeFundirInvalidOption invalid = invalidOptions[i];
+            if (invalid == null || invalid.candidateUnit == null)
+                continue;
+
+            ineligibleNeighbors.Add(new DebugIneligibleNeighbor
+            {
+                unit = invalid.candidateUnit,
+                reason = invalid.reason,
+                cell = invalid.candidateCell,
+                remainingMovement = invalid.remainingMovement,
+                requiredMovementCost = invalid.requiredMovementCost
+            });
+        }
+
         SyncQueueWithEligibleNeighbors();
 
         // Remove da lista de elegiveis os candidatos que ja estao na fila.
@@ -1001,12 +988,13 @@ public class PodeFundirSensorDebugWindow : EditorWindow
         }
 
         eligibleCount = eligibleNeighbors.Count;
-        canMerge = eligibleCount > 0;
-        sensorReason = canMerge ? string.Empty : "Sem unidade adjacente do mesmo tipo disponivel (ou todas ja estao na fila).";
+        canMerge = sensorStatus;
+        sensorReason = canMerge ? sensorCollectedReason : (string.IsNullOrWhiteSpace(sensorCollectedReason) ? "Sem unidade adjacente do mesmo tipo disponivel (ou todas ja estao na fila)." : sensorCollectedReason);
 
         if (eligibleNeighbors.Count > 0)
         {
             selectedNeighborIndex = 0;
+            selectedIneligibleIndex = -1;
             SelectLineForDrawing(eligibleNeighbors[0]);
         }
         else
@@ -1029,6 +1017,25 @@ public class PodeFundirSensorDebugWindow : EditorWindow
         selectedLineEndCell.z = 0;
         selectedLineColor = Color.cyan;
         selectedLineLabel = $"Fusao: {selectedUnit.name} -> {target.name}";
+        hasSelectedLine = true;
+        SceneView.RepaintAll();
+    }
+
+    private void SelectIneligibleLineForDrawing(DebugIneligibleNeighbor item)
+    {
+        if (selectedUnit == null || item == null || item.unit == null)
+        {
+            ClearSelectedLine();
+            return;
+        }
+
+        selectedLineStartCell = selectedUnit.CurrentCellPosition;
+        selectedLineStartCell.z = 0;
+        selectedLineEndCell = item.unit.CurrentCellPosition;
+        selectedLineEndCell.z = 0;
+        selectedLineColor = Color.red;
+        string reason = string.IsNullOrWhiteSpace(item.reason) ? "invalido" : item.reason;
+        selectedLineLabel = $"Fusao invalida: {selectedUnit.name} -> {item.unit.name} | {reason}";
         hasSelectedLine = true;
         SceneView.RepaintAll();
     }
@@ -1418,3 +1425,5 @@ public class PodeFundirSensorDebugWindow : EditorWindow
     }
 
 }
+
+

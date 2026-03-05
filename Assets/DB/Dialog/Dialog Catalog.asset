@@ -1,0 +1,82 @@
+﻿%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a5b1302c46c0734dbc565ff0ea07a06, type: 3}
+  m_Name: Dialog Catalog
+  m_EditorClassIdentifier: Assembly-CSharp::DialogCatalog
+  entries:
+  - id: helper.title.shopping
+    condition: Titulo do helper no estado ShoppingAndServices.
+    message: SHOPPING
+  - id: helper.shopping.line.with_cost
+    condition: Linha de item de compra quando o custo esta disponivel.
+    message: <index> - <unit> ($<valor>)
+  - id: helper.shopping.line.no_cost
+    condition: Linha de item de compra sem custo resolvido.
+    message: <index> - <unit>
+  - id: helper.title.sensors
+    condition: Titulo do helper no estado de sensores apos mover.
+    message: SENSORS
+  - id: helper.sensors.label.aim
+    condition: Rotulo da acao de mirar.
+    message: Aim
+  - id: helper.sensors.label.embark
+    condition: Rotulo da acao de embarcar.
+    message: Embark
+  - id: helper.sensors.label.disembark
+    condition: Rotulo da acao de desembarcar.
+    message: Disembark
+  - id: helper.sensors.label.capture
+    condition: Rotulo da acao de capturar.
+    message: Capture
+  - id: helper.sensors.label.fuse
+    condition: Rotulo da acao de fundir unidades.
+    message: Fuse units
+  - id: helper.sensors.label.supply
+    condition: Rotulo da acao de suprir.
+    message: Supply
+  - id: helper.sensors.label.transfer
+    condition: Rotulo da acao de transferir.
+    message: Transfer
+  - id: helper.sensors.label.layer
+    condition: Rotulo da acao de mudar layer.
+    message: Layer
+  - id: helper.sensors.label.move_only
+    condition: Rotulo da acao de mover apenas.
+    message: Move Only
+  - id: helper.sensors.line.format
+    condition: Formato padrao da linha de acao no helper de sensores.
+    message: <action> - <label>
+  - id: helper.sensors.line.move_only
+    condition: Linha especifica do Move Only.
+    message: <action> - <label>
+  - id: helper.title.disembark
+    condition: Titulo do helper no estado Desembarcando.
+    message: DISEMBARK
+  - id: helper.disembark.section.order
+    condition: Cabecalho da secao de ordem de desembarque.
+    message: Order
+  - id: helper.disembark.order.line
+    condition: Linha de ordem de desembarque enfileirada.
+    message: <index> - <unit> (<stats>) -> <terrain>
+  - id: helper.disembark.order.empty
+    condition: Mensagem quando nao ha ordens de desembarque.
+    message: 0 - (empty)
+  - id: helper.disembark.section.select_passenger
+    condition: Cabecalho da secao de selecao de passageiro.
+    message: Select Passenger
+  - id: helper.disembark.passenger.line
+    condition: Linha de passageiro disponivel para desembarque.
+    message: <index> - <unit> (<stats>)
+  - id: helper.disembark.process_order.line
+    condition: Linha para processar ordens enfileiradas.
+    message: 0 - Process Order
+

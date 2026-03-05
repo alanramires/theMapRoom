@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -50,6 +50,7 @@ public class SaveGameManager : MonoBehaviour
         public int currentHP;
         public int currentAmmo;
         public int currentFuel;
+        public int remainingMovementPoints;
         public bool hasActed;
         public bool receivedSuppliesThisTurn;
         public bool isEmbarked;
@@ -162,7 +163,7 @@ public class SaveGameManager : MonoBehaviour
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? Application.persistentDataPath);
             File.WriteAllText(path, json);
             cursorController?.PlayLoadSfx();
-            PanelUnitController.TrySetTransientText("Game saved", 2.2f);
+            PanelDialogController.TrySetTransientText("Game saved", 2.2f);
             Debug.Log($"[SaveGame] jogo salvo em: {path}");
         }
         catch (Exception ex)
@@ -324,6 +325,7 @@ public class SaveGameManager : MonoBehaviour
                     manager.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
                     if (saved.hasActed) manager.MarkAsActed();
                     else manager.ResetActed();
+                    manager.SetRemainingMovementPoints(saved.remainingMovementPoints);
 
                     Domain domain = (Domain)saved.domain;
                     HeightLevel heightLevel = (HeightLevel)saved.heightLevel;
@@ -395,6 +397,7 @@ public class SaveGameManager : MonoBehaviour
 
                     if (saved.hasActed) unit.MarkAsActed();
                     else unit.ResetActed();
+                    unit.SetRemainingMovementPoints(saved.remainingMovementPoints);
                     unit.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
                 }
             }
@@ -402,7 +405,7 @@ public class SaveGameManager : MonoBehaviour
             cursorController?.PlayBeepSfx();
             if (verboseLogs)
                 Debug.Log($"[SaveGame] Load concluido: {data.units?.Count ?? 0} unidades, {data.constructions?.Count ?? 0} construcoes.");
-            PanelUnitController.TrySetTransientText("Game loaded", 2.2f);
+            PanelDialogController.TrySetTransientText("Game loaded", 2.2f);
         }
         catch (Exception ex)
         {
@@ -472,6 +475,7 @@ public class SaveGameManager : MonoBehaviour
                 currentHP = unit.CurrentHP,
                 currentAmmo = unit.CurrentAmmo,
                 currentFuel = unit.CurrentFuel,
+                remainingMovementPoints = unit.RemainingMovementPoints,
                 hasActed = unit.HasActed,
                 receivedSuppliesThisTurn = unit.ReceivedSuppliesThisTurn,
                 isEmbarked = unit.IsEmbarked,
@@ -911,3 +915,4 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
+

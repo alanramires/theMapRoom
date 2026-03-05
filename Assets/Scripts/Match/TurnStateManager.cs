@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -69,6 +69,8 @@ public partial class TurnStateManager : MonoBehaviour
     private bool hasCommittedMovement;
     private int preparedFuelCost;
     private bool hasPreparedFuelCost;
+    private int preparedMovementCost;
+    private bool hasPreparedMovementCost;
     private bool hasTemporaryTakeoffSelectionState;
     private UnitManager temporaryTakeoffUnit;
     private Domain temporaryTakeoffOriginalDomain = Domain.Land;
@@ -113,9 +115,9 @@ public partial class TurnStateManager : MonoBehaviour
         string normalized = text.Replace('\n', ' ').Replace('\r', ' ').Trim();
         const int maxLen = 64;
         if (normalized.Length > maxLen)
-            normalized = normalized.Substring(0, maxLen - 1).TrimEnd() + "…";
+            normalized = normalized.Substring(0, maxLen - 1).TrimEnd() + "â€¦";
 
-        PanelUnitController.TrySetTransientText(normalized, durationSeconds);
+        PanelDialogController.TrySetTransientText(normalized, durationSeconds);
     }
 
     private void SetCursorState(CursorState nextState, string reason, bool rollback = false)
@@ -240,6 +242,21 @@ public partial class TurnStateManager : MonoBehaviour
         int beforeFuel = target.CurrentFuel;
         target.SetCurrentFuel(autonomyValue);
         message = $"Autonomia atualizada: {ResolveDebugUnitName(target)} {beforeFuel}->{target.CurrentFuel}/{target.GetMaxFuel()} em ({cursorCell.x},{cursorCell.y},0).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TrySetUnitRemainingMovementUnderCursorFromDebug(int remainingMovementValue, out string message)
+    {
+        message = string.Empty;
+        if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out message))
+            return false;
+
+        int before = target.RemainingMovementPoints;
+        int max = target.MaxMovementPoints;
+        int clamped = Mathf.Clamp(remainingMovementValue, 0, Mathf.Max(0, max));
+        target.SetRemainingMovementPoints(clamped);
+        message = $"Movimento restante atualizado: {ResolveDebugUnitName(target)} {before}->{target.RemainingMovementPoints}/{max} em ({cursorCell.x},{cursorCell.y},0).";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -496,9 +513,15 @@ public partial class TurnStateManager : MonoBehaviour
         shoppingUnitsForSale.Clear();
 
         if (keepPreparedFuelCost)
+        {
             CommitPreparedFuelCost();
+            CommitPreparedMovementCost();
+        }
         else
+        {
             RestorePreparedFuelCostIfAny();
+            RestorePreparedMovementCostIfAny();
+        }
 
         if (selectedUnit != null)
             animationManager?.ClearSelectionVisual(selectedUnit);
@@ -831,7 +854,6 @@ public partial class TurnStateManager : MonoBehaviour
             dpqMatchupDatabase = FindFirstAssetEditor<DPQMatchupDatabase>();
         if (rpsDatabase == null)
             rpsDatabase = FindFirstAssetEditor<RPSDatabase>();
-
 #endif
     }
 
@@ -869,8 +891,7 @@ public partial class TurnStateManager : MonoBehaviour
         if (unit == null)
             return 0;
 
-        int moveRange = Mathf.Max(0, unit.GetMovementRange());
-        return moveRange;
+        return Mathf.Max(0, unit.RemainingMovementPoints);
     }
 
     private void PrepareFuelCostForCommittedPath()
@@ -882,6 +903,18 @@ public partial class TurnStateManager : MonoBehaviour
             committedMovementPath,
             terrainDatabase);
         ApplyPreparedFuelCost(movementCost);
+    }
+
+    private void PrepareMovementCostForCommittedPath()
+    {
+        Tilemap movementTilemap = terrainTilemap != null ? terrainTilemap : (selectedUnit != null ? selectedUnit.BoardTilemap : null);
+        int movementCost = UnitMovementPathRules.CalculateAutonomyCostForPath(
+            movementTilemap,
+            selectedUnit,
+            committedMovementPath,
+            terrainDatabase,
+            applyOperationalAutonomyModifier: false);
+        ApplyPreparedMovementCost(movementCost);
     }
 
     private void ApplyPreparedFuelCost(int movementCost)
@@ -928,8 +961,54 @@ public partial class TurnStateManager : MonoBehaviour
         hasPreparedFuelCost = false;
     }
 
+    private void ApplyPreparedMovementCost(int movementCost)
+    {
+        if (selectedUnit == null)
+        {
+            preparedMovementCost = 0;
+            hasPreparedMovementCost = false;
+            return;
+        }
+
+        RestorePreparedMovementCostIfAny();
+
+        int currentRemaining = Mathf.Max(0, selectedUnit.RemainingMovementPoints);
+        int clampedCost = Mathf.Clamp(movementCost, 0, currentRemaining);
+        if (clampedCost <= 0)
+        {
+            preparedMovementCost = 0;
+            hasPreparedMovementCost = false;
+            return;
+        }
+
+        selectedUnit.ConsumeMovementPoints(clampedCost);
+        preparedMovementCost = clampedCost;
+        hasPreparedMovementCost = true;
+    }
+
+    private void RestorePreparedMovementCostIfAny()
+    {
+        if (!hasPreparedMovementCost || preparedMovementCost <= 0 || selectedUnit == null)
+        {
+            preparedMovementCost = 0;
+            hasPreparedMovementCost = false;
+            return;
+        }
+
+        selectedUnit.SetRemainingMovementPoints(selectedUnit.RemainingMovementPoints + preparedMovementCost);
+        preparedMovementCost = 0;
+        hasPreparedMovementCost = false;
+    }
+
+    private void CommitPreparedMovementCost()
+    {
+        preparedMovementCost = 0;
+        hasPreparedMovementCost = false;
+    }
+
     private bool IsMovementAnimationRunning()
     {
         return (animationManager != null && animationManager.IsAnimatingMovement) || embarkExecutionInProgress || disembarkExecutionInProgress;
     }
 }
+

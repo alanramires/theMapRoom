@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Tilemaps;
 using UnityEngine.EventSystems;
 using System.Collections.Generic;
@@ -197,7 +197,7 @@ public class CursorController : MonoBehaviour
 
         if (!TryCycleToReadyUnit(direction))
         {
-            PanelUnitController.TrySetTransientText("Sem unidades prontas", 2.2f);
+            PanelDialogController.TrySetTransientText("Sem unidades prontas", 2.2f);
             PlayUiSfx(errorSfx);
         }
     }
@@ -592,7 +592,7 @@ public class CursorController : MonoBehaviour
                 return;
 
             pendingEndTurnConfirmation = true;
-            PanelUnitController.TrySetExternalText("End Turn :: Confirm");
+            PanelDialogController.TrySetExternalText("End Turn :: Confirm");
             PlayConfirmSfx();
             return;
         }
@@ -650,7 +650,7 @@ public class CursorController : MonoBehaviour
             return;
 
         pendingEndTurnConfirmation = false;
-        PanelUnitController.ClearExternalText();
+        PanelDialogController.ClearExternalText();
     }
 
     private bool TryTeleportToActiveTeamHeadQuarterOnNeutral()
@@ -937,8 +937,8 @@ public class CursorController : MonoBehaviour
         if (clip == null)
             return;
 
-        if (clip == errorSfx && !PanelUnitController.HasActiveExternalText())
-            PanelUnitController.TrySetTransientText("Invalid action", 2f);
+        if (clip == errorSfx && !PanelDialogController.HasActiveExternalText())
+            PanelDialogController.TrySetTransientText("Invalid action", 2f);
 
         if (audioSource == null)
         {
@@ -1101,3 +1101,4 @@ public class CursorController : MonoBehaviour
     }
 
 }
+

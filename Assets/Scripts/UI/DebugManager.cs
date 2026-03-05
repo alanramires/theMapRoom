@@ -113,6 +113,14 @@ public class DebugManager : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
+        else if (TryParseSetMoveRemainCommand(command, out int remainingMovementValue))
+        {
+            executed = turnStateManager.TrySetUnitRemainingMovementUnderCursorFromDebug(remainingMovementValue, out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
         else if (command == "REFUEL UNIT")
         {
             executed = turnStateManager.TryRefuelUnitAutonomyUnderCursorFromDebug(out string message);
@@ -382,6 +390,28 @@ public class DebugManager : MonoBehaviour
 
         weaponIndex = 1; // Sem indice explicito, assume arma #1.
         return true;
+    }
+
+    private static bool TryParseSetMoveRemainCommand(string normalizedCommand, out int remainingMovementValue)
+    {
+        remainingMovementValue = 0;
+        if (string.IsNullOrWhiteSpace(normalizedCommand))
+            return false;
+
+        const string prefixA = "SET MOVE_REMAIN ";
+        const string prefixB = "SET MOVE REMAIN ";
+        string valueToken;
+        if (normalizedCommand.StartsWith(prefixA))
+            valueToken = normalizedCommand.Substring(prefixA.Length).Trim();
+        else if (normalizedCommand.StartsWith(prefixB))
+            valueToken = normalizedCommand.Substring(prefixB.Length).Trim();
+        else
+            return false;
+
+        if (string.IsNullOrWhiteSpace(valueToken))
+            return false;
+
+        return int.TryParse(valueToken, out remainingMovementValue);
     }
 
     private static bool TryParseSetConstructionTeamCommand(string normalizedCommand, out int teamValue)

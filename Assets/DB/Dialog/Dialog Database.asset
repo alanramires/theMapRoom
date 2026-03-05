@@ -1,0 +1,28 @@
+﻿%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3d7af1c6b5b4f2197b68e16f4fa7f37, type: 3}
+  m_Name: Dialog Database
+  m_EditorClassIdentifier: Assembly-CSharp::DialogDatabase
+  messages:
+  - {fileID: 11400000, guid: 4e6235e984074a23bca35d4745256b58, type: 2}
+  - {fileID: 11400000, guid: 030f25b746a847babe608607c5746bba, type: 2}
+  - {fileID: 11400000, guid: 4c0b02597cd042bb92ba4cabbbee63b2, type: 2}
+  - {fileID: 11400000, guid: 4fbb7ddfff694a87a945f016ad8075c1, type: 2}
+  - {fileID: 11400000, guid: 22957f83e0494af4975848c54beabb59, type: 2}
+  - {fileID: 11400000, guid: 96a93ba7164f424a9cbec673f085006e, type: 2}
+  - {fileID: 11400000, guid: f19f5720940a4fb599b09d1f44ccfece, type: 2}
+  - {fileID: 11400000, guid: e144fe5ed76e4a9f9a00f59449fc0bb4, type: 2}
+  - {fileID: 11400000, guid: 3d16731ae4fb414cb2a7c574ee30ac76, type: 2}
+  - {fileID: 11400000, guid: f8be799ad7434260b4d34a09b783bfcd, type: 2}
+  - {fileID: 11400000, guid: 86b405973daa432388657fa3fa86cc58, type: 2}
+  - {fileID: 11400000, guid: 9f1a4c1e6e1d4f5c8a24c4f2b7d91e11, type: 2}
+
