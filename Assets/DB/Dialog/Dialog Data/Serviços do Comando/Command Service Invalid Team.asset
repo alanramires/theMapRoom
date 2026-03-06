@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b19f67231d8b4327a5a8b1187b9901d2, type: 3}
-  m_Name: Sensor Aim
+  m_Name: Command Service Invalid Team
   m_EditorClassIdentifier: Assembly-CSharp::DialogData
-  id: panel_dialog.sensor.aim
-  condition: Nome do sensor Mirando.
-  message: Mirar
+  id: command_service.invalid_team
+  condition: Servico do comando sem time ativo valido.
+  message: "Servi\xE7o do Comando indispon\xEDvel"

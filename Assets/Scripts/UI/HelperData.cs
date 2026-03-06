@@ -28,6 +28,13 @@ public class HelperData : ScriptableObject
         "- helper.merge.separator -> sem token\n" +
         "- helper.merge.confirm.preview -> <preview>\n" +
         "- helper.merge.process_order.line -> <preview>\n" +
+        "- helper.command_service.targets -> <targets>\n" +
+        "- helper.command_service.targets.estimate -> <targets>\n" +
+        "- helper.command_service.gains -> <hp>, <fuel>, <ammo>\n" +
+        "- helper.command_service.gains.estimate -> <hp>, <fuel>, <ammo>\n" +
+        "- helper.command_service.total_cost -> <valor>\n" +
+        "- helper.command_service.total_cost.estimate -> <valor>\n" +
+        "- helper.command_service.balance.estimate -> <before>, <after>\n" +
         "- demais IDs de titulo/label -> sem token")]
     public string message;
 }

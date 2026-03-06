@@ -2015,6 +2015,17 @@ public partial class TurnStateManager
         cursorController.SetCell(targetCell, playMoveSfx: false);
     }
 
+    private static string ResolveAimInvalidDialogMessage(PodeMirarInvalidOption invalidOption)
+    {
+        string fallback = invalidOption != null && !string.IsNullOrWhiteSpace(invalidOption.reason)
+            ? invalidOption.reason
+            : "Aim: alvo invalido";
+        string id = invalidOption != null && !string.IsNullOrWhiteSpace(invalidOption.reasonId)
+            ? invalidOption.reasonId
+            : PodeMirarInvalidOption.ReasonIdGeneric;
+        return PanelDialogController.ResolveDialogMessage(id, fallback);
+    }
+
     private bool TryConfirmScannerAttack()
     {
         if (cursorState != CursorState.Mirando)
@@ -2034,7 +2045,7 @@ public partial class TurnStateManager
                     ? cycleEntry.invalidOption.reason
                     : "alvo invalido para este ataque.";
                 Debug.Log($"[Mirando] Alvo invalido. {reason}");
-                PushPanelUnitMessage("Aim: alvo invalido", 2.6f);
+                PushPanelUnitMessage(ResolveAimInvalidDialogMessage(cycleEntry.invalidOption), 2.6f);
                 cursorController?.PlayErrorSfx();
                 return false;
             }
@@ -2062,7 +2073,7 @@ public partial class TurnStateManager
                 ? entry.invalidOption.reason
                 : "alvo invalido para este ataque.";
             Debug.Log($"[Mirando] Alvo invalido. {reason}");
-            PushPanelUnitMessage("Aim: alvo invalido", 2.6f);
+            PushPanelUnitMessage(ResolveAimInvalidDialogMessage(entry.invalidOption), 2.6f);
             cursorController?.PlayErrorSfx();
             return false;
         }
@@ -2113,6 +2124,7 @@ public partial class TurnStateManager
 
         if (attackerTrajectory == WeaponTrajectoryType.Parabolic && animationManager != null && defender != null)
         {
+            PanelDialogController.ClearExternalText();
             float effectDuration = animationManager.PlayRangedAttackDefenderEffect(defender, audioDuration);
             waitDuration = Mathf.Max(waitDuration, effectDuration);
         }
@@ -2542,18 +2554,9 @@ public partial class TurnStateManager
 
         scannerPromptStep = ScannerPromptStep.MirandoConfirmTarget;
         MirandoSelectionEntry picked = cachedMirandoSelectionEntries[scannerSelectedTargetIndex];
-        bool singleTarget = GetMirandoEntryCount() == 1;
-        if (singleTarget)
-        {
-            RebuildMirandoPreviewPath(picked);
-            SetMirandoPreviewVisible(cursorState == CursorState.Mirando);
-            SetMirandoSpotterPreviewsVisible(cursorState == CursorState.Mirando && picked.isValid);
-        }
-        else
-        {
-            SetMirandoPreviewVisible(false);
-            SetMirandoSpotterPreviewsVisible(false);
-        }
+        RebuildMirandoPreviewPath(picked);
+        SetMirandoPreviewVisible(cursorState == CursorState.Mirando);
+        SetMirandoSpotterPreviewsVisible(cursorState == CursorState.Mirando && picked.isValid);
         LogAttackConfirmationPrompt(picked, scannerSelectedTargetIndex + 1);
     }
 
@@ -2923,14 +2926,13 @@ public partial class TurnStateManager
             cursorState == CursorState.Mirando &&
             scannerPromptStep == ScannerPromptStep.MirandoCycleTarget;
 
-        bool isMirandoConfirmSingleTarget =
+        bool isMirandoConfirm =
             cursorState == CursorState.Mirando &&
-            scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget &&
-            GetMirandoEntryCount() == 1;
+            scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget;
 
         bool canRenderMirandoPreview =
             !combatExecutionInProgress &&
-            (isMirandoCycle || isMirandoConfirmSingleTarget);
+            (isMirandoCycle || isMirandoConfirm);
 
         if (canRenderMirandoPreview)
             TryRefreshMirandoPreviewPathIfNeeded();

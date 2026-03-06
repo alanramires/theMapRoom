@@ -2,6 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using System.Collections.Generic;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -219,13 +220,7 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
         hotkeysText.color = Color.white;
         hotkeysText.alignment = TextAlignmentOptions.TopLeft;
         hotkeysText.textWrappingMode = TextWrappingModes.NoWrap;
-        hotkeysText.text =
-            "HOME: Center HQ\n" +
-            "N: Mini-Map\n" +
-            "Enter: Confirm\n" +
-            "Esc: Cancel\n" +
-            "Tab: Cycle Units\n" +
-            "Shift+Tab: Reverse Cycle Units";
+        hotkeysText.text = BuildDefaultHotkeysText();
 
         EnsureHotkeysDefaultTexts();
 
@@ -235,7 +230,26 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
     private void EnsureHotkeysDefaultTexts()
     {
         if (hotkeysTitle != null && string.IsNullOrWhiteSpace(hotkeysTitle.text))
-            hotkeysTitle.text = "HOTKEYS";
+            hotkeysTitle.text = ResolveDialog("hotkeys.title", "HOTKEYS");
+        if (hotkeysText != null && string.IsNullOrWhiteSpace(hotkeysText.text))
+            hotkeysText.text = BuildDefaultHotkeysText();
+    }
+
+    private static string ResolveDialog(string id, string fallback)
+    {
+        return PanelDialogController.ResolveDialogMessage(id, fallback);
+    }
+
+    private static string BuildDefaultHotkeysText()
+    {
+        return ResolveDialog(
+            "hotkeys.default.list",
+            "HOME: Center HQ\n" +
+            "N: Mini-Map\n" +
+            "Enter: Confirm\n" +
+            "Esc: Cancel\n" +
+            "Tab: Cycle Units\n" +
+            "Shift+Tab: Reverse Cycle Units");
     }
 
     private static TMP_Text FindNamedTmpText(Transform root, string name)

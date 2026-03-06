@@ -48,6 +48,9 @@ public partial class TurnStateManager
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
 
+        if (TryCancelPendingCommandServiceConfirmation())
+            return ActionSfx.Cancel;
+
         switch (cursorState)
         {
             case CursorState.Neutral:
@@ -83,6 +86,9 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileNeutral()
     {
         LogStateStep("HandleConfirmWhileNeutral");
+        if (TryConfirmPendingCommandServiceOrder())
+            return ActionSfx.Confirm;
+
         if (cursorController == null)
             return ActionSfx.None;
 

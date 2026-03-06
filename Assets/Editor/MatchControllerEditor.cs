@@ -164,10 +164,11 @@ public class MatchControllerEditor : Editor
                 startMoneyProp.intValue = Mathf.Max(0, EditorGUILayout.IntField("Start Money", startMoneyProp.intValue));
             }
 
+            if (actualMoneyProp != null)
+                actualMoneyProp.intValue = Mathf.Max(0, EditorGUILayout.IntField("Actual Money", actualMoneyProp.intValue));
+
             using (new EditorGUI.DisabledScope(true))
             {
-                if (actualMoneyProp != null)
-                    EditorGUILayout.IntField("Actual Money", Mathf.Max(0, actualMoneyProp.intValue));
                 if (incomePerTurnProp != null)
                     EditorGUILayout.IntField("Income Per Turn", Mathf.Max(0, incomePerTurnProp.intValue));
             }
@@ -175,7 +176,7 @@ public class MatchControllerEditor : Editor
             EditorGUILayout.EndVertical();
         }
 
-        EditorGUILayout.HelpBox("Actual Money e Income Per Turn sao automáticos e somente leitura.", MessageType.None);
+        EditorGUILayout.HelpBox("Actual Money agora pode ser ajustado manualmente. Income Per Turn continua automatico e somente leitura.", MessageType.None);
     }
 
     private void DrawPlayersRecoveryTools()

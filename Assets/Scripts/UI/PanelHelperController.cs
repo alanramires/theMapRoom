@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -33,16 +36,28 @@ public class PanelHelperController : MonoBehaviour
     private bool lastPanelVisible;
     private CanvasGroup selfPanelCanvasGroup;
     private RectTransform helperRect;
+    private RectTransform helperTitleRect;
+    private RectTransform helperTxtRect;
+    private RectMask2D helperMask;
     private Vector2 originalAnchorMin;
     private Vector2 originalAnchorMax;
     private Vector2 originalPivot;
     private Vector2 originalAnchoredPosition;
+    private Vector2 originalHelperTitleAnchoredPosition;
+    private Vector2 originalHelperTxtAnchoredPosition;
+    private float originalBodySpacingFromTitle = 0f;
+    private float originalHelperTitleHeight = -1f;
+    private float originalHelperTxtHeight = -1f;
     private bool layoutCached;
     private bool isDockedCenterLeft;
     private bool hasLastUndockedScreenRect;
     private Rect lastUndockedScreenRect;
     private Color lastHelperTxtColor = new Color(float.NaN, float.NaN, float.NaN, float.NaN);
     private float cachedBasePanelHeight = -1f;
+    private float helperScrollOffset;
+    private float helperScrollMaxOffset;
+    private bool helperScrollActive;
+    [SerializeField] [Range(1f, 80f)] private float helperScrollStep = 24f;
 
     private void Awake()
     {
@@ -55,6 +70,7 @@ public class PanelHelperController : MonoBehaviour
     {
         TryAutoAssignReferences();
         Refresh(force: false);
+        HandleHelperScrollInput();
     }
 
 #if UNITY_EDITOR
@@ -83,8 +99,12 @@ public class PanelHelperController : MonoBehaviour
 
         if (helperTitle == null)
             helperTitle = FindNamedTmpText("helper_title");
+        if (helperTitleRect == null && helperTitle != null)
+            helperTitleRect = helperTitle.rectTransform;
         if (helperTxt == null)
             helperTxt = FindNamedTmpText("helper_txt");
+        if (helperTxtRect == null && helperTxt != null)
+            helperTxtRect = helperTxt.rectTransform;
 
         if (helperRect == null && panelHelper != null)
             helperRect = panelHelper.GetComponent<RectTransform>();
@@ -136,6 +156,11 @@ public class PanelHelperController : MonoBehaviour
             case TurnStateManager.HelperPanelKind.Merge:
                 title = ResolveMessage("helper.title.merge", "MERGE");
                 body = BuildMergeBody(data);
+                return;
+
+            case TurnStateManager.HelperPanelKind.CommandService:
+                title = ResolveMessage("helper.title.command_service", "COMMAND SERVICE");
+                body = BuildCommandServiceBody(data);
                 return;
 
             default:
@@ -384,6 +409,80 @@ public class PanelHelperController : MonoBehaviour
         return sb.ToString().TrimEnd();
     }
 
+    private string BuildCommandServiceBody(TurnStateManager.HelperPanelData data)
+    {
+        if (data == null || data.CommandServiceServedTargets <= 0)
+            return string.Empty;
+
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine(ResolveMessage(
+            data.CommandServiceIsEstimate ? "helper.command_service.targets.estimate" : "helper.command_service.targets",
+            data.CommandServiceIsEstimate ? "Previstos: <targets>" : "Atendidos: <targets>",
+            new Dictionary<string, string>
+            {
+                { "targets", Mathf.Max(0, data.CommandServiceServedTargets).ToString() }
+            }));
+        sb.AppendLine(ResolveMessage(
+            data.CommandServiceIsEstimate ? "helper.command_service.total_cost.estimate" : "helper.command_service.total_cost",
+            data.CommandServiceIsEstimate ? "Custo previsto: $<valor>" : "Custo final: $<valor>",
+            new Dictionary<string, string>
+            {
+                { "valor", Mathf.Max(0, data.CommandServiceTotalCost).ToString() }
+            }));
+
+        if (data.CommandServiceIsEstimate)
+        {
+            sb.AppendLine(ResolveMessage(
+                "helper.command_service.balance.estimate",
+                "Saldo: $<after>",
+                new Dictionary<string, string>
+                {
+                    { "before", Mathf.Max(0, data.CommandServiceMoneyBefore).ToString() },
+                    { "after", Mathf.Max(0, data.CommandServiceMoneyAfter).ToString() }
+                }));
+        }
+
+        if (data.CommandServiceIsEstimate && data.CommandServiceTargetLines != null && data.CommandServiceTargetLines.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
+            for (int i = 0; i < data.CommandServiceTargetLines.Count; i++)
+            {
+                TurnStateManager.HelperCommandServiceTargetLine line = data.CommandServiceTargetLines[i];
+                if (line == null)
+                    continue;
+
+                string prefix = line.isFocused ? ">> " : string.Empty;
+                sb.AppendLine($"{prefix}{line.unitName}");
+                sb.AppendLine($"({line.gainsLabel})");
+            }
+        }
+
+        if (data.CommandServiceIsEstimate && data.CommandServiceSkippedUnitLines != null && data.CommandServiceSkippedUnitLines.Count > 0)
+        {
+            sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
+            sb.AppendLine($"Unidades nao atendidas: {data.CommandServiceSkippedUnitLines.Count}");
+            for (int i = 0; i < data.CommandServiceSkippedUnitLines.Count; i++)
+            {
+                TurnStateManager.HelperCommandServiceSkippedUnitLine line = data.CommandServiceSkippedUnitLines[i];
+                if (line == null)
+                    continue;
+
+                string prefix = line.isFocused ? ">> " : string.Empty;
+                sb.AppendLine($"<color=#8F8F8F>{prefix}{line.unitName} ({line.sourceLabel})</color>");
+            }
+        }
+        else if (data.CommandServiceStoppedByEconomy)
+        {
+            sb.AppendLine();
+            sb.Append(ResolveMessage(
+                data.CommandServiceIsEstimate ? "helper.command_service.economy_stop.estimate" : "helper.command_service.economy_stop",
+                data.CommandServiceIsEstimate ? "Fila vai parar por saldo" : "Fila interrompida por saldo"));
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
     private string ResolveSensorLabel(string sensorKey)
     {
         switch (sensorKey)
@@ -449,6 +548,7 @@ public class PanelHelperController : MonoBehaviour
         if (isDockedCenterLeft)
             RestoreOriginalLayout();
         hasLastUndockedScreenRect = false;
+        ResetHelperScrollLayout();
         SetVisible(panelVisible: false, title: string.Empty, body: string.Empty, force: force);
     }
 
@@ -500,6 +600,7 @@ public class PanelHelperController : MonoBehaviour
         {
             float resetHeight = cachedBasePanelHeight > 0f ? cachedBasePanelHeight : helperRect.rect.height;
             helperRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, resetHeight);
+            ResetHelperScrollLayout();
             return;
         }
 
@@ -510,7 +611,9 @@ public class PanelHelperController : MonoBehaviour
         if (helperTitle != null)
         {
             helperTitle.ForceMeshUpdate();
-            titleHeight = Mathf.Max(0f, helperTitle.preferredHeight);
+            titleHeight = originalHelperTitleHeight > 0f
+                ? originalHelperTitleHeight
+                : Mathf.Max(0f, helperTitle.preferredHeight);
         }
 
         float bodyHeight = 0f;
@@ -525,6 +628,7 @@ public class PanelHelperController : MonoBehaviour
         float maxHeight = Mathf.Max(minHeight, maxPanelHeight);
         float targetHeight = Mathf.Clamp(titleHeight + bodyHeight + Mathf.Max(0f, contentVerticalPadding), minHeight, maxHeight);
         helperRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
+        RefreshHelperScrollLayout(titleHeight, bodyHeight, targetHeight);
     }
 
     private Color ResolveActiveTeamColor()
@@ -592,6 +696,21 @@ public class PanelHelperController : MonoBehaviour
         originalPivot = helperRect.pivot;
         originalAnchoredPosition = helperRect.anchoredPosition;
         cachedBasePanelHeight = Mathf.Max(0f, helperRect.rect.height);
+        if (helperTitle != null)
+        {
+            helperTitleRect = helperTitle.rectTransform;
+            originalHelperTitleAnchoredPosition = helperTitleRect.anchoredPosition;
+            originalHelperTitleHeight = Mathf.Max(0f, helperTitleRect.rect.height);
+        }
+        if (helperTxt != null)
+        {
+            helperTxtRect = helperTxt.rectTransform;
+            originalHelperTxtAnchoredPosition = helperTxtRect.anchoredPosition;
+            originalHelperTxtHeight = Mathf.Max(0f, helperTxtRect.rect.height);
+            float titleBottom = -originalHelperTitleAnchoredPosition.y + Mathf.Max(0f, originalHelperTitleHeight);
+            float bodyTop = -originalHelperTxtAnchoredPosition.y;
+            originalBodySpacingFromTitle = Mathf.Max(0f, bodyTop - titleBottom);
+        }
         layoutCached = true;
     }
 
@@ -665,6 +784,137 @@ public class PanelHelperController : MonoBehaviour
 
         if (panelHelper.activeSelf != visible)
             panelHelper.SetActive(visible);
+    }
+
+    private void RefreshHelperScrollLayout(float titleHeight, float bodyHeight, float panelHeight)
+    {
+        if (helperRect == null || helperTitle == null || helperTxt == null)
+            return;
+
+        EnsureHelperMask();
+        CacheOriginalLayoutIfNeeded();
+        helperTitleRect = helperTitle.rectTransform;
+        helperTxtRect = helperTxt.rectTransform;
+        if (helperTitleRect == null || helperTxtRect == null)
+            return;
+
+        float targetTitleHeight = Mathf.Max(originalHelperTitleHeight > 0f ? originalHelperTitleHeight : 0f, titleHeight);
+        float targetBodyHeight = Mathf.Max(originalHelperTxtHeight > 0f ? originalHelperTxtHeight : 0f, bodyHeight);
+        helperTitleRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetTitleHeight);
+        helperTxtRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetBodyHeight);
+
+        float titleTopInset = Mathf.Max(0f, -originalHelperTitleAnchoredPosition.y);
+        float combinedContentHeight = targetTitleHeight + originalBodySpacingFromTitle + targetBodyHeight;
+        float viewportHeight = Mathf.Max(1f, panelHeight - titleTopInset);
+        helperScrollMaxOffset = Mathf.Max(0f, combinedContentHeight - viewportHeight);
+        helperScrollActive = helperScrollMaxOffset > 0.5f;
+        helperScrollOffset = Mathf.Clamp(helperScrollOffset, 0f, helperScrollMaxOffset);
+        if (!helperScrollActive)
+            helperScrollOffset = 0f;
+
+        Vector2 scrollOffset = new Vector2(0f, helperScrollOffset);
+        Vector2 bodyBasePosition = new Vector2(
+            originalHelperTxtAnchoredPosition.x,
+            originalHelperTitleAnchoredPosition.y - targetTitleHeight - originalBodySpacingFromTitle);
+        helperTitleRect.anchoredPosition = originalHelperTitleAnchoredPosition + scrollOffset;
+        helperTxtRect.anchoredPosition = bodyBasePosition + scrollOffset;
+    }
+
+    private void ResetHelperScrollLayout()
+    {
+        helperScrollOffset = 0f;
+        helperScrollMaxOffset = 0f;
+        helperScrollActive = false;
+
+        if (helperTitle != null)
+        {
+            helperTitleRect = helperTitle.rectTransform;
+            if (helperTitleRect != null)
+            {
+                if (originalHelperTitleHeight > 0f)
+                    helperTitleRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, originalHelperTitleHeight);
+                helperTitleRect.anchoredPosition = originalHelperTitleAnchoredPosition;
+            }
+        }
+
+        if (helperTxt == null)
+            return;
+
+        helperTxtRect = helperTxt.rectTransform;
+        if (helperTxtRect == null)
+            return;
+
+        if (originalHelperTxtHeight > 0f)
+            helperTxtRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, originalHelperTxtHeight);
+        helperTxtRect.anchoredPosition = originalHelperTxtAnchoredPosition;
+    }
+
+    private void EnsureHelperMask()
+    {
+        if (panelHelper == null)
+            return;
+
+        if (helperMask == null)
+            helperMask = panelHelper.GetComponent<RectMask2D>();
+        if (helperMask == null)
+            helperMask = panelHelper.AddComponent<RectMask2D>();
+    }
+
+    private void HandleHelperScrollInput()
+    {
+        if (!helperScrollActive || !lastPanelVisible || helperRect == null)
+            return;
+
+        Vector2 scrollDelta = ReadMouseScrollDelta();
+        if (Mathf.Abs(scrollDelta.y) <= 0.01f)
+            return;
+
+        Rect panelScreenRect = GetScreenRect(helperRect);
+        Vector3 mouseScreen = ReadMouseScreenPosition();
+        if (!panelScreenRect.Contains(new Vector2(mouseScreen.x, mouseScreen.y)))
+            return;
+
+        helperScrollOffset = Mathf.Clamp(
+            helperScrollOffset - scrollDelta.y * Mathf.Max(1f, helperScrollStep),
+            0f,
+            helperScrollMaxOffset);
+
+        if (helperTitle != null)
+        {
+            helperTitleRect = helperTitle.rectTransform;
+            if (helperTitleRect != null)
+                helperTitleRect.anchoredPosition = originalHelperTitleAnchoredPosition + new Vector2(0f, helperScrollOffset);
+        }
+
+        if (helperTxt != null)
+        {
+            helperTxtRect = helperTxt.rectTransform;
+            if (helperTxtRect != null)
+            {
+                Vector2 bodyBasePosition = new Vector2(
+                    originalHelperTxtAnchoredPosition.x,
+                    originalHelperTitleAnchoredPosition.y - Mathf.Max(0f, helperTitleRect != null ? helperTitleRect.rect.height : originalHelperTitleHeight) - originalBodySpacingFromTitle);
+                helperTxtRect.anchoredPosition = bodyBasePosition + new Vector2(0f, helperScrollOffset);
+            }
+        }
+    }
+
+    private static Vector2 ReadMouseScrollDelta()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Mouse.current != null)
+            return Mouse.current.scroll.ReadValue();
+#endif
+        return Input.mouseScrollDelta;
+    }
+
+    private static Vector3 ReadMouseScreenPosition()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Mouse.current != null)
+            return Mouse.current.position.ReadValue();
+#endif
+        return Input.mousePosition;
     }
 
     private GameObject FindNamedObject(string name)

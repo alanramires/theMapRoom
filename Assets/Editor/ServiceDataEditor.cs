@@ -22,6 +22,7 @@ public class ServiceDataEditor : Editor
         SerializedProperty percentCostProp = serializedObject.FindProperty("percentCost");
         SerializedProperty suppliesUsedProp = serializedObject.FindProperty("suppliesUsed");
         SerializedProperty serviceEfficiencyProp = serializedObject.FindProperty("serviceEfficiency");
+        SerializedProperty weightProp = serializedObject.FindProperty("costWeight");
         SerializedProperty serviceLimitProp = serializedObject.FindProperty("serviceLimitPerUnitPerTurn");
 
         if (idProp != null)
@@ -68,19 +69,27 @@ public class ServiceDataEditor : Editor
         if (suppliesUsedProp != null)
             EditorGUILayout.PropertyField(suppliesUsedProp, new GUIContent("Supply Used"), includeChildren: true);
         EditorGUILayout.Space();
-        DrawPointsRecoverList(serviceEfficiencyProp);
+        DrawEfficiencyList(
+            serviceEfficiencyProp,
+            "Points recover per 1 unit of supply used",
+            "Add points recover entry");
+        EditorGUILayout.Space();
+        DrawEfficiencyList(
+            weightProp,
+            "Cost Weight",
+            "Add cost weight entry");
         if (serviceLimitProp != null)
             EditorGUILayout.PropertyField(serviceLimitProp);
 
         serializedObject.ApplyModifiedProperties();
     }
 
-    private static void DrawPointsRecoverList(SerializedProperty listProp)
+    private static void DrawEfficiencyList(SerializedProperty listProp, string listTitle, string addButtonLabel)
     {
         if (listProp == null)
             return;
 
-        EditorGUILayout.LabelField("Points Recover", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(listTitle, EditorStyles.boldLabel);
         EditorGUI.indentLevel++;
         for (int i = 0; i < listProp.arraySize; i++)
         {
@@ -111,7 +120,7 @@ public class ServiceDataEditor : Editor
             EditorGUILayout.EndVertical();
         }
 
-        if (GUILayout.Button("Add Points Recover Entry"))
+        if (GUILayout.Button(addButtonLabel))
             listProp.arraySize += 1;
 
         EditorGUI.indentLevel--;

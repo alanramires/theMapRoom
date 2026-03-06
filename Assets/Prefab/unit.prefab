@@ -381,6 +381,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   isEmbarked: 0
   isSelected: 0
+  isPreviewDimmed: 0
   hasTemporarySortingOverride: 0
   cachedSpriteSortingOrder: 0
   cachedActedLockSortingOrder: 0
@@ -390,6 +391,8 @@ MonoBehaviour:
   selectionBlinkInactiveDuration: 0.16
   actedDarkenFactor: 0.5
   actedGrayBlend: 0.6
+  previewDimDarkenFactor: 0.55
+  previewDimGrayBlend: 0.75
   actedGlowColor: {r: 1, g: 1, b: 1, a: 1}
   actedGlowSize: 1.5
   actedGlowStrength: 1.25

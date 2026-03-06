@@ -40,6 +40,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField] private bool isEmbarked;
     [SerializeField] private bool isSelected;
+    [SerializeField, HideInInspector] private bool isPreviewDimmed;
     [SerializeField, HideInInspector] private bool hasTemporarySortingOverride;
     [SerializeField, HideInInspector] private int cachedSpriteSortingOrder;
     [SerializeField, HideInInspector] private int cachedActedLockSortingOrder;
@@ -49,6 +50,8 @@ public class UnitManager : MonoBehaviour
     [SerializeField] [Range(0.05f, 1f)] private float selectionBlinkInactiveDuration = 0.16f;
     [SerializeField] [Range(0f, 1f)] private float actedDarkenFactor = 0.5f;
     [SerializeField] [Range(0f, 1f)] private float actedGrayBlend = 0.6f;
+    [SerializeField] [Range(0f, 1f)] private float previewDimDarkenFactor = 0.55f;
+    [SerializeField] [Range(0f, 1f)] private float previewDimGrayBlend = 0.75f;
     [SerializeField] private Color actedGlowColor = Color.white;
     [SerializeField] [Range(0.1f, 6f)] private float actedGlowSize = 1.5f;
     [SerializeField] [Range(0f, 4f)] private float actedGlowStrength = 1.25f;
@@ -379,6 +382,15 @@ public class UnitManager : MonoBehaviour
 
         isSelected = selected;
         RefreshSelectionVisual();
+    }
+
+    public void SetPreviewDimmed(bool dimmed)
+    {
+        if (isPreviewDimmed == dimmed)
+            return;
+
+        isPreviewDimmed = dimmed;
+        RefreshActedVisual();
     }
 
     public void SetSelectionBlinkInterval(float interval)
@@ -1778,7 +1790,7 @@ public class UnitManager : MonoBehaviour
         if (!isActiveTeamUnit)
         {
             if (spriteRenderer != null)
-                spriteRenderer.color = teamColor;
+                spriteRenderer.color = ResolvePreviewDimmedColor(teamColor);
 
             SetActedGlowEnabled(false);
 
@@ -1812,7 +1824,7 @@ public class UnitManager : MonoBehaviour
             Color unitColor = shouldHighlightActed
                 ? new Color(grayMixed.r * Mathf.Clamp01(actedDarkenFactor), grayMixed.g * Mathf.Clamp01(actedDarkenFactor), grayMixed.b * Mathf.Clamp01(actedDarkenFactor), teamColor.a)
                 : teamColor;
-            spriteRenderer.color = unitColor;
+            spriteRenderer.color = ResolvePreviewDimmedColor(unitColor);
         }
 
         SetActedGlowEnabled(shouldHighlightActed);
@@ -1835,6 +1847,19 @@ public class UnitManager : MonoBehaviour
 
         if (actedLockRenderer != null)
             actedLockRenderer.enabled = false;
+    }
+
+    private Color ResolvePreviewDimmedColor(Color baseColor)
+    {
+        if (!isPreviewDimmed)
+            return baseColor;
+
+        Color grayMixed = Color.Lerp(baseColor, Color.gray, Mathf.Clamp01(previewDimGrayBlend));
+        return new Color(
+            grayMixed.r * Mathf.Clamp01(previewDimDarkenFactor),
+            grayMixed.g * Mathf.Clamp01(previewDimDarkenFactor),
+            grayMixed.b * Mathf.Clamp01(previewDimDarkenFactor),
+            baseColor.a);
     }
 
     private void RefreshSelectionVisual()

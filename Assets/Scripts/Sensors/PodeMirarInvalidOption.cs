@@ -4,6 +4,15 @@ using UnityEngine;
 [System.Serializable]
 public class PodeMirarInvalidOption
 {
+    public const string ReasonIdGeneric = "aim.invalid.target";
+    public const string ReasonIdOutOfRange = "aim.invalid.out_of_range";
+    public const string ReasonIdNoAmmo = "aim.invalid.no_ammo";
+    public const string ReasonIdLayer = "aim.invalid.layer";
+    public const string ReasonIdLdtBlocked = "aim.invalid.ldt_blocked";
+    public const string ReasonIdLosBlocked = "aim.invalid.los_blocked";
+    public const string ReasonIdNoForwardObserver = "aim.invalid.no_forward_observer";
+    public const string ReasonIdStealth = "aim.invalid.stealth";
+
     [Tooltip("Unidade atacante (origem da acao).")]
     public UnitManager attackerUnit;
 
@@ -28,6 +37,9 @@ public class PodeMirarInvalidOption
 
     [Tooltip("Motivo de invalidacao.")]
     public string reason;
+
+    [Tooltip("ID de mensagem para dialog database (i18n/customizacao).")]
+    public string reasonId;
 
     [Tooltip("Hex intermediario bloqueador (quando aplicavel).")]
     public Vector3Int blockedCell;

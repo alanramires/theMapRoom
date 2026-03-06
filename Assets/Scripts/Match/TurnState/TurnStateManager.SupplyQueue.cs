@@ -468,7 +468,14 @@ public partial class TurnStateManager
                 if (!ServiceHasAvailableSuppliesNow(supplier, service))
                     continue;
 
-                EstimateServiceGainsFromSupplier(supplier, target, service, out int hpPlannedGain, out int fuelPlannedGain, out int ammoPlannedGain);
+                EstimateServiceGainsFromSupplier(
+                    supplier,
+                    target,
+                    service,
+                    out int hpPlannedGain,
+                    out int fuelPlannedGain,
+                    out int ammoPlannedGain,
+                    out List<int> ammoPlannedByWeapon);
                 if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
                     continue;
                 if (!TryPayServiceCostForExecution(
@@ -478,6 +485,7 @@ public partial class TurnStateManager
                         hpPlannedGain,
                         fuelPlannedGain,
                         ammoPlannedGain,
+                        ammoPlannedByWeapon,
                         "Suprimento",
                         out _))
                 {
@@ -494,7 +502,14 @@ public partial class TurnStateManager
                 tempSingleService.Clear();
                 tempSingleService.Add(service);
                 int hpBeforeApply = Mathf.Max(0, target.CurrentHP);
-                bool changed = ApplyServicesToTarget(supplier, target, tempSingleService, out int hpStep, out int fuelStep, out int ammoStep);
+                bool changed = ApplyServicesToTarget(
+                    supplier,
+                    target,
+                    tempSingleService,
+                    out int hpStep,
+                    out int fuelStep,
+                    out int ammoStep,
+                    out _);
                 tempSingleService.Clear();
                 if (!changed)
                     continue;
@@ -1584,11 +1599,18 @@ public partial class TurnStateManager
             if (!ServiceHasAvailableSuppliesNow(supplier, service))
                 continue;
 
-            EstimateServiceGainsFromSupplier(supplier, target, service, out int hpPlannedGain, out int fuelPlannedGain, out int ammoPlannedGain);
+            EstimateServiceGainsFromSupplier(
+                supplier,
+                target,
+                service,
+                out int hpPlannedGain,
+                out int fuelPlannedGain,
+                out int ammoPlannedGain,
+                out List<int> ammoPlannedByWeapon);
             if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
                 continue;
 
-            int baseCost = ComputeServiceMoneyCost(target, service, hpPlannedGain, fuelPlannedGain, ammoPlannedGain);
+            int baseCost = ComputeServiceMoneyCost(target, service, hpPlannedGain, fuelPlannedGain, ammoPlannedGain, ammoPlannedByWeapon);
             int finalCost = matchController != null ? matchController.ResolveEconomyCost(baseCost) : Mathf.Max(0, baseCost);
             total += Mathf.Max(0, finalCost);
         }

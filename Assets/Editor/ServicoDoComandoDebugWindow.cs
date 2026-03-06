@@ -16,6 +16,19 @@ public class ServicoDoComandoDebugWindow : EditorWindow
     private string status = "Ready.";
     private Vector2 scroll;
 
+    private sealed class CostEstimateBreakdown
+    {
+        public int totalMoney;
+        public readonly List<ServiceEstimateLine> serviceLines = new List<ServiceEstimateLine>();
+        public readonly Dictionary<SupplyData, int> consumedBySupply = new Dictionary<SupplyData, int>();
+    }
+
+    private sealed class ServiceEstimateLine
+    {
+        public string summary;
+        public readonly List<string> details = new List<string>();
+    }
+
     [MenuItem("Tools/Logistica/Servico do Comando")]
     public static void OpenWindow()
     {
@@ -55,9 +68,18 @@ public class ServicoDoComandoDebugWindow : EditorWindow
             EditorGUILayout.HelpBox($"Sensor: {sensorReason}", eligibleOptions.Count > 0 ? MessageType.Info : MessageType.Warning);
 
         EditorGUILayout.Space(8f);
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.BeginVertical(GUILayout.MinWidth(420f), GUILayout.ExpandWidth(true));
         DrawEligibleSection();
         EditorGUILayout.Space(8f);
         DrawInvalidSection();
+        EditorGUILayout.EndVertical();
+
+        EditorGUILayout.Space(12f);
+        EditorGUILayout.BeginVertical(GUILayout.Width(420f));
+        DrawCostReportSection();
+        EditorGUILayout.EndVertical();
+        EditorGUILayout.EndHorizontal();
 
         using (new EditorGUI.DisabledScope(eligibleOptions.Count <= 0))
         {
@@ -124,6 +146,653 @@ public class ServicoDoComandoDebugWindow : EditorWindow
             EditorGUILayout.LabelField("Motivo", string.IsNullOrWhiteSpace(entry.reason) ? "-" : entry.reason);
             EditorGUILayout.EndVertical();
         }
+    }
+
+    private void DrawCostReportSection()
+    {
+        EditorGUILayout.LabelField("Relatorio de Custos (estimado)", EditorStyles.boldLabel);
+        EditorGUILayout.BeginVertical("box");
+        TeamId team = ResolveTargetTeam();
+        MatchController match = FindAnyObjectByType<MatchController>();
+        int availableMoney = match != null ? Mathf.Max(0, match.GetActualMoney(team)) : 0;
+
+        EditorGUILayout.LabelField("Time", $"{TeamUtils.GetName(team)} ({(int)team})");
+        EditorGUILayout.LabelField("Saldo atual", match != null ? $"${availableMoney}" : "(MatchController nao encontrado)");
+        EditorGUILayout.Space(4f);
+        int totalEligibleCost = 0;
+
+        EditorGUILayout.LabelField($"Elegiveis ({eligibleOptions.Count})", EditorStyles.boldLabel);
+        if (eligibleOptions.Count <= 0)
+        {
+            EditorGUILayout.LabelField("- nenhum", EditorStyles.wordWrappedMiniLabel);
+        }
+        else
+        {
+            for (int i = 0; i < eligibleOptions.Count; i++)
+            {
+                ServicoDoComandoOption option = eligibleOptions[i];
+                if (option == null || option.targetUnit == null)
+                    continue;
+
+                CostEstimateBreakdown estimate = EstimateOptionCost(option, match);
+                int estimated = Mathf.Max(0, estimate.totalMoney);
+                totalEligibleCost += estimated;
+                bool affordable = match == null || estimated <= availableMoney;
+                string source = option.sourceConstruction != null
+                    ? ResolveConstructionLabel(option.sourceConstruction)
+                    : ResolveSupplierUnitLabel(option.sourceSupplierUnit);
+                EditorGUILayout.BeginVertical("box");
+                EditorGUILayout.LabelField($"{i + 1}. {option.targetUnit.name}");
+                EditorGUILayout.LabelField("Origem", source);
+                EditorGUILayout.LabelField("Custo estimado", $"${estimated}");
+                EditorGUILayout.LabelField("Status", affordable ? "OK" : "SEM SALDO");
+                DrawServiceLines(estimate.serviceLines);
+                DrawConsumedSuppliesLines(estimate.consumedBySupply);
+                EditorGUILayout.EndVertical();
+            }
+        }
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField($"Invalidos ({invalidOptions.Count})", EditorStyles.boldLabel);
+        if (invalidOptions.Count <= 0)
+        {
+            EditorGUILayout.LabelField("- nenhum", EditorStyles.wordWrappedMiniLabel);
+        }
+        else
+        {
+            for (int i = 0; i < invalidOptions.Count; i++)
+            {
+                ServicoDoComandoInvalidOption invalid = invalidOptions[i];
+                if (invalid == null || invalid.targetUnit == null)
+                    continue;
+
+                CostEstimateBreakdown estimate = EstimateInvalidCost(invalid, match);
+                int estimated = Mathf.Max(0, estimate.totalMoney);
+                string reason = string.IsNullOrWhiteSpace(invalid.reason) ? "-" : invalid.reason;
+                EditorGUILayout.BeginVertical("box");
+                EditorGUILayout.LabelField($"{i + 1}. {invalid.targetUnit.name}");
+                EditorGUILayout.LabelField("Custo estimado", $"${estimated}");
+                EditorGUILayout.LabelField("Motivo", reason, EditorStyles.wordWrappedMiniLabel);
+                DrawServiceLines(estimate.serviceLines);
+                DrawConsumedSuppliesLines(estimate.consumedBySupply);
+                EditorGUILayout.EndVertical();
+            }
+        }
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Total estimado (elegiveis)", $"${Mathf.Max(0, totalEligibleCost)}", EditorStyles.boldLabel);
+        EditorGUILayout.EndVertical();
+    }
+
+    private static void DrawServiceLines(List<ServiceEstimateLine> serviceLines)
+    {
+        if (serviceLines == null || serviceLines.Count <= 0)
+        {
+            EditorGUILayout.LabelField("Servicos", "-");
+            return;
+        }
+
+        EditorGUILayout.LabelField("Servicos");
+        for (int i = 0; i < serviceLines.Count; i++)
+        {
+            ServiceEstimateLine line = serviceLines[i];
+            if (line == null || string.IsNullOrWhiteSpace(line.summary))
+                continue;
+
+            EditorGUILayout.LabelField($"- {line.summary}", EditorStyles.wordWrappedMiniLabel);
+            for (int j = 0; j < line.details.Count; j++)
+            {
+                string detail = line.details[j];
+                if (string.IsNullOrWhiteSpace(detail))
+                    continue;
+                EditorGUILayout.LabelField($"  {detail}", EditorStyles.wordWrappedMiniLabel);
+            }
+        }
+    }
+
+    private static void DrawConsumedSuppliesLines(Dictionary<SupplyData, int> consumedBySupply)
+    {
+        if (consumedBySupply == null || consumedBySupply.Count <= 0)
+            return;
+
+        EditorGUILayout.LabelField("Consumo origem");
+        foreach (KeyValuePair<SupplyData, int> pair in consumedBySupply)
+        {
+            if (pair.Key == null || pair.Value <= 0)
+                continue;
+            string supplyName = !string.IsNullOrWhiteSpace(pair.Key.displayName)
+                ? pair.Key.displayName
+                : (!string.IsNullOrWhiteSpace(pair.Key.id) ? pair.Key.id : pair.Key.name);
+            EditorGUILayout.LabelField($"- {supplyName}: -{pair.Value}", EditorStyles.wordWrappedMiniLabel);
+        }
+    }
+
+    private static CostEstimateBreakdown EstimateOptionCost(ServicoDoComandoOption option, MatchController match)
+    {
+        CostEstimateBreakdown breakdown = new CostEstimateBreakdown();
+        if (option == null || option.targetUnit == null)
+            return breakdown;
+
+        IReadOnlyList<ServiceData> offered = option.sourceConstruction != null
+            ? option.sourceConstruction.OfferedServices
+            : option.sourceSupplierUnit != null ? option.sourceSupplierUnit.GetEmbarkedServices() : null;
+        List<ServiceData> services = BuildDistinctServiceList(offered);
+        Dictionary<SupplyData, int> sourceStock = option.sourceConstruction != null
+            ? BuildConstructionStockSnapshot(option.sourceConstruction)
+            : BuildSupplierStockSnapshot(option.sourceSupplierUnit);
+        EstimateServicesCost(option.targetUnit, services, match, sourceStock, breakdown);
+        return breakdown;
+    }
+
+    private static CostEstimateBreakdown EstimateInvalidCost(ServicoDoComandoInvalidOption invalid, MatchController match)
+    {
+        CostEstimateBreakdown breakdown = new CostEstimateBreakdown();
+        if (invalid == null || invalid.targetUnit == null)
+            return breakdown;
+
+        IReadOnlyList<ServiceData> offered = invalid.sourceConstruction != null
+            ? invalid.sourceConstruction.OfferedServices
+            : invalid.sourceSupplierUnit != null ? invalid.sourceSupplierUnit.GetEmbarkedServices() : null;
+        List<ServiceData> services = BuildDistinctServiceList(offered);
+        Dictionary<SupplyData, int> sourceStock = invalid.sourceConstruction != null
+            ? BuildConstructionStockSnapshot(invalid.sourceConstruction)
+            : BuildSupplierStockSnapshot(invalid.sourceSupplierUnit);
+        EstimateServicesCost(invalid.targetUnit, services, match, sourceStock, breakdown);
+        return breakdown;
+    }
+
+    private static void EstimateServicesCost(
+        UnitManager target,
+        List<ServiceData> services,
+        MatchController match,
+        Dictionary<SupplyData, int> sourceStock,
+        CostEstimateBreakdown breakdown)
+    {
+        if (target == null || services == null || services.Count <= 0 || breakdown == null)
+            return;
+
+        int hpMissing = Mathf.Max(0, target.GetMaxHP() - target.CurrentHP);
+        if (hpMissing > 0)
+            TryEstimateNeedService(services, target, hpMissing, forHp: true, forFuel: false, sourceStock, breakdown, match);
+
+        int fuelMissing = Mathf.Max(0, target.GetMaxFuel() - target.CurrentFuel);
+        if (fuelMissing > 0)
+            TryEstimateNeedService(services, target, fuelMissing, forHp: false, forFuel: true, sourceStock, breakdown, match);
+
+        if (IsAnyAmmoMissing(target))
+            TryEstimateAmmoService(services, target, sourceStock, breakdown, match);
+    }
+
+    private static bool TryEstimateNeedService(
+        List<ServiceData> services,
+        UnitManager target,
+        int pointsMissing,
+        bool forHp,
+        bool forFuel,
+        Dictionary<SupplyData, int> sourceStock,
+        CostEstimateBreakdown breakdown,
+        MatchController match)
+    {
+        if (services == null || target == null || pointsMissing <= 0 || breakdown == null)
+            return false;
+        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
+            return false;
+
+        bool targetIsSupplier = targetData.isSupplier;
+        ServiceData chosenService = null;
+
+        for (int i = 0; i < services.Count; i++)
+        {
+            ServiceData service = services[i];
+            if (service == null || !service.isService)
+                continue;
+            if (service.apenasEntreSupridores && !targetIsSupplier)
+                continue;
+            if (forHp && !service.recuperaHp)
+                continue;
+            if (forFuel && !service.recuperaAutonomia)
+                continue;
+            if (!TryResolveSupplyFromSnapshot(service, sourceStock, out _, out _))
+                continue;
+
+            chosenService = service;
+            break;
+        }
+
+        if (chosenService == null)
+            return false;
+
+        Dictionary<SupplyData, int> consumedBySupply = new Dictionary<SupplyData, int>();
+        ServiceLogisticsFormula.EstimatePotentialServiceGains(
+            target,
+            chosenService,
+            sourceStock,
+            out int hpServed,
+            out int fuelServed,
+            out _,
+            allowHp: forHp,
+            allowFuel: forFuel,
+            allowAmmo: false,
+            consumedBySupply: consumedBySupply);
+
+        int pointsServed = forHp ? hpServed : fuelServed;
+        if (pointsServed <= 0)
+            return false;
+
+        int unitsConsumed = 0;
+        SupplyData chosenSupply = null;
+        foreach (KeyValuePair<SupplyData, int> pair in consumedBySupply)
+        {
+            int used = Mathf.Max(0, pair.Value);
+            if (pair.Key == null || used <= 0)
+                continue;
+            unitsConsumed += used;
+            if (chosenSupply == null)
+                chosenSupply = pair.Key;
+            AccumulateConsumedSupply(breakdown.consumedBySupply, pair.Key, used);
+        }
+
+        int baseCost = ComputeServiceMoneyCostEstimate(
+            target,
+            chosenService,
+            forHp ? pointsServed : 0,
+            forFuel ? pointsServed : 0,
+            null,
+            out _);
+        int finalCost = match != null ? match.ResolveEconomyCost(baseCost) : Mathf.Max(0, baseCost);
+        breakdown.totalMoney += Mathf.Max(0, finalCost);
+
+        string serviceName = !string.IsNullOrWhiteSpace(chosenService.displayName) ? chosenService.displayName : chosenService.name;
+        string supplyLabel = chosenSupply != null
+            ? (!string.IsNullOrWhiteSpace(chosenSupply.displayName) ? chosenSupply.displayName : chosenSupply.name)
+            : "-";
+        string gainLabel = forFuel ? $"AUT +{pointsServed}" : $"HP +{pointsServed}";
+        breakdown.serviceLines.Add(new ServiceEstimateLine
+        {
+            summary = $"{serviceName}: {gainLabel} | {supplyLabel} = -{Mathf.Max(0, unitsConsumed)} | ${Mathf.Max(0, finalCost)}"
+        });
+        return true;
+    }
+
+    private static bool TryEstimateAmmoService(
+        List<ServiceData> services,
+        UnitManager target,
+        Dictionary<SupplyData, int> sourceStock,
+        CostEstimateBreakdown breakdown,
+        MatchController match)
+    {
+        if (services == null || target == null || breakdown == null)
+            return false;
+        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null || targetData.embarkedWeapons == null)
+            return false;
+
+        IReadOnlyList<UnitEmbarkedWeapon> runtimeWeapons = target.GetEmbarkedWeapons();
+        if (runtimeWeapons == null || runtimeWeapons.Count == 0 || targetData.embarkedWeapons.Count == 0)
+            return false;
+
+        bool targetIsSupplier = targetData.isSupplier;
+        ServiceData chosenService = null;
+        for (int i = 0; i < services.Count; i++)
+        {
+            ServiceData service = services[i];
+            if (service == null || !service.isService || !service.recuperaMunicao)
+                continue;
+            if (service.apenasEntreSupridores && !targetIsSupplier)
+                continue;
+            if (!TryResolveSupplyFromSnapshot(service, sourceStock, out _, out _))
+                continue;
+
+            chosenService = service;
+            break;
+        }
+
+        if (chosenService == null)
+            return false;
+
+        int count = Mathf.Min(runtimeWeapons.Count, targetData.embarkedWeapons.Count);
+        List<int> ammoByWeapon = new List<int>();
+        Dictionary<SupplyData, int> consumedBySupply = new Dictionary<SupplyData, int>();
+        ServiceLogisticsFormula.EstimatePotentialServiceGains(
+            target,
+            chosenService,
+            sourceStock,
+            out _,
+            out _,
+            out int totalRecoveredAmmo,
+            ammoByWeapon: ammoByWeapon,
+            allowHp: false,
+            allowFuel: false,
+            allowAmmo: true,
+            consumedBySupply: consumedBySupply);
+
+        int totalBoxesUsed = 0;
+        SupplyData chosenSupply = null;
+        List<int> ammoSuppliesByWeapon = new List<int>();
+        for (int i = 0; i < ammoByWeapon.Count; i++)
+        {
+            int recovered = Mathf.Max(0, ammoByWeapon[i]);
+            if (recovered <= 0)
+                continue;
+            int pointsPerSupply = 1;
+            if (i < targetData.embarkedWeapons.Count)
+            {
+                UnitEmbarkedWeapon baseline = targetData.embarkedWeapons[i];
+                if (baseline != null && baseline.weapon != null)
+                    pointsPerSupply = Mathf.Max(1, ResolvePointsPerSupply(chosenService, ResolveWeaponClass(baseline.weapon)));
+            }
+            while (ammoSuppliesByWeapon.Count <= i)
+                ammoSuppliesByWeapon.Add(0);
+            ammoSuppliesByWeapon[i] = Mathf.CeilToInt(recovered / (float)pointsPerSupply);
+        }
+
+        if (totalRecoveredAmmo <= 0)
+            return false;
+
+        foreach (KeyValuePair<SupplyData, int> pair in consumedBySupply)
+        {
+            int used = Mathf.Max(0, pair.Value);
+            if (pair.Key == null || used <= 0)
+                continue;
+            if (chosenSupply == null)
+                chosenSupply = pair.Key;
+            totalBoxesUsed += used;
+            AccumulateConsumedSupply(breakdown.consumedBySupply, pair.Key, used);
+        }
+
+        int baseCost = ComputeServiceMoneyCostEstimate(
+            target,
+            chosenService,
+            0,
+            0,
+            ammoByWeapon,
+            out List<int> ammoCostByWeapon);
+        int finalCost = match != null ? match.ResolveEconomyCost(baseCost) : Mathf.Max(0, baseCost);
+        breakdown.totalMoney += Mathf.Max(0, finalCost);
+
+        string serviceName = !string.IsNullOrWhiteSpace(chosenService.displayName) ? chosenService.displayName : chosenService.name;
+        string supplyLabel = chosenSupply != null
+            ? (!string.IsNullOrWhiteSpace(chosenSupply.displayName) ? chosenSupply.displayName : chosenSupply.name)
+            : "-";
+        ServiceEstimateLine line = new ServiceEstimateLine
+        {
+            summary = $"{serviceName}: MUN +{totalRecoveredAmmo} | {supplyLabel} = -{Mathf.Max(0, totalBoxesUsed)} | ${Mathf.Max(0, finalCost)}"
+        };
+        AddAmmoWeaponDetailLines(line.details, ammoByWeapon, ammoSuppliesByWeapon, ammoCostByWeapon);
+        breakdown.serviceLines.Add(line);
+        return true;
+    }
+
+    private static void EstimatePotentialServiceGains(
+        UnitManager target,
+        ServiceData service,
+        Dictionary<SupplyData, int> sourceStock,
+        out int hpGain,
+        out int fuelGain,
+        out int ammoGain,
+        out List<int> ammoByWeapon,
+        out List<int> ammoSuppliesByWeapon,
+        out SupplyData usedSupply,
+        out int consumedSupplies)
+    {
+        ammoByWeapon = new List<int>();
+        ammoSuppliesByWeapon = new List<int>();
+        Dictionary<SupplyData, int> consumedBySupply = new Dictionary<SupplyData, int>();
+        ServiceLogisticsFormula.EstimatePotentialServiceGains(
+            target,
+            service,
+            sourceStock,
+            out hpGain,
+            out fuelGain,
+            out ammoGain,
+            ammoByWeapon: ammoByWeapon,
+            consumedBySupply: consumedBySupply);
+
+        usedSupply = null;
+        consumedSupplies = 0;
+        foreach (KeyValuePair<SupplyData, int> pair in consumedBySupply)
+        {
+            if (usedSupply == null && pair.Key != null && pair.Value > 0)
+                usedSupply = pair.Key;
+            consumedSupplies += Mathf.Max(0, pair.Value);
+        }
+
+        if (usedSupply != null && consumedSupplies > 0 && ammoByWeapon != null && ammoByWeapon.Count > 0)
+        {
+            for (int i = 0; i < ammoByWeapon.Count; i++)
+            {
+                int recovered = Mathf.Max(0, ammoByWeapon[i]);
+                if (recovered <= 0)
+                    continue;
+                int pointsPerSupply = 1;
+                if (target != null && target.TryGetUnitData(out UnitData targetData) && targetData != null && targetData.embarkedWeapons != null && i < targetData.embarkedWeapons.Count)
+                {
+                    UnitEmbarkedWeapon baseline = targetData.embarkedWeapons[i];
+                    pointsPerSupply = baseline != null && baseline.weapon != null
+                        ? Mathf.Max(1, ResolvePointsPerSupply(service, ResolveWeaponClass(baseline.weapon)))
+                        : 1;
+                }
+                while (ammoSuppliesByWeapon.Count <= i)
+                    ammoSuppliesByWeapon.Add(0);
+                ammoSuppliesByWeapon[i] = Mathf.CeilToInt(recovered / (float)pointsPerSupply);
+            }
+        }
+    }
+
+    private static void AccumulateConsumedSupply(Dictionary<SupplyData, int> map, SupplyData supply, int amount)
+    {
+        if (map == null || supply == null || amount <= 0)
+            return;
+
+        if (map.TryGetValue(supply, out int current))
+            map[supply] = current + amount;
+        else
+            map.Add(supply, amount);
+    }
+
+    private static string BuildServiceGainLabel(ServiceData service, int hpGain, int fuelGain, List<int> ammoByWeapon)
+    {
+        List<string> chunks = new List<string>();
+        if (service != null && service.recuperaHp && hpGain > 0)
+            chunks.Add($"HP +{hpGain}");
+        if (service != null && service.recuperaAutonomia && fuelGain > 0)
+            chunks.Add($"AUT +{fuelGain}");
+        if (service != null && service.recuperaMunicao && ammoByWeapon != null)
+            chunks.Add($"MUN +{SumAmmoGain(ammoByWeapon)}");
+
+        return chunks.Count > 0 ? string.Join(" | ", chunks) : "-";
+    }
+
+    private static int SumAmmoGain(List<int> ammoByWeapon)
+    {
+        if (ammoByWeapon == null || ammoByWeapon.Count <= 0)
+            return 0;
+
+        int total = 0;
+        for (int i = 0; i < ammoByWeapon.Count; i++)
+            total += Mathf.Max(0, ammoByWeapon[i]);
+        return Mathf.Max(0, total);
+    }
+
+    private static void AddAmmoWeaponDetailLines(
+        List<string> detailLines,
+        List<int> ammoByWeapon,
+        List<int> ammoSuppliesByWeapon,
+        List<int> ammoCostByWeapon)
+    {
+        if (detailLines == null || ammoByWeapon == null)
+            return;
+
+        for (int i = 0; i < ammoByWeapon.Count; i++)
+        {
+            int recovered = Mathf.Max(0, ammoByWeapon[i]);
+            if (recovered <= 0)
+                continue;
+
+            int supplySpent = ammoSuppliesByWeapon != null && i < ammoSuppliesByWeapon.Count
+                ? Mathf.Max(0, ammoSuppliesByWeapon[i])
+                : 0;
+            int cost = ammoCostByWeapon != null && i < ammoCostByWeapon.Count
+                ? Mathf.Max(0, ammoCostByWeapon[i])
+                : 0;
+            detailLines.Add($"{ResolveWeaponSlotLabel(i)}: MUN +{recovered} | caixas = -{supplySpent} | ${cost}");
+        }
+    }
+
+    private static string ResolveWeaponSlotLabel(int weaponIndex)
+    {
+        if (weaponIndex <= 0)
+            return "Primary";
+        if (weaponIndex == 1)
+            return "Secondary";
+        return $"Weapon {weaponIndex + 1}";
+    }
+
+    private static Dictionary<SupplyData, int> BuildConstructionStockSnapshot(ConstructionManager sourceConstruction)
+    {
+        Dictionary<SupplyData, int> map = new Dictionary<SupplyData, int>();
+        if (sourceConstruction == null)
+            return map;
+
+        IReadOnlyList<ConstructionSupplyOffer> offers = sourceConstruction.OfferedSupplies;
+        if (offers == null)
+            return map;
+
+        for (int i = 0; i < offers.Count; i++)
+        {
+            ConstructionSupplyOffer offer = offers[i];
+            if (offer == null || offer.supply == null)
+                continue;
+            int current = map.TryGetValue(offer.supply, out int existing) ? existing : 0;
+            int add = sourceConstruction.HasInfiniteSuppliesFor(offer.supply) || offer.quantity >= int.MaxValue
+                ? int.MaxValue
+                : Mathf.Max(0, offer.quantity);
+            if (current == int.MaxValue || add == int.MaxValue)
+            {
+                map[offer.supply] = int.MaxValue;
+            }
+            else
+            {
+                long sum = (long)current + add;
+                map[offer.supply] = sum >= int.MaxValue ? int.MaxValue : (int)sum;
+            }
+        }
+
+        return map;
+    }
+
+    private static Dictionary<SupplyData, int> BuildSupplierStockSnapshot(UnitManager supplier)
+    {
+        Dictionary<SupplyData, int> map = new Dictionary<SupplyData, int>();
+        if (supplier == null)
+            return map;
+
+        IReadOnlyList<UnitEmbarkedSupply> resources = supplier.GetEmbarkedResources();
+        if (resources == null)
+            return map;
+
+        for (int i = 0; i < resources.Count; i++)
+        {
+            UnitEmbarkedSupply entry = resources[i];
+            if (entry == null || entry.supply == null)
+                continue;
+            int current = map.TryGetValue(entry.supply, out int existing) ? existing : 0;
+            long sum = (long)current + Mathf.Max(0, entry.amount);
+            map[entry.supply] = sum >= int.MaxValue ? int.MaxValue : (int)sum;
+        }
+
+        return map;
+    }
+
+    private static bool TryResolveSupplyFromSnapshot(ServiceData service, Dictionary<SupplyData, int> stockBySupply, out SupplyData supply, out int amount)
+    {
+        supply = null;
+        amount = 0;
+        if (service == null || stockBySupply == null || service.suppliesUsed == null)
+            return false;
+
+        for (int i = 0; i < service.suppliesUsed.Count; i++)
+        {
+            SupplyData candidate = service.suppliesUsed[i];
+            if (candidate == null)
+                continue;
+            int current = ReadStockAmount(stockBySupply, candidate);
+            if (current <= 0)
+                continue;
+            supply = candidate;
+            amount = current;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static int ReadStockAmount(Dictionary<SupplyData, int> stockBySupply, SupplyData supply)
+    {
+        if (stockBySupply == null || supply == null)
+            return 0;
+        return stockBySupply.TryGetValue(supply, out int current) ? current : 0;
+    }
+
+    private static int ConsumeFromSnapshot(Dictionary<SupplyData, int> stockBySupply, SupplyData supply, int amount)
+    {
+        if (stockBySupply == null || supply == null || amount <= 0)
+            return 0;
+        if (!stockBySupply.TryGetValue(supply, out int current) || current <= 0)
+            return 0;
+        if (current == int.MaxValue)
+            return amount;
+
+        int spent = Mathf.Min(current, amount);
+        stockBySupply[supply] = Mathf.Max(0, current - spent);
+        return spent;
+    }
+
+    private static int ComputeMissingAmmoPoints(UnitManager target)
+    {
+        if (target == null)
+            return 0;
+        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null || targetData.embarkedWeapons == null)
+            return 0;
+
+        IReadOnlyList<UnitEmbarkedWeapon> runtimeWeapons = target.GetEmbarkedWeapons();
+        int totalMissing = 0;
+        for (int i = 0; i < targetData.embarkedWeapons.Count; i++)
+        {
+            UnitEmbarkedWeapon baseline = targetData.embarkedWeapons[i];
+            if (baseline == null)
+                continue;
+            int maxAmmo = Mathf.Max(0, baseline.squadAmmunition);
+            int currentAmmo = runtimeWeapons != null && i < runtimeWeapons.Count && runtimeWeapons[i] != null
+                ? Mathf.Max(0, runtimeWeapons[i].squadAmmunition)
+                : 0;
+            totalMissing += Mathf.Max(0, maxAmmo - currentAmmo);
+        }
+
+        return Mathf.Max(0, totalMissing);
+    }
+
+    private static bool IsAnyAmmoMissing(UnitManager target)
+    {
+        return ComputeMissingAmmoPoints(target) > 0;
+    }
+
+    private static int ComputeServiceMoneyCostEstimate(
+        UnitManager target,
+        ServiceData service,
+        int hpGain,
+        int fuelGain,
+        List<int> ammoByWeapon,
+        out List<int> ammoCostByWeapon)
+    {
+        ammoCostByWeapon = new List<int>();
+        return ServiceCostFormula.ComputeServiceMoneyCost(
+            target,
+            service,
+            hpGain,
+            fuelGain,
+            SumAmmoGain(ammoByWeapon),
+            ammoByWeapon,
+            ammoCostByWeapon);
     }
 
     private void AutoDetectContext()

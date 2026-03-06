@@ -10,7 +10,8 @@ public partial class TurnStateManager
         Shopping = 1,
         Sensors = 2,
         Disembark = 3,
-        Merge = 4
+        Merge = 4,
+        CommandService = 5
     }
 
     public sealed class HelperPanelData
@@ -22,6 +23,8 @@ public partial class TurnStateManager
         public readonly List<HelperDisembarkPassengerLine> DisembarkPassengerLines = new List<HelperDisembarkPassengerLine>();
         public readonly List<HelperMergeQueueLine> MergeQueueLines = new List<HelperMergeQueueLine>();
         public readonly List<HelperMergeCandidateLine> MergeCandidateLines = new List<HelperMergeCandidateLine>();
+        public readonly List<HelperCommandServiceTargetLine> CommandServiceTargetLines = new List<HelperCommandServiceTargetLine>();
+        public readonly List<HelperCommandServiceSkippedUnitLine> CommandServiceSkippedUnitLines = new List<HelperCommandServiceSkippedUnitLine>();
         public bool HasQueuedDisembarkOrders;
         public bool IsMergeConfirmStep;
         public bool HasSelectedMergeCandidate;
@@ -30,7 +33,29 @@ public partial class TurnStateManager
         public string SelectedMergeCandidateStats;
         public string MergeConfirmPreview;
         public string MergeQueuePreview;
+        public int CommandServiceServedTargets;
+        public int CommandServiceRecoveredHp;
+        public int CommandServiceRecoveredFuel;
+        public int CommandServiceRecoveredAmmo;
+        public int CommandServiceTotalCost;
+        public bool CommandServiceStoppedByEconomy;
+        public bool CommandServiceIsEstimate;
+        public int CommandServiceMoneyBefore;
+        public int CommandServiceMoneyAfter;
     }
+
+    private float commandServiceHelperVisibleUntil = -1f;
+    private int commandServiceHelperServedTargets;
+    private int commandServiceHelperRecoveredHp;
+    private int commandServiceHelperRecoveredFuel;
+    private int commandServiceHelperRecoveredAmmo;
+    private int commandServiceHelperTotalCost;
+    private bool commandServiceHelperStoppedByEconomy;
+    private bool commandServiceHelperIsEstimate;
+    private int commandServiceHelperMoneyBefore;
+    private int commandServiceHelperMoneyAfter;
+    private readonly List<HelperCommandServiceTargetLine> commandServiceHelperTargetLines = new List<HelperCommandServiceTargetLine>();
+    private readonly List<HelperCommandServiceSkippedUnitLine> commandServiceHelperSkippedUnitLines = new List<HelperCommandServiceSkippedUnitLine>();
 
     public sealed class HelperShoppingLine
     {
@@ -76,9 +101,27 @@ public partial class TurnStateManager
         public string invalidReason;
     }
 
+    public sealed class HelperCommandServiceTargetLine
+    {
+        public string unitName;
+        public string sourceLabel;
+        public string gainsLabel;
+        public bool isFocused;
+    }
+
+    public sealed class HelperCommandServiceSkippedUnitLine
+    {
+        public string unitName;
+        public string sourceLabel;
+        public bool isFocused;
+    }
+
     public bool TryBuildHelperPanelData(out HelperPanelData data)
     {
         data = new HelperPanelData();
+
+        if (TryBuildCommandServiceHelperPanelData(data))
+            return true;
 
         if (cursorState == CursorState.Neutral)
             return false;
@@ -96,6 +139,154 @@ public partial class TurnStateManager
             return TryBuildMergeHelperPanelData(data);
 
         return false;
+    }
+
+    private bool TryBuildCommandServiceHelperPanelData(HelperPanelData data)
+    {
+        bool shouldShowEstimate = commandServiceConfirmationPending && commandServiceHelperServedTargets > 0;
+        bool shouldShowSummary = !commandServiceConfirmationPending &&
+            Time.time <= commandServiceHelperVisibleUntil &&
+            commandServiceHelperServedTargets > 0;
+        if (data == null || (!shouldShowEstimate && !shouldShowSummary))
+            return false;
+
+        data.Kind = HelperPanelKind.CommandService;
+        data.CommandServiceServedTargets = Mathf.Max(0, commandServiceHelperServedTargets);
+        data.CommandServiceRecoveredHp = Mathf.Max(0, commandServiceHelperRecoveredHp);
+        data.CommandServiceRecoveredFuel = Mathf.Max(0, commandServiceHelperRecoveredFuel);
+        data.CommandServiceRecoveredAmmo = Mathf.Max(0, commandServiceHelperRecoveredAmmo);
+        data.CommandServiceTotalCost = Mathf.Max(0, commandServiceHelperTotalCost);
+        data.CommandServiceStoppedByEconomy = commandServiceHelperStoppedByEconomy;
+        data.CommandServiceIsEstimate = commandServiceHelperIsEstimate;
+        data.CommandServiceMoneyBefore = Mathf.Max(0, commandServiceHelperMoneyBefore);
+        data.CommandServiceMoneyAfter = Mathf.Max(0, commandServiceHelperMoneyAfter);
+        for (int i = 0; i < commandServiceHelperTargetLines.Count; i++)
+        {
+            HelperCommandServiceTargetLine line = commandServiceHelperTargetLines[i];
+            if (line == null)
+                continue;
+
+            data.CommandServiceTargetLines.Add(new HelperCommandServiceTargetLine
+            {
+                unitName = line.unitName,
+                sourceLabel = line.sourceLabel,
+                gainsLabel = line.gainsLabel,
+                isFocused = line.isFocused
+            });
+        }
+
+        for (int i = 0; i < commandServiceHelperSkippedUnitLines.Count; i++)
+        {
+            HelperCommandServiceSkippedUnitLine line = commandServiceHelperSkippedUnitLines[i];
+            if (line == null)
+                continue;
+
+            data.CommandServiceSkippedUnitLines.Add(new HelperCommandServiceSkippedUnitLine
+            {
+                unitName = line.unitName,
+                sourceLabel = line.sourceLabel,
+                isFocused = line.isFocused
+            });
+        }
+        return true;
+    }
+
+    private void ShowCommandServiceHelperSummary(
+        int servedTargets,
+        int recoveredHp,
+        int recoveredFuel,
+        int recoveredAmmo,
+        int totalCost,
+        bool stoppedByEconomy,
+        float durationSeconds = 3.2f)
+    {
+        commandServiceHelperServedTargets = Mathf.Max(0, servedTargets);
+        commandServiceHelperRecoveredHp = Mathf.Max(0, recoveredHp);
+        commandServiceHelperRecoveredFuel = Mathf.Max(0, recoveredFuel);
+        commandServiceHelperRecoveredAmmo = Mathf.Max(0, recoveredAmmo);
+        commandServiceHelperTotalCost = Mathf.Max(0, totalCost);
+        commandServiceHelperStoppedByEconomy = stoppedByEconomy;
+        commandServiceHelperIsEstimate = false;
+        commandServiceHelperMoneyBefore = 0;
+        commandServiceHelperMoneyAfter = 0;
+        commandServiceHelperTargetLines.Clear();
+        commandServiceHelperSkippedUnitLines.Clear();
+        commandServiceHelperVisibleUntil = Time.time + Mathf.Max(0.1f, durationSeconds);
+    }
+
+    private void ShowCommandServiceHelperEstimate(
+        int servedTargets,
+        int recoveredHp,
+        int recoveredFuel,
+        int recoveredAmmo,
+        int totalCost,
+        bool stoppedByEconomy,
+        int moneyBefore,
+        int moneyAfter,
+        List<HelperCommandServiceTargetLine> targetLines = null,
+        List<HelperCommandServiceSkippedUnitLine> skippedUnitLines = null)
+    {
+        commandServiceHelperServedTargets = Mathf.Max(0, servedTargets);
+        commandServiceHelperRecoveredHp = Mathf.Max(0, recoveredHp);
+        commandServiceHelperRecoveredFuel = Mathf.Max(0, recoveredFuel);
+        commandServiceHelperRecoveredAmmo = Mathf.Max(0, recoveredAmmo);
+        commandServiceHelperTotalCost = Mathf.Max(0, totalCost);
+        commandServiceHelperStoppedByEconomy = stoppedByEconomy;
+        commandServiceHelperIsEstimate = true;
+        commandServiceHelperMoneyBefore = Mathf.Max(0, moneyBefore);
+        commandServiceHelperMoneyAfter = Mathf.Max(0, moneyAfter);
+        commandServiceHelperTargetLines.Clear();
+        if (targetLines != null)
+        {
+            for (int i = 0; i < targetLines.Count; i++)
+            {
+                HelperCommandServiceTargetLine line = targetLines[i];
+                if (line == null)
+                    continue;
+
+                commandServiceHelperTargetLines.Add(new HelperCommandServiceTargetLine
+                {
+                    unitName = line.unitName,
+                    sourceLabel = line.sourceLabel,
+                    gainsLabel = line.gainsLabel,
+                    isFocused = line.isFocused
+                });
+            }
+        }
+        commandServiceHelperSkippedUnitLines.Clear();
+        if (skippedUnitLines != null)
+        {
+            for (int i = 0; i < skippedUnitLines.Count; i++)
+            {
+                HelperCommandServiceSkippedUnitLine line = skippedUnitLines[i];
+                if (line == null)
+                    continue;
+
+                commandServiceHelperSkippedUnitLines.Add(new HelperCommandServiceSkippedUnitLine
+                {
+                    unitName = line.unitName,
+                    sourceLabel = line.sourceLabel,
+                    isFocused = line.isFocused
+                });
+            }
+        }
+        commandServiceHelperVisibleUntil = -1f;
+    }
+
+    private void ClearCommandServiceHelper()
+    {
+        commandServiceHelperVisibleUntil = -1f;
+        commandServiceHelperServedTargets = 0;
+        commandServiceHelperRecoveredHp = 0;
+        commandServiceHelperRecoveredFuel = 0;
+        commandServiceHelperRecoveredAmmo = 0;
+        commandServiceHelperTotalCost = 0;
+        commandServiceHelperStoppedByEconomy = false;
+        commandServiceHelperIsEstimate = false;
+        commandServiceHelperMoneyBefore = 0;
+        commandServiceHelperMoneyAfter = 0;
+        commandServiceHelperTargetLines.Clear();
+        commandServiceHelperSkippedUnitLines.Clear();
     }
 
     private bool TryBuildShoppingHelperPanelData(HelperPanelData data)

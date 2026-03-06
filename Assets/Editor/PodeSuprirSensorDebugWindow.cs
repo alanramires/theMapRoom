@@ -48,6 +48,8 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
         public ServiceData service;
         public readonly List<string> participantLines = new List<string>();
         public readonly Dictionary<SupplyData, int> consumedBySupply = new Dictionary<SupplyData, int>();
+        public readonly List<int> ammoCostByWeapon = new List<int>();
+        public readonly Dictionary<WeaponClass, int> ammoBoxesByClass = new Dictionary<WeaponClass, int>();
         public int recoveredHp;
         public int recoveredFuel;
         public int recoveredAmmo;
@@ -329,6 +331,9 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
         }
 
         List<ServiceExecutionSummary> ordered = BuildOrderedServiceSummaries(estimate.serviceSummaries);
+        DrawConsolidatedSupplyReport(ordered, estimate);
+        EditorGUILayout.Space(6f);
+
         for (int i = 0; i < ordered.Count; i++)
         {
             ServiceExecutionSummary summary = ordered[i];
@@ -373,6 +378,78 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
         foreach (KeyValuePair<SupplyData, int> pair in estimate.supplyUsage)
             EditorGUILayout.LabelField($"{ResolveSupplyName(pair.Key)}: {pair.Value}");
         EditorGUILayout.LabelField($"Total de supplies utilizados: {estimate.totalSupplyUnitsUsed}");
+    }
+
+    private static void DrawConsolidatedSupplyReport(List<ServiceExecutionSummary> ordered, QueueUsageEstimate estimate)
+    {
+        ServiceExecutionSummary repair = null;
+        ServiceExecutionSummary refuel = null;
+        ServiceExecutionSummary rearm = null;
+        if (ordered != null)
+        {
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                ServiceExecutionSummary summary = ordered[i];
+                if (summary == null || summary.service == null)
+                    continue;
+                if (repair == null && summary.service.recuperaHp)
+                    repair = summary;
+                else if (refuel == null && summary.service.recuperaAutonomia)
+                    refuel = summary;
+                else if (rearm == null && summary.service.recuperaMunicao)
+                    rearm = summary;
+            }
+        }
+
+        int repairCost = repair != null ? Mathf.Max(0, repair.subtotalCost) : 0;
+        int refuelCost = refuel != null ? Mathf.Max(0, refuel.subtotalCost) : 0;
+        int rearmCost = rearm != null ? Mathf.Max(0, rearm.subtotalCost) : 0;
+        int primaryCost = GetAmmoWeaponCost(rearm, 0);
+        int secondaryCost = GetAmmoWeaponCost(rearm, 1);
+        int pieces = SumConsumedByService(repair);
+        int gallons = SumConsumedByService(refuel);
+        int ammoBoxesTotal = SumConsumedByService(rearm);
+        int heavyBoxes = GetAmmoBoxesByClass(rearm, WeaponClass.Heavy);
+        int mediumBoxes = GetAmmoBoxesByClass(rearm, WeaponClass.Medium);
+
+        EditorGUILayout.LabelField("Relatorio Consolidado", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField($"Reparar: ${repairCost}");
+        EditorGUILayout.LabelField($"Reabastecimento: ${refuelCost}");
+        EditorGUILayout.LabelField($"Rearmamento: ${rearmCost}");
+        EditorGUILayout.LabelField($"  primary: ${primaryCost}");
+        EditorGUILayout.LabelField($"  secondary: ${secondaryCost}");
+        EditorGUILayout.LabelField($"Total Servicos: ${Mathf.Max(0, estimate != null ? estimate.totalEstimatedCost : 0)}");
+        EditorGUILayout.Space(2f);
+        EditorGUILayout.LabelField($"Pecas de manutencao: {pieces}");
+        EditorGUILayout.LabelField($"Galoes de combustivel: {gallons}");
+        EditorGUILayout.LabelField($"Caixas totais de municao: {ammoBoxesTotal}");
+        EditorGUILayout.LabelField($"  Caixas heavy: {heavyBoxes}");
+        EditorGUILayout.LabelField($"  Caixas medium: {mediumBoxes}");
+    }
+
+    private static int SumConsumedByService(ServiceExecutionSummary summary)
+    {
+        if (summary == null || summary.consumedBySupply == null)
+            return 0;
+
+        int total = 0;
+        foreach (KeyValuePair<SupplyData, int> pair in summary.consumedBySupply)
+            total += Mathf.Max(0, pair.Value);
+        return Mathf.Max(0, total);
+    }
+
+    private static int GetAmmoWeaponCost(ServiceExecutionSummary summary, int weaponIndex)
+    {
+        if (summary == null || summary.ammoCostByWeapon == null || weaponIndex < 0 || weaponIndex >= summary.ammoCostByWeapon.Count)
+            return 0;
+        return Mathf.Max(0, summary.ammoCostByWeapon[weaponIndex]);
+    }
+
+    private static int GetAmmoBoxesByClass(ServiceExecutionSummary summary, WeaponClass weaponClass)
+    {
+        if (summary == null || summary.ammoBoxesByClass == null)
+            return 0;
+        return summary.ammoBoxesByClass.TryGetValue(weaponClass, out int value) ? Mathf.Max(0, value) : 0;
     }
 
     private static QueueUsageEstimate BuildQueueUsageEstimate(UnitManager supplier, UnitData supplierData, List<SupplyCandidateEntry> queue)
@@ -519,34 +596,36 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
         if (chosenService == null)
             return false;
 
-        int pointsServed = pointsMissing;
-        if (chosenService.serviceLimitPerUnitPerTurn > 0)
-            pointsServed = Mathf.Min(pointsServed, Mathf.Max(0, chosenService.serviceLimitPerUnitPerTurn));
-        int unitsConsumed = 0;
-        if (chosenSupply != null)
+        Dictionary<SupplyData, int> consumedBySupply = new Dictionary<SupplyData, int>();
+        ServiceLogisticsFormula.EstimatePotentialServiceGains(
+            target,
+            chosenService,
+            workingStock,
+            out int hpServed,
+            out int fuelServed,
+            out _,
+            allowHp: forHp,
+            allowFuel: forFuel,
+            allowAmmo: false,
+            consumedBySupply: consumedBySupply);
+
+        int pointsServed = forHp ? hpServed : fuelServed;
+        if (pointsServed <= 0)
+            return false;
+
+        foreach (KeyValuePair<SupplyData, int> pair in consumedBySupply)
         {
-            int maxRecoverBySupply = Mathf.FloorToInt(chosenSupplyAvailable * chosenEfficiency);
-            if (maxRecoverBySupply <= 0)
-                return false;
-
-            pointsServed = Mathf.Min(pointsMissing, maxRecoverBySupply);
-            if (chosenService.serviceLimitPerUnitPerTurn > 0)
-                pointsServed = Mathf.Min(pointsServed, Mathf.Max(0, chosenService.serviceLimitPerUnitPerTurn));
-            unitsConsumed = Mathf.CeilToInt(pointsServed / chosenEfficiency);
-            unitsConsumed = Mathf.Clamp(unitsConsumed, 0, chosenSupplyAvailable);
-            if (unitsConsumed <= 0)
-                return false;
-
-            int stockBefore = workingStock.TryGetValue(chosenSupply, out int current) ? current : 0;
-            workingStock[chosenSupply] = Mathf.Max(0, stockBefore - unitsConsumed);
-            if (estimate.supplyUsage.TryGetValue(chosenSupply, out int consumed))
-                estimate.supplyUsage[chosenSupply] = consumed + unitsConsumed;
+            int used = Mathf.Max(0, pair.Value);
+            if (pair.Key == null || used <= 0)
+                continue;
+            if (estimate.supplyUsage.TryGetValue(pair.Key, out int consumed))
+                estimate.supplyUsage[pair.Key] = consumed + used;
             else
-                estimate.supplyUsage.Add(chosenSupply, unitsConsumed);
-            estimate.totalSupplyUnitsUsed += unitsConsumed;
-
-            consumedSupply = chosenSupply;
-            consumedAmount = unitsConsumed;
+                estimate.supplyUsage.Add(pair.Key, used);
+            estimate.totalSupplyUnitsUsed += used;
+            if (consumedSupply == null)
+                consumedSupply = pair.Key;
+            consumedAmount += used;
         }
 
         if (estimate.serviceUsageByTarget.TryGetValue(chosenService, out int countByService))
@@ -554,21 +633,12 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
         else
             estimate.serviceUsageByTarget.Add(chosenService, 1);
 
-        int squadCost = targetData != null ? Mathf.Max(0, targetData.cost) : 0;
-        float serviceShare = Mathf.Clamp(chosenService.percentCost, 0, 100) / 100f;
-        float allocatedServiceCost = squadCost * serviceShare;
-        float costPerPoint;
-        if (forFuel)
-        {
-            int maxFuel = target != null ? Mathf.Max(1, target.GetMaxFuel()) : 1;
-            costPerPoint = allocatedServiceCost / maxFuel;
-        }
-        else
-        {
-            int maxHp = targetData != null ? Mathf.Max(1, targetData.maxHP) : 10;
-            costPerPoint = allocatedServiceCost / maxHp;
-        }
-        int money = Mathf.RoundToInt(pointsServed * costPerPoint);
+        int money = ComputeServiceMoneyCostEstimate(
+            target,
+            chosenService,
+            forHp ? pointsServed : 0,
+            forFuel ? pointsServed : 0,
+            0);
         estimate.totalEstimatedCost += Mathf.Max(0, money);
         estimatedCost = Mathf.Max(0, money);
 
@@ -642,79 +712,65 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
 
         int count = Mathf.Min(runtimeWeapons.Count, targetData.embarkedWeapons.Count);
         int totalMissingAmmo = 0;
-        int totalRecoveredAmmo = 0;
-        int totalCost = 0;
-        int boxesUsed = 0;
-        int remainingSupply = chosenSupply != null ? chosenSupplyAvailable : int.MaxValue;
-        int ammoServiceLimit = chosenService.serviceLimitPerUnitPerTurn > 0 ? chosenService.serviceLimitPerUnitPerTurn : int.MaxValue;
-        int remainingAmmoLimit = ammoServiceLimit;
-        Dictionary<WeaponClass, int> recoveredByClass = new Dictionary<WeaponClass, int>();
-        Dictionary<WeaponClass, int> boxesByClass = new Dictionary<WeaponClass, int>();
-
-        int squadCost = Mathf.Max(0, targetData.cost);
-        float share = Mathf.Clamp(chosenService.percentCost, 0, 100) / 100f;
-        int allocatedCost = Mathf.RoundToInt(squadCost * share);
-        int totalWeaponPointsCapacity = ComputeTotalWeaponPointCapacity(targetData);
-        float costPerWeaponPoint = totalWeaponPointsCapacity > 0 ? allocatedCost / (float)totalWeaponPointsCapacity : 0f;
-
         for (int i = 0; i < count; i++)
         {
             UnitEmbarkedWeapon runtime = runtimeWeapons[i];
             UnitEmbarkedWeapon baseline = targetData.embarkedWeapons[i];
             if (runtime == null || baseline == null || baseline.weapon == null)
                 continue;
-
             int missing = Mathf.Max(0, Mathf.Max(0, baseline.squadAmmunition) - Mathf.Max(0, runtime.squadAmmunition));
-            if (missing <= 0)
-                continue;
-
             totalMissingAmmo += missing;
-            if (remainingAmmoLimit <= 0 || remainingSupply <= 0)
+        }
+
+        List<int> ammoByWeapon = new List<int>();
+        Dictionary<SupplyData, int> consumedBySupply = new Dictionary<SupplyData, int>();
+        ServiceLogisticsFormula.EstimatePotentialServiceGains(
+            target,
+            chosenService,
+            workingStock,
+            out _,
+            out _,
+            out int totalRecoveredAmmo,
+            ammoByWeapon: ammoByWeapon,
+            allowHp: false,
+            allowFuel: false,
+            allowAmmo: true,
+            consumedBySupply: consumedBySupply);
+
+        Dictionary<WeaponClass, int> recoveredByClass = new Dictionary<WeaponClass, int>();
+        Dictionary<WeaponClass, int> boxesByClass = new Dictionary<WeaponClass, int>();
+        int boxesUsed = 0;
+        for (int i = 0; i < ammoByWeapon.Count; i++)
+        {
+            int recovered = Mathf.Max(0, ammoByWeapon[i]);
+            if (recovered <= 0)
                 continue;
-
-            ArmorWeaponClass classKey = MapWeaponClassToArmorWeaponClass(baseline.weapon.WeaponClass);
-            float recoverPerSupply = ResolveServiceEfficiencyValueForClass(chosenService, classKey);
-            if (recoverPerSupply <= 0f)
-                continue;
-
-            int recoverCapBySupply = chosenSupply != null ? Mathf.FloorToInt(remainingSupply * recoverPerSupply) : missing;
-            int recoverable = Mathf.Min(missing, recoverCapBySupply, remainingAmmoLimit);
-            if (recoverable <= 0)
-                continue;
-
-            int usedBoxesForWeapon = chosenSupply != null ? Mathf.CeilToInt(recoverable / recoverPerSupply) : 0;
-            if (chosenSupply != null)
-            {
-                usedBoxesForWeapon = Mathf.Clamp(usedBoxesForWeapon, 0, remainingSupply);
-                if (usedBoxesForWeapon <= 0)
-                    continue;
-                remainingSupply -= usedBoxesForWeapon;
-                boxesUsed += usedBoxesForWeapon;
-            }
-
-            int weaponPoints = GetWeaponClassPoints(baseline.weapon.WeaponClass);
-            int costForWeapon = Mathf.RoundToInt(recoverable * (costPerWeaponPoint * weaponPoints));
-            totalCost += Mathf.Max(0, costForWeapon);
-            totalRecoveredAmmo += recoverable;
-            remainingAmmoLimit -= recoverable;
-            AccumulateClassMetric(recoveredByClass, baseline.weapon.WeaponClass, recoverable);
-            AccumulateClassMetric(boxesByClass, baseline.weapon.WeaponClass, usedBoxesForWeapon);
+            WeaponClass cls = WeaponClass.Light;
+            if (i < targetData.embarkedWeapons.Count && targetData.embarkedWeapons[i] != null && targetData.embarkedWeapons[i].weapon != null)
+                cls = targetData.embarkedWeapons[i].weapon.WeaponClass;
+            int pointsPerSupply = Mathf.Max(1, Mathf.RoundToInt(ResolveServiceEfficiencyValueForClass(chosenService, MapWeaponClassToArmorWeaponClass(cls))));
+            int usedBoxesForWeapon = Mathf.CeilToInt(recovered / (float)pointsPerSupply);
+            AccumulateClassMetric(recoveredByClass, cls, recovered);
+            AccumulateClassMetric(boxesByClass, cls, usedBoxesForWeapon);
         }
 
         if (totalRecoveredAmmo <= 0)
             return false;
 
-        if (chosenSupply != null && boxesUsed > 0)
+        foreach (KeyValuePair<SupplyData, int> pair in consumedBySupply)
         {
-            int stockBefore = workingStock.TryGetValue(chosenSupply, out int current) ? current : 0;
-            workingStock[chosenSupply] = Mathf.Max(0, stockBefore - boxesUsed);
-            if (estimate.supplyUsage.TryGetValue(chosenSupply, out int consumed))
-                estimate.supplyUsage[chosenSupply] = consumed + boxesUsed;
+            int used = Mathf.Max(0, pair.Value);
+            if (pair.Key == null || used <= 0)
+                continue;
+            if (estimate.supplyUsage.TryGetValue(pair.Key, out int consumed))
+                estimate.supplyUsage[pair.Key] = consumed + used;
             else
-                estimate.supplyUsage.Add(chosenSupply, boxesUsed);
-            estimate.totalSupplyUnitsUsed += boxesUsed;
-            consumedSupply = chosenSupply;
-            consumedAmount = boxesUsed;
+                estimate.supplyUsage.Add(pair.Key, used);
+            estimate.totalSupplyUnitsUsed += used;
+            boxesUsed += used;
+            if (consumedSupply == null)
+                consumedSupply = pair.Key;
+            consumedAmount += used;
         }
 
         if (estimate.serviceUsageByTarget.TryGetValue(chosenService, out int countByService))
@@ -722,6 +778,15 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
         else
             estimate.serviceUsageByTarget.Add(chosenService, 1);
 
+        List<int> ammoCostByWeapon = new List<int>();
+        int totalCost = ServiceCostFormula.ComputeServiceMoneyCost(
+            target,
+            chosenService,
+            0,
+            0,
+            totalRecoveredAmmo,
+            ammoByWeapon,
+            ammoCostByWeapon);
         estimate.totalEstimatedCost += totalCost;
         estimatedCost = totalCost;
 
@@ -741,7 +806,46 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
             consumedSupply,
             consumedAmount,
             detail);
+        AccumulateAmmoReportMetrics(estimate, chosenService, ammoCostByWeapon, boxesByClass);
         return true;
+    }
+
+    private static void AccumulateAmmoReportMetrics(
+        QueueUsageEstimate estimate,
+        ServiceData service,
+        List<int> ammoCostByWeapon,
+        Dictionary<WeaponClass, int> boxesByClass)
+    {
+        if (estimate == null || service == null)
+            return;
+
+        ServiceExecutionSummary summary = GetOrCreateServiceSummary(estimate, service);
+        if (ammoCostByWeapon != null)
+        {
+            for (int i = 0; i < ammoCostByWeapon.Count; i++)
+            {
+                int cost = Mathf.Max(0, ammoCostByWeapon[i]);
+                if (cost <= 0)
+                    continue;
+                while (summary.ammoCostByWeapon.Count <= i)
+                    summary.ammoCostByWeapon.Add(0);
+                summary.ammoCostByWeapon[i] += cost;
+            }
+        }
+
+        if (boxesByClass != null)
+        {
+            foreach (KeyValuePair<WeaponClass, int> pair in boxesByClass)
+            {
+                int used = Mathf.Max(0, pair.Value);
+                if (used <= 0)
+                    continue;
+                if (summary.ammoBoxesByClass.TryGetValue(pair.Key, out int current))
+                    summary.ammoBoxesByClass[pair.Key] = current + used;
+                else
+                    summary.ammoBoxesByClass.Add(pair.Key, used);
+            }
+        }
     }
 
     private static void AddSupplyConsumption(Dictionary<SupplyData, int> map, SupplyData supply, int amount)
@@ -967,36 +1071,9 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
         }
     }
 
-    private static int GetWeaponClassPoints(WeaponClass weaponClass)
+    private static int ComputeServiceMoneyCostEstimate(UnitManager target, ServiceData service, int hpGain, int fuelGain, int ammoGain)
     {
-        switch (weaponClass)
-        {
-            case WeaponClass.Heavy:
-                return 3;
-            case WeaponClass.Medium:
-                return 2;
-            default:
-                return 1;
-        }
-    }
-
-    private static int ComputeTotalWeaponPointCapacity(UnitData targetData)
-    {
-        if (targetData == null || targetData.embarkedWeapons == null || targetData.embarkedWeapons.Count == 0)
-            return 0;
-
-        int total = 0;
-        for (int i = 0; i < targetData.embarkedWeapons.Count; i++)
-        {
-            UnitEmbarkedWeapon weapon = targetData.embarkedWeapons[i];
-            if (weapon == null || weapon.weapon == null)
-                continue;
-            int maxAmmo = Mathf.Max(0, weapon.squadAmmunition);
-            int classPoints = GetWeaponClassPoints(weapon.weapon.WeaponClass);
-            total += maxAmmo * classPoints;
-        }
-
-        return Mathf.Max(0, total);
+        return ServiceCostFormula.ComputeServiceMoneyCost(target, service, hpGain, fuelGain, ammoGain);
     }
 
     private static void AccumulateClassMetric(Dictionary<WeaponClass, int> map, WeaponClass weaponClass, int amount)

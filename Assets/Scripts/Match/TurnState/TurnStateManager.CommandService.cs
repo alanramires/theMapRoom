@@ -14,20 +14,51 @@ public partial class TurnStateManager
         public int ammoRecovered;
     }
 
+    private sealed class CommandServiceEstimateSummary
+    {
+        public int servedTargets;
+        public int recoveredHp;
+        public int recoveredFuel;
+        public int recoveredAmmo;
+        public int totalCost;
+        public int moneyBefore;
+        public int moneyAfter;
+        public bool hasSkippedServices;
+        public readonly List<HelperCommandServiceTargetLine> targetLines = new List<HelperCommandServiceTargetLine>();
+        public readonly List<UnitManager> targetLineUnits = new List<UnitManager>();
+        public readonly List<HelperCommandServiceSkippedUnitLine> skippedUnitLines = new List<HelperCommandServiceSkippedUnitLine>();
+        public readonly List<UnitManager> skippedLineUnits = new List<UnitManager>();
+        public readonly List<UnitManager> skippedUnits = new List<UnitManager>();
+        public readonly List<CommandServicePreviewEntry> previewEntries = new List<CommandServicePreviewEntry>();
+    }
+
+    private sealed class CommandServicePreviewEntry
+    {
+        public UnitManager targetUnit;
+        public Vector3Int cell;
+        public bool willBeServed;
+        public int targetLineIndex = -1;
+        public int skippedLineIndex = -1;
+    }
+
     private readonly List<ServicoDoComandoOption> commandServiceQueuedOrders = new List<ServicoDoComandoOption>();
     private readonly List<ServicoDoComandoInvalidOption> commandServiceInvalidOrders = new List<ServicoDoComandoInvalidOption>();
+    private readonly List<CommandServicePreviewEntry> commandServicePreviewEntries = new List<CommandServicePreviewEntry>();
     private readonly HashSet<int> commandServiceServedUnitInstanceIds = new HashSet<int>();
+    private readonly HashSet<UnitManager> commandServicePreviewDimmedUnits = new HashSet<UnitManager>();
     private int commandServiceServedCacheTurn = int.MinValue;
     private int commandServiceServedCacheTeamId = int.MinValue;
+    private int commandServicePreviewSelectedIndex = -1;
     private bool commandServiceExecutionInProgress;
-    public bool IsPlayerCursorLockedByCommandService => commandServiceExecutionInProgress;
+    private bool commandServiceConfirmationPending;
+    public bool IsPlayerCursorLockedByCommandService => false;
 
     private void ProcessCommandServiceHotkeyInput()
     {
         if (!WasLetterPressedThisFrame('X'))
             return;
 
-        TryStartCommandServiceOrder(out _, emitLogs: true);
+        TryPreviewCommandServiceOrder(out _, emitLogs: true);
     }
 
     public bool TryStartCommandServiceOrder(out string message)
@@ -36,6 +67,54 @@ public partial class TurnStateManager
     }
 
     private bool TryStartCommandServiceOrder(out string message, bool emitLogs)
+    {
+        if (!TryPrepareCommandServiceOrders(out message, emitLogs))
+            return false;
+
+        ClearPendingCommandServiceConfirmation();
+        message = $"Servico do Comando (\"X\"): iniciando ordem com {commandServiceQueuedOrders.Count} unidade(s).";
+        if (emitLogs)
+            Debug.Log(message);
+        PushPanelUnitMessage(
+            PanelDialogController.ResolveDialogMessage(
+                "command_service.executing",
+                "Servico do comando: executando"),
+            2.2f);
+        StartCoroutine(ExecuteCommandServiceOrderSequence());
+        return true;
+    }
+
+    private bool TryPreviewCommandServiceOrder(out string message, bool emitLogs)
+    {
+        if (!TryPrepareCommandServiceOrders(out message, emitLogs))
+            return false;
+
+        CommandServiceEstimateSummary estimate = EstimateCommandServiceQueuedOrders();
+        ShowCommandServiceHelperEstimate(
+            estimate.servedTargets,
+            estimate.recoveredHp,
+            estimate.recoveredFuel,
+            estimate.recoveredAmmo,
+            estimate.totalCost,
+            estimate.hasSkippedServices,
+            estimate.moneyBefore,
+            estimate.moneyAfter,
+            estimate.targetLines,
+            estimate.skippedUnitLines);
+        ApplyCommandServicePreviewDimmedUnits(estimate.skippedUnits);
+        commandServiceConfirmationPending = true;
+        PanelDialogController.TrySetExternalText(
+            PanelDialogController.ResolveDialogMessage(
+                "command_service.confirm",
+                "Servico do Comando :: Confirmar"));
+        message = $"Servico do Comando (\"X\"): confirmacao pendente para {estimate.servedTargets} alvo(s) | custo previsto=${Mathf.Max(0, estimate.totalCost)}.";
+        if (emitLogs)
+            Debug.Log(message);
+        cursorController?.PlayConfirmSfx();
+        return true;
+    }
+
+    private bool TryPrepareCommandServiceOrders(out string message, bool emitLogs)
     {
         message = string.Empty;
         if (commandServiceExecutionInProgress ||
@@ -51,7 +130,10 @@ public partial class TurnStateManager
             message = "Servico do Comando indisponivel durante outra execucao.";
             if (emitLogs)
                 Debug.Log(message);
-            PushPanelUnitMessage("Servico do comando: indisponivel");
+            ClearPendingCommandServiceConfirmation();
+            PushPanelUnitMessage(PanelDialogController.ResolveDialogMessage(
+                "command_service.unavailable",
+                "Servico do comando: indisponivel"));
             return false;
         }
 
@@ -60,7 +142,10 @@ public partial class TurnStateManager
             message = $"Servico do Comando (\"X\") exige cursor em Neutral (atual: {cursorState}).";
             if (emitLogs)
                 Debug.Log(message);
-            PushPanelUnitMessage("Servico do comando: use no Neutral");
+            ClearPendingCommandServiceConfirmation();
+            PushPanelUnitMessage(PanelDialogController.ResolveDialogMessage(
+                "command_service.neutral_only",
+                "Servico do comando: use no Neutral"));
             return false;
         }
 
@@ -71,7 +156,10 @@ public partial class TurnStateManager
             message = "Servico do Comando (\"X\"): sem time ativo valido.";
             if (emitLogs)
                 Debug.Log(message);
-            PushPanelUnitMessage("Servico do comando: time invalido");
+            ClearPendingCommandServiceConfirmation();
+            PushPanelUnitMessage(PanelDialogController.ResolveDialogMessage(
+                "command_service.invalid_team",
+                "Servico do comando: time invalido"));
             return false;
         }
 
@@ -111,16 +199,16 @@ public partial class TurnStateManager
             message = $"Servico do Comando (\"X\"): {reason}{suffix}";
             if (emitLogs)
                 Debug.Log(message);
-            PushPanelUnitMessage("Servico do comando: sem candidatos", 2.6f);
+            ClearPendingCommandServiceConfirmation();
+            PushPanelUnitMessage(
+                PanelDialogController.ResolveDialogMessage(
+                    "command_service.no_candidates",
+                    "Servico do comando: sem candidatos"),
+                2.6f);
             cursorController?.PlayLoadSfx();
             return false;
         }
 
-        message = $"Servico do Comando (\"X\"): iniciando ordem com {commandServiceQueuedOrders.Count} unidade(s).";
-        if (emitLogs)
-            Debug.Log(message);
-        PushPanelUnitMessage("Servico do comando: executando", 2.2f);
-        StartCoroutine(ExecuteCommandServiceOrderSequence());
         return true;
     }
 
@@ -128,19 +216,25 @@ public partial class TurnStateManager
     {
         RefreshCommandServiceServedCacheScope();
         commandServiceExecutionInProgress = true;
+        commandServiceConfirmationPending = false;
+        ClearCommandServicePreviewDimmedUnits();
+        PanelDialogController.ClearExternalText();
+        ClearCommandServiceHelper();
         RestoreSupplyEmbarkedSelectionVisuals();
 
-        Debug.Log($"[ServicoComando][Fila] Inicio da execucao: {commandServiceQueuedOrders.Count} ordem(ns).");
-        for (int q = 0; q < commandServiceQueuedOrders.Count; q++)
+        try
         {
-            ServicoDoComandoOption queued = commandServiceQueuedOrders[q];
-            UnitManager queuedTarget = queued != null ? queued.targetUnit : null;
-            string targetName = queuedTarget != null ? queuedTarget.name : "(null)";
-            string sourceName = queued != null && queued.sourceConstruction != null
-                ? $"construcao={queued.sourceConstruction.name}"
-                : (queued != null && queued.sourceSupplierUnit != null ? $"fornecedor={queued.sourceSupplierUnit.name}" : "fonte=(null)");
-            Debug.Log($"[ServicoComando][Fila] {q + 1}/{commandServiceQueuedOrders.Count} alvo={targetName} | {sourceName}");
-        }
+            Debug.Log($"[ServicoComando][Fila] Inicio da execucao: {commandServiceQueuedOrders.Count} ordem(ns).");
+            for (int q = 0; q < commandServiceQueuedOrders.Count; q++)
+            {
+                ServicoDoComandoOption queued = commandServiceQueuedOrders[q];
+                UnitManager queuedTarget = queued != null ? queued.targetUnit : null;
+                string targetName = queuedTarget != null ? queuedTarget.name : "(null)";
+                string sourceName = queued != null && queued.sourceConstruction != null
+                    ? $"construcao={queued.sourceConstruction.name}"
+                    : (queued != null && queued.sourceSupplierUnit != null ? $"fornecedor={queued.sourceSupplierUnit.name}" : "fonte=(null)");
+                Debug.Log($"[ServicoComando][Fila] {q + 1}/{commandServiceQueuedOrders.Count} alvo={targetName} | {sourceName}");
+            }
 
         int servedTargets = 0;
         int recoveredHp = 0;
@@ -254,6 +348,13 @@ public partial class TurnStateManager
                 {
                     int availableMoney = matchController.GetActualMoney(target.TeamId);
                     bool canAffordAnyServiceForTarget = false;
+                    Dictionary<SupplyData, int> sourceStockSnapshot = fromConstruction
+                        ? BuildConstructionStockSnapshot(sourceConstruction)
+                        : BuildSupplierStockSnapshot(sourceSupplierUnit);
+                    int simulatedHpForPrecheck = Mathf.Clamp(target.CurrentHP, 0, target.GetMaxHP());
+                    int simulatedFuelForPrecheck = Mathf.Clamp(target.CurrentFuel, 0, target.GetMaxFuel());
+                    List<int> simulatedAmmoForPrecheck = BuildRuntimeAmmoSnapshot(target);
+
                     for (int s = 0; s < services.Count; s++)
                     {
                         ServiceData service = services[s];
@@ -263,30 +364,27 @@ public partial class TurnStateManager
                             continue;
                         if (!UnitNeedsServiceForSupplyExecution(target, service))
                             continue;
-                        bool hasServiceStock = fromConstruction
-                            ? ServiceHasAvailableSuppliesNow(sourceConstruction, service)
-                            : ServiceHasAvailableSuppliesNow(sourceSupplierUnit, service);
-                        if (!hasServiceStock)
-                            continue;
-                        bool willActuallyApply = fromConstruction
-                            ? CanServiceApplyNow(sourceConstruction, target, service)
-                            : CanServiceApplyNow(sourceSupplierUnit, target, service);
-                        if (!willActuallyApply)
-                            continue;
 
-                        int hpPlannedGain;
-                        int fuelPlannedGain;
-                        int ammoPlannedGain;
-                        if (fromConstruction)
-                            EstimateServiceGainsFromConstruction(sourceConstruction, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain);
-                        else
-                            EstimateServiceGainsFromSupplier(sourceSupplierUnit, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain);
+                        Dictionary<SupplyData, int> candidateStock = CloneSupplySnapshot(sourceStockSnapshot);
+                        List<int> candidateSimulatedAmmo = CloneAmmoSnapshot(simulatedAmmoForPrecheck);
+                        List<int> ammoPlannedByWeapon = new List<int>();
+                        EstimatePotentialServiceGains(
+                            target,
+                            service,
+                            candidateStock,
+                            out int hpPlannedGain,
+                            out int fuelPlannedGain,
+                            out int ammoPlannedGain,
+                            ammoByWeapon: ammoPlannedByWeapon,
+                            simulatedHp: simulatedHpForPrecheck,
+                            simulatedFuel: simulatedFuelForPrecheck,
+                            simulatedAmmoByWeapon: candidateSimulatedAmmo);
 
                         if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
                             continue;
 
                         int projectedCost = matchController.ResolveEconomyCost(
-                            ComputeServiceMoneyCost(target, service, hpPlannedGain, fuelPlannedGain, ammoPlannedGain));
+                            ComputeServiceMoneyCost(target, service, hpPlannedGain, fuelPlannedGain, ammoPlannedGain, ammoPlannedByWeapon));
                         if (projectedCost <= availableMoney)
                         {
                             canAffordAnyServiceForTarget = true;
@@ -297,6 +395,9 @@ public partial class TurnStateManager
                     if (!canAffordAnyServiceForTarget)
                     {
                         stopByEconomy = true;
+                        commandServiceExecutionInProgress = false;
+                        commandServiceQueuedOrders.Clear();
+                        commandServiceInvalidOrders.Clear();
                         cursorController?.PlayErrorSfx();
                         Debug.Log($"[ServicoComando] Interrompido: saldo insuficiente para continuar no alvo {target.name} (saldo atual=${Mathf.Max(0, availableMoney)}).");
                         break;
@@ -334,10 +435,11 @@ public partial class TurnStateManager
                     int hpPlannedGain;
                     int fuelPlannedGain;
                     int ammoPlannedGain;
+                    List<int> ammoPlannedByWeapon;
                     if (fromConstruction)
-                        EstimateServiceGainsFromConstruction(sourceConstruction, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain);
+                        EstimateServiceGainsFromConstruction(sourceConstruction, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain, out ammoPlannedByWeapon);
                     else
-                        EstimateServiceGainsFromSupplier(sourceSupplierUnit, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain);
+                        EstimateServiceGainsFromSupplier(sourceSupplierUnit, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain, out ammoPlannedByWeapon);
 
                     if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
                         continue;
@@ -348,12 +450,12 @@ public partial class TurnStateManager
                             hpPlannedGain,
                             fuelPlannedGain,
                             ammoPlannedGain,
+                            ammoPlannedByWeapon,
                             "ServicoComando",
                             out int serviceMoneySpent))
                     {
-                        stopByEconomy = true;
-                        Debug.Log("[ServicoComando] Execucao interrompida por saldo insuficiente.");
-                        break;
+                        Debug.Log($"[ServicoComando] Servico ignorado por saldo insuficiente: {ResolveServiceLabel(service)}.");
+                        continue;
                     }
                     totalMoneySpent += Mathf.Max(0, serviceMoneySpent);
 
@@ -375,7 +477,7 @@ public partial class TurnStateManager
                     int fuelBeforeApply = Mathf.Max(0, target.CurrentFuel);
                     bool changed = fromConstruction
                         ? ApplyConstructionServicesToTarget(sourceConstruction, target, tempSingleService, out int hpStep, out int fuelStep, out int ammoStep)
-                        : ApplyServicesToTarget(sourceSupplierUnit, target, tempSingleService, out hpStep, out fuelStep, out ammoStep);
+                        : ApplyServicesToTarget(sourceSupplierUnit, target, tempSingleService, out hpStep, out fuelStep, out ammoStep, out _);
                     tempSingleService.Clear();
                     if (!changed)
                         continue;
@@ -482,17 +584,119 @@ public partial class TurnStateManager
         if (servedTargets <= 0)
         {
             Debug.Log("[ServicoComando] Nenhum alvo recebeu servico (necessidade/estoque).");
-            PushPanelUnitMessage("Servico do comando: sem candidatos", 2.6f);
+            if (stopByEconomy)
+            {
+                PushPanelUnitMessage(
+                    PanelDialogController.ResolveDialogMessage(
+                        "command_service.insufficient_money",
+                        "Servico do comando: saldo insuficiente"),
+                    2.8f);
+            }
+            else
+            {
+                PushPanelUnitMessage(
+                    PanelDialogController.ResolveDialogMessage(
+                        "command_service.no_candidates",
+                        "Servico do comando: sem candidatos"),
+                    2.6f);
+            }
             cursorController?.PlayLoadSfx();
             commandServiceExecutionInProgress = false;
+            SetCursorState(CursorState.Neutral, "ExecuteCommandServiceOrderSequence: no served targets");
             yield break;
         }
 
         Debug.Log($"[ServicoComando] alvos atendidos={servedTargets} | HP +{recoveredHp} | autonomia +{recoveredFuel} | municao +{recoveredAmmo} | custo ${Mathf.Max(0, totalMoneySpent)}");
-        PushPanelUnitMessage($"Servico comando: {servedTargets} alvos | ${Mathf.Max(0, totalMoneySpent)}", 3.2f);
-        Debug.Log(BuildCommandServiceDetailedReportLog(detailedReport));
-        cursorController?.PlayLoadSfx();
-        commandServiceExecutionInProgress = false;
+        ShowCommandServiceHelperSummary(
+            servedTargets,
+            recoveredHp,
+            recoveredFuel,
+            recoveredAmmo,
+            totalMoneySpent,
+            stopByEconomy,
+            durationSeconds: 3.2f);
+        if (stopByEconomy)
+        {
+            PushPanelUnitMessage(
+                PanelDialogController.ResolveDialogMessage(
+                    "command_service.insufficient_money",
+                    "Servico do comando: saldo insuficiente"),
+                2.8f);
+        }
+        else
+        {
+            PushPanelUnitMessage(
+                PanelDialogController.ResolveDialogMessage(
+                    "command_service.summary",
+                    $"Servico comando: {servedTargets} alvos | ${Mathf.Max(0, totalMoneySpent)}",
+                    new Dictionary<string, string>
+                    {
+                        { "targets", servedTargets.ToString() },
+                        { "valor", Mathf.Max(0, totalMoneySpent).ToString() }
+                    }),
+                3.2f);
+        }
+            Debug.Log(BuildCommandServiceDetailedReportLog(detailedReport));
+            cursorController?.PlayLoadSfx();
+            commandServiceExecutionInProgress = false;
+            SetCursorState(CursorState.Neutral, "ExecuteCommandServiceOrderSequence: completed");
+        }
+        finally
+        {
+            commandServiceExecutionInProgress = false;
+            commandServiceConfirmationPending = false;
+            commandServiceQueuedOrders.Clear();
+            commandServiceInvalidOrders.Clear();
+            ClearCommandServicePreviewDimmedUnits();
+            RestoreSupplyEmbarkedSelectionVisuals();
+            SetCursorState(CursorState.Neutral, "ExecuteCommandServiceOrderSequence: cleanup");
+        }
+    }
+
+    private bool TryConfirmPendingCommandServiceOrder()
+    {
+        if (!commandServiceConfirmationPending)
+            return false;
+
+        if (commandServiceQueuedOrders.Count <= 0)
+        {
+            ClearPendingCommandServiceConfirmation();
+            cursorController?.PlayErrorSfx();
+            return true;
+        }
+
+        string message = $"Servico do Comando (\"X\"): iniciando ordem com {commandServiceQueuedOrders.Count} unidade(s).";
+        Debug.Log(message);
+        commandServiceConfirmationPending = false;
+        ClearCommandServicePreviewDimmedUnits();
+        PanelDialogController.ClearExternalText();
+        ClearCommandServiceHelper();
+        PushPanelUnitMessage(
+            PanelDialogController.ResolveDialogMessage(
+                "command_service.executing",
+                "Servico do comando: executando"),
+            2.2f);
+        StartCoroutine(ExecuteCommandServiceOrderSequence());
+        return true;
+    }
+
+    private bool TryCancelPendingCommandServiceConfirmation()
+    {
+        if (!commandServiceConfirmationPending)
+            return false;
+
+        ClearPendingCommandServiceConfirmation();
+        return true;
+    }
+
+    private void ClearPendingCommandServiceConfirmation()
+    {
+        commandServiceConfirmationPending = false;
+        commandServiceQueuedOrders.Clear();
+        commandServiceInvalidOrders.Clear();
+        ClearCommandServicePreviewDimmedUnits();
+        PanelDialogController.ClearExternalText();
+        ClearCommandServiceHelper();
     }
 
     private void RefreshCommandServiceServedCacheScope()
@@ -527,6 +731,494 @@ public partial class TurnStateManager
 
         if (!unit.ReceivedSuppliesThisTurn)
             unit.MarkReceivedSuppliesThisTurn();
+    }
+
+    private CommandServiceEstimateSummary EstimateCommandServiceQueuedOrders()
+    {
+        CommandServiceEstimateSummary summary = new CommandServiceEstimateSummary();
+        int remainingMoney = matchController != null && matchController.ActiveTeamId >= 0
+            ? Mathf.Max(0, matchController.GetActualMoney((TeamId)matchController.ActiveTeamId))
+            : 0;
+        summary.moneyBefore = remainingMoney;
+
+        Dictionary<ConstructionManager, Dictionary<SupplyData, int>> constructionStockBySource = new Dictionary<ConstructionManager, Dictionary<SupplyData, int>>();
+        Dictionary<UnitManager, Dictionary<SupplyData, int>> supplierStockBySource = new Dictionary<UnitManager, Dictionary<SupplyData, int>>();
+
+        for (int i = 0; i < commandServiceQueuedOrders.Count; i++)
+        {
+            ServicoDoComandoOption order = commandServiceQueuedOrders[i];
+            if (order == null || order.targetUnit == null)
+                continue;
+            if (order.targetUnit.ReceivedSuppliesThisTurn || WasUnitServedByCommandThisTurn(order.targetUnit))
+                continue;
+
+            UnitManager target = order.targetUnit;
+            IReadOnlyList<ServiceData> offered = order.sourceConstruction != null
+                ? order.sourceConstruction.OfferedServices
+                : order.sourceSupplierUnit != null ? order.sourceSupplierUnit.GetEmbarkedServices() : null;
+            List<ServiceData> services = BuildDistinctServiceList(offered);
+            if (services == null || services.Count <= 0)
+                continue;
+
+            Dictionary<SupplyData, int> sourceStock = null;
+            if (order.sourceConstruction != null)
+            {
+                if (!constructionStockBySource.TryGetValue(order.sourceConstruction, out sourceStock))
+                {
+                    sourceStock = BuildConstructionStockSnapshot(order.sourceConstruction);
+                    constructionStockBySource.Add(order.sourceConstruction, sourceStock);
+                }
+            }
+            else if (order.sourceSupplierUnit != null)
+            {
+                if (!supplierStockBySource.TryGetValue(order.sourceSupplierUnit, out sourceStock))
+                {
+                    sourceStock = BuildSupplierStockSnapshot(order.sourceSupplierUnit);
+                    supplierStockBySource.Add(order.sourceSupplierUnit, sourceStock);
+                }
+            }
+
+            int targetHp = 0;
+            int targetFuel = 0;
+            int targetAmmo = 0;
+            List<int> targetAmmoByWeapon = new List<int>();
+            int simulatedHp = Mathf.Clamp(target.CurrentHP, 0, target.GetMaxHP());
+            int simulatedFuel = Mathf.Clamp(target.CurrentFuel, 0, target.GetMaxFuel());
+            List<int> simulatedAmmoByWeapon = BuildRuntimeAmmoSnapshot(target);
+            bool targetServed = false;
+            bool targetSkippedByMoney = false;
+
+            for (int s = 0; s < services.Count; s++)
+            {
+                ServiceData service = services[s];
+                if (service == null || !service.isService)
+                    continue;
+                if (service.apenasEntreSupridores && !IsSupplier(target))
+                    continue;
+                if (!CanServiceApplyByClassAndNeed(target, service))
+                    continue;
+
+                Dictionary<SupplyData, int> candidateStock = CloneSupplySnapshot(sourceStock);
+                List<int> candidateSimulatedAmmo = CloneAmmoSnapshot(simulatedAmmoByWeapon);
+                List<int> candidateAmmoByWeaponGain = new List<int>();
+                EstimatePotentialServiceGains(
+                    target,
+                    service,
+                    candidateStock,
+                    out int hpGain,
+                    out int fuelGain,
+                    out int ammoGain,
+                    candidateAmmoByWeaponGain,
+                    simulatedHp,
+                    simulatedFuel,
+                    candidateSimulatedAmmo);
+                if (hpGain <= 0 && fuelGain <= 0 && ammoGain <= 0)
+                    continue;
+
+                int finalCost = matchController != null
+                    ? matchController.ResolveEconomyCost(ComputeServiceMoneyCost(target, service, hpGain, fuelGain, ammoGain, candidateAmmoByWeaponGain))
+                    : Mathf.Max(0, ComputeServiceMoneyCost(target, service, hpGain, fuelGain, ammoGain, candidateAmmoByWeaponGain));
+                if (finalCost > remainingMoney)
+                {
+                    summary.hasSkippedServices = true;
+                    targetSkippedByMoney = true;
+                    continue;
+                }
+
+                OverwriteSupplySnapshot(sourceStock, candidateStock);
+                remainingMoney -= Mathf.Max(0, finalCost);
+                summary.totalCost += Mathf.Max(0, finalCost);
+                targetHp += hpGain;
+                targetFuel += fuelGain;
+                targetAmmo += ammoGain;
+                MergeAmmoGainSnapshot(targetAmmoByWeapon, candidateAmmoByWeaponGain);
+                simulatedHp = Mathf.Clamp(simulatedHp + hpGain, 0, target.GetMaxHP());
+                simulatedFuel = Mathf.Clamp(simulatedFuel + fuelGain, 0, target.GetMaxFuel());
+                simulatedAmmoByWeapon = candidateSimulatedAmmo;
+                targetServed = true;
+            }
+
+            if (targetServed)
+            {
+                summary.servedTargets++;
+                summary.recoveredHp += targetHp;
+                summary.recoveredFuel += targetFuel;
+                summary.recoveredAmmo += targetAmmo;
+                summary.targetLines.Add(new HelperCommandServiceTargetLine
+                {
+                    unitName = ResolveUnitRuntimeName(target),
+                    sourceLabel = ResolveCommandServiceSourceLabel(order),
+                    gainsLabel = BuildCommandServiceGainsInline(targetHp, targetFuel, targetAmmoByWeapon)
+                });
+                summary.targetLineUnits.Add(target);
+                int targetLineIndex = summary.targetLines.Count - 1;
+                summary.previewEntries.Add(new CommandServicePreviewEntry
+                {
+                    targetUnit = target,
+                    cell = ResolveCommandServicePreviewCell(order),
+                    willBeServed = true,
+                    targetLineIndex = targetLineIndex
+                });
+            }
+            else if (targetSkippedByMoney)
+            {
+                summary.skippedUnits.Add(target);
+                summary.skippedUnitLines.Add(new HelperCommandServiceSkippedUnitLine
+                {
+                    unitName = ResolveUnitRuntimeName(target),
+                    sourceLabel = ResolveCommandServiceSourceLabel(order)
+                });
+                summary.skippedLineUnits.Add(target);
+                int skippedLineIndex = summary.skippedUnitLines.Count - 1;
+                summary.previewEntries.Add(new CommandServicePreviewEntry
+                {
+                    targetUnit = target,
+                    cell = ResolveCommandServicePreviewCell(order),
+                    willBeServed = false,
+                    skippedLineIndex = skippedLineIndex
+                });
+            }
+        }
+
+        SortCommandServiceEstimateSummary(summary);
+        summary.moneyAfter = Mathf.Max(0, remainingMoney);
+        return summary;
+    }
+
+    private void SortCommandServiceEstimateSummary(CommandServiceEstimateSummary summary)
+    {
+        if (summary == null)
+            return;
+
+        SortCommandServiceTargetLines(summary.targetLines, summary.targetLineUnits);
+        SortCommandServiceSkippedLines(summary.skippedUnitLines, summary.skippedLineUnits);
+
+        for (int i = 0; i < summary.previewEntries.Count; i++)
+        {
+            CommandServicePreviewEntry entry = summary.previewEntries[i];
+            if (entry == null || entry.targetUnit == null)
+                continue;
+
+            entry.targetLineIndex = entry.willBeServed
+                ? FindCommandServiceUnitIndex(summary.targetLineUnits, entry.targetUnit)
+                : -1;
+            entry.skippedLineIndex = !entry.willBeServed
+                ? FindCommandServiceUnitIndex(summary.skippedLineUnits, entry.targetUnit)
+                : -1;
+        }
+
+        summary.previewEntries.Sort(CompareCommandServicePreviewEntries);
+    }
+
+    private void SortCommandServiceTargetLines(List<HelperCommandServiceTargetLine> lines, List<UnitManager> units)
+    {
+        if (lines == null || units == null || lines.Count != units.Count || lines.Count <= 1)
+            return;
+
+        List<KeyValuePair<HelperCommandServiceTargetLine, UnitManager>> zipped = new List<KeyValuePair<HelperCommandServiceTargetLine, UnitManager>>(lines.Count);
+        for (int i = 0; i < lines.Count; i++)
+            zipped.Add(new KeyValuePair<HelperCommandServiceTargetLine, UnitManager>(lines[i], units[i]));
+
+        zipped.Sort((a, b) => CompareCommandServiceUnitsTopToBottom(a.Value, b.Value));
+
+        lines.Clear();
+        units.Clear();
+        for (int i = 0; i < zipped.Count; i++)
+        {
+            lines.Add(zipped[i].Key);
+            units.Add(zipped[i].Value);
+        }
+    }
+
+    private void SortCommandServiceSkippedLines(List<HelperCommandServiceSkippedUnitLine> lines, List<UnitManager> units)
+    {
+        if (lines == null || units == null || lines.Count != units.Count || lines.Count <= 1)
+            return;
+
+        List<KeyValuePair<HelperCommandServiceSkippedUnitLine, UnitManager>> zipped = new List<KeyValuePair<HelperCommandServiceSkippedUnitLine, UnitManager>>(lines.Count);
+        for (int i = 0; i < lines.Count; i++)
+            zipped.Add(new KeyValuePair<HelperCommandServiceSkippedUnitLine, UnitManager>(lines[i], units[i]));
+
+        zipped.Sort((a, b) => CompareCommandServiceUnitsTopToBottom(a.Value, b.Value));
+
+        lines.Clear();
+        units.Clear();
+        for (int i = 0; i < zipped.Count; i++)
+        {
+            lines.Add(zipped[i].Key);
+            units.Add(zipped[i].Value);
+        }
+    }
+
+    private int CompareCommandServicePreviewEntries(CommandServicePreviewEntry a, CommandServicePreviewEntry b)
+    {
+        if (a == null && b == null)
+            return 0;
+        if (a == null)
+            return 1;
+        if (b == null)
+            return -1;
+        if (a.willBeServed != b.willBeServed)
+            return a.willBeServed ? -1 : 1;
+        return CompareCommandServiceUnitsTopToBottom(a.targetUnit, b.targetUnit);
+    }
+
+    private static int FindCommandServiceUnitIndex(List<UnitManager> units, UnitManager target)
+    {
+        if (units == null || target == null)
+            return -1;
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            if (units[i] == target)
+                return i;
+        }
+
+        return -1;
+    }
+
+    private static int CompareCommandServiceUnitsTopToBottom(UnitManager a, UnitManager b)
+    {
+        if (a == null && b == null)
+            return 0;
+        if (a == null)
+            return 1;
+        if (b == null)
+            return -1;
+
+        Vector3 aPos = a.transform.position;
+        Vector3 bPos = b.transform.position;
+        int byY = -aPos.y.CompareTo(bPos.y);
+        if (byY != 0)
+            return byY;
+
+        int byX = aPos.x.CompareTo(bPos.x);
+        if (byX != 0)
+            return byX;
+
+        Vector3Int aCell = a.CurrentCellPosition;
+        Vector3Int bCell = b.CurrentCellPosition;
+        int byCellY = aCell.y.CompareTo(bCell.y);
+        if (byCellY != 0)
+            return byCellY;
+
+        return aCell.x.CompareTo(bCell.x);
+    }
+
+    private void ApplyCommandServicePreviewDimmedUnits(IReadOnlyList<UnitManager> skippedUnits)
+    {
+        ClearCommandServicePreviewDimmedUnits();
+        if (skippedUnits == null || skippedUnits.Count <= 0)
+            return;
+
+        for (int i = 0; i < skippedUnits.Count; i++)
+        {
+            UnitManager unit = skippedUnits[i];
+            if (unit == null)
+                continue;
+
+            commandServicePreviewDimmedUnits.Add(unit);
+            unit.SetPreviewDimmed(true);
+        }
+    }
+
+    private void ClearCommandServicePreviewDimmedUnits()
+    {
+        if (commandServicePreviewDimmedUnits.Count <= 0)
+            return;
+
+        foreach (UnitManager unit in commandServicePreviewDimmedUnits)
+        {
+            if (unit != null)
+                unit.SetPreviewDimmed(false);
+        }
+
+        commandServicePreviewDimmedUnits.Clear();
+    }
+
+    private void ApplyCommandServicePreviewNavigation(IReadOnlyList<CommandServicePreviewEntry> previewEntries)
+    {
+        commandServicePreviewEntries.Clear();
+        commandServicePreviewSelectedIndex = -1;
+
+        if (previewEntries == null || previewEntries.Count <= 0)
+            return;
+
+        for (int i = 0; i < previewEntries.Count; i++)
+        {
+            CommandServicePreviewEntry entry = previewEntries[i];
+            if (entry == null || entry.targetUnit == null)
+                continue;
+
+            commandServicePreviewEntries.Add(new CommandServicePreviewEntry
+            {
+                targetUnit = entry.targetUnit,
+                cell = entry.cell,
+                willBeServed = entry.willBeServed,
+                targetLineIndex = entry.targetLineIndex,
+                skippedLineIndex = entry.skippedLineIndex
+            });
+        }
+
+        if (commandServicePreviewEntries.Count <= 0)
+            return;
+
+        commandServicePreviewSelectedIndex = 0;
+        RefreshCommandServiceHelperFocus();
+        if (cursorController != null)
+            cursorController.SetCell(commandServicePreviewEntries[0].cell, playMoveSfx: false);
+    }
+
+    private void ClearCommandServicePreviewNavigation()
+    {
+        commandServicePreviewEntries.Clear();
+        commandServicePreviewSelectedIndex = -1;
+        RefreshCommandServiceHelperFocus();
+    }
+
+    private bool TryResolveCommandServicePreviewCursorMove(Vector3Int currentCell, Vector3Int inputDelta, out Vector3Int resolvedCell)
+    {
+        resolvedCell = currentCell;
+        if (!commandServiceConfirmationPending || commandServicePreviewEntries.Count <= 0)
+            return false;
+
+        int step = GetMirandoStepFromInput(inputDelta);
+        if (step == 0)
+            return false;
+
+        SyncCommandServicePreviewSelectionFromCursor();
+
+        int currentIndex = commandServicePreviewSelectedIndex;
+        if (currentIndex < 0 || currentIndex >= commandServicePreviewEntries.Count)
+            currentIndex = 0;
+
+        int nextIndex = (currentIndex + step + commandServicePreviewEntries.Count) % commandServicePreviewEntries.Count;
+        CommandServicePreviewEntry next = commandServicePreviewEntries[nextIndex];
+        if (next == null)
+            return false;
+
+        commandServicePreviewSelectedIndex = nextIndex;
+        RefreshCommandServiceHelperFocus();
+        resolvedCell = next.cell;
+        resolvedCell.z = 0;
+        return true;
+    }
+
+    private void SyncCommandServicePreviewSelectionFromCursor()
+    {
+        if (cursorController == null || commandServicePreviewEntries.Count <= 0)
+            return;
+
+        Vector3Int cell = cursorController.CurrentCell;
+        cell.z = 0;
+        for (int i = 0; i < commandServicePreviewEntries.Count; i++)
+        {
+            CommandServicePreviewEntry entry = commandServicePreviewEntries[i];
+            if (entry == null)
+                continue;
+            if (entry.cell == cell)
+            {
+                commandServicePreviewSelectedIndex = i;
+                RefreshCommandServiceHelperFocus();
+                return;
+            }
+        }
+    }
+
+    private void RefreshCommandServiceHelperFocus()
+    {
+        for (int i = 0; i < commandServiceHelperTargetLines.Count; i++)
+        {
+            HelperCommandServiceTargetLine line = commandServiceHelperTargetLines[i];
+            if (line != null)
+                line.isFocused = false;
+        }
+
+        for (int i = 0; i < commandServiceHelperSkippedUnitLines.Count; i++)
+        {
+            HelperCommandServiceSkippedUnitLine line = commandServiceHelperSkippedUnitLines[i];
+            if (line != null)
+                line.isFocused = false;
+        }
+
+        if (commandServicePreviewSelectedIndex < 0 || commandServicePreviewSelectedIndex >= commandServicePreviewEntries.Count)
+            return;
+
+        CommandServicePreviewEntry focused = commandServicePreviewEntries[commandServicePreviewSelectedIndex];
+        if (focused == null)
+            return;
+
+        if (focused.targetLineIndex >= 0 && focused.targetLineIndex < commandServiceHelperTargetLines.Count)
+        {
+            HelperCommandServiceTargetLine line = commandServiceHelperTargetLines[focused.targetLineIndex];
+            if (line != null)
+                line.isFocused = true;
+        }
+
+        if (focused.skippedLineIndex >= 0 && focused.skippedLineIndex < commandServiceHelperSkippedUnitLines.Count)
+        {
+            HelperCommandServiceSkippedUnitLine line = commandServiceHelperSkippedUnitLines[focused.skippedLineIndex];
+            if (line != null)
+                line.isFocused = true;
+        }
+    }
+
+    private static Vector3Int ResolveCommandServicePreviewCell(ServicoDoComandoOption order)
+    {
+        if (order == null || order.targetUnit == null)
+            return Vector3Int.zero;
+
+        UnitManager target = order.targetUnit;
+        UnitManager supplier = order.sourceSupplierUnit;
+        bool isEmbarkedPassenger = supplier != null && target.IsEmbarked && target.EmbarkedTransporter == supplier;
+        Vector3Int cell = isEmbarkedPassenger ? supplier.CurrentCellPosition : target.CurrentCellPosition;
+        cell.z = 0;
+        return cell;
+    }
+
+    private static string BuildCommandServiceGainsInline(int hp, int fuel, List<int> ammoByWeapon)
+    {
+        List<string> segments = new List<string>();
+        if (hp > 0)
+            segments.Add($"HP +{hp}");
+        if (fuel > 0)
+            segments.Add($"FUEL +{fuel}");
+        if (ammoByWeapon != null)
+        {
+            for (int i = 0; i < ammoByWeapon.Count; i++)
+            {
+                int amount = Mathf.Max(0, ammoByWeapon[i]);
+                if (amount <= 0)
+                    continue;
+
+                string slotLabel = $"W{i + 1}";
+                segments.Add($"{slotLabel}+{amount}");
+            }
+        }
+        return segments.Count > 0 ? string.Join(" | ", segments) : "-";
+    }
+
+    private static string ResolveCommandServiceSourceLabel(ServicoDoComandoOption order)
+    {
+        if (order == null)
+            return string.Empty;
+
+        if (order.sourceConstruction != null)
+        {
+            Vector3Int cell = order.sourceConstruction.CurrentCellPosition;
+            string label = !string.IsNullOrWhiteSpace(order.sourceConstruction.ConstructionDisplayName)
+                ? order.sourceConstruction.ConstructionDisplayName
+                : order.sourceConstruction.name;
+            return $"{label} {cell.x},{cell.y}";
+        }
+
+        if (order.sourceSupplierUnit != null)
+        {
+            Vector3Int cell = order.sourceSupplierUnit.CurrentCellPosition;
+            return $"{order.sourceSupplierUnit.name} {cell.x},{cell.y}";
+        }
+
+        return string.Empty;
     }
 
     private void ForceHideEmbarkedPassengersExcept(UnitManager supplier, UnitManager keepVisible)
@@ -1072,6 +1764,189 @@ public partial class TurnStateManager
         }
 
         return remaining <= 0;
+    }
+
+    private static Dictionary<SupplyData, int> BuildConstructionStockSnapshot(ConstructionManager sourceConstruction)
+    {
+        Dictionary<SupplyData, int> map = new Dictionary<SupplyData, int>();
+        if (sourceConstruction == null)
+            return map;
+
+        IReadOnlyList<ConstructionSupplyOffer> offers = sourceConstruction.OfferedSupplies;
+        if (offers == null)
+            return map;
+
+        for (int i = 0; i < offers.Count; i++)
+        {
+            ConstructionSupplyOffer offer = offers[i];
+            if (offer == null || offer.supply == null)
+                continue;
+
+            int current = map.TryGetValue(offer.supply, out int existing) ? existing : 0;
+            int add = sourceConstruction.HasInfiniteSuppliesFor(offer.supply) || offer.quantity >= int.MaxValue
+                ? int.MaxValue
+                : Mathf.Max(0, offer.quantity);
+            if (current == int.MaxValue || add == int.MaxValue)
+            {
+                map[offer.supply] = int.MaxValue;
+            }
+            else
+            {
+                long sum = (long)current + add;
+                map[offer.supply] = sum >= int.MaxValue ? int.MaxValue : (int)sum;
+            }
+        }
+
+        return map;
+    }
+
+    private static Dictionary<SupplyData, int> BuildSupplierStockSnapshot(UnitManager supplier)
+    {
+        Dictionary<SupplyData, int> map = new Dictionary<SupplyData, int>();
+        if (supplier == null)
+            return map;
+
+        IReadOnlyList<UnitEmbarkedSupply> resources = supplier.GetEmbarkedResources();
+        if (resources == null)
+            return map;
+
+        for (int i = 0; i < resources.Count; i++)
+        {
+            UnitEmbarkedSupply entry = resources[i];
+            if (entry == null || entry.supply == null)
+                continue;
+
+            int current = map.TryGetValue(entry.supply, out int existing) ? existing : 0;
+            long sum = (long)current + Mathf.Max(0, entry.amount);
+            map[entry.supply] = sum >= int.MaxValue ? int.MaxValue : (int)sum;
+        }
+
+        return map;
+    }
+
+    private static void EstimatePotentialServiceGains(
+        UnitManager target,
+        ServiceData service,
+        Dictionary<SupplyData, int> sourceStock,
+        out int hpGain,
+        out int fuelGain,
+        out int ammoGain,
+        List<int> ammoByWeapon = null,
+        int simulatedHp = -1,
+        int simulatedFuel = -1,
+        List<int> simulatedAmmoByWeapon = null)
+    {
+        ServiceLogisticsFormula.EstimatePotentialServiceGains(
+            target,
+            service,
+            sourceStock,
+            out hpGain,
+            out fuelGain,
+            out ammoGain,
+            ammoByWeapon,
+            simulatedHp,
+            simulatedFuel,
+            simulatedAmmoByWeapon);
+    }
+
+    private static List<int> BuildRuntimeAmmoSnapshot(UnitManager target)
+    {
+        List<int> snapshot = new List<int>();
+        if (target == null)
+            return snapshot;
+
+        IReadOnlyList<UnitEmbarkedWeapon> runtimeWeapons = target.GetEmbarkedWeapons();
+        if (runtimeWeapons == null)
+            return snapshot;
+
+        for (int i = 0; i < runtimeWeapons.Count; i++)
+        {
+            UnitEmbarkedWeapon runtime = runtimeWeapons[i];
+            snapshot.Add(runtime != null ? Mathf.Max(0, runtime.squadAmmunition) : 0);
+        }
+
+        return snapshot;
+    }
+
+    private static Dictionary<SupplyData, int> CloneSupplySnapshot(Dictionary<SupplyData, int> sourceStock)
+    {
+        return sourceStock != null
+            ? new Dictionary<SupplyData, int>(sourceStock)
+            : new Dictionary<SupplyData, int>();
+    }
+
+    private static List<int> CloneAmmoSnapshot(List<int> source)
+    {
+        return source != null ? new List<int>(source) : new List<int>();
+    }
+
+    private static void OverwriteSupplySnapshot(Dictionary<SupplyData, int> destination, Dictionary<SupplyData, int> source)
+    {
+        if (destination == null || source == null)
+            return;
+
+        destination.Clear();
+        foreach (KeyValuePair<SupplyData, int> pair in source)
+            destination[pair.Key] = pair.Value;
+    }
+
+    private static void MergeAmmoGainSnapshot(List<int> destination, List<int> gains)
+    {
+        if (destination == null || gains == null || gains.Count <= 0)
+            return;
+
+        while (destination.Count < gains.Count)
+            destination.Add(0);
+
+        for (int i = 0; i < gains.Count; i++)
+            destination[i] += Mathf.Max(0, gains[i]);
+    }
+
+    private static bool TryResolveSupplyFromSnapshot(ServiceData service, Dictionary<SupplyData, int> stockBySupply, out SupplyData supply, out int amount)
+    {
+        supply = null;
+        amount = 0;
+        if (service == null || stockBySupply == null || service.suppliesUsed == null)
+            return false;
+
+        for (int i = 0; i < service.suppliesUsed.Count; i++)
+        {
+            SupplyData candidate = service.suppliesUsed[i];
+            if (candidate == null)
+                continue;
+
+            int current = ReadStockAmount(stockBySupply, candidate);
+            if (current <= 0)
+                continue;
+
+            supply = candidate;
+            amount = current;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static int ReadStockAmount(Dictionary<SupplyData, int> stockBySupply, SupplyData supply)
+    {
+        if (stockBySupply == null || supply == null)
+            return 0;
+
+        return stockBySupply.TryGetValue(supply, out int current) ? current : 0;
+    }
+
+    private static int ConsumeFromSnapshot(Dictionary<SupplyData, int> stockBySupply, SupplyData supply, int amount)
+    {
+        if (stockBySupply == null || supply == null || amount <= 0)
+            return 0;
+        if (!stockBySupply.TryGetValue(supply, out int current) || current <= 0)
+            return 0;
+        if (current == int.MaxValue)
+            return amount;
+
+        int spent = Mathf.Min(current, amount);
+        stockBySupply[supply] = Mathf.Max(0, current - spent);
+        return spent;
     }
 }
 

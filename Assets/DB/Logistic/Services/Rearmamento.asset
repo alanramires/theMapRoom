@@ -33,4 +33,11 @@ MonoBehaviour:
     value: 2
   - armorWeaponClass: 2
     value: 1
+  costWeight:
+  - armorWeaponClass: 0
+    value: 1
+  - armorWeaponClass: 1
+    value: 2
+  - armorWeaponClass: 2
+    value: 3
   serviceLimitPerUnitPerTurn: 0

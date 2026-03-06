@@ -12,6 +12,29 @@ public static class PodeMirarSensor
     private const string InvalidReasonStealth = "Alvo nao detectado (stealth placeholder).";
     private const int DefaultObservationRangeHexes = 3;
 
+    private static string ResolveInvalidReasonId(string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            return PodeMirarInvalidOption.ReasonIdGeneric;
+
+        if (reason.StartsWith("Fora de alcance da arma", System.StringComparison.OrdinalIgnoreCase))
+            return PodeMirarInvalidOption.ReasonIdOutOfRange;
+        if (reason.IndexOf(InvalidReasonNoAmmo, System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return PodeMirarInvalidOption.ReasonIdNoAmmo;
+        if (reason.IndexOf(InvalidReasonLayer, System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return PodeMirarInvalidOption.ReasonIdLayer;
+        if (reason.IndexOf(InvalidReasonLdtBlocked, System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return PodeMirarInvalidOption.ReasonIdLdtBlocked;
+        if (reason.IndexOf(InvalidReasonLosBlocked, System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return PodeMirarInvalidOption.ReasonIdLosBlocked;
+        if (reason.IndexOf(InvalidReasonNoForwardObserver, System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return PodeMirarInvalidOption.ReasonIdNoForwardObserver;
+        if (reason.IndexOf(InvalidReasonStealth, System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return PodeMirarInvalidOption.ReasonIdStealth;
+
+        return PodeMirarInvalidOption.ReasonIdGeneric;
+    }
+
     private struct WeaponRangeCandidate
     {
         public int index;
@@ -1331,6 +1354,7 @@ public static class PodeMirarSensor
             attackerPositionLabel = attackerPositionLabel,
             defenderPositionLabel = defenderPositionLabel,
             reason = reason,
+            reasonId = ResolveInvalidReasonId(reason),
             blockedCell = blockedCell,
             lineOfFireIntermediateCells = lineOfFireIntermediateCells != null
                 ? new List<Vector3Int>(lineOfFireIntermediateCells)

@@ -23,6 +23,9 @@ A v1.1.4 consolida o fluxo de dialog/helper em banco de dados e refatora a fusao
 3. UX de fusao e preview
 - Queue de fusao com preview de resultado.
 - Preview de confirmacao e de process queue no helper.
+- `X` no Servico do Comando agora abre preview/confirmacao antes da execucao automatica da fila.
+- `panel_helper` mostra expectativa compacta de atendidos, ganhos agregados, custo previsto e saldo apos a fila.
+- A execucao so comeca apos confirmar; cancelamento nao consome saldo.
 - Limpeza de helper/estado durante execucao da fila para evitar recalculo visual indevido.
 
 4. Debug e apoio a testes

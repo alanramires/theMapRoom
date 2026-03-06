@@ -24,11 +24,13 @@ public partial class TurnStateManager
         List<ServiceData> services,
         out int hpRecovered,
         out int fuelRecovered,
-        out int ammoRecovered)
+        out int ammoRecovered,
+        out List<int> ammoRecoveredByWeapon)
     {
         hpRecovered = 0;
         fuelRecovered = 0;
         ammoRecovered = 0;
+        ammoRecoveredByWeapon = new List<int>();
         if (supplier == null || target == null || services == null || services.Count == 0)
             return false;
 
@@ -64,10 +66,11 @@ public partial class TurnStateManager
 
             if (service.recuperaMunicao)
             {
-                int applied = ApplyAmmoService(supplier, target, service);
+                int applied = ApplyAmmoService(supplier, target, service, out List<int> ammoStepByWeapon);
                 if (applied > 0)
                 {
                     ammoRecovered += applied;
+                    MergeAmmoGainByWeapon(ammoRecoveredByWeapon, ammoStepByWeapon);
                     any = true;
                 }
             }
@@ -169,8 +172,9 @@ public partial class TurnStateManager
         return recovered;
     }
 
-    private static int ApplyAmmoService(UnitManager supplier, UnitManager target, ServiceData service)
+    private static int ApplyAmmoService(UnitManager supplier, UnitManager target, ServiceData service, out List<int> recoveredByWeapon)
     {
+        recoveredByWeapon = new List<int>();
         if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
             return 0;
 
@@ -241,8 +245,11 @@ public partial class TurnStateManager
             {
                 string weaponLabel = ResolveWeaponLabel(baseline.weapon);
                 Debug.Log($"[AmmoGain] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | arma={weaponLabel} | {beforeAmmo}->{afterAmmo} (+{actualGain})");
+                while (recoveredByWeapon.Count <= i)
+                    recoveredByWeapon.Add(0);
+                recoveredByWeapon[i] += actualGain;
             }
-            recoveredTotal += recovered;
+            recoveredTotal += actualGain;
             serviceBudget -= recovered;
         }
 
@@ -261,6 +268,22 @@ public partial class TurnStateManager
         }
 
         return recoveredTotal;
+    }
+
+    private static void MergeAmmoGainByWeapon(List<int> destination, List<int> source)
+    {
+        if (destination == null || source == null || source.Count <= 0)
+            return;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            int gain = Mathf.Max(0, source[i]);
+            if (gain <= 0)
+                continue;
+            while (destination.Count <= i)
+                destination.Add(0);
+            destination[i] += gain;
+        }
     }
 
     private static bool TryResolveSupplyForService(UnitManager supplier, ServiceData service, out SupplyData supply, out int stockAmount)
@@ -430,6 +453,7 @@ public partial class TurnStateManager
         int hpGain,
         int fuelGain,
         int ammoGain,
+        List<int> ammoGainByWeapon,
         string contextLabel,
         out int chargedCost)
     {
@@ -439,7 +463,7 @@ public partial class TurnStateManager
         if (matchController == null)
             return true;
 
-        int baseCost = ComputeServiceMoneyCost(target, service, hpGain, fuelGain, ammoGain);
+        int baseCost = ComputeServiceMoneyCost(target, service, hpGain, fuelGain, ammoGain, ammoGainByWeapon);
         int finalCost = matchController.ResolveEconomyCost(baseCost);
         if (finalCost <= 0)
             return true;
@@ -456,65 +480,15 @@ public partial class TurnStateManager
         return false;
     }
 
-    private static int ComputeServiceMoneyCost(UnitManager target, ServiceData service, int hpGain, int fuelGain, int ammoGain)
+    private static int ComputeServiceMoneyCost(UnitManager target, ServiceData service, int hpGain, int fuelGain, int ammoGain, List<int> ammoGainByWeapon = null)
     {
-        if (target == null || service == null)
-            return 0;
-        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
-            return 0;
-
-        int squadCost = Mathf.Max(0, targetData.cost);
-        if (squadCost <= 0)
-            return 0;
-
-        float share = Mathf.Clamp(service.percentCost, 0, 100) / 100f;
-        float allocated = squadCost * share;
-        if (allocated <= 0f)
-            return 0;
-
-        int totalCost = 0;
-        if (hpGain > 0)
-        {
-            int maxHp = Mathf.Max(1, targetData.maxHP);
-            float costPerPoint = allocated / maxHp;
-            totalCost += Mathf.RoundToInt(hpGain * costPerPoint);
-        }
-
-        if (fuelGain > 0)
-        {
-            int maxFuel = Mathf.Max(1, target.GetMaxFuel());
-            float costPerPoint = allocated / maxFuel;
-            totalCost += Mathf.RoundToInt(fuelGain * costPerPoint);
-        }
-
-        if (ammoGain > 0)
-        {
-            int totalWeaponCapacity = ComputeTotalWeaponPointCapacity(targetData);
-            if (totalWeaponCapacity > 0)
-            {
-                float costPerPoint = allocated / totalWeaponCapacity;
-                totalCost += Mathf.RoundToInt(ammoGain * costPerPoint);
-            }
-        }
-
-        return Mathf.Max(0, totalCost);
-    }
-
-    private static int ComputeTotalWeaponPointCapacity(UnitData targetData)
-    {
-        if (targetData == null || targetData.embarkedWeapons == null)
-            return 0;
-
-        int total = 0;
-        for (int i = 0; i < targetData.embarkedWeapons.Count; i++)
-        {
-            UnitEmbarkedWeapon weapon = targetData.embarkedWeapons[i];
-            if (weapon == null)
-                continue;
-            total += Mathf.Max(0, weapon.squadAmmunition);
-        }
-
-        return Mathf.Max(0, total);
+        return ServiceCostFormula.ComputeServiceMoneyCost(
+            target,
+            service,
+            hpGain,
+            fuelGain,
+            ammoGain,
+            ammoGainByWeapon);
     }
 
     private static void EstimateServiceGainsFromSupplier(
@@ -523,11 +497,27 @@ public partial class TurnStateManager
         ServiceData service,
         out int hpGain,
         out int fuelGain,
-        out int ammoGain)
+        out int ammoGain,
+        out List<int> ammoGainByWeapon)
     {
-        hpGain = EstimateHpGainFromSupplier(supplier, target, service);
-        fuelGain = EstimateFuelGainFromSupplier(supplier, target, service);
-        ammoGain = EstimateAmmoGainFromSupplier(supplier, target, service);
+        ammoGainByWeapon = new List<int>();
+        if (supplier == null)
+        {
+            hpGain = 0;
+            fuelGain = 0;
+            ammoGain = 0;
+            return;
+        }
+
+        Dictionary<SupplyData, int> stock = BuildSupplierStockSnapshot(supplier);
+        ServiceLogisticsFormula.EstimatePotentialServiceGains(
+            target,
+            service,
+            stock,
+            out hpGain,
+            out fuelGain,
+            out ammoGain,
+            ammoByWeapon: ammoGainByWeapon);
     }
 
     private static void EstimateServiceGainsFromConstruction(
@@ -536,11 +526,27 @@ public partial class TurnStateManager
         ServiceData service,
         out int hpGain,
         out int fuelGain,
-        out int ammoGain)
+        out int ammoGain,
+        out List<int> ammoGainByWeapon)
     {
-        hpGain = EstimateHpGainFromConstruction(sourceConstruction, target, service);
-        fuelGain = EstimateFuelGainFromConstruction(sourceConstruction, target, service);
-        ammoGain = EstimateAmmoGainFromConstruction(sourceConstruction, target, service);
+        ammoGainByWeapon = new List<int>();
+        if (sourceConstruction == null)
+        {
+            hpGain = 0;
+            fuelGain = 0;
+            ammoGain = 0;
+            return;
+        }
+
+        Dictionary<SupplyData, int> stock = BuildConstructionStockSnapshot(sourceConstruction);
+        ServiceLogisticsFormula.EstimatePotentialServiceGains(
+            target,
+            service,
+            stock,
+            out hpGain,
+            out fuelGain,
+            out ammoGain,
+            ammoByWeapon: ammoGainByWeapon);
     }
 
     private static int EstimateHpGainFromSupplier(UnitManager supplier, UnitManager target, ServiceData service)
@@ -591,8 +597,9 @@ public partial class TurnStateManager
         return Mathf.Min(cap, maxByStock);
     }
 
-    private static int EstimateAmmoGainFromSupplier(UnitManager supplier, UnitManager target, ServiceData service)
+    private static int EstimateAmmoGainFromSupplier(UnitManager supplier, UnitManager target, ServiceData service, out List<int> ammoGainByWeapon)
     {
+        ammoGainByWeapon = new List<int>();
         if (supplier == null || target == null || service == null || !service.recuperaMunicao)
             return 0;
         if (!target.TryGetUnitData(out UnitData targetData) || targetData == null || targetData.embarkedWeapons == null)
@@ -649,6 +656,9 @@ public partial class TurnStateManager
             int consumed = Mathf.CeilToInt(recovered / (float)pointsPerSupply);
             localStock[chosenSupply] = Mathf.Max(0, available - consumed);
             recoveredTotal += recovered;
+            while (ammoGainByWeapon.Count <= i)
+                ammoGainByWeapon.Add(0);
+            ammoGainByWeapon[i] += recovered;
             serviceBudget -= recovered;
         }
 
@@ -703,8 +713,9 @@ public partial class TurnStateManager
         return Mathf.Min(cap, maxByStock);
     }
 
-    private static int EstimateAmmoGainFromConstruction(ConstructionManager sourceConstruction, UnitManager target, ServiceData service)
+    private static int EstimateAmmoGainFromConstruction(ConstructionManager sourceConstruction, UnitManager target, ServiceData service, out List<int> ammoGainByWeapon)
     {
+        ammoGainByWeapon = new List<int>();
         if (sourceConstruction == null || target == null || service == null || !service.recuperaMunicao)
             return 0;
         if (!target.TryGetUnitData(out UnitData targetData) || targetData == null || targetData.embarkedWeapons == null)
@@ -761,6 +772,9 @@ public partial class TurnStateManager
             int consumed = Mathf.CeilToInt(recovered / (float)pointsPerSupply);
             localStock[chosenSupply] = Mathf.Max(0, available - consumed);
             recoveredTotal += recovered;
+            while (ammoGainByWeapon.Count <= i)
+                ammoGainByWeapon.Add(0);
+            ammoGainByWeapon[i] += recovered;
             serviceBudget -= recovered;
         }
 
