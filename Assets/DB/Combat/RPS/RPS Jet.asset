@@ -41,3 +41,120 @@ MonoBehaviour:
       defenseBonus: -2
       notes: Dog Fight
       rpsDefenseText: Helicopter se defende de Jet com AntiAerea com RPS Defesa -2
+  - ataque:
+      unitClass: 4
+      weaponCategory: 2
+      targetClass: 6
+      attackBonus: 2
+      notes: Dog fight
+      rpsAttackText: Jet com AntiAerea ataca Plane com RPS Ataque +2
+    defesa:
+      targetClass: 6
+      unitClass: 4
+      weaponCategory: 2
+      defenseBonus: 0
+      notes: Dog Fight
+      rpsDefenseText: Plane se defende de Jet com AntiAerea com RPS Defesa +0
+  - ataque:
+      unitClass: 4
+      weaponCategory: 0
+      targetClass: 0
+      attackBonus: -5
+      notes: Dog fight
+      rpsAttackText: Jet com AntiInfantaria ataca Infantry com RPS Ataque -5
+    defesa:
+      targetClass: 0
+      unitClass: 4
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: Dog Fight
+      rpsDefenseText: Infantry se defende de Jet com AntiInfantaria com RPS Defesa
+        +5
+  - ataque:
+      unitClass: 4
+      weaponCategory: 0
+      targetClass: 3
+      attackBonus: -5
+      notes: Dog fight
+      rpsAttackText: Jet com AntiInfantaria ataca Armored com RPS Ataque -5
+    defesa:
+      targetClass: 3
+      unitClass: 4
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: Dog Fight
+      rpsDefenseText: Armored se defende de Jet com AntiInfantaria com RPS Defesa
+        +5
+  - ataque:
+      unitClass: 4
+      weaponCategory: 0
+      targetClass: 1
+      attackBonus: -4
+      notes: Dog fight
+      rpsAttackText: Jet com AntiInfantaria ataca Vehicle com RPS Ataque -4
+    defesa:
+      targetClass: 1
+      unitClass: 4
+      weaponCategory: 0
+      defenseBonus: 4
+      notes: Dog Fight
+      rpsDefenseText: Vehicle se defende de Jet com AntiInfantaria com RPS Defesa
+        +4
+  - ataque:
+      unitClass: 4
+      weaponCategory: 0
+      targetClass: 2
+      attackBonus: -5
+      notes: Dog fight
+      rpsAttackText: Jet com AntiInfantaria ataca Artillery com RPS Ataque -5
+    defesa:
+      targetClass: 2
+      unitClass: 4
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: Dog Fight
+      rpsDefenseText: Artillery se defende de Jet com AntiInfantaria com RPS Defesa
+        +5
+  - ataque:
+      unitClass: 4
+      weaponCategory: 0
+      targetClass: 4
+      attackBonus: -4
+      notes: Dog fight
+      rpsAttackText: Jet com AntiInfantaria ataca Jet com RPS Ataque -4
+    defesa:
+      targetClass: 4
+      unitClass: 4
+      weaponCategory: 0
+      defenseBonus: 4
+      notes: Dog Fight
+      rpsDefenseText: Jet se defende de Jet com AntiInfantaria com RPS Defesa +4
+  - ataque:
+      unitClass: 4
+      weaponCategory: 0
+      targetClass: 5
+      attackBonus: -4
+      notes: Dog fight
+      rpsAttackText: Jet com AntiInfantaria ataca Helicopter com RPS Ataque -4
+    defesa:
+      targetClass: 5
+      unitClass: 4
+      weaponCategory: 0
+      defenseBonus: 4
+      notes: Dog Fight
+      rpsDefenseText: Helicopter se defende de Jet com AntiInfantaria com RPS Defesa
+        +4
+  - ataque:
+      unitClass: 4
+      weaponCategory: 0
+      targetClass: 6
+      attackBonus: -4
+      notes: Dog fight
+      rpsAttackText: Jet com AntiInfantaria ataca Plane com RPS Ataque -4
+    defesa:
+      targetClass: 6
+      unitClass: 4
+      weaponCategory: 0
+      defenseBonus: 4
+      notes: Dog Fight
+      rpsDefenseText: Plane se defende de Jet com AntiInfantaria com RPS Defesa +4

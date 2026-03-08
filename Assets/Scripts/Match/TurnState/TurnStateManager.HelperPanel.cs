@@ -1,9 +1,17 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 public partial class TurnStateManager
 {
+    [Header("Helper - Inspection")]
+    [SerializeField] [Range(0.5f, 20f)] private float inspectedHelperDurationSeconds = 4f;
+    [Header("Helper - Turn Start Autonomy")]
+    [SerializeField] [Range(0.5f, 20f)] private float turnStartAutonomyHelperDurationSeconds = 6f;
+
     public enum HelperPanelKind
     {
         None = 0,
@@ -11,7 +19,11 @@ public partial class TurnStateManager
         Sensors = 2,
         Disembark = 3,
         Merge = 4,
-        CommandService = 5
+        CommandService = 5,
+        UnitStats = 6,
+        Embark = 7,
+        Supply = 8,
+        TurnStartAutonomy = 9
     }
 
     public sealed class HelperPanelData
@@ -23,8 +35,21 @@ public partial class TurnStateManager
         public readonly List<HelperDisembarkPassengerLine> DisembarkPassengerLines = new List<HelperDisembarkPassengerLine>();
         public readonly List<HelperMergeQueueLine> MergeQueueLines = new List<HelperMergeQueueLine>();
         public readonly List<HelperMergeCandidateLine> MergeCandidateLines = new List<HelperMergeCandidateLine>();
+        public readonly List<HelperEmbarkCandidateLine> EmbarkCandidateLines = new List<HelperEmbarkCandidateLine>();
+        public readonly List<HelperSupplyTargetLine> SupplyTargetLines = new List<HelperSupplyTargetLine>();
+        public readonly List<HelperSupplyResourceLine> SupplyResourceLines = new List<HelperSupplyResourceLine>();
         public readonly List<HelperCommandServiceTargetLine> CommandServiceTargetLines = new List<HelperCommandServiceTargetLine>();
         public readonly List<HelperCommandServiceSkippedUnitLine> CommandServiceSkippedUnitLines = new List<HelperCommandServiceSkippedUnitLine>();
+        public readonly List<HelperTurnStartAutonomyLine> TurnStartAutonomyLines = new List<HelperTurnStartAutonomyLine>();
+        public string UnitStatsName;
+        public readonly List<string> UnitStatsLines = new List<string>();
+        public int SupplyServedTargets;
+        public int SupplyRecoveredHp;
+        public int SupplyRecoveredFuel;
+        public int SupplyRecoveredAmmo;
+        public int SupplyTotalCost;
+        public bool SupplyIsConfirmStep;
+        public bool SupplyHasQueuedOrders;
         public bool HasQueuedDisembarkOrders;
         public bool IsMergeConfirmStep;
         public bool HasSelectedMergeCandidate;
@@ -56,6 +81,32 @@ public partial class TurnStateManager
     private int commandServiceHelperMoneyAfter;
     private readonly List<HelperCommandServiceTargetLine> commandServiceHelperTargetLines = new List<HelperCommandServiceTargetLine>();
     private readonly List<HelperCommandServiceSkippedUnitLine> commandServiceHelperSkippedUnitLines = new List<HelperCommandServiceSkippedUnitLine>();
+    private UnitManager inspectedHelperUnit;
+    private float inspectedHelperVisibleUntil = -1f;
+    private int inspectedHelperActivatedFrame = -1;
+    private Vector3Int inspectedHelperCursorCell;
+    private readonly List<HelperTurnStartAutonomyLine> turnStartAutonomyHelperLines = new List<HelperTurnStartAutonomyLine>();
+    private float turnStartAutonomyHelperVisibleUntil = -1f;
+    private int turnStartAutonomyHelperActivatedFrame = -1;
+    private Vector3Int turnStartAutonomyHelperCursorCell;
+
+    public readonly struct TurnStartAutonomyUpkeepEntry
+    {
+        public readonly string unitName;
+        public readonly Vector3Int cell;
+        public readonly int autonomyConsumed;
+        public readonly int fuelBefore;
+        public readonly int fuelAfter;
+
+        public TurnStartAutonomyUpkeepEntry(string unitName, Vector3Int cell, int autonomyConsumed, int fuelBefore, int fuelAfter)
+        {
+            this.unitName = unitName ?? string.Empty;
+            this.cell = cell;
+            this.autonomyConsumed = Mathf.Max(0, autonomyConsumed);
+            this.fuelBefore = Mathf.Max(0, fuelBefore);
+            this.fuelAfter = Mathf.Max(0, fuelAfter);
+        }
+    }
 
     public sealed class HelperShoppingLine
     {
@@ -101,6 +152,42 @@ public partial class TurnStateManager
         public string invalidReason;
     }
 
+    public sealed class HelperEmbarkCandidateLine
+    {
+        public int index;
+        public string unitName;
+        public string stats;
+        public bool isValid;
+        public string invalidReason;
+        public bool isFocused;
+    }
+
+    public sealed class HelperSupplyTargetLine
+    {
+        public int index;
+        public string unitName;
+        public string gainsLabel;
+        public int estimatedCost;
+        public bool isFocused;
+    }
+
+    public sealed class HelperSupplyResourceLine
+    {
+        public string supplyName;
+        public int beforeAmount;
+        public int afterAmount;
+    }
+
+    private sealed class SupplyEstimateLine
+    {
+        public UnitManager target;
+        public int hp;
+        public int fuel;
+        public int ammo;
+        public int cost;
+        public bool isFocused;
+    }
+
     public sealed class HelperCommandServiceTargetLine
     {
         public string unitName;
@@ -116,11 +203,26 @@ public partial class TurnStateManager
         public bool isFocused;
     }
 
+    public sealed class HelperTurnStartAutonomyLine
+    {
+        public string unitName;
+        public int autonomyConsumed;
+        public int fuelBefore;
+        public int fuelAfter;
+        public Vector3Int cell;
+    }
+
     public bool TryBuildHelperPanelData(out HelperPanelData data)
     {
         data = new HelperPanelData();
 
         if (TryBuildCommandServiceHelperPanelData(data))
+            return true;
+
+        if (TryBuildTurnStartAutonomyHelperPanelData(data))
+            return true;
+
+        if (TryBuildUnitStatsHelperPanelData(data))
             return true;
 
         if (cursorState == CursorState.Neutral)
@@ -135,10 +237,313 @@ public partial class TurnStateManager
         if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
             return TryBuildSensorsHelperPanelData(data);
 
+        if (cursorState == CursorState.Suprindo)
+            return TryBuildSupplyHelperPanelData(data);
+
+        if (cursorState == CursorState.Embarcando)
+            return TryBuildEmbarkHelperPanelData(data);
+
         if (cursorState == CursorState.Fundindo)
             return TryBuildMergeHelperPanelData(data);
 
         return false;
+    }
+
+    public void ShowTurnStartAutonomyUpkeepHelper(IReadOnlyList<TurnStartAutonomyUpkeepEntry> entries)
+    {
+        turnStartAutonomyHelperLines.Clear();
+        if (entries == null || entries.Count <= 0)
+        {
+            ClearTurnStartAutonomyHelper();
+            return;
+        }
+
+        for (int i = 0; i < entries.Count; i++)
+        {
+            TurnStartAutonomyUpkeepEntry entry = entries[i];
+            if (entry.autonomyConsumed <= 0)
+                continue;
+
+            turnStartAutonomyHelperLines.Add(new HelperTurnStartAutonomyLine
+            {
+                unitName = entry.unitName ?? string.Empty,
+                autonomyConsumed = Mathf.Max(0, entry.autonomyConsumed),
+                fuelBefore = Mathf.Max(0, entry.fuelBefore),
+                fuelAfter = Mathf.Max(0, entry.fuelAfter),
+                cell = entry.cell
+            });
+        }
+
+        if (turnStartAutonomyHelperLines.Count <= 0)
+        {
+            ClearTurnStartAutonomyHelper();
+            return;
+        }
+
+        turnStartAutonomyHelperVisibleUntil = Time.time + Mathf.Max(0.1f, turnStartAutonomyHelperDurationSeconds);
+        turnStartAutonomyHelperActivatedFrame = Time.frameCount;
+        turnStartAutonomyHelperCursorCell = cursorController != null ? cursorController.CurrentCell : default;
+    }
+
+    private bool TryBuildTurnStartAutonomyHelperPanelData(HelperPanelData data)
+    {
+        if (data == null || !IsTurnStartAutonomyHelperActive())
+            return false;
+
+        data.Kind = HelperPanelKind.TurnStartAutonomy;
+        for (int i = 0; i < turnStartAutonomyHelperLines.Count; i++)
+            data.TurnStartAutonomyLines.Add(turnStartAutonomyHelperLines[i]);
+
+        return data.TurnStartAutonomyLines.Count > 0;
+    }
+
+    private bool IsTurnStartAutonomyHelperActive()
+    {
+        return turnStartAutonomyHelperLines.Count > 0 &&
+               turnStartAutonomyHelperVisibleUntil > 0f &&
+               Time.time <= turnStartAutonomyHelperVisibleUntil;
+    }
+
+    private void ClearTurnStartAutonomyHelper()
+    {
+        turnStartAutonomyHelperLines.Clear();
+        turnStartAutonomyHelperVisibleUntil = -1f;
+        turnStartAutonomyHelperActivatedFrame = -1;
+        turnStartAutonomyHelperCursorCell = default;
+    }
+
+    private bool TryBuildUnitStatsHelperPanelData(HelperPanelData data)
+    {
+        if (data == null)
+            return false;
+
+        UnitManager unit = null;
+        if (cursorState == CursorState.UnitSelected && selectedUnit != null)
+        {
+            unit = selectedUnit;
+        }
+        else if (cursorState == CursorState.Neutral && IsInspectedHelperActive())
+        {
+            unit = inspectedHelperUnit;
+        }
+
+        if (unit == null)
+            return false;
+
+        data.Kind = HelperPanelKind.UnitStats;
+        data.UnitStatsName = ResolveUnitRuntimeName(unit);
+
+        int hpCurrent = Mathf.Max(0, unit.CurrentHP);
+        int hpMax = Mathf.Max(1, unit.GetMaxHP());
+        int movement = 0;
+        if (unit.TryGetUnitData(out UnitData selectedData) && selectedData != null)
+            movement = Mathf.Max(0, selectedData.movement);
+        else
+            movement = Mathf.Max(0, unit.MaxMovementPoints);
+        int fuelCurrent = Mathf.Max(0, unit.CurrentFuel);
+        int fuelMax = Mathf.Max(1, unit.GetMaxFuel());
+
+        data.UnitStatsLines.Add($"HP: {hpCurrent}/{hpMax}");
+        data.UnitStatsLines.Add($"MOV: {movement}");
+        data.UnitStatsLines.Add($"AUT: {fuelCurrent}/{fuelMax}");
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats = unit.TransportedUnitSlots;
+        bool hasPassengers = false;
+        if (seats != null)
+        {
+            for (int i = 0; i < seats.Count; i++)
+            {
+                UnitManager passenger = seats[i] != null ? seats[i].embarkedUnit : null;
+                if (passenger != null && passenger.IsEmbarked && passenger.EmbarkedTransporter == unit)
+                {
+                    hasPassengers = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasPassengers)
+        {
+            data.UnitStatsLines.Add(string.Empty);
+            data.UnitStatsLines.Add("Transportando");
+            AppendTransportedUnitStatsLines(data.UnitStatsLines, unit, depth: 0);
+        }
+
+        IReadOnlyList<UnitEmbarkedSupply> resources = unit.GetEmbarkedResources();
+        if (resources != null && resources.Count > 0)
+        {
+            data.UnitStatsLines.Add(string.Empty);
+            data.UnitStatsLines.Add("Carroceria");
+            AppendSupplierStockLines(data.UnitStatsLines, unit);
+        }
+
+        return data.UnitStatsLines.Count > 0;
+    }
+
+    private bool IsInspectedHelperActive()
+    {
+        return inspectedHelperUnit != null &&
+            inspectedHelperVisibleUntil > 0f &&
+            Time.time <= inspectedHelperVisibleUntil;
+    }
+
+    private void BeginInspectedHelper(UnitManager unit)
+    {
+        if (unit == null || cursorController == null)
+            return;
+
+        inspectedHelperUnit = unit;
+        inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, inspectedHelperDurationSeconds);
+        inspectedHelperActivatedFrame = Time.frameCount;
+        inspectedHelperCursorCell = cursorController.CurrentCell;
+    }
+
+    private void ClearInspectedHelper()
+    {
+        inspectedHelperUnit = null;
+        inspectedHelperVisibleUntil = -1f;
+        inspectedHelperActivatedFrame = -1;
+        inspectedHelperCursorCell = default;
+    }
+
+    private void UpdateInspectedHelperAutoDismiss()
+    {
+        UpdateTurnStartAutonomyHelperAutoDismiss();
+
+        if (!IsInspectedHelperActive())
+        {
+            if (inspectedHelperUnit != null)
+                ClearInspectedHelper();
+            return;
+        }
+
+        if (Time.frameCount <= inspectedHelperActivatedFrame)
+            return;
+
+        if (cursorController != null && cursorController.CurrentCell != inspectedHelperCursorCell)
+        {
+            ClearInspectedHelper();
+            return;
+        }
+
+        bool anyInput = WasAnyInputPressedThisFrame();
+        if (anyInput)
+            ClearInspectedHelper();
+    }
+
+    private void UpdateTurnStartAutonomyHelperAutoDismiss()
+    {
+        if (!IsTurnStartAutonomyHelperActive())
+        {
+            if (turnStartAutonomyHelperLines.Count > 0)
+                ClearTurnStartAutonomyHelper();
+            return;
+        }
+
+        if (Time.frameCount <= turnStartAutonomyHelperActivatedFrame)
+            return;
+
+        if (cursorController != null && cursorController.CurrentCell != turnStartAutonomyHelperCursorCell)
+        {
+            ClearTurnStartAutonomyHelper();
+            return;
+        }
+
+        if (WasAnyInputPressedThisFrame())
+            ClearTurnStartAutonomyHelper();
+    }
+
+    private static bool WasAnyInputPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard != null && keyboard.anyKey.wasPressedThisFrame)
+            return true;
+
+        Mouse mouse = Mouse.current;
+        if (mouse != null &&
+            (mouse.leftButton.wasPressedThisFrame ||
+             mouse.rightButton.wasPressedThisFrame ||
+             mouse.middleButton.wasPressedThisFrame))
+            return true;
+
+        return false;
+#else
+        return Input.anyKeyDown ||
+            Input.GetMouseButtonDown(0) ||
+            Input.GetMouseButtonDown(1) ||
+            Input.GetMouseButtonDown(2);
+#endif
+    }
+
+    private void AppendTransportedUnitStatsLines(List<string> lines, UnitManager transporter, int depth)
+    {
+        if (lines == null || transporter == null)
+            return;
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
+        if (seats == null || seats.Count <= 0)
+            return;
+
+        string indent = new string(' ', Mathf.Max(0, depth) * 4);
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitManager passenger = seats[i] != null ? seats[i].embarkedUnit : null;
+            if (passenger == null || !passenger.IsEmbarked || passenger.EmbarkedTransporter != transporter)
+                continue;
+
+            lines.Add($"{indent}{ResolveUnitRuntimeName(passenger)} ({BuildUnitStatInline(passenger)})");
+            AppendTransportedUnitStatsLines(lines, passenger, depth + 1);
+        }
+    }
+
+    private void AppendSupplierStockLines(List<string> lines, UnitManager supplier)
+    {
+        if (lines == null || supplier == null)
+            return;
+
+        IReadOnlyList<UnitEmbarkedSupply> resources = supplier.GetEmbarkedResources();
+        if (resources == null || resources.Count <= 0)
+            return;
+
+        for (int i = 0; i < resources.Count; i++)
+        {
+            UnitEmbarkedSupply runtime = resources[i];
+            if (runtime == null || runtime.supply == null)
+                continue;
+
+            int current = Mathf.Max(0, runtime.amount);
+            int max = ResolveSupplierResourceMaxAmount(supplier, runtime.supply, current);
+            string label = ResolveSupplyDisplayName(runtime.supply);
+            lines.Add($"{current}/{max} {label}");
+        }
+    }
+
+    private static int ResolveSupplierResourceMaxAmount(UnitManager supplier, SupplyData supply, int fallbackCurrent)
+    {
+        if (supplier != null && supply != null && supplier.TryGetUnitData(out UnitData data) && data != null && data.supplierResources != null)
+        {
+            for (int i = 0; i < data.supplierResources.Count; i++)
+            {
+                UnitEmbarkedSupply baseline = data.supplierResources[i];
+                if (baseline == null || baseline.supply != supply)
+                    continue;
+                return Mathf.Max(0, baseline.amount);
+            }
+        }
+
+        return Mathf.Max(0, fallbackCurrent);
+    }
+
+    private static string ResolveSupplyDisplayName(SupplyData supply)
+    {
+        if (supply == null)
+            return "Supply";
+        if (!string.IsNullOrWhiteSpace(supply.displayName))
+            return supply.displayName;
+        if (!string.IsNullOrWhiteSpace(supply.id))
+            return supply.id;
+        return supply.name;
     }
 
     private bool TryBuildCommandServiceHelperPanelData(HelperPanelData data)
@@ -319,7 +724,11 @@ public partial class TurnStateManager
 
     private bool TryBuildSensorsHelperPanelData(HelperPanelData data)
     {
-        if (data == null || scannerPromptStep != ScannerPromptStep.AwaitingAction)
+        if (data == null)
+            return false;
+
+        bool isMovementSensorState = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
+        if (!isMovementSensorState && scannerPromptStep != ScannerPromptStep.AwaitingAction)
             return false;
 
         data.Kind = HelperPanelKind.Sensors;
@@ -330,7 +739,6 @@ public partial class TurnStateManager
         TryAddSensorLine(data, 'F', "fuse");
         TryAddSensorLine(data, 'S', "supply");
         TryAddSensorLine(data, 'T', "transfer");
-        TryAddSensorLine(data, 'L', "layer");
         TryAddSensorLine(data, 'M', "move_only", forceInclude: true);
 
         return data.SensorLines.Count > 0;
@@ -457,6 +865,301 @@ public partial class TurnStateManager
             data.MergeQueuePreview = BuildMergePreviewInline(null);
 
         return data.MergeQueueLines.Count > 0 || data.MergeCandidateLines.Count > 0 || data.HasSelectedMergeCandidate;
+    }
+
+    private bool TryBuildEmbarkHelperPanelData(HelperPanelData data)
+    {
+        if (data == null || cursorState != CursorState.Embarcando)
+            return false;
+
+        data.Kind = HelperPanelKind.Embark;
+        if (cachedPodeEmbarcarTargets != null)
+        {
+            HashSet<UnitManager> addedTransporters = new HashSet<UnitManager>();
+            for (int i = 0; i < cachedPodeEmbarcarTargets.Count; i++)
+            {
+                PodeEmbarcarOption option = cachedPodeEmbarcarTargets[i];
+                UnitManager transporter = option != null ? option.transporterUnit : null;
+                if (transporter == null || addedTransporters.Contains(transporter))
+                    continue;
+
+                addedTransporters.Add(transporter);
+                int shownIndex = i + 1;
+                bool isFocused = scannerSelectedEmbarkIndex == i;
+                data.EmbarkCandidateLines.Add(new HelperEmbarkCandidateLine
+                {
+                    index = shownIndex,
+                    unitName = ResolveUnitRuntimeName(transporter),
+                    stats = BuildUnitStatInline(transporter),
+                    isValid = true,
+                    invalidReason = string.Empty,
+                    isFocused = isFocused
+                });
+            }
+
+        }
+
+        return data.EmbarkCandidateLines.Count > 0;
+    }
+
+    private bool TryBuildSupplyHelperPanelData(HelperPanelData data)
+    {
+        if (data == null || cursorState != CursorState.Suprindo || selectedUnit == null || supplyExecutionInProgress)
+            return false;
+        if (scannerPromptStep != ScannerPromptStep.MergeParticipantSelect && scannerPromptStep != ScannerPromptStep.MergeConfirm)
+            return false;
+
+        List<UnitManager> executionOrder = new List<UnitManager>();
+        if (supplyQueuedOrders != null)
+        {
+            for (int i = 0; i < supplyQueuedOrders.Count; i++)
+            {
+                UnitManager queuedTarget = supplyQueuedOrders[i] != null ? supplyQueuedOrders[i].targetUnit : null;
+                if (queuedTarget == null || executionOrder.Contains(queuedTarget))
+                    continue;
+                executionOrder.Add(queuedTarget);
+            }
+        }
+
+        UnitManager focusedTarget = null;
+        if (scannerPromptStep == ScannerPromptStep.MergeConfirm && TryGetSelectedSupplyCandidate(out SupplyCandidateEntry selected) && selected != null)
+        {
+            focusedTarget = selected.targetUnit;
+            if (focusedTarget != null && !executionOrder.Contains(focusedTarget))
+                executionOrder.Add(focusedTarget);
+        }
+
+        if (executionOrder.Count <= 0)
+            return false;
+
+        List<SupplyEstimateLine> estimateLines = EstimateSupplyQueueForHelper(selectedUnit, executionOrder, focusedTarget);
+        if (estimateLines.Count <= 0)
+            return false;
+
+        data.Kind = HelperPanelKind.Supply;
+        data.SupplyIsConfirmStep = scannerPromptStep == ScannerPromptStep.MergeConfirm;
+        data.SupplyHasQueuedOrders = supplyQueuedOrders != null && supplyQueuedOrders.Count > 0;
+
+        int totalHp = 0;
+        int totalFuel = 0;
+        int totalAmmo = 0;
+        int totalCost = 0;
+        for (int i = 0; i < estimateLines.Count; i++)
+        {
+            SupplyEstimateLine line = estimateLines[i];
+            if (line == null || line.target == null)
+                continue;
+
+            totalHp += Mathf.Max(0, line.hp);
+            totalFuel += Mathf.Max(0, line.fuel);
+            totalAmmo += Mathf.Max(0, line.ammo);
+            totalCost += Mathf.Max(0, line.cost);
+
+            data.SupplyTargetLines.Add(new HelperSupplyTargetLine
+            {
+                index = i + 1,
+                unitName = ResolveUnitRuntimeName(line.target),
+                gainsLabel = FormatSupplyGains(line.hp, line.fuel, line.ammo),
+                estimatedCost = Mathf.Max(0, line.cost),
+                isFocused = line.isFocused
+            });
+        }
+
+        data.SupplyServedTargets = data.SupplyTargetLines.Count;
+        data.SupplyRecoveredHp = Mathf.Max(0, totalHp);
+        data.SupplyRecoveredFuel = Mathf.Max(0, totalFuel);
+        data.SupplyRecoveredAmmo = Mathf.Max(0, totalAmmo);
+        data.SupplyTotalCost = Mathf.Max(0, totalCost);
+        BuildSupplyResourcePreviewLines(data, selectedUnit, executionOrder);
+        return data.SupplyTargetLines.Count > 0;
+    }
+
+    private void BuildSupplyResourcePreviewLines(HelperPanelData data, UnitManager supplier, List<UnitManager> executionOrder)
+    {
+        if (data == null || supplier == null || executionOrder == null || executionOrder.Count <= 0)
+            return;
+
+        List<ServiceData> services = BuildDistinctServiceList(supplier.GetEmbarkedServices());
+        if (services == null || services.Count <= 0)
+            return;
+
+        Dictionary<SupplyData, int> initialStock = BuildSupplierStockSnapshot(supplier);
+        Dictionary<SupplyData, int> simulatedStock = CloneSupplySnapshot(initialStock);
+        int remainingMoney = matchController != null
+            ? Mathf.Max(0, matchController.GetActualMoney(supplier.TeamId))
+            : int.MaxValue;
+
+        for (int i = 0; i < executionOrder.Count; i++)
+        {
+            UnitManager target = executionOrder[i];
+            if (target == null)
+                continue;
+
+            int simulatedHp = Mathf.Clamp(target.CurrentHP, 0, target.GetMaxHP());
+            int simulatedFuel = Mathf.Clamp(target.CurrentFuel, 0, target.GetMaxFuel());
+            List<int> simulatedAmmoByWeapon = BuildRuntimeAmmoSnapshot(target);
+
+            for (int s = 0; s < services.Count; s++)
+            {
+                ServiceData service = services[s];
+                if (service == null || !service.isService)
+                    continue;
+                if (service.apenasEntreSupridores && !IsSupplier(target))
+                    continue;
+                if (!CanServiceApplyByClassAndNeed(target, service))
+                    continue;
+
+                Dictionary<SupplyData, int> candidateStock = CloneSupplySnapshot(simulatedStock);
+                List<int> candidateSimulatedAmmo = CloneAmmoSnapshot(simulatedAmmoByWeapon);
+                List<int> ammoByWeaponGain = new List<int>();
+                EstimatePotentialServiceGains(
+                    target,
+                    service,
+                    candidateStock,
+                    out int hpGain,
+                    out int fuelGain,
+                    out int ammoGain,
+                    ammoByWeaponGain,
+                    simulatedHp,
+                    simulatedFuel,
+                    candidateSimulatedAmmo);
+                if (hpGain <= 0 && fuelGain <= 0 && ammoGain <= 0)
+                    continue;
+
+                int finalCost = matchController != null
+                    ? matchController.ResolveEconomyCost(ComputeServiceMoneyCost(target, service, hpGain, fuelGain, ammoGain, ammoByWeaponGain))
+                    : Mathf.Max(0, ComputeServiceMoneyCost(target, service, hpGain, fuelGain, ammoGain, ammoByWeaponGain));
+                if (finalCost > remainingMoney)
+                    continue;
+
+                OverwriteSupplySnapshot(simulatedStock, candidateStock);
+                remainingMoney = Mathf.Max(0, remainingMoney - Mathf.Max(0, finalCost));
+                simulatedHp = Mathf.Clamp(simulatedHp + hpGain, 0, target.GetMaxHP());
+                simulatedFuel = Mathf.Clamp(simulatedFuel + fuelGain, 0, target.GetMaxFuel());
+                simulatedAmmoByWeapon = candidateSimulatedAmmo;
+            }
+        }
+
+        foreach (KeyValuePair<SupplyData, int> pair in initialStock)
+        {
+            SupplyData supply = pair.Key;
+            if (supply == null)
+                continue;
+
+            int before = Mathf.Max(0, pair.Value);
+            int after = simulatedStock.TryGetValue(supply, out int simulated) ? Mathf.Max(0, simulated) : 0;
+            if (before == after)
+                continue;
+
+            data.SupplyResourceLines.Add(new HelperSupplyResourceLine
+            {
+                supplyName = ResolveSupplyDisplayName(supply),
+                beforeAmount = before,
+                afterAmount = after
+            });
+        }
+    }
+
+    private List<SupplyEstimateLine> EstimateSupplyQueueForHelper(UnitManager supplier, List<UnitManager> executionOrder, UnitManager focusedTarget)
+    {
+        List<SupplyEstimateLine> lines = new List<SupplyEstimateLine>();
+        if (supplier == null || executionOrder == null || executionOrder.Count <= 0)
+            return lines;
+
+        List<ServiceData> services = BuildDistinctServiceList(supplier.GetEmbarkedServices());
+        if (services == null || services.Count <= 0)
+            return lines;
+
+        Dictionary<SupplyData, int> sourceStock = BuildSupplierStockSnapshot(supplier);
+        int remainingMoney = matchController != null
+            ? Mathf.Max(0, matchController.GetActualMoney(supplier.TeamId))
+            : int.MaxValue;
+
+        for (int i = 0; i < executionOrder.Count; i++)
+        {
+            UnitManager target = executionOrder[i];
+            if (target == null)
+                continue;
+
+            int hpTotal = 0;
+            int fuelTotal = 0;
+            int ammoTotal = 0;
+            int costTotal = 0;
+            int simulatedHp = Mathf.Clamp(target.CurrentHP, 0, target.GetMaxHP());
+            int simulatedFuel = Mathf.Clamp(target.CurrentFuel, 0, target.GetMaxFuel());
+            List<int> simulatedAmmoByWeapon = BuildRuntimeAmmoSnapshot(target);
+
+            for (int s = 0; s < services.Count; s++)
+            {
+                ServiceData service = services[s];
+                if (service == null || !service.isService)
+                    continue;
+                if (service.apenasEntreSupridores && !IsSupplier(target))
+                    continue;
+                if (!CanServiceApplyByClassAndNeed(target, service))
+                    continue;
+
+                Dictionary<SupplyData, int> candidateStock = CloneSupplySnapshot(sourceStock);
+                List<int> candidateSimulatedAmmo = CloneAmmoSnapshot(simulatedAmmoByWeapon);
+                List<int> ammoByWeaponGain = new List<int>();
+                EstimatePotentialServiceGains(
+                    target,
+                    service,
+                    candidateStock,
+                    out int hpGain,
+                    out int fuelGain,
+                    out int ammoGain,
+                    ammoByWeaponGain,
+                    simulatedHp,
+                    simulatedFuel,
+                    candidateSimulatedAmmo);
+                if (hpGain <= 0 && fuelGain <= 0 && ammoGain <= 0)
+                    continue;
+
+                int finalCost = matchController != null
+                    ? matchController.ResolveEconomyCost(ComputeServiceMoneyCost(target, service, hpGain, fuelGain, ammoGain, ammoByWeaponGain))
+                    : Mathf.Max(0, ComputeServiceMoneyCost(target, service, hpGain, fuelGain, ammoGain, ammoByWeaponGain));
+                if (finalCost > remainingMoney)
+                    continue;
+
+                OverwriteSupplySnapshot(sourceStock, candidateStock);
+                remainingMoney = Mathf.Max(0, remainingMoney - Mathf.Max(0, finalCost));
+                hpTotal += hpGain;
+                fuelTotal += fuelGain;
+                ammoTotal += ammoGain;
+                costTotal += Mathf.Max(0, finalCost);
+                simulatedHp = Mathf.Clamp(simulatedHp + hpGain, 0, target.GetMaxHP());
+                simulatedFuel = Mathf.Clamp(simulatedFuel + fuelGain, 0, target.GetMaxFuel());
+                simulatedAmmoByWeapon = candidateSimulatedAmmo;
+            }
+
+            if (hpTotal <= 0 && fuelTotal <= 0 && ammoTotal <= 0 && costTotal <= 0)
+                continue;
+
+            lines.Add(new SupplyEstimateLine
+            {
+                target = target,
+                hp = hpTotal,
+                fuel = fuelTotal,
+                ammo = ammoTotal,
+                cost = costTotal,
+                isFocused = target == focusedTarget
+            });
+        }
+
+        return lines;
+    }
+
+    private static string FormatSupplyGains(int hp, int fuel, int ammo)
+    {
+        List<string> segments = new List<string>();
+        if (hp > 0)
+            segments.Add($"HP +{hp}");
+        if (fuel > 0)
+            segments.Add($"FUEL +{fuel}");
+        if (ammo > 0)
+            segments.Add($"AMMO +{ammo}");
+        return segments.Count > 0 ? string.Join(" | ", segments) : "-";
     }
 
     private string BuildUnitStatInline(UnitManager unit)

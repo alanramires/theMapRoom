@@ -20,6 +20,7 @@ MonoBehaviour:
   heightLevel: 3
   aditionalDomainsAllowed: []
   alwaysAllowAirDomain: 1
+  allowDisembark: 1
   allowAircraftTakeoffAndLanding: 1
   allowedLandingClasses: 
   requiredLandingSkills:
@@ -29,6 +30,9 @@ MonoBehaviour:
   forceEndMovementOnTerrainDomainForDomains:
   - domain: 2
     heightLevel: 2
+  forceDetectOnForcedEndMovementDomains: 0
+  forceDetectUnitsWithFollowingStealthSkills:
+  - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
   basicAutonomyCost: 1
   dpqData: {fileID: 11400000, guid: 24e0fd1ecd7c6bf4eb8f3d8c215d14ef, type: 2}
   ev: 0

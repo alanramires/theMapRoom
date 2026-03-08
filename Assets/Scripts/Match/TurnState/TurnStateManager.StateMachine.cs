@@ -10,6 +10,8 @@ public partial class TurnStateManager
         LogStateStep("HandleConfirm");
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
+        if (TryConfirmPendingDestroyUnitHotkeyConfirmation())
+            return ActionSfx.None;
 
         switch (cursorState)
         {
@@ -47,6 +49,8 @@ public partial class TurnStateManager
         LogStateStep("HandleCancel", rollback: true);
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
+        if (TryCancelPendingDestroyUnitHotkeyConfirmation())
+            return ActionSfx.Cancel;
 
         if (TryCancelPendingCommandServiceConfirmation())
             return ActionSfx.Cancel;
@@ -102,12 +106,14 @@ public partial class TurnStateManager
             if (!isAlly)
             {
                 LogEnemyUnitInspection(unit, activeTeam);
+                BeginInspectedHelper(unit);
                 return ActionSfx.Confirm;
             }
 
             if (unit.HasActed)
             {
                 Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
+                BeginInspectedHelper(unit);
                 return ActionSfx.Confirm;
             }
 
@@ -116,6 +122,7 @@ public partial class TurnStateManager
                 Debug.Log($"[Pode Decolar] {takeoffInfo}");
 
             SetSelectedUnit(unit);
+            ClearInspectedHelper();
             SetCursorState(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
             return ActionSfx.Confirm;
         }

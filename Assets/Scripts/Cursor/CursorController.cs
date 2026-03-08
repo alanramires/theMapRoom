@@ -46,6 +46,8 @@ public class CursorController : MonoBehaviour
     [Header("Camera Follow")]
     [SerializeField] private CameraController cameraController;
     [SerializeField] private bool adjustCameraOnMove = true;
+    [Header("Overlay")]
+    [SerializeField] [Range(60f, 400f)] private float coordinateOverlayLabelWidth = 220f;
 
     [Header("Feedback")]
     [SerializeField] private AudioSource audioSource;
@@ -95,6 +97,7 @@ public class CursorController : MonoBehaviour
 
     public Vector3Int CurrentCell => currentCell;
     public Tilemap BoardTilemap => boardTilemap;
+    public float CoordinateOverlayLabelWidth => Mathf.Clamp(coordinateOverlayLabelWidth, 60f, 400f);
 
     private void Awake()
     {
@@ -587,7 +590,7 @@ public class CursorController : MonoBehaviour
 
             pendingEndTurnConfirmation = true;
             PanelDialogController.TrySetExternalText("End Turn :: Confirm");
-            PlayConfirmSfx();
+            PlayBeepSfx();
             return;
         }
 
@@ -651,8 +654,6 @@ public class CursorController : MonoBehaviour
     {
         if (turnStateManager == null || turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             return false;
-        if (HasAnyConstructionUnderCursor())
-            return false;
 
         TryAutoAssignMatchController();
         int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
@@ -697,24 +698,6 @@ public class CursorController : MonoBehaviour
                 continue;
 
             Vector3Int cell = unit.CurrentCellPosition;
-            cell.z = 0;
-            if (cell == currentCell)
-                return true;
-        }
-
-        return false;
-    }
-
-    private bool HasAnyConstructionUnderCursor()
-    {
-        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < constructions.Length; i++)
-        {
-            ConstructionManager construction = constructions[i];
-            if (construction == null || !construction.gameObject.activeInHierarchy)
-                continue;
-
-            Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;
             if (cell == currentCell)
                 return true;
@@ -977,6 +960,16 @@ public class CursorController : MonoBehaviour
     public void PlayBeepSfx()
     {
         PlayUiSfx(beepSfx);
+    }
+
+    public void ClearRuntimeInputLocksAfterLoad()
+    {
+        heldDirection = Vector3Int.zero;
+        nextRepeatTime = 0f;
+        ClearPendingEndTurnConfirmation();
+#if ENABLE_INPUT_SYSTEM
+        EnsureInputActionsBound();
+#endif
     }
 
     public void PlayErrorSfx()

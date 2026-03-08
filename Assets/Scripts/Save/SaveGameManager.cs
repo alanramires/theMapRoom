@@ -231,7 +231,22 @@ public class SaveGameManager : MonoBehaviour
             Debug.LogWarning($"[SaveGame] Save foi criado na cena '{data.sceneName}', cena atual: '{currentScene}'.");
         }
 
+        PrepareRuntimeForLoad();
         StartCoroutine(LoadRoutine(data));
+    }
+
+    private void PrepareRuntimeForLoad()
+    {
+        // Load pode ser disparado no meio de subfluxos (embarque/suprir/fundir etc).
+        // Antes de restaurar snapshot, limpa qualquer estado transiente pendente.
+        animationManager?.StopCurrentMovement();
+        if (turnStateManager != null)
+        {
+            turnStateManager.StopAllCoroutines();
+            turnStateManager.ForceNeutral();
+        }
+
+        cursorController?.ClearRuntimeInputLocksAfterLoad();
     }
 
     private IEnumerator LoadRoutine(SaveGameData data)
@@ -401,6 +416,11 @@ public class SaveGameManager : MonoBehaviour
                     unit.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
                 }
             }
+
+            stage = "reset-runtime-input";
+            turnStateManager?.ForceNeutral();
+            cursorController?.ClearRuntimeInputLocksAfterLoad();
+            cursorController?.SnapToCurrentCell();
 
             cursorController?.PlayBeepSfx();
             if (verboseLogs)

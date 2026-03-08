@@ -79,6 +79,10 @@ public class TerrainTypeData : ScriptableObject
     [Header("Naval Ops")]
     [Tooltip("Unidades nesses dominios/alturas encerram movimento no dominio nativo deste terreno.")]
     public List<TerrainLayerMode> forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
+    [Tooltip("Quando ligado, unidades nos dominios/alturas acima ficam livremente detectaveis neste terreno.")]
+    public bool forceDetectOnForcedEndMovementDomains = false;
+    [Tooltip("Se preenchido, somente unidades com essas Stealth Skills ficam livremente detectaveis neste terreno (nos dominios/alturas acima).")]
+    public List<SkillData> forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
 
     [Header("Movement")]
     [Tooltip("Custo basico de autonomia para entrar neste hex. Minimo 1.")]
@@ -98,7 +102,7 @@ public class TerrainTypeData : ScriptableObject
     [Tooltip("Se true, este terreno bloqueia linha de visada por padrao.")]
     public bool blockLoS = true;
 
-    [Header("Vision Exceptions")]
+    [Header("Vision Specializations")]
     [Tooltip("Excecoes de EV/Block LoS para construcoes sobre este terreno.")]
     public List<TerrainConstructionVisionOverride> constructionVisionOverrides = new List<TerrainConstructionVisionOverride>();
 
@@ -168,6 +172,8 @@ public class TerrainTypeData : ScriptableObject
             allowedTakeoffModes = new List<TakeoffMode>();
         if (forceEndMovementOnTerrainDomainForDomains == null)
             forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
+        if (forceDetectUnitsWithFollowingStealthSkills == null)
+            forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
         if (constructionVisionOverrides == null)
             constructionVisionOverrides = new List<TerrainConstructionVisionOverride>();
         if (structureVisionOverrides == null)

@@ -154,10 +154,13 @@ public partial class TurnStateManager
     private Color embarkPreviewColor = Color.white;
     private readonly List<LandingOption> cachedLandingOptions = new List<LandingOption>();
     private string landingOptionUnavailableReason = string.Empty;
+    private bool pendingDestroyUnitConfirmation;
 
     private void Update()
     {
+        UpdateInspectedHelperAutoDismiss();
         TrackRuntimeDebugLogs();
+        ProcessDestroyUnitHotkeyInput();
         ProcessConstructionShoppingInput();
         ProcessScannerPromptInput();
         ProcessCommandServiceHotkeyInput();
@@ -213,6 +216,75 @@ public partial class TurnStateManager
         ResetSupplyRuntimeState();
         ClearMirandoPreview();
         ClearEmbarkPreview();
+        ClearPendingDestroyUnitHotkeyConfirmation();
+    }
+
+    private void ProcessDestroyUnitHotkeyInput()
+    {
+        if (!WasLetterPressedThisFrame('U'))
+            return;
+
+        if (UiInputBlocker.IsTextInputFocused())
+            return;
+
+        if (pendingDestroyUnitConfirmation)
+            return;
+
+        if (IsMovementAnimationRunning())
+        {
+            Debug.Log("[Destroy Unit] Aguarde o fim da animacao atual.");
+            return;
+        }
+
+        if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out string reason))
+        {
+            if (!string.IsNullOrWhiteSpace(reason))
+                Debug.Log($"[Destroy Unit] {reason}");
+            return;
+        }
+
+        pendingDestroyUnitConfirmation = true;
+        string targetName = ResolveDebugUnitName(target);
+        PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} ({cursorCell.x},{cursorCell.y},0) :: Confirm");
+        cursorController?.PlayConfirmSfx();
+        Debug.Log("[Destroy Unit] Confirmar com Enter | Cancelar com ESC.");
+    }
+
+    private bool TryConfirmPendingDestroyUnitHotkeyConfirmation()
+    {
+        if (!pendingDestroyUnitConfirmation)
+            return false;
+
+        ClearPendingDestroyUnitHotkeyConfirmation();
+        bool destroyed = TryDestroyUnitUnderCursorFromDebug(out string message);
+        if (!destroyed)
+        {
+            if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Destroy Unit] {message}");
+            return true;
+        }
+
+        cursorController?.PlayDoneSfx();
+        return true;
+    }
+
+    private bool TryCancelPendingDestroyUnitHotkeyConfirmation()
+    {
+        if (!pendingDestroyUnitConfirmation)
+            return false;
+
+        ClearPendingDestroyUnitHotkeyConfirmation();
+        Debug.Log("[Destroy Unit] Cancelado.");
+        return true;
+    }
+
+    private void ClearPendingDestroyUnitHotkeyConfirmation()
+    {
+        if (!pendingDestroyUnitConfirmation)
+            return;
+
+        pendingDestroyUnitConfirmation = false;
+        PanelDialogController.ClearExternalText();
     }
 
     private bool HandleScannerPromptCancel()
@@ -430,12 +502,6 @@ public partial class TurnStateManager
                 return;
             }
 
-            if (WasLetterPressedThisFrame('L'))
-            {
-                HandleLandingSensorRequested();
-                return;
-            }
-
             if (WasLetterPressedThisFrame('M'))
             {
                 HandleMoveOnlyActionRequested();
@@ -565,6 +631,66 @@ public partial class TurnStateManager
             cursorController?.PlayConfirmSfx();
             LogLandingSelectionPanel();
         }
+    }
+
+    public bool TryChangeAltitudeFromDebug(Domain targetDomain, HeightLevel targetHeight, out string message)
+    {
+        message = string.Empty;
+        if (selectedUnit == null)
+        {
+            message = "Nenhuma unidade selecionada para mudar altitude/camada.";
+            return false;
+        }
+
+        bool isMovementScannerState = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
+        bool isLandingScannerState = cursorState == CursorState.Pousando;
+        if (!isMovementScannerState && !isLandingScannerState)
+        {
+            message = $"Estado atual nao permite mudanca de camada por comando ({cursorState}).";
+            return false;
+        }
+
+        BuildLandingOptionsFromCurrentState();
+        if (cachedLandingOptions.Count <= 0)
+        {
+            message = !string.IsNullOrWhiteSpace(landingOptionUnavailableReason)
+                ? landingOptionUnavailableReason
+                : "Sem opcoes de mudanca de camada neste contexto.";
+            return false;
+        }
+
+        int optionIndex = -1;
+        for (int i = 0; i < cachedLandingOptions.Count; i++)
+        {
+            LandingOption option = cachedLandingOptions[i];
+            if (option.toDomain == targetDomain && option.toHeightLevel == targetHeight)
+            {
+                optionIndex = i;
+                break;
+            }
+        }
+
+        if (optionIndex < 0)
+        {
+            message = $"Transicao para {targetDomain}/{targetHeight} nao disponivel agora.";
+            return false;
+        }
+
+        if (cursorState != CursorState.Pousando)
+        {
+            cursorStateBeforePousando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+            SetCursorState(CursorState.Pousando, "TryChangeAltitudeFromDebug");
+            ClearCommittedPathVisual();
+        }
+
+        scannerSelectedLandingIndex = optionIndex;
+        scannerPromptStep = ScannerPromptStep.LandingConfirmOption;
+        LandingOption picked = cachedLandingOptions[optionIndex];
+        Debug.Log($"[LayerOperation][Debug] Confirmado: {picked.fromDomain}/{picked.fromHeightLevel} -> {picked.toDomain}/{picked.toHeightLevel} (action={picked.action})");
+        landingExecutionInProgress = true;
+        StartCoroutine(ExecuteLandingOptionSequence(picked));
+        message = $"Mudanca de camada iniciada: {picked.label}.";
+        return true;
     }
 
     private void HandleEmbarkActionRequested()
@@ -3989,6 +4115,12 @@ public partial class TurnStateManager
                 return Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame;
 #else
                 return Input.GetKeyDown(KeyCode.T);
+#endif
+            case 'U':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.uKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.U);
 #endif
             case 'X':
 #if ENABLE_INPUT_SYSTEM

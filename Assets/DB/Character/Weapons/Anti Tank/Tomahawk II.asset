@@ -21,9 +21,9 @@ MonoBehaviour:
   aditionalDomainsAllowed:
   - domain: 1
     heightLevel: 3
-  basicAttack: 6
+  basicAttack: 10
   weaponCategory: 1
-  weaponClass: 0
+  weaponClass: 2
   operationRangeMin: 1
   operationRangeMax: 1
   trajectories: 00000000

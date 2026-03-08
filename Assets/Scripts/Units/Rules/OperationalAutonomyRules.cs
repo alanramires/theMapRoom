@@ -2,6 +2,8 @@ using UnityEngine;
 
 public static class OperationalAutonomyRules
 {
+    private static readonly ConstructionDatabase[] EmptyConstructionDatabases = System.Array.Empty<ConstructionDatabase>();
+
     public static bool HasOperationalAutonomy(UnitManager unit)
     {
         if (unit == null)
@@ -46,7 +48,7 @@ public static class OperationalAutonomyRules
         if (!profile.AppliesTurnStartUpkeep(unit.GetDomain(), unit.GetHeightLevel()))
             return 0;
 
-        if (profile.isAircraft && IsAircraftLandedOnValidConstruction(unit))
+        if (profile.isAircraft && IsAircraftOnUpkeepExemptConstruction(unit))
             return 0;
 
         return upkeep;
@@ -70,9 +72,9 @@ public static class OperationalAutonomyRules
         return database.TryResolve(assigned, out AutonomyData resolved) ? resolved : null;
     }
 
-    private static bool IsAircraftLandedOnValidConstruction(UnitManager unit)
+    private static bool IsAircraftOnUpkeepExemptConstruction(UnitManager unit)
     {
-        if (unit == null || !unit.IsAircraftGrounded)
+        if (unit == null)
             return false;
 
         if (unit.BoardTilemap == null)
@@ -81,16 +83,53 @@ public static class OperationalAutonomyRules
         Vector3Int cell = unit.CurrentCellPosition;
         cell.z = 0;
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(unit.BoardTilemap, cell);
-        if (construction == null || !construction.TryResolveConstructionData(out ConstructionData constructionData) || constructionData == null)
+        if (construction == null)
+            return false;
+
+        ConstructionData constructionData = ResolveConstructionClassData(construction);
+        if (constructionData == null)
             return false;
 
         if (!constructionData.allowAircraftTakeoffAndLanding)
+            return false;
+
+        if (constructionData.aircraftUnitsPaysUpkeep)
             return false;
 
         if (!UnitSatisfiesRequiredSkills(unit, constructionData.requiredLandingSkillRules, constructionData.requireAtLeastOneLandingSkill))
             return false;
 
         return true;
+    }
+
+    private static ConstructionData ResolveConstructionClassData(ConstructionManager construction)
+    {
+        if (construction == null)
+            return null;
+
+        string constructionId = construction.ConstructionId;
+        if (string.IsNullOrWhiteSpace(constructionId))
+            return null;
+
+        // Always resolve from class asset (ConstructionData), never from runtime mutable state.
+        ConstructionDatabase directDb = construction.ConstructionDatabase;
+        if (directDb != null && directDb.TryGetById(constructionId, out ConstructionData fromDirectDb) && fromDirectDb != null)
+            return fromDirectDb;
+
+        ConstructionDatabase[] loadedDatabases = Resources.FindObjectsOfTypeAll<ConstructionDatabase>();
+        if (loadedDatabases == null || loadedDatabases.Length == 0)
+            loadedDatabases = EmptyConstructionDatabases;
+
+        for (int i = 0; i < loadedDatabases.Length; i++)
+        {
+            ConstructionDatabase candidate = loadedDatabases[i];
+            if (candidate == null)
+                continue;
+            if (candidate.TryGetById(constructionId, out ConstructionData fromCandidate) && fromCandidate != null)
+                return fromCandidate;
+        }
+
+        return null;
     }
 
     private static bool UnitSatisfiesRequiredSkills(

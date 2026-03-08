@@ -390,6 +390,7 @@ public partial class TurnStateManager
             yield return ApplySupplyLayerTransitionIfNeeded(supplier, serviceDomain, serviceHeight);
         }
 
+        HashSet<UnitManager> hiddenTransporterHudSet = new HashSet<UnitManager>();
         for (int i = 0; i < supplyQueuedOrders.Count && servedTargets < targetBudget; i++)
         {
             PodeSuprirOption order = supplyQueuedOrders[i];
@@ -397,27 +398,22 @@ public partial class TurnStateManager
                 continue;
 
             UnitManager target = order.targetUnit;
-            bool isEmbarkedPassenger = target.IsEmbarked && target.EmbarkedTransporter == supplier;
-            if ((!target.gameObject.activeInHierarchy && !isEmbarkedPassenger) || (target.IsEmbarked && !isEmbarkedPassenger) || (int)target.TeamId != (int)supplier.TeamId)
-                continue;
+            bool isEmbarkedPassenger = IsEmbarkedPassengerOfSupplier(target, supplier);
+            if (!isEmbarkedPassenger && hiddenTransporterHudSet.Count > 0)
+                RestoreTransporterHudVisibility(hiddenTransporterHudSet);
 
+            Vector3Int targetCell;
             if (isEmbarkedPassenger)
-                HideAllSupplyEmbarkedPreviewExcept(target);
-
-            if (isEmbarkedPassenger && !supplyEmbarkedPreviewStates.ContainsKey(target))
             {
-                SupplyEmbarkedPreviewState state = new SupplyEmbarkedPreviewState
-                {
-                    domain = target.GetDomain(),
-                    height = target.GetHeightLevel()
-                };
-                supplyEmbarkedPreviewStates[target] = state;
-                ShowEmbarkedPassengerForSupply(target, supplier);
+                if (!TryPrepareEmbarkedSupplyTarget(target, supplier, hiddenTransporterHudSet, out targetCell))
+                    continue;
+            }
+            else if (!TryPrepareIndividualSupplyTarget(target, supplier.TeamId, out targetCell))
+            {
+                continue;
             }
 
             Tilemap boardMap = terrainTilemap != null ? terrainTilemap : target.BoardTilemap;
-            Vector3Int targetCell = isEmbarkedPassenger ? supplier.CurrentCellPosition : target.CurrentCellPosition;
-            targetCell.z = 0;
             if (cursorController != null)
                 cursorController.SetCell(targetCell, playMoveSfx: true);
             float cursorFocusDelay = GetSupplyCursorFocusDelay();
@@ -543,7 +539,6 @@ public partial class TurnStateManager
             recoveredHp += hpGain;
             recoveredFuel += fuelGain;
             recoveredAmmo += ammoGain;
-            target.MarkAsActed();
             cursorController?.PlayLoadSfx();
             float postTargetDelay = GetSupplyPostTargetDelay();
             if (postTargetDelay > 0f)
@@ -555,6 +550,9 @@ public partial class TurnStateManager
                 supplyEmbarkedPreviewStates.Remove(target);
             }
         }
+
+        if (hiddenTransporterHudSet.Count > 0)
+            RestoreTransporterHudVisibility(hiddenTransporterHudSet);
 
         if (servedTargets <= 0)
         {
@@ -751,7 +749,7 @@ public partial class TurnStateManager
         if (unit == null)
             return;
 
-        UnitHudController hud = unit.GetComponentInChildren<UnitHudController>(true);
+        UnitHudController hud = ResolveOwnUnitHud(unit);
         if (hud == null)
             return;
 
@@ -774,7 +772,7 @@ public partial class TurnStateManager
         if (unit == null)
             return;
 
-        UnitHudController hud = unit.GetComponentInChildren<UnitHudController>(true);
+        UnitHudController hud = ResolveOwnUnitHud(unit);
         if (hud == null)
             return;
 
@@ -1698,7 +1696,7 @@ public partial class TurnStateManager
     {
         if (selectedUnit == null)
             return;
-        UnitHudController supplierHud = selectedUnit.GetComponentInChildren<UnitHudController>(true);
+        UnitHudController supplierHud = ResolveOwnUnitHud(selectedUnit);
         if (supplierHud != null)
         {
             supplierHud.gameObject.SetActive(visible);
@@ -1756,10 +1754,74 @@ public partial class TurnStateManager
             supplyEmbarkedPreviewStates.Remove(toHide[i]);
     }
 
+    private static bool IsEmbarkedPassengerOfSupplier(UnitManager target, UnitManager supplier)
+    {
+        return target != null &&
+            supplier != null &&
+            target.IsEmbarked &&
+            target.EmbarkedTransporter == supplier;
+    }
+
+    private static bool TryPrepareIndividualSupplyTarget(UnitManager target, TeamId expectedTeam, out Vector3Int targetCell)
+    {
+        targetCell = default;
+        if (target == null)
+            return false;
+        if ((int)target.TeamId != (int)expectedTeam)
+            return false;
+        if (!target.gameObject.activeInHierarchy)
+            return false;
+        if (target.IsEmbarked)
+            return false;
+
+        targetCell = target.CurrentCellPosition;
+        targetCell.z = 0;
+        return true;
+    }
+
+    private bool TryPrepareEmbarkedSupplyTarget(UnitManager target, UnitManager transporter, HashSet<UnitManager> hiddenTransporterHudSet, out Vector3Int targetCell)
+    {
+        targetCell = default;
+        if (!IsEmbarkedPassengerOfSupplier(target, transporter))
+            return false;
+
+        ForceHideEmbarkedPassengersExcept(transporter, target);
+        HideAllSupplyEmbarkedPreviewExcept(target);
+        if (!supplyEmbarkedPreviewStates.ContainsKey(target))
+        {
+            SupplyEmbarkedPreviewState state = new SupplyEmbarkedPreviewState
+            {
+                domain = target.GetDomain(),
+                height = target.GetHeightLevel()
+            };
+            supplyEmbarkedPreviewStates[target] = state;
+            ShowEmbarkedPassengerForSupply(target, transporter);
+        }
+
+        SetSupplierHudVisibleForCommandSource(transporter, false);
+        hiddenTransporterHudSet?.Add(transporter);
+
+        targetCell = transporter.CurrentCellPosition;
+        targetCell.z = 0;
+        return true;
+    }
+
+    private static void RestoreTransporterHudVisibility(HashSet<UnitManager> hiddenTransporterHudSet)
+    {
+        if (hiddenTransporterHudSet == null || hiddenTransporterHudSet.Count <= 0)
+            return;
+
+        foreach (UnitManager transporter in hiddenTransporterHudSet)
+            SetSupplierHudVisibleForCommandSource(transporter, true);
+        hiddenTransporterHudSet.Clear();
+    }
+
     private static void ShowEmbarkedPassengerForSupply(UnitManager passenger, UnitManager supplier)
     {
         if (passenger == null || supplier == null || !passenger.IsEmbarked || passenger.EmbarkedTransporter != supplier)
             return;
+
+        passenger.BeginEmbarkedVisualPreview();
 
         Vector3Int supplierCell = supplier.CurrentCellPosition;
         supplierCell.z = 0;
@@ -1774,7 +1836,7 @@ public partial class TurnStateManager
 
         SetUnitSpriteRenderersVisible(passenger, true);
 
-        UnitHudController passengerHud = passenger.GetComponentInChildren<UnitHudController>(true);
+        UnitHudController passengerHud = ResolveOwnUnitHud(passenger);
         if (passengerHud != null)
         {
             passengerHud.gameObject.SetActive(true);
@@ -1843,11 +1905,12 @@ public partial class TurnStateManager
         if (passenger == null || !passenger.IsEmbarked)
             return;
 
+        passenger.EndEmbarkedVisualPreview();
         passenger.TrySetCurrentLayerMode(previousDomain, previousHeight);
 
         SetUnitSpriteRenderersVisible(passenger, false);
 
-        UnitHudController passengerHud = passenger.GetComponentInChildren<UnitHudController>(true);
+        UnitHudController passengerHud = ResolveOwnUnitHud(passenger);
         if (passengerHud != null)
             passengerHud.gameObject.SetActive(false);
 
@@ -1863,7 +1926,7 @@ public partial class TurnStateManager
         if (main != null)
             main.enabled = visible;
 
-        UnitHudController hud = unit.GetComponentInChildren<UnitHudController>(true);
+        UnitHudController hud = ResolveOwnUnitHud(unit);
         Transform hudRoot = hud != null ? hud.transform : null;
 
         SpriteRenderer[] renderers = unit.GetComponentsInChildren<SpriteRenderer>(true);
@@ -1879,5 +1942,28 @@ public partial class TurnStateManager
                 continue;
             renderer.enabled = visible;
         }
+    }
+
+    private static UnitHudController ResolveOwnUnitHud(UnitManager unit)
+    {
+        if (unit == null)
+            return null;
+
+        UnitHudController[] candidates = unit.GetComponentsInChildren<UnitHudController>(true);
+        if (candidates == null || candidates.Length <= 0)
+            return null;
+
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            UnitHudController candidate = candidates[i];
+            if (candidate == null)
+                continue;
+
+            UnitManager owner = candidate.GetComponentInParent<UnitManager>();
+            if (owner == unit)
+                return candidate;
+        }
+
+        return null;
     }
 }

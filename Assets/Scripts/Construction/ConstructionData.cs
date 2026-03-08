@@ -66,6 +66,8 @@ public class ConstructionData : ScriptableObject
     [FormerlySerializedAs("allowAircraftTakeoff")]
     [Tooltip("Permite pouso e decolagem de aeronaves neste tipo de construcao.")]
     public bool allowAircraftTakeoffAndLanding = false;
+    [Tooltip("Se true, aeronaves pousadas nesta construcao pagam upkeep de autonomia na virada do turno.")]
+    public bool aircraftUnitsPaysUpkeep = true;
     [FormerlySerializedAs("landingRequiredSkills")]
     [Tooltip("Campo legado de skills exigidas para pouso/decolagem (mantido para migracao).")]
     public List<SkillData> legacyRequiredLandingSkills = new List<SkillData>();
@@ -76,6 +78,10 @@ public class ConstructionData : ScriptableObject
     [Header("Naval Ops")]
     [Tooltip("Unidades nesses dominios/alturas encerram movimento no dominio nativo desta construcao.")]
     public List<TerrainLayerMode> forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
+    [Tooltip("Quando ligado, unidades nos dominios/alturas acima ficam livremente detectaveis nesta construcao.")]
+    public bool forceDetectOnForcedEndMovementDomains = false;
+    [Tooltip("Se preenchido, somente unidades com essas Stealth Skills ficam livremente detectaveis nesta construcao (nos dominios/alturas acima).")]
+    public List<SkillData> forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
 
     [Header("Construction Supplier Settings")]
     public bool isSupplier = false;
@@ -122,6 +128,8 @@ public class ConstructionData : ScriptableObject
             requiredLandingSkillRules = new List<ConstructionLandingSkillRule>();
         if (forceEndMovementOnTerrainDomainForDomains == null)
             forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
+        if (forceDetectUnitsWithFollowingStealthSkills == null)
+            forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
 
         for (int i = requiredLandingSkillRules.Count - 1; i >= 0; i--)
         {

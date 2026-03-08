@@ -30,6 +30,7 @@ MonoBehaviour:
   aditionalDomainsAllowed: []
   alwaysAllowAirDomain: 1
   allowAircraftTakeoffAndLanding: 1
+  aircraftUnitsPaysUpkeep: 0
   legacyRequiredLandingSkills: []
   requiredLandingSkillRules:
   - skill: {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}

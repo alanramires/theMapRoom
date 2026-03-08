@@ -229,6 +229,14 @@ public class DebugManager : MonoBehaviour
                 Debug.Log($"[Debug Command] Economy {(economyEnabled ? "ON" : "OFF")}.");
             }
         }
+        else if (TryParseChangeAltitudeCommand(rawCommand, out Domain targetDomain, out HeightLevel targetHeight))
+        {
+            executed = turnStateManager.TryChangeAltitudeFromDebug(targetDomain, targetHeight, out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
         else
         {
             Debug.Log($"[Debug Command] Comando desconhecido: \"{rawCommand}\"");
@@ -550,6 +558,53 @@ public class DebugManager : MonoBehaviour
             string.Equals(token, "0", System.StringComparison.OrdinalIgnoreCase))
         {
             economyEnabled = false;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryParseChangeAltitudeCommand(string rawCommand, out Domain targetDomain, out HeightLevel targetHeight)
+    {
+        targetDomain = Domain.Land;
+        targetHeight = HeightLevel.Surface;
+        if (string.IsNullOrWhiteSpace(rawCommand))
+            return false;
+
+        string trimmed = rawCommand.Trim();
+        const string prefix = "change altitude ";
+        if (!trimmed.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string token = trimmed.Substring(prefix.Length).Trim();
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+
+        if (string.Equals(token, "high", System.StringComparison.OrdinalIgnoreCase))
+        {
+            targetDomain = Domain.Air;
+            targetHeight = HeightLevel.AirHigh;
+            return true;
+        }
+
+        if (string.Equals(token, "low", System.StringComparison.OrdinalIgnoreCase))
+        {
+            targetDomain = Domain.Air;
+            targetHeight = HeightLevel.AirLow;
+            return true;
+        }
+
+        if (string.Equals(token, "surface", System.StringComparison.OrdinalIgnoreCase))
+        {
+            targetDomain = Domain.Land;
+            targetHeight = HeightLevel.Surface;
+            return true;
+        }
+
+        if (string.Equals(token, "sub", System.StringComparison.OrdinalIgnoreCase))
+        {
+            targetDomain = Domain.Submarine;
+            targetHeight = HeightLevel.Submerged;
             return true;
         }
 

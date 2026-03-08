@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 1c71fefc14592e243becc29dc286d809
+guid: b7cc814511e91714d96d15752395826b
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -8007603555266250206
-    second: exercito_0
+      213: -7368533823020329295
+    second: x_card_aeronautica_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -96,30 +96,17 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 1
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: exercito_0
+      name: x_card_aeronautica_0
       rect:
         serializedVersion: 2
         x: 148
-        y: 28
-        width: 728
-        height: 968
+        y: 25
+        width: 729
+        height: 972
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 22a333a1ef64fd090800000000000000
-      internalID: -8007603555266250206
+      spriteID: 1b61c633785bdb990800000000000000
+      internalID: -7368533823020329295
       vertices: []
       indices: 
       edges: []
@@ -148,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      exercito_0: -8007603555266250206
+      x_card_aeronautica_0: -7368533823020329295
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

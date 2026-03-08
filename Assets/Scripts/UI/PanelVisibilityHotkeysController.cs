@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using UnityEngine.Events;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -10,24 +11,54 @@ using UnityEngine.InputSystem;
 [DefaultExecutionOrder(-500)]
 public class PanelVisibilityHotkeysController : MonoBehaviour
 {
+    private enum RetractDirection
+    {
+        Auto = 0,
+        Left = 1,
+        Right = 2
+    }
+
     private const string PanelDebugName = "Panel_Debug";
     private const string PanelHotkeysName = "panel_hotkeys";
     private const string PanelTurnName = "Panel_turn";
     private const string HotkeysTitleName = "hotkeys_title";
     private const string HotkeysTextName = "hotkeys_txt";
+    private const string HotkeysToggleButtonName = "button_toggle";
 
     [Header("Manual Bindings (Optional)")]
     [SerializeField] private GameObject panelDebugBinding;
     [SerializeField] private GameObject panelHotkeysBinding;
+    [SerializeField] private Button hotkeysToggleButtonBinding;
     [SerializeField] private TMP_Text hotkeysTitleBinding;
     [SerializeField] private TMP_Text hotkeysTextBinding;
     [SerializeField] private bool autoCreateHotkeysIfMissing = true;
+    [Header("Retractable Panel")]
+    [SerializeField] private bool startHotkeysRetracted = true;
+    [SerializeField] private bool useFixedShownAnchoredX = true;
+    [SerializeField] private float fixedShownAnchoredX = 0f;
+    [SerializeField] private bool useFixedRetractedAnchoredX = true;
+    [SerializeField] private float fixedRetractedAnchoredX = -326f;
+    [SerializeField] [Min(0f)] private float retractVisibleWidth = 24f;
+    [SerializeField] private RetractDirection retractDirection = RetractDirection.Auto;
+    [SerializeField] private bool animateRetract = true;
+    [SerializeField] [Range(1f, 30f)] private float retractLerpSpeed = 14f;
+    [Header("Display")]
+    [SerializeField] private KeyCode fullscreenToggleKey = KeyCode.F11;
+    [SerializeField] private bool preferExclusiveFullscreen = true;
 
     private GameObject panelDebug;
     private GameObject panelHotkeys;
+    private RectTransform panelHotkeysRect;
+    private Button hotkeysToggleButton;
     private TMP_Text hotkeysTitle;
     private TMP_Text hotkeysText;
     private CanvasGroup hotkeysSelfCanvasGroup;
+    private bool hotkeysRetractStateInitialized;
+    private bool hotkeysIsRetracted;
+    private float hotkeysShownAnchoredX;
+    private float hotkeysRetractedAnchoredX;
+    private float hotkeysTargetAnchoredX;
+    private Button hotkeysToggleButtonHookedTarget;
     private bool debugPanelInitializedForScene;
     private int lastInitializedSceneHandle = int.MinValue;
 
@@ -51,21 +82,25 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
 
     private void OnDestroy()
     {
+        UnhookHotkeysToggleButton();
         SceneManager.sceneLoaded -= HandleSceneLoaded;
     }
 
     private void Update()
     {
-        if (UiInputBlocker.IsTextInputFocused())
-            return;
-
         RefreshReferences(forceSceneInit: false);
+        bool textInputFocused = UiInputBlocker.IsTextInputFocused();
 
-        if (WasDebugTogglePressedThisFrame())
+        if (!textInputFocused && WasDebugTogglePressedThisFrame())
             TogglePanelDebug();
 
         if (WasHotkeysTogglePressedThisFrame())
             TogglePanelHotkeys();
+
+        if (!textInputFocused && WasFullscreenTogglePressedThisFrame())
+            ToggleFullscreenMode();
+
+        UpdateHotkeysRetractAnimation();
     }
 
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -80,6 +115,8 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
         {
             debugPanelInitializedForScene = false;
             lastInitializedSceneHandle = active.handle;
+            hotkeysRetractStateInitialized = false;
+            UnhookHotkeysToggleButton();
         }
 
         if (panelDebug == null)
@@ -97,6 +134,10 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
             panelHotkeys = FindSceneObjectByName(PanelHotkeysName);
         if (panelHotkeysBinding != null)
             panelHotkeys = panelHotkeysBinding;
+        if (panelHotkeys != null)
+            panelHotkeysRect = panelHotkeys.GetComponent<RectTransform>();
+        else
+            panelHotkeysRect = null;
 
         if (hotkeysTitle == null && panelHotkeys != null)
             hotkeysTitle = FindNamedTmpText(panelHotkeys.transform, HotkeysTitleName);
@@ -107,6 +148,26 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
             hotkeysText = FindNamedTmpText(panelHotkeys.transform, HotkeysTextName) ?? panelHotkeys.GetComponentInChildren<TMP_Text>(true);
         if (hotkeysTextBinding != null)
             hotkeysText = hotkeysTextBinding;
+
+        if (hotkeysToggleButtonBinding != null)
+        {
+            hotkeysToggleButton = hotkeysToggleButtonBinding;
+        }
+        else if (panelHotkeys == null)
+        {
+            hotkeysToggleButton = null;
+        }
+        else
+        {
+            // Sempre prioriza o botao de toggle real para evitar bind em botao errado.
+            hotkeysToggleButton = FindHotkeysToggleButton(panelHotkeys.transform);
+            if (hotkeysToggleButton == null)
+                hotkeysToggleButton = FindSceneButtonByAnyName(HotkeysToggleButtonName, "Button_toggle", "buttonToggle", "hotkeys_toggle");
+        }
+
+        HookHotkeysToggleButtonIfNeeded();
+        EnsureHotkeysToggleButtonRuntimeSetup();
+        InitializeHotkeysRetractStateIfNeeded();
     }
 
     private void TogglePanelDebug()
@@ -126,8 +187,16 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
             return;
 
         if (createdNow)
-        {
             EnsureHotkeysDefaultTexts();
+
+        if (CanUseRetractableHotkeysMode())
+        {
+            SetHotkeysRetracted(!hotkeysIsRetracted, immediate: false);
+            return;
+        }
+
+        if (createdNow)
+        {
             SetPanelHotkeysVisible(true);
             return;
         }
@@ -170,6 +239,137 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
 
         if (panelHotkeys.activeSelf != visible)
             panelHotkeys.SetActive(visible);
+    }
+
+    private bool CanUseRetractableHotkeysMode()
+    {
+        return panelHotkeysRect != null;
+    }
+
+    private void InitializeHotkeysRetractStateIfNeeded()
+    {
+        if (hotkeysRetractStateInitialized || !CanUseRetractableHotkeysMode())
+            return;
+
+        hotkeysShownAnchoredX = panelHotkeysRect.anchoredPosition.x;
+        if (useFixedShownAnchoredX)
+            hotkeysShownAnchoredX = fixedShownAnchoredX;
+        float panelWidth = Mathf.Max(0f, panelHotkeysRect.rect.width);
+        float visibleWidth = Mathf.Clamp(retractVisibleWidth, 0f, panelWidth);
+        float delta = Mathf.Max(0f, panelWidth - visibleWidth);
+        bool retractToLeft = ResolveRetractToLeft(panelHotkeysRect);
+        hotkeysRetractedAnchoredX = hotkeysShownAnchoredX + (retractToLeft ? -delta : delta);
+        if (useFixedRetractedAnchoredX)
+            hotkeysRetractedAnchoredX = fixedRetractedAnchoredX;
+        if (Mathf.Abs(hotkeysRetractedAnchoredX - hotkeysShownAnchoredX) <= 0.01f)
+            hotkeysShownAnchoredX = 0f;
+
+        hotkeysIsRetracted = startHotkeysRetracted;
+        hotkeysTargetAnchoredX = hotkeysIsRetracted ? hotkeysRetractedAnchoredX : hotkeysShownAnchoredX;
+
+        SetHotkeysPanelAnchoredX(hotkeysTargetAnchoredX);
+        hotkeysRetractStateInitialized = true;
+    }
+
+    private void SetHotkeysRetracted(bool retracted, bool immediate)
+    {
+        if (!CanUseRetractableHotkeysMode())
+        {
+            SetPanelHotkeysVisible(!retracted);
+            return;
+        }
+
+        InitializeHotkeysRetractStateIfNeeded();
+        hotkeysIsRetracted = retracted;
+        hotkeysTargetAnchoredX = hotkeysIsRetracted ? hotkeysRetractedAnchoredX : hotkeysShownAnchoredX;
+
+        if (immediate || !animateRetract)
+            SetHotkeysPanelAnchoredX(hotkeysTargetAnchoredX);
+    }
+
+    private void UpdateHotkeysRetractAnimation()
+    {
+        if (!CanUseRetractableHotkeysMode() || !hotkeysRetractStateInitialized || !animateRetract)
+            return;
+
+        float currentX = panelHotkeysRect.anchoredPosition.x;
+        float nextX = Mathf.Lerp(currentX, hotkeysTargetAnchoredX, Time.unscaledDeltaTime * retractLerpSpeed);
+        if (Mathf.Abs(hotkeysTargetAnchoredX - nextX) <= 0.01f)
+            nextX = hotkeysTargetAnchoredX;
+
+        SetHotkeysPanelAnchoredX(nextX);
+    }
+
+    private void SetHotkeysPanelAnchoredX(float x)
+    {
+        if (panelHotkeysRect == null)
+            return;
+
+        Vector2 anchored = panelHotkeysRect.anchoredPosition;
+        anchored.x = x;
+        panelHotkeysRect.anchoredPosition = anchored;
+    }
+
+    private void HookHotkeysToggleButtonIfNeeded()
+    {
+        if (hotkeysToggleButton == null)
+            return;
+
+        if (hotkeysToggleButtonHookedTarget != null && hotkeysToggleButtonHookedTarget != hotkeysToggleButton)
+            UnhookHotkeysToggleButton();
+
+        if (hotkeysToggleButtonHookedTarget == hotkeysToggleButton)
+            return;
+
+        hotkeysToggleButton.onClick.AddListener(TogglePanelHotkeys);
+        hotkeysToggleButtonHookedTarget = hotkeysToggleButton;
+    }
+
+    private void UnhookHotkeysToggleButton()
+    {
+        if (hotkeysToggleButtonHookedTarget == null)
+            return;
+
+        hotkeysToggleButtonHookedTarget.onClick.RemoveListener(TogglePanelHotkeys);
+        hotkeysToggleButtonHookedTarget = null;
+    }
+
+    private void EnsureHotkeysToggleButtonRuntimeSetup()
+    {
+        if (hotkeysToggleButton == null)
+            return;
+
+        hotkeysToggleButton.enabled = true;
+        hotkeysToggleButton.interactable = true;
+        hotkeysToggleButton.transition = Selectable.Transition.None;
+        Navigation nav = hotkeysToggleButton.navigation;
+        nav.mode = Navigation.Mode.None;
+        hotkeysToggleButton.navigation = nav;
+
+        if (hotkeysToggleButton.targetGraphic == null)
+        {
+            Graphic graphic = hotkeysToggleButton.GetComponent<Graphic>();
+            if (graphic == null)
+                graphic = hotkeysToggleButton.GetComponentInChildren<Graphic>(true);
+            hotkeysToggleButton.targetGraphic = graphic;
+        }
+
+        if (hotkeysToggleButton.targetGraphic != null)
+            hotkeysToggleButton.targetGraphic.raycastTarget = true;
+    }
+
+    private bool ResolveRetractToLeft(RectTransform panelRect)
+    {
+        switch (retractDirection)
+        {
+            case RetractDirection.Left:
+                return true;
+            case RetractDirection.Right:
+                return false;
+            default:
+                // Auto: painel ancorado/pivotado para a esquerda retrai para a esquerda.
+                return panelRect != null && panelRect.pivot.x <= 0.5f;
+        }
     }
 
     private bool EnsurePanelHotkeysExists()
@@ -249,7 +449,8 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
             "Enter: Confirm\n" +
             "Esc: Cancel\n" +
             "Tab: Cycle Units\n" +
-            "Shift+Tab: Reverse Cycle Units");
+            "Shift+Tab: Reverse Cycle Units\n" +
+            "F11: Toggle Fullscreen");
     }
 
     private static TMP_Text FindNamedTmpText(Transform root, string name)
@@ -263,6 +464,80 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
             Transform child = children[i];
             if (child != null && string.Equals(child.name, name, System.StringComparison.OrdinalIgnoreCase))
                 return child.GetComponent<TMP_Text>();
+        }
+
+        return null;
+    }
+
+    private static Button FindNamedButton(Transform root, string name)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(name))
+            return null;
+
+        Transform[] children = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            Transform child = children[i];
+            if (child != null && string.Equals(child.name, name, System.StringComparison.OrdinalIgnoreCase))
+                return child.GetComponent<Button>();
+        }
+
+        return null;
+    }
+
+    private static Button FindHotkeysToggleButton(Transform panelRoot)
+    {
+        if (panelRoot == null)
+            return null;
+
+        Button direct = FindNamedButton(panelRoot, HotkeysToggleButtonName);
+        if (direct != null)
+            return direct;
+
+        Button[] buttons = panelRoot.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            Button b = buttons[i];
+            if (b == null || b.gameObject == null)
+                continue;
+
+            string name = b.gameObject.name;
+            if (string.IsNullOrWhiteSpace(name))
+                continue;
+
+            if (name.IndexOf("toggle", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return b;
+        }
+
+        return null;
+    }
+
+    private static Button FindSceneButtonByAnyName(params string[] names)
+    {
+        if (names == null || names.Length == 0)
+            return null;
+
+        Transform[] all = Resources.FindObjectsOfTypeAll<Transform>();
+        for (int i = 0; i < all.Length; i++)
+        {
+            Transform t = all[i];
+            if (t == null)
+                continue;
+            if (!t.gameObject.scene.IsValid() || !t.gameObject.scene.isLoaded)
+                continue;
+
+            for (int n = 0; n < names.Length; n++)
+            {
+                string expected = names[n];
+                if (string.IsNullOrWhiteSpace(expected))
+                    continue;
+                if (!string.Equals(t.name, expected, System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                Button button = t.GetComponent<Button>();
+                if (button != null)
+                    return button;
+            }
         }
 
         return null;
@@ -307,9 +582,74 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
     private static bool WasHotkeysTogglePressedThisFrame()
     {
 #if ENABLE_INPUT_SYSTEM
-        return Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame;
+        if (Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame)
+            return true;
+#if ENABLE_LEGACY_INPUT_MANAGER
+        return Input.GetKeyDown(KeyCode.H);
+#else
+        return false;
+#endif
 #else
         return Input.GetKeyDown(KeyCode.H);
 #endif
     }
+
+    private bool WasFullscreenTogglePressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null && WasFunctionKeyPressedThisFrame(fullscreenToggleKey))
+            return true;
+#if ENABLE_LEGACY_INPUT_MANAGER
+        return Input.GetKeyDown(fullscreenToggleKey);
+#else
+        return false;
+#endif
+#else
+        return Input.GetKeyDown(fullscreenToggleKey);
+#endif
+    }
+
+    private void ToggleFullscreenMode()
+    {
+        bool goingFullscreen = !Screen.fullScreen;
+        if (!goingFullscreen)
+        {
+            Screen.fullScreenMode = FullScreenMode.Windowed;
+            Screen.fullScreen = false;
+            PanelDialogController.TrySetTransientText("Fullscreen: OFF", 1.4f);
+            return;
+        }
+
+        FullScreenMode targetMode = (!Application.isEditor && preferExclusiveFullscreen)
+            ? FullScreenMode.ExclusiveFullScreen
+            : FullScreenMode.FullScreenWindow;
+        Screen.fullScreenMode = targetMode;
+        Screen.fullScreen = true;
+        PanelDialogController.TrySetTransientText($"Fullscreen: ON ({targetMode})", 1.4f);
+    }
+
+#if ENABLE_INPUT_SYSTEM
+    private static bool WasFunctionKeyPressedThisFrame(KeyCode keyCode)
+    {
+        if (Keyboard.current == null)
+            return false;
+
+        switch (keyCode)
+        {
+            case KeyCode.F1: return Keyboard.current.f1Key.wasPressedThisFrame;
+            case KeyCode.F2: return Keyboard.current.f2Key.wasPressedThisFrame;
+            case KeyCode.F3: return Keyboard.current.f3Key.wasPressedThisFrame;
+            case KeyCode.F4: return Keyboard.current.f4Key.wasPressedThisFrame;
+            case KeyCode.F5: return Keyboard.current.f5Key.wasPressedThisFrame;
+            case KeyCode.F6: return Keyboard.current.f6Key.wasPressedThisFrame;
+            case KeyCode.F7: return Keyboard.current.f7Key.wasPressedThisFrame;
+            case KeyCode.F8: return Keyboard.current.f8Key.wasPressedThisFrame;
+            case KeyCode.F9: return Keyboard.current.f9Key.wasPressedThisFrame;
+            case KeyCode.F10: return Keyboard.current.f10Key.wasPressedThisFrame;
+            case KeyCode.F11: return Keyboard.current.f11Key.wasPressedThisFrame;
+            case KeyCode.F12: return Keyboard.current.f12Key.wasPressedThisFrame;
+            default: return false;
+        }
+    }
+#endif
 }

@@ -73,3 +73,18 @@ MonoBehaviour:
       notes: 
       rpsDefenseText: Artillery se defende de Artillery com AntiTanque com RPS Defesa
         +3
+  - ataque:
+      unitClass: 2
+      weaponCategory: 2
+      targetClass: 5
+      attackBonus: 0
+      notes: 
+      rpsAttackText: Artillery com AntiAerea ataca Helicopter com RPS Ataque +0
+    defesa:
+      targetClass: 5
+      unitClass: 2
+      weaponCategory: 2
+      defenseBonus: 0
+      notes: 
+      rpsDefenseText: Helicopter se defende de Artillery com AntiAerea com RPS Defesa
+        +0

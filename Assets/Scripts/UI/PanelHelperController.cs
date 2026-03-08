@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Tilemaps;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -12,6 +13,13 @@ using UnityEditor;
 
 public class PanelHelperController : MonoBehaviour
 {
+    private struct CoordinateOverlayLabel
+    {
+        public Vector3Int cell;
+        public string text;
+        public Color color;
+    }
+
     [Header("References")]
     [SerializeField] private CursorController cursorController;
     [SerializeField] private MatchController matchController;
@@ -59,6 +67,23 @@ public class PanelHelperController : MonoBehaviour
     private bool helperScrollActive;
     [SerializeField] [Range(1f, 80f)] private float helperScrollStep = 24f;
 
+    [Header("Coordinate Overlay")]
+    [SerializeField] private bool showCoordinateOverlay = true;
+    [SerializeField] private KeyCode toggleCoordinateOverlayKey = KeyCode.F3;
+    [SerializeField] [Range(0f, 4f)] private float coordinateLabelWorldYOffset = 0.42f;
+    [SerializeField] private Color cursorCoordinateColor = new Color(1f, 0.92f, 0.40f, 1f);
+    [SerializeField] private Color selectedCoordinateColor = new Color(0.50f, 1f, 0.68f, 1f);
+    [SerializeField] private Color eventCoordinateColor = new Color(1f, 0.60f, 0.60f, 1f);
+    [SerializeField] private Color eventHighlightColor = new Color(1f, 0.30f, 0.20f, 1f);
+    [SerializeField] [Range(0.1f, 3f)] private float eventHighlightSeconds = 1.4f;
+
+    private readonly List<CoordinateOverlayLabel> coordinateOverlayLabels = new List<CoordinateOverlayLabel>();
+    private readonly List<Vector3Int> upkeepEventCells = new List<Vector3Int>();
+    private readonly Dictionary<Vector3Int, float> highlightedEventCells = new Dictionary<Vector3Int, float>();
+    private GUIStyle coordinateOverlayLabelStyle;
+    private GUIStyle coordinateOverlayHighlightStyle;
+    private int lastUpkeepSignature;
+
     private void Awake()
     {
         TryAutoAssignReferences();
@@ -70,7 +95,52 @@ public class PanelHelperController : MonoBehaviour
     {
         TryAutoAssignReferences();
         Refresh(force: false);
+        HandleCoordinateOverlayHotkeys();
+        RefreshCoordinateOverlayState();
         HandleHelperScrollInput();
+    }
+
+    private void OnGUI()
+    {
+        if (!showCoordinateOverlay)
+            return;
+
+        if (!Application.isPlaying || cursorController == null || cursorController.BoardTilemap == null)
+            return;
+
+        Camera cam = Camera.main;
+        if (cam == null)
+            return;
+
+        EnsureCoordinateOverlayStyles();
+
+        for (int i = 0; i < coordinateOverlayLabels.Count; i++)
+        {
+            CoordinateOverlayLabel label = coordinateOverlayLabels[i];
+            DrawCoordinateLabel(cam, cursorController.BoardTilemap, label.cell, label.text, label.color, isHighlight: false);
+        }
+
+        if (highlightedEventCells.Count <= 0)
+            return;
+
+        List<Vector3Int> expired = null;
+        foreach (KeyValuePair<Vector3Int, float> pair in highlightedEventCells)
+        {
+            if (Time.unscaledTime > pair.Value)
+            {
+                expired ??= new List<Vector3Int>();
+                expired.Add(pair.Key);
+                continue;
+            }
+
+            DrawCoordinateLabel(cam, cursorController.BoardTilemap, pair.Key, "!", eventHighlightColor, isHighlight: true);
+        }
+
+        if (expired == null)
+            return;
+
+        for (int i = 0; i < expired.Count; i++)
+            highlightedEventCells.Remove(expired[i]);
     }
 
 #if UNITY_EDITOR
@@ -158,9 +228,29 @@ public class PanelHelperController : MonoBehaviour
                 body = BuildMergeBody(data);
                 return;
 
+            case TurnStateManager.HelperPanelKind.Embark:
+                title = ResolveMessage("helper.title.embark", "EMBARK");
+                body = BuildEmbarkBody(data);
+                return;
+
+            case TurnStateManager.HelperPanelKind.Supply:
+                title = ResolveMessage("helper.title.supply_preview", "SUPPLY");
+                body = BuildSupplyBody(data);
+                return;
+
             case TurnStateManager.HelperPanelKind.CommandService:
                 title = ResolveMessage("helper.title.command_service", "COMMAND SERVICE");
                 body = BuildCommandServiceBody(data);
+                return;
+
+            case TurnStateManager.HelperPanelKind.UnitStats:
+                title = data.UnitStatsName ?? ResolveMessage("helper.title.unit_stats", "UNIT");
+                body = BuildUnitStatsBody(data);
+                return;
+
+            case TurnStateManager.HelperPanelKind.TurnStartAutonomy:
+                title = ResolveMessage("helper.title.turn_start_autonomy", "TURN START");
+                body = BuildTurnStartAutonomyBody(data);
                 return;
 
             default:
@@ -168,6 +258,47 @@ public class PanelHelperController : MonoBehaviour
                 body = string.Empty;
                 return;
         }
+    }
+
+    private string BuildUnitStatsBody(TurnStateManager.HelperPanelData data)
+    {
+        if (data == null || data.UnitStatsLines == null || data.UnitStatsLines.Count <= 0)
+            return string.Empty;
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < data.UnitStatsLines.Count; i++)
+        {
+            string line = data.UnitStatsLines[i] ?? string.Empty;
+            if (i > 0)
+                sb.AppendLine();
+            sb.Append(line);
+        }
+
+        return sb.ToString();
+    }
+
+    private string BuildTurnStartAutonomyBody(TurnStateManager.HelperPanelData data)
+    {
+        if (data == null || data.TurnStartAutonomyLines == null || data.TurnStartAutonomyLines.Count <= 0)
+            return string.Empty;
+
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine(ResolveMessage("helper.turn_start_autonomy.header", "Consumo de autonomia (operando):"));
+
+        for (int i = 0; i < data.TurnStartAutonomyLines.Count; i++)
+        {
+            TurnStateManager.HelperTurnStartAutonomyLine line = data.TurnStartAutonomyLines[i];
+            if (line == null)
+                continue;
+
+            string unitName = string.IsNullOrWhiteSpace(line.unitName) ? "Unidade" : line.unitName;
+            int consumed = Mathf.Max(0, line.autonomyConsumed);
+            int fuelBefore = Mathf.Max(0, line.fuelBefore);
+            int fuelAfter = Mathf.Max(0, line.fuelAfter);
+            sb.AppendLine($"{unitName} {line.cell.x},{line.cell.y} Fuel {fuelBefore} - {consumed} = {fuelAfter}");
+        }
+
+        return sb.ToString().TrimEnd();
     }
 
     private string BuildShoppingBody(TurnStateManager.HelperPanelData data)
@@ -478,6 +609,128 @@ public class PanelHelperController : MonoBehaviour
             sb.Append(ResolveMessage(
                 data.CommandServiceIsEstimate ? "helper.command_service.economy_stop.estimate" : "helper.command_service.economy_stop",
                 data.CommandServiceIsEstimate ? "Fila vai parar por saldo" : "Fila interrompida por saldo"));
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private string BuildEmbarkBody(TurnStateManager.HelperPanelData data)
+    {
+        if (data == null || data.EmbarkCandidateLines == null || data.EmbarkCandidateLines.Count <= 0)
+            return string.Empty;
+
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine(ResolveMessage("helper.embark.section.transporters", "Transporters"));
+        for (int i = 0; i < data.EmbarkCandidateLines.Count; i++)
+        {
+            TurnStateManager.HelperEmbarkCandidateLine line = data.EmbarkCandidateLines[i];
+            if (line == null)
+                continue;
+
+            string prefix = line.isFocused ? ">> " : string.Empty;
+            if (line.isValid)
+            {
+                string label = line.index > 0 ? $"{line.index}" : "-";
+                sb.AppendLine(ResolveMessage(
+                    "helper.embark.candidate.line",
+                    "<prefix><index> - <unit> (<stats>)",
+                    new Dictionary<string, string>
+                    {
+                        { "prefix", prefix },
+                        { "index", label },
+                        { "unit", line.unitName ?? string.Empty },
+                        { "stats", line.stats ?? string.Empty }
+                    }));
+            }
+            else
+            {
+                sb.AppendLine(ResolveMessage(
+                    "helper.embark.candidate.invalid",
+                    "<color=#8F8F8F><prefix><unit> (<stats>)</color> <color=#8F8F8F>- <reason></color>",
+                    new Dictionary<string, string>
+                    {
+                        { "prefix", prefix },
+                        { "unit", line.unitName ?? string.Empty },
+                        { "stats", line.stats ?? string.Empty },
+                        { "reason", string.IsNullOrWhiteSpace(line.invalidReason) ? "invalido" : line.invalidReason }
+                    }));
+            }
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private string BuildSupplyBody(TurnStateManager.HelperPanelData data)
+    {
+        if (data == null || data.SupplyServedTargets <= 0)
+            return string.Empty;
+
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine(ResolveMessage(
+            data.SupplyIsConfirmStep ? "helper.supply.targets.confirm" : "helper.supply.targets.queue",
+            data.SupplyIsConfirmStep ? "Previstos: <targets>" : "Na fila: <targets>",
+            new Dictionary<string, string>
+            {
+                { "targets", Mathf.Max(0, data.SupplyServedTargets).ToString() }
+            }));
+        sb.AppendLine(ResolveMessage(
+            "helper.supply.gains",
+            "Ganhos: HP +<hp> | FUEL +<fuel> | AMMO +<ammo>",
+            new Dictionary<string, string>
+            {
+                { "hp", Mathf.Max(0, data.SupplyRecoveredHp).ToString() },
+                { "fuel", Mathf.Max(0, data.SupplyRecoveredFuel).ToString() },
+                { "ammo", Mathf.Max(0, data.SupplyRecoveredAmmo).ToString() }
+            }));
+        sb.AppendLine(ResolveMessage(
+            "helper.supply.total_cost",
+            "Custo estimado: $<valor>",
+            new Dictionary<string, string>
+            {
+                { "valor", Mathf.Max(0, data.SupplyTotalCost).ToString() }
+            }));
+
+        if (data.SupplyTargetLines != null && data.SupplyTargetLines.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
+            for (int i = 0; i < data.SupplyTargetLines.Count; i++)
+            {
+                TurnStateManager.HelperSupplyTargetLine line = data.SupplyTargetLines[i];
+                if (line == null)
+                    continue;
+
+                string prefix = line.isFocused ? ">> " : string.Empty;
+                sb.AppendLine($"{prefix}{line.index}. {line.unitName}");
+                sb.AppendLine($"({line.gainsLabel}) | ${Mathf.Max(0, line.estimatedCost)}");
+            }
+        }
+
+        if (data.SupplyResourceLines != null && data.SupplyResourceLines.Count > 0)
+        {
+            sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
+            sb.AppendLine(ResolveMessage("helper.supply.supplier_consumption", "Consumo do Supridor"));
+            for (int i = 0; i < data.SupplyResourceLines.Count; i++)
+            {
+                TurnStateManager.HelperSupplyResourceLine line = data.SupplyResourceLines[i];
+                if (line == null)
+                    continue;
+                sb.AppendLine(ResolveMessage(
+                    "helper.supply.supplier_consumption.line",
+                    "<supply>: <before> -> <after>",
+                    new Dictionary<string, string>
+                    {
+                        { "supply", line.supplyName ?? "Supply" },
+                        { "before", Mathf.Max(0, line.beforeAmount).ToString() },
+                        { "after", Mathf.Max(0, line.afterAmount).ToString() }
+                    }));
+            }
+        }
+
+        if (data.SupplyHasQueuedOrders)
+        {
+            sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
+            sb.Append(ResolveMessage("helper.supply.process_order.line", "0 - Processar Ordem de Suprimentos"));
         }
 
         return sb.ToString().TrimEnd();
@@ -905,7 +1158,11 @@ public class PanelHelperController : MonoBehaviour
         if (Mouse.current != null)
             return Mouse.current.scroll.ReadValue();
 #endif
+#if ENABLE_LEGACY_INPUT_MANAGER
         return Input.mouseScrollDelta;
+#else
+        return Vector2.zero;
+#endif
     }
 
     private static Vector3 ReadMouseScreenPosition()
@@ -914,8 +1171,186 @@ public class PanelHelperController : MonoBehaviour
         if (Mouse.current != null)
             return Mouse.current.position.ReadValue();
 #endif
+#if ENABLE_LEGACY_INPUT_MANAGER
         return Input.mousePosition;
+#else
+        return Vector3.zero;
+#endif
     }
+
+    private void HandleCoordinateOverlayHotkeys()
+    {
+        if (UiInputBlocker.IsTextInputFocused())
+            return;
+
+        if (WasCoordinateOverlayTogglePressedThisFrame())
+        {
+            showCoordinateOverlay = !showCoordinateOverlay;
+            string state = showCoordinateOverlay ? "ON" : "OFF";
+            PanelDialogController.TrySetTransientText($"Coordinate Overlay: {state}", 1.6f);
+        }
+    }
+
+    private void RefreshCoordinateOverlayState()
+    {
+        coordinateOverlayLabels.Clear();
+        upkeepEventCells.Clear();
+
+        if (!showCoordinateOverlay || cursorController == null)
+            return;
+
+        Vector3Int cursorCell = cursorController.CurrentCell;
+        cursorCell.z = 0;
+        coordinateOverlayLabels.Add(new CoordinateOverlayLabel
+        {
+            cell = cursorCell,
+            text = $"CUR {cursorCell.x},{cursorCell.y}",
+            color = cursorCoordinateColor
+        });
+
+        if (turnStateManager != null && turnStateManager.SelectedUnit != null)
+        {
+            Vector3Int selectedCell = turnStateManager.SelectedUnit.CurrentCellPosition;
+            selectedCell.z = 0;
+            coordinateOverlayLabels.Add(new CoordinateOverlayLabel
+            {
+                cell = selectedCell,
+                text = $"SEL {selectedCell.x},{selectedCell.y}",
+                color = selectedCoordinateColor
+            });
+        }
+
+        if (turnStateManager == null || !turnStateManager.TryBuildHelperPanelData(out TurnStateManager.HelperPanelData data))
+            return;
+        if (data == null || data.Kind != TurnStateManager.HelperPanelKind.TurnStartAutonomy || data.TurnStartAutonomyLines == null)
+            return;
+
+        int signature = 17;
+        for (int i = 0; i < data.TurnStartAutonomyLines.Count; i++)
+        {
+            TurnStateManager.HelperTurnStartAutonomyLine line = data.TurnStartAutonomyLines[i];
+            if (line == null)
+                continue;
+
+            Vector3Int cell = line.cell;
+            cell.z = 0;
+            signature = signature * 31 + cell.x;
+            signature = signature * 31 + cell.y;
+            if (!upkeepEventCells.Contains(cell))
+                upkeepEventCells.Add(cell);
+
+            coordinateOverlayLabels.Add(new CoordinateOverlayLabel
+            {
+                cell = cell,
+                text = $"EV {cell.x},{cell.y}",
+                color = eventCoordinateColor
+            });
+        }
+
+        if (signature != lastUpkeepSignature)
+        {
+            lastUpkeepSignature = signature;
+            for (int i = 0; i < upkeepEventCells.Count; i++)
+                HighlightEventCell(upkeepEventCells[i]);
+        }
+    }
+
+    private void HighlightEventCell(Vector3Int cell)
+    {
+        float expiresAt = Time.unscaledTime + Mathf.Max(0.1f, eventHighlightSeconds);
+        highlightedEventCells[cell] = expiresAt;
+    }
+
+    private void DrawCoordinateLabel(Camera cam, Tilemap tilemap, Vector3Int cell, string text, Color color, bool isHighlight)
+    {
+        if (cam == null || tilemap == null || string.IsNullOrWhiteSpace(text))
+            return;
+
+        Vector3 world = tilemap.GetCellCenterWorld(cell);
+        world.y += coordinateLabelWorldYOffset;
+        Vector3 screen = cam.WorldToScreenPoint(world);
+        if (screen.z <= 0f)
+            return;
+
+        float regularWidth = cursorController != null
+            ? Mathf.Clamp(cursorController.CoordinateOverlayLabelWidth, 60f, 400f)
+            : 220f;
+        float width = isHighlight ? 24f : regularWidth;
+        float height = isHighlight ? 24f : 20f;
+        Rect rect = new Rect(screen.x - width * 0.5f, Screen.height - screen.y - height * 0.5f, width, height);
+        GUIStyle style = isHighlight ? coordinateOverlayHighlightStyle : coordinateOverlayLabelStyle;
+
+        Color previous = GUI.color;
+        GUI.color = color;
+        GUI.Label(rect, text, style);
+        GUI.color = previous;
+    }
+
+    private void EnsureCoordinateOverlayStyles()
+    {
+        if (coordinateOverlayLabelStyle == null)
+        {
+            coordinateOverlayLabelStyle = new GUIStyle(GUI.skin.box)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = 12,
+                fontStyle = FontStyle.Bold,
+                richText = false,
+                normal = { textColor = Color.white }
+            };
+            coordinateOverlayLabelStyle.padding = new RectOffset(4, 4, 1, 1);
+        }
+
+        if (coordinateOverlayHighlightStyle != null)
+            return;
+
+        coordinateOverlayHighlightStyle = new GUIStyle(GUI.skin.box)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 16,
+            fontStyle = FontStyle.Bold,
+            normal = { textColor = Color.white }
+        };
+        coordinateOverlayHighlightStyle.padding = new RectOffset(0, 0, 0, 0);
+    }
+
+    private bool WasCoordinateOverlayTogglePressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (WasKeyPressedThisFrame(toggleCoordinateOverlayKey))
+            return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        return Input.GetKeyDown(toggleCoordinateOverlayKey);
+#else
+        return false;
+#endif
+    }
+
+#if ENABLE_INPUT_SYSTEM
+    private static bool WasKeyPressedThisFrame(KeyCode keyCode)
+    {
+        if (Keyboard.current == null)
+            return false;
+
+        switch (keyCode)
+        {
+            case KeyCode.F1: return Keyboard.current.f1Key.wasPressedThisFrame;
+            case KeyCode.F2: return Keyboard.current.f2Key.wasPressedThisFrame;
+            case KeyCode.F3: return Keyboard.current.f3Key.wasPressedThisFrame;
+            case KeyCode.F4: return Keyboard.current.f4Key.wasPressedThisFrame;
+            case KeyCode.F5: return Keyboard.current.f5Key.wasPressedThisFrame;
+            case KeyCode.F6: return Keyboard.current.f6Key.wasPressedThisFrame;
+            case KeyCode.F7: return Keyboard.current.f7Key.wasPressedThisFrame;
+            case KeyCode.F8: return Keyboard.current.f8Key.wasPressedThisFrame;
+            case KeyCode.F9: return Keyboard.current.f9Key.wasPressedThisFrame;
+            case KeyCode.F10: return Keyboard.current.f10Key.wasPressedThisFrame;
+            case KeyCode.F11: return Keyboard.current.f11Key.wasPressedThisFrame;
+            case KeyCode.F12: return Keyboard.current.f12Key.wasPressedThisFrame;
+            default: return false;
+        }
+    }
+#endif
 
     private GameObject FindNamedObject(string name)
     {
@@ -975,4 +1410,3 @@ public class PanelHelperController : MonoBehaviour
     }
 #endif
 }
-

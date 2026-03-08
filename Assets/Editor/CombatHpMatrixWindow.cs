@@ -15,12 +15,15 @@ public class CombatHpMatrixWindow : EditorWindow
     [SerializeField] private int attackerUnitIndex;
     [SerializeField] private int defenderUnitIndex;
     [SerializeField] private int attackerWeaponIndex;
-    [SerializeField] private int selectedAttackerEmbarkedWeaponIndex = -1;
+    [SerializeField] private int defenderWeaponIndex;
+    [SerializeField] private int selectedAttackerEmbarkedWeaponIndex = -2;
+    [SerializeField] private int selectedDefenderEmbarkedWeaponIndex = -2;
     [SerializeField] private bool autoUpdate = true;
     [SerializeField] private bool logToConsole;
 
     private readonly List<UnitData> units = new List<UnitData>();
     private readonly List<WeaponOption> attackWeaponOptions = new List<WeaponOption>();
+    private readonly List<CounterWeaponOption> defenderWeaponOptions = new List<CounterWeaponOption>();
     private readonly MatrixCellResult[,] matrix = new MatrixCellResult[HpGridSize, HpGridSize];
 
     private bool matrixReady;
@@ -41,6 +44,7 @@ public class CombatHpMatrixWindow : EditorWindow
         AutoDetectContext();
         RefreshUnits();
         RefreshAttackWeaponOptions();
+        RefreshDefenderWeaponOptions();
         EditorApplication.projectChanged += OnProjectChanged;
         EditorApplication.update += OnEditorUpdate;
         Undo.undoRedoPerformed += OnUndoRedoPerformed;
@@ -75,6 +79,7 @@ public class CombatHpMatrixWindow : EditorWindow
         {
             RefreshUnits();
             RefreshAttackWeaponOptions();
+            RefreshDefenderWeaponOptions();
             matrixReady = false;
             selectedCellTitle = string.Empty;
             selectedCellLog = string.Empty;
@@ -83,6 +88,7 @@ public class CombatHpMatrixWindow : EditorWindow
         else if (previousDistance != distance)
         {
             RefreshAttackWeaponOptions();
+            RefreshDefenderWeaponOptions();
             matrixReady = false;
             selectedCellTitle = string.Empty;
             selectedCellLog = string.Empty;
@@ -95,6 +101,7 @@ public class CombatHpMatrixWindow : EditorWindow
             AutoDetectContext();
             RefreshUnits();
             RefreshAttackWeaponOptions();
+            RefreshDefenderWeaponOptions();
         }
         if (GUILayout.Button("Limpar"))
             ClearState();
@@ -107,29 +114,33 @@ public class CombatHpMatrixWindow : EditorWindow
         else
         {
             string[] labels = BuildUnitLabels(units);
-            int previousAttacker = attackerUnitIndex;
-            int previousDefender = defenderUnitIndex;
-
             attackerUnitIndex = Mathf.Clamp(attackerUnitIndex, 0, units.Count - 1);
             defenderUnitIndex = Mathf.Clamp(defenderUnitIndex, 0, units.Count - 1);
+
+            int previousAttacker = attackerUnitIndex;
             attackerUnitIndex = EditorGUILayout.Popup("Atacante", attackerUnitIndex, labels);
-            defenderUnitIndex = EditorGUILayout.Popup("Defensor", defenderUnitIndex, labels);
-
-            if (previousAttacker != attackerUnitIndex || previousDefender != defenderUnitIndex)
+            if (previousAttacker != attackerUnitIndex)
+            {
                 RefreshAttackWeaponOptions();
-        }
+                RefreshDefenderWeaponOptions();
+            }
 
-        DrawAttackWeaponSelector();
+            DrawAttackWeaponSelector();
+
+            int previousDefender = defenderUnitIndex;
+            defenderUnitIndex = EditorGUILayout.Popup("Defensor", defenderUnitIndex, labels);
+            if (previousDefender != defenderUnitIndex)
+            {
+                RefreshAttackWeaponOptions();
+                RefreshDefenderWeaponOptions();
+            }
+
+            DrawDefenderWeaponSelector();
+        }
 
         if (GUILayout.Button("Gerar Matriz de HP (10x10)"))
         {
-            int forcedEmbarkedWeaponIndex = -1;
-            if (attackWeaponOptions.Count > 0)
-            {
-                int currentPopupIndex = Mathf.Clamp(attackerWeaponIndex, 0, attackWeaponOptions.Count - 1);
-                forcedEmbarkedWeaponIndex = attackWeaponOptions[currentPopupIndex].embarkedWeaponIndex;
-            }
-            GenerateMatrix(forcedEmbarkedWeaponIndex);
+            GenerateMatrix(selectedAttackerEmbarkedWeaponIndex);
         }
 
         EditorGUILayout.Space(6f);
@@ -158,16 +169,58 @@ public class CombatHpMatrixWindow : EditorWindow
             return;
         }
 
-        string[] labels = new string[attackWeaponOptions.Count];
+        UnitData attacker = attackerUnitIndex >= 0 && attackerUnitIndex < units.Count ? units[attackerUnitIndex] : null;
+        UnitData defender = defenderUnitIndex >= 0 && defenderUnitIndex < units.Count ? units[defenderUnitIndex] : null;
+        WeaponPick autoPick = PickBestAttackWeapon(attacker, defender);
+
+        string[] labels = new string[attackWeaponOptions.Count + 1];
+        labels[0] = autoPick.isValid
+            ? $"Auto ({ResolveWeaponName(autoPick.weapon)})"
+            : "Auto (sem arma valida)";
         for (int i = 0; i < attackWeaponOptions.Count; i++)
         {
             WeaponOption option = attackWeaponOptions[i];
-            labels[i] = $"[{option.code}] {ResolveWeaponName(option.weapon)} | range={option.minRange}-{option.maxRange}";
+            labels[i + 1] = $"[{option.code}] {ResolveWeaponName(option.weapon)} | range={option.minRange}-{option.maxRange}";
         }
 
-        attackerWeaponIndex = Mathf.Clamp(attackerWeaponIndex, 0, attackWeaponOptions.Count - 1);
-        attackerWeaponIndex = EditorGUILayout.Popup("Arma do Atacante", attackerWeaponIndex, labels);
+        int popupIndex = 0;
+        if (selectedAttackerEmbarkedWeaponIndex >= 0)
+        {
+            int selectedIndex = ResolveAttackWeaponIndexByEmbarked(selectedAttackerEmbarkedWeaponIndex);
+            popupIndex = selectedIndex >= 0 ? selectedIndex + 1 : Mathf.Clamp(attackerWeaponIndex + 1, 1, attackWeaponOptions.Count);
+        }
+
+        popupIndex = EditorGUILayout.Popup("Arma do Atacante", popupIndex, labels);
+        if (popupIndex <= 0)
+        {
+            selectedAttackerEmbarkedWeaponIndex = -2;
+            if (autoPick.isValid)
+                attackerWeaponIndex = Mathf.Max(0, ResolveAttackWeaponIndexByEmbarked(autoPick.embarkedWeaponIndex));
+            return;
+        }
+
+        attackerWeaponIndex = Mathf.Clamp(popupIndex - 1, 0, attackWeaponOptions.Count - 1);
         selectedAttackerEmbarkedWeaponIndex = attackWeaponOptions[attackerWeaponIndex].embarkedWeaponIndex;
+    }
+
+    private void DrawDefenderWeaponSelector()
+    {
+        RefreshDefenderWeaponOptions();
+        if (defenderWeaponOptions.Count <= 0)
+        {
+            EditorGUILayout.HelpBox("Sem opcao de revide para o defensor nesse par/distancia.", MessageType.None);
+            defenderWeaponIndex = 0;
+            selectedDefenderEmbarkedWeaponIndex = -1;
+            return;
+        }
+
+        string[] labels = new string[defenderWeaponOptions.Count];
+        for (int i = 0; i < defenderWeaponOptions.Count; i++)
+            labels[i] = defenderWeaponOptions[i].label;
+
+        defenderWeaponIndex = Mathf.Clamp(defenderWeaponIndex, 0, defenderWeaponOptions.Count - 1);
+        defenderWeaponIndex = EditorGUILayout.Popup("Arma do Defensor (revide)", defenderWeaponIndex, labels);
+        selectedDefenderEmbarkedWeaponIndex = defenderWeaponOptions[defenderWeaponIndex].embarkedWeaponIndex;
     }
 
     private void GenerateMatrix(int forcedEmbarkedWeaponIndex)
@@ -207,9 +260,33 @@ public class CombatHpMatrixWindow : EditorWindow
 
         UnitData attacker = units[attackerUnitIndex];
         UnitData defender = units[defenderUnitIndex];
-        int effectiveWeaponIndex = ResolveAttackWeaponIndexByEmbarked(forcedEmbarkedWeaponIndex);
+        int effectiveWeaponIndex = -1;
+        if (forcedEmbarkedWeaponIndex == -2)
+        {
+            WeaponPick autoAttackPick = PickBestAttackWeapon(attacker, defender);
+            effectiveWeaponIndex = autoAttackPick.isValid
+                ? ResolveAttackWeaponIndexByEmbarked(autoAttackPick.embarkedWeaponIndex)
+                : -1;
+        }
+        else
+        {
+            effectiveWeaponIndex = ResolveAttackWeaponIndexByEmbarked(forcedEmbarkedWeaponIndex);
+        }
+
         if (effectiveWeaponIndex < 0)
-            effectiveWeaponIndex = ResolveAttackWeaponIndexByEmbarked(selectedAttackerEmbarkedWeaponIndex);
+        {
+            if (selectedAttackerEmbarkedWeaponIndex == -2)
+            {
+                WeaponPick autoAttackPick = PickBestAttackWeapon(attacker, defender);
+                effectiveWeaponIndex = autoAttackPick.isValid
+                    ? ResolveAttackWeaponIndexByEmbarked(autoAttackPick.embarkedWeaponIndex)
+                    : -1;
+            }
+            else
+            {
+                effectiveWeaponIndex = ResolveAttackWeaponIndexByEmbarked(selectedAttackerEmbarkedWeaponIndex);
+            }
+        }
         if (effectiveWeaponIndex < 0 || effectiveWeaponIndex >= attackWeaponOptions.Count)
         {
             status = "Falha: nao foi possivel resolver a arma selecionada.";
@@ -219,7 +296,9 @@ public class CombatHpMatrixWindow : EditorWindow
         attackerWeaponIndex = effectiveWeaponIndex;
         WeaponOption attackOption = attackWeaponOptions[effectiveWeaponIndex];
         selectedAttackerEmbarkedWeaponIndex = attackOption.embarkedWeaponIndex;
-        WeaponPick counterPick = PickBestCounterWeapon(defender, attacker, distance, attackOption.weapon);
+        RefreshDefenderWeaponOptions();
+        defenderWeaponIndex = Mathf.Clamp(defenderWeaponIndex, 0, Mathf.Max(0, defenderWeaponOptions.Count - 1));
+        WeaponPick counterPick = ResolveSelectedDefenderCounterWeapon(defender, attacker, attackOption.weapon);
 
         for (int row = 0; row < HpGridSize; row++)
         {
@@ -464,6 +543,7 @@ public class CombatHpMatrixWindow : EditorWindow
     {
         int previousSelectedIndex = attackerWeaponIndex;
         int previousSelectedEmbarkedIndexFromField = selectedAttackerEmbarkedWeaponIndex;
+        bool keepAutoSelection = previousSelectedEmbarkedIndexFromField == -2;
         WeaponData previousSelectedWeapon = null;
         int previousSelectedEmbarkedIndex = -1;
         if (attackWeaponOptions.Count > 0
@@ -540,12 +620,74 @@ public class CombatHpMatrixWindow : EditorWindow
         if (restoredIndex >= 0)
         {
             attackerWeaponIndex = restoredIndex;
-            selectedAttackerEmbarkedWeaponIndex = attackWeaponOptions[restoredIndex].embarkedWeaponIndex;
+            if (!keepAutoSelection)
+                selectedAttackerEmbarkedWeaponIndex = attackWeaponOptions[restoredIndex].embarkedWeaponIndex;
             return;
         }
 
         attackerWeaponIndex = Mathf.Clamp(previousSelectedIndex, 0, attackWeaponOptions.Count - 1);
-        selectedAttackerEmbarkedWeaponIndex = attackWeaponOptions[attackerWeaponIndex].embarkedWeaponIndex;
+        if (!keepAutoSelection)
+            selectedAttackerEmbarkedWeaponIndex = attackWeaponOptions[attackerWeaponIndex].embarkedWeaponIndex;
+    }
+
+    private void RefreshDefenderWeaponOptions()
+    {
+        int previousPopupIndex = defenderWeaponIndex;
+        int previousEmbarkedIndex = selectedDefenderEmbarkedWeaponIndex;
+
+        defenderWeaponOptions.Clear();
+        if (units.Count <= 0)
+            return;
+        if (attackerUnitIndex < 0 || attackerUnitIndex >= units.Count || defenderUnitIndex < 0 || defenderUnitIndex >= units.Count)
+            return;
+
+        UnitData attacker = units[attackerUnitIndex];
+        UnitData defender = units[defenderUnitIndex];
+        if (attacker == null || defender == null)
+            return;
+
+        WeaponData attackerWeaponContext = null;
+        if (attackWeaponOptions.Count > 0 && attackerWeaponIndex >= 0 && attackerWeaponIndex < attackWeaponOptions.Count)
+            attackerWeaponContext = attackWeaponOptions[attackerWeaponIndex].weapon;
+
+        WeaponPick autoPick = PickBestCounterWeapon(defender, attacker, distance, attackerWeaponContext);
+        string autoLabel = autoPick.isValid
+            ? $"Auto ({ResolveWeaponName(autoPick.weapon)})"
+            : "Auto (sem revide)";
+        defenderWeaponOptions.Add(new CounterWeaponOption(autoPick, -2, autoLabel));
+
+        if (defender.embarkedWeapons != null)
+        {
+            for (int i = 0; i < defender.embarkedWeapons.Count; i++)
+            {
+                if (!TryBuildManualCounterWeaponOption(attacker, defender.embarkedWeapons[i], i, distance, out CounterWeaponOption option))
+                    continue;
+                defenderWeaponOptions.Add(option);
+            }
+        }
+
+        defenderWeaponOptions.Add(new CounterWeaponOption(WeaponPick.None, -1, "Sem revide (forcado)"));
+
+        int restoredIndex = -1;
+        if (previousEmbarkedIndex == -2)
+            restoredIndex = 0;
+        else
+        {
+            for (int i = 0; i < defenderWeaponOptions.Count; i++)
+            {
+                if (defenderWeaponOptions[i].embarkedWeaponIndex == previousEmbarkedIndex)
+                {
+                    restoredIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (restoredIndex < 0)
+            restoredIndex = Mathf.Clamp(previousPopupIndex, 0, defenderWeaponOptions.Count - 1);
+
+        defenderWeaponIndex = restoredIndex;
+        selectedDefenderEmbarkedWeaponIndex = defenderWeaponOptions[defenderWeaponIndex].embarkedWeaponIndex;
     }
 
     private int ResolveAttackWeaponIndexByEmbarked(int embarkedWeaponIndex)
@@ -562,6 +704,41 @@ public class CombatHpMatrixWindow : EditorWindow
             }
         }
         return -1;
+    }
+
+    private WeaponPick ResolveSelectedDefenderCounterWeapon(UnitData defender, UnitData attacker, WeaponData attackerWeaponContext)
+    {
+        if (defenderWeaponOptions.Count <= 0)
+            return PickBestCounterWeapon(defender, attacker, distance, attackerWeaponContext);
+
+        defenderWeaponIndex = Mathf.Clamp(defenderWeaponIndex, 0, defenderWeaponOptions.Count - 1);
+        CounterWeaponOption selected = defenderWeaponOptions[defenderWeaponIndex];
+        if (selected.embarkedWeaponIndex == -2)
+            return PickBestCounterWeapon(defender, attacker, distance, attackerWeaponContext);
+
+        return selected.pick;
+    }
+
+    private WeaponPick PickBestAttackWeapon(UnitData attacker, UnitData defender)
+    {
+        if (attacker == null || defender == null || attackWeaponOptions.Count <= 0)
+            return WeaponPick.None;
+
+        WeaponPick fallback = WeaponPick.None;
+        for (int i = 0; i < attackWeaponOptions.Count; i++)
+        {
+            WeaponOption option = attackWeaponOptions[i];
+            if (option.weapon == null)
+                continue;
+
+            WeaponPick current = new WeaponPick(option.weapon, option.embarkedWeaponIndex, option.code, true);
+            if (!fallback.isValid)
+                fallback = current;
+            if (EvaluateWeaponPriority(weaponPriorityData, option.weapon.WeaponCategory, defender.unitClass))
+                return current;
+        }
+
+        return fallback;
     }
 
     private WeaponPick PickBestCounterWeapon(UnitData defender, UnitData attacker, int attackRange, WeaponData attackerWeaponContext)
@@ -582,7 +759,7 @@ public class CombatHpMatrixWindow : EditorWindow
             if (!embarked.weapon.SupportsOperationOn(attacker.domain, attacker.heightLevel))
                 continue;
 
-            WeaponPick current = new WeaponPick(embarked.weapon, GetWeaponLabel(embarked.weapon, i), true);
+            WeaponPick current = new WeaponPick(embarked.weapon, i, GetWeaponLabel(embarked.weapon, i), true);
             if (!fallback.isValid)
                 fallback = current;
             if (EvaluateWeaponPriority(weaponPriorityData, embarked.weapon.WeaponCategory, attacker.unitClass))
@@ -595,6 +772,26 @@ public class CombatHpMatrixWindow : EditorWindow
     private static bool EvaluateWeaponPriority(WeaponPriorityData data, WeaponCategory category, GameUnitClass targetClass)
     {
         return data != null && data.IsPreferredTarget(category, targetClass);
+    }
+
+    private static bool TryBuildManualCounterWeaponOption(UnitData attacker, UnitEmbarkedWeapon embarked, int embarkedIndex, int distance, out CounterWeaponOption option)
+    {
+        option = default(CounterWeaponOption);
+        if (attacker == null || embarked == null || embarked.weapon == null)
+            return false;
+        if (distance != 1)
+            return false;
+        if (embarked.GetRangeMin() != 1)
+            return false;
+        if (embarked.squadAmmunition <= 0)
+            return false;
+        if (!embarked.weapon.SupportsOperationOn(attacker.domain, attacker.heightLevel))
+            return false;
+
+        WeaponPick pick = new WeaponPick(embarked.weapon, embarkedIndex, GetWeaponLabel(embarked.weapon, embarkedIndex), true);
+        string label = $"Manual [{embarkedIndex}] {ResolveWeaponName(embarked.weapon)}";
+        option = new CounterWeaponOption(pick, embarkedIndex, label);
+        return true;
     }
 
     private int ResolveAttackRps(GameUnitClass attackerClass, WeaponCategory weaponCategory, GameUnitClass defenderClass)
@@ -781,8 +978,11 @@ public class CombatHpMatrixWindow : EditorWindow
         attackerUnitIndex = 0;
         defenderUnitIndex = 0;
         attackerWeaponIndex = 0;
-        selectedAttackerEmbarkedWeaponIndex = -1;
+        defenderWeaponIndex = 0;
+        selectedAttackerEmbarkedWeaponIndex = -2;
+        selectedDefenderEmbarkedWeaponIndex = -2;
         attackWeaponOptions.Clear();
+        defenderWeaponOptions.Clear();
         matrixReady = false;
         selectedCellTitle = string.Empty;
         selectedCellLog = string.Empty;
@@ -809,17 +1009,33 @@ public class CombatHpMatrixWindow : EditorWindow
 
     private readonly struct WeaponPick
     {
-        public static WeaponPick None => new WeaponPick(null, "-", false);
+        public static WeaponPick None => new WeaponPick(null, -1, "-", false);
 
         public readonly WeaponData weapon;
+        public readonly int embarkedWeaponIndex;
         public readonly string code;
         public readonly bool isValid;
 
-        public WeaponPick(WeaponData weapon, string code, bool isValid)
+        public WeaponPick(WeaponData weapon, int embarkedWeaponIndex, string code, bool isValid)
         {
             this.weapon = weapon;
+            this.embarkedWeaponIndex = embarkedWeaponIndex;
             this.code = code;
             this.isValid = isValid;
+        }
+    }
+
+    private readonly struct CounterWeaponOption
+    {
+        public readonly WeaponPick pick;
+        public readonly int embarkedWeaponIndex;
+        public readonly string label;
+
+        public CounterWeaponOption(WeaponPick pick, int embarkedWeaponIndex, string label)
+        {
+            this.pick = pick;
+            this.embarkedWeaponIndex = embarkedWeaponIndex;
+            this.label = label;
         }
     }
 

@@ -100,6 +100,10 @@ public class StructureData : ScriptableObject
     [Header("Naval Ops")]
     [Tooltip("Unidades nesses dominios/alturas encerram movimento no dominio nativo do terreno quando estiverem neste par Estrutura+Terreno.")]
     public List<TerrainLayerMode> forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
+    [Tooltip("Quando ligado, unidades nos dominios/alturas acima ficam livremente detectaveis neste par Estrutura+Terreno.")]
+    public bool forceDetectOnForcedEndMovementDomains = false;
+    [Tooltip("Se preenchido, somente unidades com essas Stealth Skills ficam livremente detectaveis neste par Estrutura+Terreno (nos dominios/alturas acima).")]
+    public List<SkillData> forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
 
     [Header("Road Routes")]
     [Tooltip("Rotas de rodovia desta estrutura (centro-a-centro dos hexes).")]
@@ -117,6 +121,8 @@ public class StructureData : ScriptableObject
             aircraftOpsByTerrain = new List<StructureAirOpsTerrainRule>();
         if (forceEndMovementOnTerrainDomainForDomains == null)
             forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
+        if (forceDetectUnitsWithFollowingStealthSkills == null)
+            forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
 
         for (int i = 0; i < aircraftOpsByTerrain.Count; i++)
         {

@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: df05c49e3fc98a848992b30c74dd2a78
+guid: 95e926cde401aaa4fa75de030455f27d
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 4843989397392444045
-    second: aeronautica_0
+      213: -3580737957162770363
+    second: x_card_marinha_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -96,30 +96,17 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 1
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: aeronautica_0
+      name: x_card_marinha_0
       rect:
         serializedVersion: 2
-        x: 148
-        y: 25
-        width: 729
-        height: 972
+        x: 117
+        y: 12
+        width: 783
+        height: 994
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: d8ac55f31be493340800000000000000
-      internalID: 4843989397392444045
+      spriteID: 5402e8dacc9ae4ec0800000000000000
+      internalID: -3580737957162770363
       vertices: []
       indices: 
       edges: []
@@ -148,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      aeronautica_0: 4843989397392444045
+      x_card_marinha_0: -3580737957162770363
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

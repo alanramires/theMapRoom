@@ -31,21 +31,6 @@ MonoBehaviour:
   - ataque:
       unitClass: 1
       weaponCategory: 0
-      targetClass: 1
-      attackBonus: -1
-      notes: "Veiculos n\xE3o atacam bem a si mesmos usando metralhadora de combate"
-      rpsAttackText: Vehicle com AntiInfantaria ataca Vehicle com RPS Ataque -1
-    defesa:
-      targetClass: 1
-      unitClass: 1
-      weaponCategory: 0
-      defenseBonus: 2
-      notes: a blindagem natural do veiculo aguenta o tranco
-      rpsDefenseText: Vehicle se defende de Vehicle com AntiInfantaria com RPS Defesa
-        +2
-  - ataque:
-      unitClass: 1
-      weaponCategory: 0
       targetClass: 3
       attackBonus: -5
       notes: "Veiculos n\xE3o atacam bem a si mesmos usando metralhadora de combate"
@@ -58,6 +43,21 @@ MonoBehaviour:
       notes: a blindagem natural do veiculo aguenta o tranco
       rpsDefenseText: Armored se defende de Vehicle com AntiInfantaria com RPS Defesa
         +5
+  - ataque:
+      unitClass: 1
+      weaponCategory: 0
+      targetClass: 1
+      attackBonus: -1
+      notes: "Veiculos n\xE3o atacam bem a si mesmos usando metralhadora de combate"
+      rpsAttackText: Vehicle com AntiInfantaria ataca Vehicle com RPS Ataque -1
+    defesa:
+      targetClass: 1
+      unitClass: 1
+      weaponCategory: 0
+      defenseBonus: 2
+      notes: a blindagem natural do veiculo aguenta o tranco
+      rpsDefenseText: Vehicle se defende de Vehicle com AntiInfantaria com RPS Defesa
+        +2
   - ataque:
       unitClass: 1
       weaponCategory: 0
@@ -76,6 +76,21 @@ MonoBehaviour:
   - ataque:
       unitClass: 1
       weaponCategory: 0
+      targetClass: 4
+      attackBonus: -5
+      notes: "Veiculos n\xE3o atacam bem artilharias"
+      rpsAttackText: Vehicle com AntiInfantaria ataca Jet com RPS Ataque -5
+    defesa:
+      targetClass: 4
+      unitClass: 1
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: "Artilheiros s\xE3o resistentes a balas"
+      rpsDefenseText: Jet se defende de Vehicle com AntiInfantaria com RPS Defesa
+        +5
+  - ataque:
+      unitClass: 1
+      weaponCategory: 0
       targetClass: 5
       attackBonus: -5
       notes: "Veiculos n\xE3o atacam bem artilharias"
@@ -88,3 +103,18 @@ MonoBehaviour:
       notes: "Artilheiros s\xE3o resistentes a balas"
       rpsDefenseText: Helicopter se defende de Vehicle com AntiInfantaria com RPS
         Defesa +5
+  - ataque:
+      unitClass: 1
+      weaponCategory: 0
+      targetClass: 6
+      attackBonus: -5
+      notes: "Veiculos n\xE3o atacam bem artilharias"
+      rpsAttackText: Vehicle com AntiInfantaria ataca Plane com RPS Ataque -5
+    defesa:
+      targetClass: 6
+      unitClass: 1
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: "Artilheiros s\xE3o resistentes a balas"
+      rpsDefenseText: Plane se defende de Vehicle com AntiInfantaria com RPS Defesa
+        +5

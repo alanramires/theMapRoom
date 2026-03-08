@@ -11,6 +11,14 @@ public static class PodeMirarSensor
     private const string InvalidReasonNoForwardObserver = "Sem observador avancado (alcance visual 3 hex).";
     private const string InvalidReasonStealth = "Alvo nao detectado (stealth placeholder).";
     private const int DefaultObservationRangeHexes = 3;
+    private static MatchController cachedMatchController;
+    private static readonly Dictionary<int, StealthRevealState> stealthRevealStateByTarget = new Dictionary<int, StealthRevealState>();
+
+    private sealed class StealthRevealState
+    {
+        public int revealForAllUntilTurn = int.MinValue;
+        public readonly Dictionary<int, int> revealByTeamUntilTurn = new Dictionary<int, int>();
+    }
 
     private static string ResolveInvalidReasonId(string reason)
     {
@@ -263,7 +271,7 @@ public static class PodeMirarSensor
                         }
                     }
 
-                    int attackerObservationRange = GetObservationRangeHexes(attacker);
+                    int attackerObservationRange = GetObservationRangeHexes(attacker, target);
                     bool requiresForwardObserver = distance > 1 && enableLosValidation && enableSpotter && distance > attackerObservationRange;
                     if (requiresForwardObserver)
                     {
@@ -308,7 +316,7 @@ public static class PodeMirarSensor
                         if (enableSpotter)
                         {
                             bool shooterSeesTarget = false;
-                            int attackerObservationRange = GetObservationRangeHexes(attacker);
+                            int attackerObservationRange = GetObservationRangeHexes(attacker, target);
                             if (distance <= 1)
                             {
                                 shooterSeesTarget = true;
@@ -369,7 +377,7 @@ public static class PodeMirarSensor
                     }
                 }
 
-                if (enableStealthValidation && !IsTargetDetectableByAttacker(attacker, target))
+                if (enableStealthValidation && !IsTargetDetectableByAttacker(attacker, target, map, terrainDatabase))
                 {
                     AppendInvalid(
                         invalidOutput,
@@ -775,7 +783,7 @@ public static class PodeMirarSensor
 
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
-        int maxObserverRange = GetTeamMaxObservationRangeHexes(attacker);
+        int maxObserverRange = GetTeamMaxObservationRangeHexes(attacker, target);
         Dictionary<Vector3Int, int> localAroundTarget = BuildDistanceMap(map, targetCell, maxObserverRange);
         if (localAroundTarget.Count == 0)
             return observers;
@@ -796,7 +804,7 @@ public static class PodeMirarSensor
             if (!localAroundTarget.TryGetValue(allyCell, out int allyDistanceToTarget))
                 continue;
 
-            int allyObservationRange = GetObservationRangeHexes(ally);
+            int allyObservationRange = GetObservationRangeHexes(ally, target);
             if (allyDistanceToTarget > allyObservationRange)
                 continue;
 
@@ -839,6 +847,21 @@ public static class PodeMirarSensor
 
     private static int GetObservationRangeHexes(UnitManager unit)
     {
+        if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null)
+            return Mathf.Max(1, data.ResolveVisionFor(unit.GetDomain(), unit.GetHeightLevel()));
+        if (unit != null)
+            return Mathf.Max(1, unit.Visao);
+
+        return DefaultObservationRangeHexes;
+    }
+
+    private static int GetObservationRangeHexes(UnitManager unit, UnitManager target)
+    {
+        if (target == null)
+            return GetObservationRangeHexes(unit);
+
+        if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null)
+            return Mathf.Max(1, data.ResolveVisionFor(target.GetDomain(), target.GetHeightLevel()));
         if (unit != null)
             return Mathf.Max(1, unit.Visao);
 
@@ -861,6 +884,29 @@ public static class PodeMirarSensor
                 continue;
 
             int allyRange = GetObservationRangeHexes(ally);
+            if (allyRange > maxRange)
+                maxRange = allyRange;
+        }
+
+        return Mathf.Max(1, maxRange);
+    }
+
+    private static int GetTeamMaxObservationRangeHexes(UnitManager referenceUnit, UnitManager target)
+    {
+        if (referenceUnit == null)
+            return DefaultObservationRangeHexes;
+
+        int maxRange = GetObservationRangeHexes(referenceUnit, target);
+        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager ally = units[i];
+            if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
+                continue;
+            if (ally.TeamId != referenceUnit.TeamId)
+                continue;
+
+            int allyRange = GetObservationRangeHexes(ally, target);
             if (allyRange > maxRange)
                 maxRange = allyRange;
         }
@@ -1465,13 +1511,221 @@ public static class PodeMirarSensor
         return true;
     }
 
-    private static bool IsTargetDetectableByAttacker(UnitManager attacker, UnitManager target)
+    private static bool IsTargetDetectableByAttacker(
+        UnitManager attacker,
+        UnitManager target,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase)
     {
         if (attacker == null || target == null)
             return false;
 
-        // Placeholder para futura regra de stealth/deteccao.
-        // Ex.: F-117 em AirHigh pode estar visivel por LoS, mas invisivel sem detector adequado.
+        if (!IsStealthTarget(target))
+            return true;
+
+        if (IsTargetFreelyDetectedByForcedEndMovementRules(target, boardMap, terrainDatabase))
+            return true;
+
+        int attackerTeamId = (int)attacker.TeamId;
+        int currentTurn = GetCurrentTurnSafe();
+        StealthRevealScope revealScope = StealthRevealScope.AllTeams;
+        int revealTurns = 1;
+        ResolveStealthRevealRules(target, out revealScope, out revealTurns);
+        if (IsTargetAlreadyRevealedForTeam(target, attackerTeamId, currentTurn))
+            return true;
+
+        if (!attacker.TryGetUnitData(out UnitData attackerData) || attackerData == null)
+            return false;
+
+        target.TryGetUnitData(out UnitData targetData);
+        bool canDetectNow = attackerData.CanDetectStealthFor(target.GetDomain(), target.GetHeightLevel(), targetData);
+        if (!canDetectNow)
+            return false;
+
+        RegisterStealthReveal(target, attackerTeamId, currentTurn, revealTurns, revealScope);
         return true;
+    }
+
+    private static bool IsStealthTarget(UnitManager target)
+    {
+        if (target == null)
+            return false;
+
+        if (target.TryGetUnitData(out UnitData targetData) && targetData != null)
+            return targetData.IsStealthUnit();
+
+        return false;
+    }
+
+    private static void ResolveStealthRevealRules(UnitManager target, out StealthRevealScope revealScope, out int revealTurns)
+    {
+        revealScope = StealthRevealScope.AllTeams;
+        revealTurns = 1;
+
+        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
+            return;
+
+        revealScope = targetData.stealthRevealScope;
+        revealTurns = targetData.ResolveStealthVisibleTurns();
+    }
+
+    private static bool IsTargetAlreadyRevealedForTeam(UnitManager target, int teamId, int currentTurn)
+    {
+        int targetKey = target.GetInstanceID();
+        if (!stealthRevealStateByTarget.TryGetValue(targetKey, out StealthRevealState state) || state == null)
+            return false;
+
+        if (state.revealForAllUntilTurn >= currentTurn)
+            return true;
+
+        if (state.revealByTeamUntilTurn.TryGetValue(teamId, out int teamUntilTurn) && teamUntilTurn >= currentTurn)
+            return true;
+
+        return false;
+    }
+
+    private static void RegisterStealthReveal(
+        UnitManager target,
+        int detectorTeamId,
+        int currentTurn,
+        int revealTurns,
+        StealthRevealScope revealScope)
+    {
+        if (target == null)
+            return;
+
+        int duration = Mathf.Max(1, revealTurns);
+        int untilTurn = currentTurn + duration - 1;
+        int targetKey = target.GetInstanceID();
+        if (!stealthRevealStateByTarget.TryGetValue(targetKey, out StealthRevealState state) || state == null)
+        {
+            state = new StealthRevealState();
+            stealthRevealStateByTarget[targetKey] = state;
+        }
+
+        if (revealScope == StealthRevealScope.AllTeams)
+        {
+            state.revealForAllUntilTurn = Mathf.Max(state.revealForAllUntilTurn, untilTurn);
+            return;
+        }
+
+        if (!state.revealByTeamUntilTurn.TryGetValue(detectorTeamId, out int currentTeamUntil) || untilTurn > currentTeamUntil)
+            state.revealByTeamUntilTurn[detectorTeamId] = untilTurn;
+    }
+
+    private static int GetCurrentTurnSafe()
+    {
+        if (cachedMatchController == null)
+            cachedMatchController = Object.FindAnyObjectByType<MatchController>();
+
+        return cachedMatchController != null ? cachedMatchController.CurrentTurn : 0;
+    }
+
+    private static bool IsTargetFreelyDetectedByForcedEndMovementRules(
+        UnitManager target,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase)
+    {
+        if (target == null || boardMap == null)
+            return false;
+
+        Vector3Int cell = target.CurrentCellPosition;
+        cell.z = 0;
+        Domain targetDomain = target.GetDomain();
+        HeightLevel targetHeight = target.GetHeightLevel();
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cell);
+        if (construction != null &&
+            construction.TryResolveConstructionData(out ConstructionData constructionData) &&
+            constructionData != null &&
+            MatchesAnyLayerMode(constructionData.forceEndMovementOnTerrainDomainForDomains, targetDomain, targetHeight))
+        {
+            if (ShouldForceDetectByStealthSkills(
+                    constructionData.forceDetectUnitsWithFollowingStealthSkills,
+                    target))
+                return true;
+
+            if (constructionData.forceDetectOnForcedEndMovementDomains)
+                return true;
+        }
+
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardMap, cell);
+        if (structure != null &&
+            MatchesAnyLayerMode(structure.forceEndMovementOnTerrainDomainForDomains, targetDomain, targetHeight))
+        {
+            if (ShouldForceDetectByStealthSkills(
+                    structure.forceDetectUnitsWithFollowingStealthSkills,
+                    target))
+                return true;
+
+            if (structure.forceDetectOnForcedEndMovementDomains)
+                return true;
+        }
+
+        if (!TryResolveTerrainAtCell(boardMap, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
+            return false;
+
+        if (!MatchesAnyLayerMode(terrain.forceEndMovementOnTerrainDomainForDomains, targetDomain, targetHeight))
+            return false;
+
+        if (ShouldForceDetectByStealthSkills(terrain.forceDetectUnitsWithFollowingStealthSkills, target))
+            return true;
+
+        return terrain.forceDetectOnForcedEndMovementDomains;
+    }
+
+    private static bool MatchesAnyLayerMode(IReadOnlyList<TerrainLayerMode> modes, Domain domain, HeightLevel heightLevel)
+    {
+        if (modes == null || modes.Count == 0)
+            return false;
+
+        for (int i = 0; i < modes.Count; i++)
+        {
+            TerrainLayerMode mode = modes[i];
+            if (mode.domain == domain && mode.heightLevel == heightLevel)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool ShouldForceDetectByStealthSkills(IReadOnlyList<SkillData> detectorSkills, UnitManager target)
+    {
+        if (detectorSkills == null || detectorSkills.Count == 0 || target == null)
+            return false;
+
+        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
+            return false;
+
+        List<SkillData> targetStealthSkills = targetData.ResolveStealthSkillsForDetection();
+        if (targetStealthSkills == null || targetStealthSkills.Count == 0)
+            return false;
+
+        for (int i = 0; i < detectorSkills.Count; i++)
+        {
+            SkillData detectorSkill = detectorSkills[i];
+            if (detectorSkill == null)
+                continue;
+
+            string detectorId = string.IsNullOrWhiteSpace(detectorSkill.id) ? string.Empty : detectorSkill.id.Trim();
+            for (int j = 0; j < targetStealthSkills.Count; j++)
+            {
+                SkillData targetSkill = targetStealthSkills[j];
+                if (targetSkill == null)
+                    continue;
+
+                if (ReferenceEquals(detectorSkill, targetSkill))
+                    return true;
+
+                string targetId = string.IsNullOrWhiteSpace(targetSkill.id) ? string.Empty : targetSkill.id.Trim();
+                if (detectorId.Length > 0 && targetId.Length > 0 &&
+                    string.Equals(detectorId, targetId, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

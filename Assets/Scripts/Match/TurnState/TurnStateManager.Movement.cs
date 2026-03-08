@@ -13,6 +13,12 @@ public partial class TurnStateManager
 
         TryApplyForcedEndMovementLayerBeforeSensors(resolvedMovementState);
         SetCursorState(resolvedMovementState, $"EnterSensorsState(anchor={resolvedMovementState})");
+        // Garante que o scanner sempre volta ao passo base ao finalizar movimento.
+        // Evita herdar substep de fluxos anteriores (suprir/fundir/etc).
+        scannerPromptStep = ScannerPromptStep.AwaitingAction;
+        scannerSelectedTargetIndex = -1;
+        scannerSelectedEmbarkIndex = -1;
+        scannerSelectedLandingIndex = -1;
         RefreshSensorsForCurrentState();
     }
 

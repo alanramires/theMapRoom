@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 088125788e0617d469c237f36169f23a
+guid: 0b42fba626965764faa067786bb37d73
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -2369867600477939372
-    second: default_0
+      213: 5273002001078839643
+    second: x_card_exercito_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -96,24 +96,11 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 1
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: default_0
+      name: x_card_exercito_0
       rect:
         serializedVersion: 2
         x: 148
@@ -128,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 4591ec439f98c1fd0800000000000000
-      internalID: -2369867600477939372
+      spriteID: b596a36e1677d2940800000000000000
+      internalID: 5273002001078839643
       vertices: []
       indices: 
       edges: []
@@ -148,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      default_0: -2369867600477939372
+      x_card_exercito_0: 5273002001078839643
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

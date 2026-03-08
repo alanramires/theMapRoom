@@ -39,6 +39,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField, HideInInspector] private bool appliedHasActed;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField] private bool isEmbarked;
+    [SerializeField] private int embarkedVisualPreviewDepth;
     [SerializeField] private bool isSelected;
     [SerializeField, HideInInspector] private bool isPreviewDimmed;
     [SerializeField, HideInInspector] private bool hasTemporarySortingOverride;
@@ -87,6 +88,7 @@ public class UnitManager : MonoBehaviour
     public bool HasActed => hasActed;
     public bool ReceivedSuppliesThisTurn => receivedSuppliesThisTurn;
     public bool IsEmbarked => isEmbarked;
+    public bool IsEmbarkedVisualPreviewActive => embarkedVisualPreviewDepth > 0;
     public bool IsSelected => isSelected;
     public UnitDatabase UnitDatabase => unitDatabase;
     public bool IsAircraftGrounded => GetAircraftType() != AircraftType.None && currentDomain != Domain.Air;
@@ -1369,6 +1371,8 @@ public class UnitManager : MonoBehaviour
             return;
 
         isEmbarked = embarked;
+        if (!isEmbarked)
+            embarkedVisualPreviewDepth = 0;
         if (isEmbarked)
         {
             SetSelected(false);
@@ -1528,7 +1532,7 @@ public class UnitManager : MonoBehaviour
 
     private void RefreshHudWidgetsOnly()
     {
-        if (unitHud == null || isEmbarked)
+        if (unitHud == null || (isEmbarked && !IsEmbarkedVisualPreviewActive))
             return;
 
         TryAutoAssignMatchController();
@@ -1766,7 +1770,7 @@ public class UnitManager : MonoBehaviour
             return;
 #endif
 
-        if (isEmbarked)
+        if (isEmbarked && !IsEmbarkedVisualPreviewActive)
         {
             SetActedGlowEnabled(false);
             SetSpriteVisible(false);
@@ -1917,7 +1921,7 @@ public class UnitManager : MonoBehaviour
 
         // Passenger embarked must stay visually hidden even if other
         // systems request visibility (selection cleanup, blink stop, etc).
-        if (isEmbarked && visible)
+        if (isEmbarked && visible && !IsEmbarkedVisualPreviewActive)
             visible = false;
 
         if (spriteRenderer != null && spriteRenderer.GetComponentInParent<UnitManager>() == this)
@@ -1988,6 +1992,19 @@ public class UnitManager : MonoBehaviour
 
             text.enabled = visible;
         }
+    }
+
+    public void BeginEmbarkedVisualPreview()
+    {
+        embarkedVisualPreviewDepth = Mathf.Max(0, embarkedVisualPreviewDepth) + 1;
+        RefreshActedVisual();
+    }
+
+    public void EndEmbarkedVisualPreview()
+    {
+        if (embarkedVisualPreviewDepth > 0)
+            embarkedVisualPreviewDepth--;
+        RefreshActedVisual();
     }
 
     [ContextMenu("Apply From Database")]

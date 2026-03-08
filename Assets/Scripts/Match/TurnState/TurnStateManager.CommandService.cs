@@ -221,9 +221,11 @@ public partial class TurnStateManager
         PanelDialogController.ClearExternalText();
         ClearCommandServiceHelper();
         RestoreSupplyEmbarkedSelectionVisuals();
+        HashSet<UnitManager> hiddenEmbarkedSuppliers = new HashSet<UnitManager>();
 
         try
         {
+            NormalizeCommandServiceQueueForEmbarkedFamilies(commandServiceQueuedOrders);
             Debug.Log($"[ServicoComando][Fila] Inicio da execucao: {commandServiceQueuedOrders.Count} ordem(ns).");
             for (int q = 0; q < commandServiceQueuedOrders.Count; q++)
             {
@@ -272,42 +274,28 @@ public partial class TurnStateManager
                 continue;
             if (fromSupplierUnit && (int)target.TeamId != (int)sourceSupplierUnit.TeamId)
                 continue;
-            bool isEmbarkedPassenger = fromSupplierUnit && target.IsEmbarked && target.EmbarkedTransporter == sourceSupplierUnit;
-            if (fromSupplierUnit && !isEmbarkedPassenger)
+            bool isEmbarkedPassenger = IsEmbarkedPassengerOfSupplier(target, sourceSupplierUnit);
+            if (fromSupplierUnit && !isEmbarkedPassenger && target != sourceSupplierUnit)
                 continue;
             if ((!target.gameObject.activeInHierarchy && !isEmbarkedPassenger) || (target.IsEmbarked && !isEmbarkedPassenger))
                 continue;
 
+            if (!isEmbarkedPassenger && hiddenEmbarkedSuppliers.Count > 0)
+                RestoreTransporterHudVisibility(hiddenEmbarkedSuppliers);
+
             Tilemap boardMap = terrainTilemap != null ? terrainTilemap : (target != null ? target.BoardTilemap : null);
 
-            Vector3Int targetCell = target.CurrentCellPosition;
-            targetCell.z = 0;
-            bool supplierHudHiddenForEmbarked = false;
+            Vector3Int targetCell;
             if (isEmbarkedPassenger)
             {
                 Debug.Log($"detectado, embarcado em {sourceSupplierUnit.name}");
-                ForceHideEmbarkedPassengersExcept(sourceSupplierUnit, target);
-                HideAllSupplyEmbarkedPreviewExcept(target);
-                if (!supplyEmbarkedPreviewStates.ContainsKey(target))
-                {
-                    SupplyEmbarkedPreviewState state = new SupplyEmbarkedPreviewState
-                    {
-                        domain = target.GetDomain(),
-                        height = target.GetHeightLevel()
-                    };
-                    supplyEmbarkedPreviewStates[target] = state;
-                    ShowEmbarkedPassengerForSupply(target, sourceSupplierUnit);
-                }
-                // So oculta HUD do fornecedor quando a fonte real do servico eh a unidade supplier.
-                // Em servico vindo de construcao, manter HUD do transportador evita estado visual preso.
-                if (fromSupplierUnit && !fromConstruction)
-                {
-                    SetSupplierHudVisibleForCommandSource(sourceSupplierUnit, false);
-                    supplierHudHiddenForEmbarked = true;
-                    Debug.Log($"ocultando HUD do {sourceSupplierUnit.name}");
-                }
-                targetCell = sourceSupplierUnit.CurrentCellPosition;
-                targetCell.z = 0;
+                if (!TryPrepareEmbarkedSupplyTarget(target, sourceSupplierUnit, hiddenEmbarkedSuppliers, out targetCell))
+                    continue;
+                Debug.Log($"ocultando HUD do {sourceSupplierUnit.name}");
+            }
+            else if (!TryPrepareIndividualSupplyTarget(target, target.TeamId, out targetCell))
+            {
+                continue;
             }
 
             try
@@ -569,14 +557,11 @@ public partial class TurnStateManager
                     HideEmbarkedPassengerAfterSupply(target, servedState.domain, servedState.height);
                     supplyEmbarkedPreviewStates.Remove(target);
                 }
-
-                if (supplierHudHiddenForEmbarked)
-                {
-                    SetSupplierHudVisibleForCommandSource(sourceSupplierUnit, true);
-                    Debug.Log($"[ServicoComando][Fila] restaurando HUD do {sourceSupplierUnit.name}, seguindo para proximo da fila...");
-                }
             }
         }
+
+        if (hiddenEmbarkedSuppliers.Count > 0)
+            RestoreTransporterHudVisibility(hiddenEmbarkedSuppliers);
 
         commandServiceQueuedOrders.Clear();
         RestoreSupplyEmbarkedSelectionVisuals();
@@ -643,6 +628,9 @@ public partial class TurnStateManager
         }
         finally
         {
+            if (hiddenEmbarkedSuppliers.Count > 0)
+                RestoreTransporterHudVisibility(hiddenEmbarkedSuppliers);
+
             commandServiceExecutionInProgress = false;
             commandServiceConfirmationPending = false;
             commandServiceQueuedOrders.Clear();
@@ -1245,9 +1233,10 @@ public partial class TurnStateManager
             }
 
             // Fallback defensivo: garante que passageiros nao selecionados permaneçam ocultos.
+            passenger.EndEmbarkedVisualPreview();
             SetUnitSpriteRenderersVisible(passenger, false);
 
-            UnitHudController passengerHud = passenger.GetComponentInChildren<UnitHudController>(true);
+            UnitHudController passengerHud = ResolveOwnUnitHud(passenger);
             if (passengerHud != null)
                 passengerHud.gameObject.SetActive(false);
 
@@ -1260,7 +1249,7 @@ public partial class TurnStateManager
         if (supplier == null)
             return;
 
-        UnitHudController supplierHud = supplier.GetComponentInChildren<UnitHudController>(true);
+        UnitHudController supplierHud = ResolveOwnUnitHud(supplier);
         if (supplierHud == null)
             return;
 
@@ -1340,6 +1329,69 @@ public partial class TurnStateManager
         }
 
         return sb.ToString();
+    }
+
+    private static void NormalizeCommandServiceQueueForEmbarkedFamilies(List<ServicoDoComandoOption> orders)
+    {
+        if (orders == null || orders.Count <= 1)
+            return;
+
+        List<ServicoDoComandoOption> normalized = new List<ServicoDoComandoOption>(orders.Count);
+        HashSet<ServicoDoComandoOption> used = new HashSet<ServicoDoComandoOption>();
+        HashSet<UnitManager> handledTransporters = new HashSet<UnitManager>();
+
+        for (int i = 0; i < orders.Count; i++)
+        {
+            ServicoDoComandoOption option = orders[i];
+            UnitManager transporter = option != null ? option.sourceSupplierUnit : null;
+            UnitManager target = option != null ? option.targetUnit : null;
+            bool isEmbarked = transporter != null && target != null && target.IsEmbarked && target.EmbarkedTransporter == transporter;
+            if (!isEmbarked || handledTransporters.Contains(transporter))
+                continue;
+
+            handledTransporters.Add(transporter);
+
+            for (int j = 0; j < orders.Count; j++)
+            {
+                ServicoDoComandoOption embarkedOrder = orders[j];
+                UnitManager embarkedTransporter = embarkedOrder != null ? embarkedOrder.sourceSupplierUnit : null;
+                UnitManager embarkedTarget = embarkedOrder != null ? embarkedOrder.targetUnit : null;
+                bool sameFamilyEmbarked =
+                    embarkedTransporter == transporter &&
+                    embarkedTarget != null &&
+                    embarkedTarget.IsEmbarked &&
+                    embarkedTarget.EmbarkedTransporter == transporter;
+                if (!sameFamilyEmbarked || used.Contains(embarkedOrder))
+                    continue;
+
+                normalized.Add(embarkedOrder);
+                used.Add(embarkedOrder);
+            }
+
+            for (int j = 0; j < orders.Count; j++)
+            {
+                ServicoDoComandoOption transporterSelf = orders[j];
+                UnitManager selfTarget = transporterSelf != null ? transporterSelf.targetUnit : null;
+                if (selfTarget != transporter || used.Contains(transporterSelf))
+                    continue;
+
+                normalized.Add(transporterSelf);
+                used.Add(transporterSelf);
+                break;
+            }
+        }
+
+        for (int i = 0; i < orders.Count; i++)
+        {
+            ServicoDoComandoOption option = orders[i];
+            if (option == null || used.Contains(option))
+                continue;
+            normalized.Add(option);
+            used.Add(option);
+        }
+
+        orders.Clear();
+        orders.AddRange(normalized);
     }
 
     private static string ResolveServiceLabel(ServiceData service)

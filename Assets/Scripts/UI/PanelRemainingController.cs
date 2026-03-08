@@ -54,7 +54,10 @@ public class PanelRemainingController : MonoBehaviour
         int totalInField = 0;
         int readyToAct = 0;
         if (matchController != null && activeTeam != TeamId.Neutral)
-            matchController.GetTeamUnitCounts(activeTeam, out totalInField, out readyToAct);
+        {
+            matchController.GetTeamUnitCounts(activeTeam, out totalInField, out _);
+            matchController.GetTeamUnitCounts(activeTeam, out _, out readyToAct, includeEmbarked: false);
+        }
 
         string nextActual = $"{Mathf.Max(0, readyToAct)}";
         string nextMax = $"/{Mathf.Max(0, totalInField):D2}";

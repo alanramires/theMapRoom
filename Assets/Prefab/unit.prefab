@@ -380,6 +380,7 @@ MonoBehaviour:
   appliedHasActed: 0
   appliedActiveTeamId: 0
   isEmbarked: 0
+  embarkedVisualPreviewDepth: 0
   isSelected: 0
   isPreviewDimmed: 0
   hasTemporarySortingOverride: 0

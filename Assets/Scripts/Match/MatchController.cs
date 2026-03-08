@@ -53,6 +53,7 @@ public class MatchController : MonoBehaviour
     [SerializeField, Min(1)] private int maxUnitsPerTeam = 40;
     [SerializeField] private AutonomyDatabase autonomyDatabase;
     [SerializeField] private CursorController cursorController;
+    [SerializeField] private TurnStateManager turnStateManager;
     [Header("Turn Transition")]
     [SerializeField] private MatchMusicAudioManager matchMusicAudioManager;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.5f;
@@ -64,6 +65,7 @@ public class MatchController : MonoBehaviour
     [SerializeField, HideInInspector] private int cachedConstructionIncomeSignature;
     [SerializeField, HideInInspector] private int cachedConstructionIncomeCount;
     [System.NonSerialized] private readonly List<TeamId> playersView = new List<TeamId>();
+    [System.NonSerialized] private List<TurnStateManager.TurnStartAutonomyUpkeepEntry> pendingTurnStartAutonomyHelperEntries;
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
@@ -170,7 +172,7 @@ public class MatchController : MonoBehaviour
         return true;
     }
 
-    public void GetTeamUnitCounts(TeamId teamId, out int totalInField, out int readyToAct)
+    public void GetTeamUnitCounts(TeamId teamId, out int totalInField, out int readyToAct, bool includeEmbarked = true)
     {
         totalInField = 0;
         readyToAct = 0;
@@ -184,6 +186,8 @@ public class MatchController : MonoBehaviour
             if (unit == null || !unit.gameObject.activeInHierarchy)
                 continue;
             if (unit.TeamId != teamId)
+                continue;
+            if (!includeEmbarked && unit.IsEmbarked)
                 continue;
 
             totalInField++;
@@ -305,6 +309,7 @@ public class MatchController : MonoBehaviour
         NormalizeState();
         TryRefreshIncomeFromConstructions(markDirtyInEditor: false);
         TryAutoAssignCursorController();
+        TryAutoAssignTurnStateManager();
         TryAutoAssignTurnTransitionReferences();
         ApplyActiveTeamIfChanged(force: true);
         ApplyTeamFlipSettingsToSceneObjects();
@@ -317,6 +322,7 @@ public class MatchController : MonoBehaviour
         NormalizeState();
         TryRefreshIncomeFromConstructions(markDirtyInEditor: true);
         TryAutoAssignCursorController();
+        TryAutoAssignTurnStateManager();
         TryAutoAssignTurnTransitionReferences();
         ApplyActiveTeamIfChanged(force: false);
         ApplyTeamFlipSettingsToSceneObjects();
@@ -331,6 +337,7 @@ public class MatchController : MonoBehaviour
             return;
 
         TryAutoAssignCursorController();
+        TryAutoAssignTurnStateManager();
         TryAutoAssignTurnTransitionReferences();
         ApplyActiveTeamIfChanged(force: false);
     }
@@ -618,6 +625,7 @@ public class MatchController : MonoBehaviour
         appliedActiveTeamId = activeTeamId;
         ReleaseUnitsForActiveTeam();
         TeleportCursorToActiveTeamHeadQuarterSilently();
+        FlushTurnStartAutonomyHelper();
     }
 
     private void ApplyTeamFlipSettingsToSceneObjects()
@@ -652,6 +660,7 @@ public class MatchController : MonoBehaviour
 
         ApplyEconomyAtTurnStartForActiveTeam();
 
+        List<TurnStateManager.TurnStartAutonomyUpkeepEntry> turnStartAutonomyEntries = null;
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
         {
@@ -665,14 +674,45 @@ public class MatchController : MonoBehaviour
             {
                 int turnStartUpkeep = OperationalAutonomyRules.GetTurnStartAutonomyUpkeep(unit, autonomyDatabase);
                 if (turnStartUpkeep > 0)
-                    unit.SetCurrentFuel(Mathf.Max(0, unit.CurrentFuel - turnStartUpkeep));
+                {
+                    int beforeFuel = Mathf.Max(0, unit.CurrentFuel);
+                    int afterFuel = Mathf.Max(0, beforeFuel - turnStartUpkeep);
+                    int consumed = Mathf.Max(0, beforeFuel - afterFuel);
+                    unit.SetCurrentFuel(afterFuel);
+
+                    bool isAircraftUnit = unit.TryGetUnitData(out UnitData unitDataAtUpkeep)
+                        && unitDataAtUpkeep != null
+                        && unitDataAtUpkeep.IsAircraft();
+
+                    if (consumed > 0 && isAircraftUnit)
+                    {
+                        turnStartAutonomyEntries ??= new List<TurnStateManager.TurnStartAutonomyUpkeepEntry>();
+                        Vector3Int cell = unit.CurrentCellPosition;
+                        cell.z = 0;
+                        turnStartAutonomyEntries.Add(new TurnStateManager.TurnStartAutonomyUpkeepEntry(
+                            ResolveRuntimeUnitName(unit),
+                            cell,
+                            consumed,
+                            beforeFuel,
+                            afterFuel));
+                    }
+                }
             }
 
             unit.ResetActed();
             unit.ClearReceivedSuppliesThisTurn();
         }
 
+        pendingTurnStartAutonomyHelperEntries = turnStartAutonomyEntries;
+
         pendingTurnStartUpkeep = false;
+    }
+
+    private void FlushTurnStartAutonomyHelper()
+    {
+        TryAutoAssignTurnStateManager();
+        turnStateManager?.ShowTurnStartAutonomyUpkeepHelper(pendingTurnStartAutonomyHelperEntries);
+        pendingTurnStartAutonomyHelperEntries = null;
     }
 
     private int FindPlayerEconomyIndex(TeamId teamId)
@@ -821,6 +861,23 @@ public class MatchController : MonoBehaviour
     {
         if (cursorController == null)
             cursorController = FindAnyObjectByType<CursorController>();
+    }
+
+    private void TryAutoAssignTurnStateManager()
+    {
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+    }
+
+    private static string ResolveRuntimeUnitName(UnitManager unit)
+    {
+        if (unit == null)
+            return "Unidade";
+        if (!string.IsNullOrWhiteSpace(unit.UnitDisplayName))
+            return unit.UnitDisplayName;
+        if (!string.IsNullOrWhiteSpace(unit.UnitId))
+            return unit.UnitId;
+        return unit.name;
     }
 
     private void TryAutoAssignTurnTransitionReferences()

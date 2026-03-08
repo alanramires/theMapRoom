@@ -15,11 +15,12 @@ MonoBehaviour:
   id: dogFight
   displayName: Dog Fight
   description: Elite Air to Air Units
+  modifierType: 0
   requiredOpponentClass: 4
   requiredWeaponCategory: 2
   eliteComparison: 1
   minEliteDifference: 1
   ownerAttackRpsModifier: 2
-  ownerDefenseRpsModifier: 5
+  ownerDefenseRpsModifier: 3
   opponentAttackRpsModifier: -2
-  opponentDefenseRpsModifier: -5
+  opponentDefenseRpsModifier: -3

@@ -31,21 +31,6 @@ MonoBehaviour:
   - ataque:
       unitClass: 0
       weaponCategory: 0
-      targetClass: 1
-      attackBonus: -3
-      notes: "Soldados n\xE3o atacam bem veiculos"
-      rpsAttackText: Infantry com AntiInfantaria ataca Vehicle com RPS Ataque -3
-    defesa:
-      targetClass: 1
-      unitClass: 0
-      weaponCategory: 0
-      defenseBonus: 2
-      notes: Veiculos tem bonus de defesa contra infantaria
-      rpsDefenseText: Vehicle se defende de Infantry com AntiInfantaria com RPS Defesa
-        +2
-  - ataque:
-      unitClass: 0
-      weaponCategory: 0
       targetClass: 3
       attackBonus: -3
       notes: Uma Infantaria com bazooka pode ser letal contra infantaria
@@ -57,6 +42,21 @@ MonoBehaviour:
       defenseBonus: 2
       notes: "Infantaria busca cobertura se jogando no ch\xE3o contra projeteis"
       rpsDefenseText: Armored se defende de Infantry com AntiInfantaria com RPS Defesa
+        +2
+  - ataque:
+      unitClass: 0
+      weaponCategory: 0
+      targetClass: 1
+      attackBonus: -3
+      notes: "Soldados n\xE3o atacam bem veiculos"
+      rpsAttackText: Infantry com AntiInfantaria ataca Vehicle com RPS Ataque -3
+    defesa:
+      targetClass: 1
+      unitClass: 0
+      weaponCategory: 0
+      defenseBonus: 2
+      notes: Veiculos tem bonus de defesa contra infantaria
+      rpsDefenseText: Vehicle se defende de Infantry com AntiInfantaria com RPS Defesa
         +2
   - ataque:
       unitClass: 0
@@ -76,6 +76,21 @@ MonoBehaviour:
   - ataque:
       unitClass: 0
       weaponCategory: 0
+      targetClass: 4
+      attackBonus: -5
+      notes: "Rifles n\xE3o destroem artilharia"
+      rpsAttackText: Infantry com AntiInfantaria ataca Jet com RPS Ataque -5
+    defesa:
+      targetClass: 4
+      unitClass: 0
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: "Arilharia nem sente os proj\xE9teis"
+      rpsDefenseText: Jet se defende de Infantry com AntiInfantaria com RPS Defesa
+        +5
+  - ataque:
+      unitClass: 0
+      weaponCategory: 0
       targetClass: 5
       attackBonus: -2
       notes: "Rifles n\xE3o destroem artilharia"
@@ -91,6 +106,21 @@ MonoBehaviour:
         Defesa +2
   - ataque:
       unitClass: 0
+      weaponCategory: 0
+      targetClass: 6
+      attackBonus: -5
+      notes: "Rifles n\xE3o destroem artilharia"
+      rpsAttackText: Infantry com AntiInfantaria ataca Plane com RPS Ataque -5
+    defesa:
+      targetClass: 6
+      unitClass: 0
+      weaponCategory: 0
+      defenseBonus: 5
+      notes: "Arilharia nem sente os proj\xE9teis"
+      rpsDefenseText: Plane se defende de Infantry com AntiInfantaria com RPS Defesa
+        +5
+  - ataque:
+      unitClass: 0
       weaponCategory: 1
       targetClass: 0
       attackBonus: 1
@@ -103,21 +133,6 @@ MonoBehaviour:
       defenseBonus: 2
       notes: "Infantaria busca cobertura se jogando no ch\xE3o contra projeteis"
       rpsDefenseText: Infantry se defende de Infantry com AntiTanque com RPS Defesa
-        +2
-  - ataque:
-      unitClass: 0
-      weaponCategory: 1
-      targetClass: 1
-      attackBonus: 0
-      notes: Uma Infantaria com bazooka pode ser letal contra infantaria
-      rpsAttackText: Infantry com AntiTanque ataca Vehicle com RPS Ataque +0
-    defesa:
-      targetClass: 1
-      unitClass: 0
-      weaponCategory: 1
-      defenseBonus: 2
-      notes: "Infantaria busca cobertura se jogando no ch\xE3o contra projeteis"
-      rpsDefenseText: Vehicle se defende de Infantry com AntiTanque com RPS Defesa
         +2
   - ataque:
       unitClass: 0
@@ -137,6 +152,21 @@ MonoBehaviour:
   - ataque:
       unitClass: 0
       weaponCategory: 1
+      targetClass: 1
+      attackBonus: 0
+      notes: Uma Infantaria com bazooka pode ser letal contra infantaria
+      rpsAttackText: Infantry com AntiTanque ataca Vehicle com RPS Ataque +0
+    defesa:
+      targetClass: 1
+      unitClass: 0
+      weaponCategory: 1
+      defenseBonus: 2
+      notes: "Infantaria busca cobertura se jogando no ch\xE3o contra projeteis"
+      rpsDefenseText: Vehicle se defende de Infantry com AntiTanque com RPS Defesa
+        +2
+  - ataque:
+      unitClass: 0
+      weaponCategory: 1
       targetClass: 2
       attackBonus: -2
       notes: "Rifles n\xE3o destroem artilharia"
@@ -152,6 +182,20 @@ MonoBehaviour:
   - ataque:
       unitClass: 0
       weaponCategory: 2
+      targetClass: 4
+      attackBonus: -5
+      notes: "Rifles n\xE3o destroem artilharia"
+      rpsAttackText: Infantry com AntiAerea ataca Jet com RPS Ataque -5
+    defesa:
+      targetClass: 4
+      unitClass: 0
+      weaponCategory: 2
+      defenseBonus: 5
+      notes: "Arilharia nem sente os proj\xE9teis"
+      rpsDefenseText: Jet se defende de Infantry com AntiAerea com RPS Defesa +5
+  - ataque:
+      unitClass: 0
+      weaponCategory: 2
       targetClass: 5
       attackBonus: -1
       notes: "Rifles n\xE3o destroem artilharia"
@@ -164,3 +208,17 @@ MonoBehaviour:
       notes: "Arilharia nem sente os proj\xE9teis"
       rpsDefenseText: Helicopter se defende de Infantry com AntiAerea com RPS Defesa
         +1
+  - ataque:
+      unitClass: 0
+      weaponCategory: 2
+      targetClass: 6
+      attackBonus: -5
+      notes: "Rifles n\xE3o destroem artilharia"
+      rpsAttackText: Infantry com AntiAerea ataca Plane com RPS Ataque -5
+    defesa:
+      targetClass: 6
+      unitClass: 0
+      weaponCategory: 2
+      defenseBonus: 5
+      notes: "Arilharia nem sente os proj\xE9teis"
+      rpsDefenseText: Plane se defende de Infantry com AntiAerea com RPS Defesa +5

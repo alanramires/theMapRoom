@@ -34,6 +34,7 @@ MonoBehaviour:
     heightLevel: 2
   alwaysAllowAirDomain: 1
   allowAircraftTakeoffAndLanding: 1
+  aircraftUnitsPaysUpkeep: 1
   legacyRequiredLandingSkills: []
   requiredLandingSkillRules:
   - skill: {fileID: 11400000, guid: 1b0f1eb9d5454df3a0e1b42f0c8d6aa1, type: 2}
