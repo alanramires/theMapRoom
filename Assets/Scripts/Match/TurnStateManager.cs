@@ -98,6 +98,7 @@ public partial class TurnStateManager : MonoBehaviour
         || captureExecutionInProgress
         || mergeExecutionInProgress
         || supplyExecutionInProgress
+        || transferExecutionInProgress
         || disembarkExecutionInProgress;
 
     private void LogStateStep(string step, bool rollback = false)
@@ -123,6 +124,13 @@ public partial class TurnStateManager : MonoBehaviour
     private void SetCursorState(CursorState nextState, string reason, bool rollback = false)
     {
         CursorState previous = cursorState;
+        if (nextState != CursorState.Neutral)
+        {
+            if (scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
+                scannerPromptStep = ScannerPromptStep.AwaitingAction;
+            ClearEnemyThreatLayersOverlay();
+        }
+
         cursorState = nextState;
 
         string rollbackTag = rollback ? " [roll back]" : string.Empty;
@@ -242,6 +250,88 @@ public partial class TurnStateManager : MonoBehaviour
         int beforeFuel = target.CurrentFuel;
         target.SetCurrentFuel(autonomyValue);
         message = $"Autonomia atualizada: {ResolveDebugUnitName(target)} {beforeFuel}->{target.CurrentFuel}/{target.GetMaxFuel()} em ({cursorCell.x},{cursorCell.y},0).";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TrySetUnitEmbarkedSupplyUnderCursorFromDebug(string supplyToken, int amountValue, out string message)
+    {
+        message = string.Empty;
+        if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out message))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(supplyToken))
+        {
+            message = "Supply invalido.";
+            return false;
+        }
+
+        if (!target.TryGetUnitData(out UnitData data) || data == null || !data.isSupplier)
+        {
+            message = $"{ResolveDebugUnitName(target)} nao e unidade logistica/supridora.";
+            return false;
+        }
+
+        IReadOnlyList<UnitEmbarkedSupply> runtimeResources = target.GetEmbarkedResources();
+        if (runtimeResources == null || runtimeResources.Count <= 0)
+        {
+            message = $"{ResolveDebugUnitName(target)} nao possui estoque embarcado.";
+            return false;
+        }
+
+        List<int> matchingRuntimeIndices = new List<int>();
+        int before = 0;
+        int max = 0;
+        SupplyData matchedSupply = null;
+
+        for (int i = 0; i < runtimeResources.Count; i++)
+        {
+            UnitEmbarkedSupply runtime = runtimeResources[i];
+            if (runtime == null || !SupplyMatchesDebugToken(runtime.supply, supplyToken))
+                continue;
+
+            matchingRuntimeIndices.Add(i);
+            before += Mathf.Max(0, runtime.amount);
+            max += ResolveSupplierRuntimeSlotMaxAmount(data, runtime, i);
+            if (matchedSupply == null)
+                matchedSupply = runtime.supply;
+        }
+
+        if (matchingRuntimeIndices.Count <= 0)
+        {
+            message = $"{ResolveDebugUnitName(target)} nao possui supply \"{supplyToken}\".";
+            return false;
+        }
+
+        if (max <= 0 && before > 0)
+            max = before;
+
+        int clamped = Mathf.Clamp(amountValue, 0, Mathf.Max(0, max));
+        int remaining = clamped;
+        for (int i = 0; i < matchingRuntimeIndices.Count; i++)
+        {
+            int runtimeIndex = matchingRuntimeIndices[i];
+            UnitEmbarkedSupply runtime = runtimeResources[runtimeIndex];
+            if (runtime == null)
+                continue;
+
+            int slotMax = ResolveSupplierRuntimeSlotMaxAmount(data, runtime, runtimeIndex);
+            int nextAmount = Mathf.Min(remaining, slotMax);
+            runtime.amount = Mathf.Max(0, nextAmount);
+            remaining -= nextAmount;
+        }
+
+        int after = 0;
+        for (int i = 0; i < matchingRuntimeIndices.Count; i++)
+        {
+            UnitEmbarkedSupply runtime = runtimeResources[matchingRuntimeIndices[i]];
+            if (runtime == null)
+                continue;
+            after += Mathf.Max(0, runtime.amount);
+        }
+
+        string supplyLabel = ResolveSupplyDisplayName(matchedSupply);
+        message = $"Estoque atualizado: {ResolveDebugUnitName(target)} {supplyLabel} {before}->{after}/{Mathf.Max(0, max)} em ({cursorCell.x},{cursorCell.y},0).";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -810,6 +900,50 @@ public partial class TurnStateManager : MonoBehaviour
 
         maxAmmo = Mathf.Max(0, baseline.squadAmmunition);
         return true;
+    }
+
+    private static bool SupplyMatchesDebugToken(SupplyData supply, string token)
+    {
+        if (supply == null || string.IsNullOrWhiteSpace(token))
+            return false;
+
+        string normalizedToken = token.Trim();
+        return string.Equals(supply.id, normalizedToken, System.StringComparison.OrdinalIgnoreCase)
+               || string.Equals(supply.displayName, normalizedToken, System.StringComparison.OrdinalIgnoreCase)
+               || string.Equals(supply.name, normalizedToken, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int ResolveSupplierRuntimeSlotMaxAmount(UnitData data, UnitEmbarkedSupply runtimeEntry, int runtimeIndex)
+    {
+        int fallbackCurrent = runtimeEntry != null ? Mathf.Max(0, runtimeEntry.amount) : 0;
+        if (data == null || data.supplierResources == null || runtimeIndex < 0 || runtimeIndex >= data.supplierResources.Count)
+            return fallbackCurrent;
+
+        UnitEmbarkedSupply baseline = data.supplierResources[runtimeIndex];
+        if (baseline == null)
+            return fallbackCurrent;
+
+        if (runtimeEntry == null || runtimeEntry.supply == null || baseline.supply == null)
+            return Mathf.Max(0, baseline.amount);
+
+        if (!AreSameSupply(baseline.supply, runtimeEntry.supply))
+            return fallbackCurrent;
+
+        return Mathf.Max(0, baseline.amount);
+    }
+
+    private static bool AreSameSupply(SupplyData a, SupplyData b)
+    {
+        if (a == null || b == null)
+            return false;
+
+        if (a == b)
+            return true;
+
+        if (!string.IsNullOrWhiteSpace(a.id) && !string.IsNullOrWhiteSpace(b.id))
+            return string.Equals(a.id, b.id, System.StringComparison.OrdinalIgnoreCase);
+
+        return false;
     }
 
     private void TryAutoAssignReferences()

@@ -354,35 +354,6 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-  - id: HQ_T-1_C17
-    construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: -1
-    cellPosition: {x: -4, y: 3, z: 0}
-    initialCapturePoints: -1
-    useConstructionConfigurationOverride: 0
-    constructionConfiguration:
-      isPlayerHeadQuarter: 1
-      isCapturable: 1
-      capturePointsMax: 40
-      capturedIncoming: 2000
-      sellingRule: 1
-      legacyCanProduceAndSellUnits: 
-      offeredUnits:
-      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-      canProvideSupplies: 1
-      offeredSupplies:
-      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-        quantity: 2147483647
-      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-        quantity: 2147483647
-      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-        quantity: 2147483647
-      offeredServices:
-      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - id: Cidade_T-1_C19
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
     initialTeamId: -1
@@ -722,6 +693,33 @@ MonoBehaviour:
     cellPosition: {x: 9, y: -12, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 1000
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 200
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 500
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 200
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: Cidade_T0_C32
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: 0
+    cellPosition: {x: -4, y: 3, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 1
     constructionConfiguration:
       isPlayerHeadQuarter: 0
       isCapturable: 1

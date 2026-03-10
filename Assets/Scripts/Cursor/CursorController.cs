@@ -585,6 +585,8 @@ public class CursorController : MonoBehaviour
 
         if (WasAdvanceTurnPressedThisFrame())
         {
+            turnStateManager?.TryCloseThreatLayerHotzone();
+
             if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
                 return;
 

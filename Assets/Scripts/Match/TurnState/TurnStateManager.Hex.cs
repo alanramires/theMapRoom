@@ -48,6 +48,9 @@ public partial class TurnStateManager
 
         if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
         {
+            if (IsTransferSelectionStepActive())
+                return TryResolveTransferCursorMove(currentCell, inputDelta, out resolvedCell);
+
             if (IsLandingPromptActive())
                 return TryResolveLandingCursorMove(inputDelta, out resolvedCell);
 

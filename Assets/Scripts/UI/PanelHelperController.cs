@@ -214,7 +214,9 @@ public class PanelHelperController : MonoBehaviour
                 return;
 
             case TurnStateManager.HelperPanelKind.Sensors:
-                title = ResolveMessage("helper.title.sensors", "SENSORS");
+                title = data.ThreatLayerSelectionActive
+                    ? ResolveMessage("helper.title.hotzone", "HOT ZONE")
+                    : ResolveMessage("helper.title.sensors", "SENSORS");
                 body = BuildSensorsBody(data);
                 return;
 
@@ -238,6 +240,11 @@ public class PanelHelperController : MonoBehaviour
                 body = BuildSupplyBody(data);
                 return;
 
+            case TurnStateManager.HelperPanelKind.Transfer:
+                title = ResolveMessage("helper.title.transfer_preview", "TRANSFER");
+                body = BuildTransferBody(data);
+                return;
+
             case TurnStateManager.HelperPanelKind.CommandService:
                 title = ResolveMessage("helper.title.command_service", "COMMAND SERVICE");
                 body = BuildCommandServiceBody(data);
@@ -246,6 +253,11 @@ public class PanelHelperController : MonoBehaviour
             case TurnStateManager.HelperPanelKind.UnitStats:
                 title = data.UnitStatsName ?? ResolveMessage("helper.title.unit_stats", "UNIT");
                 body = BuildUnitStatsBody(data);
+                return;
+
+            case TurnStateManager.HelperPanelKind.ConstructionStats:
+                title = data.ConstructionStatsName ?? ResolveMessage("helper.title.construction_stats", "CONSTRUCTION");
+                body = BuildConstructionStatsBody(data);
                 return;
 
             case TurnStateManager.HelperPanelKind.TurnStartAutonomy:
@@ -275,6 +287,23 @@ public class PanelHelperController : MonoBehaviour
         }
 
         return sb.ToString();
+    }
+
+    private string BuildConstructionStatsBody(TurnStateManager.HelperPanelData data)
+    {
+        if (data == null || data.ConstructionStatsLines == null || data.ConstructionStatsLines.Count <= 0)
+            return string.Empty;
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < data.ConstructionStatsLines.Count; i++)
+        {
+            string line = data.ConstructionStatsLines[i] ?? string.Empty;
+            if (i > 0)
+                sb.AppendLine();
+            sb.Append(line);
+        }
+
+        return sb.ToString().TrimEnd();
     }
 
     private string BuildTurnStartAutonomyBody(TurnStateManager.HelperPanelData data)
@@ -346,33 +375,78 @@ public class PanelHelperController : MonoBehaviour
 
     private string BuildSensorsBody(TurnStateManager.HelperPanelData data)
     {
-        if (data == null || data.SensorLines == null || data.SensorLines.Count == 0)
+        if (data == null)
             return string.Empty;
 
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < data.SensorLines.Count; i++)
+        if (data.SensorLines != null)
         {
-            TurnStateManager.HelperSensorLine line = data.SensorLines[i];
-            if (line == null)
-                continue;
+            for (int i = 0; i < data.SensorLines.Count; i++)
+            {
+                TurnStateManager.HelperSensorLine line = data.SensorLines[i];
+                if (line == null)
+                    continue;
 
-            string label = ResolveSensorLabel(line.sensorKey);
-            string resolvedLineId = line.sensorKey == "move_only"
-                ? "helper.sensors.line.move_only"
-                : "helper.sensors.line.format";
+                string label = ResolveSensorLabel(line.sensorKey);
+                string resolvedLineId = line.sensorKey == "move_only"
+                    ? "helper.sensors.line.move_only"
+                    : "helper.sensors.line.format";
 
-            if (sb.Length > 0)
-                sb.AppendLine();
+                if (sb.Length > 0)
+                    sb.AppendLine();
 
-            sb.Append(ResolveMessage(
-                resolvedLineId,
-                "<action> - <label>",
+                sb.Append(ResolveMessage(
+                    resolvedLineId,
+                    "<action> - <label>",
+                    new Dictionary<string, string>
+                    {
+                        { "action", line.actionCode.ToString() },
+                        { "label", label }
+                    }));
+            }
+        }
+
+        if (data.ThreatLayerSelectionActive)
+        {
+            sb.AppendLine();
+            sb.AppendLine();
+            sb.AppendLine(ResolveMessage(
+                "helper.sensors.threat_layers.current_team",
+                "Time inspecionado: <team_name> (<team_id>)",
                 new Dictionary<string, string>
                 {
-                    { "action", line.actionCode.ToString() },
-                    { "label", label }
+                    { "team_name", TeamUtils.GetName((TeamId)data.ThreatLayerInspectedTeamId) },
+                    { "team_id", data.ThreatLayerInspectedTeamId.ToString() }
                 }));
+            sb.AppendLine(ResolveMessage("helper.sensors.threat_layers.select_header", "Times pra inspecionar:"));
+            for (int i = 0; i < data.ThreatLayerTeamLines.Count; i++)
+            {
+                TurnStateManager.HelperThreatLayerTeamLine line = data.ThreatLayerTeamLines[i];
+                if (line == null)
+                    continue;
+                if (line.isOwnTeam)
+                    sb.AppendLine(ResolveMessage(
+                        "helper.sensors.threat_layers.option.own",
+                        "<option>: seu time",
+                        new Dictionary<string, string>
+                        {
+                            { "option", line.optionNumber.ToString() }
+                        }));
+                else
+                    sb.AppendLine(ResolveMessage(
+                        "helper.sensors.threat_layers.option.other",
+                        "<option>: time <team_name> (<team_id>)",
+                        new Dictionary<string, string>
+                        {
+                            { "option", line.optionNumber.ToString() },
+                            { "team_name", line.teamName ?? string.Empty },
+                            { "team_id", line.teamId.ToString() }
+                        }));
+            }
         }
+
+        if (sb.Length <= 0)
+            return string.Empty;
 
         return sb.ToString();
     }
@@ -736,6 +810,86 @@ public class PanelHelperController : MonoBehaviour
         return sb.ToString().TrimEnd();
     }
 
+    private string BuildTransferBody(TurnStateManager.HelperPanelData data)
+    {
+        if (data == null || data.TransferCandidateLines == null || data.TransferCandidateLines.Count <= 0)
+            return string.Empty;
+
+        StringBuilder sb = new StringBuilder();
+        if (!data.TransferIsConfirmStep)
+        {
+            sb.AppendLine(ResolveMessage("helper.transfer.section.select", "Selecionar Transferencia"));
+            for (int i = 0; i < data.TransferCandidateLines.Count; i++)
+            {
+                TurnStateManager.HelperTransferCandidateLine line = data.TransferCandidateLines[i];
+                if (line == null)
+                    continue;
+
+                string prefix = line.isFocused ? ">> " : string.Empty;
+                sb.AppendLine($"{prefix}{line.label}");
+            }
+
+            if (data.TransferHasCursorOption)
+            {
+                string prefix = data.TransferCursorOptionFocused ? ">> " : string.Empty;
+                int index = data.TransferCandidateLines.Count + 1;
+                sb.AppendLine($"{prefix}{index}. Selecionar pelo cursor");
+            }
+
+            sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
+            sb.Append(ResolveMessage("helper.transfer.select.hint", "Enter - confirmar destino | ESC - cancelar"));
+            return sb.ToString().TrimEnd();
+        }
+
+        sb.AppendLine(ResolveMessage("helper.transfer.section.confirm", "Confirmar Transferencia"));
+        if (!string.IsNullOrWhiteSpace(data.TransferSelectedLabel))
+            sb.AppendLine(data.TransferSelectedLabel);
+        sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
+
+        if (data.TransferResourceLines != null && data.TransferResourceLines.Count > 0)
+        {
+            if (!string.IsNullOrWhiteSpace(data.TransferSourceLabel))
+            {
+                sb.AppendLine($"Fornecedor: {data.TransferSourceLabel}");
+                for (int i = 0; i < data.TransferResourceLines.Count; i++)
+                {
+                    TurnStateManager.HelperTransferResourceLine line = data.TransferResourceLines[i];
+                    if (line == null)
+                        continue;
+
+                    // Em origem infinita, mostra somente o volume enviado (evita int.MaxValue no helper).
+                    if (line.sourceIsInfinite)
+                        sb.AppendLine($"- {line.supplyName}: {Mathf.Max(0, line.movedAmount)}");
+                    else
+                        sb.AppendLine($"- {line.supplyName}: {Mathf.Max(0, line.sourceBefore)} - {Mathf.Max(0, line.movedAmount)} -> {Mathf.Max(0, line.sourceAfter)}");
+                }
+                sb.AppendLine();
+            }
+
+            if (!string.IsNullOrWhiteSpace(data.TransferDestinationLabel))
+                sb.AppendLine($"Destino: {data.TransferDestinationLabel}");
+
+            for (int i = 0; i < data.TransferResourceLines.Count; i++)
+            {
+                TurnStateManager.HelperTransferResourceLine line = data.TransferResourceLines[i];
+                if (line == null)
+                    continue;
+
+                string dstBefore = line.destinationBefore >= int.MaxValue ? "INF" : Mathf.Max(0, line.destinationBefore).ToString();
+                string dstAfter = line.destinationAfter >= int.MaxValue ? "INF" : Mathf.Max(0, line.destinationAfter).ToString();
+                sb.AppendLine($"- {line.supplyName}: {dstBefore} + {Mathf.Max(0, line.movedAmount)} -> {dstAfter}");
+            }
+        }
+        else
+        {
+            sb.AppendLine(ResolveMessage("helper.transfer.preview.empty", "Sem estoque transferivel para esta opcao."));
+        }
+
+        sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
+        sb.Append(ResolveMessage("helper.transfer.confirm.hint", "Enter - executar | ESC - voltar"));
+        return sb.ToString().TrimEnd();
+    }
+
     private string ResolveSensorLabel(string sensorKey)
     {
         switch (sensorKey)
@@ -756,6 +910,8 @@ public class PanelHelperController : MonoBehaviour
                 return ResolveMessage("helper.sensors.label.transfer", "Transfer");
             case "layer":
                 return ResolveMessage("helper.sensors.label.layer", "Layer");
+            case "threat_layers":
+                return ResolveMessage("helper.sensors.label.threat_layers", "Threat Layers");
             case "move_only":
                 return ResolveMessage("helper.sensors.label.move_only", "Move Only");
             default:

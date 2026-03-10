@@ -112,6 +112,8 @@ public class ConstructionData : ScriptableObject
     private void OnValidate()
     {
         maxUnitsServedPerTurn = Mathf.Max(0, maxUnitsServedPerTurn);
+        if (supplierTier == SupplierTier.SelfSupplier)
+            supplierTier = SupplierTier.Receiver;
         if (supplierOperationDomains == null)
             supplierOperationDomains = new List<TerrainLayerMode>();
         if (supplierServicesProvided == null)
@@ -161,8 +163,7 @@ public class ConstructionData : ScriptableObject
             ConstructionSupplierResourceCapacity entry = supplierResources[i];
             if (entry == null)
                 continue;
-            if (entry.maxCapacity < -1)
-                entry.maxCapacity = -1;
+            entry.Sanitize();
         }
 
         if (constructionConfiguration == null)
@@ -215,7 +216,7 @@ public class ConstructionData : ScriptableObject
             if (entry == null || entry.supply == null)
                 continue;
 
-            int quantity = entry.maxCapacity < 0 ? InfiniteSupplyOfferQuantity : Mathf.Max(0, entry.maxCapacity);
+            int quantity = entry.IsInfinite() ? InfiniteSupplyOfferQuantity : Mathf.Max(0, entry.maxCapacity);
             int existingIndex = FindSupplyOfferIndex(result, entry.supply);
             if (existingIndex >= 0)
             {

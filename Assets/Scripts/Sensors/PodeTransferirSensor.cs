@@ -45,12 +45,6 @@ public static class PodeTransferirSensor
             return false;
         }
 
-        if (supplierData.supplierTier == SupplierTier.SelfSupplier)
-        {
-            reason = "Tier SelfSupplier nao participa do fluxo de transferencia.";
-            return false;
-        }
-
         if (!HasTransferService(supplier))
         {
             reason = "Unidade sem servico de transferencia.";
@@ -76,17 +70,25 @@ public static class PodeTransferirSensor
         Vector3Int origin = supplier.CurrentCellPosition;
         origin.z = 0;
 
-        ConstructionManager alliedConstruction = ResolveAlliedConstructionAtCell(boardMap, origin, supplier.TeamId);
+        ConstructionManager alliedConstruction = ResolveAlliedConstructionAtCell(
+            boardMap,
+            origin,
+            supplier.TeamId,
+            supplier.GetDomain(),
+            supplier.GetHeightLevel());
         List<ConstructionManager> constructionsInCollectionRange = CollectConstructionsInCollectionRange(
             supplierData,
             boardMap,
             origin,
-            supplier.TeamId);
+            supplier.TeamId,
+            supplier.GetDomain(),
+            supplier.GetHeightLevel());
         List<UnitManager> unitsInCollectionRange = CollectUnitsInCollectionRange(supplier, supplierData, boardMap, origin);
         List<UnitManager> nearbyHubUnits = CollectNearbyHubUnits(unitsInCollectionRange, supplier.TeamId);
+        bool hasEmbarkedPassengerInCollection = HasEmbarkedPassengerInCollectionRange(unitsInCollectionRange, supplier);
 
         bool isOnAlliedConstruction = alliedConstruction != null;
-        if (!isOnAlliedConstruction && nearbyHubUnits.Count <= 0 && constructionsInCollectionRange.Count <= 0)
+        if (!isOnAlliedConstruction && nearbyHubUnits.Count <= 0 && constructionsInCollectionRange.Count <= 0 && !hasEmbarkedPassengerInCollection)
         {
             reason = "Transferencia exige construcao/hub aliado no collection range.";
             return false;
@@ -140,9 +142,91 @@ public static class PodeTransferirSensor
         List<PodeTransferirInvalidOption> invalidOutput)
     {
         bool hasEmbarkedStock = GetUnitTotalStock(supplier) > 0;
-        bool hasAnyConstructionForFornecimento = false;
+        bool foundDonationTarget = false;
 
-        List<UnitManager> transferableTargets = new List<UnitManager>();
+        // CONSTRUCOES: Hub recebe de Hub e doa para Hub/Receiver no range.
+        if (constructionsInCollectionRange != null)
+        {
+            for (int i = 0; i < constructionsInCollectionRange.Count; i++)
+            {
+                ConstructionManager construction = constructionsInCollectionRange[i];
+                if (construction == null || !TryGetConstructionSupplierTier(construction, out SupplierTier constructionTier))
+                    continue;
+
+                bool constructionIsHub = constructionTier == SupplierTier.Hub;
+                bool constructionIsReceiver = constructionTier == SupplierTier.Receiver;
+                if (!constructionIsHub && !constructionIsReceiver)
+                    continue;
+
+                if (constructionIsHub)
+                {
+                    if (GetConstructionTotalSupply(construction) > 0)
+                    {
+                        if (CanTransferAtLeastOneSupply(null, construction, supplier))
+                        {
+                            output.Add(new PodeTransferirOption
+                            {
+                                supplierUnit = supplier,
+                                targetConstruction = construction,
+                                targetCell = construction.CurrentCellPosition,
+                                flowMode = TransferFlowMode.Recebedor,
+                                displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Recebedor, null, construction)
+                            });
+                        }
+                        else
+                        {
+                            AppendInvalid(
+                                invalidOutput,
+                                supplier,
+                                null,
+                                construction,
+                                construction.CurrentCellPosition,
+                                TransferFlowMode.Recebedor,
+                                "Supplier sem capacidade disponivel para receber recursos desta construcao.");
+                        }
+                    }
+                    else
+                    {
+                        AppendInvalid(
+                            invalidOutput,
+                            supplier,
+                            null,
+                            construction,
+                            construction.CurrentCellPosition,
+                            TransferFlowMode.Recebedor,
+                            "Construcao hub sem estoque para modo recebedor.");
+                    }
+                }
+
+                if (!hasEmbarkedStock)
+                    continue;
+
+                if (constructionIsHub && ConstructionHasInfiniteSupply(construction))
+                {
+                    AppendInvalid(
+                        invalidOutput,
+                        supplier,
+                        null,
+                        construction,
+                        construction.CurrentCellPosition,
+                        TransferFlowMode.Fornecimento,
+                        "Construcao hub com suprimento infinito bloqueia modo doar.");
+                    continue;
+                }
+
+                foundDonationTarget = true;
+                output.Add(new PodeTransferirOption
+                {
+                    supplierUnit = supplier,
+                    targetConstruction = construction,
+                    targetCell = construction.CurrentCellPosition,
+                    flowMode = TransferFlowMode.Fornecimento,
+                    displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Fornecimento, null, construction)
+                });
+            }
+        }
+
+        // UNIDADES: Hub-Hub permite receber e doar. Hub-Receiver permite apenas doar.
         for (int i = 0; i < unitsInCollectionRange.Count; i++)
         {
             UnitManager unit = unitsInCollectionRange[i];
@@ -156,6 +240,52 @@ public static class PodeTransferirSensor
                 continue;
             if (!IsDomainCompatibleForTransfer(supplier, supplierData, unit))
                 continue;
+
+            if (targetData.supplierTier == SupplierTier.Hub)
+            {
+                if (GetUnitTotalStock(unit) > 0)
+                {
+                    if (CanTransferAtLeastOneSupply(unit, null, supplier))
+                    {
+                        Vector3Int receiveCell = unit.CurrentCellPosition;
+                        receiveCell.z = 0;
+                        output.Add(new PodeTransferirOption
+                        {
+                            supplierUnit = supplier,
+                            targetUnit = unit,
+                            targetCell = receiveCell,
+                            flowMode = TransferFlowMode.Recebedor,
+                            displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Recebedor, unit, null)
+                        });
+                    }
+                    else
+                    {
+                        AppendInvalid(
+                            invalidOutput,
+                            supplier,
+                            unit,
+                            null,
+                            unit.CurrentCellPosition,
+                            TransferFlowMode.Recebedor,
+                            "Supplier sem capacidade disponivel para receber recursos do hub.");
+                    }
+                }
+                else
+                {
+                    AppendInvalid(
+                        invalidOutput,
+                        supplier,
+                        unit,
+                        null,
+                        unit.CurrentCellPosition,
+                        TransferFlowMode.Recebedor,
+                        "Hub alvo sem estoque para modo receber.");
+                }
+            }
+
+            if (!hasEmbarkedStock)
+                continue;
+
             if (!CanTransferAtLeastOneSupply(supplier, null, unit))
             {
                 AppendInvalid(
@@ -168,53 +298,18 @@ public static class PodeTransferirSensor
                     "Alvo sem capacidade disponivel para receber recursos.");
                 continue;
             }
-            transferableTargets.Add(unit);
-        }
 
-        if (constructionsInCollectionRange != null)
-        {
-            for (int i = 0; i < constructionsInCollectionRange.Count; i++)
+            foundDonationTarget = true;
+            Vector3Int donateCell = unit.CurrentCellPosition;
+            donateCell.z = 0;
+            output.Add(new PodeTransferirOption
             {
-                ConstructionManager construction = constructionsInCollectionRange[i];
-                if (construction == null)
-                    continue;
-
-                if (GetConstructionTotalSupply(construction) > 0)
-                {
-                    if (!CanTransferAtLeastOneSupply(null, construction, supplier))
-                    {
-                        AppendInvalid(
-                            invalidOutput,
-                            supplier,
-                            null,
-                            construction,
-                            construction.CurrentCellPosition,
-                            TransferFlowMode.Recebedor,
-                            "Supplier sem capacidade disponivel para receber recursos desta construcao.");
-                        continue;
-                    }
-
-                    output.Add(new PodeTransferirOption
-                    {
-                        supplierUnit = supplier,
-                        targetConstruction = construction,
-                        targetCell = construction.CurrentCellPosition,
-                        flowMode = TransferFlowMode.Recebedor,
-                        displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Recebedor, null, construction)
-                    });
-                }
-                else
-                {
-                    AppendInvalid(
-                        invalidOutput,
-                        supplier,
-                        null,
-                        construction,
-                        construction.CurrentCellPosition,
-                        TransferFlowMode.Recebedor,
-                        "Construcao sem estoque para modo recebedor.");
-                }
-            }
+                supplierUnit = supplier,
+                targetUnit = unit,
+                targetCell = donateCell,
+                flowMode = TransferFlowMode.Fornecimento,
+                displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Fornecimento, unit, null)
+            });
         }
 
         if (!hasEmbarkedStock)
@@ -231,9 +326,9 @@ public static class PodeTransferirSensor
                         supplier,
                         null,
                         construction,
-                        origin: construction.CurrentCellPosition,
-                        mode: TransferFlowMode.Fornecimento,
-                        reason: "Hub sem estoque embarcado para fornecer.");
+                        construction.CurrentCellPosition,
+                        TransferFlowMode.Fornecimento,
+                        "Hub sem estoque embarcado para doar.");
                 }
             }
             else
@@ -243,72 +338,23 @@ public static class PodeTransferirSensor
                     supplier,
                     null,
                     alliedConstruction,
-                    origin: supplier.CurrentCellPosition,
-                    mode: TransferFlowMode.Fornecimento,
-                    reason: "Hub sem estoque embarcado para fornecer.");
+                    supplier.CurrentCellPosition,
+                    TransferFlowMode.Fornecimento,
+                    "Hub sem estoque embarcado para doar.");
             }
             return;
         }
 
-        if (constructionsInCollectionRange != null)
-        {
-            for (int i = 0; i < constructionsInCollectionRange.Count; i++)
-            {
-                ConstructionManager construction = constructionsInCollectionRange[i];
-                if (construction == null)
-                    continue;
-
-                hasAnyConstructionForFornecimento = true;
-                if (ConstructionHasInfiniteSupply(construction))
-                {
-                    AppendInvalid(
-                        invalidOutput,
-                        supplier,
-                        null,
-                        construction,
-                        origin: construction.CurrentCellPosition,
-                        mode: TransferFlowMode.Fornecimento,
-                        reason: "Construcao com suprimento infinito bloqueia modo fornecimento para hub.");
-                    continue;
-                }
-
-                output.Add(new PodeTransferirOption
-                {
-                    supplierUnit = supplier,
-                    targetConstruction = construction,
-                    targetCell = construction.CurrentCellPosition,
-                    flowMode = TransferFlowMode.Fornecimento,
-                    displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Fornecimento, null, construction)
-                });
-            }
-        }
-
-        if (transferableTargets.Count <= 0 && !hasAnyConstructionForFornecimento)
+        if (!foundDonationTarget)
         {
             AppendInvalid(
                 invalidOutput,
                 supplier,
                 null,
                 alliedConstruction,
-                origin: supplier.CurrentCellPosition,
-                mode: TransferFlowMode.Fornecimento,
-                reason: "Hub sem alvo elegivel para fornecimento (hub/receiver).");
-            return;
-        }
-
-        for (int i = 0; i < transferableTargets.Count; i++)
-        {
-            UnitManager target = transferableTargets[i];
-            Vector3Int targetCell = target.CurrentCellPosition;
-            targetCell.z = 0;
-            output.Add(new PodeTransferirOption
-            {
-                supplierUnit = supplier,
-                targetUnit = target,
-                targetCell = targetCell,
-                flowMode = TransferFlowMode.Fornecimento,
-                displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Fornecimento, target, null)
-            });
+                supplier.CurrentCellPosition,
+                TransferFlowMode.Fornecimento,
+                "Hub sem alvo elegivel para doar (hub/receiver).");
         }
     }
 
@@ -321,7 +367,9 @@ public static class PodeTransferirSensor
         List<PodeTransferirOption> output,
         List<PodeTransferirInvalidOption> invalidOutput)
     {
-        bool hasValidHub = false;
+        bool hasValidHubSource = false;
+        bool hasEmbarkedStock = GetUnitTotalStock(supplier) > 0;
+        bool hasDonationTarget = false;
 
         if (constructionsInCollectionRange != null)
         {
@@ -334,7 +382,43 @@ public static class PodeTransferirSensor
                 if (!TryGetConstructionSupplierTier(construction, out SupplierTier constructionTier))
                     continue;
 
-                if (constructionTier != SupplierTier.Hub)
+                bool constructionIsHub = constructionTier == SupplierTier.Hub;
+                bool constructionIsReceiver = constructionTier == SupplierTier.Receiver;
+                if (!constructionIsHub && !constructionIsReceiver)
+                    continue;
+
+                if (constructionIsHub && GetConstructionTotalSupply(construction) > 0)
+                {
+                    if (!CanTransferAtLeastOneSupply(null, construction, supplier))
+                    {
+                        AppendInvalid(
+                            invalidOutput,
+                            supplier,
+                            null,
+                            construction,
+                            construction.CurrentCellPosition,
+                            TransferFlowMode.Recebedor,
+                            "Receiver sem necessidade/capacidade para receber recursos desta construcao.");
+                    }
+                    else
+                    {
+                        hasValidHubSource = true;
+                        output.Add(new PodeTransferirOption
+                        {
+                            supplierUnit = supplier,
+                            targetConstruction = construction,
+                            targetCell = construction.CurrentCellPosition,
+                            flowMode = TransferFlowMode.Recebedor,
+                            displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Recebedor, null, construction)
+                        });
+                    }
+                }
+
+                if (!hasEmbarkedStock)
+                    continue;
+
+                // Receiver pode doar para construcoes no range (hub finita ou receiver).
+                if (constructionIsHub && ConstructionHasInfiniteSupply(construction))
                 {
                     AppendInvalid(
                         invalidOutput,
@@ -342,35 +426,19 @@ public static class PodeTransferirSensor
                         null,
                         construction,
                         construction.CurrentCellPosition,
-                        TransferFlowMode.Recebedor,
-                        "Construcao com tier Receiver so recebe (nao fornece).");
+                        TransferFlowMode.Fornecimento,
+                        "Construcao hub com suprimento infinito bloqueia modo doar.");
                     continue;
                 }
 
-                if (GetConstructionTotalSupply(construction) <= 0)
-                    continue;
-
-                if (!CanTransferAtLeastOneSupply(null, construction, supplier))
-                {
-                    AppendInvalid(
-                        invalidOutput,
-                        supplier,
-                        null,
-                        construction,
-                        construction.CurrentCellPosition,
-                        TransferFlowMode.Recebedor,
-                        "Receiver sem necessidade/capacidade para receber recursos desta construcao.");
-                    continue;
-                }
-
-                hasValidHub = true;
+                hasDonationTarget = true;
                 output.Add(new PodeTransferirOption
                 {
                     supplierUnit = supplier,
                     targetConstruction = construction,
                     targetCell = construction.CurrentCellPosition,
-                    flowMode = TransferFlowMode.Recebedor,
-                    displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Recebedor, null, construction)
+                    flowMode = TransferFlowMode.Fornecimento,
+                    displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Fornecimento, null, construction)
                 });
             }
         }
@@ -401,7 +469,7 @@ public static class PodeTransferirSensor
                 continue;
             }
 
-            hasValidHub = true;
+            hasValidHubSource = true;
             Vector3Int hubCell = hub.CurrentCellPosition;
             hubCell.z = 0;
             output.Add(new PodeTransferirOption
@@ -414,7 +482,7 @@ public static class PodeTransferirSensor
             });
         }
 
-        if (!hasValidHub)
+        if (!hasValidHubSource)
         {
             AppendInvalid(
                 invalidOutput,
@@ -424,6 +492,31 @@ public static class PodeTransferirSensor
                 origin: supplier.CurrentCellPosition,
                 mode: TransferFlowMode.Recebedor,
                 reason: "Receiver sem hub aliado valido no collection range.");
+        }
+
+        if (!hasEmbarkedStock)
+        {
+            AppendInvalid(
+                invalidOutput,
+                supplier,
+                null,
+                alliedConstruction,
+                supplier.CurrentCellPosition,
+                TransferFlowMode.Fornecimento,
+                "Receiver sem estoque embarcado para doar.");
+            return;
+        }
+
+        if (!hasDonationTarget)
+        {
+            AppendInvalid(
+                invalidOutput,
+                supplier,
+                null,
+                alliedConstruction,
+                supplier.CurrentCellPosition,
+                TransferFlowMode.Fornecimento,
+                "Receiver sem alvo elegivel para doar no collection range.");
         }
     }
 
@@ -461,15 +554,37 @@ public static class PodeTransferirSensor
         UnitManager targetUnit,
         ConstructionManager targetConstruction)
     {
-        string supplierLabel = ResolveUnitLabel(supplier);
         string endpointLabel = targetUnit != null
             ? ResolveUnitLabel(targetUnit)
             : ResolveConstructionLabel(targetConstruction);
 
-        if (mode == TransferFlowMode.Fornecimento)
-            return $"{supplierLabel} -> Fornece -> {endpointLabel}";
+        if (targetConstruction != null)
+        {
+            string transferRole = ResolveConstructionTransferRoleLabel(targetConstruction);
+            if (!string.IsNullOrWhiteSpace(transferRole))
+                return $"{transferRole} :: {endpointLabel}";
+        }
 
-        return $"{supplierLabel} <- Recebe <- {endpointLabel}";
+        if (mode == TransferFlowMode.Fornecimento)
+            return $"Transferir: Doar -> {endpointLabel}";
+
+        return $"Transferir: Receber <- {endpointLabel}";
+    }
+
+    private static string ResolveConstructionTransferRoleLabel(ConstructionManager construction)
+    {
+        if (construction == null)
+            return string.Empty;
+        if (!construction.TryResolveConstructionData(out ConstructionData data) || data == null || !data.isSupplier)
+            return string.Empty;
+
+        if (data.supplierTier == SupplierTier.Receiver)
+            return "Transferir - Recebedor";
+        if (data.supplierTier != SupplierTier.Hub)
+            return string.Empty;
+        if (construction.HasInfiniteSuppliesFor())
+            return "Transferir - Fornecedor";
+        return "Transferir - Recebedor/Fornecedor";
     }
 
     private static List<UnitManager> CollectUnitsInCollectionRange(
@@ -551,7 +666,9 @@ public static class PodeTransferirSensor
         UnitData supplierData,
         Tilemap boardMap,
         Vector3Int originCell,
-        TeamId supplierTeam)
+        TeamId supplierTeam,
+        Domain supplierDomain,
+        HeightLevel supplierHeight)
     {
         var result = new List<ConstructionManager>();
         if (supplierData == null || boardMap == null)
@@ -564,7 +681,12 @@ public static class PodeTransferirSensor
 
         if (includeOriginCell)
         {
-            ConstructionManager originConstruction = ResolveAlliedConstructionAtCell(boardMap, originCell, supplierTeam);
+            ConstructionManager originConstruction = ResolveAlliedConstructionAtCell(
+                boardMap,
+                originCell,
+                supplierTeam,
+                supplierDomain,
+                supplierHeight);
             if (originConstruction != null)
                 result.Add(originConstruction);
         }
@@ -578,7 +700,12 @@ public static class PodeTransferirSensor
         {
             Vector3Int cell = neighbors[i];
             cell.z = 0;
-            ConstructionManager construction = ResolveAlliedConstructionAtCell(boardMap, cell, supplierTeam);
+            ConstructionManager construction = ResolveAlliedConstructionAtCell(
+                boardMap,
+                cell,
+                supplierTeam,
+                supplierDomain,
+                supplierHeight);
             if (construction == null || result.Contains(construction))
                 continue;
             result.Add(construction);
@@ -656,6 +783,11 @@ public static class PodeTransferirSensor
         if (supplier == null || supplierData == null || target == null)
             return false;
 
+        // Excecao: unidade embarcada no proprio supplier sempre pode transferir,
+        // independente do dominio/altura atual do passageiro.
+        if (target.IsEmbarked && target.EmbarkedTransporter == supplier)
+            return true;
+
         Domain supplierDomain = supplier.GetDomain();
         HeightLevel supplierHeight = supplier.GetHeightLevel();
         Domain targetDomain = target.GetDomain();
@@ -665,6 +797,23 @@ public static class PodeTransferirSensor
             return true;
 
         return SupportsOperationDomain(supplierData, targetDomain, targetHeight);
+    }
+
+    private static bool HasEmbarkedPassengerInCollectionRange(List<UnitManager> unitsInRange, UnitManager supplier)
+    {
+        if (unitsInRange == null || supplier == null)
+            return false;
+
+        for (int i = 0; i < unitsInRange.Count; i++)
+        {
+            UnitManager unit = unitsInRange[i];
+            if (unit == null)
+                continue;
+            if (unit.IsEmbarked && unit.EmbarkedTransporter == supplier)
+                return true;
+        }
+
+        return false;
     }
 
     private static int GetUnitTotalStock(UnitManager unit)
@@ -804,12 +953,19 @@ public static class PodeTransferirSensor
         return map;
     }
 
-    private static ConstructionManager ResolveAlliedConstructionAtCell(Tilemap boardMap, Vector3Int cell, TeamId teamId)
+    private static ConstructionManager ResolveAlliedConstructionAtCell(
+        Tilemap boardMap,
+        Vector3Int cell,
+        TeamId teamId,
+        Domain supplierDomain,
+        HeightLevel supplierHeight)
     {
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cell);
         if (construction == null)
             return null;
         if ((int)construction.TeamId != (int)teamId)
+            return null;
+        if (!construction.SupportsLayerMode(supplierDomain, supplierHeight))
             return null;
         return construction;
     }

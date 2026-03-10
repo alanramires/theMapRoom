@@ -528,6 +528,44 @@ public static class PodeMirarSensor
         if (map == null)
             return;
 
+        Vector3Int origin = attacker.CurrentCellPosition;
+        origin.z = 0;
+        CollectValidFireCellsFromOrigin(
+            attacker,
+            map,
+            terrainDatabase,
+            movementMode,
+            origin,
+            outputCells,
+            dpqAirHeightConfig,
+            enableLdtValidation,
+            enableLosValidation,
+            enableSpotter);
+    }
+
+    public static void CollectValidFireCellsFromOrigin(
+        UnitManager attacker,
+        Tilemap boardTilemap,
+        TerrainDatabase terrainDatabase,
+        SensorMovementMode movementMode,
+        Vector3Int originCell,
+        ICollection<Vector3Int> outputCells,
+        DPQAirHeightConfig dpqAirHeightConfig = null,
+        bool enableLdtValidation = true,
+        bool enableLosValidation = true,
+        bool enableSpotter = true)
+    {
+        if (outputCells == null)
+            return;
+
+        outputCells.Clear();
+        if (attacker == null)
+            return;
+
+        Tilemap map = boardTilemap != null ? boardTilemap : attacker.BoardTilemap;
+        if (map == null)
+            return;
+
         IReadOnlyList<UnitEmbarkedWeapon> embarkedWeapons = attacker.GetEmbarkedWeapons();
         if (embarkedWeapons == null || embarkedWeapons.Count == 0)
             return;
@@ -548,7 +586,7 @@ public static class PodeMirarSensor
         if (candidates.Count == 0 || globalMaxRange <= 0)
             return;
 
-        Vector3Int origin = attacker.CurrentCellPosition;
+        Vector3Int origin = originCell;
         origin.z = 0;
         Dictionary<Vector3Int, int> distances = BuildDistanceMap(map, origin, globalMaxRange);
         foreach (KeyValuePair<Vector3Int, int> pair in distances)
@@ -608,49 +646,122 @@ public static class PodeMirarSensor
         if (map == null || weapon == null)
             return false;
 
-        // "Alvo virtual": o dominio/camada do hex de destino precisa ser compativel com a arma.
-        if (enableLdtValidation)
-        {
-            if (!TryResolveTerrainAtCell(map, terrainDatabase, targetCell, out TerrainTypeData destinationTerrain) || destinationTerrain == null)
-                return false;
-            if (!TerrainAllowsWeaponTrajectory(destinationTerrain, weapon))
-                return false;
-        }
+        // "Alvo virtual": o dominio/camada do hex de destino precisa ser compativel com a arma
+        // independentemente da validacao de LdT.
+        if (!TryResolveTerrainAtCell(map, terrainDatabase, targetCell, out TerrainTypeData destinationTerrain) || destinationTerrain == null)
+            return false;
+        if (!TerrainAllowsWeaponTrajectory(destinationTerrain, weapon))
+            return false;
 
         if (!enableLosValidation)
             return true;
 
-        bool hasDirectLine = trajectory != WeaponTrajectoryType.Straight || HasValidStraightLineOfFire(
-            map,
-            terrainDatabase,
-            originCell,
-            targetCell,
-            attacker,
-            null,
-            dpqAirHeightConfig,
-            weapon,
-            out _,
-            out _,
-            out _,
-            enableLdtValidation,
-            enableLosValidation);
-        if (!hasDirectLine)
-            return false;
+        if (trajectory == WeaponTrajectoryType.Straight)
+        {
+            bool hasDirectLos = HasValidStraightLineOfFire(
+                map,
+                terrainDatabase,
+                originCell,
+                targetCell,
+                attacker,
+                null,
+                dpqAirHeightConfig,
+                weapon,
+                out _,
+                out _,
+                out _,
+                enableLdtValidation,
+                enableLosValidation);
 
-        int attackerObservationRange = GetObservationRangeHexes(attacker);
-        if (distanceFromAttacker <= 1)
-            return true;
+            bool hasValidLdtPath = true;
+            if (!hasDirectLos && enableLdtValidation)
+            {
+                hasValidLdtPath = HasValidStraightLineOfFire(
+                    map,
+                    terrainDatabase,
+                    originCell,
+                    targetCell,
+                    attacker,
+                    null,
+                    dpqAirHeightConfig,
+                    weapon,
+                    out _,
+                    out _,
+                    out _,
+                    enableLdtValidation: true,
+                    enableLosValidation: false);
+            }
 
-        if (!enableSpotter || distanceFromAttacker <= attackerObservationRange)
-            return true;
+            if (!hasDirectLos)
+            {
+                if (hasValidLdtPath && enableSpotter && TryFindForwardObserverForVirtualCell(
+                        attacker,
+                        targetCell,
+                        map,
+                        terrainDatabase,
+                        dpqAirHeightConfig,
+                        enableLosValidation))
+                {
+                    hasDirectLos = true;
+                }
 
-        return TryFindForwardObserverForVirtualCell(
-            attacker,
-            targetCell,
-            map,
-            terrainDatabase,
-            dpqAirHeightConfig,
-            enableLosValidation);
+                if (!hasDirectLos)
+                    return false;
+            }
+
+            int attackerObservationRange = GetObservationRangeHexes(attacker);
+            bool requiresForwardObserver = distanceFromAttacker > 1 && enableSpotter && distanceFromAttacker > attackerObservationRange;
+            if (!requiresForwardObserver)
+                return true;
+
+            return TryFindForwardObserverForVirtualCell(
+                attacker,
+                targetCell,
+                map,
+                terrainDatabase,
+                dpqAirHeightConfig,
+                enableLosValidation);
+        }
+
+        // Parabolico: mantem regra de observacao do fluxo principal.
+        bool allowParabolic = true;
+        if (enableSpotter)
+        {
+            bool shooterSeesTarget = false;
+            int attackerObservationRange = GetObservationRangeHexes(attacker);
+            if (distanceFromAttacker <= 1)
+            {
+                shooterSeesTarget = true;
+            }
+            else if (distanceFromAttacker <= attackerObservationRange)
+            {
+                shooterSeesTarget = HasValidStraightObservationLine(
+                    map,
+                    terrainDatabase,
+                    originCell,
+                    targetCell,
+                    attacker,
+                    null,
+                    dpqAirHeightConfig,
+                    out _,
+                    out _,
+                    out _,
+                    enableLosValidation);
+            }
+
+            if (!shooterSeesTarget)
+            {
+                allowParabolic = TryFindForwardObserverForVirtualCell(
+                    attacker,
+                    targetCell,
+                    map,
+                    terrainDatabase,
+                    dpqAirHeightConfig,
+                    enableLosValidation);
+            }
+        }
+
+        return allowParabolic;
     }
 
     private static bool TryBuildCandidate(UnitEmbarkedWeapon embarked, int index, SensorMovementMode movementMode, out WeaponRangeCandidate candidate, bool requireAmmo)
@@ -1094,9 +1205,6 @@ public static class PodeMirarSensor
             if (cellEv <= 0)
                 continue;
 
-            // Excecao suprema: alvo com EV pelo menos 2 acima do obstaculo nao e bloqueado por ele.
-            if ((targetEv - cellEv) >= 2)
-                continue;
             if (cellEv > losHeightAtCell)
             {
                 blockedCell = cell;
@@ -1180,9 +1288,6 @@ public static class PodeMirarSensor
             if (!cellBlocksLoS || cellEv <= 0)
                 continue;
 
-            if ((targetEv - cellEv) >= 2)
-                continue;
-
             if (cellEv > losHeightAtCell)
             {
                 blockedCell = cell;
@@ -1263,35 +1368,80 @@ public static class PodeMirarSensor
 
         originCell.z = 0;
         targetCell.z = 0;
-        int dx = targetCell.x - originCell.x;
-        int dy = targetCell.y - originCell.y;
-        int steps = Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy));
-        if (steps <= 1)
-            return cells;
-
         if (tilemap == null)
             return cells;
 
         Vector3 originWorld = tilemap.GetCellCenterWorld(originCell);
         Vector3 targetWorld = tilemap.GetCellCenterWorld(targetCell);
-        int sampleCount = steps * 4; // supersampling leve para reduzir aliasing em bordas.
+        Vector2 originWorld2 = new Vector2(originWorld.x, originWorld.y);
+        Vector2 targetWorld2 = new Vector2(targetWorld.x, targetWorld.y);
+        float neighborStep = 1f;
+        List<Vector3Int> originNeighbors = new List<Vector3Int>(6);
+        UnitMovementPathRules.GetImmediateHexNeighbors(tilemap, originCell, originNeighbors);
+        if (originNeighbors.Count > 0)
+        {
+            Vector3 n = tilemap.GetCellCenterWorld(originNeighbors[0]);
+            neighborStep = Vector2.Distance(originWorld2, new Vector2(n.x, n.y));
+            if (neighborStep <= 0.0001f)
+                neighborStep = 1f;
+        }
+
+        float worldDistance = Vector2.Distance(originWorld2, targetWorld2);
+        if (worldDistance <= 0.0001f)
+            return cells;
+
+        // Densidade por distancia real do mundo (nao por delta de celula),
+        // para nao "pular" obstaculos em diagonais/offset de hex.
+        int approxHexes = Mathf.Max(1, Mathf.CeilToInt(worldDistance / Mathf.Max(0.0001f, neighborStep)));
+        if (approxHexes <= 1)
+            return cells;
+
+        // Em hex, so expande para celulas adjacentes quando o ponto da linha cai proximo
+        // da fronteira (caso ambiguo). Evita falso bloqueio por terreno "ao lado" da linha.
+        float borderEpsilon = Mathf.Max(0.01f, neighborStep * 0.08f);
+        int sampleCount = approxHexes * 10; // supersampling mais denso para LoS robusta.
         if (sampleCount <= 1)
-            sampleCount = steps;
+            sampleCount = approxHexes * 6;
 
         HashSet<Vector3Int> seen = new HashSet<Vector3Int>();
+        List<Vector3Int> centerNeighbors = new List<Vector3Int>(6);
         for (int i = 1; i < sampleCount; i++)
         {
             float t = i / (float)sampleCount;
-            Vector3 sampleWorld = Vector3.Lerp(originWorld, targetWorld, t);
-            Vector3Int cell = tilemap.WorldToCell(sampleWorld);
-            cell.z = 0;
-            if (cell == originCell || cell == targetCell)
-                continue;
-            if (seen.Add(cell))
-                cells.Add(cell);
+            Vector2 sample2 = Vector2.Lerp(originWorld2, targetWorld2, t);
+
+            Vector3Int centerCell = tilemap.WorldToCell(new Vector3(sample2.x, sample2.y, 0f));
+            centerCell.z = 0;
+            if (centerCell != originCell && centerCell != targetCell && seen.Add(centerCell))
+                cells.Add(centerCell);
+
+            Vector2 centerWorld2 = ToWorld2(tilemap.GetCellCenterWorld(centerCell));
+            float distToCenter = Vector2.Distance(sample2, centerWorld2);
+
+            UnitMovementPathRules.GetImmediateHexNeighbors(tilemap, centerCell, centerNeighbors);
+            for (int n = 0; n < centerNeighbors.Count; n++)
+            {
+                Vector3Int neighborCell = centerNeighbors[n];
+                neighborCell.z = 0;
+                if (neighborCell == originCell || neighborCell == targetCell)
+                    continue;
+
+                Vector2 neighborWorld2 = ToWorld2(tilemap.GetCellCenterWorld(neighborCell));
+                float distToNeighbor = Vector2.Distance(sample2, neighborWorld2);
+                if (Mathf.Abs(distToCenter - distToNeighbor) > borderEpsilon)
+                    continue;
+
+                if (seen.Add(neighborCell))
+                    cells.Add(neighborCell);
+            }
         }
 
         return cells;
+    }
+
+    private static Vector2 ToWorld2(Vector3 world)
+    {
+        return new Vector2(world.x, world.y);
     }
 
     private static bool TryResolveTerrainAtCell(Tilemap terrainTilemap, TerrainDatabase terrainDatabase, Vector3Int cell, out TerrainTypeData terrain)

@@ -25,6 +25,9 @@ MonoBehaviour:
   - id: helper.title.sensors
     condition: Titulo do helper no estado de sensores apos mover.
     message: SENSORS
+  - id: helper.title.hotzone
+    condition: Titulo do helper durante selecao da hotzone de ameaca.
+    message: HOT ZONE
   - id: helper.sensors.label.aim
     condition: Rotulo da acao de mirar.
     message: Aim

@@ -306,6 +306,7 @@ public class MatchController : MonoBehaviour
     private void Awake()
     {
         ApplyGameSetupPreset();
+        SyncThreatRevisionFlags();
         NormalizeState();
         TryRefreshIncomeFromConstructions(markDirtyInEditor: false);
         TryAutoAssignCursorController();
@@ -319,6 +320,7 @@ public class MatchController : MonoBehaviour
     private void OnValidate()
     {
         ApplyGameSetupPreset();
+        SyncThreatRevisionFlags();
         NormalizeState();
         TryRefreshIncomeFromConstructions(markDirtyInEditor: true);
         TryAutoAssignCursorController();
@@ -332,6 +334,7 @@ public class MatchController : MonoBehaviour
     private void Update()
     {
         TryRefreshIncomeFromConstructions(markDirtyInEditor: !Application.isPlaying);
+        SyncThreatRevisionFlags();
 
         if (!Application.isPlaying)
             return;
@@ -351,6 +354,7 @@ public class MatchController : MonoBehaviour
     {
         gameSetup = preset;
         ApplyGameSetupPreset();
+        SyncThreatRevisionFlags();
     }
 
     public void SetActiveTeamId(int teamId)
@@ -555,6 +559,13 @@ public class MatchController : MonoBehaviour
                 enableStealthValidation = true;
                 break;
         }
+
+        SyncThreatRevisionFlags();
+    }
+
+    private void SyncThreatRevisionFlags()
+    {
+        ThreatRevisionTracker.SetMatchFlags(enableLdtValidation, enableLosValidation, enableSpotter);
     }
 
     private static TeamId ClampToTeamId(int value)

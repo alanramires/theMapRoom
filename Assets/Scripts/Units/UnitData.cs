@@ -224,6 +224,8 @@ public class UnitData : ScriptableObject
                 entry.detectUnitsWithFollowingSkills = new List<SkillData>();
         }
         maxUnitsServedPerTurn = Mathf.Max(0, maxUnitsServedPerTurn);
+        if (supplierTier == SupplierTier.SelfSupplier)
+            supplierTier = SupplierTier.Receiver;
         if (preferredAirHeight != HeightLevel.AirLow && preferredAirHeight != HeightLevel.AirHigh)
             preferredAirHeight = HeightLevel.AirLow;
         if (preferredNavalHeight != HeightLevel.Surface && preferredNavalHeight != HeightLevel.Submerged)

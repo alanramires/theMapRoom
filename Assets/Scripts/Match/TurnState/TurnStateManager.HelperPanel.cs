@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -23,7 +25,9 @@ public partial class TurnStateManager
         UnitStats = 6,
         Embark = 7,
         Supply = 8,
-        TurnStartAutonomy = 9
+        TurnStartAutonomy = 9,
+        Transfer = 10,
+        ConstructionStats = 11
     }
 
     public sealed class HelperPanelData
@@ -31,6 +35,7 @@ public partial class TurnStateManager
         public HelperPanelKind Kind = HelperPanelKind.None;
         public readonly List<HelperShoppingLine> ShoppingLines = new List<HelperShoppingLine>();
         public readonly List<HelperSensorLine> SensorLines = new List<HelperSensorLine>();
+        public readonly List<HelperThreatLayerTeamLine> ThreatLayerTeamLines = new List<HelperThreatLayerTeamLine>();
         public readonly List<HelperDisembarkOrderLine> DisembarkOrderLines = new List<HelperDisembarkOrderLine>();
         public readonly List<HelperDisembarkPassengerLine> DisembarkPassengerLines = new List<HelperDisembarkPassengerLine>();
         public readonly List<HelperMergeQueueLine> MergeQueueLines = new List<HelperMergeQueueLine>();
@@ -38,11 +43,15 @@ public partial class TurnStateManager
         public readonly List<HelperEmbarkCandidateLine> EmbarkCandidateLines = new List<HelperEmbarkCandidateLine>();
         public readonly List<HelperSupplyTargetLine> SupplyTargetLines = new List<HelperSupplyTargetLine>();
         public readonly List<HelperSupplyResourceLine> SupplyResourceLines = new List<HelperSupplyResourceLine>();
+        public readonly List<HelperTransferCandidateLine> TransferCandidateLines = new List<HelperTransferCandidateLine>();
+        public readonly List<HelperTransferResourceLine> TransferResourceLines = new List<HelperTransferResourceLine>();
         public readonly List<HelperCommandServiceTargetLine> CommandServiceTargetLines = new List<HelperCommandServiceTargetLine>();
         public readonly List<HelperCommandServiceSkippedUnitLine> CommandServiceSkippedUnitLines = new List<HelperCommandServiceSkippedUnitLine>();
         public readonly List<HelperTurnStartAutonomyLine> TurnStartAutonomyLines = new List<HelperTurnStartAutonomyLine>();
         public string UnitStatsName;
         public readonly List<string> UnitStatsLines = new List<string>();
+        public string ConstructionStatsName;
+        public readonly List<string> ConstructionStatsLines = new List<string>();
         public int SupplyServedTargets;
         public int SupplyRecoveredHp;
         public int SupplyRecoveredFuel;
@@ -50,6 +59,12 @@ public partial class TurnStateManager
         public int SupplyTotalCost;
         public bool SupplyIsConfirmStep;
         public bool SupplyHasQueuedOrders;
+        public bool TransferIsConfirmStep;
+        public bool TransferHasCursorOption;
+        public bool TransferCursorOptionFocused;
+        public string TransferSelectedLabel;
+        public string TransferSourceLabel;
+        public string TransferDestinationLabel;
         public bool HasQueuedDisembarkOrders;
         public bool IsMergeConfirmStep;
         public bool HasSelectedMergeCandidate;
@@ -67,6 +82,8 @@ public partial class TurnStateManager
         public bool CommandServiceIsEstimate;
         public int CommandServiceMoneyBefore;
         public int CommandServiceMoneyAfter;
+        public bool ThreatLayerSelectionActive;
+        public int ThreatLayerInspectedTeamId = int.MinValue;
     }
 
     private float commandServiceHelperVisibleUntil = -1f;
@@ -82,6 +99,23 @@ public partial class TurnStateManager
     private readonly List<HelperCommandServiceTargetLine> commandServiceHelperTargetLines = new List<HelperCommandServiceTargetLine>();
     private readonly List<HelperCommandServiceSkippedUnitLine> commandServiceHelperSkippedUnitLines = new List<HelperCommandServiceSkippedUnitLine>();
     private UnitManager inspectedHelperUnit;
+    private ConstructionManager inspectedHelperConstruction;
+    private readonly List<Vector3Int> inspectedThreatRangeCells = new List<Vector3Int>();
+    private readonly HashSet<Vector3Int> inspectedThreatRangeLookup = new HashSet<Vector3Int>();
+    private readonly List<Vector3Int> inspectedThreatLineCells = new List<Vector3Int>();
+    private readonly HashSet<Vector3Int> inspectedThreatLineLookup = new HashSet<Vector3Int>();
+    private bool enemyThreatLayersEnabled;
+    private int enemyThreatLayersInspectedTeamId = int.MinValue;
+    private readonly List<int> threatLayerSelectableTeamIds = new List<int>();
+    private readonly List<int> threatLayerSelectableOptionNumbers = new List<int>();
+    private readonly List<Vector3Int> enemyThreatRangeCells = new List<Vector3Int>();
+    private readonly HashSet<Vector3Int> enemyThreatRangeLookup = new HashSet<Vector3Int>();
+    private readonly List<Vector3Int> enemyThreatLineCells = new List<Vector3Int>();
+    private readonly HashSet<Vector3Int> enemyThreatLineLookup = new HashSet<Vector3Int>();
+    private readonly Dictionary<int, ThreatOverlayCacheEntry> threatOverlayCacheByUnitInstanceId = new Dictionary<int, ThreatOverlayCacheEntry>();
+    private readonly Dictionary<int, ThreatOverlayCacheMetrics> threatOverlayCacheMetricsByUnitInstanceId = new Dictionary<int, ThreatOverlayCacheMetrics>();
+    private int threatOverlayCacheTotalHits;
+    private int threatOverlayCacheTotalMisses;
     private float inspectedHelperVisibleUntil = -1f;
     private int inspectedHelperActivatedFrame = -1;
     private Vector3Int inspectedHelperCursorCell;
@@ -119,6 +153,14 @@ public partial class TurnStateManager
     {
         public char actionCode;
         public string sensorKey;
+    }
+
+    public sealed class HelperThreatLayerTeamLine
+    {
+        public int optionNumber;
+        public int teamId;
+        public string teamName;
+        public bool isOwnTeam;
     }
 
     public sealed class HelperDisembarkOrderLine
@@ -178,6 +220,25 @@ public partial class TurnStateManager
         public int afterAmount;
     }
 
+    public sealed class HelperTransferCandidateLine
+    {
+        public int index;
+        public string label;
+        public bool isFocused;
+    }
+
+    public sealed class HelperTransferResourceLine
+    {
+        public string supplyName;
+        public int movedAmount;
+        public int sourceBefore;
+        public int sourceAfter;
+        public int destinationBefore;
+        public int destinationAfter;
+        public bool sourceIsInfinite;
+        public bool destinationIsInfinite;
+    }
+
     private sealed class SupplyEstimateLine
     {
         public UnitManager target;
@@ -203,6 +264,43 @@ public partial class TurnStateManager
         public bool isFocused;
     }
 
+    private readonly struct ThreatOverlayCacheKey
+    {
+        public readonly int unitSnapshotHash;
+        public readonly int globalBoardRevision;
+        public readonly int teamObserverRevision;
+        public readonly int matchFlagsHash;
+
+        public ThreatOverlayCacheKey(int unitSnapshotHash, int globalBoardRevision, int teamObserverRevision, int matchFlagsHash)
+        {
+            this.unitSnapshotHash = unitSnapshotHash;
+            this.globalBoardRevision = globalBoardRevision;
+            this.teamObserverRevision = teamObserverRevision;
+            this.matchFlagsHash = matchFlagsHash;
+        }
+
+        public bool Equals(ThreatOverlayCacheKey other)
+        {
+            return unitSnapshotHash == other.unitSnapshotHash &&
+                   globalBoardRevision == other.globalBoardRevision &&
+                   teamObserverRevision == other.teamObserverRevision &&
+                   matchFlagsHash == other.matchFlagsHash;
+        }
+    }
+
+    private sealed class ThreatOverlayCacheEntry
+    {
+        public ThreatOverlayCacheKey key;
+        public readonly List<Vector3Int> rangeCells = new List<Vector3Int>();
+        public readonly List<Vector3Int> lineCells = new List<Vector3Int>();
+    }
+
+    private sealed class ThreatOverlayCacheMetrics
+    {
+        public int hits;
+        public int misses;
+    }
+
     public sealed class HelperTurnStartAutonomyLine
     {
         public string unitName;
@@ -224,6 +322,11 @@ public partial class TurnStateManager
 
         if (TryBuildUnitStatsHelperPanelData(data))
             return true;
+        if (TryBuildConstructionStatsHelperPanelData(data))
+            return true;
+
+        if (scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
+            return TryBuildSensorsHelperPanelData(data);
 
         if (cursorState == CursorState.Neutral)
             return false;
@@ -235,7 +338,11 @@ public partial class TurnStateManager
             return TryBuildDisembarkHelperPanelData(data);
 
         if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
+        {
+            if (IsTransferPromptActive())
+                return TryBuildTransferHelperPanelData(data);
             return TryBuildSensorsHelperPanelData(data);
+        }
 
         if (cursorState == CursorState.Suprindo)
             return TryBuildSupplyHelperPanelData(data);
@@ -380,30 +487,830 @@ public partial class TurnStateManager
         return data.UnitStatsLines.Count > 0;
     }
 
+    private bool TryBuildConstructionStatsHelperPanelData(HelperPanelData data)
+    {
+        if (data == null || cursorState != CursorState.Neutral || !IsInspectedHelperActive() || inspectedHelperConstruction == null)
+            return false;
+
+        ConstructionManager construction = inspectedHelperConstruction;
+        string constructionName = !string.IsNullOrWhiteSpace(construction.ConstructionDisplayName)
+            ? construction.ConstructionDisplayName
+            : (!string.IsNullOrWhiteSpace(construction.ConstructionId) ? construction.ConstructionId : construction.name);
+
+        data.Kind = HelperPanelKind.ConstructionStats;
+        data.ConstructionStatsName = constructionName;
+        data.ConstructionStatsLines.Add($"Dono Atual: {TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId})");
+        data.ConstructionStatsLines.Add($"Capture: {construction.CurrentCapturePoints}/{construction.CapturePointsMax}");
+
+        IReadOnlyList<ConstructionSupplyOffer> offers = construction.OfferedSupplies;
+        data.ConstructionStatsLines.Add(string.Empty);
+        data.ConstructionStatsLines.Add("Estoques");
+        if (offers == null || offers.Count <= 0)
+        {
+            data.ConstructionStatsLines.Add("- nenhum");
+        }
+        else
+        {
+            bool addedAny = false;
+            for (int i = 0; i < offers.Count; i++)
+            {
+                ConstructionSupplyOffer offer = offers[i];
+                if (offer == null || offer.supply == null)
+                    continue;
+
+                string name = ResolveSupplyDisplayName(offer.supply);
+                string amount = construction.HasInfiniteSuppliesFor(offer.supply) ? "INF" : Mathf.Max(0, offer.quantity).ToString();
+                data.ConstructionStatsLines.Add($"- {name}: {amount}");
+                addedAny = true;
+            }
+
+            if (!addedAny)
+                data.ConstructionStatsLines.Add("- nenhum");
+        }
+
+        IReadOnlyList<ServiceData> services = construction.OfferedServices;
+        data.ConstructionStatsLines.Add(string.Empty);
+        data.ConstructionStatsLines.Add("Servicos");
+        if (services == null || services.Count <= 0)
+        {
+            data.ConstructionStatsLines.Add("- nenhum");
+        }
+        else
+        {
+            bool addedAnyService = false;
+            for (int i = 0; i < services.Count; i++)
+            {
+                ServiceData service = services[i];
+                if (service == null)
+                    continue;
+
+                string label;
+                if (service.serviceType == ServiceType.Transfer)
+                    label = ResolveConstructionTransferRoleLabelForHelper(construction);
+                else
+                    label = !string.IsNullOrWhiteSpace(service.displayName) ? service.displayName : (!string.IsNullOrWhiteSpace(service.id) ? service.id : service.name);
+
+                if (string.IsNullOrWhiteSpace(label))
+                    continue;
+
+                data.ConstructionStatsLines.Add($"- {label}");
+                addedAnyService = true;
+            }
+
+            if (!addedAnyService)
+                data.ConstructionStatsLines.Add("- nenhum");
+        }
+
+        return data.ConstructionStatsLines.Count > 0;
+    }
+
     private bool IsInspectedHelperActive()
     {
-        return inspectedHelperUnit != null &&
+        return (inspectedHelperUnit != null || inspectedHelperConstruction != null) &&
             inspectedHelperVisibleUntil > 0f &&
             Time.time <= inspectedHelperVisibleUntil;
     }
 
-    private void BeginInspectedHelper(UnitManager unit)
+    private void BeginInspectedHelper(UnitManager unit, bool paintThreatOverlay = true)
     {
         if (unit == null || cursorController == null)
             return;
 
         inspectedHelperUnit = unit;
-        inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, inspectedHelperDurationSeconds);
+        inspectedHelperConstruction = null;
+        ClearEnemyThreatLayersOverlay();
+        if (paintThreatOverlay)
+            ApplyInspectedThreatOverlay(unit);
+        else
+            ClearInspectedThreatOverlay();
+        inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, GetInspectUnitHelperDurationSeconds());
         inspectedHelperActivatedFrame = Time.frameCount;
         inspectedHelperCursorCell = cursorController.CurrentCell;
+    }
+
+    private void BeginInspectedConstructionHelper(ConstructionManager construction)
+    {
+        if (construction == null || cursorController == null)
+            return;
+
+        inspectedHelperConstruction = construction;
+        inspectedHelperUnit = null;
+        ClearEnemyThreatLayersOverlay();
+        ClearInspectedThreatOverlay();
+        inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, GetInspectConstructionHelperDurationSeconds());
+        inspectedHelperActivatedFrame = Time.frameCount;
+        inspectedHelperCursorCell = cursorController.CurrentCell;
+    }
+
+    private float GetInspectUnitHelperDurationSeconds()
+    {
+        if (animationManager != null)
+            return animationManager.InspectUnitDisplayDuration;
+        return Mathf.Max(0.1f, inspectedHelperDurationSeconds);
+    }
+
+    private float GetInspectConstructionHelperDurationSeconds()
+    {
+        if (animationManager != null)
+            return animationManager.InspectConstructionDisplayDuration;
+        return Mathf.Max(0.1f, inspectedHelperDurationSeconds);
     }
 
     private void ClearInspectedHelper()
     {
         inspectedHelperUnit = null;
+        inspectedHelperConstruction = null;
+        ClearInspectedThreatOverlay();
         inspectedHelperVisibleUntil = -1f;
         inspectedHelperActivatedFrame = -1;
         inspectedHelperCursorCell = default;
+    }
+
+    private void ApplyInspectedThreatOverlay(UnitManager unit)
+    {
+        ClearInspectedThreatOverlay();
+        ClearLineOfFireArea();
+        PaintThreatOverlayForUnit(unit, inspectedThreatRangeCells, inspectedThreatRangeLookup, inspectedThreatLineCells, inspectedThreatLineLookup);
+    }
+
+    private bool EnterThreatLayerTeamSelection()
+    {
+        if (!BuildThreatLayerSelectableTeams(threatLayerSelectableTeamIds))
+            return false;
+
+        threatLayerSelectableOptionNumbers.Clear();
+        int activeTeam = matchController != null ? matchController.ActiveTeamId : int.MinValue;
+        int activeIndex = threatLayerSelectableTeamIds.IndexOf(activeTeam);
+        if (activeIndex > 0)
+        {
+            threatLayerSelectableTeamIds.RemoveAt(activeIndex);
+            threatLayerSelectableTeamIds.Insert(0, activeTeam);
+        }
+
+        for (int i = 0; i < threatLayerSelectableTeamIds.Count; i++)
+        {
+            threatLayerSelectableOptionNumbers.Add(i + 1);
+        }
+
+        bool inspectedTeamInvalid = enemyThreatLayersInspectedTeamId == int.MinValue ||
+                                    !threatLayerSelectableTeamIds.Contains(enemyThreatLayersInspectedTeamId);
+        bool inspectedTeamIsActive = enemyThreatLayersInspectedTeamId == activeTeam;
+        if (inspectedTeamInvalid || inspectedTeamIsActive)
+        {
+            enemyThreatLayersInspectedTeamId = ResolveDefaultThreatLayerTeamId(activeTeam);
+        }
+
+        ApplyEnemyThreatLayersOverlayForTeam(enemyThreatLayersInspectedTeamId);
+        enemyThreatLayersEnabled = enemyThreatLineCells.Count > 0 || enemyThreatRangeCells.Count > 0;
+        return true;
+    }
+
+    private int ResolveDefaultThreatLayerTeamId(int activeTeam)
+    {
+        int selectedTeamId = int.MinValue;
+        int bestOption = int.MaxValue;
+        for (int i = 0; i < threatLayerSelectableTeamIds.Count && i < threatLayerSelectableOptionNumbers.Count; i++)
+        {
+            int teamId = threatLayerSelectableTeamIds[i];
+            if (teamId == activeTeam)
+                continue;
+
+            int optionNumber = threatLayerSelectableOptionNumbers[i];
+            if (optionNumber < bestOption)
+            {
+                bestOption = optionNumber;
+                selectedTeamId = teamId;
+            }
+        }
+
+        if (selectedTeamId != int.MinValue)
+            return selectedTeamId;
+
+        // Fallback: se so existir o proprio time.
+        return threatLayerSelectableTeamIds.Count > 0 ? threatLayerSelectableTeamIds[0] : int.MinValue;
+    }
+
+    private bool TryApplyThreatLayerSelection(int optionNumber, out int selectedTeamId)
+    {
+        selectedTeamId = int.MinValue;
+        int index = optionNumber - 1;
+        int teamId = (index >= 0 && index < threatLayerSelectableTeamIds.Count)
+            ? threatLayerSelectableTeamIds[index]
+            : int.MinValue;
+
+        if (teamId == int.MinValue)
+            return false;
+
+        selectedTeamId = teamId;
+        enemyThreatLayersInspectedTeamId = teamId;
+        ApplyEnemyThreatLayersOverlayForTeam(teamId);
+        enemyThreatLayersEnabled = enemyThreatLineCells.Count > 0 || enemyThreatRangeCells.Count > 0;
+        return true;
+    }
+
+    public bool TryCloseThreatLayerHotzone()
+    {
+        bool hadActiveSelection = scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect;
+        bool hadOverlay = enemyThreatLayersEnabled || enemyThreatLineCells.Count > 0 || enemyThreatRangeCells.Count > 0;
+        if (!hadActiveSelection && !hadOverlay)
+            return false;
+
+        ClearEnemyThreatLayersOverlay();
+        if (hadActiveSelection)
+            scannerPromptStep = ScannerPromptStep.AwaitingAction;
+        return true;
+    }
+
+    private void RefreshEnemyThreatLayersOverlayIfEnabled()
+    {
+        if (!enemyThreatLayersEnabled || enemyThreatLayersInspectedTeamId == int.MinValue)
+            return;
+
+        ApplyEnemyThreatLayersOverlayForTeam(enemyThreatLayersInspectedTeamId);
+        enemyThreatLayersEnabled = enemyThreatLineCells.Count > 0 || enemyThreatRangeCells.Count > 0;
+    }
+
+    private static bool BuildThreatLayerSelectableTeams(List<int> output)
+    {
+        if (output == null)
+            return false;
+
+        output.Clear();
+        UnitManager[] units = UnityEngine.Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        HashSet<int> seen = new HashSet<int>();
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+
+            int teamId = (int)unit.TeamId;
+            if (teamId < 0 || teamId > 9)
+                continue;
+            if (!seen.Add(teamId))
+                continue;
+            output.Add(teamId);
+        }
+
+        output.Sort();
+        return output.Count > 0;
+    }
+
+    private void ApplyEnemyThreatLayersOverlayForTeam(int teamId)
+    {
+        ClearEnemyThreatLayersOverlay();
+        ClearLineOfFireArea();
+        UnitManager[] units = UnityEngine.Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+            if ((int)unit.TeamId != teamId)
+                continue;
+
+            PaintThreatOverlayForUnit(unit, enemyThreatRangeCells, enemyThreatRangeLookup, enemyThreatLineCells, enemyThreatLineLookup);
+        }
+    }
+
+    private void ClearEnemyThreatLayersOverlay()
+    {
+        if (rangeMapTilemap != null)
+        {
+            for (int i = 0; i < enemyThreatRangeCells.Count; i++)
+            {
+                Vector3Int cell = enemyThreatRangeCells[i];
+                rangeMapTilemap.SetTile(cell, null);
+                rangeMapTilemap.SetTileFlags(cell, TileFlags.None);
+                rangeMapTilemap.SetColor(cell, Color.white);
+            }
+        }
+        enemyThreatRangeCells.Clear();
+        enemyThreatRangeLookup.Clear();
+
+        if (lineOfFireMapTilemap != null)
+        {
+            for (int i = 0; i < enemyThreatLineCells.Count; i++)
+            {
+                Vector3Int cell = enemyThreatLineCells[i];
+                lineOfFireMapTilemap.SetTile(cell, null);
+                lineOfFireMapTilemap.SetTileFlags(cell, TileFlags.None);
+                lineOfFireMapTilemap.SetColor(cell, Color.white);
+            }
+        }
+        enemyThreatLineCells.Clear();
+        enemyThreatLineLookup.Clear();
+        enemyThreatLayersEnabled = false;
+    }
+
+    private void PaintThreatOverlayForUnit(
+        UnitManager unit,
+        List<Vector3Int> targetRangeCells,
+        HashSet<Vector3Int> targetRangeLookup,
+        List<Vector3Int> targetLineCells,
+        HashSet<Vector3Int> targetLineLookup)
+    {
+        if (unit == null || targetRangeCells == null || targetRangeLookup == null || targetLineCells == null || targetLineLookup == null)
+            return;
+
+        InspectedThreatProfile threatProfile = ResolveInspectedThreatProfile(unit);
+        if (threatProfile == InspectedThreatProfile.None)
+            return;
+
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : unit.BoardTilemap;
+        if (boardMap == null || lineOfFireOverlayTile == null)
+            return;
+        if (rangeMapTilemap == null)
+            rangeMapTilemap = FindRangeMapTilemap();
+        if (lineOfFireMapTilemap == null)
+            lineOfFireMapTilemap = FindLineOfFireMapTilemap();
+        if (lineOfFireMapTilemap == null)
+            return;
+
+        bool enableLdt = matchController != null ? matchController.EnableLdtValidation : true;
+        bool enableLos = matchController != null ? matchController.EnableLosValidation : true;
+        bool enableSpotter = matchController != null ? matchController.EnableSpotter : true;
+
+        Color teamColor = TeamUtils.GetColor(unit.TeamId);
+
+        bool includeStaticThreat = threatProfile == InspectedThreatProfile.DistanceStatic || threatProfile == InspectedThreatProfile.Hybrid;
+        bool includeMovementThreat = threatProfile == InspectedThreatProfile.Movement || threatProfile == InspectedThreatProfile.Hybrid;
+        if (!TryResolveThreatOverlayCells(
+                unit,
+                boardMap,
+                threatProfile,
+                includeStaticThreat,
+                includeMovementThreat,
+                enableLdt,
+                enableLos,
+                enableSpotter,
+                out List<Vector3Int> cachedRangeCells,
+                out List<Vector3Int> cachedLineCells))
+        {
+            return;
+        }
+
+        Color movementColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(movementRangeAlpha));
+        if (rangeMapTilemap != null && rangeOverlayTile != null)
+        {
+            for (int i = 0; i < cachedRangeCells.Count; i++)
+            {
+                Vector3Int cell = cachedRangeCells[i];
+                if (targetRangeLookup.Contains(cell))
+                    continue;
+
+                rangeMapTilemap.SetTile(cell, rangeOverlayTile);
+                rangeMapTilemap.SetTileFlags(cell, TileFlags.None);
+                rangeMapTilemap.SetColor(cell, movementColor);
+                targetRangeCells.Add(cell);
+                targetRangeLookup.Add(cell);
+            }
+        }
+
+        if (cachedLineCells.Count <= 0)
+            return;
+        Color threatColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(lineOfFireAlpha));
+        for (int i = 0; i < cachedLineCells.Count; i++)
+        {
+            Vector3Int cell = cachedLineCells[i];
+            if (targetLineLookup.Contains(cell))
+                continue;
+            lineOfFireMapTilemap.SetTile(cell, lineOfFireOverlayTile);
+            lineOfFireMapTilemap.SetTileFlags(cell, TileFlags.None);
+            lineOfFireMapTilemap.SetColor(cell, threatColor);
+            targetLineCells.Add(cell);
+            targetLineLookup.Add(cell);
+        }
+    }
+
+    private bool TryResolveThreatOverlayCells(
+        UnitManager unit,
+        Tilemap boardMap,
+        InspectedThreatProfile threatProfile,
+        bool includeStaticThreat,
+        bool includeMovementThreat,
+        bool enableLdt,
+        bool enableLos,
+        bool enableSpotter,
+        out List<Vector3Int> rangeCells,
+        out List<Vector3Int> lineCells)
+    {
+        rangeCells = null;
+        lineCells = null;
+        if (unit == null || boardMap == null)
+            return false;
+
+        ThreatOverlayCacheKey key = BuildThreatOverlayCacheKey(unit, boardMap, enableLdt, enableLos, enableSpotter);
+        int cacheIndex = ResolveThreatOverlayCacheIndex(unit);
+        if (threatOverlayCacheByUnitInstanceId.TryGetValue(cacheIndex, out ThreatOverlayCacheEntry existing) &&
+            existing != null &&
+            existing.key.Equals(key))
+        {
+            RegisterThreatOverlayCacheResult(unit, cacheIndex, wasHit: true);
+            rangeCells = existing.rangeCells;
+            lineCells = existing.lineCells;
+            return true;
+        }
+
+        HashSet<Vector3Int> staticThreatCells = new HashSet<Vector3Int>();
+        HashSet<Vector3Int> mobileThreatCells = new HashSet<Vector3Int>();
+        HashSet<Vector3Int> movementCells = new HashSet<Vector3Int>();
+        HashSet<Vector3Int> finalRangeCells = new HashSet<Vector3Int>();
+        HashSet<Vector3Int> finalLineCells = new HashSet<Vector3Int>();
+
+        if (includeStaticThreat)
+        {
+            HashSet<Vector3Int> staticThreatRawCells = new HashSet<Vector3Int>();
+            PodeMirarSensor.CollectValidFireCellsFromOrigin(
+                unit,
+                boardMap,
+                terrainDatabase,
+                SensorMovementMode.MoveuParado,
+                unit.CurrentCellPosition,
+                staticThreatRawCells,
+                dpqAirHeightConfig,
+                enableLdt,
+                enableLos,
+                enableSpotter);
+
+            foreach (Vector3Int targetCell in staticThreatRawCells)
+            {
+                Vector3Int cell = targetCell;
+                cell.z = 0;
+                if (boardMap.GetTile(cell) == null)
+                    continue;
+                staticThreatCells.Add(cell);
+            }
+        }
+
+        if (includeMovementThreat)
+        {
+            int movementSteps = ResolveInspectionMovementSteps(unit);
+            if (movementSteps >= 0)
+            {
+                Dictionary<Vector3Int, List<Vector3Int>> validPaths = UnitMovementPathRules.CalcularCaminhosValidos(
+                    boardMap,
+                    unit,
+                    movementSteps,
+                    terrainDatabase);
+
+                foreach (KeyValuePair<Vector3Int, List<Vector3Int>> pair in validPaths)
+                {
+                    Vector3Int cell = pair.Key;
+                    cell.z = 0;
+                    if (boardMap.GetTile(cell) == null)
+                        continue;
+                    movementCells.Add(cell);
+                }
+
+                Vector3Int origin = unit.CurrentCellPosition;
+                origin.z = 0;
+                if (boardMap.GetTile(origin) != null)
+                    movementCells.Add(origin);
+
+                foreach (Vector3Int cell in movementCells)
+                {
+                    if (threatProfile == InspectedThreatProfile.Hybrid && staticThreatCells.Contains(cell))
+                        continue;
+                    finalRangeCells.Add(cell);
+                }
+
+                if (movementCells.Count > 0)
+                {
+                    HashSet<Vector3Int> localThreatCells = new HashSet<Vector3Int>();
+                    foreach (Vector3Int moveCell in movementCells)
+                    {
+                        localThreatCells.Clear();
+                        PodeMirarSensor.CollectValidFireCellsFromOrigin(
+                            unit,
+                            boardMap,
+                            terrainDatabase,
+                            SensorMovementMode.MoveuAndando,
+                            moveCell,
+                            localThreatCells,
+                            dpqAirHeightConfig,
+                            enableLdt,
+                            enableLos,
+                            enableSpotter);
+                        foreach (Vector3Int targetCell in localThreatCells)
+                        {
+                            Vector3Int cell = targetCell;
+                            cell.z = 0;
+                            if (boardMap.GetTile(cell) == null)
+                                continue;
+                            mobileThreatCells.Add(cell);
+                        }
+                    }
+                }
+            }
+        }
+
+        HashSet<Vector3Int> threatCells = new HashSet<Vector3Int>(staticThreatCells);
+        threatCells.UnionWith(mobileThreatCells);
+        foreach (Vector3Int cell in threatCells)
+        {
+            if (threatProfile == InspectedThreatProfile.Hybrid)
+            {
+                bool isStaticThreat = staticThreatCells.Contains(cell);
+                if (!isStaticThreat && movementCells.Contains(cell))
+                    continue;
+            }
+            else if (includeMovementThreat && movementCells.Contains(cell))
+            {
+                continue;
+            }
+
+            finalLineCells.Add(cell);
+        }
+
+        ThreatOverlayCacheEntry cached = existing ?? new ThreatOverlayCacheEntry();
+        cached.key = key;
+        cached.rangeCells.Clear();
+        cached.lineCells.Clear();
+        if (finalRangeCells.Count > 0)
+            cached.rangeCells.AddRange(finalRangeCells);
+        if (finalLineCells.Count > 0)
+            cached.lineCells.AddRange(finalLineCells);
+        threatOverlayCacheByUnitInstanceId[cacheIndex] = cached;
+        RegisterThreatOverlayCacheResult(unit, cacheIndex, wasHit: false);
+
+        rangeCells = cached.rangeCells;
+        lineCells = cached.lineCells;
+        return true;
+    }
+
+    public IEnumerator WarmUpThreatCacheFromScene(Action<int, int> onProgress = null, int unitsPerFrame = 4)
+    {
+        if (!Application.isPlaying)
+            yield break;
+
+        UnitManager[] allUnits = UnityEngine.Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        List<UnitManager> candidates = new List<UnitManager>(allUnits.Length);
+        for (int i = 0; i < allUnits.Length; i++)
+        {
+            UnitManager unit = allUnits[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+
+            candidates.Add(unit);
+        }
+
+        int total = candidates.Count;
+        int processed = 0;
+        onProgress?.Invoke(processed, total);
+        if (total <= 0)
+            yield break;
+
+        int batchSize = Mathf.Max(1, unitsPerFrame);
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            PreWarmThreatOverlayCacheForUnit(candidates[i]);
+            processed++;
+            onProgress?.Invoke(processed, total);
+
+            if (processed % batchSize == 0)
+                yield return null;
+        }
+    }
+
+    private void PreWarmThreatOverlayCacheForUnit(UnitManager unit)
+    {
+        if (unit == null)
+            return;
+
+        InspectedThreatProfile threatProfile = ResolveInspectedThreatProfile(unit);
+        if (threatProfile == InspectedThreatProfile.None)
+            return;
+
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : unit.BoardTilemap;
+        if (boardMap == null)
+            return;
+
+        bool enableLdt = matchController != null ? matchController.EnableLdtValidation : true;
+        bool enableLos = matchController != null ? matchController.EnableLosValidation : true;
+        bool enableSpotter = matchController != null ? matchController.EnableSpotter : true;
+        bool includeStaticThreat = threatProfile == InspectedThreatProfile.DistanceStatic || threatProfile == InspectedThreatProfile.Hybrid;
+        bool includeMovementThreat = threatProfile == InspectedThreatProfile.Movement || threatProfile == InspectedThreatProfile.Hybrid;
+
+        TryResolveThreatOverlayCells(
+            unit,
+            boardMap,
+            threatProfile,
+            includeStaticThreat,
+            includeMovementThreat,
+            enableLdt,
+            enableLos,
+            enableSpotter,
+            out _,
+            out _);
+    }
+
+    private static int ResolveThreatOverlayCacheIndex(UnitManager unit)
+    {
+        if (unit == null)
+            return 0;
+
+        int instanceId = unit.InstanceId;
+        if (instanceId > 0)
+            return instanceId;
+        return unit.GetInstanceID();
+    }
+
+    private static ThreatOverlayCacheKey BuildThreatOverlayCacheKey(UnitManager unit, Tilemap boardMap, bool enableLdt, bool enableLos, bool enableSpotter)
+    {
+        int snapshotHash = BuildUnitSnapshotHash(unit, boardMap);
+        int globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision;
+        int teamObserverRevision = ThreatRevisionTracker.GetTeamObserverRevision(unit != null ? unit.TeamId : TeamId.Neutral);
+        int matchFlagsHash = ThreatRevisionTracker.MatchFlagsHash;
+
+        // Mantem consistencia mesmo em contextos antigos sem sincronizacao externa.
+        int requestedFlagsHash = BuildThreatFlagsHash(enableLdt, enableLos, enableSpotter);
+        if (matchFlagsHash != requestedFlagsHash)
+            matchFlagsHash = requestedFlagsHash;
+
+        return new ThreatOverlayCacheKey(snapshotHash, globalBoardRevision, teamObserverRevision, matchFlagsHash);
+    }
+
+    private static int BuildUnitSnapshotHash(UnitManager unit, Tilemap boardMap)
+    {
+        unchecked
+        {
+            if (unit == null)
+                return 0;
+
+            int hash = 17;
+            Vector3Int cell = unit.CurrentCellPosition;
+            hash = (hash * 31) + cell.x;
+            hash = (hash * 31) + cell.y;
+            hash = (hash * 31) + (int)unit.GetDomain();
+            hash = (hash * 31) + (int)unit.GetHeightLevel();
+            hash = (hash * 31) + (int)unit.TeamId;
+            hash = (hash * 31) + (unit.IsEmbarked ? 1 : 0);
+            hash = (hash * 31) + (unit.IsAircraftGrounded ? 1 : 0);
+            hash = (hash * 31) + Mathf.Max(0, unit.CurrentFuel);
+            hash = (hash * 31) + Mathf.Max(0, unit.MaxMovementPoints);
+            hash = (hash * 31) + (boardMap != null ? boardMap.GetInstanceID() : 0);
+
+            IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+            int weaponCount = weapons != null ? weapons.Count : 0;
+            hash = (hash * 31) + weaponCount;
+            for (int i = 0; i < weaponCount; i++)
+            {
+                UnitEmbarkedWeapon runtimeWeapon = weapons[i];
+                if (runtimeWeapon == null)
+                {
+                    hash = (hash * 31) + 7;
+                    continue;
+                }
+
+                WeaponData weaponData = runtimeWeapon.weapon;
+                hash = (hash * 31) + (weaponData != null ? weaponData.GetInstanceID() : 0);
+                hash = (hash * 31) + Mathf.Max(0, runtimeWeapon.squadAmmunition);
+                hash = (hash * 31) + (int)runtimeWeapon.selectedTrajectory;
+                hash = (hash * 31) + runtimeWeapon.GetRangeMin();
+                hash = (hash * 31) + runtimeWeapon.GetRangeMax();
+            }
+
+            return hash;
+        }
+    }
+
+    private static int BuildThreatFlagsHash(bool enableLdt, bool enableLos, bool enableSpotter)
+    {
+        unchecked
+        {
+            int hash = 17;
+            hash = hash * 31 + (enableLdt ? 1 : 0);
+            hash = hash * 31 + (enableLos ? 1 : 0);
+            hash = hash * 31 + (enableSpotter ? 1 : 0);
+            return hash;
+        }
+    }
+
+    private void RegisterThreatOverlayCacheResult(UnitManager unit, int cacheIndex, bool wasHit)
+    {
+        if (!Application.isPlaying)
+            return;
+
+        if (!threatOverlayCacheMetricsByUnitInstanceId.TryGetValue(cacheIndex, out ThreatOverlayCacheMetrics metrics) || metrics == null)
+        {
+            metrics = new ThreatOverlayCacheMetrics();
+            threatOverlayCacheMetricsByUnitInstanceId[cacheIndex] = metrics;
+        }
+
+        if (wasHit)
+        {
+            metrics.hits++;
+            threatOverlayCacheTotalHits++;
+        }
+        else
+        {
+            metrics.misses++;
+            threatOverlayCacheTotalMisses++;
+        }
+
+        int unitHits = metrics.hits;
+        int unitMisses = metrics.misses;
+        int unitTotal = unitHits + unitMisses;
+        float unitHitRate = unitTotal > 0 ? (100f * unitHits / unitTotal) : 0f;
+
+        int totalHits = threatOverlayCacheTotalHits;
+        int totalMisses = threatOverlayCacheTotalMisses;
+        int total = totalHits + totalMisses;
+        float totalHitRate = total > 0 ? (100f * totalHits / total) : 0f;
+
+        string unitName = unit != null ? ResolveUnitRuntimeName(unit) : $"unit#{cacheIndex}";
+        string result = wasHit ? "HIT" : "MISS";
+        Debug.Log(
+            $"[HotzoneCache] {result} | unit={unitName} ({cacheIndex}) | " +
+            $"unit[h={unitHits},m={unitMisses},rate={unitHitRate:0.0}%] | " +
+            $"session[h={totalHits},m={totalMisses},rate={totalHitRate:0.0}%]");
+    }
+
+    private static int ResolveInspectionMovementSteps(UnitManager unit)
+    {
+        if (unit == null)
+            return 0;
+
+        // Inspecao de ameaca deve representar capacidade potencial da unidade,
+        // nao os pontos restantes da rodada atual.
+        return Mathf.Max(0, unit.MaxMovementPoints);
+    }
+
+    private void ClearInspectedThreatOverlay()
+    {
+        if (rangeMapTilemap != null)
+        {
+            for (int i = 0; i < inspectedThreatRangeCells.Count; i++)
+            {
+                Vector3Int cell = inspectedThreatRangeCells[i];
+                rangeMapTilemap.SetTile(cell, null);
+                rangeMapTilemap.SetTileFlags(cell, TileFlags.None);
+                rangeMapTilemap.SetColor(cell, Color.white);
+            }
+        }
+        inspectedThreatRangeCells.Clear();
+        inspectedThreatRangeLookup.Clear();
+
+        if (lineOfFireMapTilemap != null)
+        {
+            for (int i = 0; i < inspectedThreatLineCells.Count; i++)
+            {
+                Vector3Int cell = inspectedThreatLineCells[i];
+                lineOfFireMapTilemap.SetTile(cell, null);
+                lineOfFireMapTilemap.SetTileFlags(cell, TileFlags.None);
+                lineOfFireMapTilemap.SetColor(cell, Color.white);
+            }
+        }
+        inspectedThreatLineCells.Clear();
+        inspectedThreatLineLookup.Clear();
+    }
+
+    private enum InspectedThreatProfile
+    {
+        None = 0,
+        Movement = 1,
+        DistanceStatic = 2,
+        Hybrid = 3
+    }
+
+    private static InspectedThreatProfile ResolveInspectedThreatProfile(UnitManager unit)
+    {
+        if (unit == null)
+            return InspectedThreatProfile.None;
+
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+        if (weapons == null || weapons.Count <= 0)
+            return InspectedThreatProfile.None;
+
+        bool hasOneToOne = false;
+        bool hasGreaterThanOne = false;
+        bool hasHybridRange = false;
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = weapons[i];
+            if (embarked == null || embarked.weapon == null || embarked.squadAmmunition <= 0)
+                continue;
+
+            int min = embarked.GetRangeMin();
+            int max = embarked.GetRangeMax();
+            if (max < min)
+                max = min;
+            if (max > 1)
+                hasGreaterThanOne = true;
+            if (min == 1 && max > 1)
+                hasHybridRange = true;
+            if (min == 1 && max == 1)
+                hasOneToOne = true;
+        }
+
+        if (hasHybridRange || (hasOneToOne && hasGreaterThanOne))
+            return InspectedThreatProfile.Hybrid;
+        if (hasGreaterThanOne)
+            return InspectedThreatProfile.DistanceStatic;
+        if (hasOneToOne)
+            return InspectedThreatProfile.Movement;
+        return InspectedThreatProfile.None;
     }
 
     private void UpdateInspectedHelperAutoDismiss()
@@ -412,7 +1319,7 @@ public partial class TurnStateManager
 
         if (!IsInspectedHelperActive())
         {
-            if (inspectedHelperUnit != null)
+            if (inspectedHelperUnit != null || inspectedHelperConstruction != null)
                 ClearInspectedHelper();
             return;
         }
@@ -544,6 +1451,20 @@ public partial class TurnStateManager
         if (!string.IsNullOrWhiteSpace(supply.id))
             return supply.id;
         return supply.name;
+    }
+
+    private static string ResolveConstructionTransferRoleLabelForHelper(ConstructionManager construction)
+    {
+        if (construction == null || !construction.TryResolveConstructionData(out ConstructionData data) || data == null || !data.isSupplier)
+            return string.Empty;
+
+        if (data.supplierTier == SupplierTier.Receiver)
+            return "Transferir - Recebedor";
+        if (data.supplierTier != SupplierTier.Hub)
+            return string.Empty;
+        if (construction.HasInfiniteSuppliesFor())
+            return "Transferir - Fornecedor";
+        return "Transferir - Recebedor/Fornecedor";
     }
 
     private bool TryBuildCommandServiceHelperPanelData(HelperPanelData data)
@@ -728,20 +1649,42 @@ public partial class TurnStateManager
             return false;
 
         bool isMovementSensorState = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
-        if (!isMovementSensorState && scannerPromptStep != ScannerPromptStep.AwaitingAction)
+        bool isThreatLayerSelectionStep = scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect;
+        if (!isMovementSensorState && !isThreatLayerSelectionStep)
             return false;
 
         data.Kind = HelperPanelKind.Sensors;
-        TryAddSensorLine(data, 'A', "aim");
-        TryAddSensorLine(data, 'E', "embark");
-        TryAddSensorLine(data, 'D', "disembark");
-        TryAddSensorLine(data, 'C', "capture");
-        TryAddSensorLine(data, 'F', "fuse");
-        TryAddSensorLine(data, 'S', "supply");
-        TryAddSensorLine(data, 'T', "transfer");
-        TryAddSensorLine(data, 'M', "move_only", forceInclude: true);
+        if (isMovementSensorState)
+        {
+            TryAddSensorLine(data, 'A', "aim");
+            TryAddSensorLine(data, 'E', "embark");
+            TryAddSensorLine(data, 'D', "disembark");
+            TryAddSensorLine(data, 'C', "capture");
+            TryAddSensorLine(data, 'F', "fuse");
+            TryAddSensorLine(data, 'S', "supply");
+            TryAddSensorLine(data, 'T', "transfer");
+            TryAddSensorLine(data, 'M', "move_only", forceInclude: true);
+        }
 
-        return data.SensorLines.Count > 0;
+        if (isThreatLayerSelectionStep)
+        {
+            data.ThreatLayerSelectionActive = true;
+            data.ThreatLayerInspectedTeamId = enemyThreatLayersInspectedTeamId;
+            int activeTeam = matchController != null ? matchController.ActiveTeamId : int.MinValue;
+            for (int i = 0; i < threatLayerSelectableTeamIds.Count && i < threatLayerSelectableOptionNumbers.Count; i++)
+            {
+                int teamId = threatLayerSelectableTeamIds[i];
+                data.ThreatLayerTeamLines.Add(new HelperThreatLayerTeamLine
+                {
+                    optionNumber = threatLayerSelectableOptionNumbers[i],
+                    teamId = teamId,
+                    teamName = TeamUtils.GetName((TeamId)teamId),
+                    isOwnTeam = teamId == activeTeam
+                });
+            }
+        }
+
+        return data.SensorLines.Count > 0 || data.ThreatLayerSelectionActive;
     }
 
     private void TryAddSensorLine(HelperPanelData data, char actionCode, string sensorKey, bool forceInclude = false)
@@ -972,6 +1915,73 @@ public partial class TurnStateManager
         data.SupplyTotalCost = Mathf.Max(0, totalCost);
         BuildSupplyResourcePreviewLines(data, selectedUnit, executionOrder);
         return data.SupplyTargetLines.Count > 0;
+    }
+
+    private bool TryBuildTransferHelperPanelData(HelperPanelData data)
+    {
+        if (data == null || !IsTransferPromptActive() || selectedUnit == null || transferExecutionInProgress)
+            return false;
+
+        data.Kind = HelperPanelKind.Transfer;
+        data.TransferIsConfirmStep = IsTransferConfirmStepActive();
+        data.TransferHasCursorOption = HasMultipleTransferTargetCells();
+        data.TransferCursorOptionFocused = transferCursorSelectionMode;
+
+        for (int i = 0; i < transferPromptOptions.Count; i++)
+        {
+            PodeTransferirOption option = transferPromptOptions[i];
+            if (option == null)
+                continue;
+
+            data.TransferCandidateLines.Add(new HelperTransferCandidateLine
+            {
+                index = i + 1,
+                label = ResolveTransferOptionLabel(option, i + 1),
+                isFocused = !transferCursorSelectionMode && transferPromptSelectedIndex == i
+            });
+        }
+
+        if (data.TransferIsConfirmStep &&
+            transferPromptSelectedIndex >= 0 &&
+            transferPromptSelectedIndex < transferPromptOptions.Count)
+        {
+            PodeTransferirOption selectedOption = transferPromptOptions[transferPromptSelectedIndex];
+            data.TransferSelectedLabel = ResolveTransferOptionLabel(selectedOption, transferPromptSelectedIndex + 1);
+            ResolveTransferEndpoints(
+                selectedOption,
+                selectedUnit,
+                out UnitManager sourceUnit,
+                out ConstructionManager sourceConstruction,
+                out UnitManager destinationUnit,
+                out ConstructionManager destinationConstruction);
+            data.TransferSourceLabel = sourceUnit != null
+                ? ResolveUnitRuntimeName(sourceUnit)
+                : ResolveConstructionName(sourceConstruction);
+            data.TransferDestinationLabel = destinationUnit != null
+                ? ResolveUnitRuntimeName(destinationUnit)
+                : ResolveConstructionName(destinationConstruction);
+            RebuildTransferPreviewLines();
+            for (int i = 0; i < transferPreviewLines.Count; i++)
+            {
+                TransferEstimateLine line = transferPreviewLines[i];
+                if (line == null || line.supply == null)
+                    continue;
+
+                data.TransferResourceLines.Add(new HelperTransferResourceLine
+                {
+                    supplyName = ResolveSupplyDisplayName(line.supply),
+                    movedAmount = Mathf.Max(0, line.moved),
+                    sourceBefore = line.sourceBefore >= int.MaxValue ? int.MaxValue : Mathf.Max(0, line.sourceBefore),
+                    sourceAfter = line.sourceAfter >= int.MaxValue ? int.MaxValue : Mathf.Max(0, line.sourceAfter),
+                    destinationBefore = line.destinationBefore >= int.MaxValue ? int.MaxValue : Mathf.Max(0, line.destinationBefore),
+                    destinationAfter = line.destinationAfter >= int.MaxValue ? int.MaxValue : Mathf.Max(0, line.destinationAfter),
+                    sourceIsInfinite = line.sourceBefore >= int.MaxValue || line.sourceAfter >= int.MaxValue,
+                    destinationIsInfinite = line.destinationBefore >= int.MaxValue || line.destinationAfter >= int.MaxValue
+                });
+            }
+        }
+
+        return data.TransferCandidateLines.Count > 0;
     }
 
     private void BuildSupplyResourcePreviewLines(HelperPanelData data, UnitManager supplier, List<UnitManager> executionOrder)

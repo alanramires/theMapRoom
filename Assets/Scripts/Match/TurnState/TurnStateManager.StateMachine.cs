@@ -12,6 +12,8 @@ public partial class TurnStateManager
             return ActionSfx.None;
         if (TryConfirmPendingDestroyUnitHotkeyConfirmation())
             return ActionSfx.None;
+        if (TryConfirmPendingTransferPrompt())
+            return ActionSfx.Confirm;
 
         switch (cursorState)
         {
@@ -51,8 +53,12 @@ public partial class TurnStateManager
             return ActionSfx.None;
         if (TryCancelPendingDestroyUnitHotkeyConfirmation())
             return ActionSfx.Cancel;
+        if (TryCancelPendingTransferPrompt())
+            return ActionSfx.Cancel;
 
         if (TryCancelPendingCommandServiceConfirmation())
+            return ActionSfx.Cancel;
+        if (HandleScannerPromptCancel())
             return ActionSfx.Cancel;
 
         switch (cursorState)
@@ -113,7 +119,7 @@ public partial class TurnStateManager
             if (unit.HasActed)
             {
                 Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
-                BeginInspectedHelper(unit);
+                BeginInspectedHelper(unit, paintThreatOverlay: false);
                 return ActionSfx.Confirm;
             }
 
@@ -134,14 +140,14 @@ public partial class TurnStateManager
         bool isConstructionAlly = (int)construction.TeamId == activeTeam;
         if (!isConstructionAlly)
         {
-            LogEnemyConstructionInspection(construction, activeTeam);
+            BeginInspectedConstructionHelper(construction);
             return ActionSfx.Confirm;
         }
 
         if (TryEnterConstructionShoppingState(construction, activeTeam))
             return ActionSfx.Confirm;
 
-        LogAllyConstructionInspection(construction, activeTeam);
+        BeginInspectedConstructionHelper(construction);
         return ActionSfx.Confirm;
     }
 
@@ -209,9 +215,11 @@ public partial class TurnStateManager
             ? construction.ConstructionDisplayName
             : (!string.IsNullOrWhiteSpace(construction.ConstructionId) ? construction.ConstructionId : construction.name);
 
-        Debug.Log(
-            $"[Inspecao Inimigo] Construcao: {constructionName} | Team: {TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId}) | " +
-            $"Capture: {construction.CurrentCapturePoints}/{construction.CapturePointsMax} | ActiveTeam: {activeTeam}");
+        StringBuilder sb = new StringBuilder();
+        sb.Append($"[Inspecao Inimigo] Construcao: {constructionName} | Dono Atual: {TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId}) | ");
+        sb.Append($"Capture: {construction.CurrentCapturePoints}/{construction.CapturePointsMax} | ActiveTeam: {activeTeam}");
+        AppendConstructionSupplyAndServiceDetails(sb, construction);
+        Debug.Log(sb.ToString());
     }
 
     private static void LogAllyConstructionInspection(ConstructionManager construction, int activeTeam)
@@ -223,9 +231,96 @@ public partial class TurnStateManager
             ? construction.ConstructionDisplayName
             : (!string.IsNullOrWhiteSpace(construction.ConstructionId) ? construction.ConstructionId : construction.name);
 
-        Debug.Log(
-            $"[Inspecao Aliada] Construcao: {constructionName} | Team: {TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId}) | " +
-            $"Capture: {construction.CurrentCapturePoints}/{construction.CapturePointsMax} | ActiveTeam: {activeTeam} | Sem unidades a venda.");
+        StringBuilder sb = new StringBuilder();
+        sb.Append($"[Inspecao Aliada] Construcao: {constructionName} | Dono Atual: {TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId}) | ");
+        sb.Append($"Capture: {construction.CurrentCapturePoints}/{construction.CapturePointsMax} | ActiveTeam: {activeTeam} | Sem unidades a venda.");
+        AppendConstructionSupplyAndServiceDetails(sb, construction);
+        Debug.Log(sb.ToString());
+    }
+
+    private static void AppendConstructionSupplyAndServiceDetails(StringBuilder sb, ConstructionManager construction)
+    {
+        if (sb == null || construction == null)
+            return;
+
+        IReadOnlyList<ConstructionSupplyOffer> offers = construction.OfferedSupplies;
+        if (offers != null && offers.Count > 0)
+        {
+            sb.Append(" | Estoques: ");
+            bool appendedAnyStock = false;
+            for (int i = 0; i < offers.Count; i++)
+            {
+                ConstructionSupplyOffer offer = offers[i];
+                if (offer == null || offer.supply == null)
+                    continue;
+
+                if (appendedAnyStock)
+                    sb.Append("; ");
+
+                string supplyName = ResolveSupplyDisplayName(offer.supply);
+                string amount = construction.HasInfiniteSuppliesFor(offer.supply)
+                    ? "INF"
+                    : Mathf.Max(0, offer.quantity).ToString();
+                sb.Append($"{supplyName}={amount}");
+                appendedAnyStock = true;
+            }
+
+            if (!appendedAnyStock)
+                sb.Append("nenhum");
+        }
+        else
+        {
+            sb.Append(" | Estoques: nenhum");
+        }
+
+        IReadOnlyList<ServiceData> services = construction.OfferedServices;
+        if (services != null && services.Count > 0)
+        {
+            sb.Append(" | Servicos: ");
+            bool appendedAnyService = false;
+            for (int i = 0; i < services.Count; i++)
+            {
+                ServiceData service = services[i];
+                if (service == null)
+                    continue;
+
+                if (appendedAnyService)
+                    sb.Append("; ");
+
+                if (service.serviceType == ServiceType.Transfer)
+                {
+                    sb.Append(ResolveConstructionTransferRoleLabel(construction));
+                }
+                else
+                {
+                    sb.Append(!string.IsNullOrWhiteSpace(service.displayName)
+                        ? service.displayName
+                        : (!string.IsNullOrWhiteSpace(service.id) ? service.id : service.name));
+                }
+                appendedAnyService = true;
+            }
+
+            if (!appendedAnyService)
+                sb.Append("nenhum");
+        }
+        else
+        {
+            sb.Append(" | Servicos: nenhum");
+        }
+    }
+
+    private static string ResolveConstructionTransferRoleLabel(ConstructionManager construction)
+    {
+        if (construction == null || !construction.TryResolveConstructionData(out ConstructionData data) || data == null || !data.isSupplier)
+            return "Transferir - (indisponivel)";
+
+        if (data.supplierTier == SupplierTier.Receiver)
+            return "Transferir - Recebedor";
+        if (data.supplierTier != SupplierTier.Hub)
+            return "Transferir - (indisponivel)";
+        if (construction.HasInfiniteSuppliesFor())
+            return "Transferir - Fornecedor";
+        return "Transferir - Recebedor/Fornecedor";
     }
 
     private ActionSfx HandleConfirmWhileUnitSelected()

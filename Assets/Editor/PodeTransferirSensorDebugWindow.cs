@@ -100,10 +100,10 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
         EditorGUILayout.HelpBox(
             "Regras:\n" +
             "1) Unidade selecionada deve ser supplier com serviceType=Transfer\n" +
-            "2) Hierarquia: Hub > Receiver\n" +
-            "3) Precisa estar em construcao aliada ou com hub no collection range\n" +
-            "4) Hub: Recebedor sempre, Fornecimento apenas para receiver no alcance\n" +
-            "5) Construcao com suprimento infinito (-1) bloqueia Fornecimento do Hub",
+            "2) Alcance sempre respeita collection range\n" +
+            "3) Hub x Hub: aparecem Receber e Doar\n" +
+            "4) Hub x Receiver: apenas Doar\n" +
+            "5) Construcao Hub infinita: somente Receber",
             MessageType.Info);
 
         selectedSupplier = (UnitManager)EditorGUILayout.ObjectField("Supplier", selectedSupplier, typeof(UnitManager), true);
@@ -124,11 +124,18 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
         if (!string.IsNullOrWhiteSpace(sensorReason))
             EditorGUILayout.HelpBox($"Sensor: {sensorReason}", canTransfer ? MessageType.Info : MessageType.Warning);
         EditorGUILayout.LabelField("Pode Transferir", canTransfer ? "SIM" : "NAO");
-        using (new EditorGUI.DisabledScope(transferOrder.Count == 0))
+        EditorGUILayout.BeginHorizontal();
+        using (new EditorGUI.DisabledScope(CountTransferOrderEntries(TransferFlowMode.Recebedor) == 0))
         {
-            if (GUILayout.Button("Transferir (Debug)"))
-                ExecuteTransferOrderDebug();
+            if (GUILayout.Button("Transferir: Receber (Debug)"))
+                ExecuteTransferOrderDebug(TransferFlowMode.Recebedor);
         }
+        using (new EditorGUI.DisabledScope(CountTransferOrderEntries(TransferFlowMode.Fornecimento) == 0))
+        {
+            if (GUILayout.Button("Transferir: Doar (Debug)"))
+                ExecuteTransferOrderDebug(TransferFlowMode.Fornecimento);
+        }
+        EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.Space(8f);
         EditorGUILayout.BeginHorizontal();
@@ -692,7 +699,7 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
                         AddAmount(orderEntry.blockedByCapacity, supply, blockedAmount);
                 }
             }
-            string flowLabel = option.flowMode == TransferFlowMode.Fornecimento ? "Fornecer" : "Receber";
+            string flowLabel = option.flowMode == TransferFlowMode.Fornecimento ? "Doar" : "Receber";
             report.selectedOrderLines.Add($"{i + 1}. {flowLabel} | {queued.label}");
             CopyMap(orderEntry.supplierAfter, sourceMap);
             CopyMap(orderEntry.destinationAfter, destinationMap);
@@ -1006,13 +1013,6 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField($"Destino: {entry.destinationLabel}", EditorStyles.boldLabel);
         DrawDestinationSection(entry);
 
-        if (!entry.supplierIsInfinite && entry.blockedByCapacity.Count > 0)
-        {
-            EditorGUILayout.Space(2f);
-            EditorGUILayout.LabelField($"Excedente nao enviado: {entry.destinationLabel}", EditorStyles.boldLabel);
-            DrawBlockedSection(entry);
-        }
-
         EditorGUILayout.EndVertical();
     }
 
@@ -1128,7 +1128,25 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
         return value.ToString();
     }
 
-    private void ExecuteTransferOrderDebug()
+    private int CountTransferOrderEntries(TransferFlowMode mode)
+    {
+        if (transferOrder == null || transferOrder.Count <= 0)
+            return 0;
+
+        int count = 0;
+        for (int i = 0; i < transferOrder.Count; i++)
+        {
+            TransferCandidateEntry entry = transferOrder[i];
+            if (entry == null || entry.option == null)
+                continue;
+            if (entry.option.flowMode == mode)
+                count++;
+        }
+
+        return count;
+    }
+
+    private void ExecuteTransferOrderDebug(TransferFlowMode flowMode)
     {
         if (selectedSupplier == null)
         {
@@ -1143,8 +1161,8 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
         }
 
         long movedTotal = 0;
-        long blockedTotal = 0;
         List<Object> touched = new List<Object>();
+        List<int> executedIndices = new List<int>();
 
         for (int i = 0; i < transferOrder.Count; i++)
         {
@@ -1153,6 +1171,9 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
                 continue;
 
             PodeTransferirOption option = queued.option;
+            if (option.flowMode != flowMode)
+                continue;
+
             ResolveTransferEndpoints(option, selectedSupplier, out UnitManager sourceUnit, out ConstructionManager sourceConstruction, out UnitManager destinationUnit, out ConstructionManager destinationConstruction);
             if (sourceUnit == null && sourceConstruction == null)
                 continue;
@@ -1167,10 +1188,18 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
                 sourceConstruction,
                 destinationUnit,
                 destinationConstruction,
-                out long blockedThisOrder);
+                out _);
 
             movedTotal += movedThisOrder;
-            blockedTotal += blockedThisOrder;
+            executedIndices.Add(i);
+        }
+
+        if (executedIndices.Count <= 0)
+        {
+            statusMessage = flowMode == TransferFlowMode.Recebedor
+                ? "Nao ha ordens de Receber para executar."
+                : "Nao ha ordens de Doar para executar.";
+            return;
         }
 
         for (int i = 0; i < touched.Count; i++)
@@ -1179,11 +1208,13 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
         if (selectedSupplier.gameObject != null && selectedSupplier.gameObject.scene.IsValid())
             EditorSceneManager.MarkSceneDirty(selectedSupplier.gameObject.scene);
 
-        transferOrder.Clear();
-        orderMessage = "Ordem executada.";
-        statusMessage = blockedTotal > 0
-            ? $"Transferencia executada. Transferido: {movedTotal}. Excedente nao transferido por limite de capacidade: {blockedTotal}."
-            : $"Transferencia executada. Movido: {movedTotal}.";
+        for (int i = executedIndices.Count - 1; i >= 0; i--)
+            transferOrder.RemoveAt(executedIndices[i]);
+
+        orderMessage = flowMode == TransferFlowMode.Recebedor
+            ? "Ordem de receber executada."
+            : "Ordem de doar executada.";
+        statusMessage = $"Transferencia executada. Movido: {movedTotal}.";
 
         RunSimulation();
     }
@@ -1426,7 +1457,7 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
         for (int i = 0; i < data.supplierResources.Count; i++)
         {
             ConstructionSupplierResourceCapacity entry = data.supplierResources[i];
-            if (entry != null && entry.maxCapacity < 0)
+            if (entry != null && entry.IsInfinite())
                 return true;
         }
 
@@ -1460,8 +1491,8 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
             : (invalid.targetConstruction != null ? ResolveConstructionDisplayName(invalid.targetConstruction) : "sem destino");
 
         if (invalid.flowMode == TransferFlowMode.Fornecimento)
-            return $"{supplier} -> Fornece -> {endpoint}";
-        return $"{supplier} <- Recebe <- {endpoint}";
+            return $"Transferir: Doar -> {endpoint}";
+        return $"Transferir: Receber <- {endpoint}";
     }
 
     private static string ResolveConstructionDisplayName(ConstructionManager construction)

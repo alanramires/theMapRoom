@@ -52,20 +52,11 @@ public partial class TurnStateManager
             return;
         }
 
-        bool hasFireCandidateWeapon = PodeMirarSensor.HasAnyFireCandidateWeapon(selectedUnit, movementMode);
-        if (selectedUnit.IsAircraftGrounded || selectedUnit.IsAircraftEmbarkedInCarrier || selectedUnit.AircraftOperationLockTurns > 0)
-            hasFireCandidateWeapon = false;
-        if (hasFireCandidateWeapon)
-        {
-            ClearMovementRange(keepCommittedMovement: true);
-            PaintLineOfFireArea(movementMode);
-        }
-        else
-        {
-            ClearLineOfFireArea();
-            if (paintedRangeCells.Count == 0)
-                PaintSelectedUnitMovementRange();
-        }
+        // Nao pinta mais area automatica de linha de tiro ao final do movimento.
+        // A visualizacao de ameaca agora fica restrita aos fluxos de inspecao.
+        ClearLineOfFireArea();
+        if (paintedRangeCells.Count == 0)
+            PaintSelectedUnitMovementRange();
 
         Tilemap boardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
         int remainingMovementPoints = ComputeRemainingMovementPointsForSensors(movementMode);
@@ -108,12 +99,7 @@ public partial class TurnStateManager
             boardMap,
             terrainDatabase,
             movementMode);
-        List<LandingOption> layerOperationOptions = new List<LandingOption>();
-        bool hasLayerOperation = TryCollectLayerOperationOptions(selectedUnit, movementMode, layerOperationOptions, out string layerOperationReason);
-        if (hasLayerOperation && !availableSensorActionCodes.Contains('L'))
-            availableSensorActionCodes.Add('L');
-        else if (!string.IsNullOrWhiteSpace(layerOperationReason))
-            landingOptionUnavailableReason = layerOperationReason;
+        availableSensorActionCodes.Remove('L');
 
         bool canCapture = PodeCapturarSensor.TryGetCaptureTarget(
             selectedUnit,
@@ -174,6 +160,7 @@ public partial class TurnStateManager
             cachedPodeMirarInvalidTargets.Clear();
         }
 
+        RefreshEnemyThreatLayersOverlayIfEnabled();
         ResetScannerPromptState();
         LogScannerPanel();
     }
@@ -231,6 +218,7 @@ public partial class TurnStateManager
         cachedPodeTransferirReason = string.Empty;
         landingOptionUnavailableReason = string.Empty;
         cachedAircraftOperationDecision = default;
+        ClearEnemyThreatLayersOverlay();
         ClearLineOfFireArea();
     }
 
@@ -287,7 +275,7 @@ public partial class TurnStateManager
         bool podeMirar = availableSensorActionCodes.Contains('A');
         bool podeEmbarcar = availableSensorActionCodes.Contains('E');
         bool podeDesembarcar = availableSensorActionCodes.Contains('D');
-        bool podeMudarAltitude = availableSensorActionCodes.Contains('L');
+        bool podeLayersAmeaca = false;
         bool podeCapturar = availableSensorActionCodes.Contains('C');
         bool podeFundir = availableSensorActionCodes.Contains('F');
         bool podeSuprir = availableSensorActionCodes.Contains('S');
@@ -301,7 +289,7 @@ public partial class TurnStateManager
             $"F={(podeFundir ? "sim" : "nao")} ({cachedPodeFundirAdjacentCount}) | " +
             $"S={(podeSuprir ? "sim" : "nao")} ({cachedPodeSuprirTargets.Count}) | " +
             $"T={(podeTransferir ? "sim" : "nao")} ({cachedPodeTransferirTargets.Count}) | " +
-            $"L={(podeMudarAltitude ? "sim" : "nao")}");
+            $"L={(podeLayersAmeaca ? "sim" : "nao")}");
 
         string painel =
             "Resultado dos Scanners | " +
@@ -312,19 +300,15 @@ public partial class TurnStateManager
             $"Pode Fundir (\"F\"): {(podeFundir ? "sim" : "nao")} | " +
             $"Pode Suprir (\"S\"): {(podeSuprir ? "sim" : "nao")} | " +
             $"Pode Transferir (\"T\"): {(podeTransferir ? "sim" : "nao")} | " +
-            $"Pode Mudar de Altitude (\"L\"): {(podeMudarAltitude ? "sim" : "nao")} | " +
+            $"Pode Layers de Ameaca (\"L\"): {(podeLayersAmeaca ? "sim" : "nao")} | " +
             "Apenas Mover (\"M\") | " +
             "Desfazer Movimento (ESC) | " +
             ">> digite a acao desejada";
 
-        if (podeMudarAltitude)
-            painel += "\nL: Mudar Altitude";
-        else if (cachedAircraftOperationDecision.available)
-            painel += $"\nL: {cachedAircraftOperationDecision.label}";
-        else if (!string.IsNullOrWhiteSpace(landingOptionUnavailableReason))
-            painel += $"\nL indisponivel: {landingOptionUnavailableReason}";
-        else if (!string.IsNullOrWhiteSpace(cachedAircraftOperationDecision.reason))
-            painel += $"\nL indisponivel: {cachedAircraftOperationDecision.reason}";
+        if (podeLayersAmeaca)
+            painel += enemyThreatLayersEnabled
+                ? "\nL: Ocultar layers de ameaca inimiga"
+                : "\nL: Mostrar layers de ameaca inimiga";
 
         if (cachedPodeEmbarcarTargets.Count > 0)
             painel += $"\nE opcoes: {cachedPodeEmbarcarTargets.Count}";

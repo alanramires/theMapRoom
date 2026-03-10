@@ -58,6 +58,7 @@ public partial class TurnStateManager
         if (!WasLetterPressedThisFrame('X'))
             return;
 
+        TryCloseThreatLayerHotzone();
         TryPreviewCommandServiceOrder(out _, emitLogs: true);
     }
 
@@ -222,6 +223,7 @@ public partial class TurnStateManager
         ClearCommandServiceHelper();
         RestoreSupplyEmbarkedSelectionVisuals();
         HashSet<UnitManager> hiddenEmbarkedSuppliers = new HashSet<UnitManager>();
+        HashSet<UnitManager> touchedSupplierUnits = new HashSet<UnitManager>();
 
         try
         {
@@ -264,6 +266,8 @@ public partial class TurnStateManager
             bool fromSupplierUnit = sourceSupplierUnit != null;
             if (!fromConstruction && !fromSupplierUnit)
                 continue;
+            if (fromSupplierUnit)
+                touchedSupplierUnits.Add(sourceSupplierUnit);
 
             string sourceLabel = fromConstruction
                 ? $"construcao={sourceConstruction.name}"
@@ -630,6 +634,7 @@ public partial class TurnStateManager
         {
             if (hiddenEmbarkedSuppliers.Count > 0)
                 RestoreTransporterHudVisibility(hiddenEmbarkedSuppliers);
+            RefreshTransporterHudAfterCommandService(touchedSupplierUnits);
 
             commandServiceExecutionInProgress = false;
             commandServiceConfirmationPending = false;
@@ -1272,6 +1277,22 @@ public partial class TurnStateManager
             supplier.GetDomain(),
             supplier.GetHeightLevel(),
             showTransportIndicator);
+    }
+
+    private static void RefreshTransporterHudAfterCommandService(HashSet<UnitManager> touchedSupplierUnits)
+    {
+        if (touchedSupplierUnits == null || touchedSupplierUnits.Count <= 0)
+            return;
+
+        foreach (UnitManager supplier in touchedSupplierUnits)
+        {
+            if (supplier == null || !supplier.gameObject.activeInHierarchy)
+                continue;
+            if (supplier.IsEmbarked)
+                continue;
+
+            SetSupplierHudVisibleForCommandSource(supplier, true);
+        }
     }
 
     private static bool HasEmbarkedPassengersForTransportIndicator(UnitManager supplier)

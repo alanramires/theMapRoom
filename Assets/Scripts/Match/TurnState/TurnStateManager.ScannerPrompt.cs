@@ -22,7 +22,8 @@ public partial class TurnStateManager
         DisembarkConfirm = 9,
         MergeParticipantSelect = 10,
         MergeTargetSelect = 11,
-        MergeConfirm = 12
+        MergeConfirm = 12,
+        ThreatLayerTeamSelect = 13
     }
 
     private enum LandingOptionAction
@@ -168,6 +169,7 @@ public partial class TurnStateManager
         UpdateEmbarkPreviewAnimation();
         UpdateMergeQueuePreviewAnimation();
         UpdateSupplyQueuePreviewAnimation();
+        UpdateTransferPromptPreview();
     }
 
     private void TrackRuntimeDebugLogs()
@@ -214,6 +216,7 @@ public partial class TurnStateManager
         disembarkLandingAutoEntered = false;
         ResetMergeRuntimeState();
         ResetSupplyRuntimeState();
+        ClearPendingTransferPrompt();
         ClearMirandoPreview();
         ClearEmbarkPreview();
         ClearPendingDestroyUnitHotkeyConfirmation();
@@ -417,16 +420,72 @@ public partial class TurnStateManager
             return true;
         }
 
+        if (scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
+        {
+            ClearEnemyThreatLayersOverlay();
+            scannerPromptStep = ScannerPromptStep.AwaitingAction;
+            return true;
+        }
+
         return false;
     }
 
     private void ProcessScannerPromptInput()
     {
-        if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress || combatExecutionInProgress || captureExecutionInProgress || mergeExecutionInProgress || supplyExecutionInProgress)
+        if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress || combatExecutionInProgress || captureExecutionInProgress || mergeExecutionInProgress || supplyExecutionInProgress || transferExecutionInProgress)
             return;
 
         if (cursorState == CursorState.Mirando)
             return;
+
+        if (cursorState != CursorState.Neutral && scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
+        {
+            ClearEnemyThreatLayersOverlay();
+            scannerPromptStep = ScannerPromptStep.AwaitingAction;
+        }
+
+        if (cursorState == CursorState.Neutral)
+        {
+            if (scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
+            {
+                if (WasLetterPressedThisFrame('Z'))
+                {
+                    TryCloseThreatLayerHotzone();
+                    return;
+                }
+
+                if (TryReadPressedNumber(out int number))
+                {
+                    if (TryApplyThreatLayerSelection(number, out int selectedTeamId))
+                    {
+                        cursorController?.PlayConfirmSfx();
+                        Debug.Log(PanelDialogController.ResolveDialogMessage(
+                            "threat_layers.selected",
+                            "Layers de Ameaca: time inspecionado -> <team_name> (<team_id>).",
+                            new Dictionary<string, string>
+                            {
+                                { "team_name", TeamUtils.GetName((TeamId)selectedTeamId) },
+                                { "team_id", selectedTeamId.ToString() }
+                            }));
+                    }
+                    else
+                    {
+                        Debug.Log(PanelDialogController.ResolveDialogMessage(
+                            "threat_layers.invalid",
+                            "Layers de Ameaca: time <team_id> nao disponivel nesta partida.",
+                            new Dictionary<string, string>
+                            {
+                                { "team_id", number.ToString() }
+                            }));
+                    }
+                }
+                return;
+            }
+
+            if (WasLetterPressedThisFrame('Z'))
+                HandleThreatLayersActionRequested();
+            return;
+        }
 
         bool isMovementScannerState = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
         bool isLandingScannerState = cursorState == CursorState.Pousando;
@@ -454,6 +513,12 @@ public partial class TurnStateManager
 
         if (!isMovementScannerState && !isLandingScannerState && !isEmbarkScannerState)
             return;
+
+        if (isMovementScannerState && IsTransferPromptActive())
+        {
+            ProcessTransferPromptInput();
+            return;
+        }
 
         if (scannerPromptStep == ScannerPromptStep.AwaitingAction)
         {
@@ -631,6 +696,29 @@ public partial class TurnStateManager
             cursorController?.PlayConfirmSfx();
             LogLandingSelectionPanel();
         }
+    }
+
+    private void HandleThreatLayersActionRequested()
+    {
+        if (cursorState != CursorState.Neutral)
+        {
+            Debug.Log("Layers de Ameaca (\"Z\"): so disponivel em cursor neutro.");
+            return;
+        }
+
+        if (!EnterThreatLayerTeamSelection())
+        {
+            Debug.Log(PanelDialogController.ResolveDialogMessage(
+                "threat_layers.unavailable",
+                "Layers de Ameaca (\"Z\"): nenhum time valido para inspecionar."));
+            return;
+        }
+
+        scannerPromptStep = ScannerPromptStep.ThreatLayerTeamSelect;
+        cursorController?.PlayConfirmSfx();
+        Debug.Log(PanelDialogController.ResolveDialogMessage(
+            "threat_layers.open",
+            "Layers de Ameaca (\"Z\"): selecione o numero do time no helper. ESC para sair."));
     }
 
     public bool TryChangeAltitudeFromDebug(Domain targetDomain, HeightLevel targetHeight, out string message)
@@ -4033,6 +4121,7 @@ public partial class TurnStateManager
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
         {
+            if (Keyboard.current.digit0Key.wasPressedThisFrame || Keyboard.current.numpad0Key.wasPressedThisFrame) { number = 0; return true; }
             if (Keyboard.current.digit1Key.wasPressedThisFrame || Keyboard.current.numpad1Key.wasPressedThisFrame) { number = 1; return true; }
             if (Keyboard.current.digit2Key.wasPressedThisFrame || Keyboard.current.numpad2Key.wasPressedThisFrame) { number = 2; return true; }
             if (Keyboard.current.digit3Key.wasPressedThisFrame || Keyboard.current.numpad3Key.wasPressedThisFrame) { number = 3; return true; }
@@ -4044,6 +4133,7 @@ public partial class TurnStateManager
             if (Keyboard.current.digit9Key.wasPressedThisFrame || Keyboard.current.numpad9Key.wasPressedThisFrame) { number = 9; return true; }
         }
 #else
+        if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Keypad0)) { number = 0; return true; }
         if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1)) { number = 1; return true; }
         if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2)) { number = 2; return true; }
         if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3)) { number = 3; return true; }
@@ -4127,6 +4217,12 @@ public partial class TurnStateManager
                 return Keyboard.current != null && Keyboard.current.xKey.wasPressedThisFrame;
 #else
                 return Input.GetKeyDown(KeyCode.X);
+#endif
+            case 'Z':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.zKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.Z);
 #endif
             default:
                 return false;

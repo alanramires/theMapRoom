@@ -253,6 +253,7 @@ public class SaveGameManager : MonoBehaviour
     {
         loadInProgress = true;
         string stage = "init";
+        bool coreLoadSucceeded = false;
 
         // Espera um frame apos destruir para evitar residuos de lookup no mesmo frame.
         stage = "clear-runtime";
@@ -417,24 +418,45 @@ public class SaveGameManager : MonoBehaviour
                 }
             }
 
+            coreLoadSucceeded = true;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[SaveGame] Falha no load (etapa: {stage}): {ex.Message}\n{ex.StackTrace}");
+        }
+
+        if (coreLoadSucceeded)
+        {
+            stage = "warmup-hotzone-cache";
+            if (turnStateManager != null)
+            {
+                yield return turnStateManager.WarmUpThreatCacheFromScene((processed, total) =>
+                {
+                    string progressText = total > 0
+                        ? $"Loading hotzone cache {processed}/{total}"
+                        : "Loading hotzone cache";
+                    PanelDialogController.TrySetExternalText(progressText);
+
+                    if (!verboseLogs)
+                        return;
+                    if (total <= 0 || processed == 0 || processed == total || processed % 10 == 0)
+                        Debug.Log($"[SaveGame] Warm-up hotzone cache: {processed}/{total}");
+                });
+            }
+
             stage = "reset-runtime-input";
             turnStateManager?.ForceNeutral();
             cursorController?.ClearRuntimeInputLocksAfterLoad();
             cursorController?.SnapToCurrentCell();
+            PanelDialogController.ClearExternalText();
 
             cursorController?.PlayBeepSfx();
             if (verboseLogs)
                 Debug.Log($"[SaveGame] Load concluido: {data.units?.Count ?? 0} unidades, {data.constructions?.Count ?? 0} construcoes.");
             PanelDialogController.TrySetTransientText("Game loaded", 2.2f);
         }
-        catch (Exception ex)
-        {
-            Debug.LogError($"[SaveGame] Falha no load (etapa: {stage}): {ex.Message}\n{ex.StackTrace}");
-        }
-        finally
-        {
-            loadInProgress = false;
-        }
+
+        loadInProgress = false;
     }
 
     private SaveGameData BuildSaveData()

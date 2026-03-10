@@ -270,6 +270,7 @@ public class ConstructionManager : MonoBehaviour
 
     public void SetTeamId(TeamId team)
     {
+        TeamId previousTeam = teamId;
         teamId = team;
         if (!originalOwnerInitialized)
         {
@@ -286,6 +287,7 @@ public class ConstructionManager : MonoBehaviour
         if (!ApplyFromDatabase())
             UpdateDynamicName();
         RefreshHud();
+        ThreatRevisionTracker.NotifyConstructionTeamChanged(previousTeam, teamId);
     }
 
     public void ApplyTeamVisualFlipX(bool flipX)
@@ -300,6 +302,7 @@ public class ConstructionManager : MonoBehaviour
 
     public void InitializeOwnershipForSpawn(TeamId initialTeam)
     {
+        TeamId previousTeam = teamId;
         teamId = initialTeam;
         originalOwnerTeamId = initialTeam;
         originalOwnerInitialized = true;
@@ -318,10 +321,12 @@ public class ConstructionManager : MonoBehaviour
         if (!ApplyFromDatabase())
             UpdateDynamicName();
         RefreshHud();
+        ThreatRevisionTracker.NotifyConstructionTeamChanged(previousTeam, teamId);
     }
 
     public void ApplyOwnershipState(TeamId currentTeam, TeamId originalOwner, bool hasOriginalOwner, TeamId firstOwner, bool hasFirstOwner)
     {
+        TeamId previousTeam = teamId;
         teamId = currentTeam;
         originalOwnerTeamId = originalOwner;
         originalOwnerInitialized = hasOriginalOwner;
@@ -331,6 +336,7 @@ public class ConstructionManager : MonoBehaviour
         if (!ApplyFromDatabase())
             UpdateDynamicName();
         RefreshHud();
+        ThreatRevisionTracker.NotifyConstructionTeamChanged(previousTeam, teamId);
     }
 
     public void AssignSpawnInstanceId(int id)
@@ -350,8 +356,10 @@ public class ConstructionManager : MonoBehaviour
 
     public void SetCurrentCellPosition(Vector3Int cell)
     {
+        Vector3Int previousCell = currentCellPosition;
         currentCellPosition = cell;
         SnapToCellCenter();
+        ThreatRevisionTracker.NotifyConstructionCellChanged(this, previousCell, currentCellPosition);
     }
 
     public void ApplySiteRuntime(ConstructionSiteRuntime runtime)
@@ -410,7 +418,7 @@ public class ConstructionManager : MonoBehaviour
                     continue;
                 if (supply != null && entry.supply != supply)
                     continue;
-                if (entry.maxCapacity < 0)
+                if (entry.IsInfinite())
                     return true;
             }
         }

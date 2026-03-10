@@ -113,6 +113,14 @@ public class DebugManager : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
+        else if (TryParseSetEmbarkedSupplyCommand(command, out string supplyToken, out int supplyAmount))
+        {
+            executed = turnStateManager.TrySetUnitEmbarkedSupplyUnderCursorFromDebug(supplyToken, supplyAmount, out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
         else if (TryParseSetMoveRemainCommand(command, out int remainingMovementValue))
         {
             executed = turnStateManager.TrySetUnitRemainingMovementUnderCursorFromDebug(remainingMovementValue, out string message);
@@ -359,6 +367,50 @@ public class DebugManager : MonoBehaviour
             return false;
 
         return int.TryParse(valueToken, out autonomyValue);
+    }
+
+    private static bool TryParseSetEmbarkedSupplyCommand(string normalizedCommand, out string supplyToken, out int amountValue)
+    {
+        supplyToken = string.Empty;
+        amountValue = 0;
+        if (string.IsNullOrWhiteSpace(normalizedCommand))
+            return false;
+
+        if (TryParseSetEmbarkedSupplyCommandForPrefix(normalizedCommand, "SET GALAO ", out amountValue))
+        {
+            supplyToken = "gasolina";
+            return true;
+        }
+
+        if (TryParseSetEmbarkedSupplyCommandForPrefix(normalizedCommand, "SET CAIXAS ", out amountValue))
+        {
+            supplyToken = "caixaMunicao";
+            return true;
+        }
+
+        if (TryParseSetEmbarkedSupplyCommandForPrefix(normalizedCommand, "SET PECAS ", out amountValue))
+        {
+            supplyToken = "pecas";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryParseSetEmbarkedSupplyCommandForPrefix(
+        string normalizedCommand,
+        string prefix,
+        out int amountValue)
+    {
+        amountValue = 0;
+        if (!normalizedCommand.StartsWith(prefix))
+            return false;
+
+        string valueToken = normalizedCommand.Substring(prefix.Length).Trim();
+        if (string.IsNullOrWhiteSpace(valueToken))
+            return false;
+
+        return int.TryParse(valueToken, out amountValue);
     }
 
     private static bool TryParseSetAmmoCommand(string normalizedCommand, out int weaponIndex, out int ammoValue)

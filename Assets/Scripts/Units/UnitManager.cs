@@ -149,6 +149,7 @@ public class UnitManager : MonoBehaviour
 
     private void OnDisable()
     {
+        ThreatRevisionTracker.NotifyUnitDisabled(this, teamId, isEmbarked);
         StopSelectionBlinkRoutine();
         ClearTemporarySortingOrder();
         SetSpriteVisible(true);
@@ -250,6 +251,7 @@ public class UnitManager : MonoBehaviour
         currentPosition = transform.position;
         UpdateDynamicName();
         RefreshActedVisual();
+        ThreatRevisionTracker.NotifyUnitDataApplied(this);
     }
 
     public void SetAutonomia(int autonomiaMax, bool refillCurrentFuel)
@@ -477,12 +479,15 @@ public class UnitManager : MonoBehaviour
 
     public bool TrySetCurrentLayerMode(Domain domain, HeightLevel heightLevel)
     {
+        Domain previousDomain = currentDomain;
+        HeightLevel previousHeight = currentHeightLevel;
         UnitLayerMode[] modes = BuildLayerModesSnapshot();
         for (int i = 0; i < modes.Length; i++)
         {
             if (modes[i].domain == domain && modes[i].heightLevel == heightLevel)
             {
                 SetCurrentLayerState(i, modes[i]);
+                ThreatRevisionTracker.NotifyUnitLayerChanged(this, previousDomain, previousHeight, currentDomain, currentHeightLevel);
                 return true;
             }
         }
@@ -1314,6 +1319,7 @@ public class UnitManager : MonoBehaviour
 
     public void SetTeamId(TeamId team)
     {
+        TeamId previousTeam = teamId;
         teamId = team;
         if (!ApplyFromDatabase())
         {
@@ -1321,6 +1327,7 @@ public class UnitManager : MonoBehaviour
             UpdateDynamicName();
         }
         RefreshActedVisual();
+        ThreatRevisionTracker.NotifyUnitTeamChanged(previousTeam, teamId);
     }
 
     public void ApplyTeamVisualFlipX(bool flipX)
@@ -1350,6 +1357,7 @@ public class UnitManager : MonoBehaviour
 
     public void SetCurrentCellPosition(Vector3Int cell, bool enforceFinalOccupancyRule = true)
     {
+        Vector3Int previousCell = currentCellPosition;
         if (enforceFinalOccupancyRule && Application.isPlaying && boardTilemap != null)
         {
             Vector3Int target = cell;
@@ -1363,10 +1371,12 @@ public class UnitManager : MonoBehaviour
 
         currentCellPosition = cell;
         SnapToCellCenter();
+        ThreatRevisionTracker.NotifyUnitCellChanged(this, previousCell, currentCellPosition);
     }
 
     public void SetEmbarked(bool embarked)
     {
+        bool previousEmbarked = isEmbarked;
         if (isEmbarked == embarked)
             return;
 
@@ -1382,6 +1392,7 @@ public class UnitManager : MonoBehaviour
             SyncHierarchyForEmbarkedState();
             if (actedLockRenderer != null)
                 actedLockRenderer.enabled = false;
+            ThreatRevisionTracker.NotifyUnitEmbarkStateChanged(this, previousEmbarked, isEmbarked);
             return;
         }
 
@@ -1394,6 +1405,7 @@ public class UnitManager : MonoBehaviour
         SetHudVisible(true);
         SetOwnedUiVisualsVisible(true);
         RefreshActedVisual();
+        ThreatRevisionTracker.NotifyUnitEmbarkStateChanged(this, previousEmbarked, isEmbarked);
     }
 
     private void AssignEmbarkTransport(UnitManager transporter, int slotIndex)
@@ -2037,4 +2049,158 @@ public class UnitManager : MonoBehaviour
         return stage != null;
     }
 #endif
+}
+
+public static class ThreatRevisionTracker
+{
+    private const int TeamIdMin = 0;
+    private const int TeamIdMax = 9;
+    private static readonly int[] teamObserverRevision = new int[TeamIdMax + 1];
+    private static int globalBoardRevision;
+    private static int matchFlagsHash = BuildFlagsHash(enableLdt: true, enableLos: true, enableSpotter: true);
+
+    public static int GlobalBoardRevision => globalBoardRevision;
+    public static int MatchFlagsHash => matchFlagsHash;
+
+    public static int GetTeamObserverRevision(int teamId)
+    {
+        if (teamId < TeamIdMin || teamId > TeamIdMax)
+            return 0;
+        return teamObserverRevision[teamId];
+    }
+
+    public static int GetTeamObserverRevision(TeamId teamId)
+    {
+        return GetTeamObserverRevision((int)teamId);
+    }
+
+    public static void SetMatchFlags(bool enableLdt, bool enableLos, bool enableSpotter)
+    {
+        int nextHash = BuildFlagsHash(enableLdt, enableLos, enableSpotter);
+        if (matchFlagsHash == nextHash)
+            return;
+
+        matchFlagsHash = nextHash;
+    }
+
+    public static void NotifyUnitCellChanged(UnitManager unit, Vector3Int previousCell, Vector3Int nextCell)
+    {
+        if (!Application.isPlaying || unit == null)
+            return;
+
+        previousCell.z = 0;
+        nextCell.z = 0;
+        if (previousCell == nextCell)
+            return;
+
+        IncrementGlobalBoard();
+        IncrementTeamObserver(unit.TeamId);
+    }
+
+    public static void NotifyUnitLayerChanged(UnitManager unit, Domain previousDomain, HeightLevel previousHeight, Domain nextDomain, HeightLevel nextHeight)
+    {
+        if (!Application.isPlaying || unit == null)
+            return;
+        if (previousDomain == nextDomain && previousHeight == nextHeight)
+            return;
+
+        IncrementGlobalBoard();
+        IncrementTeamObserver(unit.TeamId);
+    }
+
+    public static void NotifyUnitEmbarkStateChanged(UnitManager unit, bool previousEmbarked, bool nextEmbarked)
+    {
+        if (!Application.isPlaying || unit == null)
+            return;
+        if (previousEmbarked == nextEmbarked)
+            return;
+
+        IncrementGlobalBoard();
+        IncrementTeamObserver(unit.TeamId);
+    }
+
+    public static void NotifyUnitTeamChanged(TeamId previousTeam, TeamId nextTeam)
+    {
+        if (!Application.isPlaying)
+            return;
+        if (previousTeam == nextTeam)
+            return;
+
+        IncrementGlobalBoard();
+        IncrementTeamObserver(previousTeam);
+        IncrementTeamObserver(nextTeam);
+    }
+
+    public static void NotifyUnitDisabled(UnitManager unit, TeamId teamId, bool isEmbarked)
+    {
+        if (!Application.isPlaying || unit == null)
+            return;
+
+        IncrementGlobalBoard();
+        IncrementTeamObserver(teamId);
+    }
+
+    public static void NotifyUnitDataApplied(UnitManager unit)
+    {
+        if (!Application.isPlaying || unit == null)
+            return;
+
+        IncrementTeamObserver(unit.TeamId);
+    }
+
+    public static void NotifyConstructionCellChanged(ConstructionManager construction, Vector3Int previousCell, Vector3Int nextCell)
+    {
+        if (!Application.isPlaying || construction == null)
+            return;
+
+        previousCell.z = 0;
+        nextCell.z = 0;
+        if (previousCell == nextCell)
+            return;
+
+        IncrementGlobalBoard();
+    }
+
+    public static void NotifyConstructionTeamChanged(TeamId previousTeam, TeamId nextTeam)
+    {
+        if (!Application.isPlaying)
+            return;
+        if (previousTeam == nextTeam)
+            return;
+
+        IncrementGlobalBoard();
+    }
+
+    private static void IncrementGlobalBoard()
+    {
+        if (globalBoardRevision == int.MaxValue)
+            globalBoardRevision = 1;
+        else
+            globalBoardRevision++;
+    }
+
+    private static void IncrementTeamObserver(TeamId teamId)
+    {
+        IncrementTeamObserver((int)teamId);
+    }
+
+    private static void IncrementTeamObserver(int teamId)
+    {
+        if (teamId < TeamIdMin || teamId > TeamIdMax)
+            return;
+
+        if (teamObserverRevision[teamId] == int.MaxValue)
+            teamObserverRevision[teamId] = 1;
+        else
+            teamObserverRevision[teamId]++;
+    }
+
+    private static int BuildFlagsHash(bool enableLdt, bool enableLos, bool enableSpotter)
+    {
+        int hash = 17;
+        hash = hash * 31 + (enableLdt ? 1 : 0);
+        hash = hash * 31 + (enableLos ? 1 : 0);
+        hash = hash * 31 + (enableSpotter ? 1 : 0);
+        return hash;
+    }
 }

@@ -75,7 +75,11 @@ public partial class TurnStateManager
                 continue;
 
             string mapName = map.name.ToLowerInvariant();
-            if (mapName == "linhadetiromap" || mapName == "lineoffiremap")
+            if (mapName == "linhadetiromap" ||
+                mapName == "lineoffiremap" ||
+                mapName == "ameacamap" ||
+                mapName == "ameaçamap" ||
+                mapName == "threatmap")
                 return map;
         }
 
