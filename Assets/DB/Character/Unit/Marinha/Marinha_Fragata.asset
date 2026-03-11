@@ -29,7 +29,7 @@ MonoBehaviour:
   visionSpecializations:
   - domain: 2
     heightLevel: 2
-    vision: 3
+    vision: 6
     detectsStealth: 1
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
@@ -57,23 +57,36 @@ MonoBehaviour:
     operationRangeMax: 1
     selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: b1045e7e2a509504e9c1835590083ec2, type: 2}
-  isSupplier: 0
-  supplierTier: 0
-  maxUnitsServedPerTurn: 0
+  - weapon: {fileID: 11400000, guid: 25d842bdbac39ad44b5fa321908eb7f8, type: 2}
+    squadAmmunition: 4
+    operationRangeMin: 1
+    operationRangeMax: 2
+    selectedTrajectory: 0
+    lastSyncedWeapon: {fileID: 11400000, guid: 25d842bdbac39ad44b5fa321908eb7f8, type: 2}
+  cantUseWeaponsOnTheFollowDomain: []
+  isSupplier: 1
+  supplierTier: 1
+  maxUnitsServedPerTurn: 1
   serviceRange: 0
   collectionRange: 0
   supplierOperationDomains: []
-  supplierServicesProvided: []
-  supplierResources: []
+  supplierServicesProvided:
+  - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  supplierResources:
+  - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+    amount: 70
   isTransporter: 1
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains:
   - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
+  - {fileID: 11400000, guid: 47664243e1e61d84aa1c496ae463bd9c, type: 2}
   allowedEmbarkWhenTransporterAtTerrainStructures: []
   allowedEmbarkWhenTransporterAtConstructions:
   - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
   allowedDisembarkWhenTransporterAtTerrains:
   - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
+  - {fileID: 11400000, guid: 47664243e1e61d84aa1c496ae463bd9c, type: 2}
   allowedDisembarkWhenTransporterAtTerrainStructures: []
   allowedDisembarkWhenTransporterAtConstructions:
   - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
@@ -81,17 +94,19 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToTerrainStructures: []
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots:
-  - slotId: container
-    capacity: 2
+  - slotId: helipad
+    capacity: 1
     allowedLayerModes:
     - domain: 0
-      heightLevel: 3
+      heightLevel: 0
+    - domain: 3
+      heightLevel: 4
     legacyAllowedDomain: 0
-    legacyAllowedHeight: 3
+    legacyAllowedHeight: 0
     legacyAllowedLayerModes: []
-    allowedClasses: 
-    requiredSkills: []
-    blockedSkills:
-    - {fileID: 11400000, guid: 5ef7a75e35294b68ac315145f98dcd17, type: 2}
+    allowedClasses: 05000000
+    requiredSkills:
+    - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
+    blockedSkills: []
   autonomia: 90
   cost: 16500

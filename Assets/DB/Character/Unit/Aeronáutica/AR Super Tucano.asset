@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
   id: superTucano
   displayName: Super Tucano
-  apelido: ST
+  apelido: SPT
   description: 
   spriteDefault: {fileID: 21300000, guid: 66c29b8fc0b48bd4d9395477688a860f, type: 3}
   spriteGreen: {fileID: 0}
@@ -60,18 +60,21 @@ MonoBehaviour:
   stealthSkills: []
   autonomyData: {fileID: 11400000, guid: 4570edfd95d40d0438c040f364e8ec07, type: 2}
   embarkedWeapons:
-  - weapon: {fileID: 11400000, guid: 5430f79fb5141ce41a424bd96250ed1b, type: 2}
+  - weapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
     squadAmmunition: 8
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
-    lastSyncedWeapon: {fileID: 11400000, guid: 5430f79fb5141ce41a424bd96250ed1b, type: 2}
+    lastSyncedWeapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
   - weapon: {fileID: 11400000, guid: afbb31a3d8a2c3645bf90df243540a74, type: 2}
     squadAmmunition: 4
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: afbb31a3d8a2c3645bf90df243540a74, type: 2}
+  cantUseWeaponsOnTheFollowDomain:
+  - domain: 0
+    heightLevel: 3
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0
@@ -93,4 +96,4 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
   autonomia: 90
-  cost: 8500
+  cost: 9000

@@ -158,3 +158,17 @@ MonoBehaviour:
       defenseBonus: 4
       notes: Dog Fight
       rpsDefenseText: Plane se defende de Jet com AntiInfantaria com RPS Defesa +4
+  - ataque:
+      unitClass: 4
+      weaponCategory: 3
+      targetClass: 7
+      attackBonus: -4
+      notes: Dog fight
+      rpsAttackText: Jet com AntiNavio ataca Submarine com RPS Ataque -4
+    defesa:
+      targetClass: 7
+      unitClass: 4
+      weaponCategory: 3
+      defenseBonus: 4
+      notes: Dog Fight
+      rpsDefenseText: Submarine se defende de Jet com AntiNavio com RPS Defesa +4

@@ -353,6 +353,11 @@ public class CursorController : MonoBehaviour
 
     public bool SetCell(Vector3Int cell, bool playMoveSfx)
     {
+        return SetCell(cell, playMoveSfx, adjustCamera: true);
+    }
+
+    public bool SetCell(Vector3Int cell, bool playMoveSfx, bool adjustCamera)
+    {
         cell.z = 0;
         if (!IsCellValid(cell))
             return false;
@@ -361,7 +366,7 @@ public class CursorController : MonoBehaviour
         SnapToCell(currentCell);
         if (playMoveSfx)
             OnCursorMoved();
-        if (adjustCameraOnMove)
+        if (adjustCameraOnMove && adjustCamera)
             TryAdjustCameraToCursor();
         return true;
     }

@@ -83,7 +83,7 @@ public partial class TurnStateManager
 
         // Normaliza os codigos de acao com base nos resultados efetivos dos sensores.
         availableSensorActionCodes.Remove('A');
-        if (cachedPodeMirarTargets.Count > 0)
+        if (cachedPodeMirarTargets.Count > 0 || cachedPodeMirarInvalidTargets.Count > 0)
             availableSensorActionCodes.Add('A');
 
         availableSensorActionCodes.Remove('E');
@@ -153,7 +153,7 @@ public partial class TurnStateManager
             cachedPodeMirarInvalidTargets.Clear();
         }
 
-        if (selectedUnit.IsAircraftGrounded || selectedUnit.IsAircraftEmbarkedInCarrier)
+        if (selectedUnit.IsEmbarked)
         {
             availableSensorActionCodes.Remove('A');
             cachedPodeMirarTargets.Clear();

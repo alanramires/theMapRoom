@@ -51,6 +51,13 @@ MonoBehaviour:
     operationRangeMax: 4
     selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: e58612c9a6796da4eb35f981486fa0e4, type: 2}
+  - weapon: {fileID: 11400000, guid: b1045e7e2a509504e9c1835590083ec2, type: 2}
+    squadAmmunition: 4
+    operationRangeMin: 1
+    operationRangeMax: 2
+    selectedTrajectory: 0
+    lastSyncedWeapon: {fileID: 11400000, guid: b1045e7e2a509504e9c1835590083ec2, type: 2}
+  cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 1
   supplierTier: 0
   maxUnitsServedPerTurn: 2

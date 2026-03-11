@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: "Gal\xE3o"
   m_EditorClassIdentifier: Assembly-CSharp::SupplyData
   id: gasolina
-  displayName: Gasolina
+  displayName: "Gal\xF5es"
   description: usado para recuperar Autonomia
   spriteDefault: {fileID: 21300000, guid: 0d5da139a3219074191fb5a7061cee49, type: 3}
   relatedServices:

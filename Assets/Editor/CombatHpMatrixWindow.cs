@@ -295,7 +295,10 @@ public class CombatHpMatrixWindow : EditorWindow
 
         attackerWeaponIndex = effectiveWeaponIndex;
         WeaponOption attackOption = attackWeaponOptions[effectiveWeaponIndex];
-        selectedAttackerEmbarkedWeaponIndex = attackOption.embarkedWeaponIndex;
+        bool isAutoSelection = forcedEmbarkedWeaponIndex == -2 || selectedAttackerEmbarkedWeaponIndex == -2;
+        selectedAttackerEmbarkedWeaponIndex = isAutoSelection
+            ? -2
+            : attackOption.embarkedWeaponIndex;
         RefreshDefenderWeaponOptions();
         defenderWeaponIndex = Mathf.Clamp(defenderWeaponIndex, 0, Mathf.Max(0, defenderWeaponOptions.Count - 1));
         WeaponPick counterPick = ResolveSelectedDefenderCounterWeapon(defender, attacker, attackOption.weapon);
@@ -544,6 +547,7 @@ public class CombatHpMatrixWindow : EditorWindow
         int previousSelectedIndex = attackerWeaponIndex;
         int previousSelectedEmbarkedIndexFromField = selectedAttackerEmbarkedWeaponIndex;
         bool keepAutoSelection = previousSelectedEmbarkedIndexFromField == -2;
+        StringBuilder rejectionDetails = new StringBuilder();
         WeaponData previousSelectedWeapon = null;
         int previousSelectedEmbarkedIndex = -1;
         if (attackWeaponOptions.Count > 0
@@ -570,15 +574,35 @@ public class CombatHpMatrixWindow : EditorWindow
         for (int i = 0; i < attacker.embarkedWeapons.Count; i++)
         {
             UnitEmbarkedWeapon embarked = attacker.embarkedWeapons[i];
-            if (embarked == null || embarked.weapon == null || embarked.squadAmmunition <= 0)
+            if (embarked == null || embarked.weapon == null)
+            {
+                rejectionDetails.AppendLine($"- arma#{i}: vazia");
                 continue;
+            }
 
-            int minRange = Mathf.Max(0, embarked.GetRangeMin());
-            int maxRange = Mathf.Max(minRange, embarked.GetRangeMax());
+            string weaponName = ResolveWeaponName(embarked.weapon);
+
+            if (!PodeMirarSensor.TryResolveWeaponRangeCandidate(
+                    embarked,
+                    SensorMovementMode.MoveuParado,
+                    requireAmmo: true,
+                    out int minRange,
+                    out int maxRange))
+            {
+                rejectionDetails.AppendLine($"- {weaponName}#{i}: sem municao ou range invalido ({embarked.GetRangeMin()}-{embarked.GetRangeMax()})");
+                continue;
+            }
+
             if (distance < minRange || distance > maxRange)
+            {
+                rejectionDetails.AppendLine($"- {weaponName}#{i}: fora de alcance (dist={distance}, range={minRange}-{maxRange})");
                 continue;
+            }
             if (!embarked.weapon.SupportsOperationOn(defender.domain, defender.heightLevel))
+            {
+                rejectionDetails.AppendLine($"- {weaponName}#{i}: dominio/altura incompativel com alvo ({defender.domain}/{defender.heightLevel})");
                 continue;
+            }
 
             attackWeaponOptions.Add(new WeaponOption(embarked.weapon, i, minRange, maxRange));
         }
@@ -587,6 +611,23 @@ public class CombatHpMatrixWindow : EditorWindow
         {
             attackerWeaponIndex = 0;
             selectedAttackerEmbarkedWeaponIndex = -1;
+            string details = rejectionDetails.Length > 0 ? rejectionDetails.ToString().TrimEnd() : "- sem detalhes";
+            status = $"Sem arma atacante valida para {GetUnitLabel(attacker)} -> {GetUnitLabel(defender)} (dist={distance}).\n{details}";
+            return;
+        }
+
+        if (keepAutoSelection)
+        {
+            UnitData attackerAuto = attackerUnitIndex >= 0 && attackerUnitIndex < units.Count ? units[attackerUnitIndex] : null;
+            UnitData defenderAuto = defenderUnitIndex >= 0 && defenderUnitIndex < units.Count ? units[defenderUnitIndex] : null;
+            WeaponPick autoPick = PickBestAttackWeapon(attackerAuto, defenderAuto);
+            int autoIndex = autoPick.isValid
+                ? ResolveAttackWeaponIndexByEmbarked(autoPick.embarkedWeaponIndex)
+                : -1;
+            attackerWeaponIndex = autoIndex >= 0
+                ? autoIndex
+                : 0;
+            selectedAttackerEmbarkedWeaponIndex = -2;
             return;
         }
 
@@ -734,7 +775,7 @@ public class CombatHpMatrixWindow : EditorWindow
             WeaponPick current = new WeaponPick(option.weapon, option.embarkedWeaponIndex, option.code, true);
             if (!fallback.isValid)
                 fallback = current;
-            if (EvaluateWeaponPriority(weaponPriorityData, option.weapon.WeaponCategory, defender.unitClass))
+            if (PodeMirarSensor.IsPreferredWeaponForTarget(weaponPriorityData, option.weapon, defender.unitClass))
                 return current;
         }
 
@@ -743,35 +784,19 @@ public class CombatHpMatrixWindow : EditorWindow
 
     private WeaponPick PickBestCounterWeapon(UnitData defender, UnitData attacker, int attackRange, WeaponData attackerWeaponContext)
     {
-        if (defender == null || attacker == null || defender.embarkedWeapons == null || defender.embarkedWeapons.Count == 0)
-            return WeaponPick.None;
-        if (attackRange != 1)
-            return WeaponPick.None;
-
-        WeaponPick fallback = WeaponPick.None;
-        for (int i = 0; i < defender.embarkedWeapons.Count; i++)
+        if (!PodeMirarSensor.TryResolveCounterAttackFromData(
+                defender,
+                attacker,
+                attackRange,
+                weaponPriorityData,
+                out WeaponData counterWeapon,
+                out int counterEmbarkedIndex,
+                out _))
         {
-            UnitEmbarkedWeapon embarked = defender.embarkedWeapons[i];
-            if (embarked == null || embarked.weapon == null || embarked.squadAmmunition <= 0)
-                continue;
-            if (embarked.GetRangeMin() != 1)
-                continue;
-            if (!embarked.weapon.SupportsOperationOn(attacker.domain, attacker.heightLevel))
-                continue;
-
-            WeaponPick current = new WeaponPick(embarked.weapon, i, GetWeaponLabel(embarked.weapon, i), true);
-            if (!fallback.isValid)
-                fallback = current;
-            if (EvaluateWeaponPriority(weaponPriorityData, embarked.weapon.WeaponCategory, attacker.unitClass))
-                return current;
+            return WeaponPick.None;
         }
 
-        return fallback;
-    }
-
-    private static bool EvaluateWeaponPriority(WeaponPriorityData data, WeaponCategory category, GameUnitClass targetClass)
-    {
-        return data != null && data.IsPreferredTarget(category, targetClass);
+        return new WeaponPick(counterWeapon, counterEmbarkedIndex, GetWeaponLabel(counterWeapon, counterEmbarkedIndex), true);
     }
 
     private static bool TryBuildManualCounterWeaponOption(UnitData attacker, UnitEmbarkedWeapon embarked, int embarkedIndex, int distance, out CounterWeaponOption option)
@@ -779,11 +804,16 @@ public class CombatHpMatrixWindow : EditorWindow
         option = default(CounterWeaponOption);
         if (attacker == null || embarked == null || embarked.weapon == null)
             return false;
-        if (distance != 1)
+        if (!PodeMirarSensor.TryResolveWeaponRangeCandidate(
+                embarked,
+                SensorMovementMode.MoveuParado,
+                requireAmmo: true,
+                out int minRange,
+                out _))
+        {
             return false;
-        if (embarked.GetRangeMin() != 1)
-            return false;
-        if (embarked.squadAmmunition <= 0)
+        }
+        if (distance != 1 || minRange != 1)
             return false;
         if (!embarked.weapon.SupportsOperationOn(attacker.domain, attacker.heightLevel))
             return false;

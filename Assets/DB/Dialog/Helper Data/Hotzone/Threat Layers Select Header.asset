@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HelperData
   id: helper.sensors.threat_layers.select_header
   condition: Cabecalho da lista de times para hotzone.
-  message: "Times pra inspecionar:"
+  message: "Op\xE7\xF5es:"

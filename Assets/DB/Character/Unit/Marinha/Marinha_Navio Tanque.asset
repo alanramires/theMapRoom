@@ -26,6 +26,9 @@ MonoBehaviour:
   armorClass: 1
   movement: 5
   visao: 3
+  visionSpecializations: []
+  stealthRevealScope: 0
+  stealthVisibleIfDetectedForTurns: 1
   movementCategory: 3
   militaryForce: 2
   unitClass: 8
@@ -39,8 +42,10 @@ MonoBehaviour:
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
   skills: []
+  stealthSkills: []
   autonomyData: {fileID: 0}
   embarkedWeapons: []
+  cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 1
   supplierTier: 0
   maxUnitsServedPerTurn: 1
@@ -72,4 +77,4 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
   autonomia: 120
-  cost: 11500
+  cost: 8000

@@ -14,4 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HelperData
   id: helper.sensors.threat_layers.current_team
   condition: Linha de time atualmente inspecionado no helper da hotzone.
-  message: 'Time inspecionado: <team_name>'
+  message: 'Time inspecionado: <team_name>
+
+    ------'

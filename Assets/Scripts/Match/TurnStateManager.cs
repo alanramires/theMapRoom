@@ -88,6 +88,8 @@ public partial class TurnStateManager : MonoBehaviour
     private ConstructionManager shoppingConstruction;
     private readonly List<UnitData> shoppingUnitsForSale = new List<UnitData>();
     private bool captureExecutionInProgress;
+    private readonly List<UnitManager> turnStartFuelDepletionDeathQueue = new List<UnitManager>();
+    private bool turnStartFuelDepletionExecutionInProgress;
 
     public CursorState CurrentCursorState => cursorState;
     public UnitManager SelectedUnit => selectedUnit;
@@ -789,6 +791,90 @@ public partial class TurnStateManager : MonoBehaviour
         target.SetCurrentHP(0);
         KillEmbarkedChildrenChain(target);
         yield return ExecuteUnitDeathPresentation(target, targetCell, worldPos, applyStartDelay: false);
+    }
+
+    public void EnqueueTurnStartFuelDepletionDeaths(IReadOnlyList<UnitManager> units)
+    {
+        if (!Application.isPlaying || units == null || units.Count <= 0)
+            return;
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy)
+                continue;
+
+            if (turnStartFuelDepletionDeathQueue.Contains(unit))
+                continue;
+
+            turnStartFuelDepletionDeathQueue.Add(unit);
+        }
+
+        if (!turnStartFuelDepletionExecutionInProgress && turnStartFuelDepletionDeathQueue.Count > 0)
+            StartCoroutine(ExecuteTurnStartFuelDepletionDeathQueue());
+    }
+
+    private IEnumerator ExecuteTurnStartFuelDepletionDeathQueue()
+    {
+        if (turnStartFuelDepletionExecutionInProgress)
+            yield break;
+
+        turnStartFuelDepletionExecutionInProgress = true;
+        try
+        {
+            float initialDelay = animationManager != null ? animationManager.TurnStartFuelDeathInitialDelay : 0.20f;
+            float cursorFocusDelay = animationManager != null ? animationManager.TurnStartFuelDeathCursorFocusDelay : 0.20f;
+            float betweenKillsDelay = animationManager != null ? animationManager.TurnStartFuelDeathBetweenKillsDelay : 0.15f;
+
+            if (turnStartFuelDepletionDeathQueue.Count > 0 && initialDelay > 0f)
+                yield return new WaitForSeconds(initialDelay);
+
+            while (turnStartFuelDepletionDeathQueue.Count > 0)
+            {
+                UnitManager target = turnStartFuelDepletionDeathQueue[0];
+                turnStartFuelDepletionDeathQueue.RemoveAt(0);
+                if (target == null || !target.gameObject.activeInHierarchy)
+                    continue;
+
+                if (selectedUnit == target)
+                    ClearSelectionAndReturnToNeutral();
+
+                Vector3Int targetCell = target.CurrentCellPosition;
+                targetCell.z = 0;
+                Vector3 worldPos = target.transform.position;
+
+                if (cursorController != null)
+                {
+                    cursorController.SetCell(targetCell, playMoveSfx: true, adjustCamera: true);
+                    if (cursorFocusDelay > 0f)
+                        yield return new WaitForSeconds(cursorFocusDelay);
+                }
+
+                target.SetCurrentHP(0);
+                KillEmbarkedChildrenChain(target);
+                PanelDialogController.TrySetTransientText("caiu por falta de combustivel", 2.6f);
+                yield return ExecuteUnitDeathPresentation(
+                    target,
+                    targetCell,
+                    worldPos,
+                    applyStartDelay: false,
+                    moveCursorFirst: false);
+
+                cursorController?.PlayLoadSfx();
+
+                if (turnStartFuelDepletionDeathQueue.Count > 0)
+                {
+                    if (betweenKillsDelay > 0f)
+                        yield return new WaitForSeconds(betweenKillsDelay);
+                }
+            }
+        }
+        finally
+        {
+            turnStartFuelDepletionExecutionInProgress = false;
+            if (turnStartFuelDepletionDeathQueue.Count > 0)
+                StartCoroutine(ExecuteTurnStartFuelDepletionDeathQueue());
+        }
     }
 
     private static string ResolveDebugUnitName(UnitManager unit)

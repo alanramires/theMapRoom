@@ -66,6 +66,7 @@ public class MatchController : MonoBehaviour
     [SerializeField, HideInInspector] private int cachedConstructionIncomeCount;
     [System.NonSerialized] private readonly List<TeamId> playersView = new List<TeamId>();
     [System.NonSerialized] private List<TurnStateManager.TurnStartAutonomyUpkeepEntry> pendingTurnStartAutonomyHelperEntries;
+    [System.NonSerialized] private readonly List<UnitManager> turnStartUnitsMarkedForFuelDepletionDeath = new List<UnitManager>();
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
@@ -634,8 +635,8 @@ public class MatchController : MonoBehaviour
             return;
 
         appliedActiveTeamId = activeTeamId;
-        ReleaseUnitsForActiveTeam();
         TeleportCursorToActiveTeamHeadQuarterSilently();
+        ReleaseUnitsForActiveTeam();
         FlushTurnStartAutonomyHelper();
     }
 
@@ -672,6 +673,7 @@ public class MatchController : MonoBehaviour
         ApplyEconomyAtTurnStartForActiveTeam();
 
         List<TurnStateManager.TurnStartAutonomyUpkeepEntry> turnStartAutonomyEntries = null;
+        turnStartUnitsMarkedForFuelDepletionDeath.Clear();
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
         {
@@ -680,6 +682,8 @@ public class MatchController : MonoBehaviour
                 continue;
             if ((int)unit.TeamId != activeTeamId)
                 continue;
+
+            unit.ConsumeForcedLayerLockTurn();
 
             if (pendingTurnStartUpkeep)
             {
@@ -690,12 +694,25 @@ public class MatchController : MonoBehaviour
                     int afterFuel = Mathf.Max(0, beforeFuel - turnStartUpkeep);
                     int consumed = Mathf.Max(0, beforeFuel - afterFuel);
                     unit.SetCurrentFuel(afterFuel);
+                    bool markedForFuelDepletionDeath = false;
+                    if (beforeFuel > 0 && afterFuel <= 0)
+                    {
+                        bool isAirUnitInFlight =
+                            unit.GetAircraftType() != AircraftType.None &&
+                            !unit.IsAircraftGrounded &&
+                            !unit.IsEmbarked;
+                        if (isAirUnitInFlight && unit.gameObject.activeInHierarchy)
+                        {
+                            turnStartUnitsMarkedForFuelDepletionDeath.Add(unit);
+                            markedForFuelDepletionDeath = true;
+                        }
+                    }
 
                     bool isAircraftUnit = unit.TryGetUnitData(out UnitData unitDataAtUpkeep)
                         && unitDataAtUpkeep != null
                         && unitDataAtUpkeep.IsAircraft();
 
-                    if (consumed > 0 && isAircraftUnit)
+                    if ((consumed > 0 && isAircraftUnit) || markedForFuelDepletionDeath)
                     {
                         turnStartAutonomyEntries ??= new List<TurnStateManager.TurnStartAutonomyUpkeepEntry>();
                         Vector3Int cell = unit.CurrentCellPosition;
@@ -715,6 +732,8 @@ public class MatchController : MonoBehaviour
         }
 
         pendingTurnStartAutonomyHelperEntries = turnStartAutonomyEntries;
+        TryAutoAssignTurnStateManager();
+        turnStateManager?.EnqueueTurnStartFuelDepletionDeaths(turnStartUnitsMarkedForFuelDepletionDeath);
 
         pendingTurnStartUpkeep = false;
     }

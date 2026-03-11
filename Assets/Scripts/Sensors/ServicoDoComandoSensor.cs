@@ -671,6 +671,11 @@ public static class ServicoDoComandoSensor
                     reason = $"Alvo submerso pode emergir, mas o hex atual nao aceita Naval/Surface ({surfaceReason}).";
                     return false;
                 }
+                if (target.IsLayerChangeBlockedByForcedLock(Domain.Naval, HeightLevel.Surface, out string lockReason))
+                {
+                    reason = lockReason;
+                    return false;
+                }
 
                 forceSurfaceBeforeSupply = true;
                 plannedServiceDomain = Domain.Naval;
@@ -702,6 +707,11 @@ public static class ServicoDoComandoSensor
             {
                 Vector3Int targetCell = target.CurrentCellPosition;
                 targetCell.z = 0;
+                if (target.IsLayerChangeBlockedByForcedLock(constructionDomain, constructionHeight, out string lockReason))
+                {
+                    reason = lockReason;
+                    return false;
+                }
                 if (!PodeSuprirSensor.CanUseLayerModeAtCurrentCellForSupply(
                         target,
                         boardMap,
@@ -731,6 +741,11 @@ public static class ServicoDoComandoSensor
                 {
                     Vector3Int targetCell = target.CurrentCellPosition;
                     targetCell.z = 0;
+                    if (target.IsLayerChangeBlockedByForcedLock(Domain.Air, takeoffHeight, out string lockReason))
+                    {
+                        reason = lockReason;
+                        return false;
+                    }
                     if (!PodeSuprirSensor.CanUseLayerModeAtCurrentCellForSupply(
                             target,
                             boardMap,

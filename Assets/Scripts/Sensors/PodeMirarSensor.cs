@@ -6,6 +6,7 @@ public static class PodeMirarSensor
 {
     private const string InvalidReasonNoAmmo = "Falta de municao.";
     private const string InvalidReasonLayer = "Layer do alvo incompativel com a arma.";
+    private const string InvalidReasonAttackerLayerWeaponBlocked = "nao atira quando em";
     private const string InvalidReasonLdtBlocked = "Linha de tiro invalida para os dominios no trajeto (LdT).";
     private const string InvalidReasonLosBlocked = "Linha de visada bloqueada.";
     private const string InvalidReasonNoForwardObserver = "Sem observador avancado (alcance visual 3 hex).";
@@ -31,6 +32,8 @@ public static class PodeMirarSensor
             return PodeMirarInvalidOption.ReasonIdNoAmmo;
         if (reason.IndexOf(InvalidReasonLayer, System.StringComparison.OrdinalIgnoreCase) >= 0)
             return PodeMirarInvalidOption.ReasonIdLayer;
+        if (reason.IndexOf(InvalidReasonAttackerLayerWeaponBlocked, System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return PodeMirarInvalidOption.ReasonIdAttackerBlockedAt;
         if (reason.IndexOf(InvalidReasonLdtBlocked, System.StringComparison.OrdinalIgnoreCase) >= 0)
             return PodeMirarInvalidOption.ReasonIdLdtBlocked;
         if (reason.IndexOf(InvalidReasonLosBlocked, System.StringComparison.OrdinalIgnoreCase) >= 0)
@@ -100,6 +103,12 @@ public static class PodeMirarSensor
 
         Vector3Int origin = attacker.CurrentCellPosition;
         origin.z = 0;
+
+        bool attackerWeaponUseBlockedByLayer =
+            attacker.TryGetUnitData(out UnitData attackerData) &&
+            attackerData != null &&
+            attackerData.IsWeaponUseBlockedAt(attacker.GetDomain(), attacker.GetHeightLevel());
+
         Dictionary<Vector3Int, int> distances = BuildDistanceMap(map, origin, globalMaxRange);
         string attackerPositionLabel = ResolveUnitPositionLabel(map, terrainDatabase, attacker, origin);
 
@@ -116,6 +125,29 @@ public static class PodeMirarSensor
             string defenderPositionLabel = ResolveUnitPositionLabel(map, terrainDatabase, target, targetCell);
             if (!distances.TryGetValue(targetCell, out int distance))
                 continue;
+
+            if (attackerWeaponUseBlockedByLayer)
+            {
+                string attackerName = !string.IsNullOrWhiteSpace(attacker.UnitDisplayName)
+                    ? attacker.UnitDisplayName
+                    : (!string.IsNullOrWhiteSpace(attacker.UnitId) ? attacker.UnitId : attacker.name);
+                string attackerLayerReason =
+                    $"{attackerName} nao atira quando em {attacker.GetDomain()}/{attacker.GetHeightLevel()}";
+                AppendInvalid(
+                    invalidOutput,
+                    attacker,
+                    target,
+                    null,
+                    -1,
+                    distance,
+                    attackerPositionLabel,
+                    defenderPositionLabel,
+                    attackerLayerReason,
+                    Vector3Int.zero,
+                    null,
+                    null);
+                continue;
+            }
 
             for (int j = 0; j < candidates.Count; j++)
             {
@@ -502,6 +534,120 @@ public static class PodeMirarSensor
             if (TryBuildCandidate(embarkedWeapons[i], i, movementMode, out _, requireAmmo: true))
                 return true;
         }
+
+        return false;
+    }
+
+    public static bool TryResolveWeaponRangeCandidate(
+        UnitEmbarkedWeapon embarked,
+        SensorMovementMode movementMode,
+        bool requireAmmo,
+        out int minRange,
+        out int maxRange)
+    {
+        minRange = 0;
+        maxRange = 0;
+        if (!TryBuildCandidate(embarked, -1, movementMode, out WeaponRangeCandidate candidate, requireAmmo))
+            return false;
+
+        minRange = candidate.minRange;
+        maxRange = candidate.maxRange;
+        return true;
+    }
+
+    public static bool IsPreferredWeaponForTarget(WeaponPriorityData data, WeaponData weapon, GameUnitClass targetClass)
+    {
+        if (weapon == null)
+            return false;
+        return EvaluateWeaponPriority(data, weapon.WeaponCategory, targetClass);
+    }
+
+    public static bool TryResolveCounterAttackFromData(
+        UnitData defender,
+        UnitData attacker,
+        int distance,
+        WeaponPriorityData weaponPriorityData,
+        out WeaponData counterWeapon,
+        out int counterEmbarkedIndex,
+        out string reason)
+    {
+        counterWeapon = null;
+        counterEmbarkedIndex = -1;
+        reason = string.Empty;
+
+        if (defender == null || attacker == null)
+        {
+            reason = "Defensor ou atacante invalido.";
+            return false;
+        }
+
+        if (distance != 1)
+        {
+            reason = "Distancia para revide diferente de 1.";
+            return false;
+        }
+
+        if (defender.embarkedWeapons == null || defender.embarkedWeapons.Count == 0)
+        {
+            reason = "Defensor sem armas.";
+            return false;
+        }
+
+        bool hasMinRangeOne = false;
+        bool hasAmmo = false;
+        bool hasLayerCompatible = false;
+        int fallbackIndex = -1;
+        WeaponData fallbackWeapon = null;
+
+        for (int i = 0; i < defender.embarkedWeapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = defender.embarkedWeapons[i];
+            if (embarked == null || embarked.weapon == null)
+                continue;
+
+            if (!TryResolveWeaponRangeCandidate(embarked, SensorMovementMode.MoveuParado, requireAmmo: false, out int minRange, out _))
+                continue;
+            if (minRange != 1)
+                continue;
+            hasMinRangeOne = true;
+
+            if (embarked.squadAmmunition <= 0)
+                continue;
+            hasAmmo = true;
+
+            if (!embarked.weapon.SupportsOperationOn(attacker.domain, attacker.heightLevel))
+                continue;
+            hasLayerCompatible = true;
+
+            if (fallbackWeapon == null)
+            {
+                fallbackWeapon = embarked.weapon;
+                fallbackIndex = i;
+            }
+
+            if (IsPreferredWeaponForTarget(weaponPriorityData, embarked.weapon, attacker.unitClass))
+            {
+                counterWeapon = embarked.weapon;
+                counterEmbarkedIndex = i;
+                return true;
+            }
+        }
+
+        if (fallbackWeapon != null)
+        {
+            counterWeapon = fallbackWeapon;
+            counterEmbarkedIndex = fallbackIndex;
+            return true;
+        }
+
+        if (!hasMinRangeOne)
+            reason = "Defensor sem arma de revide (range min 1).";
+        else if (!hasAmmo)
+            reason = "Defensor sem municao para revide.";
+        else if (!hasLayerCompatible)
+            reason = "Layer do atacante incompativel para revide.";
+        else
+            reason = "Revide indisponivel.";
 
         return false;
     }
@@ -1048,6 +1194,23 @@ public static class PodeMirarSensor
         if (distance != 1)
         {
             reason = "Distancia para revide diferente de 1.";
+            return false;
+        }
+
+        if (defender.IsEmbarked)
+        {
+            reason = "Defensor embarcado nao pode revidar.";
+            return false;
+        }
+
+        if (defender.TryGetUnitData(out UnitData defenderData) &&
+            defenderData != null &&
+            defenderData.IsWeaponUseBlockedAt(defender.GetDomain(), defender.GetHeightLevel()))
+        {
+            string defenderName = !string.IsNullOrWhiteSpace(defender.UnitDisplayName)
+                ? defender.UnitDisplayName
+                : (!string.IsNullOrWhiteSpace(defender.UnitId) ? defender.UnitId : defender.name);
+            reason = $"{defenderName} nao atira quando em {defender.GetDomain()}/{defender.GetHeightLevel()}";
             return false;
         }
 

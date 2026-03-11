@@ -65,6 +65,11 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private HeightLevel preferredAirHeightRuntime = HeightLevel.AirLow;
     [SerializeField] private bool useExplicitPreferredNavalHeightRuntime;
     [SerializeField] private HeightLevel preferredNavalHeightRuntime = HeightLevel.Submerged;
+    [Header("Forced Layer Lock")]
+    [SerializeField] private bool hasForcedLayerLock;
+    [SerializeField] private Domain forcedLayerLockDomain = Domain.Land;
+    [SerializeField] private HeightLevel forcedLayerLockHeight = HeightLevel.Surface;
+    [SerializeField, Min(0)] private int forcedLayerLockTurnsRemaining;
     [Header("Transport Runtime")]
     [SerializeField] private List<UnitTransportSeatRuntime> transportedUnitSlots = new List<UnitTransportSeatRuntime>();
     [SerializeField, HideInInspector] private UnitManager embarkedTransporter;
@@ -93,7 +98,11 @@ public class UnitManager : MonoBehaviour
     public UnitDatabase UnitDatabase => unitDatabase;
     public bool IsAircraftGrounded => GetAircraftType() != AircraftType.None && currentDomain != Domain.Air;
     public bool IsAircraftEmbarkedInCarrier => isEmbarked;
-    public int AircraftOperationLockTurns => 0;
+    public int AircraftOperationLockTurns => Mathf.Max(0, forcedLayerLockTurnsRemaining);
+    public bool HasForcedLayerLock => hasForcedLayerLock && forcedLayerLockTurnsRemaining > 0;
+    public Domain ForcedLayerLockDomain => forcedLayerLockDomain;
+    public HeightLevel ForcedLayerLockHeight => forcedLayerLockHeight;
+    public int ForcedLayerLockTurnsRemaining => Mathf.Max(0, forcedLayerLockTurnsRemaining);
     public IReadOnlyList<UnitTransportSeatRuntime> TransportedUnitSlots => transportedUnitSlots;
     public UnitManager EmbarkedTransporter => embarkedTransporter;
     public int EmbarkedTransporterSlotIndex => embarkedTransporterSlotIndex;
@@ -479,6 +488,9 @@ public class UnitManager : MonoBehaviour
 
     public bool TrySetCurrentLayerMode(Domain domain, HeightLevel heightLevel)
     {
+        if (IsLayerChangeBlockedByForcedLock(domain, heightLevel, out _))
+            return false;
+
         Domain previousDomain = currentDomain;
         HeightLevel previousHeight = currentHeightLevel;
         UnitLayerMode[] modes = BuildLayerModesSnapshot();
@@ -505,6 +517,74 @@ public class UnitManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    public bool TryGetForcedLayerLock(out Domain domain, out HeightLevel heightLevel, out int turnsRemaining)
+    {
+        if (!HasForcedLayerLock)
+        {
+            domain = currentDomain;
+            heightLevel = currentHeightLevel;
+            turnsRemaining = 0;
+            return false;
+        }
+
+        domain = forcedLayerLockDomain;
+        heightLevel = forcedLayerLockHeight;
+        turnsRemaining = Mathf.Max(0, forcedLayerLockTurnsRemaining);
+        return true;
+    }
+
+    public bool IsLayerChangeBlockedByForcedLock(Domain targetDomain, HeightLevel targetHeightLevel, out string reason)
+    {
+        if (!HasForcedLayerLock)
+        {
+            reason = string.Empty;
+            return false;
+        }
+
+        bool sameLockedLayer = forcedLayerLockDomain == targetDomain && forcedLayerLockHeight == targetHeightLevel;
+        if (sameLockedLayer)
+        {
+            reason = string.Empty;
+            return false;
+        }
+
+        reason = PanelDialogController.ResolveDialogMessage(
+            "layer.locked.by.weapon",
+            "Camada travada em <domain>/<height> por <turns> turno(s).",
+            new Dictionary<string, string>
+            {
+                { "unit", ResolveRuntimeUnitName() },
+                { "domain", forcedLayerLockDomain.ToString() },
+                { "height", forcedLayerLockHeight.ToString() },
+                { "turns", forcedLayerLockTurnsRemaining.ToString() }
+            });
+        return true;
+    }
+
+    public void SetForcedLayerLock(Domain domain, HeightLevel heightLevel, int turns)
+    {
+        hasForcedLayerLock = true;
+        forcedLayerLockDomain = domain;
+        forcedLayerLockHeight = heightLevel;
+        forcedLayerLockTurnsRemaining = Mathf.Max(1, turns);
+    }
+
+    public void ClearForcedLayerLock()
+    {
+        hasForcedLayerLock = false;
+        forcedLayerLockTurnsRemaining = 0;
+    }
+
+    public void ConsumeForcedLayerLockTurn()
+    {
+        if (!HasForcedLayerLock)
+            return;
+
+        forcedLayerLockTurnsRemaining = Mathf.Max(0, forcedLayerLockTurnsRemaining - 1);
+        if (forcedLayerLockTurnsRemaining <= 0)
+            ClearForcedLayerLock();
     }
 
     // Debug utility: allows forcing a runtime layer state even when that exact
@@ -714,7 +794,22 @@ public class UnitManager : MonoBehaviour
 
     public void SetAircraftOperationLockTurns(int turns)
     {
-        // Deprecated runtime flag: kept for API compatibility.
+        if (turns <= 0)
+        {
+            ClearForcedLayerLock();
+            return;
+        }
+
+        SetForcedLayerLock(currentDomain, currentHeightLevel, turns);
+    }
+
+    private string ResolveRuntimeUnitName()
+    {
+        if (!string.IsNullOrWhiteSpace(unitDisplayName))
+            return unitDisplayName;
+        if (!string.IsNullOrWhiteSpace(unitId))
+            return unitId;
+        return name;
     }
 
     public IReadOnlyList<UnitEmbarkedWeapon> GetEmbarkedWeapons()
@@ -2049,158 +2144,4 @@ public class UnitManager : MonoBehaviour
         return stage != null;
     }
 #endif
-}
-
-public static class ThreatRevisionTracker
-{
-    private const int TeamIdMin = 0;
-    private const int TeamIdMax = 9;
-    private static readonly int[] teamObserverRevision = new int[TeamIdMax + 1];
-    private static int globalBoardRevision;
-    private static int matchFlagsHash = BuildFlagsHash(enableLdt: true, enableLos: true, enableSpotter: true);
-
-    public static int GlobalBoardRevision => globalBoardRevision;
-    public static int MatchFlagsHash => matchFlagsHash;
-
-    public static int GetTeamObserverRevision(int teamId)
-    {
-        if (teamId < TeamIdMin || teamId > TeamIdMax)
-            return 0;
-        return teamObserverRevision[teamId];
-    }
-
-    public static int GetTeamObserverRevision(TeamId teamId)
-    {
-        return GetTeamObserverRevision((int)teamId);
-    }
-
-    public static void SetMatchFlags(bool enableLdt, bool enableLos, bool enableSpotter)
-    {
-        int nextHash = BuildFlagsHash(enableLdt, enableLos, enableSpotter);
-        if (matchFlagsHash == nextHash)
-            return;
-
-        matchFlagsHash = nextHash;
-    }
-
-    public static void NotifyUnitCellChanged(UnitManager unit, Vector3Int previousCell, Vector3Int nextCell)
-    {
-        if (!Application.isPlaying || unit == null)
-            return;
-
-        previousCell.z = 0;
-        nextCell.z = 0;
-        if (previousCell == nextCell)
-            return;
-
-        IncrementGlobalBoard();
-        IncrementTeamObserver(unit.TeamId);
-    }
-
-    public static void NotifyUnitLayerChanged(UnitManager unit, Domain previousDomain, HeightLevel previousHeight, Domain nextDomain, HeightLevel nextHeight)
-    {
-        if (!Application.isPlaying || unit == null)
-            return;
-        if (previousDomain == nextDomain && previousHeight == nextHeight)
-            return;
-
-        IncrementGlobalBoard();
-        IncrementTeamObserver(unit.TeamId);
-    }
-
-    public static void NotifyUnitEmbarkStateChanged(UnitManager unit, bool previousEmbarked, bool nextEmbarked)
-    {
-        if (!Application.isPlaying || unit == null)
-            return;
-        if (previousEmbarked == nextEmbarked)
-            return;
-
-        IncrementGlobalBoard();
-        IncrementTeamObserver(unit.TeamId);
-    }
-
-    public static void NotifyUnitTeamChanged(TeamId previousTeam, TeamId nextTeam)
-    {
-        if (!Application.isPlaying)
-            return;
-        if (previousTeam == nextTeam)
-            return;
-
-        IncrementGlobalBoard();
-        IncrementTeamObserver(previousTeam);
-        IncrementTeamObserver(nextTeam);
-    }
-
-    public static void NotifyUnitDisabled(UnitManager unit, TeamId teamId, bool isEmbarked)
-    {
-        if (!Application.isPlaying || unit == null)
-            return;
-
-        IncrementGlobalBoard();
-        IncrementTeamObserver(teamId);
-    }
-
-    public static void NotifyUnitDataApplied(UnitManager unit)
-    {
-        if (!Application.isPlaying || unit == null)
-            return;
-
-        IncrementTeamObserver(unit.TeamId);
-    }
-
-    public static void NotifyConstructionCellChanged(ConstructionManager construction, Vector3Int previousCell, Vector3Int nextCell)
-    {
-        if (!Application.isPlaying || construction == null)
-            return;
-
-        previousCell.z = 0;
-        nextCell.z = 0;
-        if (previousCell == nextCell)
-            return;
-
-        IncrementGlobalBoard();
-    }
-
-    public static void NotifyConstructionTeamChanged(TeamId previousTeam, TeamId nextTeam)
-    {
-        if (!Application.isPlaying)
-            return;
-        if (previousTeam == nextTeam)
-            return;
-
-        IncrementGlobalBoard();
-    }
-
-    private static void IncrementGlobalBoard()
-    {
-        if (globalBoardRevision == int.MaxValue)
-            globalBoardRevision = 1;
-        else
-            globalBoardRevision++;
-    }
-
-    private static void IncrementTeamObserver(TeamId teamId)
-    {
-        IncrementTeamObserver((int)teamId);
-    }
-
-    private static void IncrementTeamObserver(int teamId)
-    {
-        if (teamId < TeamIdMin || teamId > TeamIdMax)
-            return;
-
-        if (teamObserverRevision[teamId] == int.MaxValue)
-            teamObserverRevision[teamId] = 1;
-        else
-            teamObserverRevision[teamId]++;
-    }
-
-    private static int BuildFlagsHash(bool enableLdt, bool enableLos, bool enableSpotter)
-    {
-        int hash = 17;
-        hash = hash * 31 + (enableLdt ? 1 : 0);
-        hash = hash * 31 + (enableLos ? 1 : 0);
-        hash = hash * 31 + (enableSpotter ? 1 : 0);
-        return hash;
-    }
 }

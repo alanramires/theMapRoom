@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: "Caixas de Muni\xE7\xE3o"
   m_EditorClassIdentifier: Assembly-CSharp::SupplyData
   id: caixaMunicao
-  displayName: "Caixas de Muni\xE7\xE3o"
+  displayName: "cx. Muni\xE7\xE3o"
   description: "usado para recuperar Ataques de Esquadr\xE3o / Muni\xE7\xE3o por
     arma"
   spriteDefault: {fileID: 21300000, guid: e3ede48e128f1554ca30a49b9223a6b5, type: 3}

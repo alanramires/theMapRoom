@@ -8,6 +8,20 @@ public enum WeaponTrajectoryType
     Parabolic = 1
 }
 
+[System.Serializable]
+public class WeaponForcedLayerAfterHit
+{
+    [Tooltip("Dominio forcado no alvo quando este efeito acerta.")]
+    public Domain domain = Domain.Land;
+
+    [Tooltip("Altura forcada no alvo quando este efeito acerta.")]
+    public HeightLevel heightLevel = HeightLevel.Surface;
+
+    [Min(1)]
+    [Tooltip("Duracao do lock de camada em turnos do alvo.")]
+    public int turns = 2;
+}
+
 [CreateAssetMenu(menuName = "Game/Weapons/Weapon Data", fileName = "WeaponData_")]
 public class WeaponData : ScriptableObject
 {
@@ -33,6 +47,10 @@ public class WeaponData : ScriptableObject
     [FormerlySerializedAs("additionalLayerModes")]
     [Tooltip("Dominios/alturas adicionais onde a arma pode operar.")]
     public List<WeaponLayerMode> aditionalDomainsAllowed = new List<WeaponLayerMode>();
+
+    [Header("Layer Force After Hit")]
+    [Tooltip("Forca o alvo a ir para um dominio/altura apos acerto e bloqueia retorno por alguns turnos.")]
+    public List<WeaponForcedLayerAfterHit> forceOpponentToGoToDomainAfterHit = new List<WeaponForcedLayerAfterHit>();
 
     [Header("Combat")]
     [Tooltip("Ataque base da arma (antes de modificadores).")]
@@ -84,6 +102,15 @@ public class WeaponData : ScriptableObject
             operationRangeMax = 0;
         if (operationRangeMax < operationRangeMin)
             operationRangeMax = operationRangeMin;
+        if (forceOpponentToGoToDomainAfterHit == null)
+            forceOpponentToGoToDomainAfterHit = new List<WeaponForcedLayerAfterHit>();
+        for (int i = 0; i < forceOpponentToGoToDomainAfterHit.Count; i++)
+        {
+            WeaponForcedLayerAfterHit entry = forceOpponentToGoToDomainAfterHit[i];
+            if (entry == null)
+                continue;
+            entry.turns = Mathf.Max(1, entry.turns);
+        }
         EnsureDefaultTrajectory();
         fireSfxVolume = Mathf.Clamp01(fireSfxVolume);
         projectileScale = Mathf.Clamp(projectileScale, 0.05f, 3f);

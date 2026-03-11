@@ -12,6 +12,8 @@ public class PodeMirarInvalidOption
     public const string ReasonIdLosBlocked = "aim.invalid.los_blocked";
     public const string ReasonIdNoForwardObserver = "aim.invalid.no_forward_observer";
     public const string ReasonIdStealth = "aim.invalid.stealth";
+    public const string ReasonIdAttackerLayerBlocked = "aim.invalid.attacker_layer_blocked";
+    public const string ReasonIdAttackerBlockedAt = "aim.invalid.attacker_blocked_at";
 
     [Tooltip("Unidade atacante (origem da acao).")]
     public UnitManager attackerUnit;

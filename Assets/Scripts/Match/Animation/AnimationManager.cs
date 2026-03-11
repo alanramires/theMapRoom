@@ -176,6 +176,13 @@ public class AnimationManager : MonoBehaviour
     [SerializeField, HideInInspector] private bool explosionSortingLayerInitialized;
     [SerializeField] private int explosionSortingOrder = 145;
     [SerializeField] [Range(0.2f, 4f)] private float explosionScale = 1f;
+    [Header("Fuel Death Sequence")]
+    [Tooltip("Pausa antes de iniciar a fila de quedas por falta de combustivel.")]
+    [SerializeField] [Range(0f, 2f)] private float turnStartFuelDeathInitialDelay = 0.20f;
+    [Tooltip("Pausa apos mover o cursor para o alvo, para a camera acompanhar antes da explosao.")]
+    [SerializeField] [Range(0f, 2f)] private float turnStartFuelDeathCursorFocusDelay = 0.20f;
+    [Tooltip("Pausa entre explosoes consecutivas na fila de falta de combustivel.")]
+    [SerializeField] [Range(0f, 2f)] private float turnStartFuelDeathBetweenKillsDelay = 0.15f;
     [Header("Combat Projectile FX")]
     [Tooltip("Velocidade base do projetil (units/s).")]
     [SerializeField] [Range(0.5f, 20f)] private float combatProjectileSpeed = 9f;
@@ -246,6 +253,9 @@ public class AnimationManager : MonoBehaviour
     public bool IsAnimatingMovement => movementRoutine != null;
     public float CombatCounterShotDelay => Mathf.Clamp(combatCounterShotDelay, 0f, 1f);
     public float CombatDeathStartDelay => Mathf.Clamp(combatDeathStartDelay, 0f, 2f);
+    public float TurnStartFuelDeathInitialDelay => Mathf.Clamp(turnStartFuelDeathInitialDelay, 0f, 2f);
+    public float TurnStartFuelDeathCursorFocusDelay => Mathf.Clamp(turnStartFuelDeathCursorFocusDelay, 0f, 2f);
+    public float TurnStartFuelDeathBetweenKillsDelay => Mathf.Clamp(turnStartFuelDeathBetweenKillsDelay, 0f, 2f);
     public Material MirandoPreviewMaterial => mirandoPreviewMaterial;
     public Color MirandoPreviewColor => mirandoPreviewColor;
     public float MirandoPreviewWidth => Mathf.Clamp(mirandoPreviewWidth, 0.03f, 0.4f);

@@ -58,6 +58,38 @@ public partial class TurnStateManager
             return new CombatResolutionResult(false, false, false, false, attacker, defender, 0, 0, trace.ToString());
         }
 
+        if (defender.IsEmbarked)
+        {
+            trace.AppendLine("1) Falha: defensor embarcado nao pode ser alvejado diretamente.");
+            return new CombatResolutionResult(
+                false,
+                false,
+                false,
+                false,
+                attacker,
+                defender,
+                Mathf.Max(0, attacker.CurrentHP),
+                Mathf.Max(0, defender.CurrentHP),
+                trace.ToString());
+        }
+
+        if (attacker.TryGetUnitData(out UnitData attackerData) &&
+            attackerData != null &&
+            attackerData.IsWeaponUseBlockedAt(attacker.GetDomain(), attacker.GetHeightLevel()))
+        {
+            trace.AppendLine("1) Falha: camada atual do atacante bloqueia uso de armas.");
+            return new CombatResolutionResult(
+                false,
+                false,
+                false,
+                false,
+                attacker,
+                defender,
+                Mathf.Max(0, attacker.CurrentHP),
+                Mathf.Max(0, defender.CurrentHP),
+                trace.ToString());
+        }
+
         string attackWeaponName = ResolveWeaponName(option.weapon, "arma");
         string counterWeaponName = ResolveWeaponName(option.defenderCounterWeapon, "-");
         int attackerHpBefore = Mathf.Max(0, attacker.CurrentHP);
@@ -101,8 +133,16 @@ public partial class TurnStateManager
 
         bool defenderConsumed = false;
         string counterReason = option.defenderCounterReason;
+        bool defenderCounterBlockedByEmbarked = defender.IsEmbarked;
+        bool defenderCounterBlockedByLayer =
+            defender.TryGetUnitData(out UnitData defenderData) &&
+            defenderData != null &&
+            defenderData.IsWeaponUseBlockedAt(defender.GetDomain(), defender.GetHeightLevel());
         trace.AppendLine("4) Revide");
-        if (option.defenderCanCounterAttack && option.defenderCounterEmbarkedWeaponIndex >= 0)
+        if (option.defenderCanCounterAttack &&
+            option.defenderCounterEmbarkedWeaponIndex >= 0 &&
+            !defenderCounterBlockedByEmbarked &&
+            !defenderCounterBlockedByLayer)
         {
             defenderConsumed = defender.TryConsumeEmbarkedWeaponAmmo(option.defenderCounterEmbarkedWeaponIndex, 1);
             trace.AppendLine($"- Arma revide: {counterWeaponName}");
@@ -111,11 +151,20 @@ public partial class TurnStateManager
         }
         else
         {
+            if (defenderCounterBlockedByEmbarked)
+                counterReason = "Defensor embarcado nao pode revidar.";
+            else if (defenderCounterBlockedByLayer)
+                counterReason = $"{defender.name} nao atira quando em {defender.GetDomain()}/{defender.GetHeightLevel()}";
+
             trace.AppendLine("- Sem revide.");
             trace.AppendLine($"- Motivo: {SafeText(counterReason)}");
         }
 
-        bool counterExecuted = option.defenderCanCounterAttack && defenderConsumed;
+        bool counterExecuted =
+            option.defenderCanCounterAttack &&
+            !defenderCounterBlockedByEmbarked &&
+            !defenderCounterBlockedByLayer &&
+            defenderConsumed;
         GameUnitClass attackerClass = ResolveUnitClass(attacker);
         GameUnitClass defenderClass = ResolveUnitClass(defender);
         int attackerEliteLevel = ResolveEliteLevel(attacker);
@@ -135,6 +184,16 @@ public partial class TurnStateManager
         RpsBonusInfo defenderAttackRps = counterExecuted
             ? ResolveAttackRps(defenderClass, defenderWeaponCategory, attackerClass)
             : RpsBonusInfo.None;
+        bool defenderIsGroundedAircraft = IsGroundedAircraft(defender);
+        bool attackerIsGroundedAircraft = IsGroundedAircraft(attacker);
+        int attackerAttackRpsBaseValue = attackerAttackRps.value;
+        int defenderAttackRpsBaseValue = defenderAttackRps.value;
+        int attackerAttackRpsAppliedValue = defenderIsGroundedAircraft
+            ? Mathf.Max(0, attackerAttackRpsBaseValue)
+            : attackerAttackRpsBaseValue;
+        int defenderAttackRpsAppliedValue = counterExecuted && attackerIsGroundedAircraft
+            ? Mathf.Max(0, defenderAttackRpsBaseValue)
+            : defenderAttackRpsBaseValue;
         WeaponCategory defenderWeaponCategoryForSkill = counterExecuted ? defenderWeaponCategory : attackerWeaponCategory;
         SkillRpsBonusInfo attackerSkillRps = ResolveSkillRps(
             attacker,
@@ -159,8 +218,8 @@ public partial class TurnStateManager
         int attackerDefenseSkillTotal = attackerSkillRps.ownerDefenseValue + defenderSkillRps.opponentDefenseValue;
         int defenderDefenseSkillTotal = defenderDefenseSkillRps.ownerDefenseValue + attackerSkillRps.opponentDefenseValue;
 
-        int attackerTotalAttackRps = attackerAttackRps.value + attackerAttackSkillTotal;
-        int defenderTotalAttackRps = defenderAttackRps.value + defenderAttackSkillTotal;
+        int attackerTotalAttackRps = attackerAttackRpsAppliedValue + attackerAttackSkillTotal;
+        int defenderTotalAttackRps = defenderAttackRpsAppliedValue + defenderAttackSkillTotal;
 
         int attackerAttackTermRaw = attackerWeaponPower + attackerTotalAttackRps;
         int attackerAttackTermApplied = Mathf.Max(1, attackerAttackTermRaw); // Disparo valido: piso de FA = 1.
@@ -175,8 +234,12 @@ public partial class TurnStateManager
             : 0;
 
         trace.AppendLine("5) Forca de ataque efetiva");
-        trace.AppendLine($"- Atacante: HP({attackerHpBefore}) x max(1, Arma({attackerWeaponPower}) + RPSAtaqueBase({FormatSigned(attackerAttackRps.value)}) + EliteSkillAtaqueProprio({FormatSigned(attackerSkillRps.ownerAttackValue)}) + EliteSkillAtaqueRecebido({FormatSigned(defenderSkillRps.opponentAttackValue)})) = {attackerAttackEffective} (termo bruto={attackerAttackTermRaw}, aplicado={attackerAttackTermApplied})");
-        trace.AppendLine($"- Defensor: HP({defenderHpBefore}) x {(counterExecuted ? "max(1, " : string.Empty)}Arma({defenderWeaponPower}) + RPSAtaqueBase({FormatSigned(defenderAttackRps.value)}) + EliteSkillAtaqueProprio({FormatSigned(defenderSkillRps.ownerAttackValue)}) + EliteSkillAtaqueRecebido({FormatSigned(attackerSkillRps.opponentAttackValue)}){(counterExecuted ? ")" : string.Empty)} = {defenderAttackEffective} (termo bruto={defenderAttackTermRaw}, aplicado={defenderAttackTermApplied})");
+        trace.AppendLine($"- Atacante: HP({attackerHpBefore}) x max(1, Arma({attackerWeaponPower}) + RPSAtaqueBase({FormatSigned(attackerAttackRpsAppliedValue)}) + EliteSkillAtaqueProprio({FormatSigned(attackerSkillRps.ownerAttackValue)}) + EliteSkillAtaqueRecebido({FormatSigned(defenderSkillRps.opponentAttackValue)})) = {attackerAttackEffective} (termo bruto={attackerAttackTermRaw}, aplicado={attackerAttackTermApplied})");
+        trace.AppendLine($"- Defensor: HP({defenderHpBefore}) x {(counterExecuted ? "max(1, " : string.Empty)}Arma({defenderWeaponPower}) + RPSAtaqueBase({FormatSigned(defenderAttackRpsAppliedValue)}) + EliteSkillAtaqueProprio({FormatSigned(defenderSkillRps.ownerAttackValue)}) + EliteSkillAtaqueRecebido({FormatSigned(attackerSkillRps.opponentAttackValue)}){(counterExecuted ? ")" : string.Empty)} = {defenderAttackEffective} (termo bruto={defenderAttackTermRaw}, aplicado={defenderAttackTermApplied})");
+        if (defenderIsGroundedAircraft && attackerAttackRpsAppliedValue != attackerAttackRpsBaseValue)
+            trace.AppendLine($"- Regra grounded aplicada no ataque: RPS atacante {FormatSigned(attackerAttackRpsBaseValue)} -> {FormatSigned(attackerAttackRpsAppliedValue)}.");
+        if (counterExecuted && attackerIsGroundedAircraft && defenderAttackRpsAppliedValue != defenderAttackRpsBaseValue)
+            trace.AppendLine($"- Regra grounded aplicada no revide: RPS defensor {FormatSigned(defenderAttackRpsBaseValue)} -> {FormatSigned(defenderAttackRpsAppliedValue)}.");
         trace.AppendLine($"- Detalhe RPS ataque atacante: {attackerAttackRps.summary}");
         trace.AppendLine($"- Detalhe RPS ataque defensor: {defenderAttackRps.summary}");
         trace.AppendLine($"- ELITE SKILL ataque atacante: proprio={FormatSigned(attackerSkillRps.ownerAttackValue)} | recebido={FormatSigned(defenderSkillRps.opponentAttackValue)} | total={FormatSigned(attackerAttackSkillTotal)}");
@@ -345,6 +408,14 @@ public partial class TurnStateManager
         }
 
         return RpsBonusInfo.NoneWithReason("sem match");
+    }
+
+    private static bool IsGroundedAircraft(UnitManager unit)
+    {
+        if (unit == null || !unit.IsAircraftGrounded)
+            return false;
+
+        return unit.TryGetUnitData(out UnitData data) && data != null && data.IsAircraft();
     }
 
     private RpsBonusInfo ResolveDefenseRps(GameUnitClass defenderClass, GameUnitClass attackerClass, WeaponCategory category)

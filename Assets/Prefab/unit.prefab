@@ -405,6 +405,10 @@ MonoBehaviour:
   preferredAirHeightRuntime: 4
   useExplicitPreferredNavalHeightRuntime: 0
   preferredNavalHeightRuntime: 2
+  hasForcedLayerLock: 0
+  forcedLayerLockDomain: 0
+  forcedLayerLockHeight: 3
+  forcedLayerLockTurnsRemaining: 0
   transportedUnitSlots: []
   embarkedTransporter: {fileID: 0}
   embarkedTransporterSlotIndex: -1

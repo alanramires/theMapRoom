@@ -48,6 +48,21 @@ public static class AircraftOperationRules
         if (!HasAirOperationProfile(unit, data))
             return Unavailable("Unidade sem perfil de operacao aerea.");
 
+        if (unit.TryGetForcedLayerLock(out Domain lockDomain, out HeightLevel lockHeight, out int lockTurns))
+        {
+            string lockReason = PanelDialogController.ResolveDialogMessage(
+                "layer.locked.by.weapon",
+                "Camada travada em <domain>/<height> por <turns> turno(s).",
+                new System.Collections.Generic.Dictionary<string, string>
+                {
+                    { "unit", !string.IsNullOrWhiteSpace(unit.UnitDisplayName) ? unit.UnitDisplayName : unit.name },
+                    { "domain", lockDomain.ToString() },
+                    { "height", lockHeight.ToString() },
+                    { "turns", lockTurns.ToString() }
+                });
+            return Unavailable(lockReason);
+        }
+
         if (unit.AircraftOperationLockTurns > 0)
             return Unavailable("Aeronave em recuperacao operacional.");
 

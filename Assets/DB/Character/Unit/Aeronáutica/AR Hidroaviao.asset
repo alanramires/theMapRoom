@@ -26,6 +26,9 @@ MonoBehaviour:
   armorClass: 0
   movement: 4
   visao: 3
+  visionSpecializations: []
+  stealthRevealScope: 0
+  stealthVisibleIfDetectedForTurns: 1
   movementCategory: 0
   militaryForce: 1
   unitClass: 6
@@ -55,8 +58,10 @@ MonoBehaviour:
   skills:
   - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
   - {fileID: 11400000, guid: e6032267446372a4b9de350d17b18418, type: 2}
+  stealthSkills: []
   autonomyData: {fileID: 11400000, guid: 86f5ee654cae4d8ca9adadca74d0d9b8, type: 2}
   embarkedWeapons: []
+  cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0
@@ -107,4 +112,4 @@ MonoBehaviour:
     requiredSkills: []
     blockedSkills: []
   autonomia: 50
-  cost: 3000
+  cost: 2000

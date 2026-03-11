@@ -1231,6 +1231,13 @@ public partial class TurnStateManager
             if (mode.domain == currentDomain && mode.heightLevel == currentHeight)
                 continue;
 
+            if (unit.IsLayerChangeBlockedByForcedLock(mode.domain, mode.heightLevel, out string forcedLockReason))
+            {
+                if (string.IsNullOrWhiteSpace(unavailableReason))
+                    unavailableReason = forcedLockReason;
+                continue;
+            }
+
             if (!CanUseLayerModeAtCurrentCell(unit, boardMap, terrainDatabase, unitCell, mode.domain, mode.heightLevel, out string blockReason))
             {
                 if (string.IsNullOrWhiteSpace(unavailableReason))
@@ -1272,7 +1279,8 @@ public partial class TurnStateManager
         if (output.Count > 0)
             return true;
 
-        unavailableReason = "Sem transicoes disponiveis para a camada atual.";
+        if (string.IsNullOrWhiteSpace(unavailableReason))
+            unavailableReason = "Sem transicoes disponiveis para a camada atual.";
         return false;
     }
 
@@ -2237,7 +2245,27 @@ public partial class TurnStateManager
         string id = invalidOption != null && !string.IsNullOrWhiteSpace(invalidOption.reasonId)
             ? invalidOption.reasonId
             : PodeMirarInvalidOption.ReasonIdGeneric;
-        return PanelDialogController.ResolveDialogMessage(id, fallback);
+
+        string unitName = string.Empty;
+        string domainName = string.Empty;
+        string heightName = string.Empty;
+        UnitManager attacker = invalidOption != null ? invalidOption.attackerUnit : null;
+        if (attacker != null)
+        {
+            unitName = ResolveUnitRuntimeName(attacker);
+            domainName = attacker.GetDomain().ToString();
+            heightName = attacker.GetHeightLevel().ToString();
+        }
+
+        return PanelDialogController.ResolveDialogMessage(
+            id,
+            fallback,
+            new Dictionary<string, string>
+            {
+                { "unit", unitName },
+                { "domain", domainName },
+                { "height", heightName }
+            });
     }
 
     private bool TryConfirmScannerAttack()
@@ -2346,7 +2374,11 @@ public partial class TurnStateManager
         if (waitDuration > 0f)
             yield return new WaitForSeconds(waitDuration);
 
+        int defenderHpBeforeResolution = defender != null ? Mathf.Max(0, defender.CurrentHP) : 0;
+        int attackerHpBeforeResolution = attacker != null ? Mathf.Max(0, attacker.CurrentHP) : 0;
+
         yield return ExecuteCombatProjectileExchange(option, attackerTrajectory, combat.counterExecuted);
+        ApplyPostHitForcedLayerEffects(option, combat, attackerHpBeforeResolution, defenderHpBeforeResolution);
         ApplyPendingCombatHp(combat);
         yield return ExecuteDeathResolutionIfNeeded(combat);
 
@@ -2478,6 +2510,83 @@ public partial class TurnStateManager
             int attackerHpAfter = Mathf.Max(0, combat.attackerHpAfter);
             combat.attackerUnit.SetCurrentHP(attackerHpAfter);
             ApplyEmbarkedCascadeFromDirectHit(combat.attackerUnit, attackerHpBefore, attackerHpAfter);
+        }
+    }
+
+    private void ApplyPostHitForcedLayerEffects(
+        PodeMirarTargetOption option,
+        CombatResolutionResult combat,
+        int attackerHpBeforeResolution,
+        int defenderHpBeforeResolution)
+    {
+        if (!combat.success || option == null)
+            return;
+
+        UnitManager defender = combat.defenderUnit;
+        if (defender != null &&
+            combat.defenderHpAfter > 0 &&
+            combat.defenderHpAfter < Mathf.Max(0, defenderHpBeforeResolution))
+        {
+            TryApplyForcedLayerEffectFromWeapon(defender, option.weapon);
+        }
+
+        UnitManager attacker = combat.attackerUnit;
+        if (combat.counterExecuted &&
+            attacker != null &&
+            combat.attackerHpAfter > 0 &&
+            combat.attackerHpAfter < Mathf.Max(0, attackerHpBeforeResolution))
+        {
+            TryApplyForcedLayerEffectFromWeapon(attacker, option.defenderCounterWeapon);
+        }
+    }
+
+    private void TryApplyForcedLayerEffectFromWeapon(UnitManager target, WeaponData weapon)
+    {
+        if (target == null || weapon == null || target.IsEmbarked)
+            return;
+
+        if (weapon.forceOpponentToGoToDomainAfterHit == null || weapon.forceOpponentToGoToDomainAfterHit.Count <= 0)
+            return;
+
+        for (int i = 0; i < weapon.forceOpponentToGoToDomainAfterHit.Count; i++)
+        {
+            WeaponForcedLayerAfterHit effect = weapon.forceOpponentToGoToDomainAfterHit[i];
+            if (effect == null)
+                continue;
+
+            Domain forcedDomain = effect.domain;
+            HeightLevel forcedHeight = effect.heightLevel;
+            int turns = Mathf.Max(1, effect.turns);
+            if (!target.SupportsLayerMode(forcedDomain, forcedHeight))
+                continue;
+
+            bool hadPreviousLock = target.TryGetForcedLayerLock(out Domain previousDomain, out HeightLevel previousHeight, out int previousTurns);
+            target.ClearForcedLayerLock();
+
+            bool moved = target.GetDomain() == forcedDomain && target.GetHeightLevel() == forcedHeight;
+            if (!moved)
+                moved = target.TrySetCurrentLayerMode(forcedDomain, forcedHeight);
+
+            if (!moved)
+            {
+                if (hadPreviousLock)
+                    target.SetForcedLayerLock(previousDomain, previousHeight, previousTurns);
+                continue;
+            }
+
+            target.SetForcedLayerLock(forcedDomain, forcedHeight, turns);
+            string forcedMessage = PanelDialogController.ResolveDialogMessage(
+                "layer.forced.after_hit",
+                "<unit> forcada para <domain>/<height> (<turns> turnos).",
+                new Dictionary<string, string>
+                {
+                    { "unit", ResolveDebugUnitName(target) },
+                    { "domain", forcedDomain.ToString() },
+                    { "height", forcedHeight.ToString() },
+                    { "turns", turns.ToString() }
+                });
+            PushPanelUnitMessage(forcedMessage, 2.6f);
+            return;
         }
     }
 
@@ -2619,7 +2728,12 @@ public partial class TurnStateManager
         }
     }
 
-    private IEnumerator ExecuteUnitDeathPresentation(UnitManager unit, Vector3Int focusCell, Vector3 worldPos, bool applyStartDelay)
+    private IEnumerator ExecuteUnitDeathPresentation(
+        UnitManager unit,
+        Vector3Int focusCell,
+        Vector3 worldPos,
+        bool applyStartDelay,
+        bool moveCursorFirst = true)
     {
         if (unit == null || !unit.gameObject.activeInHierarchy)
             yield break;
@@ -2631,10 +2745,10 @@ public partial class TurnStateManager
                 yield return new WaitForSeconds(deathStartDelay);
         }
 
-        if (cursorController != null)
+        if (moveCursorFirst && cursorController != null)
         {
             focusCell.z = 0;
-            cursorController.SetCell(focusCell, playMoveSfx: true);
+            cursorController.SetCell(focusCell, playMoveSfx: true, adjustCamera: true);
         }
 
         SpriteRenderer[] renderers = CollectDeathBlinkRenderers(unit);

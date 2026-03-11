@@ -398,6 +398,11 @@ public static class PodeSuprirSensor
                     reason = $"Alvo submerso pode emergir, mas o hex atual nao aceita Naval/Surface ({surfaceReason}).";
                     return false;
                 }
+                if (target.IsLayerChangeBlockedByForcedLock(Domain.Naval, HeightLevel.Surface, out string lockReason))
+                {
+                    reason = lockReason;
+                    return false;
+                }
 
                 forceSurfaceBeforeSupply = true;
                 plannedServiceDomain = Domain.Naval;
@@ -423,15 +428,20 @@ public static class PodeSuprirSensor
                 useManualRemainingMovement: false,
                 manualRemainingMovement: 0);
 
-            if (landing != null && landing.status)
-            {
-                Vector3Int targetCell = target.CurrentCellPosition;
-                targetCell.z = 0;
-                if (!CanUseLayerModeAtCurrentCellForSupply(
-                        target,
-                        boardMap,
-                        terrainDatabase,
-                        targetCell,
+                if (landing != null && landing.status)
+                {
+                    Vector3Int targetCell = target.CurrentCellPosition;
+                    targetCell.z = 0;
+                    if (target.IsLayerChangeBlockedByForcedLock(supplier.GetDomain(), supplier.GetHeightLevel(), out string lockReason))
+                    {
+                        reason = lockReason;
+                        return false;
+                    }
+                    if (!CanUseLayerModeAtCurrentCellForSupply(
+                            target,
+                            boardMap,
+                            terrainDatabase,
+                            targetCell,
                         supplier.GetDomain(),
                         supplier.GetHeightLevel(),
                         out string landingLayerReason))
@@ -459,6 +469,11 @@ public static class PodeSuprirSensor
                 {
                     Vector3Int targetCell = target.CurrentCellPosition;
                     targetCell.z = 0;
+                    if (target.IsLayerChangeBlockedByForcedLock(Domain.Air, takeoffHeight, out string lockReason))
+                    {
+                        reason = lockReason;
+                        return false;
+                    }
                     if (!CanUseLayerModeAtCurrentCellForSupply(
                             target,
                             boardMap,

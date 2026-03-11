@@ -383,6 +383,11 @@ public partial class TurnStateManager
         blockReason = string.Empty;
         if (selectedUnit == null || !selectedUnit.IsAircraftGrounded)
             return true;
+        if (selectedUnit.CurrentFuel <= 0)
+        {
+            blockReason = "Autonomia insuficiente para decolagem.";
+            return false;
+        }
         if (hasTemporaryTakeoffSelectionState &&
             (temporaryTakeoffMoveOptions.Contains(0) || temporaryTakeoffMoveOptions.Contains(1)))
             return true;

@@ -81,6 +81,12 @@ public static class PodeDecolarSensor
             return report;
         }
 
+        if (selectedUnit.CurrentFuel <= 0)
+        {
+            report.explicacao = "Autonomia insuficiente para decolagem.";
+            return report;
+        }
+
         AircraftOperationDecision decision = AircraftOperationRules.Evaluate(
             selectedUnit,
             map,

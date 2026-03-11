@@ -115,6 +115,9 @@ public class UnitData : ScriptableObject
     [Header("Embarked Weapons")]
     [Tooltip("Armas embarcadas na unidade. A ordem da lista define prioridade (primaria, secundaria...). Pode ficar vazia para unidades desarmadas.")]
     public List<UnitEmbarkedWeapon> embarkedWeapons = new List<UnitEmbarkedWeapon>();
+    [Header("Weapon Restrictions")]
+    [Tooltip("Bloqueia o uso de armas quando a unidade estiver nestes dominios/alturas (ex.: cacas pousados em Land/Surface).")]
+    public List<WeaponLayerMode> cantUseWeaponsOnTheFollowDomain = new List<WeaponLayerMode>();
 
     [Header("Logistics")]
     public bool isSupplier = false;
@@ -176,6 +179,8 @@ public class UnitData : ScriptableObject
 
         if (embarkedWeapons == null)
             embarkedWeapons = new List<UnitEmbarkedWeapon>();
+        if (cantUseWeaponsOnTheFollowDomain == null)
+            cantUseWeaponsOnTheFollowDomain = new List<WeaponLayerMode>();
         if (supplierOperationDomains == null)
             supplierOperationDomains = new List<SupplierOperationDomain>();
         if (supplierServicesProvided == null)
@@ -264,6 +269,21 @@ public class UnitData : ScriptableObject
         return unitClass == GameUnitClass.Jet ||
                unitClass == GameUnitClass.Plane ||
                unitClass == GameUnitClass.Helicopter;
+    }
+
+    public bool IsWeaponUseBlockedAt(Domain currentDomain, HeightLevel currentHeightLevel)
+    {
+        if (cantUseWeaponsOnTheFollowDomain == null || cantUseWeaponsOnTheFollowDomain.Count <= 0)
+            return false;
+
+        for (int i = 0; i < cantUseWeaponsOnTheFollowDomain.Count; i++)
+        {
+            WeaponLayerMode blocked = cantUseWeaponsOnTheFollowDomain[i];
+            if (blocked.domain == currentDomain && blocked.heightLevel == currentHeightLevel)
+                return true;
+        }
+
+        return false;
     }
 
     public int ResolveVisionFor(Domain targetDomain, HeightLevel targetHeightLevel)
