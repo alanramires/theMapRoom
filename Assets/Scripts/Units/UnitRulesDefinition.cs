@@ -11,6 +11,11 @@ public static class UnitRulesDefinition
         return UnitOccupancyRules.IsUnitCellOccupied(referenceTilemap, cell, exceptUnit);
     }
 
+    public static bool IsUnitCellOccupiedForTeam(Tilemap referenceTilemap, Vector3Int cell, TeamId teamId, UnitManager exceptUnit = null)
+    {
+        return UnitOccupancyRules.IsUnitCellOccupiedForTeam(referenceTilemap, cell, teamId, exceptUnit);
+    }
+
     public static UnitManager GetUnitAtCell(Tilemap referenceTilemap, Vector3Int cell, UnitManager exceptUnit = null)
     {
         return UnitOccupancyRules.GetUnitAtCell(referenceTilemap, cell, exceptUnit);
@@ -32,6 +37,13 @@ public static class UnitRulesDefinition
         if (moverDomain != blockerDomain || moverHeight != blockerHeight)
             return true;
 
+        if (IsTotalWarEnabled())
+        {
+            // Total War: mesma camada permite coexistencia entre times diferentes,
+            // mas bloqueia empilhar duas unidades do mesmo time.
+            return mover.TeamId != blocker.TeamId;
+        }
+
         // Mesma camada: aliado atravessa; inimigo fica bloqueado por enquanto.
         return mover.TeamId == blocker.TeamId;
     }
@@ -51,5 +63,11 @@ public static class UnitRulesDefinition
         }
 
         return false;
+    }
+
+    public static bool IsTotalWarEnabled()
+    {
+        MatchController matchController = Object.FindAnyObjectByType<MatchController>();
+        return matchController != null && matchController.EnableTotalWar;
     }
 }

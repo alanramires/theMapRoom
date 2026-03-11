@@ -62,6 +62,7 @@ public class UnitHudController : MonoBehaviour
     [SerializeField] private Sprite altitudeLowSprite;
     [SerializeField] private Sprite altitudeSubmergedSprite;
     [SerializeField] private Transform transportIndicatorRoot;
+    [SerializeField] private Transform detectedIndicatorRoot;
 
     [Header("Sorting")]
     [SerializeField] private bool applyHudSorting = true;
@@ -114,7 +115,8 @@ public class UnitHudController : MonoBehaviour
         Color teamColor,
         Domain domain,
         HeightLevel heightLevel,
-        bool showTransportIndicator)
+        bool showTransportIndicator,
+        bool showDetectedIndicator)
     {
         if (altitudeImage == null && altitudeRenderer == null)
             AutoAssignCommonReferences();
@@ -125,6 +127,7 @@ public class UnitHudController : MonoBehaviour
         RefreshWeaponAmmoVisuals();
         RefreshAltitude(domain, heightLevel);
         RefreshTransportIndicator(showTransportIndicator);
+        RefreshDetectedIndicator(showDetectedIndicator);
     }
 
     private static void RefreshPips(PipGroup group, int current, int max, Color teamColor)
@@ -377,6 +380,9 @@ public class UnitHudController : MonoBehaviour
                 transportIndicatorRoot = FindChildRecursive(transform, "transport");
         }
 
+        if (detectedIndicatorRoot == null)
+            detectedIndicatorRoot = FindChildRecursive(transform, "detected");
+
         if (altitudeHighSprite == null)
             altitudeHighSprite = FindSpriteByName("high altitude");
         if (altitudeLowSprite == null)
@@ -560,6 +566,23 @@ public class UnitHudController : MonoBehaviour
 
         if (transportIndicatorRoot.gameObject.activeSelf != show)
             transportIndicatorRoot.gameObject.SetActive(show);
+    }
+
+    private void RefreshDetectedIndicator(bool show)
+    {
+        if (detectedIndicatorRoot == null)
+            return;
+
+        if (detectedIndicatorRoot.gameObject.activeSelf != show)
+            detectedIndicatorRoot.gameObject.SetActive(show);
+    }
+
+    public void SetDetectedIndicatorVisible(bool visible)
+    {
+        if (detectedIndicatorRoot == null)
+            AutoAssignCommonReferences();
+
+        RefreshDetectedIndicator(visible);
     }
 
     private void DisableLegacyLockVisuals()

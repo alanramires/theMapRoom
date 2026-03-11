@@ -333,6 +333,17 @@ public partial class TurnStateManager
         UnitManager unit = FindUnitAtCell(cursorCell);
         if (unit != null && unit != selectedUnit)
         {
+            bool allowSharedHexByTotalWar =
+                UnitRulesDefinition.IsTotalWarEnabled() &&
+                UnitRulesDefinition.CanPassThrough(selectedUnit, unit);
+            if (allowSharedHexByTotalWar)
+            {
+                unit = null;
+            }
+        }
+
+        if (unit != null && unit != selectedUnit)
+        {
             PushPanelUnitMessage("Hex ocupado", 2.4f);
             Debug.Log("unidade selecionada, escolha um local valido para movimento");
             return ActionSfx.Error;

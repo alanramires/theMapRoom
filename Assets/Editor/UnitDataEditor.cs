@@ -14,6 +14,8 @@ public class UnitDataEditor : Editor
     private SerializedProperty supplierOperationDomainsProperty;
     private SerializedProperty supplierServicesProvidedProperty;
     private SerializedProperty supplierResourcesProperty;
+    private SerializedProperty stealthSkillRulesProperty;
+    private SerializedProperty stealthSkillsLegacyProperty;
 
     private void OnEnable()
     {
@@ -26,6 +28,8 @@ public class UnitDataEditor : Editor
         supplierOperationDomainsProperty = serializedObject.FindProperty("supplierOperationDomains");
         supplierServicesProvidedProperty = serializedObject.FindProperty("supplierServicesProvided");
         supplierResourcesProperty = serializedObject.FindProperty("supplierResources");
+        stealthSkillRulesProperty = serializedObject.FindProperty("stealthSkillRules");
+        stealthSkillsLegacyProperty = serializedObject.FindProperty("stealthSkills");
     }
 
     public override void OnInspectorGUI()
@@ -36,6 +40,7 @@ public class UnitDataEditor : Editor
         DrawTopAttributesSection();
         DrawAirPreferenceSection();
         DrawNavalPreferenceSection();
+        DrawStealthSection();
         DrawPropertiesExcluding(
             serializedObject,
             "m_Script",
@@ -51,6 +56,8 @@ public class UnitDataEditor : Editor
             "movementCategory",
             "autonomia",
             "cost",
+            "stealthSkills",
+            "stealthSkillRules",
             "useExplicitPreferredAirHeight",
             "preferredAirHeight",
             "useExplicitPreferredNavalHeight",
@@ -321,6 +328,62 @@ public class UnitDataEditor : Editor
 
         if (GUILayout.Button("Add Weapon Slot"))
             embarkedWeaponsProperty.InsertArrayElementAtIndex(embarkedWeaponsProperty.arraySize);
+    }
+
+    private void DrawStealthSection()
+    {
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Stealth Skills", EditorStyles.boldLabel);
+
+        if (stealthSkillRulesProperty != null)
+        {
+            EditorGUILayout.HelpBox(
+                "Config principal por camada. Cada elemento define: Skill + Domain + Height.",
+                MessageType.None);
+
+            for (int i = 0; i < stealthSkillRulesProperty.arraySize; i++)
+            {
+                SerializedProperty element = stealthSkillRulesProperty.GetArrayElementAtIndex(i);
+                if (element == null)
+                    continue;
+
+                SerializedProperty skillProperty = element.FindPropertyRelative("skill");
+                SerializedProperty domainProperty = element.FindPropertyRelative("domain");
+                SerializedProperty heightProperty = element.FindPropertyRelative("heightLevel");
+
+                EditorGUILayout.BeginVertical("box");
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField($"Element {i}", EditorStyles.boldLabel);
+                if (GUILayout.Button("-", GUILayout.Width(28f)))
+                {
+                    stealthSkillRulesProperty.DeleteArrayElementAtIndex(i);
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.EndVertical();
+                    break;
+                }
+                EditorGUILayout.EndHorizontal();
+
+                if (skillProperty != null)
+                    EditorGUILayout.PropertyField(skillProperty, new GUIContent("Skill"));
+                if (domainProperty != null)
+                    EditorGUILayout.PropertyField(domainProperty, new GUIContent("Domain"));
+                if (heightProperty != null)
+                    EditorGUILayout.PropertyField(heightProperty, new GUIContent("Height"));
+                EditorGUILayout.EndVertical();
+            }
+
+            if (GUILayout.Button("+ Add Stealth Skill Rule"))
+                stealthSkillRulesProperty.InsertArrayElementAtIndex(stealthSkillRulesProperty.arraySize);
+        }
+
+        if (stealthSkillsLegacyProperty != null)
+        {
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.PropertyField(
+                stealthSkillsLegacyProperty,
+                new GUIContent("Legacy Global Stealth Skills (Fallback)"),
+                includeChildren: true);
+        }
     }
 
     private static List<WeaponData> BuildCatalog(WeaponDatabase database)

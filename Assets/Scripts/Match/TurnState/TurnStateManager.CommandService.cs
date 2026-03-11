@@ -1276,7 +1276,8 @@ public partial class TurnStateManager
             TeamUtils.GetColor(supplier.TeamId),
             supplier.GetDomain(),
             supplier.GetHeightLevel(),
-            showTransportIndicator);
+            showTransportIndicator,
+            showDetectedIndicator: ResolveDetectedIndicatorForHud(supplier));
     }
 
     private static void RefreshTransporterHudAfterCommandService(HashSet<UnitManager> touchedSupplierUnits)
@@ -1313,6 +1314,19 @@ public partial class TurnStateManager
         }
 
         return false;
+    }
+
+    private static bool ResolveDetectedIndicatorForHud(UnitManager unit)
+    {
+        if (unit == null)
+            return false;
+
+        if (!unit.TryGetUnitData(out UnitData unitData) || unitData == null || !unitData.IsStealthUnit(unit.GetDomain(), unit.GetHeightLevel()))
+            return false;
+
+        MatchController controller = Object.FindAnyObjectByType<MatchController>();
+        int viewerTeamId = controller != null ? controller.ActiveTeamId : (int)unit.TeamId;
+        return PodeMirarSensor.IsStealthTargetRevealedForTeam(unit, viewerTeamId);
     }
 
     private static string BuildCommandServiceDetailedReportLog(List<CommandServiceTargetReport> rows)

@@ -137,6 +137,7 @@ public partial class TurnStateManager
     private readonly List<Vector3> mirandoPreviewSegmentPoints = new List<Vector3>();
     private readonly List<MirandoSelectionEntry> cachedMirandoSelectionEntries = new List<MirandoSelectionEntry>();
     private readonly Dictionary<SpriteRenderer, Color> mirandoInvalidTintOriginalColors = new Dictionary<SpriteRenderer, Color>();
+    private UnitManager highlightedMirandoTarget;
     private float mirandoPreviewPathLength;
     private float mirandoPreviewHeadDistance;
     private bool mirandoPreviewUseInvalidColor;
@@ -2892,6 +2893,7 @@ public partial class TurnStateManager
     {
         if (GetMirandoEntryCount() == 0)
         {
+            ClearMirandoTargetHighlight();
             SetMirandoPreviewVisible(false);
             SetMirandoSpotterPreviewsVisible(false);
             return;
@@ -2901,6 +2903,7 @@ public partial class TurnStateManager
             scannerSelectedTargetIndex = 0;
 
         MirandoSelectionEntry option = cachedMirandoSelectionEntries[scannerSelectedTargetIndex];
+        UpdateMirandoTargetHighlight(option.TargetUnit);
         if (moveCursor)
             MoveCursorToTarget(option.TargetUnit);
         RebuildMirandoPreviewPath(option);
@@ -4071,6 +4074,7 @@ public partial class TurnStateManager
 
     private void ClearMirandoPreview()
     {
+        ClearMirandoTargetHighlight();
         mirandoPreviewPathPoints.Clear();
         mirandoPreviewSegmentPoints.Clear();
         mirandoPreviewPathLength = 0f;
@@ -4081,6 +4085,28 @@ public partial class TurnStateManager
         ClearMirandoSpotterPreviewData();
         SetMirandoSpotterPreviewsVisible(false);
         RestoreMirandoInvalidUnitTint();
+    }
+
+    private void UpdateMirandoTargetHighlight(UnitManager target)
+    {
+        if (highlightedMirandoTarget == target)
+            return;
+
+        if (highlightedMirandoTarget != null)
+            highlightedMirandoTarget.ClearTemporarySortingOrder();
+
+        highlightedMirandoTarget = target;
+        if (highlightedMirandoTarget != null)
+            highlightedMirandoTarget.SetTemporarySortingOrder();
+    }
+
+    private void ClearMirandoTargetHighlight()
+    {
+        if (highlightedMirandoTarget == null)
+            return;
+
+        highlightedMirandoTarget.ClearTemporarySortingOrder();
+        highlightedMirandoTarget = null;
     }
 
     private Material GetMirandoPreviewMaterial()

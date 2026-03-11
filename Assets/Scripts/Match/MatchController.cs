@@ -50,6 +50,7 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enableLosValidation = true;
     [SerializeField] private bool enableSpotter = true;
     [SerializeField] private bool enableStealthValidation = true;
+    [SerializeField] private bool enableTotalWar = true;
     [SerializeField, Min(1)] private int maxUnitsPerTeam = 40;
     [SerializeField] private AutonomyDatabase autonomyDatabase;
     [SerializeField] private CursorController cursorController;
@@ -92,6 +93,7 @@ public class MatchController : MonoBehaviour
     public bool EnableLosValidation => enableLosValidation;
     public bool EnableSpotter => enableSpotter;
     public bool EnableStealthValidation => enableStealthValidation;
+    public bool EnableTotalWar => enableTotalWar;
     public int MaxUnitsPerTeam => Mathf.Max(1, maxUnitsPerTeam);
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;
     public int ActivePlayerListIndex => activePlayerListIndex;
@@ -533,24 +535,28 @@ public class MatchController : MonoBehaviour
                 enableLosValidation = false;
                 enableSpotter = false;
                 enableStealthValidation = false;
+                enableTotalWar = false;
                 break;
             case GameSetupPreset.FisicaBasica:
                 enableLdtValidation = true;
                 enableLosValidation = false;
                 enableSpotter = false;
                 enableStealthValidation = false;
+                enableTotalWar = false;
                 break;
             case GameSetupPreset.AMontanhaAvacalha:
                 enableLdtValidation = true;
                 enableLosValidation = true;
                 enableSpotter = false;
                 enableStealthValidation = false;
+                enableTotalWar = false;
                 break;
             case GameSetupPreset.NeblinaLeve:
                 enableLdtValidation = true;
                 enableLosValidation = true;
                 enableSpotter = true;
                 enableStealthValidation = false;
+                enableTotalWar = false;
                 break;
             case GameSetupPreset.FogOfWarTotal:
             default:
@@ -558,6 +564,7 @@ public class MatchController : MonoBehaviour
                 enableLosValidation = true;
                 enableSpotter = true;
                 enableStealthValidation = true;
+                enableTotalWar = true;
                 break;
         }
 

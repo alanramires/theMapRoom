@@ -146,6 +146,17 @@ public partial class TurnStateManager
         if (canTransfer)
             availableSensorActionCodes.Add('T');
 
+        bool isContestedHexTotalWar = IsSelectedUnitInContestedHexTotalWar();
+        if (isContestedHexTotalWar)
+            ApplyContestedHexActionRestrictions();
+
+        if (isContestedHexTotalWar && movementMode == SensorMovementMode.MoveuAndando)
+        {
+            availableSensorActionCodes.Remove('A');
+            cachedPodeMirarTargets.Clear();
+            cachedPodeMirarInvalidTargets.Clear();
+        }
+
         if (selectedUnit.AircraftOperationLockTurns > 0)
         {
             availableSensorActionCodes.Remove('A');
@@ -163,6 +174,65 @@ public partial class TurnStateManager
         RefreshEnemyThreatLayersOverlayIfEnabled();
         ResetScannerPromptState();
         LogScannerPanel();
+    }
+
+    private bool IsSelectedUnitInContestedHexTotalWar()
+    {
+        if (selectedUnit == null || !UnitRulesDefinition.IsTotalWarEnabled())
+            return false;
+
+        Vector3Int selectedCell = selectedUnit.CurrentCellPosition;
+        selectedCell.z = 0;
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager candidate = units[i];
+            if (candidate == null || candidate == selectedUnit || !candidate.gameObject.activeInHierarchy || candidate.IsEmbarked)
+                continue;
+            if (candidate.TeamId == selectedUnit.TeamId)
+                continue;
+
+            Vector3Int candidateCell = candidate.CurrentCellPosition;
+            candidateCell.z = 0;
+            if (candidateCell == selectedCell)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void ApplyContestedHexActionRestrictions()
+    {
+        const string contestedReason = "Hex disputado: acao indisponivel.";
+
+        availableSensorActionCodes.Remove('C');
+        cachedPodeCapturarConstruction = null;
+        cachedPodeCapturarReason = contestedReason;
+
+        availableSensorActionCodes.Remove('F');
+        cachedPodeFundirTargets.Clear();
+        cachedPodeFundirInvalidTargets.Clear();
+        cachedPodeFundirAdjacentCount = 0;
+        cachedPodeFundirReason = contestedReason;
+
+        availableSensorActionCodes.Remove('E');
+        cachedPodeEmbarcarTargets.Clear();
+        cachedPodeEmbarcarInvalidTargets.Clear();
+
+        availableSensorActionCodes.Remove('D');
+        cachedPodeDesembarcarTargets.Clear();
+        cachedPodeDesembarcarInvalidTargets.Clear();
+
+        availableSensorActionCodes.Remove('S');
+        cachedPodeSuprirTargets.Clear();
+        cachedPodeSuprirInvalidTargets.Clear();
+        cachedPodeSuprirReason = contestedReason;
+
+        availableSensorActionCodes.Remove('T');
+        cachedPodeTransferirTargets.Clear();
+        cachedPodeTransferirInvalidTargets.Clear();
+        cachedPodeTransferirReason = contestedReason;
     }
 
     private static void CollapseMirarTargetsByTargetUnit(List<PodeMirarTargetOption> options)

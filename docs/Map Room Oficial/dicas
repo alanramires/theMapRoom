@@ -1,0 +1,47 @@
+A sintaxe que você está lembrando é a de **alerts** (notificações) usada no GitHub e em outras plataformas que suportam Markdown estendido.
+
+O formato correto é:
+
+```markdown
+> [!NOTE]
+> Texto da sua nota ou informação importante.
+```
+
+A palavra-chave vai **dentro dos colchetes, com o ponto de exclamação antes dela** — exatamente como você escreveu, mas sem o ponto de exclamação no final. ??
+
+### Principais tipos suportados no GitHub:
+- `> [!NOTE]`  
+- `> [!TIP]`  
+- `> [!IMPORTANT]`  
+- `> [!WARNING]`  
+- `> [!CAUTION]`
+
+### Exemplo visual:
+```markdown
+> [!NOTE]
+> Isso é uma nota útil para o leitor.
+```
+Fica assim:
+
+> [!NOTE]
+> Isso é uma nota útil para o leitor.
+
+---
+
+### E se não for no GitHub?
+Se você estiver usando outra ferramenta (como MkDocs, Jekyll, ou alguns editores), pode haver uma sintaxe diferente. Por exemplo, no MkDocs Material existe as **admonitions**:
+
+```markdown
+!!! note "Título opcional"
+    Texto da nota.
+```
+
+Ou até versões colapsáveis:
+```markdown
+??? summary "Clique para ver"
+    Conteúdo escondido.
+```
+
+Nesse caso, `summary` realmente aparece como palavra-chave (para um bloco expansível). Mas o mais comum e que você provavelmente viu por aí é o `[!NOTE]` do GitHub.
+
+Resumindo: a sintaxe que você está procurando é `> [!NOTE]` (ou outra palavra como `TIP`, `WARNING` etc.).

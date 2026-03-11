@@ -33,7 +33,14 @@ MonoBehaviour:
     detectsStealth: 1
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
+  - domain: 1
+    heightLevel: 3
+    vision: 6
+    detectsStealth: 1
+    detectUnitsWithFollowingSkills:
+    - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
   stealthRevealScope: 0
+  stealthRevealTeams: 
   stealthVisibleIfDetectedForTurns: 1
   movementCategory: 3
   militaryForce: 2
@@ -49,6 +56,7 @@ MonoBehaviour:
   preferredNavalHeight: 2
   skills: []
   stealthSkills: []
+  stealthSkillRules: []
   autonomyData: {fileID: 0}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: b1045e7e2a509504e9c1835590083ec2, type: 2}

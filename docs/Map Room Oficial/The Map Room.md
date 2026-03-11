@@ -257,12 +257,12 @@ Com esses valores, o DPQ se torna imediato. Dois soldados na estrada — ambos D
 
 A partir do DPQ, determinamos a condição do confronto:
 
-|DPQ|Condição|Atacante|Defensor|
-|---|---|---|---|
-|2 ou mais|Vantagem Superior|Vantagem|Desvantagem|
-|0 ou 1|Iniciativa do Atacante|Vantagem|Neutro|
-|−1|Vantagem Anulada|Neutro|Neutro|
-|−2 ou menos|Emboscada|Desvantagem|Vantagem|
+| DPQ         | Condição               | Atacante    | Defensor    |
+| ----------- | ---------------------- | ----------- | ----------- |
+| 2 ou mais   | Vantagem Superior      | Vantagem    | Desvantagem |
+| 0 ou 1      | Iniciativa do Atacante | Vantagem    | Neutro      |
+| −1          | Vantagem Anulada       | Neutro      | Neutro      |
+| −2 ou menos | Emboscada              | Desvantagem | Vantagem    |
 
 Guarde os termos **Vantagem**, **Neutro** e **Desvantagem** — eles serão detalhados no capítulo de combate, onde você verá como o resultado é inflexionado por esse par. Uma emboscada na montanha não é só desfavorável no papel — você deixa de eliminar um alvo a mais, e o defensor elimina um a mais devido à posição superior.
 
@@ -492,3 +492,158 @@ _Um veterano de guerra aérea não é automaticamente um veterano de tudo. Ele �
 ---
 
 O objetivo aqui é só estabelecer o conceito antes de entrar nas contas. O que importa entender agora: Elite não é progressão de personagem. É um multiplicador de assimetria que só existe quando há desequilíbrio de nível — e quando existe, é brutal.
+
+
+-----
+
+# A Formula e os números
+
+Para entender a fórmula, vamos partir do inicio que os Recrutas (uma unidade usada aqui apenas como exemplo) tem ataque 4 (carabina) e defesa 8 (uniforme de recruta). Você já entendeu que hp é o numero de unidades vivas no esquadrão de recrutas certo?  Vamos fazer um confronto simétrico.
+
+## Fórmula básica:
+Então vamos ao confronto. Os Recrutas Verdes encontram os Recrutas Vermelhos nas planicies distantes. Como ambos estão ha 1 hex de distancia um do outro e com armas adequadas (carabinas são armas land/surface e os alvos estão no domínio). O combate é considerado simultâneo com revide.
+
+## Iniciativa
+Como os Recrutas Verdes atiram primeiro, eles são chamados de **atacantes** e como os vermelhos respondem ao fogo, são chamados de **defensor**. Isso é importante para o calculo da diferença de posição (após a eliminação bruta)
+
+### Força de Ataque Efetiva (FA Efetiva)
+Primeiro, determinamos a Força de Ataque efetiva de cada lado, multiplicando o HP atual antes dos tiros de cada lado pela força da arma equipada usada no confronto (a carabina).
+
+**Força de Ataque Efetiva dos Atacantes**: (FA Efetiva) = HP dos Atacantes x Força de Ataque base da arma (FA base) = 10 x 4 = 40
+**Força de Ataque Efetiva dos Defensores**: (FA Efetiva) = HP dos Atacantes x Força de Ataque base da arma (FA base) = 10 x 4 = 40
+
+### Força de Defesa Efetiva (FD Efetiva)
+A força de defesa Efetiva considera a força de defesa básica da unidade somada da força de defesa da posição da unidade. Como cada lado do confronto está em um terreno de planície, eles recebem +0 de defesa extra da posição. Logo 
+
+**Força de Defesa Efetiva dos Atacantes**: (FD Efetiva) = FD base dos Atacantes + FD base da Posição = 8 + 0 = 8
+**Força de Defesa Efetiva dos Defensores**: (FD Efetiva) = FD base dos Atacantes + FD base da Posição = 8 + 0 = 8
+
+### Eliminação Bruta
+Após determinar os valores efetivos de ataque e defesa, seguimos para a divisão para descobrir quantos membros morreram em cada conjunto, ou quanto de HP cada lado sofreu. O calculo é simultâneo em combate (não é como no d&d que você revida com o que sobrou). O valor encontrado **não é arredondado** nessa etapa.
+
+**Eliminações Brutas dos Atacantes** = Força de Ataque Efetiva dos Atacantes / Força de Defesa Efetiva dos Defensores = FA Efetiva / FD Efetiva = 40 / 8 = 5
+**Eliminações Brutas dos Defensores** = Força de Ataque Efetiva dos Defensores / Força de Defesa Efetiva dos Atacantes = FA Efetiva / FD Efetiva = 40 / 8 = 5
+
+Aparentemente 5 HP de baixas em cada esquadrão certo? porem não fizemos a avaliação do DPQ
+### Observação Importante — Teto de Eliminações
+
+O número final de eliminações está sujeito a **dois tetos**:
+
+1. **Teto do Alvo**: nunca pode exceder o HP **atual** do esquadrão-alvo.
+2. **Teto do Atacante**: nunca pode exceder o HP que o esquadrão atacante possuía no **início deste combate**.
+
+Um esquadrão com apenas 1 HP restante só consegue eliminar, no máximo, **1** inimigo — mesmo que o cálculo indique 5 ou mais. Da mesma forma, um esquadrão que começou o combate com 4 HP não pode eliminar mais de 4 unidades inimigas.
+
+**Metáfora das bolas de gude**: só restam X bolas no copo — logo, só X carabinas podem disparar.
+
+### Exemplo prático de unidades enfraquecidas
+
+**Exemplo 1 — Recrutas enfraquecidos** Dois esquadrões de Recrutas (ambos com 2 HP restantes) se enfrentam em planície.
+
+- FA Efetiva = 2 × 4 = 8
+- FD Efetiva = 8 + 0 = 8
+- Eliminações Brutas = 8 ÷ 8 = 1,0 (exato)
+
+**Verdes (Vantagem — atiram primeiro):** 1,0 exato → +1 extra = **2 eliminações** (respeita teto do alvo).
+
+**Vermelhos (Neutro — revidam):** 1,0 exato → mantém **1 eliminação**.
+
+**Resultado:** Verdes terminam com 1 HP | Vermelhos são eliminados.
+
+**Exemplo 2 — Tanques vs Recrutas** (números exatos) Tanques (4 HP, FD 13, canhão potência 10) atacam Recrutas (10 HP, FD 8, carabina potência 4) em planície. Os Tanques têm **Vantagem** (atacam primeiro), Recrutas estão **Neutros**.
+
+**Tanques atacando (Vantagem):**
+
+- FA Efetiva = 4 × 10 = **40**
+- FD do alvo = **8**
+- Eliminações Brutas = 40 ÷ 8 = **5,0** (exato)
+- Vantagem + exato → **6**
+- Teto do atacante (4 HP) → eliminam **4** Recrutas
+
+**Recrutas revidando (Neutro):**
+
+- FA Efetiva = 10 × 4 = **40**
+- FD do alvo = **13**
+- Eliminações Brutas = 40 ÷ 13 ≈ **3,077**
+- Neutro → arredonda para **3** Tanques
+
+**Resultado final:** Tanques sobram com **1 HP** | Recrutas sobram com **6 HP**
+### Diferença de Posição e Qualidade (DPQ)
+Pela iniciativa, determinamos que o **atacante** são os recrutas verdes, então fazemos uma avaliação do ponto de vista do atacante em relação ao defensor. Pela seção *DPQ - Pontuação de Qualidade* temos que a Planície fornece 1 ponto de qualidade e defesa +0. Logo
+
+DPQ Atacante - Defensor = Pontos Qualidade Atacante - Pontos Qualidade Defensor = 1 - 1 = 0
+
+Pela Tabela de DPQ
+
+| DPQ       | Condição               | Atacante | Defensor    |
+| --------- | ---------------------- | -------- | ----------- |
+| 0 ou 1    | Iniciativa do Atacante | Vantagem | Neutro      |
+
+Onde
+**Vantagem** significa arredondar o resultado bruto da divisão para **cima** OU em divisões exatas, somar +1 nas eliminações (sim! um grande desvio de 25% ou mais dependendo das eliminações)
+**Desvantagem** significa arredondar o resultado bruto da divisão para **baixo** OU em divisões exatas, subtrair -1 nas eliminações (sim! uma perda de 20 a 25% dependendo das eliminações)
+**Neutro** significa arredondar o resultado bruto da divisão para cima se a fração for 0,5 ou superior OU em divisões exatas, manter o resultado como está.
+
+Logo os Recrutas Verdes estão em **vantagem** por terem atirado primeiro e os recrutas Vermelhos estão **normal**
+
+Como a divisão deu exata, os recrutas verdes **eliminam 1 a mais** = 6 eliminados, enquanto os vermelhos apenas 5
+
+Resultado Final do Confronto
+**Verdes** com 5 HP restante x **Vermelhos** com 4 HP restantes
+
+### Regra de arredondamento 
+
+Depois de calcular Eliminações Brutas, aplique a condição de DPQ nesta ordem exata:
+
+1. **Vantagem** (Iniciativa do Atacante): Arredonde **para cima** (ceil). Se o resultado bruto for **exato** (sem decimal), some +1 extra.
+2. **Neutro**: Arredonde normalmente (0,5 ou mais → para cima; abaixo de 0,5 → para baixo). Se exato, mantém o número.
+3. **Desvantagem**: Arredonde **para baixo** (floor). Se o resultado bruto for **exato**, subtraia -1.
+4. **Aplique o teto** (nunca pode ultrapassar HP atual do alvo).
+
+Exemplo rápido: 5,3 em Vantagem → arredonda para cima = **6** (não soma +1 porque não foi exato).
+
+---
+
+
+## Formula Avançada
+Em RPS aprendemos sobre o vocabulario de operacores que usam armas contra alvos e alvos que se defendem de operadores com armas. Mas você precisa saber que 
+
+em RPS, quase tudo viraria disputa de numero bruto (HP, ataque base, defesa).
+Com RPS, o jogo recompensa escolher a unidade/arma certa para o alvo certo.
+
+Para ilustrar melhor o cenario, vamos imaginar o seguinte. Um mestre e uma aluna. Se pudessemos transformar esses 2 em classe, teriamos o seguinte vocabulario
+
+RPS  Mestre com Espada vs Aluna
+O Mestre manejando uma Espada ataca a Aluna com +2 (afinal ele é veterano em combate)
+A Aluna se defende do Mestre manejando uma espada com -2 (ela mal ve de onde vem o golpe)
+
+RPS Aluna com Espada vs Mestre
+A Aluna manejando uma Espada ataca o Mestre com -1 (a espada pra ela é desajeitado)
+O Mestre se defende da Aluna manejando uma espada com +3 (pra ele, desviar dos golpes dela é tranquilo)
+
+Note que acabamos de criar duas entradas de RPS de Ataque e Defesa para 1 confronto entre 2 classes distintas. 
+
+Supondo que esse mesmo mestre tenha 2 alunas. a situação seria mais ou menos assim
+
+RPS Aluna com Espada vs Aluna
+A Aluna manejando uma Espada ataca outra aluna com +0 (elas estão no mesmo nivel)
+A Aluna se defende de outra Aluna manejando uma espada com +3 (elas telegrafam o ataque)
+
+e essa entrada repetiria para a outra aluna atacando a amiga.
+
+ou podemos pensar em 
+RPS  Mestre com Espada vs Mestre
+O Mestre manejando uma Espada ataca outro Mestre com -1 (eles se movimentam rapidamente)
+O Mestre se defende de outro Mestre manejando uma espada com +0 (eles já conhecem os truques um do outro)
+
+O que isso quer dizer na pratica? que esses parametros de RPS aos pares, são acrescentados na formula para o calculo do ataque efetivo e da defesa efetiva, no total 4 novos parametros são adicionados nas 2 formulas (atacantes e defensores) dependendo de contra qual classe eles estão lutando (note que aluna, aluno, aprendiz, etc, todos eles são "alunas" pois o sistema nao trata nomes, e sim classes). Vamos supor que Recrutas enfrentando recrutas é  +1 pra ataque e +3 pra defesa. afinal eles fazem o que foram treinados pra fazer e tambem sabem rolar no chão 
+
+**Força de Ataque Efetiva dos Atacantes**: (FA Efetiva) = ((HP dos Atacantes x (Força de Ataque base da arma (FA base) + RPS Ataque do Atacante) = ((10 x (4+1)) = 50
+**Força de Ataque Efetiva dos Defensores**: (FA Efetiva) = ((HP dos Defensores x (Força de Ataque base da arma (FA base) + RPS Ataque do Defensor) = ((10 x (4+1)) = 50
+
+e  aformula de defesa tambem é atualizada
+
+**Força de Defesa Efetiva dos Atacantes**: (FD Efetiva) = FD base dos Atacantes + FD base da Posição + FD RPS do Atacante = 8 + 0 + 3 = 11
+**Força de Defesa Efetiva dos Defensores**: (FD Efetiva) = FD base dos Atacantes + FD base da Posição + FD RPS do Defensor = 8 + 0 +3 =  11
+
+Logo em 50/11 = 4,54, ambos vão eliminar 5 cada (pois em vantagem, os verdes arredonda pra cima pra 5, e em neutro, os vermelhos tambem arredonda  padrão pra cima pra 5 devido a fração acima de 0,5+)

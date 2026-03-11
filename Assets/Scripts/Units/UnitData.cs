@@ -33,10 +33,24 @@ public class UnitVisionException
     public List<SkillData> detectUnitsWithFollowingSkills = new List<SkillData>();
 }
 
+[System.Serializable]
+public class UnitStealthSkillRule
+{
+    [Tooltip("Dominio onde esta skill stealth fica ativa para deteccao.")]
+    public Domain domain = Domain.Land;
+
+    [Tooltip("Altura onde esta skill stealth fica ativa para deteccao.")]
+    public HeightLevel heightLevel = HeightLevel.Surface;
+
+    [Tooltip("Skill stealth ativa neste dominio/altura.")]
+    public SkillData skill;
+}
+
 public enum StealthRevealScope
 {
     AllTeams = 0,
-    DetectorTeamOnly = 1
+    DetectorTeamOnly = 1,
+    ConfiguredTeams = 2
 }
 
 [CreateAssetMenu(menuName = "Game/Units/Unit Data", fileName = "UnitData_")]
@@ -74,6 +88,8 @@ public class UnitData : ScriptableObject
     [Header("Stealth Visibility")]
     [Tooltip("Escopo de quem passa a enxergar a unidade quando ela e detectada.")]
     public StealthRevealScope stealthRevealScope = StealthRevealScope.AllTeams;
+    [Tooltip("Quando scope = ConfiguredTeams, define quais times passam a enxergar a unidade apos deteccao.")]
+    public List<TeamId> stealthRevealTeams = new List<TeamId>();
     [Min(1)]
     [Tooltip("Quantidade de turnos (round) em que o alvo stealth permanece revelado apos deteccao.")]
     public int stealthVisibleIfDetectedForTurns = 1;
@@ -109,6 +125,8 @@ public class UnitData : ScriptableObject
     [Header("Stealth Skills")]
     [Tooltip("Skills que tornam a unidade stealth. Detectores precisam casar essas skills na fechadura de deteccao.")]
     public List<SkillData> stealthSkills = new List<SkillData>();
+    [Tooltip("Versao por dominio/altura das stealth skills. Se houver match na camada atual, esta lista tem prioridade.")]
+    public List<UnitStealthSkillRule> stealthSkillRules = new List<UnitStealthSkillRule>();
     [Header("Autonomy")]
     [Tooltip("Perfil de autonomia usado pelas regras da skill Operational Autonomy.")]
     public AutonomyData autonomyData;
@@ -193,6 +211,10 @@ public class UnitData : ScriptableObject
             skills = new List<SkillData>();
         if (stealthSkills == null)
             stealthSkills = new List<SkillData>();
+        if (stealthRevealTeams == null)
+            stealthRevealTeams = new List<TeamId>();
+        if (stealthSkillRules == null)
+            stealthSkillRules = new List<UnitStealthSkillRule>();
         if (visionSpecializations == null)
             visionSpecializations = new List<UnitVisionException>();
         if (transportSlots == null)
@@ -218,6 +240,7 @@ public class UnitData : ScriptableObject
         eliteLevel = Mathf.Max(0, eliteLevel);
         visao = Mathf.Max(1, visao);
         stealthVisibleIfDetectedForTurns = Mathf.Max(1, stealthVisibleIfDetectedForTurns);
+        NormalizeStealthRevealTeams();
         for (int i = 0; i < visionSpecializations.Count; i++)
         {
             UnitVisionException entry = visionSpecializations[i];
@@ -264,6 +287,25 @@ public class UnitData : ScriptableObject
 
     }
 
+    private void NormalizeStealthRevealTeams()
+    {
+        if (stealthRevealTeams == null || stealthRevealTeams.Count <= 1)
+            return;
+
+        HashSet<TeamId> seen = new HashSet<TeamId>();
+        for (int i = stealthRevealTeams.Count - 1; i >= 0; i--)
+        {
+            TeamId team = stealthRevealTeams[i];
+            if (seen.Contains(team))
+            {
+                stealthRevealTeams.RemoveAt(i);
+                continue;
+            }
+
+            seen.Add(team);
+        }
+    }
+
     public bool IsAircraft()
     {
         return unitClass == GameUnitClass.Jet ||
@@ -305,7 +347,7 @@ public class UnitData : ScriptableObject
         if (targetData == null || entry.detectUnitsWithFollowingSkills == null || entry.detectUnitsWithFollowingSkills.Count == 0)
             return false;
 
-        List<SkillData> targetStealthSkills = targetData.ResolveStealthSkillsForDetection();
+        List<SkillData> targetStealthSkills = targetData.ResolveStealthSkillsForDetection(targetDomain, targetHeightLevel);
         if (targetStealthSkills == null || targetStealthSkills.Count == 0)
             return false;
 
@@ -322,11 +364,40 @@ public class UnitData : ScriptableObject
         return ResolveStealthSkillsForDetection().Count > 0;
     }
 
+    public bool IsStealthUnit(Domain currentDomain, HeightLevel currentHeightLevel)
+    {
+        return ResolveStealthSkillsForDetection(currentDomain, currentHeightLevel).Count > 0;
+    }
+
     public List<SkillData> ResolveStealthSkillsForDetection()
     {
+        List<SkillData> flattened = new List<SkillData>();
+        CollectStealthSkillsFromRules(flattened, domainFilterEnabled: false, Domain.Land, HeightLevel.Surface);
+        if (flattened.Count > 0)
+            return flattened;
+
         if (stealthSkills != null && stealthSkills.Count > 0)
             return stealthSkills;
 
+        return ResolveLegacyStealthSkills();
+    }
+
+    public List<SkillData> ResolveStealthSkillsForDetection(Domain targetDomain, HeightLevel targetHeightLevel)
+    {
+        bool hasLayerRules = stealthSkillRules != null && stealthSkillRules.Count > 0;
+        List<SkillData> byLayer = new List<SkillData>();
+        CollectStealthSkillsFromRules(byLayer, domainFilterEnabled: true, targetDomain, targetHeightLevel);
+        if (hasLayerRules)
+            return byLayer;
+
+        if (stealthSkills != null && stealthSkills.Count > 0)
+            return stealthSkills;
+
+        return ResolveLegacyStealthSkills();
+    }
+
+    private List<SkillData> ResolveLegacyStealthSkills()
+    {
         // Compatibilidade: enquanto assets antigos nao migram, aceita skills stealth legadas por ID.
         List<SkillData> legacy = new List<SkillData>();
         if (skills == null || skills.Count == 0)
@@ -349,6 +420,51 @@ public class UnitData : ScriptableObject
         }
 
         return legacy;
+    }
+
+    private void CollectStealthSkillsFromRules(List<SkillData> output, bool domainFilterEnabled, Domain domainFilter, HeightLevel heightFilter)
+    {
+        if (output == null || stealthSkillRules == null || stealthSkillRules.Count == 0)
+            return;
+
+        for (int i = 0; i < stealthSkillRules.Count; i++)
+        {
+            UnitStealthSkillRule rule = stealthSkillRules[i];
+            if (rule == null || rule.skill == null)
+                continue;
+
+            if (domainFilterEnabled && (rule.domain != domainFilter || rule.heightLevel != heightFilter))
+                continue;
+
+            if (!ContainsSkill(output, rule.skill))
+                output.Add(rule.skill);
+        }
+    }
+
+    private static bool ContainsSkill(List<SkillData> list, SkillData skill)
+    {
+        if (list == null || skill == null)
+            return false;
+
+        string id = string.IsNullOrWhiteSpace(skill.id) ? string.Empty : skill.id.Trim();
+        for (int i = 0; i < list.Count; i++)
+        {
+            SkillData current = list[i];
+            if (current == null)
+                continue;
+
+            if (ReferenceEquals(current, skill))
+                return true;
+
+            string currentId = string.IsNullOrWhiteSpace(current.id) ? string.Empty : current.id.Trim();
+            if (id.Length > 0 && currentId.Length > 0 &&
+                string.Equals(id, currentId, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private bool TryGetVisionException(Domain targetDomain, HeightLevel targetHeightLevel, out UnitVisionException match)

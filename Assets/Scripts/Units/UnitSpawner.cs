@@ -57,7 +57,7 @@ public class UnitSpawner : MonoBehaviour
             Vector3Int targetCell = HexCoordinates.WorldToCell(boardTilemap, position);
             targetCell.z = 0;
             int targetSortingLayerId = GetTargetSortingLayerId();
-            if (IsCellOccupiedOnSortingLayer(targetCell, targetSortingLayerId))
+            if (IsCellOccupiedOnSortingLayer(targetCell, targetSortingLayerId, teamId))
             {
                 Debug.LogWarning($"[UnitSpawner] Celula ocupada na mesma sorting layer em ({targetCell.x},{targetCell.y},0). Spawn cancelado.");
                 return null;
@@ -283,7 +283,7 @@ public class UnitSpawner : MonoBehaviour
 
         Vector3Int fixedCell = new Vector3Int(cell.x, cell.y, 0);
         int targetSortingLayerId = GetTargetSortingLayerId();
-        if (IsCellOccupiedOnSortingLayer(fixedCell, targetSortingLayerId))
+        if (IsCellOccupiedOnSortingLayer(fixedCell, targetSortingLayerId, teamId))
         {
             Debug.LogWarning($"[UnitSpawner] Celula ocupada na mesma sorting layer em ({fixedCell.x},{fixedCell.y},0). Spawn cancelado.");
             return null;
@@ -307,7 +307,7 @@ public class UnitSpawner : MonoBehaviour
 
         Vector3Int fixedCell = new Vector3Int(cell.x, cell.y, 0);
         int targetSortingLayerId = GetTargetSortingLayerId();
-        if (IsCellOccupiedOnSortingLayer(fixedCell, targetSortingLayerId))
+        if (IsCellOccupiedOnSortingLayer(fixedCell, targetSortingLayerId, teamId))
         {
             Debug.LogWarning($"[UnitSpawner] Celula ocupada na mesma sorting layer em ({fixedCell.x},{fixedCell.y},0). Spawn cancelado.");
             return null;
@@ -383,14 +383,22 @@ public class UnitSpawner : MonoBehaviour
         return renderer != null ? renderer.sortingLayerID : 0;
     }
 
-    private bool IsCellOccupiedOnSortingLayer(Vector3Int cell, int sortingLayerId)
+    private bool IsCellOccupiedOnSortingLayer(Vector3Int cell, int sortingLayerId, TeamId teamId)
     {
         if (boardTilemap == null)
             return false;
 
-        // Regra global: no maximo 1 unidade por hex.
-        if (UnitRulesDefinition.IsUnitCellOccupied(boardTilemap, cell))
-            return true;
+        if (UnitRulesDefinition.IsTotalWarEnabled())
+        {
+            if (UnitRulesDefinition.IsUnitCellOccupiedForTeam(boardTilemap, cell, teamId))
+                return true;
+        }
+        else
+        {
+            // Regra global: no maximo 1 unidade por hex.
+            if (UnitRulesDefinition.IsUnitCellOccupied(boardTilemap, cell))
+                return true;
+        }
 
         ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < constructions.Length; i++)

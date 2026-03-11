@@ -18,14 +18,14 @@ MonoBehaviour:
       weaponCategory: 0
       targetClass: 0
       attackBonus: -1
-      notes: 
+      notes: "A Roof Gun \xE9 levemente instavel"
       rpsAttackText: Armored com AntiInfantaria ataca Infantry com RPS Ataque -1
     defesa:
       targetClass: 0
       unitClass: 3
       weaponCategory: 0
       defenseBonus: 2
-      notes: 
+      notes: "e os soldados sabem rolar no ch\xE3o pra se defender"
       rpsDefenseText: Infantry se defende de Armored com AntiInfantaria com RPS Defesa
         +2
   - ataque:

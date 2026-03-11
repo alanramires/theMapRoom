@@ -24,7 +24,7 @@ public class SensorMeasureWindow : EditorWindow
     private int validPathDistanceHexes = -1;
     private string statusMessage = "Selecione hex inicial e final para medir.";
 
-    [MenuItem("Tools/Sensor/Medir")]
+    [MenuItem("Tools/Utils/Medir")]
     public static void OpenWindow()
     {
         GetWindow<SensorMeasureWindow>("Sensor Medir");

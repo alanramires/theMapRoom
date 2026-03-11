@@ -37,7 +37,13 @@ MonoBehaviour:
     vision: 7
     detectsStealth: 0
     detectUnitsWithFollowingSkills: []
+  - domain: 2
+    heightLevel: 2
+    vision: 0
+    detectsStealth: 0
+    detectUnitsWithFollowingSkills: []
   stealthRevealScope: 0
+  stealthRevealTeams: 
   stealthVisibleIfDetectedForTurns: 1
   movementCategory: 4
   militaryForce: 0
@@ -53,8 +59,10 @@ MonoBehaviour:
   preferredNavalHeight: 2
   skills: []
   stealthSkills: []
+  stealthSkillRules: []
   autonomyData: {fileID: 0}
   embarkedWeapons: []
+  cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0

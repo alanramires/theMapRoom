@@ -14,6 +14,7 @@ public class MatchControllerEditor : Editor
     private SerializedProperty enableLosValidationProp;
     private SerializedProperty enableSpotterProp;
     private SerializedProperty enableStealthValidationProp;
+    private SerializedProperty enableTotalWarProp;
     private SerializedProperty autonomyDatabaseProp;
     private SerializedProperty activePlayerListIndexProp;
     private SerializedProperty matchMusicAudioManagerProp;
@@ -32,6 +33,7 @@ public class MatchControllerEditor : Editor
         enableLosValidationProp = serializedObject.FindProperty("enableLosValidation");
         enableSpotterProp = serializedObject.FindProperty("enableSpotter");
         enableStealthValidationProp = serializedObject.FindProperty("enableStealthValidation");
+        enableTotalWarProp = serializedObject.FindProperty("enableTotalWar");
         autonomyDatabaseProp = serializedObject.FindProperty("autonomyDatabase");
         activePlayerListIndexProp = serializedObject.FindProperty("activePlayerListIndex");
         matchMusicAudioManagerProp = serializedObject.FindProperty("matchMusicAudioManager");
@@ -74,6 +76,8 @@ public class MatchControllerEditor : Editor
                 EditorGUILayout.PropertyField(enableSpotterProp, new GUIContent("Spotter"));
             if (enableStealthValidationProp != null)
                 EditorGUILayout.PropertyField(enableStealthValidationProp, new GUIContent("Stealth"));
+            if (enableTotalWarProp != null)
+                EditorGUILayout.PropertyField(enableTotalWarProp, new GUIContent("Total War"));
         }
         if (autonomyDatabaseProp != null)
             EditorGUILayout.PropertyField(autonomyDatabaseProp, new GUIContent("Autonomy Database"));

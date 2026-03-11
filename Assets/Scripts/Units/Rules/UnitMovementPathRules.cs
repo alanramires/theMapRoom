@@ -983,6 +983,41 @@ public static class UnitMovementPathRules
         public UnitManager GetUnitAtCell(Vector3Int cell, UnitManager exceptUnit = null)
         {
             cell.z = 0;
+
+            if (UnitRulesDefinition.IsTotalWarEnabled() && exceptUnit != null)
+            {
+                UnitManager sameTeam = null;
+                UnitManager otherTeam = null;
+                for (int i = 0; i < units.Length; i++)
+                {
+                    UnitManager unit = units[i];
+                    if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
+                        continue;
+
+                    Vector3Int occupiedCell = unit.BoardTilemap == referenceTilemap
+                        ? unit.CurrentCellPosition
+                        : HexCoordinates.WorldToCell(referenceTilemap, unit.transform.position);
+
+                    occupiedCell.z = 0;
+                    if (occupiedCell != cell)
+                        continue;
+
+                    if (unit.TeamId == exceptUnit.TeamId)
+                    {
+                        sameTeam = unit;
+                        break;
+                    }
+
+                    if (otherTeam == null)
+                        otherTeam = unit;
+                }
+
+                if (sameTeam != null)
+                    return sameTeam;
+                if (otherTeam != null)
+                    return otherTeam;
+            }
+
             for (int i = 0; i < units.Length; i++)
             {
                 UnitManager unit = units[i];

@@ -13,13 +13,6 @@ public static class PodeMirarSensor
     private const string InvalidReasonStealth = "Alvo nao detectado (stealth placeholder).";
     private const int DefaultObservationRangeHexes = 3;
     private static MatchController cachedMatchController;
-    private static readonly Dictionary<int, StealthRevealState> stealthRevealStateByTarget = new Dictionary<int, StealthRevealState>();
-
-    private sealed class StealthRevealState
-    {
-        public int revealForAllUntilTurn = int.MinValue;
-        public readonly Dictionary<int, int> revealByTeamUntilTurn = new Dictionary<int, int>();
-    }
 
     private static string ResolveInvalidReasonId(string reason)
     {
@@ -75,6 +68,7 @@ public static class PodeMirarSensor
         invalidOutput?.Clear();
         if (attacker == null)
             return false;
+
 
         IReadOnlyList<UnitEmbarkedWeapon> embarkedWeapons = attacker.GetEmbarkedWeapons();
         if (embarkedWeapons == null || embarkedWeapons.Count == 0)
@@ -479,6 +473,7 @@ public static class PodeMirarSensor
 
         return output.Count > 0;
     }
+
 
     private static int CompareTargetOptionsByPriority(PodeMirarTargetOption a, PodeMirarTargetOption b)
     {
@@ -1843,7 +1838,8 @@ public static class PodeMirarSensor
         int currentTurn = GetCurrentTurnSafe();
         StealthRevealScope revealScope = StealthRevealScope.AllTeams;
         int revealTurns = 1;
-        ResolveStealthRevealRules(target, out revealScope, out revealTurns);
+        List<int> configuredRevealTeamIds = null;
+        ResolveStealthRevealRules(target, out revealScope, out revealTurns, out configuredRevealTeamIds);
         if (IsTargetAlreadyRevealedForTeam(target, attackerTeamId, currentTurn))
             return true;
 
@@ -1855,7 +1851,7 @@ public static class PodeMirarSensor
         if (!canDetectNow)
             return false;
 
-        RegisterStealthReveal(target, attackerTeamId, currentTurn, revealTurns, revealScope);
+        RegisterStealthReveal(target, attackerTeamId, currentTurn, revealTurns, revealScope, configuredRevealTeamIds);
         return true;
     }
 
@@ -1865,36 +1861,64 @@ public static class PodeMirarSensor
             return false;
 
         if (target.TryGetUnitData(out UnitData targetData) && targetData != null)
-            return targetData.IsStealthUnit();
+            return targetData.IsStealthUnit(target.GetDomain(), target.GetHeightLevel());
 
         return false;
     }
 
-    private static void ResolveStealthRevealRules(UnitManager target, out StealthRevealScope revealScope, out int revealTurns)
+    private static void ResolveStealthRevealRules(
+        UnitManager target,
+        out StealthRevealScope revealScope,
+        out int revealTurns,
+        out List<int> configuredRevealTeamIds)
     {
         revealScope = StealthRevealScope.AllTeams;
         revealTurns = 1;
+        configuredRevealTeamIds = null;
 
         if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
             return;
 
         revealScope = targetData.stealthRevealScope;
         revealTurns = targetData.ResolveStealthVisibleTurns();
+        if (revealScope != StealthRevealScope.ConfiguredTeams || targetData.stealthRevealTeams == null || targetData.stealthRevealTeams.Count <= 0)
+            return;
+
+        configuredRevealTeamIds = new List<int>(targetData.stealthRevealTeams.Count);
+        for (int i = 0; i < targetData.stealthRevealTeams.Count; i++)
+            configuredRevealTeamIds.Add((int)targetData.stealthRevealTeams[i]);
     }
 
     private static bool IsTargetAlreadyRevealedForTeam(UnitManager target, int teamId, int currentTurn)
     {
-        int targetKey = target.GetInstanceID();
-        if (!stealthRevealStateByTarget.TryGetValue(targetKey, out StealthRevealState state) || state == null)
+        if (target == null)
             return false;
 
-        if (state.revealForAllUntilTurn >= currentTurn)
-            return true;
+        return target.IsStealthRevealedForTeam(teamId, currentTurn);
+    }
 
-        if (state.revealByTeamUntilTurn.TryGetValue(teamId, out int teamUntilTurn) && teamUntilTurn >= currentTurn)
-            return true;
+    public static bool IsStealthTargetRevealedForTeam(UnitManager target, int viewerTeamId)
+    {
+        if (target == null)
+            return false;
 
-        return false;
+        if (!IsStealthTarget(target))
+            return false;
+
+        int currentTurn = GetCurrentTurnSafe();
+        return IsTargetAlreadyRevealedForTeam(target, viewerTeamId, currentTurn);
+    }
+
+    public static int GetStealthRevealTurnsRemainingForTeam(UnitManager target, int viewerTeamId)
+    {
+        if (target == null)
+            return 0;
+
+        if (!IsStealthTarget(target))
+            return 0;
+
+        int currentTurn = GetCurrentTurnSafe();
+        return target.GetStealthRevealTurnsRemainingForTeam(viewerTeamId, currentTurn);
     }
 
     private static void RegisterStealthReveal(
@@ -1902,28 +1926,13 @@ public static class PodeMirarSensor
         int detectorTeamId,
         int currentTurn,
         int revealTurns,
-        StealthRevealScope revealScope)
+        StealthRevealScope revealScope,
+        IReadOnlyList<int> configuredRevealTeamIds)
     {
         if (target == null)
             return;
 
-        int duration = Mathf.Max(1, revealTurns);
-        int untilTurn = currentTurn + duration - 1;
-        int targetKey = target.GetInstanceID();
-        if (!stealthRevealStateByTarget.TryGetValue(targetKey, out StealthRevealState state) || state == null)
-        {
-            state = new StealthRevealState();
-            stealthRevealStateByTarget[targetKey] = state;
-        }
-
-        if (revealScope == StealthRevealScope.AllTeams)
-        {
-            state.revealForAllUntilTurn = Mathf.Max(state.revealForAllUntilTurn, untilTurn);
-            return;
-        }
-
-        if (!state.revealByTeamUntilTurn.TryGetValue(detectorTeamId, out int currentTeamUntil) || untilTurn > currentTeamUntil)
-            state.revealByTeamUntilTurn[detectorTeamId] = untilTurn;
+        target.RegisterStealthReveal(detectorTeamId, currentTurn, revealTurns, revealScope, configuredRevealTeamIds);
     }
 
     private static int GetCurrentTurnSafe()
@@ -2010,7 +2019,7 @@ public static class PodeMirarSensor
         if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
             return false;
 
-        List<SkillData> targetStealthSkills = targetData.ResolveStealthSkillsForDetection();
+        List<SkillData> targetStealthSkills = targetData.ResolveStealthSkillsForDetection(target.GetDomain(), target.GetHeightLevel());
         if (targetStealthSkills == null || targetStealthSkills.Count == 0)
             return false;
 

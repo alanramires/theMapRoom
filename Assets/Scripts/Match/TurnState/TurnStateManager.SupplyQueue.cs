@@ -764,7 +764,8 @@ public partial class TurnStateManager
             TeamUtils.GetColor(unit.TeamId),
             unit.GetDomain(),
             unit.GetHeightLevel(),
-            showTransportIndicator: false);
+            showTransportIndicator: false,
+            showDetectedIndicator: ResolveDetectedIndicatorForHud(unit));
     }
 
     private static void EnsureFuelHudReadyForAnimation(UnitManager unit)
@@ -1729,7 +1730,8 @@ public partial class TurnStateManager
                     TeamUtils.GetColor(selectedUnit.TeamId),
                     selectedUnit.GetDomain(),
                     selectedUnit.GetHeightLevel(),
-                    showTransportIndicator);
+                    showTransportIndicator,
+                    showDetectedIndicator: ResolveDetectedIndicatorForHud(selectedUnit));
             }
         }
     }
@@ -1877,7 +1879,8 @@ public partial class TurnStateManager
                 TeamUtils.GetColor(passenger.TeamId),
                 passenger.GetDomain(),
                 passenger.GetHeightLevel(),
-                showTransportIndicator: false);
+                showTransportIndicator: false,
+                showDetectedIndicator: ResolveDetectedIndicatorForHud(passenger));
         }
     }
 

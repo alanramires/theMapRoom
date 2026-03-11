@@ -25,20 +25,32 @@ MonoBehaviour:
   defense: 12
   armorClass: 1
   movement: 4
-  visao: 6
+  visao: 2
   visionSpecializations:
   - domain: 2
     heightLevel: 2
-    vision: 6
+    vision: 7
     detectsStealth: 1
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
   - domain: 1
     heightLevel: 3
-    vision: 8
+    vision: 7
+    detectsStealth: 0
+    detectUnitsWithFollowingSkills:
+    - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
+  - domain: 3
+    heightLevel: 4
+    vision: 1
+    detectsStealth: 0
+    detectUnitsWithFollowingSkills: []
+  - domain: 3
+    heightLevel: 5
+    vision: 1
     detectsStealth: 0
     detectUnitsWithFollowingSkills: []
   stealthRevealScope: 0
+  stealthRevealTeams: 
   stealthVisibleIfDetectedForTurns: 1
   movementCategory: 3
   militaryForce: 2
@@ -59,9 +71,13 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 1
   preferredNavalHeight: 2
-  skills:
+  skills: []
+  stealthSkills:
   - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
-  stealthSkills: []
+  stealthSkillRules:
+  - domain: 2
+    heightLevel: 2
+    skill: {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
   autonomyData: {fileID: 0}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: afbb31a3d8a2c3645bf90df243540a74, type: 2}
