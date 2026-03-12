@@ -727,13 +727,24 @@ public partial class TurnStateManager
         message = string.Empty;
         if (selectedUnit == null)
         {
-            message = "Nenhuma unidade selecionada para mudar altitude/camada.";
-            return false;
+            if (cursorState != CursorState.Neutral)
+            {
+                message = $"Nenhuma unidade selecionada e estado atual nao permite auto-selecao ({cursorState}).";
+                return false;
+            }
+
+            if (!TryGetUnitUnderCursorForDebug(out UnitManager unitUnderCursor, out Vector3Int cursorCell, out message))
+                return false;
+
+            SetSelectedUnit(unitUnderCursor);
+            SetCursorState(CursorState.UnitSelected, "TryChangeAltitudeFromDebug(auto-select)");
+            message = $"Unidade auto-selecionada no cursor ({cursorCell.x},{cursorCell.y},0).";
         }
 
         bool isMovementScannerState = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
         bool isLandingScannerState = cursorState == CursorState.Pousando;
-        if (!isMovementScannerState && !isLandingScannerState)
+        bool isSelectionScannerState = cursorState == CursorState.UnitSelected;
+        if (!isMovementScannerState && !isLandingScannerState && !isSelectionScannerState)
         {
             message = $"Estado atual nao permite mudanca de camada por comando ({cursorState}).";
             return false;
@@ -777,7 +788,7 @@ public partial class TurnStateManager
         LandingOption picked = cachedLandingOptions[optionIndex];
         Debug.Log($"[LayerOperation][Debug] Confirmado: {picked.fromDomain}/{picked.fromHeightLevel} -> {picked.toDomain}/{picked.toHeightLevel} (action={picked.action})");
         landingExecutionInProgress = true;
-        StartCoroutine(ExecuteLandingOptionSequence(picked));
+        StartCoroutine(ExecuteLandingOptionSequence(picked, consumeAction: false));
         message = $"Mudanca de camada iniciada: {picked.label}.";
         return true;
     }
@@ -948,7 +959,7 @@ public partial class TurnStateManager
         Debug.Log($"Confirma \"{option.label}\"? (Enter=sim, ESC=nao)");
     }
 
-    private System.Collections.IEnumerator ExecuteLandingOptionSequence(LandingOption option)
+    private System.Collections.IEnumerator ExecuteLandingOptionSequence(LandingOption option, bool consumeAction = true)
     {
         try
         {
@@ -972,18 +983,8 @@ public partial class TurnStateManager
                     }
 
                     cursorController?.PlayConfirmSfx();
-
-                    // Descer de Air/High para Air/Low consome a acao da unidade e encerra turno.
-                    bool finished = TryFinalizeSelectedUnitActionFromDebug();
-                    if (finished)
-                    {
-                        cursorController?.PlayDoneSfx();
-                        ResetScannerPromptState();
+                    if (TryCompleteLayerOperationAfterExecution(consumeAction))
                         yield break;
-                    }
-
-                    ExitLandingStateToMovement(rollback: false);
-                    RefreshSensorsForCurrentState();
                     break;
                 }
                 case LandingOptionAction.AscendToAirHigh:
@@ -994,15 +995,8 @@ public partial class TurnStateManager
                         yield return new WaitForSeconds(duration);
                     selectedUnit.TrySetCurrentLayerMode(Domain.Air, HeightLevel.AirHigh);
                     cursorController?.PlayConfirmSfx();
-                    bool ascendFinished = TryFinalizeSelectedUnitActionFromDebug();
-                    if (ascendFinished)
-                    {
-                        cursorController?.PlayDoneSfx();
-                        ResetScannerPromptState();
+                    if (TryCompleteLayerOperationAfterExecution(consumeAction))
                         yield break;
-                    }
-                    ExitLandingStateToMovement(rollback: false);
-                    RefreshSensorsForCurrentState();
                     break;
                 }
                 case LandingOptionAction.Land:
@@ -1031,16 +1025,8 @@ public partial class TurnStateManager
                             yield return new WaitForSeconds(postTransitionDelay);
 
                         cursorController?.PlayConfirmSfx();
-                        bool domainTransitionFinished = TryFinalizeSelectedUnitActionFromDebug();
-                        if (domainTransitionFinished)
-                        {
-                            cursorController?.PlayDoneSfx();
-                            ResetScannerPromptState();
+                        if (TryCompleteLayerOperationAfterExecution(consumeAction))
                             yield break;
-                        }
-
-                        ExitLandingStateToMovement(rollback: false);
-                        RefreshSensorsForCurrentState();
                         break;
                     }
 
@@ -1112,23 +1098,8 @@ public partial class TurnStateManager
                         yield return new WaitForSeconds(postLandingDelay);
 
                     cursorController?.PlayConfirmSfx();
-                    bool finished = TryFinalizeSelectedUnitActionFromDebug();
-                    if (finished)
-                    {
-                        cursorController?.PlayDoneSfx();
-                        ResetScannerPromptState();
+                    if (TryCompleteLayerOperationAfterExecution(consumeAction))
                         yield break;
-                    }
-
-                    SetCursorState(CursorState.UnitSelected, "ExecuteLandingOptionSequence: landing without action consume");
-                    ClearSensorResults();
-                    PaintSelectedUnitMovementRange();
-                    if (cursorController != null && selectedUnit != null)
-                    {
-                        Vector3Int unitCell = selectedUnit.CurrentCellPosition;
-                        unitCell.z = 0;
-                        cursorController.SetCell(unitCell, playMoveSfx: false);
-                    }
                     break;
                 }
                 case LandingOptionAction.DomainTransition:
@@ -1150,16 +1121,8 @@ public partial class TurnStateManager
                         yield return new WaitForSeconds(postTransitionDelay);
 
                     cursorController?.PlayConfirmSfx();
-                    bool finished = TryFinalizeSelectedUnitActionFromDebug();
-                    if (finished)
-                    {
-                        cursorController?.PlayDoneSfx();
-                        ResetScannerPromptState();
+                    if (TryCompleteLayerOperationAfterExecution(consumeAction))
                         yield break;
-                    }
-
-                    ExitLandingStateToMovement(rollback: false);
-                    RefreshSensorsForCurrentState();
                     break;
                 }
             }
@@ -1175,6 +1138,38 @@ public partial class TurnStateManager
         {
             landingExecutionInProgress = false;
         }
+    }
+
+    private bool TryCompleteLayerOperationAfterExecution(bool consumeAction)
+    {
+        if (consumeAction)
+        {
+            bool finished = TryFinalizeSelectedUnitActionFromDebug();
+            if (finished)
+            {
+                cursorController?.PlayDoneSfx();
+                ResetScannerPromptState();
+                return true;
+            }
+
+            ExitLandingStateToMovement(rollback: false);
+            RefreshSensorsForCurrentState();
+            return false;
+        }
+
+        SetCursorState(CursorState.UnitSelected, "ExecuteLandingOptionSequence: debug keep turn");
+        scannerPromptStep = ScannerPromptStep.AwaitingAction;
+        ClearSensorResults();
+        PaintSelectedUnitMovementRange();
+        if (cursorController != null && selectedUnit != null)
+        {
+            Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+            unitCell.z = 0;
+            cursorController.SetCell(unitCell, playMoveSfx: false);
+        }
+
+        cursorController?.PlayDoneSfx();
+        return false;
     }
 
     private void BuildLandingOptionsFromCurrentState()

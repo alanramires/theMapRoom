@@ -385,6 +385,7 @@ MonoBehaviour:
   isSelected: 0
   isPreviewDimmed: 0
   hasTemporarySortingOverride: 0
+  hiddenByFogOfWar: 0
   cachedSpriteSortingOrder: 0
   cachedActedLockSortingOrder: 0
   enableSelectionBlink: 1

@@ -115,7 +115,7 @@ Quando algo parecer "estranho" no campo:
 1. Verificar camada real do alvo (`Domain/Height`).
 2. Verificar `visionSpecializations` do observador para aquela camada.
 3. Verificar se alvo stealth esta ativo naquela camada (`stealthSkillRules`).
-4. Verificar se observador possui deteccao stealth para aquela camada (`detectsStealth` ou lista de skills).
+4. Verificar se observador possui especializacao de visao que case as stealth skills do alvo para aquela camada.
 5. Verificar LOS.
 6. Verificar escopo/duracao de reveal (`stealthRevealScope`, `stealthRevealTeams`, `stealthVisibleIfDetectedForTurns`).
 

@@ -8,6 +8,21 @@ using UnityEngine.InputSystem;
 
 public class CursorController : MonoBehaviour
 {
+    [System.Serializable]
+    private class MovementCategorySfxBinding
+    {
+        public MovementCategory category = MovementCategory.Marcha;
+        public AudioClip clip;
+    }
+
+    [System.Serializable]
+    private class SkillSfxBinding
+    {
+        [Tooltip("Uma ou mais skills que compartilham este mesmo som.")]
+        public List<SkillData> skills = new List<SkillData>();
+        public AudioClip clip;
+    }
+
     public enum BoundsMode
     {
         PaintedTiles,
@@ -65,10 +80,19 @@ public class CursorController : MonoBehaviour
     [SerializeField] private AudioClip explosionSfx;
     [SerializeField] private AudioClip endingTurnSfx;
     [SerializeField] private AudioClip heliceMoveSfx;
+    [SerializeField] private AudioClip turboHeliceMoveSfx;
+    [SerializeField] private AudioClip trainMoveSfx;
     [SerializeField] private AudioClip jatoMoveSfx;
     [SerializeField] private AudioClip marchaMoveSfx;
     [SerializeField] private AudioClip navalMoveSfx;
     [SerializeField] private AudioClip motorMoveSfx;
+    [Header("Movement Category SFX")]
+    [Tooltip("Vinculo entre MovementCategory e AudioClip de movimento. Pode ser ajustado sem hardcode.")]
+    [SerializeField] private List<MovementCategorySfxBinding> movementCategorySfx = new List<MovementCategorySfxBinding>();
+    [Header("Skill Custom SFX")]
+    [SerializeField] private AudioClip sonarSkillSfx;
+    [Tooltip("Vinculo entre uma ou mais skills e um AudioClip customizado.")]
+    [SerializeField] private List<SkillSfxBinding> skillSfxBindings = new List<SkillSfxBinding>();
     [Range(0f, 1f)]
     [SerializeField] private float moveSfxVolume = 1f;
     [Range(0f, 1f)]
@@ -83,6 +107,8 @@ public class CursorController : MonoBehaviour
     [SerializeField] private float explosionSfxVolume = 1f;
     [Range(0f, 1f)]
     [SerializeField] private float endingTurnSfxVolume = 1f;
+    [Range(0f, 1f)]
+    [SerializeField] private float skillSfxVolume = 1f;
 
     [Header("State")]
     [SerializeField] private TurnStateManager turnStateManager;
@@ -533,6 +559,10 @@ public class CursorController : MonoBehaviour
 
         if (heliceMoveSfx == null)
             heliceMoveSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/move/helice.MP3");
+        if (turboHeliceMoveSfx == null)
+            turboHeliceMoveSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/move/turbo helice.MP3");
+        if (trainMoveSfx == null)
+            trainMoveSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/move/train.MP3");
         if (jatoMoveSfx == null)
             jatoMoveSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/move/jato.MP3");
         if (marchaMoveSfx == null)
@@ -541,7 +571,12 @@ public class CursorController : MonoBehaviour
             navalMoveSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/move/naval.MP3");
         if (motorMoveSfx == null)
             motorMoveSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/move/motor.MP3");
+        if (sonarSkillSfx == null)
+            sonarSkillSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/sonar.MP3");
 #endif
+
+        EnsureMovementCategorySfxBindings();
+        EnsureSkillSfxBindings();
 
         if (turnStateManager == null)
             turnStateManager = FindAnyObjectByType<TurnStateManager>();
@@ -666,29 +701,10 @@ public class CursorController : MonoBehaviour
         int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
         if (activeTeam < 0)
             return false;
-
-        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        ConstructionManager bestHq = null;
-        for (int i = 0; i < constructions.Length; i++)
-        {
-            ConstructionManager c = constructions[i];
-            if (c == null || !c.gameObject.activeInHierarchy)
-                continue;
-            if (!IsHeadQuarterConstruction(c))
-                continue;
-            if ((int)c.TeamId != activeTeam)
-                continue;
-
-            if (bestHq == null || c.InstanceId < bestHq.InstanceId)
-                bestHq = c;
-        }
-
-        if (bestHq == null)
+        if (!TeamAnchorResolver.TryResolveAnchorCell(activeTeam, out Vector3Int anchorCell))
             return false;
 
-        Vector3Int hqCell = bestHq.CurrentCellPosition;
-        hqCell.z = 0;
-        if (!SetCell(hqCell, playMoveSfx: false))
+        if (!SetCell(anchorCell, playMoveSfx: false))
             return false;
 
         PlayUiSfx(beepSfx);
@@ -709,27 +725,6 @@ public class CursorController : MonoBehaviour
             if (cell == currentCell)
                 return true;
         }
-
-        return false;
-    }
-
-    private static bool IsHeadQuarterConstruction(ConstructionManager construction)
-    {
-        if (construction == null)
-            return false;
-
-        if (construction.IsPlayerHeadQuarter)
-            return true;
-
-        string constructionId = construction.ConstructionId;
-        if (!string.IsNullOrWhiteSpace(constructionId) &&
-            string.Equals(constructionId.Trim(), "hq", System.StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        string displayName = construction.ConstructionDisplayName;
-        if (!string.IsNullOrWhiteSpace(displayName) &&
-            displayName.IndexOf("hq", System.StringComparison.OrdinalIgnoreCase) >= 0)
-            return true;
 
         return false;
     }
@@ -1054,12 +1049,63 @@ public class CursorController : MonoBehaviour
         audioSource.PlayOneShot(clip, unitMoveSfxVolume);
     }
 
+    public bool TryPlaySkillSfx(SkillData skill, float volumeScale = 1f)
+    {
+        AudioClip clip = GetSkillSfxFor(skill);
+        if (clip == null)
+            return false;
+
+        float volume = Mathf.Clamp01(skillSfxVolume * Mathf.Clamp01(volumeScale));
+        if (audioSource == null)
+        {
+            AudioSource.PlayClipAtPoint(clip, transform.position, volume);
+            return true;
+        }
+
+        audioSource.PlayOneShot(clip, volume);
+        return true;
+    }
+
+    public bool TryPlayUnitSkillSfx(UnitManager unit, float volumeScale = 1f)
+    {
+        if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null || data.skills == null)
+            return false;
+
+        for (int i = 0; i < data.skills.Count; i++)
+        {
+            SkillData skill = data.skills[i];
+            if (TryPlaySkillSfx(skill, volumeScale))
+                return true;
+        }
+
+        return false;
+    }
+
     private AudioClip GetUnitMovementClipFor(MovementCategory category)
+    {
+        EnsureMovementCategorySfxBindings();
+        for (int i = 0; i < movementCategorySfx.Count; i++)
+        {
+            MovementCategorySfxBinding binding = movementCategorySfx[i];
+            if (binding == null || binding.category != category || binding.clip == null)
+                continue;
+
+            return binding.clip;
+        }
+
+        return GetLegacyMovementClipFor(category);
+    }
+
+    private AudioClip GetLegacyMovementClipFor(MovementCategory category)
     {
         switch (category)
         {
             case MovementCategory.Helice:
                 return heliceMoveSfx;
+            case MovementCategory.TurboHelice:
+                return turboHeliceMoveSfx;
+            case MovementCategory.Train:
+                return trainMoveSfx;
             case MovementCategory.Jato:
                 return jatoMoveSfx;
             case MovementCategory.Naval:
@@ -1070,6 +1116,108 @@ public class CursorController : MonoBehaviour
             default:
                 return marchaMoveSfx;
         }
+    }
+
+    private void EnsureMovementCategorySfxBindings()
+    {
+        if (movementCategorySfx == null)
+            movementCategorySfx = new List<MovementCategorySfxBinding>();
+
+        EnsureMovementCategorySfxBinding(MovementCategory.Helice, heliceMoveSfx);
+        EnsureMovementCategorySfxBinding(MovementCategory.TurboHelice, turboHeliceMoveSfx);
+        EnsureMovementCategorySfxBinding(MovementCategory.Train, trainMoveSfx);
+        EnsureMovementCategorySfxBinding(MovementCategory.Jato, jatoMoveSfx);
+        EnsureMovementCategorySfxBinding(MovementCategory.Marcha, marchaMoveSfx);
+        EnsureMovementCategorySfxBinding(MovementCategory.Naval, navalMoveSfx);
+        EnsureMovementCategorySfxBinding(MovementCategory.Motor, motorMoveSfx);
+    }
+
+    private void EnsureMovementCategorySfxBinding(MovementCategory category, AudioClip defaultClip)
+    {
+        int foundIndex = -1;
+        for (int i = 0; i < movementCategorySfx.Count; i++)
+        {
+            MovementCategorySfxBinding binding = movementCategorySfx[i];
+            if (binding == null)
+                continue;
+
+            if (binding.category != category)
+                continue;
+
+            foundIndex = i;
+            break;
+        }
+
+        if (foundIndex < 0)
+        {
+            movementCategorySfx.Add(new MovementCategorySfxBinding
+            {
+                category = category,
+                clip = defaultClip
+            });
+            return;
+        }
+
+        MovementCategorySfxBinding existing = movementCategorySfx[foundIndex];
+        if (existing.clip == null && defaultClip != null)
+            existing.clip = defaultClip;
+    }
+
+    private AudioClip GetSkillSfxFor(SkillData skill)
+    {
+        if (skill == null)
+            return null;
+
+        EnsureSkillSfxBindings();
+        for (int i = 0; i < skillSfxBindings.Count; i++)
+        {
+            SkillSfxBinding binding = skillSfxBindings[i];
+            if (binding == null || binding.clip == null || binding.skills == null || binding.skills.Count == 0)
+                continue;
+
+            if (!BindingContainsSkill(binding.skills, skill))
+                continue;
+
+            return binding.clip;
+        }
+
+        return null;
+    }
+
+    private void EnsureSkillSfxBindings()
+    {
+        if (skillSfxBindings == null)
+            skillSfxBindings = new List<SkillSfxBinding>();
+
+        if (skillSfxBindings.Count == 0 && sonarSkillSfx != null)
+        {
+            skillSfxBindings.Add(new SkillSfxBinding
+            {
+                clip = sonarSkillSfx
+            });
+        }
+    }
+
+    private static bool BindingContainsSkill(List<SkillData> candidateSkills, SkillData targetSkill)
+    {
+        for (int i = 0; i < candidateSkills.Count; i++)
+        {
+            SkillData candidate = candidateSkills[i];
+            if (candidate == null)
+                continue;
+
+            if (candidate == targetSkill)
+                return true;
+
+            string candidateId = candidate.id;
+            string targetId = targetSkill.id;
+            if (!string.IsNullOrWhiteSpace(candidateId) &&
+                !string.IsNullOrWhiteSpace(targetId) &&
+                string.Equals(candidateId, targetId, System.StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private void PlayClipWithPitch(AudioClip clip, float volume, float pitch)
@@ -1094,5 +1242,86 @@ public class CursorController : MonoBehaviour
         audioSource.pitch = basePitch;
     }
 
+}
+
+public static class TeamAnchorResolver
+{
+    public static bool TryResolveAnchorCell(int teamId, out Vector3Int anchorCell)
+    {
+        anchorCell = Vector3Int.zero;
+        if (teamId < 0)
+            return false;
+
+        ConstructionManager[] constructions = Object.FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        ConstructionManager bestHq = null;
+        ConstructionManager firstTeamConstruction = null;
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if ((int)construction.TeamId != teamId)
+                continue;
+
+            if (firstTeamConstruction == null || construction.InstanceId < firstTeamConstruction.InstanceId)
+                firstTeamConstruction = construction;
+
+            if (!IsHeadQuarterConstruction(construction))
+                continue;
+
+            if (bestHq == null || construction.InstanceId < bestHq.InstanceId)
+                bestHq = construction;
+        }
+
+        ConstructionManager targetConstruction = bestHq != null ? bestHq : firstTeamConstruction;
+        if (targetConstruction != null)
+        {
+            anchorCell = targetConstruction.CurrentCellPosition;
+            anchorCell.z = 0;
+            return true;
+        }
+
+        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        UnitManager firstTeamUnit = null;
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+            if ((int)unit.TeamId != teamId)
+                continue;
+
+            if (firstTeamUnit == null || unit.InstanceId < firstTeamUnit.InstanceId)
+                firstTeamUnit = unit;
+        }
+
+        if (firstTeamUnit == null)
+            return false;
+
+        anchorCell = firstTeamUnit.CurrentCellPosition;
+        anchorCell.z = 0;
+        return true;
+    }
+
+    private static bool IsHeadQuarterConstruction(ConstructionManager construction)
+    {
+        if (construction == null)
+            return false;
+
+        if (construction.IsPlayerHeadQuarter)
+            return true;
+
+        string constructionId = construction.ConstructionId;
+        if (!string.IsNullOrWhiteSpace(constructionId) &&
+            string.Equals(constructionId.Trim(), "hq", System.StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        string displayName = construction.ConstructionDisplayName;
+        if (!string.IsNullOrWhiteSpace(displayName) &&
+            displayName.IndexOf("hq", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        return false;
+    }
 }
 

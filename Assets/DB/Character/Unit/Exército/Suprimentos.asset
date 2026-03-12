@@ -28,8 +28,9 @@ MonoBehaviour:
   visao: 3
   visionSpecializations: []
   stealthRevealScope: 0
+  stealthRevealTeams: 
   stealthVisibleIfDetectedForTurns: 1
-  movementCategory: 4
+  movementCategory: 6
   militaryForce: 0
   unitClass: 1
   eliteLevel: 0
@@ -44,8 +45,10 @@ MonoBehaviour:
   skills:
   - {fileID: 11400000, guid: 759d9c0f4a06434f8f54d781709f8c7e, type: 2}
   stealthSkills: []
+  stealthSkillRules: []
   autonomyData: {fileID: 0}
   embarkedWeapons: []
+  cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 1
   supplierTier: 1
   maxUnitsServedPerTurn: 2

@@ -21,6 +21,7 @@ public class DebugManager : MonoBehaviour
     private PropertyInfo cachedTextProperty;
     private InputField resolvedLegacyInputField;
     private TMP_InputField resolvedTmpInputField;
+    private int lastSubmitFrame = -1;
 
     private void Awake()
     {
@@ -43,6 +44,18 @@ public class DebugManager : MonoBehaviour
         TryAutoAssignReferences();
     }
 #endif
+
+    private void Update()
+    {
+        if (!IsCommandInputFocused())
+            return;
+
+        // Enquanto estiver digitando no panel_debug, bloqueia qualquer atalho de gameplay.
+        UiInputBlocker.SuppressGameplayInputForFrames(1);
+
+        if (IsEnterPressedThisFrame())
+            TrySubmitCommandInputOncePerFrame();
+    }
 
     private void TryAutoAssignReferences()
     {
@@ -76,6 +89,10 @@ public class DebugManager : MonoBehaviour
         string rawCommand = GetInputText();
         if (string.IsNullOrWhiteSpace(rawCommand))
             return;
+
+        // Evita que o mesmo Enter usado para enviar o comando seja processado
+        // como confirmacao de gameplay (ex.: finalizar acao/turno) no mesmo frame.
+        UiInputBlocker.SuppressGameplayInputForFrames(2);
 
         if (turnStateManager == null)
             return;
@@ -294,22 +311,37 @@ public class DebugManager : MonoBehaviour
 
     private void HandleLegacyInputEndEdit(string _)
     {
+        // Inclui ESC/Cancel do input para nao vazar para atalhos de gameplay.
+        UiInputBlocker.SuppressGameplayInputForFrames(2);
+
         if (!IsEnterPressedThisFrame())
             return;
 
-        HandleSendClicked();
+        TrySubmitCommandInputOncePerFrame();
     }
 
     private void HandleTmpInputSubmit(string _)
     {
-        HandleSendClicked();
+        TrySubmitCommandInputOncePerFrame();
     }
 
     private void HandleTmpInputEndEdit(string _)
     {
+        // Inclui ESC/Cancel do input para nao vazar para atalhos de gameplay.
+        UiInputBlocker.SuppressGameplayInputForFrames(2);
+
         if (!IsEnterPressedThisFrame())
             return;
 
+        TrySubmitCommandInputOncePerFrame();
+    }
+
+    private void TrySubmitCommandInputOncePerFrame()
+    {
+        if (lastSubmitFrame == Time.frameCount)
+            return;
+
+        lastSubmitFrame = Time.frameCount;
         HandleSendClicked();
     }
 
@@ -638,6 +670,9 @@ public class DebugManager : MonoBehaviour
             return false;
 
         string trimmed = rawCommand.Trim();
+        if (TryParseAltitudeAliasCommand(trimmed, out targetDomain, out targetHeight))
+            return true;
+
         const string prefix = "change altitude ";
         if (!trimmed.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
             return false;
@@ -646,31 +681,117 @@ public class DebugManager : MonoBehaviour
         if (string.IsNullOrWhiteSpace(token))
             return false;
 
+        if (TryParseDomainHeightPair(token, out targetDomain, out targetHeight))
+            return true;
+
+        // Compatibilidade com comandos antigos.
         if (string.Equals(token, "high", System.StringComparison.OrdinalIgnoreCase))
+            return TryParseDomainHeightPair("air/high", out targetDomain, out targetHeight);
+        if (string.Equals(token, "low", System.StringComparison.OrdinalIgnoreCase))
+            return TryParseDomainHeightPair("air/low", out targetDomain, out targetHeight);
+        if (string.Equals(token, "surface", System.StringComparison.OrdinalIgnoreCase))
+            return TryParseDomainHeightPair("land/surface", out targetDomain, out targetHeight);
+        if (string.Equals(token, "sub", System.StringComparison.OrdinalIgnoreCase))
+            return TryParseDomainHeightPair("submarine/submerged", out targetDomain, out targetHeight);
+
+        return TryParseAltitudeAliasCommand(token, out targetDomain, out targetHeight);
+    }
+
+    private static bool TryParseAltitudeAliasCommand(string token, out Domain targetDomain, out HeightLevel targetHeight)
+    {
+        targetDomain = Domain.Land;
+        targetHeight = HeightLevel.Surface;
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+
+        string normalized = token.Trim();
+        if (string.Equals(normalized, "landing", System.StringComparison.OrdinalIgnoreCase))
+            return TryParseDomainHeightPair("land/surface", out targetDomain, out targetHeight);
+        if (string.Equals(normalized, "emerge", System.StringComparison.OrdinalIgnoreCase))
+            return TryParseDomainHeightPair("naval/surface", out targetDomain, out targetHeight);
+        if (string.Equals(normalized, "submerge", System.StringComparison.OrdinalIgnoreCase))
+            return TryParseDomainHeightPair("submarine/submerged", out targetDomain, out targetHeight);
+        if (string.Equals(normalized, "take off", System.StringComparison.OrdinalIgnoreCase))
+            return TryParseDomainHeightPair("air/low", out targetDomain, out targetHeight);
+        if (string.Equals(normalized, "fast take off", System.StringComparison.OrdinalIgnoreCase))
+            return TryParseDomainHeightPair("air/high", out targetDomain, out targetHeight);
+
+        return false;
+    }
+
+    private static bool TryParseDomainHeightPair(string token, out Domain targetDomain, out HeightLevel targetHeight)
+    {
+        targetDomain = Domain.Land;
+        targetHeight = HeightLevel.Surface;
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+
+        string[] parts = token.Split('/');
+        if (parts.Length != 2)
+            return false;
+
+        if (!TryParseDomainToken(parts[0].Trim(), out targetDomain))
+            return false;
+        if (!TryParseHeightToken(parts[1].Trim(), out targetHeight))
+            return false;
+
+        return true;
+    }
+
+    private static bool TryParseDomainToken(string token, out Domain domain)
+    {
+        domain = Domain.Land;
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+
+        if (string.Equals(token, "land", System.StringComparison.OrdinalIgnoreCase))
         {
-            targetDomain = Domain.Air;
-            targetHeight = HeightLevel.AirHigh;
+            domain = Domain.Land;
+            return true;
+        }
+        if (string.Equals(token, "naval", System.StringComparison.OrdinalIgnoreCase))
+        {
+            domain = Domain.Naval;
+            return true;
+        }
+        if (string.Equals(token, "submarine", System.StringComparison.OrdinalIgnoreCase))
+        {
+            domain = Domain.Submarine;
+            return true;
+        }
+        if (string.Equals(token, "air", System.StringComparison.OrdinalIgnoreCase))
+        {
+            domain = Domain.Air;
             return true;
         }
 
-        if (string.Equals(token, "low", System.StringComparison.OrdinalIgnoreCase))
-        {
-            targetDomain = Domain.Air;
-            targetHeight = HeightLevel.AirLow;
-            return true;
-        }
+        return false;
+    }
+
+    private static bool TryParseHeightToken(string token, out HeightLevel height)
+    {
+        height = HeightLevel.Surface;
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
 
         if (string.Equals(token, "surface", System.StringComparison.OrdinalIgnoreCase))
         {
-            targetDomain = Domain.Land;
-            targetHeight = HeightLevel.Surface;
+            height = HeightLevel.Surface;
             return true;
         }
-
-        if (string.Equals(token, "sub", System.StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(token, "submerged", System.StringComparison.OrdinalIgnoreCase))
         {
-            targetDomain = Domain.Submarine;
-            targetHeight = HeightLevel.Submerged;
+            height = HeightLevel.Submerged;
+            return true;
+        }
+        if (string.Equals(token, "low", System.StringComparison.OrdinalIgnoreCase))
+        {
+            height = HeightLevel.AirLow;
+            return true;
+        }
+        if (string.Equals(token, "high", System.StringComparison.OrdinalIgnoreCase))
+        {
+            height = HeightLevel.AirHigh;
             return true;
         }
 
@@ -815,12 +936,41 @@ public class DebugManager : MonoBehaviour
 
         return null;
     }
+
+    private bool IsCommandInputFocused()
+    {
+        if (resolvedCommandInputField == null)
+            resolvedCommandInputField = ResolveCommandInputComponentFromGameObject(commandInputObject);
+
+        if (resolvedLegacyInputField == null)
+            resolvedLegacyInputField = resolvedCommandInputField as InputField;
+        if (resolvedTmpInputField == null)
+            resolvedTmpInputField = resolvedCommandInputField as TMP_InputField;
+
+        if (resolvedLegacyInputField != null && resolvedLegacyInputField.isFocused)
+            return true;
+        if (resolvedTmpInputField != null && resolvedTmpInputField.isFocused)
+            return true;
+
+        return false;
+    }
 }
 
 public static class UiInputBlocker
 {
+    private static int suppressUntilFrame = -1;
+
+    public static void SuppressGameplayInputForFrames(int frames)
+    {
+        int safeFrames = Mathf.Max(1, frames);
+        suppressUntilFrame = Mathf.Max(suppressUntilFrame, Time.frameCount + safeFrames);
+    }
+
     public static bool IsTextInputFocused()
     {
+        if (Time.frameCount <= suppressUntilFrame)
+            return true;
+
         EventSystem eventSystem = EventSystem.current;
         if (eventSystem == null)
             return false;

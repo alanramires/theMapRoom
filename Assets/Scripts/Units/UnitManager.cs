@@ -75,10 +75,8 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private List<UnitTransportSeatRuntime> transportedUnitSlots = new List<UnitTransportSeatRuntime>();
     [SerializeField, HideInInspector] private UnitManager embarkedTransporter;
     [SerializeField, HideInInspector] private int embarkedTransporterSlotIndex = -1;
-    [Header("Stealth Reveal Runtime")]
-    [SerializeField, HideInInspector] private int stealthRevealForAllUntilTurn = int.MinValue;
-    [SerializeField, HideInInspector] private List<int> stealthRevealTeamIds = new List<int>();
-    [SerializeField, HideInInspector] private List<int> stealthRevealTeamUntilTurns = new List<int>();
+    [Header("Stealth Runtime")]
+    [SerializeField, HideInInspector] private List<int> currentlyObservedByTeamIds = new List<int>();
 
     public TeamId TeamId => teamId;
     public Tilemap BoardTilemap => boardTilemap;
@@ -111,6 +109,7 @@ public class UnitManager : MonoBehaviour
     public IReadOnlyList<UnitTransportSeatRuntime> TransportedUnitSlots => transportedUnitSlots;
     public UnitManager EmbarkedTransporter => embarkedTransporter;
     public int EmbarkedTransporterSlotIndex => embarkedTransporterSlotIndex;
+    public IReadOnlyList<int> CurrentlyObservedByTeamIds => currentlyObservedByTeamIds;
 
     private static readonly int GlowColorId = Shader.PropertyToID("_GlowColor");
     private static readonly int GlowSizeId = Shader.PropertyToID("_GlowSize");
@@ -214,6 +213,8 @@ public class UnitManager : MonoBehaviour
             appliedHasActed = hasActed;
             RefreshActedVisual();
         }
+
+        EnsureDetectedIndicatorConsistency();
     }
 
     public void Setup(UnitDatabase database, string id)
@@ -396,101 +397,97 @@ public class UnitManager : MonoBehaviour
         SetReceivedSuppliesThisTurn(false);
     }
 
-    public void RegisterStealthReveal(
-        int detectorTeamId,
-        int currentTurn,
-        int revealTurns,
-        StealthRevealScope revealScope,
-        IReadOnlyList<int> configuredRevealTeamIds = null)
+    public void RefreshRuntimeVisualState()
     {
-        int duration = Mathf.Max(1, revealTurns);
-        int untilTurn = currentTurn + duration - 1;
-
-        if (revealScope == StealthRevealScope.AllTeams)
-        {
-            stealthRevealForAllUntilTurn = Mathf.Max(stealthRevealForAllUntilTurn, untilTurn);
-            return;
-        }
-
-        if (revealScope == StealthRevealScope.ConfiguredTeams)
-        {
-            if (configuredRevealTeamIds != null && configuredRevealTeamIds.Count > 0)
-            {
-                for (int i = 0; i < configuredRevealTeamIds.Count; i++)
-                    RegisterStealthRevealForTeam(configuredRevealTeamIds[i], untilTurn);
-                return;
-            }
-
-            // Fallback defensivo: sem lista configurada, ao menos o detector enxerga.
-            RegisterStealthRevealForTeam(detectorTeamId, untilTurn);
-            return;
-        }
-
-        RegisterStealthRevealForTeam(detectorTeamId, untilTurn);
+        RefreshActedVisual();
     }
 
-    private void RegisterStealthRevealForTeam(int teamId, int untilTurn)
+    public void RegisterStealthReveal(int detectorTeamId)
     {
-        int index = FindStealthRevealTeamIndex(teamId);
-        if (index < 0)
-        {
-            stealthRevealTeamIds.Add(teamId);
-            stealthRevealTeamUntilTurns.Add(untilTurn);
-            return;
-        }
-
-        if (index >= stealthRevealTeamUntilTurns.Count)
-            return;
-
-        if (untilTurn > stealthRevealTeamUntilTurns[index])
-            stealthRevealTeamUntilTurns[index] = untilTurn;
+        AddCurrentlyObservedByTeam(detectorTeamId);
     }
 
     public bool IsStealthRevealedForTeam(int viewerTeamId, int currentTurn)
     {
-        if (stealthRevealForAllUntilTurn >= currentTurn)
-            return true;
-
-        int index = FindStealthRevealTeamIndex(viewerTeamId);
-        if (index < 0 || index >= stealthRevealTeamUntilTurns.Count)
+        if (currentlyObservedByTeamIds == null || currentlyObservedByTeamIds.Count <= 0)
             return false;
 
-        return stealthRevealTeamUntilTurns[index] >= currentTurn;
-    }
-
-    public int GetStealthRevealTurnsRemainingForTeam(int viewerTeamId, int currentTurn)
-    {
-        int untilTurn = stealthRevealForAllUntilTurn;
-        int index = FindStealthRevealTeamIndex(viewerTeamId);
-        if (index >= 0 && index < stealthRevealTeamUntilTurns.Count && stealthRevealTeamUntilTurns[index] > untilTurn)
-            untilTurn = stealthRevealTeamUntilTurns[index];
-
-        if (untilTurn < currentTurn)
-            return 0;
-
-        return (untilTurn - currentTurn) + 1;
+        return currentlyObservedByTeamIds.Contains(viewerTeamId);
     }
 
     public void ClearStealthRevealState()
     {
-        stealthRevealForAllUntilTurn = int.MinValue;
-        stealthRevealTeamIds.Clear();
-        stealthRevealTeamUntilTurns.Clear();
+        if (currentlyObservedByTeamIds != null)
+            currentlyObservedByTeamIds.Clear();
     }
 
-    private int FindStealthRevealTeamIndex(int teamId)
+    public bool AddCurrentlyObservedByTeam(int teamId)
     {
-        if (stealthRevealTeamIds == null || stealthRevealTeamUntilTurns == null)
-            return -1;
+        if (currentlyObservedByTeamIds == null)
+            currentlyObservedByTeamIds = new List<int>();
+        if (teamId < -1 || teamId > 3)
+            return false;
+        if (currentlyObservedByTeamIds.Contains(teamId))
+            return false;
 
-        int count = Mathf.Min(stealthRevealTeamIds.Count, stealthRevealTeamUntilTurns.Count);
-        for (int i = 0; i < count; i++)
+        currentlyObservedByTeamIds.Add(teamId);
+        return true;
+    }
+
+    public bool RemoveCurrentlyObservedByTeam(int teamId)
+    {
+        if (currentlyObservedByTeamIds == null || currentlyObservedByTeamIds.Count <= 0)
+            return false;
+
+        return currentlyObservedByTeamIds.Remove(teamId);
+    }
+
+    public bool SyncCurrentlyObservedByTeams(IEnumerable<int> teamIds)
+    {
+        if (currentlyObservedByTeamIds == null)
+            currentlyObservedByTeamIds = new List<int>();
+
+        HashSet<int> desired = new HashSet<int>();
+        if (teamIds != null)
         {
-            if (stealthRevealTeamIds[i] == teamId)
-                return i;
+            foreach (int teamId in teamIds)
+            {
+                if (teamId < -1 || teamId > 3)
+                    continue;
+                desired.Add(teamId);
+            }
         }
 
-        return -1;
+        bool changed = false;
+        for (int i = currentlyObservedByTeamIds.Count - 1; i >= 0; i--)
+        {
+            int teamId = currentlyObservedByTeamIds[i];
+            if (desired.Contains(teamId))
+                continue;
+
+            currentlyObservedByTeamIds.RemoveAt(i);
+            changed = true;
+        }
+
+        foreach (int teamId in desired)
+        {
+            if (currentlyObservedByTeamIds.Contains(teamId))
+                continue;
+
+            currentlyObservedByTeamIds.Add(teamId);
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    public bool ClearCurrentlyObservedByTeams()
+    {
+        if (currentlyObservedByTeamIds == null || currentlyObservedByTeamIds.Count <= 0)
+            return false;
+
+        currentlyObservedByTeamIds.Clear();
+        return true;
     }
 
     public void SetReceivedSuppliesThisTurn(bool value)
@@ -1222,6 +1219,14 @@ public class UnitManager : MonoBehaviour
             embarkedResourcesRuntime = new List<UnitEmbarkedSupply>();
         if (embarkedServicesRuntime == null)
             embarkedServicesRuntime = new List<ServiceData>();
+        if (currentlyObservedByTeamIds == null)
+            currentlyObservedByTeamIds = new List<int>();
+        for (int i = currentlyObservedByTeamIds.Count - 1; i >= 0; i--)
+        {
+            int team = currentlyObservedByTeamIds[i];
+            if (team < -1 || team > 3)
+                currentlyObservedByTeamIds.RemoveAt(i);
+        }
 
         if (data == null || !data.isSupplier)
         {
@@ -2098,12 +2103,36 @@ public class UnitManager : MonoBehaviour
 
     private bool ShouldShowDetectedIndicator(UnitData unitData)
     {
-        if (unitData == null || !unitData.IsStealthUnit(currentDomain, currentHeightLevel))
+        if (unitData == null || !unitData.IsStealthUnit())
             return false;
 
-        TryAutoAssignMatchController();
-        int viewerTeamId = matchController != null ? matchController.ActiveTeamId : (int)teamId;
-        return PodeMirarSensor.IsStealthTargetRevealedForTeam(this, viewerTeamId);
+        if (currentlyObservedByTeamIds == null || currentlyObservedByTeamIds.Count <= 0)
+            return false;
+
+        int ownerTeamId = (int)teamId;
+        for (int i = 0; i < currentlyObservedByTeamIds.Count; i++)
+        {
+            int observerTeamId = currentlyObservedByTeamIds[i];
+            if (observerTeamId < -1 || observerTeamId > 3)
+                continue;
+            if (observerTeamId == ownerTeamId)
+                continue;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private void EnsureDetectedIndicatorConsistency()
+    {
+        if (unitHud == null)
+            TryAutoAssignHud();
+        if (unitHud == null || !unitHud.gameObject.activeInHierarchy)
+            return;
+
+        bool shouldShow = ShouldShowDetectedIndicator(TryGetUnitData());
+        unitHud.SetDetectedIndicatorVisible(shouldShow);
     }
 
     private void RefreshSelectionVisual()
@@ -2161,6 +2190,8 @@ public class UnitManager : MonoBehaviour
     {
         if (spriteRenderer == null)
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (unitHud == null)
+            TryAutoAssignHud();
 
         // Passenger embarked must stay visually hidden even if other
         // systems request visibility (selection cleanup, blink stop, etc).
@@ -2182,9 +2213,15 @@ public class UnitManager : MonoBehaviour
             SpriteRenderer renderer = renderers[i];
             if (renderer == null)
                 continue;
+            if (renderer == spriteRenderer)
+                continue;
 
             UnitManager owner = renderer.GetComponentInParent<UnitManager>();
             if (owner != this)
+                continue;
+
+            // HUD sprites (altitude/detected/etc) sao controlados pelo UnitHudController.
+            if (renderer.GetComponentInParent<UnitHudController>() != null)
                 continue;
 
             if (hudRoot != null && renderer.transform.IsChildOf(hudRoot))
@@ -2210,6 +2247,10 @@ public class UnitManager : MonoBehaviour
 
     private void SetOwnedUiVisualsVisible(bool visible)
     {
+        if (unitHud == null)
+            TryAutoAssignHud();
+        Transform hudRoot = unitHud != null ? unitHud.transform : null;
+
         Canvas[] canvases = GetComponentsInChildren<Canvas>(true);
         for (int i = 0; i < canvases.Length; i++)
         {
@@ -2219,6 +2260,8 @@ public class UnitManager : MonoBehaviour
 
             UnitManager owner = canvas.GetComponentInParent<UnitManager>();
             if (owner != this)
+                continue;
+            if (hudRoot != null && canvas.transform.IsChildOf(hudRoot))
                 continue;
 
             canvas.enabled = visible;
@@ -2234,6 +2277,8 @@ public class UnitManager : MonoBehaviour
             UnitManager owner = graphic.GetComponentInParent<UnitManager>();
             if (owner != this)
                 continue;
+            if (hudRoot != null && graphic.transform.IsChildOf(hudRoot))
+                continue;
 
             graphic.enabled = visible;
         }
@@ -2247,6 +2292,8 @@ public class UnitManager : MonoBehaviour
 
             UnitManager owner = text.GetComponentInParent<UnitManager>();
             if (owner != this)
+                continue;
+            if (hudRoot != null && text.transform.IsChildOf(hudRoot))
                 continue;
 
             text.enabled = visible;

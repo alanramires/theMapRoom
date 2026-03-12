@@ -30,29 +30,25 @@ MonoBehaviour:
   - domain: 2
     heightLevel: 2
     vision: 7
-    detectsStealth: 1
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
   - domain: 1
     heightLevel: 3
     vision: 7
-    detectsStealth: 0
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
   - domain: 3
     heightLevel: 4
     vision: 1
-    detectsStealth: 0
     detectUnitsWithFollowingSkills: []
   - domain: 3
     heightLevel: 5
     vision: 1
-    detectsStealth: 0
     detectUnitsWithFollowingSkills: []
   stealthRevealScope: 0
   stealthRevealTeams: 
   stealthVisibleIfDetectedForTurns: 1
-  movementCategory: 3
+  movementCategory: 5
   militaryForce: 2
   unitClass: 7
   eliteLevel: 0

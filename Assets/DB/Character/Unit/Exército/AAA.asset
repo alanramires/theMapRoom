@@ -28,8 +28,9 @@ MonoBehaviour:
   visao: 3
   visionSpecializations: []
   stealthRevealScope: 0
+  stealthRevealTeams: 
   stealthVisibleIfDetectedForTurns: 1
-  movementCategory: 4
+  movementCategory: 6
   militaryForce: 0
   unitClass: 2
   eliteLevel: 0
@@ -46,6 +47,7 @@ MonoBehaviour:
   preferredNavalHeight: 2
   skills: []
   stealthSkills: []
+  stealthSkillRules: []
   autonomyData: {fileID: 0}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: 0991ffcafb9efd6458da3a2162d2e488, type: 2}
@@ -54,6 +56,7 @@ MonoBehaviour:
     operationRangeMax: 1
     selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: 0991ffcafb9efd6458da3a2162d2e488, type: 2}
+  cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0

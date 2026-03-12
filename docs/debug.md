@@ -92,12 +92,26 @@ Comandos disponiveis no `panel_debug`.
   - Liga/desliga a economia da partida.
   - Ex.: `set economy off`
 
-- `change altitude high`
-- `change altitude low`
-- `change altitude surface`
-- `change altitude sub`
+- `change altitude <dominio>/<altura>`
   - Altera a camada/altitude da unidade sob o cursor (debug).
-  - Ex.: `change altitude high`
+  - Ex.: `change altitude air/high`
+  - Dominios aceitos: `land`, `naval`, `submarine`, `air`.
+  - Alturas aceitas: `surface`, `submerged`, `low`, `high`.
+
+- `landing`
+  - Atalho para `change altitude land/surface`.
+
+- `emerge`
+  - Atalho para `change altitude naval/surface`.
+
+- `submerge`
+  - Atalho para `change altitude submarine/submerged`.
+
+- `take off`
+  - Atalho para `change altitude air/low`.
+
+- `fast take off`
+  - Atalho para `change altitude air/high`.
 
 ## Observacoes
 

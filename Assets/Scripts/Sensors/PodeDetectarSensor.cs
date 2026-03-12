@@ -24,12 +24,6 @@ public static class PodeDetectarSensor
         if (boardMap == null)
             return false;
 
-        UnitData targetData = null;
-        target.TryGetUnitData(out targetData);
-        bool isStealthTarget = targetData != null && targetData.IsStealthUnit(target.GetDomain(), target.GetHeightLevel());
-        if (isStealthTarget && enableStealthValidation && PodeMirarSensor.IsStealthTargetRevealedForTeam(target, viewerTeamId))
-            return true;
-
         UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
         {
@@ -361,6 +355,18 @@ public static class PodeDetectarSensor
                     continue;
                 }
 
+                string stealthDetectionReason = ResolveStealthDetectionReason(
+                    observerData,
+                    targetData,
+                    targetDomain,
+                    targetHeight);
+                string observationModeReason = usedForwardObserver
+                    ? "via observador avancado"
+                    : "com LOS direta";
+                string detectedReason = string.IsNullOrWhiteSpace(stealthDetectionReason)
+                    ? $"Detectado stealth {observationModeReason}."
+                    : $"{stealthDetectionReason} ({observationModeReason}).";
+
                 detectedStealthOutput.Add(new PodeDetectarOption
                 {
                     observerUnit = observer,
@@ -376,7 +382,7 @@ public static class PodeDetectarSensor
                     forwardObserverUnit = forwardObserver,
                     lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
                     blockedCell = blockedCell,
-                    reason = usedForwardObserver ? "Detectado via observador avancado." : "Detectado com LOS direta."
+                    reason = detectedReason
                 });
                 continue;
             }
@@ -717,6 +723,106 @@ public static class PodeDetectarSensor
             return true;
 
         return observerData != null && observerData.CanDetectStealthFor(targetDomain, targetHeight, targetData);
+    }
+
+    private static string ResolveStealthDetectionReason(
+        UnitData observerData,
+        UnitData targetData,
+        Domain targetDomain,
+        HeightLevel targetHeight)
+    {
+        if (observerData == null)
+            return string.Empty;
+
+        UnitVisionException specialization = FindVisionSpecialization(observerData, targetDomain, targetHeight);
+        if (specialization == null)
+            return string.Empty;
+
+        if (targetData == null || specialization.detectUnitsWithFollowingSkills == null || specialization.detectUnitsWithFollowingSkills.Count == 0)
+            return string.Empty;
+
+        List<SkillData> targetStealthSkills = targetData.ResolveStealthSkillsForDetection(targetDomain, targetHeight);
+        if (targetStealthSkills == null || targetStealthSkills.Count == 0)
+            return string.Empty;
+
+        if (!TryGetFirstMatchingSkill(specialization.detectUnitsWithFollowingSkills, targetStealthSkills, out SkillData matchedSkill))
+            return string.Empty;
+
+        string skillName = ResolveSkillName(matchedSkill);
+        return string.IsNullOrWhiteSpace(skillName)
+            ? "Detectado via skill da visao especializada"
+            : $"Detectado via skill '{skillName}' da visao especializada";
+    }
+
+    private static UnitVisionException FindVisionSpecialization(UnitData observerData, Domain targetDomain, HeightLevel targetHeight)
+    {
+        if (observerData == null || observerData.visionSpecializations == null)
+            return null;
+
+        for (int i = 0; i < observerData.visionSpecializations.Count; i++)
+        {
+            UnitVisionException entry = observerData.visionSpecializations[i];
+            if (entry == null)
+                continue;
+            if (entry.domain != targetDomain || entry.heightLevel != targetHeight)
+                continue;
+
+            return entry;
+        }
+
+        return null;
+    }
+
+    private static bool TryGetFirstMatchingSkill(
+        List<SkillData> detectorSkills,
+        List<SkillData> targetSkills,
+        out SkillData matchedSkill)
+    {
+        matchedSkill = null;
+        if (detectorSkills == null || targetSkills == null)
+            return false;
+
+        for (int i = 0; i < detectorSkills.Count; i++)
+        {
+            SkillData detectorSkill = detectorSkills[i];
+            if (detectorSkill == null)
+                continue;
+
+            string detectorId = string.IsNullOrWhiteSpace(detectorSkill.id) ? string.Empty : detectorSkill.id.Trim();
+            for (int j = 0; j < targetSkills.Count; j++)
+            {
+                SkillData targetSkill = targetSkills[j];
+                if (targetSkill == null)
+                    continue;
+
+                if (ReferenceEquals(detectorSkill, targetSkill))
+                {
+                    matchedSkill = detectorSkill;
+                    return true;
+                }
+
+                string targetId = string.IsNullOrWhiteSpace(targetSkill.id) ? string.Empty : targetSkill.id.Trim();
+                if (detectorId.Length > 0 && targetId.Length > 0 &&
+                    string.Equals(detectorId, targetId, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    matchedSkill = detectorSkill;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static string ResolveSkillName(SkillData skill)
+    {
+        if (skill == null)
+            return string.Empty;
+        if (!string.IsNullOrWhiteSpace(skill.displayName))
+            return skill.displayName.Trim();
+        if (!string.IsNullOrWhiteSpace(skill.id))
+            return skill.id.Trim();
+        return skill.name;
     }
 
     private static bool TryResolveObservationTargetLayer(

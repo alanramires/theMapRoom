@@ -26,9 +26,6 @@ public class UnitVisionException
     [Tooltip("Alcance de visao quando o alvo estiver no dominio/altura desta excecao.")]
     public int vision = 3;
 
-    [Tooltip("Se true, esta excecao tambem habilita deteccao de alvos stealth neste dominio/altura.")]
-    public bool detectsStealth = false;
-
     [Tooltip("Detecta unidades que possuam qualquer skill desta lista (match por referencia ou ID).")]
     public List<SkillData> detectUnitsWithFollowingSkills = new List<SkillData>();
 }
@@ -44,13 +41,6 @@ public class UnitStealthSkillRule
 
     [Tooltip("Skill stealth ativa neste dominio/altura.")]
     public SkillData skill;
-}
-
-public enum StealthRevealScope
-{
-    AllTeams = 0,
-    DetectorTeamOnly = 1,
-    ConfiguredTeams = 2
 }
 
 [CreateAssetMenu(menuName = "Game/Units/Unit Data", fileName = "UnitData_")]
@@ -85,14 +75,6 @@ public class UnitData : ScriptableObject
     [FormerlySerializedAs("visionExceptions")]
     [Tooltip("Vision Specializations por dominio/altura do alvo. Se nao houver match, usa o campo visao padrao.")]
     public List<UnitVisionException> visionSpecializations = new List<UnitVisionException>();
-    [Header("Stealth Visibility")]
-    [Tooltip("Escopo de quem passa a enxergar a unidade quando ela e detectada.")]
-    public StealthRevealScope stealthRevealScope = StealthRevealScope.AllTeams;
-    [Tooltip("Quando scope = ConfiguredTeams, define quais times passam a enxergar a unidade apos deteccao.")]
-    public List<TeamId> stealthRevealTeams = new List<TeamId>();
-    [Min(1)]
-    [Tooltip("Quantidade de turnos (round) em que o alvo stealth permanece revelado apos deteccao.")]
-    public int stealthVisibleIfDetectedForTurns = 1;
     public MovementCategory movementCategory = MovementCategory.Marcha;
     public MilitaryForce militaryForce = MilitaryForce.Army;
     public GameUnitClass unitClass = GameUnitClass.Infantry;
@@ -211,8 +193,6 @@ public class UnitData : ScriptableObject
             skills = new List<SkillData>();
         if (stealthSkills == null)
             stealthSkills = new List<SkillData>();
-        if (stealthRevealTeams == null)
-            stealthRevealTeams = new List<TeamId>();
         if (stealthSkillRules == null)
             stealthSkillRules = new List<UnitStealthSkillRule>();
         if (visionSpecializations == null)
@@ -239,8 +219,6 @@ public class UnitData : ScriptableObject
             passengersCanDisembarkAndGoesToConstructions = new List<ConstructionData>();
         eliteLevel = Mathf.Max(0, eliteLevel);
         visao = Mathf.Max(1, visao);
-        stealthVisibleIfDetectedForTurns = Mathf.Max(1, stealthVisibleIfDetectedForTurns);
-        NormalizeStealthRevealTeams();
         for (int i = 0; i < visionSpecializations.Count; i++)
         {
             UnitVisionException entry = visionSpecializations[i];
@@ -287,25 +265,6 @@ public class UnitData : ScriptableObject
 
     }
 
-    private void NormalizeStealthRevealTeams()
-    {
-        if (stealthRevealTeams == null || stealthRevealTeams.Count <= 1)
-            return;
-
-        HashSet<TeamId> seen = new HashSet<TeamId>();
-        for (int i = stealthRevealTeams.Count - 1; i >= 0; i--)
-        {
-            TeamId team = stealthRevealTeams[i];
-            if (seen.Contains(team))
-            {
-                stealthRevealTeams.RemoveAt(i);
-                continue;
-            }
-
-            seen.Add(team);
-        }
-    }
-
     public bool IsAircraft()
     {
         return unitClass == GameUnitClass.Jet ||
@@ -341,9 +300,6 @@ public class UnitData : ScriptableObject
         if (!TryGetVisionException(targetDomain, targetHeightLevel, out UnitVisionException entry))
             return false;
 
-        if (entry.detectsStealth)
-            return true;
-
         if (targetData == null || entry.detectUnitsWithFollowingSkills == null || entry.detectUnitsWithFollowingSkills.Count == 0)
             return false;
 
@@ -352,11 +308,6 @@ public class UnitData : ScriptableObject
             return false;
 
         return HasAnySkillMatch(entry.detectUnitsWithFollowingSkills, targetStealthSkills);
-    }
-
-    public int ResolveStealthVisibleTurns()
-    {
-        return Mathf.Max(1, stealthVisibleIfDetectedForTurns);
     }
 
     public bool IsStealthUnit()

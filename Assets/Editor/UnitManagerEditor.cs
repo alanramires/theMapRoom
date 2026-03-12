@@ -38,6 +38,7 @@ public class UnitManagerEditor : Editor
     private SerializedProperty preferredAirHeightRuntimeProp;
     private SerializedProperty useExplicitPreferredNavalHeightRuntimeProp;
     private SerializedProperty preferredNavalHeightRuntimeProp;
+    private SerializedProperty currentlyObservedByTeamIdsProp;
 
     private void OnEnable()
     {
@@ -73,6 +74,7 @@ public class UnitManagerEditor : Editor
         preferredAirHeightRuntimeProp = serializedObject.FindProperty("preferredAirHeightRuntime");
         useExplicitPreferredNavalHeightRuntimeProp = serializedObject.FindProperty("useExplicitPreferredNavalHeightRuntime");
         preferredNavalHeightRuntimeProp = serializedObject.FindProperty("preferredNavalHeightRuntime");
+        currentlyObservedByTeamIdsProp = serializedObject.FindProperty("currentlyObservedByTeamIds");
     }
 
     public override void OnInspectorGUI()
@@ -181,6 +183,8 @@ public class UnitManagerEditor : Editor
             EditorGUILayout.HelpBox($"Preferencia aerea: {prefSource}", MessageType.None);
         }
 
+        DrawStealthRevealRuntimeSection(unit);
+
         serializedObject.ApplyModifiedProperties();
 
         DrawLayerStateCycleButtons(unit);
@@ -191,6 +195,32 @@ public class UnitManagerEditor : Editor
             unit.SnapToCellCenter();
         if (GUILayout.Button("Pull Cell From Transform"))
             unit.PullCellFromTransform();
+    }
+
+    private void DrawStealthRevealRuntimeSection(UnitManager unit)
+    {
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField("Stealth Runtime (Observed By Teams)", EditorStyles.boldLabel);
+        if (unit == null)
+            return;
+
+        if (currentlyObservedByTeamIdsProp == null || currentlyObservedByTeamIdsProp.arraySize <= 0)
+        {
+            EditorGUILayout.HelpBox("Nenhum time inimigo marcado como vendo agora.", MessageType.Info);
+            return;
+        }
+
+        for (int i = 0; i < currentlyObservedByTeamIdsProp.arraySize; i++)
+        {
+            SerializedProperty teamIdProp = currentlyObservedByTeamIdsProp.GetArrayElementAtIndex(i);
+            if (teamIdProp == null)
+                continue;
+
+            int teamId = teamIdProp.intValue;
+            string teamLabel = TeamUtils.GetName((TeamId)teamId);
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.TextField($"Team {teamId} ({teamLabel})", "observando");
+        }
     }
 
     private void DrawTransportRuntimeSection(UnitManager unit)

@@ -330,6 +330,20 @@ public partial class TurnStateManager
             return ActionSfx.None;
 
         Vector3Int cursorCell = cursorController.CurrentCell;
+        Tilemap occupancyMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
+        if (UnitRulesDefinition.IsTotalWarEnabled() &&
+            occupancyMap != null &&
+            UnitRulesDefinition.IsUnitCellOccupiedForTeam(
+                occupancyMap,
+                cursorCell,
+                selectedUnit.TeamId,
+                selectedUnit))
+        {
+            PushPanelUnitMessage("Hex disputado: ja existe aliado no local", 2.4f);
+            Debug.Log("movimento bloqueado: em hex disputado nao pode haver duas unidades do mesmo time");
+            return ActionSfx.Error;
+        }
+
         UnitManager unit = FindUnitAtCell(cursorCell);
         if (unit != null && unit != selectedUnit)
         {

@@ -40,6 +40,7 @@ public class MatchController : MonoBehaviour
         public readonly HashSet<Vector3Int> visibleCells = new HashSet<Vector3Int>();
     }
 
+
     [System.Serializable]
     private struct PlayerEntry
     {
@@ -114,6 +115,7 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private bool fogSortingLayerValidated;
     [System.NonSerialized] private int fogCachedTeamId = int.MinValue;
     [System.NonSerialized] private bool fogOverlayInitialized;
+    [System.NonSerialized] private bool initialStealthDetectionBootstrapped;
     [System.NonSerialized] private bool debugFogOfWarEnabled = true;
 
     public int CurrentTurn => currentTurn;
@@ -367,6 +369,12 @@ public class MatchController : MonoBehaviour
             TryAutoAssignFogOfWarReferences();
         ApplyActiveTeamIfChanged(force: true);
         ApplyTeamFlipSettingsToSceneObjects();
+    }
+
+    private void Start()
+    {
+        TryBootstrapInitialStealthDetection();
+        RunTurnStartStillObservedForActiveTeamStealthUnits();
     }
 
 #if UNITY_EDITOR
@@ -710,6 +718,7 @@ public class MatchController : MonoBehaviour
         {
             RefreshFogOfWarForActiveTeam();
             RefreshRuntimeUnitFogVisibility();
+            RunTurnStartStillObservedForActiveTeamStealthUnits();
         }
         else
         {
@@ -1069,6 +1078,8 @@ public class MatchController : MonoBehaviour
             return;
         if (unit == null || !unit.gameObject.activeInHierarchy)
             return;
+        if (!unit.HasActed)
+            return;
         if (activeTeamId < 0)
             return;
         if ((int)unit.TeamId != activeTeamId)
@@ -1087,11 +1098,447 @@ public class MatchController : MonoBehaviour
         if (fogCachedTeamId != activeTeamId || !fogOverlayInitialized)
         {
             RefreshFogOfWarForActiveTeam();
+            TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
+            if (ShouldRunDetectedPersistenceScan(unit))
+                TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
             return;
         }
 
         UpdateFogVisibilityForUnit(unit, boardMap);
         RefreshRuntimeUnitFogVisibility();
+        TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
+        if (ShouldRunDetectedPersistenceScan(unit))
+            TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
+    }
+
+    private void RunTurnStartStillObservedForActiveTeamStealthUnits()
+    {
+        if (!Application.isPlaying || !debugFogOfWarEnabled || !enableTotalWar)
+            return;
+        if (!initialStealthDetectionBootstrapped)
+            return;
+        if (activeTeamId < 0)
+            return;
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return;
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        int scannedStealthUnits = 0;
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+            if ((int)unit.TeamId != activeTeamId)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData unitData) || unitData == null)
+                continue;
+            if (!unitData.IsStealthUnit())
+                continue;
+
+            scannedStealthUnits++;
+            TryRefreshDetectedPersistenceForActedUnit(unit, boardMap, allowWithoutHasAct: true);
+        }
+
+        Debug.Log($"[AindaMeVe][TurnStart] team={activeTeamId} scannedStealthUnits={scannedStealthUnits}");
+    }
+
+    private bool ShouldRunDetectedPersistenceScan(UnitManager unit)
+    {
+        if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+            return false;
+
+        if (HasAnyActiveEnemyReveal(unit))
+            return true;
+
+        if (!unit.TryGetUnitData(out UnitData unitData) || unitData == null)
+            return false;
+
+        return unitData.IsStealthUnit();
+    }
+
+    private void TryPlaySkillDetectionSfxForActedUnit(
+        UnitManager observer,
+        Tilemap boardMap,
+        bool allowSkillSfx = true)
+    {
+        if (observer == null)
+            return;
+        if (!observer.HasActed)
+            return;
+        if (!observer.TryGetUnitData(out UnitData observerData) || observerData == null)
+            return;
+        bool canPlaySkillSfx = allowSkillSfx && cursorController != null && observer.HasActed;
+
+        Tilemap map = boardMap != null ? boardMap : ResolveFogBoardTilemap();
+        if (map == null)
+            return;
+
+        List<PodeDetectarOption> detectedStealth = new List<PodeDetectarOption>();
+        List<PodeDetectarOption> undetectedStealth = new List<PodeDetectarOption>();
+        List<PodeDetectarOption> spottedCandidates = new List<PodeDetectarOption>();
+        List<PodeDetectarOption> blockedByLos = new List<PodeDetectarOption>();
+
+        PodeDetectarSensor.CollectDetection(
+            observer,
+            map,
+            fogOfWarTerrainDatabase,
+            detectedStealth,
+            undetectedStealth,
+            spottedCandidates,
+            blockedByLos,
+            out _,
+            fogOfWarDpqAirHeightConfig,
+            enableLosValidation,
+            enableSpotter,
+            enableStealthValidation);
+
+        int observerTeamId = (int)observer.TeamId;
+        Debug.Log(
+            $"[PodeDetectar][Runtime] observer={observer.name} team={observerTeamId} " +
+            $"detectedStealth={detectedStealth.Count} undetectedStealth={undetectedStealth.Count} " +
+            $"spotted={spottedCandidates.Count} blockedLos={blockedByLos.Count}");
+        for (int i = 0; i < detectedStealth.Count; i++)
+        {
+            PodeDetectarOption option = detectedStealth[i];
+            if (option == null || option.targetUnit == null)
+                continue;
+
+            string reason = string.IsNullOrWhiteSpace(option.reason) ? "-" : option.reason;
+            Debug.Log(
+                $"[PodeDetectar][Runtime][Detected] observer={observer.name} -> target={option.targetUnit.name} " +
+                $"layer={option.targetDomain}/{option.targetHeightLevel} reason={reason}");
+        }
+
+        bool appliedReveal = false;
+        bool playedSkillSfx = false;
+        HashSet<UnitManager> updatedTargets = new HashSet<UnitManager>();
+        for (int i = 0; i < detectedStealth.Count; i++)
+        {
+            PodeDetectarOption option = detectedStealth[i];
+            if (option == null || option.targetUnit == null)
+                continue;
+            if (!option.targetUnit.TryGetUnitData(out UnitData targetData) || targetData == null)
+                continue;
+            if (targetData.IsStealthUnit() && updatedTargets.Add(option.targetUnit))
+            {
+                // Gameplay runtime: qualquer unidade stealth-capable detectada por PodeDetectar
+                // deve receber o marcador de "observada por time".
+                RegisterStealthRevealFromDetection(observer, option.targetUnit);
+                appliedReveal = true;
+            }
+
+            if (!TryResolveSkillMatchedDetectorSkill(observerData, targetData, option.targetDomain, option.targetHeightLevel, out SkillData matchedDetectorSkill))
+                continue;
+            if (matchedDetectorSkill == null)
+                continue;
+
+            if (!canPlaySkillSfx || playedSkillSfx || !IsSubmarineLikeDetectionTarget(option))
+                continue;
+
+            cursorController.TryPlaySkillSfx(matchedDetectorSkill, 1f);
+            playedSkillSfx = true;
+        }
+
+        // Quando a unidade stealth-capable estiver fora da camada stealth ativa, ela pode entrar
+        // como spottedCandidates. Ainda assim precisa receber olhinho ao ser observada.
+        for (int i = 0; i < spottedCandidates.Count; i++)
+        {
+            PodeDetectarOption option = spottedCandidates[i];
+            if (option == null || option.targetUnit == null)
+                continue;
+            if (!option.targetUnit.TryGetUnitData(out UnitData targetData) || targetData == null)
+                continue;
+            if (!targetData.IsStealthUnit())
+                continue;
+            if (!updatedTargets.Add(option.targetUnit))
+                continue;
+
+            RegisterStealthRevealFromDetection(observer, option.targetUnit);
+            appliedReveal = true;
+        }
+
+        if (appliedReveal)
+            RefreshRuntimeUnitFogVisibility();
+    }
+
+    private void TryBootstrapInitialStealthDetection()
+    {
+        if (!Application.isPlaying || initialStealthDetectionBootstrapped)
+            return;
+        if (!debugFogOfWarEnabled || !enableTotalWar)
+            return;
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return;
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+
+        int observersProcessed = 0;
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager observer = units[i];
+            if (observer == null || !observer.gameObject.activeInHierarchy || observer.IsEmbarked)
+                continue;
+            observersProcessed++;
+
+            // 0) Start do jogo: roda PodeDetectar para cada unidade.
+            TryPlaySkillDetectionSfxForActedUnit(observer, boardMap, allowSkillSfx: false);
+            // 0) Start do jogo: roda AlguemMeVe para cada unidade.
+            TryRefreshDetectedPersistenceForActedUnit(observer, boardMap, allowWithoutHasAct: true);
+        }
+
+        RefreshRuntimeUnitFogVisibility();
+
+        initialStealthDetectionBootstrapped = true;
+        Debug.Log($"[Sensors][Bootstrap] unitsProcessed={observersProcessed}");
+    }
+
+    private void RegisterStealthRevealFromDetection(UnitManager observer, UnitManager target)
+    {
+        if (observer == null || target == null)
+            return;
+
+        int detectorTeamId = (int)observer.TeamId;
+        target.RegisterStealthReveal(detectorTeamId);
+        target.AddCurrentlyObservedByTeam(detectorTeamId);
+        target.RefreshRuntimeVisualState();
+    }
+
+    private static bool IsSubmarineLikeDetectionTarget(PodeDetectarOption option)
+    {
+        if (option == null)
+            return false;
+
+        return option.targetDomain == Domain.Submarine || option.targetHeightLevel == HeightLevel.Submerged;
+    }
+
+    private static bool TryResolveSkillMatchedDetectorSkill(
+        UnitData observerData,
+        UnitData targetData,
+        Domain targetDomain,
+        HeightLevel targetHeightLevel,
+        out SkillData matchedDetectorSkill)
+    {
+        matchedDetectorSkill = null;
+        if (observerData == null || targetData == null || observerData.visionSpecializations == null || observerData.visionSpecializations.Count == 0)
+            return false;
+
+        UnitVisionException match = null;
+        for (int i = 0; i < observerData.visionSpecializations.Count; i++)
+        {
+            UnitVisionException entry = observerData.visionSpecializations[i];
+            if (entry == null)
+                continue;
+            if (entry.domain != targetDomain || entry.heightLevel != targetHeightLevel)
+                continue;
+
+            match = entry;
+            break;
+        }
+
+        if (match == null || match.detectUnitsWithFollowingSkills == null || match.detectUnitsWithFollowingSkills.Count == 0)
+            return false;
+
+        List<SkillData> targetStealthSkills = targetData.ResolveStealthSkillsForDetection(targetDomain, targetHeightLevel);
+        if (targetStealthSkills == null || targetStealthSkills.Count == 0)
+            return false;
+
+        for (int i = 0; i < match.detectUnitsWithFollowingSkills.Count; i++)
+        {
+            SkillData detectorSkill = match.detectUnitsWithFollowingSkills[i];
+            if (detectorSkill == null)
+                continue;
+            if (!ContainsSkill(targetStealthSkills, detectorSkill))
+                continue;
+
+            matchedDetectorSkill = detectorSkill;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool ContainsSkill(List<SkillData> haystack, SkillData needle)
+    {
+        if (haystack == null || needle == null)
+            return false;
+
+        string needleId = string.IsNullOrWhiteSpace(needle.id) ? string.Empty : needle.id.Trim();
+        for (int i = 0; i < haystack.Count; i++)
+        {
+            SkillData current = haystack[i];
+            if (current == null)
+                continue;
+            if (ReferenceEquals(current, needle))
+                return true;
+
+            string currentId = string.IsNullOrWhiteSpace(current.id) ? string.Empty : current.id.Trim();
+            if (needleId.Length > 0 && currentId.Length > 0 &&
+                string.Equals(needleId, currentId, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private void TryRefreshDetectedPersistenceForActedUnit(UnitManager actedUnit, Tilemap boardMap, bool allowWithoutHasAct = false)
+    {
+        if (actedUnit == null || !actedUnit.gameObject.activeInHierarchy || actedUnit.IsEmbarked)
+            return;
+        if (!allowWithoutHasAct && !actedUnit.HasActed)
+            return;
+        if (!actedUnit.TryGetUnitData(out UnitData actedData) || actedData == null)
+            return;
+        if (!actedData.IsStealthUnit())
+            return;
+
+        Tilemap map = boardMap != null ? boardMap : ResolveFogBoardTilemap();
+        if (map == null)
+            return;
+
+        bool hadRevealBefore = HasAnyActiveEnemyReveal(actedUnit);
+        HashSet<int> observerTeamIds = new HashSet<int>();
+        bool isObservedNow = CollectObserverEnemyTeamsWithinRadius(actedUnit, map, 7, observerTeamIds);
+        string teamsObservedLabel = observerTeamIds.Count > 0
+            ? string.Join(",", observerTeamIds)
+            : "-";
+        Debug.Log(
+            $"[AindaMeVe][Runtime] target={actedUnit.name} team={(int)actedUnit.TeamId} " +
+            $"hadRevealBefore={hadRevealBefore} observedNow={isObservedNow} observerTeams={teamsObservedLabel}");
+        if (isObservedNow)
+        {
+            bool observedTeamsChanged = actedUnit.SyncCurrentlyObservedByTeams(observerTeamIds);
+            if (observedTeamsChanged)
+            {
+                actedUnit.RefreshRuntimeVisualState();
+                RefreshRuntimeUnitFogVisibility();
+            }
+
+            return;
+        }
+
+        bool observedTeamsCleared = actedUnit.ClearCurrentlyObservedByTeams();
+        if (hadRevealBefore)
+        {
+            actedUnit.ClearStealthRevealState();
+            actedUnit.RefreshRuntimeVisualState();
+            RefreshRuntimeUnitFogVisibility();
+            Debug.Log($"[AindaMeVe][Runtime][Clear] target={actedUnit.name} -> nenhum inimigo detectando.");
+            return;
+        }
+
+        if (observedTeamsCleared)
+            actedUnit.RefreshRuntimeVisualState();
+    }
+
+    private bool HasAnyActiveEnemyReveal(UnitManager target)
+    {
+        if (target == null)
+            return false;
+
+        int ownerTeamId = (int)target.TeamId;
+        for (int teamId = -1; teamId <= 3; teamId++)
+        {
+            if (teamId == ownerTeamId)
+                continue;
+            if (target.IsStealthRevealedForTeam(teamId, currentTurn))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool CollectObserverEnemyTeamsWithinRadius(UnitManager target, Tilemap map, int radius, HashSet<int> observerTeamIds)
+    {
+        if (observerTeamIds == null)
+            return false;
+        observerTeamIds.Clear();
+        if (target == null || map == null || radius < 0)
+            return false;
+
+        Vector3Int center = target.CurrentCellPosition;
+        center.z = 0;
+        HashSet<Vector3Int> cellsInRadius = BuildCellsInRadius(map, center, radius);
+        if (cellsInRadius.Count <= 0)
+            return false;
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager observer = units[i];
+            if (observer == null || observer == target || !observer.gameObject.activeInHierarchy || observer.IsEmbarked)
+                continue;
+            if (observer.TeamId == target.TeamId)
+                continue;
+
+            Vector3Int observerCell = observer.CurrentCellPosition;
+            observerCell.z = 0;
+            if (!cellsInRadius.Contains(observerCell))
+                continue;
+
+            int observerTeamId = (int)observer.TeamId;
+            if (observerTeamId < -1 || observerTeamId > 3)
+                continue;
+
+            bool canObserveTarget = PodeDetectarSensor.IsTargetObservedByTeam(
+                target,
+                observerTeamId,
+                map,
+                fogOfWarTerrainDatabase,
+                fogOfWarDpqAirHeightConfig,
+                enableLosValidation,
+                enableSpotter,
+                enableStealthValidation);
+            if (!canObserveTarget)
+                continue;
+
+            observerTeamIds.Add(observerTeamId);
+        }
+
+        return observerTeamIds.Count > 0;
+    }
+
+    private static HashSet<Vector3Int> BuildCellsInRadius(Tilemap map, Vector3Int origin, int radius)
+    {
+        HashSet<Vector3Int> visited = new HashSet<Vector3Int>();
+        if (map == null || radius < 0)
+            return visited;
+
+        origin.z = 0;
+        Queue<Vector3Int> queue = new Queue<Vector3Int>();
+        Dictionary<Vector3Int, int> distance = new Dictionary<Vector3Int, int>();
+        queue.Enqueue(origin);
+        visited.Add(origin);
+        distance[origin] = 0;
+
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+        while (queue.Count > 0)
+        {
+            Vector3Int current = queue.Dequeue();
+            int currentDistance = distance[current];
+            if (currentDistance >= radius)
+                continue;
+
+            neighbors.Clear();
+            UnitMovementPathRules.GetImmediateHexNeighbors(map, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = neighbors[i];
+                next.z = 0;
+                if (visited.Contains(next))
+                    continue;
+
+                visited.Add(next);
+                distance[next] = currentDistance + 1;
+                queue.Enqueue(next);
+            }
+        }
+
+        return visited;
     }
 
     public bool IsUnitVisibleForActiveTeam(UnitManager unit)
@@ -1501,48 +1948,9 @@ public class MatchController : MonoBehaviour
         if (cursorController == null)
             return;
 
-        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        ConstructionManager bestHq = null;
-        for (int i = 0; i < constructions.Length; i++)
-        {
-            ConstructionManager c = constructions[i];
-            if (c == null || !c.gameObject.activeInHierarchy)
-                continue;
-            if (!IsHeadQuarterConstruction(c))
-                continue;
-            if ((int)c.TeamId != activeTeamId)
-                continue;
-
-            if (bestHq == null || c.InstanceId < bestHq.InstanceId)
-                bestHq = c;
-        }
-
-        if (bestHq == null)
+        if (!TeamAnchorResolver.TryResolveAnchorCell(activeTeamId, out Vector3Int anchorCell))
             return;
 
-        Vector3Int hqCell = bestHq.CurrentCellPosition;
-        hqCell.z = 0;
-        cursorController.SetCell(hqCell, playMoveSfx: false);
-    }
-
-    private static bool IsHeadQuarterConstruction(ConstructionManager construction)
-    {
-        if (construction == null)
-            return false;
-
-        if (construction.IsPlayerHeadQuarter)
-            return true;
-
-        string constructionId = construction.ConstructionId;
-        if (!string.IsNullOrWhiteSpace(constructionId) &&
-            string.Equals(constructionId.Trim(), "hq", System.StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        string displayName = construction.ConstructionDisplayName;
-        if (!string.IsNullOrWhiteSpace(displayName) &&
-            displayName.IndexOf("hq", System.StringComparison.OrdinalIgnoreCase) >= 0)
-            return true;
-
-        return false;
+        cursorController.SetCell(anchorCell, playMoveSfx: false);
     }
 }

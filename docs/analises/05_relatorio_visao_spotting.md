@@ -15,8 +15,7 @@
 ## Excecoes de visao (por dominio/camada do alvo)
 - O sistema agora suporta specialization por `Domain/HeightLevel` do alvo em `UnitData.visionSpecializations`.
 - O sensor usa `ResolveVisionFor(targetDomain, targetHeightLevel)` para calcular alcance efetivo de observacao.
-- Cada excecao tambem possui `detectsStealth` (default `false`), usado para permitir/negar deteccao de stealth por camada alvo.
-- Cada excecao possui ainda `detectUnitsWithFollowingSkills` (lista): detecta alvos que tenham qualquer skill da lista, mesmo com `detectsStealth=false`.
+- Cada excecao possui `detectUnitsWithFollowingSkills` (lista): detecta alvos que tenham qualquer skill da lista.
 - Uso pratico: unidade com visao base X pode ter alcance diferente contra `Land/Surface`, `Naval/Surface`, `Submarine/Submerged`, etc.
 - Isso virou o mecanismo principal para experimentar deteccao especializada (ex.: anti-sub) sem quebrar o resto da regra.
 
@@ -53,7 +52,7 @@ Fluxo de validacao em `PodeMirarSensor` combina:
 - Ja existe gate de stealth no `PodeMirarSensor`:
   - alvo com skill id (`stealth`, `furtividade`, `submarine_stealth`, `submerged_stealth`) tambem entra como stealth.
 - Para detectar alvo stealth, o atacante precisa de specialization em `visionSpecializations` para o `Domain/HeightLevel` do alvo e:
-  - `detectsStealth = true`, ou
+  - match de skill em `detectUnitsWithFollowingSkills`,
   - `detectUnitsWithFollowingSkills` contendo uma skill do alvo.
 - Ao detectar, o alvo pode ficar revelado por N turnos (`stealthVisibleIfDetectedForTurns`, default 1) e com escopo configuravel (`stealthRevealScope`):
   - `AllTeams`: todos os times podem alvejar enquanto a janela estiver ativa;
