@@ -43,6 +43,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private bool isSelected;
     [SerializeField, HideInInspector] private bool isPreviewDimmed;
     [SerializeField, HideInInspector] private bool hasTemporarySortingOverride;
+    [SerializeField, HideInInspector] private bool hiddenByFogOfWar;
     [SerializeField, HideInInspector] private int cachedSpriteSortingOrder;
     [SerializeField, HideInInspector] private int cachedActedLockSortingOrder;
     [SerializeField] private bool enableSelectionBlink = true;
@@ -342,6 +343,18 @@ public class UnitManager : MonoBehaviour
         hasActed = true;
         appliedHasActed = hasActed;
         RefreshActedVisual();
+        TryAutoAssignMatchController();
+        matchController?.NotifyUnitReachedHasAct(this);
+    }
+
+    public void SetFogOfWarVisibility(bool visible)
+    {
+        bool shouldHide = !visible;
+        if (hiddenByFogOfWar == shouldHide)
+            return;
+
+        hiddenByFogOfWar = shouldHide;
+        ApplyFogOfWarVisibility();
     }
 
     public void ResetActed()
@@ -2099,18 +2112,21 @@ public class UnitManager : MonoBehaviour
         {
             StopSelectionBlinkRoutine();
             SetSpriteVisible(true);
+            ApplyFogOfWarVisibility();
             return;
         }
 
         if (!enableSelectionBlink)
         {
             SetSpriteVisible(true);
+            ApplyFogOfWarVisibility();
             return;
         }
 
         if (!Application.isPlaying)
         {
             SetSpriteVisible(true);
+            ApplyFogOfWarVisibility();
             return;
         }
 
@@ -2150,6 +2166,8 @@ public class UnitManager : MonoBehaviour
         // systems request visibility (selection cleanup, blink stop, etc).
         if (isEmbarked && visible && !IsEmbarkedVisualPreviewActive)
             visible = false;
+        if (hiddenByFogOfWar && visible)
+            visible = false;
 
         if (spriteRenderer != null && spriteRenderer.GetComponentInParent<UnitManager>() == this)
             spriteRenderer.enabled = visible;
@@ -2174,6 +2192,20 @@ public class UnitManager : MonoBehaviour
 
             renderer.enabled = visible;
         }
+    }
+
+    private void ApplyFogOfWarVisibility()
+    {
+        bool visible = !hiddenByFogOfWar;
+        if (!visible)
+        {
+            StopSelectionBlinkRoutine();
+            isSelected = false;
+        }
+
+        SetSpriteVisible(visible);
+        SetHudVisible(visible);
+        SetOwnedUiVisualsVisible(visible);
     }
 
     private void SetOwnedUiVisualsVisible(bool visible)

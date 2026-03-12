@@ -104,7 +104,14 @@ public partial class TurnStateManager
     private UnitManager FindUnitAtCell(Vector3Int cell)
     {
         int preferredTeamId = matchController != null ? matchController.ActiveTeamId : -1;
-        return HexOccupancyQuery.FindUnitAtCell(cell, preferredTeamId);
+        UnitManager unit = HexOccupancyQuery.FindUnitAtCell(cell, preferredTeamId);
+        if (unit == null)
+            return null;
+
+        if (matchController != null && !matchController.IsUnitVisibleForActiveTeam(unit))
+            return null;
+
+        return unit;
     }
 
     private ConstructionManager FindConstructionAtCell(Vector3Int cell)

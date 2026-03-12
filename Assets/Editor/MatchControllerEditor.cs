@@ -20,6 +20,11 @@ public class MatchControllerEditor : Editor
     private SerializedProperty matchMusicAudioManagerProp;
     private SerializedProperty advanceTurnPreDelayProp;
     private SerializedProperty advanceTurnPostDelayProp;
+    private SerializedProperty fogOfWarTilemapProp;
+    private SerializedProperty fogOfWarOverlayTileProp;
+    private SerializedProperty fogOfWarTerrainDatabaseProp;
+    private SerializedProperty fogOfWarDpqAirHeightConfigProp;
+    private SerializedProperty fogOfWarAlphaProp;
 
     private void OnEnable()
     {
@@ -39,6 +44,11 @@ public class MatchControllerEditor : Editor
         matchMusicAudioManagerProp = serializedObject.FindProperty("matchMusicAudioManager");
         advanceTurnPreDelayProp = serializedObject.FindProperty("advanceTurnPreDelay");
         advanceTurnPostDelayProp = serializedObject.FindProperty("advanceTurnPostDelay");
+        fogOfWarTilemapProp = serializedObject.FindProperty("fogOfWarTilemap");
+        fogOfWarOverlayTileProp = serializedObject.FindProperty("fogOfWarOverlayTile");
+        fogOfWarTerrainDatabaseProp = serializedObject.FindProperty("fogOfWarTerrainDatabase");
+        fogOfWarDpqAirHeightConfigProp = serializedObject.FindProperty("fogOfWarDpqAirHeightConfig");
+        fogOfWarAlphaProp = serializedObject.FindProperty("fogOfWarAlpha");
     }
 
     public override void OnInspectorGUI()
@@ -92,6 +102,19 @@ public class MatchControllerEditor : Editor
             EditorGUILayout.PropertyField(advanceTurnPreDelayProp, new GUIContent("Advance Turn Pre Delay"));
         if (advanceTurnPostDelayProp != null)
             EditorGUILayout.PropertyField(advanceTurnPostDelayProp, new GUIContent("Advance Turn Post Delay"));
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Fog Of War", EditorStyles.boldLabel);
+        if (fogOfWarTilemapProp != null)
+            EditorGUILayout.PropertyField(fogOfWarTilemapProp, new GUIContent("Fog Of War Tilemap"));
+        if (fogOfWarOverlayTileProp != null)
+            EditorGUILayout.PropertyField(fogOfWarOverlayTileProp, new GUIContent("Fog Overlay Tile"));
+        if (fogOfWarTerrainDatabaseProp != null)
+            EditorGUILayout.PropertyField(fogOfWarTerrainDatabaseProp, new GUIContent("Terrain Database"));
+        if (fogOfWarDpqAirHeightConfigProp != null)
+            EditorGUILayout.PropertyField(fogOfWarDpqAirHeightConfigProp, new GUIContent("DPQ Air Height Config"));
+        if (fogOfWarAlphaProp != null)
+            EditorGUILayout.PropertyField(fogOfWarAlphaProp, new GUIContent("Fog Alpha"));
 
         serializedObject.ApplyModifiedProperties();
 

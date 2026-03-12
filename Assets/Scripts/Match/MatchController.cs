@@ -3,12 +3,43 @@ using System.Collections.Generic;
 using System.Collections;
 using System;
 using UnityEngine.Serialization;
+using UnityEngine.Tilemaps;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
 public class MatchController : MonoBehaviour
 {
+    private readonly struct FogOfWarUnitCacheKey : IEquatable<FogOfWarUnitCacheKey>
+    {
+        public readonly int snapshotHash;
+        public readonly int globalBoardRevision;
+        public readonly int teamObserverRevision;
+        public readonly int sensorFlagsHash;
+
+        public FogOfWarUnitCacheKey(int snapshotHash, int globalBoardRevision, int teamObserverRevision, int sensorFlagsHash)
+        {
+            this.snapshotHash = snapshotHash;
+            this.globalBoardRevision = globalBoardRevision;
+            this.teamObserverRevision = teamObserverRevision;
+            this.sensorFlagsHash = sensorFlagsHash;
+        }
+
+        public bool Equals(FogOfWarUnitCacheKey other)
+        {
+            return snapshotHash == other.snapshotHash
+                && globalBoardRevision == other.globalBoardRevision
+                && teamObserverRevision == other.teamObserverRevision
+                && sensorFlagsHash == other.sensorFlagsHash;
+        }
+    }
+
+    private sealed class FogOfWarUnitCacheEntry
+    {
+        public FogOfWarUnitCacheKey key;
+        public readonly HashSet<Vector3Int> visibleCells = new HashSet<Vector3Int>();
+    }
+
     [System.Serializable]
     private struct PlayerEntry
     {
@@ -59,6 +90,12 @@ public class MatchController : MonoBehaviour
     [SerializeField] private MatchMusicAudioManager matchMusicAudioManager;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.5f;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPostDelay = 0.2f;
+    [Header("Fog Of War")]
+    [SerializeField] private Tilemap fogOfWarTilemap;
+    [SerializeField] private TileBase fogOfWarOverlayTile;
+    [SerializeField] private TerrainDatabase fogOfWarTerrainDatabase;
+    [SerializeField] private DPQAirHeightConfig fogOfWarDpqAirHeightConfig;
+    [SerializeField] [Range(0f, 1f)] private float fogOfWarAlpha = 0.65f;
     [SerializeField] private int activePlayerListIndex = 0;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField, HideInInspector] private bool pendingTurnStartUpkeep;
@@ -68,6 +105,16 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private readonly List<TeamId> playersView = new List<TeamId>();
     [System.NonSerialized] private List<TurnStateManager.TurnStartAutonomyUpkeepEntry> pendingTurnStartAutonomyHelperEntries;
     [System.NonSerialized] private readonly List<UnitManager> turnStartUnitsMarkedForFuelDepletionDeath = new List<UnitManager>();
+    [System.NonSerialized] private readonly List<Vector3Int> fogBoardCellsBuffer = new List<Vector3Int>(1024);
+    [System.NonSerialized] private readonly HashSet<Vector3Int> fogVisibleCellsBuffer = new HashSet<Vector3Int>();
+    [System.NonSerialized] private readonly Dictionary<int, FogOfWarUnitCacheEntry> fogVisibleCellsByUnit = new Dictionary<int, FogOfWarUnitCacheEntry>();
+    [System.NonSerialized] private readonly Dictionary<Vector3Int, int> fogVisibleContributorsByCell = new Dictionary<Vector3Int, int>();
+    [System.NonSerialized] private readonly Dictionary<int, bool> fogUnitVisibilityByCacheIndex = new Dictionary<int, bool>();
+    [System.NonSerialized] private readonly HashSet<Vector3Int> fogUnitVisibleScratchBuffer = new HashSet<Vector3Int>();
+    [System.NonSerialized] private bool fogSortingLayerValidated;
+    [System.NonSerialized] private int fogCachedTeamId = int.MinValue;
+    [System.NonSerialized] private bool fogOverlayInitialized;
+    [System.NonSerialized] private bool debugFogOfWarEnabled = true;
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
@@ -94,6 +141,7 @@ public class MatchController : MonoBehaviour
     public bool EnableSpotter => enableSpotter;
     public bool EnableStealthValidation => enableStealthValidation;
     public bool EnableTotalWar => enableTotalWar;
+    public bool IsFogOfWarDebugEnabled => debugFogOfWarEnabled;
     public int MaxUnitsPerTeam => Mathf.Max(1, maxUnitsPerTeam);
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;
     public int ActivePlayerListIndex => activePlayerListIndex;
@@ -315,6 +363,8 @@ public class MatchController : MonoBehaviour
         TryAutoAssignCursorController();
         TryAutoAssignTurnStateManager();
         TryAutoAssignTurnTransitionReferences();
+        if (enableTotalWar)
+            TryAutoAssignFogOfWarReferences();
         ApplyActiveTeamIfChanged(force: true);
         ApplyTeamFlipSettingsToSceneObjects();
     }
@@ -329,6 +379,8 @@ public class MatchController : MonoBehaviour
         TryAutoAssignCursorController();
         TryAutoAssignTurnStateManager();
         TryAutoAssignTurnTransitionReferences();
+        if (enableTotalWar)
+            TryAutoAssignFogOfWarReferences();
         ApplyActiveTeamIfChanged(force: false);
         ApplyTeamFlipSettingsToSceneObjects();
     }
@@ -345,6 +397,8 @@ public class MatchController : MonoBehaviour
         TryAutoAssignCursorController();
         TryAutoAssignTurnStateManager();
         TryAutoAssignTurnTransitionReferences();
+        if (enableTotalWar)
+            TryAutoAssignFogOfWarReferences();
         ApplyActiveTeamIfChanged(force: false);
     }
 
@@ -644,6 +698,24 @@ public class MatchController : MonoBehaviour
         appliedActiveTeamId = activeTeamId;
         TeleportCursorToActiveTeamHeadQuarterSilently();
         ReleaseUnitsForActiveTeam();
+        if (!debugFogOfWarEnabled)
+        {
+            ResetFogOfWarRuntime(clearTilemap: true);
+            ShowAllUnitsIgnoringFog();
+            FlushTurnStartAutonomyHelper();
+            return;
+        }
+
+        if (enableTotalWar)
+        {
+            RefreshFogOfWarForActiveTeam();
+            RefreshRuntimeUnitFogVisibility();
+        }
+        else
+        {
+            ResetFogOfWarRuntime(clearTilemap: true);
+            RefreshRuntimeUnitFogVisibility();
+        }
         FlushTurnStartAutonomyHelper();
     }
 
@@ -921,6 +993,498 @@ public class MatchController : MonoBehaviour
     {
         if (matchMusicAudioManager == null)
             matchMusicAudioManager = FindAnyObjectByType<MatchMusicAudioManager>();
+    }
+
+    private void TryAutoAssignFogOfWarReferences()
+    {
+        if (fogOfWarTilemap == null)
+            fogOfWarTilemap = FindTilemapByName("FogOfWar");
+
+        if (fogOfWarTerrainDatabase == null)
+            fogOfWarTerrainDatabase = FindAnyObjectByType<TerrainDatabase>();
+    }
+
+    private static Tilemap FindTilemapByName(string targetName)
+    {
+        if (string.IsNullOrWhiteSpace(targetName))
+            return null;
+
+        Tilemap[] tilemaps = FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < tilemaps.Length; i++)
+        {
+            Tilemap tilemap = tilemaps[i];
+            if (tilemap == null)
+                continue;
+            if (string.Equals(tilemap.name, targetName, StringComparison.OrdinalIgnoreCase))
+                return tilemap;
+        }
+
+        return null;
+    }
+
+    private void RefreshFogOfWarForActiveTeam()
+    {
+        if (!enableTotalWar)
+            return;
+
+        if (fogOfWarTilemap == null)
+            return;
+        if (activeTeamId < 0)
+            return;
+
+        ValidateFogOfWarSortingLayer();
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return;
+
+        ResetFogOfWarRuntime(clearTilemap: false);
+        InitializeFogOverlay(boardMap);
+        if (!fogOverlayInitialized)
+            return;
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+            if ((int)unit.TeamId != activeTeamId)
+                continue;
+
+            UpdateFogVisibilityForUnit(unit, boardMap);
+        }
+
+        ApplyFriendlyConstructionVision(boardMap);
+        RefreshRuntimeUnitFogVisibility();
+    }
+
+    public void NotifyUnitReachedHasAct(UnitManager unit)
+    {
+        if (!Application.isPlaying)
+            return;
+        if (!debugFogOfWarEnabled)
+            return;
+        if (!enableTotalWar)
+            return;
+        if (unit == null || !unit.gameObject.activeInHierarchy)
+            return;
+        if (activeTeamId < 0)
+            return;
+        if ((int)unit.TeamId != activeTeamId)
+            return;
+
+        if (fogOfWarTilemap == null)
+            TryAutoAssignFogOfWarReferences();
+        if (fogOfWarTilemap == null)
+            return;
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return;
+
+        ValidateFogOfWarSortingLayer();
+        if (fogCachedTeamId != activeTeamId || !fogOverlayInitialized)
+        {
+            RefreshFogOfWarForActiveTeam();
+            return;
+        }
+
+        UpdateFogVisibilityForUnit(unit, boardMap);
+        RefreshRuntimeUnitFogVisibility();
+    }
+
+    public bool IsUnitVisibleForActiveTeam(UnitManager unit)
+    {
+        if (!debugFogOfWarEnabled)
+            return true;
+
+        if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+            return false;
+
+        int cacheIndex = ResolveFogCacheIndex(unit);
+        if (fogCachedTeamId == activeTeamId &&
+            fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible))
+        {
+            return cachedVisible;
+        }
+
+        return ComputeIsUnitVisibleForActiveTeam(unit);
+    }
+
+    private bool ComputeIsUnitVisibleForActiveTeam(UnitManager unit)
+    {
+        if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+            return false;
+
+        TeamId unitTeam = unit.TeamId;
+        if ((int)unitTeam == activeTeamId)
+            return true;
+
+        if (!enableTotalWar)
+            return true;
+
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+        if (!IsCellVisibleForActiveTeam(cell))
+            return false;
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return false;
+
+        return PodeDetectarSensor.IsTargetObservedByTeam(
+            unit,
+            activeTeamId,
+            boardMap,
+            fogOfWarTerrainDatabase,
+            fogOfWarDpqAirHeightConfig,
+            enableLosValidation,
+            enableSpotter,
+            enableStealthValidation);
+    }
+
+    public bool IsCellVisibleForActiveTeam(Vector3Int cell)
+    {
+        if (!debugFogOfWarEnabled)
+            return true;
+        if (!enableTotalWar)
+            return true;
+        if (activeTeamId < 0)
+            return false;
+        if (fogCachedTeamId != activeTeamId)
+            return false;
+
+        cell.z = 0;
+        return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
+    }
+
+    private void ValidateFogOfWarSortingLayer()
+    {
+        if (fogSortingLayerValidated || fogOfWarTilemap == null)
+            return;
+
+        fogSortingLayerValidated = true;
+        TilemapRenderer renderer = fogOfWarTilemap.GetComponent<TilemapRenderer>();
+        if (renderer == null)
+            return;
+
+        const string expectedLayer = "SFX";
+        string currentLayer = SortingLayer.IDToName(renderer.sortingLayerID);
+        if (!string.Equals(currentLayer, expectedLayer, StringComparison.OrdinalIgnoreCase))
+            Debug.LogWarning($"[FogOfWar] Sorting layer atual = {currentLayer}. Esperado = {expectedLayer}.");
+        else
+            Debug.Log("[FogOfWar] Sorting layer validada em SFX.");
+    }
+
+    private Tilemap ResolveFogBoardTilemap()
+    {
+        if (cursorController != null && cursorController.BoardTilemap != null)
+            return cursorController.BoardTilemap;
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit != null && unit.BoardTilemap != null)
+                return unit.BoardTilemap;
+        }
+
+        return null;
+    }
+
+    private static void CollectBoardCells(Tilemap boardMap, List<Vector3Int> output)
+    {
+        if (boardMap == null || output == null)
+            return;
+
+        BoundsInt bounds = boardMap.cellBounds;
+        for (int x = bounds.xMin; x < bounds.xMax; x++)
+        {
+            for (int y = bounds.yMin; y < bounds.yMax; y++)
+            {
+                Vector3Int cell = new Vector3Int(x, y, 0);
+                if (boardMap.HasTile(cell))
+                    output.Add(cell);
+            }
+        }
+    }
+
+    private void ResetFogOfWarRuntime(bool clearTilemap)
+    {
+        fogBoardCellsBuffer.Clear();
+        fogVisibleCellsBuffer.Clear();
+        fogVisibleCellsByUnit.Clear();
+        fogVisibleContributorsByCell.Clear();
+        fogUnitVisibilityByCacheIndex.Clear();
+        fogUnitVisibleScratchBuffer.Clear();
+        fogCachedTeamId = int.MinValue;
+        fogOverlayInitialized = false;
+        if (clearTilemap && fogOfWarTilemap != null)
+            fogOfWarTilemap.ClearAllTiles();
+    }
+
+    private void InitializeFogOverlay(Tilemap boardMap)
+    {
+        fogBoardCellsBuffer.Clear();
+        CollectBoardCells(boardMap, fogBoardCellsBuffer);
+        if (fogBoardCellsBuffer.Count <= 0)
+        {
+            fogOfWarTilemap.ClearAllTiles();
+            fogOverlayInitialized = false;
+            return;
+        }
+
+        fogOfWarTilemap.ClearAllTiles();
+        Color fogColor = new Color(0f, 0f, 0f, Mathf.Clamp01(fogOfWarAlpha));
+        for (int i = 0; i < fogBoardCellsBuffer.Count; i++)
+        {
+            Vector3Int cell = fogBoardCellsBuffer[i];
+            TileBase tile = ResolveFogTileForCell(boardMap, cell);
+            if (tile == null)
+                continue;
+
+            fogOfWarTilemap.SetTile(cell, tile);
+            fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
+            fogOfWarTilemap.SetColor(cell, fogColor);
+        }
+
+        fogCachedTeamId = activeTeamId;
+        fogOverlayInitialized = true;
+    }
+
+    private void UpdateFogVisibilityForUnit(UnitManager unit, Tilemap boardMap)
+    {
+        if (unit == null)
+            return;
+
+        int cacheIndex = ResolveFogCacheIndex(unit);
+        FogOfWarUnitCacheKey nextKey = BuildFogUnitCacheKey(unit, boardMap);
+        if (fogVisibleCellsByUnit.TryGetValue(cacheIndex, out FogOfWarUnitCacheEntry cacheEntry) &&
+            cacheEntry != null &&
+            cacheEntry.key.Equals(nextKey))
+        {
+            return;
+        }
+
+        if (cacheEntry == null)
+        {
+            cacheEntry = new FogOfWarUnitCacheEntry();
+            fogVisibleCellsByUnit[cacheIndex] = cacheEntry;
+        }
+
+        if (cacheEntry.visibleCells.Count > 0)
+        {
+            foreach (Vector3Int cell in cacheEntry.visibleCells)
+                ApplyFogContribution(cell, -1, boardMap);
+            cacheEntry.visibleCells.Clear();
+        }
+
+        if (!unit.gameObject.activeInHierarchy || unit.IsEmbarked || (int)unit.TeamId != activeTeamId)
+        {
+            cacheEntry.key = nextKey;
+            return;
+        }
+
+        fogUnitVisibleScratchBuffer.Clear();
+        PodeDetectarSensor.CollectVisibleCells(
+            unit,
+            boardMap,
+            fogOfWarTerrainDatabase,
+            fogUnitVisibleScratchBuffer,
+            fogOfWarDpqAirHeightConfig,
+            enableLosValidation,
+            enableSpotter,
+            useOccupantLayerForTarget: false);
+
+        foreach (Vector3Int cell in fogUnitVisibleScratchBuffer)
+        {
+            cacheEntry.visibleCells.Add(cell);
+            ApplyFogContribution(cell, +1, boardMap);
+        }
+
+        cacheEntry.key = nextKey;
+    }
+
+    private void ApplyFogContribution(Vector3Int cell, int delta, Tilemap boardMap)
+    {
+        if (delta == 0)
+            return;
+
+        if (!fogVisibleContributorsByCell.TryGetValue(cell, out int current))
+            current = 0;
+
+        int next = Mathf.Max(0, current + delta);
+        if (next == current)
+            return;
+
+        if (next <= 0)
+            fogVisibleContributorsByCell.Remove(cell);
+        else
+            fogVisibleContributorsByCell[cell] = next;
+
+        if (current <= 0 && next > 0)
+        {
+            fogOfWarTilemap.SetTile(cell, null);
+            return;
+        }
+
+        if (current > 0 && next <= 0)
+        {
+            TileBase tile = ResolveFogTileForCell(boardMap, cell);
+            if (tile == null)
+                return;
+
+            fogOfWarTilemap.SetTile(cell, tile);
+            fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
+            fogOfWarTilemap.SetColor(cell, new Color(0f, 0f, 0f, Mathf.Clamp01(fogOfWarAlpha)));
+        }
+    }
+
+    private TileBase ResolveFogTileForCell(Tilemap boardMap, Vector3Int cell)
+    {
+        if (fogOfWarOverlayTile != null)
+            return fogOfWarOverlayTile;
+        if (boardMap == null)
+            return null;
+        return boardMap.GetTile(cell);
+    }
+
+    private void ApplyFriendlyConstructionVision(Tilemap boardMap)
+    {
+        if (boardMap == null || activeTeamId < 0)
+            return;
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if ((int)construction.TeamId != activeTeamId)
+                continue;
+
+            Vector3Int cell = construction.CurrentCellPosition;
+            cell.z = 0;
+            if (boardMap.GetTile(cell) == null)
+                continue;
+
+            ApplyFogContribution(cell, +1, boardMap);
+        }
+    }
+
+    private void RefreshRuntimeUnitFogVisibility()
+    {
+        if (!debugFogOfWarEnabled)
+        {
+            ShowAllUnitsIgnoringFog();
+            return;
+        }
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        fogUnitVisibilityByCacheIndex.Clear();
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null)
+                continue;
+
+            bool visible = ComputeIsUnitVisibleForActiveTeam(unit);
+            fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
+            unit.SetFogOfWarVisibility(visible);
+        }
+    }
+
+    public void SetFogOfWarDebugEnabled(bool enabled)
+    {
+        if (debugFogOfWarEnabled == enabled)
+            return;
+
+        debugFogOfWarEnabled = enabled;
+        if (!enabled)
+        {
+            ResetFogOfWarRuntime(clearTilemap: true);
+            ShowAllUnitsIgnoringFog();
+            Debug.Log("[Debug Command] FoW OFF (debug).");
+            return;
+        }
+
+        if (enableTotalWar)
+            RefreshFogOfWarForActiveTeam();
+        else
+            ResetFogOfWarRuntime(clearTilemap: true);
+
+        RefreshRuntimeUnitFogVisibility();
+        Debug.Log("[Debug Command] FoW ON (debug).");
+    }
+
+    private void ShowAllUnitsIgnoringFog()
+    {
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        fogUnitVisibilityByCacheIndex.Clear();
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null)
+                continue;
+
+            fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = true;
+            unit.SetFogOfWarVisibility(true);
+        }
+    }
+
+    private static int ResolveFogCacheIndex(UnitManager unit)
+    {
+        if (unit == null)
+            return 0;
+
+        int instanceId = unit.InstanceId;
+        if (instanceId > 0)
+            return instanceId;
+        return unit.GetInstanceID();
+    }
+
+    private FogOfWarUnitCacheKey BuildFogUnitCacheKey(UnitManager unit, Tilemap boardMap)
+    {
+        int snapshotHash = BuildFogUnitSnapshotHash(unit, boardMap);
+        int globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision;
+        int teamObserverRevision = ThreatRevisionTracker.GetTeamObserverRevision(activeTeamId);
+        int sensorFlagsHash = BuildFogSensorFlagsHash(enableLosValidation, enableSpotter);
+        return new FogOfWarUnitCacheKey(snapshotHash, globalBoardRevision, teamObserverRevision, sensorFlagsHash);
+    }
+
+    private int BuildFogUnitSnapshotHash(UnitManager unit, Tilemap boardMap)
+    {
+        unchecked
+        {
+            if (unit == null)
+                return 0;
+
+            int hash = 17;
+            Vector3Int cell = unit.CurrentCellPosition;
+            hash = (hash * 31) + cell.x;
+            hash = (hash * 31) + cell.y;
+            hash = (hash * 31) + (int)unit.TeamId;
+            hash = (hash * 31) + (int)unit.GetDomain();
+            hash = (hash * 31) + (int)unit.GetHeightLevel();
+            hash = (hash * 31) + (unit.IsEmbarked ? 1 : 0);
+            hash = (hash * 31) + Mathf.Max(1, unit.Visao);
+            hash = (hash * 31) + (boardMap != null ? boardMap.GetInstanceID() : 0);
+            hash = (hash * 31) + (fogOfWarTerrainDatabase != null ? fogOfWarTerrainDatabase.GetInstanceID() : 0);
+            hash = (hash * 31) + (fogOfWarDpqAirHeightConfig != null ? fogOfWarDpqAirHeightConfig.GetInstanceID() : 0);
+            return hash;
+        }
+    }
+
+    private static int BuildFogSensorFlagsHash(bool enableLos, bool enableSpotter)
+    {
+        unchecked
+        {
+            int hash = 17;
+            hash = (hash * 31) + (enableLos ? 1 : 0);
+            hash = (hash * 31) + (enableSpotter ? 1 : 0);
+            return hash;
+        }
     }
 
     private void PlayAdvanceTurnSfx()

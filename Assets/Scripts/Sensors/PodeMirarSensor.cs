@@ -1094,6 +1094,16 @@ public static class PodeMirarSensor
         if (!target.gameObject.activeInHierarchy || target.IsEmbarked)
             return false;
 
+        if (cachedMatchController == null)
+            cachedMatchController = Object.FindAnyObjectByType<MatchController>();
+        if (cachedMatchController != null &&
+            cachedMatchController.EnableTotalWar &&
+            cachedMatchController.ActiveTeamId == (int)attacker.TeamId &&
+            !cachedMatchController.IsUnitVisibleForActiveTeam(target))
+        {
+            return false;
+        }
+
         return attacker.TeamId != target.TeamId;
     }
 

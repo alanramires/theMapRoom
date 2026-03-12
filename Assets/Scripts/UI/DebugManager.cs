@@ -245,6 +245,20 @@ public class DebugManager : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
+        else if (TryParseSetFoWCommand(rawCommand, out bool fogEnabled))
+        {
+            if (matchController == null)
+            {
+                Debug.Log("[Debug Command] MatchController nao encontrado.");
+            }
+            else
+            {
+                matchController.SetFogOfWarDebugEnabled(fogEnabled);
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log($"[Debug Command] FoW {(fogEnabled ? "ON" : "OFF")}.");
+            }
+        }
         else
         {
             Debug.Log($"[Debug Command] Comando desconhecido: \"{rawCommand}\"");
@@ -657,6 +671,45 @@ public class DebugManager : MonoBehaviour
         {
             targetDomain = Domain.Submarine;
             targetHeight = HeightLevel.Submerged;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryParseSetFoWCommand(string rawCommand, out bool fogEnabled)
+    {
+        fogEnabled = true;
+        if (string.IsNullOrWhiteSpace(rawCommand))
+            return false;
+
+        string trimmed = rawCommand.Trim();
+        const string prefixA = "fow ";
+        const string prefixB = "fog of war ";
+        string token;
+        if (trimmed.StartsWith(prefixA, System.StringComparison.OrdinalIgnoreCase))
+            token = trimmed.Substring(prefixA.Length).Trim();
+        else if (trimmed.StartsWith(prefixB, System.StringComparison.OrdinalIgnoreCase))
+            token = trimmed.Substring(prefixB.Length).Trim();
+        else
+            return false;
+
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+
+        if (string.Equals(token, "on", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(token, "true", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(token, "1", System.StringComparison.OrdinalIgnoreCase))
+        {
+            fogEnabled = true;
+            return true;
+        }
+
+        if (string.Equals(token, "off", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(token, "false", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(token, "0", System.StringComparison.OrdinalIgnoreCase))
+        {
+            fogEnabled = false;
             return true;
         }
 
