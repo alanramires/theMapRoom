@@ -131,6 +131,9 @@ public partial class TurnStateManager
             return new CombatResolutionResult(false, false, false, false, attacker, defender, attackerHpBefore, defenderHpBefore, trace.ToString());
         }
 
+        attacker.MarkAsFired();
+        trace.AppendLine("- Marcador de disparo runtime: ativo (hasFiredThisTurn=true).");
+
         bool defenderConsumed = false;
         string counterReason = option.defenderCounterReason;
         bool defenderCounterBlockedByEmbarked = defender.IsEmbarked;

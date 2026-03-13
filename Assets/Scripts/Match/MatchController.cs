@@ -1099,16 +1099,14 @@ public class MatchController : MonoBehaviour
         {
             RefreshFogOfWarForActiveTeam();
             TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
-            if (ShouldRunDetectedPersistenceScan(unit))
-                TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
+            TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
             return;
         }
 
         UpdateFogVisibilityForUnit(unit, boardMap);
         RefreshRuntimeUnitFogVisibility();
         TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
-        if (ShouldRunDetectedPersistenceScan(unit))
-            TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
+        TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
     }
 
     private void RunTurnStartStillObservedForActiveTeamStealthUnits()
@@ -1143,20 +1141,6 @@ public class MatchController : MonoBehaviour
         }
 
         Debug.Log($"[AindaMeVe][TurnStart] team={activeTeamId} scannedStealthUnits={scannedStealthUnits}");
-    }
-
-    private bool ShouldRunDetectedPersistenceScan(UnitManager unit)
-    {
-        if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
-            return false;
-
-        if (HasAnyActiveEnemyReveal(unit))
-            return true;
-
-        if (!unit.TryGetUnitData(out UnitData unitData) || unitData == null)
-            return false;
-
-        return unitData.IsStealthUnit();
     }
 
     private void TryPlaySkillDetectionSfxForActedUnit(
@@ -1484,6 +1468,7 @@ public class MatchController : MonoBehaviour
             if (observerTeamId < -1 || observerTeamId > 3)
                 continue;
 
+            bool enforceStealthValidation = enableStealthValidation && !target.HasFiredThisTurn;
             bool canObserveTarget = PodeDetectarSensor.IsTargetObservedByTeam(
                 target,
                 observerTeamId,
@@ -1492,7 +1477,7 @@ public class MatchController : MonoBehaviour
                 fogOfWarDpqAirHeightConfig,
                 enableLosValidation,
                 enableSpotter,
-                enableStealthValidation);
+                enforceStealthValidation);
             if (!canObserveTarget)
                 continue;
 
@@ -1580,6 +1565,7 @@ public class MatchController : MonoBehaviour
         if (boardMap == null)
             return false;
 
+        bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn;
         return PodeDetectarSensor.IsTargetObservedByTeam(
             unit,
             activeTeamId,
@@ -1588,7 +1574,7 @@ public class MatchController : MonoBehaviour
             fogOfWarDpqAirHeightConfig,
             enableLosValidation,
             enableSpotter,
-            enableStealthValidation);
+            enforceStealthValidation);
     }
 
     public bool IsCellVisibleForActiveTeam(Vector3Int cell)

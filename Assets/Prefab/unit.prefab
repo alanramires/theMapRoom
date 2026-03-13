@@ -362,6 +362,7 @@ MonoBehaviour:
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: 0, y: 0, z: 0}
   hasActed: 0
+  hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
   teamId: 0
   unitId: Soldado
@@ -414,9 +415,7 @@ MonoBehaviour:
   transportedUnitSlots: []
   embarkedTransporter: {fileID: 0}
   embarkedTransporterSlotIndex: -1
-  stealthRevealForAllUntilTurn: -2147483648
-  stealthRevealTeamIds: 
-  stealthRevealTeamUntilTurns: 
+  currentlyObservedByTeamIds: 
 --- !u!1 &1880344687583074483
 GameObject:
   m_ObjectHideFlags: 0

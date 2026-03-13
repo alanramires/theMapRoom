@@ -2541,6 +2541,9 @@ public partial class TurnStateManager
         if (target == null || weapon == null || target.IsEmbarked)
             return;
 
+        if (TryApplyForcedEmergeAfterHitFromWeapon(target, weapon))
+            return;
+
         if (weapon.forceOpponentToGoToDomainAfterHit == null || weapon.forceOpponentToGoToDomainAfterHit.Count <= 0)
             return;
 
@@ -2584,6 +2587,52 @@ public partial class TurnStateManager
             PushPanelUnitMessage(forcedMessage, 2.6f);
             return;
         }
+    }
+
+    private bool TryApplyForcedEmergeAfterHitFromWeapon(UnitManager target, WeaponData weapon)
+    {
+        if (target == null || weapon == null)
+            return false;
+
+        Domain targetDomain = target.GetDomain();
+        HeightLevel targetHeight = target.GetHeightLevel();
+        if (!weapon.ShouldForceTargetToEmergeAfterHit(targetDomain, targetHeight))
+            return false;
+
+        if (!TryResolveForcedEmergeLayerTarget(targetDomain, targetHeight, out Domain forcedDomain, out HeightLevel forcedHeight))
+            return false;
+
+        if (!target.SupportsLayerMode(forcedDomain, forcedHeight))
+            return false;
+
+        const int forcedTurns = 2;
+        bool hadPreviousLock = target.TryGetForcedLayerLock(out Domain previousDomain, out HeightLevel previousHeight, out int previousTurns);
+        target.ClearForcedLayerLock();
+
+        bool moved = targetDomain == forcedDomain && targetHeight == forcedHeight;
+        if (!moved)
+            moved = target.TrySetCurrentLayerMode(forcedDomain, forcedHeight);
+
+        if (!moved)
+        {
+            if (hadPreviousLock)
+                target.SetForcedLayerLock(previousDomain, previousHeight, previousTurns);
+            return false;
+        }
+
+        target.SetForcedLayerLock(forcedDomain, forcedHeight, forcedTurns);
+        string forcedMessage = PanelDialogController.ResolveDialogMessage(
+            "layer.forced.after_hit",
+            "<unit> forcada para <domain>/<height> (<turns> turnos).",
+            new Dictionary<string, string>
+            {
+                { "unit", ResolveDebugUnitName(target) },
+                { "domain", forcedDomain.ToString() },
+                { "height", forcedHeight.ToString() },
+                { "turns", forcedTurns.ToString() }
+            });
+        PushPanelUnitMessage(forcedMessage, 2.6f);
+        return true;
     }
 
     private void ApplyEmbarkedCascadeFromDirectHit(UnitManager directlyHitUnit, int hpBefore, int hpAfter)

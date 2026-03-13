@@ -39,9 +39,10 @@ public static class UnitRulesDefinition
 
         if (IsTotalWarEnabled())
         {
-            // Total War: mesma camada permite coexistencia entre times diferentes,
-            // mas bloqueia empilhar duas unidades do mesmo time.
-            return mover.TeamId != blocker.TeamId;
+            // Total War: na mesma camada, o movimento pode atravessar unidades de
+            // qualquer time. O bloqueio de "parar no hex com aliado" eh aplicado
+            // na validacao de destino final.
+            return true;
         }
 
         // Mesma camada: aliado atravessa; inimigo fica bloqueado por enquanto.

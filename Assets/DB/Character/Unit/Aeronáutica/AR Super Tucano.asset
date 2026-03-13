@@ -22,26 +22,21 @@ MonoBehaviour:
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   maxHP: 10
-  defense: 11
-  armorClass: 0
+  defense: 12
+  armorClass: 1
   movement: 6
   visao: 4
   visionSpecializations:
   - domain: 2
     heightLevel: 2
     vision: 5
-    detectsStealth: 1
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
   - domain: 1
     heightLevel: 3
     vision: 5
-    detectsStealth: 1
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
-  stealthRevealScope: 0
-  stealthRevealTeams: 
-  stealthVisibleIfDetectedForTurns: 1
   movementCategory: 1
   militaryForce: 1
   unitClass: 4

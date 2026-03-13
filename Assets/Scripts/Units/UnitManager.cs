@@ -18,6 +18,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private bool autoSnapWhenMovedInEditor = true;
     [SerializeField] private Vector3Int currentCellPosition = Vector3Int.zero;
     [SerializeField] private bool hasActed;
+    [SerializeField, HideInInspector] private bool hasFiredThisTurn;
     [SerializeField] private bool receivedSuppliesThisTurn;
     [SerializeField] private TeamId teamId = TeamId.Green;
     [SerializeField] private string unitId;
@@ -94,6 +95,7 @@ public class UnitManager : MonoBehaviour
     public int RemainingMovementPoints => Mathf.Clamp(remainingMovementPoints, 0, MaxMovementPoints);
     public int Visao => Mathf.Max(1, visao);
     public bool HasActed => hasActed;
+    public bool HasFiredThisTurn => hasFiredThisTurn;
     public bool ReceivedSuppliesThisTurn => receivedSuppliesThisTurn;
     public bool IsEmbarked => isEmbarked;
     public bool IsEmbarkedVisualPreviewActive => embarkedVisualPreviewDepth > 0;
@@ -348,6 +350,11 @@ public class UnitManager : MonoBehaviour
         matchController?.NotifyUnitReachedHasAct(this);
     }
 
+    public void MarkAsFired()
+    {
+        hasFiredThisTurn = true;
+    }
+
     public void SetFogOfWarVisibility(bool visible)
     {
         bool shouldHide = !visible;
@@ -361,6 +368,7 @@ public class UnitManager : MonoBehaviour
     public void ResetActed()
     {
         hasActed = false;
+        hasFiredThisTurn = false;
         ResetRemainingMovement();
         appliedHasActed = hasActed;
         RefreshActedVisual();

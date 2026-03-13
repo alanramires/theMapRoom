@@ -31,20 +31,6 @@ MonoBehaviour:
   - ataque:
       unitClass: 6
       weaponCategory: 1
-      targetClass: 3
-      attackBonus: 1
-      notes: 
-      rpsAttackText: Plane com AntiTanque ataca Armored com RPS Ataque +1
-    defesa:
-      targetClass: 3
-      unitClass: 6
-      weaponCategory: 1
-      defenseBonus: -1
-      notes: 
-      rpsDefenseText: Armored se defende de Plane com AntiTanque com RPS Defesa -1
-  - ataque:
-      unitClass: 6
-      weaponCategory: 1
       targetClass: 1
       attackBonus: 0
       notes: 
@@ -56,6 +42,20 @@ MonoBehaviour:
       defenseBonus: 0
       notes: 
       rpsDefenseText: Vehicle se defende de Plane com AntiTanque com RPS Defesa +0
+  - ataque:
+      unitClass: 6
+      weaponCategory: 1
+      targetClass: 3
+      attackBonus: 1
+      notes: 
+      rpsAttackText: Plane com AntiTanque ataca Armored com RPS Ataque +1
+    defesa:
+      targetClass: 3
+      unitClass: 6
+      weaponCategory: 1
+      defenseBonus: -1
+      notes: 
+      rpsDefenseText: Armored se defende de Plane com AntiTanque com RPS Defesa -1
   - ataque:
       unitClass: 6
       weaponCategory: 1
@@ -71,3 +71,17 @@ MonoBehaviour:
       notes: 
       rpsDefenseText: Artillery se defende de Plane com AntiTanque com RPS Defesa
         +0
+  - ataque:
+      unitClass: 6
+      weaponCategory: 1
+      targetClass: 8
+      attackBonus: 1
+      notes: 
+      rpsAttackText: Plane com AntiTanque ataca Ship com RPS Ataque +1
+    defesa:
+      targetClass: 8
+      unitClass: 6
+      weaponCategory: 1
+      defenseBonus: -1
+      notes: 
+      rpsDefenseText: Ship se defende de Plane com AntiTanque com RPS Defesa -1

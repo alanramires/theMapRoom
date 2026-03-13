@@ -21,6 +21,7 @@ public partial class TurnStateManager
         int radius = GetAvailableMovementSteps(selectedUnit);
         if (radius < 0)
             return;
+        Tilemap occupancyMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
 
         Color teamColor = TeamUtils.GetColor(selectedUnit.TeamId);
         Color overlayColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(movementRangeAlpha));
@@ -34,6 +35,17 @@ public partial class TurnStateManager
             Vector3Int cell = pair.Key;
             if (terrainTilemap.GetTile(cell) == null)
                 continue;
+            if (UnitRulesDefinition.IsTotalWarEnabled() &&
+                occupancyMap != null &&
+                UnitRulesDefinition.IsUnitCellOccupiedForTeam(
+                    occupancyMap,
+                    cell,
+                    selectedUnit.TeamId,
+                    selectedUnit))
+            {
+                // Em hex disputado, pode atravessar aliado, mas nao pode encerrar nele.
+                continue;
+            }
             if (!IsRangeCellAllowedByTakeoffOptions(cell, pair.Value))
                 continue;
 

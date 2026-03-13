@@ -31,21 +31,6 @@ MonoBehaviour:
   - ataque:
       unitClass: 2
       weaponCategory: 1
-      targetClass: 3
-      attackBonus: -1
-      notes: 
-      rpsAttackText: Artillery com AntiTanque ataca Armored com RPS Ataque -1
-    defesa:
-      targetClass: 3
-      unitClass: 2
-      weaponCategory: 1
-      defenseBonus: 1
-      notes: 
-      rpsDefenseText: Armored se defende de Artillery com AntiTanque com RPS Defesa
-        +1
-  - ataque:
-      unitClass: 2
-      weaponCategory: 1
       targetClass: 1
       attackBonus: -2
       notes: 
@@ -58,6 +43,21 @@ MonoBehaviour:
       notes: 
       rpsDefenseText: Vehicle se defende de Artillery com AntiTanque com RPS Defesa
         +2
+  - ataque:
+      unitClass: 2
+      weaponCategory: 1
+      targetClass: 3
+      attackBonus: -1
+      notes: 
+      rpsAttackText: Artillery com AntiTanque ataca Armored com RPS Ataque -1
+    defesa:
+      targetClass: 3
+      unitClass: 2
+      weaponCategory: 1
+      defenseBonus: 1
+      notes: 
+      rpsDefenseText: Armored se defende de Artillery com AntiTanque com RPS Defesa
+        +1
   - ataque:
       unitClass: 2
       weaponCategory: 1
@@ -87,4 +87,33 @@ MonoBehaviour:
       defenseBonus: 0
       notes: 
       rpsDefenseText: Helicopter se defende de Artillery com AntiAerea com RPS Defesa
+        +0
+  - ataque:
+      unitClass: 2
+      weaponCategory: 2
+      targetClass: 4
+      attackBonus: 0
+      notes: 
+      rpsAttackText: Artillery com AntiAerea ataca Jet com RPS Ataque +0
+    defesa:
+      targetClass: 4
+      unitClass: 2
+      weaponCategory: 2
+      defenseBonus: 0
+      notes: 
+      rpsDefenseText: Jet se defende de Artillery com AntiAerea com RPS Defesa +0
+  - ataque:
+      unitClass: 2
+      weaponCategory: 2
+      targetClass: 6
+      attackBonus: 0
+      notes: 
+      rpsAttackText: Artillery com AntiAerea ataca Plane com RPS Ataque +0
+    defesa:
+      targetClass: 6
+      unitClass: 2
+      weaponCategory: 2
+      defenseBonus: 0
+      notes: 
+      rpsDefenseText: Plane se defende de Artillery com AntiAerea com RPS Defesa
         +0

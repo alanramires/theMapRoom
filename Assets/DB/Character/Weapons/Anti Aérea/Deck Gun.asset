@@ -23,6 +23,10 @@ MonoBehaviour:
     heightLevel: 5
   - domain: 0
     heightLevel: 3
+  - domain: 1
+    heightLevel: 3
+  forceOpponentToGoToDomainAfterHit: []
+  unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit: []
   basicAttack: 5
   weaponCategory: 2
   weaponClass: 0

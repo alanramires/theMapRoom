@@ -52,6 +52,10 @@ public class WeaponData : ScriptableObject
     [Tooltip("Forca o alvo a ir para um dominio/altura apos acerto e bloqueia retorno por alguns turnos.")]
     public List<WeaponForcedLayerAfterHit> forceOpponentToGoToDomainAfterHit = new List<WeaponForcedLayerAfterHit>();
 
+    [Header("The Units On The Follow Domain Are Forced To Emerge After Being Hit")]
+    [Tooltip("Se o alvo estiver em algum destes domain/height quando for atingido, sera forcado a emergir.")]
+    public List<WeaponLayerMode> unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit = new List<WeaponLayerMode>();
+
     [Header("Combat")]
     [Tooltip("Ataque base da arma (antes de modificadores).")]
     public int basicAttack = 1;
@@ -104,6 +108,8 @@ public class WeaponData : ScriptableObject
             operationRangeMax = operationRangeMin;
         if (forceOpponentToGoToDomainAfterHit == null)
             forceOpponentToGoToDomainAfterHit = new List<WeaponForcedLayerAfterHit>();
+        if (unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit == null)
+            unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit = new List<WeaponLayerMode>();
         for (int i = 0; i < forceOpponentToGoToDomainAfterHit.Count; i++)
         {
             WeaponForcedLayerAfterHit entry = forceOpponentToGoToDomainAfterHit[i];
@@ -128,6 +134,22 @@ public class WeaponData : ScriptableObject
         {
             WeaponLayerMode mode = aditionalDomainsAllowed[i];
             if (mode.domain == operationDomain && mode.heightLevel == operationHeightLevel)
+                return true;
+        }
+
+        return false;
+    }
+
+    public bool ShouldForceTargetToEmergeAfterHit(Domain targetDomain, HeightLevel targetHeightLevel)
+    {
+        if (unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit == null ||
+            unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit.Count <= 0)
+            return false;
+
+        for (int i = 0; i < unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit.Count; i++)
+        {
+            WeaponLayerMode mode = unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit[i];
+            if (mode.domain == targetDomain && mode.heightLevel == targetHeightLevel)
                 return true;
         }
 

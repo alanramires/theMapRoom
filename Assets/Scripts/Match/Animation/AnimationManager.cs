@@ -151,6 +151,8 @@ public class AnimationManager : MonoBehaviour
     [Header("Taking Hit FX")]
     [Tooltip("Frames da animacao de hit (em ordem).")]
     [SerializeField] private Sprite[] takingHitFrames;
+    [Tooltip("Frames da animacao de hit naval (em ordem). Se vazio, usa Taking Hit Frames.")]
+    [SerializeField] private Sprite[] takingHitNavalFrames;
     [Tooltip("Duracao por frame da animacao de taking hit.")]
     [SerializeField] [Range(0.02f, 0.2f)] private float takingHitFrameDuration = 0.06f;
     [Tooltip("Duracao total do flash (pisca vermelho/branco) ao tomar hit.")]
@@ -505,6 +507,7 @@ public class AnimationManager : MonoBehaviour
 #if UNITY_EDITOR
         TryAutoAssignVtolLandingFramesInEditor();
         TryAutoAssignTakingHitFramesInEditor();
+        TryAutoAssignTakingHitNavalFramesInEditor();
         TryAutoAssignExplosionFramesInEditor();
 #endif
     }
@@ -568,10 +571,12 @@ public class AnimationManager : MonoBehaviour
         if (unit.IsEmbarked)
             return 0f;
 
+        Sprite[] framesToUse = ResolveTakingHitFramesForUnit(unit);
         float sequenceDuration = 0f;
-        if (takingHitFrames != null && takingHitFrames.Length > 0)
+        if (framesToUse != null && framesToUse.Length > 0)
         {
-            GameObject fx = new GameObject("Taking Hit FX");
+            string fxName = IsNavalHitTarget(unit) ? "Naval Hit FX" : "Taking Hit FX";
+            GameObject fx = new GameObject(fxName);
             fx.transform.position = unit.transform.position;
             fx.transform.localScale = Vector3.one * Mathf.Max(0.2f, takingHitScale);
 
@@ -580,7 +585,7 @@ public class AnimationManager : MonoBehaviour
             sr.sortingOrder = takingHitSortingOrder;
 
             SpriteSequenceFx sequence = fx.AddComponent<SpriteSequenceFx>();
-            sequence.Configure(takingHitFrames, takingHitFrameDuration, autoDestroy: true);
+            sequence.Configure(framesToUse, takingHitFrameDuration, autoDestroy: true);
             sequenceDuration = sequence.TotalDuration;
         }
 
@@ -596,6 +601,29 @@ public class AnimationManager : MonoBehaviour
             StartCoroutine(PlayTakingHitShakeRoutine(unit.transform, shakeDuration, shakeMagnitude));
 
         return Mathf.Max(sequenceDuration, Mathf.Max(flashDuration, shakeDuration));
+    }
+
+    private Sprite[] ResolveTakingHitFramesForUnit(UnitManager unit)
+    {
+        if (IsNavalHitTarget(unit) && takingHitNavalFrames != null && takingHitNavalFrames.Length > 0)
+            return takingHitNavalFrames;
+
+        return takingHitFrames;
+    }
+
+    private static bool IsNavalHitTarget(UnitManager unit)
+    {
+        if (unit == null)
+            return false;
+
+        Domain domain = unit.GetDomain();
+        if (domain == Domain.Naval || domain == Domain.Submarine)
+            return true;
+
+        if (!unit.TryGetUnitData(out UnitData data) || data == null)
+            return false;
+
+        return data.unitClass == GameUnitClass.Ship || data.unitClass == GameUnitClass.Submarine;
     }
 
     public float PlayExplosionEffectAt(Vector3 worldPosition)
@@ -1059,6 +1087,32 @@ public class AnimationManager : MonoBehaviour
 
         if (loaded.Count > 0)
             takingHitFrames = loaded.ToArray();
+    }
+
+    private void TryAutoAssignTakingHitNavalFramesInEditor()
+    {
+        if (takingHitNavalFrames != null && takingHitNavalFrames.Length > 0)
+            return;
+
+        string[] paths = new[]
+        {
+            "Assets/img/animations/naval hit/hit1.png",
+            "Assets/img/animations/naval hit/hit2.png",
+            "Assets/img/animations/naval hit/hit3.png",
+            "Assets/img/animations/naval hit/hit4.png",
+            "Assets/img/animations/naval hit/hit5.png"
+        };
+
+        List<Sprite> loaded = new List<Sprite>(paths.Length);
+        for (int i = 0; i < paths.Length; i++)
+        {
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(paths[i]);
+            if (sprite != null)
+                loaded.Add(sprite);
+        }
+
+        if (loaded.Count > 0)
+            takingHitNavalFrames = loaded.ToArray();
     }
 
     private void TryAutoAssignExplosionFramesInEditor()

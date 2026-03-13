@@ -27,6 +27,7 @@ public class UnitManagerEditor : Editor
     private SerializedProperty embarkedResourcesRuntimeProp;
     private SerializedProperty embarkedServicesRuntimeProp;
     private SerializedProperty hasActedProp;
+    private SerializedProperty hasFiredThisTurnProp;
     private SerializedProperty receivedSuppliesThisTurnProp;
     private SerializedProperty isEmbarkedProp;
     private SerializedProperty matchControllerProp;
@@ -63,6 +64,7 @@ public class UnitManagerEditor : Editor
         embarkedResourcesRuntimeProp = serializedObject.FindProperty("embarkedResourcesRuntime");
         embarkedServicesRuntimeProp = serializedObject.FindProperty("embarkedServicesRuntime");
         hasActedProp = serializedObject.FindProperty("hasActed");
+        hasFiredThisTurnProp = serializedObject.FindProperty("hasFiredThisTurn");
         receivedSuppliesThisTurnProp = serializedObject.FindProperty("receivedSuppliesThisTurn");
         isEmbarkedProp = serializedObject.FindProperty("isEmbarked");
         matchControllerProp = serializedObject.FindProperty("matchController");
@@ -100,6 +102,11 @@ public class UnitManagerEditor : Editor
         using (new EditorGUILayout.HorizontalScope())
         {
             EditorGUILayout.PropertyField(hasActedProp, new GUIContent("Has Acted"));
+            if (hasFiredThisTurnProp != null)
+            {
+                using (new EditorGUI.DisabledScope(true))
+                    EditorGUILayout.PropertyField(hasFiredThisTurnProp, new GUIContent("Has Fired (Runtime)"));
+            }
             if (receivedSuppliesThisTurnProp != null)
                 EditorGUILayout.PropertyField(receivedSuppliesThisTurnProp, new GUIContent("Received Supply This Turn"));
         }
