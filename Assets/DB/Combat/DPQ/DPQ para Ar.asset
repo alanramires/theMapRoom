@@ -18,6 +18,6 @@ MonoBehaviour:
   airLowEv: 3
   airHighEv: 4
   fallbackEv: 0
-  airLowBlockLoS: 0
+  airLowBlockLoS: 1
   airHighBlockLoS: 0
   fallbackBlockLoS: 0

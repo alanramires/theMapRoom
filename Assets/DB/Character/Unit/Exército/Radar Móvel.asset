@@ -30,21 +30,15 @@ MonoBehaviour:
   - domain: 3
     heightLevel: 5
     vision: 7
-    detectsStealth: 0
     detectUnitsWithFollowingSkills: []
   - domain: 3
     heightLevel: 4
-    vision: 7
-    detectsStealth: 0
+    vision: 5
     detectUnitsWithFollowingSkills: []
   - domain: 2
     heightLevel: 2
     vision: 0
-    detectsStealth: 0
     detectUnitsWithFollowingSkills: []
-  stealthRevealScope: 0
-  stealthRevealTeams: 
-  stealthVisibleIfDetectedForTurns: 1
   movementCategory: 6
   militaryForce: 0
   unitClass: 1

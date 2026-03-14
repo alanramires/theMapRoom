@@ -23,6 +23,8 @@ public static class PodeDetectarSensor
         Tilemap boardMap = map != null ? map : target.BoardTilemap;
         if (boardMap == null)
             return false;
+        if (!IsUnitOnBoard(target, boardMap))
+            return false;
 
         UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
@@ -31,6 +33,8 @@ public static class PodeDetectarSensor
             if (observer == null || !observer.gameObject.activeInHierarchy || observer.IsEmbarked)
                 continue;
             if ((int)observer.TeamId != viewerTeamId)
+                continue;
+            if (!IsUnitOnBoard(observer, boardMap))
                 continue;
 
             if (CanObserverObserveTarget(
@@ -59,7 +63,13 @@ public static class PodeDetectarSensor
         bool enableLosValidation = true,
         bool enableSpotter = true,
         bool useOccupantLayerForTarget = true,
-        bool preserveObserverLayerRangeForHexVisibility = false)
+        bool preserveObserverLayerRangeForHexVisibility = false,
+        bool forceVirtualTargetLayer = false,
+        Domain forcedVirtualTargetDomain = Domain.Land,
+        HeightLevel forcedVirtualTargetHeight = HeightLevel.Surface,
+        int forcedDetectionRangeOverride = -1,
+        bool skipSpecializedTargetLayers = false,
+        bool useRangeOnlyForAirHighWhenConfigured = false)
     {
         if (visibleCellsOutput == null)
             return;
@@ -79,7 +89,9 @@ public static class PodeDetectarSensor
             ? ResolveDetectionRange(observer, observerData, null, observerDomain, observerHeight)
             : 0;
 
-        int maxRange = ResolveObserverMaxVisionRange(observerData, observer);
+        int maxRange = forcedDetectionRangeOverride >= 0
+            ? Mathf.Max(0, forcedDetectionRangeOverride)
+            : ResolveObserverMaxVisionRange(observerData, observer);
         if (maxRange <= 0)
             return;
 
@@ -94,22 +106,67 @@ public static class PodeDetectarSensor
             int distance = pair.Value;
             if (distance <= 0)
                 continue;
-            if (!TryResolveObservationTargetLayer(
-                    boardMap,
-                    terrainDatabase,
-                    cell,
-                    out Domain targetDomain,
-                    out HeightLevel targetHeight,
-                    useOccupantLayerForTarget))
-                continue;
+            Domain targetDomain;
+            HeightLevel targetHeight;
+            if (forceVirtualTargetLayer)
+            {
+                targetDomain = forcedVirtualTargetDomain;
+                targetHeight = forcedVirtualTargetHeight;
+            }
+            else
+            {
+                if (!TryResolveObservationTargetLayer(
+                        boardMap,
+                        terrainDatabase,
+                        cell,
+                        out targetDomain,
+                        out targetHeight,
+                        useOccupantLayerForTarget))
+                {
+                    continue;
+                }
+            }
 
-            int detectionRange = ResolveDetectionRange(observer, observerData, null, targetDomain, targetHeight);
+            if (skipSpecializedTargetLayers &&
+                HasVisionSpecializationForLayer(observerData, targetDomain, targetHeight))
+            {
+                continue;
+            }
+
+            if (!forceVirtualTargetLayer && preserveObserverLayerRangeForHexVisibility)
+            {
+                if (CanObserveCellByAnyObserverVisionLayer(
+                        observer,
+                        observerData,
+                        boardMap,
+                        terrainDatabase,
+                        dpqAirHeightConfig,
+                        observerCell,
+                        cell,
+                        distance,
+                        targetDomain,
+                        targetHeight,
+                        enableLosValidation,
+                        enableSpotter,
+                        useRangeOnlyForAirHighWhenConfigured))
+                {
+                    visibleCellsOutput.Add(cell);
+                }
+
+                continue;
+            }
+
+            int detectionRange = forcedDetectionRangeOverride >= 0
+                ? Mathf.Max(0, forcedDetectionRangeOverride)
+                : ResolveDetectionRange(observer, observerData, null, targetDomain, targetHeight);
             if (preserveObserverLayerRangeForHexVisibility && observerLayerRangeFloor > detectionRange)
                 detectionRange = observerLayerRangeFloor;
             if (distance > detectionRange)
                 continue;
 
-            bool hasDirectLos = !enableLosValidation || HasValidStraightObservationLine(
+            bool skipLosForCurrentTarget = useRangeOnlyForAirHighWhenConfigured &&
+                IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
+            bool hasDirectLos = skipLosForCurrentTarget || !enableLosValidation || HasValidStraightObservationLine(
                 boardMap,
                 terrainDatabase,
                 observerCell,
@@ -120,7 +177,9 @@ public static class PodeDetectarSensor
                 out _,
                 out _,
                 out _,
-                enableLosValidation: true);
+                enableLosValidation: true,
+                forcedTargetDomain: forceVirtualTargetLayer ? forcedVirtualTargetDomain : null,
+                forcedTargetHeightLevel: forceVirtualTargetLayer ? forcedVirtualTargetHeight : null);
 
             bool hasObservation = hasDirectLos;
             if (!hasObservation)
@@ -140,6 +199,161 @@ public static class PodeDetectarSensor
             if (hasObservation)
                 visibleCellsOutput.Add(cell);
         }
+    }
+
+    private static bool CanObserveCellByAnyObserverVisionLayer(
+        UnitManager observer,
+        UnitData observerData,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        Vector3Int observerCell,
+        Vector3Int targetCell,
+        int distance,
+        Domain resolvedTargetDomain,
+        HeightLevel resolvedTargetHeight,
+        bool enableLosValidation,
+        bool enableSpotter,
+        bool useRangeOnlyForAirHighWhenConfigured)
+    {
+        if (CanObserveCellWithLayer(
+                observer,
+                observerData,
+                boardMap,
+                terrainDatabase,
+                dpqAirHeightConfig,
+                observerCell,
+                targetCell,
+                distance,
+                resolvedTargetDomain,
+                resolvedTargetHeight,
+                enableLosValidation,
+                enableSpotter,
+                useRangeOnlyForAirHighWhenConfigured))
+        {
+            return true;
+        }
+
+        if (observerData == null || observerData.visionSpecializations == null || observerData.visionSpecializations.Count <= 0)
+            return false;
+
+        HashSet<int> seen = new HashSet<int>();
+        for (int i = 0; i < observerData.visionSpecializations.Count; i++)
+        {
+            UnitVisionException specialization = observerData.visionSpecializations[i];
+            if (specialization == null)
+                continue;
+
+            Domain domain = specialization.domain;
+            HeightLevel height = specialization.heightLevel;
+            int key = ((int)domain * 100) + (int)height;
+            if (!seen.Add(key))
+                continue;
+            if (domain == resolvedTargetDomain && height == resolvedTargetHeight)
+                continue;
+
+            if (CanObserveCellWithLayer(
+                    observer,
+                    observerData,
+                    boardMap,
+                    terrainDatabase,
+                    dpqAirHeightConfig,
+                    observerCell,
+                    targetCell,
+                    distance,
+                    domain,
+                    height,
+                    enableLosValidation,
+                    enableSpotter,
+                    useRangeOnlyForAirHighWhenConfigured))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool CanObserveCellWithLayer(
+        UnitManager observer,
+        UnitData observerData,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        Vector3Int observerCell,
+        Vector3Int targetCell,
+        int distance,
+        Domain targetDomain,
+        HeightLevel targetHeight,
+        bool enableLosValidation,
+        bool enableSpotter,
+        bool useRangeOnlyForAirHighWhenConfigured)
+    {
+        int detectionRange = ResolveDetectionRange(observer, observerData, null, targetDomain, targetHeight);
+        if (distance > detectionRange)
+            return false;
+
+        bool skipLosForCurrentTarget = useRangeOnlyForAirHighWhenConfigured &&
+            IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
+        bool hasDirectLos = skipLosForCurrentTarget || !enableLosValidation || HasValidStraightObservationLine(
+            boardMap,
+            terrainDatabase,
+            observerCell,
+            targetCell,
+            observer,
+            null,
+            dpqAirHeightConfig,
+            out _,
+            out _,
+            out _,
+            enableLosValidation: true,
+            forcedTargetDomain: targetDomain,
+            forcedTargetHeightLevel: targetHeight);
+
+        if (hasDirectLos)
+            return true;
+
+        if (enableSpotter && ShouldUseForwardObserverRule(targetDomain, targetHeight))
+        {
+            return TryFindForwardObserverForVirtualCell(
+                observer,
+                targetCell,
+                boardMap,
+                terrainDatabase,
+                dpqAirHeightConfig,
+                enableLosValidation: true);
+        }
+
+        return false;
+    }
+
+    private static bool HasVisionSpecializationForLayer(UnitData observerData, Domain targetDomain, HeightLevel targetHeight)
+    {
+        if (observerData == null || observerData.visionSpecializations == null)
+            return false;
+
+        for (int i = 0; i < observerData.visionSpecializations.Count; i++)
+        {
+            UnitVisionException entry = observerData.visionSpecializations[i];
+            if (entry == null)
+                continue;
+            if (entry.domain == targetDomain && entry.heightLevel == targetHeight)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsAirHighRangeOnlyVision(DPQAirHeightConfig dpqAirHeightConfig, Domain targetDomain, HeightLevel targetHeight)
+    {
+        if (targetDomain != Domain.Air || targetHeight != HeightLevel.AirHigh)
+            return false;
+        if (dpqAirHeightConfig == null)
+            return false;
+        if (!dpqAirHeightConfig.TryGetVisionFor(targetDomain, targetHeight, out _, out bool blockLoS))
+            return false;
+
+        return !blockLoS;
     }
 
     public static bool CollectDetection(
@@ -186,6 +400,11 @@ public static class PodeDetectarSensor
             reason = "Tilemap indisponivel para o scan.";
             return false;
         }
+        if (!IsUnitOnBoard(observer, boardMap))
+        {
+            reason = "Observador fora do tilemap selecionado.";
+            return false;
+        }
 
         UnitData observerData = null;
         observer.TryGetUnitData(out observerData);
@@ -205,7 +424,7 @@ public static class PodeDetectarSensor
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager target = units[i];
-            if (!IsEnemyTargetCandidate(observer, target))
+            if (!IsEnemyTargetCandidate(observer, target, boardMap))
                 continue;
 
             UnitData targetData = null;
@@ -225,7 +444,8 @@ public static class PodeDetectarSensor
 
             List<Vector3Int> lineCells = new List<Vector3Int>();
             Vector3Int blockedCell = Vector3Int.zero;
-            bool hasDirectLos = !enableLosValidation || HasValidStraightObservationLine(
+            bool skipLosForCurrentTarget = IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
+            bool hasDirectLos = skipLosForCurrentTarget || !enableLosValidation || HasValidStraightObservationLine(
                 boardMap,
                 terrainDatabase,
                 observerCell,
@@ -408,6 +628,133 @@ public static class PodeDetectarSensor
         return detectedStealthOutput.Count > 0 || spottedCandidatesOutput.Count > 0;
     }
 
+    public static bool TryGetObservationLineDebug(
+        UnitManager observer,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        Vector3Int targetCell,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        bool enableLosValidation,
+        Domain? forcedTargetDomain,
+        HeightLevel? forcedTargetHeightLevel,
+        out float finalReachedEv,
+        out float losHeightAtBlockedCell,
+        out int blockedCellEv,
+        out Vector3Int blockedCell,
+        out float losHeightAtStrongestPassedCell,
+        out int strongestPassedCellEv,
+        out Vector3Int strongestPassedCell,
+        out List<float> lineRiseHeights)
+    {
+        finalReachedEv = 0f;
+        losHeightAtBlockedCell = 0f;
+        blockedCellEv = 0;
+        blockedCell = Vector3Int.zero;
+        losHeightAtStrongestPassedCell = 0f;
+        strongestPassedCellEv = 0;
+        strongestPassedCell = Vector3Int.zero;
+        lineRiseHeights = new List<float>();
+
+        if (observer == null)
+            return false;
+
+        Tilemap boardMap = map != null ? map : observer.BoardTilemap;
+        if (boardMap == null)
+            return false;
+
+        Vector3Int originCell = observer.CurrentCellPosition;
+        originCell.z = 0;
+        targetCell.z = 0;
+
+        bool hasDirectLos = HasValidStraightObservationLine(
+            boardMap,
+            terrainDatabase,
+            originCell,
+            targetCell,
+            observer,
+            null,
+            dpqAirHeightConfig,
+            out List<Vector3Int> intermediateCells,
+            out List<float> evPath,
+            out blockedCell,
+            enableLosValidation: enableLosValidation,
+            forcedTargetDomain: forcedTargetDomain,
+            forcedTargetHeightLevel: forcedTargetHeightLevel);
+
+        if (evPath != null && evPath.Count > 0)
+        {
+            finalReachedEv = evPath[evPath.Count - 1];
+            lineRiseHeights.AddRange(evPath);
+        }
+        losHeightAtBlockedCell = finalReachedEv;
+
+        if (blockedCell != Vector3Int.zero && intermediateCells != null && evPath != null)
+        {
+            int blockedIndex = intermediateCells.IndexOf(blockedCell);
+            if (blockedIndex >= 0)
+            {
+                int evPathIndex = blockedIndex + 1; // +1 because index 0 is origin EV.
+                if (evPathIndex >= 0 && evPathIndex < evPath.Count)
+                    losHeightAtBlockedCell = evPath[evPathIndex];
+            }
+
+            if (TryResolveCellVision(
+                    boardMap,
+                    terrainDatabase,
+                    blockedCell,
+                    null,
+                    dpqAirHeightConfig,
+                    out int resolvedBlockedEv,
+                    out _,
+                    forcedDomain: forcedTargetDomain,
+                    forcedHeightLevel: forcedTargetHeightLevel))
+            {
+                blockedCellEv = resolvedBlockedEv;
+            }
+        }
+
+        if (intermediateCells != null && evPath != null)
+        {
+            for (int i = 0; i < intermediateCells.Count; i++)
+            {
+                Vector3Int cell = intermediateCells[i];
+                int evPathIndex = i + 1; // index 0 is origin EV
+                if (evPathIndex < 0 || evPathIndex >= evPath.Count)
+                    continue;
+
+                if (!TryResolveCellVision(
+                        boardMap,
+                        terrainDatabase,
+                        cell,
+                        null,
+                        dpqAirHeightConfig,
+                        out int cellEv,
+                        out bool cellBlocksLoS,
+                        forcedDomain: forcedTargetDomain,
+                        forcedHeightLevel: forcedTargetHeightLevel))
+                {
+                    continue;
+                }
+
+                if (cellEv <= 0)
+                    continue;
+
+                float losHeightAtCell = evPath[evPathIndex];
+                if (cellEv > losHeightAtCell)
+                    continue;
+
+                if (cellEv > strongestPassedCellEv)
+                {
+                    strongestPassedCellEv = cellEv;
+                    strongestPassedCell = cell;
+                    losHeightAtStrongestPassedCell = losHeightAtCell;
+                }
+            }
+        }
+
+        return hasDirectLos;
+    }
+
     private static int ResolveObserverMaxVisionRange(UnitData observerData, UnitManager observer)
     {
         int maxRange = observerData != null ? Mathf.Max(1, observerData.visao) : Mathf.Max(1, observer.Visao);
@@ -460,10 +807,12 @@ public static class PodeDetectarSensor
         List<UnitManager> observers = new List<UnitManager>();
         if (observer == null || target == null || map == null)
             return observers;
+        if (!IsUnitOnBoard(observer, map) || !IsUnitOnBoard(target, map))
+            return observers;
 
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
-        int maxObserverRange = GetTeamMaxObservationRangeHexes(observer, target);
+        int maxObserverRange = GetTeamMaxObservationRangeHexes(observer, target, map);
         Dictionary<Vector3Int, int> localAroundTarget = BuildDistanceMap(map, targetCell, maxObserverRange);
         if (localAroundTarget.Count == 0)
             return observers;
@@ -477,6 +826,8 @@ public static class PodeDetectarSensor
             if (ally.TeamId != observer.TeamId)
                 continue;
             if (ally == observer)
+                continue;
+            if (!IsUnitOnBoard(ally, map))
                 continue;
 
             Vector3Int allyCell = ally.CurrentCellPosition;
@@ -531,9 +882,9 @@ public static class PodeDetectarSensor
         return 1;
     }
 
-    private static int GetTeamMaxObservationRangeHexes(UnitManager referenceUnit, UnitManager target)
+    private static int GetTeamMaxObservationRangeHexes(UnitManager referenceUnit, UnitManager target, Tilemap boardMap)
     {
-        if (referenceUnit == null)
+        if (referenceUnit == null || boardMap == null)
             return 1;
 
         int maxRange = GetObservationRangeHexes(referenceUnit, target);
@@ -545,6 +896,8 @@ public static class PodeDetectarSensor
                 continue;
             if (ally.TeamId != referenceUnit.TeamId)
                 continue;
+            if (!IsUnitOnBoard(ally, boardMap))
+                continue;
 
             int allyRange = GetObservationRangeHexes(ally, target);
             if (allyRange > maxRange)
@@ -554,9 +907,9 @@ public static class PodeDetectarSensor
         return Mathf.Max(1, maxRange);
     }
 
-    private static int GetTeamMaxObservationRangeHexes(UnitManager referenceUnit)
+    private static int GetTeamMaxObservationRangeHexes(UnitManager referenceUnit, Tilemap boardMap)
     {
-        if (referenceUnit == null)
+        if (referenceUnit == null || boardMap == null)
             return 1;
 
         int maxRange = GetObservationRangeHexes(referenceUnit);
@@ -567,6 +920,8 @@ public static class PodeDetectarSensor
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
                 continue;
             if (ally.TeamId != referenceUnit.TeamId)
+                continue;
+            if (!IsUnitOnBoard(ally, boardMap))
                 continue;
 
             int allyRange = GetObservationRangeHexes(ally);
@@ -587,9 +942,11 @@ public static class PodeDetectarSensor
     {
         if (observer == null || map == null)
             return false;
+        if (!IsUnitOnBoard(observer, map))
+            return false;
 
         targetCell.z = 0;
-        int maxObserverRange = GetTeamMaxObservationRangeHexes(observer);
+        int maxObserverRange = GetTeamMaxObservationRangeHexes(observer, map);
         Dictionary<Vector3Int, int> localAroundTarget = BuildDistanceMap(map, targetCell, maxObserverRange);
         if (localAroundTarget.Count == 0)
             return false;
@@ -601,6 +958,8 @@ public static class PodeDetectarSensor
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
                 continue;
             if (ally.TeamId != observer.TeamId)
+                continue;
+            if (!IsUnitOnBoard(ally, map))
                 continue;
 
             Vector3Int allyCell = ally.CurrentCellPosition;
@@ -632,13 +991,15 @@ public static class PodeDetectarSensor
         return false;
     }
 
-    private static bool IsEnemyTargetCandidate(UnitManager observer, UnitManager target)
+    private static bool IsEnemyTargetCandidate(UnitManager observer, UnitManager target, Tilemap boardMap)
     {
         if (observer == null || target == null)
             return false;
         if (target == observer)
             return false;
         if (!target.gameObject.activeInHierarchy || target.IsEmbarked)
+            return false;
+        if (!IsUnitOnBoard(observer, boardMap) || !IsUnitOnBoard(target, boardMap))
             return false;
 
         return observer.TeamId != target.TeamId;
@@ -655,6 +1016,8 @@ public static class PodeDetectarSensor
         bool enableStealthValidation)
     {
         if (observer == null || target == null || boardMap == null)
+            return false;
+        if (!IsUnitOnBoard(observer, boardMap) || !IsUnitOnBoard(target, boardMap))
             return false;
 
         UnitData observerData = null;
@@ -677,7 +1040,8 @@ public static class PodeDetectarSensor
         if (distance > detectionRange)
             return false;
 
-        bool hasDirectLos = !enableLosValidation || HasValidStraightObservationLine(
+        bool skipLosForCurrentTarget = IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
+        bool hasDirectLos = skipLosForCurrentTarget || !enableLosValidation || HasValidStraightObservationLine(
             boardMap,
             terrainDatabase,
             observerCell,
@@ -715,6 +1079,17 @@ public static class PodeDetectarSensor
             return true;
 
         return observerData != null && observerData.CanDetectStealthFor(targetDomain, targetHeight, targetData);
+    }
+
+    private static bool IsUnitOnBoard(UnitManager unit, Tilemap boardMap)
+    {
+        if (unit == null || boardMap == null)
+            return false;
+
+        if (unit.BoardTilemap == null || unit.BoardTilemap != boardMap)
+            return false;
+
+        return unit.gameObject.scene == boardMap.gameObject.scene;
     }
 
     private static string ResolveStealthDetectionReason(
@@ -873,7 +1248,9 @@ public static class PodeDetectarSensor
         out List<Vector3Int> intermediateCells,
         out List<float> evPath,
         out Vector3Int blockedCell,
-        bool enableLosValidation)
+        bool enableLosValidation,
+        Domain? forcedTargetDomain = null,
+        HeightLevel? forcedTargetHeightLevel = null)
     {
         intermediateCells = new List<Vector3Int>();
         evPath = new List<float>();
@@ -894,9 +1271,9 @@ public static class PodeDetectarSensor
         }
         originEv = ResolveOriginEvForLos(tilemap, terrainDatabase, originCell, observer, dpqAirHeightConfig, originEv);
 
-        Domain? forcedTargetDomain = null;
-        HeightLevel? forcedTargetHeightLevel = null;
-        if (target == null &&
+        if (!forcedTargetDomain.HasValue &&
+            !forcedTargetHeightLevel.HasValue &&
+            target == null &&
             TryResolveObservationTargetLayer(
                 tilemap,
                 terrainDatabase,
@@ -943,7 +1320,9 @@ public static class PodeDetectarSensor
                     null,
                     dpqAirHeightConfig,
                     out int cellEv,
-                    out bool cellBlocksLoS))
+                    out bool cellBlocksLoS,
+                    forcedDomain: forcedTargetDomain,
+                    forcedHeightLevel: forcedTargetHeightLevel))
             {
                 continue;
             }

@@ -4,6 +4,7 @@ using System.Collections;
 using System;
 using UnityEngine.Serialization;
 using UnityEngine.Tilemaps;
+using UnityEngine.SceneManagement;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -117,6 +118,8 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private bool fogOverlayInitialized;
     [System.NonSerialized] private bool initialStealthDetectionBootstrapped;
     [System.NonSerialized] private bool debugFogOfWarEnabled = true;
+    [Header("Debug")]
+    [SerializeField] private bool enableFogSourceDebugLogs = false;
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
@@ -1049,22 +1052,64 @@ public class MatchController : MonoBehaviour
         if (boardMap == null)
             return;
 
+        if (enableFogSourceDebugLogs)
+        {
+            Debug.Log(
+                $"[FoW][Context] activeTeam={activeTeamId} " +
+                $"controllerScene={gameObject.scene.name} " +
+                $"fogScene={(fogOfWarTilemap != null ? fogOfWarTilemap.gameObject.scene.name : "-")} " +
+                $"boardMap={boardMap.name} boardScene={boardMap.gameObject.scene.name}");
+        }
+
         ResetFogOfWarRuntime(clearTilemap: false);
         InitializeFogOverlay(boardMap);
         if (!fogOverlayInitialized)
             return;
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        int unitsIncluded = 0;
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
             if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+            {
+                if (enableFogSourceDebugLogs && unit != null)
+                    Debug.Log($"[FoW][Unit][Skip] {unit.name} reason=inactive_or_embarked");
                 continue;
+            }
             if ((int)unit.TeamId != activeTeamId)
+            {
+                if (enableFogSourceDebugLogs)
+                    Debug.Log($"[FoW][Unit][Skip] {unit.name} reason=other_team team={(int)unit.TeamId}");
                 continue;
+            }
+            if (!IsUnitOnBoard(unit, boardMap))
+            {
+                if (enableFogSourceDebugLogs)
+                {
+                    string unitMap = unit.BoardTilemap != null ? unit.BoardTilemap.name : "-";
+                    string unitScene = unit.gameObject.scene.name;
+                    Debug.Log(
+                        $"[FoW][Unit][Skip] {unit.name} reason=other_board_or_scene " +
+                        $"unitMap={unitMap} unitScene={unitScene} " +
+                        $"boardMap={boardMap.name} boardScene={boardMap.gameObject.scene.name}");
+                }
+                continue;
+            }
+
+            unitsIncluded++;
+            if (enableFogSourceDebugLogs)
+            {
+                Debug.Log(
+                    $"[FoW][Unit][Use] {unit.name} team={(int)unit.TeamId} " +
+                    $"unitMap={unit.BoardTilemap.name} unitScene={unit.gameObject.scene.name}");
+            }
 
             UpdateFogVisibilityForUnit(unit, boardMap);
         }
+
+        if (enableFogSourceDebugLogs)
+            Debug.Log($"[FoW][Unit][Summary] total={units.Length} included={unitsIncluded}");
 
         ApplyFriendlyConstructionVision(boardMap);
         RefreshRuntimeUnitFogVisibility();
@@ -1132,6 +1177,8 @@ public class MatchController : MonoBehaviour
             if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
                 continue;
             if ((int)unit.TeamId != activeTeamId)
+                continue;
+            if (!IsUnitOnBoard(unit, boardMap))
                 continue;
             if (!unit.TryGetUnitData(out UnitData unitData) || unitData == null)
                 continue;
@@ -1269,6 +1316,8 @@ public class MatchController : MonoBehaviour
             UnitManager observer = units[i];
             if (observer == null || !observer.gameObject.activeInHierarchy || observer.IsEmbarked)
                 continue;
+            if (!IsUnitOnBoard(observer, boardMap))
+                continue;
             observersProcessed++;
 
             // 0) Start do jogo: roda PodeDetectar para cada unidade.
@@ -1388,13 +1437,14 @@ public class MatchController : MonoBehaviour
 
         bool hadRevealBefore = HasAnyActiveEnemyReveal(actedUnit);
         HashSet<int> observerTeamIds = new HashSet<int>();
-        bool isObservedNow = CollectObserverEnemyTeamsWithinRadius(actedUnit, map, 7, observerTeamIds);
+        int observerRadius = ResolveMaxEnemyObservationRadiusForTarget(actedUnit);
+        bool isObservedNow = CollectObserverEnemyTeamsWithinRadius(actedUnit, map, observerRadius, observerTeamIds);
         string teamsObservedLabel = observerTeamIds.Count > 0
             ? string.Join(",", observerTeamIds)
             : "-";
         Debug.Log(
             $"[AindaMeVe][Runtime] target={actedUnit.name} team={(int)actedUnit.TeamId} " +
-            $"hadRevealBefore={hadRevealBefore} observedNow={isObservedNow} observerTeams={teamsObservedLabel}");
+            $"hadRevealBefore={hadRevealBefore} observedNow={isObservedNow} observerRadius={observerRadius} observerTeams={teamsObservedLabel}");
         if (isObservedNow)
         {
             bool observedTeamsChanged = actedUnit.SyncCurrentlyObservedByTeams(observerTeamIds);
@@ -1419,6 +1469,47 @@ public class MatchController : MonoBehaviour
 
         if (observedTeamsCleared)
             actedUnit.RefreshRuntimeVisualState();
+    }
+
+    private int ResolveMaxEnemyObservationRadiusForTarget(UnitManager target)
+    {
+        const int MaxObservationScanRadius = 7;
+
+        if (target == null)
+            return 1;
+
+        Tilemap boardMap = target.BoardTilemap != null
+            ? target.BoardTilemap
+            : ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return 1;
+
+        Domain targetDomain = target.GetDomain();
+        HeightLevel targetHeight = target.GetHeightLevel();
+        int targetTeamId = (int)target.TeamId;
+
+        int maxRange = 1;
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager observer = units[i];
+            if (observer == null || observer == target || !observer.gameObject.activeInHierarchy || observer.IsEmbarked)
+                continue;
+            if ((int)observer.TeamId == targetTeamId)
+                continue;
+            if (!IsUnitOnBoard(observer, boardMap))
+                continue;
+
+            int observerRange = observer.Visao;
+            if (observer.TryGetUnitData(out UnitData observerData) && observerData != null)
+                observerRange = Mathf.Max(0, observerData.ResolveVisionFor(targetDomain, targetHeight));
+
+            if (observerRange > maxRange)
+                maxRange = observerRange;
+        }
+
+        maxRange = Mathf.Clamp(maxRange, 1, MaxObservationScanRadius);
+        return maxRange;
     }
 
     private bool HasAnyActiveEnemyReveal(UnitManager target)
@@ -1459,6 +1550,8 @@ public class MatchController : MonoBehaviour
             if (observer == null || observer == target || !observer.gameObject.activeInHierarchy || observer.IsEmbarked)
                 continue;
             if (observer.TeamId == target.TeamId)
+                continue;
+            if (!IsUnitOnBoard(observer, map))
                 continue;
 
             Vector3Int observerCell = observer.CurrentCellPosition;
@@ -1614,15 +1707,41 @@ public class MatchController : MonoBehaviour
 
     private Tilemap ResolveFogBoardTilemap()
     {
+        Scene contextScene = fogOfWarTilemap != null
+            ? fogOfWarTilemap.gameObject.scene
+            : gameObject.scene;
+
         if (cursorController != null && cursorController.BoardTilemap != null)
-            return cursorController.BoardTilemap;
+        {
+            Tilemap cursorMap = cursorController.BoardTilemap;
+            if (cursorMap.gameObject.scene == contextScene)
+                return cursorMap;
+        }
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
-            if (unit != null && unit.BoardTilemap != null)
+            if (unit == null || unit.BoardTilemap == null)
+                continue;
+            if (unit.gameObject.scene != contextScene)
+                continue;
+
+            return unit.BoardTilemap;
+        }
+
+        if (fogOfWarTilemap != null)
+        {
+            for (int i = 0; i < units.Length; i++)
+            {
+                UnitManager unit = units[i];
+                if (unit == null || unit.BoardTilemap == null)
+                    continue;
+                if (unit.gameObject.scene != contextScene)
+                    continue;
+
                 return unit.BoardTilemap;
+            }
         }
 
         return null;
@@ -1731,7 +1850,8 @@ public class MatchController : MonoBehaviour
             enableLosValidation,
             enableSpotter: false,
             useOccupantLayerForTarget: false,
-            preserveObserverLayerRangeForHexVisibility: true);
+            preserveObserverLayerRangeForHexVisibility: true,
+            useRangeOnlyForAirHighWhenConfigured: true);
 
         foreach (Vector3Int cell in fogUnitVisibleScratchBuffer)
         {
@@ -1792,21 +1912,53 @@ public class MatchController : MonoBehaviour
             return;
 
         ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        int constructionsIncluded = 0;
         for (int i = 0; i < constructions.Length; i++)
         {
             ConstructionManager construction = constructions[i];
             if (construction == null || !construction.gameObject.activeInHierarchy)
                 continue;
             if ((int)construction.TeamId != activeTeamId)
+            {
+                if (enableFogSourceDebugLogs)
+                    Debug.Log($"[FoW][Construction][Skip] {construction?.name} reason=other_team team={(int)construction.TeamId}");
                 continue;
+            }
+            if (construction.BoardTilemap == null || construction.BoardTilemap != boardMap)
+            {
+                if (enableFogSourceDebugLogs)
+                {
+                    string cMap = construction.BoardTilemap != null ? construction.BoardTilemap.name : "-";
+                    Debug.Log(
+                        $"[FoW][Construction][Skip] {construction.name} reason=other_board " +
+                        $"constructionMap={cMap} boardMap={boardMap.name}");
+                }
+                continue;
+            }
+            if (construction.gameObject.scene != boardMap.gameObject.scene)
+            {
+                if (enableFogSourceDebugLogs)
+                {
+                    Debug.Log(
+                        $"[FoW][Construction][Skip] {construction.name} reason=other_scene " +
+                        $"constructionScene={construction.gameObject.scene.name} boardScene={boardMap.gameObject.scene.name}");
+                }
+                continue;
+            }
 
             Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;
             if (boardMap.GetTile(cell) == null)
                 continue;
 
+            constructionsIncluded++;
+            if (enableFogSourceDebugLogs)
+                Debug.Log($"[FoW][Construction][Use] {construction.name} cell={cell.x},{cell.y}");
             ApplyFogContribution(cell, +1, boardMap);
         }
+
+        if (enableFogSourceDebugLogs)
+            Debug.Log($"[FoW][Construction][Summary] total={constructions.Length} included={constructionsIncluded}");
     }
 
     private void RefreshRuntimeUnitFogVisibility()
@@ -1819,10 +1971,13 @@ public class MatchController : MonoBehaviour
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         fogUnitVisibilityByCacheIndex.Clear();
+        Tilemap boardMap = ResolveFogBoardTilemap();
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
             if (unit == null)
+                continue;
+            if (boardMap != null && !IsUnitOnBoard(unit, boardMap))
                 continue;
 
             bool visible = ComputeIsUnitVisibleForActiveTeam(unit);
@@ -1858,15 +2013,29 @@ public class MatchController : MonoBehaviour
     {
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         fogUnitVisibilityByCacheIndex.Clear();
+        Tilemap boardMap = ResolveFogBoardTilemap();
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
             if (unit == null)
                 continue;
+            if (boardMap != null && !IsUnitOnBoard(unit, boardMap))
+                continue;
 
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = true;
             unit.SetFogOfWarVisibility(true);
         }
+    }
+
+    private static bool IsUnitOnBoard(UnitManager unit, Tilemap boardMap)
+    {
+        if (unit == null || boardMap == null)
+            return false;
+
+        if (unit.BoardTilemap == null || unit.BoardTilemap != boardMap)
+            return false;
+
+        return unit.gameObject.scene == boardMap.gameObject.scene;
     }
 
     private static int ResolveFogCacheIndex(UnitManager unit)

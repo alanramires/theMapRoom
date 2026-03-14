@@ -13,6 +13,11 @@ Objetivo: validar que `Pode Mirar`, `Pode Detectar`, `Alguem me ve` e `Pode Enxe
   - `Tools > Combat > Pode Mirar`
   - `Tools > Sensors > Pode Detectar`
   - `Tools > Sensor > Pode Enxergar`
+  - Se a unidade tiver `visionSpecializations`, rodar os cenarios por especializacao no `Pode Enxergar`:
+    - `Visao Geral (base, sem especializacao)` para cobrir camadas nao especializadas
+    - cada especializacao gera seu bloco com:
+      - `Desenhar todas as validas`
+      - `Desenhar todas as invalidas`
 
 ## Teste 1 - Adjacente sem obstaculo
 - Coloque soldado A e soldado B adjacentes em planicie.
@@ -52,6 +57,7 @@ Objetivo: validar que `Pode Mirar`, `Pode Detectar`, `Alguem me ve` e `Pode Enxe
 - Esperado:
   - FoW de hex pode permanecer aberto ate 7 quando essa verdade for valida.
   - Unidade terrestre distante so aparece se `Pode Detectar` permitir.
+  - Se `DPQ Air Height Config` estiver com `AirHigh blockLoS = false`, em `air/high` o teste de visao por hex considera alcance sem bloqueio de LoS.
 
 ## Teste 7 - Stealth real
 - Alvo stealth sem skill de deteccao no observador.
@@ -80,9 +86,47 @@ Objetivo: validar que `Pode Mirar`, `Pode Detectar`, `Alguem me ve` e `Pode Enxe
   - Resultado identico entre gameplay e tools.
   - Sem diferenca estranha de LoS por map errado.
 
+## Teste 11 - Unidade com so visao (sem especializacao)
+- Use unidade com apenas `visao` base (sem `visionSpecializations`).
+- No `Tools > Sensors > Pode Enxergar`, rode com `Forcar camada virtual alvo` desligado e ligado.
+- Esperado:
+  - Alcance de hex visivel segue o `visao` base.
+  - Alcance permanece coerente em todos os dominios/alturas quando nao houver especializacao por camada.
+
+## Teste 11.1 - Unidade com especializacao + visao geral base
+- Exemplo: `visao=3`, especializacoes `air/high=7`, `air/low=5`, `submarine/submerged=0`.
+- Em `Pode Enxergar`, rode sem `Forcar camada virtual alvo`.
+- Esperado:
+  - Existe bloco `Visao Geral (base, sem especializacao)` cobrindo camadas nao especializadas (ex.: `land/surface`, `naval/surface`) com range base.
+  - Existem blocos separados para cada especializacao com range proprio.
+
+## Teste 12 - Camada virtual forcada air/low
+- Em `Pode Enxergar`, ligue `Forcar camada virtual alvo`.
+- Configure `Domain virtual = Air` e `Height virtual = AirLow`.
+- Esperado:
+  - Calculo considera alvo virtual em `air/low` para todos os hexes.
+  - Alcance e LoS refletem a regra de visao da unidade para `air/low`.
+
+## Teste 13 - Camada virtual forcada air/high
+- Em `Pode Enxergar`, mantenha `Forcar camada virtual alvo` ligado.
+- Configure `Domain virtual = Air` e `Height virtual = AirHigh`.
+- Esperado:
+  - Calculo considera alvo virtual em `air/high` para todos os hexes.
+  - Alcance e LoS refletem a regra de visao da unidade para `air/high`.
+
+## Teste 14 - Camada virtual forcada sub/submerge
+- Em `Pode Enxergar`, mantenha `Forcar camada virtual alvo` ligado.
+- Configure `Domain virtual = Submarine` e `Height virtual = Submerged`.
+- Esperado:
+  - Calculo considera alvo virtual em `submarine/submerged` para todos os hexes.
+  - Alcance e LoS refletem a regra de visao da unidade para `submarine/submerged`.
+
 ## Registro sugerido por teste
 - `PASS` / `FAIL`
 - Coordenadas dos hexes
 - Prints (tool + gameplay)
 - Flag ativa no momento (`LdT/LoS/Spotter/Stealth/Total War`)
 - Observacao curta do desvio
+- No `Pode Enxergar`:
+  - em validos: registrar `EV final (chegou)`
+  - em invalidos: registrar `EV na parada` e `EV que passou` (hex bloqueador)
