@@ -213,7 +213,16 @@ public class UnitPainterWindow : EditorWindow
 
         SerializedObject so = new SerializedObject(unitSpawner);
         SerializedProperty tilemapProp = so.FindProperty("boardTilemap");
-        return tilemapProp != null ? tilemapProp.objectReferenceValue as Tilemap : null;
+        Tilemap current = tilemapProp != null ? tilemapProp.objectReferenceValue as Tilemap : null;
+        Tilemap resolved = ResolvePreferredBoardTilemap(current);
+        if (resolved != null && tilemapProp != null && current != resolved)
+        {
+            tilemapProp.objectReferenceValue = resolved;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(unitSpawner);
+        }
+
+        return resolved;
     }
 
     private void TryAutoAssignReferences(bool force)
@@ -295,5 +304,36 @@ public class UnitPainterWindow : EditorWindow
         }
 
         return false;
+    }
+
+    private static Tilemap ResolvePreferredBoardTilemap(Tilemap current)
+    {
+        if (IsTileMapByName(current))
+            return current;
+
+        Tilemap byName = FindSceneTileMapByName();
+        if (byName != null)
+            return byName;
+
+        return current;
+    }
+
+    private static bool IsTileMapByName(Tilemap tilemap)
+    {
+        return tilemap != null &&
+               string.Equals(tilemap.name, "TileMap", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Tilemap FindSceneTileMapByName()
+    {
+        Tilemap[] maps = Object.FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (IsTileMapByName(map))
+                return map;
+        }
+
+        return null;
     }
 }

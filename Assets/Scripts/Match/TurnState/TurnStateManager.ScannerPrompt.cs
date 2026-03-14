@@ -701,6 +701,12 @@ public partial class TurnStateManager
 
     private void HandleThreatLayersActionRequested()
     {
+        if (matchController != null && matchController.EnableTotalWar)
+        {
+            Debug.Log("Layers de Ameaca (\"Z\"): indisponivel quando Guerra Total estiver ativa.");
+            return;
+        }
+
         if (cursorState != CursorState.Neutral)
         {
             Debug.Log("Layers de Ameaca (\"Z\"): so disponivel em cursor neutro.");

@@ -157,7 +157,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
             return;
         }
 
-        Tilemap map = overrideTilemap != null ? overrideTilemap : selectedUnit.BoardTilemap;
+        Tilemap map = ResolveBoardTilemapForSimulation();
         TerrainDatabase db = terrainDatabase != null ? terrainDatabase : FindFirstTerrainDatabaseAsset();
         SensorMovementMode effectiveMode = movementMode;
         bool enableLdt = true;
@@ -207,7 +207,8 @@ public class PodeMirarSensorDebugWindow : EditorWindow
             enableLdt,
             enableLos,
             enableSpotter,
-            enableStealth);
+            enableStealth,
+            respectTotalWarVisibility: useGameplaySensorContext && Application.isPlaying);
         statusMessage = canAim
             ? $"Sensor TRUE. {results.Count} opcao(oes) valida(s), {invalidResults.Count} invalida(s)."
             : $"Sensor FALSE. Nenhum alvo elegivel ({invalidResults.Count} invalido(s)).";
@@ -657,6 +658,12 @@ public class PodeMirarSensorDebugWindow : EditorWindow
     {
         if (overrideTilemap != null)
             return overrideTilemap;
+        if (useGameplaySensorContext)
+        {
+            Tilemap gameplayMap = ResolveGameplayTerrainTilemap();
+            if (gameplayMap != null)
+                return gameplayMap;
+        }
         if (selectedUnit != null && selectedUnit.BoardTilemap != null)
             return selectedUnit.BoardTilemap;
         return FindPreferredTilemap();
@@ -674,6 +681,16 @@ public class PodeMirarSensorDebugWindow : EditorWindow
             terrainDatabase = so.FindProperty("terrainDatabase")?.objectReferenceValue as TerrainDatabase;
         if (dpqAirHeightConfig == null)
             dpqAirHeightConfig = so.FindProperty("dpqAirHeightConfig")?.objectReferenceValue as DPQAirHeightConfig;
+    }
+
+    private Tilemap ResolveGameplayTerrainTilemap()
+    {
+        if (turnStateManager == null)
+            return null;
+
+        SerializedObject so = new SerializedObject(turnStateManager);
+        SerializedProperty terrainProp = so.FindProperty("terrainTilemap");
+        return terrainProp != null ? terrainProp.objectReferenceValue as Tilemap : null;
     }
 
     private bool TryResolveRangeMapContext(out Tilemap map, out TileBase tile)

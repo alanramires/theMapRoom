@@ -93,6 +93,8 @@ public partial class TurnStateManager : MonoBehaviour
 
     public CursorState CurrentCursorState => cursorState;
     public UnitManager SelectedUnit => selectedUnit;
+    public TerrainDatabase TerrainDatabaseRef => terrainDatabase;
+    public DPQAirHeightConfig DpqAirHeightConfigRef => dpqAirHeightConfig;
     public bool IsScannerActionExecutionInProgress =>
         embarkExecutionInProgress
         || landingExecutionInProgress
@@ -1054,8 +1056,8 @@ public partial class TurnStateManager : MonoBehaviour
         if (unitSpawner == null)
             unitSpawner = FindAnyObjectByType<UnitSpawner>();
 
-        if (terrainTilemap == null && cursorController != null)
-            terrainTilemap = cursorController.BoardTilemap;
+        if (terrainTilemap == null)
+            terrainTilemap = ResolvePreferredTerrainTilemap();
 
         if (rangeMapTilemap == null)
             rangeMapTilemap = FindRangeMapTilemap();
@@ -1075,6 +1077,37 @@ public partial class TurnStateManager : MonoBehaviour
         if (rpsDatabase == null)
             rpsDatabase = FindFirstAssetEditor<RPSDatabase>();
 #endif
+    }
+
+    private Tilemap ResolvePreferredTerrainTilemap()
+    {
+        Tilemap namedBoard = FindTilemapByName("TileMap");
+        if (namedBoard != null)
+            return namedBoard;
+
+        if (cursorController != null && cursorController.BoardTilemap != null)
+            return cursorController.BoardTilemap;
+
+        return null;
+    }
+
+    private static Tilemap FindTilemapByName(string expectedName)
+    {
+        if (string.IsNullOrWhiteSpace(expectedName))
+            return null;
+
+        Tilemap[] maps = FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (map == null)
+                continue;
+
+            if (string.Equals(map.name, expectedName, System.StringComparison.OrdinalIgnoreCase))
+                return map;
+        }
+
+        return null;
     }
 
     private void ClearCommittedMovement()

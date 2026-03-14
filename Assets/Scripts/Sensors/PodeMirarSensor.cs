@@ -59,7 +59,8 @@ public static class PodeMirarSensor
         bool enableLdtValidation = true,
         bool enableLosValidation = true,
         bool enableSpotter = true,
-        bool enableStealthValidation = true)
+        bool enableStealthValidation = true,
+        bool respectTotalWarVisibility = true)
     {
         if (output == null)
             return false;
@@ -111,7 +112,7 @@ public static class PodeMirarSensor
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager target = units[i];
-            if (!IsEnemyTargetCandidate(attacker, target))
+            if (!IsEnemyTargetCandidate(attacker, target, respectTotalWarVisibility))
                 continue;
 
             Vector3Int targetCell = target.CurrentCellPosition;
@@ -1083,7 +1084,7 @@ public static class PodeMirarSensor
         return observers;
     }
 
-    private static bool IsEnemyTargetCandidate(UnitManager attacker, UnitManager target)
+    private static bool IsEnemyTargetCandidate(UnitManager attacker, UnitManager target, bool respectTotalWarVisibility = true)
     {
         if (attacker == null || target == null)
             return false;
@@ -1096,7 +1097,8 @@ public static class PodeMirarSensor
 
         if (cachedMatchController == null)
             cachedMatchController = Object.FindAnyObjectByType<MatchController>();
-        if (cachedMatchController != null &&
+        if (respectTotalWarVisibility &&
+            cachedMatchController != null &&
             cachedMatchController.EnableTotalWar &&
             cachedMatchController.ActiveTeamId == (int)attacker.TeamId &&
             !cachedMatchController.IsUnitVisibleForActiveTeam(target))

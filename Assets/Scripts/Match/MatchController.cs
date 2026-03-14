@@ -1010,7 +1010,9 @@ public class MatchController : MonoBehaviour
             fogOfWarTilemap = FindTilemapByName("FogOfWar");
 
         if (fogOfWarTerrainDatabase == null)
-            fogOfWarTerrainDatabase = FindAnyObjectByType<TerrainDatabase>();
+            fogOfWarTerrainDatabase = ResolveFogTerrainDatabase();
+        if (fogOfWarDpqAirHeightConfig == null)
+            fogOfWarDpqAirHeightConfig = ResolveFogDpqAirHeightConfig();
     }
 
     private static Tilemap FindTilemapByName(string targetName)
@@ -1168,15 +1170,15 @@ public class MatchController : MonoBehaviour
         PodeDetectarSensor.CollectDetection(
             observer,
             map,
-            fogOfWarTerrainDatabase,
+            ResolveFogTerrainDatabase(),
             detectedStealth,
             undetectedStealth,
             spottedCandidates,
             blockedByLos,
             out _,
-            fogOfWarDpqAirHeightConfig,
+            ResolveFogDpqAirHeightConfig(),
             enableLosValidation,
-            enableSpotter,
+            enableSpotter: false,
             enableStealthValidation);
 
         int observerTeamId = (int)observer.TeamId;
@@ -1473,10 +1475,10 @@ public class MatchController : MonoBehaviour
                 target,
                 observerTeamId,
                 map,
-                fogOfWarTerrainDatabase,
-                fogOfWarDpqAirHeightConfig,
+                ResolveFogTerrainDatabase(),
+                ResolveFogDpqAirHeightConfig(),
                 enableLosValidation,
-                enableSpotter,
+                enableSpotter: false,
                 enforceStealthValidation);
             if (!canObserveTarget)
                 continue;
@@ -1570,10 +1572,10 @@ public class MatchController : MonoBehaviour
             unit,
             activeTeamId,
             boardMap,
-            fogOfWarTerrainDatabase,
-            fogOfWarDpqAirHeightConfig,
+            ResolveFogTerrainDatabase(),
+            ResolveFogDpqAirHeightConfig(),
             enableLosValidation,
-            enableSpotter,
+            enableSpotter: false,
             enforceStealthValidation);
     }
 
@@ -1723,12 +1725,13 @@ public class MatchController : MonoBehaviour
         PodeDetectarSensor.CollectVisibleCells(
             unit,
             boardMap,
-            fogOfWarTerrainDatabase,
+            ResolveFogTerrainDatabase(),
             fogUnitVisibleScratchBuffer,
-            fogOfWarDpqAirHeightConfig,
+            ResolveFogDpqAirHeightConfig(),
             enableLosValidation,
-            enableSpotter,
-            useOccupantLayerForTarget: false);
+            enableSpotter: false,
+            useOccupantLayerForTarget: false,
+            preserveObserverLayerRangeForHexVisibility: true);
 
         foreach (Vector3Int cell in fogUnitVisibleScratchBuffer)
         {
@@ -1882,7 +1885,7 @@ public class MatchController : MonoBehaviour
         int snapshotHash = BuildFogUnitSnapshotHash(unit, boardMap);
         int globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision;
         int teamObserverRevision = ThreatRevisionTracker.GetTeamObserverRevision(activeTeamId);
-        int sensorFlagsHash = BuildFogSensorFlagsHash(enableLosValidation, enableSpotter);
+        int sensorFlagsHash = BuildFogSensorFlagsHash(enableLosValidation);
         return new FogOfWarUnitCacheKey(snapshotHash, globalBoardRevision, teamObserverRevision, sensorFlagsHash);
     }
 
@@ -1903,19 +1906,76 @@ public class MatchController : MonoBehaviour
             hash = (hash * 31) + (unit.IsEmbarked ? 1 : 0);
             hash = (hash * 31) + Mathf.Max(1, unit.Visao);
             hash = (hash * 31) + (boardMap != null ? boardMap.GetInstanceID() : 0);
-            hash = (hash * 31) + (fogOfWarTerrainDatabase != null ? fogOfWarTerrainDatabase.GetInstanceID() : 0);
-            hash = (hash * 31) + (fogOfWarDpqAirHeightConfig != null ? fogOfWarDpqAirHeightConfig.GetInstanceID() : 0);
+            TerrainDatabase fogTerrainDb = ResolveFogTerrainDatabase();
+            DPQAirHeightConfig fogAirConfig = ResolveFogDpqAirHeightConfig();
+            hash = (hash * 31) + (fogTerrainDb != null ? fogTerrainDb.GetInstanceID() : 0);
+            hash = (hash * 31) + (fogAirConfig != null ? fogAirConfig.GetInstanceID() : 0);
             return hash;
         }
     }
 
-    private static int BuildFogSensorFlagsHash(bool enableLos, bool enableSpotter)
+    private TerrainDatabase ResolveFogTerrainDatabase()
+    {
+        if (fogOfWarTerrainDatabase != null)
+            return fogOfWarTerrainDatabase;
+
+        if (turnStateManager != null && turnStateManager.TerrainDatabaseRef != null)
+        {
+            fogOfWarTerrainDatabase = turnStateManager.TerrainDatabaseRef;
+            return fogOfWarTerrainDatabase;
+        }
+
+#if UNITY_EDITOR
+        string[] guids = AssetDatabase.FindAssets("t:TerrainDatabase");
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            TerrainDatabase db = AssetDatabase.LoadAssetAtPath<TerrainDatabase>(path);
+            if (db != null)
+            {
+                fogOfWarTerrainDatabase = db;
+                return fogOfWarTerrainDatabase;
+            }
+        }
+#endif
+
+        return fogOfWarTerrainDatabase;
+    }
+
+    private DPQAirHeightConfig ResolveFogDpqAirHeightConfig()
+    {
+        if (fogOfWarDpqAirHeightConfig != null)
+            return fogOfWarDpqAirHeightConfig;
+
+        if (turnStateManager != null && turnStateManager.DpqAirHeightConfigRef != null)
+        {
+            fogOfWarDpqAirHeightConfig = turnStateManager.DpqAirHeightConfigRef;
+            return fogOfWarDpqAirHeightConfig;
+        }
+
+#if UNITY_EDITOR
+        string[] guids = AssetDatabase.FindAssets("t:DPQAirHeightConfig");
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            DPQAirHeightConfig config = AssetDatabase.LoadAssetAtPath<DPQAirHeightConfig>(path);
+            if (config != null)
+            {
+                fogOfWarDpqAirHeightConfig = config;
+                return fogOfWarDpqAirHeightConfig;
+            }
+        }
+#endif
+
+        return fogOfWarDpqAirHeightConfig;
+    }
+
+    private static int BuildFogSensorFlagsHash(bool enableLos)
     {
         unchecked
         {
             int hash = 17;
             hash = (hash * 31) + (enableLos ? 1 : 0);
-            hash = (hash * 31) + (enableSpotter ? 1 : 0);
             return hash;
         }
     }

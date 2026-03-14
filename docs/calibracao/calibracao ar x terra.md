@@ -41,3 +41,11 @@ AAA X CB    10X3    9X1   A
 -- ARTILLERY VS PLANE
 AAA X BB    2X3     2x3     ok
 SAM X BB    10X1    10x2    A
+
+
+--------------------------------
+Helicopter
+------------------------------
+AP X TB     10X6 --> 10X4
+AP X OL     10X6 OK
+AP X APC    10X5 OK

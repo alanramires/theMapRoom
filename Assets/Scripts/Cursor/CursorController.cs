@@ -479,6 +479,18 @@ public class CursorController : MonoBehaviour
 
     private void TryAutoAssignReferences()
     {
+        if (boardTilemap != null &&
+            string.Equals(boardTilemap.name, "TileMap", System.StringComparison.OrdinalIgnoreCase))
+        {
+            // Keep explicit gameplay board binding.
+        }
+        else
+        {
+            Tilemap namedBoard = FindTilemapByName("TileMap");
+            if (namedBoard != null)
+                boardTilemap = namedBoard;
+        }
+
         if (boardTilemap == null)
             boardTilemap = GetComponentInParent<Tilemap>();
 
@@ -588,6 +600,25 @@ public class CursorController : MonoBehaviour
     {
         if (matchController == null)
             matchController = FindAnyObjectByType<MatchController>();
+    }
+
+    private static Tilemap FindTilemapByName(string expectedName)
+    {
+        if (string.IsNullOrWhiteSpace(expectedName))
+            return null;
+
+        Tilemap[] maps = FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (map == null)
+                continue;
+
+            if (string.Equals(map.name, expectedName, System.StringComparison.OrdinalIgnoreCase))
+                return map;
+        }
+
+        return null;
     }
 
     private void TryAdjustCameraToCursor()

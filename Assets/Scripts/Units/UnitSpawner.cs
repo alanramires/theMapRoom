@@ -40,10 +40,18 @@ public class UnitSpawner : MonoBehaviour
 
     private void Start()
     {
+        TryAutoAssignBoardTilemap();
         TryAutoAssignMatchController();
         if (spawnMapListOnStart)
             SpawnMapList();
     }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        TryAutoAssignBoardTilemap();
+    }
+#endif
 
     public GameObject Spawn(string unitId, Vector3 position, Quaternion rotation)
     {
@@ -52,6 +60,7 @@ public class UnitSpawner : MonoBehaviour
 
     public GameObject Spawn(string unitId, TeamId teamId, Vector3 position, Quaternion rotation)
     {
+        TryAutoAssignBoardTilemap();
         if (boardTilemap != null)
         {
             Vector3Int targetCell = HexCoordinates.WorldToCell(boardTilemap, position);
@@ -203,6 +212,7 @@ public class UnitSpawner : MonoBehaviour
 
     public GameObject Spawn(UnitData data, TeamId teamId, Vector3 position, Quaternion rotation)
     {
+        TryAutoAssignBoardTilemap();
         if (data == null)
         {
             Debug.LogWarning("[UnitSpawner] UnitData nulo.");
@@ -275,6 +285,7 @@ public class UnitSpawner : MonoBehaviour
 
     public GameObject SpawnAtCell(string unitId, TeamId teamId, Vector3Int cell)
     {
+        TryAutoAssignBoardTilemap();
         if (boardTilemap == null)
         {
             Debug.LogError("[UnitSpawner] boardTilemap nao setado para SpawnAtCell.");
@@ -299,6 +310,7 @@ public class UnitSpawner : MonoBehaviour
 
     public GameObject SpawnAtCell(UnitData data, TeamId teamId, Vector3Int cell)
     {
+        TryAutoAssignBoardTilemap();
         if (boardTilemap == null)
         {
             Debug.LogError("[UnitSpawner] boardTilemap nao setado para SpawnAtCell.");
@@ -385,6 +397,7 @@ public class UnitSpawner : MonoBehaviour
 
     private bool IsCellOccupiedOnSortingLayer(Vector3Int cell, int sortingLayerId, TeamId teamId)
     {
+        TryAutoAssignBoardTilemap();
         if (boardTilemap == null)
             return false;
 
@@ -439,5 +452,58 @@ public class UnitSpawner : MonoBehaviour
         }
 
         return sb.ToString();
+    }
+
+    private void TryAutoAssignBoardTilemap()
+    {
+        if (boardTilemap != null &&
+            string.Equals(boardTilemap.name, "TileMap", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        Tilemap preferred = FindBoardTilemapByName("TileMap");
+        if (preferred != null)
+        {
+            boardTilemap = preferred;
+            return;
+        }
+
+        if (boardTilemap != null)
+            return;
+
+        Tilemap[] maps = FindObjectsByType<Tilemap>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (map == null)
+                continue;
+
+            GridLayout.CellLayout layout = map.layoutGrid != null ? map.layoutGrid.cellLayout : GridLayout.CellLayout.Rectangle;
+            if (layout == GridLayout.CellLayout.Hexagon)
+            {
+                boardTilemap = map;
+                return;
+            }
+        }
+    }
+
+    private static Tilemap FindBoardTilemapByName(string expectedName)
+    {
+        if (string.IsNullOrWhiteSpace(expectedName))
+            return null;
+
+        Tilemap[] maps = FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (map == null)
+                continue;
+
+            if (string.Equals(map.name, expectedName, System.StringComparison.OrdinalIgnoreCase))
+                return map;
+        }
+
+        return null;
     }
 }

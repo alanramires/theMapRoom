@@ -1836,11 +1836,24 @@ public class UnitManager : MonoBehaviour
 
     private void TryAutoAssignBoardTilemap()
     {
-        if (boardTilemap != null)
+        if (boardTilemap != null &&
+            string.Equals(boardTilemap.name, "TileMap", System.StringComparison.OrdinalIgnoreCase))
+        {
             return;
+        }
 
         // Avoid trying to bind scene references while editing the prefab asset itself.
         if (!gameObject.scene.IsValid() || !gameObject.scene.isLoaded)
+            return;
+
+        Tilemap namedBoard = FindTilemapByName("TileMap");
+        if (namedBoard != null)
+        {
+            boardTilemap = namedBoard;
+            return;
+        }
+
+        if (boardTilemap != null)
             return;
 
         Tilemap[] maps = FindObjectsByType<Tilemap>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
@@ -1856,6 +1869,25 @@ public class UnitManager : MonoBehaviour
                 return;
             }
         }
+    }
+
+    private static Tilemap FindTilemapByName(string expectedName)
+    {
+        if (string.IsNullOrWhiteSpace(expectedName))
+            return null;
+
+        Tilemap[] maps = FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (map == null)
+                continue;
+
+            if (string.Equals(map.name, expectedName, System.StringComparison.OrdinalIgnoreCase))
+                return map;
+        }
+
+        return null;
     }
 
     private void TryAutoAssignMatchController()

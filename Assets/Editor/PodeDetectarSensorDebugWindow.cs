@@ -6,6 +6,7 @@ using UnityEngine.Tilemaps;
 public class PodeDetectarSensorDebugWindow : EditorWindow
 {
     [SerializeField] private UnitManager selectedUnit;
+    [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private MatchController matchController;
     [SerializeField] private Tilemap overrideTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
@@ -56,6 +57,7 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
             MessageType.Info);
 
         selectedUnit = (UnitManager)EditorGUILayout.ObjectField("Unidade", selectedUnit, typeof(UnitManager), true);
+        turnStateManager = (TurnStateManager)EditorGUILayout.ObjectField("TurnStateManager", turnStateManager, typeof(TurnStateManager), true);
         matchController = (MatchController)EditorGUILayout.ObjectField("MatchController", matchController, typeof(MatchController), true);
         overrideTilemap = (Tilemap)EditorGUILayout.ObjectField("Tilemap (opcional)", overrideTilemap, typeof(Tilemap), true);
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
@@ -152,7 +154,7 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
             return;
         }
 
-        Tilemap map = overrideTilemap != null ? overrideTilemap : selectedUnit.BoardTilemap;
+        Tilemap map = ResolveBoardTilemapForSimulation();
         TerrainDatabase db = terrainDatabase != null ? terrainDatabase : FindFirstAsset<TerrainDatabase>();
         bool enableLos = true;
         bool enableSpotter = true;
@@ -342,6 +344,8 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
 
     private void AutoDetectContext()
     {
+        if (turnStateManager == null)
+            turnStateManager = Object.FindAnyObjectByType<TurnStateManager>();
         if (matchController == null)
             matchController = Object.FindAnyObjectByType<MatchController>();
         if (overrideTilemap == null)
@@ -354,6 +358,10 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
 
     private static Tilemap FindPreferredTilemap()
     {
+        Tilemap board = FindTilemapByName("TileMap");
+        if (board != null)
+            return board;
+
         Tilemap[] maps = Object.FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         if (maps == null || maps.Length == 0)
             return null;
@@ -368,6 +376,55 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
         }
 
         return maps[0];
+    }
+
+    private Tilemap ResolveBoardTilemapForSimulation()
+    {
+        if (overrideTilemap != null)
+            return overrideTilemap;
+
+        if (useGameplaySensorContext)
+        {
+            Tilemap gameplayMap = ResolveGameplayTerrainTilemap();
+            if (gameplayMap != null)
+                return gameplayMap;
+        }
+
+        if (selectedUnit != null && selectedUnit.BoardTilemap != null)
+            return selectedUnit.BoardTilemap;
+
+        return FindPreferredTilemap();
+    }
+
+    private Tilemap ResolveGameplayTerrainTilemap()
+    {
+        if (turnStateManager == null)
+            turnStateManager = Object.FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager == null)
+            return null;
+
+        SerializedObject so = new SerializedObject(turnStateManager);
+        SerializedProperty terrainProp = so.FindProperty("terrainTilemap");
+        return terrainProp != null ? terrainProp.objectReferenceValue as Tilemap : null;
+    }
+
+    private static Tilemap FindTilemapByName(string expectedName)
+    {
+        if (string.IsNullOrWhiteSpace(expectedName))
+            return null;
+
+        Tilemap[] maps = Object.FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (map == null)
+                continue;
+
+            if (string.Equals(map.name, expectedName, System.StringComparison.OrdinalIgnoreCase))
+                return map;
+        }
+
+        return null;
     }
 
     private static T FindFirstAsset<T>() where T : ScriptableObject

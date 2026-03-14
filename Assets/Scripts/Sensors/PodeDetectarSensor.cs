@@ -58,7 +58,8 @@ public static class PodeDetectarSensor
         DPQAirHeightConfig dpqAirHeightConfig = null,
         bool enableLosValidation = true,
         bool enableSpotter = true,
-        bool useOccupantLayerForTarget = true)
+        bool useOccupantLayerForTarget = true,
+        bool preserveObserverLayerRangeForHexVisibility = false)
     {
         if (visibleCellsOutput == null)
             return;
@@ -72,6 +73,11 @@ public static class PodeDetectarSensor
 
         UnitData observerData = null;
         observer.TryGetUnitData(out observerData);
+        Domain observerDomain = observer.GetDomain();
+        HeightLevel observerHeight = observer.GetHeightLevel();
+        int observerLayerRangeFloor = preserveObserverLayerRangeForHexVisibility
+            ? ResolveDetectionRange(observer, observerData, null, observerDomain, observerHeight)
+            : 0;
 
         int maxRange = ResolveObserverMaxVisionRange(observerData, observer);
         if (maxRange <= 0)
@@ -98,6 +104,8 @@ public static class PodeDetectarSensor
                 continue;
 
             int detectionRange = ResolveDetectionRange(observer, observerData, null, targetDomain, targetHeight);
+            if (preserveObserverLayerRangeForHexVisibility && observerLayerRangeFloor > detectionRange)
+                detectionRange = observerLayerRangeFloor;
             if (distance > detectionRange)
                 continue;
 
@@ -117,11 +125,7 @@ public static class PodeDetectarSensor
             bool hasObservation = hasDirectLos;
             if (!hasObservation)
             {
-                if (distance <= detectionRange)
-                {
-                    hasObservation = true;
-                }
-                else if (enableSpotter && ShouldUseForwardObserverRule(targetDomain, targetHeight))
+                if (enableSpotter && ShouldUseForwardObserverRule(targetDomain, targetHeight))
                 {
                     hasObservation = TryFindForwardObserverForVirtualCell(
                         observer,
@@ -239,14 +243,7 @@ public static class PodeDetectarSensor
             bool canUseForwardObserver = enableSpotter && ShouldUseForwardObserverRule(targetDomain, targetHeight);
             if (!hasDirectLos)
             {
-                // Auto-observador: quando o alvo esta no proprio alcance de visao,
-                // a unidade pode atuar como seu proprio observer.
-                if (distance <= detectionRange)
-                {
-                    usedForwardObserver = true;
-                    forwardObserver = observer;
-                }
-                else if (canUseForwardObserver)
+                if (canUseForwardObserver)
                 {
                     List<UnitManager> forwardObservers = CollectForwardObserversForTarget(
                         observer,
@@ -696,12 +693,7 @@ public static class PodeDetectarSensor
         bool usedForwardObserver = false;
         if (!hasDirectLos)
         {
-            // Mantem o mesmo comportamento do sensor Pode Detectar atual.
-            if (distance <= detectionRange)
-            {
-                usedForwardObserver = true;
-            }
-            else if (enableSpotter && ShouldUseForwardObserverRule(targetDomain, targetHeight))
+            if (enableSpotter && ShouldUseForwardObserverRule(targetDomain, targetHeight))
             {
                 List<UnitManager> forwardObservers = CollectForwardObserversForTarget(
                     observer,
@@ -850,6 +842,21 @@ public static class PodeDetectarSensor
         if (!TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
             return true;
 
+        if (TryResolveConstructionAtCell(map, cell, out ConstructionData constructionData) && constructionData != null)
+        {
+            domain = constructionData.domain;
+            height = constructionData.heightLevel;
+            return true;
+        }
+
+        StructureData structureData = StructureOccupancyRules.GetStructureAtCell(map, cell);
+        if (structureData != null)
+        {
+            domain = structureData.domain;
+            height = structureData.heightLevel;
+            return true;
+        }
+
         domain = terrain.domain;
         height = terrain.heightLevel;
         return true;
@@ -887,6 +894,21 @@ public static class PodeDetectarSensor
         }
         originEv = ResolveOriginEvForLos(tilemap, terrainDatabase, originCell, observer, dpqAirHeightConfig, originEv);
 
+        Domain? forcedTargetDomain = null;
+        HeightLevel? forcedTargetHeightLevel = null;
+        if (target == null &&
+            TryResolveObservationTargetLayer(
+                tilemap,
+                terrainDatabase,
+                targetCell,
+                out Domain resolvedTargetDomain,
+                out HeightLevel resolvedTargetHeightLevel,
+                useOccupantLayerForTarget: false))
+        {
+            forcedTargetDomain = resolvedTargetDomain;
+            forcedTargetHeightLevel = resolvedTargetHeightLevel;
+        }
+
         if (!TryResolveCellVision(
                 tilemap,
                 terrainDatabase,
@@ -894,7 +916,9 @@ public static class PodeDetectarSensor
                 target,
                 dpqAirHeightConfig,
                 out int targetEv,
-                out _))
+                out _,
+                forcedDomain: forcedTargetDomain,
+                forcedHeightLevel: forcedTargetHeightLevel))
         {
             targetEv = 0;
         }
@@ -982,31 +1006,39 @@ public static class PodeDetectarSensor
         UnitManager occupantUnit,
         DPQAirHeightConfig dpqAirHeightConfig,
         out int ev,
-        out bool blockLoS)
+        out bool blockLoS,
+        Domain? forcedDomain = null,
+        HeightLevel? forcedHeightLevel = null)
     {
         ev = 0;
         blockLoS = true;
         if (!TryResolveTerrainAtCell(tilemap, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
             return false;
 
-        ConstructionData constructionData = null;
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(tilemap, cell);
-        if (construction != null)
-        {
-            ConstructionDatabase db = construction.ConstructionDatabase;
-            string id = construction.ConstructionId;
-            if (db != null && !string.IsNullOrWhiteSpace(id) && db.TryGetById(id, out ConstructionData data) && data != null)
-                constructionData = data;
-        }
-
+        TryResolveConstructionAtCell(tilemap, cell, out ConstructionData constructionData);
         StructureData structureData = StructureOccupancyRules.GetStructureAtCell(tilemap, cell);
 
         Domain domain = Domain.Land;
         HeightLevel height = HeightLevel.Surface;
-        if (occupantUnit != null)
+        if (forcedDomain.HasValue && forcedHeightLevel.HasValue)
+        {
+            domain = forcedDomain.Value;
+            height = forcedHeightLevel.Value;
+        }
+        else if (occupantUnit != null)
         {
             domain = occupantUnit.GetDomain();
             height = occupantUnit.GetHeightLevel();
+        }
+        else
+        {
+            TryResolveObservationTargetLayer(
+                tilemap,
+                terrainDatabase,
+                cell,
+                out domain,
+                out height,
+                useOccupantLayerForTarget: false);
         }
 
         TerrainVisionResolver.Resolve(
@@ -1019,6 +1051,28 @@ public static class PodeDetectarSensor
             out ev,
             out blockLoS);
 
+        return true;
+    }
+
+    private static bool TryResolveConstructionAtCell(Tilemap tilemap, Vector3Int cell, out ConstructionData constructionData)
+    {
+        constructionData = null;
+        if (tilemap == null)
+            return false;
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(tilemap, cell);
+        if (construction == null)
+            return false;
+
+        ConstructionDatabase db = construction.ConstructionDatabase;
+        string id = construction.ConstructionId;
+        if (db == null || string.IsNullOrWhiteSpace(id))
+            return false;
+
+        if (!db.TryGetById(id, out ConstructionData data) || data == null)
+            return false;
+
+        constructionData = data;
         return true;
     }
 

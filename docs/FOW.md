@@ -10,6 +10,23 @@ Controlar informacao em campo: o jogador enxerga o terreno iluminado pelo seu ti
 - `LdT`, `LoS`, `Spotter`, `Stealth`
   - influenciam regras de observacao/deteccao usadas pelo FoW de unidades.
 
+## Escada de validadores (Game Setup)
+As flags sao incrementais. Cada nivel novo adiciona uma validacao sobre o anterior, sem redefinir a base.
+
+Nivel 0 (tudo desligado):
+- Sem `LdT`: torpedos/projeteis podem atravessar peninsula/obstaculo de trajetoria.
+- Sem `LoS`: tiro depende de alcance da arma (ignora atributo de visao para bloquear ataque).
+- Sem `Spotter`: sem observador avancado.
+- Sem `Stealth`: ignora skill stealth e especializacao de visao/deteccao.
+- Sem `Total War`: sem coloracao de FoW e todas as unidades ficam sempre visiveis.
+
+Camadas adicionais:
+- `LdT = true`: valida dominio + trajetoria ate o alvo.
+- `LoS = true`: valida elevacao/bloqueio de visada.
+- `Spotter = true`: habilita observador avancado para apoiar ataque sem visao direta do atirador.
+- `Stealth = true`: exige regra stealth skill vs vision specialization para detectar alvo furtivo.
+- `Total War = true`: ativa ocultacao visual de unidades nao observadas + neblina de guerra no mapa.
+
 ## Fluxo geral
 1. Inicio/troca de turno do time ativo:
    - FoW recarrega para o novo time.
@@ -30,6 +47,7 @@ Controlar informacao em campo: o jogador enxerga o terreno iluminado pelo seu ti
 - Calculada por alcance de visao por camada (`ResolveVisionFor` + especializacoes).
 - FoW de terreno usa camada do **terreno** para o calculo do hex.
 - Nao usa camada do ocupante oculto (evita vazamento de informacao por "buraco").
+- Nao usa `Spotter`: hex ilumina apenas com LoS direta valida (respeita EV/blockLoS de floresta/montanha).
 - Construcoes aliadas iluminam o proprio hex (`visao 0`).
 
 ## Visibilidade de unidade inimiga
