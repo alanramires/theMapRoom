@@ -8,6 +8,8 @@ using UnityEngine.UI;
 [ExecuteAlways]
 public class UnitManager : MonoBehaviour
 {
+    public static readonly List<UnitManager> AllActive = new List<UnitManager>();
+
     [SerializeField] private SpriteRenderer spriteRenderer;
     [SerializeField] private UnitHudController unitHud;
     [SerializeField] private SpriteRenderer actedLockRenderer;
@@ -160,10 +162,26 @@ public class UnitManager : MonoBehaviour
         appliedHasActed = hasActed;
         appliedActiveTeamId = matchController != null ? matchController.ActiveTeamId : int.MinValue;
         RefreshActedVisual();
+        RefreshDetectedIndicator();
+    }
+
+    private void OnEnable()
+    {
+        if (Application.isPlaying && !AllActive.Contains(this))
+            AllActive.Add(this);
+        MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
+        MatchController.OnUnitActedStateChanged += HandleUnitActedStateChanged;
+        MatchController.OnFogOfWarUpdated += HandleFogOfWarUpdated;
+        if (Application.isPlaying)
+            RefreshDetectedIndicator();
     }
 
     private void OnDisable()
     {
+        AllActive.Remove(this);
+        MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
+        MatchController.OnUnitActedStateChanged -= HandleUnitActedStateChanged;
+        MatchController.OnFogOfWarUpdated -= HandleFogOfWarUpdated;
         ThreatRevisionTracker.NotifyUnitDisabled(this, teamId, isEmbarked);
         StopSelectionBlinkRoutine();
         ClearTemporarySortingOrder();
@@ -196,28 +214,6 @@ public class UnitManager : MonoBehaviour
         RefreshActedVisual();
     }
 #endif
-
-    private void Update()
-    {
-        if (!Application.isPlaying)
-            return;
-
-        TryAutoAssignMatchController();
-        int activeTeamId = matchController != null ? matchController.ActiveTeamId : int.MinValue;
-        if (appliedActiveTeamId != activeTeamId)
-        {
-            appliedActiveTeamId = activeTeamId;
-            RefreshActedVisual();
-        }
-
-        if (appliedHasActed != hasActed)
-        {
-            appliedHasActed = hasActed;
-            RefreshActedVisual();
-        }
-
-        EnsureDetectedIndicatorConsistency();
-    }
 
     public void Setup(UnitDatabase database, string id)
     {
@@ -427,6 +423,7 @@ public class UnitManager : MonoBehaviour
     {
         if (currentlyObservedByTeamIds != null)
             currentlyObservedByTeamIds.Clear();
+        RefreshDetectedIndicator();
     }
 
     public bool AddCurrentlyObservedByTeam(int teamId)
@@ -439,6 +436,7 @@ public class UnitManager : MonoBehaviour
             return false;
 
         currentlyObservedByTeamIds.Add(teamId);
+        RefreshDetectedIndicator();
         return true;
     }
 
@@ -447,7 +445,10 @@ public class UnitManager : MonoBehaviour
         if (currentlyObservedByTeamIds == null || currentlyObservedByTeamIds.Count <= 0)
             return false;
 
-        return currentlyObservedByTeamIds.Remove(teamId);
+        bool removed = currentlyObservedByTeamIds.Remove(teamId);
+        if (removed)
+            RefreshDetectedIndicator();
+        return removed;
     }
 
     public bool SyncCurrentlyObservedByTeams(IEnumerable<int> teamIds)
@@ -486,6 +487,8 @@ public class UnitManager : MonoBehaviour
             changed = true;
         }
 
+        if (changed)
+            RefreshDetectedIndicator();
         return changed;
     }
 
@@ -495,6 +498,7 @@ public class UnitManager : MonoBehaviour
             return false;
 
         currentlyObservedByTeamIds.Clear();
+        RefreshDetectedIndicator();
         return true;
     }
 
@@ -1587,6 +1591,11 @@ public class UnitManager : MonoBehaviour
         SyncPositionState();
     }
 
+    public void SetMatchController(MatchController mc)
+    {
+        matchController = mc;
+    }
+
     public void SetCurrentCellPosition(Vector3Int cell, bool enforceFinalOccupancyRule = true)
     {
         Vector3Int previousCell = currentCellPosition;
@@ -1624,6 +1633,7 @@ public class UnitManager : MonoBehaviour
             SyncHierarchyForEmbarkedState();
             if (actedLockRenderer != null)
                 actedLockRenderer.enabled = false;
+            RefreshDetectedIndicator();
             ThreatRevisionTracker.NotifyUnitEmbarkStateChanged(this, previousEmbarked, isEmbarked);
             return;
         }
@@ -1637,6 +1647,7 @@ public class UnitManager : MonoBehaviour
         SetHudVisible(true);
         SetOwnedUiVisualsVisible(true);
         RefreshActedVisual();
+        RefreshDetectedIndicator();
         ThreatRevisionTracker.NotifyUnitEmbarkStateChanged(this, previousEmbarked, isEmbarked);
     }
 
@@ -2191,7 +2202,7 @@ public class UnitManager : MonoBehaviour
         return false;
     }
 
-    private void EnsureDetectedIndicatorConsistency()
+    private void RefreshDetectedIndicator()
     {
         if (unitHud == null)
             TryAutoAssignHud();
@@ -2200,6 +2211,31 @@ public class UnitManager : MonoBehaviour
 
         bool shouldShow = ShouldShowDetectedIndicator(TryGetUnitData());
         unitHud.SetDetectedIndicatorVisible(shouldShow);
+    }
+
+    private void HandleActiveTeamChanged(int newTeamId)
+    {
+        if (appliedActiveTeamId == newTeamId)
+            return;
+
+        appliedActiveTeamId = newTeamId;
+        RefreshActedVisual();
+    }
+
+    private void HandleUnitActedStateChanged(UnitManager changed)
+    {
+        if (changed != this)
+            return;
+        if (appliedHasActed == hasActed)
+            return;
+
+        appliedHasActed = hasActed;
+        RefreshActedVisual();
+    }
+
+    private void HandleFogOfWarUpdated()
+    {
+        RefreshDetectedIndicator();
     }
 
     private void RefreshSelectionVisual()

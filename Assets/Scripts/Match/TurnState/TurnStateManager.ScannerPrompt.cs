@@ -157,6 +157,11 @@ public partial class TurnStateManager
     private readonly List<LandingOption> cachedLandingOptions = new List<LandingOption>();
     private string landingOptionUnavailableReason = string.Empty;
     private bool pendingDestroyUnitConfirmation;
+    [Header("Debug Perf Snapshot (F8)")]
+    [SerializeField] private bool showPerfRangeLine = true;
+    [SerializeField] private bool showPerfSensorsLine = true;
+    [SerializeField] private bool showPerfSelectionLine = true;
+    [SerializeField] private bool showPerfTakeoffPrepLine = true;
     private const int PerfFrameWindowSampleCount = 120;
     private int perfFrameSamplesCollected;
     private double perfFrameWindowSumMs;
@@ -296,10 +301,14 @@ public partial class TurnStateManager
         sb.AppendLine($"Unidades ativas: {activeUnits} | embarcadas: {embarkedUnits} | construcoes ativas: {activeConstructions}");
         sb.AppendLine($"Memoria managed: {managedMb:0.0} MB");
         sb.AppendLine($"Memoria Unity: alloc={unityAllocatedMb:0.0} MB | reserved={unityReservedMb:0.0} MB | unusedReserved={unityUnusedReservedMb:0.0} MB");
-        sb.AppendLine($"PaintSelectedUnitMovementRange: last={perfLastRangeMs:0.00}ms | avg={avgRangeMs:0.00}ms | calls={perfRangeCallCount}");
-        sb.AppendLine($"RefreshSensorsForCurrentState: last={perfLastSensorsMs:0.00}ms | avg={avgSensorsMs:0.00}ms | calls={perfSensorsCallCount}");
-        sb.AppendLine($"SetSelectedUnit pipeline: last={perfLastSelectionMs:0.00}ms | avg={avgSelectionMs:0.00}ms | calls={perfSelectionCallCount}");
-        sb.AppendLine($"TryPrepareTemporaryTakeoffStateForSelection: last={perfLastTakeoffPrepMs:0.00}ms | avg={avgTakeoffPrepMs:0.00}ms | calls={perfTakeoffPrepCallCount}");
+        if (showPerfRangeLine)
+            sb.AppendLine($"PaintSelectedUnitMovementRange: last={perfLastRangeMs:0.00}ms | avg={avgRangeMs:0.00}ms | calls={perfRangeCallCount}");
+        if (showPerfSensorsLine)
+            sb.AppendLine($"RefreshSensorsForCurrentState: last={perfLastSensorsMs:0.00}ms | avg={avgSensorsMs:0.00}ms | calls={perfSensorsCallCount}");
+        if (showPerfSelectionLine)
+            sb.AppendLine($"SetSelectedUnit pipeline: last={perfLastSelectionMs:0.00}ms | avg={avgSelectionMs:0.00}ms | calls={perfSelectionCallCount}");
+        if (showPerfTakeoffPrepLine)
+            sb.AppendLine($"TryPrepareTemporaryTakeoffStateForSelection: last={perfLastTakeoffPrepMs:0.00}ms | avg={avgTakeoffPrepMs:0.00}ms | calls={perfTakeoffPrepCallCount}");
         Debug.Log(sb.ToString());
         PanelDialogController.TrySetTransientText("Perf snapshot logged (F8)", 1.8f);
     }

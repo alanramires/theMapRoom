@@ -194,14 +194,14 @@ public static class PodeSuprirSensor
             return result;
         }
 
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        if (units == null || units.Length <= 0)
+        List<UnitManager> units = UnitManager.AllActive;
+        if (units == null || units.Count <= 0)
             return result;
 
         originCell.z = 0;
         if (!adjacentRange)
         {
-            for (int i = 0; i < units.Length; i++)
+            for (int i = 0; i < units.Count; i++)
             {
                 UnitManager target = units[i];
                 if (target == null || target == supplier)
@@ -218,7 +218,7 @@ public static class PodeSuprirSensor
 
         if (includeOriginCell)
         {
-            for (int i = 0; i < units.Length; i++)
+            for (int i = 0; i < units.Count; i++)
             {
                 UnitManager target = units[i];
                 if (target == null || target == supplier)
@@ -240,7 +240,7 @@ public static class PodeSuprirSensor
             adjacentLookup.Add(neighbor);
         }
 
-        for (int i = 0; i < units.Length; i++)
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager target = units[i];
             if (target == null || target == supplier)

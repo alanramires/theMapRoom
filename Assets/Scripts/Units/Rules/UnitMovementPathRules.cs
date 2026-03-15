@@ -31,6 +31,7 @@ public static class UnitMovementPathRules
         Dictionary<PathNodeKey, int> autonomyCostByState = new Dictionary<PathNodeKey, int>();
         Dictionary<PathNodeKey, PathNodeKey> cameFrom = new Dictionary<PathNodeKey, PathNodeKey>();
         List<Vector3Int> neighbors = new List<Vector3Int>(6);
+        int expandedStateCount = 0;
 
         PathNodeKey originKey = new PathNodeKey(origin, 0, usedFreeRoadBonusStep: false, roadOnlyUntilBaseMove: true);
         frontier.Enqueue(originKey);
@@ -40,6 +41,7 @@ public static class UnitMovementPathRules
         while (frontier.Count > 0)
         {
             PathNodeKey currentKey = frontier.Dequeue();
+            expandedStateCount++;
             Vector3Int current = currentKey.cell;
             int currentSteps = currentKey.steps;
             int currentAutonomyCost = autonomyCostByState[currentKey];
@@ -117,6 +119,14 @@ public static class UnitMovementPathRules
 
         foreach (KeyValuePair<Vector3Int, PathNodeKey> pair in bestStateByDestination)
             pathsByDestination[pair.Key] = BuildPath(originKey, pair.Value, cameFrom);
+
+        if (PathManager.IsPathfindingDebugLogsEnabled && Application.isPlaying)
+        {
+            Debug.Log(
+                $"[PathBFS] unit={unit.name} maxSteps={maxMovementCost} fuel={maxAutonomyCost} " +
+                $"expandedStates={expandedStateCount} visitedStates={autonomyCostByState.Count} " +
+                $"reachableHexes={pathsByDestination.Count}");
+        }
 
         return pathsByDestination;
     }

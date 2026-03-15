@@ -108,8 +108,8 @@ public static class PodeMirarSensor
         string attackerPositionLabel = ResolveUnitPositionLabel(map, terrainDatabase, attacker, origin);
 
         int sensorOrderCounter = 0;
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager target = units[i];
             if (!IsEnemyTargetCandidate(attacker, target, respectTotalWarVisibility))
@@ -984,8 +984,8 @@ public static class PodeMirarSensor
         if (localAroundTarget.Count == 0)
             return false;
 
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
@@ -1041,8 +1041,8 @@ public static class PodeMirarSensor
         if (localAroundTarget.Count == 0)
             return observers;
 
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
@@ -1138,8 +1138,8 @@ public static class PodeMirarSensor
             return DefaultObservationRangeHexes;
 
         int maxRange = GetObservationRangeHexes(referenceUnit);
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
@@ -1161,8 +1161,8 @@ public static class PodeMirarSensor
             return DefaultObservationRangeHexes;
 
         int maxRange = GetObservationRangeHexes(referenceUnit, target);
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
@@ -2020,3 +2020,4 @@ public static class PodeMirarSensor
         return false;
     }
 }
+

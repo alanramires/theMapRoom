@@ -11,6 +11,10 @@ using UnityEditor;
 
 public class MatchController : MonoBehaviour
 {
+    public static event Action<int> OnActiveTeamChanged;
+    public static event Action<UnitManager> OnUnitActedStateChanged;
+    public static event Action OnFogOfWarUpdated;
+
     private readonly struct FogOfWarUnitCacheKey : IEquatable<FogOfWarUnitCacheKey>
     {
         public readonly int snapshotHash;
@@ -123,6 +127,7 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private float runtimeConstructionIncomeRefreshTimer;
     [Header("Debug")]
     [SerializeField] private bool enableFogSourceDebugLogs = false;
+    public bool SuppressFogOfWarRefresh { get; set; } = false;
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
@@ -723,6 +728,8 @@ public class MatchController : MonoBehaviour
             return;
 
         appliedActiveTeamId = activeTeamId;
+        if (Application.isPlaying)
+            OnActiveTeamChanged?.Invoke(activeTeamId);
         TeleportCursorToActiveTeamHeadQuarterSilently();
         ReleaseUnitsForActiveTeam();
         if (!debugFogOfWarEnabled)
@@ -1052,8 +1059,11 @@ public class MatchController : MonoBehaviour
         return null;
     }
 
-    private void RefreshFogOfWarForActiveTeam()
+    public void RefreshFogOfWarForActiveTeam()
     {
+        if (SuppressFogOfWarRefresh)
+            return;
+
         if (!enableTotalWar)
             return;
 
@@ -1129,11 +1139,17 @@ public class MatchController : MonoBehaviour
 
         ApplyFriendlyConstructionVision(boardMap);
         RefreshRuntimeUnitFogVisibility();
+        if (Application.isPlaying)
+            OnFogOfWarUpdated?.Invoke();
     }
 
     public void NotifyUnitReachedHasAct(UnitManager unit)
     {
         if (!Application.isPlaying)
+            return;
+        if (unit != null)
+            OnUnitActedStateChanged?.Invoke(unit);
+        if (SuppressFogOfWarRefresh)
             return;
         if (!debugFogOfWarEnabled)
             return;
@@ -1170,6 +1186,7 @@ public class MatchController : MonoBehaviour
         RefreshRuntimeUnitFogVisibility();
         TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
         TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
+        OnFogOfWarUpdated?.Invoke();
     }
 
     private void RunTurnStartStillObservedForActiveTeamStealthUnits()

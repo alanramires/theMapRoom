@@ -122,8 +122,14 @@ public class UnitHudController : MonoBehaviour
 
     public UnitManager ResolveOwnerUnit()
     {
-        if (ownerUnit == null)
-            ownerUnit = GetComponentInParent<UnitManager>();
+        if (ownerUnit != null)
+        {
+            Transform ownerTransform = ownerUnit.transform;
+            if (ownerTransform != null && transform.IsChildOf(ownerTransform))
+                return ownerUnit;
+        }
+
+        ownerUnit = GetComponentInParent<UnitManager>();
         return ownerUnit;
     }
 
@@ -416,8 +422,7 @@ public class UnitHudController : MonoBehaviour
 
     private void RefreshWeaponAmmoVisuals()
     {
-        if (ownerUnit == null)
-            ownerUnit = GetComponentInParent<UnitManager>();
+        ownerUnit = ResolveOwnerUnit();
 
         int weaponCount = GetConfiguredWeaponAmmoInfo(
             out int current0, out int max0,

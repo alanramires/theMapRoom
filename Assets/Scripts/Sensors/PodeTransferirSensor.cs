@@ -600,14 +600,14 @@ public static class PodeTransferirSensor
         bool adjacentRange = supplierData.collectionRange == SupplierRangeMode.Adjacent1Hex
             || supplierData.collectionRange == SupplierRangeMode.Hybrid0Or1Hex;
         bool includeOriginCell = supplierData.collectionRange == SupplierRangeMode.Hybrid0Or1Hex;
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        if (units == null || units.Length <= 0)
+        List<UnitManager> units = UnitManager.AllActive;
+        if (units == null || units.Count <= 0)
             return result;
 
         originCell.z = 0;
         if (!adjacentRange)
         {
-            for (int i = 0; i < units.Length; i++)
+            for (int i = 0; i < units.Count; i++)
             {
                 UnitManager target = units[i];
                 if (target == null || target == supplier)
@@ -624,7 +624,7 @@ public static class PodeTransferirSensor
 
         if (includeOriginCell)
         {
-            for (int i = 0; i < units.Length; i++)
+            for (int i = 0; i < units.Count; i++)
             {
                 UnitManager target = units[i];
                 if (target == null || target == supplier)
@@ -647,7 +647,7 @@ public static class PodeTransferirSensor
             adjacentLookup.Add(neighbor);
         }
 
-        for (int i = 0; i < units.Length; i++)
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager target = units[i];
             if (target == null || target == supplier)

@@ -4,6 +4,9 @@ using UnityEngine.Tilemaps;
 
 public class PathManager : MonoBehaviour
 {
+    [Header("Debug")]
+    [SerializeField] private bool enablePathfindingDebugLogs = false;
+
     [Header("Committed Path Visual")]
     [SerializeField] private Material committedPathMaterial;
     [SerializeField] private bool committedPathUseTeamColor = true;
@@ -14,15 +17,25 @@ public class PathManager : MonoBehaviour
     [SerializeField] private int committedPathSortingOrder = 50;
 
     private LineRenderer committedPathRenderer;
+    private static bool pathfindingDebugLogsEnabled;
+
+    public static bool IsPathfindingDebugLogsEnabled => pathfindingDebugLogsEnabled;
 
     private void Awake()
     {
+        ApplyDebugFlags();
         EnsureDefaults();
+    }
+
+    private void OnEnable()
+    {
+        ApplyDebugFlags();
     }
 
 #if UNITY_EDITOR
     private void OnValidate()
     {
+        ApplyDebugFlags();
         EnsureDefaults();
     }
 #endif
@@ -115,5 +128,10 @@ public class PathManager : MonoBehaviour
             committedPathSortingLayer = SortingLayerReference.FromName("Constru\u00E7\u00F5es");
             committedPathSortingLayerInitialized = true;
         }
+    }
+
+    private void ApplyDebugFlags()
+    {
+        pathfindingDebugLogsEnabled = enablePathfindingDebugLogs;
     }
 }

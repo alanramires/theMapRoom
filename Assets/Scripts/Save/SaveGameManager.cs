@@ -261,6 +261,13 @@ public class SaveGameManager : MonoBehaviour
         loadInProgress = true;
         string stage = "init";
         bool coreLoadSucceeded = false;
+        bool suppressedFogRefresh = false;
+
+        if (matchController != null)
+        {
+            matchController.SuppressFogOfWarRefresh = true;
+            suppressedFogRefresh = true;
+        }
 
         // Espera um frame apos destruir para evitar residuos de lookup no mesmo frame.
         stage = "clear-runtime";
@@ -465,11 +472,21 @@ public class SaveGameManager : MonoBehaviour
             cursorController?.SnapToCurrentCell();
             PanelDialogController.ClearExternalText();
 
+            if (matchController != null)
+            {
+                matchController.SuppressFogOfWarRefresh = false;
+                suppressedFogRefresh = false;
+                matchController.RefreshFogOfWarForActiveTeam();
+            }
+
             cursorController?.PlayBeepSfx();
             if (verboseLogs)
                 Debug.Log($"[SaveGame] Load concluido: {data.units?.Count ?? 0} unidades, {data.constructions?.Count ?? 0} construcoes.");
             PanelDialogController.TrySetTransientText("Game loaded", 2.2f);
         }
+
+        if (suppressedFogRefresh && matchController != null)
+            matchController.SuppressFogOfWarRefresh = false;
 
         loadInProgress = false;
     }

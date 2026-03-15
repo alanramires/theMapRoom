@@ -213,6 +213,7 @@ public class UnitSpawner : MonoBehaviour
     public GameObject Spawn(UnitData data, TeamId teamId, Vector3 position, Quaternion rotation)
     {
         TryAutoAssignBoardTilemap();
+        TryAutoAssignMatchController();
         if (data == null)
         {
             Debug.LogWarning("[UnitSpawner] UnitData nulo.");
@@ -231,6 +232,7 @@ public class UnitSpawner : MonoBehaviour
         UnitManager manager = instance.GetComponent<UnitManager>();
         if (manager != null)
         {
+            manager.SetMatchController(matchController);
             manager.AssignSpawnInstanceId(GetNextId());
             manager.SetBoardTilemap(boardTilemap);
             manager.SetTeamId(teamId);

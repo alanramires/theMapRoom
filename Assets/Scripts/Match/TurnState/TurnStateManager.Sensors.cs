@@ -192,8 +192,8 @@ public partial class TurnStateManager
         Vector3Int selectedCell = selectedUnit.CurrentCellPosition;
         selectedCell.z = 0;
 
-        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager candidate = units[i];
             if (candidate == null || candidate == selectedUnit || !candidate.gameObject.activeInHierarchy || candidate.IsEmbarked)

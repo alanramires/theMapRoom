@@ -31,8 +31,8 @@ public static class ServicoDoComandoSensor
             return false;
         }
 
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        if (units == null || units.Length <= 0)
+        List<UnitManager> units = UnitManager.AllActive;
+        if (units == null || units.Count <= 0)
         {
             reason = "Nenhuma unidade em cena.";
             return false;
@@ -284,14 +284,14 @@ public static class ServicoDoComandoSensor
 
     private static void CollectTransportSupplierOptions(
         TeamId activeTeam,
-        UnitManager[] units,
+        IReadOnlyList<UnitManager> units,
         List<ServicoDoComandoOption> output,
         List<ServicoDoComandoInvalidOption> invalidOutput)
     {
-        if (units == null || units.Length <= 0)
+        if (units == null || units.Count <= 0)
             return;
 
-        for (int i = 0; i < units.Length; i++)
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager supplier = units[i];
             if (supplier == null || !supplier.gameObject.activeInHierarchy || supplier.IsEmbarked)
@@ -374,11 +374,11 @@ public static class ServicoDoComandoSensor
         TeamId activeTeam,
         Tilemap map,
         TerrainDatabase terrainDatabase,
-        UnitManager[] units,
+        IReadOnlyList<UnitManager> units,
         List<ServicoDoComandoOption> output,
         List<ServicoDoComandoInvalidOption> invalidOutput)
     {
-        if (units == null || units.Length <= 0)
+        if (units == null || units.Count <= 0)
             return;
 
         ConstructionManager[] constructions = Object.FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
@@ -412,7 +412,7 @@ public static class ServicoDoComandoSensor
             Vector3Int constructionCell = construction.CurrentCellPosition;
             constructionCell.z = 0;
 
-            for (int u = 0; u < units.Length; u++)
+            for (int u = 0; u < units.Count; u++)
             {
                 UnitManager transporter = units[u];
                 if (transporter == null || !transporter.gameObject.activeInHierarchy || transporter.IsEmbarked)
@@ -786,13 +786,13 @@ public static class ServicoDoComandoSensor
         return false;
     }
 
-    private static Dictionary<Vector3Int, List<UnitManager>> BuildUnitsByCell(UnitManager[] units)
+    private static Dictionary<Vector3Int, List<UnitManager>> BuildUnitsByCell(IReadOnlyList<UnitManager> units)
     {
         var map = new Dictionary<Vector3Int, List<UnitManager>>();
         if (units == null)
             return map;
 
-        for (int i = 0; i < units.Length; i++)
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager unit = units[i];
             if (unit == null || unit.IsEmbarked)

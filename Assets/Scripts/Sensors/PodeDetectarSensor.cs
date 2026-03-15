@@ -26,8 +26,8 @@ public static class PodeDetectarSensor
         if (!IsUnitOnBoard(target, boardMap))
             return false;
 
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager observer = units[i];
             if (observer == null || !observer.gameObject.activeInHierarchy || observer.IsEmbarked)
@@ -420,8 +420,8 @@ public static class PodeDetectarSensor
         observerCell.z = 0;
         Dictionary<Vector3Int, int> distanceMap = BuildDistanceMap(boardMap, observerCell, maxRange);
 
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager target = units[i];
             if (!IsEnemyTargetCandidate(observer, target, boardMap))
@@ -817,8 +817,8 @@ public static class PodeDetectarSensor
         if (localAroundTarget.Count == 0)
             return observers;
 
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
@@ -888,8 +888,8 @@ public static class PodeDetectarSensor
             return 1;
 
         int maxRange = GetObservationRangeHexes(referenceUnit, target);
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
@@ -913,8 +913,8 @@ public static class PodeDetectarSensor
             return 1;
 
         int maxRange = GetObservationRangeHexes(referenceUnit);
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
@@ -951,8 +951,8 @@ public static class PodeDetectarSensor
         if (localAroundTarget.Count == 0)
             return false;
 
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
@@ -1612,3 +1612,4 @@ public static class PodeDetectarSensor
         return distances;
     }
 }
+

@@ -412,6 +412,7 @@ public partial class TurnStateManager : MonoBehaviour
         UnitEmbarkedWeapon runtimeWeapon = runtimeWeapons[weaponIndex];
         int before = Mathf.Max(0, runtimeWeapon.squadAmmunition);
         runtimeWeapon.squadAmmunition = Mathf.Clamp(ammoValue, 0, maxAmmo);
+        target.RefreshRuntimeVisualState();
         message = $"Muni arma#{weaponOneBasedIndex} atualizada: {ResolveDebugUnitName(target)} {before}->{runtimeWeapon.squadAmmunition}/{maxAmmo} em ({cursorCell.x},{cursorCell.y},0).";
         Debug.Log($"[Debug Command] {message}");
         return true;
@@ -445,6 +446,7 @@ public partial class TurnStateManager : MonoBehaviour
                 changed++;
         }
 
+        target.RefreshRuntimeVisualState();
         message = $"Muni recarregada: {ResolveDebugUnitName(target)} | armas atualizadas={changed} em ({cursorCell.x},{cursorCell.y},0).";
         Debug.Log($"[Debug Command] {message}");
         return true;
