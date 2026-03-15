@@ -173,11 +173,22 @@ public class UnitManager : MonoBehaviour
         MatchController.OnUnitActedStateChanged += HandleUnitActedStateChanged;
         MatchController.OnFogOfWarUpdated += HandleFogOfWarUpdated;
         if (Application.isPlaying)
+        {
+            Vector3Int cell = currentCellPosition;
+            cell.z = 0;
+            UnitOccupancyRules.NotifyUnitOccupancyChanged(this, cell, cell);
             RefreshDetectedIndicator();
+        }
     }
 
     private void OnDisable()
     {
+        if (Application.isPlaying)
+        {
+            Vector3Int cell = currentCellPosition;
+            cell.z = 0;
+            UnitOccupancyRules.NotifyUnitOccupancyChanged(this, cell, cell);
+        }
         AllActive.Remove(this);
         MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
         MatchController.OnUnitActedStateChanged -= HandleUnitActedStateChanged;
@@ -1564,6 +1575,12 @@ public class UnitManager : MonoBehaviour
         }
         RefreshActedVisual();
         ThreatRevisionTracker.NotifyUnitTeamChanged(previousTeam, teamId);
+        if (Application.isPlaying)
+        {
+            Vector3Int cell = currentCellPosition;
+            cell.z = 0;
+            UnitOccupancyRules.NotifyUnitOccupancyChanged(this, cell, cell);
+        }
     }
 
     public void ApplyTeamVisualFlipX(bool flipX)
@@ -1613,6 +1630,8 @@ public class UnitManager : MonoBehaviour
         currentCellPosition = cell;
         SnapToCellCenter();
         ThreatRevisionTracker.NotifyUnitCellChanged(this, previousCell, currentCellPosition);
+        if (Application.isPlaying)
+            UnitOccupancyRules.NotifyUnitOccupancyChanged(this, previousCell, currentCellPosition);
     }
 
     public void SetEmbarked(bool embarked)
@@ -1635,6 +1654,12 @@ public class UnitManager : MonoBehaviour
                 actedLockRenderer.enabled = false;
             RefreshDetectedIndicator();
             ThreatRevisionTracker.NotifyUnitEmbarkStateChanged(this, previousEmbarked, isEmbarked);
+            if (Application.isPlaying)
+            {
+                Vector3Int cell = currentCellPosition;
+                cell.z = 0;
+                UnitOccupancyRules.NotifyUnitOccupancyChanged(this, cell, cell);
+            }
             return;
         }
 
@@ -1649,6 +1674,12 @@ public class UnitManager : MonoBehaviour
         RefreshActedVisual();
         RefreshDetectedIndicator();
         ThreatRevisionTracker.NotifyUnitEmbarkStateChanged(this, previousEmbarked, isEmbarked);
+        if (Application.isPlaying)
+        {
+            Vector3Int cell = currentCellPosition;
+            cell.z = 0;
+            UnitOccupancyRules.NotifyUnitOccupancyChanged(this, cell, cell);
+        }
     }
 
     private void AssignEmbarkTransport(UnitManager transporter, int slotIndex)

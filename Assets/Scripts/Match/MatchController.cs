@@ -378,12 +378,22 @@ public class MatchController : MonoBehaviour
         TryAutoAssignTurnTransitionReferences();
         if (enableTotalWar)
             TryAutoAssignFogOfWarReferences();
-        ApplyActiveTeamIfChanged(force: true);
+        if (Application.isPlaying)
+        {
+            // Delay first team apply/FoW refresh to Start so all scene objects had OnEnable.
+            appliedActiveTeamId = activeTeamId;
+        }
+        else
+        {
+            ApplyActiveTeamIfChanged(force: true);
+        }
         ApplyTeamFlipSettingsToSceneObjects();
     }
 
     private void Start()
     {
+        if (Application.isPlaying)
+            ApplyActiveTeamIfChanged(force: true);
         TryBootstrapInitialStealthDetection();
         RunTurnStartStillObservedForActiveTeamStealthUnits();
     }
@@ -1944,11 +1954,17 @@ public class MatchController : MonoBehaviour
         if (boardMap == null || activeTeamId < 0)
             return;
 
-        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        List<ConstructionManager> constructions = ConstructionManager.AllActive;
         int constructionsIncluded = 0;
-        for (int i = 0; i < constructions.Length; i++)
+        int activeTeamCandidates = 0;
+        for (int i = constructions.Count - 1; i >= 0; i--)
         {
             ConstructionManager construction = constructions[i];
+            if (construction == null)
+            {
+                constructions.RemoveAt(i);
+                continue;
+            }
             if (construction == null || !construction.gameObject.activeInHierarchy)
                 continue;
             if ((int)construction.TeamId != activeTeamId)
@@ -1957,11 +1973,21 @@ public class MatchController : MonoBehaviour
                     Debug.Log($"[FoW][Construction][Skip] {construction?.name} reason=other_team team={(int)construction.TeamId}");
                 continue;
             }
-            if (construction.BoardTilemap == null || construction.BoardTilemap != boardMap)
+            activeTeamCandidates++;
+            Tilemap constructionMap = construction.BoardTilemap;
+            if (constructionMap == null && construction.gameObject.scene == boardMap.gameObject.scene)
+            {
+                // Event-driven construction refresh removed the old periodic path that
+                // indirectly auto-bound missing board refs. Ensure FoW can still resolve.
+                construction.SetBoardTilemap(boardMap);
+                constructionMap = construction.BoardTilemap;
+            }
+
+            if (constructionMap == null || constructionMap != boardMap)
             {
                 if (enableFogSourceDebugLogs)
                 {
-                    string cMap = construction.BoardTilemap != null ? construction.BoardTilemap.name : "-";
+                    string cMap = constructionMap != null ? constructionMap.name : "-";
                     Debug.Log(
                         $"[FoW][Construction][Skip] {construction.name} reason=other_board " +
                         $"constructionMap={cMap} boardMap={boardMap.name}");
@@ -1990,8 +2016,12 @@ public class MatchController : MonoBehaviour
             ApplyFogContribution(cell, +1, boardMap);
         }
 
+        Debug.Log(
+            $"[FoW][Construction][Temp] allActive={constructions.Count} " +
+            $"activeTeamCandidates={activeTeamCandidates} included={constructionsIncluded} activeTeam={activeTeamId}");
+
         if (enableFogSourceDebugLogs)
-            Debug.Log($"[FoW][Construction][Summary] total={constructions.Length} included={constructionsIncluded}");
+            Debug.Log($"[FoW][Construction][Summary] total={constructions.Count} included={constructionsIncluded}");
     }
 
     private void RefreshRuntimeUnitFogVisibility()

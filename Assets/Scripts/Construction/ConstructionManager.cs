@@ -5,6 +5,8 @@ using UnityEngine.Tilemaps;
 [ExecuteAlways]
 public class ConstructionManager : MonoBehaviour
 {
+    public static readonly List<ConstructionManager> AllActive = new List<ConstructionManager>();
+
     [SerializeField] private SpriteRenderer spriteRenderer;
     [SerializeField] private ConstructionDatabase constructionDatabase;
     [SerializeField] private Tilemap boardTilemap;
@@ -27,10 +29,11 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private bool firstOwnerInitialized;
     [Header("Runtime Visual")]
     [SerializeField] [Range(0f, 1f)] private float occupiedByReadyUnitDarkenFactor = 0.4f;
-    [SerializeField] [Range(0.02f, 1f)] private float runtimeVisualRefreshIntervalSeconds = 0.12f;
     [SerializeField] private ConstructionHudController hudController;
     [SerializeField] private MatchController matchController;
-    [System.NonSerialized] private float runtimeVisualRefreshTimer;
+    [System.NonSerialized] private int cachedOccupantInstanceId = int.MinValue;
+    [System.NonSerialized] private bool cachedOccupantReadySameTeam;
+    [System.NonSerialized] private bool cachedShowFlagThreatOutline;
 
     public TeamId TeamId => teamId;
     public Tilemap BoardTilemap => boardTilemap;
@@ -150,7 +153,7 @@ public class ConstructionManager : MonoBehaviour
         TryAutoAssignMatchController();
         TryAutoAssignBoardTilemap();
         SyncPositionState();
-        RefreshHud();
+        RefreshRuntimeVisualState(force: true);
     }
 
     private void LateUpdate()
@@ -177,7 +180,24 @@ public class ConstructionManager : MonoBehaviour
         if (autoApplyOnStart)
             ApplyFromDatabase();
 
-        RefreshHud();
+        RefreshRuntimeVisualState(force: true);
+    }
+
+    private void OnEnable()
+    {
+        if (!AllActive.Contains(this))
+            AllActive.Add(this);
+
+        MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
+        UnitOccupancyRules.OnUnitOccupancyChanged += HandleUnitOccupancyChanged;
+        RefreshRuntimeVisualState(force: true);
+    }
+
+    private void OnDisable()
+    {
+        AllActive.Remove(this);
+        MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
+        UnitOccupancyRules.OnUnitOccupancyChanged -= HandleUnitOccupancyChanged;
     }
 
     private void Update()
@@ -186,17 +206,8 @@ public class ConstructionManager : MonoBehaviour
         if (!Application.isPlaying && IsEditingPrefabContext())
             return;
 #endif
-        if (Application.isPlaying)
-        {
-            runtimeVisualRefreshTimer += Mathf.Max(0f, Time.unscaledDeltaTime);
-            if (runtimeVisualRefreshTimer < Mathf.Max(0.02f, runtimeVisualRefreshIntervalSeconds))
-                return;
-
-            runtimeVisualRefreshTimer = 0f;
-        }
-
-        RefreshOccupancyVisualTint();
-        RefreshHud();
+        if (!Application.isPlaying)
+            RefreshRuntimeVisualState(force: false);
     }
 
 #if UNITY_EDITOR
@@ -218,7 +229,7 @@ public class ConstructionManager : MonoBehaviour
         SyncPositionState();
         if (!ApplyFromDatabase())
             UpdateDynamicName();
-        RefreshHud();
+        RefreshRuntimeVisualState(force: true);
     }
 #endif
 
@@ -267,7 +278,7 @@ public class ConstructionManager : MonoBehaviour
         EnsureCapturePointsInitialized();
         currentPosition = transform.position;
         UpdateDynamicName();
-        RefreshHud();
+        RefreshRuntimeVisualState(force: true);
     }
 
     public void SetCurrentPosition(Vector3 position)
@@ -296,7 +307,7 @@ public class ConstructionManager : MonoBehaviour
 
         if (!ApplyFromDatabase())
             UpdateDynamicName();
-        RefreshHud();
+        RefreshRuntimeVisualState(force: true);
         ThreatRevisionTracker.NotifyConstructionTeamChanged(previousTeam, teamId);
     }
 
@@ -330,7 +341,7 @@ public class ConstructionManager : MonoBehaviour
 
         if (!ApplyFromDatabase())
             UpdateDynamicName();
-        RefreshHud();
+        RefreshRuntimeVisualState(force: true);
         ThreatRevisionTracker.NotifyConstructionTeamChanged(previousTeam, teamId);
     }
 
@@ -345,7 +356,7 @@ public class ConstructionManager : MonoBehaviour
 
         if (!ApplyFromDatabase())
             UpdateDynamicName();
-        RefreshHud();
+        RefreshRuntimeVisualState(force: true);
         ThreatRevisionTracker.NotifyConstructionTeamChanged(previousTeam, teamId);
     }
 
@@ -379,13 +390,13 @@ public class ConstructionManager : MonoBehaviour
             siteRuntime = new ConstructionSiteRuntime();
             siteRuntime.Sanitize();
             hasSiteRuntimeOverride = false;
-            RefreshHud();
+            RefreshRuntimeVisualState(force: true);
             return;
         }
 
         siteRuntime = runtime.Clone();
         hasSiteRuntimeOverride = true;
-        RefreshHud();
+        RefreshRuntimeVisualState(force: true);
     }
 
     public ConstructionSiteRuntime GetSiteRuntimeSnapshot()
@@ -401,13 +412,13 @@ public class ConstructionManager : MonoBehaviour
     {
         int max = Mathf.Max(0, CapturePointsMax);
         currentCapturePoints = Mathf.Clamp(value, 0, max);
-        RefreshHud();
+        RefreshRuntimeVisualState(force: true);
     }
 
     public void SetInfiniteSuppliesOverride(bool value)
     {
         hasInfiniteSuppliesOverride = value;
-        RefreshHud();
+        RefreshRuntimeVisualState(force: true);
     }
 
     public bool HasInfiniteSuppliesFor(SupplyData supply = null)
@@ -730,7 +741,7 @@ public class ConstructionManager : MonoBehaviour
         ApplyTeamVisualFlipX(matchController.GetTeamFlipX(teamId));
     }
 
-    private void RefreshOccupancyVisualTint()
+    private void RefreshOccupancyVisualTint(UnitManager occupant)
     {
         if (spriteRenderer == null)
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -740,7 +751,6 @@ public class ConstructionManager : MonoBehaviour
         Color baseColor = TeamUtils.GetColor(teamId);
         Color targetColor = baseColor;
 
-        UnitManager occupant = TryGetOccupantOnTop();
         bool sameTeam = occupant != null && occupant.TeamId == teamId;
         if (sameTeam && !occupant.HasActed)
         {
@@ -752,14 +762,13 @@ public class ConstructionManager : MonoBehaviour
             spriteRenderer.color = targetColor;
     }
 
-    private void RefreshHud()
+    private void RefreshHud(UnitManager occupant)
     {
         if (hudController == null)
             hudController = GetComponentInChildren<ConstructionHudController>(true);
         if (hudController == null)
             return;
 
-        UnitManager occupant = TryGetOccupantOnTop();
         bool hasUnitOnTop = occupant != null;
         bool showFlagThreatOutline = occupant != null
             && occupant.TeamId != teamId
@@ -772,6 +781,54 @@ public class ConstructionManager : MonoBehaviour
             teamId,
             hasUnitOnTop,
             showFlagThreatOutline);
+    }
+
+    private void RefreshRuntimeVisualState(bool force)
+    {
+        UnitManager occupant = TryGetOccupantOnTop();
+        int occupantId = occupant != null ? occupant.GetInstanceID() : 0;
+        bool sameTeamReady = occupant != null && occupant.TeamId == teamId && !occupant.HasActed;
+        bool showFlagThreatOutline = occupant != null
+            && occupant.TeamId != teamId
+            && currentCapturePoints <= Mathf.Max(0, occupant.CurrentHP);
+
+        if (!force
+            && cachedOccupantInstanceId == occupantId
+            && cachedOccupantReadySameTeam == sameTeamReady
+            && cachedShowFlagThreatOutline == showFlagThreatOutline)
+        {
+            return;
+        }
+
+        cachedOccupantInstanceId = occupantId;
+        cachedOccupantReadySameTeam = sameTeamReady;
+        cachedShowFlagThreatOutline = showFlagThreatOutline;
+        RefreshOccupancyVisualTint(occupant);
+        RefreshHud(occupant);
+    }
+
+    private void HandleActiveTeamChanged(int _)
+    {
+        RefreshRuntimeVisualState(force: true);
+    }
+
+    private void HandleUnitOccupancyChanged(UnitManager unit, Vector3Int previousCell, Vector3Int currentCell)
+    {
+        if (unit == null || unit.BoardTilemap == null || boardTilemap == null)
+            return;
+        if (unit.BoardTilemap != boardTilemap)
+            return;
+        if (unit.gameObject.scene != gameObject.scene)
+            return;
+
+        previousCell.z = 0;
+        currentCell.z = 0;
+        Vector3Int ownCell = currentCellPosition;
+        ownCell.z = 0;
+        if (previousCell != ownCell && currentCell != ownCell)
+            return;
+
+        RefreshRuntimeVisualState(force: false);
     }
 
     private UnitManager TryGetOccupantOnTop()

@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -9,7 +10,17 @@ using UnityEngine.Tilemaps;
 
 public class BasicMapGeneratorWindow : EditorWindow
 {
-    private const int ArchipelagoPresetSize = 60;
+    private const int SlotCount = 3;
+
+    [Serializable]
+    private class MapSlotData
+    {
+        public int width;
+        public int height;
+        public int originX;
+        public int originY;
+        public List<string> terrainIds = new List<string>();
+    }
 
     private readonly struct ZonePreset
     {
@@ -92,18 +103,6 @@ public class BasicMapGeneratorWindow : EditorWindow
         new Vector2Int(1, 1)
     };
 
-    private static readonly ZonePreset[] ArchipelagoPresets =
-    {
-        new ZonePreset("Base NO", 0, 19, 0, 19, "floresta com montanha", 0.85f),
-        new ZonePreset("Base NE", 40, 59, 0, 19, "floresta com montanha", 0.85f),
-        new ZonePreset("Base SO", 0, 19, 40, 59, "floresta com montanha", 0.85f),
-        new ZonePreset("Base SE", 40, 59, 40, 59, "floresta com montanha", 0.85f),
-        new ZonePreset("Flanco Oeste", 0, 19, 20, 39, "planicie costeira", 0.75f),
-        new ZonePreset("Flanco Leste", 40, 59, 20, 39, "planicie costeira", 0.75f),
-        new ZonePreset("Canal Central", 20, 39, 0, 59, "agua", 0.05f),
-        new ZonePreset("Ilha Central", 25, 34, 25, 34, "planicie costeira", 0.75f)
-    };
-
     [SerializeField] private Tilemap terrainTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private GeneratorMode mode = GeneratorMode.ConvincingFromDescription;
@@ -126,9 +125,22 @@ public class BasicMapGeneratorWindow : EditorWindow
     [SerializeField] private bool zoneOverrideLandRatio;
     [SerializeField] [Range(0f, 1f)] private float zoneLandRatio = 0.5f;
     [SerializeField] private bool archipelagoSymmetricMode = true;
+    [SerializeField] private bool autoMirrorDuringEdit;
+    [SerializeField] private int autoMirrorXMin = 0;
+    [SerializeField] private int autoMirrorXMax = 59;
+    [SerializeField] private int autoMirrorYMin = 0;
+    [SerializeField] private int autoMirrorYMax = 59;
+    [SerializeField] private bool showMirrorAxisInScene = true;
+    [SerializeField] private bool zonePreviewEnabled = true;
 
     private string status = "Configure e clique em Gerar.";
     private Vector2 scroll;
+    private bool hasZonePreview;
+    private int previewXMin;
+    private int previewXMax;
+    private int previewYMin;
+    private int previewYMax;
+    private string previewLabel = string.Empty;
 
     [MenuItem("Tools/Utils/Map Generator (Basic)")]
     public static void OpenWindow()
@@ -140,7 +152,15 @@ public class BasicMapGeneratorWindow : EditorWindow
 
     private void OnEnable()
     {
+        autoMirrorDuringEdit = TilemapAutoMirrorDuringEdit.Enabled;
+        TilemapAutoMirrorDuringEdit.GetBounds(out autoMirrorXMin, out autoMirrorXMax, out autoMirrorYMin, out autoMirrorYMax);
+        SceneView.duringSceneGui += OnSceneGUI;
         AutoDetectContext(force: false);
+    }
+
+    private void OnDisable()
+    {
+        SceneView.duringSceneGui -= OnSceneGUI;
     }
 
     private void OnFocus()
@@ -236,40 +256,86 @@ public class BasicMapGeneratorWindow : EditorWindow
             if (GUILayout.Button("Limpar Zona"))
                 ClearZone();
         }
+        zonePreviewEnabled = EditorGUILayout.ToggleLeft("Preview visual da zona no Scene", zonePreviewEnabled);
 
         EditorGUILayout.Space(10f);
         EditorGUILayout.LabelField("--- Presets: Arquipelago 60x60 ---", EditorStyles.boldLabel);
+        ZonePreset[] archipelagoPresets = BuildScaledArchipelagoPresets(Mathf.Max(1, width), Mathf.Max(1, height));
         using (new EditorGUILayout.HorizontalScope())
         {
             if (GUILayout.Button("Base NO"))
-                ApplyZonePreset(ArchipelagoPresets[0]);
+                ApplyZonePreset(archipelagoPresets[0]);
             if (GUILayout.Button("Base NE"))
-                ApplyZonePreset(ArchipelagoPresets[1]);
+                ApplyZonePreset(archipelagoPresets[1]);
             if (GUILayout.Button("Base SO"))
-                ApplyZonePreset(ArchipelagoPresets[2]);
+                ApplyZonePreset(archipelagoPresets[2]);
         }
 
         using (new EditorGUILayout.HorizontalScope())
         {
             if (GUILayout.Button("Base SE"))
-                ApplyZonePreset(ArchipelagoPresets[3]);
+                ApplyZonePreset(archipelagoPresets[3]);
             if (GUILayout.Button("Flanco Oeste"))
-                ApplyZonePreset(ArchipelagoPresets[4]);
+                ApplyZonePreset(archipelagoPresets[4]);
             if (GUILayout.Button("Flanco Leste"))
-                ApplyZonePreset(ArchipelagoPresets[5]);
+                ApplyZonePreset(archipelagoPresets[5]);
         }
 
         using (new EditorGUILayout.HorizontalScope())
         {
             if (GUILayout.Button("Canal Central"))
-                ApplyZonePreset(ArchipelagoPresets[6]);
+                ApplyZonePreset(archipelagoPresets[6]);
             if (GUILayout.Button("Ilha Central"))
-                ApplyZonePreset(ArchipelagoPresets[7]);
+                ApplyZonePreset(archipelagoPresets[7]);
         }
 
         archipelagoSymmetricMode = EditorGUILayout.ToggleLeft("Modo Simetrico (espelha esquerda -> direita)", archipelagoSymmetricMode);
         if (GUILayout.Button("Gerar Arquipelago Completo", GUILayout.Height(28f)))
             GenerateArchipelagoComplete();
+
+        EditorGUILayout.Space(10f);
+        EditorGUILayout.LabelField("--- Slots (1,2,3) ---", EditorStyles.boldLabel);
+        DrawSlotRow(1);
+        DrawSlotRow(2);
+        DrawSlotRow(3);
+
+        EditorGUILayout.Space(10f);
+        EditorGUILayout.LabelField("--- Auto Mirror During Edit ---", EditorStyles.boldLabel);
+        bool nextAutoMirror = EditorGUILayout.ToggleLeft("Ativar espelhamento automatico (Tile Palette)", autoMirrorDuringEdit);
+        if (nextAutoMirror != autoMirrorDuringEdit)
+        {
+            autoMirrorDuringEdit = nextAutoMirror;
+            TilemapAutoMirrorDuringEdit.Enabled = autoMirrorDuringEdit;
+            SceneView.RepaintAll();
+        }
+
+        using (new EditorGUI.DisabledScope(!autoMirrorDuringEdit))
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                autoMirrorXMin = EditorGUILayout.IntField("xMin", autoMirrorXMin);
+                autoMirrorXMax = EditorGUILayout.IntField("xMax", autoMirrorXMax);
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                autoMirrorYMin = EditorGUILayout.IntField("yMin", autoMirrorYMin);
+                autoMirrorYMax = EditorGUILayout.IntField("yMax", autoMirrorYMax);
+            }
+
+            if (GUILayout.Button("Aplicar Bounds do Auto Mirror"))
+            {
+                TilemapAutoMirrorDuringEdit.SetBounds(autoMirrorXMin, autoMirrorXMax, autoMirrorYMin, autoMirrorYMax);
+                status = $"Auto Mirror bounds aplicados: x[{Mathf.Min(autoMirrorXMin, autoMirrorXMax)}..{Mathf.Max(autoMirrorXMin, autoMirrorXMax)}], y[{Mathf.Min(autoMirrorYMin, autoMirrorYMax)}..{Mathf.Max(autoMirrorYMin, autoMirrorYMax)}].";
+            }
+        }
+
+        bool nextShowMirrorAxis = EditorGUILayout.ToggleLeft("Mostrar eixo do mirror no Scene", showMirrorAxisInScene);
+        if (nextShowMirrorAxis != showMirrorAxisInScene)
+        {
+            showMirrorAxisInScene = nextShowMirrorAxis;
+            SceneView.RepaintAll();
+        }
 
         EditorGUILayout.EndScrollView();
     }
@@ -1142,6 +1208,7 @@ public class BasicMapGeneratorWindow : EditorWindow
         zoneOverrideLandRatio = true;
         zoneLandRatio = Mathf.Clamp01(preset.landRatioBase);
         zoneRandomSeed = true;
+        SetZonePreview(zoneXMin, zoneXMax, zoneYMin, zoneYMax, preset.label);
         status = $"Preset aplicado: {preset.label}. Ajuste seed se quiser e clique em Gerar Zona.";
     }
 
@@ -1150,98 +1217,102 @@ public class BasicMapGeneratorWindow : EditorWindow
         if (!EnsureZonePrerequisites(out TerrainSet set))
             return;
 
+        int mapWidth = Mathf.Max(1, width);
+        int mapHeight = Mathf.Max(1, height);
+        ZonePreset[] archipelagoPresets = BuildScaledArchipelagoPresets(mapWidth, mapHeight);
         int globalTerrainSeed = UnityEngine.Random.Range(int.MinValue, int.MaxValue);
         int generatedCount = 0;
 
         if (archipelagoSymmetricMode)
         {
-            ZonePreset[] leftPresets =
+            ZonePreset[] topPresets =
             {
-                ArchipelagoPresets[0], // Base NO
-                ArchipelagoPresets[2], // Base SO
-                ArchipelagoPresets[4]  // Flanco Oeste
+                archipelagoPresets[0], // Base NO
+                archipelagoPresets[1]  // Base NE
             };
 
-            for (int i = 0; i < leftPresets.Length; i++)
+            for (int i = 0; i < topPresets.Length; i++)
             {
-                ZonePreset leftPreset = leftPresets[i];
+                ZonePreset topPreset = topPresets[i];
                 if (!TryClampZoneRect(
-                        leftPreset.xMin,
-                        leftPreset.xMax,
-                        leftPreset.yMin,
-                        leftPreset.yMax,
-                        out int lxMin,
-                        out int lxMax,
-                        out int lyMin,
-                        out int lyMax,
+                        topPreset.xMin,
+                        topPreset.xMax,
+                        topPreset.yMin,
+                        topPreset.yMax,
+                        out int txMin,
+                        out int txMax,
+                        out int tyMin,
+                        out int tyMax,
                         persistToFields: false,
                         useCustomBounds: true,
                         customBoundXMin: 0,
-                        customBoundXMax: ArchipelagoPresetSize - 1,
+                        customBoundXMax: mapWidth - 1,
                         customBoundYMin: 0,
-                        customBoundYMax: ArchipelagoPresetSize - 1))
+                        customBoundYMax: mapHeight - 1))
                     continue;
 
-                int zoneWidth = (lxMax - lxMin) + 1;
-                int zoneHeight = (lyMax - lyMin) + 1;
-                CellKind[,] leftMap = BuildMap(
+                int zoneWidth = (txMax - txMin) + 1;
+                int zoneHeight = (tyMax - tyMin) + 1;
+                CellKind[,] topMap = BuildMap(
                     zoneWidth,
                     zoneHeight,
                     ZoneGeneratorMode.ConvincingFromDescription,
-                    leftPreset.description,
+                    topPreset.description,
                     globalTerrainSeed,
                     set,
                     minIslandSize,
-                    lxMin,
-                    lyMin,
+                    txMin,
+                    tyMin,
                     useLandRatioOverride: true,
-                    landRatioOverride: leftPreset.landRatioBase);
+                    landRatioOverride: topPreset.landRatioBase);
 
-                PaintMap(terrainTilemap, leftMap, new Vector2Int(lxMin, -lyMin), set);
-                Debug.Log($"[MapGen] Arquipelago preset '{leftPreset.label}' => zone ({lxMin},{lyMin}) -> ({lxMax},{lyMax}) | cellY {-lyMin}..{-lyMax} | seed={globalTerrainSeed}");
+                PaintMap(terrainTilemap, topMap, new Vector2Int(txMin, -tyMin), set);
+                Debug.Log($"[MapGen] Arquipelago preset '{topPreset.label}' => zone ({txMin},{tyMin}) -> ({txMax},{tyMax}) | cellY {-tyMin}..{-tyMax} | seed={globalTerrainSeed}");
                 generatedCount++;
 
-                ZonePreset rightPreset = GetMirroredArchipelagoPreset(leftPreset);
+                ZonePreset bottomPreset = GetMirroredArchipelagoPreset(topPreset, archipelagoPresets);
                 if (!TryClampZoneRect(
-                        rightPreset.xMin,
-                        rightPreset.xMax,
-                        rightPreset.yMin,
-                        rightPreset.yMax,
-                        out int rxMin,
-                        out int rxMax,
-                        out int ryMin,
-                        out int ryMax,
+                        bottomPreset.xMin,
+                        bottomPreset.xMax,
+                        bottomPreset.yMin,
+                        bottomPreset.yMax,
+                        out int bxMin,
+                        out int bxMax,
+                        out int byMin,
+                        out int byMax,
                         persistToFields: false,
                         useCustomBounds: true,
                         customBoundXMin: 0,
-                        customBoundXMax: ArchipelagoPresetSize - 1,
+                        customBoundXMax: mapWidth - 1,
                         customBoundYMin: 0,
-                        customBoundYMax: ArchipelagoPresetSize - 1))
+                        customBoundYMax: mapHeight - 1))
                     continue;
 
-                MirrorZoneHorizontally(
+                MirrorZoneVertically(
                     terrainTilemap,
-                    lxMin,
-                    lxMax,
-                    lyMin,
-                    lyMax,
-                    rxMin,
-                    rxMax,
-                    ryMin,
-                    ryMax);
-                Debug.Log($"[MapGen] Arquipelago preset espelhado '{rightPreset.label}' <= '{leftPreset.label}' => zone ({rxMin},{ryMin}) -> ({rxMax},{ryMax})");
+                    txMin,
+                    txMax,
+                    tyMin,
+                    tyMax,
+                    bxMin,
+                    bxMax,
+                    byMin,
+                    byMax);
+                Debug.Log($"[MapGen] Arquipelago preset espelhado '{bottomPreset.label}' <= '{topPreset.label}' => zone ({bxMin},{byMin}) -> ({bxMax},{byMax})");
                 generatedCount++;
             }
 
-            ZonePreset[] specialPresets =
+            ZonePreset[] independentPresets =
             {
-                ArchipelagoPresets[6], // Canal Central
-                ArchipelagoPresets[7]  // Ilha Central
+                archipelagoPresets[4], // Flanco Oeste
+                archipelagoPresets[5], // Flanco Leste
+                archipelagoPresets[6], // Canal Central
+                archipelagoPresets[7]  // Ilha Central
             };
 
-            for (int i = 0; i < specialPresets.Length; i++)
+            for (int i = 0; i < independentPresets.Length; i++)
             {
-                ZonePreset preset = specialPresets[i];
+                ZonePreset preset = independentPresets[i];
                 if (!TryClampZoneRect(
                         preset.xMin,
                         preset.xMax,
@@ -1254,9 +1325,9 @@ public class BasicMapGeneratorWindow : EditorWindow
                         persistToFields: false,
                         useCustomBounds: true,
                         customBoundXMin: 0,
-                        customBoundXMax: ArchipelagoPresetSize - 1,
+                        customBoundXMax: mapWidth - 1,
                         customBoundYMin: 0,
-                        customBoundYMax: ArchipelagoPresetSize - 1))
+                        customBoundYMax: mapHeight - 1))
                     continue;
 
                 int effectiveSeed = UnityEngine.Random.Range(int.MinValue, int.MaxValue);
@@ -1281,14 +1352,14 @@ public class BasicMapGeneratorWindow : EditorWindow
                 generatedCount++;
             }
 
-            status = $"Arquipelago completo gerado (simetrico): {generatedCount}/{ArchipelagoPresets.Length} zonas.";
+            status = $"Arquipelago completo gerado (simetrico): {generatedCount}/{archipelagoPresets.Length} zonas.";
             Debug.Log($"[MapGen] {status}");
             return;
         }
 
-        for (int i = 0; i < ArchipelagoPresets.Length; i++)
+        for (int i = 0; i < archipelagoPresets.Length; i++)
         {
-            ZonePreset preset = ArchipelagoPresets[i];
+            ZonePreset preset = archipelagoPresets[i];
             if (!TryClampZoneRect(
                     preset.xMin,
                     preset.xMax,
@@ -1301,9 +1372,9 @@ public class BasicMapGeneratorWindow : EditorWindow
                     persistToFields: false,
                     useCustomBounds: true,
                     customBoundXMin: 0,
-                    customBoundXMax: ArchipelagoPresetSize - 1,
+                    customBoundXMax: mapWidth - 1,
                     customBoundYMin: 0,
-                    customBoundYMax: ArchipelagoPresetSize - 1))
+                    customBoundYMax: mapHeight - 1))
                 continue;
 
             bool isSpecialSeedPreset = IsSpecialArchipelagoPreset(preset);
@@ -1331,22 +1402,68 @@ public class BasicMapGeneratorWindow : EditorWindow
             generatedCount++;
         }
 
-        status = $"Arquipelago completo gerado: {generatedCount}/{ArchipelagoPresets.Length} zonas.";
+        status = $"Arquipelago completo gerado: {generatedCount}/{archipelagoPresets.Length} zonas.";
         Debug.Log($"[MapGen] {status}");
     }
 
-    private static ZonePreset GetMirroredArchipelagoPreset(ZonePreset leftPreset)
+    private static ZonePreset GetMirroredArchipelagoPreset(ZonePreset sourcePreset, ZonePreset[] presets)
     {
-        if (leftPreset.label == "Base NO")
-            return ArchipelagoPresets[1];
-        if (leftPreset.label == "Base SO")
-            return ArchipelagoPresets[3];
-        if (leftPreset.label == "Flanco Oeste")
-            return ArchipelagoPresets[5];
-        return leftPreset;
+        if (sourcePreset.label == "Base NO")
+            return presets[2];
+        if (sourcePreset.label == "Base NE")
+            return presets[3];
+        return sourcePreset;
     }
 
-    private static void MirrorZoneHorizontally(
+    private static ZonePreset[] BuildScaledArchipelagoPresets(int mapWidth, int mapHeight)
+    {
+        int maxX = Mathf.Max(0, mapWidth - 1);
+        int maxY = Mathf.Max(0, mapHeight - 1);
+
+        int xLeftEnd = ScaleIndex(19, 59, maxX);
+        int xCenterStart = ScaleIndex(20, 59, maxX);
+        int xCenterEnd = ScaleIndex(39, 59, maxX);
+        int xRightStart = ScaleIndex(40, 59, maxX);
+        int xIslandStart = ScaleIndex(25, 59, maxX);
+        int xIslandEnd = ScaleIndex(34, 59, maxX);
+
+        int yTopEnd = ScaleIndex(19, 59, maxY);
+        int yMiddleStart = ScaleIndex(20, 59, maxY);
+        int yMiddleEnd = ScaleIndex(39, 59, maxY);
+        int yBottomStart = ScaleIndex(40, 59, maxY);
+        int yIslandStart = ScaleIndex(25, 59, maxY);
+        int yIslandEnd = ScaleIndex(34, 59, maxY);
+
+        return new[]
+        {
+            BuildSafePreset("Base NO", 0, xLeftEnd, 0, yTopEnd, "floresta com montanha", 0.85f, maxX, maxY),
+            BuildSafePreset("Base NE", xRightStart, maxX, 0, yTopEnd, "floresta com montanha", 0.85f, maxX, maxY),
+            BuildSafePreset("Base SO", 0, xLeftEnd, yBottomStart, maxY, "floresta com montanha", 0.85f, maxX, maxY),
+            BuildSafePreset("Base SE", xRightStart, maxX, yBottomStart, maxY, "floresta com montanha", 0.85f, maxX, maxY),
+            BuildSafePreset("Flanco Oeste", 0, xLeftEnd, yMiddleStart, yMiddleEnd, "planicie costeira", 0.75f, maxX, maxY),
+            BuildSafePreset("Flanco Leste", xRightStart, maxX, yMiddleStart, yMiddleEnd, "planicie costeira", 0.75f, maxX, maxY),
+            BuildSafePreset("Canal Central", xCenterStart, xCenterEnd, 0, maxY, "agua", 0.05f, maxX, maxY),
+            BuildSafePreset("Ilha Central", xIslandStart, xIslandEnd, yIslandStart, yIslandEnd, "planicie costeira", 0.75f, maxX, maxY)
+        };
+    }
+
+    private static ZonePreset BuildSafePreset(string label, int xMin, int xMax, int yMin, int yMax, string description, float landRatio, int maxX, int maxY)
+    {
+        int safeXMin = Mathf.Clamp(Mathf.Min(xMin, xMax), 0, maxX);
+        int safeXMax = Mathf.Clamp(Mathf.Max(xMin, xMax), 0, maxX);
+        int safeYMin = Mathf.Clamp(Mathf.Min(yMin, yMax), 0, maxY);
+        int safeYMax = Mathf.Clamp(Mathf.Max(yMin, yMax), 0, maxY);
+        return new ZonePreset(label, safeXMin, safeXMax, safeYMin, safeYMax, description, landRatio);
+    }
+
+    private static int ScaleIndex(int sourceIndex, int sourceMax, int targetMax)
+    {
+        if (targetMax <= 0 || sourceMax <= 0)
+            return 0;
+        return Mathf.Clamp(Mathf.RoundToInt((sourceIndex / (float)sourceMax) * targetMax), 0, targetMax);
+    }
+
+    private static void MirrorZoneVertically(
         Tilemap tilemap,
         int srcXMin,
         int srcXMax,
@@ -1371,11 +1488,11 @@ public class BasicMapGeneratorWindow : EditorWindow
         for (int y = 0; y < srcHeight; y++)
         {
             int srcY = srcYMin + y;
-            int dstY = dstYMin + y;
+            int dstY = dstYMax - y;
             for (int i = 0; i < srcWidth; i++)
             {
                 int srcX = srcXMin + i;
-                int dstX = dstXMax - i;
+                int dstX = dstXMin + i;
                 Vector3Int srcCell = new Vector3Int(srcX, -srcY, 0);
                 Vector3Int dstCell = new Vector3Int(dstX, -dstY, 0);
                 tilemap.SetTile(dstCell, tilemap.GetTile(srcCell));
@@ -1392,4 +1509,481 @@ public class BasicMapGeneratorWindow : EditorWindow
         string id = NormalizeForMatch(preset.label);
         return id.Contains("canal central") || id.Contains("ilha central");
     }
+
+    private void DrawSlotRow(int slotIndex)
+    {
+        bool exists = File.Exists(GetSlotPath(slotIndex));
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField($"Slot {slotIndex}", GUILayout.Width(52f));
+            EditorGUILayout.LabelField(exists ? "Salvo" : "Vazio", GUILayout.Width(52f));
+
+            if (GUILayout.Button("Salvar", GUILayout.Width(80f)))
+                SaveSlot(slotIndex);
+
+            using (new EditorGUI.DisabledScope(!exists))
+            {
+                if (GUILayout.Button("Carregar", GUILayout.Width(80f)))
+                    LoadSlot(slotIndex);
+                if (GUILayout.Button("Limpar", GUILayout.Width(80f)))
+                    ClearSlot(slotIndex);
+            }
+        }
+    }
+
+    private bool EnsureSlotPrerequisites(out TerrainSet set)
+    {
+        set = default;
+        if (terrainTilemap == null)
+        {
+            status = "Falha: selecione uma Tilemap.";
+            return false;
+        }
+
+        if (terrainDatabase == null)
+        {
+            status = "Falha: selecione um TerrainDatabase.";
+            return false;
+        }
+
+        if (!TryResolveTerrains(terrainDatabase, out set, out string resolveError))
+        {
+            status = $"Falha: {resolveError}";
+            return false;
+        }
+
+        return true;
+    }
+
+    private void SaveSlot(int slotIndex)
+    {
+        if (!EnsureSlotPrerequisites(out TerrainSet _))
+            return;
+
+        int mapWidth = Mathf.Max(1, width);
+        int mapHeight = Mathf.Max(1, height);
+        MapSlotData data = new MapSlotData
+        {
+            width = mapWidth,
+            height = mapHeight,
+            originX = originCell.x,
+            originY = originCell.y
+        };
+
+        int unmappedCount = 0;
+        for (int y = 0; y < mapHeight; y++)
+        {
+            for (int x = 0; x < mapWidth; x++)
+            {
+                Vector3Int cell = new Vector3Int(originCell.x + x, originCell.y - y, 0);
+                TileBase tile = terrainTilemap.GetTile(cell);
+                string terrainId = string.Empty;
+
+                if (tile != null)
+                {
+                    if (terrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData terrain) && terrain != null && !string.IsNullOrWhiteSpace(terrain.id))
+                        terrainId = terrain.id;
+                    else
+                        unmappedCount++;
+                }
+
+                data.terrainIds.Add(terrainId);
+            }
+        }
+
+        string path = GetSlotPath(slotIndex);
+        EnsureSlotDirectoryExists();
+        string json = JsonUtility.ToJson(data, prettyPrint: true);
+        File.WriteAllText(path, json, Encoding.UTF8);
+
+        status = $"Slot {slotIndex} salvo ({mapWidth}x{mapHeight}).";
+        if (unmappedCount > 0)
+            status += $" Aviso: {unmappedCount} tiles nao mapeados para TerrainTypeData foram salvos como vazio.";
+    }
+
+    private void LoadSlot(int slotIndex)
+    {
+        if (!EnsureSlotPrerequisites(out TerrainSet _))
+            return;
+
+        string path = GetSlotPath(slotIndex);
+        if (!File.Exists(path))
+        {
+            status = $"Slot {slotIndex} vazio.";
+            return;
+        }
+
+        string json = File.ReadAllText(path, Encoding.UTF8);
+        MapSlotData data = JsonUtility.FromJson<MapSlotData>(json);
+        if (data == null || data.width <= 0 || data.height <= 0 || data.terrainIds == null)
+        {
+            status = $"Slot {slotIndex} invalido/corrompido.";
+            return;
+        }
+
+        int expectedCount = data.width * data.height;
+        if (data.terrainIds.Count < expectedCount)
+        {
+            status = $"Slot {slotIndex} invalido: dados incompletos.";
+            return;
+        }
+
+        Undo.RegisterCompleteObjectUndo(terrainTilemap, $"Load Map Slot {slotIndex}");
+        int missingTerrainCount = 0;
+        int index = 0;
+        for (int y = 0; y < data.height; y++)
+        {
+            for (int x = 0; x < data.width; x++)
+            {
+                Vector3Int cell = new Vector3Int(data.originX + x, data.originY - y, 0);
+                string terrainId = data.terrainIds[index++];
+                TileBase tile = null;
+
+                if (!string.IsNullOrWhiteSpace(terrainId))
+                {
+                    if (terrainDatabase.TryGetById(terrainId, out TerrainTypeData terrain) && terrain != null)
+                        tile = terrain.paletteTile;
+                    else
+                        missingTerrainCount++;
+                }
+
+                terrainTilemap.SetTile(cell, tile);
+            }
+        }
+
+        EditorUtility.SetDirty(terrainTilemap);
+        if (terrainTilemap.gameObject.scene.IsValid())
+            EditorSceneManager.MarkSceneDirty(terrainTilemap.gameObject.scene);
+
+        width = data.width;
+        height = data.height;
+        originCell = new Vector2Int(data.originX, data.originY);
+        if (lockOriginAtZeroTopLeft)
+            originCell = Vector2Int.zero;
+
+        status = $"Slot {slotIndex} carregado ({data.width}x{data.height}).";
+        if (missingTerrainCount > 0)
+            status += $" Aviso: {missingTerrainCount} ids de terreno nao encontrados no TerrainDatabase atual.";
+    }
+
+    private void ClearSlot(int slotIndex)
+    {
+        string path = GetSlotPath(slotIndex);
+        if (File.Exists(path))
+            File.Delete(path);
+        status = $"Slot {slotIndex} limpo.";
+    }
+
+    private static string GetSlotDirectory()
+    {
+        return Path.Combine("ProjectSettings", "MapGeneratorSlots");
+    }
+
+    private static string GetSlotPath(int slotIndex)
+    {
+        int safeSlot = Mathf.Clamp(slotIndex, 1, SlotCount);
+        return Path.Combine(GetSlotDirectory(), $"slot_{safeSlot}.json");
+    }
+
+    private static void EnsureSlotDirectoryExists()
+    {
+        string directory = GetSlotDirectory();
+        if (!Directory.Exists(directory))
+            Directory.CreateDirectory(directory);
+    }
+
+    private void SetZonePreview(int xMin, int xMax, int yMin, int yMax, string label)
+    {
+        hasZonePreview = true;
+        previewXMin = Mathf.Min(xMin, xMax);
+        previewXMax = Mathf.Max(xMin, xMax);
+        previewYMin = Mathf.Min(yMin, yMax);
+        previewYMax = Mathf.Max(yMin, yMax);
+        previewLabel = label ?? string.Empty;
+        SceneView.RepaintAll();
+    }
+
+    private void OnSceneGUI(SceneView sceneView)
+    {
+        if (terrainTilemap == null)
+            return;
+
+        if (zonePreviewEnabled && hasZonePreview)
+        {
+            Vector3 a = terrainTilemap.GetCellCenterWorld(new Vector3Int(previewXMin, -previewYMin, 0));
+            Vector3 b = terrainTilemap.GetCellCenterWorld(new Vector3Int(previewXMax, -previewYMin, 0));
+            Vector3 c = terrainTilemap.GetCellCenterWorld(new Vector3Int(previewXMax, -previewYMax, 0));
+            Vector3 d = terrainTilemap.GetCellCenterWorld(new Vector3Int(previewXMin, -previewYMax, 0));
+
+            Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
+            Color edge = new Color(0.2f, 0.65f, 1f, 0.95f);
+            Color fill = new Color(0.2f, 0.65f, 1f, 0.10f);
+            Handles.color = fill;
+            Handles.DrawAAConvexPolygon(a, b, c, d);
+            Handles.color = edge;
+            Handles.DrawAAPolyLine(4f, a, b, c, d, a);
+
+            Vector3 labelPos = (a + b + c + d) * 0.25f + new Vector3(0f, 0.1f, 0f);
+            string text = string.IsNullOrWhiteSpace(previewLabel)
+                ? $"Zona: ({previewXMin},{previewYMin}) -> ({previewXMax},{previewYMax})"
+                : $"{previewLabel} | ({previewXMin},{previewYMin}) -> ({previewXMax},{previewYMax})";
+            if (IsVisibleInSceneCamera(labelPos))
+                Handles.Label(labelPos, text);
+        }
+
+        DrawMirrorAxisOverlay();
+    }
+
+    private void DrawMirrorAxisOverlay()
+    {
+        if (!showMirrorAxisInScene)
+            return;
+        if (!TilemapAutoMirrorDuringEdit.Enabled)
+            return;
+
+        TilemapAutoMirrorDuringEdit.GetBounds(out int xMin, out int xMax, out int yMin, out int yMax);
+        if (xMin > xMax || yMin > yMax)
+            return;
+
+        int centerY = (yMin + yMax) / 2;
+        Vector3 leftWorld = terrainTilemap.GetCellCenterWorld(new Vector3Int(xMin, -centerY, 0));
+        Vector3 rightWorld = terrainTilemap.GetCellCenterWorld(new Vector3Int(xMax, -centerY, 0));
+
+        Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
+        Handles.color = new Color(1f, 0.2f, 0.2f, 0.95f);
+        Handles.DrawAAPolyLine(3f, leftWorld, rightWorld);
+        for (int x = xMin; x <= xMax; x++)
+        {
+            Vector3 p = terrainTilemap.GetCellCenterWorld(new Vector3Int(x, -centerY, 0));
+            float radius = HandleUtility.GetHandleSize(p) * 0.06f;
+            Handles.DrawSolidDisc(p, Vector3.forward, radius);
+        }
+
+        Vector3 labelPos = Vector3.Lerp(leftWorld, rightWorld, 0.5f) + new Vector3(0.15f, 0.15f, 0f);
+        if (IsVisibleInSceneCamera(labelPos))
+            Handles.Label(labelPos, $"Mirror Line Y={centerY} | x[{xMin}..{xMax}] | espelha cima/baixo");
+    }
+
+    private static bool IsVisibleInSceneCamera(Vector3 world)
+    {
+        SceneView scene = SceneView.currentDrawingSceneView;
+        if (scene == null || scene.camera == null)
+            return true;
+
+        Vector3 vp = scene.camera.WorldToViewportPoint(world);
+        if (vp.z <= 0f)
+            return false;
+        return vp.x >= 0f && vp.x <= 1f && vp.y >= 0f && vp.y <= 1f;
+    }
 }
+
+[InitializeOnLoad]
+public static class TilemapAutoMirrorDuringEdit
+{
+    private const string EnabledKey = "MapGen.AutoMirror.Enabled";
+    private const string BoundsXMinKey = "MapGen.AutoMirror.BoundsXMin";
+    private const string BoundsXMaxKey = "MapGen.AutoMirror.BoundsXMax";
+    private const string BoundsYMinKey = "MapGen.AutoMirror.BoundsYMin";
+    private const string BoundsYMaxKey = "MapGen.AutoMirror.BoundsYMax";
+    private const int DefaultXMin = 0;
+    private const int DefaultXMax = 59;
+    private const int DefaultYMin = 0;
+    private const int DefaultYMax = 59;
+
+    private static readonly Dictionary<Vector3Int, TileBase> Snapshot = new Dictionary<Vector3Int, TileBase>(4096);
+
+    private static double lastScanTime;
+    private static bool isApplyingMirror;
+
+    static TilemapAutoMirrorDuringEdit()
+    {
+        EditorApplication.update += OnEditorUpdate;
+    }
+
+    public static bool Enabled
+    {
+        get => EditorPrefs.GetBool(EnabledKey, false);
+        set
+        {
+            EditorPrefs.SetBool(EnabledKey, value);
+            ResetSnapshot();
+        }
+    }
+
+    public static void SetBounds(int xMin, int xMax, int yMin, int yMax)
+    {
+        EditorPrefs.SetInt(BoundsXMinKey, Mathf.Min(xMin, xMax));
+        EditorPrefs.SetInt(BoundsXMaxKey, Mathf.Max(xMin, xMax));
+        EditorPrefs.SetInt(BoundsYMinKey, Mathf.Min(yMin, yMax));
+        EditorPrefs.SetInt(BoundsYMaxKey, Mathf.Max(yMin, yMax));
+        ResetSnapshot();
+    }
+
+    public static void GetBounds(out int xMin, out int xMax, out int yMin, out int yMax)
+    {
+        xMin = EditorPrefs.GetInt(BoundsXMinKey, DefaultXMin);
+        xMax = EditorPrefs.GetInt(BoundsXMaxKey, DefaultXMax);
+        yMin = EditorPrefs.GetInt(BoundsYMinKey, DefaultYMin);
+        yMax = EditorPrefs.GetInt(BoundsYMaxKey, DefaultYMax);
+    }
+
+    private static void OnEditorUpdate()
+    {
+        if (!Enabled || isApplyingMirror)
+            return;
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+            return;
+
+        double now = EditorApplication.timeSinceStartup;
+        if (now - lastScanTime < 0.12d)
+            return;
+        lastScanTime = now;
+
+        Tilemap tilemap = ResolveTilemap();
+        if (tilemap == null)
+            return;
+
+        GetBounds(out int xMin, out int xMax, out int yMin, out int yMax);
+        if (xMin > xMax || yMin > yMax)
+            return;
+
+        List<Vector3Int> changed = new List<Vector3Int>(32);
+        for (int y = yMin; y <= yMax; y++)
+        {
+            for (int x = xMin; x <= xMax; x++)
+            {
+                Vector3Int cell = new Vector3Int(x, -y, 0);
+                TileBase tile = tilemap.GetTile(cell);
+                if (!Snapshot.TryGetValue(cell, out TileBase previous) || previous != tile)
+                    changed.Add(cell);
+            }
+        }
+
+        if (changed.Count == 0)
+            return;
+
+        isApplyingMirror = true;
+        try
+        {
+            Undo.RegisterCompleteObjectUndo(tilemap, "Auto Mirror Tilemap Edit");
+            bool changedAnyTile = false;
+
+            for (int i = 0; i < changed.Count; i++)
+            {
+                Vector3Int src = changed[i];
+                TileBase srcTile = tilemap.GetTile(src);
+                if (!TryResolveMirroredCell(tilemap, src, xMin, xMax, yMin, yMax, out Vector3Int dst))
+                    continue;
+                if (dst == src)
+                    continue;
+
+                TileBase dstCurrent = tilemap.GetTile(dst);
+                if (dstCurrent == srcTile)
+                    continue;
+
+                tilemap.SetTile(dst, srcTile);
+                changedAnyTile = true;
+            }
+
+            Snapshot.Clear();
+            for (int y = yMin; y <= yMax; y++)
+            {
+                for (int x = xMin; x <= xMax; x++)
+                {
+                    Vector3Int cell = new Vector3Int(x, -y, 0);
+                    Snapshot[cell] = tilemap.GetTile(cell);
+                }
+            }
+
+            if (changedAnyTile)
+            {
+                EditorUtility.SetDirty(tilemap);
+                if (tilemap.gameObject.scene.IsValid())
+                    EditorSceneManager.MarkSceneDirty(tilemap.gameObject.scene);
+            }
+        }
+        finally
+        {
+            isApplyingMirror = false;
+        }
+    }
+
+    private static Tilemap ResolveTilemap()
+    {
+        TurnStateManager tsm = UnityEngine.Object.FindAnyObjectByType<TurnStateManager>();
+        if (tsm != null)
+        {
+            SerializedObject so = new SerializedObject(tsm);
+            SerializedProperty tileProp = so.FindProperty("terrainTilemap");
+            if (tileProp != null && tileProp.objectReferenceValue is Tilemap tsmTilemap)
+                return tsmTilemap;
+        }
+
+        Tilemap named = FindTilemapByName("TileMap");
+        if (named != null)
+            return named;
+        named = FindTilemapByName("Tilemap");
+        if (named != null)
+            return named;
+
+        return UnityEngine.Object.FindAnyObjectByType<Tilemap>();
+    }
+
+    private static Tilemap FindTilemapByName(string expectedName)
+    {
+        if (string.IsNullOrWhiteSpace(expectedName))
+            return null;
+
+        Tilemap[] maps = UnityEngine.Object.FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (map == null)
+                continue;
+            if (string.Equals(map.name, expectedName, StringComparison.OrdinalIgnoreCase))
+                return map;
+        }
+
+        return null;
+    }
+
+    private static void ResetSnapshot()
+    {
+        Snapshot.Clear();
+        lastScanTime = 0d;
+    }
+
+    private static bool TryResolveMirroredCell(
+        Tilemap tilemap,
+        Vector3Int srcCell,
+        int xMin,
+        int xMax,
+        int yMin,
+        int yMax,
+        out Vector3Int dstCell)
+    {
+        dstCell = srcCell;
+        if (tilemap == null)
+            return false;
+
+        int srcMapY = -srcCell.y;
+        int centerMapY = (yMin + yMax) / 2;
+        if (srcMapY == centerMapY)
+            return false;
+
+        // Espelha acima/abaixo em torno da linha central horizontal.
+        Vector3 axisWorld = tilemap.GetCellCenterWorld(new Vector3Int(xMin, -centerMapY, 0));
+        Vector3 srcWorld = tilemap.GetCellCenterWorld(srcCell);
+        Vector3 mirroredWorld = new Vector3(srcWorld.x, (2f * axisWorld.y) - srcWorld.y, srcWorld.z);
+        Vector3Int candidate = tilemap.WorldToCell(mirroredWorld);
+        candidate.z = 0;
+
+        int candidateMapY = -candidate.y;
+        if (candidate.x < xMin || candidate.x > xMax || candidateMapY < yMin || candidateMapY > yMax)
+            return false;
+
+        dstCell = candidate;
+        return true;
+    }
+}
+

@@ -743,7 +743,6 @@ MonoBehaviour:
   firstOwnerTeamId: 0
   firstOwnerInitialized: 1
   occupiedByReadyUnitDarkenFactor: 0.4
-  runtimeVisualRefreshIntervalSeconds: 0.12
   hudController: {fileID: 1370441032517419065}
   matchController: {fileID: 0}
 --- !u!1 &8405094446092215197

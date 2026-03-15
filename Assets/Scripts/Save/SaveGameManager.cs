@@ -114,6 +114,7 @@ public class SaveGameManager : MonoBehaviour
     [SerializeField] private KeyCode quickSaveKey = KeyCode.I;
     [SerializeField] private KeyCode quickLoadKey = KeyCode.Alpha0;
     [SerializeField] private string slotName = "quicksave";
+    [SerializeField, Range(1, 3)] private int activeSlot = 1;
     [SerializeField] private bool useSceneSpecificSlot = true;
     [SerializeField] private bool blockCrossSceneLoad = true;
     [SerializeField] private bool verboseLogs = true;
@@ -146,12 +147,27 @@ public class SaveGameManager : MonoBehaviour
     [ContextMenu("Save Quick Slot")]
     public void Save()
     {
+        SaveSlot(activeSlot);
+    }
+
+    [ContextMenu("Save Slot 1")]
+    public void SaveSlot1() => SaveSlot(1);
+
+    [ContextMenu("Save Slot 2")]
+    public void SaveSlot2() => SaveSlot(2);
+
+    [ContextMenu("Save Slot 3")]
+    public void SaveSlot3() => SaveSlot(3);
+
+    public void SaveSlot(int slotIndex)
+    {
         if (!Application.isPlaying)
         {
             Debug.LogWarning("[SaveGame] Save funciona apenas em Play Mode.");
             return;
         }
 
+        int normalizedSlot = NormalizeSlot(slotIndex);
         try
         {
             TryAutoAssignReferences();
@@ -166,12 +182,12 @@ public class SaveGameManager : MonoBehaviour
 
             SaveGameData data = BuildSaveData();
             string json = JsonUtility.ToJson(data, true);
-            string path = GetSlotPath();
+            string path = GetSlotPath(normalizedSlot);
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? Application.persistentDataPath);
             File.WriteAllText(path, json);
             cursorController?.PlayLoadSfx();
             PanelDialogController.TrySetTransientText("Game saved", 2.2f);
-            Debug.Log($"[SaveGame] jogo salvo em: {path}");
+            Debug.Log($"[SaveGame] Slot {normalizedSlot} salvo em: {path}");
         }
         catch (Exception ex)
         {
@@ -181,6 +197,20 @@ public class SaveGameManager : MonoBehaviour
 
     [ContextMenu("Load Quick Slot")]
     public void Load()
+    {
+        LoadSlot(activeSlot);
+    }
+
+    [ContextMenu("Load Slot 1")]
+    public void LoadSlot1() => LoadSlot(1);
+
+    [ContextMenu("Load Slot 2")]
+    public void LoadSlot2() => LoadSlot(2);
+
+    [ContextMenu("Load Slot 3")]
+    public void LoadSlot3() => LoadSlot(3);
+
+    public void LoadSlot(int slotIndex)
     {
         if (!Application.isPlaying)
         {
@@ -198,11 +228,12 @@ public class SaveGameManager : MonoBehaviour
             Debug.LogError("[SaveGame] UnitSpawner/ConstructionSpawner nao encontrados na cena.");
             return;
         }
-        string path = GetSlotPath();
+        int normalizedSlot = NormalizeSlot(slotIndex);
+        string path = GetSlotPath(normalizedSlot);
         if (!File.Exists(path))
         {
             cursorController?.PlayErrorSfx();
-            Debug.LogWarning($"[SaveGame] Sem savegame para carregar: {path}");
+            Debug.LogWarning($"[SaveGame] Slot {normalizedSlot} sem savegame: {path}");
             return;
         }
 
@@ -240,6 +271,29 @@ public class SaveGameManager : MonoBehaviour
 
         PrepareRuntimeForLoad();
         StartCoroutine(LoadRoutine(data));
+    }
+
+    [ContextMenu("Clear Slot 1")]
+    public void ClearSlot1() => ClearSlot(1);
+
+    [ContextMenu("Clear Slot 2")]
+    public void ClearSlot2() => ClearSlot(2);
+
+    [ContextMenu("Clear Slot 3")]
+    public void ClearSlot3() => ClearSlot(3);
+
+    public void ClearSlot(int slotIndex)
+    {
+        int normalizedSlot = NormalizeSlot(slotIndex);
+        string path = GetSlotPath(normalizedSlot);
+        if (!File.Exists(path))
+        {
+            Debug.LogWarning($"[SaveGame] Slot {normalizedSlot} ja esta vazio.");
+            return;
+        }
+
+        File.Delete(path);
+        Debug.Log($"[SaveGame] Slot {normalizedSlot} limpo: {path}");
     }
 
     private void PrepareRuntimeForLoad()
@@ -474,6 +528,8 @@ public class SaveGameManager : MonoBehaviour
 
             if (matchController != null)
             {
+                // Ensure spawned constructions/units finished enable-cycle and static lists are up-to-date.
+                yield return null;
                 matchController.SuppressFogOfWarRefresh = false;
                 suppressedFogRefresh = false;
                 matchController.RefreshFogOfWarForActiveTeam();
@@ -682,7 +738,14 @@ public class SaveGameManager : MonoBehaviour
 
     private string GetSlotPath()
     {
+        return GetSlotPath(activeSlot);
+    }
+
+    private string GetSlotPath(int slotIndex)
+    {
+        int normalizedSlot = NormalizeSlot(slotIndex);
         string safeSlot = string.IsNullOrWhiteSpace(slotName) ? "quicksave" : slotName.Trim();
+        safeSlot = $"{safeSlot}_slot{normalizedSlot}";
         if (useSceneSpecificSlot)
         {
             Scene scene = SceneManager.GetActiveScene();
@@ -693,6 +756,11 @@ public class SaveGameManager : MonoBehaviour
         }
 
         return Path.Combine(Application.persistentDataPath, safeSlot + ".json");
+    }
+
+    private static int NormalizeSlot(int slotIndex)
+    {
+        return Mathf.Clamp(slotIndex, 1, 3);
     }
 
     private static string ComputeShortStableHash(string input)

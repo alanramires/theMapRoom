@@ -1,8 +1,11 @@
+using System;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
 public static class UnitOccupancyRules
 {
+    public static event Action<UnitManager, Vector3Int, Vector3Int> OnUnitOccupancyChanged;
+
     private static int cachedUnitsFrame = -1;
     private static UnitManager[] cachedUnits = System.Array.Empty<UnitManager>();
 
@@ -12,9 +15,30 @@ public static class UnitOccupancyRules
         if (cachedUnitsFrame == frame && cachedUnits != null)
             return cachedUnits;
 
-        cachedUnits = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        var all = UnitManager.AllActive;
+        if (all == null || all.Count == 0)
+        {
+            cachedUnits = System.Array.Empty<UnitManager>();
+        }
+        else
+        {
+            if (cachedUnits == null || cachedUnits.Length != all.Count)
+                cachedUnits = new UnitManager[all.Count];
+            all.CopyTo(cachedUnits);
+        }
         cachedUnitsFrame = frame;
         return cachedUnits;
+    }
+
+    public static void NotifyUnitOccupancyChanged(UnitManager unit, Vector3Int previousCell, Vector3Int currentCell)
+    {
+        cachedUnitsFrame = -1;
+        if (unit == null || !Application.isPlaying)
+            return;
+
+        previousCell.z = 0;
+        currentCell.z = 0;
+        OnUnitOccupancyChanged?.Invoke(unit, previousCell, currentCell);
     }
 
     public static bool IsUnitCellOccupied(Tilemap referenceTilemap, Vector3Int cell, UnitManager exceptUnit = null)
