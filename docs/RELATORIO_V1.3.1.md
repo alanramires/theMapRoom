@@ -47,6 +47,6 @@ perf: refactor Update polling to events, centralize unit list, cache pathfinding
 Result: 17 FPS -> 84 FPS, load 3s -> <2s
 
 ## Git
-- Commit: (preencher apos commit)
+- Commit: d5d3fb1
 - Tag: v1.3.1
 - Branch: main
