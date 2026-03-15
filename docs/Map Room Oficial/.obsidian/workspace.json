@@ -34,9 +34,23 @@
               "icon": "lucide-file",
               "title": "Unidades"
             }
+          },
+          {
+            "id": "6c9c94f3fc48c559",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "The Map Room 2027 - Pitch.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "The Map Room 2027 - Pitch"
+            }
           }
         ],
-        "currentTab": 1
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -171,13 +185,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Unidades.md",
+                "file": "The Map Room 2027 - Pitch.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Sumário de Unidades"
+              "title": "Sumário de The Map Room 2027 - Pitch"
             }
           }
         ],
@@ -198,10 +212,11 @@
       "bases:Criar nova base": false
     }
   },
-  "active": "59f499f045fcc63d",
+  "active": "6c9c94f3fc48c559",
   "lastOpenFiles": [
+    "Unidades.md",
+    "The Map Room 2027 - Pitch.md",
     "The Map Room.md",
-    "dicas",
-    "Unidades.md"
+    "dicas"
   ]
 }
