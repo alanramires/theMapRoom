@@ -3,6 +3,20 @@ using UnityEngine.Tilemaps;
 
 public static class UnitOccupancyRules
 {
+    private static int cachedUnitsFrame = -1;
+    private static UnitManager[] cachedUnits = System.Array.Empty<UnitManager>();
+
+    private static UnitManager[] GetActiveUnitsSnapshot()
+    {
+        int frame = Time.frameCount;
+        if (cachedUnitsFrame == frame && cachedUnits != null)
+            return cachedUnits;
+
+        cachedUnits = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        cachedUnitsFrame = frame;
+        return cachedUnits;
+    }
+
     public static bool IsUnitCellOccupied(Tilemap referenceTilemap, Vector3Int cell, UnitManager exceptUnit = null)
     {
         if (UnitRulesDefinition.IsTotalWarEnabled() && exceptUnit != null)
@@ -11,17 +25,16 @@ public static class UnitOccupancyRules
         cell.z = 0;
         int count = 0;
 
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        UnitManager[] units = GetActiveUnitsSnapshot();
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
             if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
                 continue;
+            if (!IsUnitOnReferenceMap(unit, referenceTilemap))
+                continue;
 
-            Vector3Int occupiedCell = unit.BoardTilemap == referenceTilemap
-                ? unit.CurrentCellPosition
-                : HexCoordinates.WorldToCell(referenceTilemap, unit.transform.position);
-
+            Vector3Int occupiedCell = unit.CurrentCellPosition;
             occupiedCell.z = 0;
             if (occupiedCell != cell)
                 continue;
@@ -38,7 +51,7 @@ public static class UnitOccupancyRules
     {
         cell.z = 0;
 
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        UnitManager[] units = GetActiveUnitsSnapshot();
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
@@ -46,11 +59,10 @@ public static class UnitOccupancyRules
                 continue;
             if (unit.TeamId != teamId)
                 continue;
+            if (!IsUnitOnReferenceMap(unit, referenceTilemap))
+                continue;
 
-            Vector3Int occupiedCell = unit.BoardTilemap == referenceTilemap
-                ? unit.CurrentCellPosition
-                : HexCoordinates.WorldToCell(referenceTilemap, unit.transform.position);
-
+            Vector3Int occupiedCell = unit.CurrentCellPosition;
             occupiedCell.z = 0;
             if (occupiedCell == cell)
                 return true;
@@ -70,17 +82,16 @@ public static class UnitOccupancyRules
             UnitManager sameTeam = null;
             UnitManager otherTeam = null;
 
-            UnitManager[] totalWarUnits = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            UnitManager[] totalWarUnits = GetActiveUnitsSnapshot();
             for (int i = 0; i < totalWarUnits.Length; i++)
             {
                 UnitManager unit = totalWarUnits[i];
                 if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
                     continue;
+                if (!IsUnitOnReferenceMap(unit, referenceTilemap))
+                    continue;
 
-                Vector3Int occupiedCell = unit.BoardTilemap == referenceTilemap
-                    ? unit.CurrentCellPosition
-                    : HexCoordinates.WorldToCell(referenceTilemap, unit.transform.position);
-
+                Vector3Int occupiedCell = unit.CurrentCellPosition;
                 occupiedCell.z = 0;
                 if (occupiedCell != cell)
                     continue;
@@ -101,22 +112,31 @@ public static class UnitOccupancyRules
                 return otherTeam;
         }
 
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        UnitManager[] units = GetActiveUnitsSnapshot();
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
             if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
                 continue;
+            if (!IsUnitOnReferenceMap(unit, referenceTilemap))
+                continue;
 
-            Vector3Int occupiedCell = unit.BoardTilemap == referenceTilemap
-                ? unit.CurrentCellPosition
-                : HexCoordinates.WorldToCell(referenceTilemap, unit.transform.position);
-
+            Vector3Int occupiedCell = unit.CurrentCellPosition;
             occupiedCell.z = 0;
             if (occupiedCell == cell)
                 return unit;
         }
 
         return null;
+    }
+
+    private static bool IsUnitOnReferenceMap(UnitManager unit, Tilemap referenceTilemap)
+    {
+        if (unit == null || referenceTilemap == null)
+            return false;
+        if (unit.BoardTilemap == null || unit.BoardTilemap != referenceTilemap)
+            return false;
+
+        return unit.gameObject.scene == referenceTilemap.gameObject.scene;
     }
 }

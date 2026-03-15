@@ -772,6 +772,8 @@ public partial class TurnStateManager
     {
         if (unit == null)
             return;
+        if (unit.IsEmbarked && !unit.IsEmbarkedVisualPreviewActive)
+            return;
 
         UnitHudController hud = ResolveOwnUnitHud(unit);
         if (hud == null)

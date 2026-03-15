@@ -104,6 +104,8 @@ public class MatchController : MonoBehaviour
     [SerializeField, HideInInspector] private bool pendingTurnStartEconomy = true;
     [SerializeField, HideInInspector] private int cachedConstructionIncomeSignature;
     [SerializeField, HideInInspector] private int cachedConstructionIncomeCount;
+    [Header("Runtime Perf")]
+    [SerializeField] [Range(0.05f, 2f)] private float constructionIncomeRefreshIntervalSeconds = 0.35f;
     [System.NonSerialized] private readonly List<TeamId> playersView = new List<TeamId>();
     [System.NonSerialized] private List<TurnStateManager.TurnStartAutonomyUpkeepEntry> pendingTurnStartAutonomyHelperEntries;
     [System.NonSerialized] private readonly List<UnitManager> turnStartUnitsMarkedForFuelDepletionDeath = new List<UnitManager>();
@@ -118,6 +120,7 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private bool fogOverlayInitialized;
     [System.NonSerialized] private bool initialStealthDetectionBootstrapped;
     [System.NonSerialized] private bool debugFogOfWarEnabled = true;
+    [System.NonSerialized] private float runtimeConstructionIncomeRefreshTimer;
     [Header("Debug")]
     [SerializeField] private bool enableFogSourceDebugLogs = false;
 
@@ -399,7 +402,20 @@ public class MatchController : MonoBehaviour
 
     private void Update()
     {
-        TryRefreshIncomeFromConstructions(markDirtyInEditor: !Application.isPlaying);
+        if (Application.isPlaying)
+        {
+            runtimeConstructionIncomeRefreshTimer += Mathf.Max(0f, Time.unscaledDeltaTime);
+            if (runtimeConstructionIncomeRefreshTimer >= Mathf.Max(0.05f, constructionIncomeRefreshIntervalSeconds))
+            {
+                runtimeConstructionIncomeRefreshTimer = 0f;
+                TryRefreshIncomeFromConstructions(markDirtyInEditor: false);
+            }
+        }
+        else
+        {
+            TryRefreshIncomeFromConstructions(markDirtyInEditor: true);
+        }
+
         SyncThreatRevisionFlags();
 
         if (!Application.isPlaying)

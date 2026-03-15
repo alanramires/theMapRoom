@@ -70,7 +70,6 @@ public class MatchControllerEditor : Editor
         EditorGUILayout.PropertyField(currentTurnProp, new GUIContent("Current Turn"));
         EditorGUILayout.PropertyField(activeTeamIdProp, new GUIContent("Active Team ID"));
         DrawPlayersList();
-        DrawPlayersRecoveryTools();
         EditorGUILayout.PropertyField(includeNeutralTeamProp, new GUIContent("Include Neutral Team"));
         if (economyEnabledProp != null)
             EditorGUILayout.PropertyField(economyEnabledProp, new GUIContent("Economy Enabled"));
@@ -204,53 +203,6 @@ public class MatchControllerEditor : Editor
         }
 
         EditorGUILayout.HelpBox("Actual Money agora pode ser ajustado manualmente. Income Per Turn continua automatico e somente leitura.", MessageType.None);
-    }
-
-    private void DrawPlayersRecoveryTools()
-    {
-        MatchController match = target as MatchController;
-        if (match == null)
-            return;
-
-        EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Restore Default Teams (Green/Red)"))
-        {
-            Undo.RecordObject(match, "Restore Default Teams");
-            SetPlayersToDefault();
-            EditorUtility.SetDirty(match);
-            serializedObject.Update();
-        }
-
-        if (GUILayout.Button("Add All Teams"))
-        {
-            Undo.RecordObject(match, "Add All Teams");
-            SetPlayersToAll();
-            EditorUtility.SetDirty(match);
-            serializedObject.Update();
-        }
-        EditorGUILayout.EndHorizontal();
-    }
-
-    private void SetPlayersToDefault()
-    {
-        if (playersProp == null)
-            return;
-
-        playersProp.arraySize = 0;
-        AddPlayer(TeamId.Green);
-        AddPlayer(TeamId.Red);
-    }
-
-    private void SetPlayersToAll()
-    {
-        if (playersProp == null)
-            return;
-
-        playersProp.arraySize = 0;
-        AddPlayer(TeamId.Green);
-        AddPlayer(TeamId.Red);
-        AddPlayer(TeamId.Blue);
-        AddPlayer(TeamId.Yellow);
     }
 
     private void AddPlayer(TeamId team)

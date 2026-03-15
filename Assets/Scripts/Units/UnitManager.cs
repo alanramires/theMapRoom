@@ -1052,6 +1052,9 @@ public class UnitManager : MonoBehaviour
             passenger.SetEmbarked(true);
         else
             passenger.SyncHierarchyForEmbarkedState();
+        // Defensive refresh after reparent to transporter hierarchy:
+        // guarantees embarked passenger visuals/HUD remain hidden.
+        passenger.RefreshRuntimeVisualState();
         freeSeat.embarkedUnit = passenger;
         RefreshSpriteForCurrentLayer(data);
         RefreshActedVisual();
@@ -1116,6 +1119,9 @@ public class UnitManager : MonoBehaviour
             passenger.SetEmbarked(true);
         else
             passenger.SyncHierarchyForEmbarkedState();
+        // Defensive refresh after reparent to transporter hierarchy:
+        // guarantees embarked passenger visuals/HUD remain hidden.
+        passenger.RefreshRuntimeVisualState();
         targetSeat.embarkedUnit = passenger;
         RefreshSpriteForCurrentLayer(data);
         RefreshActedVisual();
@@ -1650,15 +1656,9 @@ public class UnitManager : MonoBehaviour
 
     private void SyncHierarchyForEmbarkedState()
     {
-        if (isEmbarked && embarkedTransporter != null)
-        {
-            Transform targetParent = embarkedTransporter.transform;
-            if (transform.parent != targetParent)
-                transform.SetParent(targetParent, true);
-            return;
-        }
-
-        if (transform.parent != null)
+        // Keep units independent in hierarchy even when embarked.
+        // Embark linkage is controlled by runtime references/slots only.
+        if (embarkedTransporter != null && transform.parent == embarkedTransporter.transform)
             transform.SetParent(null, true);
     }
 
@@ -1760,12 +1760,39 @@ public class UnitManager : MonoBehaviour
         if (unitHud == null)
             TryAutoAssignHud();
 
-        if (unitHud == null)
-            return;
+        // Passenger embarked must keep HUD hidden unless an explicit visual
+        // preview is active (e.g. temporary supply animation preview).
+        if (isEmbarked && visible && !IsEmbarkedVisualPreviewActive)
+            visible = false;
+        if (hiddenByFogOfWar && visible)
+            visible = false;
 
-        unitHud.gameObject.SetActive(visible);
+        ApplyOwnedHudVisibility(visible);
+
         if (visible)
             RefreshHudWidgetsOnly();
+    }
+
+    private void ApplyOwnedHudVisibility(bool visible)
+    {
+        bool anyOwnedHud = false;
+        UnitHudController[] ownedHuds = GetComponentsInChildren<UnitHudController>(true);
+        for (int i = 0; i < ownedHuds.Length; i++)
+        {
+            UnitHudController hud = ownedHuds[i];
+            if (hud == null)
+                continue;
+
+            UnitManager owner = hud.ResolveOwnerUnit();
+            if (owner != this)
+                continue;
+
+            hud.gameObject.SetActive(visible);
+            anyOwnedHud = true;
+        }
+
+        if (!anyOwnedHud && unitHud != null)
+            unitHud.gameObject.SetActive(visible);
     }
 
     private void RefreshHudWidgetsOnly()

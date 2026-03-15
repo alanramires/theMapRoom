@@ -87,6 +87,21 @@ public class UnitHudController : MonoBehaviour
         ApplySorting();
     }
 
+    private void LateUpdate()
+    {
+        if (!Application.isPlaying)
+            return;
+
+        UnitManager owner = ResolveOwnerUnit();
+        if (owner == null)
+            return;
+
+        // Defensive self-hide: embarked passengers must not keep HUD active
+        // unless a temporary visual preview explicitly enables it.
+        if (owner.IsEmbarked && !owner.IsEmbarkedVisualPreviewActive && gameObject.activeSelf)
+            gameObject.SetActive(false);
+    }
+
 #if UNITY_EDITOR
     private void OnValidate()
     {
@@ -103,6 +118,13 @@ public class UnitHudController : MonoBehaviour
         AutoAssignCommonReferences();
         DisableLegacyLockVisuals();
         ApplySorting();
+    }
+
+    public UnitManager ResolveOwnerUnit()
+    {
+        if (ownerUnit == null)
+            ownerUnit = GetComponentInParent<UnitManager>();
+        return ownerUnit;
     }
 
     public void Apply(

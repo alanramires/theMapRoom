@@ -762,6 +762,7 @@ public static class UnitMovementPathRules
         private readonly UnitManager[] units;
         private readonly ConstructionManager[] constructions;
         private readonly RoadNetworkManager[] roadNetworks;
+        private readonly Dictionary<Vector3Int, List<UnitManager>> unitsByCell = new Dictionary<Vector3Int, List<UnitManager>>();
         private readonly Dictionary<Vector3Int, ConstructionManager> constructionByCell = new Dictionary<Vector3Int, ConstructionManager>();
         private readonly Dictionary<Vector3Int, StructureData> structureByCell = new Dictionary<Vector3Int, StructureData>();
         private readonly Dictionary<Vector3Int, TerrainTypeData> terrainByCell = new Dictionary<Vector3Int, TerrainTypeData>();
@@ -781,6 +782,25 @@ public static class UnitMovementPathRules
             units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             constructions = Object.FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             roadNetworks = Object.FindObjectsByType<RoadNetworkManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+
+            for (int i = 0; i < units.Length; i++)
+            {
+                UnitManager unit = units[i];
+                if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                    continue;
+                if (!IsUnitOnReferenceMap(unit, referenceTilemap))
+                    continue;
+
+                Vector3Int occupiedCell = unit.CurrentCellPosition;
+                occupiedCell.z = 0;
+                if (!unitsByCell.TryGetValue(occupiedCell, out List<UnitManager> occupants))
+                {
+                    occupants = new List<UnitManager>(1);
+                    unitsByCell[occupiedCell] = occupants;
+                }
+
+                occupants.Add(unit);
+            }
         }
 
         public ConstructionManager GetConstructionAtCell(Vector3Int cell)
@@ -983,23 +1003,17 @@ public static class UnitMovementPathRules
         public UnitManager GetUnitAtCell(Vector3Int cell, UnitManager exceptUnit = null)
         {
             cell.z = 0;
+            if (!unitsByCell.TryGetValue(cell, out List<UnitManager> occupants) || occupants == null || occupants.Count == 0)
+                return null;
 
             if (UnitRulesDefinition.IsTotalWarEnabled() && exceptUnit != null)
             {
                 UnitManager sameTeam = null;
                 UnitManager otherTeam = null;
-                for (int i = 0; i < units.Length; i++)
+                for (int i = 0; i < occupants.Count; i++)
                 {
-                    UnitManager unit = units[i];
-                    if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
-                        continue;
-
-                    Vector3Int occupiedCell = unit.BoardTilemap == referenceTilemap
-                        ? unit.CurrentCellPosition
-                        : HexCoordinates.WorldToCell(referenceTilemap, unit.transform.position);
-
-                    occupiedCell.z = 0;
-                    if (occupiedCell != cell)
+                    UnitManager unit = occupants[i];
+                    if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit)
                         continue;
 
                     if (unit.TeamId == exceptUnit.TeamId)
@@ -1018,16 +1032,13 @@ public static class UnitMovementPathRules
                     return otherTeam;
             }
 
-            for (int i = 0; i < units.Length; i++)
+            for (int i = 0; i < occupants.Count; i++)
             {
-                UnitManager unit = units[i];
-                if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
+                UnitManager unit = occupants[i];
+                if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit)
                     continue;
 
-                Vector3Int occupiedCell = unit.BoardTilemap == referenceTilemap
-                    ? unit.CurrentCellPosition
-                    : HexCoordinates.WorldToCell(referenceTilemap, unit.transform.position);
-
+                Vector3Int occupiedCell = unit.CurrentCellPosition;
                 occupiedCell.z = 0;
                 if (occupiedCell == cell)
                     return unit;
@@ -1050,6 +1061,16 @@ public static class UnitMovementPathRules
                 return true;
 
             return false;
+        }
+
+        private static bool IsUnitOnReferenceMap(UnitManager unit, Tilemap referenceTilemap)
+        {
+            if (unit == null || referenceTilemap == null)
+                return false;
+            if (unit.BoardTilemap == null || unit.BoardTilemap != referenceTilemap)
+                return false;
+
+            return unit.gameObject.scene == referenceTilemap.gameObject.scene;
         }
     }
 }

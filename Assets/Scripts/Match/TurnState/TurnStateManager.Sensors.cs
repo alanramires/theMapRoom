@@ -38,48 +38,51 @@ public partial class TurnStateManager
 
     private void RefreshSensorsForCurrentState()
     {
-        if (selectedUnit == null)
+        double perfStart = Time.realtimeSinceStartupAsDouble;
+        try
         {
-            ClearSensorResults();
-            return;
-        }
+            if (selectedUnit == null)
+            {
+                ClearSensorResults();
+                return;
+            }
 
-        landingOptionUnavailableReason = string.Empty;
+            landingOptionUnavailableReason = string.Empty;
 
-        if (!TryResolveSensorMovementModeForCurrentState(out SensorMovementMode movementMode))
-        {
-            ClearSensorResults();
-            return;
-        }
+            if (!TryResolveSensorMovementModeForCurrentState(out SensorMovementMode movementMode))
+            {
+                ClearSensorResults();
+                return;
+            }
 
-        // Nao pinta mais area automatica de linha de tiro ao final do movimento.
-        // A visualizacao de ameaca agora fica restrita aos fluxos de inspecao.
-        ClearLineOfFireArea();
-        if (paintedRangeCells.Count == 0)
-            PaintSelectedUnitMovementRange();
+            // Nao pinta mais area automatica de linha de tiro ao final do movimento.
+            // A visualizacao de ameaca agora fica restrita aos fluxos de inspecao.
+            ClearLineOfFireArea();
+            if (paintedRangeCells.Count == 0)
+                PaintSelectedUnitMovementRange();
 
-        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
-        int remainingMovementPoints = ComputeRemainingMovementPointsForSensors(movementMode);
-        SensorHandle.RunAll(
-            selectedUnit,
-            boardMap,
-            terrainDatabase,
-            weaponPriorityData,
-            dpqAirHeightConfig,
-            matchController != null ? matchController.EnableLdtValidation : true,
-            matchController != null ? matchController.EnableLosValidation : true,
-            matchController != null ? matchController.EnableSpotter : true,
-            matchController != null ? matchController.EnableStealthValidation : true,
-            movementMode,
-            remainingMovementPoints,
-            availableSensorActionCodes,
-            cachedPodeMirarTargets,
-            cachedPodeMirarInvalidTargets,
-            cachedPodeEmbarcarTargets,
-            cachedPodeEmbarcarInvalidTargets,
-            cachedPodeDesembarcarTargets,
-            cachedPodeDesembarcarInvalidTargets);
-        CollapseMirarTargetsByTargetUnit(cachedPodeMirarTargets);
+            Tilemap boardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
+            int remainingMovementPoints = ComputeRemainingMovementPointsForSensors(movementMode);
+            SensorHandle.RunAll(
+                selectedUnit,
+                boardMap,
+                terrainDatabase,
+                weaponPriorityData,
+                dpqAirHeightConfig,
+                matchController != null ? matchController.EnableLdtValidation : true,
+                matchController != null ? matchController.EnableLosValidation : true,
+                matchController != null ? matchController.EnableSpotter : true,
+                matchController != null ? matchController.EnableStealthValidation : true,
+                movementMode,
+                remainingMovementPoints,
+                availableSensorActionCodes,
+                cachedPodeMirarTargets,
+                cachedPodeMirarInvalidTargets,
+                cachedPodeEmbarcarTargets,
+                cachedPodeEmbarcarInvalidTargets,
+                cachedPodeDesembarcarTargets,
+                cachedPodeDesembarcarInvalidTargets);
+            CollapseMirarTargetsByTargetUnit(cachedPodeMirarTargets);
 
         // Normaliza os codigos de acao com base nos resultados efetivos dos sensores.
         availableSensorActionCodes.Remove('A');
@@ -171,9 +174,14 @@ public partial class TurnStateManager
             cachedPodeMirarInvalidTargets.Clear();
         }
 
-        RefreshEnemyThreatLayersOverlayIfEnabled();
-        ResetScannerPromptState();
-        LogScannerPanel();
+            RefreshEnemyThreatLayersOverlayIfEnabled();
+            ResetScannerPromptState();
+            LogScannerPanel();
+        }
+        finally
+        {
+            RegisterPerfSensorsDuration((Time.realtimeSinceStartupAsDouble - perfStart) * 1000d);
+        }
     }
 
     private bool IsSelectedUnitInContestedHexTotalWar()

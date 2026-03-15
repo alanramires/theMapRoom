@@ -157,9 +157,28 @@ public partial class TurnStateManager
     private readonly List<LandingOption> cachedLandingOptions = new List<LandingOption>();
     private string landingOptionUnavailableReason = string.Empty;
     private bool pendingDestroyUnitConfirmation;
+    private const int PerfFrameWindowSampleCount = 120;
+    private int perfFrameSamplesCollected;
+    private double perfFrameWindowSumMs;
+    private float perfFrameWindowMinMs = float.MaxValue;
+    private float perfFrameWindowMaxMs;
+    private double perfLastRangeMs;
+    private double perfRangeTotalMs;
+    private int perfRangeCallCount;
+    private double perfLastSensorsMs;
+    private double perfSensorsTotalMs;
+    private int perfSensorsCallCount;
+    private double perfLastSelectionMs;
+    private double perfSelectionTotalMs;
+    private int perfSelectionCallCount;
+    private double perfLastTakeoffPrepMs;
+    private double perfTakeoffPrepTotalMs;
+    private int perfTakeoffPrepCallCount;
 
     private void Update()
     {
+        RecordFramePerfSample();
+        ProcessPerformanceSnapshotHotkeyInput();
         UpdateInspectedHelperAutoDismiss();
         TrackRuntimeDebugLogs();
         ProcessDestroyUnitHotkeyInput();
@@ -171,6 +190,118 @@ public partial class TurnStateManager
         UpdateMergeQueuePreviewAnimation();
         UpdateSupplyQueuePreviewAnimation();
         UpdateTransferPromptPreview();
+    }
+
+    private void RecordFramePerfSample()
+    {
+        float frameMs = Time.unscaledDeltaTime * 1000f;
+        if (!float.IsFinite(frameMs) || frameMs <= 0f)
+            return;
+
+        perfFrameWindowSumMs += frameMs;
+        perfFrameWindowMinMs = Mathf.Min(perfFrameWindowMinMs, frameMs);
+        perfFrameWindowMaxMs = Mathf.Max(perfFrameWindowMaxMs, frameMs);
+        perfFrameSamplesCollected++;
+
+        if (perfFrameSamplesCollected <= PerfFrameWindowSampleCount)
+            return;
+
+        perfFrameSamplesCollected = PerfFrameWindowSampleCount;
+        perfFrameWindowSumMs -= perfFrameWindowSumMs / PerfFrameWindowSampleCount;
+    }
+
+    private void RegisterPerfRangeDuration(double ms)
+    {
+        if (ms < 0d || double.IsNaN(ms) || double.IsInfinity(ms))
+            return;
+
+        perfLastRangeMs = ms;
+        perfRangeTotalMs += ms;
+        perfRangeCallCount++;
+    }
+
+    private void RegisterPerfSensorsDuration(double ms)
+    {
+        if (ms < 0d || double.IsNaN(ms) || double.IsInfinity(ms))
+            return;
+
+        perfLastSensorsMs = ms;
+        perfSensorsTotalMs += ms;
+        perfSensorsCallCount++;
+    }
+
+    private void RegisterPerfSelectionDuration(double ms)
+    {
+        if (ms < 0d || double.IsNaN(ms) || double.IsInfinity(ms))
+            return;
+
+        perfLastSelectionMs = ms;
+        perfSelectionTotalMs += ms;
+        perfSelectionCallCount++;
+    }
+
+    private void RegisterPerfTakeoffPrepDuration(double ms)
+    {
+        if (ms < 0d || double.IsNaN(ms) || double.IsInfinity(ms))
+            return;
+
+        perfLastTakeoffPrepMs = ms;
+        perfTakeoffPrepTotalMs += ms;
+        perfTakeoffPrepCallCount++;
+    }
+
+    private void ProcessPerformanceSnapshotHotkeyInput()
+    {
+        if (!WasFunctionKeyPressedThisFrame(KeyCode.F8))
+            return;
+        if (UiInputBlocker.IsTextInputFocused())
+            return;
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        int activeUnits = units != null ? units.Length : 0;
+        int embarkedUnits = 0;
+        for (int i = 0; i < activeUnits; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit != null && unit.IsEmbarked)
+                embarkedUnits++;
+        }
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        int activeConstructions = constructions != null ? constructions.Length : 0;
+
+        float avgFrameMs = perfFrameSamplesCollected > 0 ? (float)(perfFrameWindowSumMs / perfFrameSamplesCollected) : 0f;
+        float avgFps = avgFrameMs > 0.0001f ? (1000f / avgFrameMs) : 0f;
+        float minFrameMs = perfFrameWindowMinMs == float.MaxValue ? 0f : perfFrameWindowMinMs;
+        float maxFrameMs = perfFrameWindowMaxMs;
+        double managedMb = System.GC.GetTotalMemory(false) / (1024d * 1024d);
+#if UNITY_2020_1_OR_NEWER
+        double unityAllocatedMb = UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / (1024d * 1024d);
+        double unityReservedMb = UnityEngine.Profiling.Profiler.GetTotalReservedMemoryLong() / (1024d * 1024d);
+        double unityUnusedReservedMb = UnityEngine.Profiling.Profiler.GetTotalUnusedReservedMemoryLong() / (1024d * 1024d);
+#else
+        double unityAllocatedMb = 0d;
+        double unityReservedMb = 0d;
+        double unityUnusedReservedMb = 0d;
+#endif
+        double avgRangeMs = perfRangeCallCount > 0 ? perfRangeTotalMs / perfRangeCallCount : 0d;
+        double avgSensorsMs = perfSensorsCallCount > 0 ? perfSensorsTotalMs / perfSensorsCallCount : 0d;
+        double avgSelectionMs = perfSelectionCallCount > 0 ? perfSelectionTotalMs / perfSelectionCallCount : 0d;
+        double avgTakeoffPrepMs = perfTakeoffPrepCallCount > 0 ? perfTakeoffPrepTotalMs / perfTakeoffPrepCallCount : 0d;
+
+        System.Text.StringBuilder sb = new System.Text.StringBuilder(768);
+        sb.AppendLine("[PERF SNAPSHOT F8]");
+        sb.AppendLine($"Amostras frame: {perfFrameSamplesCollected}/{PerfFrameWindowSampleCount}");
+        sb.AppendLine($"Frame: avg={avgFrameMs:0.00}ms ({avgFps:0.0} FPS) | min={minFrameMs:0.00}ms | max={maxFrameMs:0.00}ms");
+        sb.AppendLine($"Unidades ativas: {activeUnits} | embarcadas: {embarkedUnits} | construcoes ativas: {activeConstructions}");
+        sb.AppendLine($"Memoria managed: {managedMb:0.0} MB");
+        sb.AppendLine($"Memoria Unity: alloc={unityAllocatedMb:0.0} MB | reserved={unityReservedMb:0.0} MB | unusedReserved={unityUnusedReservedMb:0.0} MB");
+        sb.AppendLine($"PaintSelectedUnitMovementRange: last={perfLastRangeMs:0.00}ms | avg={avgRangeMs:0.00}ms | calls={perfRangeCallCount}");
+        sb.AppendLine($"RefreshSensorsForCurrentState: last={perfLastSensorsMs:0.00}ms | avg={avgSensorsMs:0.00}ms | calls={perfSensorsCallCount}");
+        sb.AppendLine($"SetSelectedUnit pipeline: last={perfLastSelectionMs:0.00}ms | avg={avgSelectionMs:0.00}ms | calls={perfSelectionCallCount}");
+        sb.AppendLine($"TryPrepareTemporaryTakeoffStateForSelection: last={perfLastTakeoffPrepMs:0.00}ms | avg={avgTakeoffPrepMs:0.00}ms | calls={perfTakeoffPrepCallCount}");
+        Debug.Log(sb.ToString());
+        PanelDialogController.TrySetTransientText("Perf snapshot logged (F8)", 1.8f);
     }
 
     private void TrackRuntimeDebugLogs()
@@ -4417,5 +4548,17 @@ public partial class TurnStateManager
             default:
                 return false;
         }
+    }
+
+    private static bool WasFunctionKeyPressedThisFrame(KeyCode key)
+    {
+        if (key != KeyCode.F8)
+            return false;
+
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.f8Key.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.F8);
+#endif
     }
 }

@@ -123,7 +123,9 @@ public partial class TurnStateManager
                 return ActionSfx.Confirm;
             }
 
+            double takeoffPerfStart = Time.realtimeSinceStartupAsDouble;
             TryPrepareTemporaryTakeoffStateForSelection(unit, out string takeoffInfo);
+            RegisterPerfTakeoffPrepDuration((Time.realtimeSinceStartupAsDouble - takeoffPerfStart) * 1000d);
             if (!string.IsNullOrWhiteSpace(takeoffInfo))
                 Debug.Log($"[Pode Decolar] {takeoffInfo}");
 
@@ -345,17 +347,6 @@ public partial class TurnStateManager
         }
 
         UnitManager unit = FindUnitAtCell(cursorCell);
-        if (unit != null && unit != selectedUnit)
-        {
-            bool allowSharedHexByTotalWar =
-                UnitRulesDefinition.IsTotalWarEnabled() &&
-                UnitRulesDefinition.CanPassThrough(selectedUnit, unit);
-            if (allowSharedHexByTotalWar)
-            {
-                unit = null;
-            }
-        }
-
         if (unit != null && unit != selectedUnit)
         {
             PushPanelUnitMessage("Hex ocupado", 2.4f);

@@ -582,8 +582,12 @@ public partial class TurnStateManager : MonoBehaviour
 
     private void SetSelectedUnit(UnitManager unit)
     {
+        double perfStart = Time.realtimeSinceStartupAsDouble;
         if (selectedUnit == unit)
+        {
+            RegisterPerfSelectionDuration((Time.realtimeSinceStartupAsDouble - perfStart) * 1000d);
             return;
+        }
 
         ClearSensorResults();
 
@@ -596,6 +600,8 @@ public partial class TurnStateManager : MonoBehaviour
             animationManager?.ApplySelectionVisual(selectedUnit);
             PaintSelectedUnitMovementRange();
         }
+
+        RegisterPerfSelectionDuration((Time.realtimeSinceStartupAsDouble - perfStart) * 1000d);
     }
 
     private void ClearSelectionAndReturnToNeutral(bool keepPreparedFuelCost = false)

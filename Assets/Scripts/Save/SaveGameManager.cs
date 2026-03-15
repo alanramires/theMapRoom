@@ -111,8 +111,8 @@ public class SaveGameManager : MonoBehaviour
 
     [Header("Quick Save/Load")]
     [SerializeField] private bool enableHotkeys = true;
-    [SerializeField] private KeyCode quickSaveKey = KeyCode.F8;
-    [SerializeField] private KeyCode quickLoadKey = KeyCode.F9;
+    [SerializeField] private KeyCode quickSaveKey = KeyCode.I;
+    [SerializeField] private KeyCode quickLoadKey = KeyCode.Alpha0;
     [SerializeField] private string slotName = "quicksave";
     [SerializeField] private bool useSceneSpecificSlot = true;
     [SerializeField] private bool blockCrossSceneLoad = true;
@@ -155,6 +155,13 @@ public class SaveGameManager : MonoBehaviour
         try
         {
             TryAutoAssignReferences();
+            if (matchController != null && matchController.EnableTotalWar && turnStateManager != null)
+            {
+                turnStateManager.ClearThreatLayerHotzoneCache();
+                if (verboseLogs)
+                    Debug.Log("[SaveGame] Skip saving hotzone cache: Total War ativo.");
+            }
+
             cursorController?.PlayConfirmSfx();
 
             SaveGameData data = BuildSaveData();
@@ -430,18 +437,26 @@ public class SaveGameManager : MonoBehaviour
             stage = "warmup-hotzone-cache";
             if (turnStateManager != null)
             {
-                yield return turnStateManager.WarmUpThreatCacheFromScene((processed, total) =>
+                bool skipHotzoneWarmup = matchController != null && matchController.EnableTotalWar;
+                if (!skipHotzoneWarmup)
                 {
-                    string progressText = total > 0
-                        ? $"Loading hotzone cache {processed}/{total}"
-                        : "Loading hotzone cache";
-                    PanelDialogController.TrySetExternalText(progressText);
+                    yield return turnStateManager.WarmUpThreatCacheFromScene((processed, total) =>
+                    {
+                        string progressText = total > 0
+                            ? $"Loading hotzone cache {processed}/{total}"
+                            : "Loading hotzone cache";
+                        PanelDialogController.TrySetExternalText(progressText);
 
-                    if (!verboseLogs)
-                        return;
-                    if (total <= 0 || processed == 0 || processed == total || processed % 10 == 0)
-                        Debug.Log($"[SaveGame] Warm-up hotzone cache: {processed}/{total}");
-                });
+                        if (!verboseLogs)
+                            return;
+                        if (total <= 0 || processed == 0 || processed == total || processed % 10 == 0)
+                            Debug.Log($"[SaveGame] Warm-up hotzone cache: {processed}/{total}");
+                    });
+                }
+                else if (verboseLogs)
+                {
+                    Debug.Log("[SaveGame] Skip loading hotzone cache: Total War ativo.");
+                }
             }
 
             stage = "reset-runtime-input";

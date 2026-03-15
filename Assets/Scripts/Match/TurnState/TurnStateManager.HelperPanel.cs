@@ -635,6 +635,9 @@ public partial class TurnStateManager
 
     private bool EnterThreatLayerTeamSelection()
     {
+        if (matchController != null && matchController.EnableTotalWar)
+            return false;
+
         if (!BuildThreatLayerSelectableTeams(threatLayerSelectableTeamIds))
             return false;
 
@@ -721,8 +724,27 @@ public partial class TurnStateManager
         return true;
     }
 
+    public void ClearThreatLayerHotzoneCache()
+    {
+        ClearEnemyThreatLayersOverlay();
+        threatOverlayCacheByUnitInstanceId.Clear();
+        threatOverlayCacheMetricsByUnitInstanceId.Clear();
+        threatOverlayCacheTotalHits = 0;
+        threatOverlayCacheTotalMisses = 0;
+        threatLayerSelectableTeamIds.Clear();
+        threatLayerSelectableOptionNumbers.Clear();
+        enemyThreatLayersInspectedTeamId = int.MinValue;
+    }
+
     private void RefreshEnemyThreatLayersOverlayIfEnabled()
     {
+        if (matchController != null && matchController.EnableTotalWar)
+        {
+            if (enemyThreatLayersEnabled || enemyThreatLineCells.Count > 0 || enemyThreatRangeCells.Count > 0)
+                ClearEnemyThreatLayersOverlay();
+            return;
+        }
+
         if (!enemyThreatLayersEnabled || enemyThreatLayersInspectedTeamId == int.MinValue)
             return;
 
@@ -1043,6 +1065,12 @@ public partial class TurnStateManager
     {
         if (!Application.isPlaying)
             yield break;
+        if (matchController != null && matchController.EnableTotalWar)
+        {
+            onProgress?.Invoke(0, 0);
+            Debug.Log("[HotzoneCache] Skip warm-up: Total War ativo.");
+            yield break;
+        }
 
         UnitManager[] allUnits = UnityEngine.Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         List<UnitManager> candidates = new List<UnitManager>(allUnits.Length);

@@ -27,8 +27,10 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private bool firstOwnerInitialized;
     [Header("Runtime Visual")]
     [SerializeField] [Range(0f, 1f)] private float occupiedByReadyUnitDarkenFactor = 0.4f;
+    [SerializeField] [Range(0.02f, 1f)] private float runtimeVisualRefreshIntervalSeconds = 0.12f;
     [SerializeField] private ConstructionHudController hudController;
     [SerializeField] private MatchController matchController;
+    [System.NonSerialized] private float runtimeVisualRefreshTimer;
 
     public TeamId TeamId => teamId;
     public Tilemap BoardTilemap => boardTilemap;
@@ -184,6 +186,14 @@ public class ConstructionManager : MonoBehaviour
         if (!Application.isPlaying && IsEditingPrefabContext())
             return;
 #endif
+        if (Application.isPlaying)
+        {
+            runtimeVisualRefreshTimer += Mathf.Max(0f, Time.unscaledDeltaTime);
+            if (runtimeVisualRefreshTimer < Mathf.Max(0.02f, runtimeVisualRefreshIntervalSeconds))
+                return;
+
+            runtimeVisualRefreshTimer = 0f;
+        }
 
         RefreshOccupancyVisualTint();
         RefreshHud();
