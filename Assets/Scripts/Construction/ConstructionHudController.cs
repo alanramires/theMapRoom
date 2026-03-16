@@ -39,6 +39,7 @@ public class ConstructionHudController : MonoBehaviour
     private bool shouldShowFlagThreatOutline;
     private float flagThreatPulseTimer;
     private float flagThreatPulseDuration = 1f;
+    private Coroutine flagThreatPulseRoutine;
 
     private void Awake()
     {
@@ -64,11 +65,6 @@ public class ConstructionHudController : MonoBehaviour
         EnsureFlagThreatOutline();
         EnsureCaptureVisualOrder();
         ApplySorting();
-    }
-
-    private void Update()
-    {
-        RefreshFlagThreatOutlinePulse();
     }
 
     public void Apply(int currentCapture, int maxCapture, bool isCapturable, TeamId ownerTeam, bool hideCaptureBarBecauseOccupied, bool showFlagThreatOutline = false)
@@ -138,6 +134,7 @@ public class ConstructionHudController : MonoBehaviour
         shouldShowFlagThreatOutline = showFlagIcon && showFlagThreatOutline;
         if (!shouldShowFlagThreatOutline)
             ResetFlagThreatOutlineVisual();
+        UpdateFlagThreatPulseRoutineState();
 
         if (flagText != null)
         {
@@ -146,6 +143,12 @@ public class ConstructionHudController : MonoBehaviour
                 flagText.gameObject.SetActive(showFlagText);
             flagText.enabled = showFlagText;
         }
+    }
+
+    private void OnDisable()
+    {
+        StopFlagThreatPulseRoutine();
+        ResetFlagThreatOutlineVisual();
     }
 
     private void AutoAssignReferences()
@@ -276,6 +279,38 @@ public class ConstructionHudController : MonoBehaviour
         flagThreatOutline.effectColor = c;
         if (!flagThreatOutline.enabled)
             flagThreatOutline.enabled = true;
+    }
+
+    private void UpdateFlagThreatPulseRoutineState()
+    {
+        if (shouldShowFlagThreatOutline)
+        {
+            if (flagThreatPulseRoutine == null)
+                flagThreatPulseRoutine = StartCoroutine(FlagThreatPulseRoutine());
+            return;
+        }
+
+        StopFlagThreatPulseRoutine();
+    }
+
+    private void StopFlagThreatPulseRoutine()
+    {
+        if (flagThreatPulseRoutine == null)
+            return;
+
+        StopCoroutine(flagThreatPulseRoutine);
+        flagThreatPulseRoutine = null;
+    }
+
+    private System.Collections.IEnumerator FlagThreatPulseRoutine()
+    {
+        while (shouldShowFlagThreatOutline && isActiveAndEnabled)
+        {
+            RefreshFlagThreatOutlinePulse();
+            yield return null;
+        }
+
+        flagThreatPulseRoutine = null;
     }
 
     private void ResetFlagThreatOutlineVisual()

@@ -1092,8 +1092,8 @@ public partial class TurnStateManager
         if (supplyPreviewLastTarget == target && supplyPreviewPathLength > 0.0001f && supplyPreviewPathPoints.Count >= 2)
             return;
 
-        Vector3 from = target.transform.position;
-        Vector3 to = selectedUnit.transform.position;
+        Vector3 from = selectedUnit.transform.position;
+        Vector3 to = target.transform.position;
         from.z = to.z;
         supplyPreviewPathPoints.Clear();
         supplyPreviewPathPoints.Add(from);
@@ -1151,8 +1151,8 @@ public partial class TurnStateManager
                 continue;
             }
 
-            Vector3 from = target.transform.position;
-            Vector3 to = selectedUnit.transform.position;
+            Vector3 from = selectedUnit.transform.position;
+            Vector3 to = target.transform.position;
             from.z = to.z;
             track.pathPoints.Clear();
             track.pathPoints.Add(from);

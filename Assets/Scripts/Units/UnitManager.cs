@@ -1561,7 +1561,10 @@ public class UnitManager : MonoBehaviour
         currentPosition = position;
         transform.position = position;
         if (boardTilemap != null)
+        {
             currentCellPosition = HexCoordinates.WorldToCell(boardTilemap, position);
+            SyncEmbarkedPassengersCellPosition();
+        }
     }
 
     public void SetTeamId(TeamId team)
@@ -1629,9 +1632,37 @@ public class UnitManager : MonoBehaviour
 
         currentCellPosition = cell;
         SnapToCellCenter();
+        SyncEmbarkedPassengersCellPosition();
         ThreatRevisionTracker.NotifyUnitCellChanged(this, previousCell, currentCellPosition);
         if (Application.isPlaying)
             UnitOccupancyRules.NotifyUnitOccupancyChanged(this, previousCell, currentCellPosition);
+    }
+
+    private void SyncEmbarkedPassengersCellPosition()
+    {
+        if (transportedUnitSlots == null || transportedUnitSlots.Count <= 0)
+            return;
+
+        Vector3Int transporterCell = currentCellPosition;
+        transporterCell.z = 0;
+
+        for (int i = 0; i < transportedUnitSlots.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = transportedUnitSlots[i];
+            if (seat == null || seat.embarkedUnit == null)
+                continue;
+
+            UnitManager passenger = seat.embarkedUnit;
+            if (!passenger.IsEmbarked || passenger.EmbarkedTransporter != this)
+                continue;
+
+            Vector3Int passengerCell = passenger.CurrentCellPosition;
+            passengerCell.z = 0;
+            if (passengerCell == transporterCell)
+                continue;
+
+            passenger.SetCurrentCellPosition(transporterCell, enforceFinalOccupancyRule: false);
+        }
     }
 
     public void SetEmbarked(bool embarked)

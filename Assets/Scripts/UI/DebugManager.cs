@@ -566,7 +566,8 @@ public class DebugManager : MonoBehaviour
         if (string.IsNullOrWhiteSpace(normalizedCommand))
             return false;
 
-        if (TryParseSetEmbarkedSupplyCommandForPrefix(normalizedCommand, "SET GALAO ", out amountValue))
+        if (TryParseSetEmbarkedSupplyCommandForPrefix(normalizedCommand, "SET GALAO ", out amountValue) ||
+            TryParseSetEmbarkedSupplyCommandForPrefix(normalizedCommand, "SET GALOES ", out amountValue))
         {
             supplyToken = "gasolina";
             return true;
@@ -726,7 +727,7 @@ public class DebugManager : MonoBehaviour
             "set fuel <v> (alias de set autonomy)\n" +
             "set move_remain <v>\n" +
             "set ammo <v> | set ammo:<idx> <v>\n" +
-            "set galao <v> | set caixas <v> | set pecas <v>\n" +
+            "set galao <v> | set galoes <v> | set caixas <v> | set pecas <v>\n" +
             "refuel unit | rearm unit | repair unit\n" +
             "set construction team <x>\n" +
             "set owner <x> (alias, -1 neutro, 0 verde, 1 azul, 2 vermelho, 3 amarelo)\n" +

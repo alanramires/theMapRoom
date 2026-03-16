@@ -223,7 +223,8 @@ public partial class TurnStateManager
     public sealed class HelperTransferCandidateLine
     {
         public int index;
-        public string label;
+        public string unitName;
+        public bool isDonate;
         public bool isFocused;
     }
 
@@ -453,6 +454,8 @@ public partial class TurnStateManager
         data.UnitStatsLines.Add($"HP: {hpCurrent}/{hpMax}");
         data.UnitStatsLines.Add($"MOV: {movement}");
         data.UnitStatsLines.Add($"AUT: {fuelCurrent}/{fuelMax}");
+        if (selectedData != null && !string.IsNullOrWhiteSpace(selectedData.description))
+            data.UnitStatsLines.Add($"DESC: {selectedData.description.Trim()}");
 
         IReadOnlyList<UnitTransportSeatRuntime> seats = unit.TransportedUnitSlots;
         bool hasPassengers = false;
@@ -1952,8 +1955,8 @@ public partial class TurnStateManager
 
         data.Kind = HelperPanelKind.Transfer;
         data.TransferIsConfirmStep = IsTransferConfirmStepActive();
-        data.TransferHasCursorOption = HasMultipleTransferTargetCells();
-        data.TransferCursorOptionFocused = transferCursorSelectionMode;
+        data.TransferHasCursorOption = false;
+        data.TransferCursorOptionFocused = false;
 
         for (int i = 0; i < transferPromptOptions.Count; i++)
         {
@@ -1964,8 +1967,9 @@ public partial class TurnStateManager
             data.TransferCandidateLines.Add(new HelperTransferCandidateLine
             {
                 index = i + 1,
-                label = ResolveTransferOptionLabel(option, i + 1),
-                isFocused = !transferCursorSelectionMode && transferPromptSelectedIndex == i
+                unitName = ResolveTransferOptionTargetName(option),
+                isDonate = option.flowMode == TransferFlowMode.Fornecimento,
+                isFocused = transferPromptSelectedIndex == i
             });
         }
 
@@ -2010,6 +2014,20 @@ public partial class TurnStateManager
         }
 
         return data.TransferCandidateLines.Count > 0;
+    }
+
+    private static string ResolveTransferOptionTargetName(PodeTransferirOption option)
+    {
+        if (option == null)
+            return "(invalido)";
+
+        if (option.targetUnit != null)
+            return ResolveUnitRuntimeName(option.targetUnit);
+
+        if (option.targetConstruction != null)
+            return ResolveConstructionName(option.targetConstruction);
+
+        return "(sem alvo)";
     }
 
     private void BuildSupplyResourcePreviewLines(HelperPanelData data, UnitManager supplier, List<UnitManager> executionOrder)
@@ -2203,19 +2221,35 @@ public partial class TurnStateManager
     private string BuildUnitStatInline(UnitManager unit)
     {
         if (unit == null)
-            return "-";
+            return ResolveUnitStatInlineEmpty();
 
         int hp = Mathf.Max(0, unit.CurrentHP);
         int fuel = Mathf.Max(0, unit.CurrentFuel);
         List<string> segments = new List<string>
         {
-            $"{hp}HP",
-            $"{fuel}F"
+            PanelHelperController.ResolveHelperMessage(
+                "helper.unit_stats.inline.hp",
+                "<value>HP",
+                new Dictionary<string, string>
+                {
+                    { "value", hp.ToString() }
+                }),
+            PanelHelperController.ResolveHelperMessage(
+                "helper.unit_stats.inline.fuel",
+                "<value>F",
+                new Dictionary<string, string>
+                {
+                    { "value", fuel.ToString() }
+                })
         };
 
         AppendWeaponStatSegments(segments, unit);
         AppendSupplyStatSegments(segments, unit);
-        return segments.Count > 0 ? string.Join(" | ", segments) : "-";
+        if (segments.Count <= 0)
+            return ResolveUnitStatInlineEmpty();
+
+        string separator = PanelHelperController.ResolveHelperMessage("helper.unit_stats.inline.separator", " | ");
+        return string.Join(separator, segments);
     }
 
     private void AppendWeaponStatSegments(List<string> segments, UnitManager unit)
@@ -2240,7 +2274,14 @@ public partial class TurnStateManager
 
             weaponCounter++;
             int currentAmmo = runtime != null ? Mathf.Max(0, runtime.squadAmmunition) : 0;
-            segments.Add($"W{weaponCounter}:{currentAmmo}");
+            segments.Add(PanelHelperController.ResolveHelperMessage(
+                "helper.unit_stats.inline.weapon",
+                "W<index>:<value>",
+                new Dictionary<string, string>
+                {
+                    { "index", weaponCounter.ToString() },
+                    { "value", currentAmmo.ToString() }
+                }));
         }
     }
 
@@ -2262,8 +2303,22 @@ public partial class TurnStateManager
 
             supplyCounter++;
             int amount = Mathf.Max(0, entry.amount);
-            segments.Add($"R{supplyCounter}:{amount}");
+            segments.Add(PanelHelperController.ResolveHelperMessage(
+                "helper.unit_stats.inline.supply",
+                "R<index>:<value>",
+                new Dictionary<string, string>
+                {
+                    { "index", supplyCounter.ToString() },
+                    { "value", amount.ToString() }
+                }));
         }
+    }
+
+    private static string ResolveUnitStatInlineEmpty()
+    {
+        return PanelHelperController.ResolveHelperMessage(
+            "helper.unit_stats.inline.empty",
+            "-");
     }
 
     private string BuildMergePreviewInline(UnitManager candidateOrNull)

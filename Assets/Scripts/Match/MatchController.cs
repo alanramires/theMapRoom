@@ -45,6 +45,20 @@ public class MatchController : MonoBehaviour
         public readonly HashSet<Vector3Int> visibleCells = new HashSet<Vector3Int>();
     }
 
+    private readonly struct FogCollectPerfEntry
+    {
+        public readonly string unitName;
+        public readonly double collectMs;
+        public readonly int visibleCellCount;
+
+        public FogCollectPerfEntry(string unitName, double collectMs, int visibleCellCount)
+        {
+            this.unitName = unitName ?? string.Empty;
+            this.collectMs = Math.Max(0d, collectMs);
+            this.visibleCellCount = Math.Max(0, visibleCellCount);
+        }
+    }
+
 
     [System.Serializable]
     private struct PlayerEntry
@@ -129,6 +143,8 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private float runtimeConstructionIncomeRefreshTimer;
     [Header("Debug")]
     [SerializeField] private bool enableFogSourceDebugLogs = false;
+    [SerializeField] private bool enableFogStepPerfLogs = false;
+    [SerializeField] [Range(1, 8)] private int fogStepPerfTopUnits = 3;
     public bool SuppressFogOfWarRefresh { get; set; } = false;
 
     public int CurrentTurn => currentTurn;
@@ -1085,6 +1101,7 @@ public class MatchController : MonoBehaviour
 
     public void RefreshFogOfWarForActiveTeam()
     {
+        PodeDetectarSensor.ClearRefreshScopedTerrainCache();
         if (SuppressFogOfWarRefresh)
             return;
 
@@ -1115,6 +1132,16 @@ public class MatchController : MonoBehaviour
         InitializeFogOverlay(boardMap);
         if (!fogOverlayInitialized)
             return;
+
+        double refreshStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
+        if (enableFogStepPerfLogs)
+            PodeDetectarSensor.ResetFogDebugCounters();
+        double collectTotalMs = 0d;
+        int collectUnitsMeasured = 0;
+        int collectVisibleCellsTotal = 0;
+        List<FogCollectPerfEntry> topCollectEntries = enableFogStepPerfLogs
+            ? new List<FogCollectPerfEntry>(Mathf.Clamp(fogStepPerfTopUnits, 1, 8))
+            : null;
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         int unitsIncluded = 0;
@@ -1155,16 +1182,66 @@ public class MatchController : MonoBehaviour
                     $"unitMap={unit.BoardTilemap.name} unitScene={unit.gameObject.scene.name}");
             }
 
-            UpdateFogVisibilityForUnit(unit, boardMap);
+            UpdateFogVisibilityForUnit(
+                unit,
+                boardMap,
+                out double collectMs,
+                out int visibleCellsCollected,
+                out bool collectExecuted);
+            if (collectExecuted)
+            {
+                collectTotalMs += collectMs;
+                collectUnitsMeasured++;
+                collectVisibleCellsTotal += visibleCellsCollected;
+                if (topCollectEntries != null)
+                    RegisterFogCollectTopEntry(topCollectEntries, unit, collectMs, visibleCellsCollected, Mathf.Clamp(fogStepPerfTopUnits, 1, 8));
+            }
         }
 
         if (enableFogSourceDebugLogs)
             Debug.Log($"[FoW][Unit][Summary] total={units.Length} included={unitsIncluded}");
 
-        ApplyFriendlyConstructionVision(boardMap);
+        double constructionVisionStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
+        int constructionsIncluded = ApplyFriendlyConstructionVision(boardMap);
+        double constructionVisionMs = enableFogStepPerfLogs
+            ? (Time.realtimeSinceStartupAsDouble - constructionVisionStartMs) * 1000d
+            : 0d;
         RefreshRuntimeUnitFogVisibility();
         if (Application.isPlaying)
             OnFogOfWarUpdated?.Invoke();
+
+        if (enableFogStepPerfLogs)
+        {
+            double refreshTotalMs = (Time.realtimeSinceStartupAsDouble - refreshStartMs) * 1000d;
+            double collectAvgMs = collectUnitsMeasured > 0 ? collectTotalMs / collectUnitsMeasured : 0d;
+            string dominant = collectTotalMs >= constructionVisionMs
+                ? "CollectVisibleCells"
+                : "ApplyFriendlyConstructionVision";
+            Debug.Log(
+                $"[FoW][Perf] total={refreshTotalMs:F3}ms | " +
+                $"collect.total={collectTotalMs:F3}ms collect.avg/unit={collectAvgMs:F3}ms collect.units={collectUnitsMeasured} collect.cells={collectVisibleCellsTotal} | " +
+                $"constructionVision={constructionVisionMs:F3}ms constructions={constructionsIncluded} | dominant={dominant}");
+            PodeDetectarSensor.GetFogDebugCounters(
+                out int cacheHits,
+                out int cacheMisses,
+                out int poolRents,
+                out int poolReleases,
+                out int fragataCollectWorkspaceRents,
+                out int fragataCollectWorkspaceReleases);
+            Debug.Log($"[FoW][Cache] hits={cacheHits} misses={cacheMisses}");
+            Debug.Log(
+                $"[FoW][Pool] rents={poolRents} releases={poolReleases} " +
+                $"fragataCollect.rents={fragataCollectWorkspaceRents} fragataCollect.releases={fragataCollectWorkspaceReleases}");
+
+            if (topCollectEntries != null && topCollectEntries.Count > 0)
+            {
+                for (int i = 0; i < topCollectEntries.Count; i++)
+                {
+                    FogCollectPerfEntry entry = topCollectEntries[i];
+                    Debug.Log($"[FoW][Perf][CollectTop{(i + 1)}] unit={entry.unitName} ms={entry.collectMs:F3} cells={entry.visibleCellCount}");
+                }
+            }
+        }
     }
 
     public void NotifyUnitReachedHasAct(UnitManager unit)
@@ -1206,7 +1283,7 @@ public class MatchController : MonoBehaviour
             return;
         }
 
-        UpdateFogVisibilityForUnit(unit, boardMap);
+        UpdateFogVisibilityForUnit(unit, boardMap, out _, out _, out _);
         RefreshRuntimeUnitFogVisibility();
         TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
         TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
@@ -1940,8 +2017,17 @@ public class MatchController : MonoBehaviour
         fogOverlayInitialized = true;
     }
 
-    private void UpdateFogVisibilityForUnit(UnitManager unit, Tilemap boardMap)
+    private void UpdateFogVisibilityForUnit(
+        UnitManager unit,
+        Tilemap boardMap,
+        out double collectMs,
+        out int visibleCellsCollected,
+        out bool collectExecuted)
     {
+        collectMs = 0d;
+        visibleCellsCollected = 0;
+        collectExecuted = false;
+
         if (unit == null)
             return;
 
@@ -1974,6 +2060,7 @@ public class MatchController : MonoBehaviour
         }
 
         fogUnitVisibleScratchBuffer.Clear();
+        double collectStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         PodeDetectarSensor.CollectVisibleCells(
             unit,
             boardMap,
@@ -1985,6 +2072,10 @@ public class MatchController : MonoBehaviour
             useOccupantLayerForTarget: false,
             preserveObserverLayerRangeForHexVisibility: true,
             useRangeOnlyForAirHighWhenConfigured: true);
+        collectExecuted = true;
+        visibleCellsCollected = fogUnitVisibleScratchBuffer.Count;
+        if (enableFogStepPerfLogs)
+            collectMs = (Time.realtimeSinceStartupAsDouble - collectStartMs) * 1000d;
 
         foreach (Vector3Int cell in fogUnitVisibleScratchBuffer)
         {
@@ -2039,10 +2130,10 @@ public class MatchController : MonoBehaviour
         return boardMap.GetTile(cell);
     }
 
-    private void ApplyFriendlyConstructionVision(Tilemap boardMap)
+    private int ApplyFriendlyConstructionVision(Tilemap boardMap)
     {
         if (boardMap == null || activeTeamId < 0)
-            return;
+            return 0;
 
         List<ConstructionManager> constructions = ConstructionManager.AllActive;
         int constructionsIncluded = 0;
@@ -2112,6 +2203,45 @@ public class MatchController : MonoBehaviour
 
         if (enableFogSourceDebugLogs)
             Debug.Log($"[FoW][Construction][Summary] total={constructions.Count} included={constructionsIncluded}");
+
+        return constructionsIncluded;
+    }
+
+    private static void RegisterFogCollectTopEntry(
+        List<FogCollectPerfEntry> topEntries,
+        UnitManager unit,
+        double collectMs,
+        int visibleCellsCollected,
+        int topN)
+    {
+        if (topEntries == null || topN <= 0)
+            return;
+        if (unit == null)
+            return;
+
+        string unitName = !string.IsNullOrWhiteSpace(unit.UnitDisplayName) ? unit.UnitDisplayName : unit.name;
+        FogCollectPerfEntry candidate = new FogCollectPerfEntry(unitName, collectMs, visibleCellsCollected);
+
+        int insertIndex = topEntries.Count;
+        for (int i = 0; i < topEntries.Count; i++)
+        {
+            if (candidate.collectMs > topEntries[i].collectMs)
+            {
+                insertIndex = i;
+                break;
+            }
+        }
+
+        if (insertIndex >= topN && topEntries.Count >= topN)
+            return;
+
+        if (insertIndex >= topEntries.Count)
+            topEntries.Add(candidate);
+        else
+            topEntries.Insert(insertIndex, candidate);
+
+        while (topEntries.Count > topN)
+            topEntries.RemoveAt(topEntries.Count - 1);
     }
 
     private void RefreshRuntimeUnitFogVisibility()

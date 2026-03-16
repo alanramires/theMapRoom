@@ -61,6 +61,7 @@ public class SaveGameManager : MonoBehaviour
         public int domain;
         public int heightLevel;
         public List<int> embarkedWeaponAmmo = new List<int>();
+        public List<RuntimeSupplySaveData> embarkedSupplies = new List<RuntimeSupplySaveData>();
     }
 
     [Serializable]
@@ -679,6 +680,8 @@ public class SaveGameManager : MonoBehaviour
                         }
                     }
 
+                    ApplySavedEmbarkedSupplies(manager, saved.embarkedSupplies);
+
                     unitsById[saved.instanceId] = manager;
                     if (saved.instanceId > maxUnitId)
                         maxUnitId = saved.instanceId;
@@ -875,6 +878,23 @@ public class SaveGameManager : MonoBehaviour
                 {
                     UnitEmbarkedWeapon weapon = embarked[weaponIndex];
                     item.embarkedWeaponAmmo.Add(weapon != null ? Mathf.Max(0, weapon.squadAmmunition) : 0);
+                }
+            }
+
+            IReadOnlyList<UnitEmbarkedSupply> supplies = unit.GetEmbarkedResources();
+            if (supplies != null)
+            {
+                for (int supplyIndex = 0; supplyIndex < supplies.Count; supplyIndex++)
+                {
+                    UnitEmbarkedSupply supply = supplies[supplyIndex];
+                    if (supply == null || supply.supply == null || string.IsNullOrWhiteSpace(supply.supply.id))
+                        continue;
+
+                    item.embarkedSupplies.Add(new RuntimeSupplySaveData
+                    {
+                        supplyId = supply.supply.id,
+                        quantity = Mathf.Max(0, supply.amount)
+                    });
                 }
             }
 
@@ -1343,6 +1363,46 @@ public class SaveGameManager : MonoBehaviour
 #else
         return Input.GetKeyDown(key);
 #endif
+    }
+
+    private void ApplySavedEmbarkedSupplies(UnitManager unit, List<RuntimeSupplySaveData> savedSupplies)
+    {
+        if (unit == null || savedSupplies == null || savedSupplies.Count <= 0)
+            return;
+
+        IReadOnlyList<UnitEmbarkedSupply> runtimeSupplies = unit.GetEmbarkedResources();
+        if (runtimeSupplies == null || runtimeSupplies.Count <= 0)
+            return;
+
+        Dictionary<string, Queue<int>> amountsBySupplyId = new Dictionary<string, Queue<int>>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < savedSupplies.Count; i++)
+        {
+            RuntimeSupplySaveData entry = savedSupplies[i];
+            if (entry == null || string.IsNullOrWhiteSpace(entry.supplyId))
+                continue;
+
+            string key = entry.supplyId.Trim();
+            if (!amountsBySupplyId.TryGetValue(key, out Queue<int> bucket))
+            {
+                bucket = new Queue<int>();
+                amountsBySupplyId[key] = bucket;
+            }
+
+            bucket.Enqueue(Mathf.Max(0, entry.quantity));
+        }
+
+        for (int i = 0; i < runtimeSupplies.Count; i++)
+        {
+            UnitEmbarkedSupply runtime = runtimeSupplies[i];
+            if (runtime == null || runtime.supply == null || string.IsNullOrWhiteSpace(runtime.supply.id))
+                continue;
+
+            string key = runtime.supply.id.Trim();
+            if (!amountsBySupplyId.TryGetValue(key, out Queue<int> bucket) || bucket.Count <= 0)
+                continue;
+
+            runtime.amount = Mathf.Max(0, bucket.Dequeue());
+        }
     }
 
     private ConstructionSiteRuntimeSaveData BuildSiteRuntimeSaveData(ConstructionSiteRuntime runtime)

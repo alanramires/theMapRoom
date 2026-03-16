@@ -20,9 +20,12 @@ public partial class TurnStateManager
     private int transferPromptSelectedIndex = -1;
     private bool transferPromptSelectionPending;
     private bool transferPromptConfirmationPending;
-    private bool transferCursorSelectionMode;
     private bool transferExecutionInProgress;
-    private LineRenderer transferPreviewRenderer;
+    private readonly List<LineRenderer> transferPreviewRenderers = new List<LineRenderer>();
+    private readonly List<Vector3> transferPreviewPathPoints = new List<Vector3>(2);
+    private readonly List<Vector3> transferPreviewSegmentPoints = new List<Vector3>(8);
+    private float transferPreviewPathLength;
+    private float transferPreviewHeadDistance;
 
     private void HandleTransferActionRequested()
     {
@@ -78,17 +81,13 @@ public partial class TurnStateManager
         if (number >= 1 && number <= optionCount)
         {
             transferPromptSelectedIndex = number - 1;
-            transferCursorSelectionMode = false;
             FocusTransferOptionByIndex(transferPromptSelectedIndex, playSfx: true);
             EnterTransferConfirmStep();
             return;
         }
 
-        if (!TrySelectTransferPromptOptionByNumber(number))
-        {
-            cursorController?.PlayErrorSfx();
-            Debug.Log($"[Transfer] Opcao invalida: {number}.");
-        }
+        cursorController?.PlayErrorSfx();
+        Debug.Log($"[Transfer] Opcao invalida: {number}.");
     }
 
     private void UpdateTransferPromptPreview()
@@ -123,21 +122,76 @@ public partial class TurnStateManager
             return;
         }
 
-        EnsureTransferPreviewRenderer();
-        if (transferPreviewRenderer == null)
+        transferPreviewPathPoints.Clear();
+        transferPreviewPathPoints.Add(from);
+        transferPreviewPathPoints.Add(to);
+        transferPreviewPathLength = ComputePathLength(transferPreviewPathPoints);
+        if (transferPreviewPathLength <= 0.0001f)
+        {
+            SetTransferPreviewVisible(false);
+            return;
+        }
+
+        int segmentQuantities = Mathf.Max(1, GetMergeQueuePreviewSegmentQuantities());
+        float previewMultiplier = GetMergeQueuePreviewMultiplier();
+        float speed = Mathf.Max(0.2f, GetMergeQueuePreviewSegmentSpeed());
+        float spacingMultiplier = Mathf.Max(0.2f, GetMergeQueuePreviewSegmentSpacingMultiplier());
+        float segmentLen = Mathf.Max(0.08f, GetMirandoPreviewSegmentLength() * previewMultiplier);
+        float width = Mathf.Max(0.025f, GetMirandoPreviewWidth() * 0.85f);
+        Color baseColor = GetMirandoPreviewColor();
+        Color color = new Color(baseColor.r, baseColor.g, baseColor.b, Mathf.Clamp01(baseColor.a * 0.85f));
+
+        EnsureTransferPreviewRenderers(segmentQuantities);
+        if (transferPreviewRenderers.Count == 0)
             return;
 
-        float width = Mathf.Max(0.025f, GetMirandoPreviewWidth() * 0.85f);
-        Color color = GetMirandoPreviewColor();
-        color.a = Mathf.Clamp01(color.a * 0.85f);
-        transferPreviewRenderer.startWidth = width;
-        transferPreviewRenderer.endWidth = width;
-        transferPreviewRenderer.startColor = color;
-        transferPreviewRenderer.endColor = color;
-        transferPreviewRenderer.positionCount = 2;
-        transferPreviewRenderer.SetPosition(0, from);
-        transferPreviewRenderer.SetPosition(1, to);
-        transferPreviewRenderer.enabled = true;
+        float cycleLen = transferPreviewPathLength + segmentLen;
+        transferPreviewHeadDistance += speed * Time.deltaTime;
+        if (transferPreviewHeadDistance > cycleLen)
+            transferPreviewHeadDistance = 0f;
+
+        float spacing = (cycleLen / segmentQuantities) * spacingMultiplier;
+        for (int segmentIndex = 0; segmentIndex < segmentQuantities; segmentIndex++)
+        {
+            if (segmentIndex >= transferPreviewRenderers.Count)
+                break;
+
+            LineRenderer renderer = transferPreviewRenderers[segmentIndex];
+            if (renderer == null)
+                continue;
+
+            float segmentHeadDistance = transferPreviewHeadDistance - (spacing * segmentIndex);
+            while (segmentHeadDistance < 0f)
+                segmentHeadDistance += cycleLen;
+            while (segmentHeadDistance > cycleLen)
+                segmentHeadDistance -= cycleLen;
+
+            float startDist = Mathf.Max(0f, segmentHeadDistance - segmentLen);
+            float endDist = Mathf.Min(segmentHeadDistance, transferPreviewPathLength);
+            if (endDist <= startDist + 0.0001f)
+            {
+                renderer.positionCount = 0;
+                renderer.enabled = false;
+                continue;
+            }
+
+            BuildPathSegmentPointsFrom(transferPreviewPathPoints, startDist, endDist, transferPreviewSegmentPoints);
+            if (transferPreviewSegmentPoints.Count < 2)
+            {
+                renderer.positionCount = 0;
+                renderer.enabled = false;
+                continue;
+            }
+
+            renderer.startWidth = width;
+            renderer.endWidth = width;
+            renderer.startColor = color;
+            renderer.endColor = color;
+            renderer.positionCount = transferPreviewSegmentPoints.Count;
+            for (int p = 0; p < transferPreviewSegmentPoints.Count; p++)
+                renderer.SetPosition(p, transferPreviewSegmentPoints[p]);
+            renderer.enabled = true;
+        }
     }
 
     private bool IsTransferPromptActive()
@@ -157,34 +211,6 @@ public partial class TurnStateManager
         return IsTransferPromptActive() && transferPromptConfirmationPending;
     }
 
-    private bool TrySelectTransferPromptOptionByNumber(int oneBasedNumber)
-    {
-        if (!IsTransferSelectionStepActive())
-            return false;
-
-        int optionCount = transferPromptOptions.Count;
-        if (oneBasedNumber >= 1 && oneBasedNumber <= optionCount)
-        {
-            transferPromptSelectedIndex = oneBasedNumber - 1;
-            transferCursorSelectionMode = false;
-            FocusTransferOptionByIndex(transferPromptSelectedIndex, playSfx: true);
-            EnterTransferConfirmStep();
-            return true;
-        }
-
-        int cursorOptionNumber = optionCount + 1;
-        if (oneBasedNumber == cursorOptionNumber && HasMultipleTransferTargetCells())
-        {
-            transferCursorSelectionMode = true;
-            cursorController?.PlayConfirmSfx();
-            PanelDialogController.TrySetExternalText("Transferir :: escolha no cursor + Enter");
-            LogTransferPromptOptions();
-            return true;
-        }
-
-        return false;
-    }
-
     private bool TryConfirmPendingTransferPrompt()
     {
         if (!IsTransferPromptActive())
@@ -199,7 +225,7 @@ public partial class TurnStateManager
 
         if (IsTransferSelectionStepActive())
         {
-            if (transferPromptSelectedIndex < 0 || transferPromptSelectedIndex >= transferPromptOptions.Count || transferCursorSelectionMode)
+            if (transferPromptSelectedIndex < 0 || transferPromptSelectedIndex >= transferPromptOptions.Count)
             {
                 if (!TrySelectTransferOptionFromCursor())
                 {
@@ -274,7 +300,6 @@ public partial class TurnStateManager
 
             transferPromptConfirmationPending = false;
             transferPromptSelectionPending = true;
-            transferCursorSelectionMode = false;
             transferPreviewLines.Clear();
             LogTransferPromptOptions();
             Debug.Log("[Transfer] Confirmacao cancelada. Retornando para selecao.");
@@ -290,11 +315,14 @@ public partial class TurnStateManager
     {
         transferPromptSelectionPending = false;
         transferPromptConfirmationPending = false;
-        transferCursorSelectionMode = false;
         transferPromptSelectedIndex = -1;
         transferPromptOptions.Clear();
         transferPromptIndexByCell.Clear();
         transferPreviewLines.Clear();
+        transferPreviewPathPoints.Clear();
+        transferPreviewSegmentPoints.Clear();
+        transferPreviewPathLength = 0f;
+        transferPreviewHeadDistance = 0f;
         SetTransferPreviewVisible(false);
         PanelDialogController.ClearExternalText();
     }
@@ -303,7 +331,6 @@ public partial class TurnStateManager
     {
         transferPromptSelectionPending = true;
         transferPromptConfirmationPending = false;
-        transferCursorSelectionMode = false;
         transferPromptSelectedIndex = transferPromptOptions.Count > 0 ? 0 : -1;
         transferPreviewLines.Clear();
         RebuildTransferCellIndex();
@@ -324,10 +351,14 @@ public partial class TurnStateManager
 
         transferPromptSelectionPending = false;
         transferPromptConfirmationPending = true;
-        transferCursorSelectionMode = false;
         RebuildTransferPreviewLines();
-        string label = ResolveTransferOptionLabel(transferPromptOptions[transferPromptSelectedIndex], transferPromptSelectedIndex + 1);
-        PanelDialogController.TrySetExternalText($"Transferir :: Confirmar {label}");
+        PodeTransferirOption selectedOption = transferPromptOptions[transferPromptSelectedIndex];
+        Dictionary<string, string> tokens = BuildTransferDialogTokens(selectedOption, transferPromptSelectedIndex + 1);
+        string confirmText = PanelDialogController.ResolveDialogMessage(
+            "transfer.prompt.confirm_prefix",
+            "Transferir :: Confirmar <label>",
+            tokens);
+        PanelDialogController.TrySetExternalText(confirmText);
     }
 
     private void LogTransferPromptOptions()
@@ -348,17 +379,62 @@ public partial class TurnStateManager
         for (int i = 0; i < transferPromptOptions.Count; i++)
         {
             string label = ResolveTransferOptionLabel(transferPromptOptions[i], i + 1);
-            string marker = i == selectedIndex && !transferCursorSelectionMode ? ">" : " ";
+            string marker = i == selectedIndex ? ">" : " ";
             Debug.Log($"{marker} {label}");
         }
 
-        if (HasMultipleTransferTargetCells())
+        Dictionary<string, string> tokens = BuildTransferDialogTokens(
+            transferPromptOptions[selectedIndex],
+            selectedIndex + 1);
+        PanelDialogController.TrySetExternalText(PanelDialogController.ResolveDialogMessage(
+            "transfer.prompt.select_number",
+            "Transferir :: escolha numero + Enter",
+            tokens));
+    }
+
+    private string ResolveTransferSupplierDisplayName()
+    {
+        if (selectedUnit == null)
+            return string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(selectedUnit.UnitDisplayName))
+            return selectedUnit.UnitDisplayName;
+
+        return selectedUnit.name;
+    }
+
+    private Dictionary<string, string> BuildTransferDialogTokens(PodeTransferirOption option, int oneBasedIndex)
+    {
+        string transferType = ResolveTransferTypeLabel(option);
+        string label = ResolveTransferOptionLabel(option, oneBasedIndex);
+        Dictionary<string, string> tokens = new Dictionary<string, string>
         {
-            string marker = transferCursorSelectionMode ? ">" : " ";
-            Debug.Log($"{marker} {transferPromptOptions.Count + 1}. Selecionar pelo cursor");
+            { "unit", ResolveTransferSupplierDisplayName() },
+            { "transfer type", transferType },
+            { "transfer_type", transferType },
+            { "transfer_type.selecionado", transferType },
+            { "type", transferType },
+            { "label", label },
+            { "index", Mathf.Max(1, oneBasedIndex).ToString() }
+        };
+        return tokens;
+    }
+
+    private static string ResolveTransferTypeLabel(PodeTransferirOption option)
+    {
+        if (option == null)
+            return string.Empty;
+
+        if (option.flowMode == TransferFlowMode.Fornecimento)
+        {
+            return PanelDialogController.ResolveDialogMessage(
+                "transfer_type.doar",
+                "Doar");
         }
 
-        PanelDialogController.TrySetExternalText("Transferir :: escolha numero + Enter");
+        return PanelDialogController.ResolveDialogMessage(
+            "transfer_type.receber",
+            "Receber");
     }
 
     private bool TryResolveTransferCursorMove(Vector3Int currentCell, Vector3Int inputDelta, out Vector3Int resolvedCell)
@@ -376,7 +452,6 @@ public partial class TurnStateManager
 
         int nextIndex = (transferPromptSelectedIndex + step + transferPromptOptions.Count) % transferPromptOptions.Count;
         transferPromptSelectedIndex = nextIndex;
-        transferCursorSelectionMode = false;
         FocusTransferOptionByIndex(nextIndex, playSfx: false);
         resolvedCell = ResolveTransferOptionCell(transferPromptOptions[nextIndex]);
         return true;
@@ -419,7 +494,6 @@ public partial class TurnStateManager
         if (matches == 1 && foundIndex >= 0)
         {
             transferPromptSelectedIndex = foundIndex;
-            transferCursorSelectionMode = false;
             return true;
         }
 
@@ -447,43 +521,49 @@ public partial class TurnStateManager
         return cell;
     }
 
-    private void EnsureTransferPreviewRenderer()
+    private void EnsureTransferPreviewRenderers(int count)
     {
-        if (transferPreviewRenderer != null)
-            return;
-
-        GameObject go = new GameObject("TransferConfirmPreviewLine");
-        go.transform.SetParent(transform, false);
-        LineRenderer renderer = go.AddComponent<LineRenderer>();
-        renderer.useWorldSpace = true;
-        renderer.textureMode = LineTextureMode.Stretch;
-        renderer.numCapVertices = 2;
-        renderer.numCornerVertices = 2;
-        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        renderer.receiveShadows = false;
-        Material previewMaterial = GetMirandoPreviewMaterial();
-        renderer.material = previewMaterial != null ? previewMaterial : new Material(Shader.Find("Sprites/Default"));
-        int sortingLayerId = GetMirandoPreviewSortingLayerId();
-        if (sortingLayerId != 0)
-            renderer.sortingLayerID = sortingLayerId;
-        renderer.sortingOrder = Mathf.Max(0, GetMirandoPreviewSortingOrder() - 1);
-        renderer.enabled = false;
-        transferPreviewRenderer = renderer;
+        int desired = Mathf.Max(1, count);
+        while (transferPreviewRenderers.Count < desired)
+        {
+            int segmentIndex = transferPreviewRenderers.Count;
+            GameObject go = new GameObject($"TransferConfirmPreviewLine_{segmentIndex + 1}");
+            go.transform.SetParent(transform, false);
+            LineRenderer renderer = go.AddComponent<LineRenderer>();
+            renderer.useWorldSpace = true;
+            renderer.textureMode = LineTextureMode.Stretch;
+            renderer.numCapVertices = 2;
+            renderer.numCornerVertices = 2;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            Material previewMaterial = GetMirandoPreviewMaterial();
+            renderer.material = previewMaterial != null ? previewMaterial : new Material(Shader.Find("Sprites/Default"));
+            int sortingLayerId = GetMirandoPreviewSortingLayerId();
+            if (sortingLayerId != 0)
+                renderer.sortingLayerID = sortingLayerId;
+            renderer.sortingOrder = Mathf.Max(0, GetMirandoPreviewSortingOrder() - 1);
+            renderer.enabled = false;
+            transferPreviewRenderers.Add(renderer);
+        }
     }
 
     private void SetTransferPreviewVisible(bool visible)
     {
-        if (transferPreviewRenderer == null)
-            return;
-
-        if (!visible)
+        for (int i = 0; i < transferPreviewRenderers.Count; i++)
         {
-            transferPreviewRenderer.positionCount = 0;
-            transferPreviewRenderer.enabled = false;
-            return;
-        }
+            LineRenderer renderer = transferPreviewRenderers[i];
+            if (renderer == null)
+                continue;
 
-        transferPreviewRenderer.enabled = true;
+            if (!visible)
+            {
+                renderer.positionCount = 0;
+                renderer.enabled = false;
+                continue;
+            }
+
+            renderer.enabled = true;
+        }
     }
 
     private static bool IsTransferEmbarkedOnlyCollection(UnitManager supplier)

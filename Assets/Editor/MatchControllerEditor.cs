@@ -25,6 +25,8 @@ public class MatchControllerEditor : Editor
     private SerializedProperty fogOfWarTerrainDatabaseProp;
     private SerializedProperty fogOfWarDpqAirHeightConfigProp;
     private SerializedProperty fogOfWarAlphaProp;
+    private SerializedProperty enableFogStepPerfLogsProp;
+    private SerializedProperty fogStepPerfTopUnitsProp;
 
     private void OnEnable()
     {
@@ -49,6 +51,8 @@ public class MatchControllerEditor : Editor
         fogOfWarTerrainDatabaseProp = serializedObject.FindProperty("fogOfWarTerrainDatabase");
         fogOfWarDpqAirHeightConfigProp = serializedObject.FindProperty("fogOfWarDpqAirHeightConfig");
         fogOfWarAlphaProp = serializedObject.FindProperty("fogOfWarAlpha");
+        enableFogStepPerfLogsProp = serializedObject.FindProperty("enableFogStepPerfLogs");
+        fogStepPerfTopUnitsProp = serializedObject.FindProperty("fogStepPerfTopUnits");
     }
 
     public override void OnInspectorGUI()
@@ -114,6 +118,14 @@ public class MatchControllerEditor : Editor
             EditorGUILayout.PropertyField(fogOfWarDpqAirHeightConfigProp, new GUIContent("DPQ Air Height Config"));
         if (fogOfWarAlphaProp != null)
             EditorGUILayout.PropertyField(fogOfWarAlphaProp, new GUIContent("Fog Alpha"));
+        if (enableFogStepPerfLogsProp != null)
+            EditorGUILayout.PropertyField(enableFogStepPerfLogsProp, new GUIContent("Enable Fog Step Perf Logs"));
+        if (enableFogStepPerfLogsProp != null &&
+            enableFogStepPerfLogsProp.boolValue &&
+            fogStepPerfTopUnitsProp != null)
+        {
+            EditorGUILayout.PropertyField(fogStepPerfTopUnitsProp, new GUIContent("Fog Step Perf Top Units"));
+        }
 
         serializedObject.ApplyModifiedProperties();
 

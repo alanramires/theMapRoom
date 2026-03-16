@@ -24,7 +24,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -40,7 +41,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -56,7 +58,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -72,7 +75,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -88,12 +92,13 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: PortoNaval_T-1_C4
+  - id: Cidade_T-1_C247
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
     initialTeamId: -1
     cellPosition: {x: 9, y: -8, z: 0}
@@ -104,7 +109,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -120,7 +126,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -136,7 +143,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -152,7 +160,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -168,7 +177,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -184,7 +194,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -200,7 +211,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -216,7 +228,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -232,7 +245,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -248,7 +262,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -264,7 +279,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -280,7 +296,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -296,7 +313,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -312,7 +330,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -328,7 +347,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -344,7 +364,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -360,7 +381,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -376,7 +398,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -392,7 +415,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -408,7 +432,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -424,7 +449,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -440,7 +466,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -456,7 +483,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -472,7 +500,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -488,7 +517,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -504,7 +534,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -520,7 +551,8 @@ MonoBehaviour:
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 0
       offeredSupplies: []
@@ -536,7 +568,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
-      canProduceAndSellUnits: 00000000
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 1
       offeredSupplies:
@@ -562,7 +595,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 40
       capturedIncoming: 2000
-      canProduceAndSellUnits: 01000000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
       offeredUnits:
       - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
       - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
@@ -590,7 +624,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 30
       capturedIncoming: 1000
-      canProduceAndSellUnits: 01000000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
       offeredUnits:
       - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
       - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
@@ -608,7 +643,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 30
       capturedIncoming: 1000
-      canProduceAndSellUnits: 
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits:
       - {fileID: 11400000, guid: ed1abcbe546e36d4faf0bc05a5338687, type: 2}
       - {fileID: 11400000, guid: 59c2875292c8d004690a6847461bedb0, type: 2}
@@ -627,7 +663,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 30
       capturedIncoming: 1000
-      canProduceAndSellUnits: 01000000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
       offeredUnits:
       - {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
       - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
@@ -662,7 +699,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
-      canProduceAndSellUnits: 00000000
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 1
       offeredSupplies:
@@ -688,7 +726,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
-      canProduceAndSellUnits: 00000000
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 1
       offeredSupplies:
@@ -714,7 +753,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 40
       capturedIncoming: 2000
-      canProduceAndSellUnits: 01000000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
       offeredUnits:
       - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
       - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
@@ -742,7 +782,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
-      canProduceAndSellUnits: 00000000
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 1
       offeredSupplies:
@@ -768,7 +809,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
-      canProduceAndSellUnits: 00000000
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 1
       offeredSupplies:
@@ -794,7 +836,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
-      canProduceAndSellUnits: 00000000
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 1
       offeredSupplies:
@@ -820,7 +863,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
-      canProduceAndSellUnits: 00000000
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
       offeredUnits: []
       canProvideSupplies: 1
       offeredSupplies:
@@ -846,7 +890,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 40
       capturedIncoming: 2000
-      canProduceAndSellUnits: 01000000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
       offeredUnits:
       - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
       - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
@@ -874,7 +919,8 @@ MonoBehaviour:
       isCapturable: 1
       capturePointsMax: 30
       capturedIncoming: 1000
-      canProduceAndSellUnits: 01000000
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
       offeredUnits:
       - {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
       - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}

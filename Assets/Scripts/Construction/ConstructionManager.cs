@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 [ExecuteAlways]
 public class ConstructionManager : MonoBehaviour
@@ -36,6 +39,9 @@ public class ConstructionManager : MonoBehaviour
     [System.NonSerialized] private int cachedOccupantInstanceId = int.MinValue;
     [System.NonSerialized] private bool cachedOccupantReadySameTeam;
     [System.NonSerialized] private bool cachedShowFlagThreatOutline;
+#if UNITY_EDITOR
+    [System.NonSerialized] private bool editorTickRegistered;
+#endif
 
     public TeamId TeamId => teamId;
     public Tilemap BoardTilemap => boardTilemap;
@@ -158,24 +164,6 @@ public class ConstructionManager : MonoBehaviour
         RefreshRuntimeVisualState(force: true);
     }
 
-    private void LateUpdate()
-    {
-#if UNITY_EDITOR
-        if (Application.isPlaying || !autoSnapWhenMovedInEditor)
-            return;
-
-        if (boardTilemap == null)
-            TryAutoAssignBoardTilemap();
-
-        if (boardTilemap == null || !transform.hasChanged)
-            return;
-
-        transform.hasChanged = false;
-        PullCellFromTransform();
-        SnapToCellCenter();
-#endif
-    }
-
     private void Start()
     {
         TryAutoAssignMatchController();
@@ -193,6 +181,9 @@ public class ConstructionManager : MonoBehaviour
         MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
         UnitOccupancyRules.OnUnitOccupancyChanged += HandleUnitOccupancyChanged;
         RefreshRuntimeVisualState(force: true);
+#if UNITY_EDITOR
+        RegisterEditorTick();
+#endif
     }
 
     private void OnDisable()
@@ -200,20 +191,9 @@ public class ConstructionManager : MonoBehaviour
         AllActive.Remove(this);
         MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
         UnitOccupancyRules.OnUnitOccupancyChanged -= HandleUnitOccupancyChanged;
-    }
-
-    private void Update()
-    {
 #if UNITY_EDITOR
-        if (!Application.isPlaying && IsEditingPrefabContext())
-            return;
+        UnregisterEditorTick();
 #endif
-        if (!Application.isPlaying)
-        {
-            if (!continuousEditorVisualRefresh)
-                return;
-            RefreshRuntimeVisualState(force: false);
-        }
     }
 
 #if UNITY_EDITOR
@@ -671,6 +651,52 @@ public class ConstructionManager : MonoBehaviour
     {
         return float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
     }
+
+#if UNITY_EDITOR
+    private void RegisterEditorTick()
+    {
+        if (editorTickRegistered)
+            return;
+
+        EditorApplication.update += HandleEditorTick;
+        editorTickRegistered = true;
+    }
+
+    private void UnregisterEditorTick()
+    {
+        if (!editorTickRegistered)
+            return;
+
+        EditorApplication.update -= HandleEditorTick;
+        editorTickRegistered = false;
+    }
+
+    private void HandleEditorTick()
+    {
+        if (this == null || !isActiveAndEnabled)
+            return;
+        if (Application.isPlaying)
+            return;
+        if (IsEditingPrefabContext())
+            return;
+
+        if (autoSnapWhenMovedInEditor)
+        {
+            if (boardTilemap == null)
+                TryAutoAssignBoardTilemap();
+
+            if (boardTilemap != null && transform.hasChanged)
+            {
+                transform.hasChanged = false;
+                PullCellFromTransform();
+                SnapToCellCenter();
+            }
+        }
+
+        if (continuousEditorVisualRefresh)
+            RefreshRuntimeVisualState(force: false);
+    }
+#endif
 
     private void UpdateDynamicName()
     {

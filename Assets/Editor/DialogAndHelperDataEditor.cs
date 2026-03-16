@@ -26,7 +26,10 @@ public class DialogDataEditor : Editor
 
     private static void DrawMessageWithHelp(SerializedProperty messageProperty, string tooltip)
     {
-        EditorGUILayout.PropertyField(messageProperty);
+        EditorGUILayout.LabelField(messageProperty.displayName);
+        messageProperty.stringValue = EditorGUILayout.TextArea(
+            messageProperty.stringValue ?? string.Empty,
+            GUILayout.MinHeight(72f));
         EditorGUILayout.HelpBox(tooltip, MessageType.Info);
     }
 }
@@ -65,7 +68,10 @@ public class HelperDataEditor : Editor
 
     private static void DrawMessageWithHelp(SerializedProperty messageProperty, string tooltip)
     {
-        EditorGUILayout.PropertyField(messageProperty);
+        EditorGUILayout.LabelField(messageProperty.displayName);
+        messageProperty.stringValue = EditorGUILayout.TextArea(
+            messageProperty.stringValue ?? string.Empty,
+            GUILayout.MinHeight(72f));
         EditorGUILayout.HelpBox(tooltip, MessageType.Info);
     }
 }

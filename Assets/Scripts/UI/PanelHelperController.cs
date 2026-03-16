@@ -310,13 +310,120 @@ public class PanelHelperController : MonoBehaviour
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < data.UnitStatsLines.Count; i++)
         {
-            string line = data.UnitStatsLines[i] ?? string.Empty;
+            string line = ResolveUnitStatsLine(data.UnitStatsLines[i] ?? string.Empty);
             if (i > 0)
                 sb.AppendLine();
             sb.Append(line);
         }
 
         return sb.ToString();
+    }
+
+    private string ResolveUnitStatsLine(string line)
+    {
+        if (string.IsNullOrEmpty(line))
+            return string.Empty;
+
+        if (line.StartsWith("HP: "))
+        {
+            string value = line.Substring(4);
+            string[] parts = value.Split('/');
+            if (parts.Length == 2 &&
+                int.TryParse(parts[0], out int current) &&
+                int.TryParse(parts[1], out int max))
+            {
+                return ResolveMessage(
+                    "helper.unit_stats.line.hp",
+                    "HP: <current>/<max>",
+                    new Dictionary<string, string>
+                    {
+                        { "current", Mathf.Max(0, current).ToString() },
+                        { "max", Mathf.Max(0, max).ToString() }
+                    });
+            }
+        }
+
+        if (line.StartsWith("MOV: "))
+        {
+            string value = line.Substring(5);
+            if (int.TryParse(value, out int movement))
+            {
+                return ResolveMessage(
+                    "helper.unit_stats.line.mov",
+                    "MOV: <mov>",
+                    new Dictionary<string, string>
+                    {
+                        { "mov", Mathf.Max(0, movement).ToString() }
+                    });
+            }
+        }
+
+        if (line.StartsWith("AUT: "))
+        {
+            string value = line.Substring(5);
+            string[] parts = value.Split('/');
+            if (parts.Length == 2 &&
+                int.TryParse(parts[0], out int current) &&
+                int.TryParse(parts[1], out int max))
+            {
+                return ResolveMessage(
+                    "helper.unit_stats.line.aut",
+                    "AUT: <current>/<max>",
+                    new Dictionary<string, string>
+                    {
+                        { "current", Mathf.Max(0, current).ToString() },
+                        { "max", Mathf.Max(0, max).ToString() }
+                    });
+            }
+        }
+
+        if (line.StartsWith("DESC: "))
+        {
+            string description = line.Substring(6).Trim();
+            return ResolveMessage(
+                "helper.unit_stats.line.description",
+                "<description>",
+                new Dictionary<string, string>
+                {
+                    { "description", description }
+                });
+        }
+
+        if (line == "Transportando")
+            return ResolveMessage("helper.unit_stats.section.transporting", "Transportando");
+
+        if (line == "Reserva")
+            return ResolveMessage("helper.unit_stats.section.reserve", "Reserva");
+
+        int openStatsIndex = line.LastIndexOf(" (", System.StringComparison.Ordinal);
+        if (openStatsIndex > 0 && line.EndsWith(")", System.StringComparison.Ordinal))
+        {
+            string head = line.Substring(0, openStatsIndex);
+            string stats = line.Substring(openStatsIndex + 2, line.Length - openStatsIndex - 3);
+            if (!string.IsNullOrWhiteSpace(stats))
+            {
+                int unitStart = 0;
+                while (unitStart < head.Length && head[unitStart] == ' ')
+                    unitStart++;
+
+                string indent = unitStart > 0 ? head.Substring(0, unitStart) : string.Empty;
+                string unitName = unitStart < head.Length ? head.Substring(unitStart) : string.Empty;
+                if (!string.IsNullOrWhiteSpace(unitName))
+                {
+                    return ResolveMessage(
+                        "helper.unit_stats.line.transported",
+                        "<indent><unit> (<stats>)",
+                        new Dictionary<string, string>
+                        {
+                            { "indent", indent },
+                            { "unit", unitName },
+                            { "stats", stats }
+                        });
+                }
+            }
+        }
+
+        return line;
     }
 
     private string BuildConstructionStatsBody(TurnStateManager.HelperPanelData data)
@@ -856,14 +963,18 @@ public class PanelHelperController : MonoBehaviour
                     continue;
 
                 string prefix = line.isFocused ? ">> " : string.Empty;
-                sb.AppendLine($"{prefix}{line.label}");
-            }
-
-            if (data.TransferHasCursorOption)
-            {
-                string prefix = data.TransferCursorOptionFocused ? ">> " : string.Empty;
-                int index = data.TransferCandidateLines.Count + 1;
-                sb.AppendLine($"{prefix}{index}. Selecionar pelo cursor");
+                string transferType = line.isDonate
+                    ? ResolveMessage("helper.transfer.type.donate", "Doar")
+                    : ResolveMessage("helper.transfer.type.receive", "Receber");
+                sb.AppendLine(prefix + ResolveMessage(
+                    "helper.transfer.candidate.line",
+                    "<number>. <transfer_type> -> <unit_name>",
+                    new Dictionary<string, string>
+                    {
+                        { "number", line.index.ToString() },
+                        { "transfer_type", transferType },
+                        { "unit_name", line.unitName ?? "(alvo)" }
+                    }));
             }
 
             sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
@@ -872,15 +983,48 @@ public class PanelHelperController : MonoBehaviour
         }
 
         sb.AppendLine(ResolveMessage("helper.transfer.section.confirm", "Confirmar Transferencia"));
-        if (!string.IsNullOrWhiteSpace(data.TransferSelectedLabel))
+        TurnStateManager.HelperTransferCandidateLine selectedLine = null;
+        for (int i = 0; i < data.TransferCandidateLines.Count; i++)
+        {
+            TurnStateManager.HelperTransferCandidateLine candidate = data.TransferCandidateLines[i];
+            if (candidate != null && candidate.isFocused)
+            {
+                selectedLine = candidate;
+                break;
+            }
+        }
+        if (selectedLine != null)
+        {
+            string transferType = selectedLine.isDonate
+                ? ResolveMessage("helper.transfer.type.donate", "Doar")
+                : ResolveMessage("helper.transfer.type.receive", "Receber");
+            sb.AppendLine(ResolveMessage(
+                "helper.transfer.candidate.line",
+                "<number>. <transfer_type> -> <unit_name>",
+                new Dictionary<string, string>
+                {
+                    { "number", selectedLine.index.ToString() },
+                    { "transfer_type", transferType },
+                    { "unit_name", selectedLine.unitName ?? "(alvo)" }
+                }));
+        }
+        else if (!string.IsNullOrWhiteSpace(data.TransferSelectedLabel))
+        {
             sb.AppendLine(data.TransferSelectedLabel);
+        }
         sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
 
         if (data.TransferResourceLines != null && data.TransferResourceLines.Count > 0)
         {
             if (!string.IsNullOrWhiteSpace(data.TransferSourceLabel))
             {
-                sb.AppendLine($"Fornecedor: {data.TransferSourceLabel}");
+                sb.AppendLine(ResolveMessage(
+                    "helper.transfer.source.header",
+                    "Fornecedor: <source>",
+                    new Dictionary<string, string>
+                    {
+                        { "source", data.TransferSourceLabel }
+                    }));
                 for (int i = 0; i < data.TransferResourceLines.Count; i++)
                 {
                     TurnStateManager.HelperTransferResourceLine line = data.TransferResourceLines[i];
@@ -889,15 +1033,43 @@ public class PanelHelperController : MonoBehaviour
 
                     // Em origem infinita, mostra somente o volume enviado (evita int.MaxValue no helper).
                     if (line.sourceIsInfinite)
-                        sb.AppendLine($"- {line.supplyName}: {Mathf.Max(0, line.movedAmount)}");
+                    {
+                        sb.AppendLine(ResolveMessage(
+                            "helper.transfer.source.line.infinite",
+                            "- <supply>: <moved>",
+                            new Dictionary<string, string>
+                            {
+                                { "supply", line.supplyName ?? "Supply" },
+                                { "moved", Mathf.Max(0, line.movedAmount).ToString() }
+                            }));
+                    }
                     else
-                        sb.AppendLine($"- {line.supplyName}: {Mathf.Max(0, line.sourceBefore)} - {Mathf.Max(0, line.movedAmount)} -> {Mathf.Max(0, line.sourceAfter)}");
+                    {
+                        sb.AppendLine(ResolveMessage(
+                            "helper.transfer.source.line.finite",
+                            "- <supply>: <before> - <moved> -> <after>",
+                            new Dictionary<string, string>
+                            {
+                                { "supply", line.supplyName ?? "Supply" },
+                                { "before", Mathf.Max(0, line.sourceBefore).ToString() },
+                                { "moved", Mathf.Max(0, line.movedAmount).ToString() },
+                                { "after", Mathf.Max(0, line.sourceAfter).ToString() }
+                            }));
+                    }
                 }
                 sb.AppendLine();
             }
 
             if (!string.IsNullOrWhiteSpace(data.TransferDestinationLabel))
-                sb.AppendLine($"Destino: {data.TransferDestinationLabel}");
+            {
+                sb.AppendLine(ResolveMessage(
+                    "helper.transfer.destination.header",
+                    "Destino: <destination>",
+                    new Dictionary<string, string>
+                    {
+                        { "destination", data.TransferDestinationLabel }
+                    }));
+            }
 
             for (int i = 0; i < data.TransferResourceLines.Count; i++)
             {
@@ -907,7 +1079,16 @@ public class PanelHelperController : MonoBehaviour
 
                 string dstBefore = line.destinationBefore >= int.MaxValue ? "INF" : Mathf.Max(0, line.destinationBefore).ToString();
                 string dstAfter = line.destinationAfter >= int.MaxValue ? "INF" : Mathf.Max(0, line.destinationAfter).ToString();
-                sb.AppendLine($"- {line.supplyName}: {dstBefore} + {Mathf.Max(0, line.movedAmount)} -> {dstAfter}");
+                sb.AppendLine(ResolveMessage(
+                    "helper.transfer.destination.line",
+                    "- <supply>: <before> + <moved> -> <after>",
+                    new Dictionary<string, string>
+                    {
+                        { "supply", line.supplyName ?? "Supply" },
+                        { "before", dstBefore },
+                        { "moved", Mathf.Max(0, line.movedAmount).ToString() },
+                        { "after", dstAfter }
+                    }));
             }
         }
         else
