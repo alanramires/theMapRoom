@@ -9,6 +9,8 @@ using UnityEngine.InputSystem;
 
 public class DebugManager : MonoBehaviour
 {
+    private static DebugManager instance;
+
     [Header("References")]
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private MatchController matchController;
@@ -25,6 +27,7 @@ public class DebugManager : MonoBehaviour
 
     private void Awake()
     {
+        instance = this;
         TryAutoAssignReferences();
         if (sendButton != null)
             sendButton.onClick.AddListener(HandleSendClicked);
@@ -36,6 +39,54 @@ public class DebugManager : MonoBehaviour
         if (sendButton != null)
             sendButton.onClick.RemoveListener(HandleSendClicked);
         UnregisterInputSubmitListeners();
+        UiInputBlocker.SetExplicitTextInputFocused(false);
+        if (instance == this)
+            instance = null;
+    }
+
+    private void OnDisable()
+    {
+        UiInputBlocker.SetExplicitTextInputFocused(false);
+    }
+
+    public static bool TryFocusCommandInput()
+    {
+        if (instance == null)
+            return false;
+
+        instance.StartCoroutine(instance.FocusCommandInputNextFrame());
+        return true;
+    }
+
+    public static bool TryReleaseCommandInput()
+    {
+        if (instance == null)
+            return false;
+
+        instance.ReleaseCommandInputFocus();
+        return true;
+    }
+
+    public static bool IsDebugCommandInputFocused()
+    {
+        return instance != null && instance.IsCommandInputFocused();
+    }
+
+    public static bool TryConsumeDebugToggleCharacterFromInput()
+    {
+        if (instance == null)
+            return false;
+
+        string value = instance.GetInputText();
+        if (string.IsNullOrEmpty(value))
+            return false;
+
+        char last = value[value.Length - 1];
+        if (last != '\'' && last != ';' && last != '`')
+            return false;
+
+        instance.SetInputText(value.Substring(0, value.Length - 1));
+        return true;
     }
 
 #if UNITY_EDITOR
@@ -47,7 +98,16 @@ public class DebugManager : MonoBehaviour
 
     private void Update()
     {
-        if (!IsCommandInputFocused())
+        bool commandInputFocused = IsCommandInputFocused();
+        if (!commandInputFocused)
+        {
+            // Mantem foco "grudado" no input enquanto o panel_debug estiver aberto.
+            FocusCommandInputNow();
+            commandInputFocused = IsCommandInputFocused();
+        }
+        UiInputBlocker.SetExplicitTextInputFocused(commandInputFocused);
+
+        if (!commandInputFocused)
             return;
 
         // Enquanto estiver digitando no panel_debug, bloqueia qualquer atalho de gameplay.
@@ -114,6 +174,36 @@ public class DebugManager : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
+        else if (command == "WAKE ALL UNITS")
+        {
+            executed = turnStateManager.TryWakeAllUnitsForActiveTeamFromDebug(out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (TryParseSetActiveTeamCommand(command, out int activeTeamValue))
+        {
+            executed = turnStateManager.TrySetActiveTeamFromDebug(activeTeamValue, out string message);
+            if (executed)
+            {
+                cursorController?.PlayDoneSfx();
+                PanelDialogController.TrySetTransientText($"DEBUG: Active Team forced to {activeTeamValue}", 2.6f);
+            }
+            if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (command == "HELP")
+        {
+            string helpText = BuildDebugHelpSummary();
+            bool shownOnHelper = PanelHelperController.TrySetTransientText("DEBUG COMMANDS", helpText, 35f);
+            if (!shownOnHelper)
+                PanelDialogController.TrySetTransientText("Debug help enviado ao console", 2.4f);
+
+            Debug.Log($"[Debug Command] HELP\n{helpText}");
+            cursorController?.PlayBeepSfx();
+            executed = true;
+        }
         else if (TryParseSetHpCommand(command, out int hpValue))
         {
             executed = turnStateManager.TrySetUnitHpUnderCursorFromDebug(hpValue, out string message);
@@ -165,6 +255,14 @@ public class DebugManager : MonoBehaviour
         else if (TryParseSetConstructionTeamCommand(command, out int constructionTeam))
         {
             executed = turnStateManager.TrySetConstructionTeamUnderCursorFromDebug(constructionTeam, out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (TryParseSetOwnerCommand(command, out int ownerTeam))
+        {
+            executed = turnStateManager.TrySetConstructionTeamUnderCursorFromDebug(ownerTeam, out string message);
             if (executed)
                 cursorController?.PlayDoneSfx();
             else if (!string.IsNullOrWhiteSpace(message))
@@ -345,6 +443,49 @@ public class DebugManager : MonoBehaviour
         HandleSendClicked();
     }
 
+    private System.Collections.IEnumerator FocusCommandInputNextFrame()
+    {
+        yield return null;
+        FocusCommandInputNow();
+    }
+
+    private void FocusCommandInputNow()
+    {
+        TryAutoAssignReferences();
+        if (resolvedCommandInputField == null)
+            return;
+
+        if (resolvedLegacyInputField != null)
+        {
+            EventSystem.current?.SetSelectedGameObject(resolvedLegacyInputField.gameObject);
+            resolvedLegacyInputField.Select();
+            resolvedLegacyInputField.ActivateInputField();
+            return;
+        }
+
+        if (resolvedTmpInputField != null)
+        {
+            EventSystem.current?.SetSelectedGameObject(resolvedTmpInputField.gameObject);
+            resolvedTmpInputField.Select();
+            resolvedTmpInputField.ActivateInputField();
+            return;
+        }
+
+        GameObject target = resolvedCommandInputField.gameObject;
+        EventSystem.current?.SetSelectedGameObject(target);
+    }
+
+    private void ReleaseCommandInputFocus()
+    {
+        if (resolvedLegacyInputField != null)
+            resolvedLegacyInputField.DeactivateInputField();
+        if (resolvedTmpInputField != null)
+            resolvedTmpInputField.DeactivateInputField();
+
+        EventSystem.current?.SetSelectedGameObject(null);
+        UiInputBlocker.SetExplicitTextInputFocused(false);
+    }
+
     private static bool IsEnterPressedThisFrame()
     {
 #if ENABLE_INPUT_SYSTEM
@@ -401,11 +542,14 @@ public class DebugManager : MonoBehaviour
 
         const string prefixA = "SET AUTONOMY ";
         const string prefixB = "SET AUTONOMI ";
+        const string prefixC = "SET FUEL ";
         string valueToken = string.Empty;
         if (normalizedCommand.StartsWith(prefixA))
             valueToken = normalizedCommand.Substring(prefixA.Length).Trim();
         else if (normalizedCommand.StartsWith(prefixB))
             valueToken = normalizedCommand.Substring(prefixB.Length).Trim();
+        else if (normalizedCommand.StartsWith(prefixC))
+            valueToken = normalizedCommand.Substring(prefixC.Length).Trim();
         else
             return false;
 
@@ -535,6 +679,67 @@ public class DebugManager : MonoBehaviour
             return false;
 
         return int.TryParse(valueToken, out teamValue);
+    }
+
+    private static bool TryParseSetOwnerCommand(string normalizedCommand, out int teamValue)
+    {
+        teamValue = 0;
+        if (string.IsNullOrWhiteSpace(normalizedCommand))
+            return false;
+
+        const string prefix = "SET OWNER ";
+        if (!normalizedCommand.StartsWith(prefix))
+            return false;
+
+        string valueToken = normalizedCommand.Substring(prefix.Length).Trim();
+        if (string.IsNullOrWhiteSpace(valueToken))
+            return false;
+
+        return int.TryParse(valueToken, out teamValue);
+    }
+
+    private static bool TryParseSetActiveTeamCommand(string normalizedCommand, out int teamValue)
+    {
+        teamValue = 0;
+        if (string.IsNullOrWhiteSpace(normalizedCommand))
+            return false;
+
+        const string prefix = "SET ACTIVE TEAM ";
+        if (!normalizedCommand.StartsWith(prefix))
+            return false;
+
+        string valueToken = normalizedCommand.Substring(prefix.Length).Trim();
+        if (string.IsNullOrWhiteSpace(valueToken))
+            return false;
+
+        return int.TryParse(valueToken, out teamValue);
+    }
+
+    private static string BuildDebugHelpSummary()
+    {
+        return
+            "wake unit - acorda unidade no cursor\n" +
+            "wake all units - acorda todas unidades do time ativo\n" +
+            "destroy unit - destroi unidade no cursor\n" +
+            "set hp <v>\n" +
+            "set autonomy <v>\n" +
+            "set fuel <v> (alias de set autonomy)\n" +
+            "set move_remain <v>\n" +
+            "set ammo <v> | set ammo:<idx> <v>\n" +
+            "set galao <v> | set caixas <v> | set pecas <v>\n" +
+            "refuel unit | rearm unit | repair unit\n" +
+            "set construction team <x>\n" +
+            "set owner <x> (alias, -1 neutro, 0 verde, 1 azul, 2 vermelho, 3 amarelo)\n" +
+            "set active team <x> (troca time ativo sem avancar turno)\n" +
+            "set capture points <v>\n" +
+            "spawn <unit>\n" +
+            "spawn:<team> <unit>\n" +
+            "set money <v> | set money:<team> <v>\n" +
+            "set economy on|off\n" +
+            "change altitude <dominio>/<altura>\n" +
+            "landing | emerge | submerge | take off | fast take off\n" +
+            "fow on|off\n" +
+            "help";
     }
 
     private static bool TryParseSetCapturePointsCommand(string normalizedCommand, out int capturePointsValue)
@@ -959,6 +1164,7 @@ public class DebugManager : MonoBehaviour
 public static class UiInputBlocker
 {
     private static int suppressUntilFrame = -1;
+    private static bool explicitTextInputFocused;
 
     public static void SuppressGameplayInputForFrames(int frames)
     {
@@ -966,8 +1172,16 @@ public static class UiInputBlocker
         suppressUntilFrame = Mathf.Max(suppressUntilFrame, Time.frameCount + safeFrames);
     }
 
+    public static void SetExplicitTextInputFocused(bool focused)
+    {
+        explicitTextInputFocused = focused;
+    }
+
     public static bool IsTextInputFocused()
     {
+        if (explicitTextInputFocused)
+            return true;
+
         if (Time.frameCount <= suppressUntilFrame)
             return true;
 
@@ -986,6 +1200,23 @@ public static class UiInputBlocker
         TMP_InputField tmpInput = selected.GetComponentInParent<TMP_InputField>();
         if (tmpInput != null && tmpInput.isFocused)
             return true;
+
+        // Fallback robusto: alguns fluxos nao mantem o selected GameObject no input.
+        TMP_InputField[] tmpInputs = Object.FindObjectsByType<TMP_InputField>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < tmpInputs.Length; i++)
+        {
+            TMP_InputField field = tmpInputs[i];
+            if (field != null && field.isActiveAndEnabled && field.isFocused)
+                return true;
+        }
+
+        InputField[] legacyInputs = Object.FindObjectsByType<InputField>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < legacyInputs.Length; i++)
+        {
+            InputField field = legacyInputs[i];
+            if (field != null && field.isActiveAndEnabled && field.isFocused)
+                return true;
+        }
 
         return false;
     }

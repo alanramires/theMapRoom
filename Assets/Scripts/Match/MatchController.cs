@@ -465,6 +465,15 @@ public class MatchController : MonoBehaviour
         ApplyActiveTeamIfChanged(force: false);
     }
 
+    // Debug: troca o time ativo sem aplicar efeitos de inicio de turno
+    // (economia/upkeep/reset acted), mas atualiza musica/FoW/cursor/UI.
+    public void SetActiveTeamIdWithoutTurnStart(int teamId)
+    {
+        activeTeamId = Mathf.Clamp(teamId, -1, 3);
+        SyncActivePlayerIndexFromActiveTeam();
+        ApplyActiveTeamIfChanged(force: false, applyTurnStartEffects: false);
+    }
+
     // Debug: avanca apenas o cursor de team sem alterar currentTurn.
     public void AdvanceTeam()
     {
@@ -734,7 +743,7 @@ public class MatchController : MonoBehaviour
         ApplyActiveTeamIfChanged(force: false);
     }
 
-    private void ApplyActiveTeamIfChanged(bool force)
+    private void ApplyActiveTeamIfChanged(bool force, bool applyTurnStartEffects = true)
     {
         if (!force && appliedActiveTeamId == activeTeamId)
             return;
@@ -743,7 +752,10 @@ public class MatchController : MonoBehaviour
         if (Application.isPlaying)
             OnActiveTeamChanged?.Invoke(activeTeamId);
         TeleportCursorToActiveTeamHeadQuarterSilently();
-        ReleaseUnitsForActiveTeam();
+        if (applyTurnStartEffects)
+            ReleaseUnitsForActiveTeam();
+        else
+            pendingTurnStartAutonomyHelperEntries = null;
         if (!debugFogOfWarEnabled)
         {
             ResetFogOfWarRuntime(clearTilemap: true);

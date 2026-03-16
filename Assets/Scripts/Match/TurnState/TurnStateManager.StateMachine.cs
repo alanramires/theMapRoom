@@ -341,7 +341,10 @@ public partial class TurnStateManager
                 selectedUnit.TeamId,
                 selectedUnit))
         {
-            PushPanelUnitMessage("Hex disputado: ja existe aliado no local", 2.4f);
+            string message = PanelDialogController.ResolveDialogMessage(
+                "hex.contested.occupied",
+                "Hex disputado: ja existe uma unidade no local");
+            PushPanelUnitMessage(message, 2.4f);
             Debug.Log("movimento bloqueado: em hex disputado nao pode haver duas unidades do mesmo time");
             return ActionSfx.Error;
         }

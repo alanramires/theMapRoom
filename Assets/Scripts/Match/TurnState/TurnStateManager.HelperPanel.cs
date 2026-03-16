@@ -480,7 +480,7 @@ public partial class TurnStateManager
         if (resources != null && resources.Count > 0)
         {
             data.UnitStatsLines.Add(string.Empty);
-            data.UnitStatsLines.Add("Carroceria");
+            data.UnitStatsLines.Add("Reserva");
             AppendSupplierStockLines(data.UnitStatsLines, unit);
         }
 

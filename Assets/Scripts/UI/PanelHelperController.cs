@@ -13,6 +13,8 @@ using UnityEditor;
 
 public class PanelHelperController : MonoBehaviour
 {
+    private static PanelHelperController instance;
+
     private struct CoordinateOverlayLabel
     {
         public Vector3Int cell;
@@ -83,12 +85,23 @@ public class PanelHelperController : MonoBehaviour
     private GUIStyle coordinateOverlayLabelStyle;
     private GUIStyle coordinateOverlayHighlightStyle;
     private int lastUpkeepSignature;
+    private bool hasExternalOverrideText;
+    private string externalOverrideTitle = string.Empty;
+    private string externalOverrideBody = string.Empty;
+    private float externalOverrideUntilUnscaledTime = -1f;
 
     private void Awake()
     {
+        instance = this;
         TryAutoAssignReferences();
         CacheOriginalLayoutIfNeeded();
         HideAll(force: true);
+    }
+
+    private void OnDestroy()
+    {
+        if (instance == this)
+            instance = null;
     }
 
     private void Update()
@@ -187,6 +200,23 @@ public class PanelHelperController : MonoBehaviour
 
     private void Refresh(bool force)
     {
+        if (hasExternalOverrideText &&
+            externalOverrideUntilUnscaledTime > 0f &&
+            Time.unscaledTime >= externalOverrideUntilUnscaledTime)
+        {
+            hasExternalOverrideText = false;
+            externalOverrideTitle = string.Empty;
+            externalOverrideBody = string.Empty;
+            externalOverrideUntilUnscaledTime = -1f;
+        }
+
+        if (hasExternalOverrideText)
+        {
+            SetVisible(panelVisible: true, title: externalOverrideTitle, body: externalOverrideBody, force: force);
+            RefreshDockByCursorProximity();
+            return;
+        }
+
         if (turnStateManager == null || !turnStateManager.TryBuildHelperPanelData(out TurnStateManager.HelperPanelData data))
         {
             HideAll(force);
@@ -1044,6 +1074,68 @@ public class PanelHelperController : MonoBehaviour
     {
         TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
         return TeamUtils.GetColor(activeTeam);
+    }
+
+    public static bool TrySetExternalText(string title, string body)
+    {
+        if (instance == null)
+            return false;
+
+        instance.SetExternalText(title, body, 0f, timed: false);
+        return true;
+    }
+
+    public static string ResolveHelperMessage(string id, string fallback)
+    {
+        if (instance == null)
+            return fallback ?? string.Empty;
+
+        return instance.ResolveMessage(id, fallback);
+    }
+
+    public static string ResolveHelperMessage(string id, string fallback, IReadOnlyDictionary<string, string> tokens)
+    {
+        if (instance == null)
+            return ApplyInlineTokens(fallback ?? string.Empty, tokens);
+
+        return instance.ResolveMessage(id, fallback, tokens);
+    }
+
+    public static bool TrySetTransientText(string title, string body, float durationSeconds = 2.4f)
+    {
+        if (instance == null)
+            return false;
+
+        instance.SetExternalText(title, body, Mathf.Max(0.05f, durationSeconds), timed: true);
+        return true;
+    }
+
+    public static void ClearExternalText()
+    {
+        if (instance == null)
+            return;
+
+        instance.hasExternalOverrideText = false;
+        instance.externalOverrideTitle = string.Empty;
+        instance.externalOverrideBody = string.Empty;
+        instance.externalOverrideUntilUnscaledTime = -1f;
+    }
+
+    private void SetExternalText(string title, string body, float durationSeconds, bool timed)
+    {
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+        {
+            hasExternalOverrideText = false;
+            externalOverrideTitle = string.Empty;
+            externalOverrideBody = string.Empty;
+            externalOverrideUntilUnscaledTime = -1f;
+            return;
+        }
+
+        hasExternalOverrideText = true;
+        externalOverrideTitle = title ?? string.Empty;
+        externalOverrideBody = body ?? string.Empty;
+        externalOverrideUntilUnscaledTime = timed ? Time.unscaledTime + Mathf.Max(0.05f, durationSeconds) : -1f;
     }
 
     private void RefreshDockByCursorProximity()

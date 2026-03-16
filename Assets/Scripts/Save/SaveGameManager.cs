@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -15,8 +16,9 @@ public class SaveGameManager : MonoBehaviour
     [Serializable]
     private class SaveGameData
     {
-        public int version = 2;
+        public int version = 3;
         public string sceneName;
+        public long savedAtUtcTicks;
         public int currentTurn;
         public int activeTeamId;
         public bool includeNeutralTeam;
@@ -112,21 +114,56 @@ public class SaveGameManager : MonoBehaviour
     [Header("Quick Save/Load")]
     [SerializeField] private bool enableHotkeys = true;
     [SerializeField] private KeyCode quickSaveKey = KeyCode.I;
-    [SerializeField] private KeyCode quickLoadKey = KeyCode.Alpha0;
-    [SerializeField] private string slotName = "quicksave";
-    [SerializeField, Range(1, 3)] private int activeSlot = 1;
-    [SerializeField] private bool useSceneSpecificSlot = true;
+    [SerializeField] private KeyCode quickLoadKey = KeyCode.O;
+    [FormerlySerializedAs("slotName")]
+    [SerializeField] private string fileNameDefault = "<Map>_<date>_<hour>";
+    [SerializeField] private bool useSceneSpecificSlot = false;
+    [Header("Save Path")]
+    [Tooltip("Diretorio atual de save (editavel). Se vazio, usa Application.persistentDataPath.")]
+    [SerializeField] private string customSaveDirectory = string.Empty;
     [SerializeField] private bool blockCrossSceneLoad = true;
     [SerializeField] private bool verboseLogs = true;
     [SerializeField] private bool forceLoadWhenBusy = true;
 
+    private enum SlotPromptState
+    {
+        None = 0,
+        SaveSelectSlot = 1,
+        SaveConfirmOverwrite = 2,
+        LoadSelectSlot = 3
+    }
+
+    private sealed class SaveSlotMetadata
+    {
+        public int slotIndex;
+        public bool exists;
+        public string sceneName;
+        public DateTime savedAtLocal;
+        public string path;
+    }
+
     private bool loadInProgress;
+    private SlotPromptState promptState;
+    private int overwritePendingSlot;
     private readonly Dictionary<string, ServiceData> cachedServicesById = new Dictionary<string, ServiceData>(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SupplyData> cachedSuppliesById = new Dictionary<string, SupplyData>(StringComparer.OrdinalIgnoreCase);
 
     private void Awake()
     {
+        EnsureDefaultSaveDirectoryConfigured();
         TryAutoAssignReferences();
+    }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        EnsureDefaultSaveDirectoryConfigured();
+    }
+#endif
+
+    private void OnDisable()
+    {
+        CancelPrompt(clearDialogOverride: true);
     }
 
     private void Update()
@@ -134,20 +171,33 @@ public class SaveGameManager : MonoBehaviour
         if (!Application.isPlaying || !enableHotkeys || loadInProgress)
             return;
 
+        if (promptState != SlotPromptState.None)
+        {
+            UiInputBlocker.SuppressGameplayInputForFrames(1);
+            HandlePromptInput();
+            return;
+        }
+
         if (UiInputBlocker.IsTextInputFocused())
             return;
 
         if (WasKeyPressedThisFrame(quickSaveKey))
-            Save();
+        {
+            OpenSaveSlotPrompt();
+            return;
+        }
 
         if (WasKeyPressedThisFrame(quickLoadKey))
-            Load();
+        {
+            OpenLoadSlotPrompt();
+            return;
+        }
     }
 
     [ContextMenu("Save Quick Slot")]
     public void Save()
     {
-        SaveSlot(activeSlot);
+        SaveSlot(1);
     }
 
     [ContextMenu("Save Slot 1")]
@@ -158,6 +208,208 @@ public class SaveGameManager : MonoBehaviour
 
     [ContextMenu("Save Slot 3")]
     public void SaveSlot3() => SaveSlot(3);
+
+    private void OpenSaveSlotPrompt()
+    {
+        promptState = SlotPromptState.SaveSelectSlot;
+        overwritePendingSlot = 0;
+        cursorController?.PlayConfirmSfx();
+        PanelDialogController.ClearExternalText();
+        RefreshPromptHelper();
+    }
+
+    private void OpenLoadSlotPrompt()
+    {
+        promptState = SlotPromptState.LoadSelectSlot;
+        overwritePendingSlot = 0;
+        cursorController?.PlayConfirmSfx();
+        PanelDialogController.ClearExternalText();
+        RefreshPromptHelper();
+    }
+
+    private void HandlePromptInput()
+    {
+        if (WasAnySlotNumberPressedThisFrame(out int slotPressed))
+        {
+            HandleSlotChosen(slotPressed);
+            return;
+        }
+
+        if (promptState == SlotPromptState.SaveConfirmOverwrite &&
+            (WasKeyPressedThisFrame(KeyCode.Return) || WasKeyPressedThisFrame(KeyCode.KeypadEnter)))
+        {
+            SaveSlot(overwritePendingSlot);
+            CancelPrompt(clearDialogOverride: false);
+            return;
+        }
+
+        if (WasKeyPressedThisFrame(KeyCode.Escape))
+        {
+            if (promptState == SlotPromptState.SaveConfirmOverwrite)
+            {
+                promptState = SlotPromptState.SaveSelectSlot;
+                overwritePendingSlot = 0;
+                PanelDialogController.ClearExternalText();
+                RefreshPromptHelper();
+            }
+            else
+            {
+                CancelPrompt(clearDialogOverride: true);
+            }
+            cursorController?.PlayBeepSfx();
+        }
+    }
+
+    private void HandleSlotChosen(int slotIndex)
+    {
+        int normalizedSlot = NormalizeSlot(slotIndex);
+        SaveSlotMetadata metadata = ReadSlotMetadata(normalizedSlot);
+        if (promptState == SlotPromptState.LoadSelectSlot)
+        {
+            if (!metadata.exists)
+            {
+                cursorController?.PlayErrorSfx();
+                string text = ResolveDialog(
+                    "dialog.load_prompt.slot_empty",
+                    "Nao e possivel carregar: slot <slot> vazio.",
+                    new Dictionary<string, string> { { "slot", normalizedSlot.ToString() } });
+                PanelDialogController.TrySetTransientText(text, 2.4f);
+                return;
+            }
+
+            LoadSlot(normalizedSlot);
+            CancelPrompt(clearDialogOverride: false);
+            return;
+        }
+
+        if (metadata.exists)
+        {
+            promptState = SlotPromptState.SaveConfirmOverwrite;
+            overwritePendingSlot = normalizedSlot;
+            PanelDialogController.TrySetExternalText(BuildOverwriteDialogText(metadata));
+            RefreshPromptHelper();
+            cursorController?.PlayBeepSfx();
+            return;
+        }
+
+        SaveSlot(normalizedSlot);
+        CancelPrompt(clearDialogOverride: false);
+    }
+
+    private void CancelPrompt(bool clearDialogOverride)
+    {
+        if (promptState == SlotPromptState.None)
+            return;
+
+        promptState = SlotPromptState.None;
+        overwritePendingSlot = 0;
+        PanelHelperController.ClearExternalText();
+        if (clearDialogOverride)
+            PanelDialogController.ClearExternalText();
+    }
+
+    private void RefreshPromptHelper()
+    {
+        if (promptState == SlotPromptState.None)
+        {
+            PanelHelperController.ClearExternalText();
+            return;
+        }
+
+        string title = promptState == SlotPromptState.LoadSelectSlot
+            ? ResolveHelper("helper.load_prompt.title", "LOAD")
+            : ResolveHelper("helper.save_prompt.title", "SAVE");
+        string body = BuildPromptBody();
+        PanelHelperController.TrySetExternalText(title, body);
+    }
+
+    private string BuildPromptBody()
+    {
+        StringBuilder sb = new StringBuilder();
+        string header = promptState == SlotPromptState.LoadSelectSlot
+            ? ResolveHelper("helper.load_prompt.header", "carregar jogo")
+            : ResolveHelper("helper.save_prompt.header", "salvar em qual slot");
+        sb.AppendLine(header);
+        for (int slot = 1; slot <= 3; slot++)
+        {
+            SaveSlotMetadata metadata = ReadSlotMetadata(slot);
+            sb.AppendLine(BuildSlotDisplayLine(metadata));
+        }
+
+        if (promptState == SlotPromptState.SaveConfirmOverwrite)
+        {
+            sb.Append(ResolveHelper("helper.save_prompt.footer.overwrite", "ENTER: confirmar sobrescrita | ESC: voltar"));
+        }
+        else if (promptState == SlotPromptState.LoadSelectSlot)
+        {
+            sb.Append(ResolveHelper("helper.load_prompt.footer.select", "ESC: cancelar"));
+        }
+        else
+        {
+            sb.Append(ResolveHelper("helper.save_prompt.footer.select", "ESC: cancelar"));
+        }
+
+        return sb.ToString();
+    }
+
+    private string BuildSlotDisplayLine(SaveSlotMetadata metadata)
+    {
+        if (metadata == null)
+            return "-";
+
+        if (!metadata.exists)
+        {
+            return ResolveHelper(
+                "helper.slot.line.empty",
+                "<slot>:",
+                new Dictionary<string, string> { { "slot", metadata.slotIndex.ToString() } });
+        }
+
+        string scene = string.IsNullOrWhiteSpace(metadata.sceneName) ? "Mapa desconhecido" : metadata.sceneName.Trim();
+        string date = metadata.savedAtLocal.ToString("dd-MM-yy HH'h'mm");
+        return ResolveHelper(
+            "helper.slot.line.filled",
+            "<slot>:  <scene> - <date>",
+            new Dictionary<string, string>
+            {
+                { "slot", metadata.slotIndex.ToString() },
+                { "scene", scene },
+                { "date", date }
+            });
+    }
+
+    private string BuildOverwriteDialogText(SaveSlotMetadata metadata)
+    {
+        string slotLine = BuildSlotDisplayLine(metadata);
+        return ResolveDialog(
+            "dialog.save_prompt.overwrite_confirm",
+            "<slot_line>\nSobrescrever este save?\nENTER: confirmar | ESC: voltar",
+            new Dictionary<string, string> { { "slot_line", slotLine } });
+    }
+
+    private bool WasAnySlotNumberPressedThisFrame(out int slotIndex)
+    {
+        if (WasKeyPressedThisFrame(KeyCode.Alpha1) || WasKeyPressedThisFrame(KeyCode.Keypad1))
+        {
+            slotIndex = 1;
+            return true;
+        }
+
+        if (WasKeyPressedThisFrame(KeyCode.Alpha2) || WasKeyPressedThisFrame(KeyCode.Keypad2))
+        {
+            slotIndex = 2;
+            return true;
+        }
+
+        if (WasKeyPressedThisFrame(KeyCode.Alpha3) || WasKeyPressedThisFrame(KeyCode.Keypad3))
+        {
+            slotIndex = 3;
+            return true;
+        }
+
+        slotIndex = 0;
+        return false;
+    }
 
     public void SaveSlot(int slotIndex)
     {
@@ -182,8 +434,8 @@ public class SaveGameManager : MonoBehaviour
 
             SaveGameData data = BuildSaveData();
             string json = JsonUtility.ToJson(data, true);
-            string path = GetSlotPath(normalizedSlot);
-            Directory.CreateDirectory(Path.GetDirectoryName(path) ?? Application.persistentDataPath);
+            string path = ResolveWritableSlotPath(normalizedSlot);
+            Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ResolveSaveDirectory());
             File.WriteAllText(path, json);
             cursorController?.PlayLoadSfx();
             PanelDialogController.TrySetTransientText("Game saved", 2.2f);
@@ -198,7 +450,7 @@ public class SaveGameManager : MonoBehaviour
     [ContextMenu("Load Quick Slot")]
     public void Load()
     {
-        LoadSlot(activeSlot);
+        LoadSlot(1);
     }
 
     [ContextMenu("Load Slot 1")]
@@ -229,7 +481,7 @@ public class SaveGameManager : MonoBehaviour
             return;
         }
         int normalizedSlot = NormalizeSlot(slotIndex);
-        string path = GetSlotPath(normalizedSlot);
+        string path = ResolveReadableSlotPath(normalizedSlot);
         if (!File.Exists(path))
         {
             cursorController?.PlayErrorSfx();
@@ -285,7 +537,7 @@ public class SaveGameManager : MonoBehaviour
     public void ClearSlot(int slotIndex)
     {
         int normalizedSlot = NormalizeSlot(slotIndex);
-        string path = GetSlotPath(normalizedSlot);
+        string path = ResolveReadableSlotPath(normalizedSlot);
         if (!File.Exists(path))
         {
             Debug.LogWarning($"[SaveGame] Slot {normalizedSlot} ja esta vazio.");
@@ -553,6 +805,7 @@ public class SaveGameManager : MonoBehaviour
         SaveGameData data = new SaveGameData
         {
             sceneName = activeScene.name,
+            savedAtUtcTicks = DateTime.UtcNow.Ticks,
             currentTurn = matchController != null ? matchController.CurrentTurn : 0,
             activeTeamId = matchController != null ? matchController.ActiveTeamId : (int)TeamId.Green,
             includeNeutralTeam = matchController != null && matchController.IncludeNeutralTeam,
@@ -736,15 +989,10 @@ public class SaveGameManager : MonoBehaviour
         return true;
     }
 
-    private string GetSlotPath()
-    {
-        return GetSlotPath(activeSlot);
-    }
-
-    private string GetSlotPath(int slotIndex)
+    private string GetSlotPathFromTemplate(int slotIndex)
     {
         int normalizedSlot = NormalizeSlot(slotIndex);
-        string safeSlot = string.IsNullOrWhiteSpace(slotName) ? "quicksave" : slotName.Trim();
+        string safeSlot = ResolveFileNameDefaultTemplate();
         safeSlot = $"{safeSlot}_slot{normalizedSlot}";
         if (useSceneSpecificSlot)
         {
@@ -755,7 +1003,214 @@ public class SaveGameManager : MonoBehaviour
             safeSlot = $"{safeSlot}_{sceneName}_{sceneHash}";
         }
 
-        return Path.Combine(Application.persistentDataPath, safeSlot + ".json");
+        string fileName = SanitizeFileName(safeSlot) + ".json";
+        return Path.Combine(ResolveSaveDirectory(), fileName);
+    }
+
+    private string ResolveWritableSlotPath(int slotIndex)
+    {
+        string existing = ResolveReadableSlotPath(slotIndex);
+        if (File.Exists(existing))
+            return existing;
+
+        return GetSlotPathFromTemplate(slotIndex);
+    }
+
+    private string ResolveReadableSlotPath(int slotIndex)
+    {
+        int normalizedSlot = NormalizeSlot(slotIndex);
+        string primaryPath = GetSlotPathFromTemplate(normalizedSlot);
+        if (File.Exists(primaryPath))
+            return primaryPath;
+
+        string saveDir = ResolveSaveDirectory();
+        try
+        {
+            if (Directory.Exists(saveDir))
+            {
+                string[] candidates = Directory.GetFiles(saveDir, $"*_slot{normalizedSlot}.json", SearchOption.TopDirectoryOnly);
+                if (candidates != null && candidates.Length > 0)
+                {
+                    string latest = candidates[0];
+                    DateTime latestWrite = File.GetLastWriteTimeUtc(latest);
+                    for (int i = 1; i < candidates.Length; i++)
+                    {
+                        string current = candidates[i];
+                        DateTime currentWrite = File.GetLastWriteTimeUtc(current);
+                        if (currentWrite > latestWrite)
+                        {
+                            latest = current;
+                            latestWrite = currentWrite;
+                        }
+                    }
+
+                    return latest;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (verboseLogs)
+                Debug.LogWarning($"[SaveGame] Falha ao listar saves do slot {normalizedSlot}: {ex.Message}");
+        }
+
+        // Compatibilidade com arquivos antigos em persistentDataPath.
+        string legacyStem = string.IsNullOrWhiteSpace(fileNameDefault) ? "quicksave" : fileNameDefault.Trim();
+        string legacyName = $"{legacyStem}_slot{normalizedSlot}.json";
+        string legacyPath = Path.Combine(Application.persistentDataPath, SanitizeFileName(legacyName));
+        if (File.Exists(legacyPath))
+            return legacyPath;
+
+        return primaryPath;
+    }
+
+    private string ResolveFileNameDefaultTemplate()
+    {
+        string template = string.IsNullOrWhiteSpace(fileNameDefault) ? "<Map>_<date>_<hour>" : fileNameDefault.Trim();
+        Scene activeScene = SceneManager.GetActiveScene();
+        string mapName = string.IsNullOrWhiteSpace(activeScene.name) ? "Map" : activeScene.name.Trim();
+        DateTime localNow = DateTime.Now;
+        string dateTag = localNow.ToString("yyyy-MM-dd");
+        string hourTag = localNow.ToString("HH-mm");
+
+        return template
+            .Replace("<Map>", mapName)
+            .Replace("<date>", dateTag)
+            .Replace("<hour>", hourTag);
+    }
+
+    private string ResolveSaveDirectory()
+    {
+        string basePath = string.IsNullOrWhiteSpace(customSaveDirectory)
+            ? Application.persistentDataPath
+            : customSaveDirectory.Trim();
+
+        if (!Path.IsPathRooted(basePath))
+            basePath = Path.Combine(Application.persistentDataPath, basePath);
+
+        return basePath;
+    }
+
+    private void EnsureDefaultSaveDirectoryConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(customSaveDirectory))
+            customSaveDirectory = Application.persistentDataPath;
+    }
+
+    public string GetResolvedSaveDirectory()
+    {
+        return ResolveSaveDirectory();
+    }
+
+    public void SetCustomSaveDirectory(string directoryPath)
+    {
+        customSaveDirectory = string.IsNullOrWhiteSpace(directoryPath)
+            ? Application.persistentDataPath
+            : directoryPath.Trim();
+    }
+
+    [ContextMenu("Log Save Directory")]
+    public void LogSaveDirectory()
+    {
+        Debug.Log($"[SaveGame] Diretorio atual de save: {ResolveSaveDirectory()}");
+    }
+
+    private static string ResolveHelper(string id, string fallback)
+    {
+        return PanelHelperController.ResolveHelperMessage(id, fallback);
+    }
+
+    private static string ResolveHelper(string id, string fallback, IReadOnlyDictionary<string, string> tokens)
+    {
+        return PanelHelperController.ResolveHelperMessage(id, fallback, tokens);
+    }
+
+    private static string ResolveDialog(string id, string fallback)
+    {
+        return PanelDialogController.ResolveDialogMessage(id, fallback);
+    }
+
+    private static string ResolveDialog(string id, string fallback, IReadOnlyDictionary<string, string> tokens)
+    {
+        return PanelDialogController.ResolveDialogMessage(id, fallback, tokens);
+    }
+
+    private SaveSlotMetadata ReadSlotMetadata(int slotIndex)
+    {
+        int normalizedSlot = NormalizeSlot(slotIndex);
+        SaveSlotMetadata metadata = new SaveSlotMetadata
+        {
+            slotIndex = normalizedSlot,
+            exists = false,
+            sceneName = string.Empty,
+            savedAtLocal = DateTime.Now,
+            path = ResolveReadableSlotPath(normalizedSlot)
+        };
+
+        if (!File.Exists(metadata.path))
+            return metadata;
+
+        metadata.exists = true;
+
+        DateTime fallbackLocalTime = File.GetLastWriteTime(metadata.path);
+        try
+        {
+            string json = File.ReadAllText(metadata.path);
+            SaveGameData data = JsonUtility.FromJson<SaveGameData>(json);
+            if (data != null)
+            {
+                metadata.sceneName = data.sceneName ?? string.Empty;
+                if (data.savedAtUtcTicks > 0L)
+                {
+                    DateTime utc = new DateTime(data.savedAtUtcTicks, DateTimeKind.Utc);
+                    metadata.savedAtLocal = utc.ToLocalTime();
+                }
+                else
+                {
+                    metadata.savedAtLocal = fallbackLocalTime;
+                }
+            }
+            else
+            {
+                metadata.savedAtLocal = fallbackLocalTime;
+            }
+        }
+        catch (Exception ex)
+        {
+            metadata.savedAtLocal = fallbackLocalTime;
+            if (verboseLogs)
+                Debug.LogWarning($"[SaveGame] Nao foi possivel ler metadados do slot {normalizedSlot}: {ex.Message}");
+        }
+
+        if (string.IsNullOrWhiteSpace(metadata.sceneName))
+            metadata.sceneName = "Mapa desconhecido";
+
+        return metadata;
+    }
+
+    private static string SanitizeFileName(string raw)
+    {
+        string input = string.IsNullOrWhiteSpace(raw) ? "save_slot" : raw.Trim();
+        char[] invalid = Path.GetInvalidFileNameChars();
+        StringBuilder sb = new StringBuilder(input.Length);
+        for (int i = 0; i < input.Length; i++)
+        {
+            char ch = input[i];
+            bool isInvalid = false;
+            for (int j = 0; j < invalid.Length; j++)
+            {
+                if (invalid[j] == ch)
+                {
+                    isInvalid = true;
+                    break;
+                }
+            }
+
+            sb.Append(isInvalid ? '_' : ch);
+        }
+
+        string sanitized = sb.ToString().Trim();
+        return string.IsNullOrWhiteSpace(sanitized) ? "save_slot" : sanitized;
     }
 
     private static int NormalizeSlot(int slotIndex)

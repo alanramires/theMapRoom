@@ -600,6 +600,10 @@ public partial class TurnStateManager
                 int current = destinationStock != null && destinationStock.TryGetValue(supply, out int currentDst) ? Mathf.Max(0, currentDst) : 0;
                 int remaining = Mathf.Max(0, capacity - current);
                 transferable = Mathf.Min(transferable, remaining);
+
+                // Limite hard no runtime real da unidade (evita qualquer overflow por divergencia de snapshot).
+                int liveRemaining = GetUnitRemainingCapacityForSupply(destinationUnit, supply);
+                transferable = Mathf.Min(transferable, liveRemaining);
             }
 
             if (transferable <= 0)
@@ -899,6 +903,22 @@ public partial class TurnStateManager
         }
 
         return amount - remaining;
+    }
+
+    private static int GetUnitRemainingCapacityForSupply(UnitManager unit, SupplyData supply)
+    {
+        if (unit == null || supply == null)
+            return 0;
+
+        Dictionary<SupplyData, int> stockBySupply = ReadUnitStockMap(unit);
+        Dictionary<SupplyData, int> capacityBySupply = ReadUnitCapacityMap(unit);
+        if (capacityBySupply == null || !capacityBySupply.TryGetValue(supply, out int capacity))
+            return 0;
+
+        int current = stockBySupply != null && stockBySupply.TryGetValue(supply, out int existing)
+            ? Mathf.Max(0, existing)
+            : 0;
+        return Mathf.Max(0, Mathf.Max(0, capacity) - current);
     }
 
     private static int AddToConstruction(ConstructionManager construction, SupplyData supply, int amount)

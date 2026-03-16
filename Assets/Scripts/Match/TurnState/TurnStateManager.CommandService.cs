@@ -55,6 +55,9 @@ public partial class TurnStateManager
 
     private void ProcessCommandServiceHotkeyInput()
     {
+        if (UiInputBlocker.IsTextInputFocused())
+            return;
+
         if (!WasLetterPressedThisFrame('X'))
             return;
 

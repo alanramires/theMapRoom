@@ -90,11 +90,12 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
     {
         RefreshReferences(forceSceneInit: false);
         bool textInputFocused = UiInputBlocker.IsTextInputFocused();
+        bool debugInputFocused = DebugManager.IsDebugCommandInputFocused();
 
-        if (!textInputFocused && WasDebugTogglePressedThisFrame())
+        if (WasDebugTogglePressedThisFrame() && (!textInputFocused || debugInputFocused))
             TogglePanelDebug();
 
-        if (WasHotkeysTogglePressedThisFrame())
+        if (!textInputFocused && WasHotkeysTogglePressedThisFrame())
             TogglePanelHotkeys();
 
         if (!textInputFocused && WasFullscreenTogglePressedThisFrame())
@@ -177,7 +178,14 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
         if (panelDebug == null)
             return;
 
-        panelDebug.SetActive(!panelDebug.activeSelf);
+        bool willOpen = !panelDebug.activeSelf;
+        if (!willOpen)
+            DebugManager.TryConsumeDebugToggleCharacterFromInput();
+        panelDebug.SetActive(willOpen);
+        if (willOpen)
+            DebugManager.TryFocusCommandInput();
+        else
+            DebugManager.TryReleaseCommandInput();
     }
 
     private void TogglePanelHotkeys()

@@ -238,6 +238,8 @@ public static class PodeTransferirSensor
             UnitManager unit = unitsInCollectionRange[i];
             if (unit == null)
                 continue;
+            if ((int)unit.TeamId != (int)supplier.TeamId)
+                continue;
             if (!TryGetSupplierData(unit, out UnitData targetData))
                 continue;
             if (targetData.supplierTier != SupplierTier.Hub && targetData.supplierTier != SupplierTier.Receiver)
@@ -374,8 +376,6 @@ public static class PodeTransferirSensor
         List<PodeTransferirInvalidOption> invalidOutput)
     {
         bool hasValidHubSource = false;
-        bool hasEmbarkedStock = GetUnitTotalStock(supplier) > 0;
-        bool hasDonationTarget = false;
 
         if (constructionsInCollectionRange != null)
         {
@@ -419,33 +419,6 @@ public static class PodeTransferirSensor
                         });
                     }
                 }
-
-                if (!hasEmbarkedStock)
-                    continue;
-
-                // Receiver pode doar para construcoes no range (hub finita ou receiver).
-                if (constructionIsHub && ConstructionHasInfiniteSupply(construction))
-                {
-                    AppendInvalid(
-                        invalidOutput,
-                        supplier,
-                        null,
-                        construction,
-                        construction.CurrentCellPosition,
-                        TransferFlowMode.Fornecimento,
-                        "Construcao hub com suprimento infinito bloqueia modo doar.");
-                    continue;
-                }
-
-                hasDonationTarget = true;
-                output.Add(new PodeTransferirOption
-                {
-                    supplierUnit = supplier,
-                    targetConstruction = construction,
-                    targetCell = construction.CurrentCellPosition,
-                    flowMode = TransferFlowMode.Fornecimento,
-                    displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Fornecimento, null, construction)
-                });
             }
         }
 
@@ -498,31 +471,6 @@ public static class PodeTransferirSensor
                 origin: supplier.CurrentCellPosition,
                 mode: TransferFlowMode.Recebedor,
                 reason: "Receiver sem hub aliado valido no collection range.");
-        }
-
-        if (!hasEmbarkedStock)
-        {
-            AppendInvalid(
-                invalidOutput,
-                supplier,
-                null,
-                alliedConstruction,
-                supplier.CurrentCellPosition,
-                TransferFlowMode.Fornecimento,
-                "Receiver sem estoque embarcado para doar.");
-            return;
-        }
-
-        if (!hasDonationTarget)
-        {
-            AppendInvalid(
-                invalidOutput,
-                supplier,
-                null,
-                alliedConstruction,
-                supplier.CurrentCellPosition,
-                TransferFlowMode.Fornecimento,
-                "Receiver sem alvo elegivel para doar no collection range.");
         }
     }
 
@@ -857,23 +805,12 @@ public static class PodeTransferirSensor
         if (sourceStock == null || sourceStock.Count <= 0)
             return false;
 
-        Dictionary<SupplyData, long> destinationStock = ReadUnitStockMap(destinationUnit);
-        Dictionary<SupplyData, long> destinationCapacity = ReadUnitCapacityMap(destinationUnit);
-        if (destinationCapacity == null || destinationCapacity.Count <= 0)
-            return false;
-
         foreach (KeyValuePair<SupplyData, long> pair in sourceStock)
         {
             SupplyData supply = pair.Key;
             if (supply == null || pair.Value <= 0)
                 continue;
-            if (!destinationCapacity.TryGetValue(supply, out long capacity))
-                continue;
-
-            long current = destinationStock != null && destinationStock.TryGetValue(supply, out long existing)
-                ? existing
-                : 0;
-            long remaining = System.Math.Max(0L, capacity - current);
+            long remaining = GetUnitRemainingCapacityForSupply(destinationUnit, supply);
             if (remaining > 0)
                 return true;
         }
@@ -927,6 +864,22 @@ public static class PodeTransferirSensor
         }
 
         return map;
+    }
+
+    private static long GetUnitRemainingCapacityForSupply(UnitManager unit, SupplyData supply)
+    {
+        if (unit == null || supply == null)
+            return 0L;
+
+        Dictionary<SupplyData, long> stockBySupply = ReadUnitStockMap(unit);
+        Dictionary<SupplyData, long> capacityBySupply = ReadUnitCapacityMap(unit);
+        if (capacityBySupply == null || !capacityBySupply.TryGetValue(supply, out long capacity) || capacity <= 0L)
+            return 0L;
+
+        long current = stockBySupply != null && stockBySupply.TryGetValue(supply, out long existing)
+            ? existing
+            : 0L;
+        return System.Math.Max(0L, capacity - current);
     }
 
     private static Dictionary<SupplyData, long> ReadConstructionStockMap(ConstructionManager construction)

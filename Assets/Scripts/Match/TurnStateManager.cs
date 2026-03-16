@@ -217,6 +217,89 @@ public partial class TurnStateManager : MonoBehaviour
         return true;
     }
 
+    public bool TryWakeAllUnitsForActiveTeamFromDebug(out string message)
+    {
+        message = string.Empty;
+        if (matchController == null)
+        {
+            message = "MatchController nao encontrado.";
+            return false;
+        }
+
+        TeamId activeTeam = matchController.ActiveTeam;
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        int totalTeamUnits = 0;
+        int wokeUnits = 0;
+
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || unit.TeamId != activeTeam)
+                continue;
+
+            totalTeamUnits++;
+            if (!unit.HasActed)
+                continue;
+
+            unit.ResetActed();
+            wokeUnits++;
+        }
+
+        message = $"Wake all units: time ativo {TeamUtils.GetName(activeTeam)} | reativadas {wokeUnits}/{totalTeamUnits}.";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TrySetActiveTeamFromDebug(int teamValue, out string message)
+    {
+        message = string.Empty;
+        if (matchController == null)
+        {
+            message = "MatchController nao encontrado.";
+            return false;
+        }
+
+        if (teamValue < (int)TeamId.Neutral || teamValue > (int)TeamId.Yellow)
+        {
+            message = $"Team invalido: {teamValue}. Use entre {(int)TeamId.Neutral} e {(int)TeamId.Yellow}.";
+            return false;
+        }
+
+        TeamId previous = matchController.ActiveTeam;
+        TeamId next = (TeamId)teamValue;
+        if (previous == next)
+        {
+            message = $"Time ativo ja e {TeamUtils.GetName(next)} ({(int)next}).";
+            return true;
+        }
+
+        UnitManager previouslySelected = selectedUnit;
+        bool keepSelection =
+            previouslySelected != null &&
+            previouslySelected.TeamId == next &&
+            previouslySelected.gameObject.activeInHierarchy &&
+            !previouslySelected.IsEmbarked;
+
+        if (!keepSelection)
+        {
+            // Evita estado selecionado de outra equipe durante o switch forçado.
+            ForceNeutral();
+        }
+
+        matchController.SetActiveTeamIdWithoutTurnStart(teamValue);
+
+        if (keepSelection && cursorController != null)
+        {
+            Vector3Int selectedCell = previouslySelected.CurrentCellPosition;
+            selectedCell.z = 0;
+            cursorController.SetCell(selectedCell, playMoveSfx: false, adjustCamera: true);
+        }
+
+        message = $"Time ativo alterado: {TeamUtils.GetName(previous)} ({(int)previous}) -> {TeamUtils.GetName(next)} ({(int)next}) sem avancar turno.";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
     public bool TrySetUnitHpUnderCursorFromDebug(int hpValue, out string message)
     {
         message = string.Empty;
