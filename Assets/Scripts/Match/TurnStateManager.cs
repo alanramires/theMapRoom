@@ -173,7 +173,7 @@ public partial class TurnStateManager : MonoBehaviour
         UnitManager target = FindUnitAtCell(cursorCell);
         if (target == null)
         {
-            message = $"Nenhuma unidade no cursor ({cursorCell.x},{cursorCell.y},0).";
+            message = $"Nenhuma unidade no cursor {FormatMapCellWithZ(cursorCell)}.";
             return false;
         }
 
@@ -182,7 +182,7 @@ public partial class TurnStateManager : MonoBehaviour
 
         string targetName = ResolveDebugUnitName(target);
         StartCoroutine(ExecuteDebugDestroyUnitWithPresentation(target));
-        message = $"Destruindo unidade: {targetName} em ({cursorCell.x},{cursorCell.y},0).";
+        message = $"Destruindo unidade: {targetName} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -201,7 +201,7 @@ public partial class TurnStateManager : MonoBehaviour
         UnitManager target = FindUnitAtCell(cursorCell);
         if (target == null)
         {
-            message = $"Nenhuma unidade no cursor ({cursorCell.x},{cursorCell.y},0).";
+            message = $"Nenhuma unidade no cursor {FormatMapCellWithZ(cursorCell)}.";
             return false;
         }
 
@@ -212,7 +212,7 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         target.ResetActed();
-        message = $"Unidade reativada: {ResolveDebugUnitName(target)} em ({cursorCell.x},{cursorCell.y},0).";
+        message = $"Unidade reativada: {ResolveDebugUnitName(target)} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -231,7 +231,7 @@ public partial class TurnStateManager : MonoBehaviour
         UnitManager target = FindUnitAtCell(cursorCell);
         if (target == null)
         {
-            message = $"Nenhuma unidade no cursor ({cursorCell.x},{cursorCell.y},0).";
+            message = $"Nenhuma unidade no cursor {FormatMapCellWithZ(cursorCell)}.";
             return false;
         }
 
@@ -253,7 +253,7 @@ public partial class TurnStateManager : MonoBehaviour
 
         int beforeFuel = target.CurrentFuel;
         target.SetCurrentFuel(autonomyValue);
-        message = $"Autonomia atualizada: {ResolveDebugUnitName(target)} {beforeFuel}->{target.CurrentFuel}/{target.GetMaxFuel()} em ({cursorCell.x},{cursorCell.y},0).";
+        message = $"Autonomia atualizada: {ResolveDebugUnitName(target)} {beforeFuel}->{target.CurrentFuel}/{target.GetMaxFuel()} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -335,7 +335,7 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         string supplyLabel = ResolveSupplyDisplayName(matchedSupply);
-        message = $"Estoque atualizado: {ResolveDebugUnitName(target)} {supplyLabel} {before}->{after}/{Mathf.Max(0, max)} em ({cursorCell.x},{cursorCell.y},0).";
+        message = $"Estoque atualizado: {ResolveDebugUnitName(target)} {supplyLabel} {before}->{after}/{Mathf.Max(0, max)} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -350,7 +350,7 @@ public partial class TurnStateManager : MonoBehaviour
         int max = target.MaxMovementPoints;
         int clamped = Mathf.Clamp(remainingMovementValue, 0, Mathf.Max(0, max));
         target.SetRemainingMovementPoints(clamped);
-        message = $"Movimento restante atualizado: {ResolveDebugUnitName(target)} {before}->{target.RemainingMovementPoints}/{max} em ({cursorCell.x},{cursorCell.y},0).";
+        message = $"Movimento restante atualizado: {ResolveDebugUnitName(target)} {before}->{target.RemainingMovementPoints}/{max} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -364,7 +364,7 @@ public partial class TurnStateManager : MonoBehaviour
         int beforeFuel = target.CurrentFuel;
         int maxFuel = target.GetMaxFuel();
         target.SetCurrentFuel(maxFuel);
-        message = $"Autonomia recarregada: {ResolveDebugUnitName(target)} {beforeFuel}->{target.CurrentFuel}/{maxFuel} em ({cursorCell.x},{cursorCell.y},0).";
+        message = $"Autonomia recarregada: {ResolveDebugUnitName(target)} {beforeFuel}->{target.CurrentFuel}/{maxFuel} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -378,7 +378,7 @@ public partial class TurnStateManager : MonoBehaviour
         int beforeHp = target.CurrentHP;
         int maxHp = target.GetMaxHP();
         target.SetCurrentHP(maxHp);
-        message = $"Unidade reparada: {ResolveDebugUnitName(target)} {beforeHp}->{target.CurrentHP}/{maxHp} em ({cursorCell.x},{cursorCell.y},0).";
+        message = $"Unidade reparada: {ResolveDebugUnitName(target)} {beforeHp}->{target.CurrentHP}/{maxHp} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -413,7 +413,7 @@ public partial class TurnStateManager : MonoBehaviour
         int before = Mathf.Max(0, runtimeWeapon.squadAmmunition);
         runtimeWeapon.squadAmmunition = Mathf.Clamp(ammoValue, 0, maxAmmo);
         target.RefreshRuntimeVisualState();
-        message = $"Muni arma#{weaponOneBasedIndex} atualizada: {ResolveDebugUnitName(target)} {before}->{runtimeWeapon.squadAmmunition}/{maxAmmo} em ({cursorCell.x},{cursorCell.y},0).";
+        message = $"Muni arma#{weaponOneBasedIndex} atualizada: {ResolveDebugUnitName(target)} {before}->{runtimeWeapon.squadAmmunition}/{maxAmmo} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -447,7 +447,7 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         target.RefreshRuntimeVisualState();
-        message = $"Muni recarregada: {ResolveDebugUnitName(target)} | armas atualizadas={changed} em ({cursorCell.x},{cursorCell.y},0).";
+        message = $"Muni recarregada: {ResolveDebugUnitName(target)} | armas atualizadas={changed} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -493,11 +493,11 @@ public partial class TurnStateManager : MonoBehaviour
         GameObject spawned = unitSpawner.SpawnAtCell(unitData, teamId, cursorCell);
         if (spawned == null)
         {
-            message = $"Falha ao spawnar {ResolveDebugUnitDataName(unitData)} em ({cursorCell.x},{cursorCell.y},0). Hex pode estar ocupado.";
+            message = $"Falha ao spawnar {ResolveDebugUnitDataName(unitData)} em {FormatMapCellWithZ(cursorCell)}. Hex pode estar ocupado.";
             return false;
         }
 
-        message = $"Spawnado: {ResolveDebugUnitDataName(unitData)} em ({cursorCell.x},{cursorCell.y},0) para team {TeamUtils.GetName(teamId)}.";
+        message = $"Spawnado: {ResolveDebugUnitDataName(unitData)} em {FormatMapCellWithZ(cursorCell)} para team {TeamUtils.GetName(teamId)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -517,7 +517,7 @@ public partial class TurnStateManager : MonoBehaviour
         TeamId before = target.TeamId;
         TeamId next = (TeamId)teamValue;
         target.SetTeamId(next);
-        message = $"Construcao atualizada: {target.name} team {TeamUtils.GetName(before)} -> {TeamUtils.GetName(next)} em ({cursorCell.x},{cursorCell.y},0).";
+        message = $"Construcao atualizada: {target.name} team {TeamUtils.GetName(before)} -> {TeamUtils.GetName(next)} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -531,7 +531,7 @@ public partial class TurnStateManager : MonoBehaviour
         int before = target.CurrentCapturePoints;
         int max = Mathf.Max(0, target.CapturePointsMax);
         target.SetCurrentCapturePoints(capturePointsValue);
-        message = $"Capture points atualizados: {target.name} {before}->{target.CurrentCapturePoints}/{max} (req={capturePointsValue}) em ({cursorCell.x},{cursorCell.y},0).";
+        message = $"Capture points atualizados: {target.name} {before}->{target.CurrentCapturePoints}/{max} (req={capturePointsValue}) em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -911,6 +911,19 @@ public partial class TurnStateManager : MonoBehaviour
         return data.name;
     }
 
+    protected static string FormatMapCell(Vector3Int cell)
+    {
+        cell.z = 0;
+        int linha = -cell.y;
+        int coluna = cell.x;
+        return $"L{linha},C{coluna}";
+    }
+
+    protected static string FormatMapCellWithZ(Vector3Int cell)
+    {
+        return $"({FormatMapCell(cell)},0)";
+    }
+
     private bool TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out string message)
     {
         target = null;
@@ -928,7 +941,7 @@ public partial class TurnStateManager : MonoBehaviour
         target = FindUnitAtCell(cursorCell);
         if (target == null)
         {
-            message = $"Nenhuma unidade no cursor ({cursorCell.x},{cursorCell.y},0).";
+            message = $"Nenhuma unidade no cursor {FormatMapCellWithZ(cursorCell)}.";
             return false;
         }
 
@@ -974,7 +987,7 @@ public partial class TurnStateManager : MonoBehaviour
 
         if (target == null)
         {
-            message = $"Nenhuma construcao no cursor ({cursorCell.x},{cursorCell.y},0).";
+            message = $"Nenhuma construcao no cursor {FormatMapCellWithZ(cursorCell)}.";
             return false;
         }
 

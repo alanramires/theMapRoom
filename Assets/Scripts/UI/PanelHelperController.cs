@@ -324,7 +324,7 @@ public class PanelHelperController : MonoBehaviour
             int consumed = Mathf.Max(0, line.autonomyConsumed);
             int fuelBefore = Mathf.Max(0, line.fuelBefore);
             int fuelAfter = Mathf.Max(0, line.fuelAfter);
-            sb.AppendLine($"{unitName} {line.cell.x},{line.cell.y} Fuel {fuelBefore} - {consumed} = {fuelAfter}");
+            sb.AppendLine($"{unitName} {FormatMapCell(line.cell)} Fuel {fuelBefore} - {consumed} = {fuelAfter}");
         }
 
         return sb.ToString().TrimEnd();
@@ -1360,7 +1360,7 @@ public class PanelHelperController : MonoBehaviour
         coordinateOverlayLabels.Add(new CoordinateOverlayLabel
         {
             cell = cursorCell,
-            text = $"CUR {cursorCell.x},{cursorCell.y}",
+            text = $"CUR {FormatMapCell(cursorCell)}",
             color = cursorCoordinateColor
         });
 
@@ -1371,7 +1371,7 @@ public class PanelHelperController : MonoBehaviour
             coordinateOverlayLabels.Add(new CoordinateOverlayLabel
             {
                 cell = selectedCell,
-                text = $"SEL {selectedCell.x},{selectedCell.y}",
+                text = $"SEL {FormatMapCell(selectedCell)}",
                 color = selectedCoordinateColor
             });
         }
@@ -1398,7 +1398,7 @@ public class PanelHelperController : MonoBehaviour
             coordinateOverlayLabels.Add(new CoordinateOverlayLabel
             {
                 cell = cell,
-                text = $"EV {cell.x},{cell.y}",
+                text = $"EV {FormatMapCell(cell)}",
                 color = eventCoordinateColor
             });
         }
@@ -1440,6 +1440,13 @@ public class PanelHelperController : MonoBehaviour
         GUI.color = color;
         GUI.Label(rect, text, style);
         GUI.color = previous;
+    }
+
+    private static string FormatMapCell(Vector3Int cell)
+    {
+        int linha = -cell.y;
+        int coluna = cell.x;
+        return $"L{linha},C{coluna}";
     }
 
     private void EnsureCoordinateOverlayStyles()

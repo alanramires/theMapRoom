@@ -33,6 +33,20 @@ public class StructureAirOpsTerrainRule
     public bool requireAtLeastOneLandingSkill = false;
 }
 
+[System.Serializable]
+public class StructureSkillTerrainRule
+{
+    [Tooltip("Terreno base desta regra em par com a estrutura.")]
+    public TerrainTypeData terrainData;
+
+    [Tooltip("Se houver skills nesta lista, a unidade precisa ter pelo menos uma para entrar nesta estrutura neste terreno.")]
+    public List<SkillData> requiredSkillsToEnter = new List<SkillData>();
+    [Tooltip("Se a unidade possuir qualquer skill desta lista, entrada nesta estrutura neste terreno e bloqueada.")]
+    public List<SkillData> blockedSkills = new List<SkillData>();
+    [Tooltip("Overrides opcionais de custo de autonomia por skill neste par Estrutura+Terreno.")]
+    public List<TerrainSkillCostOverride> skillCostOverrides = new List<TerrainSkillCostOverride>();
+}
+
 [CreateAssetMenu(menuName = "Game/Structures/Structure Data", fileName = "StructureData_")]
 public class StructureData : ScriptableObject
 {
@@ -74,6 +88,8 @@ public class StructureData : ScriptableObject
     public List<SkillData> blockedSkills = new List<SkillData>();
     [Tooltip("Overrides opcionais de custo de autonomia por skill.")]
     public List<TerrainSkillCostOverride> skillCostOverrides = new List<TerrainSkillCostOverride>();
+    [Tooltip("Regras por par Estrutura+Terreno. Quando o terreno do hex casar, estas regras complementam/substituem as globais.")]
+    public List<StructureSkillTerrainRule> skillRulesByTerrain = new List<StructureSkillTerrainRule>();
 
     [Header("Build Rules")]
     [FormerlySerializedAs("additionalBuildLayerModes")]
@@ -117,6 +133,8 @@ public class StructureData : ScriptableObject
             blockedSkills = new List<SkillData>();
         if (skillCostOverrides == null)
             skillCostOverrides = new List<TerrainSkillCostOverride>();
+        if (skillRulesByTerrain == null)
+            skillRulesByTerrain = new List<StructureSkillTerrainRule>();
         if (aircraftOpsByTerrain == null)
             aircraftOpsByTerrain = new List<StructureAirOpsTerrainRule>();
         if (forceEndMovementOnTerrainDomainForDomains == null)
@@ -159,6 +177,66 @@ public class StructureData : ScriptableObject
                 }
             }
         }
+
+        for (int i = 0; i < skillRulesByTerrain.Count; i++)
+        {
+            StructureSkillTerrainRule rule = skillRulesByTerrain[i];
+            if (rule == null)
+                continue;
+
+            if (rule.requiredSkillsToEnter == null)
+                rule.requiredSkillsToEnter = new List<SkillData>();
+            if (rule.blockedSkills == null)
+                rule.blockedSkills = new List<SkillData>();
+            if (rule.skillCostOverrides == null)
+                rule.skillCostOverrides = new List<TerrainSkillCostOverride>();
+        }
+    }
+
+    public IReadOnlyList<SkillData> GetRequiredSkillsToEnter(TerrainTypeData terrain)
+    {
+        if (TryGetSkillRuleForTerrain(terrain, out StructureSkillTerrainRule rule) && rule.requiredSkillsToEnter != null && rule.requiredSkillsToEnter.Count > 0)
+            return rule.requiredSkillsToEnter;
+
+        return requiredSkillsToEnter;
+    }
+
+    public IReadOnlyList<SkillData> GetBlockedSkillsToEnter(TerrainTypeData terrain)
+    {
+        if (TryGetSkillRuleForTerrain(terrain, out StructureSkillTerrainRule rule) && rule.blockedSkills != null && rule.blockedSkills.Count > 0)
+            return rule.blockedSkills;
+
+        return blockedSkills;
+    }
+
+    public IReadOnlyList<TerrainSkillCostOverride> GetSkillCostOverrides(TerrainTypeData terrain)
+    {
+        if (TryGetSkillRuleForTerrain(terrain, out StructureSkillTerrainRule rule) && rule.skillCostOverrides != null && rule.skillCostOverrides.Count > 0)
+            return rule.skillCostOverrides;
+
+        return skillCostOverrides;
+    }
+
+    public bool TryGetSkillRuleForTerrain(TerrainTypeData terrain, out StructureSkillTerrainRule rule)
+    {
+        rule = null;
+        if (terrain == null || skillRulesByTerrain == null || skillRulesByTerrain.Count == 0)
+            return false;
+
+        for (int i = 0; i < skillRulesByTerrain.Count; i++)
+        {
+            StructureSkillTerrainRule candidate = skillRulesByTerrain[i];
+            if (candidate == null || candidate.terrainData == null)
+                continue;
+
+            if (candidate.terrainData == terrain)
+            {
+                rule = candidate;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public bool SupportsBuildOn(Domain domainToBuildOn, HeightLevel heightLevelToBuildOn)

@@ -408,7 +408,7 @@ public partial class TurnStateManager
 
                 string transporterName = invalid.transporterUnit != null
                     ? invalid.transporterUnit.name
-                    : $"hex {invalid.evaluatedCell.x},{invalid.evaluatedCell.y}";
+                    : $"hex {FormatMapCell(invalid.evaluatedCell)}";
                 string reason = !string.IsNullOrWhiteSpace(invalid.reason) ? invalid.reason : "motivo nao informado";
                 painel += $"\n- {transporterName}: {reason}";
             }
@@ -425,7 +425,7 @@ public partial class TurnStateManager
 
                 string passengerName = invalid.passengerUnit != null ? invalid.passengerUnit.name : "(sem passageiro)";
                 string reason = !string.IsNullOrWhiteSpace(invalid.reason) ? invalid.reason : "motivo nao informado";
-                painel += $"\n- {passengerName} @ {invalid.evaluatedCell.x},{invalid.evaluatedCell.y}: {reason}";
+                painel += $"\n- {passengerName} @ {FormatMapCell(invalid.evaluatedCell)}: {reason}";
             }
         }
         if (!podeMirar && cachedPodeMirarInvalidTargets.Count > 0)

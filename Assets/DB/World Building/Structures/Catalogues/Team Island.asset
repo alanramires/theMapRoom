@@ -115,14 +115,21 @@ MonoBehaviour:
     - routeName: HQ cima esquerda
       ownerDatabase: {fileID: 11400000}
       cells:
+      - {x: 8, y: -3, z: 0}
+      - {x: 7, y: -3, z: 0}
+      - {x: 6, y: -3, z: 0}
+      - {x: 5, y: -3, z: 0}
+      - {x: 4, y: -3, z: 0}
+      - {x: 4, y: -2, z: 0}
+      - {x: 3, y: -2, z: 0}
       - {x: 2, y: -2, z: 0}
       - {x: 3, y: -2, z: 0}
       - {x: 4, y: -2, z: 0}
-      - {x: 5, y: -2, z: 0}
+      - {x: 4, y: -3, z: 0}
       - {x: 5, y: -3, z: 0}
-      - {x: 6, y: -3, z: 0}
-      - {x: 7, y: -4, z: 0}
-      - {x: 7, y: -5, z: 0}
+      - {x: 6, y: -4, z: 0}
+      - {x: 6, y: -5, z: 0}
+      - {x: 7, y: -6, z: 0}
     - routeName: Ilha cima esquerda
       ownerDatabase: {fileID: 11400000}
       cells:
@@ -175,8 +182,8 @@ MonoBehaviour:
       - {x: 10, y: -3, z: 0}
       - {x: 9, y: -3, z: 0}
       - {x: 8, y: -3, z: 0}
-      - {x: 7, y: -3, z: 0}
-      - {x: 6, y: -3, z: 0}
+      - {x: 8, y: -4, z: 0}
+      - {x: 7, y: -5, z: 0}
     - routeName: ilha superior direita
       ownerDatabase: {fileID: 11400000}
       cells:
@@ -316,7 +323,6 @@ MonoBehaviour:
       - {x: 55, y: -54, z: 0}
       - {x: 55, y: -55, z: 0}
       - {x: 56, y: -56, z: 0}
-      - {x: 56, y: -57, z: 0}
     - routeName: flanco inferior direito
       ownerDatabase: {fileID: 11400000}
       cells:
@@ -485,13 +491,13 @@ MonoBehaviour:
     - routeName: Azul trilho
       ownerDatabase: {fileID: 11400000}
       cells:
-      - {x: 55, y: -57, z: 0}
-      - {x: 54, y: -57, z: 0}
-      - {x: 53, y: -57, z: 0}
-      - {x: 52, y: -57, z: 0}
-      - {x: 51, y: -57, z: 0}
-      - {x: 50, y: -57, z: 0}
-      - {x: 49, y: -57, z: 0}
+      - {x: 55, y: -56, z: 0}
+      - {x: 54, y: -56, z: 0}
+      - {x: 53, y: -56, z: 0}
+      - {x: 52, y: -56, z: 0}
+      - {x: 51, y: -56, z: 0}
+      - {x: 50, y: -56, z: 0}
+      - {x: 49, y: -56, z: 0}
       - {x: 48, y: -57, z: 0}
       - {x: 47, y: -57, z: 0}
       - {x: 46, y: -57, z: 0}
@@ -508,16 +514,17 @@ MonoBehaviour:
       - {x: 44, y: -46, z: 0}
       - {x: 43, y: -45, z: 0}
       - {x: 43, y: -44, z: 0}
-      - {x: 43, y: -43, z: 0}
-      - {x: 44, y: -42, z: 0}
-      - {x: 44, y: -41, z: 0}
-      - {x: 45, y: -40, z: 0}
+      - {x: 42, y: -43, z: 0}
+      - {x: 43, y: -42, z: 0}
+      - {x: 43, y: -41, z: 0}
+      - {x: 44, y: -40, z: 0}
+      - {x: 44, y: -39, z: 0}
       - {x: 45, y: -39, z: 0}
-      - {x: 46, y: -38, z: 0}
-      - {x: 47, y: -38, z: 0}
-      - {x: 48, y: -38, z: 0}
+      - {x: 46, y: -39, z: 0}
+      - {x: 47, y: -39, z: 0}
+      - {x: 48, y: -39, z: 0}
       - {x: 49, y: -38, z: 0}
-    - routeName: Amarelo treilho
+    - routeName: Amarelo trilho
       ownerDatabase: {fileID: 11400000}
       cells:
       - {x: 55, y: -2, z: 0}
@@ -545,11 +552,11 @@ MonoBehaviour:
       - {x: 43, y: -15, z: 0}
       - {x: 44, y: -16, z: 0}
       - {x: 44, y: -17, z: 0}
-      - {x: 45, y: -18, z: 0}
-      - {x: 45, y: -19, z: 0}
-      - {x: 46, y: -20, z: 0}
-      - {x: 47, y: -20, z: 0}
-      - {x: 48, y: -20, z: 0}
+      - {x: 45, y: -17, z: 0}
+      - {x: 46, y: -18, z: 0}
+      - {x: 46, y: -19, z: 0}
+      - {x: 47, y: -19, z: 0}
+      - {x: 48, y: -19, z: 0}
       - {x: 49, y: -20, z: 0}
     - routeName: verde trilho
       ownerDatabase: {fileID: 11400000}

@@ -27,8 +27,6 @@ MonoBehaviour:
   movement: 7
   visao: 3
   visionSpecializations: []
-  stealthRevealScope: 0
-  stealthVisibleIfDetectedForTurns: 1
   movementCategory: 1
   militaryForce: 1
   unitClass: 6
@@ -59,6 +57,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
   - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
   stealthSkills: []
+  stealthSkillRules: []
   autonomyData: {fileID: 11400000, guid: 4570edfd95d40d0438c040f364e8ec07, type: 2}
   embarkedWeapons: []
   cantUseWeaponsOnTheFollowDomain: []

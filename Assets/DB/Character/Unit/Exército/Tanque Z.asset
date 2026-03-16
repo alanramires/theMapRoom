@@ -27,9 +27,6 @@ MonoBehaviour:
   movement: 4
   visao: 3
   visionSpecializations: []
-  stealthRevealScope: 0
-  stealthRevealTeams: 
-  stealthVisibleIfDetectedForTurns: 1
   movementCategory: 6
   militaryForce: 0
   unitClass: 3
@@ -48,7 +45,8 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
-  skills: []
+  skills:
+  - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
   stealthSkills: []
   stealthSkillRules: []
   autonomyData: {fileID: 0}

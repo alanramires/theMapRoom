@@ -30,18 +30,13 @@ MonoBehaviour:
   - domain: 2
     heightLevel: 2
     vision: 6
-    detectsStealth: 1
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
   - domain: 1
     heightLevel: 3
     vision: 6
-    detectsStealth: 1
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
-  stealthRevealScope: 0
-  stealthRevealTeams: 
-  stealthVisibleIfDetectedForTurns: 1
   movementCategory: 5
   militaryForce: 2
   unitClass: 8
@@ -81,9 +76,15 @@ MonoBehaviour:
   supplierServicesProvided:
   - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+  - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   supplierResources:
   - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-    amount: 70
+    amount: 150
+  - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+    amount: 20
+  - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+    amount: 20
   isTransporter: 1
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains:

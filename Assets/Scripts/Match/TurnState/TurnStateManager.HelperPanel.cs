@@ -2390,6 +2390,6 @@ public partial class TurnStateManager
         if (TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) && terrain != null)
             return ResolveTerrainName(terrain);
 
-        return $"({cell.x},{cell.y})";
+        return FormatMapCellWithZ(cell);
     }
 }

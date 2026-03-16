@@ -25,6 +25,12 @@ public static class PodeSuprirSensor
             return false;
         }
 
+        if (supplier.TeamId == TeamId.Neutral)
+        {
+            reason = "Exercito neutro nao pode suprir.";
+            return false;
+        }
+
         if (supplier.IsEmbarked)
         {
             reason = "Unidade embarcada nao pode suprir.";
@@ -700,6 +706,11 @@ public static class PodeSuprirSensor
                 reason = "skill exigida pela construcao ausente";
                 return false;
             }
+            if (UnitHasAnyBlockedSkill(unit, construction.GetBlockedSkillsToEnter()))
+            {
+                reason = "skill bloqueada pela construcao";
+                return false;
+            }
 
             return true;
         }
@@ -707,6 +718,8 @@ public static class PodeSuprirSensor
         StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardMap, cell);
         if (structure != null)
         {
+            TryResolveTerrainAtCellForSupply(boardMap, terrainDb, cell, out TerrainTypeData terrainWithStructure);
+
             if (!StructureSupportsLayerModeForSupply(structure, targetDomain, targetHeight))
             {
                 reason = $"estrutura nao suporta {targetDomain}/{targetHeight}";
@@ -714,13 +727,18 @@ public static class PodeSuprirSensor
             }
 
             bool usesAdditionalStructureMode = StructureSupportsAdditionalLayerModeForSupply(structure, targetDomain, targetHeight);
-            if (!usesAdditionalStructureMode && !UnitPassesAnyRequiredSkill(unit, structure.requiredSkillsToEnter))
+            if (!usesAdditionalStructureMode && !UnitPassesAnyRequiredSkill(unit, structure.GetRequiredSkillsToEnter(terrainWithStructure)))
             {
                 reason = "skill exigida pela estrutura ausente";
                 return false;
             }
+            if (UnitHasAnyBlockedSkill(unit, structure.GetBlockedSkillsToEnter(terrainWithStructure)))
+            {
+                reason = "skill bloqueada pela estrutura";
+                return false;
+            }
 
-            if (!TryResolveTerrainAtCellForSupply(boardMap, terrainDb, cell, out TerrainTypeData terrainWithStructure) || terrainWithStructure == null)
+            if (terrainWithStructure == null)
             {
                 reason = "terreno nao encontrado";
                 return false;
@@ -729,12 +747,6 @@ public static class PodeSuprirSensor
             if (!TerrainSupportsLayerModeForSupply(terrainWithStructure, targetDomain, targetHeight))
             {
                 reason = $"terreno nao suporta {targetDomain}/{targetHeight}";
-                return false;
-            }
-
-            if (!UnitPassesAnyRequiredSkill(unit, terrainWithStructure.requiredSkillsToEnter))
-            {
-                reason = "skill exigida pelo terreno ausente";
                 return false;
             }
 
@@ -758,6 +770,11 @@ public static class PodeSuprirSensor
             reason = "skill exigida pelo terreno ausente";
             return false;
         }
+        if (UnitHasAnyBlockedSkill(unit, terrain.blockedSkills))
+        {
+            reason = "skill bloqueada pelo terreno";
+            return false;
+        }
 
         return true;
     }
@@ -769,12 +786,34 @@ public static class PodeSuprirSensor
         if (unit == null)
             return false;
 
+        bool hasAnyValidRequiredSkill = false;
         for (int i = 0; i < requiredSkills.Count; i++)
         {
             SkillData required = requiredSkills[i];
             if (required == null)
                 continue;
+            hasAnyValidRequiredSkill = true;
             if (unit.HasSkill(required))
+                return true;
+        }
+
+        if (!hasAnyValidRequiredSkill)
+            return true;
+
+        return false;
+    }
+
+    private static bool UnitHasAnyBlockedSkill(UnitManager unit, IReadOnlyList<SkillData> blockedSkills)
+    {
+        if (unit == null || blockedSkills == null || blockedSkills.Count == 0)
+            return false;
+
+        for (int i = 0; i < blockedSkills.Count; i++)
+        {
+            SkillData blockedSkill = blockedSkills[i];
+            if (blockedSkill == null)
+                continue;
+            if (unit.HasSkill(blockedSkill))
                 return true;
         }
 

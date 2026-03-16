@@ -26,6 +26,12 @@ public static class PodeTransferirSensor
             return false;
         }
 
+        if (supplier.TeamId == TeamId.Neutral)
+        {
+            reason = "Exercito neutro nao pode transferir recursos.";
+            return false;
+        }
+
         if (supplier.IsEmbarked)
         {
             reason = "Unidade embarcada nao pode transferir.";

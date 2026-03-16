@@ -110,6 +110,8 @@ public class MatchController : MonoBehaviour
     [SerializeField, HideInInspector] private int cachedConstructionIncomeCount;
     [Header("Runtime Perf")]
     [SerializeField] [Range(0.05f, 2f)] private float constructionIncomeRefreshIntervalSeconds = 0.35f;
+    [Header("Editor")]
+    [SerializeField] private bool continuousEditorRefresh = false;
     [System.NonSerialized] private readonly List<TeamId> playersView = new List<TeamId>();
     [System.NonSerialized] private List<TurnStateManager.TurnStartAutonomyUpkeepEntry> pendingTurnStartAutonomyHelperEntries;
     [System.NonSerialized] private readonly List<UnitManager> turnStartUnitsMarkedForFuelDepletionDeath = new List<UnitManager>();
@@ -240,7 +242,7 @@ public class MatchController : MonoBehaviour
     {
         totalInField = 0;
         readyToAct = 0;
-        if (teamId == TeamId.Neutral)
+        if (teamId == TeamId.Neutral && !includeNeutralTeam)
             return;
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
@@ -426,7 +428,7 @@ public class MatchController : MonoBehaviour
                 TryRefreshIncomeFromConstructions(markDirtyInEditor: false);
             }
         }
-        else
+        else if (continuousEditorRefresh)
         {
             TryRefreshIncomeFromConstructions(markDirtyInEditor: true);
         }
@@ -468,7 +470,7 @@ public class MatchController : MonoBehaviour
     {
         if (players.Count == 0)
         {
-            if (includeNeutralTeam)
+            if (includeNeutralTeam && HasAnyNeutralUnitsInField())
                 SetNeutralActiveTeam();
             return;
         }
@@ -482,7 +484,7 @@ public class MatchController : MonoBehaviour
                 return;
             }
 
-            if (includeNeutralTeam)
+            if (includeNeutralTeam && HasAnyNeutralUnitsInField())
             {
                 SetNeutralActiveTeam();
                 return;
@@ -500,7 +502,7 @@ public class MatchController : MonoBehaviour
     {
         if (players.Count == 0)
         {
-            if (includeNeutralTeam)
+            if (includeNeutralTeam && HasAnyNeutralUnitsInField())
                 SetNeutralActiveTeam();
             currentTurn = Mathf.Max(0, currentTurn + 1);
             return;
@@ -519,7 +521,7 @@ public class MatchController : MonoBehaviour
             }
 
             // Saiu da lista: vai para neutral se estiver habilitado.
-            if (includeNeutralTeam)
+            if (includeNeutralTeam && HasAnyNeutralUnitsInField())
             {
                 SetNeutralActiveTeam();
                 return;
@@ -791,7 +793,7 @@ public class MatchController : MonoBehaviour
     {
         if (!Application.isPlaying)
             return;
-        if (activeTeamId < 0)
+        if (activeTeamId < 0 && !includeNeutralTeam)
             return;
 
         ApplyEconomyAtTurnStartForActiveTeam();
@@ -1079,7 +1081,7 @@ public class MatchController : MonoBehaviour
 
         if (fogOfWarTilemap == null)
             return;
-        if (activeTeamId < 0)
+        if (activeTeamId < 0 && !includeNeutralTeam)
             return;
 
         ValidateFogOfWarSortingLayer();
@@ -1318,6 +1320,23 @@ public class MatchController : MonoBehaviour
             playedSkillSfx = true;
         }
 
+        if (!playedSkillSfx &&
+            canPlaySkillSfx &&
+            IsSubmarineLikeObserver(observer))
+        {
+            bool hasAnyDetection = detectedStealth.Count > 0 || spottedCandidates.Count > 0;
+            if (hasAnyDetection)
+            {
+                // Fallback: em deteccoes de submarino para alvos de superficie (ex.: fragata),
+                // toca o sonar mesmo quando nao houver match de skill por stealth-target.
+                if (TryResolveSonarSkill(observerData, out SkillData sonarSkill) && sonarSkill != null)
+                    playedSkillSfx = cursorController.TryPlaySkillSfx(sonarSkill, 1f);
+
+                if (!playedSkillSfx)
+                    playedSkillSfx = cursorController.TryPlayUnitSkillSfx(observer, 1f);
+            }
+        }
+
         // Quando a unidade stealth-capable estiver fora da camada stealth ativa, ela pode entrar
         // como spottedCandidates. Ainda assim precisa receber olhinho ao ser observada.
         for (int i = 0; i < spottedCandidates.Count; i++)
@@ -1392,6 +1411,42 @@ public class MatchController : MonoBehaviour
             return false;
 
         return option.targetDomain == Domain.Submarine || option.targetHeightLevel == HeightLevel.Submerged;
+    }
+
+    private static bool IsSubmarineLikeObserver(UnitManager observer)
+    {
+        if (observer == null)
+            return false;
+
+        return observer.GetDomain() == Domain.Submarine || observer.GetHeightLevel() == HeightLevel.Submerged;
+    }
+
+    private static bool TryResolveSonarSkill(UnitData observerData, out SkillData sonarSkill)
+    {
+        sonarSkill = null;
+        if (observerData == null || observerData.skills == null || observerData.skills.Count == 0)
+            return false;
+
+        for (int i = 0; i < observerData.skills.Count; i++)
+        {
+            SkillData skill = observerData.skills[i];
+            if (skill == null)
+                continue;
+
+            string id = string.IsNullOrWhiteSpace(skill.id) ? string.Empty : skill.id.Trim();
+            string display = string.IsNullOrWhiteSpace(skill.displayName) ? string.Empty : skill.displayName.Trim();
+            string name = string.IsNullOrWhiteSpace(skill.name) ? string.Empty : skill.name.Trim();
+
+            if (id.IndexOf("sonar", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                display.IndexOf("sonar", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                name.IndexOf("sonar", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                sonarSkill = skill;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryResolveSkillMatchedDetectorSkill(
@@ -1721,13 +1776,36 @@ public class MatchController : MonoBehaviour
             return true;
         if (!enableTotalWar)
             return true;
-        if (activeTeamId < 0)
-            return false;
         if (fogCachedTeamId != activeTeamId)
             return false;
 
         cell.z = 0;
         return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
+    }
+
+    private static bool HasAnyNeutralUnitsInField()
+    {
+        List<UnitManager> units = UnitManager.AllActive;
+        if (units == null || units.Count == 0)
+            return false;
+
+        for (int i = units.Count - 1; i >= 0; i--)
+        {
+            UnitManager unit = units[i];
+            if (unit == null)
+            {
+                units.RemoveAt(i);
+                continue;
+            }
+
+            if (!unit.gameObject.activeInHierarchy)
+                continue;
+
+            if (unit.TeamId == TeamId.Neutral)
+                return true;
+        }
+
+        return false;
     }
 
     private void ValidateFogOfWarSortingLayer()
@@ -2221,14 +2299,60 @@ public class MatchController : MonoBehaviour
     {
         if (!Application.isPlaying)
             return;
-        if (activeTeamId < 0)
+        if (activeTeamId < 0 && !includeNeutralTeam)
             return;
         if (cursorController == null)
             return;
 
         if (!TeamAnchorResolver.TryResolveAnchorCell(activeTeamId, out Vector3Int anchorCell))
+        {
+            // Fallback para turno neutro sem HQ: teleporta para a unidade neutra mais proxima.
+            if (activeTeamId == (int)TeamId.Neutral && includeNeutralTeam)
+                TryTeleportCursorToNearestReadyUnitForActiveTeam();
             return;
+        }
 
         cursorController.SetCell(anchorCell, playMoveSfx: false);
+    }
+
+    private void TryTeleportCursorToNearestReadyUnitForActiveTeam()
+    {
+        if (cursorController == null)
+            return;
+
+        List<UnitManager> units = UnitManager.AllActive;
+        if (units == null || units.Count == 0)
+            return;
+
+        Vector3Int origin = cursorController.CurrentCell;
+        origin.z = 0;
+        bool found = false;
+        Vector3Int bestCell = origin;
+        float bestDistanceSqr = float.MaxValue;
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked || unit.HasActed)
+                continue;
+            if ((int)unit.TeamId != activeTeamId)
+                continue;
+
+            Vector3Int cell = unit.CurrentCellPosition;
+            cell.z = 0;
+
+            float dx = cell.x - origin.x;
+            float dy = cell.y - origin.y;
+            float distanceSqr = (dx * dx) + (dy * dy);
+            if (!found || distanceSqr < bestDistanceSqr)
+            {
+                found = true;
+                bestDistanceSqr = distanceSqr;
+                bestCell = cell;
+            }
+        }
+
+        if (found)
+            cursorController.SetCell(bestCell, playMoveSfx: false);
     }
 }

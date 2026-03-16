@@ -389,7 +389,7 @@ public partial class TurnStateManager
 
         pendingDestroyUnitConfirmation = true;
         string targetName = ResolveDebugUnitName(target);
-        PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} ({cursorCell.x},{cursorCell.y},0) :: Confirm");
+        PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
         cursorController?.PlayConfirmSfx();
         Debug.Log("[Destroy Unit] Confirmar com Enter | Cancelar com ESC.");
     }
@@ -884,7 +884,7 @@ public partial class TurnStateManager
 
             SetSelectedUnit(unitUnderCursor);
             SetCursorState(CursorState.UnitSelected, "TryChangeAltitudeFromDebug(auto-select)");
-            message = $"Unidade auto-selecionada no cursor ({cursorCell.x},{cursorCell.y},0).";
+            message = $"Unidade auto-selecionada no cursor {FormatMapCellWithZ(cursorCell)}.";
         }
 
         bool isMovementScannerState = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
@@ -1506,6 +1506,11 @@ public partial class TurnStateManager
                 reason = "Unidade nao possui skill exigida pela construcao para trocar de camada.";
                 return false;
             }
+            if (UnitHasAnyBlockedSkill(unit, construction.GetBlockedSkillsToEnter()))
+            {
+                reason = "Unidade possui skill bloqueada pela construcao para trocar de camada.";
+                return false;
+            }
 
             return true;
         }
@@ -1513,6 +1518,8 @@ public partial class TurnStateManager
         StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardMap, cell);
         if (structure != null)
         {
+            TryResolveTerrainAtCell(boardMap, terrainDb, cell, out TerrainTypeData terrainWithStructure);
+
             if (!StructureSupportsLayerMode(structure, targetDomain, targetHeight))
             {
                 reason = $"Estrutura no hex nao suporta {targetDomain}/{targetHeight}.";
@@ -1520,13 +1527,18 @@ public partial class TurnStateManager
             }
 
             bool usesAdditionalStructureMode = StructureSupportsAdditionalLayerMode(structure, targetDomain, targetHeight);
-            if (!usesAdditionalStructureMode && !UnitPassesSkillRequirement(unit, structure.requiredSkillsToEnter))
+            if (!usesAdditionalStructureMode && !UnitPassesSkillRequirement(unit, structure.GetRequiredSkillsToEnter(terrainWithStructure)))
             {
                 reason = "Unidade nao possui skill exigida pela estrutura para trocar de camada.";
                 return false;
             }
+            if (UnitHasAnyBlockedSkill(unit, structure.GetBlockedSkillsToEnter(terrainWithStructure)))
+            {
+                reason = "Unidade possui skill bloqueada pela estrutura para trocar de camada.";
+                return false;
+            }
 
-            if (!TryResolveTerrainAtCell(boardMap, terrainDb, cell, out TerrainTypeData terrainWithStructure) || terrainWithStructure == null)
+            if (terrainWithStructure == null)
             {
                 reason = "Terreno do hex nao encontrado para validar camada com estrutura.";
                 return false;
@@ -1535,12 +1547,6 @@ public partial class TurnStateManager
             if (!TerrainSupportsLayerMode(terrainWithStructure, targetDomain, targetHeight))
             {
                 reason = $"Terreno no hex (com estrutura) nao suporta {targetDomain}/{targetHeight}.";
-                return false;
-            }
-
-            if (!UnitPassesSkillRequirement(unit, terrainWithStructure.requiredSkillsToEnter))
-            {
-                reason = "Unidade nao possui skill exigida pelo terreno para trocar de camada.";
                 return false;
             }
 
@@ -1564,6 +1570,11 @@ public partial class TurnStateManager
             reason = "Unidade nao possui skill exigida pelo terreno para trocar de camada.";
             return false;
         }
+        if (UnitHasAnyBlockedSkill(unit, terrain.blockedSkills))
+        {
+            reason = "Unidade possui skill bloqueada pelo terreno para trocar de camada.";
+            return false;
+        }
 
         return true;
     }
@@ -1575,13 +1586,36 @@ public partial class TurnStateManager
         if (unit == null)
             return false;
 
+        bool hasAnyValidRequiredSkill = false;
         for (int i = 0; i < requiredSkills.Count; i++)
         {
             SkillData requiredSkill = requiredSkills[i];
             if (requiredSkill == null)
                 continue;
 
+            hasAnyValidRequiredSkill = true;
             if (unit.HasSkill(requiredSkill))
+                return true;
+        }
+
+        if (!hasAnyValidRequiredSkill)
+            return true;
+
+        return false;
+    }
+
+    private static bool UnitHasAnyBlockedSkill(UnitManager unit, IReadOnlyList<SkillData> blockedSkills)
+    {
+        if (unit == null || blockedSkills == null || blockedSkills.Count <= 0)
+            return false;
+
+        for (int i = 0; i < blockedSkills.Count; i++)
+        {
+            SkillData blockedSkill = blockedSkills[i];
+            if (blockedSkill == null)
+                continue;
+
+            if (unit.HasSkill(blockedSkill))
                 return true;
         }
 
@@ -2254,7 +2288,7 @@ public partial class TurnStateManager
 
         string transporter = invalidOption != null && invalidOption.transporterUnit != null
             ? invalidOption.transporterUnit.name
-            : (invalidOption != null ? $"hex {invalidOption.evaluatedCell.x},{invalidOption.evaluatedCell.y}" : "invalido");
+            : (invalidOption != null ? $"hex {FormatMapCell(invalidOption.evaluatedCell)}" : "invalido");
         string reason = invalidOption != null && !string.IsNullOrWhiteSpace(invalidOption.reason)
             ? invalidOption.reason
             : "motivo nao informado";

@@ -62,7 +62,7 @@ public partial class TurnStateManager
             return "(null)";
         string status = entry.isValid ? "VALID" : "INVALID";
         string reason = !entry.isValid ? $" reason=\"{ResolveMergeInvalidReason(entry)}\"" : string.Empty;
-        return $"{entry.selectionNumber}:{ResolveUnitRuntimeName(entry.unit)}@{entry.cell.x},{entry.cell.y} {status} rem={entry.remainingMovement} cost={entry.requiredMovementCost}{reason}";
+        return $"{entry.selectionNumber}:{ResolveUnitRuntimeName(entry.unit)}@{FormatMapCell(entry.cell)} {status} rem={entry.remainingMovement} cost={entry.requiredMovementCost}{reason}";
     }
 
     private void EnterMergeStateFromSensors()
@@ -823,7 +823,7 @@ public partial class TurnStateManager
                 unit = unit,
                 selectionNumber = number,
                 cell = cell,
-                label = $"{ResolveUnitRuntimeName(unit)} ({cell.x},{cell.y})",
+                label = $"{ResolveUnitRuntimeName(unit)} {FormatMapCellWithZ(cell)}",
                 isValid = true,
                 invalidReasonId = string.Empty,
                 invalidReason = string.Empty,
@@ -849,7 +849,7 @@ public partial class TurnStateManager
                 unit = unit,
                 selectionNumber = number,
                 cell = cell,
-                label = $"{ResolveUnitRuntimeName(unit)} ({cell.x},{cell.y})",
+                label = $"{ResolveUnitRuntimeName(unit)} {FormatMapCellWithZ(cell)}",
                 isValid = false,
                 invalidReasonId = invalid.reasonId,
                 invalidReason = invalid.reason,

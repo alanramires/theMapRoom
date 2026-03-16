@@ -745,6 +745,7 @@ MonoBehaviour:
   occupiedByReadyUnitDarkenFactor: 0.4
   hudController: {fileID: 1370441032517419065}
   matchController: {fileID: 0}
+  continuousEditorVisualRefresh: 0
 --- !u!1 &8405094446092215197
 GameObject:
   m_ObjectHideFlags: 0

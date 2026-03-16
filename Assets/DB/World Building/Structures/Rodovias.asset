@@ -26,6 +26,13 @@ MonoBehaviour:
   blockedSkills:
   - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
   skillCostOverrides: []
+  skillRulesByTerrain:
+  - terrainData: {fileID: 11400000, guid: 75d32a51167ec98409039b6f5d4d287f, type: 2}
+    requiredSkillsToEnter: []
+    blockedSkills: []
+    skillCostOverrides:
+    - skill: {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
+      autonomyCost: 2
   canAlsoBeBuiltOnTheFollowDomains: []
   roadSegmentSprite: {fileID: 21300000, guid: 03650c0a2457e5046b8234d0bc968b5a, type: 3}
   roadColor: {r: 1, g: 1, b: 1, a: 1}
@@ -47,6 +54,8 @@ MonoBehaviour:
   forceEndMovementOnTerrainDomainForDomains:
   - domain: 2
     heightLevel: 2
+  forceDetectOnForcedEndMovementDomains: 0
+  forceDetectUnitsWithFollowingStealthSkills: []
   roadRoutes:
   - routeName: Rota 66
     ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}

@@ -29,6 +29,7 @@ public class MatchMusicAudioManager : MonoBehaviour
     [SerializeField] private List<AudioClip> freeModePlaylist = new List<AudioClip>();
 
     [Header("Team Tracks")]
+    [SerializeField] private AudioClip neutralTrack;
     [SerializeField] private AudioClip team0Track;
     [SerializeField] private AudioClip team1Track;
     [SerializeField] private AudioClip team2Track;
@@ -257,6 +258,14 @@ public class MatchMusicAudioManager : MonoBehaviour
     {
         switch (teamId)
         {
+            case -1:
+                if (neutralTrack != null)
+                    return neutralTrack;
+                if (team0Track != null)
+                    return team0Track;
+
+                List<AudioClip> valid = GetValidFreePlaylist();
+                return valid.Count > 0 ? valid[0] : null;
             case 0: return team0Track;
             case 1: return team1Track;
             case 2: return team2Track;
@@ -369,7 +378,9 @@ public class MatchMusicAudioManager : MonoBehaviour
 
             discovered.Add(clip);
             string name = clip.name.ToLowerInvariant();
-            if (name == "team0")
+            if (name == "neutraltrack" || name == "neutral")
+                neutralTrack = clip;
+            else if (name == "team0")
                 team0Track = clip;
             else if (name == "team1")
                 team1Track = clip;

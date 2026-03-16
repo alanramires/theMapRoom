@@ -229,7 +229,8 @@ public class CursorController : MonoBehaviour
     {
         TryAutoAssignMatchController();
         int activeTeamId = matchController != null ? matchController.ActiveTeamId : -1;
-        if (activeTeamId < 0)
+        bool allowNeutralCycle = activeTeamId == (int)TeamId.Neutral && matchController != null && matchController.IncludeNeutralTeam;
+        if (activeTeamId < 0 && !allowNeutralCycle)
             return false;
 
         List<UnitManager> candidates = CollectCycleCandidates(activeTeamId);

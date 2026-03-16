@@ -270,7 +270,7 @@ public static class UnitMovementPathRules
             if (construction != null && CanTraverseUsingConstruction(construction, unit, currentDomain, currentHeight))
                 return true;
 
-            if (structure != null && CanTraverseUsingStructure(structure, unit, currentDomain, currentHeight))
+            if (structure != null && CanTraverseUsingStructure(structure, terrainData, unit, currentDomain, currentHeight))
                 return true;
 
             if (terrainData == null)
@@ -283,7 +283,7 @@ public static class UnitMovementPathRules
             return CanTraverseUsingConstruction(construction, unit, currentDomain, currentHeight);
 
         if (structure != null)
-            return CanTraverseUsingStructure(structure, unit, currentDomain, currentHeight);
+            return CanTraverseUsingStructure(structure, terrainData, unit, currentDomain, currentHeight);
 
         if (cache != null && cache.HasAnyRouteStructureAtCellAllowingUnit(cell, unit))
             return true;
@@ -325,6 +325,7 @@ public static class UnitMovementPathRules
 
     private static bool CanTraverseUsingStructure(
         StructureData structure,
+        TerrainTypeData terrainData,
         UnitManager unit,
         Domain currentDomain,
         HeightLevel currentHeight)
@@ -335,14 +336,14 @@ public static class UnitMovementPathRules
         if (currentDomain == Domain.Air)
         {
             if (structure.alwaysAllowAirDomain)
-                return UnitPassesSkillRules(unit, structure.requiredSkillsToEnter, structure.blockedSkills);
+                return UnitPassesSkillRules(unit, structure.GetRequiredSkillsToEnter(terrainData), structure.GetBlockedSkillsToEnter(terrainData));
             if (!StructureSupportsMode(structure, currentDomain, currentHeight))
                 return false;
-            return UnitPassesSkillRules(unit, structure.requiredSkillsToEnter, structure.blockedSkills);
+            return UnitPassesSkillRules(unit, structure.GetRequiredSkillsToEnter(terrainData), structure.GetBlockedSkillsToEnter(terrainData));
         }
 
         if (StructureSupportsAdditionalMode(structure, currentDomain, currentHeight))
-            return true;
+            return UnitPassesSkillRules(unit, structure.GetRequiredSkillsToEnter(terrainData), structure.GetBlockedSkillsToEnter(terrainData));
 
         IReadOnlyList<UnitLayerMode> unitModes = unit.GetAllLayerModes();
         bool supportsAnyMode = false;
@@ -359,7 +360,7 @@ public static class UnitMovementPathRules
         if (!supportsAnyMode)
             return false;
 
-        return UnitPassesSkillRules(unit, structure.requiredSkillsToEnter, structure.blockedSkills);
+        return UnitPassesSkillRules(unit, structure.GetRequiredSkillsToEnter(terrainData), structure.GetBlockedSkillsToEnter(terrainData));
     }
 
     private static bool CanTraverseUsingTerrain(
@@ -400,7 +401,7 @@ public static class UnitMovementPathRules
     {
         if (structure == null || unit == null)
             return false;
-        return UnitPassesSkillRules(unit, structure.requiredSkillsToEnter, structure.blockedSkills);
+        return UnitPassesSkillRules(unit, structure.GetRequiredSkillsToEnter(null), structure.GetBlockedSkillsToEnter(null));
     }
 
     private static bool StructureQualifiesAsRailForUnit(StructureData structure, UnitManager unit)
@@ -408,7 +409,7 @@ public static class UnitMovementPathRules
         if (structure == null || unit == null)
             return false;
 
-        return CanTraverseUsingStructure(structure, unit, unit.GetDomain(), unit.GetHeightLevel());
+        return CanTraverseUsingStructure(structure, null, unit, unit.GetDomain(), unit.GetHeightLevel());
     }
 
     private static bool UnitHasRailSkill(UnitManager unit)
@@ -500,7 +501,10 @@ public static class UnitMovementPathRules
         else if (construction != null)
             baseCost = GetAutonomyCostWithSkillOverrides(construction.GetBaseMovementCost(), construction.GetSkillCostOverrides(), unit);
         else if (structure != null)
-            baseCost = GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, structure.skillCostOverrides, unit);
+        {
+            baseCost = GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, structure.GetSkillCostOverrides(terrainData), unit);
+            baseCost = GetAutonomyCostWithSkillOverrides(baseCost, terrainData != null ? terrainData.skillCostOverrides : null, unit);
+        }
         else if (terrainData != null)
             baseCost = GetAutonomyCostWithSkillOverrides(terrainData.basicAutonomyCost, terrainData.skillCostOverrides, unit);
         else
@@ -536,15 +540,20 @@ public static class UnitMovementPathRules
         if (unit == null || requiredSkills == null || requiredSkills.Count == 0)
             return false;
 
+        bool hasAnyValidRequiredSkill = false;
         for (int i = 0; i < requiredSkills.Count; i++)
         {
             SkillData requiredSkill = requiredSkills[i];
             if (requiredSkill == null)
                 continue;
 
+            hasAnyValidRequiredSkill = true;
             if (unit.HasSkill(requiredSkill))
                 return true;
         }
+
+        if (!hasAnyValidRequiredSkill)
+            return true;
 
         return false;
     }
@@ -1084,3 +1093,4 @@ public static class UnitMovementPathRules
         }
     }
 }
+

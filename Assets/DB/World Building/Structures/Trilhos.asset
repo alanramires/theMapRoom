@@ -20,11 +20,42 @@ MonoBehaviour:
   heightLevel: 3
   aditionalDomainsAllowed: []
   alwaysAllowAirDomain: 1
-  baseMovementCost: 1
+  baseMovementCost: 2
   dpqData: {fileID: 11400000, guid: 24e0fd1ecd7c6bf4eb8f3d8c215d14ef, type: 2}
-  requiredSkillsToEnter: []
-  blockedSkills: []
-  skillCostOverrides: []
+  requiredSkillsToEnter:
+  - {fileID: 0}
+  blockedSkills:
+  - {fileID: 0}
+  skillCostOverrides:
+  - skill: {fileID: 0}
+    autonomyCost: 0
+  skillRulesByTerrain:
+  - terrainData: {fileID: 11400000, guid: f8bd8dc9dbe197d4f828ad72d3d90df6, type: 2}
+    requiredSkillsToEnter: []
+    blockedSkills: []
+    skillCostOverrides:
+    - skill: {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
+      autonomyCost: 2
+    - skill: {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
+      autonomyCost: 1
+    - skill: {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
+      autonomyCost: 1
+  - terrainData: {fileID: 11400000, guid: 75d32a51167ec98409039b6f5d4d287f, type: 2}
+    requiredSkillsToEnter: []
+    blockedSkills: []
+    skillCostOverrides:
+    - skill: {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
+      autonomyCost: 1
+    - skill: {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
+      autonomyCost: 1
+  - terrainData: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
+    requiredSkillsToEnter: []
+    blockedSkills: []
+    skillCostOverrides:
+    - skill: {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
+      autonomyCost: 1
+    - skill: {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
+      autonomyCost: 1
   canAlsoBeBuiltOnTheFollowDomains: []
   roadSegmentSprite: {fileID: 21300000, guid: b94af34894ff2604d9843a63adf1a6b0, type: 3}
   roadColor: {r: 1, g: 1, b: 1, a: 1}
@@ -46,6 +77,8 @@ MonoBehaviour:
   forceEndMovementOnTerrainDomainForDomains:
   - domain: 2
     heightLevel: 2
+  forceDetectOnForcedEndMovementDomains: 0
+  forceDetectUnitsWithFollowingStealthSkills: []
   roadRoutes:
   - routeName: Ferrovia Norte
     ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}

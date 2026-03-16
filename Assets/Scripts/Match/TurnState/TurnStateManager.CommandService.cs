@@ -1202,13 +1202,13 @@ public partial class TurnStateManager
             string label = !string.IsNullOrWhiteSpace(order.sourceConstruction.ConstructionDisplayName)
                 ? order.sourceConstruction.ConstructionDisplayName
                 : order.sourceConstruction.name;
-            return $"{label} {cell.x},{cell.y}";
+            return $"{label} {FormatMapCell(cell)}";
         }
 
         if (order.sourceSupplierUnit != null)
         {
             Vector3Int cell = order.sourceSupplierUnit.CurrentCellPosition;
-            return $"{order.sourceSupplierUnit.name} {cell.x},{cell.y}";
+            return $"{order.sourceSupplierUnit.name} {FormatMapCell(cell)}";
         }
 
         return string.Empty;

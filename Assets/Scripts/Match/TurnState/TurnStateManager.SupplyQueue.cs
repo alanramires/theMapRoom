@@ -949,8 +949,8 @@ public partial class TurnStateManager
                 selectionNumber = number,
                 cell = cell,
                 label = isEmbarkedPassenger
-                    ? $"{option.targetUnit.name} [EMB] ({cell.x},{cell.y})"
-                    : $"{option.targetUnit.name} ({cell.x},{cell.y})"
+                    ? $"{option.targetUnit.name} [EMB] {FormatMapCellWithZ(cell)}"
+                    : $"{option.targetUnit.name} {FormatMapCellWithZ(cell)}"
             });
             supplyCandidateIndexByCell[cell] = supplyCandidateEntries.Count - 1;
         }

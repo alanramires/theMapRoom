@@ -1,0 +1,79 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
+  m_Name: 18Wheels
+  m_EditorClassIdentifier: Assembly-CSharp::UnitData
+  id: 18wheels
+  displayName: "Caminh\xE3o de Carga"
+  apelido: CC18
+  description: 
+  spriteDefault: {fileID: 21300000, guid: 40bc339bdcc1ea045b344a41eb1c170c, type: 3}
+  spriteGreen: {fileID: 0}
+  spriteRed: {fileID: 0}
+  spriteBlue: {fileID: 0}
+  spriteYellow: {fileID: 0}
+  maxHP: 10
+  defense: 8
+  armorClass: 0
+  movement: 6
+  visao: 1
+  visionSpecializations: []
+  movementCategory: 6
+  militaryForce: 0
+  unitClass: 1
+  eliteLevel: 0
+  combatModifiers: []
+  domain: 0
+  heightLevel: 3
+  aditionalDomainsAllowed: []
+  useExplicitPreferredAirHeight: 0
+  preferredAirHeight: 4
+  useExplicitPreferredNavalHeight: 0
+  preferredNavalHeight: 2
+  skills:
+  - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
+  stealthSkills: []
+  stealthSkillRules: []
+  autonomyData: {fileID: 0}
+  embarkedWeapons: []
+  cantUseWeaponsOnTheFollowDomain: []
+  isSupplier: 1
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 2
+  supplierOperationDomains:
+  - domain: 0
+    heightLevel: 3
+  supplierServicesProvided:
+  - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  supplierResources:
+  - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+    amount: 150
+  - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+    amount: 40
+  - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+    amount: 40
+  isTransporter: 0
+  spriteTransport: {fileID: 0}
+  allowedEmbarkWhenTransporterAtTerrains: []
+  allowedEmbarkWhenTransporterAtTerrainStructures: []
+  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtTerrains: []
+  allowedDisembarkWhenTransporterAtTerrainStructures: []
+  allowedDisembarkWhenTransporterAtConstructions: []
+  passengersCanDisembarkAndGoesToTerrains: []
+  passengersCanDisembarkAndGoesToTerrainStructures: []
+  passengersCanDisembarkAndGoesToConstructions: []
+  transportSlots: []
+  autonomia: 60
+  cost: 2000

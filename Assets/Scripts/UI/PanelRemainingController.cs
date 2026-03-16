@@ -53,7 +53,10 @@ public class PanelRemainingController : MonoBehaviour
         TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
         int totalInField = 0;
         int readyToAct = 0;
-        if (matchController != null && activeTeam != TeamId.Neutral)
+        bool shouldCountActiveTeam =
+            matchController != null &&
+            (activeTeam != TeamId.Neutral || matchController.IncludeNeutralTeam);
+        if (shouldCountActiveTeam)
         {
             matchController.GetTeamUnitCounts(activeTeam, out totalInField, out _);
             matchController.GetTeamUnitCounts(activeTeam, out _, out readyToAct, includeEmbarked: false);

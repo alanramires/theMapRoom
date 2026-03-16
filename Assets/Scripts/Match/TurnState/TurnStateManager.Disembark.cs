@@ -92,7 +92,7 @@ public partial class TurnStateManager
 
             string passengerName = ResolveUnitRuntimeName(order.passenger);
             Vector3Int cell = order.targetCell;
-            lines[i] = $"{i + 1}. {passengerName} | slot={order.slotIndex}:{order.seatIndex} -> ({cell.x},{cell.y})";
+            lines[i] = $"{i + 1}. {passengerName} | slot={order.slotIndex}:{order.seatIndex} -> {FormatMapCellWithZ(cell)}";
         }
 
         return lines;
@@ -230,7 +230,7 @@ public partial class TurnStateManager
         targetCell.z = 0;
         if (IsCellAlreadyQueuedForDisembark(targetCell))
         {
-            Debug.Log($"[Desembarque] Hex ({targetCell.x},{targetCell.y}) ja reservado por outra ordem. Escolha outro hex.");
+            Debug.Log($"[Desembarque] Hex {FormatMapCell(targetCell)} ja reservado por outra ordem. Escolha outro hex.");
             ReturnToDisembarkLandingSelect();
             return true;
         }
@@ -252,7 +252,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        Debug.Log($"[Desembarque] Ordem adicionada para {ResolveUnitRuntimeName(entry.passenger)} -> ({option.disembarkCell.x},{option.disembarkCell.y}).");
+        Debug.Log($"[Desembarque] Ordem adicionada para {ResolveUnitRuntimeName(entry.passenger)} -> {FormatMapCell(option.disembarkCell)}.");
         EnterDisembarkPassengerSelectStep();
         return true;
     }

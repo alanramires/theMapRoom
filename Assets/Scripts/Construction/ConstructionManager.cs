@@ -31,6 +31,8 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] [Range(0f, 1f)] private float occupiedByReadyUnitDarkenFactor = 0.4f;
     [SerializeField] private ConstructionHudController hudController;
     [SerializeField] private MatchController matchController;
+    [Header("Editor")]
+    [SerializeField] private bool continuousEditorVisualRefresh = false;
     [System.NonSerialized] private int cachedOccupantInstanceId = int.MinValue;
     [System.NonSerialized] private bool cachedOccupantReadySameTeam;
     [System.NonSerialized] private bool cachedShowFlagThreatOutline;
@@ -207,7 +209,11 @@ public class ConstructionManager : MonoBehaviour
             return;
 #endif
         if (!Application.isPlaying)
+        {
+            if (!continuousEditorVisualRefresh)
+                return;
             RefreshRuntimeVisualState(force: false);
+        }
     }
 
 #if UNITY_EDITOR

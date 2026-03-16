@@ -24,12 +24,13 @@ MonoBehaviour:
   - domain: 2
     heightLevel: 2
   alwaysAllowAirDomain: 1
-  baseMovementCost: 1
+  baseMovementCost: 2
   dpqData: {fileID: 11400000, guid: 24e0fd1ecd7c6bf4eb8f3d8c215d14ef, type: 2}
   requiredSkillsToEnter:
   - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
   blockedSkills: []
   skillCostOverrides: []
+  skillRulesByTerrain: []
   canAlsoBeBuiltOnTheFollowDomains:
   - domain: 1
     heightLevel: 3
@@ -47,6 +48,8 @@ MonoBehaviour:
   forceEndMovementOnTerrainDomainForDomains:
   - domain: 2
     heightLevel: 2
+  forceDetectOnForcedEndMovementDomains: 0
+  forceDetectUnitsWithFollowingStealthSkills: []
   roadRoutes:
   - routeName: Ponte do Trem Norte
     ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
