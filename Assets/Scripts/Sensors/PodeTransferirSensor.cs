@@ -44,13 +44,6 @@ public static class PodeTransferirSensor
             return false;
         }
 
-        int transferLimit = Mathf.Max(0, supplierData.maxUnitsServedPerTurn);
-        if (transferLimit <= 0)
-        {
-            reason = "Supplier sem capacidade de transferencia (maxUnitsServedPerTurn=0).";
-            return false;
-        }
-
         if (!HasTransferService(supplier))
         {
             reason = "Unidade sem servico de transferencia.";

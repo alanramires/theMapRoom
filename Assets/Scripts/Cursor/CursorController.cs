@@ -991,6 +991,11 @@ public class CursorController : MonoBehaviour
         PlayUiSfx(confirmSfx);
     }
 
+    public void PlayCursorMoveSfx()
+    {
+        PlayMoveSfx();
+    }
+
     public void PlayBeepSfx()
     {
         PlayUiSfx(beepSfx);

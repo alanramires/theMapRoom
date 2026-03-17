@@ -147,6 +147,7 @@ public partial class TurnStateManager
         public int index;
         public string unitName;
         public int? cost;
+        public bool isFocused;
     }
 
     public sealed class HelperSensorLine
@@ -1430,7 +1431,9 @@ public partial class TurnStateManager
             if (passenger == null || !passenger.IsEmbarked || passenger.EmbarkedTransporter != transporter)
                 continue;
 
-            lines.Add($"{indent}{ResolveUnitRuntimeName(passenger)} ({BuildUnitStatInline(passenger)})");
+            string stats = BuildUnitStatInlineWithoutSupplies(passenger);
+            string supplies = BuildUnitSuppliesInline(passenger);
+            lines.Add($"{indent}{ResolveUnitRuntimeName(passenger)} ({stats})||SUPPLIES||{supplies}");
             AppendTransportedUnitStatsLines(lines, passenger, depth + 1);
         }
     }
@@ -1667,7 +1670,8 @@ public partial class TurnStateManager
             {
                 index = i + 1,
                 unitName = ResolveUnitName(unit),
-                cost = resolvedCost
+                cost = resolvedCost,
+                isFocused = shoppingSelectedIndex == i
             });
         }
 
@@ -2247,6 +2251,53 @@ public partial class TurnStateManager
         AppendSupplyStatSegments(segments, unit);
         if (segments.Count <= 0)
             return ResolveUnitStatInlineEmpty();
+
+        string separator = PanelHelperController.ResolveHelperMessage("helper.unit_stats.inline.separator", " | ");
+        return string.Join(separator, segments);
+    }
+
+    private string BuildUnitStatInlineWithoutSupplies(UnitManager unit)
+    {
+        if (unit == null)
+            return ResolveUnitStatInlineEmpty();
+
+        int hp = Mathf.Max(0, unit.CurrentHP);
+        int fuel = Mathf.Max(0, unit.CurrentFuel);
+        List<string> segments = new List<string>
+        {
+            PanelHelperController.ResolveHelperMessage(
+                "helper.unit_stats.inline.hp",
+                "<value>HP",
+                new Dictionary<string, string>
+                {
+                    { "value", hp.ToString() }
+                }),
+            PanelHelperController.ResolveHelperMessage(
+                "helper.unit_stats.inline.fuel",
+                "<value>F",
+                new Dictionary<string, string>
+                {
+                    { "value", fuel.ToString() }
+                })
+        };
+
+        AppendWeaponStatSegments(segments, unit);
+        if (segments.Count <= 0)
+            return ResolveUnitStatInlineEmpty();
+
+        string separator = PanelHelperController.ResolveHelperMessage("helper.unit_stats.inline.separator", " | ");
+        return string.Join(separator, segments);
+    }
+
+    private string BuildUnitSuppliesInline(UnitManager unit)
+    {
+        if (unit == null)
+            return string.Empty;
+
+        List<string> segments = new List<string>();
+        AppendSupplyStatSegments(segments, unit);
+        if (segments.Count <= 0)
+            return string.Empty;
 
         string separator = PanelHelperController.ResolveHelperMessage("helper.unit_stats.inline.separator", " | ");
         return string.Join(separator, segments);

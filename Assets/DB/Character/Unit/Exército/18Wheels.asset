@@ -14,8 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
   id: 18wheels
   displayName: "Caminh\xE3o de Carga"
-  apelido: CC18
-  description: 
+  apelido: 18w
+  description: "Ve\xEDculo log\xEDstico dedicado ao transporte de recursos entre
+    base e front. Essencial para manter cidades e posi\xE7\xF5es avan\xE7adas operacionais.
+    N\xE3o participa diretamente do combate, mas sua presen\xE7a garante fluxo cont\xEDnuo
+    de suprimentos. Use para sustentar opera\xE7\xF5es prolongadas e evitar colapso
+    por falta de recursos."
   spriteDefault: {fileID: 21300000, guid: 40bc339bdcc1ea045b344a41eb1c170c, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

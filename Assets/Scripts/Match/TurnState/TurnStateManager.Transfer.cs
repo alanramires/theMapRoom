@@ -26,6 +26,7 @@ public partial class TurnStateManager
     private readonly List<Vector3> transferPreviewSegmentPoints = new List<Vector3>(8);
     private float transferPreviewPathLength;
     private float transferPreviewHeadDistance;
+    private bool transferPromptTemporarilyHidCommittedPath;
 
     private void HandleTransferActionRequested()
     {
@@ -313,6 +314,7 @@ public partial class TurnStateManager
 
     private void ClearPendingTransferPrompt()
     {
+        TryRestoreCommittedPathAfterTransferPrompt();
         transferPromptSelectionPending = false;
         transferPromptConfirmationPending = false;
         transferPromptSelectedIndex = -1;
@@ -329,6 +331,7 @@ public partial class TurnStateManager
 
     private void EnterTransferSelectionStep()
     {
+        TryHideCommittedPathForTransferPrompt();
         transferPromptSelectionPending = true;
         transferPromptConfirmationPending = false;
         transferPromptSelectedIndex = transferPromptOptions.Count > 0 ? 0 : -1;
@@ -342,6 +345,31 @@ public partial class TurnStateManager
         }
 
         LogTransferPromptOptions();
+    }
+
+    private void TryHideCommittedPathForTransferPrompt()
+    {
+        transferPromptTemporarilyHidCommittedPath = false;
+        if (!hasCommittedMovement || committedMovementPath == null || committedMovementPath.Count < 2)
+            return;
+
+        ClearCommittedPathVisual();
+        transferPromptTemporarilyHidCommittedPath = true;
+    }
+
+    private void TryRestoreCommittedPathAfterTransferPrompt()
+    {
+        if (!transferPromptTemporarilyHidCommittedPath)
+            return;
+
+        transferPromptTemporarilyHidCommittedPath = false;
+        bool canRestoreInMovementSensors = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
+        if (!canRestoreInMovementSensors)
+            return;
+        if (!hasCommittedMovement || committedMovementPath == null || committedMovementPath.Count < 2)
+            return;
+
+        DrawCommittedPathVisual(committedMovementPath);
     }
 
     private void EnterTransferConfirmStep()

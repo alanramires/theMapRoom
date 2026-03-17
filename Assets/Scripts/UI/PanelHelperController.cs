@@ -395,6 +395,15 @@ public class PanelHelperController : MonoBehaviour
         if (line == "Reserva")
             return ResolveMessage("helper.unit_stats.section.reserve", "Reserva");
 
+        string supplies = string.Empty;
+        const string transportedSuppliesMarker = "||SUPPLIES||";
+        int suppliesMarkerIndex = line.IndexOf(transportedSuppliesMarker, System.StringComparison.Ordinal);
+        if (suppliesMarkerIndex >= 0)
+        {
+            supplies = line.Substring(suppliesMarkerIndex + transportedSuppliesMarker.Length);
+            line = line.Substring(0, suppliesMarkerIndex);
+        }
+
         int openStatsIndex = line.LastIndexOf(" (", System.StringComparison.Ordinal);
         if (openStatsIndex > 0 && line.EndsWith(")", System.StringComparison.Ordinal))
         {
@@ -410,20 +419,43 @@ public class PanelHelperController : MonoBehaviour
                 string unitName = unitStart < head.Length ? head.Substring(unitStart) : string.Empty;
                 if (!string.IsNullOrWhiteSpace(unitName))
                 {
-                    return ResolveMessage(
+                    string resolved = ResolveMessage(
                         "helper.unit_stats.line.transported",
-                        "<indent><unit> (<stats>)",
+                        "<indent><unit>\n<indent>   <stats>\n<indent>   <supplies>",
                         new Dictionary<string, string>
                         {
                             { "indent", indent },
                             { "unit", unitName },
-                            { "stats", stats }
+                            { "stats", stats },
+                            { "supplies", supplies }
                         });
+
+                    return RemoveWhitespaceOnlyLines(resolved);
                 }
             }
         }
 
         return line;
+    }
+
+    private static string RemoveWhitespaceOnlyLines(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        string[] lines = value.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (string.IsNullOrWhiteSpace(lines[i]))
+                continue;
+
+            if (sb.Length > 0)
+                sb.Append('\n');
+            sb.Append(lines[i]);
+        }
+
+        return sb.ToString();
     }
 
     private string BuildConstructionStatsBody(TurnStateManager.HelperPanelData data)
@@ -484,7 +516,7 @@ public class PanelHelperController : MonoBehaviour
 
             if (line.cost.HasValue)
             {
-                sb.Append(ResolveMessage(
+                string content = ResolveMessage(
                     "helper.shopping.line.with_cost",
                     "<index> - <unit> ($<valor>)",
                     new Dictionary<string, string>
@@ -492,22 +524,29 @@ public class PanelHelperController : MonoBehaviour
                         { "index", line.index.ToString() },
                         { "unit", line.unitName ?? string.Empty },
                         { "valor", line.cost.Value.ToString() }
-                    }));
+                    });
+                sb.Append(line.isFocused ? ">> " : string.Empty);
+                sb.Append(content);
             }
             else
             {
-                sb.Append(ResolveMessage(
+                string content = ResolveMessage(
                     "helper.shopping.line.no_cost",
                     "<index> - <unit>",
                     new Dictionary<string, string>
                     {
                         { "index", line.index.ToString() },
                         { "unit", line.unitName ?? string.Empty }
-                    }));
+                    });
+                sb.Append(line.isFocused ? ">> " : string.Empty);
+                sb.Append(content);
             }
         }
 
-        return sb.ToString();
+        sb.AppendLine();
+        sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
+        sb.Append(ResolveMessage("helper.shopping.hint", "Setas: foco | Enter: comprar | ESC: cancelar"));
+        return sb.ToString().TrimEnd();
     }
 
     private string BuildSensorsBody(TurnStateManager.HelperPanelData data)
@@ -884,7 +923,7 @@ public class PanelHelperController : MonoBehaviour
             {
                 { "targets", Mathf.Max(0, data.SupplyServedTargets).ToString() }
             }));
-        sb.AppendLine(ResolveMessage(
+        string gainsLine = ResolveMessage(
             "helper.supply.gains",
             "Ganhos: HP +<hp> | FUEL +<fuel> | AMMO +<ammo>",
             new Dictionary<string, string>
@@ -892,7 +931,10 @@ public class PanelHelperController : MonoBehaviour
                 { "hp", Mathf.Max(0, data.SupplyRecoveredHp).ToString() },
                 { "fuel", Mathf.Max(0, data.SupplyRecoveredFuel).ToString() },
                 { "ammo", Mathf.Max(0, data.SupplyRecoveredAmmo).ToString() }
-            }));
+            });
+        gainsLine = RemoveZeroGainSegments(gainsLine);
+        if (!string.IsNullOrWhiteSpace(gainsLine))
+            sb.AppendLine(gainsLine);
         sb.AppendLine(ResolveMessage(
             "helper.supply.total_cost",
             "Custo estimado: $<valor>",
@@ -945,6 +987,46 @@ public class PanelHelperController : MonoBehaviour
         }
 
         return sb.ToString().TrimEnd();
+    }
+
+    private static string RemoveZeroGainSegments(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+            return string.Empty;
+
+        string[] segments = line.Split('|');
+        if (segments.Length <= 1)
+            return ContainsStandalonePlusZero(line) ? string.Empty : line.Trim();
+
+        List<string> kept = new List<string>(segments.Length);
+        for (int i = 0; i < segments.Length; i++)
+        {
+            string segment = segments[i].Trim();
+            if (string.IsNullOrWhiteSpace(segment))
+                continue;
+            if (ContainsStandalonePlusZero(segment))
+                continue;
+            kept.Add(segment);
+        }
+
+        return kept.Count <= 0 ? string.Empty : string.Join(" | ", kept);
+    }
+
+    private static bool ContainsStandalonePlusZero(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return false;
+
+        int index = text.IndexOf("+0", System.StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            int next = index + 2;
+            if (next >= text.Length || !char.IsDigit(text[next]))
+                return true;
+            index = text.IndexOf("+0", next, System.StringComparison.Ordinal);
+        }
+
+        return false;
     }
 
     private string BuildTransferBody(TurnStateManager.HelperPanelData data)

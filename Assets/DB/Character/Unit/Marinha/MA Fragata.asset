@@ -15,7 +15,10 @@ MonoBehaviour:
   id: fragata
   displayName: Fragata
   apelido: FR
-  description: Navio de transporte militar e tambem AAA naval leve
+  description: "Navio especializado em detec\xE7\xE3o de submarinos e opera\xE7\xF5es
+    com helic\xF3pteros. Revela amea\xE7as submersas e transportar Apache, oferecendo
+    reabastecimento limitado. Possui armamento leve e deve operar protegido. Essencial
+    para controle de informa\xE7\xE3o e apoio naval."
   spriteDefault: {fileID: 21300000, guid: 5324b658b32ed07459481f31620710f1, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

@@ -741,6 +741,9 @@ public class SaveGameManager : MonoBehaviour
                 }
             }
 
+            stage = "apply-conservative-fog-visibility";
+            matchController?.ApplyConservativeFogVisibilityForLoading();
+
             coreLoadSucceeded = true;
         }
         catch (Exception ex)

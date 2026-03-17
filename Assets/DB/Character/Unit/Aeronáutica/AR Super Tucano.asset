@@ -15,7 +15,11 @@ MonoBehaviour:
   id: superTucano
   displayName: Super Tucano
   apelido: SPT
-  description: 
+  description: "Aeronave leve de patrulha e reconhecimento com capacidade de detectar
+    submarinos e alvos navais. Combina boa vis\xE3o com perman\xEAncia prolongada
+    no ar, permitindo vigil\xE2ncia cont\xEDnua. Possui armamento leve para apoio,
+    mas seu valor est\xE1 na detec\xE7\xE3o e controle de informa\xE7\xE3o. Use para
+    revelar amea\xE7as ocultas e orientar opera\xE7\xF5es."
   spriteDefault: {fileID: 21300000, guid: 66c29b8fc0b48bd4d9395477688a860f, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

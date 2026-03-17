@@ -416,6 +416,29 @@ public class ConstructionManager : MonoBehaviour
             return ContainsOfferedSupply(supply);
         }
 
+        IReadOnlyList<ConstructionSupplyOffer> offers = OfferedSupplies;
+        bool hasRuntimeSupplyData = false;
+        if (offers != null)
+        {
+            for (int i = 0; i < offers.Count; i++)
+            {
+                ConstructionSupplyOffer offer = offers[i];
+                if (offer == null || offer.supply == null)
+                    continue;
+                if (supply != null && offer.supply != supply)
+                    continue;
+
+                hasRuntimeSupplyData = true;
+                if (offer.quantity >= int.MaxValue)
+                    return true;
+            }
+        }
+
+        // Se a instancia possui dado runtime desse supply (ou da lista geral), ele prevalece
+        // sobre o asset pai, inclusive para "nao infinito".
+        if (hasRuntimeSupplyData)
+            return false;
+
         if (TryResolveConstructionData(out ConstructionData constructionData) && constructionData != null && constructionData.supplierResources != null)
         {
             for (int i = 0; i < constructionData.supplierResources.Count; i++)
@@ -428,21 +451,6 @@ public class ConstructionManager : MonoBehaviour
                 if (entry.IsInfinite())
                     return true;
             }
-        }
-
-        IReadOnlyList<ConstructionSupplyOffer> offers = OfferedSupplies;
-        if (offers == null)
-            return false;
-
-        for (int i = 0; i < offers.Count; i++)
-        {
-            ConstructionSupplyOffer offer = offers[i];
-            if (offer == null || offer.supply == null)
-                continue;
-            if (supply != null && offer.supply != supply)
-                continue;
-            if (offer.quantity >= int.MaxValue)
-                return true;
         }
 
         return false;

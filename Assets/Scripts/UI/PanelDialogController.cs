@@ -16,6 +16,9 @@ public class PanelDialogController : MonoBehaviour
     [SerializeField] private DialogDatabase dialogDatabase;
     [SerializeField] private GameObject panelUnit;
     [SerializeField] private TMP_Text textUnit;
+    [SerializeField] private Image unitPreviewImage;
+    [SerializeField] [Range(100f, 1200f)] private float shoppingPreviewPanelHeight = 350f;
+    [SerializeField] [Range(10f, 72f)] private float shoppingPreviewFontSize = 18f;
 
     private string lastText = string.Empty;
     private bool lastPanelVisible;
@@ -25,6 +28,26 @@ public class PanelDialogController : MonoBehaviour
     private bool hasExternalOverrideText;
     private string externalOverrideText = string.Empty;
     private float externalOverrideUntilUnscaledTime = -1f;
+    private bool shoppingPreviewMode;
+    private Sprite externalPreviewSprite;
+    private Color externalPreviewColor = Color.white;
+    private RectTransform panelRect;
+    private float basePanelHeight = -1f;
+    private RectTransform textRect;
+    private float baseTextRectHeight = -1f;
+    private bool cachedTextLayoutDefaults;
+    private TextWrappingModes baseTextWrappingMode;
+    private bool baseRichText;
+    private TextOverflowModes baseOverflowMode;
+    private bool baseEnableAutoSizing;
+    private float baseFontSize = -1f;
+    private TextAlignmentOptions baseAlignment = TextAlignmentOptions.TopLeft;
+    private bool cachedTextRectDefaults;
+    private Vector2 baseTextAnchorMin;
+    private Vector2 baseTextAnchorMax;
+    private Vector2 baseTextPivot;
+    private Vector2 baseTextAnchoredPosition;
+    private Vector2 baseTextSizeDelta;
 
     private void Awake()
     {
@@ -65,12 +88,45 @@ public class PanelDialogController : MonoBehaviour
             panelUnit = FindNamedObject("panel_dialog") ?? FindNamedObject("panel_unit") ?? FindNamedObject("unit_panel");
         if (panelUnit == null)
             panelUnit = gameObject;
+        if (panelRect == null && panelUnit != null)
+            panelRect = panelUnit.GetComponent<RectTransform>();
+        if (basePanelHeight <= 0f && panelRect != null)
+            basePanelHeight = Mathf.Max(0f, panelRect.rect.height);
 
         if (textUnit == null)
             textUnit = FindNamedTmpText("text_unit")
                 ?? FindNamedTmpText("txt_unit")
                 ?? FindNamedTmpText("unit_text")
                 ?? FindNamedTmpText("text_dialog");
+        if (textRect == null && textUnit != null)
+            textRect = textUnit.rectTransform;
+        if (!cachedTextLayoutDefaults && textUnit != null)
+        {
+            baseTextWrappingMode = textUnit.textWrappingMode;
+            baseRichText = textUnit.richText;
+            baseOverflowMode = textUnit.overflowMode;
+            baseEnableAutoSizing = textUnit.enableAutoSizing;
+            baseFontSize = textUnit.fontSize;
+            baseAlignment = textUnit.alignment;
+            baseTextRectHeight = textRect != null ? Mathf.Max(0f, textRect.rect.height) : -1f;
+            cachedTextLayoutDefaults = true;
+        }
+        if (!cachedTextRectDefaults && textRect != null)
+        {
+            baseTextAnchorMin = textRect.anchorMin;
+            baseTextAnchorMax = textRect.anchorMax;
+            baseTextPivot = textRect.pivot;
+            baseTextAnchoredPosition = textRect.anchoredPosition;
+            baseTextSizeDelta = textRect.sizeDelta;
+            cachedTextRectDefaults = true;
+        }
+        if (unitPreviewImage == null)
+            unitPreviewImage = FindNamedImage("img_unit")
+                ?? FindNamedImage("unit_image")
+                ?? FindNamedImage("image_unit")
+                ?? FindNamedImage("unit_preview")
+                ?? FindNamedImage("preview_unit")
+                ?? FindTopLeftPreviewImageCandidate();
 
 #if UNITY_EDITOR
         if (dialogDatabase == null)
@@ -87,12 +143,16 @@ public class PanelDialogController : MonoBehaviour
             hasExternalOverrideText = false;
             externalOverrideText = string.Empty;
             externalOverrideUntilUnscaledTime = -1f;
+            shoppingPreviewMode = false;
+            externalPreviewSprite = null;
+            externalPreviewColor = Color.white;
         }
 
         if (hasExternalOverrideText)
         {
             Color overrideColor = ResolveActiveTeamColor();
             SetVisible(panelVisible: true, textVisible: true, textValue: externalOverrideText, textColor: overrideColor, force: force);
+            RefreshPreviewVisual();
             return;
         }
 
@@ -100,6 +160,7 @@ public class PanelDialogController : MonoBehaviour
         if (selectedUnit == null)
         {
             HideAll(force);
+            RefreshPreviewVisual();
             return;
         }
 
@@ -107,6 +168,7 @@ public class PanelDialogController : MonoBehaviour
         string nextText = BuildStateText(unitName, turnStateManager.CurrentCursorState);
         Color textColor = ResolveActiveTeamColor();
         SetVisible(panelVisible: true, textVisible: true, textValue: nextText, textColor: textColor, force: force);
+        RefreshPreviewVisual();
     }
 
     private UnitManager ResolveSelectedUnit()
@@ -265,6 +327,9 @@ public class PanelDialogController : MonoBehaviour
         if (instance == null)
             return false;
 
+        instance.shoppingPreviewMode = false;
+        instance.externalPreviewSprite = null;
+        instance.externalPreviewColor = Color.white;
         instance.SetExternalText(text);
         return true;
     }
@@ -277,6 +342,9 @@ public class PanelDialogController : MonoBehaviour
         instance.hasExternalOverrideText = false;
         instance.externalOverrideText = string.Empty;
         instance.externalOverrideUntilUnscaledTime = -1f;
+        instance.shoppingPreviewMode = false;
+        instance.externalPreviewSprite = null;
+        instance.externalPreviewColor = Color.white;
     }
 
     public static bool TrySetTransientText(string text, float durationSeconds = 2.6f)
@@ -284,7 +352,34 @@ public class PanelDialogController : MonoBehaviour
         if (instance == null)
             return false;
 
+        instance.shoppingPreviewMode = false;
+        instance.externalPreviewSprite = null;
+        instance.externalPreviewColor = Color.white;
         instance.SetExternalText(text, Mathf.Max(0.05f, durationSeconds), timed: true);
+        return true;
+    }
+
+    public static bool TrySetShoppingPreview(string text, Sprite previewSprite)
+    {
+        if (instance == null)
+            return false;
+
+        instance.shoppingPreviewMode = true;
+        instance.externalPreviewSprite = previewSprite;
+        instance.externalPreviewColor = Color.white;
+        instance.SetExternalText(text, 0f, timed: false);
+        return true;
+    }
+
+    public static bool TrySetShoppingPreview(string text, Sprite previewSprite, Color previewColor)
+    {
+        if (instance == null)
+            return false;
+
+        instance.shoppingPreviewMode = true;
+        instance.externalPreviewSprite = previewSprite;
+        instance.externalPreviewColor = previewColor;
+        instance.SetExternalText(text, 0f, timed: false);
         return true;
     }
 
@@ -342,6 +437,97 @@ public class PanelDialogController : MonoBehaviour
         hasExternalOverrideText = true;
         externalOverrideText = text;
         externalOverrideUntilUnscaledTime = timed ? Time.unscaledTime + Mathf.Max(0.05f, durationSeconds) : -1f;
+    }
+
+    private void RefreshPreviewVisual()
+    {
+        if (unitPreviewImage != null)
+        {
+            bool showPreview = hasExternalOverrideText && shoppingPreviewMode && externalPreviewSprite != null;
+            if (showPreview)
+            {
+                unitPreviewImage.sprite = externalPreviewSprite;
+                unitPreviewImage.color = externalPreviewColor;
+            }
+
+            unitPreviewImage.enabled = showPreview;
+            if (unitPreviewImage.gameObject.activeSelf != showPreview)
+                unitPreviewImage.gameObject.SetActive(showPreview);
+        }
+
+        if (panelRect == null || basePanelHeight <= 0f)
+        {
+            RefreshShoppingTextLayout();
+            return;
+        }
+
+        float targetHeight = basePanelHeight;
+        if (hasExternalOverrideText && shoppingPreviewMode)
+            targetHeight = Mathf.Max(350f, shoppingPreviewPanelHeight);
+
+        panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
+        RefreshShoppingTextLayout();
+    }
+
+    private void RefreshShoppingTextLayout()
+    {
+        if (textUnit == null)
+            return;
+
+        bool shoppingActive = hasExternalOverrideText && shoppingPreviewMode;
+        if (shoppingActive)
+        {
+            textUnit.enableAutoSizing = false;
+            textUnit.fontSize = Mathf.Max(10f, shoppingPreviewFontSize);
+            textUnit.textWrappingMode = TextWrappingModes.Normal;
+            textUnit.overflowMode = TextOverflowModes.Truncate;
+            textUnit.richText = false;
+            textUnit.alignment = TextAlignmentOptions.TopLeft;
+            if (textRect != null && panelRect != null)
+            {
+                bool previewVisible = unitPreviewImage != null &&
+                                      unitPreviewImage.gameObject.activeSelf &&
+                                      unitPreviewImage.enabled;
+                float previewWidth = previewVisible ? Mathf.Max(0f, unitPreviewImage.rectTransform.rect.width) : 0f;
+                float leftInset = previewVisible ? 14f + previewWidth + 10f : 14f;
+                float rightInset = 10f;
+                float topInset = 10f;
+                float bottomInset = 10f;
+                float targetWidth = Mathf.Max(24f, panelRect.rect.width - leftInset - rightInset);
+                float targetHeight = Mathf.Max(24f, panelRect.rect.height - topInset - bottomInset);
+
+                textRect.anchorMin = new Vector2(0f, 1f);
+                textRect.anchorMax = new Vector2(0f, 1f);
+                textRect.pivot = new Vector2(0f, 1f);
+                textRect.anchoredPosition = new Vector2(leftInset, -topInset);
+                textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, targetWidth);
+                textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
+            }
+            return;
+        }
+
+        if (!cachedTextLayoutDefaults)
+            return;
+
+        textUnit.enableAutoSizing = baseEnableAutoSizing;
+        if (baseFontSize > 0f)
+            textUnit.fontSize = baseFontSize;
+        textUnit.textWrappingMode = baseTextWrappingMode;
+        textUnit.richText = baseRichText;
+        textUnit.overflowMode = baseOverflowMode;
+        textUnit.alignment = baseAlignment;
+        if (textRect != null && cachedTextRectDefaults)
+        {
+            textRect.anchorMin = baseTextAnchorMin;
+            textRect.anchorMax = baseTextAnchorMax;
+            textRect.pivot = baseTextPivot;
+            textRect.anchoredPosition = baseTextAnchoredPosition;
+            textRect.sizeDelta = baseTextSizeDelta;
+        }
+        else if (textRect != null && baseTextRectHeight > 0f)
+        {
+            textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, baseTextRectHeight);
+        }
     }
 
     private void SetPanelVisible(bool visible)
@@ -436,6 +622,67 @@ public class PanelDialogController : MonoBehaviour
 
         GameObject global = GameObject.Find(name);
         return global != null ? global.GetComponent<TMP_Text>() : null;
+    }
+
+    private Image FindNamedImage(string name)
+    {
+        Transform local = FindChildRecursive(transform, name);
+        if (local != null)
+            return local.GetComponent<Image>();
+
+        GameObject global = GameObject.Find(name);
+        return global != null ? global.GetComponent<Image>() : null;
+    }
+
+    private Image FindTopLeftPreviewImageCandidate()
+    {
+        if (panelUnit == null)
+            return null;
+
+        Image[] images = panelUnit.GetComponentsInChildren<Image>(true);
+        if (images == null || images.Length <= 0)
+            return null;
+
+        Image best = null;
+        float bestScore = float.NegativeInfinity;
+        for (int i = 0; i < images.Length; i++)
+        {
+            Image candidate = images[i];
+            if (candidate == null)
+                continue;
+            if (candidate == unitPreviewImage)
+                continue;
+            if (candidate.transform == panelUnit.transform)
+                continue;
+
+            RectTransform rt = candidate.rectTransform;
+            if (rt == null)
+                continue;
+
+            // Heuristica para o placeholder criado: 100x100 ancorado no canto superior esquerdo.
+            float anchorScore = 0f;
+            anchorScore -= Mathf.Abs(rt.anchorMin.x - 0f) * 10f;
+            anchorScore -= Mathf.Abs(rt.anchorMin.y - 1f) * 10f;
+            anchorScore -= Mathf.Abs(rt.anchorMax.x - 0f) * 10f;
+            anchorScore -= Mathf.Abs(rt.anchorMax.y - 1f) * 10f;
+
+            float sizeX = Mathf.Max(0f, rt.rect.width);
+            float sizeY = Mathf.Max(0f, rt.rect.height);
+            float sizeScore = -Mathf.Abs(sizeX - 100f) * 0.2f - Mathf.Abs(sizeY - 100f) * 0.2f;
+
+            float pivotScore = 0f;
+            pivotScore -= Mathf.Abs(rt.pivot.x - 0f) * 4f;
+            pivotScore -= Mathf.Abs(rt.pivot.y - 1f) * 4f;
+
+            float score = anchorScore + sizeScore + pivotScore;
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = candidate;
+            }
+        }
+
+        return best;
     }
 
     private static Transform FindChildRecursive(Transform parent, string childName)

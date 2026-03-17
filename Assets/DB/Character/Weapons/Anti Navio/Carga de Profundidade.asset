@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Carga de Profundidade
   m_EditorClassIdentifier: Assembly-CSharp::WeaponData
   id: cargaProfundidade
-  displayName: Carga de Profundidade
+  displayName: Mina Naval
   apelido: CP
   description: "Mina Naval / Carga de Submarino - anti sub. For\xE7a a emergir por
     3 rodadas."

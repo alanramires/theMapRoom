@@ -15,7 +15,10 @@ MonoBehaviour:
   id: navioTanque
   displayName: Navio Tanque
   apelido: NT
-  description: 
+  description: "Navio log\xEDstico de grande capacidade respons\xE1vel por transportar
+    recursos entre portos e frentes mar\xEDtimas. Sustenta opera\xE7\xF5es prolongadas
+    e abastece posi\xE7\xF5es avan\xE7adas. N\xE3o possui capacidade ofensiva relevante
+    e deve operar protegido, pois sua perda compromete a cadeia de suprimentos."
   spriteDefault: {fileID: 21300000, guid: 3538d62717fccc644b7e50d2cd9df3ef, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

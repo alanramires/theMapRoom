@@ -10,6 +10,7 @@ public partial class TurnStateManager
 
         if (cursorState == CursorState.ShoppingAndServices)
         {
+            TryResolveShoppingCursorMove(currentCell, inputDelta);
             resolvedCell = currentCell;
             return false;
         }

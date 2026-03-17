@@ -15,7 +15,10 @@ MonoBehaviour:
   id: tanque B
   displayName: Tanque Leve
   apelido: TB
-  description: 
+  description: "Blindado barato voltado para press\xE3o e desgaste. Eficaz contra
+    infantaria e ve\xEDculos leves, mas n\xE3o resiste a unidades superiores. Use
+    em grupo para for\xE7ar o inimigo a gastar muni\xE7\xE3o e criar oportunidades.
+    Depende de n\xFAmero e coordena\xE7\xE3o para ser relevante."
   spriteDefault: {fileID: 21300000, guid: eb765444f338388409c52aaed0921eef, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

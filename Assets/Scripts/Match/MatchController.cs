@@ -59,6 +59,13 @@ public class MatchController : MonoBehaviour
         }
     }
 
+    public sealed class FogUnitContributorDebugInfo
+    {
+        public UnitManager targetUnit;
+        public bool isVisibleForActiveTeam;
+        public readonly List<UnitManager> contributors = new List<UnitManager>();
+    }
+
 
     [System.Serializable]
     private struct PlayerEntry
@@ -1872,6 +1879,137 @@ public class MatchController : MonoBehaviour
         return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
     }
 
+    public void BuildFogUnitContributorDebugSnapshot(List<FogUnitContributorDebugInfo> output)
+    {
+        if (output == null)
+            return;
+        output.Clear();
+
+        if (!Application.isPlaying)
+            return;
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return;
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        List<UnitManager> observers = new List<UnitManager>(64);
+        List<UnitManager> targets = new List<UnitManager>(64);
+        Dictionary<int, UnitManager> unitsById = new Dictionary<int, UnitManager>(128);
+
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+            if (!IsUnitOnBoard(unit, boardMap))
+                continue;
+
+            int cacheId = ResolveFogCacheIndex(unit);
+            unitsById[cacheId] = unit;
+            if ((int)unit.TeamId == activeTeamId)
+                observers.Add(unit);
+            else
+                targets.Add(unit);
+        }
+
+        Dictionary<int, HashSet<int>> contributorIdsByTarget = new Dictionary<int, HashSet<int>>();
+        List<PodeDetectarOption> detectedStealth = new List<PodeDetectarOption>();
+        List<PodeDetectarOption> undetectedStealth = new List<PodeDetectarOption>();
+        List<PodeDetectarOption> spottedCandidates = new List<PodeDetectarOption>();
+        List<PodeDetectarOption> blockedByLos = new List<PodeDetectarOption>();
+
+        for (int i = 0; i < observers.Count; i++)
+        {
+            UnitManager observer = observers[i];
+            if (observer == null)
+                continue;
+
+            PodeDetectarSensor.CollectDetection(
+                observer,
+                boardMap,
+                ResolveFogTerrainDatabase(),
+                detectedStealth,
+                undetectedStealth,
+                spottedCandidates,
+                blockedByLos,
+                out _,
+                ResolveFogDpqAirHeightConfig(),
+                enableLosValidation,
+                enableSpotter: false,
+                enableStealthValidation);
+
+            int observerId = ResolveFogCacheIndex(observer);
+            RegisterContributorOptions(detectedStealth, observerId, contributorIdsByTarget);
+            RegisterContributorOptions(spottedCandidates, observerId, contributorIdsByTarget);
+        }
+
+        for (int i = 0; i < targets.Count; i++)
+        {
+            UnitManager target = targets[i];
+            if (target == null)
+                continue;
+
+            FogUnitContributorDebugInfo info = new FogUnitContributorDebugInfo
+            {
+                targetUnit = target,
+                isVisibleForActiveTeam = IsUnitVisibleForActiveTeam(target)
+            };
+
+            int targetId = ResolveFogCacheIndex(target);
+            if (contributorIdsByTarget.TryGetValue(targetId, out HashSet<int> contributorIds))
+            {
+                foreach (int contributorId in contributorIds)
+                {
+                    if (unitsById.TryGetValue(contributorId, out UnitManager contributor) && contributor != null)
+                        info.contributors.Add(contributor);
+                }
+            }
+
+            output.Add(info);
+        }
+
+        output.Sort((a, b) =>
+        {
+            int visibleCompare = b.isVisibleForActiveTeam.CompareTo(a.isVisibleForActiveTeam);
+            if (visibleCompare != 0)
+                return visibleCompare;
+            int countCompare = b.contributors.Count.CompareTo(a.contributors.Count);
+            if (countCompare != 0)
+                return countCompare;
+
+            string aName = a.targetUnit != null ? a.targetUnit.UnitDisplayName : string.Empty;
+            string bName = b.targetUnit != null ? b.targetUnit.UnitDisplayName : string.Empty;
+            return string.Compare(aName, bName, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    private static void RegisterContributorOptions(
+        List<PodeDetectarOption> options,
+        int observerId,
+        Dictionary<int, HashSet<int>> contributorIdsByTarget)
+    {
+        if (options == null || contributorIdsByTarget == null || observerId == 0)
+            return;
+
+        for (int i = 0; i < options.Count; i++)
+        {
+            PodeDetectarOption option = options[i];
+            UnitManager target = option != null ? option.targetUnit : null;
+            if (target == null)
+                continue;
+
+            int targetId = target.InstanceId > 0 ? target.InstanceId : target.GetInstanceID();
+            if (!contributorIdsByTarget.TryGetValue(targetId, out HashSet<int> contributors))
+            {
+                contributors = new HashSet<int>();
+                contributorIdsByTarget[targetId] = contributors;
+            }
+
+            contributors.Add(observerId);
+        }
+    }
+
     private static bool HasAnyNeutralUnitsInField()
     {
         List<UnitManager> units = UnitManager.AllActive;
@@ -2086,6 +2224,35 @@ public class MatchController : MonoBehaviour
         cacheEntry.key = nextKey;
     }
 
+    public void NotifyUnitWillBeDisabledForFog(UnitManager unit)
+    {
+        if (!Application.isPlaying || unit == null)
+            return;
+        if (!debugFogOfWarEnabled || !enableTotalWar)
+            return;
+        if (fogOfWarTilemap == null)
+            return;
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return;
+
+        int cacheIndex = ResolveFogCacheIndex(unit);
+        if (fogVisibleCellsByUnit.TryGetValue(cacheIndex, out FogOfWarUnitCacheEntry cacheEntry) &&
+            cacheEntry != null &&
+            cacheEntry.visibleCells.Count > 0)
+        {
+            foreach (Vector3Int cell in cacheEntry.visibleCells)
+                ApplyFogContribution(cell, -1, boardMap);
+            cacheEntry.visibleCells.Clear();
+            fogVisibleCellsByUnit.Remove(cacheIndex);
+        }
+
+        fogUnitVisibilityByCacheIndex[cacheIndex] = false;
+        RefreshRuntimeUnitFogVisibility();
+        OnFogOfWarUpdated?.Invoke();
+    }
+
     private void ApplyFogContribution(Vector3Int cell, int delta, Tilemap boardMap)
     {
         if (delta == 0)
@@ -2264,6 +2431,27 @@ public class MatchController : MonoBehaviour
                 continue;
 
             bool visible = ComputeIsUnitVisibleForActiveTeam(unit);
+            fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
+            unit.SetFogOfWarVisibility(visible);
+        }
+    }
+
+    public void ApplyConservativeFogVisibilityForLoading()
+    {
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        fogUnitVisibilityByCacheIndex.Clear();
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        bool useConservativeFog = debugFogOfWarEnabled && enableTotalWar && activeTeamId >= 0;
+
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null)
+                continue;
+            if (boardMap != null && !IsUnitOnBoard(unit, boardMap))
+                continue;
+
+            bool visible = !useConservativeFog || (int)unit.TeamId == activeTeamId;
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
             unit.SetFogOfWarVisibility(visible);
         }

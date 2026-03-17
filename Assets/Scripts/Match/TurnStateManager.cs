@@ -87,6 +87,7 @@ public partial class TurnStateManager : MonoBehaviour
     private HeightLevel forcedLayerRollbackHeight = HeightLevel.Surface;
     private ConstructionManager shoppingConstruction;
     private readonly List<UnitData> shoppingUnitsForSale = new List<UnitData>();
+    private int shoppingSelectedIndex = -1;
     private bool captureExecutionInProgress;
     private readonly List<UnitManager> turnStartFuelDepletionDeathQueue = new List<UnitManager>();
     private bool turnStartFuelDepletionExecutionInProgress;

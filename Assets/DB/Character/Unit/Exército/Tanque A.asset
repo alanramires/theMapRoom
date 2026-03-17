@@ -15,7 +15,10 @@ MonoBehaviour:
   id: tanqueA
   displayName: MBT (Main Battle Tank)
   apelido: TA
-  description: 
+  description: "Blindado r\xE1pido e vers\xE1til, ideal para flanquear e explorar
+    falhas na linha inimiga. Eficiente contra blindados e infantaria, mas vulner\xE1vel
+    se exposto sem apoio. Posicione fora do alcance inimigo e use sua mobilidade
+    para atacar no momento certo."
   spriteDefault: {fileID: 21300000, guid: 3e0f3f5da4bfffd4b9e5959af789a09d, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

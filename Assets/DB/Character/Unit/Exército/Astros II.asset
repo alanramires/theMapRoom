@@ -15,7 +15,10 @@ MonoBehaviour:
   id: astrosII
   displayName: "Lan\xE7a Foguetes"
   apelido: A2
-  description: 
+  description: "Artilharia de satura\xE7\xE3o focada em infantaria e ve\xEDculos
+    leves. Causa alto dano direto no alvo, sendo eficaz contra unidades agrupadas
+    ou expostas. Ineficaz contra blindados pesados e extremamente fr\xE1gil. Use
+    para quebrar forma\xE7\xF5es e abrir espa\xE7o para avan\xE7o."
   spriteDefault: {fileID: 21300000, guid: 6802ac413b53adb4f85dfda3b65b80d2, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

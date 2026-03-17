@@ -2989,6 +2989,7 @@ public partial class TurnStateManager
             }
         }
 
+        matchController?.NotifyUnitWillBeDisabledForFog(unit);
         unit.gameObject.SetActive(false);
 
         float explosionDuration = animationManager != null

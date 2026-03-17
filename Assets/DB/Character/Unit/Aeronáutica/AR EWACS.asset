@@ -15,7 +15,11 @@ MonoBehaviour:
   id: ewacs
   displayName: EWACS
   apelido: EW
-  description: 
+  description: "Aeronave de reconhecimento que amplia drasticamente a vis\xE3o a\xE9rea,
+    revelando movimentos em grandes dist\xE2ncias. Essencial para antecipar amea\xE7as
+    e coordenar opera\xE7\xF5es. N\xE3o possui capacidade de combate e n\xE3o detecta
+    unidades terrestres ou submarinos. Deve operar protegida, pois sua perda reduz
+    severamente a consci\xEAncia do campo de batalha."
   spriteDefault: {fileID: 21300000, guid: c0b17bc8f689a46478caca98f7d5183b, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

@@ -15,4 +15,4 @@ MonoBehaviour:
   id: helper.unit_stats.line.transported
   condition: Linha de unidade embarcada (suporta recursao por <indent>) no helper
     de unidade selecionada.
-  message: "<indent><unit> \n   <stats>"
+  message: "<indent><unit>\n<indent>   <stats>\n<indent>   <supplies>"

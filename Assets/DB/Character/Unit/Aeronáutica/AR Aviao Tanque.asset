@@ -15,7 +15,10 @@ MonoBehaviour:
   id: aviaoTanque
   displayName: "Avi\xE3o Tanque"
   apelido: AT
-  description: "Avi\xE3o Reabastecedor de unidades em voo"
+  description: "Aeronave de reabastecimento que estende o alcance e o tempo de opera\xE7\xE3o
+    de ca\xE7as e bombardeiros. Permite miss\xF5es mais profundas e sustentadas longe
+    da base. Tamb\xE9m pode apoiar helic\xF3pteros com combust\xEDvel. Vulner\xE1vel
+    e sem capacidade ofensiva, deve operar protegido e fora do alcance inimigo."
   spriteDefault: {fileID: 21300000, guid: 38a846ce0549df1408b70c042c03b5dc, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

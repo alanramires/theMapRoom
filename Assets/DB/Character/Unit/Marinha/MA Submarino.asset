@@ -15,7 +15,11 @@ MonoBehaviour:
   id: submarino
   displayName: Submarino
   apelido: SUB
-  description: 
+  description: "Unidade furtiva especializada em ataques surpresa contra navios.
+    Permanece oculta enquanto submersa, mas se revela temporariamente ap\xF3s atacar.
+    Ideal para emboscadas e controle de \xE1reas mar\xEDtimas. Vulner\xE1vel quando
+    exposta e dependente de posicionamento. Pode ser neutralizado por detec\xE7\xE3o
+    naval especializada."
   spriteDefault: {fileID: 21300000, guid: 2345ab0360bab724090a920cb6b3bdb9, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
@@ -45,9 +49,6 @@ MonoBehaviour:
     heightLevel: 5
     vision: 1
     detectUnitsWithFollowingSkills: []
-  stealthRevealScope: 0
-  stealthRevealTeams: 
-  stealthVisibleIfDetectedForTurns: 1
   movementCategory: 5
   militaryForce: 2
   unitClass: 7

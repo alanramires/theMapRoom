@@ -15,7 +15,10 @@ MonoBehaviour:
   id: portaAvioes
   displayName: "Porta Avi\xF5es"
   apelido: PA
-  description: "Porta Avi\xF5es naval"
+  description: "Base a\xE9rea m\xF3vel que transporta e sustenta opera\xE7\xF5es
+    de aeronaves no mar. Permite projetar poder a\xE9reo longe da base e manter miss\xF5es
+    ativas por mais tempo. Possui defesa anti-a\xE9rea limitada e depende de escolta.
+    Vulner\xE1vel a submarinos e ataques coordenados."
   spriteDefault: {fileID: 21300000, guid: afb5ef766ad0a334fb60994606a18363, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
@@ -108,4 +111,4 @@ MonoBehaviour:
     - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
     blockedSkills: []
   autonomia: 90
-  cost: 20000
+  cost: 22500

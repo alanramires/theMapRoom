@@ -15,7 +15,11 @@ MonoBehaviour:
   id: suprimentos
   displayName: Suprimentos
   apelido: ST
-  description: 
+  description: "Unidade log\xEDstica que mant\xE9m for\xE7as em combate ao reparar
+    e rearmar unidades pr\xF3ximas. Permite sustentar avan\xE7os por mais tempo,
+    evitando recuos frequentes. Sua capacidade \xE9 limitada e exige reposi\xE7\xE3o
+    constante. Vulner\xE1vel no front, deve ser protegido, pois sua perda pode colapsar
+    rapidamente a linha de combate."
   spriteDefault: {fileID: 21300000, guid: 7bb9e34a5859e51449deab8a27150dd5, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

@@ -15,7 +15,11 @@ MonoBehaviour:
   id: tremCarga
   displayName: Trem de Carga
   apelido: TC
-  description: 
+  description: "Unidade log\xEDstica de grande capacidade que transporta recursos
+    ao longo de trilhos entre base e front. Ideal para sustentar opera\xE7\xF5es
+    em larga escala e abastecer cidades avan\xE7adas. Possui alguma prote\xE7\xE3o,
+    mas depende da integridade da linha f\xE9rrea. Sua interrup\xE7\xE3o pode comprometer
+    toda a cadeia de suprimentos."
   spriteDefault: {fileID: 21300000, guid: 867592e92dfef1948a0e46f4c664642e, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

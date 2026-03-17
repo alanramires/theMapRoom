@@ -1,4 +1,5 @@
 using System.Text;
+using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
@@ -34,7 +35,9 @@ public partial class TurnStateManager
             return false;
 
         shoppingConstruction = construction;
+        shoppingSelectedIndex = 0;
         SetCursorState(CursorState.ShoppingAndServices, "TryEnterConstructionShoppingState: ally construction with units for sale");
+        RefreshShoppingSelectionPresentation(logOptions: false);
         LogConstructionShoppingPanel();
         return true;
     }
@@ -43,6 +46,8 @@ public partial class TurnStateManager
     {
         shoppingConstruction = null;
         shoppingUnitsForSale.Clear();
+        shoppingSelectedIndex = -1;
+        PanelDialogController.ClearExternalText();
         SetCursorState(CursorState.Neutral, "ExitConstructionShoppingStateToNeutral", rollback: rollback);
     }
 
@@ -63,21 +68,46 @@ public partial class TurnStateManager
         int index = number - 1;
         if (index < 0 || index >= shoppingUnitsForSale.Count)
         {
+            cursorController?.PlayErrorSfx();
             Debug.Log($"[Shopping] Opcao invalida: {number}. Escolha entre 1 e {shoppingUnitsForSale.Count}.");
             return;
         }
+
+        shoppingSelectedIndex = index;
+        RefreshShoppingSelectionPresentation(logOptions: false);
+        TryPurchaseShoppingUnitByIndex(index);
+    }
+
+    private bool TryConfirmSelectedShoppingOption()
+    {
+        if (cursorState != CursorState.ShoppingAndServices)
+            return false;
+        if (shoppingConstruction == null || shoppingUnitsForSale.Count <= 0)
+            return false;
+
+        int index = ClampShoppingSelectedIndex();
+        if (index < 0 || index >= shoppingUnitsForSale.Count)
+            return false;
+
+        return TryPurchaseShoppingUnitByIndex(index);
+    }
+
+    private bool TryPurchaseShoppingUnitByIndex(int index)
+    {
+        if (index < 0 || index >= shoppingUnitsForSale.Count)
+            return false;
 
         UnitData unit = shoppingUnitsForSale[index];
         if (unit == null)
         {
             Debug.LogWarning("[Shopping] Unidade selecionada esta nula.");
-            return;
+            return false;
         }
 
         if (unitSpawner == null)
         {
             Debug.LogWarning("[Shopping] UnitSpawner nao encontrado na cena.");
-            return;
+            return false;
         }
 
         int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
@@ -86,7 +116,7 @@ public partial class TurnStateManager
         {
             cursorController?.PlayErrorSfx();
             Debug.LogError($"[Shopping] Limite de unidades atingido para {TeamUtils.GetName(spawnTeam)} ({matchController.MaxUnitsPerTeam}).");
-            return;
+            return false;
         }
 
         int unitCost = matchController != null
@@ -100,7 +130,7 @@ public partial class TurnStateManager
                 PushPanelUnitMessage("Sem dinheiro suficiente", 2.6f);
                 cursorController?.PlayErrorSfx();
                 Debug.LogWarning($"[Shopping] Dinheiro insuficiente para comprar {ResolveUnitName(unit)}. Custo=${unitCost}, saldo=${currentMoney}.");
-                return;
+                return false;
             }
         }
 
@@ -110,8 +140,9 @@ public partial class TurnStateManager
         GameObject spawned = unitSpawner.SpawnAtCell(unit, spawnTeam, spawnCell);
         if (spawned == null)
         {
+            cursorController?.PlayErrorSfx();
             Debug.LogWarning($"[Shopping] Falha ao comprar {ResolveUnitName(unit)}. Verifique ocupacao/camada da celula.");
-            return;
+            return false;
         }
 
         int remainingMoney = matchController != null ? matchController.GetActualMoney(spawnTeam) : 0;
@@ -121,7 +152,7 @@ public partial class TurnStateManager
             Destroy(spawned);
             cursorController?.PlayErrorSfx();
             Debug.LogError($"[Shopping] Falha ao debitar custo da unidade {ResolveUnitName(unit)}. Saldo atual=${remainingMoney}, custo=${unitCost}.");
-            return;
+            return false;
         }
 
         if (matchController != null)
@@ -130,6 +161,291 @@ public partial class TurnStateManager
         cursorController?.PlayDoneSfx();
         Debug.Log($"[Shopping] Compra concluida: {ResolveUnitName(unit)} por ${unitCost} em {ResolveConstructionName(shoppingConstruction)}.");
         ExitConstructionShoppingStateToNeutral(rollback: false);
+        return true;
+    }
+
+    private int ClampShoppingSelectedIndex()
+    {
+        if (shoppingUnitsForSale == null || shoppingUnitsForSale.Count <= 0)
+        {
+            shoppingSelectedIndex = -1;
+            return -1;
+        }
+
+        if (shoppingSelectedIndex < 0 || shoppingSelectedIndex >= shoppingUnitsForSale.Count)
+            shoppingSelectedIndex = Mathf.Clamp(shoppingSelectedIndex, 0, shoppingUnitsForSale.Count - 1);
+        return shoppingSelectedIndex;
+    }
+
+    private bool TryResolveShoppingCursorMove(Vector3Int currentCell, Vector3Int inputDelta)
+    {
+        if (cursorState != CursorState.ShoppingAndServices || shoppingUnitsForSale == null || shoppingUnitsForSale.Count <= 0)
+            return false;
+
+        int step = GetMirandoStepFromInput(inputDelta);
+        if (step == 0)
+            return false;
+
+        int count = shoppingUnitsForSale.Count;
+        if (count <= 1)
+            return false;
+
+        int currentIndex = ClampShoppingSelectedIndex();
+        int nextIndex = (currentIndex + step + count) % count;
+        if (nextIndex == currentIndex)
+            return false;
+
+        shoppingSelectedIndex = nextIndex;
+        cursorController?.PlayCursorMoveSfx();
+        RefreshShoppingSelectionPresentation(logOptions: true);
+        return true;
+    }
+
+    private void RefreshShoppingSelectionPresentation(bool logOptions)
+    {
+        int index = ClampShoppingSelectedIndex();
+        if (index < 0 || index >= shoppingUnitsForSale.Count)
+            return;
+
+        UnitData focusedUnit = shoppingUnitsForSale[index];
+        if (focusedUnit == null)
+            return;
+
+        string preview = BuildShoppingDialogPreview(focusedUnit);
+        TeamId previewTeam = matchController != null && matchController.ActiveTeamId >= 0
+            ? (TeamId)matchController.ActiveTeamId
+            : (shoppingConstruction != null ? shoppingConstruction.TeamId : TeamId.Neutral);
+        Sprite previewSprite = ResolveShoppingPreviewSprite(focusedUnit, previewTeam, out Color previewTint);
+        PanelDialogController.TrySetShoppingPreview(preview, previewSprite, previewTint);
+        if (logOptions)
+            LogConstructionShoppingPanel();
+    }
+
+    private string BuildShoppingDialogPreview(UnitData unit)
+    {
+        if (unit == null)
+            return string.Empty;
+
+        int resolvedCost = matchController != null
+            ? matchController.ResolveEconomyCost(unit.cost)
+            : Mathf.Max(0, unit.cost);
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine($"{ResolveUnitName(unit)} $ {resolvedCost.ToString("N0", CultureInfo.GetCultureInfo("pt-BR"))} | Classe: {ResolveGameUnitClassName(unit.unitClass)} | Defesa: {Mathf.Max(0, unit.defense)}");
+        string airUpkeepSuffix = ResolveAirTurnUpkeepSuffix(unit);
+        sb.AppendLine($"Movimento: {Mathf.Max(0, unit.movement)} | Autonomia: {Mathf.Max(0, unit.autonomia)}{airUpkeepSuffix} | Visao: {Mathf.Max(0, unit.visao)}");
+        if (TryBuildVisionSpecializationsSummary(unit, out string visionSpecializationsSummary))
+            sb.AppendLine($"    {visionSpecializationsSummary}");
+
+        AppendShoppingPreviewWeaponLines(sb, unit);
+        AppendShoppingPreviewSupplyLines(sb, unit);
+
+        if (!string.IsNullOrWhiteSpace(unit.description))
+        {
+            sb.AppendLine();
+            sb.Append(unit.description.Trim());
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+
+    private static string ResolveAirTurnUpkeepSuffix(UnitData unit)
+    {
+        if (unit == null || unit.autonomyData == null)
+            return string.Empty;
+
+        AutonomyData profile = unit.autonomyData;
+        int upkeep = Mathf.Max(0, profile.turnStartUpkeep);
+        if (upkeep <= 0)
+            return string.Empty;
+
+        bool hasAirUpkeep = false;
+        if (profile.upkeepStartLayerModes != null)
+        {
+            for (int i = 0; i < profile.upkeepStartLayerModes.Count; i++)
+            {
+                AutonomyLayerMode mode = profile.upkeepStartLayerModes[i];
+                if (mode.domain == Domain.Air)
+                {
+                    hasAirUpkeep = true;
+                    break;
+                }
+            }
+        }
+
+        if (!hasAirUpkeep)
+            return string.Empty;
+
+        return $" (-{upkeep} por turno no ar)";
+    }
+    private static bool TryBuildVisionSpecializationsSummary(UnitData unit, out string summary)
+    {
+        summary = string.Empty;
+        if (unit == null || unit.visionSpecializations == null || unit.visionSpecializations.Count <= 0)
+            return false;
+
+        List<string> segments = new List<string>();
+        for (int i = 0; i < unit.visionSpecializations.Count; i++)
+        {
+            UnitVisionException entry = unit.visionSpecializations[i];
+            if (entry == null)
+                continue;
+
+            string domainLabel = ResolveDomainName(entry.domain);
+            string heightLabel = ResolveHeightName(entry.heightLevel);
+            int visionValue = Mathf.Max(0, entry.vision);
+            segments.Add($"{domainLabel} {heightLabel}: {visionValue}");
+        }
+
+        if (segments.Count <= 0)
+            return false;
+
+        summary = string.Join(", ", segments);
+        return true;
+    }
+
+    private static string ResolveDomainName(Domain domain)
+    {
+        switch (domain)
+        {
+            case Domain.Land: return "Land";
+            case Domain.Naval: return "Naval";
+            case Domain.Submarine: return "Submarine";
+            case Domain.Air: return "Air";
+            default: return domain.ToString();
+        }
+    }
+
+    private static string ResolveHeightName(HeightLevel heightLevel)
+    {
+        switch (heightLevel)
+        {
+            case HeightLevel.Submerged: return "Submerged";
+            case HeightLevel.Surface: return "Surface";
+            case HeightLevel.AirLow: return "Low";
+            case HeightLevel.AirHigh: return "High";
+            default: return heightLevel.ToString();
+        }
+    }
+
+    private static void AppendShoppingPreviewWeaponLines(StringBuilder sb, UnitData unit)
+    {
+        if (sb == null || unit == null || unit.embarkedWeapons == null || unit.embarkedWeapons.Count <= 0)
+            return;
+
+        bool hasAny = false;
+        for (int i = 0; i < unit.embarkedWeapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = unit.embarkedWeapons[i];
+            if (embarked == null || embarked.weapon == null)
+                continue;
+
+            if (!hasAny)
+            {
+                sb.AppendLine();
+                sb.AppendLine("Armas");
+                hasAny = true;
+            }
+
+            string weaponName = !string.IsNullOrWhiteSpace(embarked.weapon.displayName)
+                ? embarked.weapon.displayName
+                : (!string.IsNullOrWhiteSpace(embarked.weapon.id) ? embarked.weapon.id : embarked.weapon.name);
+            int ammo = Mathf.Max(0, embarked.squadAmmunition);
+            int rangeMin = Mathf.Max(0, embarked.GetRangeMin());
+            int rangeMax = Mathf.Max(rangeMin, embarked.GetRangeMax());
+            string rangeLabel = rangeMin == rangeMax
+                ? rangeMin.ToString()
+                : $"{rangeMin}-{rangeMax}";
+            int attack = Mathf.Max(0, embarked.GetWeaponBasicAttack());
+            string weaponCategory = ResolveWeaponCategoryName(embarked.weapon.WeaponCategory);
+            sb.AppendLine($"- {weaponName} | Ammo: {ammo} | Alcance: {rangeLabel} | Potência: {attack} ({weaponCategory})");
+        }
+    }
+
+    private static string ResolveWeaponCategoryName(WeaponCategory weaponCategory)
+    {
+        switch (weaponCategory)
+        {
+            case WeaponCategory.AntiInfantaria: return "anti infantaria";
+            case WeaponCategory.AntiTanque: return "anti tanque";
+            case WeaponCategory.AntiAerea: return "anti aerea";
+            case WeaponCategory.AntiNavio: return "anti navio";
+            default: return weaponCategory.ToString().ToLowerInvariant();
+        }
+    }
+
+    private static void AppendShoppingPreviewSupplyLines(StringBuilder sb, UnitData unit)
+    {
+        if (sb == null || unit == null || unit.supplierResources == null || unit.supplierResources.Count <= 0)
+            return;
+
+        List<string> segments = new List<string>();
+        for (int i = 0; i < unit.supplierResources.Count; i++)
+        {
+            UnitEmbarkedSupply entry = unit.supplierResources[i];
+            if (entry == null || entry.supply == null)
+                continue;
+
+            string supplyName = !string.IsNullOrWhiteSpace(entry.supply.displayName)
+                ? entry.supply.displayName
+                : (!string.IsNullOrWhiteSpace(entry.supply.id) ? entry.supply.id : entry.supply.name);
+            segments.Add($"{supplyName}: {Mathf.Max(0, entry.amount)}");
+        }
+
+        if (segments.Count <= 0)
+            return;
+
+        sb.AppendLine();
+        sb.AppendLine("Carga:");
+        sb.AppendLine($"    {string.Join(" | ", segments)}");
+    }
+
+    private static string ResolveGameUnitClassName(GameUnitClass gameUnitClass)
+    {
+        switch (gameUnitClass)
+        {
+            case GameUnitClass.Infantry: return "Infantaria";
+            case GameUnitClass.Vehicle: return "Veiculo";
+            case GameUnitClass.Artillery: return "Artilharia";
+            case GameUnitClass.Armored: return "Blindado";
+            case GameUnitClass.Jet: return "Jato";
+            case GameUnitClass.Helicopter: return "Helicoptero";
+            case GameUnitClass.Plane: return "Aviao";
+            case GameUnitClass.Submarine: return "Submarino";
+            case GameUnitClass.Ship: return "Navio";
+            default: return gameUnitClass.ToString();
+        }
+    }
+
+    private static Sprite ResolveShoppingPreviewSprite(UnitData unit, TeamId team, out Color tint)
+    {
+        tint = Color.white;
+        if (unit == null)
+            return null;
+
+        Sprite teamSprite = null;
+        switch (team)
+        {
+            case TeamId.Green:
+                teamSprite = unit.spriteGreen;
+                break;
+            case TeamId.Red:
+                teamSprite = unit.spriteRed;
+                break;
+            case TeamId.Blue:
+                teamSprite = unit.spriteBlue;
+                break;
+            case TeamId.Yellow:
+                teamSprite = unit.spriteYellow;
+                break;
+        }
+
+        if (teamSprite != null)
+            return teamSprite;
+
+        tint = TeamUtils.GetColor(team);
+        tint.a = 1f;
+        return unit.spriteDefault;
     }
 
     private void LogConstructionShoppingPanel()
@@ -146,15 +462,18 @@ public partial class TurnStateManager
             if (unit == null)
                 continue;
 
+            string marker = i == ClampShoppingSelectedIndex() ? ">" : " ";
+            sb.Append(marker);
+            sb.Append(' ');
             sb.Append(i + 1);
             sb.Append(". ");
             sb.Append(ResolveUnitName(unit));
             sb.Append(" $");
-            sb.Append(Mathf.Max(0, unit.cost));
+            sb.Append(matchController != null ? matchController.ResolveEconomyCost(unit.cost) : Mathf.Max(0, unit.cost));
             sb.AppendLine();
         }
 
-        sb.Append("Atalhos: 1-9, 0=10, Shift+1=11, Shift+2=12 ... Shift+9=19. ESC cancela.");
+        sb.Append("Setas: muda foco | Enter: comprar focada | Atalhos: 1-9, 0=10, Shift+1=11... ESC cancela.");
         Debug.Log(sb.ToString());
     }
 
@@ -209,3 +528,10 @@ public partial class TurnStateManager
     }
 
 }
+
+
+
+
+
+
+

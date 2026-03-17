@@ -594,8 +594,9 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileShoppingAndServices()
     {
         LogStateStep("HandleConfirmWhileShoppingAndServices");
-        LogConstructionShoppingPanel();
-        return ActionSfx.None;
+        return TryConfirmSelectedShoppingOption()
+            ? ActionSfx.Confirm
+            : ActionSfx.Error;
     }
 
     private ActionSfx HandleCancelWhileDesembarcando()

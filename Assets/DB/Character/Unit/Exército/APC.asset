@@ -15,7 +15,11 @@ MonoBehaviour:
   id: apc
   displayName: APC
   apelido: APC
-  description: 
+  description: "Ve\xEDculo de transporte r\xE1pido para levar Soldados e Bazookas
+    ao front com agilidade. Escala terrenos dif\xEDceis e acompanha avan\xE7os por
+    rotas onde blindados pesados perdem ritmo. Sua metralhadora \xE9 eficaz contra
+    infantaria exposta, mas seu valor real est\xE1 em reposicionar tropas e antecipar
+    capturas, emboscadas e respostas t\xE1ticas."
   spriteDefault: {fileID: 21300000, guid: eb47016b4b81a574eb99e655c0ae0803, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

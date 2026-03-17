@@ -15,7 +15,10 @@ MonoBehaviour:
   id: obusMedio
   displayName: "Obuseiro M\xF3vel"
   apelido: OM
-  description: 
+  description: "Artilharia de m\xE9dio alcance que acompanha o avan\xE7o e elimina
+    amea\xE7as \xE0 dist\xE2ncia. Eficaz contra blindados leves e m\xE9dios. Use
+    atr\xE1s da linha de frente e reposicione ap\xF3s disparar. Ideal para enfraquecer
+    ou finalizar unidades antes do combate direto."
   spriteDefault: {fileID: 21300000, guid: 380f58649d92e934fa83b684653a7435, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

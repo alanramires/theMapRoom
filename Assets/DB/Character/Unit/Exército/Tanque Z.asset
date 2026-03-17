@@ -15,7 +15,10 @@ MonoBehaviour:
   id: tanqueZ
   displayName: Tanque Pesado
   apelido: TZ
-  description: 
+  description: "Blindado de alto impacto, resistente e eficaz contra m\xFAltiplos
+    alvos terrestres. Com alcance ampliado, pode remover amea\xE7as \xE0 dist\xE2ncia,
+    mas exige suporte e tem alto custo de manuten\xE7\xE3o. Use com cautela: erros
+    com essa unidade s\xE3o financeiramente severos."
   spriteDefault: {fileID: 21300000, guid: 7a5c0d43a20e5e54093e52848a52ee5c, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
@@ -54,7 +57,7 @@ MonoBehaviour:
   - weapon: {fileID: 11400000, guid: a8f1b8deb50f0a04596f31c015730045, type: 2}
     squadAmmunition: 9
     operationRangeMin: 1
-    operationRangeMax: 3
+    operationRangeMax: 2
     selectedTrajectory: 0
     lastSyncedWeapon: {fileID: 11400000, guid: a8f1b8deb50f0a04596f31c015730045, type: 2}
   - weapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
@@ -84,5 +87,5 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToTerrainStructures: []
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
-  autonomia: 80
+  autonomia: 50
   cost: 28000

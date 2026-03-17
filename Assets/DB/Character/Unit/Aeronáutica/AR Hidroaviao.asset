@@ -15,7 +15,10 @@ MonoBehaviour:
   id: hidroaviao
   displayName: "Hidroavi\xE3o"
   apelido: HA
-  description: "Hidroavi\xE3o como alternativa barata de transporte desarmado"
+  description: "Aeronave leve de transporte com alcance limitado, usada para deslocamentos
+    r\xE1pidos em curtas dist\xE2ncias entre terra e \xE1gua. Carrega uma unidade
+    de infantaria e pousa em praias ou estradas. Ideal para movimentos improvisados
+    e situa\xE7\xF5es espec\xEDficas, mas n\xE3o substitui transportes dedicados."
   spriteDefault: {fileID: 21300000, guid: 45ca2a03cea85fe4f895f32d1843c233, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
@@ -24,12 +27,9 @@ MonoBehaviour:
   maxHP: 10
   defense: 8
   armorClass: 0
-  movement: 4
+  movement: 3
   visao: 3
   visionSpecializations: []
-  stealthRevealScope: 0
-  stealthRevealTeams: 
-  stealthVisibleIfDetectedForTurns: 1
   movementCategory: 1
   militaryForce: 1
   unitClass: 6
@@ -113,5 +113,5 @@ MonoBehaviour:
     allowedClasses: 00000000
     requiredSkills: []
     blockedSkills: []
-  autonomia: 50
+  autonomia: 30
   cost: 2000

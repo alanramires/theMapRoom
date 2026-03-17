@@ -15,7 +15,10 @@ MonoBehaviour:
   id: aaa
   displayName: Anti Arcraft Artilery
   apelido: AAA
-  description: 
+  description: "Defesa anti-a\xE9rea de curto alcance, m\xF3vel e barata. Protege
+    unidades terrestres contra ataques a\xE9reos e reduz a liberdade do inimigo no
+    uso de aeronaves. N\xE3o elimina amea\xE7as sozinha, mas imp\xF5e risco constante.
+    Ideal para acompanhar avan\xE7os e proteger forma\xE7\xF5es."
   spriteDefault: {fileID: 21300000, guid: 7cffcbae4b6cd034693321f798081f60, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

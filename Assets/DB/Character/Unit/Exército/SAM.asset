@@ -15,7 +15,10 @@ MonoBehaviour:
   id: sam
   displayName: Surface Air Missile
   apelido: SAM
-  description: 
+  description: "Sistema anti-a\xE9reo de m\xE9dio alcance que controla o espa\xE7o
+    a\xE9reo. Quando combinado com radar ou detec\xE7\xE3o, cria zonas de nega\xE7\xE3o
+    eficazes. Posicione m\xFAltiplas unidades cobrindo pontos cegos. Vulner\xE1vel
+    a ataques terrestres e dependente de posicionamento estrat\xE9gico."
   spriteDefault: {fileID: 21300000, guid: 0b38e614f48c0a74aacb439821d77c9c, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
