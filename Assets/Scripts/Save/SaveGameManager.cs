@@ -439,7 +439,11 @@ public class SaveGameManager : MonoBehaviour
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ResolveSaveDirectory());
             File.WriteAllText(path, json);
             cursorController?.PlayLoadSfx();
-            PanelDialogController.TrySetTransientText("Game saved", 2.2f);
+            string savedText = ResolveDialog(
+                "dialog.save_status.success",
+                ResolveHelper("helper.save_status.success", "Jogo salvo no slot <slot>"),
+                new Dictionary<string, string> { { "slot", normalizedSlot.ToString() } });
+            PanelDialogController.TrySetTransientText(savedText, 2.2f);
             Debug.Log($"[SaveGame] Slot {normalizedSlot} salvo em: {path}");
         }
         catch (Exception ex)
@@ -523,7 +527,7 @@ public class SaveGameManager : MonoBehaviour
         }
 
         PrepareRuntimeForLoad();
-        StartCoroutine(LoadRoutine(data));
+        StartCoroutine(LoadRoutine(data, normalizedSlot));
     }
 
     [ContextMenu("Clear Slot 1")]
@@ -563,7 +567,7 @@ public class SaveGameManager : MonoBehaviour
         cursorController?.ClearRuntimeInputLocksAfterLoad();
     }
 
-    private IEnumerator LoadRoutine(SaveGameData data)
+    private IEnumerator LoadRoutine(SaveGameData data, int loadedSlot)
     {
         loadInProgress = true;
         string stage = "init";
@@ -796,7 +800,11 @@ public class SaveGameManager : MonoBehaviour
             cursorController?.PlayBeepSfx();
             if (verboseLogs)
                 Debug.Log($"[SaveGame] Load concluido: {data.units?.Count ?? 0} unidades, {data.constructions?.Count ?? 0} construcoes.");
-            PanelDialogController.TrySetTransientText("Game loaded", 2.2f);
+            string loadedText = ResolveDialog(
+                "dialog.load_status.success",
+                ResolveHelper("helper.load_status.success", "Jogo do slot <slot> carregado"),
+                new Dictionary<string, string> { { "slot", loadedSlot.ToString() } });
+            PanelDialogController.TrySetTransientText(loadedText, 2.2f);
         }
 
         if (suppressedFogRefresh && matchController != null)

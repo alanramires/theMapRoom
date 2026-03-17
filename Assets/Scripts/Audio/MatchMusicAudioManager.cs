@@ -24,6 +24,12 @@ public class MatchMusicAudioManager : MonoBehaviour
     [SerializeField] private bool playOnStart = true;
     [SerializeField] [Range(0f, 1f)] private float musicVolume = 0.7f;
     [SerializeField] private bool shuffleFreeMode = false;
+    [Header("Per-Team Volume")]
+    [SerializeField] [Range(0f, 2f)] private float neutralMusicVolume = 1f;
+    [SerializeField] [Range(0f, 2f)] private float team0MusicVolume = 1f;
+    [SerializeField] [Range(0f, 2f)] private float team1MusicVolume = 1f;
+    [SerializeField] [Range(0f, 2f)] private float team2MusicVolume = 1f;
+    [SerializeField] [Range(0f, 2f)] private float team3MusicVolume = 1f;
 
     [Header("Free Mode Playlist")]
     [SerializeField] private List<AudioClip> freeModePlaylist = new List<AudioClip>();
@@ -34,6 +40,9 @@ public class MatchMusicAudioManager : MonoBehaviour
     [SerializeField] private AudioClip team1Track;
     [SerializeField] private AudioClip team2Track;
     [SerializeField] private AudioClip team3Track;
+    [Header("Preview")]
+    [SerializeField] [Range(-1, 3)] private int previewTeamId = 0;
+    [SerializeField] private bool previewLoop = true;
 
     private int currentFreeIndex = -1;
     private int observedTeamId = int.MinValue;
@@ -47,6 +56,8 @@ public class MatchMusicAudioManager : MonoBehaviour
     private void Awake()
     {
         EnsureReferences();
+        EnsurePerTeamVolumeLegacyFallback();
+        ClampPerTeamVolumes();
         EnsureFreePlaylistFallback();
         ApplyAudioSourceDefaults();
     }
@@ -70,12 +81,46 @@ public class MatchMusicAudioManager : MonoBehaviour
     private void OnValidate()
     {
         EnsureReferences();
+        EnsurePerTeamVolumeLegacyFallback();
         musicVolume = Mathf.Clamp01(musicVolume);
+        ClampPerTeamVolumes();
         TryAutoAssignMusicClipsInEditor();
         EnsureFreePlaylistFallback();
         ApplyAudioSourceDefaults();
     }
 #endif
+
+    public void SetMasterMusicVolume(float volume)
+    {
+        musicVolume = Mathf.Clamp01(volume);
+        RefreshOutputVolume();
+    }
+
+    public float GetMasterMusicVolume()
+    {
+        return musicVolume;
+    }
+
+    public void SetTeamMusicVolume(int teamId, float volume)
+    {
+        float clamped = Mathf.Clamp(volume, 0f, 2f);
+        switch (teamId)
+        {
+            case -1: neutralMusicVolume = clamped; break;
+            case 0: team0MusicVolume = clamped; break;
+            case 1: team1MusicVolume = clamped; break;
+            case 2: team2MusicVolume = clamped; break;
+            case 3: team3MusicVolume = clamped; break;
+            default: return;
+        }
+
+        RefreshOutputVolume();
+    }
+
+    public float GetTeamMusicVolume(int teamId)
+    {
+        return ResolveTeamVolumeMultiplier(teamId);
+    }
 
     public void SetPlaybackMode(MusicPlaybackMode mode)
     {
@@ -154,6 +199,65 @@ public class MatchMusicAudioManager : MonoBehaviour
         StartPlaybackForCurrentMode(forceRestart: true);
     }
 
+    [ContextMenu("Music Preview/Play Configured Team")]
+    public void PlayPreviewConfiguredTeam()
+    {
+        PlayPreviewForTeam(previewTeamId, previewLoop);
+    }
+
+    [ContextMenu("Music Preview/Play Neutral")]
+    public void PlayPreviewNeutral() => PlayPreviewForTeam(-1, previewLoop);
+
+    [ContextMenu("Music Preview/Play Team 0")]
+    public void PlayPreviewTeam0() => PlayPreviewForTeam(0, previewLoop);
+
+    [ContextMenu("Music Preview/Play Team 1")]
+    public void PlayPreviewTeam1() => PlayPreviewForTeam(1, previewLoop);
+
+    [ContextMenu("Music Preview/Play Team 2")]
+    public void PlayPreviewTeam2() => PlayPreviewForTeam(2, previewLoop);
+
+    [ContextMenu("Music Preview/Play Team 3")]
+    public void PlayPreviewTeam3() => PlayPreviewForTeam(3, previewLoop);
+
+    [ContextMenu("Music Preview/Stop")]
+    public void StopPreview()
+    {
+        if (audioSource == null)
+            return;
+
+        audioSource.Stop();
+    }
+
+    public void PlayPreviewForTeam(int teamId, bool loop = true)
+    {
+        if (!Application.isPlaying)
+        {
+            Debug.LogWarning("[Music] Preview funciona em Play Mode.");
+            return;
+        }
+
+        EnsureReferences();
+        if (audioSource == null)
+            return;
+
+        AudioClip clip = GetTeamClip(teamId);
+        if (clip == null)
+        {
+            Debug.LogWarning($"[Music] Sem faixa para o team {teamId}.");
+            return;
+        }
+
+        observedTeamId = teamId;
+        isPausedByUser = false;
+        pausedByTurnTransition = false;
+        suppressPlaybackForTurnTransition = false;
+        audioSource.clip = clip;
+        audioSource.loop = loop;
+        RefreshOutputVolume();
+        audioSource.Play();
+    }
+
     private void EnsurePlayback()
     {
         if (audioSource == null)
@@ -226,6 +330,7 @@ public class MatchMusicAudioManager : MonoBehaviour
         if (audioSource == null)
             return;
 
+        observedTeamId = teamId;
         AudioClip clip = GetTeamClip(teamId);
         if (clip == null)
         {
@@ -250,7 +355,7 @@ public class MatchMusicAudioManager : MonoBehaviour
 
         audioSource.clip = clip;
         audioSource.loop = loop;
-        audioSource.volume = musicVolume;
+        RefreshOutputVolume();
         audioSource.Play();
     }
 
@@ -319,6 +424,36 @@ public class MatchMusicAudioManager : MonoBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
     }
 
+    private void EnsurePerTeamVolumeLegacyFallback()
+    {
+        // Compatibilidade: cenas antigas podem desserializar todos os novos campos em 0.
+        // So aplica fallback quando TODOS estao zerados.
+        bool allZero =
+            Mathf.Approximately(neutralMusicVolume, 0f) &&
+            Mathf.Approximately(team0MusicVolume, 0f) &&
+            Mathf.Approximately(team1MusicVolume, 0f) &&
+            Mathf.Approximately(team2MusicVolume, 0f) &&
+            Mathf.Approximately(team3MusicVolume, 0f);
+
+        if (!allZero)
+            return;
+
+        neutralMusicVolume = 1f;
+        team0MusicVolume = 1f;
+        team1MusicVolume = 1f;
+        team2MusicVolume = 1f;
+        team3MusicVolume = 1f;
+    }
+
+    private void ClampPerTeamVolumes()
+    {
+        neutralMusicVolume = Mathf.Clamp(neutralMusicVolume, 0f, 2f);
+        team0MusicVolume = Mathf.Clamp(team0MusicVolume, 0f, 2f);
+        team1MusicVolume = Mathf.Clamp(team1MusicVolume, 0f, 2f);
+        team2MusicVolume = Mathf.Clamp(team2MusicVolume, 0f, 2f);
+        team3MusicVolume = Mathf.Clamp(team3MusicVolume, 0f, 2f);
+    }
+
     private void ApplyAudioSourceDefaults()
     {
         if (audioSource == null)
@@ -326,7 +461,53 @@ public class MatchMusicAudioManager : MonoBehaviour
 
         audioSource.playOnAwake = false;
         audioSource.spatialBlend = 0f;
-        audioSource.volume = musicVolume;
+        RefreshOutputVolume();
+    }
+
+    private void RefreshOutputVolume()
+    {
+        if (audioSource == null)
+            return;
+
+        float teamMultiplier = ResolveCurrentClipVolumeMultiplier();
+
+        audioSource.volume = Mathf.Clamp01(musicVolume * teamMultiplier);
+    }
+
+    private float ResolveCurrentClipVolumeMultiplier()
+    {
+        if (playbackMode == MusicPlaybackMode.ByTeam)
+            return ResolveTeamVolumeMultiplier(observedTeamId);
+
+        AudioClip currentClip = audioSource != null ? audioSource.clip : null;
+        if (currentClip == null)
+            return 1f;
+
+        if (neutralTrack != null && currentClip == neutralTrack)
+            return neutralMusicVolume;
+        if (team0Track != null && currentClip == team0Track)
+            return team0MusicVolume;
+        if (team1Track != null && currentClip == team1Track)
+            return team1MusicVolume;
+        if (team2Track != null && currentClip == team2Track)
+            return team2MusicVolume;
+        if (team3Track != null && currentClip == team3Track)
+            return team3MusicVolume;
+
+        return 1f;
+    }
+
+    private float ResolveTeamVolumeMultiplier(int teamId)
+    {
+        switch (teamId)
+        {
+            case -1: return neutralMusicVolume;
+            case 0: return team0MusicVolume;
+            case 1: return team1MusicVolume;
+            case 2: return team2MusicVolume;
+            case 3: return team3MusicVolume;
+            default: return 1f;
+        }
     }
 
     private void EnsureFreePlaylistFallback()

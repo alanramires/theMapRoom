@@ -4,6 +4,15 @@ using UnityEngine;
 [CustomEditor(typeof(ConstructionData))]
 public class ConstructionDataEditor : Editor
 {
+    private enum ForceCopyFilter
+    {
+        Army,
+        Navy,
+        Aeronautic
+    }
+
+    private ForceCopyFilter forceCopyFilter = ForceCopyFilter.Army;
+
     public override void OnInspectorGUI()
     {
         serializedObject.Update();
@@ -50,7 +59,7 @@ public class ConstructionDataEditor : Editor
         DrawIfExists(so.FindProperty("requireAtLeastOneLandingSkill"), "Pelo menos 1 skill");
     }
 
-    private static void DrawConstructionConfigurationExpanded(SerializedProperty configProperty)
+    private void DrawConstructionConfigurationExpanded(SerializedProperty configProperty)
     {
         if (configProperty == null)
             return;
@@ -66,9 +75,108 @@ public class ConstructionDataEditor : Editor
         DrawIfExists(configProperty.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
         DrawIfExists(configProperty.FindPropertyRelative("capturedIncoming"), "Captured Incoming");
         DrawIfExists(configProperty.FindPropertyRelative("sellingRule"), "Selling Rules");
-        DrawIfExists(configProperty.FindPropertyRelative("offeredUnits"), "Offered Units");
+        SerializedProperty offeredUnitsProp = configProperty.FindPropertyRelative("offeredUnits");
+        DrawIfExists(offeredUnitsProp, "Offered Units");
+        DrawOfferedUnitsQuickFill(offeredUnitsProp);
 
         EditorGUI.indentLevel--;
+    }
+
+    private void DrawOfferedUnitsQuickFill(SerializedProperty offeredUnitsProp)
+    {
+        if (offeredUnitsProp == null)
+            return;
+
+        EditorGUILayout.Space(2f);
+        EditorGUILayout.LabelField("Quick Fill Offered Units", EditorStyles.miniBoldLabel);
+        forceCopyFilter = (ForceCopyFilter)EditorGUILayout.EnumPopup("Copy Units Of", forceCopyFilter);
+
+        UnitDatabase db = ResolvePreferredUnitDatabase();
+        using (new EditorGUI.DisabledScope(db == null))
+        {
+            if (GUILayout.Button("Copy From Current Unit Database"))
+            {
+                int copied = CopyOfferedUnitsByForce(offeredUnitsProp, db, forceCopyFilter);
+                Debug.Log($"[ConstructionDataEditor] Offered Units atualizadas: {copied} unidade(s) copiadas ({forceCopyFilter}).");
+            }
+        }
+
+        if (db == null)
+            EditorGUILayout.HelpBox("Unit Database nao encontrada na cena/projeto. Verifique se existe UnitSpawner com UnitDatabase configurado ou um asset UnitDatabase no projeto.", MessageType.Warning);
+        else
+            EditorGUILayout.ObjectField("Current Unit Database", db, typeof(UnitDatabase), false);
+    }
+
+    private static UnitDatabase ResolvePreferredUnitDatabase()
+    {
+        UnitDatabase fromScene = ResolveUnitDatabaseFromScene();
+        if (fromScene != null)
+            return fromScene;
+
+        string[] guids = AssetDatabase.FindAssets("t:UnitDatabase");
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            UnitDatabase db = AssetDatabase.LoadAssetAtPath<UnitDatabase>(path);
+            if (db != null)
+                return db;
+        }
+
+        return null;
+    }
+
+    private static UnitDatabase ResolveUnitDatabaseFromScene()
+    {
+        UnitSpawner[] spawners = Object.FindObjectsByType<UnitSpawner>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < spawners.Length; i++)
+        {
+            UnitSpawner spawner = spawners[i];
+            if (spawner == null)
+                continue;
+
+            SerializedObject so = new SerializedObject(spawner);
+            SerializedProperty dbProp = so.FindProperty("unitDatabase");
+            if (dbProp == null)
+                continue;
+
+            UnitDatabase db = dbProp.objectReferenceValue as UnitDatabase;
+            if (db != null)
+                return db;
+        }
+
+        return null;
+    }
+
+    private static int CopyOfferedUnitsByForce(SerializedProperty offeredUnitsProp, UnitDatabase db, ForceCopyFilter filter)
+    {
+        if (offeredUnitsProp == null || db == null || db.Units == null)
+            return 0;
+
+        MilitaryForce wanted = MilitaryForce.Army;
+        if (filter == ForceCopyFilter.Navy)
+            wanted = MilitaryForce.Navy;
+        else if (filter == ForceCopyFilter.Aeronautic)
+            wanted = MilitaryForce.Aeronautic;
+
+        offeredUnitsProp.arraySize = 0;
+        int copied = 0;
+        for (int i = 0; i < db.Units.Count; i++)
+        {
+            UnitData unit = db.Units[i];
+            if (unit == null || unit.militaryForce != wanted)
+                continue;
+
+            int index = offeredUnitsProp.arraySize;
+            offeredUnitsProp.InsertArrayElementAtIndex(index);
+            SerializedProperty elem = offeredUnitsProp.GetArrayElementAtIndex(index);
+            if (elem != null)
+            {
+                elem.objectReferenceValue = unit;
+                copied++;
+            }
+        }
+
+        return copied;
     }
 
     private static void DrawIfExists(SerializedProperty prop, string label)

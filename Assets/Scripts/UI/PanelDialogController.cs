@@ -19,6 +19,8 @@ public class PanelDialogController : MonoBehaviour
     [SerializeField] private Image unitPreviewImage;
     [SerializeField] [Range(100f, 1200f)] private float shoppingPreviewPanelHeight = 350f;
     [SerializeField] [Range(10f, 72f)] private float shoppingPreviewFontSize = 18f;
+    [Header("Dock")]
+    [SerializeField] private Vector2 dockedCenterAnchoredPosition = Vector2.zero;
 
     private string lastText = string.Empty;
     private bool lastPanelVisible;
@@ -33,6 +35,12 @@ public class PanelDialogController : MonoBehaviour
     private Color externalPreviewColor = Color.white;
     private RectTransform panelRect;
     private float basePanelHeight = -1f;
+    private bool cachedPanelDockDefaults;
+    private Vector2 basePanelAnchorMin;
+    private Vector2 basePanelAnchorMax;
+    private Vector2 basePanelPivot;
+    private Vector2 basePanelAnchoredPosition;
+    private bool isTemporarilyCentered;
     private RectTransform textRect;
     private float baseTextRectHeight = -1f;
     private bool cachedTextLayoutDefaults;
@@ -92,6 +100,14 @@ public class PanelDialogController : MonoBehaviour
             panelRect = panelUnit.GetComponent<RectTransform>();
         if (basePanelHeight <= 0f && panelRect != null)
             basePanelHeight = Mathf.Max(0f, panelRect.rect.height);
+        if (!cachedPanelDockDefaults && panelRect != null)
+        {
+            basePanelAnchorMin = panelRect.anchorMin;
+            basePanelAnchorMax = panelRect.anchorMax;
+            basePanelPivot = panelRect.pivot;
+            basePanelAnchoredPosition = panelRect.anchoredPosition;
+            cachedPanelDockDefaults = true;
+        }
 
         if (textUnit == null)
             textUnit = FindNamedTmpText("text_unit")
@@ -288,6 +304,7 @@ public class PanelDialogController : MonoBehaviour
 
     private void HideAll(bool force)
     {
+        RestoreDockLayoutIfNeeded();
         SetVisible(panelVisible: false, textVisible: false, textValue: string.Empty, textColor: ResolveActiveTeamColor(), force: force);
     }
 
@@ -457,6 +474,7 @@ public class PanelDialogController : MonoBehaviour
 
         if (panelRect == null || basePanelHeight <= 0f)
         {
+            RestoreDockLayoutIfNeeded();
             RefreshShoppingTextLayout();
             return;
         }
@@ -466,7 +484,60 @@ public class PanelDialogController : MonoBehaviour
             targetHeight = Mathf.Max(350f, shoppingPreviewPanelHeight);
 
         panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
+        RefreshDockByHelperState(targetHeight);
         RefreshShoppingTextLayout();
+    }
+
+    private void RefreshDockByHelperState(float currentPanelHeight)
+    {
+        bool isExpandedToShoppingSize =
+            hasExternalOverrideText &&
+            shoppingPreviewMode &&
+            currentPanelHeight >= Mathf.Max(350f, shoppingPreviewPanelHeight) - 0.01f;
+
+        bool helperDockedLeft = PanelHelperController.IsDockedCenterLeft();
+        bool cursorStillOnRight = PanelHelperController.IsCursorNearOriginalDockRegion();
+        bool shouldCenterTemporarily = isExpandedToShoppingSize &&
+                                       helperDockedLeft &&
+                                       (shoppingPreviewMode || cursorStillOnRight);
+
+        if (shouldCenterTemporarily)
+            ApplyTemporaryCenteredDock();
+        else
+            RestoreDockLayoutIfNeeded();
+    }
+
+    private void ApplyTemporaryCenteredDock()
+    {
+        if (panelRect == null)
+            return;
+
+        if (!cachedPanelDockDefaults)
+        {
+            basePanelAnchorMin = panelRect.anchorMin;
+            basePanelAnchorMax = panelRect.anchorMax;
+            basePanelPivot = panelRect.pivot;
+            basePanelAnchoredPosition = panelRect.anchoredPosition;
+            cachedPanelDockDefaults = true;
+        }
+
+        panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+        panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+        panelRect.pivot = new Vector2(0.5f, 0.5f);
+        panelRect.anchoredPosition = dockedCenterAnchoredPosition;
+        isTemporarilyCentered = true;
+    }
+
+    private void RestoreDockLayoutIfNeeded()
+    {
+        if (!isTemporarilyCentered || panelRect == null || !cachedPanelDockDefaults)
+            return;
+
+        panelRect.anchorMin = basePanelAnchorMin;
+        panelRect.anchorMax = basePanelAnchorMax;
+        panelRect.pivot = basePanelPivot;
+        panelRect.anchoredPosition = basePanelAnchoredPosition;
+        isTemporarilyCentered = false;
     }
 
     private void RefreshShoppingTextLayout()

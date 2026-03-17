@@ -12,7 +12,7 @@ public partial class TurnStateManager
     [Header("Helper - Inspection")]
     [SerializeField] [Range(0.5f, 20f)] private float inspectedHelperDurationSeconds = 4f;
     [Header("Helper - Turn Start Autonomy")]
-    [SerializeField] [Range(0.5f, 20f)] private float turnStartAutonomyHelperDurationSeconds = 6f;
+    [SerializeField] [Range(0.5f, 20f)] private float turnStartAutonomyHelperDurationFallbackSeconds = 6f;
 
     public enum HelperPanelKind
     {
@@ -48,6 +48,7 @@ public partial class TurnStateManager
         public readonly List<HelperCommandServiceTargetLine> CommandServiceTargetLines = new List<HelperCommandServiceTargetLine>();
         public readonly List<HelperCommandServiceSkippedUnitLine> CommandServiceSkippedUnitLines = new List<HelperCommandServiceSkippedUnitLine>();
         public readonly List<HelperTurnStartAutonomyLine> TurnStartAutonomyLines = new List<HelperTurnStartAutonomyLine>();
+        public string ShoppingConstructionName;
         public string UnitStatsName;
         public readonly List<string> UnitStatsLines = new List<string>();
         public string ConstructionStatsName;
@@ -389,7 +390,10 @@ public partial class TurnStateManager
             return;
         }
 
-        turnStartAutonomyHelperVisibleUntil = Time.time + Mathf.Max(0.1f, turnStartAutonomyHelperDurationSeconds);
+        float helperDuration = animationManager != null
+            ? animationManager.TurnStartAutonomyHelperTextDuration
+            : Mathf.Max(0.5f, turnStartAutonomyHelperDurationFallbackSeconds);
+        turnStartAutonomyHelperVisibleUntil = Time.time + Mathf.Max(0.1f, helperDuration);
         turnStartAutonomyHelperActivatedFrame = Time.frameCount;
         turnStartAutonomyHelperCursorCell = cursorController != null ? cursorController.CurrentCell : default;
     }
@@ -1655,6 +1659,7 @@ public partial class TurnStateManager
             return false;
 
         data.Kind = HelperPanelKind.Shopping;
+        data.ShoppingConstructionName = ResolveConstructionName(shoppingConstruction);
 
         for (int i = 0; i < shoppingUnitsForSale.Count; i++)
         {

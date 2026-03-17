@@ -70,7 +70,9 @@ MonoBehaviour:
     capturedIncoming: 500
     sellingRule: 0
     legacyCanProduceAndSellUnits: 
-    offeredUnits: []
+    offeredUnits:
+    - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+    - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}

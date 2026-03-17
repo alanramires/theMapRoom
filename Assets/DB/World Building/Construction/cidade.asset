@@ -68,7 +68,7 @@ MonoBehaviour:
     isCapturable: 1
     capturePointsMax: 20
     capturedIncoming: 1000
-    sellingRule: 0
+    sellingRule: 3
     legacyCanProduceAndSellUnits: 
     offeredUnits: []
     canProvideSupplies: 1

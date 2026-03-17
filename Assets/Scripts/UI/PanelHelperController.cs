@@ -26,6 +26,7 @@ public class PanelHelperController : MonoBehaviour
     [SerializeField] private CursorController cursorController;
     [SerializeField] private MatchController matchController;
     [SerializeField] private TurnStateManager turnStateManager;
+    [SerializeField] private AnimationManager animationManager;
     [SerializeField] private HelperDatabase helperDatabase;
     [SerializeField] private GameObject panelHelper;
     [SerializeField] private TMP_Text helperTitle;
@@ -62,6 +63,7 @@ public class PanelHelperController : MonoBehaviour
     private bool isDockedCenterLeft;
     private bool hasLastUndockedScreenRect;
     private Rect lastUndockedScreenRect;
+    private bool cursorNearUndockedDockRegion;
     private Color lastHelperTxtColor = new Color(float.NaN, float.NaN, float.NaN, float.NaN);
     private float cachedBasePanelHeight = -1f;
     private float helperScrollOffset;
@@ -174,6 +176,8 @@ public class PanelHelperController : MonoBehaviour
 
         if (turnStateManager == null)
             turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        if (animationManager == null)
+            animationManager = FindAnyObjectByType<AnimationManager>();
 
         if (panelHelper == null)
             panelHelper = FindNamedObject("panel_helper") ?? FindNamedObject("Panel_helper") ?? FindNamedObject("Panel_Helper");
@@ -239,7 +243,15 @@ public class PanelHelperController : MonoBehaviour
         switch (data.Kind)
         {
             case TurnStateManager.HelperPanelKind.Shopping:
-                title = ResolveMessage("helper.title.shopping", "SHOPPING");
+                title = ResolveMessage(
+                    "helper.title.shopping",
+                    "SHOPPING",
+                    new Dictionary<string, string>
+                    {
+                        ["Construction"] = string.IsNullOrWhiteSpace(data.ShoppingConstructionName)
+                            ? "Construction"
+                            : data.ShoppingConstructionName
+                    });
                 body = BuildShoppingBody(data);
                 return;
 
@@ -493,7 +505,17 @@ public class PanelHelperController : MonoBehaviour
             int consumed = Mathf.Max(0, line.autonomyConsumed);
             int fuelBefore = Mathf.Max(0, line.fuelBefore);
             int fuelAfter = Mathf.Max(0, line.fuelAfter);
-            sb.AppendLine($"{unitName} {FormatMapCell(line.cell)} Fuel {fuelBefore} - {consumed} = {fuelAfter}");
+            sb.AppendLine(ResolveMessage(
+                "helper.turn_start_autonomy.line",
+                "<unit> <cell> Fuel <before> - <consumed> = <after>",
+                new Dictionary<string, string>
+                {
+                    { "unit", unitName },
+                    { "cell", FormatMapCell(line.cell) },
+                    { "before", fuelBefore.ToString() },
+                    { "consumed", consumed.ToString() },
+                    { "after", fuelAfter.ToString() }
+                }));
         }
 
         return sb.ToString().TrimEnd();
@@ -1250,6 +1272,7 @@ public class PanelHelperController : MonoBehaviour
         if (isDockedCenterLeft)
             RestoreOriginalLayout();
         hasLastUndockedScreenRect = false;
+        cursorNearUndockedDockRegion = false;
         ResetHelperScrollLayout();
         SetVisible(panelVisible: false, title: string.Empty, body: string.Empty, force: force);
     }
@@ -1364,6 +1387,24 @@ public class PanelHelperController : MonoBehaviour
         return instance.ResolveMessage(id, fallback, tokens);
     }
 
+    public static bool IsDockedCenterLeft()
+    {
+        if (instance == null)
+            return false;
+
+        return instance.isDockedCenterLeft &&
+               instance.panelHelper != null &&
+               instance.panelHelper.activeInHierarchy;
+    }
+
+    public static bool IsCursorNearOriginalDockRegion()
+    {
+        if (instance == null)
+            return false;
+
+        return instance.cursorNearUndockedDockRegion;
+    }
+
     public static bool TrySetTransientText(string title, string body, float durationSeconds = 2.4f)
     {
         if (instance == null)
@@ -1404,37 +1445,57 @@ public class PanelHelperController : MonoBehaviour
     private void RefreshDockByCursorProximity()
     {
         if (helperRect == null || cursorController == null || panelHelper == null)
+        {
+            cursorNearUndockedDockRegion = false;
             return;
+        }
         if (!panelHelper.activeInHierarchy)
+        {
+            cursorNearUndockedDockRegion = false;
             return;
+        }
 
         Camera cam = Camera.main;
         if (cam == null)
+        {
+            cursorNearUndockedDockRegion = false;
             return;
+        }
 
         Vector3 cursorWorld = cursorController.transform.position;
         Vector3 cursorScreen = cam.WorldToScreenPoint(cursorWorld);
         if (cursorScreen.z < 0f)
+        {
+            cursorNearUndockedDockRegion = false;
             return;
+        }
 
         if (!isDockedCenterLeft)
         {
             Rect panelScreenRect = GetScreenRect(helperRect);
             if (panelScreenRect.width <= 0f || panelScreenRect.height <= 0f)
+            {
+                cursorNearUndockedDockRegion = false;
                 return;
+            }
 
             lastUndockedScreenRect = panelScreenRect;
             hasLastUndockedScreenRect = true;
+            cursorNearUndockedDockRegion = IsNearRect(panelScreenRect, cursorScreen, dockEnterProximityPixels);
 
-            if (IsNearRect(panelScreenRect, cursorScreen, dockEnterProximityPixels))
+            if (cursorNearUndockedDockRegion)
                 ApplyDockCenterLeft();
             return;
         }
 
         if (!hasLastUndockedScreenRect)
+        {
+            cursorNearUndockedDockRegion = false;
             return;
+        }
 
-        if (!IsNearRect(lastUndockedScreenRect, cursorScreen, dockExitProximityPixels))
+        cursorNearUndockedDockRegion = IsNearRect(lastUndockedScreenRect, cursorScreen, dockExitProximityPixels);
+        if (!cursorNearUndockedDockRegion)
             RestoreOriginalLayout();
     }
 
@@ -1768,7 +1829,10 @@ public class PanelHelperController : MonoBehaviour
 
     private void HighlightEventCell(Vector3Int cell)
     {
-        float expiresAt = Time.unscaledTime + Mathf.Max(0.1f, eventHighlightSeconds);
+        float duration = animationManager != null
+            ? animationManager.TurnStartAutonomyHelperBangDuration
+            : Mathf.Max(0.1f, eventHighlightSeconds);
+        float expiresAt = Time.unscaledTime + Mathf.Max(0.1f, duration);
         highlightedEventCells[cell] = expiresAt;
     }
 

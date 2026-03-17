@@ -15,11 +15,12 @@ MonoBehaviour:
   id: tremCarga
   displayName: Trem de Carga
   apelido: TC
-  description: "Unidade log\xEDstica de grande capacidade que transporta recursos
-    ao longo de trilhos entre base e front. Ideal para sustentar opera\xE7\xF5es
-    em larga escala e abastecer cidades avan\xE7adas. Possui alguma prote\xE7\xE3o,
-    mas depende da integridade da linha f\xE9rrea. Sua interrup\xE7\xE3o pode comprometer
-    toda a cadeia de suprimentos."
+  description: "Unidade log\xEDstica de alta capacidade que transporta recursos e
+    tropas ao longo de trilhos, conectando a retaguarda ao front. Essencial para
+    sustentar opera\xE7\xF5es em larga escala e refor\xE7ar cidades avan\xE7adas
+    com efici\xEAncia.\n\nDepende totalmente da integridade da malha ferrovi\xE1ria:
+    interrup\xE7\xF5es na linha podem atrasar refor\xE7os e comprometer toda a cadeia
+    de suprimentos. Possui prote\xE7\xE3o limitada e requer escolta em \xE1reas contestadas."
   spriteDefault: {fileID: 21300000, guid: 867592e92dfef1948a0e46f4c664642e, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
@@ -45,6 +46,7 @@ MonoBehaviour:
   preferredNavalHeight: 2
   skills:
   - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
+  - {fileID: 11400000, guid: 759d9c0f4a06434f8f54d781709f8c7e, type: 2}
   stealthSkills: []
   stealthSkillRules: []
   autonomyData: {fileID: 0}
@@ -67,17 +69,42 @@ MonoBehaviour:
     amount: 60
   - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
     amount: 60
-  isTransporter: 0
+  isTransporter: 1
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtConstructions:
+  - {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
+  - {fileID: 11400000, guid: 5572b2429e4e3fb43a7e49289c1fac2e, type: 2}
+  - {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+  - {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+  - {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
+  - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtConstructions:
+  - {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
+  - {fileID: 11400000, guid: 5572b2429e4e3fb43a7e49289c1fac2e, type: 2}
+  - {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+  - {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+  - {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
+  - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
   passengersCanDisembarkAndGoesToConstructions: []
-  transportSlots: []
+  transportSlots:
+  - slotId: "Vag\xE3o"
+    capacity: 2
+    allowedLayerModes:
+    - domain: 0
+      heightLevel: 0
+    - domain: 0
+      heightLevel: 3
+    legacyAllowedDomain: 0
+    legacyAllowedHeight: 0
+    legacyAllowedLayerModes: []
+    allowedClasses: 
+    requiredSkills: []
+    blockedSkills: []
   autonomia: 120
   cost: 7500

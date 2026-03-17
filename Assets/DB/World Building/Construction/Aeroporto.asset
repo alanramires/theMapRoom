@@ -74,14 +74,14 @@ MonoBehaviour:
     legacyCanProduceAndSellUnits: 
     offeredUnits:
     - {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
-    - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
-    - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+    - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
     - {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
     - {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
-    - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
-    - {fileID: 11400000, guid: b7f859c456bfb334fafe58f296fddc6b, type: 2}
+    - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
     - {fileID: 11400000, guid: f818fb00e3afbc64baa48f18f9d88465, type: 2}
+    - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
     - {fileID: 11400000, guid: 9d52bdec098eb9047906b57709b8d578, type: 2}
+    - {fileID: 11400000, guid: b7f859c456bfb334fafe58f296fddc6b, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}

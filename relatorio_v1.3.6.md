@@ -1,28 +1,55 @@
-# Relatorio v1.3.6
+ï»¿# Relatorio v1.3.6
 
-## Tema
-Point save pre-agente com foco em performance, estabilidade de fluxo e legibilidade de UI durante turno/compras/fog.
+Data: 2026-03-17
+Versao: v1.3.6
+Resumo: Ajustes de interface da gameplay, helper/dialog e usabilidade de fluxo de turno.
 
-## Entregas principais
-- Fluxo de compra em construcoes revisado com selecao por foco (`shoppingSelectedIndex`), confirmacao por Enter e navegacao por setas.
-- Preview detalhado no painel de dialogo durante compras (stats, armas, carga e sprite da unidade), com layout dinamico para leitura.
-- Atualizacao do helper panel para destacar item focado na loja, melhorar linhas de transporte e limpar ruido visual.
-- Ajustes no `ConstructionManager` para priorizar corretamente oferta runtime de suprimentos (inclusive quando nao infinito).
-- Inclusao de `FogOfWarController` (debug/editor) para snapshot de contribuidores por unidade alvo.
-- `MatchController` recebeu utilitarios de debug/consistencia de FoW e aplicacao conservadora de visibilidade no load.
-- `SaveGameManager` aplica visibilidade conservadora de FoW apos carregar estado.
-- Ajustes de fluxo em `TurnStateManager` (shopping, helper, transfer, state machine) e pequenos refinos de SFX/UI.
+## Principais ajustes
 
-## Dados e balanceamento
-- Atualizacoes amplas em assets de unidades (Aeronáutica, Exército e Marinha), incluindo custos/atributos e catalogo.
-- Remocao de `MA Sea Hawk` dos assets.
-- Atualizacao de matriz de combate em `docs/COMBAT_MATRIX.csv`.
-- Ajustes de cena em `Assets/Scenes/Team Island.unity` e atualizacoes de assets de fonte/TMP.
+- Helper de shopping com token de construcao:
+  - `helper.title.shopping` agora aceita `<Construction>`.
+  - O runtime preenche o token com o nome da construcao ativa.
 
-## Impacto
-- Menor friccao operacional no turno (comprar/confirmar/cancelar) e melhor feedback visual para tomada de decisao.
-- Estado de FoW mais seguro durante carregamento, reduzindo risco de exibicao indevida de unidades.
-- Base preparada para trabalho com agente com snapshot consistente do estado atual.
+- Save/Load com mensagens por slot:
+  - Suporte ao token `<slot>` em mensagens de sucesso de salvar e carregar.
+  - Textos e assets de dialog/helper alinhados para exibir o slot corretamente.
 
-## Observacao
-- Esta versao consolida todas as alteracoes presentes no working tree no momento do point save.
+- Painel de dialog em compra:
+  - Quando o painel expande para modo de compra e o helper estiver deslocado para a esquerda, o dialog pode centralizar temporariamente.
+  - Retorno do layout quando cursor/helper voltam ao estado normal.
+
+- Helper de virada de turno (consumo de autonomia):
+  - Linhas e titulo externalizados para Helper Data.
+  - Duracao do texto e do destaque `!` configuravel via Animation Manager.
+
+- Camera (atalho `N`):
+  - Segundo toque restaura o zoom anterior do jogador, sem fixar em valor constante.
+
+- Turno neutro:
+  - Corrigido fluxo de upkeep/economia no inicio do turno neutro.
+  - Ajuste de comportamento para foco/teleporte quando neutro nao possui HQ.
+
+- Audio de musica por time:
+  - Sliders de volume por time (incluindo neutro).
+  - Preview no manager para tocar/parar faixas de teste.
+  - Correcoes para respeitar volume por time tambem no modo de playback livre.
+
+- Editor de construcao (produtividade):
+  - `ConstructionDataEditor` agora tambem possui quick fill de `Offered Units` por forca (`Army`, `Navy`, `Aeronautic`), igual ao manager.
+
+## Arquivos-chave impactados
+
+- `Assets/Scripts/UI/PanelHelperController.cs`
+- `Assets/Scripts/UI/PanelDialogController.cs`
+- `Assets/Scripts/Match/TurnState/TurnStateManager.HelperPanel.cs`
+- `Assets/Scripts/Save/SaveGameManager.cs`
+- `Assets/Scripts/Camera/CameraController.cs`
+- `Assets/Scripts/Match/MatchController.cs`
+- `Assets/Scripts/Audio/MatchMusicAudioManager.cs`
+- `Assets/Scripts/Match/Animation/AnimationManager.cs`
+- `Assets/Editor/ConstructionDataEditor.cs`
+
+## Observacoes
+
+- Esta versao consolida pequenos reparos iterativos de UX/gameplay feitos durante o dia.
+- Tambem inclui atualizacoes de assets de dialog/helper, construcoes e cena em uso.

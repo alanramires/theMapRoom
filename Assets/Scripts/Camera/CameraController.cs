@@ -45,6 +45,8 @@ public class CameraController : MonoBehaviour
 
     private Vector3 _dragStartWorld;
     private bool _dragging;
+    private float _quickZoomNearSize;
+    private bool _hasQuickZoomNearSize;
 
     void Awake()
     {
@@ -60,6 +62,7 @@ public class CameraController : MonoBehaviour
         if (recalcBoundsOnStart)
             RecalculatePaintedBounds();
         ClampCamera();
+        CacheQuickZoomNearSizeIfNeeded();
     }
 
     void Update()
@@ -83,12 +86,22 @@ public class CameraController : MonoBehaviour
         Vector3 cursorWorldBefore = hasCursorAnchor ? _cursorController.transform.position : Vector3.zero;
 
         float effectiveMax = GetEffectiveMaxOrthoSize();
-        float clampedDefault = Mathf.Clamp(defaultOrthoSize, minOrthoSize, effectiveMax);
         float clampedFar = GetQuickZoomFarOrthoSize();
 
         float current = _cam.orthographicSize;
         bool nearFar = Mathf.Abs(current - clampedFar) <= 0.01f;
-        _cam.orthographicSize = nearFar ? clampedDefault : clampedFar;
+        if (nearFar)
+        {
+            float nearSize = ResolveQuickZoomNearSize(effectiveMax);
+            _cam.orthographicSize = nearSize;
+        }
+        else
+        {
+            // Guarda o zoom atual antes de abrir para o "far", para restaurar no proximo N.
+            _quickZoomNearSize = Mathf.Clamp(current, minOrthoSize, effectiveMax);
+            _hasQuickZoomNearSize = true;
+            _cam.orthographicSize = clampedFar;
+        }
 
         if (nearFar)
         {
@@ -104,6 +117,24 @@ public class CameraController : MonoBehaviour
         }
 
         PlayQuickZoomToggleSfx();
+    }
+
+    void CacheQuickZoomNearSizeIfNeeded()
+    {
+        if (_cam == null)
+            return;
+
+        float effectiveMax = GetEffectiveMaxOrthoSize();
+        _quickZoomNearSize = Mathf.Clamp(_cam.orthographicSize, minOrthoSize, effectiveMax);
+        _hasQuickZoomNearSize = true;
+    }
+
+    float ResolveQuickZoomNearSize(float effectiveMax)
+    {
+        if (_hasQuickZoomNearSize)
+            return Mathf.Clamp(_quickZoomNearSize, minOrthoSize, effectiveMax);
+
+        return Mathf.Clamp(defaultOrthoSize, minOrthoSize, effectiveMax);
     }
 
     void HandleZoom()

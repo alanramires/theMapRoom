@@ -218,6 +218,11 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] [Range(0.5f, 20f)] private float inspectUnitDisplayDuration = 4f;
     [Tooltip("Tempo de exibicao do panel helper ao inspecionar construcao.")]
     [SerializeField] [Range(0.5f, 20f)] private float inspectConstructionDisplayDuration = 4f;
+    [Header("Turn Start Helper")]
+    [Tooltip("Tempo de exibicao do texto do helper de consumo de autonomia no inicio do turno.")]
+    [SerializeField] [Range(0.5f, 20f)] private float turnStartAutonomyHelperTextDuration = 6f;
+    [Tooltip("Tempo de exibicao do marcador '!' nas celulas destacadas do helper de consumo de autonomia.")]
+    [SerializeField] [Range(0.1f, 10f)] private float turnStartAutonomyHelperBangDuration = 1.4f;
     [Header("Supply Projectile FX")]
     [Tooltip("Velocidade do item voando no suprimento (units/s).")]
     [SerializeField] [Range(0.2f, 20f)] private float supplyProjectileSpeed = 5f;
@@ -289,6 +294,8 @@ public class AnimationManager : MonoBehaviour
     public float MoneyUpdateFadeDuration => Mathf.Clamp(moneyUpdateFadeDuration, 0.05f, 5f);
     public float InspectUnitDisplayDuration => Mathf.Clamp(inspectUnitDisplayDuration, 0.5f, 20f);
     public float InspectConstructionDisplayDuration => Mathf.Clamp(inspectConstructionDisplayDuration, 0.5f, 20f);
+    public float TurnStartAutonomyHelperTextDuration => Mathf.Clamp(turnStartAutonomyHelperTextDuration, 0.5f, 20f);
+    public float TurnStartAutonomyHelperBangDuration => Mathf.Clamp(turnStartAutonomyHelperBangDuration, 0.1f, 10f);
     public float SupplyProjectileSpeed => Mathf.Clamp(supplyProjectileSpeed, 0.2f, 20f);
     public float SupplyProjectileMinDuration => Mathf.Clamp(supplyProjectileMinDuration, 0.03f, 2f);
     public float SupplyProjectileScale => Mathf.Clamp(supplyProjectileScale, 0.05f, 3f);

@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HelperData
   id: helper.unit_stats.line.description
   condition: Descricao da unidade no helper de unidade selecionada.
-  message: <description>
+  message: ---

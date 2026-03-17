@@ -535,7 +535,11 @@ public class MatchController : MonoBehaviour
         if (players.Count == 0)
         {
             if (includeNeutralTeam && HasAnyNeutralUnitsInField())
+            {
+                pendingTurnStartUpkeep = true;
+                pendingTurnStartEconomy = true;
                 SetNeutralActiveTeam();
+            }
             currentTurn = Mathf.Max(0, currentTurn + 1);
             return;
         }
@@ -555,6 +559,8 @@ public class MatchController : MonoBehaviour
             // Saiu da lista: vai para neutral se estiver habilitado.
             if (includeNeutralTeam && HasAnyNeutralUnitsInField())
             {
+                pendingTurnStartUpkeep = true;
+                pendingTurnStartEconomy = true;
                 SetNeutralActiveTeam();
                 return;
             }
@@ -2634,36 +2640,50 @@ public class MatchController : MonoBehaviour
         if (cursorController == null)
             return;
 
+        if (activeTeamId == (int)TeamId.Neutral && includeNeutralTeam)
+        {
+            if (TryResolveTeamHeadQuarterCell(activeTeamId, out Vector3Int neutralHeadQuarterCell))
+            {
+                cursorController.SetCell(neutralHeadQuarterCell, playMoveSfx: false);
+                return;
+            }
+
+            if (TryTeleportCursorToNearestUnitForActiveTeam(preferReadyUnits: true))
+                return;
+        }
+
         if (!TeamAnchorResolver.TryResolveAnchorCell(activeTeamId, out Vector3Int anchorCell))
         {
-            // Fallback para turno neutro sem HQ: teleporta para a unidade neutra mais proxima.
             if (activeTeamId == (int)TeamId.Neutral && includeNeutralTeam)
-                TryTeleportCursorToNearestReadyUnitForActiveTeam();
+                TryTeleportCursorToNearestUnitForActiveTeam(preferReadyUnits: true);
             return;
         }
 
         cursorController.SetCell(anchorCell, playMoveSfx: false);
     }
 
-    private void TryTeleportCursorToNearestReadyUnitForActiveTeam()
+    private bool TryTeleportCursorToNearestUnitForActiveTeam(bool preferReadyUnits)
     {
         if (cursorController == null)
-            return;
+            return false;
 
         List<UnitManager> units = UnitManager.AllActive;
         if (units == null || units.Count == 0)
-            return;
+            return false;
 
         Vector3Int origin = cursorController.CurrentCell;
         origin.z = 0;
-        bool found = false;
-        Vector3Int bestCell = origin;
-        float bestDistanceSqr = float.MaxValue;
+        bool foundPreferred = false;
+        Vector3Int bestPreferredCell = origin;
+        float bestPreferredDistanceSqr = float.MaxValue;
+        bool foundFallback = false;
+        Vector3Int bestFallbackCell = origin;
+        float bestFallbackDistanceSqr = float.MaxValue;
 
         for (int i = 0; i < units.Count; i++)
         {
             UnitManager unit = units[i];
-            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked || unit.HasActed)
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
                 continue;
             if ((int)unit.TeamId != activeTeamId)
                 continue;
@@ -2674,15 +2694,86 @@ public class MatchController : MonoBehaviour
             float dx = cell.x - origin.x;
             float dy = cell.y - origin.y;
             float distanceSqr = (dx * dx) + (dy * dy);
-            if (!found || distanceSqr < bestDistanceSqr)
+
+            if (!foundFallback || distanceSqr < bestFallbackDistanceSqr)
             {
-                found = true;
-                bestDistanceSqr = distanceSqr;
-                bestCell = cell;
+                foundFallback = true;
+                bestFallbackDistanceSqr = distanceSqr;
+                bestFallbackCell = cell;
+            }
+
+            bool isPreferred = !preferReadyUnits || !unit.HasActed;
+            if (isPreferred && (!foundPreferred || distanceSqr < bestPreferredDistanceSqr))
+            {
+                foundPreferred = true;
+                bestPreferredDistanceSqr = distanceSqr;
+                bestPreferredCell = cell;
             }
         }
 
-        if (found)
-            cursorController.SetCell(bestCell, playMoveSfx: false);
+        if (foundPreferred)
+        {
+            cursorController.SetCell(bestPreferredCell, playMoveSfx: false);
+            return true;
+        }
+
+        if (foundFallback)
+        {
+            cursorController.SetCell(bestFallbackCell, playMoveSfx: false);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveTeamHeadQuarterCell(int teamId, out Vector3Int cell)
+    {
+        cell = Vector3Int.zero;
+        if (teamId < 0)
+            return false;
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        ConstructionManager bestHq = null;
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if ((int)construction.TeamId != teamId)
+                continue;
+            if (!IsHeadQuarterConstruction(construction))
+                continue;
+
+            if (bestHq == null || construction.InstanceId < bestHq.InstanceId)
+                bestHq = construction;
+        }
+
+        if (bestHq == null)
+            return false;
+
+        cell = bestHq.CurrentCellPosition;
+        cell.z = 0;
+        return true;
+    }
+
+    private static bool IsHeadQuarterConstruction(ConstructionManager construction)
+    {
+        if (construction == null)
+            return false;
+
+        if (construction.IsPlayerHeadQuarter)
+            return true;
+
+        string constructionId = construction.ConstructionId;
+        if (!string.IsNullOrWhiteSpace(constructionId) &&
+            string.Equals(constructionId.Trim(), "hq", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        string displayName = construction.ConstructionDisplayName;
+        if (!string.IsNullOrWhiteSpace(displayName) &&
+            displayName.IndexOf("hq", StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        return false;
     }
 }
