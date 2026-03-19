@@ -627,6 +627,7 @@ public partial class TurnStateManager
             passenger.ClearTemporarySortingOrder();
             cursorController?.PlayLoadSfx();
             passenger.MarkAsActed();
+            RecordDisembarkReplayCommand(passenger, transporter, targetCell);
             movedPassengers.Add(passenger);
 
             // Pausa entre encerramento de um passageiro e inicio do proximo.
@@ -1131,3 +1132,4 @@ public partial class TurnStateManager
         return true;
     }
 }
+

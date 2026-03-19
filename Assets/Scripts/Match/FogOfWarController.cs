@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
@@ -87,6 +87,17 @@ public class FogOfWarController : MonoBehaviour
         lastDump = dumpBuilder.ToString();
     }
 
+
+    public void RefreshFogOfWarForTeam(TeamId observerTeamId)
+    {
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+        if (matchController == null)
+            return;
+
+        matchController.RefreshFogOfWarForTeam(observerTeamId);
+        RebuildSnapshot();
+    }
     public void DumpSnapshotToConsole()
     {
         if (string.IsNullOrWhiteSpace(lastDump))
@@ -140,3 +151,4 @@ public class FogOfWarController : MonoBehaviour
         return builder.ToString();
     }
 }
+

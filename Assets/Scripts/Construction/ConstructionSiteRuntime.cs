@@ -17,6 +17,8 @@ public class ConstructionSiteRuntime
     [Header("Role")]
     [Tooltip("Marca esta construcao como HQ de jogador (pode disparar condicao de fim de jogo).")]
     public bool isPlayerHeadQuarter = false;
+    [Tooltip("Marca esta construcao como ponto de vitoria para contagem de estrelas por rodada.")]
+    public bool isVictoryBuilding = false;
 
     [Header("Capture")]
     public bool isCapturable = true;
@@ -68,6 +70,7 @@ public class ConstructionSiteRuntime
         ConstructionSiteRuntime copy = new ConstructionSiteRuntime
         {
             isPlayerHeadQuarter = isPlayerHeadQuarter,
+            isVictoryBuilding = isVictoryBuilding,
             isCapturable = isCapturable,
             capturePointsMax = capturePointsMax,
             capturedIncoming = capturedIncoming,

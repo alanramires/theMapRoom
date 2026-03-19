@@ -350,6 +350,9 @@ public class UnitManager : MonoBehaviour
 
     public void MarkAsActed()
     {
+        if (hasActed)
+            return;
+
         hasActed = true;
         appliedHasActed = hasActed;
         RefreshActedVisual();

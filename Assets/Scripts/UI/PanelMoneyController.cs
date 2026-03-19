@@ -3,9 +3,17 @@ using TMPro;
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.UI;
+using System;
 
 public class PanelMoneyController : MonoBehaviour
 {
+    private struct StarIconEntry
+    {
+        public int index;
+        public Image image;
+    }
+
     private struct PendingMoneyUpdate
     {
         public TeamId team;
@@ -23,6 +31,9 @@ public class PanelMoneyController : MonoBehaviour
     [SerializeField] private TMP_Text textMoney;
     [SerializeField] private TMP_Text textUpdate;
     [SerializeField] private TMP_Text textIncoming;
+    [SerializeField] private TMP_Text textProgress;
+    [SerializeField] private Sprite starSilverSprite;
+    [SerializeField] private Sprite starGoldSprite;
 
     [Header("Display")]
     [SerializeField] private string prefix = "$ ";
@@ -33,8 +44,15 @@ public class PanelMoneyController : MonoBehaviour
     private string lastRenderedValue = string.Empty;
     private Color lastRenderedColor = new Color(float.NaN, float.NaN, float.NaN, float.NaN);
     private string lastRenderedIncoming = string.Empty;
+    private string lastRenderedProgress = string.Empty;
     private readonly Dictionary<TeamId, int> knownMoneyByTeam = new Dictionary<TeamId, int>();
     private Coroutine moneyUpdateRoutine;
+    private readonly List<StarIconEntry> starIcons = new List<StarIconEntry>();
+    private int lastRenderedVictoryGoal = -1;
+    private int lastRenderedVictoryPoints = -1;
+    private TeamId lastRenderedVictoryTeam = (TeamId)int.MinValue;
+    private Sprite lastStarSilverSprite;
+    private Sprite lastStarGoldSprite;
 
     public static void PushContextualUpdate(TeamId team, int resultingMoney, string label, int delta)
     {
@@ -59,7 +77,10 @@ public class PanelMoneyController : MonoBehaviour
         TryAutoAssignReferences();
         SeedKnownMoneySnapshot();
         SetUpdateTextVisible(false);
+        DiscoverStarIcons();
         RefreshMoneyText(force: true);
+        RefreshVictoryProgressText(force: true);
+        RefreshVictoryStars(force: true);
         ConsumePendingMoneyUpdates();
     }
 
@@ -88,13 +109,18 @@ public class PanelMoneyController : MonoBehaviour
         TryAutoAssignReferences();
         TryEmitMoneyDeltaForActiveTeam();
         RefreshMoneyText(force: false);
+        RefreshVictoryProgressText(force: false);
+        RefreshVictoryStars(force: false);
     }
 
 #if UNITY_EDITOR
     private void OnValidate()
     {
         TryAutoAssignReferences();
+        DiscoverStarIcons();
         RefreshMoneyText(force: true);
+        RefreshVictoryProgressText(force: true);
+        RefreshVictoryStars(force: true);
     }
 #endif
 
@@ -113,9 +139,66 @@ public class PanelMoneyController : MonoBehaviour
             textUpdate = FindMoneyUpdateTextByName();
         if (textIncoming == null)
             textIncoming = FindMoneyIncomingTextByName();
+        if (textProgress == null)
+            textProgress = FindMoneyProgressTextByName();
 
         if (textMoney == null)
             textMoney = GetComponentInChildren<TMP_Text>(true);
+    }
+
+    private void DiscoverStarIcons()
+    {
+        starIcons.Clear();
+        CollectStarIconsRecursive(transform, starIcons);
+        starIcons.Sort((a, b) => a.index.CompareTo(b.index));
+    }
+
+    private static void CollectStarIconsRecursive(Transform parent, List<StarIconEntry> output)
+    {
+        if (parent == null || output == null)
+            return;
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            if (child == null)
+                continue;
+
+            if (TryParseStarIndex(child.name, out int starIndex))
+            {
+                Image image = child.GetComponent<Image>();
+                if (image != null)
+                {
+                    output.Add(new StarIconEntry
+                    {
+                        index = starIndex,
+                        image = image
+                    });
+                }
+            }
+
+            CollectStarIconsRecursive(child, output);
+        }
+    }
+
+    private static bool TryParseStarIndex(string name, out int index)
+    {
+        index = 0;
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+
+        string trimmed = name.Trim();
+        if (!trimmed.StartsWith("star_", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string suffix = trimmed.Substring(5);
+        if (!int.TryParse(suffix, out int parsed))
+            return false;
+        if (parsed <= 0)
+            return false;
+
+        index = parsed;
+        return true;
     }
 
     private TMP_Text FindMoneyTextByName()
@@ -137,6 +220,14 @@ public class PanelMoneyController : MonoBehaviour
     private TMP_Text FindMoneyIncomingTextByName()
     {
         Transform named = FindChildRecursive(transform, "text_incoming");
+        if (named == null)
+            return null;
+        return named.GetComponent<TMP_Text>();
+    }
+
+    private TMP_Text FindMoneyProgressTextByName()
+    {
+        Transform named = FindChildRecursive(transform, "text_progress");
         if (named == null)
             return null;
         return named.GetComponent<TMP_Text>();
@@ -193,6 +284,30 @@ public class PanelMoneyController : MonoBehaviour
     {
         if (textIncoming != null)
             textIncoming.text = value;
+    }
+
+    private void RefreshVictoryProgressText(bool force)
+    {
+        if (textProgress == null)
+            return;
+
+        TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
+        int currentStars = 0;
+        int goal = 0;
+        int projectedGain = 0;
+        if (matchController != null && activeTeam != TeamId.Neutral)
+        {
+            currentStars = Mathf.Max(0, matchController.GetVictoryStars(activeTeam));
+            goal = Mathf.Max(1, matchController.VictoryStarsToWin);
+            projectedGain = Mathf.Max(0, matchController.GetProjectedVictoryStarsGain(activeTeam));
+        }
+
+        string next = $"Controle: {currentStars}/{goal}  (+{projectedGain}";
+        if (!force && next == lastRenderedProgress)
+            return;
+
+        textProgress.text = next;
+        lastRenderedProgress = next;
     }
 
     private void TryEmitMoneyDeltaForActiveTeam()
@@ -329,6 +444,51 @@ public class PanelMoneyController : MonoBehaviour
 
         if (textUpdate != null)
             textUpdate.enabled = visible;
+    }
+
+    private void RefreshVictoryStars(bool force)
+    {
+        if (matchController == null || starIcons.Count <= 0)
+            return;
+
+        TeamId activeTeam = matchController.ActiveTeam;
+        int goal = Mathf.Max(1, matchController.VictoryStarsToWin);
+        int vp = activeTeam == TeamId.Neutral ? 0 : Mathf.Max(0, matchController.GetVictoryStars(activeTeam));
+        Sprite silver = starSilverSprite;
+        Sprite gold = starGoldSprite;
+
+        bool noChange = !force &&
+                        lastRenderedVictoryGoal == goal &&
+                        lastRenderedVictoryPoints == vp &&
+                        lastRenderedVictoryTeam == activeTeam &&
+                        lastStarSilverSprite == silver &&
+                        lastStarGoldSprite == gold;
+        if (noChange)
+            return;
+
+        for (int i = 0; i < starIcons.Count; i++)
+        {
+            StarIconEntry entry = starIcons[i];
+            if (entry.image == null)
+                continue;
+
+            bool shouldShow = entry.index <= goal;
+            if (entry.image.gameObject.activeSelf != shouldShow)
+                entry.image.gameObject.SetActive(shouldShow);
+            if (!shouldShow)
+                continue;
+
+            bool collected = entry.index <= vp;
+            Sprite targetSprite = collected ? gold : silver;
+            if (targetSprite != null)
+                entry.image.sprite = targetSprite;
+        }
+
+        lastRenderedVictoryGoal = goal;
+        lastRenderedVictoryPoints = vp;
+        lastRenderedVictoryTeam = activeTeam;
+        lastStarSilverSprite = silver;
+        lastStarGoldSprite = gold;
     }
 
     private static string FormatWithThousandsDots(int value)

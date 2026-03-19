@@ -162,6 +162,7 @@ public partial class TurnStateManager
     [SerializeField] private bool showPerfSensorsLine = true;
     [SerializeField] private bool showPerfSelectionLine = true;
     [SerializeField] private bool showPerfTakeoffPrepLine = true;
+    [SerializeField] private bool enableTurnStateRuntimeLogs = false;
     private const int PerfFrameWindowSampleCount = 120;
     private int perfFrameSamplesCollected;
     private double perfFrameWindowSumMs;
@@ -315,7 +316,7 @@ public partial class TurnStateManager
 
     private void TrackRuntimeDebugLogs()
     {
-        if (!Application.isPlaying)
+        if (!Application.isPlaying || !enableTurnStateRuntimeLogs)
             return;
 
         bool stateChanged = lastLoggedCursorState != cursorState;
@@ -329,7 +330,7 @@ public partial class TurnStateManager
         lastLoggedScannerPromptStep = scannerPromptStep;
         lastLoggedSelectedUnit = selectedUnit;
         string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
-        Debug.Log($"[TurnState] state={cursorState} | selected={selectedName}");
+        //Debug.Log($"[TurnState] state={cursorState} | selected={selectedName}");
         if (substepChanged)
         {
             bool rollback = previousSubstep != (ScannerPromptStep)(-1) && (int)scannerPromptStep < (int)previousSubstep;
@@ -365,6 +366,9 @@ public partial class TurnStateManager
 
     private void ProcessDestroyUnitHotkeyInput()
     {
+        if (replayManager != null && replayManager.IsReplaying)
+            return;
+
         if (!WasLetterPressedThisFrame('U'))
             return;
 
@@ -435,6 +439,8 @@ public partial class TurnStateManager
     {
         if (combatExecutionInProgress)
             return true;
+
+        DiscardPendingCombatCinematicTrack();
 
         if (cursorState == CursorState.Mirando && scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget)
         {
@@ -750,7 +756,7 @@ public partial class TurnStateManager
 
     }
 
-    private void HandleAimActionRequested()
+    public void HandleAimActionRequested()
     {
         bool canAim = availableSensorActionCodes.Contains('A');
         if (!canAim)
@@ -2195,6 +2201,8 @@ public partial class TurnStateManager
 
         transporter.MarkAsActed();
 
+        RecordEmbarkReplayCommand(passenger, transporter, option.transporterSlotIndex);
+
         string label = !string.IsNullOrWhiteSpace(option.displayLabel) ? option.displayLabel : transporter.name;
         message = $"Embarque concluido em: {label} | custo={embarkCost} | autonomia {fuelBeforeEmbark}->{passenger.CurrentFuel}";
         return true;
@@ -2451,6 +2459,8 @@ public partial class TurnStateManager
         if (combatExecutionInProgress)
             return true;
 
+        DiscardPendingCombatCinematicTrack();
+
         if (scannerPromptStep == ScannerPromptStep.MirandoCycleTarget)
         {
             if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= GetMirandoEntryCount())
@@ -2520,6 +2530,9 @@ public partial class TurnStateManager
             return true;
         }
 
+        if (option.targetUnit != null)
+            RecordCinematicConfirm(option.targetUnit.CurrentCellPosition);
+
         WeaponTrajectoryType trajectory = ResolveSelectedTrajectory(option);
         StartCoroutine(ExecuteConfirmedAttackSequence(option, trajectory, combat));
         return true;
@@ -2552,10 +2565,17 @@ public partial class TurnStateManager
 
         int defenderHpBeforeResolution = defender != null ? Mathf.Max(0, defender.CurrentHP) : 0;
         int attackerHpBeforeResolution = attacker != null ? Mathf.Max(0, attacker.CurrentHP) : 0;
+        Dictionary<int, int> embarkedHpBeforeById = CaptureEmbarkedHpSnapshot(attacker, defender);
 
         yield return ExecuteCombatProjectileExchange(option, attackerTrajectory, combat.counterExecuted);
         ApplyPostHitForcedLayerEffects(option, combat, attackerHpBeforeResolution, defenderHpBeforeResolution);
         ApplyPendingCombatHp(combat);
+        RecordAttackReplayCommand(
+            attacker,
+            defender,
+            attackerHpBeforeResolution,
+            defenderHpBeforeResolution,
+            embarkedHpBeforeById);
         yield return ExecuteDeathResolutionIfNeeded(combat);
 
         combatExecutionInProgress = false;
@@ -3073,6 +3093,8 @@ public partial class TurnStateManager
         ClearCommittedPathVisual();
 
         SetCursorState(CursorState.Mirando, "EnterMirandoState");
+        if (cursorController != null)
+            RecordCinematicAimAction(cursorController.CurrentCell);
         scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
         scannerSelectedTargetIndex = 0;
 
@@ -4606,3 +4628,12 @@ public partial class TurnStateManager
 #endif
     }
 }
+
+
+
+
+
+
+
+
+

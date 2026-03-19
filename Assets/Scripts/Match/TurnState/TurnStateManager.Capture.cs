@@ -84,6 +84,9 @@ public partial class TurnStateManager
         int safeMax = Mathf.Max(0, targetConstruction.CapturePointsMax);
         int after;
         bool concluded;
+        bool captureCompletedForReplay = false;
+        TeamId newOwnerForReplay = targetConstruction.TeamId;
+
         if (operationType == PodeCapturarSensor.CaptureOperationType.RecoverAlly)
         {
             after = Mathf.Min(safeMax, before + captureDamage);
@@ -113,6 +116,8 @@ public partial class TurnStateManager
             {
                 targetConstruction.SetTeamId(capturer.TeamId);
                 targetConstruction.SetCurrentCapturePoints(targetConstruction.CapturePointsMax);
+                captureCompletedForReplay = true;
+                newOwnerForReplay = capturer.TeamId;
                 Debug.Log(
                     $"[Captura] Construcao capturada por {TeamUtils.GetName(capturer.TeamId)}. " +
                     $"Capture resetado para {targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}.");
@@ -123,6 +128,14 @@ public partial class TurnStateManager
                     $"[Captura] Construcao aliada recuperada para {targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}.");
             }
 
+            RecordCaptureReplayCommand(
+                capturer,
+                targetConstruction,
+                before,
+                targetConstruction.CurrentCapturePoints,
+                captureCompletedForReplay,
+                newOwnerForReplay);
+
             FinalizeCaptureAction(capturer);
             captureExecutionInProgress = false;
             yield break;
@@ -131,6 +144,15 @@ public partial class TurnStateManager
         cursorController?.PlayDoneSfx();
         if (postDoneSfxDelay > 0f)
             yield return new WaitForSeconds(postDoneSfxDelay);
+
+        RecordCaptureReplayCommand(
+            capturer,
+            targetConstruction,
+            before,
+            targetConstruction.CurrentCapturePoints,
+            captureCompleted: false,
+            newOwner: targetConstruction.TeamId);
+
         FinalizeCaptureAction(capturer);
         captureExecutionInProgress = false;
     }

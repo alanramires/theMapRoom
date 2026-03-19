@@ -25,8 +25,24 @@ public class MatchControllerEditor : Editor
     private SerializedProperty fogOfWarTerrainDatabaseProp;
     private SerializedProperty fogOfWarDpqAirHeightConfigProp;
     private SerializedProperty fogOfWarAlphaProp;
+    private SerializedProperty enableFogSourceDebugLogsProp;
     private SerializedProperty enableFogStepPerfLogsProp;
+    private SerializedProperty enableFogValidationLogsProp;
+    private SerializedProperty enableSensorsRuntimeLogsProp;
+    private SerializedProperty enableAindaMeVeRuntimeLogsProp;
+    private SerializedProperty enablePodeDetectarRuntimeLogsProp;
+    private SerializedProperty enablePodeEnxergarRuntimeLogsProp;
     private SerializedProperty fogStepPerfTopUnitsProp;
+    private SerializedProperty showVictoryOverlayProp;
+    private SerializedProperty victoryOverlayTilemapProp;
+    private SerializedProperty victoryOverlayTileProp;
+    private SerializedProperty victoryOverlayAlphaProp;
+    private SerializedProperty enableVictoryStarsProp;
+    private SerializedProperty victoryStarsToWinProp;
+    private SerializedProperty freezeTurnAdvanceAfterVictoryProp;
+    private SerializedProperty victoryStarsByTeamProp;
+    private SerializedProperty hasVictoryWinnerProp;
+    private SerializedProperty victoryWinnerTeamProp;
 
     private void OnEnable()
     {
@@ -51,8 +67,24 @@ public class MatchControllerEditor : Editor
         fogOfWarTerrainDatabaseProp = serializedObject.FindProperty("fogOfWarTerrainDatabase");
         fogOfWarDpqAirHeightConfigProp = serializedObject.FindProperty("fogOfWarDpqAirHeightConfig");
         fogOfWarAlphaProp = serializedObject.FindProperty("fogOfWarAlpha");
+        enableFogSourceDebugLogsProp = serializedObject.FindProperty("enableFogSourceDebugLogs");
         enableFogStepPerfLogsProp = serializedObject.FindProperty("enableFogStepPerfLogs");
+        enableFogValidationLogsProp = serializedObject.FindProperty("enableFogValidationLogs");
+        enableSensorsRuntimeLogsProp = serializedObject.FindProperty("enableSensorsRuntimeLogs");
+        enableAindaMeVeRuntimeLogsProp = serializedObject.FindProperty("enableAindaMeVeRuntimeLogs");
+        enablePodeDetectarRuntimeLogsProp = serializedObject.FindProperty("enablePodeDetectarRuntimeLogs");
+        enablePodeEnxergarRuntimeLogsProp = serializedObject.FindProperty("enablePodeEnxergarRuntimeLogs");
         fogStepPerfTopUnitsProp = serializedObject.FindProperty("fogStepPerfTopUnits");
+        showVictoryOverlayProp = serializedObject.FindProperty("showVictoryOverlay");
+        victoryOverlayTilemapProp = serializedObject.FindProperty("victoryOverlayTilemap");
+        victoryOverlayTileProp = serializedObject.FindProperty("victoryOverlayTile");
+        victoryOverlayAlphaProp = serializedObject.FindProperty("victoryOverlayAlpha");
+        enableVictoryStarsProp = serializedObject.FindProperty("enableVictoryStars");
+        victoryStarsToWinProp = serializedObject.FindProperty("victoryStarsToWin");
+        freezeTurnAdvanceAfterVictoryProp = serializedObject.FindProperty("freezeTurnAdvanceAfterVictory");
+        victoryStarsByTeamProp = serializedObject.FindProperty("victoryStarsByTeam");
+        hasVictoryWinnerProp = serializedObject.FindProperty("hasVictoryWinner");
+        victoryWinnerTeamProp = serializedObject.FindProperty("victoryWinnerTeam");
     }
 
     public override void OnInspectorGUI()
@@ -118,13 +150,52 @@ public class MatchControllerEditor : Editor
             EditorGUILayout.PropertyField(fogOfWarDpqAirHeightConfigProp, new GUIContent("DPQ Air Height Config"));
         if (fogOfWarAlphaProp != null)
             EditorGUILayout.PropertyField(fogOfWarAlphaProp, new GUIContent("Fog Alpha"));
+        if (enableFogSourceDebugLogsProp != null)
+            EditorGUILayout.PropertyField(enableFogSourceDebugLogsProp, new GUIContent("Enable Fog Source Debug Logs"));
         if (enableFogStepPerfLogsProp != null)
             EditorGUILayout.PropertyField(enableFogStepPerfLogsProp, new GUIContent("Enable Fog Step Perf Logs"));
+        if (enableFogValidationLogsProp != null)
+            EditorGUILayout.PropertyField(enableFogValidationLogsProp, new GUIContent("Enable Fog Validation Logs"));
+        if (enableSensorsRuntimeLogsProp != null)
+            EditorGUILayout.PropertyField(enableSensorsRuntimeLogsProp, new GUIContent("Enable Sensors Runtime Logs"));
+        if (enableAindaMeVeRuntimeLogsProp != null)
+            EditorGUILayout.PropertyField(enableAindaMeVeRuntimeLogsProp, new GUIContent("Enable AindaMeVe Runtime Logs"));
+        if (enablePodeDetectarRuntimeLogsProp != null)
+            EditorGUILayout.PropertyField(enablePodeDetectarRuntimeLogsProp, new GUIContent("Enable PodeDetectar Runtime Logs"));
+        if (enablePodeEnxergarRuntimeLogsProp != null)
+            EditorGUILayout.PropertyField(enablePodeEnxergarRuntimeLogsProp, new GUIContent("Enable PodeEnxergar Runtime Logs"));
         if (enableFogStepPerfLogsProp != null &&
             enableFogStepPerfLogsProp.boolValue &&
             fogStepPerfTopUnitsProp != null)
         {
             EditorGUILayout.PropertyField(fogStepPerfTopUnitsProp, new GUIContent("Fog Step Perf Top Units"));
+        }
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Victory Overlay", EditorStyles.boldLabel);
+        if (showVictoryOverlayProp != null)
+            EditorGUILayout.PropertyField(showVictoryOverlayProp, new GUIContent("Show Victory Overlay"));
+        if (victoryOverlayTilemapProp != null)
+            EditorGUILayout.PropertyField(victoryOverlayTilemapProp, new GUIContent("Victory Overlay Tilemap"));
+        if (victoryOverlayTileProp != null)
+            EditorGUILayout.PropertyField(victoryOverlayTileProp, new GUIContent("Victory Overlay Tile"));
+        if (victoryOverlayAlphaProp != null)
+            EditorGUILayout.PropertyField(victoryOverlayAlphaProp, new GUIContent("Victory Overlay Alpha"));
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Victory Stars", EditorStyles.boldLabel);
+        if (enableVictoryStarsProp != null)
+            EditorGUILayout.PropertyField(enableVictoryStarsProp, new GUIContent("Enable Victory Stars"));
+        if (victoryStarsToWinProp != null)
+            EditorGUILayout.PropertyField(victoryStarsToWinProp, new GUIContent("Victory Stars To Win"));
+        if (freezeTurnAdvanceAfterVictoryProp != null)
+            EditorGUILayout.PropertyField(freezeTurnAdvanceAfterVictoryProp, new GUIContent("Freeze Turn Advance After Victory"));
+        using (new EditorGUI.DisabledScope(true))
+        {
+            if (hasVictoryWinnerProp != null)
+                EditorGUILayout.PropertyField(hasVictoryWinnerProp, new GUIContent("Has Victory Winner"));
+            if (victoryWinnerTeamProp != null)
+                EditorGUILayout.PropertyField(victoryWinnerTeamProp, new GUIContent("Victory Winner Team"));
         }
 
         serializedObject.ApplyModifiedProperties();
@@ -211,10 +282,74 @@ public class MatchControllerEditor : Editor
                     EditorGUILayout.IntField("Income Per Turn", Mathf.Max(0, incomePerTurnProp.intValue));
             }
 
+            TeamId team = GetTeamFromEnumProp(teamProp);
+            int vp = ResolveVictoryStarsForTeam(team);
+            int nextVp = Mathf.Max(0, EditorGUILayout.IntField("Current VP", Mathf.Max(0, vp)));
+            if (nextVp != vp)
+                SetVictoryStarsForTeam(team, nextVp);
+
             EditorGUILayout.EndVertical();
         }
 
         EditorGUILayout.HelpBox("Actual Money agora pode ser ajustado manualmente. Income Per Turn continua automatico e somente leitura.", MessageType.None);
+    }
+
+    private int ResolveVictoryStarsForTeam(TeamId team)
+    {
+        if (victoryStarsByTeamProp == null || team == TeamId.Neutral)
+            return 0;
+
+        for (int i = 0; i < victoryStarsByTeamProp.arraySize; i++)
+        {
+            SerializedProperty entry = victoryStarsByTeamProp.GetArrayElementAtIndex(i);
+            if (entry == null)
+                continue;
+
+            SerializedProperty teamProp = entry.FindPropertyRelative("teamId");
+            SerializedProperty starsProp = entry.FindPropertyRelative("stars");
+            TeamId entryTeam = GetTeamFromEnumProp(teamProp);
+            if (entryTeam != team)
+                continue;
+
+            return starsProp != null ? Mathf.Max(0, starsProp.intValue) : 0;
+        }
+
+        return 0;
+    }
+
+    private void SetVictoryStarsForTeam(TeamId team, int value)
+    {
+        if (victoryStarsByTeamProp == null || team == TeamId.Neutral)
+            return;
+
+        int safe = Mathf.Max(0, value);
+        for (int i = 0; i < victoryStarsByTeamProp.arraySize; i++)
+        {
+            SerializedProperty entry = victoryStarsByTeamProp.GetArrayElementAtIndex(i);
+            if (entry == null)
+                continue;
+
+            SerializedProperty teamProp = entry.FindPropertyRelative("teamId");
+            SerializedProperty starsProp = entry.FindPropertyRelative("stars");
+            TeamId entryTeam = GetTeamFromEnumProp(teamProp);
+            if (entryTeam != team || starsProp == null)
+                continue;
+
+            starsProp.intValue = safe;
+            return;
+        }
+
+        int index = victoryStarsByTeamProp.arraySize;
+        victoryStarsByTeamProp.InsertArrayElementAtIndex(index);
+        SerializedProperty added = victoryStarsByTeamProp.GetArrayElementAtIndex(index);
+        if (added == null)
+            return;
+
+        SerializedProperty addedTeam = added.FindPropertyRelative("teamId");
+        SerializedProperty addedStars = added.FindPropertyRelative("stars");
+        SetTeamToEnumProp(addedTeam, team);
+        if (addedStars != null)
+            addedStars.intValue = safe;
     }
 
     private void AddPlayer(TeamId team)

@@ -71,6 +71,7 @@ public class ConstructionDataEditor : Editor
         EditorGUI.indentLevel++;
 
         DrawIfExists(configProperty.FindPropertyRelative("isPlayerHeadQuarter"), "Is Player Head Quarter");
+        DrawIfExists(configProperty.FindPropertyRelative("isVictoryBuilding"), "Is Victory Building");
         DrawIfExists(configProperty.FindPropertyRelative("isCapturable"), "Is Capturable");
         DrawIfExists(configProperty.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
         DrawIfExists(configProperty.FindPropertyRelative("capturedIncoming"), "Captured Incoming");

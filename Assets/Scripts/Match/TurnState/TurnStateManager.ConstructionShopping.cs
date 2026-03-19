@@ -1,4 +1,4 @@
-using System.Text;
+ï»¿using System.Text;
 using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine;
@@ -69,7 +69,8 @@ public partial class TurnStateManager
         if (index < 0 || index >= shoppingUnitsForSale.Count)
         {
             cursorController?.PlayErrorSfx();
-            Debug.Log($"[Shopping] Opcao invalida: {number}. Escolha entre 1 e {shoppingUnitsForSale.Count}.");
+            if (enableTurnStateRuntimeLogs)
+                Debug.Log($"[Shopping] Opcao invalida: {number}. Escolha entre 1 e {shoppingUnitsForSale.Count}.");
             return;
         }
 
@@ -119,6 +120,7 @@ public partial class TurnStateManager
             return false;
         }
 
+        int economyBefore = matchController != null ? matchController.GetActualMoney(spawnTeam) : 0;
         int unitCost = matchController != null
             ? matchController.ResolveEconomyCost(unit.cost)
             : Mathf.Max(0, unit.cost);
@@ -155,11 +157,15 @@ public partial class TurnStateManager
             return false;
         }
 
+        int economyAfter = matchController != null ? matchController.GetActualMoney(spawnTeam) : economyBefore;
+        RecordShoppingBuyReplayCommand(spawned, unit, spawnTeam, spawnCell, economyBefore, economyAfter);
+
         if (matchController != null)
             PanelMoneyController.PushContextualUpdate(spawnTeam, remainingMoney, ResolveUnitName(unit), -unitCost);
 
         cursorController?.PlayDoneSfx();
-        Debug.Log($"[Shopping] Compra concluida: {ResolveUnitName(unit)} por ${unitCost} em {ResolveConstructionName(shoppingConstruction)}.");
+        if (enableTurnStateRuntimeLogs)
+            Debug.Log($"[Shopping] Compra concluida: {ResolveUnitName(unit)} por ${unitCost} em {ResolveConstructionName(shoppingConstruction)}.");
         ExitConstructionShoppingStateToNeutral(rollback: false);
         return true;
     }
@@ -230,7 +236,7 @@ public partial class TurnStateManager
             ? matchController.ResolveEconomyCost(unit.cost)
             : Mathf.Max(0, unit.cost);
         StringBuilder sb = new StringBuilder();
-        sb.AppendLine($"{ResolveUnitName(unit)} $ {resolvedCost.ToString("N0", CultureInfo.GetCultureInfo("pt-BR"))} | Classe: {ResolveGameUnitClassName(unit.unitClass)} | Defesa: {Mathf.Max(0, unit.defense)}");
+        sb.AppendLine($"{ResolveUnitName(unit)} $ {resolvedCost.ToString("N0", CultureInfo.GetCultureInfo("pt-BR"))} | Classe: {ResolveGameUnitClassName(unit.unitClass)}");
         string airUpkeepSuffix = ResolveAirTurnUpkeepSuffix(unit);
         sb.AppendLine($"Movimento: {Mathf.Max(0, unit.movement)} | Autonomia: {Mathf.Max(0, unit.autonomia)}{airUpkeepSuffix} | Visao: {Mathf.Max(0, unit.visao)}");
         if (TryBuildVisionSpecializationsSummary(unit, out string visionSpecializationsSummary))
@@ -356,9 +362,8 @@ public partial class TurnStateManager
             string rangeLabel = rangeMin == rangeMax
                 ? rangeMin.ToString()
                 : $"{rangeMin}-{rangeMax}";
-            int attack = Mathf.Max(0, embarked.GetWeaponBasicAttack());
             string weaponCategory = ResolveWeaponCategoryName(embarked.weapon.WeaponCategory);
-            sb.AppendLine($"- {weaponName} | Ammo: {ammo} | Alcance: {rangeLabel} | Potência: {attack} ({weaponCategory})");
+            sb.AppendLine($"- {weaponName} | Ammo: {ammo} | Alcance: {rangeLabel} ({weaponCategory})");
         }
     }
 
@@ -450,6 +455,8 @@ public partial class TurnStateManager
 
     private void LogConstructionShoppingPanel()
     {
+        if (!enableTurnStateRuntimeLogs)
+            return;
         if (cursorState != CursorState.ShoppingAndServices || shoppingConstruction == null)
             return;
 
@@ -516,6 +523,40 @@ public partial class TurnStateManager
         return false;
     }
 
+    private void RecordShoppingBuyReplayCommand(
+        GameObject spawned,
+        UnitData unit,
+        TeamId buyingTeam,
+        Vector3Int spawnCell,
+        int economyBefore,
+        int economyAfter)
+    {
+        if (replayManager == null || spawned == null || unit == null)
+            return;
+
+        UnitManager spawnedManager = spawned.GetComponent<UnitManager>();
+        if (spawnedManager == null || spawnedManager.InstanceId <= 0)
+            return;
+
+        Vector3Int normalizedSpawnCell = spawnCell;
+        normalizedSpawnCell.z = 0;
+        UnitLayerMode spawnLayer = spawnedManager.GetCurrentLayerMode();
+
+        BuyUnitReplayCommand command = new BuyUnitReplayCommand
+        {
+            UnitInstanceId = spawnedManager.InstanceId.ToString(),
+            UnitTypeId = unit.id,
+            SpawnHex = normalizedSpawnCell,
+            SpawnLayer = spawnLayer,
+            BuyingTeam = buyingTeam,
+            EconomyBefore = Mathf.Max(0, economyBefore),
+            EconomyAfter = Mathf.Max(0, economyAfter),
+            debugLabel = $"Buy: {TeamUtils.GetName(buyingTeam)} spawns {ResolveUnitName(unit)} (id:{spawnedManager.InstanceId}) at ({normalizedSpawnCell.x},{normalizedSpawnCell.y}) | ${Mathf.Max(0, economyBefore)} -> ${Mathf.Max(0, economyAfter)}"
+        };
+
+        replayManager.RecordCommand(command);
+    }
+
     private static string ResolveUnitName(UnitData unit)
     {
         if (unit == null)
@@ -528,10 +569,5 @@ public partial class TurnStateManager
     }
 
 }
-
-
-
-
-
 
 

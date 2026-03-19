@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -32,7 +32,13 @@ public partial class TurnStateManager
         committedMovementPath.AddRange(path);
         committedOriginCell = path[0];
         committedDestinationCell = path[path.Count - 1];
+        committedMovementLayerBeforeDomain = selectedUnit.GetDomain();
+        committedMovementLayerBeforeHeight = selectedUnit.GetHeightLevel();
+        hasCommittedMovementLayerBefore = true;
         hasCommittedMovement = true;
+
+        RecordCinematicCursorMove(committedDestinationCell);
+        RecordCinematicConfirm(committedDestinationCell);
 
         if (animationManager == null)
             return;
@@ -127,6 +133,7 @@ public partial class TurnStateManager
             DrawCommittedPathVisual(committedMovementPath);
             Debug.Log($"moveu para {committedDestinationCell.x},{committedDestinationCell.y}");
             EnterSensorsState(CursorState.MoveuAndando);
+            RecordConfirmedMovementReplayStep();
             return;
         }
         else if (onCompleteState == CursorState.MoveuParado)
@@ -145,6 +152,43 @@ public partial class TurnStateManager
             ClearSensorResults();
     }
 
+
+    private void RecordConfirmedMovementReplayStep()
+    {
+        if (replayManager == null || selectedUnit == null)
+            return;
+
+        if (!hasCommittedMovement || committedMovementPath == null || committedMovementPath.Count < 2)
+            return;
+
+        if (selectedUnit.InstanceId <= 0)
+            return;
+
+        Domain layerBeforeDomain = hasCommittedMovementLayerBefore ? committedMovementLayerBeforeDomain : selectedUnit.GetDomain();
+        HeightLevel layerBeforeHeight = hasCommittedMovementLayerBefore ? committedMovementLayerBeforeHeight : selectedUnit.GetHeightLevel();
+
+        int fuelAfter = Mathf.Max(0, selectedUnit.CurrentFuel);
+        int fuelBefore = Mathf.Max(fuelAfter, fuelAfter + Mathf.Max(0, preparedFuelCost));
+
+        Vector3Int originCell = committedOriginCell;
+        originCell.z = 0;
+        Vector3Int destinationCell = committedDestinationCell;
+        destinationCell.z = 0;
+
+        MoveUnitReplayCommand command = new MoveUnitReplayCommand
+        {
+            UnitInstanceId = selectedUnit.InstanceId.ToString(),
+            OriginCell = originCell,
+            TargetCell = destinationCell,
+            LayerBefore = new UnitLayerMode(layerBeforeDomain, layerBeforeHeight),
+            LayerAfter = selectedUnit.GetCurrentLayerMode(),
+            FuelBefore = fuelBefore,
+            FuelAfter = fuelAfter,
+            debugLabel = $"Move Unit {selectedUnit.InstanceId} from ({originCell.x},{originCell.y}) to ({destinationCell.x},{destinationCell.y}) layer {layerBeforeDomain}/{layerBeforeHeight}->{selectedUnit.GetDomain()}/{selectedUnit.GetHeightLevel()}"
+        };
+
+        replayManager.RecordCommand(command);
+    }
     private void TryApplyForcedEndMovementLayerBeforeSensors(CursorState movementState)
     {
         if (selectedUnit == null)
@@ -462,3 +506,7 @@ public partial class TurnStateManager
         cursorController.PlayUnitMovementSfx(unit.GetMovementCategory());
     }
 }
+
+
+
+

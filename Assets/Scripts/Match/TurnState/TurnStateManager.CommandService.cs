@@ -55,6 +55,9 @@ public partial class TurnStateManager
 
     private void ProcessCommandServiceHotkeyInput()
     {
+        if (replayManager != null && replayManager.IsReplaying)
+            return;
+
         if (UiInputBlocker.IsTextInputFocused())
             return;
 
@@ -438,6 +441,7 @@ public partial class TurnStateManager
 
                     if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
                         continue;
+                    int economyBefore = matchController != null ? matchController.GetActualMoney(target.TeamId) : 0;
                     if (!TryPayServiceCostForExecution(
                             target.TeamId,
                             target,
@@ -453,6 +457,7 @@ public partial class TurnStateManager
                         continue;
                     }
                     totalMoneySpent += Mathf.Max(0, serviceMoneySpent);
+                    int economyAfter = matchController != null ? matchController.GetActualMoney(target.TeamId) : economyBefore;
 
                     Vector3 sourceWorld = fromConstruction
                         ? sourceConstruction.transform.position
@@ -470,6 +475,7 @@ public partial class TurnStateManager
                     tempSingleService.Add(service);
                     int hpBeforeApply = Mathf.Max(0, target.CurrentHP);
                     int fuelBeforeApply = Mathf.Max(0, target.CurrentFuel);
+                    List<int> ammoBeforeApply = SnapshotUnitAmmoByWeapon(target);
                     bool changed = fromConstruction
                         ? ApplyConstructionServicesToTarget(sourceConstruction, target, tempSingleService, out int hpStep, out int fuelStep, out int ammoStep)
                         : ApplyServicesToTarget(sourceSupplierUnit, target, tempSingleService, out hpStep, out fuelStep, out ammoStep, out _);
@@ -510,9 +516,24 @@ public partial class TurnStateManager
                         Debug.Log($"[ServicoComando][FuelAnim] {target.name}: sem animacao de fuel ({fuelReason}) | fuel={fuelBeforeApply}/{target.MaxFuel} | service={ResolveServiceLabel(service)}");
                     }
 
+                    List<int> ammoAfterApply = SnapshotUnitAmmoByWeapon(target);
+                    RecordSupplyReplayCommand(
+                        supplier: sourceSupplierUnit,
+                        sourceConstruction: sourceConstruction,
+                        receiver: target,
+                        payingTeam: target.TeamId,
+                        economyBefore: economyBefore,
+                        economyAfter: economyAfter,
+                        hpBefore: hpBeforeApply,
+                        hpAfter: hpAfterApply,
+                        fuelBefore: fuelBeforeApply,
+                        fuelAfter: fuelAfterApply,
+                        ammoBefore: ammoBeforeApply,
+                        ammoAfter: ammoAfterApply);
+
                     hpGain += actualHpGain;
                     fuelGain += actualFuelGain;
-                    ammoGain += ammoStep;
+                    ammoGain += Mathf.Max(0, ammoStep);
 
                     string serviceName = ResolveServiceLabel(service);
                     string line = $"{serviceName}: HP +{actualHpGain} | AUT +{actualFuelGain} | MUN +{ammoStep}";
@@ -2039,6 +2060,7 @@ public partial class TurnStateManager
         return spent;
     }
 }
+
 
 
 

@@ -13,97 +13,6 @@ using UnityEngine.InputSystem;
 
 public class SaveGameManager : MonoBehaviour
 {
-    [Serializable]
-    private class SaveGameData
-    {
-        public int version = 3;
-        public string sceneName;
-        public long savedAtUtcTicks;
-        public int currentTurn;
-        public int activeTeamId;
-        public bool includeNeutralTeam;
-        public bool economyEnabled = true;
-        public List<MatchPlayerSaveData> players = new List<MatchPlayerSaveData>();
-        public List<UnitSaveData> units = new List<UnitSaveData>();
-        public List<ConstructionSaveData> constructions = new List<ConstructionSaveData>();
-    }
-
-    [Serializable]
-    private class MatchPlayerSaveData
-    {
-        public int teamId;
-        public bool flipX;
-        public int startMoney;
-        public int actualMoney;
-        public int incomePerTurn;
-        public bool startMoneyApplied;
-    }
-
-    [Serializable]
-    private class UnitSaveData
-    {
-        public int instanceId;
-        public string unitId;
-        public int teamId;
-        public int cellX;
-        public int cellY;
-        public float worldX;
-        public float worldY;
-        public int currentHP;
-        public int currentAmmo;
-        public int currentFuel;
-        public int remainingMovementPoints;
-        public bool hasActed;
-        public bool receivedSuppliesThisTurn;
-        public bool isEmbarked;
-        public int transporterInstanceId;
-        public int transporterSlotIndex;
-        public int domain;
-        public int heightLevel;
-        public List<int> embarkedWeaponAmmo = new List<int>();
-        public List<RuntimeSupplySaveData> embarkedSupplies = new List<RuntimeSupplySaveData>();
-    }
-
-    [Serializable]
-    private class RuntimeSupplySaveData
-    {
-        public string supplyId;
-        public int quantity;
-    }
-
-    [Serializable]
-    private class ConstructionSiteRuntimeSaveData
-    {
-        public bool isPlayerHeadQuarter;
-        public bool isCapturable;
-        public int capturePointsMax;
-        public int capturedIncoming;
-        public int sellingRule;
-        public bool canProvideSupplies;
-        public List<string> offeredUnitIds = new List<string>();
-        public List<string> offeredServiceIds = new List<string>();
-        public List<RuntimeSupplySaveData> offeredSupplies = new List<RuntimeSupplySaveData>();
-    }
-
-    [Serializable]
-    private class ConstructionSaveData
-    {
-        public int instanceId;
-        public string constructionId;
-        public int teamId;
-        public int cellX;
-        public int cellY;
-        public float worldX;
-        public float worldY;
-        public int currentCapturePoints;
-        public int originalOwnerTeamId;
-        public bool hasOriginalOwner;
-        public int firstOwnerTeamId;
-        public bool hasFirstOwner;
-        public bool hasInfiniteSuppliesOverride;
-        public ConstructionSiteRuntimeSaveData siteRuntime;
-    }
-
     [Header("References")]
     [SerializeField] private UnitSpawner unitSpawner;
     [SerializeField] private ConstructionSpawner constructionSpawner;
@@ -111,6 +20,7 @@ public class SaveGameManager : MonoBehaviour
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private AnimationManager animationManager;
     [SerializeField] private CursorController cursorController;
+    [SerializeField] private ReplayManager replayManager;
 
     [Header("Quick Save/Load")]
     [SerializeField] private bool enableHotkeys = true;
@@ -125,6 +35,9 @@ public class SaveGameManager : MonoBehaviour
     [SerializeField] private bool blockCrossSceneLoad = true;
     [SerializeField] private bool verboseLogs = true;
     [SerializeField] private bool forceLoadWhenBusy = true;
+
+    [Header("Replay")]
+    [SerializeField] private bool saveReplayData = true;
 
     private enum SlotPromptState
     {
@@ -615,19 +528,7 @@ public class SaveGameManager : MonoBehaviour
                     if (manager == null)
                         continue;
 
-                    manager.AssignSpawnInstanceId(saved.instanceId);
-                    manager.SetCurrentCellPosition(new Vector3Int(saved.cellX, saved.cellY, 0));
-                    manager.ApplyOwnershipState(
-                        (TeamId)saved.teamId,
-                        (TeamId)saved.originalOwnerTeamId,
-                        saved.hasOriginalOwner,
-                        (TeamId)saved.firstOwnerTeamId,
-                        saved.hasFirstOwner);
-                    ConstructionSiteRuntime restoredRuntime = BuildSiteRuntimeFromSaveData(saved.siteRuntime);
-                    if (restoredRuntime != null)
-                        manager.ApplySiteRuntime(restoredRuntime);
-                    manager.SetCurrentCapturePoints(saved.currentCapturePoints);
-                    manager.SetInfiniteSuppliesOverride(saved.hasInfiniteSuppliesOverride);
+                    SaveDataMapper.ApplyConstructionSaveData(manager, saved, BuildSiteRuntimeFromSaveData);
 
                     if (saved.instanceId > maxConstructionId)
                         maxConstructionId = saved.instanceId;
@@ -658,33 +559,7 @@ public class SaveGameManager : MonoBehaviour
                     if (manager == null)
                         continue;
 
-                    manager.AssignSpawnInstanceId(saved.instanceId);
-                    manager.SetCurrentCellPosition(new Vector3Int(saved.cellX, saved.cellY, 0), enforceFinalOccupancyRule: false);
-                    manager.SetCurrentHP(saved.currentHP);
-                    manager.SetCurrentAmmo(saved.currentAmmo);
-                    manager.SetCurrentFuel(saved.currentFuel);
-                    manager.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
-                    if (saved.hasActed) manager.MarkAsActed();
-                    else manager.ResetActed();
-                    manager.SetRemainingMovementPoints(saved.remainingMovementPoints);
-
-                    Domain domain = (Domain)saved.domain;
-                    HeightLevel heightLevel = (HeightLevel)saved.heightLevel;
-                    manager.TrySetCurrentLayerMode(domain, heightLevel);
-
-                    IReadOnlyList<UnitEmbarkedWeapon> embarked = manager.GetEmbarkedWeapons();
-                    if (embarked != null && saved.embarkedWeaponAmmo != null)
-                    {
-                        int count = Mathf.Min(embarked.Count, saved.embarkedWeaponAmmo.Count);
-                        for (int weaponIndex = 0; weaponIndex < count; weaponIndex++)
-                        {
-                            if (embarked[weaponIndex] == null)
-                                continue;
-                            embarked[weaponIndex].squadAmmunition = Mathf.Max(0, saved.embarkedWeaponAmmo[weaponIndex]);
-                        }
-                    }
-
-                    ApplySavedEmbarkedSupplies(manager, saved.embarkedSupplies);
+                    SaveDataMapper.ApplyUnitSaveData(manager, saved);
 
                     unitsById[saved.instanceId] = manager;
                     if (saved.instanceId > maxUnitId)
@@ -738,10 +613,7 @@ public class SaveGameManager : MonoBehaviour
                     if (saved == null || !unitsById.TryGetValue(saved.instanceId, out UnitManager unit) || unit == null)
                         continue;
 
-                    if (saved.hasActed) unit.MarkAsActed();
-                    else unit.ResetActed();
-                    unit.SetRemainingMovementPoints(saved.remainingMovementPoints);
-                    unit.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
+                    SaveDataMapper.ApplyUnitTurnFlagsFromSaveData(unit, saved);
                 }
             }
 
@@ -782,6 +654,13 @@ public class SaveGameManager : MonoBehaviour
                 }
             }
 
+            stage = "restore-replay-history";
+            if (replayManager != null)
+            {
+                ReplaySaveData replayData = data.replay;
+                replayManager.ImportReplaySaveData(replayData);
+            }
+
             stage = "reset-runtime-input";
             turnStateManager?.ForceNeutral();
             cursorController?.ClearRuntimeInputLocksAfterLoad();
@@ -816,40 +695,22 @@ public class SaveGameManager : MonoBehaviour
     private SaveGameData BuildSaveData()
     {
         Scene activeScene = SceneManager.GetActiveScene();
+        MatchStateSaveData matchState = SaveDataMapper.BuildMatchStateSaveData(matchController);
         SaveGameData data = new SaveGameData
         {
             sceneName = activeScene.name,
             savedAtUtcTicks = DateTime.UtcNow.Ticks,
-            currentTurn = matchController != null ? matchController.CurrentTurn : 0,
-            activeTeamId = matchController != null ? matchController.ActiveTeamId : (int)TeamId.Green,
-            includeNeutralTeam = matchController != null && matchController.IncludeNeutralTeam,
-            economyEnabled = matchController == null || matchController.EconomyEnabled
+            currentTurn = matchState.currentTurn,
+            activeTeamId = matchState.activeTeamId,
+            includeNeutralTeam = matchState.includeNeutralTeam,
+            economyEnabled = matchState.economyEnabled,
+            victoryStarsEnabled = matchState.victoryStarsEnabled,
+            victoryStarsToWin = matchState.victoryStarsToWin,
+            hasVictoryWinner = matchState.hasVictoryWinner,
+            victoryWinnerTeamId = matchState.victoryWinnerTeamId,
+            players = matchState.players != null ? matchState.players : new List<MatchPlayerSaveData>(),
+            victoryStars = matchState.victoryStars != null ? matchState.victoryStars : new List<MatchVictoryStarSaveData>()
         };
-
-        if (matchController != null)
-        {
-            List<int> teamIds = new List<int>();
-            List<bool> flipXs = new List<bool>();
-            List<int> startMoneys = new List<int>();
-            List<int> actualMoneys = new List<int>();
-            List<int> incomePerTurns = new List<int>();
-            List<bool> startMoneyAppliedFlags = new List<bool>();
-            matchController.ExportPlayersState(teamIds, flipXs, startMoneys, actualMoneys, incomePerTurns, startMoneyAppliedFlags);
-
-            int count = teamIds.Count;
-            for (int i = 0; i < count; i++)
-            {
-                data.players.Add(new MatchPlayerSaveData
-                {
-                    teamId = teamIds[i],
-                    flipX = i < flipXs.Count && flipXs[i],
-                    startMoney = i < startMoneys.Count ? Mathf.Max(0, startMoneys[i]) : 0,
-                    actualMoney = i < actualMoneys.Count ? Mathf.Max(0, actualMoneys[i]) : 0,
-                    incomePerTurn = i < incomePerTurns.Count ? Mathf.Max(0, incomePerTurns[i]) : 0,
-                    startMoneyApplied = i < startMoneyAppliedFlags.Count && startMoneyAppliedFlags[i]
-                });
-            }
-        }
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
@@ -860,56 +721,9 @@ public class SaveGameManager : MonoBehaviour
             if (unit.gameObject.scene != activeScene)
                 continue;
 
-            UnitSaveData item = new UnitSaveData
-            {
-                instanceId = unit.InstanceId,
-                unitId = unit.UnitId,
-                teamId = (int)unit.TeamId,
-                cellX = unit.CurrentCellPosition.x,
-                cellY = unit.CurrentCellPosition.y,
-                worldX = unit.transform.position.x,
-                worldY = unit.transform.position.y,
-                currentHP = unit.CurrentHP,
-                currentAmmo = unit.CurrentAmmo,
-                currentFuel = unit.CurrentFuel,
-                remainingMovementPoints = unit.RemainingMovementPoints,
-                hasActed = unit.HasActed,
-                receivedSuppliesThisTurn = unit.ReceivedSuppliesThisTurn,
-                isEmbarked = unit.IsEmbarked,
-                transporterInstanceId = unit.EmbarkedTransporter != null ? unit.EmbarkedTransporter.InstanceId : 0,
-                transporterSlotIndex = unit.IsEmbarked ? unit.EmbarkedTransporterSlotIndex : -1,
-                domain = (int)unit.GetDomain(),
-                heightLevel = (int)unit.GetHeightLevel()
-            };
-
-            IReadOnlyList<UnitEmbarkedWeapon> embarked = unit.GetEmbarkedWeapons();
-            if (embarked != null)
-            {
-                for (int weaponIndex = 0; weaponIndex < embarked.Count; weaponIndex++)
-                {
-                    UnitEmbarkedWeapon weapon = embarked[weaponIndex];
-                    item.embarkedWeaponAmmo.Add(weapon != null ? Mathf.Max(0, weapon.squadAmmunition) : 0);
-                }
-            }
-
-            IReadOnlyList<UnitEmbarkedSupply> supplies = unit.GetEmbarkedResources();
-            if (supplies != null)
-            {
-                for (int supplyIndex = 0; supplyIndex < supplies.Count; supplyIndex++)
-                {
-                    UnitEmbarkedSupply supply = supplies[supplyIndex];
-                    if (supply == null || supply.supply == null || string.IsNullOrWhiteSpace(supply.supply.id))
-                        continue;
-
-                    item.embarkedSupplies.Add(new RuntimeSupplySaveData
-                    {
-                        supplyId = supply.supply.id,
-                        quantity = Mathf.Max(0, supply.amount)
-                    });
-                }
-            }
-
-            data.units.Add(item);
+            UnitSaveData item = SaveDataMapper.BuildUnitSaveData(unit);
+            if (item != null)
+                data.units.Add(item);
         }
 
         ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
@@ -921,66 +735,33 @@ public class SaveGameManager : MonoBehaviour
             if (construction.gameObject.scene != activeScene)
                 continue;
 
-            ConstructionSaveData item = new ConstructionSaveData
-            {
-                instanceId = construction.InstanceId,
-                constructionId = construction.ConstructionId,
-                teamId = (int)construction.TeamId,
-                cellX = construction.CurrentCellPosition.x,
-                cellY = construction.CurrentCellPosition.y,
-                worldX = construction.transform.position.x,
-                worldY = construction.transform.position.y,
-                currentCapturePoints = construction.CurrentCapturePoints,
-                originalOwnerTeamId = (int)construction.OriginalOwnerTeamId,
-                hasOriginalOwner = construction.HasOriginalOwner,
-                firstOwnerTeamId = (int)construction.FirstOwnerTeamId,
-                hasFirstOwner = construction.HasFirstOwner,
-                hasInfiniteSuppliesOverride = construction.HasInfiniteSuppliesOverride,
-                siteRuntime = BuildSiteRuntimeSaveData(construction.GetSiteRuntimeSnapshot())
-            };
-
-            data.constructions.Add(item);
+            ConstructionSaveData item = SaveDataMapper.BuildConstructionSaveData(construction);
+            if (item != null)
+                data.constructions.Add(item);
         }
+
+        if (saveReplayData && replayManager != null)
+            data.replay = replayManager.ExportReplaySaveData();
 
         return data;
     }
 
     private void RestoreMatchPlayers(SaveGameData data)
     {
-        if (matchController == null || data == null)
-            return;
-        if (data.players == null || data.players.Count == 0)
+        if (data == null)
             return;
 
-        List<int> teamIds = new List<int>(data.players.Count);
-        List<bool> flipXs = new List<bool>(data.players.Count);
-        List<int> startMoneys = new List<int>(data.players.Count);
-        List<int> actualMoneys = new List<int>(data.players.Count);
-        List<int> incomePerTurns = new List<int>(data.players.Count);
-        List<bool> startMoneyAppliedFlags = new List<bool>(data.players.Count);
-
-        for (int i = 0; i < data.players.Count; i++)
+        MatchStateSaveData matchState = new MatchStateSaveData
         {
-            MatchPlayerSaveData player = data.players[i];
-            if (player == null)
-                continue;
-
-            teamIds.Add(player.teamId);
-            flipXs.Add(player.flipX);
-            startMoneys.Add(Mathf.Max(0, player.startMoney));
-            actualMoneys.Add(Mathf.Max(0, player.actualMoney));
-            incomePerTurns.Add(Mathf.Max(0, player.incomePerTurn));
-            startMoneyAppliedFlags.Add(player.startMoneyApplied);
-        }
-
-        matchController.ImportPlayersState(
-            teamIds,
-            flipXs,
-            startMoneys,
-            actualMoneys,
-            incomePerTurns,
-            startMoneyAppliedFlags,
-            data.includeNeutralTeam);
+            includeNeutralTeam = data.includeNeutralTeam,
+            players = data.players != null ? data.players : new List<MatchPlayerSaveData>(),
+            victoryStars = data.victoryStars != null ? data.victoryStars : new List<MatchVictoryStarSaveData>(),
+            victoryStarsEnabled = data.victoryStarsEnabled,
+            victoryStarsToWin = data.victoryStarsToWin,
+            hasVictoryWinner = data.hasVictoryWinner,
+            victoryWinnerTeamId = data.victoryWinnerTeamId
+        };
+        SaveDataMapper.ApplyMatchStateSaveData(matchController, matchState);
     }
 
     private void ClearCurrentRuntime()
@@ -1279,6 +1060,8 @@ public class SaveGameManager : MonoBehaviour
             animationManager = FindInActiveScene<AnimationManager>();
         if (cursorController == null)
             cursorController = FindInActiveScene<CursorController>();
+        if (replayManager == null)
+            replayManager = FindInActiveScene<ReplayManager>();
     }
 
     private static T FindInActiveScene<T>() where T : Component
@@ -1376,167 +1159,21 @@ public class SaveGameManager : MonoBehaviour
 #endif
     }
 
-    private void ApplySavedEmbarkedSupplies(UnitManager unit, List<RuntimeSupplySaveData> savedSupplies)
-    {
-        if (unit == null || savedSupplies == null || savedSupplies.Count <= 0)
-            return;
-
-        IReadOnlyList<UnitEmbarkedSupply> runtimeSupplies = unit.GetEmbarkedResources();
-        if (runtimeSupplies == null || runtimeSupplies.Count <= 0)
-            return;
-
-        Dictionary<string, Queue<int>> amountsBySupplyId = new Dictionary<string, Queue<int>>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < savedSupplies.Count; i++)
-        {
-            RuntimeSupplySaveData entry = savedSupplies[i];
-            if (entry == null || string.IsNullOrWhiteSpace(entry.supplyId))
-                continue;
-
-            string key = entry.supplyId.Trim();
-            if (!amountsBySupplyId.TryGetValue(key, out Queue<int> bucket))
-            {
-                bucket = new Queue<int>();
-                amountsBySupplyId[key] = bucket;
-            }
-
-            bucket.Enqueue(Mathf.Max(0, entry.quantity));
-        }
-
-        for (int i = 0; i < runtimeSupplies.Count; i++)
-        {
-            UnitEmbarkedSupply runtime = runtimeSupplies[i];
-            if (runtime == null || runtime.supply == null || string.IsNullOrWhiteSpace(runtime.supply.id))
-                continue;
-
-            string key = runtime.supply.id.Trim();
-            if (!amountsBySupplyId.TryGetValue(key, out Queue<int> bucket) || bucket.Count <= 0)
-                continue;
-
-            runtime.amount = Mathf.Max(0, bucket.Dequeue());
-        }
-    }
-
-    private ConstructionSiteRuntimeSaveData BuildSiteRuntimeSaveData(ConstructionSiteRuntime runtime)
-    {
-        if (runtime == null)
-            return null;
-
-        runtime.Sanitize();
-        ConstructionSiteRuntimeSaveData result = new ConstructionSiteRuntimeSaveData
-        {
-            isPlayerHeadQuarter = runtime.isPlayerHeadQuarter,
-            isCapturable = runtime.isCapturable,
-            capturePointsMax = Mathf.Max(0, runtime.capturePointsMax),
-            capturedIncoming = Mathf.Max(0, runtime.capturedIncoming),
-            sellingRule = (int)runtime.sellingRule,
-            canProvideSupplies = runtime.canProvideSupplies
-        };
-
-        if (runtime.offeredUnits != null)
-        {
-            for (int i = 0; i < runtime.offeredUnits.Count; i++)
-            {
-                UnitData unit = runtime.offeredUnits[i];
-                if (unit == null || string.IsNullOrWhiteSpace(unit.id))
-                    continue;
-                result.offeredUnitIds.Add(unit.id);
-            }
-        }
-
-        if (runtime.offeredServices != null)
-        {
-            for (int i = 0; i < runtime.offeredServices.Count; i++)
-            {
-                ServiceData service = runtime.offeredServices[i];
-                if (service == null || string.IsNullOrWhiteSpace(service.id))
-                    continue;
-                result.offeredServiceIds.Add(service.id);
-            }
-        }
-
-        if (runtime.offeredSupplies != null)
-        {
-            for (int i = 0; i < runtime.offeredSupplies.Count; i++)
-            {
-                ConstructionSupplyOffer offer = runtime.offeredSupplies[i];
-                if (offer == null || offer.supply == null || string.IsNullOrWhiteSpace(offer.supply.id))
-                    continue;
-                result.offeredSupplies.Add(new RuntimeSupplySaveData
-                {
-                    supplyId = offer.supply.id,
-                    quantity = Mathf.Max(0, offer.quantity)
-                });
-            }
-        }
-
-        return result;
-    }
-
     private ConstructionSiteRuntime BuildSiteRuntimeFromSaveData(ConstructionSiteRuntimeSaveData saved)
     {
-        if (saved == null)
+        return SaveDataMapper.BuildConstructionSiteRuntimeFromSaveData(
+            saved,
+            ResolveUnitById,
+            ResolveServiceById,
+            ResolveSupplyById);
+    }
+
+    private UnitData ResolveUnitById(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || unitSpawner == null)
             return null;
 
-        ConstructionSiteRuntime runtime = new ConstructionSiteRuntime
-        {
-            isPlayerHeadQuarter = saved.isPlayerHeadQuarter,
-            isCapturable = saved.isCapturable,
-            capturePointsMax = Mathf.Max(0, saved.capturePointsMax),
-            capturedIncoming = Mathf.Max(0, saved.capturedIncoming),
-            sellingRule = System.Enum.IsDefined(typeof(ConstructionUnitMarketRule), saved.sellingRule)
-                ? (ConstructionUnitMarketRule)saved.sellingRule
-                : ConstructionUnitMarketRule.FreeMarket,
-            canProvideSupplies = saved.canProvideSupplies,
-            offeredUnits = new List<UnitData>(),
-            offeredServices = new List<ServiceData>(),
-            offeredSupplies = new List<ConstructionSupplyOffer>()
-        };
-
-        if (saved.offeredUnitIds != null)
-        {
-            for (int i = 0; i < saved.offeredUnitIds.Count; i++)
-            {
-                string id = saved.offeredUnitIds[i];
-                if (string.IsNullOrWhiteSpace(id))
-                    continue;
-                if (unitSpawner != null && unitSpawner.TryGetUnitData(id, out UnitData unit) && unit != null)
-                    runtime.offeredUnits.Add(unit);
-            }
-        }
-
-        if (saved.offeredServiceIds != null)
-        {
-            for (int i = 0; i < saved.offeredServiceIds.Count; i++)
-            {
-                string id = saved.offeredServiceIds[i];
-                if (string.IsNullOrWhiteSpace(id))
-                    continue;
-                ServiceData service = ResolveServiceById(id);
-                if (service != null)
-                    runtime.offeredServices.Add(service);
-            }
-        }
-
-        if (saved.offeredSupplies != null)
-        {
-            for (int i = 0; i < saved.offeredSupplies.Count; i++)
-            {
-                RuntimeSupplySaveData entry = saved.offeredSupplies[i];
-                if (entry == null || string.IsNullOrWhiteSpace(entry.supplyId))
-                    continue;
-                SupplyData supply = ResolveSupplyById(entry.supplyId);
-                if (supply == null)
-                    continue;
-                runtime.offeredSupplies.Add(new ConstructionSupplyOffer
-                {
-                    supply = supply,
-                    quantity = Mathf.Max(0, entry.quantity)
-                });
-            }
-        }
-
-        runtime.Sanitize();
-        return runtime;
+        return unitSpawner.TryGetUnitData(id, out UnitData unit) ? unit : null;
     }
 
     private ServiceData ResolveServiceById(string id)
@@ -1583,4 +1220,5 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
+
 

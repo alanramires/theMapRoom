@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.Tilemaps;
 using UnityEngine.EventSystems;
 using System.Collections.Generic;
@@ -113,6 +113,7 @@ public class CursorController : MonoBehaviour
     [Header("State")]
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private MatchController matchController;
+    [SerializeField] private ReplayManager replayManager;
     [SerializeField] private bool enableNeutralLeftClickTeleport = true;
 
     private Vector3Int heldDirection = Vector3Int.zero;
@@ -157,6 +158,13 @@ public class CursorController : MonoBehaviour
     private void Update()
     {
         TryAutoAssignMatchController();
+        TryAutoAssignReplayManager();
+        if (replayManager != null && replayManager.IsReplaying)
+        {
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
         if (UiInputBlocker.IsTextInputFocused())
         {
             heldDirection = Vector3Int.zero;
@@ -595,12 +603,19 @@ public class CursorController : MonoBehaviour
             turnStateManager = FindAnyObjectByType<TurnStateManager>();
 
         TryAutoAssignMatchController();
+        TryAutoAssignReplayManager();
     }
 
     private void TryAutoAssignMatchController()
     {
         if (matchController == null)
             matchController = FindAnyObjectByType<MatchController>();
+    }
+
+    private void TryAutoAssignReplayManager()
+    {
+        if (replayManager == null)
+            replayManager = FindAnyObjectByType<ReplayManager>();
     }
 
     private static Tilemap FindTilemapByName(string expectedName)
@@ -1361,4 +1376,8 @@ public static class TeamAnchorResolver
         return false;
     }
 }
+
+
+
+
 

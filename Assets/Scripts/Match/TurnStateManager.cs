@@ -38,6 +38,7 @@ public partial class TurnStateManager : MonoBehaviour
     [SerializeField] private AnimationManager animationManager;
     [SerializeField] private PathManager pathManager;
     [SerializeField] private UnitSpawner unitSpawner;
+    [SerializeField] private ReplayManager replayManager;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private WeaponPriorityData weaponPriorityData;
     [SerializeField] private DPQMatchupDatabase dpqMatchupDatabase;
@@ -67,6 +68,9 @@ public partial class TurnStateManager : MonoBehaviour
     private Vector3Int committedOriginCell;
     private Vector3Int committedDestinationCell;
     private bool hasCommittedMovement;
+    private Domain committedMovementLayerBeforeDomain = Domain.Land;
+    private HeightLevel committedMovementLayerBeforeHeight = HeightLevel.Surface;
+    private bool hasCommittedMovementLayerBefore;
     private int preparedFuelCost;
     private bool hasPreparedFuelCost;
     private int preparedMovementCost;
@@ -108,6 +112,9 @@ public partial class TurnStateManager : MonoBehaviour
 
     private void LogStateStep(string step, bool rollback = false)
     {
+        if (!enableTurnStateRuntimeLogs)
+            return;
+
         string rollbackTag = rollback ? " [roll back]" : string.Empty;
         string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
         Debug.Log($"[TurnState]{rollbackTag} state={cursorState} | step={step} | selected={selectedName}");
@@ -137,6 +144,9 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         cursorState = nextState;
+
+        if (!enableTurnStateRuntimeLogs)
+            return;
 
         string rollbackTag = rollback ? " [roll back]" : string.Empty;
         string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
@@ -722,7 +732,6 @@ public partial class TurnStateManager : MonoBehaviour
         ClearMovementRange();
         ClearCommittedMovement();
     }
-
     private void CommitTemporaryTakeoffSelectionState()
     {
         hasTemporaryTakeoffSelectionState = false;
@@ -1161,6 +1170,9 @@ public partial class TurnStateManager : MonoBehaviour
         if (unitSpawner == null)
             unitSpawner = FindAnyObjectByType<UnitSpawner>();
 
+        if (replayManager == null)
+            replayManager = FindAnyObjectByType<ReplayManager>();
+
         if (terrainTilemap == null)
             terrainTilemap = ResolvePreferredTerrainTilemap();
 
@@ -1221,6 +1233,7 @@ public partial class TurnStateManager : MonoBehaviour
         committedOriginCell = Vector3Int.zero;
         committedDestinationCell = Vector3Int.zero;
         hasCommittedMovement = false;
+        hasCommittedMovementLayerBefore = false;
         hasForcedLayerRollbackSnapshot = false;
         ClearCommittedPathVisual();
     }
@@ -1369,4 +1382,7 @@ public partial class TurnStateManager : MonoBehaviour
         return (animationManager != null && animationManager.IsAnimatingMovement) || embarkExecutionInProgress || disembarkExecutionInProgress;
     }
 }
+
+
+
 

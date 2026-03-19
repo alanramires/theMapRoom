@@ -474,6 +474,7 @@ public partial class TurnStateManager
                     out List<int> ammoPlannedByWeapon);
                 if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
                     continue;
+                int economyBefore = matchController != null ? matchController.GetActualMoney(supplier.TeamId) : 0;
                 if (!TryPayServiceCostForExecution(
                         supplier.TeamId,
                         target,
@@ -487,6 +488,7 @@ public partial class TurnStateManager
                 {
                     continue;
                 }
+                int economyAfter = matchController != null ? matchController.GetActualMoney(supplier.TeamId) : economyBefore;
 
                 float flightDuration = PlaySupplyServiceProjectile(supplier, target, service);
                 float spawnInterval = GetSupplySpawnInterval();
@@ -498,6 +500,8 @@ public partial class TurnStateManager
                 tempSingleService.Clear();
                 tempSingleService.Add(service);
                 int hpBeforeApply = Mathf.Max(0, target.CurrentHP);
+                int fuelBeforeApply = Mathf.Max(0, target.CurrentFuel);
+                List<int> ammoBeforeApply = SnapshotUnitAmmoByWeapon(target);
                 bool changed = ApplyServicesToTarget(
                     supplier,
                     target,
@@ -511,7 +515,10 @@ public partial class TurnStateManager
                     continue;
 
                 int hpAfterApply = Mathf.Clamp(target.CurrentHP, 0, target.GetMaxHP());
+                int fuelAfterApply = Mathf.Clamp(target.CurrentFuel, 0, target.MaxFuel);
+                List<int> ammoAfterApply = SnapshotUnitAmmoByWeapon(target);
                 int actualHpGain = Mathf.Max(0, hpAfterApply - hpBeforeApply);
+                int actualFuelGain = Mathf.Max(0, fuelAfterApply - fuelBeforeApply);
                 if (actualHpGain > 0)
                 {
                     int desiredHp = Mathf.Clamp(hpBeforeApply + actualHpGain, 0, target.GetMaxHP());
@@ -519,17 +526,31 @@ public partial class TurnStateManager
                     yield return AnimateHpRecoverFill(target, hpBeforeApply, desiredHp);
                 }
 
-                if (fuelStep > 0)
+                if (actualFuelGain > 0)
                 {
-                    int desiredFuel = Mathf.Clamp(startFuel + fuelStep, 0, target.MaxFuel);
-                    target.SetCurrentFuel(startFuel);
-                    yield return AnimateFuelRecoverFill(target, startFuel, desiredFuel);
+                    int desiredFuel = Mathf.Clamp(fuelBeforeApply + actualFuelGain, 0, target.MaxFuel);
+                    target.SetCurrentFuel(fuelBeforeApply);
+                    yield return AnimateFuelRecoverFill(target, fuelBeforeApply, desiredFuel);
                     startFuel = desiredFuel;
                 }
 
+                RecordSupplyReplayCommand(
+                    supplier,
+                    sourceConstruction: null,
+                    receiver: target,
+                    payingTeam: supplier.TeamId,
+                    economyBefore: economyBefore,
+                    economyAfter: economyAfter,
+                    hpBefore: hpBeforeApply,
+                    hpAfter: hpAfterApply,
+                    fuelBefore: fuelBeforeApply,
+                    fuelAfter: fuelAfterApply,
+                    ammoBefore: ammoBeforeApply,
+                    ammoAfter: ammoAfterApply);
+
                 hpGain += actualHpGain;
-                fuelGain += fuelStep;
-                ammoGain += ammoStep;
+                fuelGain += actualFuelGain;
+                ammoGain += Mathf.Max(0, ammoStep);
             }
 
             if (hpGain <= 0 && fuelGain <= 0 && ammoGain <= 0)
@@ -1972,3 +1993,4 @@ public partial class TurnStateManager
         return null;
     }
 }
+

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 #if UNITY_EDITOR
@@ -8,6 +8,7 @@ using UnityEditor;
 [ExecuteAlways]
 public class ConstructionManager : MonoBehaviour
 {
+    private const string VictoryBuildingOverlayObjectName = "VictoryBuildingOverlay";
     public static readonly List<ConstructionManager> AllActive = new List<ConstructionManager>();
 
     [SerializeField] private SpriteRenderer spriteRenderer;
@@ -34,6 +35,13 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] [Range(0f, 1f)] private float occupiedByReadyUnitDarkenFactor = 0.4f;
     [SerializeField] private ConstructionHudController hudController;
     [SerializeField] private MatchController matchController;
+    [Header("Victory Building")]
+    [SerializeField] private SpriteRenderer victoryBuildingOverlayRenderer;
+    [SerializeField] private Sprite victoryBuildingOverlaySprite;
+    [SerializeField] private Color victoryBuildingOverlayColor = new Color(1f, 0.84f, 0.22f, 1f);
+    [SerializeField] private Vector3 victoryBuildingOverlayLocalPosition = new Vector3(0f, 0f, -0.01f);
+    [SerializeField] private Vector3 victoryBuildingOverlayLocalScale = Vector3.one;
+    [SerializeField] [Range(-100, 100)] private int victoryBuildingOverlaySortingOrderOffset = 6;
     [Header("Editor")]
     [SerializeField] private bool continuousEditorVisualRefresh = false;
     [System.NonSerialized] private int cachedOccupantInstanceId = int.MinValue;
@@ -58,6 +66,7 @@ public class ConstructionManager : MonoBehaviour
     public bool CanProvideSupplies => siteRuntime != null && siteRuntime.canProvideSupplies;
     public bool HasInfiniteSuppliesOverride => hasInfiniteSuppliesOverride;
     public bool IsPlayerHeadQuarter => siteRuntime != null && siteRuntime.isPlayerHeadQuarter;
+    public bool IsVictoryBuilding => siteRuntime != null && siteRuntime.isVictoryBuilding;
     public int CapturedIncoming => siteRuntime != null ? Mathf.Max(0, siteRuntime.capturedIncoming) : 0;
     public IReadOnlyList<ServiceData> OfferedServices => siteRuntime != null && siteRuntime.offeredServices != null ? siteRuntime.offeredServices : System.Array.Empty<ServiceData>();
     public IReadOnlyList<UnitData> OfferedUnits => siteRuntime != null && siteRuntime.offeredUnits != null ? siteRuntime.offeredUnits : System.Array.Empty<UnitData>();
@@ -179,6 +188,7 @@ public class ConstructionManager : MonoBehaviour
             AllActive.Add(this);
 
         MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
+        MatchController.OnUnitActedStateChanged += HandleUnitActedStateChanged;
         UnitOccupancyRules.OnUnitOccupancyChanged += HandleUnitOccupancyChanged;
         RefreshRuntimeVisualState(force: true);
 #if UNITY_EDITOR
@@ -190,6 +200,7 @@ public class ConstructionManager : MonoBehaviour
     {
         AllActive.Remove(this);
         MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
+        MatchController.OnUnitActedStateChanged -= HandleUnitActedStateChanged;
         UnitOccupancyRules.OnUnitOccupancyChanged -= HandleUnitOccupancyChanged;
 #if UNITY_EDITOR
         UnregisterEditorTick();
@@ -203,7 +214,7 @@ public class ConstructionManager : MonoBehaviour
             return;
 
         if (spriteRenderer == null)
-            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            spriteRenderer = ResolvePrimarySpriteRenderer();
 
         EnsureDefaults();
         TryAutoAssignMatchController();
@@ -248,7 +259,7 @@ public class ConstructionManager : MonoBehaviour
         constructionDisplayName = string.IsNullOrWhiteSpace(data.displayName) ? data.id : data.displayName;
 
         if (spriteRenderer == null)
-            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            spriteRenderer = ResolvePrimarySpriteRenderer();
 
         if (spriteRenderer != null)
         {
@@ -300,7 +311,7 @@ public class ConstructionManager : MonoBehaviour
     public void ApplyTeamVisualFlipX(bool flipX)
     {
         if (spriteRenderer == null)
-            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            spriteRenderer = ResolvePrimarySpriteRenderer();
         if (spriteRenderer == null)
             return;
 
@@ -404,6 +415,21 @@ public class ConstructionManager : MonoBehaviour
     public void SetInfiniteSuppliesOverride(bool value)
     {
         hasInfiniteSuppliesOverride = value;
+        RefreshRuntimeVisualState(force: true);
+    }
+
+    public bool GetVictoryBuildingRuntimeFlag()
+    {
+        return siteRuntime != null && siteRuntime.isVictoryBuilding;
+    }
+
+    public void SetVictoryBuildingRuntimeFlag(bool enabled)
+    {
+        if (siteRuntime == null)
+            siteRuntime = new ConstructionSiteRuntime();
+
+        siteRuntime.isVictoryBuilding = enabled;
+        hasSiteRuntimeOverride = true;
         RefreshRuntimeVisualState(force: true);
     }
 
@@ -512,6 +538,10 @@ public class ConstructionManager : MonoBehaviour
         if (siteRuntime == null)
             siteRuntime = new ConstructionSiteRuntime();
         siteRuntime.Sanitize();
+        if (spriteRenderer == null)
+            spriteRenderer = ResolvePrimarySpriteRenderer();
+        if (victoryBuildingOverlayRenderer == null)
+            victoryBuildingOverlayRenderer = FindVictoryBuildingOverlayRenderer();
         if (hudController == null)
             hudController = GetComponentInChildren<ConstructionHudController>(true);
         if (hudController == null)
@@ -784,7 +814,7 @@ public class ConstructionManager : MonoBehaviour
     private void RefreshOccupancyVisualTint(UnitManager occupant)
     {
         if (spriteRenderer == null)
-            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            spriteRenderer = ResolvePrimarySpriteRenderer();
         if (spriteRenderer == null)
             return;
 
@@ -825,6 +855,8 @@ public class ConstructionManager : MonoBehaviour
 
     private void RefreshRuntimeVisualState(bool force)
     {
+        RefreshVictoryBuildingOverlayVisual();
+
         UnitManager occupant = TryGetOccupantOnTop();
         int occupantId = occupant != null ? occupant.GetInstanceID() : 0;
         bool sameTeamReady = occupant != null && occupant.TeamId == teamId && !occupant.HasActed;
@@ -845,6 +877,96 @@ public class ConstructionManager : MonoBehaviour
         cachedShowFlagThreatOutline = showFlagThreatOutline;
         RefreshOccupancyVisualTint(occupant);
         RefreshHud(occupant);
+    }
+
+    private void RefreshVictoryBuildingOverlayVisual()
+    {
+        bool shouldShow = siteRuntime != null && siteRuntime.isVictoryBuilding;
+        if (!shouldShow && victoryBuildingOverlayRenderer == null)
+            return;
+
+        if (shouldShow && victoryBuildingOverlayRenderer == null)
+            victoryBuildingOverlayRenderer = EnsureVictoryBuildingOverlayRenderer();
+        if (victoryBuildingOverlayRenderer == null)
+            return;
+
+        victoryBuildingOverlayRenderer.gameObject.SetActive(shouldShow);
+        if (!shouldShow)
+            return;
+
+        victoryBuildingOverlayRenderer.sprite = victoryBuildingOverlaySprite;
+        victoryBuildingOverlayRenderer.color = victoryBuildingOverlayColor;
+        Transform overlayTransform = victoryBuildingOverlayRenderer.transform;
+        overlayTransform.localPosition = victoryBuildingOverlayLocalPosition;
+        overlayTransform.localRotation = Quaternion.identity;
+        overlayTransform.localScale = victoryBuildingOverlayLocalScale;
+
+        if (spriteRenderer != null)
+        {
+            victoryBuildingOverlayRenderer.sortingLayerID = spriteRenderer.sortingLayerID;
+            victoryBuildingOverlayRenderer.sortingOrder = spriteRenderer.sortingOrder + victoryBuildingOverlaySortingOrderOffset;
+        }
+    }
+
+    private SpriteRenderer EnsureVictoryBuildingOverlayRenderer()
+    {
+        SpriteRenderer existing = FindVictoryBuildingOverlayRenderer();
+        if (existing != null)
+            return existing;
+
+        GameObject overlayGo = new GameObject(VictoryBuildingOverlayObjectName);
+        overlayGo.transform.SetParent(transform, false);
+        overlayGo.transform.localPosition = victoryBuildingOverlayLocalPosition;
+        overlayGo.transform.localRotation = Quaternion.identity;
+        overlayGo.transform.localScale = victoryBuildingOverlayLocalScale;
+
+        SpriteRenderer overlayRenderer = overlayGo.AddComponent<SpriteRenderer>();
+        overlayRenderer.sprite = victoryBuildingOverlaySprite;
+        overlayRenderer.color = victoryBuildingOverlayColor;
+        return overlayRenderer;
+    }
+
+    private SpriteRenderer FindVictoryBuildingOverlayRenderer()
+    {
+        if (victoryBuildingOverlayRenderer != null)
+            return victoryBuildingOverlayRenderer;
+
+        Transform[] children = GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            Transform child = children[i];
+            if (child == null || !string.Equals(child.name, VictoryBuildingOverlayObjectName, System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            SpriteRenderer renderer = child.GetComponent<SpriteRenderer>();
+            if (renderer != null)
+                return renderer;
+        }
+
+        return null;
+    }
+
+    private SpriteRenderer ResolvePrimarySpriteRenderer()
+    {
+        SpriteRenderer ownRenderer = GetComponent<SpriteRenderer>();
+        if (ownRenderer != null)
+            return ownRenderer;
+
+        SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            SpriteRenderer candidate = renderers[i];
+            if (candidate == null)
+                continue;
+            if (victoryBuildingOverlayRenderer != null && candidate == victoryBuildingOverlayRenderer)
+                continue;
+            if (string.Equals(candidate.gameObject.name, VictoryBuildingOverlayObjectName, System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            return candidate;
+        }
+
+        return null;
     }
 
     private void HandleActiveTeamChanged(int _)
@@ -869,6 +991,29 @@ public class ConstructionManager : MonoBehaviour
             return;
 
         RefreshRuntimeVisualState(force: false);
+    }
+
+    private void HandleUnitActedStateChanged(UnitManager unit)
+    {
+        if (unit == null || unit.gameObject.scene != gameObject.scene || unit.IsEmbarked)
+            return;
+
+        Vector3Int ownCell = currentCellPosition;
+        ownCell.z = 0;
+
+        Vector3Int unitCell = unit.CurrentCellPosition;
+        unitCell.z = 0;
+
+        if (unit.BoardTilemap != null && boardTilemap != null && unit.BoardTilemap == boardTilemap)
+        {
+            unitCell = HexCoordinates.WorldToCell(boardTilemap, unit.transform.position);
+            unitCell.z = 0;
+        }
+
+        if (unitCell != ownCell)
+            return;
+
+        RefreshRuntimeVisualState(force: true);
     }
 
     private UnitManager TryGetOccupantOnTop()
@@ -907,3 +1052,4 @@ public class ConstructionManager : MonoBehaviour
         return null;
     }
 }
+

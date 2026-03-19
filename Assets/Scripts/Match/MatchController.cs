@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System;
@@ -11,9 +11,11 @@ using UnityEditor;
 
 public class MatchController : MonoBehaviour
 {
+    private const int MaxVictoryStarsGoal = 12;
     public static event Action<int> OnActiveTeamChanged;
     public static event Action<UnitManager> OnUnitActedStateChanged;
     public static event Action OnFogOfWarUpdated;
+    public static event Action OnBeforeAdvanceTurn;
 
     private readonly struct FogOfWarUnitCacheKey : IEquatable<FogOfWarUnitCacheKey>
     {
@@ -78,6 +80,13 @@ public class MatchController : MonoBehaviour
         [SerializeField, HideInInspector] public bool startMoneyApplied;
     }
 
+    [System.Serializable]
+    private struct TeamVictoryEntry
+    {
+        public TeamId teamId;
+        [Min(0)] public int stars;
+    }
+
     public enum GameSetupPreset
     {
         GameBoyClassic = 0,
@@ -117,12 +126,24 @@ public class MatchController : MonoBehaviour
     [SerializeField] private MatchMusicAudioManager matchMusicAudioManager;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.5f;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPostDelay = 0.2f;
+    [Header("Victory Stars")]
+    [SerializeField] private bool enableVictoryStars = true;
+    [SerializeField] [Range(1, MaxVictoryStarsGoal)] private int victoryStarsToWin = 5;
+    [SerializeField] private bool freezeTurnAdvanceAfterVictory = true;
+    [SerializeField] private List<TeamVictoryEntry> victoryStarsByTeam = new List<TeamVictoryEntry>();
+    [SerializeField, HideInInspector] private bool hasVictoryWinner;
+    [SerializeField, HideInInspector] private TeamId victoryWinnerTeam = TeamId.Neutral;
     [Header("Fog Of War")]
     [SerializeField] private Tilemap fogOfWarTilemap;
     [SerializeField] private TileBase fogOfWarOverlayTile;
     [SerializeField] private TerrainDatabase fogOfWarTerrainDatabase;
     [SerializeField] private DPQAirHeightConfig fogOfWarDpqAirHeightConfig;
     [SerializeField] [Range(0f, 1f)] private float fogOfWarAlpha = 0.65f;
+    [Header("Victory Overlay")]
+    [SerializeField] private bool showVictoryOverlay = true;
+    [SerializeField] private Tilemap victoryOverlayTilemap;
+    [SerializeField] private TileBase victoryOverlayTile;
+    [SerializeField] [Range(0f, 1f)] private float victoryOverlayAlpha = 1f;
     [SerializeField] private int activePlayerListIndex = 0;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField, HideInInspector] private bool pendingTurnStartUpkeep;
@@ -148,11 +169,28 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private bool initialStealthDetectionBootstrapped;
     [System.NonSerialized] private bool debugFogOfWarEnabled = true;
     [System.NonSerialized] private float runtimeConstructionIncomeRefreshTimer;
+    [System.NonSerialized] private readonly HashSet<Vector3Int> victoryOverlayActiveCells = new HashSet<Vector3Int>();
+    [System.NonSerialized] private int cachedVictoryOverlaySignature;
+    [System.NonSerialized] private int cachedVictoryOverlayCount;
+    [System.NonSerialized] private int cachedVictoryOverlaySettingsSignature;
+    [System.NonSerialized] private Tilemap lastVictoryOverlayTilemap;
+#if UNITY_EDITOR
+    [System.NonSerialized] private bool pendingVictoryOverlayRefreshInEditor;
+#endif
     [Header("Debug")]
     [SerializeField] private bool enableFogSourceDebugLogs = false;
     [SerializeField] private bool enableFogStepPerfLogs = false;
+    [SerializeField] private bool enableFogValidationLogs = false;
+    [SerializeField] private bool enableSensorsRuntimeLogs = false;
+    [SerializeField] private bool enableAindaMeVeRuntimeLogs = false;
+    [SerializeField] private bool enablePodeDetectarRuntimeLogs = false;
+    [SerializeField] private bool enablePodeEnxergarRuntimeLogs = false;
     [SerializeField] [Range(1, 8)] private int fogStepPerfTopUnits = 3;
     public bool SuppressFogOfWarRefresh { get; set; } = false;
+
+    private bool ShouldLogPodeEnxergarRuntime => enableFogSourceDebugLogs || enablePodeEnxergarRuntimeLogs;
+    private bool ShouldLogAindaMeVeRuntime => enableSensorsRuntimeLogs || enableAindaMeVeRuntimeLogs;
+    private bool ShouldLogPodeDetectarRuntime => enableSensorsRuntimeLogs || enablePodeDetectarRuntimeLogs;
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
@@ -184,7 +222,62 @@ public class MatchController : MonoBehaviour
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;
     public int ActivePlayerListIndex => activePlayerListIndex;
     public bool IsTurnTransitionInProgress => advanceTurnTransitionRoutine != null;
+    public bool EnableVictoryStars => enableVictoryStars;
+    public int VictoryStarsToWin => ClampVictoryStarsGoal(victoryStarsToWin);
+    public bool HasVictoryWinner => hasVictoryWinner;
+    public TeamId VictoryWinnerTeam => victoryWinnerTeam;
     private Coroutine advanceTurnTransitionRoutine;
+
+    public int GetVictoryStars(TeamId team)
+    {
+        int index = FindVictoryEntryIndex(team);
+        if (index < 0)
+            return 0;
+
+        return Mathf.Max(0, victoryStarsByTeam[index].stars);
+    }
+
+    public void GetVictoryControlForTeam(TeamId team, out int controlled, out int total)
+    {
+        controlled = 0;
+        total = 0;
+
+        if (team == TeamId.Neutral)
+            return;
+        if (FindPlayerIndexByTeam(team) < 0)
+            return;
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if (!construction.IsVictoryBuilding)
+                continue;
+
+            total++;
+            if (construction.TeamId == team)
+                controlled++;
+        }
+    }
+
+    public int GetProjectedVictoryStarsGain(TeamId team)
+    {
+        if (!enableVictoryStars)
+            return 0;
+        if (team == TeamId.Neutral)
+            return 0;
+        if (FindPlayerIndexByTeam(team) < 0)
+            return 0;
+
+        GetVictoryControlForTeam(team, out int controlled, out int total);
+        if (total <= 0)
+            return 0;
+
+        int majorityThreshold = (total / 2) + 1;
+        return controlled >= majorityThreshold ? 1 : 0;
+    }
 
     public int GetActualMoney(TeamId team)
     {
@@ -359,8 +452,66 @@ public class MatchController : MonoBehaviour
         }
 
         NormalizePlayersList();
+        NormalizeVictoryStars();
         SyncActivePlayerIndexFromActiveTeam();
         ApplyTeamFlipSettingsToSceneObjects();
+    }
+
+    public void ExportVictoryStarsState(
+        List<int> teamIds,
+        List<int> stars,
+        out bool enabled,
+        out int starsToWin,
+        out bool winnerDefined,
+        out int winnerTeamId)
+    {
+        enabled = enableVictoryStars;
+        starsToWin = ClampVictoryStarsGoal(victoryStarsToWin);
+        winnerDefined = hasVictoryWinner;
+        winnerTeamId = (int)victoryWinnerTeam;
+
+        if (teamIds == null || stars == null)
+            return;
+
+        teamIds.Clear();
+        stars.Clear();
+        for (int i = 0; i < victoryStarsByTeam.Count; i++)
+        {
+            TeamVictoryEntry entry = victoryStarsByTeam[i];
+            if (entry.teamId == TeamId.Neutral)
+                continue;
+
+            teamIds.Add((int)entry.teamId);
+            stars.Add(Mathf.Max(0, entry.stars));
+        }
+    }
+
+    public void ImportVictoryStarsState(
+        IList<int> teamIds,
+        IList<int> stars,
+        bool enabled,
+        int starsToWin,
+        bool winnerDefined,
+        int winnerTeamId)
+    {
+        enableVictoryStars = enabled;
+        victoryStarsToWin = ClampVictoryStarsGoal(starsToWin);
+        hasVictoryWinner = winnerDefined;
+        victoryWinnerTeam = ClampToTeamId(winnerTeamId);
+
+        victoryStarsByTeam.Clear();
+        int count = teamIds != null ? teamIds.Count : 0;
+        for (int i = 0; i < count; i++)
+        {
+            TeamId team = ClampToTeamId(teamIds[i]);
+            if (team == TeamId.Neutral)
+                continue;
+
+            int value = stars != null && i < stars.Count ? Mathf.Max(0, stars[i]) : 0;
+            victoryStarsByTeam.Add(new TeamVictoryEntry { teamId = team, stars = value });
+        }
+
+        NormalizeVictoryStars();
     }
 
     public void RefreshIncomeFromConstructionsNow()
@@ -401,6 +552,8 @@ public class MatchController : MonoBehaviour
         TryAutoAssignCursorController();
         TryAutoAssignTurnStateManager();
         TryAutoAssignTurnTransitionReferences();
+        TryAutoAssignVictoryOverlayReferences();
+        TryRefreshVictoryOverlayFromConstructions(markDirtyInEditor: false);
         if (enableTotalWar)
             TryAutoAssignFogOfWarReferences();
         if (Application.isPlaying)
@@ -426,6 +579,12 @@ public class MatchController : MonoBehaviour
 #if UNITY_EDITOR
     private void OnValidate()
     {
+        if (Application.isPlaying)
+        {
+            SyncThreatRevisionFlags();
+            return;
+        }
+
         ApplyGameSetupPreset();
         SyncThreatRevisionFlags();
         NormalizeState();
@@ -433,12 +592,41 @@ public class MatchController : MonoBehaviour
         TryAutoAssignCursorController();
         TryAutoAssignTurnStateManager();
         TryAutoAssignTurnTransitionReferences();
+        TryAutoAssignVictoryOverlayReferences();
+        ScheduleVictoryOverlayRefreshInEditor();
         if (enableTotalWar)
             TryAutoAssignFogOfWarReferences();
         ApplyActiveTeamIfChanged(force: false);
         ApplyTeamFlipSettingsToSceneObjects();
     }
 #endif
+
+#if UNITY_EDITOR
+    private void ScheduleVictoryOverlayRefreshInEditor()
+    {
+        if (Application.isPlaying)
+            return;
+
+        if (pendingVictoryOverlayRefreshInEditor)
+            return;
+
+        pendingVictoryOverlayRefreshInEditor = true;
+        EditorApplication.delayCall += ExecuteDelayedVictoryOverlayRefreshInEditor;
+    }
+
+    private void ExecuteDelayedVictoryOverlayRefreshInEditor()
+    {
+        if (this == null)
+            return;
+
+        pendingVictoryOverlayRefreshInEditor = false;
+        if (Application.isPlaying)
+            return;
+
+        TryRefreshVictoryOverlayFromConstructions(markDirtyInEditor: true);
+    }
+#endif
+
 
     private void Update()
     {
@@ -449,11 +637,13 @@ public class MatchController : MonoBehaviour
             {
                 runtimeConstructionIncomeRefreshTimer = 0f;
                 TryRefreshIncomeFromConstructions(markDirtyInEditor: false);
+                TryRefreshVictoryOverlayFromConstructions(markDirtyInEditor: false);
             }
         }
         else if (continuousEditorRefresh)
         {
             TryRefreshIncomeFromConstructions(markDirtyInEditor: true);
+            ScheduleVictoryOverlayRefreshInEditor();
         }
 
         SyncThreatRevisionFlags();
@@ -532,6 +722,10 @@ public class MatchController : MonoBehaviour
     // Avanca para o proximo membro da lista. So incrementa currentTurn ao "fechar ciclo".
     public void AdvanceTurn()
     {
+        if (freezeTurnAdvanceAfterVictory && hasVictoryWinner)
+            return;
+        if (Application.isPlaying)
+            OnBeforeAdvanceTurn?.Invoke();
         if (players.Count == 0)
         {
             if (includeNeutralTeam && HasAnyNeutralUnitsInField())
@@ -540,7 +734,7 @@ public class MatchController : MonoBehaviour
                 pendingTurnStartEconomy = true;
                 SetNeutralActiveTeam();
             }
-            currentTurn = Mathf.Max(0, currentTurn + 1);
+            CloseRoundAndAdvanceToFirstPlayer();
             return;
         }
 
@@ -566,7 +760,7 @@ public class MatchController : MonoBehaviour
             }
 
             // Sem neutral: fecha ciclo de turno.
-            currentTurn = Mathf.Max(0, currentTurn + 1);
+            CloseRoundAndAdvanceToFirstPlayer();
             pendingTurnStartUpkeep = true;
             pendingTurnStartEconomy = true;
             SetActivePlayerByIndex(0, forceApply: true);
@@ -574,7 +768,7 @@ public class MatchController : MonoBehaviour
         }
 
         // Estavamos em neutral (ou fora da lista): fecha ciclo de turno e volta para o primeiro player.
-        currentTurn = Mathf.Max(0, currentTurn + 1);
+        CloseRoundAndAdvanceToFirstPlayer();
         pendingTurnStartUpkeep = true;
         pendingTurnStartEconomy = true;
         SetActivePlayerByIndex(0, forceApply: true);
@@ -619,7 +813,12 @@ public class MatchController : MonoBehaviour
         if (advanceTurnPostDelay > 0f)
             yield return new WaitForSeconds(advanceTurnPostDelay);
 
-        if (wasMusicPlaying && !wasPausedByUser && matchMusicAudioManager != null)
+        if (hasVictoryWinner && matchMusicAudioManager != null)
+        {
+            matchMusicAudioManager.StopForTurnTransition();
+            matchMusicAudioManager.EndTurnTransition();
+        }
+        else if (wasMusicPlaying && !wasPausedByUser && matchMusicAudioManager != null)
         {
             if (usePauseResume)
                 matchMusicAudioManager.ResumeAfterTurnTransition();
@@ -634,12 +833,79 @@ public class MatchController : MonoBehaviour
         advanceTurnTransitionRoutine = null;
     }
 
+    private void CloseRoundAndAdvanceToFirstPlayer()
+    {
+        currentTurn = Mathf.Max(0, currentTurn + 1);
+    }
+
+    private void EvaluateVictoryStarsAtTurnStartForActiveTeam()
+    {
+        if (!enableVictoryStars)
+            return;
+        if (hasVictoryWinner)
+            return;
+        if (players == null || players.Count <= 0 || activeTeamId < 0)
+            return;
+
+        NormalizeVictoryStars();
+        if (victoryStarsByTeam == null || victoryStarsByTeam.Count <= 0)
+            return;
+
+        TeamId activeTeam = ClampToTeamId(activeTeamId);
+        if (activeTeam == TeamId.Neutral)
+            return;
+        if (FindPlayerIndexByTeam(activeTeam) < 0)
+            return;
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        int totalVictoryBuildings = 0;
+        int activeTeamControlledVictoryBuildings = 0;
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if (!construction.IsVictoryBuilding)
+                continue;
+
+            totalVictoryBuildings++;
+            if (construction.TeamId == activeTeam)
+                activeTeamControlledVictoryBuildings++;
+        }
+
+        if (totalVictoryBuildings <= 0)
+            return;
+
+        int majorityThreshold = (totalVictoryBuildings / 2) + 1;
+        if (activeTeamControlledVictoryBuildings < majorityThreshold)
+            return;
+
+        int winnerEntryIndex = FindVictoryEntryIndex(activeTeam);
+        if (winnerEntryIndex < 0)
+            return;
+
+        TeamVictoryEntry winnerEntry = victoryStarsByTeam[winnerEntryIndex];
+        winnerEntry.stars = Mathf.Max(0, winnerEntry.stars + 1);
+        victoryStarsByTeam[winnerEntryIndex] = winnerEntry;
+
+        int goal = ClampVictoryStarsGoal(victoryStarsToWin);
+        Debug.Log($"[VictoryStars] +1 estrela para {TeamUtils.GetName(activeTeam)} ({winnerEntry.stars}/{goal}) | dominio {activeTeamControlledVictoryBuildings}/{totalVictoryBuildings}.");
+        if (winnerEntry.stars < goal)
+            return;
+
+        hasVictoryWinner = true;
+        victoryWinnerTeam = activeTeam;
+        HandleVictoryAestheticPresentation(activeTeam, goal);
+    }
+
     private void NormalizeState()
     {
+        debugFogOfWarEnabled = fogOfWar;
         currentTurn = Mathf.Max(0, currentTurn);
         activeTeamId = Mathf.Clamp(activeTeamId, -1, 3);
         maxUnitsPerTeam = Mathf.Max(1, maxUnitsPerTeam);
         NormalizePlayersList();
+        NormalizeVictoryStars();
         RecalculateIncomePerTurnForAllPlayers();
         SyncActivePlayerIndexFromActiveTeam();
 
@@ -742,6 +1008,89 @@ public class MatchController : MonoBehaviour
         }
     }
 
+    private void NormalizeVictoryStars()
+    {
+        if (victoryStarsByTeam == null)
+            victoryStarsByTeam = new List<TeamVictoryEntry>();
+
+        victoryStarsToWin = ClampVictoryStarsGoal(victoryStarsToWin);
+
+        for (int i = victoryStarsByTeam.Count - 1; i >= 0; i--)
+        {
+            TeamVictoryEntry entry = victoryStarsByTeam[i];
+            if (entry.teamId == TeamId.Neutral || FindPlayerIndexByTeam(entry.teamId) < 0)
+            {
+                victoryStarsByTeam.RemoveAt(i);
+                continue;
+            }
+
+            entry.stars = Mathf.Max(0, entry.stars);
+            victoryStarsByTeam[i] = entry;
+        }
+
+        if (players != null)
+        {
+            for (int i = 0; i < players.Count; i++)
+            {
+                TeamId team = players[i].teamId;
+                if (team == TeamId.Neutral)
+                    continue;
+                if (FindVictoryEntryIndex(team) >= 0)
+                    continue;
+
+                victoryStarsByTeam.Add(new TeamVictoryEntry
+                {
+                    teamId = team,
+                    stars = 0
+                });
+            }
+        }
+
+        if (hasVictoryWinner)
+        {
+            if (victoryWinnerTeam == TeamId.Neutral || FindPlayerIndexByTeam(victoryWinnerTeam) < 0)
+            {
+                hasVictoryWinner = false;
+                victoryWinnerTeam = TeamId.Neutral;
+            }
+        }
+    }
+
+    private int FindVictoryEntryIndex(TeamId team)
+    {
+        if (victoryStarsByTeam == null)
+            return -1;
+
+        for (int i = 0; i < victoryStarsByTeam.Count; i++)
+        {
+            if (victoryStarsByTeam[i].teamId == team)
+                return i;
+        }
+
+        return -1;
+    }
+
+    private static int ClampVictoryStarsGoal(int value)
+    {
+        return Mathf.Clamp(value, 1, MaxVictoryStarsGoal);
+    }
+
+    private void HandleVictoryAestheticPresentation(TeamId winnerTeam, int goal)
+    {
+        string winnerLabel = TeamUtils.GetName(winnerTeam);
+        Debug.Log($"[VictoryStars] Vitoria de {winnerLabel}: meta de {goal} estrela(s) atingida.");
+
+        TryAutoAssignTurnTransitionReferences();
+        if (matchMusicAudioManager != null)
+        {
+            matchMusicAudioManager.StopForTurnTransition();
+            matchMusicAudioManager.EndTurnTransition();
+        }
+
+        string winnerUpper = (winnerLabel ?? string.Empty).ToUpperInvariant();
+        PanelDialogController.TrySetTransientText($"VENCEDOR: TEAM {winnerUpper}", 4.2f);
+    }
+
     private void SyncActivePlayerIndexFromActiveTeam()
     {
         if (players == null || players.Count == 0 || activeTeamId == (int)TeamId.Neutral)
@@ -837,6 +1186,7 @@ public class MatchController : MonoBehaviour
         if (activeTeamId < 0 && !includeNeutralTeam)
             return;
 
+        EvaluateVictoryStarsAtTurnStartForActiveTeam();
         ApplyEconomyAtTurnStartForActiveTeam();
 
         List<TurnStateManager.TurnStartAutonomyUpkeepEntry> turnStartAutonomyEntries = null;
@@ -1094,6 +1444,159 @@ public class MatchController : MonoBehaviour
             fogOfWarDpqAirHeightConfig = ResolveFogDpqAirHeightConfig();
     }
 
+    private void TryAutoAssignVictoryOverlayReferences()
+    {
+        if (victoryOverlayTilemap != null)
+            return;
+
+        victoryOverlayTilemap = FindTilemapByName("VictoryOverlay")
+            ?? FindTilemapByName("Victory")
+            ?? FindTilemapByName("TileMapVictory");
+    }
+
+    private void TryRefreshVictoryOverlayFromConstructions(bool markDirtyInEditor)
+    {
+        int settingsSignature = BuildVictoryOverlaySettingsSignature();
+
+        if (lastVictoryOverlayTilemap != null && lastVictoryOverlayTilemap != victoryOverlayTilemap)
+            ClearVictoryOverlayOnTilemap(lastVictoryOverlayTilemap, markDirtyInEditor);
+        lastVictoryOverlayTilemap = victoryOverlayTilemap;
+
+        if (!showVictoryOverlay || victoryOverlayTilemap == null || victoryOverlayTile == null)
+        {
+            if (victoryOverlayActiveCells.Count > 0)
+                ClearVictoryOverlay(markDirtyInEditor);
+            cachedVictoryOverlaySignature = 0;
+            cachedVictoryOverlayCount = 0;
+            cachedVictoryOverlaySettingsSignature = settingsSignature;
+            return;
+        }
+
+        ComputeVictoryOverlaySignature(out int signature, out int count);
+        if (settingsSignature == cachedVictoryOverlaySettingsSignature &&
+            signature == cachedVictoryOverlaySignature &&
+            count == cachedVictoryOverlayCount)
+        {
+            return;
+        }
+
+        cachedVictoryOverlaySignature = signature;
+        cachedVictoryOverlayCount = count;
+        cachedVictoryOverlaySettingsSignature = settingsSignature;
+        ApplyVictoryOverlayFromConstructions(markDirtyInEditor);
+    }
+
+    private int BuildVictoryOverlaySettingsSignature()
+    {
+        unchecked
+        {
+            int signature = 17;
+            signature = (signature * 31) + (showVictoryOverlay ? 1 : 0);
+            signature = (signature * 31) + (victoryOverlayTilemap != null ? victoryOverlayTilemap.GetInstanceID() : 0);
+            signature = (signature * 31) + (victoryOverlayTile != null ? victoryOverlayTile.GetInstanceID() : 0);
+            signature = (signature * 31) + Mathf.RoundToInt(Mathf.Clamp01(victoryOverlayAlpha) * 1000f);
+            return signature;
+        }
+    }
+
+    private void ComputeVictoryOverlaySignature(out int signature, out int count)
+    {
+        signature = 17;
+        count = 0;
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy || !construction.IsVictoryBuilding)
+                continue;
+
+            Vector3Int cell = construction.CurrentCellPosition;
+            cell.z = 0;
+
+            unchecked
+            {
+                signature = (signature * 31) + construction.InstanceId;
+                signature = (signature * 31) + cell.x;
+                signature = (signature * 31) + cell.y;
+            }
+            count++;
+        }
+    }
+
+    private void ApplyVictoryOverlayFromConstructions(bool markDirtyInEditor)
+    {
+        if (victoryOverlayTilemap == null)
+            return;
+
+        HashSet<Vector3Int> desired = new HashSet<Vector3Int>();
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy || !construction.IsVictoryBuilding)
+                continue;
+
+            Vector3Int cell = construction.CurrentCellPosition;
+            cell.z = 0;
+            desired.Add(cell);
+        }
+
+        foreach (Vector3Int cell in victoryOverlayActiveCells)
+        {
+            if (desired.Contains(cell))
+                continue;
+
+            victoryOverlayTilemap.SetTile(cell, null);
+            victoryOverlayTilemap.SetTileFlags(cell, TileFlags.None);
+            victoryOverlayTilemap.SetColor(cell, Color.white);
+        }
+
+        Color overlayColor = Color.white;
+        overlayColor.a = Mathf.Clamp01(victoryOverlayAlpha);
+        foreach (Vector3Int cell in desired)
+        {
+            victoryOverlayTilemap.SetTile(cell, victoryOverlayTile);
+            victoryOverlayTilemap.SetTileFlags(cell, TileFlags.None);
+            victoryOverlayTilemap.SetColor(cell, overlayColor);
+        }
+
+        victoryOverlayActiveCells.Clear();
+        foreach (Vector3Int cell in desired)
+            victoryOverlayActiveCells.Add(cell);
+
+#if UNITY_EDITOR
+        if (markDirtyInEditor && !Application.isPlaying)
+            EditorUtility.SetDirty(victoryOverlayTilemap);
+#endif
+    }
+
+    private void ClearVictoryOverlay(bool markDirtyInEditor)
+    {
+        if (victoryOverlayTilemap == null)
+            return;
+
+        ClearVictoryOverlayOnTilemap(victoryOverlayTilemap, markDirtyInEditor);
+    }
+
+    private void ClearVictoryOverlayOnTilemap(Tilemap targetTilemap, bool markDirtyInEditor)
+    {
+        if (targetTilemap == null)
+            return;
+
+        foreach (Vector3Int cell in victoryOverlayActiveCells)
+        {
+            targetTilemap.SetTile(cell, null);
+            targetTilemap.SetTileFlags(cell, TileFlags.None);
+            targetTilemap.SetColor(cell, Color.white);
+        }
+
+        victoryOverlayActiveCells.Clear();
+#if UNITY_EDITOR
+        if (markDirtyInEditor && !Application.isPlaying)
+            EditorUtility.SetDirty(targetTilemap);
+#endif
+    }
+
     private static Tilemap FindTilemapByName(string targetName)
     {
         if (string.IsNullOrWhiteSpace(targetName))
@@ -1132,7 +1635,7 @@ public class MatchController : MonoBehaviour
         if (boardMap == null)
             return;
 
-        if (enableFogSourceDebugLogs)
+        if (ShouldLogPodeEnxergarRuntime)
         {
             Debug.Log(
                 $"[FoW][Context] activeTeam={activeTeamId} " +
@@ -1163,19 +1666,19 @@ public class MatchController : MonoBehaviour
             UnitManager unit = units[i];
             if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
             {
-                if (enableFogSourceDebugLogs && unit != null)
+                if (ShouldLogPodeEnxergarRuntime && unit != null)
                     Debug.Log($"[FoW][Unit][Skip] {unit.name} reason=inactive_or_embarked");
                 continue;
             }
             if ((int)unit.TeamId != activeTeamId)
             {
-                if (enableFogSourceDebugLogs)
+                if (ShouldLogPodeEnxergarRuntime)
                     Debug.Log($"[FoW][Unit][Skip] {unit.name} reason=other_team team={(int)unit.TeamId}");
                 continue;
             }
             if (!IsUnitOnBoard(unit, boardMap))
             {
-                if (enableFogSourceDebugLogs)
+                if (ShouldLogPodeEnxergarRuntime)
                 {
                     string unitMap = unit.BoardTilemap != null ? unit.BoardTilemap.name : "-";
                     string unitScene = unit.gameObject.scene.name;
@@ -1188,7 +1691,7 @@ public class MatchController : MonoBehaviour
             }
 
             unitsIncluded++;
-            if (enableFogSourceDebugLogs)
+            if (ShouldLogPodeEnxergarRuntime)
             {
                 Debug.Log(
                     $"[FoW][Unit][Use] {unit.name} team={(int)unit.TeamId} " +
@@ -1211,7 +1714,7 @@ public class MatchController : MonoBehaviour
             }
         }
 
-        if (enableFogSourceDebugLogs)
+        if (ShouldLogPodeEnxergarRuntime)
             Debug.Log($"[FoW][Unit][Summary] total={units.Length} included={unitsIncluded}");
 
         double constructionVisionStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
@@ -1257,6 +1760,20 @@ public class MatchController : MonoBehaviour
         }
     }
 
+
+    public void RefreshFogOfWarForTeam(TeamId observerTeamId)
+    {
+        int previousActiveTeamId = activeTeamId;
+        try
+        {
+            activeTeamId = Mathf.Clamp((int)observerTeamId, -1, 3);
+            RefreshFogOfWarForActiveTeam();
+        }
+        finally
+        {
+            activeTeamId = previousActiveTeamId;
+        }
+    }
     public void NotifyUnitReachedHasAct(UnitManager unit)
     {
         if (!Application.isPlaying)
@@ -1336,7 +1853,8 @@ public class MatchController : MonoBehaviour
             TryRefreshDetectedPersistenceForActedUnit(unit, boardMap, allowWithoutHasAct: true);
         }
 
-        Debug.Log($"[AindaMeVe][TurnStart] team={activeTeamId} scannedStealthUnits={scannedStealthUnits}");
+        if (ShouldLogAindaMeVeRuntime)
+            Debug.Log($"[AindaMeVe][TurnStart] team={activeTeamId} scannedStealthUnits={scannedStealthUnits}");
     }
 
     private void TryPlaySkillDetectionSfxForActedUnit(
@@ -1376,20 +1894,23 @@ public class MatchController : MonoBehaviour
             enableStealthValidation);
 
         int observerTeamId = (int)observer.TeamId;
-        Debug.Log(
-            $"[PodeDetectar][Runtime] observer={observer.name} team={observerTeamId} " +
-            $"detectedStealth={detectedStealth.Count} undetectedStealth={undetectedStealth.Count} " +
-            $"spotted={spottedCandidates.Count} blockedLos={blockedByLos.Count}");
-        for (int i = 0; i < detectedStealth.Count; i++)
+        if (ShouldLogPodeDetectarRuntime)
         {
-            PodeDetectarOption option = detectedStealth[i];
-            if (option == null || option.targetUnit == null)
-                continue;
-
-            string reason = string.IsNullOrWhiteSpace(option.reason) ? "-" : option.reason;
             Debug.Log(
-                $"[PodeDetectar][Runtime][Detected] observer={observer.name} -> target={option.targetUnit.name} " +
-                $"layer={option.targetDomain}/{option.targetHeightLevel} reason={reason}");
+                $"[PodeDetectar][Runtime] observer={observer.name} team={observerTeamId} " +
+                $"detectedStealth={detectedStealth.Count} undetectedStealth={undetectedStealth.Count} " +
+                $"spotted={spottedCandidates.Count} blockedLos={blockedByLos.Count}");
+            for (int i = 0; i < detectedStealth.Count; i++)
+            {
+                PodeDetectarOption option = detectedStealth[i];
+                if (option == null || option.targetUnit == null)
+                    continue;
+
+                string reason = string.IsNullOrWhiteSpace(option.reason) ? "-" : option.reason;
+                Debug.Log(
+                    $"[PodeDetectar][Runtime][Detected] observer={observer.name} -> target={option.targetUnit.name} " +
+                    $"layer={option.targetDomain}/{option.targetHeightLevel} reason={reason}");
+            }
         }
 
         bool appliedReveal = false;
@@ -1493,7 +2014,8 @@ public class MatchController : MonoBehaviour
         RefreshRuntimeUnitFogVisibility();
 
         initialStealthDetectionBootstrapped = true;
-        Debug.Log($"[Sensors][Bootstrap] unitsProcessed={observersProcessed}");
+        if (ShouldLogPodeDetectarRuntime || ShouldLogAindaMeVeRuntime)
+            Debug.Log($"[Sensors][Bootstrap] unitsProcessed={observersProcessed}");
     }
 
     private void RegisterStealthRevealFromDetection(UnitManager observer, UnitManager target)
@@ -1642,9 +2164,12 @@ public class MatchController : MonoBehaviour
         string teamsObservedLabel = observerTeamIds.Count > 0
             ? string.Join(",", observerTeamIds)
             : "-";
-        Debug.Log(
-            $"[AindaMeVe][Runtime] target={actedUnit.name} team={(int)actedUnit.TeamId} " +
-            $"hadRevealBefore={hadRevealBefore} observedNow={isObservedNow} observerRadius={observerRadius} observerTeams={teamsObservedLabel}");
+        if (ShouldLogAindaMeVeRuntime)
+        {
+            Debug.Log(
+                $"[AindaMeVe][Runtime] target={actedUnit.name} team={(int)actedUnit.TeamId} " +
+                $"hadRevealBefore={hadRevealBefore} observedNow={isObservedNow} observerRadius={observerRadius} observerTeams={teamsObservedLabel}");
+        }
         if (isObservedNow)
         {
             bool observedTeamsChanged = actedUnit.SyncCurrentlyObservedByTeams(observerTeamIds);
@@ -1663,7 +2188,8 @@ public class MatchController : MonoBehaviour
             actedUnit.ClearStealthRevealState();
             actedUnit.RefreshRuntimeVisualState();
             RefreshRuntimeUnitFogVisibility();
-            Debug.Log($"[AindaMeVe][Runtime][Clear] target={actedUnit.name} -> nenhum inimigo detectando.");
+            if (ShouldLogAindaMeVeRuntime)
+                Debug.Log($"[AindaMeVe][Runtime][Clear] target={actedUnit.name} -> nenhum inimigo detectando.");
             return;
         }
 
@@ -2053,6 +2579,9 @@ public class MatchController : MonoBehaviour
 
         const string expectedLayer = "SFX";
         string currentLayer = SortingLayer.IDToName(renderer.sortingLayerID);
+        if (!enableFogValidationLogs)
+            return;
+
         if (!string.Equals(currentLayer, expectedLayer, StringComparison.OrdinalIgnoreCase))
             Debug.LogWarning($"[FogOfWar] Sorting layer atual = {currentLayer}. Esperado = {expectedLayer}.");
         else
@@ -2323,7 +2852,7 @@ public class MatchController : MonoBehaviour
                 continue;
             if ((int)construction.TeamId != activeTeamId)
             {
-                if (enableFogSourceDebugLogs)
+                if (ShouldLogPodeEnxergarRuntime)
                     Debug.Log($"[FoW][Construction][Skip] {construction?.name} reason=other_team team={(int)construction.TeamId}");
                 continue;
             }
@@ -2339,7 +2868,7 @@ public class MatchController : MonoBehaviour
 
             if (constructionMap == null || constructionMap != boardMap)
             {
-                if (enableFogSourceDebugLogs)
+                if (ShouldLogPodeEnxergarRuntime)
                 {
                     string cMap = constructionMap != null ? constructionMap.name : "-";
                     Debug.Log(
@@ -2350,7 +2879,7 @@ public class MatchController : MonoBehaviour
             }
             if (construction.gameObject.scene != boardMap.gameObject.scene)
             {
-                if (enableFogSourceDebugLogs)
+                if (ShouldLogPodeEnxergarRuntime)
                 {
                     Debug.Log(
                         $"[FoW][Construction][Skip] {construction.name} reason=other_scene " +
@@ -2365,16 +2894,19 @@ public class MatchController : MonoBehaviour
                 continue;
 
             constructionsIncluded++;
-            if (enableFogSourceDebugLogs)
+            if (ShouldLogPodeEnxergarRuntime)
                 Debug.Log($"[FoW][Construction][Use] {construction.name} cell={cell.x},{cell.y}");
             ApplyFogContribution(cell, +1, boardMap);
         }
 
-        Debug.Log(
-            $"[FoW][Construction][Temp] allActive={constructions.Count} " +
-            $"activeTeamCandidates={activeTeamCandidates} included={constructionsIncluded} activeTeam={activeTeamId}");
+        if (ShouldLogPodeEnxergarRuntime)
+        {
+            Debug.Log(
+                $"[FoW][Construction][Temp] allActive={constructions.Count} " +
+                $"activeTeamCandidates={activeTeamCandidates} included={constructionsIncluded} activeTeam={activeTeamId}");
+        }
 
-        if (enableFogSourceDebugLogs)
+        if (ShouldLogPodeEnxergarRuntime)
             Debug.Log($"[FoW][Construction][Summary] total={constructions.Count} included={constructionsIncluded}");
 
         return constructionsIncluded;
@@ -2469,6 +3001,7 @@ public class MatchController : MonoBehaviour
             return;
 
         debugFogOfWarEnabled = enabled;
+        fogOfWar = enabled;
         if (!enabled)
         {
             ResetFogOfWarRuntime(clearTilemap: true);
@@ -2777,3 +3310,10 @@ public class MatchController : MonoBehaviour
         return false;
     }
 }
+
+
+
+
+
+
+

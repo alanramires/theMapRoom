@@ -56,6 +56,8 @@ public partial class TurnStateManager
         if (TryCancelPendingTransferPrompt())
             return ActionSfx.Cancel;
 
+        DiscardPendingCombatCinematicTrack();
+
         if (TryCancelPendingCommandServiceConfirmation())
             return ActionSfx.Cancel;
         if (HandleScannerPromptCancel())
@@ -129,6 +131,7 @@ public partial class TurnStateManager
             if (!string.IsNullOrWhiteSpace(takeoffInfo))
                 Debug.Log($"[Pode Decolar] {takeoffInfo}");
 
+            RecordCinematicConfirm(cursorCell);
             SetSelectedUnit(unit);
             ClearInspectedHelper();
             SetCursorState(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
@@ -661,3 +664,4 @@ public partial class TurnStateManager
         return ActionSfx.Cancel;
     }
 }
+

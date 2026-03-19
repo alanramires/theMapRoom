@@ -460,6 +460,8 @@ public partial class TurnStateManager
         Dictionary<SupplyData, int> supplyStepsByType = BuildMergeSupplyStepTotals(receiver, participants);
         int missingSupplySlots = ApplyMergedSupplyAmountsToBaseUnit(receiver, supplyStepsByType, resultHp);
 
+        List<UnitManager> consumedParticipants = new List<UnitManager>(participants.Count);
+
         float mergeStepDuration = GetMergeMoveStepDuration();
         float cursorHopDelay = GetMergeCursorHopDelay();
         float afterParticipantMoveDelay = GetMergeAfterParticipantMoveDelay();
@@ -533,6 +535,7 @@ public partial class TurnStateManager
             participant.ClearTemporarySortingOrder();
             cursorController?.PlayLoadSfx();
             KillEntireEmbarkedChain(participant, detachSelf: true);
+            consumedParticipants.Add(participant);
 
             if (afterParticipantLoadDelay > 0f)
                 yield return new WaitForSeconds(afterParticipantLoadDelay);
@@ -546,6 +549,8 @@ public partial class TurnStateManager
             Debug.Log($"[Fusao] Aviso: {missingWeaponSlots} tipo(s) de arma sem slot na unidade resultante.");
         if (missingSupplySlots > 0)
             Debug.Log($"[Fusao] Aviso: {missingSupplySlots} tipo(s) de suprimento sem slot na unidade resultante.");
+
+        RecordMergeReplayCommand(receiver, consumedParticipants);
 
         receiver.MarkAsActed();
         cursorController?.PlayDoneSfx();
@@ -1796,3 +1801,5 @@ public partial class TurnStateManager
         return supplyStepsByType.Count;
     }
 }
+
+

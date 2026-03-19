@@ -714,6 +714,7 @@ MonoBehaviour:
   autoApplyOnStart: 1
   siteRuntime:
     isPlayerHeadQuarter: 1
+    isVictoryBuilding: 0
     isCapturable: 1
     capturePointsMax: 40
     capturedIncoming: 3000
@@ -745,6 +746,12 @@ MonoBehaviour:
   occupiedByReadyUnitDarkenFactor: 0.4
   hudController: {fileID: 1370441032517419065}
   matchController: {fileID: 0}
+  victoryBuildingOverlayRenderer: {fileID: 0}
+  victoryBuildingOverlaySprite: {fileID: 0}
+  victoryBuildingOverlayColor: {r: 1, g: 0.84, b: 0.22, a: 1}
+  victoryBuildingOverlayLocalPosition: {x: 0, y: 0, z: -0.01}
+  victoryBuildingOverlayLocalScale: {x: 1, y: 1, z: 1}
+  victoryBuildingOverlaySortingOrderOffset: 6
   continuousEditorVisualRefresh: 0
 --- !u!1 &8405094446092215197
 GameObject:

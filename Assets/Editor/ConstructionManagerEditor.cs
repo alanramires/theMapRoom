@@ -81,6 +81,7 @@ public class ConstructionManagerEditor : Editor
 
         EditorGUILayout.PropertyField(currentPositionProp, new GUIContent("Current Position"));
         EditorGUILayout.PropertyField(constructionDisplayNameProp, new GUIContent("Construction Display Name"));
+        DrawGlobalVictoryFallbackToggle();
 
         DrawCaptureEditorBlock();
 
@@ -129,6 +130,26 @@ public class ConstructionManagerEditor : Editor
             construction.SnapToCellCenter();
         if (GUILayout.Button("Pull Cell From Transform"))
             construction.PullCellFromTransform();
+    }
+
+    private void DrawGlobalVictoryFallbackToggle()
+    {
+        ConstructionManager construction = target as ConstructionManager;
+        if (construction == null)
+            return;
+
+        EditorGUILayout.Space(3f);
+        EditorGUILayout.LabelField("Victory (Fallback)", EditorStyles.boldLabel);
+        bool current = construction.GetVictoryBuildingRuntimeFlag();
+        bool next = EditorGUILayout.Toggle("Is Victory Building", current);
+        if (next == current)
+            return;
+
+        Undo.RecordObject(construction, "Toggle Victory Building");
+        construction.SetVictoryBuildingRuntimeFlag(next);
+        if (hasSiteRuntimeOverrideProp != null)
+            hasSiteRuntimeOverrideProp.boolValue = true;
+        EditorUtility.SetDirty(construction);
     }
 
     private void DrawConstructionIdPopup()
@@ -219,6 +240,7 @@ public class ConstructionManagerEditor : Editor
 
         EditorGUI.indentLevel++;
         DrawIfExists(siteRuntime.FindPropertyRelative("isPlayerHeadQuarter"), "Is Player Head Quarter");
+        DrawVictoryBuildingToggle(runtimeOverrideProp);
 
         EditorGUILayout.Space(2f);
         EditorGUILayout.LabelField("Capture", EditorStyles.boldLabel);
@@ -243,6 +265,24 @@ public class ConstructionManagerEditor : Editor
         EditorGUILayout.LabelField("Services", EditorStyles.boldLabel);
         DrawIfExists(siteRuntime.FindPropertyRelative("offeredServices"), "Offered Services");
         EditorGUI.indentLevel--;
+    }
+
+    private void DrawVictoryBuildingToggle(SerializedProperty runtimeOverrideProp)
+    {
+        ConstructionManager construction = target as ConstructionManager;
+        if (construction == null)
+            return;
+
+        bool current = construction.GetVictoryBuildingRuntimeFlag();
+        bool next = EditorGUILayout.Toggle("Is Victory Building", current);
+        if (next == current)
+            return;
+
+        Undo.RecordObject(construction, "Toggle Victory Building");
+        construction.SetVictoryBuildingRuntimeFlag(next);
+        EditorUtility.SetDirty(construction);
+        if (runtimeOverrideProp != null)
+            runtimeOverrideProp.boolValue = true;
     }
 
     private void DrawOfferedUnitsQuickFill(SerializedProperty offeredUnitsProp, SerializedProperty runtimeOverrideProp)
