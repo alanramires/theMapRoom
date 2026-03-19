@@ -435,7 +435,7 @@ public partial class TurnStateManager
         {
             unit = selectedUnit;
         }
-        else if (cursorState == CursorState.Neutral && IsInspectedHelperActive())
+        else if ((cursorState == CursorState.Neutral || IsInspectingState()) && IsInspectedHelperActive())
         {
             unit = inspectedHelperUnit;
         }
@@ -497,7 +497,10 @@ public partial class TurnStateManager
 
     private bool TryBuildConstructionStatsHelperPanelData(HelperPanelData data)
     {
-        if (data == null || cursorState != CursorState.Neutral || !IsInspectedHelperActive() || inspectedHelperConstruction == null)
+        bool canRenderInspectConstruction =
+            cursorState == CursorState.Neutral ||
+            cursorState == CursorState.InspectingBuilding;
+        if (data == null || !canRenderInspectConstruction || !IsInspectedHelperActive() || inspectedHelperConstruction == null)
             return false;
 
         ConstructionManager construction = inspectedHelperConstruction;
@@ -634,6 +637,15 @@ public partial class TurnStateManager
         inspectedHelperCursorCell = default;
     }
 
+    private void ExitInspectStateToNeutral()
+    {
+        ClearInspectedHelper();
+        if (cursorState == CursorState.InspectingUnit ||
+            cursorState == CursorState.InspectingBuilding ||
+            cursorState == CursorState.InspectingHotZone)
+            SetCursorState(CursorState.Neutral, "ExitInspectStateToNeutral", rollback: true);
+    }
+
     private void ApplyInspectedThreatOverlay(UnitManager unit)
     {
         ClearInspectedThreatOverlay();
@@ -729,6 +741,8 @@ public partial class TurnStateManager
         ClearEnemyThreatLayersOverlay();
         if (hadActiveSelection)
             scannerPromptStep = ScannerPromptStep.AwaitingAction;
+        if (cursorState == CursorState.InspectingHotZone)
+            SetCursorState(CursorState.Neutral, "TryCloseThreatLayerHotzone", rollback: true);
         return true;
     }
 
@@ -1365,13 +1379,13 @@ public partial class TurnStateManager
 
         if (cursorController != null && cursorController.CurrentCell != inspectedHelperCursorCell)
         {
-            ClearInspectedHelper();
+            ExitInspectStateToNeutral();
             return;
         }
 
         bool anyInput = WasAnyInputPressedThisFrame();
         if (anyInput)
-            ClearInspectedHelper();
+            ExitInspectStateToNeutral();
     }
 
     private void UpdateTurnStartAutonomyHelperAutoDismiss()
@@ -1507,8 +1521,8 @@ public partial class TurnStateManager
 
     private bool TryBuildCommandServiceHelperPanelData(HelperPanelData data)
     {
-        bool shouldShowEstimate = commandServiceConfirmationPending && commandServiceHelperServedTargets > 0;
-        bool shouldShowSummary = !commandServiceConfirmationPending &&
+        bool shouldShowEstimate = IsCommandServiceAwaitingConfirmation && commandServiceHelperServedTargets > 0;
+        bool shouldShowSummary = !IsCommandServiceAwaitingConfirmation &&
             Time.time <= commandServiceHelperVisibleUntil &&
             commandServiceHelperServedTargets > 0;
         if (data == null || (!shouldShowEstimate && !shouldShowSummary))

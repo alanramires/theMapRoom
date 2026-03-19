@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -10,8 +10,6 @@ public partial class TurnStateManager
         LogStateStep("HandleConfirm");
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
-        if (TryConfirmPendingDestroyUnitHotkeyConfirmation())
-            return ActionSfx.None;
         if (TryConfirmPendingTransferPrompt())
             return ActionSfx.Confirm;
 
@@ -19,6 +17,10 @@ public partial class TurnStateManager
         {
             case CursorState.Neutral:
                 return HandleConfirmWhileNeutral();
+            case CursorState.InspectingUnit:
+            case CursorState.InspectingBuilding:
+            case CursorState.InspectingHotZone:
+                return HandleConfirmWhileInspecting();
             case CursorState.UnitSelected:
                 return HandleConfirmWhileUnitSelected();
             case CursorState.MoveuAndando:
@@ -41,6 +43,10 @@ public partial class TurnStateManager
                 return HandleConfirmWhileShoppingAndServices();
             case CursorState.Suprindo:
                 return HandleConfirmWhileSuprindo();
+            case CursorState.CommandService:
+                return HandleConfirmWhileCommandService();
+            case CursorState.RemovingUnit:
+                return HandleConfirmWhileRemovingUnit();
         }
 
         return ActionSfx.None;
@@ -51,15 +57,10 @@ public partial class TurnStateManager
         LogStateStep("HandleCancel", rollback: true);
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
-        if (TryCancelPendingDestroyUnitHotkeyConfirmation())
-            return ActionSfx.Cancel;
         if (TryCancelPendingTransferPrompt())
             return ActionSfx.Cancel;
 
         DiscardPendingCombatCinematicTrack();
-
-        if (TryCancelPendingCommandServiceConfirmation())
-            return ActionSfx.Cancel;
         if (HandleScannerPromptCancel())
             return ActionSfx.Cancel;
 
@@ -67,6 +68,10 @@ public partial class TurnStateManager
         {
             case CursorState.Neutral:
                 return ActionSfx.None;
+            case CursorState.InspectingUnit:
+            case CursorState.InspectingBuilding:
+            case CursorState.InspectingHotZone:
+                return HandleCancelWhileInspecting();
             case CursorState.UnitSelected:
                 ClearSelectionAndReturnToNeutral();
                 return ActionSfx.Cancel;
@@ -90,6 +95,10 @@ public partial class TurnStateManager
                 return HandleCancelWhileShoppingAndServices();
             case CursorState.Suprindo:
                 return HandleCancelWhileSuprindo();
+            case CursorState.CommandService:
+                return HandleCancelWhileCommandService();
+            case CursorState.RemovingUnit:
+                return HandleCancelWhileRemovingUnit();
         }
 
         return ActionSfx.None;
@@ -98,8 +107,20 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileNeutral()
     {
         LogStateStep("HandleConfirmWhileNeutral");
-        if (TryConfirmPendingCommandServiceOrder())
-            return ActionSfx.Confirm;
+        return HandleConfirmFromNeutralLikeState();
+    }
+
+    private ActionSfx HandleConfirmWhileInspecting()
+    {
+        LogStateStep("HandleConfirmWhileInspecting");
+        ExitInspectStateToNeutral();
+        return HandleConfirmFromNeutralLikeState();
+    }
+
+    private ActionSfx HandleConfirmFromNeutralLikeState()
+    {
+        if (cursorState != CursorState.Neutral)
+            SetCursorState(CursorState.Neutral, "HandleConfirmFromNeutralLikeState: normalize");
 
         if (cursorController == null)
             return ActionSfx.None;
@@ -115,6 +136,7 @@ public partial class TurnStateManager
             {
                 LogEnemyUnitInspection(unit, activeTeam);
                 BeginInspectedHelper(unit);
+                SetCursorState(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: enemy inspect");
                 return ActionSfx.Confirm;
             }
 
@@ -122,6 +144,7 @@ public partial class TurnStateManager
             {
                 Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
                 BeginInspectedHelper(unit, paintThreatOverlay: false);
+                SetCursorState(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: acted ally inspect");
                 return ActionSfx.Confirm;
             }
 
@@ -131,7 +154,7 @@ public partial class TurnStateManager
             if (!string.IsNullOrWhiteSpace(takeoffInfo))
                 Debug.Log($"[Pode Decolar] {takeoffInfo}");
 
-            RecordCinematicConfirm(cursorCell);
+            replayManager?.EnsureCurrentUnitActionBuffer(unit, cursorCell);
             SetSelectedUnit(unit);
             ClearInspectedHelper();
             SetCursorState(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
@@ -146,6 +169,7 @@ public partial class TurnStateManager
         if (!isConstructionAlly)
         {
             BeginInspectedConstructionHelper(construction);
+            SetCursorState(CursorState.InspectingBuilding, "HandleConfirmFromNeutralLikeState: enemy construction inspect");
             return ActionSfx.Confirm;
         }
 
@@ -153,6 +177,7 @@ public partial class TurnStateManager
             return ActionSfx.Confirm;
 
         BeginInspectedConstructionHelper(construction);
+        SetCursorState(CursorState.InspectingBuilding, "HandleConfirmFromNeutralLikeState: ally construction inspect");
         return ActionSfx.Confirm;
     }
 
@@ -641,6 +666,47 @@ public partial class TurnStateManager
         return ActionSfx.Cancel;
     }
 
+    private ActionSfx HandleCancelWhileInspecting()
+    {
+        LogStateStep("HandleCancelWhileInspecting", rollback: true);
+        ExitInspectStateToNeutral();
+        return ActionSfx.Cancel;
+    }
+
+    private ActionSfx HandleConfirmWhileCommandService()
+    {
+        LogStateStep("HandleConfirmWhileCommandService");
+        if (IsCommandServiceExecutionRunning)
+            return ActionSfx.None;
+        return TryConfirmPendingCommandServiceOrder()
+            ? ActionSfx.Confirm
+            : ActionSfx.Error;
+    }
+
+    private ActionSfx HandleCancelWhileCommandService()
+    {
+        LogStateStep("HandleCancelWhileCommandService", rollback: true);
+        if (IsCommandServiceExecutionRunning)
+            return ActionSfx.None;
+        ExitCommandServiceStateToNeutral();
+        return ActionSfx.Cancel;
+    }
+
+    private ActionSfx HandleConfirmWhileRemovingUnit()
+    {
+        LogStateStep("HandleConfirmWhileRemovingUnit");
+        return TryConfirmRemovingUnit()
+            ? ActionSfx.Confirm
+            : ActionSfx.Error;
+    }
+
+    private ActionSfx HandleCancelWhileRemovingUnit()
+    {
+        LogStateStep("HandleCancelWhileRemovingUnit", rollback: true);
+        ExitRemovingUnitStateToNeutral(logCanceled: true);
+        return ActionSfx.Cancel;
+    }
+
     private ActionSfx HandleConfirmWhileSuprindo()
     {
         LogStateStep("HandleConfirmWhileSuprindo");
@@ -664,4 +730,5 @@ public partial class TurnStateManager
         return ActionSfx.Cancel;
     }
 }
+
 

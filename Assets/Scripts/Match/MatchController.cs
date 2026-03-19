@@ -217,6 +217,7 @@ public class MatchController : MonoBehaviour
     public bool EnableSpotter => enableSpotter;
     public bool EnableStealthValidation => enableStealthValidation;
     public bool EnableTotalWar => enableTotalWar;
+    public bool EnableSensorsRuntimeLogs => enableSensorsRuntimeLogs;
     public bool IsFogOfWarDebugEnabled => debugFogOfWarEnabled;
     public int MaxUnitsPerTeam => Mathf.Max(1, maxUnitsPerTeam);
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;

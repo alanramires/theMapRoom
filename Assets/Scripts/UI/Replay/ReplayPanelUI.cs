@@ -17,6 +17,7 @@ public class ReplayPanelUI : MonoBehaviour
     [SerializeField] private TMP_Text observerText;
     [SerializeField] private TMP_Text visionModeText;
     [SerializeField] private TMP_Text stepText;
+    [SerializeField] private TMP_Text startConfigText;
 
     [Header("Buttons")]
     [SerializeField] private Button startButton;
@@ -31,6 +32,21 @@ public class ReplayPanelUI : MonoBehaviour
 
     [SerializeField] private bool isOpen;
     [SerializeField] private bool replaySessionArmed;
+
+    [Header("Start Selection")]
+    [SerializeField] private ReplayStartMode replayStartMode = ReplayStartMode.FromCurrentTop;
+    [SerializeField] [Range(-1, 3)] private int specificTeam = -1;
+    [SerializeField] [Min(0)] private int specificTurn = 0;
+
+    [Header("View Selection")]
+    [SerializeField] [Range(-1, 3)] private int viewUnderSpecificTeam = -1;
+
+    private void OnValidate()
+    {
+        specificTeam = Mathf.Clamp(specificTeam, -1, 3);
+        viewUnderSpecificTeam = Mathf.Clamp(viewUnderSpecificTeam, -1, 3);
+        specificTurn = Mathf.Max(0, specificTurn);
+    }
 
     private void Awake()
     {
@@ -100,32 +116,90 @@ public class ReplayPanelUI : MonoBehaviour
             panelCanvasGroup.blocksRaycasts = open;
         }
 
-        if (open && replayManager != null)
-            replayManager.SetReplayVision(ReplayVisionMode.Omniscient, TeamId.Neutral);
+        if (open)
+            ApplyReplayViewSelection();
 
         RefreshLabels();
     }
 
     public void CycleObserverTeamPlaceholder()
     {
+        CycleViewUnderSpecificTeam();
+    }
+    public void CycleReplayStartMode()
+    {
+        int next = (int)replayStartMode + 1;
+        if (next > (int)ReplayStartMode.FromSpecificTurnTeam)
+            next = (int)ReplayStartMode.FromBeginning;
+        replayStartMode = (ReplayStartMode)next;
+        RefreshLabels();
+    }
+
+    public void CycleSpecificTeam()
+    {
+        specificTeam++;
+        if (specificTeam > 3)
+            specificTeam = -1;
+        RefreshLabels();
+    }
+
+    public void IncreaseSpecificTurn()
+    {
+        specificTurn = Mathf.Max(0, specificTurn + 1);
+        RefreshLabels();
+    }
+
+    public void DecreaseSpecificTurn()
+    {
+        specificTurn = Mathf.Max(0, specificTurn - 1);
+        RefreshLabels();
+    }
+
+    public void SetReplaySpecificSelection(int turn, int team)
+    {
+        specificTurn = Mathf.Max(0, turn);
+        specificTeam = Mathf.Clamp(team, -1, 3);
+        RefreshLabels();
+    }
+
+    public void CycleViewUnderSpecificTeam()
+    {
+        viewUnderSpecificTeam++;
+        if (viewUnderSpecificTeam > 3)
+            viewUnderSpecificTeam = -1;
+
+        ApplyReplayViewSelection();
+        RefreshLabels();
+    }
+
+    public void SetReplayViewUnderSpecificTeam(int team)
+    {
+        viewUnderSpecificTeam = Mathf.Clamp(team, -1, 3);
+        ApplyReplayViewSelection();
+        RefreshLabels();
+    }
+
+    private void ApplyReplayViewSelection()
+    {
         if (replayManager == null)
             return;
 
-        TeamId next = replayManager.ObserverTeam;
-        if (next < TeamId.Neutral || next >= TeamId.Yellow)
-            next = TeamId.Neutral;
-        else
-            next = (TeamId)((int)next + 1);
+        if (viewUnderSpecificTeam < 0)
+        {
+            replayManager.SetReplayVision(ReplayVisionMode.Omniscient, TeamId.Neutral);
+            return;
+        }
 
-        replayManager.SetReplayVision(replayManager.VisionMode, next);
-        RefreshLabels();
+        TeamId team = (TeamId)Mathf.Clamp(viewUnderSpecificTeam, 0, 3);
+        replayManager.SetReplayVision(ReplayVisionMode.TeamFiltered, team);
     }
 
     private void TryAutoAssignUiBindings()
     {
+        TMP_Text[] texts = GetComponentsInChildren<TMP_Text>(true);
+
         if (textReplay == null)
         {
-            TMP_Text[] texts = GetComponentsInChildren<TMP_Text>(true);
             for (int i = 0; i < texts.Length; i++)
             {
                 TMP_Text text = texts[i];
@@ -136,6 +210,23 @@ public class ReplayPanelUI : MonoBehaviour
                 if (name.Contains("text_replay") || name == "replay" || name.Contains("replay_status"))
                 {
                     textReplay = text;
+                    break;
+                }
+            }
+        }
+
+        if (startConfigText == null)
+        {
+            for (int i = 0; i < texts.Length; i++)
+            {
+                TMP_Text text = texts[i];
+                if (text == null || ReferenceEquals(text, textReplay))
+                    continue;
+
+                string name = text.name != null ? text.name.ToLowerInvariant() : string.Empty;
+                if (name.Contains("start_mode") || name.Contains("replay_start") || name.Contains("start_config"))
+                {
+                    startConfigText = text;
                     break;
                 }
             }
@@ -189,7 +280,35 @@ public class ReplayPanelUI : MonoBehaviour
         if (replayManager == null)
             return;
 
-        replayManager.StartReplay();
+        bool started = false;
+        ApplyReplayViewSelection();
+        TeamId specificTeamId = (TeamId)Mathf.Clamp(specificTeam, (int)TeamId.Neutral, (int)TeamId.Yellow);
+
+        switch (replayStartMode)
+        {
+            case ReplayStartMode.FromBeginning:
+                started = replayManager.StartReplayFromCurrentRecordBeginning(replayManager.VisionMode, replayManager.ObserverTeam)
+                          || replayManager.StartReplayFromBeginning(replayManager.VisionMode, replayManager.ObserverTeam);
+                break;
+            case ReplayStartMode.FromSpecificTurnTeam:
+                if (specificTeamId == TeamId.Neutral)
+                    started = replayManager.StartReplayFromTurn(specificTurn, replayManager.VisionMode, replayManager.ObserverTeam);
+                else
+                    started = replayManager.StartReplayFromTurnAndTeam(specificTurn, specificTeamId, replayManager.VisionMode, replayManager.ObserverTeam);
+                break;
+            case ReplayStartMode.FromCurrentTop:
+            default:
+                started = replayManager.StartReplayFromLatestSnapshot(replayManager.VisionMode, replayManager.ObserverTeam);
+                break;
+        }
+
+        if (!started)
+        {
+            replaySessionArmed = false;
+            RefreshLabels();
+            return;
+        }
+
         replaySessionArmed = replayManager.IsReplaying;
         replayManager.PausePlayback();
         RefreshLabels();
@@ -252,13 +371,17 @@ public class ReplayPanelUI : MonoBehaviour
             SetText(observerText, "Observador: -");
             SetText(visionModeText, "Visao: -");
             SetText(stepText, "Step: -");
-            ApplyButtonsState(false, false, false, false, false, false, false);
+            SetText(startConfigText, BuildReplayStartConfigLabel());
+            ApplyButtonsState(false, false, false, false, false, false, false, false);
             return;
         }
 
         ReplayTurnRecord record = replayManager.CurrentRecord;
-        int totalSteps = record != null && record.Steps != null ? record.Steps.Count : 0;
-        int executedSteps = Mathf.Clamp(replayManager.CurrentStepIndex + 1, 0, totalSteps);
+        int totalBatches = replayManager.CurrentReplayBatchCount;
+        int totalSnapshots = Mathf.Max(1, totalBatches + 1);
+        int currentSnapshotIndex = replayManager.IsReplaying
+            ? Mathf.Clamp(replayManager.CurrentStepIndex + 2, 1, totalSnapshots)
+            : totalSnapshots;
         int turnLabel = record != null ? record.TurnNumber : -1;
 
         string replayStateLabel;
@@ -276,29 +399,32 @@ public class ReplayPanelUI : MonoBehaviour
         SetText(turnText, turnLabel >= 0 ? $"Turno: {turnLabel}" : "Turno: -");
         SetText(observerText, $"Observador: {FormatObserverTeamLabel(replayManager.ObserverTeam)}");
         SetText(visionModeText, $"Visao: {FormatVisionModeLabel(replayManager.VisionMode, replayManager.ObserverTeam)}");
-        SetText(stepText, $"Step: {executedSteps}/{totalSteps}");
+        SetText(stepText, $"Step: {currentSnapshotIndex}/{totalSnapshots}");
+        SetText(startConfigText, BuildReplayStartConfigLabel());
 
-        bool hasAnyReplayData = totalSteps > 0 || (replayManager.MatchHistory != null && replayManager.MatchHistory.Count > 0);
+        bool hasReplayBatches = totalBatches > 0;
+        bool hasReplayHistory = replayManager.MatchHistory != null && replayManager.MatchHistory.Count > 0;
+        bool hasReplayData = hasReplayBatches || hasReplayHistory;
         bool isReplaying = replayManager.IsReplaying;
         bool isPlaying = replayManager.IsPlaying;
         bool gateOpen = replaySessionArmed;
         bool isBusy = replayManager.IsStepExecutionBusy;
         bool canStepBack = gateOpen && isReplaying && !isPlaying && !isBusy && replayManager.CurrentStepIndex >= 0;
-        bool canStepForward = gateOpen && isReplaying && !isPlaying && !isBusy && replayManager.CurrentStepIndex < totalSteps - 1;
+        bool canStepForward = gateOpen && isReplaying && !isPlaying && !isBusy && totalBatches > 0 && replayManager.CurrentStepIndex < totalBatches - 1;
 
-        ApplyButtonsState(hasAnyReplayData, gateOpen, isReplaying, isPlaying, canStepBack, canStepForward, isBusy);
+        ApplyButtonsState(hasReplayData, hasReplayBatches, gateOpen, isReplaying, isPlaying, canStepBack, canStepForward, isBusy);
     }
 
-    private void ApplyButtonsState(bool hasAnyReplayData, bool gateOpen, bool isReplaying, bool isPlaying, bool canStepBack, bool canStepForward, bool isBusy)
+    private void ApplyButtonsState(bool hasReplayData, bool hasReplayBatches, bool gateOpen, bool isReplaying, bool isPlaying, bool canStepBack, bool canStepForward, bool isBusy)
     {
         if (startButton != null)
-            startButton.interactable = hasAnyReplayData && !isReplaying;
+            startButton.interactable = hasReplayData && !isReplaying;
 
         if (playButton != null)
-            playButton.interactable = hasAnyReplayData && gateOpen && isReplaying && !isPlaying && !isBusy;
+            playButton.interactable = hasReplayBatches && gateOpen && isReplaying && !isPlaying && !isBusy;
 
         if (pauseButton != null)
-            pauseButton.interactable = isReplaying && isPlaying;
+            pauseButton.interactable = isReplaying && (isPlaying || isBusy);
 
         if (stepBackButton != null)
             stepBackButton.interactable = canStepBack;
@@ -310,6 +436,22 @@ public class ReplayPanelUI : MonoBehaviour
             stopButton.interactable = gateOpen && isReplaying;
     }
 
+    private string BuildReplayStartConfigLabel()
+    {
+        switch (replayStartMode)
+        {
+            case ReplayStartMode.FromBeginning:
+                return "Inicio: snapshot 0 (inicio do jogo/load)";
+            case ReplayStartMode.FromSpecificTurnTeam:
+                TeamId team = (TeamId)Mathf.Clamp(specificTeam, (int)TeamId.Neutral, (int)TeamId.Yellow);
+                string teamLabel = team == TeamId.Neutral
+                    ? "qualquer time"
+                    : $"Time {(int)team} ({TeamUtils.GetName(team)})";
+                return $"Inicio: especifico | {teamLabel} | Turno {Mathf.Max(0, specificTurn)}";
+            default:
+                return "Inicio: atual (ultimo snapshot da pilha)";
+        }
+    }
     private static void SetText(TMP_Text target, string value)
     {
         if (target != null)
@@ -319,7 +461,7 @@ public class ReplayPanelUI : MonoBehaviour
     private static string FormatObserverTeamLabel(TeamId teamId)
     {
         if (teamId == TeamId.Neutral)
-            return "Neutro";
+            return "Qualquer time";
 
         return $"Time {TeamUtils.GetName(teamId)}";
     }
@@ -327,15 +469,25 @@ public class ReplayPanelUI : MonoBehaviour
     private static string FormatVisionModeLabel(ReplayVisionMode mode, TeamId observerTeam)
     {
         if (mode == ReplayVisionMode.Omniscient)
-            return "Neutro";
+            return "Omnisciente";
 
         if (mode == ReplayVisionMode.TeamFiltered)
         {
             if (observerTeam == TeamId.Neutral)
-                return "Neutro";
+                return "Qualquer time";
             return $"Time {TeamUtils.GetName(observerTeam)}";
         }
 
         return mode.ToString();
     }
 }
+
+
+
+
+
+
+
+
+
+

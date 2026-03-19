@@ -637,7 +637,7 @@ public class CursorController : MonoBehaviour
         return null;
     }
 
-    private void TryAdjustCameraToCursor()
+    public void TryAdjustCameraToCursor()
     {
         if (cameraController == null)
             return;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 [Serializable]
@@ -132,6 +132,7 @@ public class ReplaySaveData
     public int selectedTurnIndex = -1;
     public int observerTeamId = (int)TeamId.Neutral;
     public int visionMode = (int)ReplayVisionMode.Omniscient;
+    public ActionStack actionStack = new ActionStack();
 }
 
 [Serializable]
@@ -142,12 +143,11 @@ public class ReplayTurnRecordSaveData
     public TurnStartSnapshot startSnapshot;
     public List<ReplayStepSaveData> steps = new List<ReplayStepSaveData>();
 }
-
 [Serializable]
 public class ReplayStepSaveData
 {
     public int stepIndex;
-    public int stepType = (int)ReplayStepType.Custom;
+    public int stepType;
     public string debugLabel;
     public string commandJson;
 }

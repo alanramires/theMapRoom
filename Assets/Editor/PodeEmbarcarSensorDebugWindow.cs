@@ -133,6 +133,8 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
 
     private void TryEmbarkSelectedOption()
     {
+        SyncEditorUnitRegistryForSensors();
+
         if (selectedOptionIndex < 0 || selectedOptionIndex >= options.Count)
         {
             statusMessage = "Opcao de embarque invalida.";
@@ -170,6 +172,8 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
 
     private void RunSimulation()
     {
+        SyncEditorUnitRegistryForSensors();
+
         options.Clear();
         invalidOptions.Clear();
         selectedOptionIndex = -1;
@@ -227,6 +231,26 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
 
             string transporterName = item.transporterUnit != null ? item.transporterUnit.name : "(nenhum)";
             Debug.Log($"[PodeEmbarcarSensorDebug][INVALIDO] {i + 1}. cell={item.evaluatedCell.x},{item.evaluatedCell.y} | transp={transporterName} | slot={item.transporterSlotIndex} | custo={item.enterCost} | movRest={item.remainingMovementBeforeEmbark} | motivo={item.reason}");
+        }
+    }
+
+    private static void SyncEditorUnitRegistryForSensors()
+    {
+        if (Application.isPlaying)
+            return;
+
+        UnitManager.AllActive.Clear();
+        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        if (units == null || units.Length == 0)
+            return;
+
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy)
+                continue;
+
+            UnitManager.AllActive.Add(unit);
         }
     }
 
@@ -312,26 +336,13 @@ public class PodeEmbarcarSensorDebugWindow : EditorWindow
         if (selectedPassenger == null)
             return 0;
 
-        int baseMove = Mathf.Max(0, selectedPassenger.GetMovementRange());
-        if (turnStateManager == null || turnStateManager.SelectedUnit != selectedPassenger)
-            return baseMove;
+        // Regra do tool: quando manual estiver OFF, usa o movimento da unidade.
+        int unitRemaining = Mathf.Max(0, selectedPassenger.RemainingMovementPoints);
+        if (unitRemaining > 0)
+            return unitRemaining;
 
-        TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
-        if (state == TurnStateManager.CursorState.MoveuParado)
-            return baseMove;
-
-        if (state != TurnStateManager.CursorState.MoveuAndando)
-            return baseMove;
-
-        if (!turnStateManager.TryGetCommittedMovementPath(out List<Vector3Int> path, out _, out _) || path == null || path.Count < 2)
-            return baseMove;
-
-        int spent = UnitMovementPathRules.CalculateAutonomyCostForPath(
-            map,
-            selectedPassenger,
-            path,
-            db);
-        return Mathf.Max(0, baseMove - Mathf.Max(0, spent));
+        // Fallback para cenarios de editor onde RemainingMovementPoints pode nao estar inicializado.
+        return Mathf.Max(0, selectedPassenger.GetMovementRange());
     }
 
     private Tilemap ResolveTilemap()

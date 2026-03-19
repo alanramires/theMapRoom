@@ -49,9 +49,15 @@ public partial class TurnStateManager
     private int commandServiceServedCacheTurn = int.MinValue;
     private int commandServiceServedCacheTeamId = int.MinValue;
     private int commandServicePreviewSelectedIndex = -1;
-    private bool commandServiceExecutionInProgress;
-    private bool commandServiceConfirmationPending;
+    private Coroutine commandServiceExecutionRoutine;
     public bool IsPlayerCursorLockedByCommandService => false;
+
+    private bool IsCommandServiceState => cursorState == CursorState.CommandService;
+    private bool IsCommandServiceExecutionRunning => commandServiceExecutionRoutine != null;
+    private bool IsCommandServiceAwaitingConfirmation =>
+        IsCommandServiceState &&
+        !IsCommandServiceExecutionRunning &&
+        commandServiceQueuedOrders.Count > 0;
 
     private void ProcessCommandServiceHotkeyInput()
     {
@@ -64,8 +70,12 @@ public partial class TurnStateManager
         if (!WasLetterPressedThisFrame('X'))
             return;
 
+        if (cursorState != CursorState.Neutral)
+            return;
+
         TryCloseThreatLayerHotzone();
-        TryPreviewCommandServiceOrder(out _, emitLogs: true);
+        if (TryPreviewCommandServiceOrder(out _, emitLogs: true))
+            SetCursorState(CursorState.CommandService, "ProcessCommandServiceHotkeyInput");
     }
 
     public bool TryStartCommandServiceOrder(out string message)
@@ -87,7 +97,8 @@ public partial class TurnStateManager
                 "command_service.executing",
                 "Servico do comando: executando"),
             2.2f);
-        StartCoroutine(ExecuteCommandServiceOrderSequence());
+        SetCursorState(CursorState.CommandService, "TryStartCommandServiceOrder");
+        commandServiceExecutionRoutine = StartCoroutine(ExecuteCommandServiceOrderSequence());
         return true;
     }
 
@@ -109,7 +120,6 @@ public partial class TurnStateManager
             estimate.targetLines,
             estimate.skippedUnitLines);
         ApplyCommandServicePreviewDimmedUnits(estimate.skippedUnits);
-        commandServiceConfirmationPending = true;
         PanelDialogController.TrySetExternalText(
             PanelDialogController.ResolveDialogMessage(
                 "command_service.confirm",
@@ -124,7 +134,7 @@ public partial class TurnStateManager
     private bool TryPrepareCommandServiceOrders(out string message, bool emitLogs)
     {
         message = string.Empty;
-        if (commandServiceExecutionInProgress ||
+        if (IsCommandServiceExecutionRunning ||
             IsMovementAnimationRunning() ||
             embarkExecutionInProgress ||
             landingExecutionInProgress ||
@@ -144,9 +154,9 @@ public partial class TurnStateManager
             return false;
         }
 
-        if (cursorState != CursorState.Neutral)
+        if (cursorState != CursorState.Neutral && cursorState != CursorState.CommandService)
         {
-            message = $"Servico do Comando (\"X\") exige cursor em Neutral (atual: {cursorState}).";
+            message = $"Servico do Comando (\"X\") exige cursor em Neutral/CommandService (atual: {cursorState}).";
             if (emitLogs)
                 Debug.Log(message);
             ClearPendingCommandServiceConfirmation();
@@ -222,8 +232,6 @@ public partial class TurnStateManager
     private IEnumerator ExecuteCommandServiceOrderSequence()
     {
         RefreshCommandServiceServedCacheScope();
-        commandServiceExecutionInProgress = true;
-        commandServiceConfirmationPending = false;
         ClearCommandServicePreviewDimmedUnits();
         PanelDialogController.ClearExternalText();
         ClearCommandServiceHelper();
@@ -393,7 +401,6 @@ public partial class TurnStateManager
                     if (!canAffordAnyServiceForTarget)
                     {
                         stopByEconomy = true;
-                        commandServiceExecutionInProgress = false;
                         commandServiceQueuedOrders.Clear();
                         commandServiceInvalidOrders.Clear();
                         cursorController?.PlayErrorSfx();
@@ -614,7 +621,6 @@ public partial class TurnStateManager
                     2.6f);
             }
             cursorController?.PlayLoadSfx();
-            commandServiceExecutionInProgress = false;
             SetCursorState(CursorState.Neutral, "ExecuteCommandServiceOrderSequence: no served targets");
             yield break;
         }
@@ -651,7 +657,6 @@ public partial class TurnStateManager
         }
             Debug.Log(BuildCommandServiceDetailedReportLog(detailedReport));
             cursorController?.PlayLoadSfx();
-            commandServiceExecutionInProgress = false;
             SetCursorState(CursorState.Neutral, "ExecuteCommandServiceOrderSequence: completed");
         }
         finally
@@ -660,19 +665,18 @@ public partial class TurnStateManager
                 RestoreTransporterHudVisibility(hiddenEmbarkedSuppliers);
             RefreshTransporterHudAfterCommandService(touchedSupplierUnits);
 
-            commandServiceExecutionInProgress = false;
-            commandServiceConfirmationPending = false;
             commandServiceQueuedOrders.Clear();
             commandServiceInvalidOrders.Clear();
             ClearCommandServicePreviewDimmedUnits();
             RestoreSupplyEmbarkedSelectionVisuals();
+            commandServiceExecutionRoutine = null;
             SetCursorState(CursorState.Neutral, "ExecuteCommandServiceOrderSequence: cleanup");
         }
     }
 
     private bool TryConfirmPendingCommandServiceOrder()
     {
-        if (!commandServiceConfirmationPending)
+        if (!IsCommandServiceAwaitingConfirmation)
             return false;
 
         if (commandServiceQueuedOrders.Count <= 0)
@@ -684,7 +688,6 @@ public partial class TurnStateManager
 
         string message = $"Servico do Comando (\"X\"): iniciando ordem com {commandServiceQueuedOrders.Count} unidade(s).";
         Debug.Log(message);
-        commandServiceConfirmationPending = false;
         ClearCommandServicePreviewDimmedUnits();
         PanelDialogController.ClearExternalText();
         ClearCommandServiceHelper();
@@ -693,22 +696,30 @@ public partial class TurnStateManager
                 "command_service.executing",
                 "Servico do comando: executando"),
             2.2f);
-        StartCoroutine(ExecuteCommandServiceOrderSequence());
+        replayManager?.RecordStandaloneAction(new PlayerAction
+        {
+            ActionType = PlayerActionType.CommandService,
+            TurnNumber = matchController != null ? matchController.CurrentTurn : 0,
+            ActingTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral,
+            CursorHex = cursorController != null ? cursorController.CurrentCell : Vector3Int.zero,
+            SensorAction = SensorActionType.CommandService,
+            Confirmed = true,
+            DebugLabel = "CommandService: confirm"
+        });
+        commandServiceExecutionRoutine = StartCoroutine(ExecuteCommandServiceOrderSequence());
         return true;
     }
 
-    private bool TryCancelPendingCommandServiceConfirmation()
+    private void ExitCommandServiceStateToNeutral()
     {
-        if (!commandServiceConfirmationPending)
-            return false;
-
+        if (!IsCommandServiceState)
+            return;
         ClearPendingCommandServiceConfirmation();
-        return true;
+        SetCursorState(CursorState.Neutral, "ExitCommandServiceStateToNeutral", rollback: true);
     }
 
     private void ClearPendingCommandServiceConfirmation()
     {
-        commandServiceConfirmationPending = false;
         commandServiceQueuedOrders.Clear();
         commandServiceInvalidOrders.Clear();
         ClearCommandServicePreviewDimmedUnits();
@@ -1096,7 +1107,7 @@ public partial class TurnStateManager
     private bool TryResolveCommandServicePreviewCursorMove(Vector3Int currentCell, Vector3Int inputDelta, out Vector3Int resolvedCell)
     {
         resolvedCell = currentCell;
-        if (!commandServiceConfirmationPending || commandServicePreviewEntries.Count <= 0)
+        if (!IsCommandServiceAwaitingConfirmation || commandServicePreviewEntries.Count <= 0)
             return false;
 
         int step = GetMirandoStepFromInput(inputDelta);
@@ -1261,7 +1272,7 @@ public partial class TurnStateManager
                 continue;
             }
 
-            // Fallback defensivo: garante que passageiros nao selecionados permaneçam ocultos.
+            // Fallback defensivo: garante que passageiros nao selecionados permaneÃ§am ocultos.
             passenger.EndEmbarkedVisualPreview();
             SetUnitSpriteRenderersVisible(passenger, false);
 

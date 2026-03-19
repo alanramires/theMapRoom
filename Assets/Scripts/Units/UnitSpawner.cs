@@ -210,7 +210,7 @@ public class UnitSpawner : MonoBehaviour
         return false;
     }
 
-    public GameObject Spawn(UnitData data, TeamId teamId, Vector3 position, Quaternion rotation)
+    public GameObject Spawn(UnitData data, TeamId teamId, Vector3 position, Quaternion rotation, bool enforceSpawnOccupancyRule = true)
     {
         TryAutoAssignBoardTilemap();
         TryAutoAssignMatchController();
@@ -238,7 +238,9 @@ public class UnitSpawner : MonoBehaviour
             manager.SetTeamId(teamId);
             manager.Setup(unitDatabase, data.id);
             if (boardTilemap != null)
-                manager.SetCurrentCellPosition(HexCoordinates.WorldToCell(boardTilemap, position));
+                manager.SetCurrentCellPosition(
+                    HexCoordinates.WorldToCell(boardTilemap, position),
+                    enforceFinalOccupancyRule: enforceSpawnOccupancyRule);
             else
                 manager.SetCurrentPosition(position);
             manager.Apply(data);

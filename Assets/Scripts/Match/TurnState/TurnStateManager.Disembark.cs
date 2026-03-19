@@ -113,6 +113,7 @@ public partial class TurnStateManager
         }
 
         cursorController?.PlayConfirmSfx();
+        replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Disembark, "DisembarkActionRequested");
         cursorStateBeforeDesembarcando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
         SetCursorState(CursorState.Desembarcando, "HandleDisembarkActionRequested");
         ClearCommittedPathVisual();

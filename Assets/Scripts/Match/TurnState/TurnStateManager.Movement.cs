@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -167,27 +167,16 @@ public partial class TurnStateManager
         Domain layerBeforeDomain = hasCommittedMovementLayerBefore ? committedMovementLayerBeforeDomain : selectedUnit.GetDomain();
         HeightLevel layerBeforeHeight = hasCommittedMovementLayerBefore ? committedMovementLayerBeforeHeight : selectedUnit.GetHeightLevel();
 
-        int fuelAfter = Mathf.Max(0, selectedUnit.CurrentFuel);
-        int fuelBefore = Mathf.Max(fuelAfter, fuelAfter + Mathf.Max(0, preparedFuelCost));
-
         Vector3Int originCell = committedOriginCell;
         originCell.z = 0;
         Vector3Int destinationCell = committedDestinationCell;
         destinationCell.z = 0;
 
-        MoveUnitReplayCommand command = new MoveUnitReplayCommand
-        {
-            UnitInstanceId = selectedUnit.InstanceId.ToString(),
-            OriginCell = originCell,
-            TargetCell = destinationCell,
-            LayerBefore = new UnitLayerMode(layerBeforeDomain, layerBeforeHeight),
-            LayerAfter = selectedUnit.GetCurrentLayerMode(),
-            FuelBefore = fuelBefore,
-            FuelAfter = fuelAfter,
-            debugLabel = $"Move Unit {selectedUnit.InstanceId} from ({originCell.x},{originCell.y}) to ({destinationCell.x},{destinationCell.y}) layer {layerBeforeDomain}/{layerBeforeHeight}->{selectedUnit.GetDomain()}/{selectedUnit.GetHeightLevel()}"
-        };
-
-        replayManager.RecordCommand(command);
+        replayManager.UpdateCurrentBufferMovement(
+            originCell,
+            destinationCell,
+            new UnitLayerMode(layerBeforeDomain, layerBeforeHeight),
+            selectedUnit.GetCurrentLayerMode());
     }
     private void TryApplyForcedEndMovementLayerBeforeSensors(CursorState movementState)
     {
@@ -506,6 +495,8 @@ public partial class TurnStateManager
         cursorController.PlayUnitMovementSfx(unit.GetMovementCategory());
     }
 }
+
+
 
 
 

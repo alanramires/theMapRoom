@@ -8,6 +8,13 @@ public partial class TurnStateManager
         resolvedCell = currentCell + inputDelta;
         resolvedCell.z = 0;
 
+        if (IsInspectingState())
+        {
+            if (resolvedCell != currentCell)
+                ExitInspectStateToNeutral();
+            return true;
+        }
+
         if (cursorState == CursorState.ShoppingAndServices)
         {
             TryResolveShoppingCursorMove(currentCell, inputDelta);

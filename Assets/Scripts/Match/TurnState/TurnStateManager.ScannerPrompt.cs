@@ -156,7 +156,6 @@ public partial class TurnStateManager
     private Color embarkPreviewColor = Color.white;
     private readonly List<LandingOption> cachedLandingOptions = new List<LandingOption>();
     private string landingOptionUnavailableReason = string.Empty;
-    private bool pendingDestroyUnitConfirmation;
     [Header("Debug Perf Snapshot (F8)")]
     [SerializeField] private bool showPerfRangeLine = true;
     [SerializeField] private bool showPerfSensorsLine = true;
@@ -361,7 +360,6 @@ public partial class TurnStateManager
         ClearPendingTransferPrompt();
         ClearMirandoPreview();
         ClearEmbarkPreview();
-        ClearPendingDestroyUnitHotkeyConfirmation();
     }
 
     private void ProcessDestroyUnitHotkeyInput()
@@ -375,7 +373,7 @@ public partial class TurnStateManager
         if (UiInputBlocker.IsTextInputFocused())
             return;
 
-        if (pendingDestroyUnitConfirmation)
+        if (cursorState != CursorState.Neutral)
             return;
 
         if (IsMovementAnimationRunning())
@@ -391,19 +389,21 @@ public partial class TurnStateManager
             return;
         }
 
-        pendingDestroyUnitConfirmation = true;
         string targetName = ResolveDebugUnitName(target);
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
+        SetCursorState(CursorState.RemovingUnit, "ProcessDestroyUnitHotkeyInput");
         cursorController?.PlayConfirmSfx();
         Debug.Log("[Destroy Unit] Confirmar com Enter | Cancelar com ESC.");
     }
 
-    private bool TryConfirmPendingDestroyUnitHotkeyConfirmation()
+    private bool TryConfirmRemovingUnit()
     {
-        if (!pendingDestroyUnitConfirmation)
+        if (cursorState != CursorState.RemovingUnit)
             return false;
 
-        ClearPendingDestroyUnitHotkeyConfirmation();
+        Vector3Int actionCell = cursorController != null ? cursorController.CurrentCell : Vector3Int.zero;
+        TeamId actionTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
+        int actionTurn = matchController != null ? matchController.CurrentTurn : 0;
         bool destroyed = TryDestroyUnitUnderCursorFromDebug(out string message);
         if (!destroyed)
         {
@@ -412,27 +412,28 @@ public partial class TurnStateManager
             return true;
         }
 
+        replayManager?.RecordStandaloneAction(new PlayerAction
+        {
+            ActionType = PlayerActionType.RemoveUnit,
+            TurnNumber = actionTurn,
+            ActingTeam = actionTeam,
+            CursorHex = actionCell,
+            TargetHex = actionCell,
+            SensorAction = SensorActionType.RemoveUnit,
+            Confirmed = true,
+            DebugLabel = "RemoveUnit: confirm"
+        });
+        ExitRemovingUnitStateToNeutral(logCanceled: false);
         cursorController?.PlayDoneSfx();
         return true;
     }
 
-    private bool TryCancelPendingDestroyUnitHotkeyConfirmation()
+    private void ExitRemovingUnitStateToNeutral(bool logCanceled)
     {
-        if (!pendingDestroyUnitConfirmation)
-            return false;
-
-        ClearPendingDestroyUnitHotkeyConfirmation();
-        Debug.Log("[Destroy Unit] Cancelado.");
-        return true;
-    }
-
-    private void ClearPendingDestroyUnitHotkeyConfirmation()
-    {
-        if (!pendingDestroyUnitConfirmation)
-            return;
-
-        pendingDestroyUnitConfirmation = false;
+        if (logCanceled)
+            Debug.Log("[Destroy Unit] Cancelado.");
         PanelDialogController.ClearExternalText();
+        SetCursorState(CursorState.Neutral, "ExitRemovingUnitStateToNeutral", rollback: logCanceled);
     }
 
     private bool HandleScannerPromptCancel()
@@ -571,6 +572,8 @@ public partial class TurnStateManager
         {
             ClearEnemyThreatLayersOverlay();
             scannerPromptStep = ScannerPromptStep.AwaitingAction;
+            if (cursorState == CursorState.InspectingHotZone)
+                SetCursorState(CursorState.Neutral, "HandleScannerPromptCancel: threat hot zone close", rollback: true);
             return true;
         }
 
@@ -585,24 +588,32 @@ public partial class TurnStateManager
         if (cursorState == CursorState.Mirando)
             return;
 
-        if (cursorState != CursorState.Neutral && scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
+        if (cursorState != CursorState.Neutral &&
+            cursorState != CursorState.InspectingHotZone &&
+            scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
         {
             ClearEnemyThreatLayersOverlay();
             scannerPromptStep = ScannerPromptStep.AwaitingAction;
         }
 
-        if (cursorState == CursorState.Neutral)
+        bool isNeutralLikeInspectState = cursorState == CursorState.Neutral || cursorState == CursorState.InspectingHotZone;
+        if (isNeutralLikeInspectState)
         {
             if (scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
             {
+                bool handledThreatLayerInput = false;
                 if (WasLetterPressedThisFrame('Z'))
                 {
+                    handledThreatLayerInput = true;
                     TryCloseThreatLayerHotzone();
+                    if (cursorState == CursorState.InspectingHotZone)
+                        SetCursorState(CursorState.Neutral, "ProcessScannerPromptInput: hot zone closed by Z", rollback: true);
                     return;
                 }
 
                 if (TryReadPressedNumber(out int number))
                 {
+                    handledThreatLayerInput = true;
                     if (TryApplyThreatLayerSelection(number, out int selectedTeamId))
                     {
                         cursorController?.PlayConfirmSfx();
@@ -626,11 +637,21 @@ public partial class TurnStateManager
                             }));
                     }
                 }
+
+                if (cursorState == CursorState.InspectingHotZone && !handledThreatLayerInput && WasAnyInputPressedThisFrame())
+                {
+                    TryCloseThreatLayerHotzone();
+                    if (cursorState != CursorState.Neutral)
+                        SetCursorState(CursorState.Neutral, "ProcessScannerPromptInput: hot zone auto-dismiss by input", rollback: true);
+                }
                 return;
             }
 
             if (WasLetterPressedThisFrame('Z'))
+            {
                 HandleThreatLayersActionRequested();
+                return;
+            }
             return;
         }
 
@@ -775,6 +796,7 @@ public partial class TurnStateManager
         }
 
         cursorController?.PlayConfirmSfx();
+        replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Attack, "AimActionRequested");
         FocusFirstOptionForAction('A');
         EnterMirandoState();
     }
@@ -806,6 +828,7 @@ public partial class TurnStateManager
             return;
         }
 
+        replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Merge, "MergeActionRequested");
         EnterMergeStateFromSensors();
     }
 
@@ -829,6 +852,7 @@ public partial class TurnStateManager
         }
 
         cursorStateBeforePousando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+        replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Land, "LandActionRequested");
         SetCursorState(CursorState.Pousando, "HandleLandingSensorRequested");
         ClearCommittedPathVisual();
         scannerSelectedLandingIndex = 0;
@@ -847,7 +871,8 @@ public partial class TurnStateManager
 
     private void HandleThreatLayersActionRequested()
     {
-        if (matchController != null && matchController.EnableTotalWar)
+        bool totalWarActive = UnitRulesDefinition.IsTotalWarEnabled() || (matchController != null && matchController.EnableTotalWar);
+        if (totalWarActive)
         {
             Debug.Log("Layers de Ameaca (\"Z\"): indisponivel quando Guerra Total estiver ativa.");
             return;
@@ -868,6 +893,7 @@ public partial class TurnStateManager
         }
 
         scannerPromptStep = ScannerPromptStep.ThreatLayerTeamSelect;
+        SetCursorState(CursorState.InspectingHotZone, "HandleThreatLayersActionRequested");
         cursorController?.PlayConfirmSfx();
         Debug.Log(PanelDialogController.ResolveDialogMessage(
             "threat_layers.open",
@@ -959,6 +985,7 @@ public partial class TurnStateManager
         }
 
         cursorController?.PlayConfirmSfx();
+        replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Embark, "EmbarkActionRequested");
         // Mesma regra do Mirando: ao entrar em um submenu de sensor, oculta o preview de movimento.
         cursorStateBeforeEmbarcando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
         SetCursorState(CursorState.Embarcando, "HandleEmbarkActionRequested");
@@ -2459,8 +2486,6 @@ public partial class TurnStateManager
         if (combatExecutionInProgress)
             return true;
 
-        DiscardPendingCombatCinematicTrack();
-
         if (scannerPromptStep == ScannerPromptStep.MirandoCycleTarget)
         {
             if (scannerSelectedTargetIndex < 0 || scannerSelectedTargetIndex >= GetMirandoEntryCount())
@@ -2477,6 +2502,9 @@ public partial class TurnStateManager
                 cursorController?.PlayErrorSfx();
                 return false;
             }
+
+            if (cycleEntry.TargetUnit != null)
+                RecordCinematicConfirm(cycleEntry.TargetUnit.CurrentCellPosition);
 
             EnterMirandoConfirmStep();
             return true;
@@ -2580,8 +2608,17 @@ public partial class TurnStateManager
 
         combatExecutionInProgress = false;
         cursorController?.PlayDoneSfx();
-        if (!TryFinalizeSelectedUnitActionFromDebug())
+        bool finalized = TryFinalizeSelectedUnitActionFromDebug();
+        if (!finalized)
+        {
             ClearSelectionAndReturnToNeutral(keepPreparedFuelCost: true);
+            if (replayManager != null)
+            {
+                string attackerId = attacker != null ? attacker.InstanceId.ToString() : "null";
+                string defenderId = defender != null ? defender.InstanceId.ToString() : "null";
+                replayManager.PromoteCurrentBuffer($"UnitAction: attack {attackerId}->{defenderId}");
+            }
+        }
         ResetScannerPromptState();
     }
 

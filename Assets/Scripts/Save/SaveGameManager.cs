@@ -551,7 +551,14 @@ public class SaveGameManager : MonoBehaviour
                     }
 
                     Vector3 world = new Vector3(saved.worldX, saved.worldY, 0f);
-                    GameObject go = unitSpawner.Spawn(unitData, (TeamId)saved.teamId, world, Quaternion.identity);
+                    // Load restores exact runtime placement/embark state right after spawn.
+                    // Skip occupancy blocking here to avoid false warnings when transporter and passenger share a cell.
+                    GameObject go = unitSpawner.Spawn(
+                        unitData,
+                        (TeamId)saved.teamId,
+                        world,
+                        Quaternion.identity,
+                        enforceSpawnOccupancyRule: false);
                     if (go == null)
                         continue;
 

@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -741,29 +741,8 @@ public partial class TurnStateManager
         if (replayManager == null || attacker == null || defender == null)
             return;
 
-        int attackerHpAfter = Mathf.Max(0, attacker.CurrentHP);
-        int defenderHpAfter = Mathf.Max(0, defender.CurrentHP);
-        bool attackerDied = attackerHpAfter <= 0 || !attacker.gameObject.activeInHierarchy;
-        bool defenderDied = defenderHpAfter <= 0 || !defender.gameObject.activeInHierarchy;
-
-        List<EmbarkedCascadeEntry> cascadeEntries = BuildEmbarkedCascadeEntries(embarkedHpBeforeById);
-        if (cascadeEntries == null)
-            cascadeEntries = new List<EmbarkedCascadeEntry>();
-
-        AttackReplayCommand command = new AttackReplayCommand
-        {
-            AttackerInstanceId = attacker.InstanceId.ToString(),
-            DefenderInstanceId = defender.InstanceId.ToString(),
-            AttackerHpBefore = Mathf.Max(0, attackerHpBefore),
-            AttackerHpAfter = attackerHpAfter,
-            DefenderHpBefore = Mathf.Max(0, defenderHpBefore),
-            DefenderHpAfter = defenderHpAfter,
-            AttackerDied = attackerDied,
-            DefenderDied = defenderDied,
-            EmbarkedCascade = cascadeEntries,`r`n            CinematicTrack = ConsumePendingCombatCinematicTrack(),`r`n            debugLabel = $"Attack: Unit {attacker.InstanceId} -> Unit {defender.InstanceId} | {defenderHpBefore}hp -> {defenderHpAfter}hp"
-        };
-
-        replayManager.RecordCommand(command);
+        replayManager.UpdateCurrentBufferSensorAction(SensorActionType.Attack, "AttackConfirm");
+        replayManager.UpdateCurrentBufferTarget(defender, null, defender.CurrentCellPosition, "AttackTargetConfirm");
     }
 
     private Dictionary<int, int> CaptureEmbarkedHpSnapshot(UnitManager rootA, UnitManager rootB)
@@ -795,50 +774,6 @@ public partial class TurnStateManager
             hpById[child.InstanceId] = Mathf.Max(0, child.CurrentHP);
             CollectEmbarkedUnitHpRecursive(child, hpById);
         }
-    }
-
-    private static List<EmbarkedCascadeEntry> BuildEmbarkedCascadeEntries(Dictionary<int, int> hpBeforeById)
-    {
-        List<EmbarkedCascadeEntry> entries = new List<EmbarkedCascadeEntry>();
-        if (hpBeforeById == null || hpBeforeById.Count <= 0)
-            return entries;
-
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        Dictionary<int, UnitManager> byId = new Dictionary<int, UnitManager>();
-        for (int i = 0; i < units.Length; i++)
-        {
-            UnitManager unit = units[i];
-            if (unit == null || unit.InstanceId <= 0)
-                continue;
-            byId[unit.InstanceId] = unit;
-        }
-
-        foreach (KeyValuePair<int, int> pair in hpBeforeById)
-        {
-            int instanceId = pair.Key;
-            int hpBefore = Mathf.Max(0, pair.Value);
-            int hpAfter = 0;
-            bool died = true;
-
-            if (byId.TryGetValue(instanceId, out UnitManager unit) && unit != null)
-            {
-                hpAfter = Mathf.Max(0, unit.CurrentHP);
-                died = hpAfter <= 0 || !unit.gameObject.activeInHierarchy;
-            }
-
-            if (hpAfter == hpBefore && !died)
-                continue;
-
-            entries.Add(new EmbarkedCascadeEntry
-            {
-                UnitInstanceId = instanceId.ToString(),
-                HpBefore = hpBefore,
-                HpAfter = hpAfter,
-                Died = died
-            });
-        }
-
-        return entries;
     }
 
     private struct PositionDpqInfo
@@ -898,4 +833,5 @@ public partial class TurnStateManager
         }
     }
 }
+
 

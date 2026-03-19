@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine;
@@ -540,21 +540,19 @@ public partial class TurnStateManager
 
         Vector3Int normalizedSpawnCell = spawnCell;
         normalizedSpawnCell.z = 0;
-        UnitLayerMode spawnLayer = spawnedManager.GetCurrentLayerMode();
 
-        BuyUnitReplayCommand command = new BuyUnitReplayCommand
+        replayManager.RecordStandaloneAction(new PlayerAction
         {
+            ActionType = PlayerActionType.Shopping,
+            TurnNumber = matchController != null ? matchController.CurrentTurn : 0,
+            ActingTeam = buyingTeam,
+            CursorHex = normalizedSpawnCell,
             UnitInstanceId = spawnedManager.InstanceId.ToString(),
-            UnitTypeId = unit.id,
-            SpawnHex = normalizedSpawnCell,
-            SpawnLayer = spawnLayer,
-            BuyingTeam = buyingTeam,
-            EconomyBefore = Mathf.Max(0, economyBefore),
-            EconomyAfter = Mathf.Max(0, economyAfter),
-            debugLabel = $"Buy: {TeamUtils.GetName(buyingTeam)} spawns {ResolveUnitName(unit)} (id:{spawnedManager.InstanceId}) at ({normalizedSpawnCell.x},{normalizedSpawnCell.y}) | ${Mathf.Max(0, economyBefore)} -> ${Mathf.Max(0, economyAfter)}"
-        };
-
-        replayManager.RecordCommand(command);
+            TargetHex = normalizedSpawnCell,
+            SensorAction = SensorActionType.Shopping,
+            Confirmed = true,
+            DebugLabel = $"Shopping: {ResolveUnitName(unit)} ({spawnedManager.InstanceId})"
+        });
     }
 
     private static string ResolveUnitName(UnitData unit)
@@ -569,5 +567,6 @@ public partial class TurnStateManager
     }
 
 }
+
 
 

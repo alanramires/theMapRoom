@@ -29,7 +29,12 @@ public partial class TurnStateManager : MonoBehaviour
         Desembarcando = 8,
         Fundindo = 9,
         ShoppingAndServices = 10,
-        Suprindo = 11
+        Suprindo = 11,
+        InspectingUnit = 12,
+        InspectingBuilding = 13,
+        InspectingHotZone = 14,
+        CommandService = 15,
+        RemovingUnit = 16
     }
 
     [Header("References")]
@@ -136,7 +141,10 @@ public partial class TurnStateManager : MonoBehaviour
     private void SetCursorState(CursorState nextState, string reason, bool rollback = false)
     {
         CursorState previous = cursorState;
-        if (nextState != CursorState.Neutral)
+        bool shouldClearThreatOverlayOnTransition =
+            nextState != CursorState.Neutral &&
+            nextState != CursorState.InspectingHotZone;
+        if (shouldClearThreatOverlayOnTransition)
         {
             if (scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
                 scannerPromptStep = ScannerPromptStep.AwaitingAction;
@@ -144,6 +152,7 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         cursorState = nextState;
+        Debug.Log($"[FSM] Estado: {previous} -> {nextState}");
 
         if (!enableTurnStateRuntimeLogs)
             return;
@@ -153,14 +162,28 @@ public partial class TurnStateManager : MonoBehaviour
         Debug.Log($"[TurnState]{rollbackTag} transition={previous} -> {nextState} | reason={reason} | selected={selectedName}");
     }
 
+    private bool IsInspectingState(CursorState state)
+    {
+        return state == CursorState.InspectingUnit
+            || state == CursorState.InspectingBuilding
+            || state == CursorState.InspectingHotZone;
+    }
+
+    private bool IsInspectingState()
+    {
+        return IsInspectingState(cursorState);
+    }
+
     public bool TryFinalizeSelectedUnitActionFromDebug()
     {
         if (selectedUnit == null)
             return false;
 
+        string finalizedUnitId = selectedUnit.InstanceId.ToString();
         CommitPreparedFuelCost();
         selectedUnit.MarkAsActed();
         ClearSelectionAndReturnToNeutral(keepPreparedFuelCost: true);
+        replayManager?.PromoteCurrentBuffer($"UnitAction: {finalizedUnitId}");
         return true;
     }
 
@@ -1382,6 +1405,7 @@ public partial class TurnStateManager : MonoBehaviour
         return (animationManager != null && animationManager.IsAnimatingMovement) || embarkExecutionInProgress || disembarkExecutionInProgress;
     }
 }
+
 
 
 

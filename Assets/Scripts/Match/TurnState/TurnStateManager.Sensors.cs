@@ -350,6 +350,9 @@ public partial class TurnStateManager
 
     private void LogScannerPanel()
     {
+        if (matchController == null || !matchController.EnableSensorsRuntimeLogs)
+            return;
+
         bool podeMirar = availableSensorActionCodes.Contains('A');
         bool podeEmbarcar = availableSensorActionCodes.Contains('E');
         bool podeDesembarcar = availableSensorActionCodes.Contains('D');

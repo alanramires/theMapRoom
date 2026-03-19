@@ -63,6 +63,7 @@ public partial class TurnStateManager
             return;
         }
 
+        replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Transfer, "TransferActionRequested");
         EnterTransferSelectionStep();
         cursorController?.PlayConfirmSfx();
     }
@@ -255,6 +256,11 @@ public partial class TurnStateManager
             return true;
         }
 
+        replayManager?.UpdateCurrentBufferTarget(
+            option.targetUnit,
+            option.targetConstruction,
+            option.targetCell,
+            "TransferTargetConfirm");
         StartCoroutine(ExecuteTransferPromptSequence(option));
         return true;
     }

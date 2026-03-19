@@ -15,6 +15,7 @@ public partial class TurnStateManager
             LogScannerPanel();
             return;
         }
+        replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Supply, "SupplyActionRequested");
         EnterSupplyStateFromSensors();
     }
 
