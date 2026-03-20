@@ -309,7 +309,7 @@ public partial class TurnStateManager
             sb.AppendLine($"SetSelectedUnit pipeline: last={perfLastSelectionMs:0.00}ms | avg={avgSelectionMs:0.00}ms | calls={perfSelectionCallCount}");
         if (showPerfTakeoffPrepLine)
             sb.AppendLine($"TryPrepareTemporaryTakeoffStateForSelection: last={perfLastTakeoffPrepMs:0.00}ms | avg={avgTakeoffPrepMs:0.00}ms | calls={perfTakeoffPrepCallCount}");
-        Debug.Log(sb.ToString());
+        RuntimeLog(sb.ToString());
         PanelDialogController.TrySetTransientText("Perf snapshot logged (F8)", 1.8f);
     }
 
@@ -329,12 +329,12 @@ public partial class TurnStateManager
         lastLoggedScannerPromptStep = scannerPromptStep;
         lastLoggedSelectedUnit = selectedUnit;
         string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
-        //Debug.Log($"[TurnState] state={cursorState} | selected={selectedName}");
+        //RuntimeLog($"[TurnState] state={cursorState} | selected={selectedName}");
         if (substepChanged)
         {
             bool rollback = previousSubstep != (ScannerPromptStep)(-1) && (int)scannerPromptStep < (int)previousSubstep;
             string rollbackTag = rollback ? " [roll back]" : string.Empty;
-            Debug.Log($"[TurnState]{rollbackTag} substep={previousSubstep} -> {scannerPromptStep} | state={cursorState}");
+            RuntimeLog($"[TurnState]{rollbackTag} substep={previousSubstep} -> {scannerPromptStep} | state={cursorState}");
         }
 
     }
@@ -378,14 +378,14 @@ public partial class TurnStateManager
 
         if (IsMovementAnimationRunning())
         {
-            Debug.Log("[Destroy Unit] Aguarde o fim da animacao atual.");
+            RuntimeLog("[Destroy Unit] Aguarde o fim da animacao atual.");
             return;
         }
 
         if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out string reason))
         {
             if (!string.IsNullOrWhiteSpace(reason))
-                Debug.Log($"[Destroy Unit] {reason}");
+                RuntimeLog($"[Destroy Unit] {reason}");
             return;
         }
 
@@ -393,7 +393,7 @@ public partial class TurnStateManager
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
         SetCursorState(CursorState.RemovingUnit, "ProcessDestroyUnitHotkeyInput");
         cursorController?.PlayConfirmSfx();
-        Debug.Log("[Destroy Unit] Confirmar com Enter | Cancelar com ESC.");
+        RuntimeLog("[Destroy Unit] Confirmar com Enter | Cancelar com ESC.");
     }
 
     private bool TryConfirmRemovingUnit()
@@ -408,7 +408,7 @@ public partial class TurnStateManager
         if (!destroyed)
         {
             if (!string.IsNullOrWhiteSpace(message))
-                Debug.Log($"[Destroy Unit] {message}");
+                RuntimeLog($"[Destroy Unit] {message}");
             return true;
         }
 
@@ -431,7 +431,7 @@ public partial class TurnStateManager
     private void ExitRemovingUnitStateToNeutral(bool logCanceled)
     {
         if (logCanceled)
-            Debug.Log("[Destroy Unit] Cancelado.");
+            RuntimeLog("[Destroy Unit] Cancelado.");
         PanelDialogController.ClearExternalText();
         SetCursorState(CursorState.Neutral, "ExitRemovingUnitStateToNeutral", rollback: logCanceled);
     }
@@ -617,7 +617,7 @@ public partial class TurnStateManager
                     if (TryApplyThreatLayerSelection(number, out int selectedTeamId))
                     {
                         cursorController?.PlayConfirmSfx();
-                        Debug.Log(PanelDialogController.ResolveDialogMessage(
+                        RuntimeLog(PanelDialogController.ResolveDialogMessage(
                             "threat_layers.selected",
                             "Layers de Ameaca: time inspecionado -> <team_name> (<team_id>).",
                             new Dictionary<string, string>
@@ -628,7 +628,7 @@ public partial class TurnStateManager
                     }
                     else
                     {
-                        Debug.Log(PanelDialogController.ResolveDialogMessage(
+                        RuntimeLog(PanelDialogController.ResolveDialogMessage(
                             "threat_layers.invalid",
                             "Layers de Ameaca: time <team_id> nao disponivel nesta partida.",
                             new Dictionary<string, string>
@@ -759,7 +759,7 @@ public partial class TurnStateManager
                     if (TryGetSelectedValidEmbarkOption(out PodeEmbarcarOption selected, out int shownIndex))
                     {
                         string label = !string.IsNullOrWhiteSpace(selected.displayLabel) ? selected.displayLabel : "transportador";
-                        Debug.Log($"Confirma embarque {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
+                        RuntimeLog($"Confirma embarque {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
                     }
                 }
             }
@@ -782,7 +782,7 @@ public partial class TurnStateManager
         bool canAim = availableSensorActionCodes.Contains('A');
         if (!canAim)
         {
-            Debug.Log("Pode Mirar (\"A\"): nao ha alvos validos agora.");
+            RuntimeLog("Pode Mirar (\"A\"): nao ha alvos validos agora.");
             LogScannerPanel();
             return;
         }
@@ -790,7 +790,7 @@ public partial class TurnStateManager
         BuildMirandoSelectionEntries();
         if (GetMirandoEntryCount() == 0)
         {
-            Debug.Log("Pode Mirar (\"A\"): nao ha alvos para listar.");
+            RuntimeLog("Pode Mirar (\"A\"): nao ha alvos para listar.");
             LogScannerPanel();
             return;
         }
@@ -807,12 +807,12 @@ public partial class TurnStateManager
         if (finished)
         {
             cursorController?.PlayDoneSfx();
-            Debug.Log("[Acao] Apenas Mover (\"M\") confirmado. Unidade finalizou sem atacar.");
+            RuntimeLog("[Acao] Apenas Mover (\"M\") confirmado. Unidade finalizou sem atacar.");
             ResetScannerPromptState();
             return;
         }
 
-        Debug.Log("[Acao] Apenas Mover (\"M\") indisponivel no estado atual.");
+        RuntimeLog("[Acao] Apenas Mover (\"M\") indisponivel no estado atual.");
     }
 
     private void HandleMergeActionRequested()
@@ -823,7 +823,7 @@ public partial class TurnStateManager
             string reason = !string.IsNullOrWhiteSpace(cachedPodeFundirReason)
                 ? cachedPodeFundirReason
                 : "nao ha unidades adjacentes do mesmo tipo.";
-            Debug.Log($"Pode Fundir (\"F\"): {reason}");
+            RuntimeLog($"Pode Fundir (\"F\"): {reason}");
             LogScannerPanel();
             return;
         }
@@ -846,7 +846,7 @@ public partial class TurnStateManager
             string reason = !string.IsNullOrWhiteSpace(landingOptionUnavailableReason)
                 ? landingOptionUnavailableReason
                 : "Sem opcoes de mudanca de camada neste contexto.";
-            Debug.Log($"Pode Mudar de Altitude (\"L\"): {reason}");
+            RuntimeLog($"Pode Mudar de Altitude (\"L\"): {reason}");
             LogScannerPanel();
             return;
         }
@@ -874,19 +874,19 @@ public partial class TurnStateManager
         bool totalWarActive = UnitRulesDefinition.IsTotalWarEnabled() || (matchController != null && matchController.EnableTotalWar);
         if (totalWarActive)
         {
-            Debug.Log("Layers de Ameaca (\"Z\"): indisponivel quando Guerra Total estiver ativa.");
+            RuntimeLog("Layers de Ameaca (\"Z\"): indisponivel quando Guerra Total estiver ativa.");
             return;
         }
 
         if (cursorState != CursorState.Neutral)
         {
-            Debug.Log("Layers de Ameaca (\"Z\"): so disponivel em cursor neutro.");
+            RuntimeLog("Layers de Ameaca (\"Z\"): so disponivel em cursor neutro.");
             return;
         }
 
         if (!EnterThreatLayerTeamSelection())
         {
-            Debug.Log(PanelDialogController.ResolveDialogMessage(
+            RuntimeLog(PanelDialogController.ResolveDialogMessage(
                 "threat_layers.unavailable",
                 "Layers de Ameaca (\"Z\"): nenhum time valido para inspecionar."));
             return;
@@ -895,7 +895,7 @@ public partial class TurnStateManager
         scannerPromptStep = ScannerPromptStep.ThreatLayerTeamSelect;
         SetCursorState(CursorState.InspectingHotZone, "HandleThreatLayersActionRequested");
         cursorController?.PlayConfirmSfx();
-        Debug.Log(PanelDialogController.ResolveDialogMessage(
+        RuntimeLog(PanelDialogController.ResolveDialogMessage(
             "threat_layers.open",
             "Layers de Ameaca (\"Z\"): selecione o numero do time no helper. ESC para sair."));
     }
@@ -964,7 +964,7 @@ public partial class TurnStateManager
         scannerSelectedLandingIndex = optionIndex;
         scannerPromptStep = ScannerPromptStep.LandingConfirmOption;
         LandingOption picked = cachedLandingOptions[optionIndex];
-        Debug.Log($"[LayerOperation][Debug] Confirmado: {picked.fromDomain}/{picked.fromHeightLevel} -> {picked.toDomain}/{picked.toHeightLevel} (action={picked.action})");
+        RuntimeLog($"[LayerOperation][Debug] Confirmado: {picked.fromDomain}/{picked.fromHeightLevel} -> {picked.toDomain}/{picked.toHeightLevel} (action={picked.action})");
         landingExecutionInProgress = true;
         StartCoroutine(ExecuteLandingOptionSequence(picked, consumeAction: false));
         message = $"Mudanca de camada iniciada: {picked.label}.";
@@ -979,7 +979,7 @@ public partial class TurnStateManager
         bool hasValid = cachedPodeEmbarcarTargets.Count > 0;
         if (!hasValid)
         {
-            Debug.Log("Pode Embarcar (\"E\"): nao ha transportador valido adjacente.");
+            RuntimeLog("Pode Embarcar (\"E\"): nao ha transportador valido adjacente.");
             LogScannerPanel();
             return;
         }
@@ -1000,7 +1000,7 @@ public partial class TurnStateManager
             if (TryGetSelectedValidEmbarkOption(out PodeEmbarcarOption selected, out int shownIndex))
             {
                 string label = !string.IsNullOrWhiteSpace(selected.displayLabel) ? selected.displayLabel : "transportador";
-                Debug.Log($"Confirma embarque {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
+                RuntimeLog($"Confirma embarque {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
             }
             return;
         }
@@ -1013,7 +1013,7 @@ public partial class TurnStateManager
     {
         if (cachedLandingOptions.Count <= 0)
         {
-            Debug.Log("[Landing] Sem opcoes.");
+            RuntimeLog("[Landing] Sem opcoes.");
             return;
         }
 
@@ -1046,7 +1046,7 @@ public partial class TurnStateManager
         if (!hasLandOption && !string.IsNullOrWhiteSpace(landingOptionUnavailableReason))
             text += $"Mudanca de camada indisponivel: {landingOptionUnavailableReason}\n";
 
-        Debug.Log(text);
+        RuntimeLog(text);
     }
 
     private void FocusFirstOptionForAction(char actionCode)
@@ -1116,7 +1116,7 @@ public partial class TurnStateManager
         }
 
         LandingOption picked = cachedLandingOptions[scannerSelectedLandingIndex];
-        Debug.Log($"[LayerOperation] Confirmado: {picked.fromDomain}/{picked.fromHeightLevel} -> {picked.toDomain}/{picked.toHeightLevel} (action={picked.action})");
+        RuntimeLog($"[LayerOperation] Confirmado: {picked.fromDomain}/{picked.fromHeightLevel} -> {picked.toDomain}/{picked.toHeightLevel} (action={picked.action})");
         landingExecutionInProgress = true;
         StartCoroutine(ExecuteLandingOptionSequence(picked));
         return true;
@@ -1135,7 +1135,7 @@ public partial class TurnStateManager
             cursorController?.PlayConfirmSfx();
 
         LandingOption option = cachedLandingOptions[scannerSelectedLandingIndex];
-        Debug.Log($"Confirma \"{option.label}\"? (Enter=sim, ESC=nao)");
+        RuntimeLog($"Confirma \"{option.label}\"? (Enter=sim, ESC=nao)");
     }
 
     private System.Collections.IEnumerator ExecuteLandingOptionSequence(LandingOption option, bool consumeAction = true)
@@ -1155,7 +1155,7 @@ public partial class TurnStateManager
                 {
                     if (!selectedUnit.TrySetCurrentLayerMode(Domain.Air, HeightLevel.AirLow))
                     {
-                        Debug.Log("[Landing] Falha ao aplicar transicao para Air/Low.");
+                        RuntimeLog("[Landing] Falha ao aplicar transicao para Air/Low.");
                         scannerPromptStep = ScannerPromptStep.LandingCycleOption;
                         LogLandingSelectionPanel();
                         yield break;
@@ -1186,7 +1186,7 @@ public partial class TurnStateManager
                         option.toHeightLevel == HeightLevel.Surface;
                     if (!isAirToGroundLanding)
                     {
-                        Debug.Log("[Landing] Opcao Land fora de Air->Land detectada. Aplicando como transicao de camada.");
+                        RuntimeLog("[Landing] Opcao Land fora de Air->Land detectada. Aplicando como transicao de camada.");
                         PlayMovementStartSfx(selectedUnit);
                         float transitionDuration = GetLayerOperationTransitionDuration();
                         if (transitionDuration > 0f)
@@ -1218,7 +1218,7 @@ public partial class TurnStateManager
                     if (!decision.available || decision.action != AircraftOperationAction.Land)
                     {
                         string reason = !string.IsNullOrWhiteSpace(decision.reason) ? decision.reason : "Pouso indisponivel.";
-                        Debug.Log($"[Landing] {reason}");
+                        RuntimeLog($"[Landing] {reason}");
                         scannerPromptStep = ScannerPromptStep.LandingCycleOption;
                         LogLandingSelectionPanel();
                         yield break;
@@ -1261,7 +1261,7 @@ public partial class TurnStateManager
 
                     if (!selectedUnit.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface))
                     {
-                        Debug.Log("[Landing] Falha ao aplicar pouso (Land/Surface).");
+                        RuntimeLog("[Landing] Falha ao aplicar pouso (Land/Surface).");
                         scannerPromptStep = ScannerPromptStep.LandingCycleOption;
                         LogLandingSelectionPanel();
                         yield break;
@@ -1785,7 +1785,7 @@ public partial class TurnStateManager
                 string reason = !string.IsNullOrWhiteSpace(decision.reason)
                     ? decision.reason
                     : "Falha ao aplicar pouso.";
-                Debug.Log($"[LayerOperation] {reason}");
+                RuntimeLog($"[LayerOperation] {reason}");
                 return false;
             }
 
@@ -1794,13 +1794,13 @@ public partial class TurnStateManager
 
         if (!selectedUnit.TrySetCurrentLayerMode(option.toDomain, option.toHeightLevel))
         {
-            Debug.Log(
+            RuntimeLog(
                 $"[LayerOperation] Falha ao aplicar camada destino {option.toDomain}/{option.toHeightLevel} " +
                 $"(atual={beforeDomain}/{beforeHeight}).");
             return false;
         }
 
-        Debug.Log(
+        RuntimeLog(
             $"[LayerOperation] Aplicado: {beforeDomain}/{beforeHeight} -> " +
             $"{selectedUnit.GetDomain()}/{selectedUnit.GetHeightLevel()}.");
         return true;
@@ -1846,7 +1846,7 @@ public partial class TurnStateManager
         {
             if (!TryGetSelectedValidEmbarkOption(out PodeEmbarcarOption selected, out int shownIndex))
             {
-                Debug.Log("[Embarque] Selecao de embarque invalida.");
+                RuntimeLog("[Embarque] Selecao de embarque invalida.");
                 return true;
             }
 
@@ -1854,7 +1854,7 @@ public partial class TurnStateManager
             // Mantem/atualiza a linha de preview durante a fase de confirmacao.
             FocusCurrentEmbarkTarget(logDetails: false, moveCursor: false);
             string label = !string.IsNullOrWhiteSpace(selected.displayLabel) ? selected.displayLabel : "transportador";
-            Debug.Log($"Confirma embarque {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
+            RuntimeLog($"Confirma embarque {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
             return true;
         }
 
@@ -1872,6 +1872,42 @@ public partial class TurnStateManager
         return true;
     }
 
+    public bool TryExecuteAutomatedEmbarkReplayTarget(string transporterInstanceId, Vector3Int targetCell)
+    {
+        if (cursorState != CursorState.Embarcando)
+            return false;
+        if (cachedPodeEmbarcarTargets == null || cachedPodeEmbarcarTargets.Count <= 0)
+            return false;
+
+        int selectedIndex = -1;
+        for (int i = 0; i < cachedPodeEmbarcarTargets.Count; i++)
+        {
+            PodeEmbarcarOption option = cachedPodeEmbarcarTargets[i];
+            if (option == null || option.transporterUnit == null)
+                continue;
+
+            bool idMatch = !string.IsNullOrWhiteSpace(transporterInstanceId)
+                && option.transporterUnit.InstanceId.ToString() == transporterInstanceId;
+            Vector3Int optionCell = option.transporterUnit.CurrentCellPosition;
+            optionCell.z = 0;
+            Vector3Int desiredCell = targetCell;
+            desiredCell.z = 0;
+            bool cellMatch = optionCell == desiredCell;
+            if (!idMatch && !cellMatch)
+                continue;
+
+            selectedIndex = i;
+            break;
+        }
+
+        if (selectedIndex < 0)
+            selectedIndex = 0;
+
+        scannerSelectedEmbarkIndex = selectedIndex;
+        scannerPromptStep = ScannerPromptStep.EmbarkConfirmTarget;
+        return TryConfirmScannerEmbark();
+    }
+
     private bool TryGetSelectedValidEmbarkOption(out PodeEmbarcarOption option, out int shownIndex)
     {
         option = null;
@@ -1887,7 +1923,7 @@ public partial class TurnStateManager
     {
         if (option == null)
         {
-            Debug.Log("[Embarque] Opcao invalida.");
+            RuntimeLog("[Embarque] Opcao invalida.");
             scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
             return;
         }
@@ -1896,7 +1932,7 @@ public partial class TurnStateManager
         UnitManager transporter = option.transporterUnit;
         if (passenger == null || transporter == null || passenger != selectedUnit)
         {
-            Debug.Log("[Embarque] Opcao desatualizada para a unidade selecionada.");
+            RuntimeLog("[Embarque] Opcao desatualizada para a unidade selecionada.");
             scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
             ExitEmbarkStateToMovement();
             RefreshSensorsForCurrentState();
@@ -1933,7 +1969,7 @@ public partial class TurnStateManager
                     SensorMovementMode.MoveuParado);
                 if (!landingDecision.available || landingDecision.action != AircraftOperationAction.Land)
                 {
-                    Debug.Log(string.IsNullOrWhiteSpace(landingDecision.reason)
+                    RuntimeLog(string.IsNullOrWhiteSpace(landingDecision.reason)
                         ? "[Embarque] Transportador aereo sem pouso valido."
                         : $"[Embarque] {landingDecision.reason}");
                     embarkExecutionInProgress = false;
@@ -1945,7 +1981,7 @@ public partial class TurnStateManager
 
                 // Feedback do "forced landing": usa o SFX de movimento da unidade que pousou.
                 PlayMovementStartSfx(transporter);
-                Debug.Log("[Embarque] Transportador pousou antes do embarque.");
+                RuntimeLog("[Embarque] Transportador pousou antes do embarque.");
 
                 bool transporterStartHigh = transporter.GetDomain() == Domain.Air && transporter.GetHeightLevel() == HeightLevel.AirHigh;
                 bool transporterStartLow = transporter.GetDomain() == Domain.Air && transporter.GetHeightLevel() == HeightLevel.AirLow;
@@ -1964,7 +2000,7 @@ public partial class TurnStateManager
                     : GetEmbarkForcedLandingDuration();
                 if (!transporter.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface))
                 {
-                    Debug.Log("[Embarque] Falha ao concluir pouso do transportador (Land/Surface).");
+                    RuntimeLog("[Embarque] Falha ao concluir pouso do transportador (Land/Surface).");
                     embarkExecutionInProgress = false;
                     scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
                     ExitEmbarkStateToMovement();
@@ -2093,7 +2129,7 @@ public partial class TurnStateManager
             {
                 if (passenger != null && passenger.CurrentFuel != fuelBeforeEmbark)
                     passenger.SetCurrentFuel(fuelBeforeEmbark);
-                Debug.Log($"Pode Embarcar (\"E\"): {resultMessage}");
+                RuntimeLog($"Pode Embarcar (\"E\"): {resultMessage}");
                 embarkExecutionInProgress = false;
                 scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
                 ExitEmbarkStateToMovement();
@@ -2102,7 +2138,7 @@ public partial class TurnStateManager
             }
 
             cursorController?.PlayLoadSfx();
-            Debug.Log(resultMessage);
+            RuntimeLog(resultMessage);
             embarkExecutionInProgress = false;
             ResetScannerPromptState();
         }
@@ -2245,7 +2281,7 @@ public partial class TurnStateManager
         int total = GetEmbarkEntryCount();
         if (total <= 0)
         {
-            Debug.Log("Sem opcoes de embarque para listar.");
+            RuntimeLog("Sem opcoes de embarque para listar.");
             return;
         }
 
@@ -2265,7 +2301,7 @@ public partial class TurnStateManager
             text += $"Invalidos detectados pelo sensor (nao selecionaveis em gameplay): {cachedPodeEmbarcarInvalidTargets.Count}\n";
 
         text += ">> Enter confirma opcao valida | ESC volta";
-        Debug.Log(text);
+        RuntimeLog(text);
     }
 
     private void FocusCurrentEmbarkTarget(bool logDetails, bool moveCursor = true)
@@ -2311,7 +2347,7 @@ public partial class TurnStateManager
                 ? validOption.displayLabel
                 : "transportador";
             int cost = validOption != null ? Mathf.Max(0, validOption.enterCost) : 0;
-            Debug.Log(
+            RuntimeLog(
                 $"[Embarque] Opcao {shownIndex}/{total} [VALIDA]\n" +
                 $"{label}\n" +
                 $"Linha: VERDE\n" +
@@ -2327,7 +2363,7 @@ public partial class TurnStateManager
         string reason = invalidOption != null && !string.IsNullOrWhiteSpace(invalidOption.reason)
             ? invalidOption.reason
             : "motivo nao informado";
-        Debug.Log(
+        RuntimeLog(
             $"[Embarque] Opcao {shownIndex}/{total} [INVALIDA]\n" +
             $"{transporter}\n" +
             $"Motivo: {reason}\n" +
@@ -2386,7 +2422,7 @@ public partial class TurnStateManager
         int total = GetMirandoEntryCount();
         if (total == 0)
         {
-            Debug.Log("Sem alvos para mirar.");
+            RuntimeLog("Sem alvos para mirar.");
             return;
         }
 
@@ -2417,7 +2453,7 @@ public partial class TurnStateManager
         }
 
         text += ">> Enter confirma alvo valido | ESC volta";
-        Debug.Log(text);
+        RuntimeLog(text);
     }
 
     private void LogAttackConfirmationPrompt(MirandoSelectionEntry entry, int shownIndex)
@@ -2428,14 +2464,14 @@ public partial class TurnStateManager
             string label = option != null && !string.IsNullOrWhiteSpace(option.displayLabel)
                 ? option.displayLabel
                 : (option != null && option.targetUnit != null ? option.targetUnit.name : $"alvo {shownIndex}");
-            Debug.Log($"Confirma alvo {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
+            RuntimeLog($"Confirma alvo {shownIndex}? {label}\n(Enter=sim, ESC=voltar para ciclar)");
             return;
         }
 
         PodeMirarInvalidOption invalid = entry.invalidOption;
         string invalidLabel = invalid != null && invalid.targetUnit != null ? invalid.targetUnit.name : $"alvo {shownIndex}";
         string reason = invalid != null && !string.IsNullOrWhiteSpace(invalid.reason) ? invalid.reason : "motivo nao informado";
-        Debug.Log($"Alvo {shownIndex} invalido: {invalidLabel}\nMotivo: {reason}\n(Enter=toca erro, ESC=voltar para ciclar)");
+        RuntimeLog($"Alvo {shownIndex} invalido: {invalidLabel}\nMotivo: {reason}\n(Enter=toca erro, ESC=voltar para ciclar)");
     }
 
     private void MoveCursorToTarget(UnitManager targetUnit)
@@ -2497,7 +2533,7 @@ public partial class TurnStateManager
                 string reason = cycleEntry.invalidOption != null && !string.IsNullOrWhiteSpace(cycleEntry.invalidOption.reason)
                     ? cycleEntry.invalidOption.reason
                     : "alvo invalido para este ataque.";
-                Debug.Log($"[Mirando] Alvo invalido. {reason}");
+                RuntimeLog($"[Mirando] Alvo invalido. {reason}");
                 PushPanelUnitMessage(ResolveAimInvalidDialogMessage(cycleEntry.invalidOption), 2.6f);
                 cursorController?.PlayErrorSfx();
                 return false;
@@ -2528,7 +2564,7 @@ public partial class TurnStateManager
             string reason = entry.invalidOption != null && !string.IsNullOrWhiteSpace(entry.invalidOption.reason)
                 ? entry.invalidOption.reason
                 : "alvo invalido para este ataque.";
-            Debug.Log($"[Mirando] Alvo invalido. {reason}");
+            RuntimeLog($"[Mirando] Alvo invalido. {reason}");
             PushPanelUnitMessage(ResolveAimInvalidDialogMessage(entry.invalidOption), 2.6f);
             cursorController?.PlayErrorSfx();
             return false;
@@ -2537,7 +2573,7 @@ public partial class TurnStateManager
         PodeMirarTargetOption option = entry.validOption;
         if (option == null || option.attackerUnit == null || option.targetUnit == null)
         {
-            Debug.Log("Falha ao confirmar ataque: opcao invalida.");
+            RuntimeLog("Falha ao confirmar ataque: opcao invalida.");
             PushPanelUnitMessage("Aim: falha ao confirmar", 2.4f);
             scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
             scannerSelectedTargetIndex = 0;
@@ -2547,10 +2583,10 @@ public partial class TurnStateManager
         }
 
         CombatResolutionResult combat = ResolveCombatFromSelectedOption(option);
-        Debug.Log(combat.trace);
+        RuntimeLog(combat.trace);
         if (!combat.success)
         {
-            Debug.Log("[Combate] Falha ao resolver combate. Retornando para selecao de alvo.");
+            RuntimeLog("[Combate] Falha ao resolver combate. Retornando para selecao de alvo.");
             PushPanelUnitMessage("Combate: falha ao resolver", 2.6f);
             scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
             FocusCurrentMirandoTarget(logDetails: true);
@@ -2564,6 +2600,43 @@ public partial class TurnStateManager
         WeaponTrajectoryType trajectory = ResolveSelectedTrajectory(option);
         StartCoroutine(ExecuteConfirmedAttackSequence(option, trajectory, combat));
         return true;
+    }
+
+    public bool TryExecuteAutomatedAttackReplayTarget(string targetInstanceId, Vector3Int targetCell)
+    {
+        if (cursorState != CursorState.Mirando)
+            return false;
+        if (GetMirandoEntryCount() <= 0)
+            return false;
+
+        int selectedIndex = -1;
+        for (int i = 0; i < GetMirandoEntryCount(); i++)
+        {
+            MirandoSelectionEntry entry = cachedMirandoSelectionEntries[i];
+            if (!entry.isValid || entry.validOption == null || entry.validOption.targetUnit == null)
+                continue;
+
+            UnitManager target = entry.validOption.targetUnit;
+            bool idMatch = !string.IsNullOrWhiteSpace(targetInstanceId)
+                && target.InstanceId.ToString() == targetInstanceId;
+            Vector3Int optionCell = target.CurrentCellPosition;
+            optionCell.z = 0;
+            Vector3Int desiredCell = targetCell;
+            desiredCell.z = 0;
+            bool cellMatch = optionCell == desiredCell;
+            if (!idMatch && !cellMatch)
+                continue;
+
+            selectedIndex = i;
+            break;
+        }
+
+        if (selectedIndex < 0)
+            selectedIndex = 0;
+
+        scannerSelectedTargetIndex = selectedIndex;
+        EnterMirandoConfirmStep();
+        return TryConfirmScannerAttack();
     }
 
     private IEnumerator ExecuteConfirmedAttackSequence(
@@ -3217,7 +3290,7 @@ public partial class TurnStateManager
             string evPathText = FormatEvPath(option.lineOfFireEvPath);
             string lineHexesText = FormatHexPath(option.lineOfFireIntermediateCells);
 
-            Debug.Log(
+            RuntimeLog(
                 $"[Mirando] Alvo {shownIndex}/{total} [VALIDO]\n" +
                 $"Label: {label}\n" +
                 $"Unidade: {target.name}\n" +
@@ -3241,7 +3314,7 @@ public partial class TurnStateManager
         string reason = !string.IsNullOrWhiteSpace(invalid.reason) ? invalid.reason : "motivo nao informado";
         string evPathInvalid = FormatEvPath(invalid.lineOfFireEvPath);
         string lineHexesInvalid = FormatHexPath(invalid.lineOfFireIntermediateCells);
-        Debug.Log(
+        RuntimeLog(
             $"[Mirando] Alvo {shownIndex}/{total} [INVALIDO]\n" +
             $"Unidade: {invalid.targetUnit.name}\n" +
             $"Distancia: {invalid.distance}\n" +
@@ -4670,3 +4743,5 @@ public partial class TurnStateManager
 #endif
     }
 }
+
+

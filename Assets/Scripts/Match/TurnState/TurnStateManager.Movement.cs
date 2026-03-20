@@ -65,7 +65,7 @@ public partial class TurnStateManager
         LogStateStep("BeginRollbackToSelection", rollback: true);
         if (selectedUnit == null || !TryGetCommittedMovementPath(out List<Vector3Int> committedPath, out Vector3Int originCell, out Vector3Int destinationCell))
         {
-            Debug.Log("[Rollback] BeginRollbackToSelection abortado: unidade nula ou caminho comprometido indisponivel.");
+            RuntimeLog("[Rollback] BeginRollbackToSelection abortado: unidade nula ou caminho comprometido indisponivel.");
             return false;
         }
 
@@ -73,7 +73,7 @@ public partial class TurnStateManager
         currentCell.z = 0;
         if (currentCell != destinationCell)
         {
-            Debug.Log(
+            RuntimeLog(
                 $"[Rollback] BeginRollbackToSelection abortado: unidade fora do destino comprometido | " +
                 $"current={currentCell.x},{currentCell.y} | destination={destinationCell.x},{destinationCell.y}");
             return false;
@@ -85,12 +85,12 @@ public partial class TurnStateManager
 
         if (animationManager == null)
         {
-            Debug.Log("[Rollback] BeginRollbackToSelection abortado: AnimationManager ausente.");
+            RuntimeLog("[Rollback] BeginRollbackToSelection abortado: AnimationManager ausente.");
             return false;
         }
 
         Tilemap movementTilemap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
-        Debug.Log(
+        RuntimeLog(
             $"[Rollback] Iniciando animacao de retorno | from={destinationCell.x},{destinationCell.y} -> " +
             $"to={originCell.x},{originCell.y} | steps={reversePath.Count}");
         ClearCommittedPathVisual();
@@ -102,7 +102,7 @@ public partial class TurnStateManager
             onAnimationStart: null,
             onAnimationFinished: () =>
             {
-                Debug.Log("[Rollback] Animacao de retorno concluida. Aplicando UnitSelected.");
+                RuntimeLog("[Rollback] Animacao de retorno concluida. Aplicando UnitSelected.");
                 HandleMovementAnimationCompleted(CursorState.UnitSelected);
             },
             onCellReached: null);
@@ -131,7 +131,7 @@ public partial class TurnStateManager
             PrepareFuelCostForCommittedPath();
             PrepareMovementCostForCommittedPath();
             DrawCommittedPathVisual(committedMovementPath);
-            Debug.Log($"moveu para {committedDestinationCell.x},{committedDestinationCell.y}");
+            RuntimeLog($"moveu para {committedDestinationCell.x},{committedDestinationCell.y}");
             EnterSensorsState(CursorState.MoveuAndando);
             RecordConfirmedMovementReplayStep();
             return;

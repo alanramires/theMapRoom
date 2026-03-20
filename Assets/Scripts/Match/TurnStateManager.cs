@@ -125,6 +125,14 @@ public partial class TurnStateManager : MonoBehaviour
         Debug.Log($"[TurnState]{rollbackTag} state={cursorState} | step={step} | selected={selectedName}");
     }
 
+    private void RuntimeLog(string message)
+    {
+        if (!enableTurnStateRuntimeLogs || string.IsNullOrWhiteSpace(message))
+            return;
+
+        Debug.Log(message);
+    }
+
     private static void PushPanelUnitMessage(string text, float durationSeconds = 2.8f)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -152,7 +160,7 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         cursorState = nextState;
-        Debug.Log($"[FSM] Estado: {previous} -> {nextState}");
+        RuntimeLog($"[FSM] Estado: {previous} -> {nextState}");
 
         if (!enableTurnStateRuntimeLogs)
             return;

@@ -318,6 +318,53 @@ public partial class TurnStateManager
         return true;
     }
 
+    public bool TryExecuteAutomatedTransferReplayOrder(string targetInstanceId, Vector3Int targetCell)
+    {
+        if (!IsTransferPromptActive() || transferExecutionInProgress)
+            return false;
+
+        int selectedIndex = -1;
+        for (int i = 0; i < transferPromptOptions.Count; i++)
+        {
+            PodeTransferirOption option = transferPromptOptions[i];
+            if (option == null)
+                continue;
+
+            bool idMatch = !string.IsNullOrWhiteSpace(targetInstanceId)
+                && option.targetUnit != null
+                && option.targetUnit.InstanceId.ToString() == targetInstanceId;
+
+            Vector3Int optionCell = option.targetCell;
+            optionCell.z = 0;
+            Vector3Int desiredCell = targetCell;
+            desiredCell.z = 0;
+            bool cellMatch = optionCell == desiredCell;
+
+            if (!idMatch && !cellMatch)
+                continue;
+
+            selectedIndex = i;
+            break;
+        }
+
+        if (selectedIndex < 0)
+            return false;
+
+        transferPromptSelectedIndex = selectedIndex;
+        FocusTransferOptionByIndex(transferPromptSelectedIndex, playSfx: false);
+
+        if (IsTransferSelectionStepActive())
+        {
+            if (!TryConfirmPendingTransferPrompt())
+                return false;
+        }
+
+        if (IsTransferConfirmStepActive())
+            return TryConfirmPendingTransferPrompt();
+
+        return transferExecutionInProgress || !IsTransferPromptActive();
+    }
+
     private void ClearPendingTransferPrompt()
     {
         TryRestoreCommittedPathAfterTransferPrompt();

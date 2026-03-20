@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
@@ -347,10 +348,12 @@ public class SaveGameManager : MonoBehaviour
             cursorController?.PlayConfirmSfx();
 
             SaveGameData data = BuildSaveData();
-            string json = JsonUtility.ToJson(data, true);
+            string json = JsonUtility.ToJson(data, false);
+            byte[] compressedBytes = CompressJsonToGzipBytes(json);
             string path = ResolveWritableSlotPath(normalizedSlot);
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ResolveSaveDirectory());
-            File.WriteAllText(path, json);
+            File.WriteAllBytes(path, compressedBytes);
+            LogSaveDiagnostics(normalizedSlot, json, compressedBytes, data);
             cursorController?.PlayLoadSfx();
             string savedText = ResolveDialog(
                 "dialog.save_status.success",
@@ -418,7 +421,15 @@ public class SaveGameManager : MonoBehaviour
             Debug.LogWarning($"[SaveGame] Load fora do estado ideal ({reason}). Forcando carregamento.");
         }
 
-        string json = File.ReadAllText(path);
+        if (!TryReadSaveJson(path, out string json, out bool wasCompressed, out int compressedBytes, out int uncompressedBytes, out string readError))
+        {
+            Debug.LogError($"[SaveGame] Falha ao ler save: {readError}");
+            return;
+        }
+
+        if (verboseLogs)
+            Debug.Log($"[SaveGame] Load slot {normalizedSlot}: compressed={wasCompressed} compressedBytes={compressedBytes} uncompressedBytes={uncompressedBytes}");
+
         SaveGameData data = JsonUtility.FromJson<SaveGameData>(json);
         if (data == null)
         {
@@ -478,6 +489,98 @@ public class SaveGameManager : MonoBehaviour
         }
 
         cursorController?.ClearRuntimeInputLocksAfterLoad();
+    }
+
+    private static void LogSaveDiagnostics(int slotIndex, string json, byte[] compressedBytes, SaveGameData data)
+    {
+        int uncompressedBytes = string.IsNullOrEmpty(json) ? 0 : Encoding.UTF8.GetByteCount(json);
+        float uncompressedKb = uncompressedBytes / 1024f;
+        int compressedSizeBytes = compressedBytes != null ? compressedBytes.Length : 0;
+        float compressedKb = compressedSizeBytes / 1024f;
+        float compressionRatio = uncompressedBytes > 0 ? (float)compressedSizeBytes / uncompressedBytes : 0f;
+
+        int actionCount = 0;
+        int nonNullActionSnapshots = 0;
+        if (data != null &&
+            data.replay != null &&
+            data.replay.actionStack != null &&
+            data.replay.actionStack.Actions != null)
+        {
+            actionCount = data.replay.actionStack.Actions.Count;
+            for (int i = 0; i < data.replay.actionStack.Actions.Count; i++)
+            {
+                PlayerAction action = data.replay.actionStack.Actions[i];
+                if (action != null && action.Snapshot != null)
+                    nonNullActionSnapshots++;
+            }
+        }
+
+        Debug.Log(
+            $"[SaveGame][Diagnostics] slot={slotIndex} " +
+            $"jsonBytes={uncompressedBytes} jsonKB={uncompressedKb:F2} " +
+            $"compressedBytes={compressedSizeBytes} compressedKB={compressedKb:F2} compressionRatio={compressionRatio:F3} " +
+            $"actionStackCount={actionCount} actionSnapshotsNonNull={nonNullActionSnapshots}");
+    }
+
+    private static byte[] CompressJsonToGzipBytes(string json)
+    {
+        string safeJson = json ?? string.Empty;
+        byte[] utf8 = Encoding.UTF8.GetBytes(safeJson);
+        using (MemoryStream output = new MemoryStream())
+        {
+            using (GZipStream gzip = new GZipStream(output, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
+            {
+                gzip.Write(utf8, 0, utf8.Length);
+            }
+
+            return output.ToArray();
+        }
+    }
+
+    private static bool TryReadSaveJson(
+        string path,
+        out string json,
+        out bool wasCompressed,
+        out int compressedBytes,
+        out int uncompressedBytes,
+        out string error)
+    {
+        json = string.Empty;
+        wasCompressed = false;
+        compressedBytes = 0;
+        uncompressedBytes = 0;
+        error = string.Empty;
+
+        try
+        {
+            byte[] raw = File.ReadAllBytes(path);
+            compressedBytes = raw != null ? raw.Length : 0;
+            bool isGzip = raw != null && raw.Length >= 2 && raw[0] == 0x1F && raw[1] == 0x8B;
+
+            if (isGzip)
+            {
+                wasCompressed = true;
+                using (MemoryStream input = new MemoryStream(raw))
+                using (GZipStream gzip = new GZipStream(input, CompressionMode.Decompress))
+                using (MemoryStream output = new MemoryStream())
+                {
+                    gzip.CopyTo(output);
+                    byte[] decompressed = output.ToArray();
+                    uncompressedBytes = decompressed.Length;
+                    json = Encoding.UTF8.GetString(decompressed);
+                    return true;
+                }
+            }
+
+            json = raw != null ? Encoding.UTF8.GetString(raw) : string.Empty;
+            uncompressedBytes = string.IsNullOrEmpty(json) ? 0 : Encoding.UTF8.GetByteCount(json);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
     }
 
     private IEnumerator LoadRoutine(SaveGameData data, int loadedSlot)
@@ -974,7 +1077,16 @@ public class SaveGameManager : MonoBehaviour
         DateTime fallbackLocalTime = File.GetLastWriteTime(metadata.path);
         try
         {
-            string json = File.ReadAllText(metadata.path);
+            if (!TryReadSaveJson(metadata.path, out string json, out _, out _, out _, out string readError))
+            {
+                if (verboseLogs)
+                    Debug.LogWarning($"[SaveGame] Nao foi possivel ler metadados do slot {normalizedSlot}: {readError}");
+                metadata.savedAtLocal = fallbackLocalTime;
+                if (string.IsNullOrWhiteSpace(metadata.sceneName))
+                    metadata.sceneName = "Mapa desconhecido";
+                return metadata;
+            }
+
             SaveGameData data = JsonUtility.FromJson<SaveGameData>(json);
             if (data != null)
             {

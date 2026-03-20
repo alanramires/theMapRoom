@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -107,7 +107,7 @@ public partial class TurnStateManager
 
         if (cachedPodeDesembarcarTargets.Count == 0)
         {
-            Debug.Log("Pode Desembarcar (\"D\"): nao ha opcoes validas agora.");
+            RuntimeLog("Pode Desembarcar (\"D\"): nao ha opcoes validas agora.");
             LogScannerPanel();
             return;
         }
@@ -139,7 +139,7 @@ public partial class TurnStateManager
                     return;
                 }
 
-                Debug.Log("[Desembarque] Nenhuma ordem em fila para executar.");
+                RuntimeLog("[Desembarque] Nenhuma ordem em fila para executar.");
                 return;
             }
 
@@ -158,7 +158,7 @@ public partial class TurnStateManager
 
             if (pickedEntry == null || index < 0 || index >= disembarkPassengerEntries.Count)
             {
-                Debug.Log($"[Desembarque] Passageiro invalido: {number}. Escolha uma das opcoes listadas.");
+                RuntimeLog($"[Desembarque] Passageiro invalido: {number}. Escolha uma das opcoes listadas.");
                 return;
             }
 
@@ -182,7 +182,7 @@ public partial class TurnStateManager
         {
             if (!disembarkSelectedLandingCellValid || !disembarkLandingByCell.ContainsKey(disembarkSelectedLandingCell))
             {
-                Debug.Log("[Desembarque] Escolha um hex valido para desembarque.");
+                RuntimeLog("[Desembarque] Escolha um hex valido para desembarque.");
                 return true;
             }
 
@@ -222,7 +222,7 @@ public partial class TurnStateManager
 
         if (IsPassengerAlreadyQueued(entry.passenger))
         {
-            Debug.Log($"[Desembarque] {ResolveUnitRuntimeName(entry.passenger)} ja possui ordem em fila. Escolha outro passageiro.");
+            RuntimeLog($"[Desembarque] {ResolveUnitRuntimeName(entry.passenger)} ja possui ordem em fila. Escolha outro passageiro.");
             ReturnToDisembarkPassengerSelect();
             return true;
         }
@@ -231,7 +231,7 @@ public partial class TurnStateManager
         targetCell.z = 0;
         if (IsCellAlreadyQueuedForDisembark(targetCell))
         {
-            Debug.Log($"[Desembarque] Hex {FormatMapCell(targetCell)} ja reservado por outra ordem. Escolha outro hex.");
+            RuntimeLog($"[Desembarque] Hex {FormatMapCell(targetCell)} ja reservado por outra ordem. Escolha outro hex.");
             ReturnToDisembarkLandingSelect();
             return true;
         }
@@ -253,7 +253,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        Debug.Log($"[Desembarque] Ordem adicionada para {ResolveUnitRuntimeName(entry.passenger)} -> {FormatMapCell(option.disembarkCell)}.");
+        RuntimeLog($"[Desembarque] Ordem adicionada para {ResolveUnitRuntimeName(entry.passenger)} -> {FormatMapCell(option.disembarkCell)}.");
         EnterDisembarkPassengerSelectStep();
         return true;
     }
@@ -301,7 +301,7 @@ public partial class TurnStateManager
         RebuildDisembarkLandingOptions(entry);
         if (disembarkLandingOptions.Count <= 0)
         {
-            Debug.Log($"[Desembarque] {ResolveUnitRuntimeName(entry.passenger)} sem hex valido para desembarque no momento.");
+            RuntimeLog($"[Desembarque] {ResolveUnitRuntimeName(entry.passenger)} sem hex valido para desembarque no momento.");
             return false;
         }
 
@@ -352,12 +352,12 @@ public partial class TurnStateManager
 
         if (disembarkSelectedPassengerIndex >= 0 && EnterDisembarkLandingSelectStep(autoEntered: false))
         {
-            Debug.Log($"[Desembarque] Ordem desfeita para {ResolveUnitRuntimeName(lastOrder.passenger)}. Escolha novo hex.");
+            RuntimeLog($"[Desembarque] Ordem desfeita para {ResolveUnitRuntimeName(lastOrder.passenger)}. Escolha novo hex.");
             return true;
         }
 
         EnterDisembarkPassengerSelectStep();
-        Debug.Log("[Desembarque] Ordem desfeita. Retornando para selecao de passageiro.");
+        RuntimeLog("[Desembarque] Ordem desfeita. Retornando para selecao de passageiro.");
         return true;
     }
 
@@ -446,7 +446,7 @@ public partial class TurnStateManager
                 SensorMovementMode.MoveuParado);
             if (!landingDecision.available || landingDecision.action != AircraftOperationAction.Land)
             {
-                Debug.Log(string.IsNullOrWhiteSpace(landingDecision.reason)
+                RuntimeLog(string.IsNullOrWhiteSpace(landingDecision.reason)
                     ? "[Desembarque] Transportador aereo sem pouso valido."
                     : $"[Desembarque] {landingDecision.reason}");
                 if (transporterSortingRaised && transporter != null)
@@ -457,7 +457,7 @@ public partial class TurnStateManager
             }
 
             PlayMovementStartSfx(transporter);
-            Debug.Log("[Desembarque] Transportador pousou antes do desembarque.");
+            RuntimeLog("[Desembarque] Transportador pousou antes do desembarque.");
 
             bool transporterStartHigh = transporter.GetDomain() == Domain.Air && transporter.GetHeightLevel() == HeightLevel.AirHigh;
             bool transporterStartLow = transporter.GetDomain() == Domain.Air && transporter.GetHeightLevel() == HeightLevel.AirLow;
@@ -475,7 +475,7 @@ public partial class TurnStateManager
                 : GetDisembarkForcedLandingDuration();
             if (!transporter.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface))
             {
-                Debug.Log("[Desembarque] Falha ao concluir pouso do transportador (Land/Surface).");
+                RuntimeLog("[Desembarque] Falha ao concluir pouso do transportador (Land/Surface).");
                 if (transporterSortingRaised && transporter != null)
                     transporter.ClearTemporarySortingOrder();
                 disembarkExecutionInProgress = false;
@@ -743,7 +743,7 @@ public partial class TurnStateManager
 
         if (skippedByQueuedReservation > 0)
         {
-            Debug.Log($"[Desembarque] {skippedByQueuedReservation} hex(es) filtrado(s) para {ResolveUnitRuntimeName(passengerEntry.passenger)} por reserva em ordens ja definidas.");
+            RuntimeLog($"[Desembarque] {skippedByQueuedReservation} hex(es) filtrado(s) para {ResolveUnitRuntimeName(passengerEntry.passenger)} por reserva em ordens ja definidas.");
         }
     }
 
@@ -949,7 +949,7 @@ public partial class TurnStateManager
         for (int i = 0; i < disembarkPassengerEntries.Count; i++)
             text += $"{disembarkPassengerEntries[i].selectionNumber}. {disembarkPassengerEntries[i].label}\n";
 
-        Debug.Log(text);
+        RuntimeLog(text);
     }
 
     private void LogDisembarkLandingSelectionPanel(DisembarkPassengerEntry entry)
@@ -960,7 +960,7 @@ public partial class TurnStateManager
             $"Hex validos: {disembarkLandingOptions.Count}\n" +
             "Use setas para selecionar hex valido.\n" +
             "Enter para confirmar alvo. ESC para voltar.";
-        Debug.Log(text);
+        RuntimeLog(text);
     }
 
     private void LogDisembarkConfirmPrompt()
@@ -969,7 +969,7 @@ public partial class TurnStateManager
             return;
 
         string label = !string.IsNullOrWhiteSpace(option.displayLabel) ? option.displayLabel : ResolveUnitRuntimeName(option.passengerUnit);
-        Debug.Log($"[Desembarque] Confirmar {label}? (Enter=sim, ESC=voltar)");
+        RuntimeLog($"[Desembarque] Confirmar {label}? (Enter=sim, ESC=voltar)");
     }
 
     private static string ResolveUnitRuntimeName(UnitManager unit)
@@ -1123,6 +1123,59 @@ public partial class TurnStateManager
 #endif
         return false;
     }
+    public bool TryQueueAutomatedDisembarkReplayOrder(string passengerInstanceId, Vector3Int targetCell)
+    {
+        if (cursorState != CursorState.Desembarcando || selectedUnit == null)
+            return false;
+
+        RebuildDisembarkPassengerEntries();
+        if (disembarkPassengerEntries.Count <= 0)
+            return false;
+
+        int selectedIndex = -1;
+        if (!string.IsNullOrWhiteSpace(passengerInstanceId))
+        {
+            for (int i = 0; i < disembarkPassengerEntries.Count; i++)
+            {
+                DisembarkPassengerEntry entry = disembarkPassengerEntries[i];
+                if (entry == null || entry.passenger == null)
+                    continue;
+
+                if (entry.passenger.InstanceId.ToString() == passengerInstanceId)
+                {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (selectedIndex < 0)
+            selectedIndex = 0;
+
+        disembarkSelectedPassengerIndex = selectedIndex;
+        if (!EnterDisembarkLandingSelectStep(autoEntered: false))
+            return false;
+
+        targetCell.z = 0;
+        if (!disembarkLandingByCell.ContainsKey(targetCell))
+            return false;
+
+        SetDisembarkSelectedLandingCell(targetCell, moveCursor: false);
+        scannerPromptStep = ScannerPromptStep.DisembarkConfirm;
+
+        return TryConfirmScannerDisembark();
+    }
+
+    public bool TryStartAutomatedDisembarkReplayExecution()
+    {
+        if (cursorState != CursorState.Desembarcando || disembarkExecutionInProgress)
+            return false;
+        if (disembarkQueuedOrders.Count <= 0)
+            return false;
+
+        StartDisembarkExecution();
+        return true;
+    }
 
     private bool ConsumeDisembarkSuppressDefaultConfirmSfxOnce()
     {
@@ -1133,4 +1186,7 @@ public partial class TurnStateManager
         return true;
     }
 }
+
+
+
 

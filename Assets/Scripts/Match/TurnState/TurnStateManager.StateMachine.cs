@@ -495,13 +495,13 @@ public partial class TurnStateManager
     private ActionSfx HandleCancelWhileMoveuAndando()
     {
         LogStateStep("HandleCancelWhileMoveuAndando", rollback: true);
-        Debug.Log(
+        RuntimeLog(
             $"[Rollback] ESC em fluxo andado (state={cursorState}) | hasCommittedMovement={hasCommittedMovement} | " +
             $"pathCount={committedMovementPath.Count} | selected={(selectedUnit != null ? selectedUnit.name : "(none)")}");
 
         if (HandleScannerPromptCancel())
         {
-            Debug.Log("[Rollback] ESC consumido por submenu/scanner prompt.");
+            RuntimeLog("[Rollback] ESC consumido por submenu/scanner prompt.");
             return ActionSfx.Cancel;
         }
 
@@ -510,7 +510,7 @@ public partial class TurnStateManager
 
         if (!hasCommittedMovement || committedMovementPath.Count < 2)
         {
-            Debug.Log("[Rollback] Sem caminho comprometido valido. Fallback para UnitSelected.");
+            RuntimeLog("[Rollback] Sem caminho comprometido valido. Fallback para UnitSelected.");
             SetCursorState(CursorState.UnitSelected, "HandleCancelWhileMoveuAndando: fallback without committed path", rollback: true);
             ClearSensorResults();
             PaintSelectedUnitMovementRange();
@@ -521,7 +521,7 @@ public partial class TurnStateManager
         RestorePreparedMovementCostIfAny();
         if (!BeginRollbackToSelection())
         {
-            Debug.Log("[Rollback] Falha ao iniciar animacao de rollback. Fallback para UnitSelected.");
+            RuntimeLog("[Rollback] Falha ao iniciar animacao de rollback. Fallback para UnitSelected.");
             SetCursorState(CursorState.UnitSelected, "HandleCancelWhileMoveuAndando: rollback animation failed", rollback: true);
             ClearCommittedMovement();
             ClearSensorResults();
@@ -529,7 +529,7 @@ public partial class TurnStateManager
         }
         else
         {
-            Debug.Log("[Rollback] Animacao de rollback iniciada.");
+            RuntimeLog("[Rollback] Animacao de rollback iniciada.");
         }
         return ActionSfx.Cancel;
     }

@@ -178,6 +178,7 @@ public partial class TurnStateManager
         }
 
         supplyQueuedOrders.Add(target.option);
+        replayManager?.UpdateCurrentBufferTarget(target.targetUnit, null, target.option.targetCell, "SupplyQueueConfirm");
         supplySuppressDefaultConfirmSfxOnce = true;
         cursorController?.PlayLoadSfx();
         RebuildSupplyQueuePreviewTracks();
@@ -1640,6 +1641,60 @@ public partial class TurnStateManager
         return Mathf.Max(0, total);
     }
 
+    public bool TryQueueAutomatedSupplyReplayOrder(string targetInstanceId)
+    {
+        if (cursorState != CursorState.Suprindo || selectedUnit == null)
+            return false;
+
+        RebuildSupplyCandidateEntries();
+        if (supplyCandidateEntries.Count <= 0)
+            return false;
+
+        int selectedIndex = -1;
+        if (!string.IsNullOrWhiteSpace(targetInstanceId))
+        {
+            for (int i = 0; i < supplyCandidateEntries.Count; i++)
+            {
+                SupplyCandidateEntry entry = supplyCandidateEntries[i];
+                if (entry == null || entry.targetUnit == null)
+                    continue;
+
+                if (entry.targetUnit.InstanceId.ToString() == targetInstanceId)
+                {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (selectedIndex < 0)
+            selectedIndex = 0;
+
+        supplySelectedCandidateIndex = selectedIndex;
+
+        if (scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
+        {
+            if (!TryConfirmScannerSupply())
+                return false;
+        }
+
+        if (scannerPromptStep == ScannerPromptStep.MergeConfirm)
+            return TryConfirmScannerSupply();
+
+        return false;
+    }
+
+    public bool TryStartAutomatedSupplyReplayExecution()
+    {
+        if (cursorState != CursorState.Suprindo || supplyExecutionInProgress)
+            return false;
+        if (supplyQueuedOrders.Count <= 0)
+            return false;
+
+        StartSupplyExecution();
+        return true;
+    }
+
     private bool ConsumeSupplySuppressDefaultConfirmSfxOnce()
     {
         if (!supplySuppressDefaultConfirmSfxOnce)
@@ -1993,4 +2048,6 @@ public partial class TurnStateManager
         return null;
     }
 }
+
+
 

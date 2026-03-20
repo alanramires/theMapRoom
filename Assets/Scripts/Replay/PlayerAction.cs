@@ -1,5 +1,16 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
+
+[Serializable]
+public class PlayerActionSubStep
+{
+    public string Label;
+    public string TargetInstanceId;
+    public string TargetConstructionId;
+    public Vector3Int TargetHex;
+    public bool HasTargetHex;
+}
 
 [Serializable]
 public class PlayerAction
@@ -27,7 +38,11 @@ public class PlayerAction
     public Vector3Int TargetHex;
     public bool HasTargetHex;
 
+    public int ShoppingSelectedIndex = -1;
+    public string ShoppingUnitTypeId;
+
     public string SubStepLabel;
+    public List<PlayerActionSubStep> SubSteps = new List<PlayerActionSubStep>();
 
     public bool Confirmed;
 
@@ -37,5 +52,3 @@ public class PlayerAction
     public bool IsTurnMarker;
     public string DebugLabel;
 }
-
-

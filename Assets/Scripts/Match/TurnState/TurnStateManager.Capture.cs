@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -26,7 +26,7 @@ public partial class TurnStateManager
                 out _,
                 out reason))
         {
-            Debug.Log(string.IsNullOrWhiteSpace(reason)
+            RuntimeLog(string.IsNullOrWhiteSpace(reason)
                 ? "Pode Capturar (\"C\"): sem alvo de captura valido."
                 : $"Pode Capturar (\"C\"): {reason}");
             LogScannerPanel();
@@ -73,7 +73,7 @@ public partial class TurnStateManager
                 out PodeCapturarSensor.CaptureOperationType operationType,
                 out string operationReason))
         {
-            Debug.Log(string.IsNullOrWhiteSpace(operationReason)
+            RuntimeLog(string.IsNullOrWhiteSpace(operationReason)
                 ? "[Captura] Operacao invalida no momento da execucao."
                 : $"[Captura] Operacao invalida: {operationReason}");
             FinalizeCaptureAction(capturer);
@@ -93,7 +93,7 @@ public partial class TurnStateManager
             after = Mathf.Min(safeMax, before + captureDamage);
             targetConstruction.SetCurrentCapturePoints(after);
             concluded = after >= safeMax;
-            Debug.Log(
+            RuntimeLog(
                 $"[Captura] {capturer.name} recuperou {captureDamage} de captura em {targetConstruction.ConstructionDisplayName} " +
                 $"({before} -> {after}).");
         }
@@ -102,7 +102,7 @@ public partial class TurnStateManager
             after = Mathf.Max(0, before - captureDamage);
             targetConstruction.SetCurrentCapturePoints(after);
             concluded = after <= 0;
-            Debug.Log(
+            RuntimeLog(
                 $"[Captura] {capturer.name} causou {captureDamage} de captura em {targetConstruction.ConstructionDisplayName} " +
                 $"({before} -> {after}).");
         }
@@ -119,13 +119,13 @@ public partial class TurnStateManager
                 targetConstruction.SetCurrentCapturePoints(targetConstruction.CapturePointsMax);
                 captureCompletedForReplay = true;
                 newOwnerForReplay = capturer.TeamId;
-                Debug.Log(
+                RuntimeLog(
                     $"[Captura] Construcao capturada por {TeamUtils.GetName(capturer.TeamId)}. " +
                     $"Capture resetado para {targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}.");
             }
             else
             {
-                Debug.Log(
+                RuntimeLog(
                     $"[Captura] Construcao aliada recuperada para {targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}.");
             }
 
@@ -170,3 +170,4 @@ public partial class TurnStateManager
     }
 
 }
+

@@ -158,7 +158,7 @@ public partial class TurnStateManager
         }
 
         int economyAfter = matchController != null ? matchController.GetActualMoney(spawnTeam) : economyBefore;
-        RecordShoppingBuyReplayCommand(spawned, unit, spawnTeam, spawnCell, economyBefore, economyAfter);
+        RecordShoppingBuyReplayCommand(spawned, unit, spawnTeam, spawnCell, economyBefore, economyAfter, index);
 
         if (matchController != null)
             PanelMoneyController.PushContextualUpdate(spawnTeam, remainingMoney, ResolveUnitName(unit), -unitCost);
@@ -183,6 +183,36 @@ public partial class TurnStateManager
         return shoppingSelectedIndex;
     }
 
+    public int GetShoppingSelectedIndexForReplay()
+    {
+        return ClampShoppingSelectedIndex();
+    }
+
+    public string GetShoppingSelectedUnitTypeIdForReplay()
+    {
+        int index = ClampShoppingSelectedIndex();
+        if (index < 0 || shoppingUnitsForSale == null || index >= shoppingUnitsForSale.Count)
+            return null;
+
+        UnitData unit = shoppingUnitsForSale[index];
+        if (unit == null)
+            return null;
+
+        return !string.IsNullOrWhiteSpace(unit.id) ? unit.id : unit.name;
+    }
+
+    public bool TryResolveShoppingCursorMoveForReplay(Vector3Int inputDelta)
+    {
+        if (cursorController == null)
+            return false;
+
+        return TryResolveShoppingCursorMove(cursorController.CurrentCell, inputDelta);
+    }
+
+    public bool TryConfirmSelectedShoppingOptionForReplay()
+    {
+        return TryConfirmSelectedShoppingOption();
+    }
     private bool TryResolveShoppingCursorMove(Vector3Int currentCell, Vector3Int inputDelta)
     {
         if (cursorState != CursorState.ShoppingAndServices || shoppingUnitsForSale == null || shoppingUnitsForSale.Count <= 0)
@@ -529,7 +559,8 @@ public partial class TurnStateManager
         TeamId buyingTeam,
         Vector3Int spawnCell,
         int economyBefore,
-        int economyAfter)
+        int economyAfter,
+        int selectedIndex)
     {
         if (replayManager == null || spawned == null || unit == null)
             return;
@@ -550,6 +581,8 @@ public partial class TurnStateManager
             UnitInstanceId = spawnedManager.InstanceId.ToString(),
             TargetHex = normalizedSpawnCell,
             SensorAction = SensorActionType.Shopping,
+            ShoppingSelectedIndex = selectedIndex,
+            ShoppingUnitTypeId = !string.IsNullOrWhiteSpace(unit.id) ? unit.id : unit.name,
             Confirmed = true,
             DebugLabel = $"Shopping: {ResolveUnitName(unit)} ({spawnedManager.InstanceId})"
         });
@@ -567,6 +600,9 @@ public partial class TurnStateManager
     }
 
 }
+
+
+
 
 
 

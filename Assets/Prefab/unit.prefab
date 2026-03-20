@@ -364,12 +364,31 @@ MonoBehaviour:
   hasActed: 0
   hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
+  hasMerged: 0
+  mergedWhenTurn: -1
+  mergedWithUnit: 
   teamId: 0
   unitId: Soldado
   instanceId: 5
   currentPosition: {x: 0, y: 0, z: 0}
   unitDisplayName: Soldado
   currentHP: 10
+  isDead: 0
+  diedByUnit: 
+  deadWhenTurn: -1
+  deadByReason: 
+  updateIsDeadInUpdate: 1
+  flagHasActed: 0
+  flagIsDead: 0
+  flagDeadWhenTurn: -1
+  flagDeadByReason: 
+  flagDiedByUnit: 
+  flagIsEmbarked: 0
+  flagEmbarkedAtUnit: 
+  flagReceivedSupplies: 0
+  flagHasMerged: 0
+  flagMergedWhenTurn: -1
+  flagMergedWithUnit: 
   currentAmmo: 3
   maxAmmo: 3
   currentFuel: 99
@@ -382,6 +401,7 @@ MonoBehaviour:
   appliedHasActed: 0
   appliedActiveTeamId: 0
   isEmbarked: 0
+  embarkedAtUnit: 
   embarkedVisualPreviewDepth: 0
   isSelected: 0
   isPreviewDimmed: 0

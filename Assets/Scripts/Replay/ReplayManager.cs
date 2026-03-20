@@ -38,6 +38,7 @@ public class ReplayManager : MonoBehaviour
     [SerializeField] private bool animateCursorTravelBetweenActions = true;
     [SerializeField, Range(0.01f, 1f)] private float cursorTravelStepDelay = 0.15f;
     [SerializeField, Range(0f, 2f)] private float replayConfirmVisualDelay = 0.25f;
+    [SerializeField, Range(0.01f, 1f)] private float shoppingNavDelay = 0.15f;
     [SerializeField] private bool animateCombatOnReplay = true;
     [SerializeField] private bool cinematicModeEnabled = true;
     [SerializeField, HideInInspector] private float autoPlayTimer;
@@ -155,6 +156,8 @@ public class ReplayManager : MonoBehaviour
     private IEnumerator TryMoveReplayCursorToActionStart(PlayerAction action, TurnStartSnapshot preActionSnapshot)
     {
         if (cursorController == null)
+            yield break;
+        if (action != null && action.ActionType == PlayerActionType.UnitAction)
             yield break;
 
         if (!TryResolveActionPreExecutionCursorCell(action, preActionSnapshot, out Vector3Int targetCursorCell))
@@ -278,6 +281,7 @@ public class ReplayManager : MonoBehaviour
             case PlayerActionType.UnitAction:
             case PlayerActionType.CommandService:
             case PlayerActionType.RemoveUnit:
+            case PlayerActionType.Shopping:
                 return true;
             default:
                 return false;
@@ -302,6 +306,9 @@ public class ReplayManager : MonoBehaviour
                 break;
             case PlayerActionType.RemoveUnit:
                 yield return ExecuteRecordedRemoveUnitBatch(action, preActionSnapshot);
+                break;
+            case PlayerActionType.Shopping:
+                yield return ExecuteRecordedShoppingBatch(action, preActionSnapshot);
                 break;
             default:
                 // Shopping and unknown actions are finalized by restoring post-action snapshot.
@@ -334,7 +341,6 @@ public class ReplayManager : MonoBehaviour
             ReplayLog($"[Replay][CursorTravel] phase=unit-batch-destination current={FormatReplayCell(NormalizeCell(cursorController.CurrentCell))} destination={FormatReplayCell(destinationCell)}");
             if (!hasOriginCell || destinationCell != originCell)
                 yield return MoveCursorToCellWithTravel(destinationCell);
-
             ExecuteReplayConfirmInput();
             yield return WaitForReplaySystemsIdle();
         }
@@ -347,6 +353,34 @@ public class ReplayManager : MonoBehaviour
 
         yield return WaitForReplaySystemsIdle();
 
+        switch (action.SensorAction)
+        {
+            case SensorActionType.Disembark:
+                yield return ExecuteRecordedDisembarkSubsteps(action);
+                yield break;
+            case SensorActionType.Merge:
+                yield return ExecuteRecordedMergeSubsteps(action);
+                yield break;
+            case SensorActionType.Supply:
+                yield return ExecuteRecordedSupplySubsteps(action);
+                yield break;
+            case SensorActionType.Transfer:
+                yield return ExecuteRecordedTransferSubsteps(action);
+                yield break;
+            case SensorActionType.Embark:
+                yield return ExecuteRecordedEmbarkSubsteps(action);
+                yield break;
+            case SensorActionType.Attack:
+                yield return ExecuteRecordedAttackSubsteps(action);
+                yield break;
+            case SensorActionType.Capture:
+                yield return ExecuteRecordedCaptureAction(action);
+                yield break;
+            case SensorActionType.Land:
+                yield return ExecuteRecordedLandAction(action);
+                yield break;
+        }
+
         if (TryResolveRecordedTargetCell(action, out Vector3Int targetCell))
         {
             targetCell = NormalizeCell(targetCell);
@@ -358,6 +392,326 @@ public class ReplayManager : MonoBehaviour
         yield return WaitForReplaySystemsIdle();
     }
 
+    private IEnumerable<PlayerActionSubStep> EnumerateRecordedTargetSubsteps(PlayerAction action)
+    {
+        if (action == null)
+            yield break;
+
+        bool yieldedFromList = false;
+        if (action.SubSteps != null)
+        {
+            for (int i = 0; i < action.SubSteps.Count; i++)
+            {
+                PlayerActionSubStep step = action.SubSteps[i];
+                if (step == null)
+                    continue;
+
+                bool hasTargetData = step.HasTargetHex ||
+                                     !string.IsNullOrWhiteSpace(step.TargetInstanceId) ||
+                                     !string.IsNullOrWhiteSpace(step.TargetConstructionId);
+                if (!hasTargetData)
+                    continue;
+
+                yieldedFromList = true;
+                yield return step;
+            }
+        }
+
+        bool actionHasTargetData = action.HasTargetHex ||
+                                   !string.IsNullOrWhiteSpace(action.TargetInstanceId) ||
+                                   !string.IsNullOrWhiteSpace(action.TargetConstructionId);
+        if (!yieldedFromList && actionHasTargetData)
+        {
+            yield return new PlayerActionSubStep
+            {
+                Label = action.SubStepLabel,
+                TargetInstanceId = action.TargetInstanceId,
+                TargetConstructionId = action.TargetConstructionId,
+                TargetHex = action.TargetHex,
+                HasTargetHex = true
+            };
+        }
+    }
+    private IEnumerator ExecuteRecordedDisembarkSubsteps(PlayerAction action)
+    {
+        if (turnStateManager == null)
+            yield break;
+
+        bool executedAny = false;
+        foreach (PlayerActionSubStep step in EnumerateRecordedTargetSubsteps(action))
+        {
+            if (step == null || !step.HasTargetHex)
+                continue;
+
+            Vector3Int targetCell = NormalizeCell(step.TargetHex);
+            if (cursorController != null && NormalizeCell(cursorController.CurrentCell) != targetCell)
+                yield return MoveCursorToCellWithTravel(targetCell);
+
+            bool queued = turnStateManager.TryQueueAutomatedDisembarkReplayOrder(step.TargetInstanceId, targetCell);
+            if (!queued)
+            {
+                ExecuteReplayConfirmInput();
+                yield return WaitForReplaySystemsIdle();
+                ExecuteReplayConfirmInput();
+                yield return WaitForReplaySystemsIdle();
+            }
+            else
+            {
+                yield return WaitForReplaySystemsIdle();
+            }
+
+            executedAny = true;
+        }
+
+        if (!executedAny)
+            yield return ExecuteDoubleConfirmFallback();
+
+        if (!turnStateManager.TryStartAutomatedDisembarkReplayExecution())
+            yield return ExecuteDoubleConfirmFallback();
+
+        yield return WaitForReplaySystemsIdle();
+    }
+    private IEnumerator ExecuteRecordedMergeSubsteps(PlayerAction action)
+    {
+        if (turnStateManager == null)
+            yield break;
+
+        bool executedAny = false;
+        foreach (PlayerActionSubStep step in EnumerateRecordedTargetSubsteps(action))
+        {
+            if (step == null || string.IsNullOrWhiteSpace(step.TargetInstanceId))
+                continue;
+
+            if (!turnStateManager.TryQueueAutomatedMergeReplayOrder(step.TargetInstanceId))
+                yield return ExecuteDoubleConfirmFallback();
+            else
+                yield return WaitForReplaySystemsIdle();
+
+            executedAny = true;
+        }
+
+        if (!executedAny)
+            yield return ExecuteDoubleConfirmFallback();
+
+        if (!turnStateManager.TryStartAutomatedMergeReplayExecution())
+            yield return ExecuteDoubleConfirmFallback();
+
+        yield return WaitForReplaySystemsIdle();
+    }
+
+    private IEnumerator ExecuteRecordedSupplySubsteps(PlayerAction action)
+    {
+        if (turnStateManager == null)
+            yield break;
+
+        bool executedAny = false;
+        foreach (PlayerActionSubStep step in EnumerateRecordedTargetSubsteps(action))
+        {
+            if (step == null || string.IsNullOrWhiteSpace(step.TargetInstanceId))
+                continue;
+
+            if (!turnStateManager.TryQueueAutomatedSupplyReplayOrder(step.TargetInstanceId))
+                yield return ExecuteDoubleConfirmFallback();
+            else
+                yield return WaitForReplaySystemsIdle();
+
+            executedAny = true;
+        }
+
+        if (!executedAny)
+            yield return ExecuteDoubleConfirmFallback();
+
+        if (!turnStateManager.TryStartAutomatedSupplyReplayExecution())
+            yield return ExecuteDoubleConfirmFallback();
+
+        yield return WaitForReplaySystemsIdle();
+    }
+
+    private IEnumerator ExecuteRecordedTransferSubsteps(PlayerAction action)
+    {
+        if (turnStateManager == null)
+            yield break;
+
+        bool executedAny = false;
+        foreach (PlayerActionSubStep step in EnumerateRecordedTargetSubsteps(action))
+        {
+            if (step == null || !step.HasTargetHex)
+                continue;
+
+            Vector3Int targetCell = NormalizeCell(step.TargetHex);
+            if (cursorController != null && NormalizeCell(cursorController.CurrentCell) != targetCell)
+                yield return MoveCursorToCellWithTravel(targetCell);
+
+            if (!turnStateManager.TryExecuteAutomatedTransferReplayOrder(step.TargetInstanceId, targetCell))
+                yield return ExecuteDoubleConfirmFallback();
+            else
+                yield return WaitForReplaySystemsIdle();
+
+            executedAny = true;
+        }
+
+        if (!executedAny)
+            yield return ExecuteDoubleConfirmFallback();
+    }
+
+    private IEnumerator ExecuteRecordedEmbarkSubsteps(PlayerAction action)
+    {
+        if (turnStateManager == null)
+            yield break;
+
+        bool executedAny = false;
+        foreach (PlayerActionSubStep step in EnumerateRecordedTargetSubsteps(action))
+        {
+            if (step == null || !step.HasTargetHex)
+                continue;
+
+            Vector3Int targetCell = NormalizeCell(step.TargetHex);
+            if (cursorController != null && NormalizeCell(cursorController.CurrentCell) != targetCell)
+                yield return MoveCursorToCellWithTravel(targetCell);
+
+            if (!turnStateManager.TryExecuteAutomatedEmbarkReplayTarget(step.TargetInstanceId, targetCell))
+                yield return ExecuteDoubleConfirmFallback();
+            else
+                yield return WaitForReplaySystemsIdle();
+
+            executedAny = true;
+        }
+
+        if (!executedAny)
+            yield return ExecuteDoubleConfirmFallback();
+    }
+
+    private IEnumerator ExecuteRecordedAttackSubsteps(PlayerAction action)
+    {
+        if (turnStateManager == null)
+            yield break;
+
+        bool executedAny = false;
+        foreach (PlayerActionSubStep step in EnumerateRecordedTargetSubsteps(action))
+        {
+            if (step == null || !step.HasTargetHex)
+                continue;
+
+            Vector3Int targetCell = NormalizeCell(step.TargetHex);
+            if (cursorController != null && NormalizeCell(cursorController.CurrentCell) != targetCell)
+                yield return MoveCursorToCellWithTravel(targetCell);
+
+            if (!turnStateManager.TryExecuteAutomatedAttackReplayTarget(step.TargetInstanceId, targetCell))
+                yield return ExecuteDoubleConfirmFallback();
+            else
+                yield return WaitForReplaySystemsIdle();
+
+            executedAny = true;
+        }
+
+        if (!executedAny)
+            yield return ExecuteDoubleConfirmFallback();
+    }
+
+    private IEnumerator ExecuteDoubleConfirmFallback()
+    {
+        ExecuteReplayConfirmInput();
+        yield return WaitForReplaySystemsIdle();
+        ExecuteReplayConfirmInput();
+        yield return WaitForReplaySystemsIdle();
+    }
+
+    private IEnumerator ExecuteRecordedCaptureAction(PlayerAction action)
+    {
+        // Capture starts execution immediately when requested; no extra confirm required.
+        yield return WaitForReplaySystemsIdle();
+    }
+
+    private IEnumerator ExecuteRecordedLandAction(PlayerAction action)
+    {
+        bool executedAny = false;
+        foreach (PlayerActionSubStep step in EnumerateRecordedTargetSubsteps(action))
+        {
+            if (step != null && step.HasTargetHex && cursorController != null)
+            {
+                Vector3Int targetCell = NormalizeCell(step.TargetHex);
+                if (NormalizeCell(cursorController.CurrentCell) != targetCell)
+                    yield return MoveCursorToCellWithTravel(targetCell);
+            }
+
+            ExecuteReplayConfirmInput();
+            yield return WaitForReplaySystemsIdle();
+            executedAny = true;
+        }
+
+        if (!executedAny)
+        {
+            ExecuteReplayConfirmInput();
+            yield return WaitForReplaySystemsIdle();
+        }
+    }
+    private IEnumerator ExecuteRecordedShoppingBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
+    {
+        if (turnStateManager == null || cursorController == null)
+            yield break;
+
+        if (TryResolveRecordedCursorCell(action, preActionSnapshot, out Vector3Int cursorCell))
+            yield return MoveCursorToCellWithTravel(NormalizeCell(cursorCell));
+
+        ExecuteReplayConfirmInput();
+        yield return WaitForReplaySystemsIdle();
+
+        if (turnStateManager.CurrentCursorState != TurnStateManager.CursorState.ShoppingAndServices)
+        {
+            ReplayLogWarning("[Replay][Shopping] Shopping menu did not open after confirm.");
+            yield break;
+        }
+
+        int targetIndex = Mathf.Max(0, action != null ? action.ShoppingSelectedIndex : 0);
+        int guard = 0;
+        const int maxGuard = 256;
+
+        while (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.ShoppingAndServices)
+        {
+            int currentIndex = turnStateManager.GetShoppingSelectedIndexForReplay();
+            if (currentIndex >= targetIndex)
+                break;
+
+            if (guard++ >= maxGuard)
+            {
+                ReplayLogWarning($"[Replay][Shopping] Navigation guard reached while moving to index {targetIndex}.");
+                break;
+            }
+
+            bool moved = turnStateManager.TryResolveShoppingCursorMoveForReplay(Vector3Int.right);
+            if (!moved)
+                moved = turnStateManager.TryResolveShoppingCursorMoveForReplay(new Vector3Int(0, -1, 0));
+
+            if (!moved)
+            {
+                ReplayLogWarning($"[Replay][Shopping] Could not advance selection (current={currentIndex}, target={targetIndex}).");
+                break;
+            }
+
+            if (shoppingNavDelay > 0f)
+                yield return new WaitForSecondsRealtime(shoppingNavDelay);
+
+            yield return WaitForReplaySystemsIdle();
+        }
+
+        if (!string.IsNullOrWhiteSpace(action != null ? action.ShoppingUnitTypeId : null))
+        {
+            string selectedUnitTypeId = turnStateManager.GetShoppingSelectedUnitTypeIdForReplay();
+            if (!string.Equals(selectedUnitTypeId, action.ShoppingUnitTypeId, StringComparison.OrdinalIgnoreCase))
+            {
+                ReplayLogWarning(
+                    $"[Replay][Shopping] Unit type mismatch at selected index. recorded={action.ShoppingUnitTypeId} selected={selectedUnitTypeId ?? "(null)"}");
+            }
+        }
+
+        if (!turnStateManager.TryConfirmSelectedShoppingOptionForReplay())
+        {
+            ReplayLogWarning("[Replay][Shopping] TryConfirmSelectedShoppingOptionForReplay failed, falling back to confirm input.");
+            ExecuteReplayConfirmInput();
+        }
+
+        yield return WaitForReplaySystemsIdle();
+    }
     private IEnumerator ExecuteRecordedCommandServiceBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
     {
         if (cursorController != null && TryResolveRecordedCursorCell(action, preActionSnapshot, out Vector3Int cursorCell))
@@ -1045,9 +1399,45 @@ public class ReplayManager : MonoBehaviour
         currentBuffer.HasTargetHex = true;
         if (!string.IsNullOrWhiteSpace(subStepLabel))
             currentBuffer.SubStepLabel = subStepLabel;
+        if (ShouldAppendCurrentBufferSubStep(subStepLabel))
+            AppendCurrentBufferSubStep(subStepLabel);
         currentBuffer.ActionType = PlayerActionType.UnitAction;
     }
 
+    private bool ShouldAppendCurrentBufferSubStep(string label)
+    {
+        if (currentBuffer == null)
+            return false;
+
+        switch (currentBuffer.SensorAction)
+        {
+            case SensorActionType.Merge:
+            case SensorActionType.Supply:
+                return !string.IsNullOrWhiteSpace(label) &&
+                       label.IndexOf("QueueConfirm", StringComparison.OrdinalIgnoreCase) >= 0;
+            default:
+                return true;
+        }
+    }
+    private void AppendCurrentBufferSubStep(string label)
+    {
+        if (currentBuffer == null)
+            return;
+
+        if (currentBuffer.SubSteps == null)
+            currentBuffer.SubSteps = new List<PlayerActionSubStep>();
+
+        PlayerActionSubStep step = new PlayerActionSubStep
+        {
+            Label = label,
+            TargetInstanceId = currentBuffer.TargetInstanceId,
+            TargetConstructionId = currentBuffer.TargetConstructionId,
+            TargetHex = currentBuffer.TargetHex,
+            HasTargetHex = currentBuffer.HasTargetHex
+        };
+
+        currentBuffer.SubSteps.Add(step);
+    }
     public void RecordStandaloneAction(PlayerAction action)
     {
         if (isReplaying || action == null)
@@ -2415,3 +2805,18 @@ public class ReplayManager : MonoBehaviour
         return resolved;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

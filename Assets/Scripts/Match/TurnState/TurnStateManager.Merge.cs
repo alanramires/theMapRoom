@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -222,6 +222,7 @@ public partial class TurnStateManager
         }
 
         mergeQueuedUnits.Add(target.unit);
+        replayManager?.UpdateCurrentBufferTarget(target.unit, null, target.unit.CurrentCellPosition, "MergeQueueConfirm");
         LogMergeDebug($"Queued candidate={ResolveUnitRuntimeName(target.unit)} queueCount={mergeQueuedUnits.Count}");
         mergeSuppressDefaultConfirmSfxOnce = true;
         cursorController?.PlayLoadSfx();
@@ -1651,6 +1652,61 @@ public partial class TurnStateManager
         }
     }
 
+    public bool TryQueueAutomatedMergeReplayOrder(string targetInstanceId)
+    {
+        if (cursorState != CursorState.Fundindo || selectedUnit == null)
+            return false;
+
+        EnsureMergeSensorSnapshot();
+        RebuildMergeCandidateEntries();
+        if (mergeCandidateEntries.Count <= 0)
+            return false;
+
+        int selectedIndex = -1;
+        if (!string.IsNullOrWhiteSpace(targetInstanceId))
+        {
+            for (int i = 0; i < mergeCandidateEntries.Count; i++)
+            {
+                MergeCandidateEntry entry = mergeCandidateEntries[i];
+                if (entry == null || entry.unit == null)
+                    continue;
+
+                if (entry.unit.InstanceId.ToString() == targetInstanceId)
+                {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (selectedIndex < 0)
+            selectedIndex = 0;
+
+        mergeSelectedCandidateIndex = selectedIndex;
+
+        if (scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
+        {
+            if (!TryConfirmScannerMerge())
+                return false;
+        }
+
+        if (scannerPromptStep == ScannerPromptStep.MergeConfirm)
+            return TryConfirmScannerMerge();
+
+        return false;
+    }
+
+    public bool TryStartAutomatedMergeReplayExecution()
+    {
+        if (cursorState != CursorState.Fundindo || mergeExecutionInProgress)
+            return false;
+        if (mergeQueuedUnits.Count <= 0)
+            return false;
+
+        StartMergeExecution();
+        return true;
+    }
+
     private bool ConsumeMergeSuppressDefaultConfirmSfxOnce()
     {
         if (!mergeSuppressDefaultConfirmSfxOnce)
@@ -1802,3 +1858,5 @@ public partial class TurnStateManager
         return supplyStepsByType.Count;
     }
 }
+
+
