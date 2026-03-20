@@ -1,26 +1,71 @@
-# TurnStateManager - mapa de estados
+﻿# TurnStateManager - mapa atual da FSM
+
+Documento canonico do estado atual do `TurnStateManager`.
+Para leitura analitica complementar, ver tambem:
+- `docs/analises/07_relatorio_turn_state_manager.md`
+- `docs/avaliacao do autor/sistema de estados.md`
 
 Legenda:
 - `[CursorState]`: estado explicito da FSM principal (`TurnStateManager.CursorState`).
-- `[ScannerPromptStep]`: subestado interno do scanner/sensors.
-- `[inline]`: fluxo sem `CursorState` dedicado (flags, helper, hotkey, coroutine).
+- `[ScannerPromptStep]`: subestado interno do scanner / prompt de sensores.
+- `[inline]`: fluxo sem estado novo na enum, mas ainda governado pelo `TurnStateManager` por flags, helper ou coroutine.
 
-Arvore atual (alto nivel):
+## CursorState atuais
+
+1. `Neutral`
+2. `UnitSelected`
+3. `MoveuAndando`
+4. `MoveuParado`
+5. `Capturando`
+6. `Mirando`
+7. `Pousando`
+8. `Embarcando`
+9. `Desembarcando`
+10. `Fundindo`
+11. `ShoppingAndServices`
+12. `Suprindo`
+13. `InspectingUnit`
+14. `InspectingBuilding`
+15. `InspectingHotZone`
+16. `CommandService`
+17. `RemovingUnit`
+
+## Leitura funcional
+
+### Base da interacao
+- `Neutral`: ponto de entrada e saida mais comum.
+- `UnitSelected`: unidade aliada ativa, pronta para mover ou abrir sensores.
+
+### Movimento
+- `MoveuParado` e `MoveuAndando` sao os dois estados apos a confirmacao de movimento.
+- Ambos reconstroem o mesmo conjunto de fluxos de sensores, mudando apenas o contexto de movimentacao.
+- `Capturando` segue como estado dedicado de execucao, e nao como substep de scanner.
+
+### Sensores / prompts dedicados
+- `Mirando` usa `MirandoCycleTarget` e `MirandoConfirmTarget`.
+- `Pousando` usa `LandingCycleOption` e `LandingConfirmOption`.
+- `Embarcando` usa `EmbarkCycleTarget` e `EmbarkConfirmTarget`.
+- `Desembarcando` usa `DisembarkPassengerSelect`, `DisembarkLandingSelect` e `DisembarkConfirm`.
+- `Fundindo` usa `MergeParticipantSelect`, `MergeTargetSelect` e `MergeConfirm`.
+- `Suprindo` reaproveita parte da navegacao de merge, mas e um `CursorState` proprio.
+- `ShoppingAndServices` e o estado de compra em construcao aliada.
+- `InspectingUnit`, `InspectingBuilding` e `InspectingHotZone` sao estados dedicados de inspecao / overlay.
+- `CommandService` e `RemovingUnit` tambem sao estados dedicados, nao fluxos inline.
+
+### Fluxos inline que continuam sem CursorState proprio
+- `transfer prompt`: pendencias de selecao / confirmacao controladas por flags e helper.
+- `emergir` / forca de camada: segue por regras de camada e sensores auxiliares, sem `CursorState.Decolando`.
+- `decolagem automatica`: pode ser preparada por regra no momento da selecao ou do movimento, mas nao cria um estado novo na enum.
+
+## Arvore resumida
 
 neutral [CursorState]
-    inspect unit [inline]
-        BeginInspectedHelper (helper de inspecao)
-    inspect building [inline]
-        BeginInspectedConstructionHelper (helper de inspecao)
-    inspect hot zone [inline + ScannerPromptStep]
-        ThreatLayerTeamSelect [ScannerPromptStep]
-    command service [inline]
-        preview/confirmacao pendente (`commandServiceConfirmationPending`)
-        execucao (`commandServiceExecutionInProgress`)
-    removing unit [inline/debug]
-        pending destroy confirmation (`pendingDestroyUnitConfirmation`)
+    inspect unit [CursorState]
+    inspect building [CursorState]
+    inspect hot zone [CursorState + ScannerPromptStep.ThreatLayerTeamSelect]
+    command service [CursorState]
+    removing unit [CursorState]
     shopping and services [CursorState]
-        compra em construcao aliada
     unit selected [CursorState]
         confirma no mesmo hex -> moveu parado [CursorState]
         confirma destino valido -> animacao de movimento -> moveu andando [CursorState]
@@ -30,122 +75,18 @@ unit selected [CursorState]
         -> moveu parado [CursorState]
         -> moveu andando [CursorState]
 
-moveu parado [CursorState]
-    sensors awaiting action [ScannerPromptStep.AwaitingAction]
-        mirando [CursorState]
-            MirandoCycleTarget [ScannerPromptStep]
-            MirandoConfirmTarget [ScannerPromptStep]
-        embarcando [CursorState]
-            EmbarkCycleTarget [ScannerPromptStep]
-            EmbarkConfirmTarget [ScannerPromptStep]
-        pousando [CursorState]
-            LandingCycleOption [ScannerPromptStep]
-            LandingConfirmOption [ScannerPromptStep]
-        desembarcando [CursorState]
-            DisembarkPassengerSelect [ScannerPromptStep]
-            DisembarkLandingSelect [ScannerPromptStep]
-            DisembarkConfirm [ScannerPromptStep]
-        capturando [CursorState]
-            fluxo por coroutine (sem substep dedicado)
-        fundindo [CursorState]
-            MergeParticipantSelect [ScannerPromptStep]
-            MergeConfirm [ScannerPromptStep]
-            MergeTargetSelect [ScannerPromptStep] (reservado no enum; nao e o caminho principal atual)
-        suprindo [CursorState]
-            MergeParticipantSelect [ScannerPromptStep] (reuso)
-            MergeConfirm [ScannerPromptStep] (reuso)
-        transfer prompt [inline]
-            selection pending (flag)
-            confirmation pending (flag)
-        move only [inline]
-            finaliza acao e volta para neutral
+moveu parado / moveu andando [CursorState]
+    mirrored scanner tree:
+        mirar -> `MirandoCycleTarget` / `MirandoConfirmTarget`
+        embarcar -> `EmbarkCycleTarget` / `EmbarkConfirmTarget`
+        pousar -> `LandingCycleOption` / `LandingConfirmOption`
+        desembarcar -> `DisembarkPassengerSelect` / `DisembarkLandingSelect` / `DisembarkConfirm`
+        fundir -> `MergeParticipantSelect` / `MergeTargetSelect` / `MergeConfirm`
+        suprir -> fluxo proprio, com reuso parcial de selecao de merge
 
-moveu andando [CursorState]
-    mesmo conjunto de subfluxos de `moveu parado`
-    (mirando, embarcando, pousando, desembarcando, capturando, fundindo, suprindo, transfer prompt)
-
-mirando [CursorState]
-    MirandoCycleTarget [ScannerPromptStep]
-    MirandoConfirmTarget [ScannerPromptStep]
-    confirma ataque -> sequencia de combate -> neutral
-    esc -> volta para moveu parado/moveu andando
-
-embarcando [CursorState]
-    EmbarkCycleTarget [ScannerPromptStep]
-    EmbarkConfirmTarget [ScannerPromptStep]
-    confirma -> sequencia de embarque
-    esc -> volta para moveu parado/moveu andando
-
-pousando [CursorState]
-    LandingCycleOption [ScannerPromptStep]
-    LandingConfirmOption [ScannerPromptStep]
-    confirma -> aplica transicao de camada
-    esc -> volta para moveu parado/moveu andando
-
-capturando [CursorState]
-    estado de execucao de captura (coroutine)
-    ao finalizar -> neutral
-
-desembarcando [CursorState]
-    DisembarkPassengerSelect [ScannerPromptStep]
-    DisembarkLandingSelect [ScannerPromptStep]
-    DisembarkConfirm [ScannerPromptStep]
-    confirma -> fila/execucao de desembarque
-    esc -> retrocede subpasso ou volta para moveu parado/moveu andando
-
-fundindo [CursorState]
-    MergeParticipantSelect [ScannerPromptStep]
-    MergeConfirm [ScannerPromptStep]
-    confirma -> fila/execucao de fusao
-    esc -> retrocede subpasso ou volta para moveu parado/moveu andando
-
-suprindo [CursorState]
-    MergeParticipantSelect [ScannerPromptStep] (reuso)
-    MergeConfirm [ScannerPromptStep] (reuso)
-    confirma -> fila/execucao de suprimento
-    esc -> retrocede subpasso ou volta para moveu parado/moveu andando
-
-shopping and services [CursorState]
-    selecao de opcao de compra
-    confirma -> compra
-    esc -> neutral
-
-Observacoes:
-- `HandleCancel()` e centralizado, mas delega por estado (`HandleCancelWhile...`) e por subpassos (`HandleScannerPromptCancel`).
-- Fluxos de `inspect unit/building`, `inspect hot zone`, `command service`, `transfer prompt` e `removing unit` nao tem `CursorState` proprio.
-- Fluxos de "emergir"/forca de camada (submarino) tambem nao tem `CursorState` proprio; ver `docs/sensors.md` em "Fluxos de camada relacionados a sensores (nao-FSM dedicado)".
-
-## Classificacao validada no codigo
-
-1. Estados inferiores (overlay/helper em `Neutral`, sem `CursorState` proprio)
-- `inspect unit`: inline via `BeginInspectedHelper(...)`.
-- `inspect building`: inline via `BeginInspectedConstructionHelper(...)`.
-- `inspect hot zone`: inline via `ScannerPromptStep.ThreatLayerTeamSelect`.
-- Comportamento de saida:
-  - `inspect unit/building`: fecha com qualquer input (teclado/mouse) ou ao mover cursor para outro hex.
-  - `inspect hot zone`: fecha por `ESC`, `Z` (toggle) ou ao sair de `Neutral` (ex.: selecionar unidade).
-- Implicacao: precisa mesmo de `HandleNeutral` robusto, porque o jogador pode sair da inspecao e entrar em selecao/acao no mesmo contexto de input.
-
-2. Estados menores com caminho unico (confirmar ate o fim ou cancelar)
-- `command service` [inline]:
-  - Preview deixa `commandServiceConfirmationPending = true`.
-  - `Enter` confirma e inicia coroutine de execucao.
-  - `ESC` cancela pendencia (`TryCancelPendingCommandServiceConfirmation()`).
-  - Exige `cursorState == Neutral`.
-- `removing unit` [inline/debug]:
-  - Hotkey `U` abre confirmacao (`pendingDestroyUnitConfirmation = true`).
-  - `Enter` executa destruir.
-  - `ESC` cancela.
-- `shopping and services` [`CursorState.ShoppingAndServices`]:
-  - `Enter` confirma compra.
-  - `ESC` volta para `Neutral`.
-
-3. Estados automaticos hardcoded
-- `pousando`: existe como `CursorState.Pousando` + substeps (`LandingCycleOption`/`LandingConfirmOption`).
-- `decolando`: nao existe `CursorState.Decolando`; e fluxo automatico por regra/flags (`TryPrepareTemporaryTakeoffStateForSelection`, `TryPrepareAutomaticTakeoffForMovement`).
-
-4. Estados/fluxos que entram no replay
-- O replay registra comandos de acao, nao "todo estado" da FSM.
-- Tipos atuais: `MoveUnit`, `Attack`, `BuyUnit`, `Capture`, `Embark`, `Disembark`, `Merge`, `Supply`.
-- Na pratica, eles sao filhos do fluxo iniciado em `UnitSelected` (direto ou via `MoveuParado/MoveuAndando`), mas a gravação ocorre no momento da execucao da acao.
-- Cinematico (cursor/camera/input sintetico) hoje so existe para `Attack`.
+## Observacoes objetivas
+- `HandleConfirm()` e `HandleCancel()` continuam centralizados, mas o roteamento agora cobre `Inspecting*`, `CommandService` e `RemovingUnit` como estados proprios.
+- `ScannerPromptStep.MergeTargetSelect` existe no enum, mas nao e o caminho principal da maioria dos fluxos atuais.
+- O replay registra comandos de acao, nao o estado inteiro da FSM.
+- Tipos atuais de acao persistidos no replay incluem `UnitAction`, `Shopping`, `CommandService` e `RemoveUnit`, alem dos fluxos de combate / logistica ligados ao runtime.
+- Se um doc antigo tratar `command service`, `inspect hot zone` ou `removing unit` como inline, essa leitura esta deprecada.

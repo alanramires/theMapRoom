@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -38,9 +38,10 @@ public class ReplayManager : MonoBehaviour
     [SerializeField] private bool animateCursorTravelBetweenActions = true;
     [SerializeField, Range(0.01f, 1f)] private float cursorTravelStepDelay = 0.15f;
     [SerializeField, Range(0f, 2f)] private float replayConfirmVisualDelay = 0.25f;
-    [SerializeField, Range(0.01f, 1f)] private float shoppingNavDelay = 0.15f;
+    [SerializeField, Range(0.01f, 1f), Tooltip("Delay between shopping menu items during replay automation (seconds).") ] private float shoppingNavDelay = 0.15f;
     [SerializeField] private bool animateCombatOnReplay = true;
     [SerializeField] private bool cinematicModeEnabled = true;
+    [SerializeField, Min(0.5f), Tooltip("Tempo maximo (segundos) para um batch concluir antes de abortar o replay.")] private float replayBatchTimeoutSeconds = 10f;
     [SerializeField, HideInInspector] private float autoPlayTimer;
     [Header("Telemetry")]
     [SerializeField] private bool snapshotTelemetryEnabled = true;
@@ -66,6 +67,7 @@ public class ReplayManager : MonoBehaviour
     private Coroutine restoreFogRefreshRoutine;
     private Coroutine attackStepExecutionRoutine;
     private Coroutine actionStepExecutionRoutine;
+    private bool replayBatchAbortRequested;
 
     private readonly Dictionary<string, ServiceData> cachedServicesById = new Dictionary<string, ServiceData>(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SupplyData> cachedSuppliesById = new Dictionary<string, SupplyData>(StringComparer.OrdinalIgnoreCase);
@@ -134,6 +136,8 @@ public class ReplayManager : MonoBehaviour
 
     private IEnumerator ExecuteActionStepFromStack(int index, PlayerAction action, TurnStartSnapshot preActionSnapshot, TurnStartSnapshot postActionSnapshot)
     {
+        replayBatchAbortRequested = false;
+
         if (preActionSnapshot != null)
             RestoreSnapshot(preActionSnapshot);
 
@@ -144,6 +148,13 @@ public class ReplayManager : MonoBehaviour
             yield return ExecuteRecordedActionBatch(action, preActionSnapshot);
         else if (postActionSnapshot != null)
             RestoreSnapshot(postActionSnapshot);
+
+        if (replayBatchAbortRequested)
+        {
+            replayBatchAbortRequested = false;
+            actionStepExecutionRoutine = null;
+            yield break;
+        }
 
         currentStepIndex = index;
         ApplyReplayVision();
@@ -329,6 +340,16 @@ public class ReplayManager : MonoBehaviour
             originCell = NormalizeCell(originCell);
             ReplayLog($"[Replay][CursorTravel] phase=unit-batch-origin current={FormatReplayCell(NormalizeCell(cursorController.CurrentCell))} origin={FormatReplayCell(originCell)}");
             yield return MoveCursorToCellWithTravel(originCell);
+
+            if (!ValidateReplayOriginUnitBeforeConfirm(action, originCell, out string mismatchDetails))
+            {
+                AbortReplayBatchDueToError(
+                    "dialog.replay.error",
+                    "replay <erro>",
+                    mismatchDetails,
+                    3.2f);
+                yield break;
+            }
 
             ExecuteReplayConfirmInput();
             yield return WaitForReplaySystemsIdle();
@@ -842,6 +863,50 @@ public class ReplayManager : MonoBehaviour
 
         return false;
     }
+    private bool ValidateReplayOriginUnitBeforeConfirm(PlayerAction action, Vector3Int originCell, out string mismatchDetails)
+    {
+        mismatchDetails = string.Empty;
+        if (action == null || string.IsNullOrWhiteSpace(action.UnitInstanceId))
+            return true;
+
+        if (!int.TryParse(action.UnitInstanceId, out int expectedInstanceId))
+        {
+            mismatchDetails = $"UnitInstanceId invalido no replay: '{action.UnitInstanceId}'";
+            Debug.LogWarning($"[Replay] {mismatchDetails}");
+            return false;
+        }
+
+        int preferredTeamId = matchController != null ? matchController.ActiveTeamId : -1;
+        UnitManager foundUnit = HexOccupancyQuery.FindUnitAtCell(originCell, preferredTeamId);
+        int foundInstanceId = foundUnit != null ? foundUnit.InstanceId : -1;
+        if (foundUnit != null && foundInstanceId == expectedInstanceId)
+            return true;
+
+        string foundLabel = foundUnit != null ? foundInstanceId.ToString() : "none";
+        mismatchDetails = $"UnitInstanceId divergiu - esperado {expectedInstanceId}, encontrado {foundLabel}";
+        Debug.LogWarning($"[Replay] {mismatchDetails}");
+        return false;
+    }
+
+    private void AbortReplayBatchDueToError(string dialogId, string fallbackTemplate, string errorText, float dialogDurationSeconds)
+    {
+        string safeError = string.IsNullOrWhiteSpace(errorText) ? "erro desconhecido" : errorText.Trim();
+        isPlaying = false;
+        autoPlayTimer = 0f;
+        replayBatchAbortRequested = true;
+
+        string message = PanelDialogController.ResolveDialogMessage(
+            dialogId,
+            fallbackTemplate,
+            new Dictionary<string, string> { { "erro", safeError } });
+        PanelDialogController.TrySetTransientText(message, Mathf.Max(0.5f, dialogDurationSeconds));
+    }
+    private void AbortReplayBatchByTimeout(float timeoutSeconds)
+    {
+        string timeoutMessage = $"[Replay] Timeout: batch não completou em {timeoutSeconds:0.##}s";
+        Debug.LogWarning(timeoutMessage);
+        AbortReplayBatchDueToError("dialog.replay.error", "replay <erro>", timeoutMessage, 3.2f);
+    }
     private void ExecuteReplayConfirmInput()
     {
         if (turnStateManager == null)
@@ -872,8 +937,19 @@ public class ReplayManager : MonoBehaviour
 
     private IEnumerator WaitForReplaySystemsIdle()
     {
+        float timeoutSeconds = Mathf.Max(0.5f, replayBatchTimeoutSeconds);
+        float deadline = Time.unscaledTime + timeoutSeconds;
+
         while (IsReplayStepExecutionBusy(includeCinematicStepRoutine: false))
+        {
+            if (Time.unscaledTime >= deadline)
+            {
+                AbortReplayBatchByTimeout(timeoutSeconds);
+                yield break;
+            }
+
             yield return null;
+        }
 
         if (replayConfirmVisualDelay > 0f)
             yield return new WaitForSecondsRealtime(replayConfirmVisualDelay);
@@ -1318,16 +1394,35 @@ public class ReplayManager : MonoBehaviour
         if (!isReplaying)
             StartReplay();
 
+        float timeoutSeconds = Mathf.Max(0.5f, replayBatchTimeoutSeconds);
+        float deadline = Time.unscaledTime + timeoutSeconds;
         while (IsReplayStepExecutionBusy())
+        {
+            if (Time.unscaledTime >= deadline)
+            {
+                AbortReplayBatchByTimeout(timeoutSeconds);
+                yield break;
+            }
+
             yield return null;
+        }
 
         if (!ExecuteStepAtIndex(actionIndex, allowCinematic: true, out bool startedAsync))
             yield break;
 
         if (startedAsync)
         {
+            deadline = Time.unscaledTime + timeoutSeconds;
             while (IsReplayStepExecutionBusy())
+            {
+                if (Time.unscaledTime >= deadline)
+                {
+                    AbortReplayBatchByTimeout(timeoutSeconds);
+                    yield break;
+                }
+
                 yield return null;
+            }
         }
         else
         {
@@ -2805,6 +2900,17 @@ public class ReplayManager : MonoBehaviour
         return resolved;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -126,6 +126,12 @@ public class SaveGameManager : MonoBehaviour
 
     private void OpenSaveSlotPrompt()
     {
+        if (TryBlockReplayPersistence(
+                "[Save] Bloqueado: replay ativo",
+                "dialog.replay.save_disabled",
+                "Replay :: save desativado durante replay"))
+            return;
+
         promptState = SlotPromptState.SaveSelectSlot;
         overwritePendingSlot = 0;
         cursorController?.PlayConfirmSfx();
@@ -135,6 +141,12 @@ public class SaveGameManager : MonoBehaviour
 
     private void OpenLoadSlotPrompt()
     {
+        if (TryBlockReplayPersistence(
+                "[Load] Bloqueado: replay ativo",
+                "dialog.replay.load_disabled",
+                "Replay :: load desativado durante replay"))
+            return;
+
         promptState = SlotPromptState.LoadSelectSlot;
         overwritePendingSlot = 0;
         cursorController?.PlayConfirmSfx();
@@ -334,6 +346,12 @@ public class SaveGameManager : MonoBehaviour
             return;
         }
 
+        if (TryBlockReplayPersistence(
+                "[Save] Bloqueado: replay ativo",
+                "dialog.replay.save_disabled",
+                "Replay :: save desativado durante replay"))
+            return;
+
         int normalizedSlot = NormalizeSlot(slotIndex);
         try
         {
@@ -390,6 +408,12 @@ public class SaveGameManager : MonoBehaviour
             Debug.LogWarning("[SaveGame] Load funciona apenas em Play Mode.");
             return;
         }
+
+        if (TryBlockReplayPersistence(
+                "[Load] Bloqueado: replay ativo",
+                "dialog.replay.load_disabled",
+                "Replay :: load desativado durante replay"))
+            return;
 
         if (loadInProgress)
             return;
@@ -908,6 +932,20 @@ public class SaveGameManager : MonoBehaviour
             return false;
         }
 
+        return true;
+    }
+
+    private bool TryBlockReplayPersistence(string logMessage, string dialogId, string dialogFallback)
+    {
+        TryAutoAssignReferences();
+        if (replayManager == null || !replayManager.IsReplaying)
+            return false;
+
+        cursorController?.PlayErrorSfx();
+        CancelPrompt(clearDialogOverride: false);
+        string dialog = ResolveDialog(dialogId, dialogFallback);
+        PanelDialogController.TrySetTransientText(dialog, 2.8f);
+        Debug.LogWarning(logMessage);
         return true;
     }
 

@@ -1,4 +1,4 @@
-# Avaliacao Arquitetural e Modelagem Conceitual do Repositorio
+﻿# Avaliacao Arquitetural e Modelagem Conceitual do Repositorio
 
 ## Escopo da avaliacao
 Analise do projeto como sistema completo, ignorando estilo de codigo e focando em:
@@ -59,8 +59,8 @@ O fluxo macro e micro esta separado:
 
 Evidencia:
 - `MatchController` administra ciclo de times, upkeep de autonomia, economia por turno e transicao audiovisual
-- `TurnStateManager` implementa maquina de estados de cursor/acao (`Neutral`, `UnitSelected`, `MoveuAndando`, `Mirando`, etc.)
-- a divisao por arquivos parciais (`StateMachine`, `Movement`, `Sensors`, `Combat`, `Supply`, `Transfer`, `HelperPanel`) mostra decomposicao por subdominio de interacao
+- `TurnStateManager` implementa maquina de estados de cursor/acao (`Neutral`, `UnitSelected`, `MoveuAndando`, `MoveuParado`, `Capturando`, `Mirando`, `Pousando`, `Embarcando`, `Desembarcando`, `Fundindo`, `ShoppingAndServices`, `Suprindo`, `InspectingUnit`, `InspectingBuilding`, `InspectingHotZone`, `CommandService`, `RemovingUnit`)
+- a divisao por arquivos parciais (`Automation`, `ConstructionShopping`, `Disembark`, `Movement`, `Sensors`, `Combat`, `Supply`, `Transfer`, `HelperPanel`, `ScannerPrompt`, `StateMachine`, `ReplayRecording`) mostra decomposicao por subdominio de interacao
 
 ### 5) Nivel de interface e observabilidade
 A UI nao decide regra; ela apresenta estado e justificativas:
@@ -100,10 +100,10 @@ Impacto:
 - crescimento incremental sem colapsar em um unico arquivo monolitico
 
 ### D. Modelo de invalidacao/caching para custo computacional
-`ThreatRevisionTracker` + cache de overlay no helper representam pensamento de performance sistêmica:
+`ThreatRevisionTracker` + cache de overlay no helper representam pensamento de performance sistÃªmica:
 - revisoes globais e por time
 - invalidacao por eventos relevantes (movimento, camada, time, flags de match)
-- evita recomputar ameaças a cada frame sem necessidade
+- evita recomputar ameaÃ§as a cada frame sem necessidade
 
 ### E. Regras explicaveis (design orientado a diagnostico)
 Sensores retornam nao apenas booleano, mas:
@@ -175,7 +175,7 @@ Tambem escolhe "melhor estado por destino" por menor custo (autonomia) e desempa
 `ServicoDoComandoSensor` classifica opcoes por contexto (embarcados, assento, coordenada, label) e reordena familias de transporte para preservar consistencia operacional.
 
 ### 5) Controle de estado transacional no fluxo da unidade
-No `TurnStateManager.Movement` ha snapshot/rollback de caminho e camada forçada:
+No `TurnStateManager.Movement` ha snapshot/rollback de caminho e camada forÃ§ada:
 - commit de caminho
 - preparacao de custos
 - retorno animado com restauracao de estado em cancelamento
@@ -190,3 +190,4 @@ O autor trabalha com uma arquitetura de jogo tatico orientada a dominio, com boa
 - interface explicativa
 
 As evidencias no codigo indicam maturidade em design de sistemas: modelagem explicita de conceitos de guerra por camadas, pipeline de resolucao de mecanicas, estrategias de invalidacao/caching e preocupacao com legibilidade operacional (motivos de invalidacao, previews, confirmacoes e rollback). O pensamento algoritmico aparece principalmente em pathfinding com restricoes multiplas, ordenacao de filas de servico, composicao de custos e resolucao de combate/logistica baseada em regras.
+

@@ -1,25 +1,48 @@
-# Relatorio v1.4.0
+﻿# Relatorio v1.4.0
 
-## Tema
-Gerador de mapa basico no Editor com foco em fluxo rapido de montagem de tabuleiro.
+Data: 2026-03-20
+Versao: v1.4.0
+Resumo: Replay parte 3 com hardening de runtime, watchdog de timeout e melhorias de UX/seguranca em fluxo de replay.
 
-## Entregas principais
-- Janela `Tools/Utils/Map Generator (Basic)` com geracao global e por zona retangular.
-- Modo `WaterOnly` e modo `ConvincingFromDescription`.
-- Coordenadas no padrao do projeto: origem no topo-esquerdo e preenchimento para direita/baixo.
-- Validacao/clamp de zona com feedback na UI.
-- Presets de arquipelago 60x60.
-- Botao de geracao completa do arquipelago.
-- Modo simetrico para arquipelago completo (espelhamento esquerda -> direita).
-- Conectividade de terreno via flood-fill com `minIslandSize`.
-- Ajustes de suavizacao de borda para evitar cantos sempre em agua.
-- Override de `targetLandRatio` no modo zona.
-- Canal com `targetLandRatio <= 0.1` forca agua pura.
-- Ruido com coordenadas globais para continuidade entre zonas adjacentes.
+## Principais entregas
 
-## Impacto
-- Montagem de mapas ficou mais previsivel, repetivel por seed e mais rapida para cenario competitivo.
-- Reducao de artefatos visuais entre zonas e melhora de simetria para mapas PvP.
+- Replay com hardening de persistencia:
+  - Save bloqueado durante replay ativo.
+  - Load bloqueado durante replay ativo.
+  - Feedback em `panel_dialog` para bloqueios de save/load durante replay.
+
+- Replay panel (F9) com comportamento mais seguro:
+  - Fechar painel pausa automaticamente o replay quando estava em execucao.
+  - Mensagens de estado para autoplay ligado/desligado e replay pausado.
+
+- Validacao de consistencia de batch:
+  - Verificacao de `UnitInstanceId` antes do `HandleConfirm()` no batch de unidade.
+  - Em divergencia, aborta batch de forma graciosa (sem crash), com warning e mensagem de erro no dialog.
+
+- Watchdog de timeout no ReplayManager:
+  - Novo campo de inspector `replayBatchTimeoutSeconds` (default `10f`).
+  - Timeout aplicado em `WaitForReplaySystemsIdle()`.
+  - Timeout aplicado nos waits de `ExecuteActionFromAutomatedPlayer()`.
+  - Ao estourar timeout, aborta graciosamente com `replayBatchAbortRequested = true`, log `[Replay] Timeout: batch nao completou em Xs` e dialog de erro.
+
+- Assets de dialog para replay:
+  - Novos `DialogData` para: autoplay ligado, autoplay desligado, replay pausado, erro de replay, save desativado durante replay e load desativado durante replay.
+  - Registro dos novos assets no `Dialog Database`.
+
+## Arquivos-chave impactados
+
+- `Assets/Scripts/Replay/ReplayManager.cs`
+- `Assets/Scripts/Save/SaveGameManager.cs`
+- `Assets/Scripts/UI/Replay/ReplayPanelUI.cs`
+- `Assets/DB/Dialog/Dialog Database.asset`
+- `Assets/DB/Dialog/Dialog Data/Replay/*`
+
+## Validacao
+
+- Build limpo executado com sucesso:
+  - `Assembly-CSharp.csproj` (clean + build)
+  - `Assembly-CSharp-Editor.csproj` (clean + build)
 
 ## Observacao
-- Esta versao inclui tambem alteracoes adicionais presentes no working tree no momento do release.
+
+- Este release inclui tambem outras alteracoes presentes no working tree (docs/cena/assets) no momento do commit.

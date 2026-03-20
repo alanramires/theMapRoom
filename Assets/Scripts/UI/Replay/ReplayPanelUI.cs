@@ -67,6 +67,11 @@ public class ReplayPanelUI : MonoBehaviour
         UnbindButtonCallbacks();
     }
 
+    private void OnDisable()
+    {
+        TryAutoPauseReplayOnPanelClose(showDialog: false);
+    }
+
     private void Update()
     {
         if (WasKeyPressedThisFrame(togglePanelKey))
@@ -107,6 +112,7 @@ public class ReplayPanelUI : MonoBehaviour
 
     public void SetPanelOpen(bool open)
     {
+        bool wasOpen = isOpen;
         isOpen = open;
 
         if (panelCanvasGroup != null)
@@ -118,6 +124,8 @@ public class ReplayPanelUI : MonoBehaviour
 
         if (open)
             ApplyReplayViewSelection();
+        else if (wasOpen)
+            TryAutoPauseReplayOnPanelClose(showDialog: true);
 
         RefreshLabels();
     }
@@ -330,6 +338,8 @@ public class ReplayPanelUI : MonoBehaviour
             return;
 
         replayManager.ResumePlayback();
+        if (replayManager.IsPlaying)
+            ShowReplayDialog("dialog.replay.autoplay_on", "replay auto play ligado");
         RefreshLabels();
     }
 
@@ -338,7 +348,10 @@ public class ReplayPanelUI : MonoBehaviour
         if (replayManager == null)
             return;
 
+        bool wasPlaying = replayManager.IsReplaying && replayManager.IsPlaying;
         replayManager.PausePlayback();
+        if (wasPlaying)
+            ShowReplayDialog("dialog.replay.autoplay_off", "replay auto play desligado");
         RefreshLabels();
     }
 
@@ -479,6 +492,25 @@ public class ReplayPanelUI : MonoBehaviour
         }
 
         return mode.ToString();
+    }
+
+    private void TryAutoPauseReplayOnPanelClose(bool showDialog)
+    {
+        if (replayManager == null)
+            return;
+        if (!replayManager.IsReplaying || !replayManager.IsPlaying)
+            return;
+
+        replayManager.PausePlayback();
+
+        if (showDialog)
+            ShowReplayDialog("dialog.replay.paused", "replay pausado");
+    }
+
+    private static void ShowReplayDialog(string id, string fallback)
+    {
+        string text = PanelDialogController.ResolveDialogMessage(id, fallback);
+        PanelDialogController.TrySetTransientText(text, 2.2f);
     }
 }
 

@@ -2,7 +2,9 @@
 
 ## Visao geral
 `TurnStateManager` e a espinha de execucao tatico-operacional por estado de cursor.
+O mapa canonico dos estados esta em `docs/turnState.md`; este relatorio resume o que importa para leitura tecnica.
 
+## Estados atuais
 Enum de fases (`CursorState`):
 1. Neutral
 2. UnitSelected
@@ -16,24 +18,26 @@ Enum de fases (`CursorState`):
 10. Fundindo
 11. ShoppingAndServices
 12. Suprindo
+13. InspectingUnit
+14. InspectingBuilding
+15. InspectingHotZone
+16. CommandService
+17. RemovingUnit
 
 ## Ordem operacional tipica de uma acao de unidade
 1. `Neutral` -> selecionar unidade aliada (`UnitSelected`)
-2. confirmar movimento -> `MoveuAndando` (ou `MoveuParado` se nao deslocou)
-3. `RefreshSensorsForCurrentState()` calcula acoes possiveis (A/E/D/C/F/S/T/L)
-4. jogador escolhe sensor/acao e entra no estado correspondente
-5. ao finalizar acao, unidade marca `HasActed` e fluxo volta para `Neutral`
+2. confirmar movimento -> `MoveuAndando` ou `MoveuParado`
+3. `RefreshSensorsForCurrentState()` calcula acoes possiveis
+4. jogador escolhe sensor / acao e entra no estado correspondente
+5. ao finalizar a acao, a unidade volta para `Neutral` ou para o estado de origem apropriado
 
-## Onde ocorre combate
-- Sensor de alvo: `PodeMirarSensor`
-- Confirmacao/execucao: estado `Mirando`
-- Formula final: `TurnStateManager.Combat.cs` (`ResolveCombatFromSelectedOption`)
-
-## Onde ocorre suprimento e reparos
-- Fluxo de pode suprir: estado `Suprindo`
-- Runtime de aplicacao: `TurnStateManager.Supply.cs`
-- Execucao em lote/encadeada: `TurnStateManager.SupplyQueue.cs`
-- Servico do comando (batch): `TurnStateManager.CommandService.cs`
+## Fluxos importantes
+- Combate: `PodeMirarSensor` -> `Mirando` -> `TurnStateManager.Combat.cs`
+- Suprimento / reparo: `Suprindo` -> `TurnStateManager.Supply.cs` / `TurnStateManager.SupplyQueue.cs`
+- Servico do comando: `CommandService` -> `TurnStateManager.CommandService.cs`
+- Compra em construcao: `ShoppingAndServices` -> `TurnStateManager.ConstructionShopping.cs`
+- Inspecao: `InspectingUnit`, `InspectingBuilding`, `InspectingHotZone`
+- Remocao de unidade: `RemovingUnit`
 
 ## Adendo de fusao (Merge): contribuicao proporcional por HP
 A fusao nao soma recursos "secos"; ela pondera contribuicao por HP de cada participante.
@@ -45,45 +49,33 @@ No runtime (`TurnStateManager.Merge.cs`):
 - `resultFuel = totalSteps / resultHp` (divisao inteira)
 
 Efeito pratico:
-- a unidade resultante pode sair com autonomia/estado "degradado" quando um membro com HP baixo entra na fusao.
-- isso e intencional para evitar exploit de "recarga gratis" so por juntar cascas.
+- a unidade resultante pode sair com autonomia / estado degradado quando um membro com HP baixo entra na fusao.
+- isso e intencional para evitar exploit de recarga gratis apenas por juntar cascas.
 
-Exemplo simples:
-- Unidade A: `HP8`, `Fuel70` -> `560 steps`
-- Unidade B: `HP2`, `Fuel10` -> `20 steps`
-- Soma HP = `10`, total steps = `580`
-- Resultado: `HP10`, `Fuel58` (e nao 70)
-
-Observacao: ammo/suprimentos embarcados tambem sao agregados por logica proporcional/slots, com descarte quando faltam slots de destino.
+Observacao: ammo / suprimentos embarcados tambem sao agregados por logica proporcional / slots, com descarte quando faltam slots de destino.
 
 ## Servicos automaticos
-- Nao ha "tick automatico" de reparo/abastecimento por turno em massa sem acao.
+- Nao ha tick automatico de reparo / abastecimento por turno em massa sem acao.
 - O que existe:
 - execucao por comando do jogador em `Suprindo`
 - execucao em lote via `ServicoDoComando` com confirmacao
-- upkeep automatico de turno e economia ocorre no `MatchController` (renda, reset/rotina de inicio de turno), nao em auto-supply global.
+- upkeep automatico de turno e economia ocorre no `MatchController`
 
-Adendo de integracao futura (QoL):
-- A ideia de `ServicoDoComando` automatico via flag on/off no `MatchController` e coerente com o desenho atual.
-- Estado atual do codigo: ainda nao existe essa flag de automacao de command service no `MatchController`; hoje a execucao segue via acao/sensor com confirmacao.
-- Recomendacao: manter modo manual como baseline e expor automacao opcional para reduzir microgerenciamento sem remover controle de quem prefere operar no detalhe.
-
-## Adendo de pouso/suprimento: decisao intencional de balanceamento
-Para unidades aereas, o fluxo de suprimento valida dominio/camada e pode forcar transicao antes de atender:
+## Pouso, decolagem e camada
+Para unidades aereas, o fluxo de servico pode forcar transicao de camada quando necessario:
 - `forceLandBeforeSupply`
 - `forceTakeoffBeforeSupply`
-- `forceSurfaceBeforeSupply` (caso naval/sub)
+- `forceSurfaceBeforeSupply`
 
-Isso aparece em `PodeSuprirSensor` e `ServicoDoComandoSensor` (validacao de dominio com `PodePousar`/`PodeDecolar` e checagem de camada permitida no hex atual).
+Isso aparece em `TurnStateManager.CommandService` e `TurnStateManager.SupplyQueue` como parte da execucao da ordem, nao como um `CursorState` novo.
 
-Decisao de design:
-- forcar pouso/decolagem/surface antes do servico quando necessario e **intencional**.
-- objetivo: evitar abastecimento aereo adjacente "gratuito" fora do contexto de operacao e manter custo/risco logistico relevante.
-- documentar isso evita que manutencao futura trate o comportamento como bug e "corrija" sem querer o balance.
+Ponto de leitura importante:
+- `Decolando` nao existe como `CursorState`.
+- a preparacao de decolagem e a resolucao de pouso / camada sao tratadas por regras auxiliares e por `ScannerPromptStep`.
 
 ## Integracao com MatchController
-- `MatchController` governa turno/economia macro (`AdvanceTurn`, renda por turno, time ativo).
-- `TurnStateManager` governa microfluxo tatico da unidade dentro do turno ativo.
+- `MatchController` governa turno / economia macro (`AdvanceTurn`, renda por turno, time ativo).
+- `TurnStateManager` governa o microfluxo tactico da unidade dentro do turno ativo.
 
 ## Resumo
-`TurnStateManager` implementa uma state machine de acao por unidade, com sensores como gateway de validacao e com executores especializados por dominio (combate, merge, supply, command service, etc.).
+`TurnStateManager` implementa uma state machine de acao por unidade, com sensores como gateway de validacao e com executores especializados por dominio. Os estados que antes eram descritos como inline em docs antigos hoje estao formalizados como `CursorState` proprios.
