@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 
 [Serializable]
@@ -9,11 +9,14 @@ public class PlayerAction
     public TeamId ActingTeam;
 
     public Vector3Int CursorHex;
+    public bool HasCursorHex;
 
     public string UnitInstanceId;
 
     public Vector3Int MoveFrom;
+    public bool HasMoveFrom;
     public Vector3Int MoveTo;
+    public bool HasMoveTo;
     public UnitLayerMode LayerBefore;
     public UnitLayerMode LayerAfter;
 
@@ -22,6 +25,7 @@ public class PlayerAction
     public string TargetInstanceId;
     public string TargetConstructionId;
     public Vector3Int TargetHex;
+    public bool HasTargetHex;
 
     public string SubStepLabel;
 
@@ -33,4 +37,5 @@ public class PlayerAction
     public bool IsTurnMarker;
     public string DebugLabel;
 }
+
 

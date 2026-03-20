@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.Serialization;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using Stopwatch = System.Diagnostics.Stopwatch;
 
 public class ReplayManager : MonoBehaviour
@@ -137,7 +140,7 @@ public class ReplayManager : MonoBehaviour
 
         bool canEmulateAction = action != null && CanReplayActionAsLiveInputs(action.ActionType);
         if (canEmulateAction)
-            yield return ExecuteRecordedActionBatch(action);
+            yield return ExecuteRecordedActionBatch(action, preActionSnapshot);
         else if (postActionSnapshot != null)
             RestoreSnapshot(postActionSnapshot);
 
@@ -157,6 +160,7 @@ public class ReplayManager : MonoBehaviour
         if (!TryResolveActionPreExecutionCursorCell(action, preActionSnapshot, out Vector3Int targetCursorCell))
             yield break;
 
+        ReplayLog($"[Replay][CursorTravel] phase=pre-batch current={FormatReplayCell(NormalizeCell(cursorController.CurrentCell))} target={FormatReplayCell(NormalizeCell(targetCursorCell))}");
         yield return MoveCursorToCellWithTravel(targetCursorCell);
     }
 
@@ -168,15 +172,21 @@ public class ReplayManager : MonoBehaviour
         Vector3Int fromCell = NormalizeCell(cursorController.CurrentCell);
         Vector3Int toCell = NormalizeCell(targetCell);
         if (fromCell == toCell)
+        {
+            ReplayLog($"[Replay][CursorTravel] skipped from==to {FormatReplayCell(fromCell)}");
             yield break;
+        }
 
         List<Vector3Int> travelPath = BuildReplayCursorTravelPath(fromCell, toCell);
         if (travelPath == null || travelPath.Count <= 0)
             travelPath = new List<Vector3Int> { toCell };
 
+        ReplayLog($"[Replay][CursorTravel] from={FormatReplayCell(fromCell)} to={FormatReplayCell(toCell)} pathSteps={travelPath.Count}");
+
         for (int i = 0; i < travelPath.Count; i++)
         {
             Vector3Int stepCell = NormalizeCell(travelPath[i]);
+            ReplayLog($"[Replay][CursorTravel] step {i + 1}/{travelPath.Count} -> {FormatReplayCell(stepCell)}");
             cursorController.SetCell(stepCell, playMoveSfx: animateCursorTravelBetweenActions, adjustCamera: false);
             cursorController.TryAdjustCameraToCursor();
 
@@ -274,7 +284,7 @@ public class ReplayManager : MonoBehaviour
         }
     }
 
-    private IEnumerator ExecuteRecordedActionBatch(PlayerAction action)
+    private IEnumerator ExecuteRecordedActionBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
     {
         if (action == null)
             yield break;
@@ -285,13 +295,13 @@ public class ReplayManager : MonoBehaviour
         switch (action.ActionType)
         {
             case PlayerActionType.UnitAction:
-                yield return ExecuteRecordedUnitActionBatch(action);
+                yield return ExecuteRecordedUnitActionBatch(action, preActionSnapshot);
                 break;
             case PlayerActionType.CommandService:
-                yield return ExecuteRecordedCommandServiceBatch(action);
+                yield return ExecuteRecordedCommandServiceBatch(action, preActionSnapshot);
                 break;
             case PlayerActionType.RemoveUnit:
-                yield return ExecuteRecordedRemoveUnitBatch(action);
+                yield return ExecuteRecordedRemoveUnitBatch(action, preActionSnapshot);
                 break;
             default:
                 // Shopping and unknown actions are finalized by restoring post-action snapshot.
@@ -301,31 +311,31 @@ public class ReplayManager : MonoBehaviour
         yield return WaitForReplaySystemsIdle();
     }
 
-    private IEnumerator ExecuteRecordedUnitActionBatch(PlayerAction action)
+    private IEnumerator ExecuteRecordedUnitActionBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
     {
         if (cursorController == null)
             yield break;
 
-        Vector3Int originCell = action.CursorHex != Vector3Int.zero ? action.CursorHex : action.MoveFrom;
-        bool hasOriginCell = originCell != Vector3Int.zero;
+        bool hasOriginCell = TryResolveRecordedOriginCell(action, preActionSnapshot, out Vector3Int originCell);
         if (hasOriginCell)
         {
             originCell = NormalizeCell(originCell);
+            ReplayLog($"[Replay][CursorTravel] phase=unit-batch-origin current={FormatReplayCell(NormalizeCell(cursorController.CurrentCell))} origin={FormatReplayCell(originCell)}");
             yield return MoveCursorToCellWithTravel(originCell);
 
-            turnStateManager.HandleConfirm();
+            ExecuteReplayConfirmInput();
             yield return WaitForReplaySystemsIdle();
         }
 
-        Vector3Int destinationCell = action.MoveTo != Vector3Int.zero ? action.MoveTo : originCell;
-        bool hasDestinationCell = destinationCell != Vector3Int.zero;
+        bool hasDestinationCell = TryResolveRecordedDestinationCell(action, hasOriginCell, originCell, out Vector3Int destinationCell);
         if (hasDestinationCell)
         {
             destinationCell = NormalizeCell(destinationCell);
+            ReplayLog($"[Replay][CursorTravel] phase=unit-batch-destination current={FormatReplayCell(NormalizeCell(cursorController.CurrentCell))} destination={FormatReplayCell(destinationCell)}");
             if (!hasOriginCell || destinationCell != originCell)
                 yield return MoveCursorToCellWithTravel(destinationCell);
 
-            turnStateManager.HandleConfirm();
+            ExecuteReplayConfirmInput();
             yield return WaitForReplaySystemsIdle();
         }
 
@@ -337,50 +347,172 @@ public class ReplayManager : MonoBehaviour
 
         yield return WaitForReplaySystemsIdle();
 
-        if (action.TargetHex != Vector3Int.zero)
+        if (TryResolveRecordedTargetCell(action, out Vector3Int targetCell))
         {
-            Vector3Int targetCell = NormalizeCell(action.TargetHex);
+            targetCell = NormalizeCell(targetCell);
             if (NormalizeCell(cursorController.CurrentCell) != targetCell)
                 yield return MoveCursorToCellWithTravel(targetCell);
         }
 
-        turnStateManager.HandleConfirm();
+        ExecuteReplayConfirmInput();
         yield return WaitForReplaySystemsIdle();
     }
 
-    private IEnumerator ExecuteRecordedCommandServiceBatch(PlayerAction action)
+    private IEnumerator ExecuteRecordedCommandServiceBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
     {
-        if (cursorController != null && action.CursorHex != Vector3Int.zero)
+        if (cursorController != null && TryResolveRecordedCursorCell(action, preActionSnapshot, out Vector3Int cursorCell))
         {
-            Vector3Int cursorCell = NormalizeCell(action.CursorHex);
-            yield return MoveCursorToCellWithTravel(cursorCell);
+            yield return MoveCursorToCellWithTravel(NormalizeCell(cursorCell));
         }
 
         if (turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.CommandService))
         {
             yield return WaitForReplaySystemsIdle();
-            turnStateManager.HandleConfirm();
+            ExecuteReplayConfirmInput();
             yield return WaitForReplaySystemsIdle();
         }
     }
 
-    private IEnumerator ExecuteRecordedRemoveUnitBatch(PlayerAction action)
+    private IEnumerator ExecuteRecordedRemoveUnitBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
     {
         if (cursorController != null)
         {
-            Vector3Int cursorCell = action.TargetHex != Vector3Int.zero ? action.TargetHex : action.CursorHex;
-            if (cursorCell != Vector3Int.zero)
-            {
-                cursorCell = NormalizeCell(cursorCell);
-                yield return MoveCursorToCellWithTravel(cursorCell);
-            }
+            if (TryResolveRecordedTargetCell(action, out Vector3Int targetCell))
+                yield return MoveCursorToCellWithTravel(NormalizeCell(targetCell));
+            else if (TryResolveRecordedCursorCell(action, preActionSnapshot, out Vector3Int cursorCell))
+                yield return MoveCursorToCellWithTravel(NormalizeCell(cursorCell));
         }
 
         if (turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.RemoveUnit))
         {
             yield return WaitForReplaySystemsIdle();
-            turnStateManager.HandleConfirm();
+            ExecuteReplayConfirmInput();
             yield return WaitForReplaySystemsIdle();
+        }
+    }
+
+    private static bool IsRecordedCellPresent(Vector3Int cell, bool explicitFlag)
+    {
+        return explicitFlag || cell != Vector3Int.zero;
+    }
+
+    private static bool TryResolveCellFromSnapshotByUnitId(TurnStartSnapshot snapshot, string unitInstanceId, out Vector3Int cell)
+    {
+        cell = Vector3Int.zero;
+        if (snapshot == null || snapshot.Units == null || snapshot.Units.Count <= 0)
+            return false;
+
+        if (!int.TryParse(unitInstanceId, out int unitId) || unitId <= 0)
+            return false;
+
+        for (int i = 0; i < snapshot.Units.Count; i++)
+        {
+            UnitSaveData unit = snapshot.Units[i];
+            if (unit == null || unit.instanceId != unitId)
+                continue;
+
+            cell = new Vector3Int(unit.cellX, unit.cellY, 0);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryResolveRecordedOriginCell(PlayerAction action, TurnStartSnapshot preActionSnapshot, out Vector3Int cell)
+    {
+        cell = Vector3Int.zero;
+        if (action == null)
+            return false;
+
+        if (IsRecordedCellPresent(action.MoveFrom, action.HasMoveFrom))
+        {
+            cell = action.MoveFrom;
+            return true;
+        }
+
+        if (IsRecordedCellPresent(action.CursorHex, action.HasCursorHex))
+        {
+            cell = action.CursorHex;
+            return true;
+        }
+
+        return TryResolveCellFromSnapshotByUnitId(preActionSnapshot, action.UnitInstanceId, out cell);
+    }
+
+    private bool TryResolveRecordedDestinationCell(PlayerAction action, bool hasOriginCell, Vector3Int originCell, out Vector3Int cell)
+    {
+        cell = Vector3Int.zero;
+        if (action == null)
+            return false;
+
+        if (IsRecordedCellPresent(action.MoveTo, action.HasMoveTo))
+        {
+            cell = action.MoveTo;
+            return true;
+        }
+
+        if (hasOriginCell)
+        {
+            cell = originCell;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryResolveRecordedCursorCell(PlayerAction action, TurnStartSnapshot preActionSnapshot, out Vector3Int cell)
+    {
+        if (TryResolveRecordedOriginCell(action, preActionSnapshot, out cell))
+            return true;
+
+        if (preActionSnapshot != null && preActionSnapshot.HasCursorCell)
+        {
+            cell = preActionSnapshot.CursorCell;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryResolveRecordedTargetCell(PlayerAction action, out Vector3Int cell)
+    {
+        cell = Vector3Int.zero;
+        if (action == null)
+            return false;
+
+        if (IsRecordedCellPresent(action.TargetHex, action.HasTargetHex))
+        {
+            cell = action.TargetHex;
+            return true;
+        }
+
+        return false;
+    }
+    private void ExecuteReplayConfirmInput()
+    {
+        if (turnStateManager == null)
+            return;
+
+        TurnStateManager.ActionSfx feedback = turnStateManager.HandleConfirm();
+        PlayReplayActionFeedback(feedback);
+    }
+
+    private void PlayReplayActionFeedback(TurnStateManager.ActionSfx feedback)
+    {
+        if (cursorController == null)
+            return;
+
+        switch (feedback)
+        {
+            case TurnStateManager.ActionSfx.Confirm:
+                cursorController.PlayConfirmSfx();
+                break;
+            case TurnStateManager.ActionSfx.Cancel:
+                cursorController.PlayCancelSfx();
+                break;
+            case TurnStateManager.ActionSfx.Error:
+                cursorController.PlayErrorSfx();
+                break;
         }
     }
 
@@ -438,6 +570,11 @@ public class ReplayManager : MonoBehaviour
 
         TryAutoAssignReferences();
 
+        // Prevent accidental snapshot#0 overwrite when BeginTurnRecording is invoked again
+        // for the same runtime turn/team (spurious team-change notifications).
+        if (isRecording && currentRecord != null && currentRecord.StartSnapshot != null && DoesCurrentRecordMatchRuntimeTurn())
+            return;
+
         // If replay was loaded from save for this exact runtime turn/team, preserve snapshot#0 and continue recording.
         if (currentRecord != null && currentRecord.StartSnapshot != null && DoesCurrentRecordMatchRuntimeTurn())
         {
@@ -466,7 +603,7 @@ public class ReplayManager : MonoBehaviour
 
     public void RecordCommand(IReplayCommand command)
     {
-        if (!isRecording || command == null || currentRecord == null)
+        if (isReplaying || !isRecording || command == null || currentRecord == null)
             return;
 
         if (currentRecord.Steps == null)
@@ -846,12 +983,17 @@ public class ReplayManager : MonoBehaviour
 
     public void EnsureCurrentUnitActionBuffer(UnitManager unit, Vector3Int cursorHex)
     {
+        if (isReplaying)
+            return;
+
         if (currentBuffer == null)
             currentBuffer = new PlayerAction();
 
         currentBuffer.ActionType = PlayerActionType.UnitAction;
         currentBuffer.CursorHex = cursorHex;
+        currentBuffer.HasCursorHex = true;
         currentBuffer.MoveFrom = cursorHex;
+        currentBuffer.HasMoveFrom = true;
 
         if (unit != null)
         {
@@ -869,8 +1011,13 @@ public class ReplayManager : MonoBehaviour
 
     public void UpdateCurrentBufferMovement(Vector3Int moveFrom, Vector3Int moveTo, UnitLayerMode layerBefore, UnitLayerMode layerAfter)
     {
+        if (isReplaying)
+            return;
+
         currentBuffer.MoveFrom = moveFrom;
+        currentBuffer.HasMoveFrom = true;
         currentBuffer.MoveTo = moveTo;
+        currentBuffer.HasMoveTo = true;
         currentBuffer.LayerBefore = layerBefore;
         currentBuffer.LayerAfter = layerAfter;
         currentBuffer.ActionType = PlayerActionType.UnitAction;
@@ -878,6 +1025,9 @@ public class ReplayManager : MonoBehaviour
 
     public void UpdateCurrentBufferSensorAction(SensorActionType sensorAction, string subStepLabel = null)
     {
+        if (isReplaying)
+            return;
+
         currentBuffer.SensorAction = sensorAction;
         if (!string.IsNullOrWhiteSpace(subStepLabel))
             currentBuffer.SubStepLabel = subStepLabel;
@@ -886,9 +1036,13 @@ public class ReplayManager : MonoBehaviour
 
     public void UpdateCurrentBufferTarget(UnitManager targetUnit, ConstructionManager targetConstruction, Vector3Int targetHex, string subStepLabel = null)
     {
+        if (isReplaying)
+            return;
+
         currentBuffer.TargetInstanceId = targetUnit != null ? targetUnit.InstanceId.ToString() : null;
         currentBuffer.TargetConstructionId = targetConstruction != null ? targetConstruction.InstanceId.ToString() : null;
         currentBuffer.TargetHex = targetHex;
+        currentBuffer.HasTargetHex = true;
         if (!string.IsNullOrWhiteSpace(subStepLabel))
             currentBuffer.SubStepLabel = subStepLabel;
         currentBuffer.ActionType = PlayerActionType.UnitAction;
@@ -896,11 +1050,23 @@ public class ReplayManager : MonoBehaviour
 
     public void RecordStandaloneAction(PlayerAction action)
     {
-        if (action == null)
+        if (isReplaying || action == null)
             return;
 
         if (actionStack == null)
             actionStack = new ActionStack();
+
+        if (!action.HasCursorHex && (action.CursorHex != Vector3Int.zero || !string.IsNullOrWhiteSpace(action.UnitInstanceId) || !string.IsNullOrWhiteSpace(action.TargetInstanceId) || !string.IsNullOrWhiteSpace(action.TargetConstructionId)))
+            action.HasCursorHex = true;
+
+        if (!action.HasMoveFrom && action.MoveFrom != Vector3Int.zero)
+            action.HasMoveFrom = true;
+
+        if (!action.HasMoveTo && action.MoveTo != Vector3Int.zero)
+            action.HasMoveTo = true;
+
+        if (!action.HasTargetHex && (action.TargetHex != Vector3Int.zero || !string.IsNullOrWhiteSpace(action.TargetInstanceId) || !string.IsNullOrWhiteSpace(action.TargetConstructionId)))
+            action.HasTargetHex = true;
 
         actionStack.Actions.Add(action);
 
@@ -922,6 +1088,9 @@ public class ReplayManager : MonoBehaviour
 
     public void PromoteCurrentBuffer(string debugLabel)
     {
+        if (isReplaying)
+            return;
+
         if (currentBuffer == null)
             currentBuffer = new PlayerAction();
 
@@ -1162,7 +1331,7 @@ public class ReplayManager : MonoBehaviour
             bool skipTrailingConfirm = isLastEvent && cinematicEvent.Action == CinematicAction.Confirm;
 
             if (!skipTrailingConfirm && cinematicEvent.Action == CinematicAction.Confirm)
-                turnStateManager?.HandleConfirm();
+                ExecuteReplayConfirmInput();
             else if (!skipTrailingConfirm && cinematicEvent.Action == CinematicAction.AimAction)
                 turnStateManager?.HandleAimActionRequested();
 
@@ -1279,9 +1448,9 @@ public class ReplayManager : MonoBehaviour
         if (action == null)
             return false;
 
-        if (action.CursorHex != Vector3Int.zero || action.MoveFrom != Vector3Int.zero)
+        if (TryResolveRecordedOriginCell(action, snapshot, out cursorCell))
         {
-            cursorCell = NormalizeCell(action.CursorHex != Vector3Int.zero ? action.CursorHex : action.MoveFrom);
+            cursorCell = NormalizeCell(cursorCell);
             return true;
         }
 
@@ -1451,14 +1620,14 @@ public class ReplayManager : MonoBehaviour
         {
             (ConstructionManager manager, bool isActive) = restoredConstructions[i];
             if (manager != null)
-                manager.gameObject.SetActive(isActive);
+                SetReplayObjectActive(manager.gameObject, isActive);
         }
 
         for (int i = 0; i < restoredUnits.Count; i++)
         {
             (UnitManager manager, UnitSaveData saved) = restoredUnits[i];
             if (manager != null && saved != null)
-                manager.gameObject.SetActive(saved.isActiveInHierarchy);
+                SetReplayObjectActive(manager.gameObject, saved.isActiveInHierarchy);
         }
 
         if (snapshot.HasCursorCell && cursorController != null)
@@ -1697,6 +1866,28 @@ public class ReplayManager : MonoBehaviour
         }
     }
 
+    private static string FormatReplayCell(Vector3Int cell)
+    {
+        return $"({cell.x},{cell.y},{cell.z})";
+    }
+
+    private static void SetReplayObjectActive(GameObject go, bool active)
+    {
+        if (go == null || go.activeSelf == active)
+            return;
+
+#if UNITY_EDITOR
+        if (!active)
+        {
+            GameObject selectedGo = Selection.activeGameObject;
+            if (selectedGo != null && (selectedGo == go || selectedGo.transform.IsChildOf(go.transform) || go.transform.IsChildOf(selectedGo.transform)))
+                Selection.activeObject = null;
+        }
+#endif
+
+        go.SetActive(active);
+    }
+
     private void TryAutoAssignReferences()
     {
         if (matchController == null)
@@ -1730,7 +1921,7 @@ public class ReplayManager : MonoBehaviour
 
             RegisterUnitInPool(unit);
             if (unit.gameObject.activeSelf)
-                unit.gameObject.SetActive(false);
+                SetReplayObjectActive(unit.gameObject, false);
         }
 
         IReadOnlyList<ConstructionManager> activeConstructions = ConstructionManager.AllActive;
@@ -1742,7 +1933,7 @@ public class ReplayManager : MonoBehaviour
 
             RegisterConstructionInPool(construction);
             if (construction.gameObject.activeSelf)
-                construction.gameObject.SetActive(false);
+                SetReplayObjectActive(construction.gameObject, false);
         }
     }
     private void ApplyReplayVision()
@@ -1993,7 +2184,7 @@ public class ReplayManager : MonoBehaviour
             if (unit == null || unit.gameObject.scene != activeScene)
                 continue;
             if (unit.gameObject.activeSelf)
-                unit.gameObject.SetActive(false);
+                SetReplayObjectActive(unit.gameObject, false);
         }
 
         foreach (KeyValuePair<int, ConstructionManager> kv in replayConstructionPool)
@@ -2002,7 +2193,7 @@ public class ReplayManager : MonoBehaviour
             if (construction == null || construction.gameObject.scene != activeScene)
                 continue;
             if (construction.gameObject.activeSelf)
-                construction.gameObject.SetActive(false);
+                SetReplayObjectActive(construction.gameObject, false);
         }
     }
 
@@ -2019,7 +2210,7 @@ public class ReplayManager : MonoBehaviour
                 continue;
 
             if (unit.gameObject.activeSelf)
-                unit.gameObject.SetActive(false);
+                SetReplayObjectActive(unit.gameObject, false);
 
             int id = unit.InstanceId;
             if (id > 0 && replayUnitPool.TryGetValue(id, out UnitManager mapped) && mapped == unit)
@@ -2224,52 +2415,3 @@ public class ReplayManager : MonoBehaviour
         return resolved;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

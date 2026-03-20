@@ -13,11 +13,15 @@ public static class PodeSuprirSensor
         List<PodeSuprirInvalidOption> invalidOutput = null)
     {
         reason = string.Empty;
+        bool sensorLogs = SensorLogGate.IsPodeSuprirEnabled();
         if (output == null)
             return false;
 
         output.Clear();
         invalidOutput?.Clear();
+
+        if (sensorLogs)
+            SensorLogGate.Log("PodeSuprirSensor", $"collect supplier={(supplier != null ? supplier.name : "(null)")}");
 
         if (supplier == null)
         {
@@ -162,9 +166,13 @@ public static class PodeSuprirSensor
                 : (includeOriginCell
                     ? "Sem candidatos validos no mesmo hex ou adjacentes para suprir."
                     : "Sem candidatos adjacentes validos para suprir.");
+            if (sensorLogs)
+                SensorLogGate.Log("PodeSuprirSensor", $"result valid={output.Count} invalid={(invalidOutput != null ? invalidOutput.Count : 0)} hasAny=false");
             return false;
         }
 
+        if (sensorLogs)
+            SensorLogGate.Log("PodeSuprirSensor", $"result valid={output.Count} invalid={(invalidOutput != null ? invalidOutput.Count : 0)} hasAny=true");
         return true;
     }
 

@@ -1006,6 +1006,11 @@ public class CursorController : MonoBehaviour
         PlayUiSfx(confirmSfx);
     }
 
+    public void PlayCancelSfx()
+    {
+        PlayUiSfx(cancelSfx);
+    }
+
     public void PlayCursorMoveSfx()
     {
         PlayMoveSfx();
@@ -1376,6 +1381,7 @@ public static class TeamAnchorResolver
         return false;
     }
 }
+
 
 
 

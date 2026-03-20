@@ -2734,6 +2734,8 @@ public partial class TurnStateManager
             int defenderHpBefore = Mathf.Max(0, combat.defenderUnit.CurrentHP);
             int defenderHpAfter = Mathf.Max(0, combat.defenderHpAfter);
             combat.defenderUnit.SetCurrentHP(defenderHpAfter);
+            if (defenderHpAfter <= 0)
+                combat.defenderUnit.MarkDiedBy(combat.attackerUnit);
             ApplyEmbarkedCascadeFromDirectHit(combat.defenderUnit, defenderHpBefore, defenderHpAfter);
         }
 
@@ -2742,6 +2744,8 @@ public partial class TurnStateManager
             int attackerHpBefore = Mathf.Max(0, combat.attackerUnit.CurrentHP);
             int attackerHpAfter = Mathf.Max(0, combat.attackerHpAfter);
             combat.attackerUnit.SetCurrentHP(attackerHpAfter);
+            if (attackerHpAfter <= 0)
+                combat.attackerUnit.MarkDiedBy(combat.defenderUnit);
             ApplyEmbarkedCascadeFromDirectHit(combat.attackerUnit, attackerHpBefore, attackerHpAfter);
         }
     }
@@ -2918,7 +2922,7 @@ public partial class TurnStateManager
             int childBefore = Mathf.Max(0, child.CurrentHP);
             if (childBefore <= 0)
             {
-                KillEntireEmbarkedChain(child);
+                KillEntireEmbarkedChain(child, deathReason: "morto porque o transportador morreu");
                 continue;
             }
 
@@ -2931,7 +2935,7 @@ public partial class TurnStateManager
 
             if (childAfter <= 0)
             {
-                KillEntireEmbarkedChain(child);
+                KillEntireEmbarkedChain(child, deathReason: "morto porque o transportador morreu");
                 continue;
             }
 
@@ -2939,7 +2943,7 @@ public partial class TurnStateManager
         }
     }
 
-    private void KillEntireEmbarkedChain(UnitManager root, bool detachSelf = true)
+    private void KillEntireEmbarkedChain(UnitManager root, bool detachSelf = true, string deathReason = "morto porque o transportador morreu")
     {
         if (root == null)
             return;
@@ -2959,10 +2963,11 @@ public partial class TurnStateManager
             }
 
             for (int i = 0; i < children.Count; i++)
-                KillEntireEmbarkedChain(children[i], detachSelf: true);
+                KillEntireEmbarkedChain(children[i], detachSelf: true, deathReason: deathReason);
         }
 
         root.SetCurrentHP(0);
+        root.MarkDead(deathReason);
 
         if (detachSelf && root.EmbarkedTransporter != null)
             root.EmbarkedTransporter.RemoveEmbarkedPassenger(root);
@@ -2994,7 +2999,7 @@ public partial class TurnStateManager
         }
 
         for (int i = 0; i < children.Count; i++)
-            KillEntireEmbarkedChain(children[i], detachSelf: true);
+            KillEntireEmbarkedChain(children[i], detachSelf: true, deathReason: "morto porque o transportador morreu");
     }
 
     private IEnumerator ExecuteDeathResolutionIfNeeded(CombatResolutionResult combat)
@@ -4665,12 +4670,3 @@ public partial class TurnStateManager
 #endif
     }
 }
-
-
-
-
-
-
-
-
-

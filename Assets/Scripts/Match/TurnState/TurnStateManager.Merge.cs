@@ -534,7 +534,7 @@ public partial class TurnStateManager
 
             participant.ClearTemporarySortingOrder();
             cursorController?.PlayLoadSfx();
-            KillEntireEmbarkedChain(participant, detachSelf: true);
+            KillEntireEmbarkedChain(participant, detachSelf: true, deathReason: "morto porque fundiu");
             consumedParticipants.Add(participant);
 
             if (afterParticipantLoadDelay > 0f)
@@ -542,6 +542,7 @@ public partial class TurnStateManager
         }
 
         receiver.SetCurrentHP(resultHp);
+        receiver.MarkMergedWith(consumedParticipants);
         receiver.SetCurrentFuel(resultAutonomy);
         receiver.SetRemainingMovementPoints(0);
 
@@ -1801,5 +1802,3 @@ public partial class TurnStateManager
         return supplyStepsByType.Count;
     }
 }
-
-

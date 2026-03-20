@@ -18,11 +18,15 @@ public static class PodePousarSensor
         bool useManualRemainingMovement,
         int manualRemainingMovement)
     {
+        bool sensorLogs = SensorLogGate.IsPodePousarEnabled();
         var report = new PodePousarReport
         {
             status = false,
             explicacao = "Contexto nao avaliado."
         };
+
+        if (sensorLogs)
+            SensorLogGate.Log("PodePousarSensor", $"collect unit={(selectedAircraft != null ? selectedAircraft.name : "(null)")} movement={movementMode}");
 
         if (selectedAircraft == null)
         {
@@ -84,6 +88,8 @@ public static class PodePousarSensor
             report.explicacao += $" Movimento restante manual={safeRemaining} (informativo neste sensor).";
         }
 
+        if (sensorLogs)
+            SensorLogGate.Log("PodePousarSensor", $"result status={report.status} msg=\"{report.explicacao}\"");
         return report;
     }
 }

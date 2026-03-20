@@ -14,11 +14,15 @@ public static class PodeTransferirSensor
         List<PodeTransferirInvalidOption> invalidOutput = null)
     {
         reason = string.Empty;
+        bool sensorLogs = SensorLogGate.IsPodeTransferirEnabled();
         if (output == null)
             return false;
 
         output.Clear();
         invalidOutput?.Clear();
+
+        if (sensorLogs)
+            SensorLogGate.Log("PodeTransferirSensor", $"collect supplier={(supplier != null ? supplier.name : "(null)")}");
 
         if (supplier == null)
         {
@@ -125,9 +129,13 @@ public static class PodeTransferirSensor
         if (output.Count <= 0)
         {
             reason = "Sem opcoes validas de transferencia neste contexto.";
+            if (sensorLogs)
+                SensorLogGate.Log("PodeTransferirSensor", $"result valid={output.Count} invalid={(invalidOutput != null ? invalidOutput.Count : 0)} hasAny=false");
             return false;
         }
 
+        if (sensorLogs)
+            SensorLogGate.Log("PodeTransferirSensor", $"result valid={output.Count} invalid={(invalidOutput != null ? invalidOutput.Count : 0)} hasAny=true");
         return true;
     }
 

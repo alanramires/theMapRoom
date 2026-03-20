@@ -82,12 +82,15 @@ public static class PodeDesembarcarSensor
             isValid = false,
             explanation = "Contexto nao avaliado."
         };
+        bool sensorLogs = SensorLogGate.IsPodeDesembarcarEnabled();
 
         if (output == null)
             return false;
 
         output.Clear();
         invalidOutput?.Clear();
+        if (sensorLogs)
+            SensorLogGate.Log("PodeDesembarcarSensor", $"collect transporter={(selectedTransporter != null ? selectedTransporter.name : "(null)")}");
 
         if (selectedTransporter == null || map == null || selectedTransporter.IsEmbarked)
         {
@@ -203,7 +206,10 @@ public static class PodeDesembarcarSensor
                 "Transportador sem passageiros embarcados.");
         }
 
-        return output.Count > 0;
+        bool hasAny = output.Count > 0;
+        if (sensorLogs)
+            SensorLogGate.Log("PodeDesembarcarSensor", $"result valid={output.Count} invalid={(invalidOutput != null ? invalidOutput.Count : 0)} hasAny={hasAny} landingOk={(landingStatus != null && landingStatus.isValid)}");
+        return hasAny;
     }
 
     private static PodeDesembarcarLandingStatus EvaluateLandingStatus(

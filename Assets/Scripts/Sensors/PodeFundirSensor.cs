@@ -54,8 +54,12 @@ public static class PodeFundirSensor
         List<PodeFundirInvalidOption> invalidOutput = null)
     {
         reason = string.Empty;
+        bool sensorLogs = SensorLogGate.IsPodeFundirEnabled();
         output?.Clear();
         invalidOutput?.Clear();
+
+        if (sensorLogs)
+            SensorLogGate.Log("PodeFundirSensor", $"collect receiver={(selectedUnit != null ? selectedUnit.name : "(null)")}");
 
         if (selectedUnit == null)
         {
@@ -139,7 +143,11 @@ public static class PodeFundirSensor
         int validCount = output != null ? output.Count : 0;
         int invalidCount = invalidOutput != null ? invalidOutput.Count : 0;
         if (validCount > 0)
+        {
+            if (sensorLogs)
+                SensorLogGate.Log("PodeFundirSensor", $"result valid={validCount} invalid={invalidCount} hasAny=true");
             return true;
+        }
 
         if (invalidCount > 0)
         {
@@ -147,10 +155,14 @@ public static class PodeFundirSensor
                 ? invalidOutput[0].reason
                 : "Sem candidatos validos para fusao.";
             reason = $"Sem candidatos validos para fusao. {firstReason}";
+            if (sensorLogs)
+                SensorLogGate.Log("PodeFundirSensor", $"result valid={validCount} invalid={invalidCount} hasAny=true(reason-only)");
             return true;
         }
 
         reason = "Sem unidade adjacente (1 hex) do mesmo tipo para fundir.";
+        if (sensorLogs)
+            SensorLogGate.Log("PodeFundirSensor", $"result valid={validCount} invalid={invalidCount} hasAny=false");
         return false;
     }
 

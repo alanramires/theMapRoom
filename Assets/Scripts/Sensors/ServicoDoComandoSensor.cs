@@ -13,11 +13,15 @@ public static class ServicoDoComandoSensor
         List<ServicoDoComandoInvalidOption> invalidOutput = null)
     {
         reason = string.Empty;
+        bool sensorLogs = SensorLogGate.IsServicoDoComandoEnabled();
         if (output == null)
             return false;
 
         output.Clear();
         invalidOutput?.Clear();
+
+        if (sensorLogs)
+            SensorLogGate.Log("ServicoDoComandoSensor", $"collect team={activeTeam}");
 
         if (activeTeam == TeamId.Neutral)
         {
@@ -89,9 +93,13 @@ public static class ServicoDoComandoSensor
         if (output.Count <= 0)
         {
             reason = "Sem unidades elegiveis sobre construcoes supridoras aliadas ou embarcadas em transportadores supridores.";
+            if (sensorLogs)
+                SensorLogGate.Log("ServicoDoComandoSensor", $"result valid={output.Count} invalid={(invalidOutput != null ? invalidOutput.Count : 0)} hasAny=false");
             return false;
         }
 
+        if (sensorLogs)
+            SensorLogGate.Log("ServicoDoComandoSensor", $"result valid={output.Count} invalid={(invalidOutput != null ? invalidOutput.Count : 0)} hasAny=true");
         return true;
     }
 

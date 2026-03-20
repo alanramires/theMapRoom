@@ -37,6 +37,10 @@ public static class PodeCapturarSensor
         targetConstruction = null;
         operationType = CaptureOperationType.None;
         reason = string.Empty;
+        bool sensorLogs = SensorLogGate.IsPodeCapturarEnabled();
+
+        if (sensorLogs)
+            SensorLogGate.Log("PodeCapturarSensor", $"collect unit={(selectedUnit != null ? selectedUnit.name : "(null)")} movement={movementMode}");
 
         if (selectedUnit == null)
         {
@@ -103,6 +107,8 @@ public static class PodeCapturarSensor
             {
                 targetConstruction = construction;
                 operationType = CaptureOperationType.RecoverAlly;
+                if (sensorLogs)
+                    SensorLogGate.Log("PodeCapturarSensor", $"result hasAny=true op={operationType} construction={construction.name}");
                 return true;
             }
 
@@ -112,6 +118,8 @@ public static class PodeCapturarSensor
 
         targetConstruction = construction;
         operationType = CaptureOperationType.CaptureEnemy;
+        if (sensorLogs)
+            SensorLogGate.Log("PodeCapturarSensor", $"result hasAny=true op={operationType} construction={construction.name}");
         return true;
     }
 }

@@ -67,6 +67,7 @@ public class UnitSaveData
     public float worldX;
     public float worldY;
     public int currentHP;
+    public bool isDead;
     public int currentAmmo;
     public int currentFuel;
     public int remainingMovementPoints;
@@ -151,3 +152,4 @@ public class ReplayStepSaveData
     public string debugLabel;
     public string commandJson;
 }
+

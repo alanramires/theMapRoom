@@ -19,15 +19,36 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private bool snapToCellCenter = true;
     [SerializeField] private bool autoSnapWhenMovedInEditor = true;
     [SerializeField] private Vector3Int currentCellPosition = Vector3Int.zero;
+    [Header("Runtime Flags")]
     [SerializeField] private bool hasActed;
     [SerializeField, HideInInspector] private bool hasFiredThisTurn;
     [SerializeField] private bool receivedSuppliesThisTurn;
+    [SerializeField] private bool hasMerged;
+    [SerializeField] private int mergedWhenTurn = -1;
+    [SerializeField] private string mergedWithUnit = string.Empty;
     [SerializeField] private TeamId teamId = TeamId.Green;
     [SerializeField] private string unitId;
     [SerializeField] private int instanceId;
     [SerializeField] private Vector3 currentPosition = Vector3.zero;
     [SerializeField] private string unitDisplayName;
     [SerializeField] private int currentHP;
+    [SerializeField] private bool isDead;
+    [SerializeField] private string diedByUnit = string.Empty;
+    [SerializeField] private int deadWhenTurn = -1;
+    [SerializeField] private string deadByReason = string.Empty;
+    [SerializeField] private bool updateIsDeadInUpdate = true;
+    [Header("Runtime Flags View")]
+    [SerializeField] private bool flagHasActed;
+    [SerializeField] private bool flagIsDead;
+    [SerializeField] private int flagDeadWhenTurn = -1;
+    [SerializeField] private string flagDeadByReason = string.Empty;
+    [SerializeField] private string flagDiedByUnit = string.Empty;
+    [SerializeField] private bool flagIsEmbarked;
+    [SerializeField] private string flagEmbarkedAtUnit = string.Empty;
+    [SerializeField] private bool flagReceivedSupplies;
+    [SerializeField] private bool flagHasMerged;
+    [SerializeField] private int flagMergedWhenTurn = -1;
+    [SerializeField] private string flagMergedWithUnit = string.Empty;
     [SerializeField] private int currentAmmo = 3;
     [SerializeField] private int maxAmmo = 3;
     [SerializeField] private int currentFuel = 99;
@@ -42,6 +63,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField, HideInInspector] private bool appliedHasActed;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField] private bool isEmbarked;
+    [SerializeField] private string embarkedAtUnit = string.Empty;
     [SerializeField] private int embarkedVisualPreviewDepth;
     [SerializeField] private bool isSelected;
     [SerializeField, HideInInspector] private bool isPreviewDimmed;
@@ -89,6 +111,14 @@ public class UnitManager : MonoBehaviour
     public Vector3 CurrentPosition => currentPosition;
     public string UnitDisplayName => unitDisplayName;
     public int CurrentHP => currentHP;
+    public bool IsDead => isDead;
+    public int DeadWhenTurn => deadWhenTurn;
+    public string DeadByReason => deadByReason;
+    public string DiedByUnit => diedByUnit;
+    public bool HasMerged => hasMerged;
+    public int MergedWhenTurn => mergedWhenTurn;
+    public string MergedWithUnit => mergedWithUnit;
+    public string EmbarkedAtUnit => embarkedAtUnit;
     public int CurrentAmmo => currentAmmo;
     public int MaxAmmo => maxAmmo;
     public int CurrentFuel => currentFuel;
@@ -136,6 +166,16 @@ public class UnitManager : MonoBehaviour
         appliedHasActed = hasActed;
         appliedActiveTeamId = matchController != null ? matchController.ActiveTeamId : int.MinValue;
         RefreshActedVisual();
+    }
+    private void Update()
+    {
+        if (!Application.isPlaying)
+            return;
+
+        if (updateIsDeadInUpdate)
+            SyncDeadFlagFromHp();
+
+        SyncRuntimeFlagInspectorView();
     }
 
     private void LateUpdate()
@@ -220,7 +260,9 @@ public class UnitManager : MonoBehaviour
             return;
 
         SyncPositionState();
+        SyncDeadFlagFromHp();
         UpdateDynamicName();
+        SyncRuntimeFlagInspectorView();
 
         RefreshActedVisual();
     }
@@ -257,6 +299,8 @@ public class UnitManager : MonoBehaviour
         if (currentHP <= 0 || currentHP > data.maxHP)
             currentHP = data.maxHP;
 
+        SyncDeadFlagFromHp();
+
         maxFuel = Mathf.Max(1, data.autonomia);
         visao = Mathf.Max(1, data.visao);
         currentAmmo = Mathf.Clamp(currentAmmo, 0, GetMaxAmmo());
@@ -289,7 +333,99 @@ public class UnitManager : MonoBehaviour
     {
         int max = GetMaxHP();
         currentHP = Mathf.Clamp(value, 0, max);
+        SyncDeadFlagFromHp();
         RefreshActedVisual();
+    }
+
+    public void SetIsDead(bool value)
+    {
+        if (isDead == value)
+            return;
+
+        isDead = value;
+        if (isDead)
+        {
+            if (deadWhenTurn < 0)
+                deadWhenTurn = ResolveCurrentTurnNumber();
+            if (string.IsNullOrWhiteSpace(deadByReason))
+                deadByReason = "(unknown)";
+            if (string.IsNullOrWhiteSpace(diedByUnit))
+                diedByUnit = "(unknown)";
+        }
+        else
+        {
+            deadWhenTurn = -1;
+            deadByReason = string.Empty;
+            diedByUnit = string.Empty;
+        }
+
+        UpdateDynamicName();
+    }
+
+    public void MarkDiedBy(UnitManager killer)
+    {
+        string killerId = ResolveKillerAuditId(killer);
+        if (string.IsNullOrWhiteSpace(killerId))
+            killerId = "(unknown)";
+        MarkDead($"morto pela unidade {killerId}", killer);
+    }
+
+    public void MarkDead(string reason, UnitManager killer = null, int turnNumber = -1)
+    {
+        if (turnNumber < 0)
+            turnNumber = ResolveCurrentTurnNumber();
+
+        isDead = true;
+        deadWhenTurn = turnNumber;
+        deadByReason = string.IsNullOrWhiteSpace(reason) ? "(unknown)" : reason.Trim();
+        diedByUnit = ResolveKillerAuditId(killer);
+        UpdateDynamicName();
+    }
+
+    public void ClearDeathAudit()
+    {
+        deadWhenTurn = -1;
+        deadByReason = string.Empty;
+        diedByUnit = string.Empty;
+        if (currentHP > 0)
+            isDead = false;
+        UpdateDynamicName();
+    }
+
+    public void MarkMergedWith(IReadOnlyList<UnitManager> donors)
+    {
+        hasMerged = true;
+        mergedWhenTurn = ResolveCurrentTurnNumber();
+        if (donors == null || donors.Count <= 0)
+        {
+            mergedWithUnit = "(unknown)";
+            UpdateDynamicName();
+            return;
+        }
+
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        for (int i = 0; i < donors.Count; i++)
+        {
+            UnitManager donor = donors[i];
+            if (donor == null)
+                continue;
+
+            if (sb.Length > 0)
+                sb.Append(", ");
+
+            sb.Append(donor.ResolveRuntimeUnitName());
+        }
+
+        mergedWithUnit = sb.Length > 0 ? sb.ToString() : "(unknown)";
+        UpdateDynamicName();
+    }
+
+    public void ClearMergeAudit()
+    {
+        hasMerged = false;
+        mergedWhenTurn = -1;
+        mergedWithUnit = string.Empty;
+        UpdateDynamicName();
     }
 
     public void SetCurrentAmmo(int value)
@@ -1676,7 +1812,10 @@ public class UnitManager : MonoBehaviour
 
         isEmbarked = embarked;
         if (!isEmbarked)
+        {
             embarkedVisualPreviewDepth = 0;
+            embarkedAtUnit = string.Empty;
+        }
         if (isEmbarked)
         {
             SetSelected(false);
@@ -1720,6 +1859,7 @@ public class UnitManager : MonoBehaviour
     {
         embarkedTransporter = transporter;
         embarkedTransporterSlotIndex = slotIndex;
+        embarkedAtUnit = transporter != null ? transporter.ResolveRuntimeUnitName() : string.Empty;
         if (isEmbarked)
             SyncHierarchyForEmbarkedState();
     }
@@ -1728,6 +1868,7 @@ public class UnitManager : MonoBehaviour
     {
         embarkedTransporter = null;
         embarkedTransporterSlotIndex = -1;
+        embarkedAtUnit = string.Empty;
     }
 
     private void SyncHierarchyForEmbarkedState()
@@ -2028,7 +2169,73 @@ public class UnitManager : MonoBehaviour
         int team = (int)teamId;
         int uid = instanceId > 0 ? instanceId : 0;
         string receivedShortcut = receivedSuppliesThisTurn ? "_X" : string.Empty;
-        gameObject.name = $"{baseName}_T{team}_U{uid}{receivedShortcut}";
+        string deadShortcut = isDead ? "_D" : string.Empty;
+        gameObject.name = $"{baseName}_T{team}_U{uid}{receivedShortcut}{deadShortcut}";
+    }
+
+    private void SyncRuntimeFlagInspectorView()
+    {
+        flagHasActed = hasActed;
+        flagIsDead = isDead;
+        flagDeadWhenTurn = deadWhenTurn;
+        flagDeadByReason = deadByReason;
+        flagDiedByUnit = diedByUnit;
+        flagIsEmbarked = isEmbarked;
+        flagEmbarkedAtUnit = embarkedAtUnit;
+        flagReceivedSupplies = receivedSuppliesThisTurn;
+        flagHasMerged = hasMerged;
+        flagMergedWhenTurn = mergedWhenTurn;
+        flagMergedWithUnit = mergedWithUnit;
+    }
+    private void SyncDeadFlagFromHp()
+    {
+        bool shouldBeDead = currentHP <= 0;
+        if (isDead == shouldBeDead)
+        {
+            if (!shouldBeDead &&
+                (!string.IsNullOrEmpty(diedByUnit) || !string.IsNullOrEmpty(deadByReason) || deadWhenTurn >= 0))
+            {
+                deadWhenTurn = -1;
+                deadByReason = string.Empty;
+                diedByUnit = string.Empty;
+                UpdateDynamicName();
+            }
+            return;
+        }
+
+        isDead = shouldBeDead;
+        if (isDead)
+        {
+            if (deadWhenTurn < 0)
+                deadWhenTurn = ResolveCurrentTurnNumber();
+            if (string.IsNullOrWhiteSpace(deadByReason))
+                deadByReason = "(unknown)";
+            if (string.IsNullOrWhiteSpace(diedByUnit))
+                diedByUnit = "(unknown)";
+        }
+        else
+        {
+            deadWhenTurn = -1;
+            deadByReason = string.Empty;
+            diedByUnit = string.Empty;
+        }
+
+        UpdateDynamicName();
+    }
+
+    private int ResolveCurrentTurnNumber()
+    {
+        TryAutoAssignMatchController();
+        return matchController != null ? matchController.CurrentTurn : -1;
+    }
+
+    private static string ResolveKillerAuditId(UnitManager killer)
+    {
+        if (killer == null)
+            return string.Empty;
+        if (!string.IsNullOrWhiteSpace(killer.UnitId))
+            return killer.UnitId.Trim();
+        return killer.ResolveRuntimeUnitName();
     }
 
     private void TryAutoAssignLockRenderer()
@@ -2155,6 +2362,12 @@ public class UnitManager : MonoBehaviour
                 actedLockRenderer.enabled = false;
             return;
         }
+
+        // Death presentation can disable renderers directly. When a snapshot revives
+        // the unit, this guarantees sprite/hud come back before color/state updates.
+        SetSpriteVisible(true);
+        SetHudVisible(true);
+        SetOwnedUiVisualsVisible(true);
 
         TryAutoAssignMatchController();
         Color teamColor = TeamUtils.GetColor(teamId);

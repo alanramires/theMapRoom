@@ -29,6 +29,15 @@ public class MatchControllerEditor : Editor
     private SerializedProperty enableFogStepPerfLogsProp;
     private SerializedProperty enableFogValidationLogsProp;
     private SerializedProperty enableSensorsRuntimeLogsProp;
+    private SerializedProperty enablePodeMirarSensorLogsProp;
+    private SerializedProperty enablePodeEmbarcarSensorLogsProp;
+    private SerializedProperty enablePodeDesembarcarSensorLogsProp;
+    private SerializedProperty enablePodeCapturarSensorLogsProp;
+    private SerializedProperty enablePodeFundirSensorLogsProp;
+    private SerializedProperty enablePodeSuprirSensorLogsProp;
+    private SerializedProperty enablePodeTransferirSensorLogsProp;
+    private SerializedProperty enableServicoDoComandoSensorLogsProp;
+    private SerializedProperty enablePodePousarSensorLogsProp;
     private SerializedProperty enableAindaMeVeRuntimeLogsProp;
     private SerializedProperty enablePodeDetectarRuntimeLogsProp;
     private SerializedProperty enablePodeEnxergarRuntimeLogsProp;
@@ -71,6 +80,15 @@ public class MatchControllerEditor : Editor
         enableFogStepPerfLogsProp = serializedObject.FindProperty("enableFogStepPerfLogs");
         enableFogValidationLogsProp = serializedObject.FindProperty("enableFogValidationLogs");
         enableSensorsRuntimeLogsProp = serializedObject.FindProperty("enableSensorsRuntimeLogs");
+        enablePodeMirarSensorLogsProp = serializedObject.FindProperty("enablePodeMirarSensorLogs");
+        enablePodeEmbarcarSensorLogsProp = serializedObject.FindProperty("enablePodeEmbarcarSensorLogs");
+        enablePodeDesembarcarSensorLogsProp = serializedObject.FindProperty("enablePodeDesembarcarSensorLogs");
+        enablePodeCapturarSensorLogsProp = serializedObject.FindProperty("enablePodeCapturarSensorLogs");
+        enablePodeFundirSensorLogsProp = serializedObject.FindProperty("enablePodeFundirSensorLogs");
+        enablePodeSuprirSensorLogsProp = serializedObject.FindProperty("enablePodeSuprirSensorLogs");
+        enablePodeTransferirSensorLogsProp = serializedObject.FindProperty("enablePodeTransferirSensorLogs");
+        enableServicoDoComandoSensorLogsProp = serializedObject.FindProperty("enableServicoDoComandoSensorLogs");
+        enablePodePousarSensorLogsProp = serializedObject.FindProperty("enablePodePousarSensorLogs");
         enableAindaMeVeRuntimeLogsProp = serializedObject.FindProperty("enableAindaMeVeRuntimeLogs");
         enablePodeDetectarRuntimeLogsProp = serializedObject.FindProperty("enablePodeDetectarRuntimeLogs");
         enablePodeEnxergarRuntimeLogsProp = serializedObject.FindProperty("enablePodeEnxergarRuntimeLogs");
@@ -158,6 +176,24 @@ public class MatchControllerEditor : Editor
             EditorGUILayout.PropertyField(enableFogValidationLogsProp, new GUIContent("Enable Fog Validation Logs"));
         if (enableSensorsRuntimeLogsProp != null)
             EditorGUILayout.PropertyField(enableSensorsRuntimeLogsProp, new GUIContent("Enable Sensors Runtime Logs"));
+        if (enablePodeMirarSensorLogsProp != null)
+            EditorGUILayout.PropertyField(enablePodeMirarSensorLogsProp, new GUIContent("Enable PodeMirar Sensor Logs"));
+        if (enablePodeEmbarcarSensorLogsProp != null)
+            EditorGUILayout.PropertyField(enablePodeEmbarcarSensorLogsProp, new GUIContent("Enable PodeEmbarcar Sensor Logs"));
+        if (enablePodeDesembarcarSensorLogsProp != null)
+            EditorGUILayout.PropertyField(enablePodeDesembarcarSensorLogsProp, new GUIContent("Enable PodeDesembarcar Sensor Logs"));
+        if (enablePodeCapturarSensorLogsProp != null)
+            EditorGUILayout.PropertyField(enablePodeCapturarSensorLogsProp, new GUIContent("Enable PodeCapturar Sensor Logs"));
+        if (enablePodeFundirSensorLogsProp != null)
+            EditorGUILayout.PropertyField(enablePodeFundirSensorLogsProp, new GUIContent("Enable PodeFundir Sensor Logs"));
+        if (enablePodeSuprirSensorLogsProp != null)
+            EditorGUILayout.PropertyField(enablePodeSuprirSensorLogsProp, new GUIContent("Enable PodeSuprir Sensor Logs"));
+        if (enablePodeTransferirSensorLogsProp != null)
+            EditorGUILayout.PropertyField(enablePodeTransferirSensorLogsProp, new GUIContent("Enable PodeTransferir Sensor Logs"));
+        if (enableServicoDoComandoSensorLogsProp != null)
+            EditorGUILayout.PropertyField(enableServicoDoComandoSensorLogsProp, new GUIContent("Enable ServicoDoComando Sensor Logs"));
+        if (enablePodePousarSensorLogsProp != null)
+            EditorGUILayout.PropertyField(enablePodePousarSensorLogsProp, new GUIContent("Enable PodePousar Sensor Logs"));
         if (enableAindaMeVeRuntimeLogsProp != null)
             EditorGUILayout.PropertyField(enableAindaMeVeRuntimeLogsProp, new GUIContent("Enable AindaMeVe Runtime Logs"));
         if (enablePodeDetectarRuntimeLogsProp != null)

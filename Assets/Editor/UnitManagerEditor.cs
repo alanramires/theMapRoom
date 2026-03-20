@@ -29,7 +29,15 @@ public class UnitManagerEditor : Editor
     private SerializedProperty hasActedProp;
     private SerializedProperty hasFiredThisTurnProp;
     private SerializedProperty receivedSuppliesThisTurnProp;
+    private SerializedProperty hasMergedProp;
+    private SerializedProperty mergedWhenTurnProp;
+    private SerializedProperty mergedWithUnitProp;
+    private SerializedProperty isDeadProp;
+    private SerializedProperty deadWhenTurnProp;
+    private SerializedProperty deadByReasonProp;
+    private SerializedProperty diedByUnitProp;
     private SerializedProperty isEmbarkedProp;
+    private SerializedProperty embarkedAtUnitProp;
     private SerializedProperty matchControllerProp;
     private SerializedProperty currentDomainProp;
     private SerializedProperty currentHeightLevelProp;
@@ -66,7 +74,15 @@ public class UnitManagerEditor : Editor
         hasActedProp = serializedObject.FindProperty("hasActed");
         hasFiredThisTurnProp = serializedObject.FindProperty("hasFiredThisTurn");
         receivedSuppliesThisTurnProp = serializedObject.FindProperty("receivedSuppliesThisTurn");
+        hasMergedProp = serializedObject.FindProperty("hasMerged");
+        mergedWhenTurnProp = serializedObject.FindProperty("mergedWhenTurn");
+        mergedWithUnitProp = serializedObject.FindProperty("mergedWithUnit");
+        isDeadProp = serializedObject.FindProperty("isDead");
+        deadWhenTurnProp = serializedObject.FindProperty("deadWhenTurn");
+        deadByReasonProp = serializedObject.FindProperty("deadByReason");
+        diedByUnitProp = serializedObject.FindProperty("diedByUnit");
         isEmbarkedProp = serializedObject.FindProperty("isEmbarked");
+        embarkedAtUnitProp = serializedObject.FindProperty("embarkedAtUnit");
         matchControllerProp = serializedObject.FindProperty("matchController");
         currentDomainProp = serializedObject.FindProperty("currentDomain");
         currentHeightLevelProp = serializedObject.FindProperty("currentHeightLevel");
@@ -127,6 +143,41 @@ public class UnitManagerEditor : Editor
             EditorGUILayout.IntField("Movement Remaining", 0);
         if (isEmbarkedProp != null)
             EditorGUILayout.PropertyField(isEmbarkedProp, new GUIContent("Is Embarked"));
+        if (embarkedAtUnitProp != null)
+        {
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.PropertyField(embarkedAtUnitProp, new GUIContent("Embarked At"));
+        }
+
+        if (isDeadProp != null)
+            EditorGUILayout.PropertyField(isDeadProp, new GUIContent("Is Dead"));
+        if (deadWhenTurnProp != null)
+        {
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.PropertyField(deadWhenTurnProp, new GUIContent("Dead When (Turn)"));
+        }
+        if (deadByReasonProp != null)
+        {
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.PropertyField(deadByReasonProp, new GUIContent("Dead By (Reason)"));
+        }
+        if (diedByUnitProp != null)
+        {
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.PropertyField(diedByUnitProp, new GUIContent("Died By (Unit)"));
+        }
+        if (hasMergedProp != null)
+            EditorGUILayout.PropertyField(hasMergedProp, new GUIContent("Has Merged"));
+        if (mergedWhenTurnProp != null)
+        {
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.PropertyField(mergedWhenTurnProp, new GUIContent("Merged When (Turn)"));
+        }
+        if (mergedWithUnitProp != null)
+        {
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.PropertyField(mergedWithUnitProp, new GUIContent("Merged With"));
+        }
 
         EditorGUILayout.PropertyField(teamIdProp, new GUIContent("Team ID"));
 

@@ -15,8 +15,11 @@ public static class PodeEmbarcarSensor
         if (output == null)
             return false;
 
+        bool sensorLogs = SensorLogGate.IsPodeEmbarcarEnabled();
         output.Clear();
         invalidOutput?.Clear();
+        if (sensorLogs)
+            SensorLogGate.Log("PodeEmbarcarSensor", $"collect unit={(selectedUnit != null ? selectedUnit.name : "(null)")} remainingMove={remainingMovementPoints}");
         if (selectedUnit == null || map == null || selectedUnit.IsEmbarked)
             return false;
         if (!selectedUnit.TryGetUnitData(out UnitData sourceData) || sourceData == null)
@@ -98,7 +101,10 @@ public static class PodeEmbarcarSensor
                 AppendInvalid(invalidOutput, selectedUnit, transporter, cell, -1, "Transportador sem slots configurados.", -1, remainingMovementPoints);
         }
 
-        return output.Count > 0;
+        bool hasAny = output.Count > 0;
+        if (sensorLogs)
+            SensorLogGate.Log("PodeEmbarcarSensor", $"result valid={output.Count} invalid={(invalidOutput != null ? invalidOutput.Count : 0)} hasAny={hasAny}");
+        return hasAny;
     }
 
     private static bool CanEmbarkAtTransporterContext(

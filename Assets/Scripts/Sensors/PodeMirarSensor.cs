@@ -65,11 +65,14 @@ public static class PodeMirarSensor
         if (output == null)
             return false;
 
+        bool sensorLogs = SensorLogGate.IsPodeMirarEnabled();
         output.Clear();
         invalidOutput?.Clear();
         if (attacker == null)
             return false;
 
+        if (sensorLogs)
+            SensorLogGate.Log("PodeMirarSensor", $"collect attacker={(attacker != null ? attacker.name : "(null)")} movement={movementMode}");
 
         IReadOnlyList<UnitEmbarkedWeapon> embarkedWeapons = attacker.GetEmbarkedWeapons();
         if (embarkedWeapons == null || embarkedWeapons.Count == 0)
@@ -472,7 +475,10 @@ public static class PodeMirarSensor
             output[i].displayLabel = $"alvo {i + 1}, {weaponName}";
         }
 
-        return output.Count > 0;
+        bool hasAny = output.Count > 0;
+        if (sensorLogs)
+            SensorLogGate.Log("PodeMirarSensor", $"result valid={output.Count} invalid={(invalidOutput != null ? invalidOutput.Count : 0)} hasAny={hasAny}");
+        return hasAny;
     }
 
 

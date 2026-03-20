@@ -915,6 +915,7 @@ public partial class TurnStateManager : MonoBehaviour
         Vector3 worldPos = target.transform.position;
 
         target.SetCurrentHP(0);
+        target.MarkDead("morto pelo comando destroy unit");
         KillEmbarkedChildrenChain(target);
         yield return ExecuteUnitDeathPresentation(target, targetCell, worldPos, applyStartDelay: false);
     }
@@ -977,6 +978,7 @@ public partial class TurnStateManager : MonoBehaviour
                 }
 
                 target.SetCurrentHP(0);
+                target.MarkDead("morto por falta de combustivel/ queda aerea");
                 KillEmbarkedChildrenChain(target);
                 PanelDialogController.TrySetTransientText("caiu por falta de combustivel", 2.6f);
                 yield return ExecuteUnitDeathPresentation(
