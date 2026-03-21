@@ -27,10 +27,17 @@ public class UnitEmbarkedWeapon
     [Tooltip("Trajetoria escolhida para esta arma nesta unidade (override por operador).")]
     public WeaponTrajectoryType selectedTrajectory = WeaponTrajectoryType.Straight;
 
+    [Header("Layer Fire Restriction")]
+    [Tooltip("Can be fire only at domain/heigh. Vazio = sem restricao de camada para disparo desta arma.")]
+    public List<UnitLayerMode> canBeFireOnlyAtDomainHeigh = new List<UnitLayerMode>();
+
     [SerializeField, HideInInspector] private WeaponData lastSyncedWeapon;
 
     public void SyncFromWeaponDefaultsIfNeeded()
     {
+        if (canBeFireOnlyAtDomainHeigh == null)
+            canBeFireOnlyAtDomainHeigh = new List<UnitLayerMode>();
+
         bool weaponChanged = lastSyncedWeapon != weapon;
         if (weapon == null)
         {
@@ -98,5 +105,20 @@ public class UnitEmbarkedWeapon
         }
 
         selectedTrajectory = available[0];
+    }
+
+    public bool CanFireAtLayer(Domain domain, HeightLevel heightLevel)
+    {
+        if (canBeFireOnlyAtDomainHeigh == null || canBeFireOnlyAtDomainHeigh.Count <= 0)
+            return true;
+
+        for (int i = 0; i < canBeFireOnlyAtDomainHeigh.Count; i++)
+        {
+            UnitLayerMode mode = canBeFireOnlyAtDomainHeigh[i];
+            if (mode.domain == domain && mode.heightLevel == heightLevel)
+                return true;
+        }
+
+        return false;
     }
 }

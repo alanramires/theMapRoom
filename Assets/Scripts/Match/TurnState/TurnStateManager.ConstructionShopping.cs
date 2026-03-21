@@ -2,6 +2,7 @@ using System.Text;
 using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -147,6 +148,9 @@ public partial class TurnStateManager
             return false;
         }
 
+        UnitManager spawnedUnitManager = spawned.GetComponent<UnitManager>();
+        TryApplyForcedSpawnLayerFromCell(spawnedUnitManager, spawnCell);
+
         int remainingMoney = matchController != null ? matchController.GetActualMoney(spawnTeam) : 0;
         if (matchController != null && !matchController.TrySpendActualMoney(spawnTeam, unitCost, out remainingMoney))
         {
@@ -168,6 +172,41 @@ public partial class TurnStateManager
             Debug.Log($"[Shopping] Compra concluida: {ResolveUnitName(unit)} por ${unitCost} em {ResolveConstructionName(shoppingConstruction)}.");
         ExitConstructionShoppingStateToNeutral(rollback: false);
         return true;
+    }
+
+    private void TryApplyForcedSpawnLayerFromCell(UnitManager spawnedUnit, Vector3Int spawnCell)
+    {
+        if (spawnedUnit == null)
+            return;
+
+        if (spawnedUnit.GetAircraftType() != AircraftType.None)
+            spawnedUnit.SetAircraftGrounded(true);
+
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : spawnedUnit.BoardTilemap;
+        if (boardMap == null)
+            return;
+
+        Domain currentDomain = spawnedUnit.GetDomain();
+        HeightLevel currentHeight = spawnedUnit.GetHeightLevel();
+        if (!TryResolveForcedEndMovementTargetForCell(
+                boardMap,
+                terrainDatabase,
+                spawnCell,
+                currentDomain,
+                currentHeight,
+                out Domain forcedDomain,
+                out HeightLevel forcedHeight,
+                out _))
+        {
+            return;
+        }
+
+        if (forcedDomain == currentDomain && forcedHeight == currentHeight)
+            return;
+        if (!spawnedUnit.SupportsLayerMode(forcedDomain, forcedHeight))
+            return;
+
+        spawnedUnit.TrySetCurrentLayerMode(forcedDomain, forcedHeight);
     }
 
     private int ClampShoppingSelectedIndex()
@@ -454,9 +493,48 @@ public partial class TurnStateManager
 
     private static Sprite ResolveShoppingPreviewSprite(UnitData unit, TeamId team, out Color tint)
     {
-        tint = Color.white;
+        tint = TeamUtils.GetColor(team);
+        tint.a = 1f;
         if (unit == null)
             return null;
+
+        // Excecao hardcoded: no shopping, submarino mostra sprite naval/surface quando existir.
+        if (unit.unitClass == GameUnitClass.Submarine && unit.aditionalDomainsAllowed != null)
+        {
+            for (int i = 0; i < unit.aditionalDomainsAllowed.Count; i++)
+            {
+                UnitLayerMode mode = unit.aditionalDomainsAllowed[i];
+                if (mode.domain != Domain.Naval || mode.heightLevel != HeightLevel.Surface)
+                    continue;
+
+                bool hasTeamVariant = false;
+                Sprite teamVariant = null;
+                switch (team)
+                {
+                    case TeamId.Green:
+                        teamVariant = mode.spriteGreen;
+                        break;
+                    case TeamId.Red:
+                        teamVariant = mode.spriteRed;
+                        break;
+                    case TeamId.Blue:
+                        teamVariant = mode.spriteBlue;
+                        break;
+                    case TeamId.Yellow:
+                        teamVariant = mode.spriteYellow;
+                        break;
+                }
+
+                hasTeamVariant = teamVariant != null;
+                Sprite surfacedSprite = hasTeamVariant ? teamVariant : mode.spriteDefault;
+                if (surfacedSprite != null)
+                {
+                    return surfacedSprite;
+                }
+
+                break;
+            }
+        }
 
         Sprite teamSprite = null;
         switch (team)
@@ -478,8 +556,6 @@ public partial class TurnStateManager
         if (teamSprite != null)
             return teamSprite;
 
-        tint = TeamUtils.GetColor(team);
-        tint.a = 1f;
         return unit.spriteDefault;
     }
 

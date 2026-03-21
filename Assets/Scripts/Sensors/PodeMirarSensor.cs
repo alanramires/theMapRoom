@@ -11,6 +11,7 @@ public static class PodeMirarSensor
     private const string InvalidReasonLosBlocked = "Linha de visada bloqueada.";
     private const string InvalidReasonNoForwardObserver = "Sem observador avancado (alcance visual 3 hex).";
     private const string InvalidReasonStealth = "Alvo nao detectado (stealth placeholder).";
+    private const string InvalidReasonWeaponLayerRestricted = "Camada atual da unidade incompativel com esta arma.";
     private const int DefaultObservationRangeHexes = 3;
     private static MatchController cachedMatchController;
 
@@ -84,6 +85,8 @@ public static class PodeMirarSensor
         for (int i = 0; i < embarkedWeapons.Count; i++)
         {
             UnitEmbarkedWeapon embarked = embarkedWeapons[i];
+            if (!CanEmbarkedWeaponFireFromCurrentLayer(attacker, embarked))
+                continue;
             if (!TryBuildCandidate(embarked, i, movementMode, out WeaponRangeCandidate candidate, requireAmmo: false))
                 continue;
 
@@ -533,7 +536,11 @@ public static class PodeMirarSensor
 
         for (int i = 0; i < embarkedWeapons.Count; i++)
         {
-            if (TryBuildCandidate(embarkedWeapons[i], i, movementMode, out _, requireAmmo: true))
+            UnitEmbarkedWeapon embarked = embarkedWeapons[i];
+            if (!CanEmbarkedWeaponFireFromCurrentLayer(attacker, embarked))
+                continue;
+
+            if (TryBuildCandidate(embarked, i, movementMode, out _, requireAmmo: true))
                 return true;
         }
 
@@ -597,6 +604,7 @@ public static class PodeMirarSensor
 
         bool hasMinRangeOne = false;
         bool hasAmmo = false;
+        bool hasCurrentLayerAllowed = false;
         bool hasLayerCompatible = false;
         int fallbackIndex = -1;
         WeaponData fallbackWeapon = null;
@@ -616,6 +624,10 @@ public static class PodeMirarSensor
             if (embarked.squadAmmunition <= 0)
                 continue;
             hasAmmo = true;
+
+            if (!CanEmbarkedWeaponFireFromLayer(embarked, defender.domain, defender.heightLevel))
+                continue;
+            hasCurrentLayerAllowed = true;
 
             if (!embarked.weapon.SupportsOperationOn(attacker.domain, attacker.heightLevel))
                 continue;
@@ -646,6 +658,8 @@ public static class PodeMirarSensor
             reason = "Defensor sem arma de revide (range min 1).";
         else if (!hasAmmo)
             reason = "Defensor sem municao para revide.";
+        else if (!hasCurrentLayerAllowed)
+            reason = InvalidReasonWeaponLayerRestricted;
         else if (!hasLayerCompatible)
             reason = "Layer do atacante incompativel para revide.";
         else
@@ -723,6 +737,8 @@ public static class PodeMirarSensor
         for (int i = 0; i < embarkedWeapons.Count; i++)
         {
             UnitEmbarkedWeapon embarked = embarkedWeapons[i];
+            if (!CanEmbarkedWeaponFireFromCurrentLayer(attacker, embarked))
+                continue;
             if (!TryBuildCandidate(embarked, i, movementMode, out WeaponRangeCandidate candidate, requireAmmo: true))
                 continue;
 
@@ -1236,6 +1252,7 @@ public static class PodeMirarSensor
 
         bool hasMinRangeOne = false;
         bool hasAmmo = false;
+        bool hasCurrentLayerAllowed = false;
         bool hasLayerCompatible = false;
         int fallbackIndex = -1;
         WeaponData fallbackWeapon = null;
@@ -1255,6 +1272,10 @@ public static class PodeMirarSensor
             if (embarked.squadAmmunition <= 0)
                 continue;
             hasAmmo = true;
+
+            if (!CanEmbarkedWeaponFireFromCurrentLayer(defender, embarked))
+                continue;
+            hasCurrentLayerAllowed = true;
 
             if (!embarked.weapon.SupportsOperationOn(attacker.GetDomain(), attacker.GetHeightLevel()))
                 continue;
@@ -1287,6 +1308,8 @@ public static class PodeMirarSensor
             reason = "Defensor sem arma de revide (range min 1).";
         else if (!hasAmmo)
             reason = "Defensor sem municao para revide.";
+        else if (!hasCurrentLayerAllowed)
+            reason = InvalidReasonWeaponLayerRestricted;
         else if (!hasLayerCompatible)
             reason = "Layer do atacante incompativel para revide.";
         else
@@ -2024,6 +2047,22 @@ public static class PodeMirarSensor
         }
 
         return false;
+    }
+
+    private static bool CanEmbarkedWeaponFireFromCurrentLayer(UnitManager unit, UnitEmbarkedWeapon embarked)
+    {
+        if (unit == null)
+            return false;
+
+        return CanEmbarkedWeaponFireFromLayer(embarked, unit.GetDomain(), unit.GetHeightLevel());
+    }
+
+    private static bool CanEmbarkedWeaponFireFromLayer(UnitEmbarkedWeapon embarked, Domain domain, HeightLevel heightLevel)
+    {
+        if (embarked == null)
+            return false;
+
+        return embarked.CanFireAtLayer(domain, heightLevel);
     }
 }
 

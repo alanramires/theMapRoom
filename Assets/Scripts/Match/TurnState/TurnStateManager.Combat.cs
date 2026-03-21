@@ -91,6 +91,22 @@ public partial class TurnStateManager
                 trace.ToString());
         }
 
+        if (!TryGetEmbarkedWeapon(attacker, option.embarkedWeaponIndex, out UnitEmbarkedWeapon attackerEmbarkedWeapon) ||
+            !attackerEmbarkedWeapon.CanFireAtLayer(attacker.GetDomain(), attacker.GetHeightLevel()))
+        {
+            trace.AppendLine("1) Falha: arma do atacante indisponivel para a camada atual da unidade.");
+            return new CombatResolutionResult(
+                false,
+                false,
+                false,
+                false,
+                attacker,
+                defender,
+                Mathf.Max(0, attacker.CurrentHP),
+                Mathf.Max(0, defender.CurrentHP),
+                trace.ToString());
+        }
+
         string attackWeaponName = ResolveWeaponName(option.weapon, "arma");
         string counterWeaponName = ResolveWeaponName(option.defenderCounterWeapon, "-");
         int attackerHpBefore = Mathf.Max(0, attacker.CurrentHP);
@@ -148,10 +164,24 @@ public partial class TurnStateManager
             !defenderCounterBlockedByEmbarked &&
             !defenderCounterBlockedByLayer)
         {
-            defenderConsumed = defender.TryConsumeEmbarkedWeaponAmmo(option.defenderCounterEmbarkedWeaponIndex, 1);
-            trace.AppendLine($"- Arma revide: {counterWeaponName}");
-            trace.AppendLine($"- Gasto implicito: 1");
-            trace.AppendLine($"- Resultado: {(defenderConsumed ? "ok" : "falhou ao consumir municao")}");
+            bool defenderWeaponAllowedAtCurrentLayer =
+                TryGetEmbarkedWeapon(defender, option.defenderCounterEmbarkedWeaponIndex, out UnitEmbarkedWeapon defenderEmbarkedWeapon) &&
+                defenderEmbarkedWeapon.CanFireAtLayer(defender.GetDomain(), defender.GetHeightLevel());
+
+            if (!defenderWeaponAllowedAtCurrentLayer)
+            {
+                defenderConsumed = false;
+                counterReason = "Camada atual da unidade incompativel com esta arma.";
+                trace.AppendLine($"- Arma revide: {counterWeaponName}");
+                trace.AppendLine("- Resultado: falhou (camada atual nao permite disparo da arma).");
+            }
+            else
+            {
+                defenderConsumed = defender.TryConsumeEmbarkedWeaponAmmo(option.defenderCounterEmbarkedWeaponIndex, 1);
+                trace.AppendLine($"- Arma revide: {counterWeaponName}");
+                trace.AppendLine("- Gasto implicito: 1");
+                trace.AppendLine($"- Resultado: {(defenderConsumed ? "ok" : "falhou ao consumir municao")}");
+            }
         }
         else
         {
@@ -698,6 +728,20 @@ public partial class TurnStateManager
 
         ammo = embarked.squadAmmunition;
         return true;
+    }
+
+    private static bool TryGetEmbarkedWeapon(UnitManager unit, int embarkedWeaponIndex, out UnitEmbarkedWeapon weapon)
+    {
+        weapon = null;
+        if (unit == null || embarkedWeaponIndex < 0)
+            return false;
+
+        System.Collections.Generic.IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+        if (weapons == null || embarkedWeaponIndex >= weapons.Count)
+            return false;
+
+        weapon = weapons[embarkedWeaponIndex];
+        return weapon != null;
     }
 
     private static string ResolveWeaponName(WeaponData weapon, string fallback)

@@ -3,7 +3,7 @@
 | ID | Cenário | Pré-condição | Ação | Resultado esperado |
 |---|---|---|---|---|
 | R01 (OK)| Gravação ActionStack: `move` | Partida ativa, unidade móvel selecionável | Mover unidade e finalizar ação | 1 batch gravado; replay reproduz exatamente célula origem/destino |
-| R02 | Gravação ActionStack: `attack` | Unidade com alvo válido | Atacar e concluir combate | Batch gravado; replay reproduz alvo, dano e estado final coerente |
+| R02 (OK) | Gravação ActionStack: `attack` | Unidade com alvo válido | Atacar e concluir combate | Batch gravado; replay reproduz alvo, dano e estado final coerente |
 | R03 | Gravação ActionStack: `buy`/`shopping` | Construção com compra disponível | Abrir shopping e comprar unidade | Batch gravado; unidade spawnada no replay no hex correto |
 | R04 | Gravação ActionStack: `capture` | Unidade em construção capturável | Executar captura | Batch gravado; dono da construção muda no replay |
 | R05 | Gravação ActionStack: `embark`/`disembark` | Transporte + passageiro válidos | Embarcar e depois desembarcar | Ambos batches gravados; estado de transporte/passageiro consistente |

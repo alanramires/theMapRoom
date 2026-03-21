@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -693,10 +693,10 @@ public partial class TurnStateManager
             if (seat == null || seat.embarkedUnit == null || !seat.embarkedUnit.IsEmbarked)
                 continue;
 
-            selectionNumber++;
             if (IsPassengerAlreadyQueued(seat.embarkedUnit))
                 continue;
 
+            selectionNumber++;
             string slotLabel = !string.IsNullOrWhiteSpace(seat.slotId) ? seat.slotId : $"slot {seat.slotIndex}";
             disembarkPassengerEntries.Add(new DisembarkPassengerEntry
             {

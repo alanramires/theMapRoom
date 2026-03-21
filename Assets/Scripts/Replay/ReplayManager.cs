@@ -38,11 +38,10 @@ public class ReplayManager : MonoBehaviour
     [SerializeField, Range(0.01f, 5f), Tooltip("Time between action batches (seconds).") ] private float timeBetweenBatches = 0.5f;
     [SerializeField] private bool animateCursorTravelBetweenActions = true;
     [SerializeField, Range(0.01f, 1f)] private float cursorTravelStepDelay = 0.15f;
+    [SerializeField, Range(0f, 1f), Tooltip("Delay between sensor substeps during replay automation (seconds).") ] private float sensorSubstepDelay = 0.08f;
     [SerializeField, Range(0f, 2f)] private float replayConfirmVisualDelay = 0.25f;
     [SerializeField, Range(0.01f, 1f), Tooltip("Delay between shopping menu items during replay automation (seconds).") ] private float shoppingNavDelay = 0.15f;
     [SerializeField, Tooltip("Quando ligado, remove delays artificiais do replay e usa teleporte do cursor entre cells.")] private bool fastReplayMode = false;
-    [SerializeField] private bool animateCombatOnReplay = true;
-    [SerializeField] private bool cinematicModeEnabled = true;
     [Header("Telemetry")]
     [SerializeField] private bool snapshotTelemetryEnabled = true;
     [SerializeField] private int snapshotTelemetryLogEvery = 20;
@@ -102,6 +101,29 @@ public class ReplayManager : MonoBehaviour
             Debug.LogWarning(message);
     }
 
+    public float GetEffectiveTimeBetweenBatchesForAutoplay()
+    {
+        return GetEffectiveTimeBetweenBatches();
+    }
+
+    public string GetReplayStepExecutionBusyReason()
+    {
+        TryAutoAssignReferences();
+
+        bool actionStepRoutineBusy = attackStepExecutionRoutine != null || actionStepExecutionRoutine != null;
+        bool movementBusy = animationManager != null && animationManager.IsAnimatingMovement;
+        bool scannerBusy = turnStateManager != null && turnStateManager.IsScannerActionExecutionInProgress;
+
+        List<string> reasons = new List<string>(3);
+        if (actionStepRoutineBusy)
+            reasons.Add("actionStepRoutine");
+        if (movementBusy)
+            reasons.Add("IsAnimatingMovement");
+        if (scannerBusy)
+            reasons.Add("IsScannerActionExecutionInProgress");
+
+        return reasons.Count > 0 ? string.Join(", ", reasons) : "none";
+    }
     private void Awake()
     {
         TryAutoAssignReferences();
@@ -185,7 +207,7 @@ public class ReplayManager : MonoBehaviour
     {
         if (cursorController == null)
             yield break;
-        if (action != null && action.ActionType == PlayerActionType.UnitAction)
+        if (action != null && (action.ActionType == PlayerActionType.UnitAction || action.ActionType == PlayerActionType.Shopping))
             yield break;
 
         if (!TryResolveActionPreExecutionCursorCell(action, preActionSnapshot, out Vector3Int targetCursorCell))
@@ -214,13 +236,6 @@ public class ReplayManager : MonoBehaviour
 
         ReplayLog($"[Replay][CursorTravel] from={FormatReplayCell(fromCell)} to={FormatReplayCell(toCell)} pathSteps={travelPath.Count}");
 
-        if (fastReplayMode)
-        {
-            cursorController.SetCell(toCell, playMoveSfx: false, adjustCamera: false);
-            cursorController.TryAdjustCameraToCursor();
-            yield break;
-        }
-
         for (int i = 0; i < travelPath.Count; i++)
         {
             Vector3Int stepCell = NormalizeCell(travelPath[i]);
@@ -233,6 +248,8 @@ public class ReplayManager : MonoBehaviour
                 float delay = GetEffectiveCursorTravelStepDelay();
                 if (delay > 0f)
                     yield return new WaitForSecondsRealtime(delay);
+                else
+                    yield return null;
             }
         }
     }
@@ -422,7 +439,7 @@ public class ReplayManager : MonoBehaviour
         if (!turnStateManager.HandleAutomatedSensorActionRequested(action.SensorAction))
             yield break;
 
-        yield return null;
+        yield return WaitForSensorSubstepDelay();
 
         bool handledBySpecificSensorRoutine = true;
         switch (action.SensorAction)
@@ -606,13 +623,13 @@ public class ReplayManager : MonoBehaviour
             if (!queued)
             {
                 ExecuteReplayConfirmInput();
-                yield return null;
+                yield return WaitForSensorSubstepDelay();
                 ExecuteReplayConfirmInput();
-                yield return null;
+                yield return WaitForSensorSubstepDelay();
             }
             else
             {
-                yield return null;
+                yield return WaitForSensorSubstepDelay();
             }
 
             executedAny = true;
@@ -624,7 +641,7 @@ public class ReplayManager : MonoBehaviour
         if (!turnStateManager.TryStartAutomatedDisembarkReplayExecution())
             yield return ExecuteDoubleConfirmFallback();
 
-        yield return null;
+        yield return WaitForSensorSubstepDelay();
     }
     private IEnumerator ExecuteRecordedMergeSubsteps(PlayerAction action)
     {
@@ -640,7 +657,7 @@ public class ReplayManager : MonoBehaviour
             if (!turnStateManager.TryQueueAutomatedMergeReplayOrder(step.TargetInstanceId))
                 yield return ExecuteDoubleConfirmFallback();
             else
-                yield return null;
+                yield return WaitForSensorSubstepDelay();
 
             executedAny = true;
         }
@@ -651,7 +668,7 @@ public class ReplayManager : MonoBehaviour
         if (!turnStateManager.TryStartAutomatedMergeReplayExecution())
             yield return ExecuteDoubleConfirmFallback();
 
-        yield return null;
+        yield return WaitForSensorSubstepDelay();
     }
 
     private IEnumerator ExecuteRecordedSupplySubsteps(PlayerAction action)
@@ -668,7 +685,7 @@ public class ReplayManager : MonoBehaviour
             if (!turnStateManager.TryQueueAutomatedSupplyReplayOrder(step.TargetInstanceId))
                 yield return ExecuteDoubleConfirmFallback();
             else
-                yield return null;
+                yield return WaitForSensorSubstepDelay();
 
             executedAny = true;
         }
@@ -679,7 +696,7 @@ public class ReplayManager : MonoBehaviour
         if (!turnStateManager.TryStartAutomatedSupplyReplayExecution())
             yield return ExecuteDoubleConfirmFallback();
 
-        yield return null;
+        yield return WaitForSensorSubstepDelay();
     }
 
     private IEnumerator ExecuteRecordedTransferSubsteps(PlayerAction action)
@@ -700,7 +717,7 @@ public class ReplayManager : MonoBehaviour
             if (!turnStateManager.TryExecuteAutomatedTransferReplayOrder(step.TargetInstanceId, targetCell))
                 yield return ExecuteDoubleConfirmFallback();
             else
-                yield return null;
+                yield return WaitForSensorSubstepDelay();
 
             executedAny = true;
         }
@@ -727,7 +744,7 @@ public class ReplayManager : MonoBehaviour
             if (!turnStateManager.TryExecuteAutomatedEmbarkReplayTarget(step.TargetInstanceId, targetCell))
                 yield return ExecuteDoubleConfirmFallback();
             else
-                yield return null;
+                yield return WaitForSensorSubstepDelay();
 
             executedAny = true;
         }
@@ -754,7 +771,7 @@ public class ReplayManager : MonoBehaviour
             if (!turnStateManager.TryExecuteAutomatedAttackReplayTarget(step.TargetInstanceId, targetCell))
                 yield return ExecuteDoubleConfirmFallback();
             else
-                yield return null;
+                yield return WaitForSensorSubstepDelay();
 
             executedAny = true;
         }
@@ -766,15 +783,15 @@ public class ReplayManager : MonoBehaviour
     private IEnumerator ExecuteDoubleConfirmFallback()
     {
         ExecuteReplayConfirmInput();
-        yield return null;
+        yield return WaitForSensorSubstepDelay();
         ExecuteReplayConfirmInput();
-        yield return null;
+        yield return WaitForSensorSubstepDelay();
     }
 
     private IEnumerator ExecuteRecordedCaptureAction(PlayerAction action)
     {
         // Capture starts execution immediately when requested; no extra confirm required.
-        yield return null;
+        yield return WaitForSensorSubstepDelay();
     }
 
     private IEnumerator ExecuteRecordedLandAction(PlayerAction action)
@@ -790,14 +807,14 @@ public class ReplayManager : MonoBehaviour
             }
 
             ExecuteReplayConfirmInput();
-            yield return null;
+            yield return WaitForSensorSubstepDelay();
             executedAny = true;
         }
 
         if (!executedAny)
         {
             ExecuteReplayConfirmInput();
-            yield return null;
+            yield return WaitForSensorSubstepDelay();
         }
     }
     private IEnumerator ExecuteRecordedShoppingBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
@@ -1763,8 +1780,11 @@ public class ReplayManager : MonoBehaviour
         if (!startedAsyncExecution)
         {
             ApplyReplayVision();
-            if (currentStepIndex >= ResolveCurrentReplayBatchCount() - 1)
+            bool reachedLastBatch = currentStepIndex >= ResolveCurrentReplayBatchCount() - 1;
+            if (reachedLastBatch)
                 isPlaying = false;
+            else if (isPlaying)
+                RequestAutoplayAdvance("step-finished-sync");
         }
 
         return true;
@@ -1784,8 +1804,16 @@ public class ReplayManager : MonoBehaviour
 
     private IEnumerator AutoplayAdvanceWhenReady(string source)
     {
-        while (isReplaying && isPlaying && IsReplayStepExecutionBusy())
+        while (isReplaying && isPlaying &&
+               (IsReplayStepExecutionBusy() ||
+                (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)))
+        {
             yield return null;
+        }
+
+        float delay = GetEffectiveTimeBetweenBatches();
+        if (delay > 0f)
+            yield return new WaitForSecondsRealtime(delay);
 
         bool started = false;
         if (isReplaying && isPlaying)
@@ -1888,7 +1916,6 @@ public class ReplayManager : MonoBehaviour
             return false;
 
         if (allowCinematic
-            && cinematicModeEnabled
             && step.StepType == ReplayStepType.Attack
             && step.Command is AttackReplayCommand attackCommand
             && attackCommand.CinematicTrack != null
@@ -1914,7 +1941,6 @@ public class ReplayManager : MonoBehaviour
         {
             ReplayExecutionContext context = BuildExecutionContext();
             // Durante cinematica, o combate ja foi apresentado pelo FSM.
-            context.AnimateCombatPresentation = false;
             step.Command.Execute(context);
             currentStepIndex = index;
             ApplyReplayVision();
@@ -1976,7 +2002,19 @@ public class ReplayManager : MonoBehaviour
     {
         return fastReplayMode ? 0f : Mathf.Max(0f, shoppingNavDelay);
     }
+    private float GetEffectiveSensorSubstepDelay()
+    {
+        return fastReplayMode ? 0f : Mathf.Max(0f, sensorSubstepDelay);
+    }
 
+    private IEnumerator WaitForSensorSubstepDelay()
+    {
+        float delay = GetEffectiveSensorSubstepDelay();
+        if (delay > 0f)
+            yield return new WaitForSecondsRealtime(delay);
+        else
+            yield return null;
+    }
     private float GetEffectiveReplayConfirmVisualDelay()
     {
         return fastReplayMode ? 0f : Mathf.Max(0f, replayConfirmVisualDelay);
@@ -2126,6 +2164,8 @@ public class ReplayManager : MonoBehaviour
         TryAutoAssignReferences();
         if (unitSpawner == null || constructionSpawner == null || matchController == null)
             return;
+
+        turnStateManager?.ResetCommandServiceReplayTransientState();
 
         EnsureReplayPoolsInitialized();
         ClearCurrentRuntime();
@@ -2290,7 +2330,6 @@ public class ReplayManager : MonoBehaviour
             AnimationManager = animationManager,
             CursorController = cursorController,
             IsReplayMode = isReplaying,
-            AnimateCombatPresentation = animateCombatOnReplay,
             VisionMode = visionMode,
             ObserverTeam = observerTeam
         };
@@ -3085,6 +3124,9 @@ public class ReplayManager : MonoBehaviour
         return resolved;
     }
 }
+
+
+
 
 
 

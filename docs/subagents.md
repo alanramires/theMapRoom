@@ -1,4 +1,12 @@
-Já tem:
+Subagents especializados:
+Beauvoir — documentação, varre docs/ e mantém atualizado
+Huygens — implementação, responde perguntas técnicas do código
+Hubble — QA, gera checklists de teste por comportamento de runtime
+
+Subagents previstos:
+Simone — conteúdo do jogador, traduz arquitetura pra linguagem acessível
+Melanie — balanceamento, especialista em RPS e Elite, custo/efetividade, assimetria de facções, Força de Ataque e Força de Defesa.
+
 
 Subagent de implementação - Huygens  — responde perguntas técnicas do código
 

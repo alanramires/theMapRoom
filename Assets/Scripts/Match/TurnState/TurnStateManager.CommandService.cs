@@ -727,6 +727,21 @@ public partial class TurnStateManager
         ClearCommandServiceHelper();
     }
 
+    public void ResetCommandServiceReplayTransientState()
+    {
+        if (commandServiceExecutionRoutine != null)
+        {
+            StopCoroutine(commandServiceExecutionRoutine);
+            commandServiceExecutionRoutine = null;
+        }
+
+        commandServiceServedCacheTurn = int.MinValue;
+        commandServiceServedCacheTeamId = int.MinValue;
+        commandServiceServedUnitInstanceIds.Clear();
+        ClearPendingCommandServiceConfirmation();
+        ClearCommandServicePreviewNavigation();
+    }
+
     private void RefreshCommandServiceServedCacheScope()
     {
         int currentTurn = matchController != null ? matchController.CurrentTurn : int.MinValue;

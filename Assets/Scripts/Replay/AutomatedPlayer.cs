@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 public class AutomatedPlayer : MonoBehaviour
@@ -18,7 +18,6 @@ public class AutomatedPlayer : MonoBehaviour
 
     private void OnDisable()
     {
-        UnsubscribeFromCursorNeutral();
         StopQueuedAdvanceRoutine();
         IsRunning = false;
     }
@@ -29,8 +28,6 @@ public class AutomatedPlayer : MonoBehaviour
             return;
 
         IsRunning = true;
-        Debug.Log("[Replay][Listener] AutomatedPlayer StartPlaying: subscribe OnCursorReturnedToNeutral");
-        SubscribeToCursorNeutral();
 
         // Kick first batch from current snapshot position.
         replayManager.ExecuteNextReplayBatch();
@@ -39,8 +36,6 @@ public class AutomatedPlayer : MonoBehaviour
     public void Pause()
     {
         IsRunning = false;
-        Debug.Log("[Replay][Listener] AutomatedPlayer Pause/Stop: unsubscribe OnCursorReturnedToNeutral");
-        UnsubscribeFromCursorNeutral();
         StopQueuedAdvanceRoutine();
     }
 
@@ -56,6 +51,14 @@ public class AutomatedPlayer : MonoBehaviour
         if (!replayManager.IsReplaying || !replayManager.IsPlaying)
             return;
 
+        if (replayManager.IsStepExecutionBusy)
+        {
+            string reason = replayManager.GetReplayStepExecutionBusyReason();
+            Debug.Log($"[Replay][AutomatedPlayer] OnNeutral recebido mas busy=true - aguardando: {reason}");
+            // MoveOnly can dispatch neutral before the replay batch really finishes.
+            return;
+        }
+
         Debug.Log("[Replay][Listener] AutomatedPlayer received OnCursorReturnedToNeutral -> queue next batch");
         QueueAdvanceWhenReady();
     }
@@ -70,14 +73,24 @@ public class AutomatedPlayer : MonoBehaviour
 
     private IEnumerator AdvanceWhenReplayStepIsReady()
     {
-        while (IsRunning && replayManager != null && replayManager.IsReplaying && replayManager.IsPlaying && replayManager.IsStepExecutionBusy)
-            yield return null;
+        float delay = replayManager != null ? replayManager.GetEffectiveTimeBetweenBatchesForAutoplay() : 0f;
+        if (delay > 0f)
+            yield return new WaitForSecondsRealtime(delay);
 
-        bool canAdvance = IsRunning && replayManager != null && replayManager.IsReplaying && replayManager.IsPlaying;
+        bool canAdvance = IsRunning
+            && replayManager != null
+            && replayManager.IsReplaying
+            && replayManager.IsPlaying
+            && !replayManager.IsStepExecutionBusy;
         if (canAdvance)
         {
             bool started = replayManager.ExecuteNextReplayBatch();
             Debug.Log($"[Replay][Listener] AutomatedPlayer queued advance executed started={started}");
+        }
+        else if (IsRunning && replayManager != null && replayManager.IsReplaying && replayManager.IsPlaying)
+        {
+            string reason = replayManager.GetReplayStepExecutionBusyReason();
+            Debug.Log($"[Replay][AutomatedPlayer] avanco cancelado: busy=true ({reason})");
         }
 
         queuedAdvanceRoutine = null;

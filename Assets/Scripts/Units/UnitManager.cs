@@ -1374,7 +1374,10 @@ public class UnitManager : MonoBehaviour
                 squadAmmunition = Mathf.Max(0, source.squadAmmunition),
                 operationRangeMin = source.GetRangeMin(),
                 operationRangeMax = source.GetRangeMax(),
-                selectedTrajectory = source.selectedTrajectory
+                selectedTrajectory = source.selectedTrajectory,
+                canBeFireOnlyAtDomainHeigh = source.canBeFireOnlyAtDomainHeigh != null
+                    ? new List<UnitLayerMode>(source.canBeFireOnlyAtDomainHeigh)
+                    : new List<UnitLayerMode>()
             };
             copy.EnsureValidSelectedTrajectory();
             embarkedWeaponsRuntime.Add(copy);

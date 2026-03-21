@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -135,15 +135,17 @@ public partial class TurnStateManager : MonoBehaviour
         Debug.Log(message);
     }
 
-    private static void PushPanelUnitMessage(string text, float durationSeconds = 2.8f)
+    private void PushPanelUnitMessage(string text, float durationSeconds = 2.8f)
     {
         if (string.IsNullOrWhiteSpace(text))
             return;
 
+        if (cursorState == CursorState.Suprindo && supplyExecutionInProgress)
+            return;
         string normalized = text.Replace('\n', ' ').Replace('\r', ' ').Trim();
         const int maxLen = 64;
         if (normalized.Length > maxLen)
-            normalized = normalized.Substring(0, maxLen - 1).TrimEnd() + "…";
+            normalized = normalized.Substring(0, maxLen - 1).TrimEnd() + "...";
 
         PanelDialogController.TrySetTransientText(normalized, durationSeconds);
     }
@@ -337,7 +339,7 @@ public partial class TurnStateManager : MonoBehaviour
 
         if (!keepSelection)
         {
-            // Evita estado selecionado de outra equipe durante o switch for�ado.
+            // Evita estado selecionado de outra equipe durante o switch forÃ¯Â¿Â½ado.
             ForceNeutral();
         }
 
@@ -1428,4 +1430,3 @@ public partial class TurnStateManager : MonoBehaviour
         return (animationManager != null && animationManager.IsAnimatingMovement) || embarkExecutionInProgress || disembarkExecutionInProgress;
     }
 }
-

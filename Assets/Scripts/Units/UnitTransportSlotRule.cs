@@ -26,6 +26,9 @@ public class UnitTransportSlotRule
     [Tooltip("Skills bloqueadas para este slot. Se a unidade tiver alguma delas, embarque e negado.")]
     public List<SkillData> blockedSkills = new List<SkillData>();
 
+    [Tooltip("Can be fire only at domain/heigh. Vazio = sem restricao (campo reservado para regras de combate por slot).")]
+    public List<UnitLayerMode> canBeFireOnlyAtDomainHeigh = new List<UnitLayerMode>();
+
     public void EnsureDefaults()
     {
         capacity = Mathf.Max(1, capacity);
@@ -37,6 +40,8 @@ public class UnitTransportSlotRule
             requiredSkills = new List<SkillData>();
         if (blockedSkills == null)
             blockedSkills = new List<SkillData>();
+        if (canBeFireOnlyAtDomainHeigh == null)
+            canBeFireOnlyAtDomainHeigh = new List<UnitLayerMode>();
 
         if (allowedLayerModes.Count == 0 && legacyAllowedLayerModes != null && legacyAllowedLayerModes.Count > 0)
         {
