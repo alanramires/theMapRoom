@@ -151,8 +151,8 @@ public partial class TurnStateManager
             double takeoffPerfStart = Time.realtimeSinceStartupAsDouble;
             TryPrepareTemporaryTakeoffStateForSelection(unit, out string takeoffInfo);
             RegisterPerfTakeoffPrepDuration((Time.realtimeSinceStartupAsDouble - takeoffPerfStart) * 1000d);
-            if (!string.IsNullOrWhiteSpace(takeoffInfo))
-                Debug.Log($"[Pode Decolar] {takeoffInfo}");
+            if (!string.IsNullOrWhiteSpace(takeoffInfo) && SensorLogGate.IsPodeDecolarEnabled())
+                SensorLogGate.Log("PodeDecolar", takeoffInfo);
 
             replayManager?.EnsureCurrentUnitActionBuffer(unit, cursorCell);
             SetSelectedUnit(unit);

@@ -22,6 +22,7 @@ public static class SensorLogGate
     public static bool IsPodeTransferirEnabled() => ResolveMatchController()?.EnablePodeTransferirSensorLogs ?? false;
     public static bool IsServicoDoComandoEnabled() => ResolveMatchController()?.EnableServicoDoComandoSensorLogs ?? false;
     public static bool IsPodePousarEnabled() => ResolveMatchController()?.EnablePodePousarSensorLogs ?? false;
+    public static bool IsPodeDecolarEnabled() => ResolveMatchController()?.EnablePodeDecolarSensorLogs ?? false;
 
     public static void Log(string sensorTag, string message)
     {

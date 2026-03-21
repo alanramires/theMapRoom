@@ -118,6 +118,35 @@ No scanner, os sensores retornam opcoes validas + invalidas (com motivo), e o `T
 - `S`: suprir (`PodeSuprirSensor`)
 - `T`: transferir (`PodeTransferirSensor`)
 
+## Contrato de listeners do replay (runtime)
+
+Este contrato define o que o replay precisa ouvir para nao avancar batch cedo demais.
+
+- Listener 1: `CursorController.OnCursorReturnedToNeutral`
+  - Sinal de fim de batch.
+  - `Play` usa esse evento para disparar o proximo batch.
+- Listener 2: `TurnStateManager.OnSensorsReady`
+  - Sinal interno de "movimento terminou e scanner carregou opcoes".
+  - Relevante dentro do batch de `UnitAction` apos confirmar destino.
+
+### Regra por tipo de batch
+
+- `UnitAction` com movimento + sensor (`A/E/D/C/F/S/T/Land`)
+  - fluxo: confirmar destino -> esperar `OnSensorsReady` -> executar sensor/substeps -> confirmar -> esperar `OnCursorReturnedToNeutral`.
+- `UnitAction` `SensorAction == None` (move-only)
+  - fluxo: confirmar destino -> esperar `OnSensorsReady` (ou fallback para `Neutral`) -> finalizar sem acao -> esperar `OnCursorReturnedToNeutral`.
+- `Shopping`
+  - nao usa `OnSensorsReady`.
+  - aguarda apenas retorno para `Neutral` ao final do fluxo de compra.
+- `CommandService` / `RemoveUnit`
+  - nao usam `OnSensorsReady`.
+  - aguardam apenas retorno para `Neutral` ao final da execucao.
+
+### Observacoes de escopo
+
+- `OnSensorsReady` so importa para replay/automacao dentro do batch; nao muda o fluxo normal do jogador.
+- Se o fluxo cair direto em `Neutral` sem abrir scanner (casos especiais), o replay deve tratar `Neutral` como condicao valida para seguir.
+
 ## Observacao importante
 
 - `PodeDecolarSensor` e `PodePousarSensor` sao sensores de decisao de contexto importantes, mas nao entram no mesmo contrato de atalhos do `SensorHandle.RunAll(...)`.

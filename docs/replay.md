@@ -69,7 +69,9 @@ Para acoes suportadas, o replay emula entrada:
 - seleciona unidade
 - move cursor/confirmacoes
 - executa sensor e substeps gravados
-- aguarda sistemas ficarem idle entre etapas
+- aguarda eventos de sincronizacao do runtime:
+  - `TurnStateManager.OnSensorsReady` dentro do batch de movimento (quando aplicavel)
+  - `CursorController.OnCursorReturnedToNeutral` para fechamento do batch e avancar no `Play`
 
 Acoes suportadas no pipeline ativo:
 - `UnitAction`
@@ -84,6 +86,10 @@ Shopping tem navegacao de menu emulada por indice gravado:
 - `ShoppingSelectedIndex`
 - `ShoppingUnitTypeId`
 - delay configuravel: `shoppingNavDelay`
+
+Observacao de fluxo:
+- `Shopping`, `CommandService` e `RemoveUnit` nao dependem de `OnSensorsReady`.
+- Nesses fluxos, o replay espera apenas retorno para `Neutral` ao final da execucao.
 
 ## Save/load
 

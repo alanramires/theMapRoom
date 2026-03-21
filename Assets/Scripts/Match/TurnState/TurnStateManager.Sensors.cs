@@ -173,10 +173,12 @@ public partial class TurnStateManager
             cachedPodeMirarTargets.Clear();
             cachedPodeMirarInvalidTargets.Clear();
         }
-
             RefreshEnemyThreatLayersOverlayIfEnabled();
             ResetScannerPromptState();
             LogScannerPanel();
+
+            if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
+                NotifySensorsReady();
         }
         finally
         {
@@ -468,3 +470,9 @@ public partial class TurnStateManager
     }
 
 }
+
+
+
+
+
+

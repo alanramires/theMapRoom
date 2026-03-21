@@ -26,6 +26,7 @@ public class ReplayPanelUI : MonoBehaviour
     [SerializeField] private Button stepBackButton;
     [SerializeField] private Button stepForwardButton;
     [SerializeField] private Button stopButton;
+    [SerializeField] private Toggle fastReplayModeToggle;
 
     [Header("Input")]
     [SerializeField] private KeyCode togglePanelKey = KeyCode.F9;
@@ -261,6 +262,24 @@ public class ReplayPanelUI : MonoBehaviour
             else if (stepForwardButton == null && (name.Contains("fwd") || name.Contains("forward") || name.Contains("next")))
                 stepForwardButton = button;
         }
+
+        if (fastReplayModeToggle == null)
+        {
+            Toggle[] toggles = GetComponentsInChildren<Toggle>(true);
+            for (int i = 0; i < toggles.Length; i++)
+            {
+                Toggle toggle = toggles[i];
+                if (toggle == null)
+                    continue;
+
+                string name = toggle.name != null ? toggle.name.ToLowerInvariant() : string.Empty;
+                if (name.Contains("fast") && name.Contains("replay"))
+                {
+                    fastReplayModeToggle = toggle;
+                    break;
+                }
+            }
+        }
     }
 
     private void BindButtonCallbacks()
@@ -271,6 +290,7 @@ public class ReplayPanelUI : MonoBehaviour
         pauseButton?.onClick.AddListener(OnPauseClicked);
         stepForwardButton?.onClick.AddListener(OnForwardClicked);
         stopButton?.onClick.AddListener(OnStopClicked);
+        fastReplayModeToggle?.onValueChanged.AddListener(OnFastReplayModeToggleChanged);
     }
 
     private void UnbindButtonCallbacks()
@@ -281,6 +301,7 @@ public class ReplayPanelUI : MonoBehaviour
         pauseButton?.onClick.RemoveListener(OnPauseClicked);
         stepForwardButton?.onClick.RemoveListener(OnForwardClicked);
         stopButton?.onClick.RemoveListener(OnStopClicked);
+        fastReplayModeToggle?.onValueChanged.RemoveListener(OnFastReplayModeToggleChanged);
     }
 
     private void OnStartClicked()
@@ -375,10 +396,25 @@ public class ReplayPanelUI : MonoBehaviour
         RefreshLabels();
     }
 
+    private void OnFastReplayModeToggleChanged(bool enabled)
+    {
+        if (replayManager == null)
+            return;
+
+        replayManager.SetFastReplayMode(enabled);
+        RefreshLabels();
+    }
+
     private void RefreshLabels()
     {
         if (replayManager == null)
         {
+            if (fastReplayModeToggle != null)
+            {
+                fastReplayModeToggle.SetIsOnWithoutNotify(false);
+                fastReplayModeToggle.interactable = false;
+            }
+
             SetText(textReplay, "Replay");
             SetText(turnText, "Turno: -");
             SetText(observerText, "Observador: -");
@@ -414,6 +450,12 @@ public class ReplayPanelUI : MonoBehaviour
         SetText(visionModeText, $"Visao: {FormatVisionModeLabel(replayManager.VisionMode, replayManager.ObserverTeam)}");
         SetText(stepText, $"Step: {currentSnapshotIndex}/{totalSnapshots}");
         SetText(startConfigText, BuildReplayStartConfigLabel());
+
+        if (fastReplayModeToggle != null)
+        {
+            fastReplayModeToggle.SetIsOnWithoutNotify(replayManager.FastReplayMode);
+            fastReplayModeToggle.interactable = true;
+        }
 
         bool hasReplayBatches = totalBatches > 0;
         bool hasReplayHistory = replayManager.MatchHistory != null && replayManager.MatchHistory.Count > 0;

@@ -191,6 +191,7 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enablePodeTransferirSensorLogs = false;
     [SerializeField] private bool enableServicoDoComandoSensorLogs = false;
     [SerializeField] private bool enablePodePousarSensorLogs = false;
+    [SerializeField] private bool enablePodeDecolarSensorLogs = false;
     [SerializeField] private bool enableAindaMeVeRuntimeLogs = false;
     [SerializeField] private bool enablePodeDetectarRuntimeLogs = false;
     [SerializeField] private bool enablePodeEnxergarRuntimeLogs = false;
@@ -236,6 +237,7 @@ public class MatchController : MonoBehaviour
     public bool EnablePodeTransferirSensorLogs => enableSensorsRuntimeLogs || enablePodeTransferirSensorLogs;
     public bool EnableServicoDoComandoSensorLogs => enableSensorsRuntimeLogs || enableServicoDoComandoSensorLogs;
     public bool EnablePodePousarSensorLogs => enableSensorsRuntimeLogs || enablePodePousarSensorLogs;
+    public bool EnablePodeDecolarSensorLogs => enableSensorsRuntimeLogs || enablePodeDecolarSensorLogs;
     public bool IsFogOfWarDebugEnabled => debugFogOfWarEnabled;
     public int MaxUnitsPerTeam => Mathf.Max(1, maxUnitsPerTeam);
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;

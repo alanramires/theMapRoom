@@ -65,7 +65,15 @@ public class MatchMusicAudioManager : MonoBehaviour
     private void Start()
     {
         if (playOnStart)
+        {
             StartPlaybackForCurrentMode(forceRestart: true);
+            return;
+        }
+
+        // Respeita "Play On Start" desativado: nao iniciar playback automatico no primeiro frame.
+        isPausedByUser = true;
+        if (audioSource != null)
+            audioSource.Stop();
     }
 
     private void Update()

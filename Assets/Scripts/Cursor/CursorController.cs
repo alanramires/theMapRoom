@@ -1,3 +1,5 @@
+using System;
+using Object = UnityEngine.Object;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using UnityEngine.EventSystems;
@@ -8,6 +10,13 @@ using UnityEngine.InputSystem;
 
 public class CursorController : MonoBehaviour
 {
+    public static event Action OnCursorReturnedToNeutral;
+
+    public static void NotifyCursorReturnedToNeutral()
+    {
+        OnCursorReturnedToNeutral?.Invoke();
+    }
+
     [System.Serializable]
     private class MovementCategorySfxBinding
     {
@@ -125,6 +134,9 @@ public class CursorController : MonoBehaviour
     public Vector3Int CurrentCell => currentCell;
     public Tilemap BoardTilemap => boardTilemap;
     public float CoordinateOverlayLabelWidth => Mathf.Clamp(coordinateOverlayLabelWidth, 60f, 400f);
+    public TurnStateManager.CursorState CurrentCursorState => turnStateManager != null ? turnStateManager.CurrentCursorState : TurnStateManager.CursorState.Neutral;
+    public TurnStateManager.CursorState CursorState => CurrentCursorState;
+    public bool IsBlocked => IsCursorBlocked();
 
     private void Awake()
     {
@@ -155,6 +167,20 @@ public class CursorController : MonoBehaviour
     }
 #endif
 
+    private bool IsCursorBlocked()
+    {
+        if (UiInputBlocker.IsTextInputFocused())
+            return true;
+
+        if (matchController != null && matchController.IsTurnTransitionInProgress)
+            return true;
+
+        if (pendingEndTurnConfirmation)
+            return true;
+
+        return false;
+    }
+
     private void Update()
     {
         TryAutoAssignMatchController();
@@ -165,13 +191,7 @@ public class CursorController : MonoBehaviour
             return;
         }
 
-        if (UiInputBlocker.IsTextInputFocused())
-        {
-            heldDirection = Vector3Int.zero;
-            return;
-        }
-
-        if (matchController != null && matchController.IsTurnTransitionInProgress)
+        if (IsCursorBlocked())
         {
             heldDirection = Vector3Int.zero;
             return;

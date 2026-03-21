@@ -1,49 +1,55 @@
-﻿# RELATORIO v1.3.6
+﻿# Relatorio v1.3.6
 
-Data: 2026-03-19
-Tema: preparativos para o refactor de state + replay
+Data: 2026-03-17
+Versao: v1.3.6
+Resumo: Ajustes de interface da gameplay, helper/dialog e usabilidade de fluxo de turno.
 
-## Objetivo desta versao
+## Principais ajustes
 
-Consolidar a base de analise e documentacao para o refactor da FSM do `TurnStateManager` e da camada de replay, reduzindo ambiguidade entre:
-- estados explicitos (`CursorState`)
-- subpassos (`ScannerPromptStep`)
-- fluxos inline/flags sem estado dedicado
-- comandos logicos de replay vs trilha cinematica
+- Helper de shopping com token de construcao:
+  - `helper.title.shopping` agora aceita `<Construction>`.
+  - O runtime preenche o token com o nome da construcao ativa.
 
-## Entregas
+- Save/Load com mensagens por slot:
+  - Suporte ao token `<slot>` em mensagens de sucesso de salvar e carregar.
+  - Textos e assets de dialog/helper alinhados para exibir o slot corretamente.
 
-1. Mapa de estados atualizado
-- Documento `docs/turnState.md` com arvore de estados atual.
-- Diferenciacao entre estado explicito, subestado e comportamento inline.
-- Inclusao de classificacao pratica:
-  - estados inferiores de inspecao
-  - fluxos menores com caminho unico (confirm/cancel)
-  - estados automaticos hardcoded
-  - recorte de fluxos que entram no replay
+- Painel de dialog em compra:
+  - Quando o painel expande para modo de compra e o helper estiver deslocado para a esquerda, o dialog pode centralizar temporariamente.
+  - Retorno do layout quando cursor/helper voltam ao estado normal.
 
-2. Inventario de sensores atualizado
-- Documento `docs/sensors.md` consolidado com sensores ativos.
-- Inclusao dos fluxos de FOW runtime:
-  - `PodeDetectar`
-  - `PodeEnxergar`
-  - `AlguemMeVe`
-- Inclusao de secao de fluxos de camada nao-FSM (forca de camada / force to emerge / preferencia de camada).
+- Helper de virada de turno (consumo de autonomia):
+  - Linhas e titulo externalizados para Helper Data.
+  - Duracao do texto e do destaque `!` configuravel via Animation Manager.
 
-3. Preparacao para refactor state + replay
-- Base documental pronta para separar com clareza:
-  - o que deve virar estado dedicado
-  - o que deve permanecer como fluxo inline
-  - o que deve ser apenas evento de replay
-- Registro de que a cinematica de replay esta hoje focada em combate (`Attack`) e que demais comandos continuam logicos.
+- Camera (atalho `N`):
+  - Segundo toque restaura o zoom anterior do jogador, sem fixar em valor constante.
 
-## Impacto esperado no proximo ciclo
+- Turno neutro:
+  - Corrigido fluxo de upkeep/economia no inicio do turno neutro.
+  - Ajuste de comportamento para foco/teleporte quando neutro nao possui HQ.
 
-- Refactor com menor risco de regressao por transicoes implicitas.
-- Melhor rastreabilidade entre input do jogador, transicao de estado e comando gravado no replay.
-- Reducao de comportamento "fantasma" em overlays/inspecoes por definicao explicita de entrada/saida.
+- Audio de musica por time:
+  - Sliders de volume por time (incluindo neutro).
+  - Preview no manager para tocar/parar faixas de teste.
+  - Correcoes para respeitar volume por time tambem no modo de playback livre.
+
+- Editor de construcao (produtividade):
+  - `ConstructionDataEditor` agora tambem possui quick fill de `Offered Units` por forca (`Army`, `Navy`, `Aeronautic`), igual ao manager.
+
+## Arquivos-chave impactados
+
+- `Assets/Scripts/UI/PanelHelperController.cs`
+- `Assets/Scripts/UI/PanelDialogController.cs`
+- `Assets/Scripts/Match/TurnState/TurnStateManager.HelperPanel.cs`
+- `Assets/Scripts/Save/SaveGameManager.cs`
+- `Assets/Scripts/Camera/CameraController.cs`
+- `Assets/Scripts/Match/MatchController.cs`
+- `Assets/Scripts/Audio/MatchMusicAudioManager.cs`
+- `Assets/Scripts/Match/Animation/AnimationManager.cs`
+- `Assets/Editor/ConstructionDataEditor.cs`
 
 ## Observacoes
 
-- Esta versao e de preparacao/organizacao para o refactor.
-- O foco foi estruturar entendimento compartilhado e pontos de acoplamento antes de mexer na arquitetura principal.
+- Esta versao consolida pequenos reparos iterativos de UX/gameplay feitos durante o dia.
+- Tambem inclui atualizacoes de assets de dialog/helper, construcoes e cena em uso.

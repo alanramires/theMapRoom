@@ -1,4 +1,5 @@
-﻿using System.Collections;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -8,6 +9,7 @@ using UnityEditor;
 
 public partial class TurnStateManager : MonoBehaviour
 {
+    public static event Action OnSensorsReady;
     public enum ActionSfx
     {
         None = 0,
@@ -141,7 +143,7 @@ public partial class TurnStateManager : MonoBehaviour
         string normalized = text.Replace('\n', ' ').Replace('\r', ' ').Trim();
         const int maxLen = 64;
         if (normalized.Length > maxLen)
-            normalized = normalized.Substring(0, maxLen - 1).TrimEnd() + "â€¦";
+            normalized = normalized.Substring(0, maxLen - 1).TrimEnd() + "…";
 
         PanelDialogController.TrySetTransientText(normalized, durationSeconds);
     }
@@ -160,6 +162,11 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         cursorState = nextState;
+        if (nextState == CursorState.Neutral && previous != CursorState.Neutral)
+        {
+            Debug.Log($"[Replay][Dispatch] OnCursorReturnedToNeutral fired previous={previous} current={nextState}");
+            CursorController.NotifyCursorReturnedToNeutral();
+        }
         RuntimeLog($"[FSM] Estado: {previous} -> {nextState}");
 
         if (!enableTurnStateRuntimeLogs)
@@ -168,6 +175,12 @@ public partial class TurnStateManager : MonoBehaviour
         string rollbackTag = rollback ? " [roll back]" : string.Empty;
         string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
         Debug.Log($"[TurnState]{rollbackTag} transition={previous} -> {nextState} | reason={reason} | selected={selectedName}");
+    }
+    private void NotifySensorsReady()
+    {
+        string selectedId = selectedUnit != null ? selectedUnit.InstanceId.ToString() : "none";
+        Debug.Log($"[Replay][Dispatch] OnSensorsReady fired state={cursorState} selected={selectedId}");
+        OnSensorsReady?.Invoke();
     }
 
     private bool IsInspectingState(CursorState state)
@@ -324,7 +337,7 @@ public partial class TurnStateManager : MonoBehaviour
 
         if (!keepSelection)
         {
-            // Evita estado selecionado de outra equipe durante o switch forçado.
+            // Evita estado selecionado de outra equipe durante o switch for�ado.
             ForceNeutral();
         }
 
@@ -1415,8 +1428,4 @@ public partial class TurnStateManager : MonoBehaviour
         return (animationManager != null && animationManager.IsAnimatingMovement) || embarkExecutionInProgress || disembarkExecutionInProgress;
     }
 }
-
-
-
-
 

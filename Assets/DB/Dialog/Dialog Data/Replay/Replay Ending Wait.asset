@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -10,9 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b19f67231d8b4327a5a8b1187b9901d2, type: 3}
-  m_Name: Replay Load Disabled
+  m_Name: Replay Ending Wait
   m_EditorClassIdentifier: Assembly-CSharp::DialogData
-  id: dialog.replay.load_disabled
-  condition: Mensagem ao tentar carregar durante replay ativo.
-  message: 'Replay :: load desativado durante replay'
-
+  id: dialog.replay.ending_wait
+  condition: Mensagem de transicao ao encerrar replay.
+  message: 

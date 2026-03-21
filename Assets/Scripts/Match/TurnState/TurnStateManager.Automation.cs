@@ -6,6 +6,8 @@ public partial class TurnStateManager
     {
         switch (action)
         {
+            case SensorActionType.None:
+                return HandleAutomatedMoveOnlyActionRequested();
             case SensorActionType.Attack:
                 HandleAimActionRequested();
                 return true;
@@ -39,6 +41,15 @@ public partial class TurnStateManager
             default:
                 return false;
         }
+    }
+
+    public bool HandleAutomatedMoveOnlyActionRequested()
+    {
+        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            return false;
+
+        HandleMoveOnlyActionRequested();
+        return cursorState == CursorState.Neutral;
     }
 
     public bool HandleAutomatedCommandServiceRequested()
