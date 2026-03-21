@@ -361,28 +361,41 @@ public partial class TurnStateManager
 
         Vector3Int cursorCell = cursorController.CurrentCell;
         Tilemap occupancyMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
-        if (UnitRulesDefinition.IsTotalWarEnabled() &&
-            occupancyMap != null &&
-            UnitRulesDefinition.IsUnitCellOccupiedForTeam(
-                occupancyMap,
-                cursorCell,
-                selectedUnit.TeamId,
-                selectedUnit))
-        {
-            string message = PanelDialogController.ResolveDialogMessage(
-                "hex.contested.occupied",
-                "Hex disputado: ja existe uma unidade no local");
-            PushPanelUnitMessage(message, 2.4f);
-            Debug.Log("movimento bloqueado: em hex disputado nao pode haver duas unidades do mesmo time");
-            return ActionSfx.Error;
-        }
 
-        UnitManager unit = FindUnitAtCell(cursorCell);
-        if (unit != null && unit != selectedUnit)
+        if (OccupancyResolver.IsLayerAwareRulesActive)
         {
-            PushPanelUnitMessage("Hex ocupado", 2.4f);
-            Debug.Log("unidade selecionada, escolha um local valido para movimento");
-            return ActionSfx.Error;
+            if (!OccupancyResolver.CanEndMove(selectedUnit, cursorCell, GetOccupantsAtCellForConfirm(cursorCell, selectedUnit, occupancyMap)))
+            {
+                PushPanelUnitMessage("Hex ocupado", 2.4f);
+                Debug.Log("unidade selecionada, escolha um local valido para movimento");
+                return ActionSfx.Error;
+            }
+        }
+        else
+        {
+            if (UnitRulesDefinition.IsTotalWarEnabled() &&
+                occupancyMap != null &&
+                UnitRulesDefinition.IsUnitCellOccupiedForTeam(
+                    occupancyMap,
+                    cursorCell,
+                    selectedUnit.TeamId,
+                    selectedUnit))
+            {
+                string message = PanelDialogController.ResolveDialogMessage(
+                    "hex.contested.occupied",
+                    "Hex disputado: ja existe uma unidade no local");
+                PushPanelUnitMessage(message, 2.4f);
+                Debug.Log("movimento bloqueado: em hex disputado nao pode haver duas unidades do mesmo time");
+                return ActionSfx.Error;
+            }
+
+            UnitManager unit = FindUnitAtCell(cursorCell);
+            if (unit != null && unit != selectedUnit)
+            {
+                PushPanelUnitMessage("Hex ocupado", 2.4f);
+                Debug.Log("unidade selecionada, escolha um local valido para movimento");
+                return ActionSfx.Error;
+            }
         }
 
         Vector3Int currentUnitCell = selectedUnit.CurrentCellPosition;
@@ -423,6 +436,30 @@ public partial class TurnStateManager
 
         BeginMovementToSelectedCell(path);
         return ActionSfx.Confirm;
+    }
+
+    private IEnumerable<UnitManager> GetOccupantsAtCellForConfirm(Vector3Int cell, UnitManager exceptUnit, Tilemap occupancyMap)
+    {
+        cell.z = 0;
+        List<UnitManager> units = UnitManager.AllActive;
+        if (units == null || units.Count <= 0)
+            yield break;
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
+                continue;
+            if (occupancyMap != null && (unit.BoardTilemap == null || unit.BoardTilemap != occupancyMap))
+                continue;
+            if (occupancyMap != null && unit.gameObject.scene != occupancyMap.gameObject.scene)
+                continue;
+
+            Vector3Int occupiedCell = unit.CurrentCellPosition;
+            occupiedCell.z = 0;
+            if (occupiedCell == cell)
+                yield return unit;
+        }
     }
 
     private bool TryPrepareAutomaticTakeoffForMovement(out string blockReason)

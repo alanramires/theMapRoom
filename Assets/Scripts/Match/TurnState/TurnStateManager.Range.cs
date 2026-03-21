@@ -198,6 +198,11 @@ public partial class TurnStateManager
                 continue;
             if (!IsRangeCellAllowedByTakeoffOptions(cell, pair.Value))
                 continue;
+            if (OccupancyResolver.IsLayerAwareRulesActive &&
+                !OccupancyResolver.CanEndMove(selectedUnit, cell, GetOccupantsAtCellForRange(cell, selectedUnit)))
+            {
+                continue;
+            }
 
             paintCells.Add(cell);
             paintedRangeCells.Add(cell);
@@ -226,6 +231,30 @@ public partial class TurnStateManager
             Vector3Int cell = paintPositions[i];
             rangeMapTilemap.SetTileFlags(cell, TileFlags.None);
             rangeMapTilemap.SetColor(cell, overlayColor);
+        }
+    }
+
+    private IEnumerable<UnitManager> GetOccupantsAtCellForRange(Vector3Int cell, UnitManager exceptUnit)
+    {
+        cell.z = 0;
+        List<UnitManager> units = UnitManager.AllActive;
+        if (units == null || units.Count <= 0)
+            yield break;
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
+                continue;
+            if (unit.BoardTilemap == null || unit.BoardTilemap != terrainTilemap)
+                continue;
+            if (unit.gameObject.scene != terrainTilemap.gameObject.scene)
+                continue;
+
+            Vector3Int occupiedCell = unit.CurrentCellPosition;
+            occupiedCell.z = 0;
+            if (occupiedCell == cell)
+                yield return unit;
         }
     }
 

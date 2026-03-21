@@ -63,16 +63,18 @@ MonoBehaviour:
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
   - weapon: {fileID: 11400000, guid: ace274cb2c4a1fc4c8790f325007fefb, type: 2}
     squadAmmunition: 4
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: ace274cb2c4a1fc4c8790f325007fefb, type: 2}
   cantUseWeaponsOnTheFollowDomain:
-  - domain: 0
-    heightLevel: 3
+  - domain: 3
+    heightLevel: 4
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0

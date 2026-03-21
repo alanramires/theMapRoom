@@ -5,7 +5,8 @@ using UnityEngine.Tilemaps;
 public class PathManager : MonoBehaviour
 {
     [Header("Debug")]
-    [SerializeField] private bool enablePathfindingDebugLogs = false;
+    [Tooltip("Liga/desliga logs detalhados do pathfinding (BFS/ocupacao/camadas).")]
+    [SerializeField] private bool enablePathfindingDebugLogs = true;
 
     [Header("Committed Path Visual")]
     [SerializeField] private Material committedPathMaterial;

@@ -70,10 +70,13 @@ MonoBehaviour:
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: 86a03ca38b95e2a4db570315170881be, type: 2}
   cantUseWeaponsOnTheFollowDomain:
-  - domain: 0
-    heightLevel: 3
+  - domain: 3
+    heightLevel: 4
+  - domain: 3
+    heightLevel: 5
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0

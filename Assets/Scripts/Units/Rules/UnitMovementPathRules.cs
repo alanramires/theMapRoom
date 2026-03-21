@@ -85,10 +85,36 @@ public static class UnitMovementPathRules
                 if (totalAutonomyCost > maxAutonomyCost)
                     continue;
 
-                UnitManager blocker = cache.GetUnitAtCell(next, unit);
-                if (blocker != null)
+                bool blockedByOccupant = false;
+                IReadOnlyList<UnitManager> blockers = cache.GetUnitsAtCell(next, unit);
+                for (int blockerIndex = 0; blockerIndex < blockers.Count; blockerIndex++)
+                {
+                    UnitManager blocker = blockers[blockerIndex];
+                    if (blocker == null)
+                        continue;
+
                     blocker.SyncLayerStateFromData(forceNativeDefault: false);
-                if (!UnitRulesDefinition.CanPassThrough(unit, blocker))
+                    HeightBand moverBand = OccupancyResolver.GetHeightBand(unit);
+                    HeightBand blockerBand = OccupancyResolver.GetHeightBand(blocker);
+                    bool canPassThrough = OccupancyResolver.CanPassThrough(unit, blocker, next);
+
+                    if (PathManager.IsPathfindingDebugLogsEnabled && Application.isPlaying)
+                    {
+                        Debug.Log(
+                            $"[PathBFS][OccupancyDebug] cell=({next.x},{next.y},{next.z}) " +
+                            $"mover={unit.name} moverBand={moverBand} " +
+                            $"blocker={blocker.name} blockerBand={blockerBand} " +
+                            $"canPassThrough={canPassThrough}");
+                    }
+
+                    if (!canPassThrough)
+                    {
+                        blockedByOccupant = true;
+                        break;
+                    }
+                }
+
+                if (blockedByOccupant)
                     continue;
 
                 if (autonomyCostByState.TryGetValue(nextKey, out int knownCost) && knownCost <= totalAutonomyCost)
@@ -775,6 +801,7 @@ public static class UnitMovementPathRules
 
     private sealed class MovementQueryCache
     {
+        private static readonly IReadOnlyList<UnitManager> EmptyUnits = System.Array.Empty<UnitManager>();
         private readonly Tilemap referenceTilemap;
         private readonly TerrainDatabase terrainDatabase;
         private readonly Tilemap[] gridTilemaps;
@@ -1064,6 +1091,35 @@ public static class UnitMovementPathRules
             }
 
             return null;
+        }
+
+        public IReadOnlyList<UnitManager> GetUnitsAtCell(Vector3Int cell, UnitManager exceptUnit = null)
+        {
+            cell.z = 0;
+            if (!unitsByCell.TryGetValue(cell, out List<UnitManager> occupants) || occupants == null || occupants.Count == 0)
+                return EmptyUnits;
+
+            if (exceptUnit == null)
+                return occupants;
+
+            List<UnitManager> filtered = null;
+            for (int i = 0; i < occupants.Count; i++)
+            {
+                UnitManager unit = occupants[i];
+                if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit)
+                    continue;
+
+                Vector3Int occupiedCell = unit.CurrentCellPosition;
+                occupiedCell.z = 0;
+                if (occupiedCell != cell)
+                    continue;
+
+                if (filtered == null)
+                    filtered = new List<UnitManager>(occupants.Count);
+                filtered.Add(unit);
+            }
+
+            return filtered ?? EmptyUnits;
         }
 
         private static bool IsCompatibleReference(Tilemap referenceTilemap, Tilemap networkTilemap)

@@ -8,6 +8,29 @@ Convencoes:
 
 ---
 
+## Status de implementacao (atualizado)
+
+### B.1 `OccupancyResolver` central
+Confirmado no codigo:
+- Arquivo criado: `Assets/Scripts/Units/Rules/OccupancyResolver.cs`.
+- Estruturas adicionadas:
+- `HeightBand` com bandas `Air`, `Sub`, `Blocking`.
+- `LayerOccupancyKey` com `Cell`, `Domain`, `HeightBand`.
+- API minima adicionada:
+- `GetHeightBand(UnitManager unit)`
+- `IsBlockingLayer(UnitManager unit)`
+- `CanPassThrough(UnitManager mover, UnitManager blocker, Vector3Int cell)`
+- `CanEndMove(UnitManager mover, Vector3Int cell, IEnumerable<UnitManager> occupants)`
+- `CanEnter(UnitManager unit, Vector3Int cell, IEnumerable<UnitManager> occupants)`
+- Feature flag adicionada no proprio resolver:
+- `OccupancyResolver.EnableLayerOccupancyResolver` (default `false`).
+
+Estado de rollout:
+- Nenhum callsite existente foi migrado ainda para `OccupancyResolver`.
+- Comportamento runtime atual permanece inalterado (modo compat), conforme solicitado para a etapa B.1.
+
+---
+
 ## A) Mapeamento objetivo (A.1..A.7)
 
 ### A.1) Validacao de destino final
@@ -148,6 +171,10 @@ Modelo alvo:
 - `CanPassThrough(mover, blocker, cell)`
 - `CanEndMove(mover, cell)`
 - `CanEnter(unit, cell, reason)`
+
+Status:
+- Implementado no codigo em `Assets/Scripts/Units/Rules/OccupancyResolver.cs`.
+- Sem migracao de callsites nesta etapa (feature flag default `false`).
 
 ### B.2) Refactor de `CanEnter / CanPassThrough / CanEndMove`
 - Migrar regra atual de `UnitRulesDefinition.CanPassThrough` para resolver central.
@@ -311,6 +338,7 @@ Criterios de aceite:
 
 ## Referencias centrais
 - `D:\Unity Projects\The Map Room\Assets\Scripts\Units\UnitRulesDefinition.cs:24`
+- `D:\Unity Projects\The Map Room\Assets\Scripts\Units\Rules\OccupancyResolver.cs:1`
 - `D:\Unity Projects\The Map Room\Assets\Scripts\Units\Rules\UnitMovementPathRules.cs:88`
 - `D:\Unity Projects\The Map Room\Assets\Scripts\Units\Rules\UnitOccupancyRules.cs:44`
 - `D:\Unity Projects\The Map Room\Assets\Scripts\Match\TurnState\TurnStateManager.StateMachine.cs:356`
