@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.Serialization;
@@ -39,6 +40,8 @@ public class SaveGameManager : MonoBehaviour
 
     [Header("Replay")]
     [SerializeField] private bool saveReplayData = true;
+    [Header("Load Performance")]
+    [SerializeField] private bool enableThreatCacheWarmupOnLoad = false;
 
     private enum SlotPromptState
     {
@@ -57,7 +60,17 @@ public class SaveGameManager : MonoBehaviour
         public string path;
     }
 
+    private sealed class LoadPreprocessResult
+    {
+        public string json;
+        public bool wasCompressed;
+        public int compressedBytes;
+        public int uncompressedBytes;
+        public string error;
+    }
+
     private bool loadInProgress;
+    private Coroutine postLoadThreatWarmupRoutine;
     private SlotPromptState promptState;
     private int overwritePendingSlot;
     private readonly Dictionary<string, ServiceData> cachedServicesById = new Dictionary<string, ServiceData>(StringComparer.OrdinalIgnoreCase);
@@ -78,6 +91,12 @@ public class SaveGameManager : MonoBehaviour
 
     private void OnDisable()
     {
+        if (postLoadThreatWarmupRoutine != null)
+        {
+            StopCoroutine(postLoadThreatWarmupRoutine);
+            postLoadThreatWarmupRoutine = null;
+        }
+
         CancelPrompt(clearDialogOverride: true);
     }
 
@@ -445,37 +464,122 @@ public class SaveGameManager : MonoBehaviour
             Debug.LogWarning($"[SaveGame] Load fora do estado ideal ({reason}). Forcando carregamento.");
         }
 
-        if (!TryReadSaveJson(path, out string json, out bool wasCompressed, out int compressedBytes, out int uncompressedBytes, out string readError))
-        {
-            Debug.LogError($"[SaveGame] Falha ao ler save: {readError}");
-            return;
-        }
+        StartCoroutine(LoadSlotAsync(path, normalizedSlot));
+    }
 
-        if (verboseLogs)
-            Debug.Log($"[SaveGame] Load slot {normalizedSlot}: compressed={wasCompressed} compressedBytes={compressedBytes} uncompressedBytes={uncompressedBytes}");
-
-        SaveGameData data = JsonUtility.FromJson<SaveGameData>(json);
-        if (data == null)
+    private IEnumerator LoadSlotAsync(string path, int normalizedSlot)
+    {
+        loadInProgress = true;
+        try
         {
-            Debug.LogError("[SaveGame] Falha ao desserializar save.");
-            return;
-        }
+            ShowLoadingIndicator("dialog.load_status.loading_wait", "Carregando jogo, aguarde");
+            // Garante pelo menos um frame para o indicador aparecer.
+            yield return null;
 
-        string currentScene = SceneManager.GetActiveScene().name;
-        if (!string.IsNullOrWhiteSpace(data.sceneName) && !string.Equals(data.sceneName, currentScene, StringComparison.Ordinal))
-        {
-            if (blockCrossSceneLoad)
+            Task<LoadPreprocessResult> preprocessTask = Task.Run(() => PreprocessLoadData(path));
+            while (!preprocessTask.IsCompleted)
+                yield return null;
+
+            if (preprocessTask.IsFaulted)
             {
+                Debug.LogError($"[SaveGame] Falha no preprocess assíncrono: {preprocessTask.Exception?.GetBaseException().Message}");
                 cursorController?.PlayErrorSfx();
-                Debug.LogWarning($"[SaveGame] Load bloqueado: save da cena '{data.sceneName}', cena atual '{currentScene}'.");
-                return;
+                PanelDialogController.ClearExternalText();
+                yield break;
             }
 
-            Debug.LogWarning($"[SaveGame] Save foi criado na cena '{data.sceneName}', cena atual: '{currentScene}'.");
+            LoadPreprocessResult preprocess = preprocessTask.Result;
+            if (!string.IsNullOrWhiteSpace(preprocess.error))
+            {
+                Debug.LogError($"[SaveGame] Falha ao preprocessar save: {preprocess.error}");
+                cursorController?.PlayErrorSfx();
+                PanelDialogController.ClearExternalText();
+                yield break;
+            }
+
+            if (verboseLogs)
+            {
+                Debug.Log(
+                    $"[SaveGame] Load slot {normalizedSlot}: compressed={preprocess.wasCompressed} " +
+                    $"compressedBytes={preprocess.compressedBytes} uncompressedBytes={preprocess.uncompressedBytes}");
+            }
+
+            SaveGameData data = null;
+            try
+            {
+                data = JsonUtility.FromJson<SaveGameData>(preprocess.json);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SaveGame] Falha ao desserializar save no main thread: {ex.Message}");
+                cursorController?.PlayErrorSfx();
+                PanelDialogController.ClearExternalText();
+                yield break;
+            }
+
+            if (data == null)
+            {
+                Debug.LogError("[SaveGame] Falha ao desserializar save.");
+                cursorController?.PlayErrorSfx();
+                PanelDialogController.ClearExternalText();
+                yield break;
+            }
+
+            string currentScene = SceneManager.GetActiveScene().name;
+            if (!string.IsNullOrWhiteSpace(data.sceneName) && !string.Equals(data.sceneName, currentScene, StringComparison.Ordinal))
+            {
+                if (blockCrossSceneLoad)
+                {
+                    cursorController?.PlayErrorSfx();
+                    Debug.LogWarning($"[SaveGame] Load bloqueado: save da cena '{data.sceneName}', cena atual '{currentScene}'.");
+                    PanelDialogController.ClearExternalText();
+                    yield break;
+                }
+
+                Debug.LogWarning($"[SaveGame] Save foi criado na cena '{data.sceneName}', cena atual: '{currentScene}'.");
+            }
+
+            PrepareRuntimeForLoad();
+            // LoadRoutine controla loadInProgress e encerra o indicador no fim.
+            yield return StartCoroutine(LoadRoutine(data, normalizedSlot));
+        }
+        finally
+        {
+            // Em casos de erro antes de entrar no LoadRoutine, garante desbloqueio.
+            loadInProgress = false;
+        }
+    }
+
+    private static LoadPreprocessResult PreprocessLoadData(string path)
+    {
+        LoadPreprocessResult result = new LoadPreprocessResult();
+        try
+        {
+            if (!TryReadSaveJson(path, out string json, out bool wasCompressed, out int compressedBytes, out int uncompressedBytes, out string readError))
+            {
+                result.error = readError;
+                return result;
+            }
+
+            result.json = json;
+            result.wasCompressed = wasCompressed;
+            result.compressedBytes = compressedBytes;
+            result.uncompressedBytes = uncompressedBytes;
+            if (string.IsNullOrWhiteSpace(json))
+                result.error = "JSON do save vazio apos leitura/decompress.";
+        }
+        catch (Exception ex)
+        {
+            result.error = ex.Message;
         }
 
-        PrepareRuntimeForLoad();
-        StartCoroutine(LoadRoutine(data, normalizedSlot));
+        return result;
+    }
+
+    private void ShowLoadingIndicator(string dialogId, string fallback)
+    {
+        string text = ResolveDialog(dialogId, fallback);
+        PanelDialogController.TrySetExternalText(text);
     }
 
     [ContextMenu("Clear Slot 1")]
@@ -763,31 +867,6 @@ public class SaveGameManager : MonoBehaviour
 
         if (coreLoadSucceeded)
         {
-            stage = "warmup-hotzone-cache";
-            if (turnStateManager != null)
-            {
-                bool skipHotzoneWarmup = matchController != null && matchController.EnableTotalWar;
-                if (!skipHotzoneWarmup)
-                {
-                    yield return turnStateManager.WarmUpThreatCacheFromScene((processed, total) =>
-                    {
-                        string progressText = total > 0
-                            ? $"Loading hotzone cache {processed}/{total}"
-                            : "Loading hotzone cache";
-                        PanelDialogController.TrySetExternalText(progressText);
-
-                        if (!verboseLogs)
-                            return;
-                        if (total <= 0 || processed == 0 || processed == total || processed % 10 == 0)
-                            Debug.Log($"[SaveGame] Warm-up hotzone cache: {processed}/{total}");
-                    });
-                }
-                else if (verboseLogs)
-                {
-                    Debug.Log("[SaveGame] Skip loading hotzone cache: Total War ativo.");
-                }
-            }
-
             stage = "restore-replay-history";
             if (replayManager != null)
             {
@@ -818,12 +897,64 @@ public class SaveGameManager : MonoBehaviour
                 ResolveHelper("helper.load_status.success", "Jogo do slot <slot> carregado"),
                 new Dictionary<string, string> { { "slot", loadedSlot.ToString() } });
             PanelDialogController.TrySetTransientText(loadedText, 2.2f);
+            SchedulePostLoadThreatWarmup();
         }
 
         if (suppressedFogRefresh && matchController != null)
             matchController.SuppressFogOfWarRefresh = false;
 
         loadInProgress = false;
+    }
+
+    private void SchedulePostLoadThreatWarmup()
+    {
+        if (turnStateManager == null)
+            return;
+
+        if (postLoadThreatWarmupRoutine != null)
+            StopCoroutine(postLoadThreatWarmupRoutine);
+
+        if (!enableThreatCacheWarmupOnLoad)
+        {
+            postLoadThreatWarmupRoutine = null;
+            if (verboseLogs)
+                Debug.Log("[SaveGame] Warm-up de hotzone no load desativado.");
+            return;
+        }
+
+        postLoadThreatWarmupRoutine = StartCoroutine(PostLoadThreatWarmupRoutine());
+    }
+
+    private IEnumerator PostLoadThreatWarmupRoutine()
+    {
+        // Deixa o primeiro frame renderizar apos o load antes de aquecer o cache.
+        yield return null;
+
+        if (turnStateManager == null)
+        {
+            postLoadThreatWarmupRoutine = null;
+            yield break;
+        }
+
+        bool skipHotzoneWarmup = matchController != null && matchController.EnableTotalWar;
+        if (skipHotzoneWarmup)
+        {
+            if (verboseLogs)
+                Debug.Log("[SaveGame] Skip loading hotzone cache: Total War ativo.");
+            postLoadThreatWarmupRoutine = null;
+            yield break;
+        }
+
+        yield return turnStateManager.WarmUpThreatCacheFromScene((processed, total) =>
+        {
+            if (!verboseLogs)
+                return;
+
+            if (total <= 0 || processed == 0 || processed == total || processed % 10 == 0)
+                Debug.Log($"[SaveGame] Warm-up hotzone cache (post-load): {processed}/{total}");
+        });
+
+        postLoadThreatWarmupRoutine = null;
     }
 
     private SaveGameData BuildSaveData()
@@ -874,7 +1005,7 @@ public class SaveGameManager : MonoBehaviour
                 data.constructions.Add(item);
         }
 
-        if (saveReplayData && replayManager != null)
+        if (saveReplayData && replayManager != null && replayManager.IsRecording)
             data.replay = replayManager.ExportReplaySaveData();
 
         return data;

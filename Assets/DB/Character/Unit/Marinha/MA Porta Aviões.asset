@@ -52,12 +52,14 @@ MonoBehaviour:
     operationRangeMin: 2
     operationRangeMax: 4
     selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: e58612c9a6796da4eb35f981486fa0e4, type: 2}
   - weapon: {fileID: 11400000, guid: b1045e7e2a509504e9c1835590083ec2, type: 2}
     squadAmmunition: 4
-    operationRangeMin: 1
-    operationRangeMax: 2
+    operationRangeMin: 2
+    operationRangeMax: 3
     selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: b1045e7e2a509504e9c1835590083ec2, type: 2}
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 1
@@ -110,5 +112,6 @@ MonoBehaviour:
     requiredSkills:
     - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
     blockedSkills: []
+    canBeFireOnlyAtDomainHeigh: []
   autonomia: 90
   cost: 22500

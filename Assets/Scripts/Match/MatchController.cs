@@ -124,8 +124,8 @@ public class MatchController : MonoBehaviour
     [SerializeField] private TurnStateManager turnStateManager;
     [Header("Turn Transition")]
     [SerializeField] private MatchMusicAudioManager matchMusicAudioManager;
-    [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.5f;
-    [SerializeField] [Range(0f, 2f)] private float advanceTurnPostDelay = 0.2f;
+    [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.1f;
+    [SerializeField] [Range(0f, 2f)] private float advanceTurnPostDelay = 0f;
     [Header("Victory Stars")]
     [SerializeField] private bool enableVictoryStars = true;
     [SerializeField] [Range(1, MaxVictoryStarsGoal)] private int victoryStarsToWin = 5;
@@ -195,12 +195,27 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enableAindaMeVeRuntimeLogs = false;
     [SerializeField] private bool enablePodeDetectarRuntimeLogs = false;
     [SerializeField] private bool enablePodeEnxergarRuntimeLogs = false;
+    [SerializeField] private bool enableTurnPerfLogs = true;
     [SerializeField] [Range(1, 8)] private int fogStepPerfTopUnits = 3;
     public bool SuppressFogOfWarRefresh { get; set; } = false;
 
     private bool ShouldLogPodeEnxergarRuntime => enableFogSourceDebugLogs || enablePodeEnxergarRuntimeLogs;
     private bool ShouldLogAindaMeVeRuntime => enableSensorsRuntimeLogs || enableAindaMeVeRuntimeLogs;
     private bool ShouldLogPodeDetectarRuntime => enableSensorsRuntimeLogs || enablePodeDetectarRuntimeLogs;
+
+    private static double TurnPerfNowMs()
+    {
+        return Time.realtimeSinceStartupAsDouble * 1000d;
+    }
+
+    private void TurnPerfLog(string stage, double startMs)
+    {
+        if (!enableTurnPerfLogs)
+            return;
+
+        double elapsed = TurnPerfNowMs() - startMs;
+        Debug.Log($"[TurnPerf] etapa={stage} ms={elapsed:F3}");
+    }
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
@@ -646,6 +661,10 @@ public class MatchController : MonoBehaviour
 
         TryRefreshVictoryOverlayFromConstructions(markDirtyInEditor: true);
     }
+#else
+    private void ScheduleVictoryOverlayRefreshInEditor()
+    {
+    }
 #endif
 
 
@@ -811,6 +830,7 @@ public class MatchController : MonoBehaviour
 
     private IEnumerator AdvanceTurnTransitionRoutine()
     {
+        double transitionStartMs = TurnPerfNowMs();
         bool wasMusicPlaying = matchMusicAudioManager != null && matchMusicAudioManager.IsPlaying;
         bool wasPausedByUser = matchMusicAudioManager != null && matchMusicAudioManager.IsPausedByUser;
         bool usePauseResume = matchMusicAudioManager != null && matchMusicAudioManager.IsFreeMode;
@@ -826,13 +846,17 @@ public class MatchController : MonoBehaviour
         }
 
         PlayAdvanceTurnSfx();
-        if (advanceTurnPreDelay > 0f)
-            yield return new WaitForSeconds(advanceTurnPreDelay);
+        float preDelay = turnStateManager != null ? turnStateManager.AdvanceTurnPreDelay : advanceTurnPreDelay;
+        if (preDelay > 0f)
+            yield return new WaitForSeconds(preDelay);
 
+        double advanceTurnStartMs = TurnPerfNowMs();
         AdvanceTurn();
+        TurnPerfLog("AdvanceTurn", advanceTurnStartMs);
 
-        if (advanceTurnPostDelay > 0f)
-            yield return new WaitForSeconds(advanceTurnPostDelay);
+        float postDelay = turnStateManager != null ? turnStateManager.AdvanceTurnPostDelay : advanceTurnPostDelay;
+        if (postDelay > 0f)
+            yield return new WaitForSeconds(postDelay);
 
         if (hasVictoryWinner && matchMusicAudioManager != null)
         {
@@ -852,6 +876,7 @@ public class MatchController : MonoBehaviour
         }
 
         advanceTurnTransitionRoutine = null;
+        TurnPerfLog("AdvanceTurnTransitionRoutine.Total", transitionStartMs);
     }
 
     private void CloseRoundAndAdvanceToFirstPlayer()
@@ -859,7 +884,7 @@ public class MatchController : MonoBehaviour
         currentTurn = Mathf.Max(0, currentTurn + 1);
     }
 
-    private void EvaluateVictoryStarsAtTurnStartForActiveTeam()
+    private void EvaluateVictoryStarsAtTurnStartForActiveTeam(List<ConstructionManager> constructions = null)
     {
         if (!enableVictoryStars)
             return;
@@ -878,10 +903,10 @@ public class MatchController : MonoBehaviour
         if (FindPlayerIndexByTeam(activeTeam) < 0)
             return;
 
-        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        constructions ??= GetActiveConstructionsOnScene();
         int totalVictoryBuildings = 0;
         int activeTeamControlledVictoryBuildings = 0;
-        for (int i = 0; i < constructions.Length; i++)
+        for (int i = 0; i < constructions.Count; i++)
         {
             ConstructionManager construction = constructions[i];
             if (construction == null || !construction.gameObject.activeInHierarchy)
@@ -1147,19 +1172,48 @@ public class MatchController : MonoBehaviour
         if (!force && appliedActiveTeamId == activeTeamId)
             return;
 
+        double totalStartMs = TurnPerfNowMs();
         appliedActiveTeamId = activeTeamId;
+
+        double stageStartMs = TurnPerfNowMs();
         if (Application.isPlaying)
+        {
+            UnitManager.ResetActiveTeamChangedPerfCounters();
+            ConstructionManager.ResetActiveTeamChangedPerfCounters();
             OnActiveTeamChanged?.Invoke(activeTeamId);
+            if (enableTurnPerfLogs)
+            {
+                UnitManager.GetActiveTeamChangedPerfCounters(out int unitHandlerCount, out double unitHandlerMs);
+                ConstructionManager.GetActiveTeamChangedPerfCounters(out int constructionHandlerCount, out double constructionHandlerMs);
+                Debug.Log($"[TurnPerf] handler=UnitManager.HandleActiveTeamChanged count={unitHandlerCount} ms={unitHandlerMs:F3}");
+                Debug.Log($"[TurnPerf] handler=ConstructionManager.HandleActiveTeamChanged count={constructionHandlerCount} ms={constructionHandlerMs:F3}");
+            }
+        }
+        TurnPerfLog("ApplyActiveTeam.OnActiveTeamChanged", stageStartMs);
+
+        stageStartMs = TurnPerfNowMs();
         TeleportCursorToActiveTeamHeadQuarterSilently();
+        TurnPerfLog("ApplyActiveTeam.TeleportCursorToHQ", stageStartMs);
+
+        List<ConstructionManager> activeConstructions = GetActiveConstructionsOnScene();
+
         if (applyTurnStartEffects)
-            ReleaseUnitsForActiveTeam();
+        {
+            stageStartMs = TurnPerfNowMs();
+            ReleaseUnitsForActiveTeam(activeConstructions);
+            TurnPerfLog("ApplyActiveTeam.ReleaseUnitsForActiveTeam", stageStartMs);
+        }
         else
             pendingTurnStartAutonomyHelperEntries = null;
+
+        stageStartMs = TurnPerfNowMs();
         if (!debugFogOfWarEnabled)
         {
             ResetFogOfWarRuntime(clearTilemap: true);
             ShowAllUnitsIgnoringFog();
             FlushTurnStartAutonomyHelper();
+            TurnPerfLog("ApplyActiveTeam.FogDisabled", stageStartMs);
+            TurnPerfLog("ApplyActiveTeam.Total", totalStartMs);
             return;
         }
 
@@ -1174,7 +1228,12 @@ public class MatchController : MonoBehaviour
             ResetFogOfWarRuntime(clearTilemap: true);
             RefreshRuntimeUnitFogVisibility();
         }
+        TurnPerfLog("ApplyActiveTeam.FogAndVisibility", stageStartMs);
+
+        stageStartMs = TurnPerfNowMs();
         FlushTurnStartAutonomyHelper();
+        TurnPerfLog("ApplyActiveTeam.FlushTurnStartAutonomyHelper", stageStartMs);
+        TurnPerfLog("ApplyActiveTeam.Total", totalStartMs);
     }
 
     private void ApplyTeamFlipSettingsToSceneObjects()
@@ -1200,20 +1259,70 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    private void ReleaseUnitsForActiveTeam()
+    private List<UnitManager> GetActiveUnitsOnScene()
+    {
+        List<UnitManager> all = UnitManager.AllActive;
+        if (all == null || all.Count == 0)
+            return new List<UnitManager>();
+
+        Scene activeScene = gameObject.scene;
+        List<UnitManager> result = new List<UnitManager>(all.Count);
+        for (int i = 0; i < all.Count; i++)
+        {
+            UnitManager unit = all[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+            if (unit.gameObject.scene != activeScene)
+                continue;
+            result.Add(unit);
+        }
+
+        return result;
+    }
+
+    private List<ConstructionManager> GetActiveConstructionsOnScene()
+    {
+        List<ConstructionManager> all = ConstructionManager.AllActive;
+        if (all == null || all.Count == 0)
+            return new List<ConstructionManager>();
+
+        Scene activeScene = gameObject.scene;
+        List<ConstructionManager> result = new List<ConstructionManager>(all.Count);
+        for (int i = 0; i < all.Count; i++)
+        {
+            ConstructionManager construction = all[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if (construction.gameObject.scene != activeScene)
+                continue;
+            result.Add(construction);
+        }
+
+        return result;
+    }
+
+    private void ReleaseUnitsForActiveTeam(List<ConstructionManager> activeConstructions = null)
     {
         if (!Application.isPlaying)
             return;
         if (activeTeamId < 0 && !includeNeutralTeam)
             return;
 
-        EvaluateVictoryStarsAtTurnStartForActiveTeam();
-        ApplyEconomyAtTurnStartForActiveTeam();
+        double stageStartMs = TurnPerfNowMs();
+        activeConstructions ??= GetActiveConstructionsOnScene();
+        EvaluateVictoryStarsAtTurnStartForActiveTeam(activeConstructions);
+        TurnPerfLog("ReleaseUnits.EvaluateVictoryStars", stageStartMs);
+
+        stageStartMs = TurnPerfNowMs();
+        ApplyEconomyAtTurnStartForActiveTeam(activeConstructions);
+        TurnPerfLog("ReleaseUnits.ApplyEconomy", stageStartMs);
 
         List<TurnStateManager.TurnStartAutonomyUpkeepEntry> turnStartAutonomyEntries = null;
         turnStartUnitsMarkedForFuelDepletionDeath.Clear();
-        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        List<UnitManager> units = GetActiveUnitsOnScene();
+
+        stageStartMs = TurnPerfNowMs();
+        for (int i = 0; i < units.Count; i++)
         {
             UnitManager unit = units[i];
             if (unit == null)
@@ -1268,10 +1377,13 @@ public class MatchController : MonoBehaviour
             unit.ResetActed();
             unit.ClearReceivedSuppliesThisTurn();
         }
+        TurnPerfLog("ReleaseUnits.IterateUnits", stageStartMs);
 
         pendingTurnStartAutonomyHelperEntries = turnStartAutonomyEntries;
         TryAutoAssignTurnStateManager();
+        stageStartMs = TurnPerfNowMs();
         turnStateManager?.EnqueueTurnStartFuelDepletionDeaths(turnStartUnitsMarkedForFuelDepletionDeath);
+        TurnPerfLog("ReleaseUnits.EnqueueFuelDepletionDeaths", stageStartMs);
 
         pendingTurnStartUpkeep = false;
     }
@@ -1297,17 +1409,17 @@ public class MatchController : MonoBehaviour
         return -1;
     }
 
-    private void RecalculateIncomePerTurnForAllPlayers()
+    private void RecalculateIncomePerTurnForAllPlayers(List<ConstructionManager> constructions = null)
     {
         if (players == null || players.Count == 0)
             return;
 
-        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        constructions ??= GetActiveConstructionsOnScene();
         for (int i = 0; i < players.Count; i++)
         {
             PlayerEntry entry = players[i];
             int income = 0;
-            for (int c = 0; c < constructions.Length; c++)
+            for (int c = 0; c < constructions.Count; c++)
             {
                 ConstructionManager construction = constructions[c];
                 if (construction == null)
@@ -1323,7 +1435,7 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    private void ApplyEconomyAtTurnStartForActiveTeam()
+    private void ApplyEconomyAtTurnStartForActiveTeam(List<ConstructionManager> constructions = null)
     {
         if (!pendingTurnStartEconomy)
             return;
@@ -1341,7 +1453,7 @@ public class MatchController : MonoBehaviour
             return;
         }
 
-        RecalculateIncomePerTurnForAllPlayers();
+        RecalculateIncomePerTurnForAllPlayers(constructions);
 
         PlayerEntry entry = players[playerIndex];
         int credit = Mathf.Max(0, entry.incomePerTurn);

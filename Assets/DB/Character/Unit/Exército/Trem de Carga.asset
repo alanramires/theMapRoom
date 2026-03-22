@@ -80,6 +80,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
   - {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
   - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
+  - {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
   allowedDisembarkWhenTransporterAtConstructions:
@@ -89,6 +90,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
   - {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
   - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
+  - {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
   passengersCanDisembarkAndGoesToConstructions: []
@@ -97,8 +99,6 @@ MonoBehaviour:
     capacity: 2
     allowedLayerModes:
     - domain: 0
-      heightLevel: 0
-    - domain: 0
       heightLevel: 3
     legacyAllowedDomain: 0
     legacyAllowedHeight: 0
@@ -106,5 +106,6 @@ MonoBehaviour:
     allowedClasses: 
     requiredSkills: []
     blockedSkills: []
+    canBeFireOnlyAtDomainHeigh: []
   autonomia: 120
   cost: 7500

@@ -9,6 +9,8 @@ using UnityEngine.UI;
 public class UnitManager : MonoBehaviour
 {
     public static readonly List<UnitManager> AllActive = new List<UnitManager>();
+    private static int activeTeamChangedHandlerCount;
+    private static double activeTeamChangedHandlerTotalMs;
 
     [SerializeField] private SpriteRenderer spriteRenderer;
     [SerializeField] private UnitHudController unitHud;
@@ -144,6 +146,18 @@ public class UnitManager : MonoBehaviour
     public UnitManager EmbarkedTransporter => embarkedTransporter;
     public int EmbarkedTransporterSlotIndex => embarkedTransporterSlotIndex;
     public IReadOnlyList<int> CurrentlyObservedByTeamIds => currentlyObservedByTeamIds;
+
+    public static void ResetActiveTeamChangedPerfCounters()
+    {
+        activeTeamChangedHandlerCount = 0;
+        activeTeamChangedHandlerTotalMs = 0d;
+    }
+
+    public static void GetActiveTeamChangedPerfCounters(out int count, out double totalMs)
+    {
+        count = activeTeamChangedHandlerCount;
+        totalMs = activeTeamChangedHandlerTotalMs;
+    }
 
     private static readonly int GlowColorId = Shader.PropertyToID("_GlowColor");
     private static readonly int GlowSizeId = Shader.PropertyToID("_GlowSize");
@@ -2499,8 +2513,21 @@ public class UnitManager : MonoBehaviour
         if (appliedActiveTeamId == newTeamId)
             return;
 
+        double startMs = Time.realtimeSinceStartupAsDouble * 1000d;
+        int previousActiveTeamId = appliedActiveTeamId;
         appliedActiveTeamId = newTeamId;
-        RefreshActedVisual();
+
+        // Units outside previous/new active teams keep the same "inactive team" visual.
+        // Skip full HUD/material refresh for them to reduce per-turn fan-out cost.
+        bool shouldRefreshFully =
+            previousActiveTeamId == int.MinValue
+            || (int)teamId == previousActiveTeamId
+            || (int)teamId == newTeamId;
+        if (shouldRefreshFully)
+            RefreshActedVisual();
+
+        activeTeamChangedHandlerCount++;
+        activeTeamChangedHandlerTotalMs += (Time.realtimeSinceStartupAsDouble * 1000d) - startMs;
     }
 
     private void HandleUnitActedStateChanged(UnitManager changed)

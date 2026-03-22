@@ -43,6 +43,11 @@ public static class OccupancyResolver
         if (mover == null)
             return false;
 
+        // Regra global: aliado nunca bloqueia travessia de path.
+        // O bloqueio para terminar no mesmo hex fica em CanEndMove.
+        if (AreFriendlyForPathTraversal(mover.TeamId, blocker.TeamId))
+            return true;
+
         if (!IsLayerAwareRulesActive)
             return UnitRulesDefinition.CanPassThrough(mover, blocker);
 
@@ -57,13 +62,14 @@ public static class OccupancyResolver
         if (moverBand != HeightBand.Blocking)
             return true;
 
-        // Mesma camada bloqueante + aliado: passa (nao implica parar).
-        if (mover.TeamId == blocker.TeamId)
-            return true;
-
         // Mesma camada bloqueante + inimigo: sempre bloqueia passagem.
         // Total War impacta apenas regra de termino de movimento (CanEndMove).
         return false;
+    }
+
+    private static bool AreFriendlyForPathTraversal(TeamId moverTeam, TeamId blockerTeam)
+    {
+        return moverTeam == blockerTeam;
     }
 
     public static bool CanEndMove(UnitManager mover, Vector3Int cell, IEnumerable<UnitManager> occupants)
@@ -88,8 +94,11 @@ public static class OccupancyResolver
             if (GetHeightBand(occupant) != moverBand)
                 continue;
 
-            // Em camada bloqueante, nao termina em hex ja ocupado pela mesma camada.
-            return false;
+            // Em camada bloqueante:
+            // - aliado nunca pode compartilhar hex final;
+            // - inimigo segue regra Total War (aqui ativo por IsLayerAwareRulesActive).
+            if (occupant.TeamId == mover.TeamId)
+                return false;
         }
 
         return true;

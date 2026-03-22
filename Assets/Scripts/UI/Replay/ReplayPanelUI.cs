@@ -75,11 +75,20 @@ public class ReplayPanelUI : MonoBehaviour
 
     private void Update()
     {
-        if (WasKeyPressedThisFrame(togglePanelKey))
+        if (WasKeyPressedThisFrame(togglePanelKey) && IsReplayPanelToggleAllowed())
             TogglePanel();
 
         if (isOpen)
             RefreshLabels();
+    }
+
+    private bool IsReplayPanelToggleAllowed()
+    {
+        if (replayManager == null)
+            return false;
+
+        // If recording is disabled, keep replay panel hotkey disabled unless we're already replaying.
+        return replayManager.IsRecording || replayManager.IsReplaying;
     }
 
     private static bool WasKeyPressedThisFrame(KeyCode key)

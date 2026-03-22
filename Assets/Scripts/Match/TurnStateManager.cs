@@ -64,6 +64,9 @@ public partial class TurnStateManager : MonoBehaviour
     [SerializeField] private UnitManager selectedUnit;
     [SerializeField] [Range(0.05f, 1f)] private float movementRangeAlpha = 0.6f;
     [SerializeField] [Range(0.05f, 1f)] private float lineOfFireAlpha = 0.45f;
+    [Header("Turn Transition")]
+    [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.1f;
+    [SerializeField] [Range(0f, 2f)] private float advanceTurnPostDelay = 0f;
 
     private readonly List<Vector3Int> paintedRangeCells = new List<Vector3Int>();
     private readonly HashSet<Vector3Int> paintedRangeLookup = new HashSet<Vector3Int>();
@@ -107,6 +110,8 @@ public partial class TurnStateManager : MonoBehaviour
     public UnitManager SelectedUnit => selectedUnit;
     public TerrainDatabase TerrainDatabaseRef => terrainDatabase;
     public DPQAirHeightConfig DpqAirHeightConfigRef => dpqAirHeightConfig;
+    public float AdvanceTurnPreDelay => Mathf.Max(0f, advanceTurnPreDelay);
+    public float AdvanceTurnPostDelay => Mathf.Max(0f, advanceTurnPostDelay);
     public bool IsScannerActionExecutionInProgress =>
         embarkExecutionInProgress
         || landingExecutionInProgress

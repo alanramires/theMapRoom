@@ -4,9 +4,6 @@ using UnityEngine.Tilemaps;
 
 public partial class TurnStateManager
 {
-    [Header("Debug")]
-    [SerializeField] private bool enableRangeCacheDebugLogs = true;
-
     private struct MovementRangeCacheKey : System.IEquatable<MovementRangeCacheKey>
     {
         public int unitInstanceId;
@@ -198,10 +195,37 @@ public partial class TurnStateManager
                 continue;
             if (!IsRangeCellAllowedByTakeoffOptions(cell, pair.Value))
                 continue;
-            if (OccupancyResolver.IsLayerAwareRulesActive &&
-                !OccupancyResolver.CanEndMove(selectedUnit, cell, GetOccupantsAtCellForRange(cell, selectedUnit)))
+            if (OccupancyResolver.IsLayerAwareRulesActive)
             {
-                continue;
+                List<string> occupantDebug = null;
+                List<UnitManager> occupants = new List<UnitManager>();
+                foreach (UnitManager occupant in GetOccupantsAtCellForRange(cell, selectedUnit))
+                {
+                    if (occupant == null)
+                        continue;
+                    occupants.Add(occupant);
+
+                    if (PathManager.IsPathfindingDebugLogsEnabled && Application.isPlaying)
+                    {
+                        if (occupantDebug == null)
+                            occupantDebug = new List<string>(2);
+                        occupantDebug.Add($"{occupant.name}[team={(int)occupant.TeamId},band={OccupancyResolver.GetHeightBand(occupant)}]");
+                    }
+                }
+
+                if (!OccupancyResolver.CanEndMove(selectedUnit, cell, occupants))
+                {
+                    if (PathManager.IsPathfindingDebugLogsEnabled && Application.isPlaying)
+                    {
+                        string info = (occupantDebug != null && occupantDebug.Count > 0)
+                            ? string.Join(", ", occupantDebug)
+                            : "none";
+                        Debug.Log(
+                            $"[RangePaint][EndMoveBlocked] cell=({cell.x},{cell.y},{cell.z}) " +
+                            $"mover={selectedUnit.name}[team={(int)selectedUnit.TeamId},band={OccupancyResolver.GetHeightBand(selectedUnit)}] " +
+                            $"occupants={info}");
+                    }
+                }
             }
 
             paintCells.Add(cell);

@@ -10,6 +10,8 @@ public class ConstructionManager : MonoBehaviour
 {
     private const string VictoryBuildingOverlayObjectName = "VictoryBuildingOverlay";
     public static readonly List<ConstructionManager> AllActive = new List<ConstructionManager>();
+    private static int activeTeamChangedHandlerCount;
+    private static double activeTeamChangedHandlerTotalMs;
 
     [SerializeField] private SpriteRenderer spriteRenderer;
     [SerializeField] private ConstructionDatabase constructionDatabase;
@@ -75,6 +77,18 @@ public class ConstructionManager : MonoBehaviour
     public bool HasOriginalOwner => originalOwnerInitialized;
     public TeamId FirstOwnerTeamId => firstOwnerTeamId;
     public bool HasFirstOwner => firstOwnerInitialized;
+
+    public static void ResetActiveTeamChangedPerfCounters()
+    {
+        activeTeamChangedHandlerCount = 0;
+        activeTeamChangedHandlerTotalMs = 0d;
+    }
+
+    public static void GetActiveTeamChangedPerfCounters(out int count, out double totalMs)
+    {
+        count = activeTeamChangedHandlerCount;
+        totalMs = activeTeamChangedHandlerTotalMs;
+    }
 
     public Domain GetDomain()
     {
@@ -971,7 +985,11 @@ public class ConstructionManager : MonoBehaviour
 
     private void HandleActiveTeamChanged(int _)
     {
-        RefreshRuntimeVisualState(force: true);
+        double startMs = Time.realtimeSinceStartupAsDouble * 1000d;
+        // Active-team switch should leverage cached occupant/flags most of the time.
+        RefreshRuntimeVisualState(force: false);
+        activeTeamChangedHandlerCount++;
+        activeTeamChangedHandlerTotalMs += (Time.realtimeSinceStartupAsDouble * 1000d) - startMs;
     }
 
     private void HandleUnitOccupancyChanged(UnitManager unit, Vector3Int previousCell, Vector3Int currentCell)
@@ -1029,16 +1047,37 @@ public class ConstructionManager : MonoBehaviour
                 return byCell;
         }
 
-        // Fallback para cenarios com referencias de tilemap inconsistentes na cena.
-        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
+        // Runtime fallback: avoid global scene scans when tilemap references are inconsistent.
+        if (Application.isPlaying)
         {
-            UnitManager unit = units[i];
+            List<UnitManager> units = UnitManager.AllActive;
+            for (int i = 0; i < units.Count; i++)
+            {
+                UnitManager unit = units[i];
+                if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                    continue;
+
+                Vector3Int unitCell = unit.CurrentCellPosition;
+                Tilemap unitMap = unit.BoardTilemap != null ? unit.BoardTilemap : map;
+                if (unitMap != null)
+                    unitCell = HexCoordinates.WorldToCell(unitMap, unit.transform.position);
+
+                unitCell.z = 0;
+                if (unitCell == currentCellPosition)
+                    return unit;
+            }
+
+            return null;
+        }
+
+        // Editor fallback for manual scene edits.
+        UnitManager[] editorUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < editorUnits.Length; i++)
+        {
+            UnitManager unit = editorUnits[i];
             if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
                 continue;
 
-            // In editor, CurrentCellPosition can lag behind if the unit was moved manually.
-            // Recompute by world position to keep occupancy tint/HUD consistent with in-game behavior.
             Vector3Int unitCell = unit.CurrentCellPosition;
             Tilemap unitMap = unit.BoardTilemap != null ? unit.BoardTilemap : map;
             if (unitMap != null)

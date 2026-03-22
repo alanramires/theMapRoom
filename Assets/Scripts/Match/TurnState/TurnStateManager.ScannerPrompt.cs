@@ -156,12 +156,13 @@ public partial class TurnStateManager
     private Color embarkPreviewColor = Color.white;
     private readonly List<LandingOption> cachedLandingOptions = new List<LandingOption>();
     private string landingOptionUnavailableReason = string.Empty;
-    [Header("Debug Perf Snapshot (F8)")]
+    [Header("Debug Logs & Perf Snapshot (F8)")]
+    [SerializeField] private bool enableTurnStateRuntimeLogs = false;
+    [SerializeField] private bool enableRangeCacheDebugLogs = true;
     [SerializeField] private bool showPerfRangeLine = true;
     [SerializeField] private bool showPerfSensorsLine = true;
     [SerializeField] private bool showPerfSelectionLine = true;
     [SerializeField] private bool showPerfTakeoffPrepLine = true;
-    [SerializeField] private bool enableTurnStateRuntimeLogs = false;
     private const int PerfFrameWindowSampleCount = 120;
     private int perfFrameSamplesCollected;
     private double perfFrameWindowSumMs;

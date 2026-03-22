@@ -102,8 +102,8 @@ public static class UnitMovementPathRules
                     {
                         Debug.Log(
                             $"[PathBFS][OccupancyDebug] cell=({next.x},{next.y},{next.z}) " +
-                            $"mover={unit.name} moverBand={moverBand} " +
-                            $"blocker={blocker.name} blockerBand={blockerBand} " +
+                            $"mover={unit.name} moverTeam={(int)unit.TeamId} moverBand={moverBand} " +
+                            $"blocker={blocker.name} blockerTeam={(int)blocker.TeamId} blockerBand={blockerBand} " +
                             $"canPassThrough={canPassThrough}");
                     }
 

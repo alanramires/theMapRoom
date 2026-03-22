@@ -175,9 +175,6 @@ public class CursorController : MonoBehaviour
         if (matchController != null && matchController.IsTurnTransitionInProgress)
             return true;
 
-        if (pendingEndTurnConfirmation)
-            return true;
-
         return false;
     }
 
