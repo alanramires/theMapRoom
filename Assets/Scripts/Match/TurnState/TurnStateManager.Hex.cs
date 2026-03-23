@@ -28,6 +28,12 @@ public partial class TurnStateManager
             return false;
         }
 
+        if (cursorState == CursorState.AircraftFuelDepletionQueue)
+        {
+            resolvedCell = currentCell;
+            return false;
+        }
+
         if (cursorState == CursorState.Mirando)
             return TryResolveMirandoCursorMove(inputDelta, out resolvedCell);
 

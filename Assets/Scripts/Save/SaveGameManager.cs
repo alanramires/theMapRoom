@@ -145,6 +145,12 @@ public class SaveGameManager : MonoBehaviour
 
     private void OpenSaveSlotPrompt()
     {
+        if (TryBlockAircraftFuelDepletionPersistence(
+                "[Save] Bloqueado: fila de aeronaves caindo em execucao",
+                "dialog.save_load.blocked_aircraft_depletion",
+                "Save/Load bloqueado: aguarde a fila de aeronaves caindo finalizar"))
+            return;
+
         if (TryBlockReplayPersistence(
                 "[Save] Bloqueado: replay ativo",
                 "dialog.replay.save_disabled",
@@ -160,6 +166,12 @@ public class SaveGameManager : MonoBehaviour
 
     private void OpenLoadSlotPrompt()
     {
+        if (TryBlockAircraftFuelDepletionPersistence(
+                "[Load] Bloqueado: fila de aeronaves caindo em execucao",
+                "dialog.save_load.blocked_aircraft_depletion",
+                "Save/Load bloqueado: aguarde a fila de aeronaves caindo finalizar"))
+            return;
+
         if (TryBlockReplayPersistence(
                 "[Load] Bloqueado: replay ativo",
                 "dialog.replay.load_disabled",
@@ -365,6 +377,12 @@ public class SaveGameManager : MonoBehaviour
             return;
         }
 
+        if (TryBlockAircraftFuelDepletionPersistence(
+                "[Save] Bloqueado: fila de aeronaves caindo em execucao",
+                "dialog.save_load.blocked_aircraft_depletion",
+                "Save/Load bloqueado: aguarde a fila de aeronaves caindo finalizar"))
+            return;
+
         if (TryBlockReplayPersistence(
                 "[Save] Bloqueado: replay ativo",
                 "dialog.replay.save_disabled",
@@ -427,6 +445,12 @@ public class SaveGameManager : MonoBehaviour
             Debug.LogWarning("[SaveGame] Load funciona apenas em Play Mode.");
             return;
         }
+
+        if (TryBlockAircraftFuelDepletionPersistence(
+                "[Load] Bloqueado: fila de aeronaves caindo em execucao",
+                "dialog.save_load.blocked_aircraft_depletion",
+                "Save/Load bloqueado: aguarde a fila de aeronaves caindo finalizar"))
+            return;
 
         if (TryBlockReplayPersistence(
                 "[Load] Bloqueado: replay ativo",
@@ -872,6 +896,17 @@ public class SaveGameManager : MonoBehaviour
             {
                 ReplaySaveData replayData = data.replay;
                 replayManager.ImportReplaySaveData(replayData);
+                int importedActionCount = replayData != null &&
+                                          replayData.actionStack != null &&
+                                          replayData.actionStack.Actions != null
+                    ? replayData.actionStack.Actions.Count
+                    : 0;
+                int importedHistoryCount = replayData != null && replayData.matchHistory != null
+                    ? replayData.matchHistory.Count
+                    : 0;
+                Debug.Log(
+                    $"[SaveGame][ReplayLoad] slot={loadedSlot} " +
+                    $"importedActionStackCount={importedActionCount} importedMatchHistoryCount={importedHistoryCount}");
             }
 
             stage = "reset-runtime-input";
@@ -1005,7 +1040,7 @@ public class SaveGameManager : MonoBehaviour
                 data.constructions.Add(item);
         }
 
-        if (saveReplayData && replayManager != null && replayManager.IsRecording)
+        if (saveReplayData && replayManager != null)
             data.replay = replayManager.ExportReplaySaveData();
 
         return data;
@@ -1070,6 +1105,20 @@ public class SaveGameManager : MonoBehaviour
     {
         TryAutoAssignReferences();
         if (replayManager == null || !replayManager.IsReplaying)
+            return false;
+
+        cursorController?.PlayErrorSfx();
+        CancelPrompt(clearDialogOverride: false);
+        string dialog = ResolveDialog(dialogId, dialogFallback);
+        PanelDialogController.TrySetTransientText(dialog, 2.8f);
+        Debug.LogWarning(logMessage);
+        return true;
+    }
+
+    private bool TryBlockAircraftFuelDepletionPersistence(string logMessage, string dialogId, string dialogFallback)
+    {
+        TryAutoAssignReferences();
+        if (turnStateManager == null || !turnStateManager.IsTurnStartFuelDepletionExecutionInProgress)
             return false;
 
         cursorController?.PlayErrorSfx();

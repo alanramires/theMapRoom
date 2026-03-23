@@ -401,32 +401,65 @@ public partial class TurnStateManager
     {
         if (cursorState != CursorState.RemovingUnit)
             return false;
+        if (removeUnitExecutionInProgress)
+            return true;
 
         Vector3Int actionCell = cursorController != null ? cursorController.CurrentCell : Vector3Int.zero;
+        actionCell.z = 0;
         TeamId actionTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
         int actionTurn = matchController != null ? matchController.CurrentTurn : 0;
-        bool destroyed = TryDestroyUnitUnderCursorFromDebug(out string message);
-        if (!destroyed)
+
+        UnitManager target = FindUnitAtCell(actionCell);
+        if (target == null)
         {
-            if (!string.IsNullOrWhiteSpace(message))
-                RuntimeLog($"[Destroy Unit] {message}");
+            RuntimeLog($"[Destroy Unit] Nenhuma unidade no cursor {FormatMapCellWithZ(actionCell)}.");
+            ExitRemovingUnitStateToNeutral(logCanceled: true);
             return true;
         }
 
-        replayManager?.RecordStandaloneAction(new PlayerAction
-        {
-            ActionType = PlayerActionType.RemoveUnit,
-            TurnNumber = actionTurn,
-            ActingTeam = actionTeam,
-            CursorHex = actionCell,
-            TargetHex = actionCell,
-            SensorAction = SensorActionType.RemoveUnit,
-            Confirmed = true,
-            DebugLabel = "RemoveUnit: confirm"
-        });
-        ExitRemovingUnitStateToNeutral(logCanceled: false);
-        cursorController?.PlayDoneSfx();
+        removeUnitExecutionInProgress = true;
+        StartCoroutine(ExecuteRemoveUnitConfirmationFlow(target, actionCell, actionTurn, actionTeam));
         return true;
+    }
+
+    private IEnumerator ExecuteRemoveUnitConfirmationFlow(UnitManager target, Vector3Int actionCell, int actionTurn, TeamId actionTeam)
+    {
+        try
+        {
+            if (target == null || !target.gameObject.activeInHierarchy)
+            {
+                RuntimeLog($"[Destroy Unit] Unidade alvo ausente em {FormatMapCellWithZ(actionCell)}.");
+                ExitRemovingUnitStateToNeutral(logCanceled: true);
+                yield break;
+            }
+
+            Vector3 worldPos = target.transform.position;
+            target.SetCurrentHP(0);
+            target.MarkDead("morto pelo comando destroy unit");
+            KillEmbarkedChildrenChain(target);
+            yield return ExecuteUnitDeathPresentation(target, actionCell, worldPos, applyStartDelay: false);
+
+            replayManager?.RecordStandaloneAction(new PlayerAction
+            {
+                ActionType = PlayerActionType.RemoveUnit,
+                TurnNumber = actionTurn,
+                ActingTeam = actionTeam,
+                CursorHex = actionCell,
+                HasCursorHex = true,
+                TargetHex = actionCell,
+                HasTargetHex = true,
+                SensorAction = SensorActionType.RemoveUnit,
+                Confirmed = true,
+                DebugLabel = "RemoveUnit: confirm"
+            });
+
+            ExitRemovingUnitStateToNeutral(logCanceled: false);
+            cursorController?.PlayLoadSfx();
+        }
+        finally
+        {
+            removeUnitExecutionInProgress = false;
+        }
     }
 
     private void ExitRemovingUnitStateToNeutral(bool logCanceled)

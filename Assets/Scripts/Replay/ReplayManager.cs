@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -40,6 +40,7 @@ public class ReplayManager : MonoBehaviour
     [SerializeField, Range(0.01f, 1f)] private float cursorTravelStepDelay = 0.15f;
     [SerializeField, Range(0f, 1f), Tooltip("Delay between sensor substeps during replay automation (seconds).") ] private float sensorSubstepDelay = 0.08f;
     [SerializeField, Range(0f, 2f)] private float replayConfirmVisualDelay = 0.25f;
+    [SerializeField, Range(0.5f, 8f), Tooltip("Tempo minimo de exibicao das mensagens de transicao do replay (segundos).") ] private float replayTransitionMinDisplaySeconds = 3f;
     [SerializeField, Range(0.01f, 1f), Tooltip("Delay between shopping menu items during replay automation (seconds).") ] private float shoppingNavDelay = 0.15f;
     [SerializeField, Tooltip("Quando ligado, remove delays artificiais do replay e usa teleporte do cursor entre cells.")] private bool fastReplayMode = false;
     [Header("Telemetry")]
@@ -68,6 +69,8 @@ public class ReplayManager : MonoBehaviour
     private Coroutine actionStepExecutionRoutine;
     private Coroutine autoplayAdvanceRetryRoutine;
     private Coroutine replayTransitionFeedbackRoutine;
+    private string replayTransitionFeedbackText = string.Empty;
+    private float replayTransitionFeedbackStartedAt;
     private bool replayBatchAbortRequested;
 
     private readonly Dictionary<string, ServiceData> cachedServicesById = new Dictionary<string, ServiceData>(StringComparer.OrdinalIgnoreCase);
@@ -104,6 +107,11 @@ public class ReplayManager : MonoBehaviour
     public float GetEffectiveTimeBetweenBatchesForAutoplay()
     {
         return GetEffectiveTimeBetweenBatches();
+    }
+
+    public float GetEffectiveCursorTravelStepDelayForRuntimeMotion()
+    {
+        return GetEffectiveCursorTravelStepDelay();
     }
 
     public string GetReplayStepExecutionBusyReason()
@@ -174,7 +182,11 @@ public class ReplayManager : MonoBehaviour
 
         bool canEmulateAction = action != null && CanReplayActionAsLiveInputs(action.ActionType);
         if (canEmulateAction)
+        {
             yield return ExecuteRecordedActionBatch(action, preActionSnapshot);
+            if (ShouldApplyPostSnapshotAfterLiveEmulation(action) && postActionSnapshot != null)
+                RestoreSnapshot(postActionSnapshot);
+        }
         else if (postActionSnapshot != null)
             RestoreSnapshot(postActionSnapshot);
 
@@ -207,7 +219,11 @@ public class ReplayManager : MonoBehaviour
     {
         if (cursorController == null)
             yield break;
-        if (action != null && (action.ActionType == PlayerActionType.UnitAction || action.ActionType == PlayerActionType.Shopping))
+        if (action != null &&
+            (action.ActionType == PlayerActionType.UnitAction
+             || action.ActionType == PlayerActionType.Shopping
+             || action.ActionType == PlayerActionType.CommandService
+             || action.ActionType == PlayerActionType.RemoveUnit))
             yield break;
 
         if (!TryResolveActionPreExecutionCursorCell(action, preActionSnapshot, out Vector3Int targetCursorCell))
@@ -339,9 +355,20 @@ public class ReplayManager : MonoBehaviour
             case PlayerActionType.RemoveUnit:
             case PlayerActionType.Shopping:
                 return true;
+
             default:
                 return false;
         }
+    }
+
+    private static bool ShouldApplyPostSnapshotAfterLiveEmulation(PlayerAction action)
+    {
+        if (action == null)
+            return false;
+
+        // RemoveUnit can drift in runtime (target resolution / async death sequencing).
+        // Reapply recorded post-action snapshot to keep replay deterministic.
+        return action.ActionType == PlayerActionType.RemoveUnit;
     }
 
     private IEnumerator ExecuteRecordedActionBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
@@ -551,10 +578,33 @@ public class ReplayManager : MonoBehaviour
         CursorController.OnCursorReturnedToNeutral += HandleCursorNeutral;
         try
         {
-            while (isReplaying && !replayBatchAbortRequested && !cursorReturnedToNeutral)
-                yield return null;
+            while (true)
+            {
+                if (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral)
+                    cursorReturnedToNeutral = true;
 
-            ReplayLog($"[Replay][Listener] wait neutral finished cursorNeutral={cursorReturnedToNeutral} state={turnStateManager.CurrentCursorState}");
+                bool scannerBusy = turnStateManager.IsScannerActionExecutionInProgress;
+                bool movementBusy = animationManager != null && animationManager.IsAnimatingMovement;
+                bool aborted = replayBatchAbortRequested;
+
+                if (cursorReturnedToNeutral)
+                    break;
+                if (aborted)
+                    break;
+
+                // Avoid race: replay can be marked inactive one frame before scanner execution
+                // finishes and returns cursor to Neutral (notably in merge flows).
+                if (!isReplaying && !scannerBusy && !movementBusy)
+                    break;
+
+                yield return null;
+            }
+
+            bool scannerBusyAtExit = turnStateManager.IsScannerActionExecutionInProgress;
+            bool movementBusyAtExit = animationManager != null && animationManager.IsAnimatingMovement;
+            ReplayLog(
+                $"[Replay][Listener] wait neutral finished cursorNeutral={cursorReturnedToNeutral} state={turnStateManager.CurrentCursorState} " +
+                $"isReplaying={isReplaying} aborted={replayBatchAbortRequested} scannerBusy={scannerBusyAtExit} movementBusy={movementBusyAtExit}");
         }
         finally
         {
@@ -562,8 +612,6 @@ public class ReplayManager : MonoBehaviour
             ReplayLog("[Replay][Listener] unsubscribe OnCursorReturnedToNeutral (wait neutral)");
         }
     }
-
-    
     private IEnumerable<PlayerActionSubStep> EnumerateRecordedTargetSubsteps(PlayerAction action)
     {
         if (action == null)
@@ -648,29 +696,88 @@ public class ReplayManager : MonoBehaviour
         if (turnStateManager == null)
             yield break;
 
+        bool hasAnyQueueLabel = false;
+        if (action != null && action.SubSteps != null)
+        {
+            for (int i = 0; i < action.SubSteps.Count; i++)
+            {
+                PlayerActionSubStep candidate = action.SubSteps[i];
+                if (candidate != null
+                    && !string.IsNullOrWhiteSpace(candidate.Label)
+                    && candidate.Label.IndexOf("QueueConfirm", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    hasAnyQueueLabel = true;
+                    break;
+                }
+            }
+        }
+
         bool executedAny = false;
         foreach (PlayerActionSubStep step in EnumerateRecordedTargetSubsteps(action))
         {
             if (step == null || string.IsNullOrWhiteSpace(step.TargetInstanceId))
                 continue;
 
-            if (!turnStateManager.TryQueueAutomatedMergeReplayOrder(step.TargetInstanceId))
-                yield return ExecuteDoubleConfirmFallback();
-            else
-                yield return WaitForSensorSubstepDelay();
+            // Merge replay must only queue participant confirmations.
+            if (hasAnyQueueLabel)
+            {
+                if (string.IsNullOrWhiteSpace(step.Label)
+                    || step.Label.IndexOf("QueueConfirm", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(step.Label)
+                     && step.Label.IndexOf("TargetConfirm", StringComparison.OrdinalIgnoreCase) >= 0
+                     && !string.IsNullOrWhiteSpace(action != null ? action.TargetInstanceId : null)
+                     && string.Equals(step.TargetInstanceId, action.TargetInstanceId, StringComparison.Ordinal))
+            {
+                // Legacy guard: ignore receiver-target confirmation when no queue labels exist.
+                continue;
+            }
 
+            if (!turnStateManager.TryQueueAutomatedMergeReplayOrder(step.TargetInstanceId))
+            {
+                ReplayLogWarning($"[Replay][Merge] Could not queue merge participant id={step.TargetInstanceId} label={step.Label ?? "(null)"}");
+                continue;
+            }
+
+            yield return WaitForSensorSubstepDelay();
             executedAny = true;
         }
 
         if (!executedAny)
-            yield return ExecuteDoubleConfirmFallback();
+        {
+            AbortReplayBatchDueToError(
+                "dialog.replay.error",
+                "replay <erro>",
+                "Merge replay sem participantes validos na fila",
+                3.2f);
+            yield break;
+        }
 
-        if (!turnStateManager.TryStartAutomatedMergeReplayExecution())
-            yield return ExecuteDoubleConfirmFallback();
+        bool startedMergeExecution = turnStateManager.TryStartAutomatedMergeReplayExecution();
+        if (!startedMergeExecution)
+        {
+            bool mergeStillRunning = turnStateManager.IsScannerActionExecutionInProgress;
+            bool stillInMergeState = turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Fundindo;
+            bool alreadyNeutral = turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral;
+
+            if (!mergeStillRunning && !stillInMergeState && !alreadyNeutral)
+            {
+                AbortReplayBatchDueToError(
+                    "dialog.replay.error",
+                    "replay <erro>",
+                    "Merge replay nao conseguiu iniciar execucao da fila",
+                    3.2f);
+                yield break;
+            }
+
+            ReplayLogWarning($"[Replay][Merge] start ignored: execution may have been auto-started by queue flow (state={turnStateManager.CurrentCursorState}, scannerBusy={turnStateManager.IsScannerActionExecutionInProgress}).");
+        }
 
         yield return WaitForSensorSubstepDelay();
     }
-
     private IEnumerator ExecuteRecordedSupplySubsteps(PlayerAction action)
     {
         if (turnStateManager == null)
@@ -892,16 +999,74 @@ public class ReplayManager : MonoBehaviour
             yield return MoveCursorToCellWithTravel(NormalizeCell(cursorCell));
         }
 
-        if (turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.CommandService))
+        if (!turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.CommandService))
         {
+            turnStateManager.ForceNeutral();
             yield return null;
-            ExecuteReplayConfirmInput();
-            yield return null;
+            if (!turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.CommandService))
+            {
+                AbortReplayBatchDueToError(
+                    "dialog.replay.error",
+                    "replay <erro>",
+                    "CommandService replay nao conseguiu entrar em estado de confirmacao",
+                    3.2f);
+                yield break;
+            }
         }
+
+        yield return null;
+        ExecuteReplayConfirmInput();
+        yield return null;
     }
 
     private IEnumerator ExecuteRecordedRemoveUnitBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
     {
+        if (turnStateManager != null && turnStateManager.TryStartAutomatedFuelDepletionReplayQueue(action))
+        {
+            yield return WaitForRemoveUnitReplayIdle();
+            yield break;
+        }
+
+        bool executedAny = false;
+        foreach (PlayerActionSubStep step in EnumerateRecordedTargetSubsteps(action))
+        {
+            if (step == null)
+                continue;
+
+            if (cursorController != null)
+            {
+                if (step.HasTargetHex)
+                    yield return MoveCursorToCellWithTravel(NormalizeCell(step.TargetHex));
+                else if (TryResolveRecordedCursorCell(action, preActionSnapshot, out Vector3Int cursorCellFromAction))
+                    yield return MoveCursorToCellWithTravel(NormalizeCell(cursorCellFromAction));
+            }
+
+            if (!turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.RemoveUnit))
+            {
+                turnStateManager.ForceNeutral();
+                yield return null;
+                if (!turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.RemoveUnit))
+                {
+                    AbortReplayBatchDueToError(
+                        "dialog.replay.error",
+                        "replay <erro>",
+                        "RemoveUnit replay nao conseguiu entrar em estado de confirmacao",
+                        3.2f);
+                    yield break;
+                }
+            }
+
+            yield return null;
+            ExecuteReplayConfirmInput();
+            yield return null;
+            yield return WaitForRemoveUnitReplayIdle();
+
+            executedAny = true;
+        }
+
+        if (executedAny)
+            yield break;
+
         if (cursorController != null)
         {
             if (TryResolveRecordedTargetCell(action, out Vector3Int targetCell))
@@ -910,12 +1075,44 @@ public class ReplayManager : MonoBehaviour
                 yield return MoveCursorToCellWithTravel(NormalizeCell(cursorCell));
         }
 
-        if (turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.RemoveUnit))
+        if (!turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.RemoveUnit))
         {
+            turnStateManager.ForceNeutral();
             yield return null;
-            ExecuteReplayConfirmInput();
+            if (!turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.RemoveUnit))
+            {
+                AbortReplayBatchDueToError(
+                    "dialog.replay.error",
+                    "replay <erro>",
+                    "RemoveUnit replay nao conseguiu entrar em estado de confirmacao",
+                    3.2f);
+                yield break;
+            }
+        }
+
+        yield return null;
+        ExecuteReplayConfirmInput();
+        yield return null;
+        yield return WaitForRemoveUnitReplayIdle();
+    }
+
+    private IEnumerator WaitForRemoveUnitReplayIdle()
+    {
+        if (turnStateManager == null)
+            yield break;
+
+        while (isReplaying && !replayBatchAbortRequested)
+        {
+            bool cursorNeutral = turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral;
+            bool scannerIdle = !turnStateManager.IsScannerActionExecutionInProgress;
+            bool movementIdle = animationManager == null || !animationManager.IsAnimatingMovement;
+            if (cursorNeutral && scannerIdle && movementIdle)
+                break;
+
             yield return null;
         }
+
+        yield return null;
     }
 
     private static bool IsRecordedCellPresent(Vector3Int cell, bool explicitFlag)
@@ -950,6 +1147,24 @@ public class ReplayManager : MonoBehaviour
         cell = Vector3Int.zero;
         if (action == null)
             return false;
+
+        // Special-case: turn-start fuel depletion queue records Target/Cursor as the
+        // last removal, but replay pre-travel must start from the first queued target
+        // to preserve visual/runtime order.
+        if (string.Equals(action.SubStepLabel, "TurnStartFuelDepletionQueue", StringComparison.OrdinalIgnoreCase)
+            && action.SubSteps != null
+            && action.SubSteps.Count > 0)
+        {
+            for (int i = 0; i < action.SubSteps.Count; i++)
+            {
+                PlayerActionSubStep subStep = action.SubSteps[i];
+                if (subStep != null && IsRecordedCellPresent(subStep.TargetHex, subStep.HasTargetHex))
+                {
+                    cell = subStep.TargetHex;
+                    return true;
+                }
+            }
+        }
 
         if (IsRecordedCellPresent(action.MoveFrom, action.HasMoveFrom))
         {
@@ -1186,7 +1401,7 @@ public class ReplayManager : MonoBehaviour
         if (currentRecord == null || currentRecord.StartSnapshot == null)
             return;
 
-        BeginReplayTransitionFeedback("dialog.replay.loading", "Replay :: Carregando");
+        BeginReplayTransitionFeedback("dialog.replay.loading", "Replay iniciando (aguarde)");
 
         // Replay do turno ativo: entra no estado atual sem reset para o step 0.
         isReplaying = true;
@@ -1215,7 +1430,7 @@ public class ReplayManager : MonoBehaviour
         if (selected == null || selected.StartSnapshot == null)
             return;
 
-        BeginReplayTransitionFeedback("dialog.replay.loading", "Replay :: Carregando");
+        BeginReplayTransitionFeedback("dialog.replay.loading", "Replay iniciando (aguarde)");
 
         currentRecord = selected;
         stepSnapshots.Clear();
@@ -1236,7 +1451,7 @@ public class ReplayManager : MonoBehaviour
     {
         bool wasReplaying = isReplaying;
         if (wasReplaying)
-            BeginReplayTransitionFeedback("dialog.replay.ending_wait", "Replay :: Encerrando (aguarde)");
+            BeginReplayTransitionFeedback("dialog.replay.ending_wait", "Replay finalizando - voltando a partida");
 
         if (attackStepExecutionRoutine != null)
         {
@@ -1382,7 +1597,7 @@ public class ReplayManager : MonoBehaviour
 
         visionMode = replayVisionMode;
         observerTeam = replayObserverTeam;
-        BeginReplayTransitionFeedback("dialog.replay.loading", "Replay :: Carregando");
+        BeginReplayTransitionFeedback("dialog.replay.loading", "Replay iniciando (aguarde)");
         isReplaying = true;
         isRecording = false;
         isPlaying = false;
@@ -1589,15 +1804,17 @@ public class ReplayManager : MonoBehaviour
     {
         if (currentBuffer == null)
             return false;
+        if (string.IsNullOrWhiteSpace(label))
+            return false;
 
         switch (currentBuffer.SensorAction)
         {
             case SensorActionType.Merge:
             case SensorActionType.Supply:
-                return !string.IsNullOrWhiteSpace(label) &&
-                       label.IndexOf("QueueConfirm", StringComparison.OrdinalIgnoreCase) >= 0;
+                return label.IndexOf("QueueConfirm", StringComparison.OrdinalIgnoreCase) >= 0;
             default:
-                return true;
+                return label.IndexOf("TargetConfirm", StringComparison.OrdinalIgnoreCase) >= 0
+                       || label.IndexOf("QueueConfirm", StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
     private void AppendCurrentBufferSubStep(string label)
@@ -1616,6 +1833,20 @@ public class ReplayManager : MonoBehaviour
             TargetHex = currentBuffer.TargetHex,
             HasTargetHex = currentBuffer.HasTargetHex
         };
+
+        int lastIndex = currentBuffer.SubSteps.Count - 1;
+        if (lastIndex >= 0)
+        {
+            PlayerActionSubStep last = currentBuffer.SubSteps[lastIndex];
+            bool sameTargetHex = (!step.HasTargetHex && !last.HasTargetHex) || (step.HasTargetHex && last.HasTargetHex && step.TargetHex == last.TargetHex);
+            bool duplicate =
+                string.Equals(last.Label, step.Label, StringComparison.Ordinal)
+                && string.Equals(last.TargetInstanceId, step.TargetInstanceId, StringComparison.Ordinal)
+                && string.Equals(last.TargetConstructionId, step.TargetConstructionId, StringComparison.Ordinal)
+                && sameTargetHex;
+            if (duplicate)
+                return;
+        }
 
         currentBuffer.SubSteps.Add(step);
     }
@@ -1835,6 +2066,11 @@ public class ReplayManager : MonoBehaviour
     {
         if (currentRecord == null || currentRecord.StartSnapshot == null)
             return false;
+
+        // Manual snapshot navigation must never keep autoplay side-effects alive.
+        isPlaying = false;
+        StopAutoplayAdvanceRetryRoutine();
+        automatedPlayer?.Pause();
 
         if (targetIndex < 0)
         {
@@ -2287,6 +2523,8 @@ public class ReplayManager : MonoBehaviour
         matchController.SetCurrentTurn(Mathf.Max(0, matchState.currentTurn));
         matchController.SetActiveTeamId(matchState.activeTeamId);
         SaveDataMapper.ApplyMatchStateSaveData(matchController, matchState);
+        // Evita drift visual de renda ao navegar snapshots (captura/reversao/avance).
+        matchController.RefreshIncomeFromConstructionsNow();
 
         for (int i = 0; i < restoredUnits.Count; i++)
         {
@@ -2431,6 +2669,8 @@ public class ReplayManager : MonoBehaviour
             stopwatch = Stopwatch.StartNew();
 
         TryAutoAssignReferences();
+        // Garante coerencia entre ownership de construcoes e income salvo no snapshot.
+        matchController?.RefreshIncomeFromConstructionsNow();
 
         MatchStateSaveData matchState = SaveDataMapper.BuildMatchStateSaveData(matchController);
         TurnStartSnapshot snapshot = new TurnStartSnapshot
@@ -2594,10 +2834,12 @@ public class ReplayManager : MonoBehaviour
 
         DeactivateAllPooledRuntime(activeScene);
 
-        IReadOnlyList<UnitManager> activeUnits = UnitManager.AllActive;
-        for (int i = 0; i < activeUnits.Count; i++)
+        // Hard reset da cena: AllActive pode perder objetos em estados transitorios
+        // (ex.: recem-spawnados no mesmo frame). Varremos tudo da cena ativa.
+        UnitManager[] allSceneUnits = Resources.FindObjectsOfTypeAll<UnitManager>();
+        for (int i = 0; i < allSceneUnits.Length; i++)
         {
-            UnitManager unit = activeUnits[i];
+            UnitManager unit = allSceneUnits[i];
             if (unit == null || unit.gameObject.scene != activeScene)
                 continue;
 
@@ -2606,10 +2848,10 @@ public class ReplayManager : MonoBehaviour
                 SetReplayObjectActive(unit.gameObject, false);
         }
 
-        IReadOnlyList<ConstructionManager> activeConstructions = ConstructionManager.AllActive;
-        for (int i = 0; i < activeConstructions.Count; i++)
+        ConstructionManager[] allSceneConstructions = Resources.FindObjectsOfTypeAll<ConstructionManager>();
+        for (int i = 0; i < allSceneConstructions.Length; i++)
         {
-            ConstructionManager construction = activeConstructions[i];
+            ConstructionManager construction = allSceneConstructions[i];
             if (construction == null || construction.gameObject.scene != activeScene)
                 continue;
 
@@ -2924,7 +3166,10 @@ public class ReplayManager : MonoBehaviour
     private void BeginReplayTransitionFeedback(string dialogId, string fallback)
     {
         string text = PanelDialogController.ResolveDialogMessage(dialogId, fallback);
+        replayTransitionFeedbackText = text;
+        replayTransitionFeedbackStartedAt = Time.realtimeSinceStartup;
         PanelDialogController.TrySetExternalText(text);
+        PanelDialogController.TrySetTransientText(text, Mathf.Max(0.5f, replayTransitionMinDisplaySeconds));
 
         if (replayTransitionFeedbackRoutine != null)
         {
@@ -2939,10 +3184,21 @@ public class ReplayManager : MonoBehaviour
     {
         yield return null;
 
-        while (restoreFogRefreshRoutine != null || IsReplayStepExecutionBusy(includeCinematicStepRoutine: false))
+        while (true)
+        {
+            bool busy = restoreFogRefreshRoutine != null || IsReplayStepExecutionBusy(includeCinematicStepRoutine: false);
+            float elapsed = Time.realtimeSinceStartup - replayTransitionFeedbackStartedAt;
+            bool minDisplayElapsed = elapsed >= Mathf.Max(0.5f, replayTransitionMinDisplaySeconds);
+            if (!busy && minDisplayElapsed)
+                break;
+
+            if (!string.IsNullOrWhiteSpace(replayTransitionFeedbackText))
+                PanelDialogController.TrySetExternalText(replayTransitionFeedbackText);
             yield return null;
+        }
 
         PanelDialogController.ClearExternalText();
+        replayTransitionFeedbackText = string.Empty;
         cursorController?.PlayBeepSfx();
         replayTransitionFeedbackRoutine = null;
     }
@@ -3124,6 +3380,16 @@ public class ReplayManager : MonoBehaviour
         return resolved;
     }
 }
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -47,6 +47,8 @@ public partial class TurnStateManager
                 return HandleConfirmWhileCommandService();
             case CursorState.RemovingUnit:
                 return HandleConfirmWhileRemovingUnit();
+            case CursorState.AircraftFuelDepletionQueue:
+                return ActionSfx.None;
         }
 
         return ActionSfx.None;
@@ -99,6 +101,8 @@ public partial class TurnStateManager
                 return HandleCancelWhileCommandService();
             case CursorState.RemovingUnit:
                 return HandleCancelWhileRemovingUnit();
+            case CursorState.AircraftFuelDepletionQueue:
+                return ActionSfx.None;
         }
 
         return ActionSfx.None;

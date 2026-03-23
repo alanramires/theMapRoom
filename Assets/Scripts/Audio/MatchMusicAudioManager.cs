@@ -414,9 +414,9 @@ public class MatchMusicAudioManager : MonoBehaviour
     private bool WasToggleKeyPressedThisFrame()
     {
 #if ENABLE_INPUT_SYSTEM
-        return Keyboard.current != null && Keyboard.current.pKey.wasPressedThisFrame;
+        return Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
 #else
-        return Input.GetKeyDown(KeyCode.P);
+        return Input.GetKeyDown(KeyCode.Space);
 #endif
     }
 

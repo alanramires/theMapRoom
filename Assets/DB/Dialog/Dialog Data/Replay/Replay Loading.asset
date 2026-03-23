@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DialogData
   id: dialog.replay.loading
   condition: Mensagem de transicao ao iniciar replay.
-  message: 
+  message: Replay iniciando (aguarde)

@@ -15,6 +15,7 @@ public class PodeFundirOption
 public class PodeFundirInvalidOption
 {
     public const string ReasonIdInsufficientMovement = "fuse.invalid.insufficient_movement";
+    public const string ReasonIdLayerMismatch = "fuse.invalid.layer_mismatch";
 
     public UnitManager receiverUnit;
     public UnitManager candidateUnit;
@@ -102,6 +103,30 @@ public static class PodeFundirSensor
 
             if (!IsSameTypeAndTeam(selectedUnit, other))
                 continue;
+
+            Domain receiverDomain = selectedUnit.GetDomain();
+            HeightLevel receiverHeight = selectedUnit.GetHeightLevel();
+            Domain candidateDomain = other.GetDomain();
+            HeightLevel candidateHeight = other.GetHeightLevel();
+            bool sameOperationalLayer = receiverDomain == candidateDomain && receiverHeight == candidateHeight;
+            if (!sameOperationalLayer)
+            {
+                if (invalidOutput != null)
+                {
+                    invalidOutput.Add(new PodeFundirInvalidOption
+                    {
+                        receiverUnit = selectedUnit,
+                        candidateUnit = other,
+                        candidateCell = cell,
+                        remainingMovement = Mathf.Max(0, other.RemainingMovementPoints),
+                        requiredMovementCost = 0,
+                        reasonId = PodeFundirInvalidOption.ReasonIdLayerMismatch,
+                        reason = "Camada/altura diferente do receptor."
+                    });
+                }
+
+                continue;
+            }
 
             bool valid = EvaluateCandidateMovement(
                 selectedUnit,

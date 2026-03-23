@@ -1,4 +1,5 @@
-﻿using TMPro;
+﻿using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
@@ -41,6 +42,7 @@ public class ReplayPanelUI : MonoBehaviour
 
     [Header("View Selection")]
     [SerializeField] [Range(-1, 3)] private int viewUnderSpecificTeam = -1;
+    private Coroutine pendingReplayTransitionRoutine;
 
     private void OnValidate()
     {
@@ -65,6 +67,12 @@ public class ReplayPanelUI : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (pendingReplayTransitionRoutine != null)
+        {
+            StopCoroutine(pendingReplayTransitionRoutine);
+            pendingReplayTransitionRoutine = null;
+        }
+
         UnbindButtonCallbacks();
     }
 
@@ -87,8 +95,12 @@ public class ReplayPanelUI : MonoBehaviour
         if (replayManager == null)
             return false;
 
-        // If recording is disabled, keep replay panel hotkey disabled unless we're already replaying.
-        return replayManager.IsRecording || replayManager.IsReplaying;
+        bool hasReplayHistory = replayManager.MatchHistory != null && replayManager.MatchHistory.Count > 0;
+        bool hasReplayBatches = replayManager.CurrentReplayBatchCount > 0;
+        bool hasCurrentRecord = replayManager.CurrentRecord != null && replayManager.CurrentRecord.StartSnapshot != null;
+
+        // Keep panel accessible when replay data was loaded from save even before recording resumes.
+        return replayManager.IsRecording || replayManager.IsReplaying || hasReplayHistory || hasReplayBatches || hasCurrentRecord;
     }
 
     private static bool WasKeyPressedThisFrame(KeyCode key)
@@ -318,6 +330,26 @@ public class ReplayPanelUI : MonoBehaviour
         if (replayManager == null)
             return;
 
+        if (pendingReplayTransitionRoutine != null)
+        {
+            StopCoroutine(pendingReplayTransitionRoutine);
+            pendingReplayTransitionRoutine = null;
+        }
+
+        ShowReplayDialog("dialog.replay.loading", "Carregando Replay aguarde");
+        pendingReplayTransitionRoutine = StartCoroutine(StartReplayNextFrame());
+    }
+
+    private IEnumerator StartReplayNextFrame()
+    {
+        yield return null;
+
+        if (replayManager == null)
+        {
+            pendingReplayTransitionRoutine = null;
+            yield break;
+        }
+
         bool started = false;
         ApplyReplayViewSelection();
         TeamId specificTeamId = (TeamId)Mathf.Clamp(specificTeam, (int)TeamId.Neutral, (int)TeamId.Yellow);
@@ -344,12 +376,14 @@ public class ReplayPanelUI : MonoBehaviour
         {
             replaySessionArmed = false;
             RefreshLabels();
-            return;
+            pendingReplayTransitionRoutine = null;
+            yield break;
         }
 
         replaySessionArmed = replayManager.IsReplaying;
         replayManager.PausePlayback();
         RefreshLabels();
+        pendingReplayTransitionRoutine = null;
     }
 
     private void OnBackClicked()
@@ -400,9 +434,30 @@ public class ReplayPanelUI : MonoBehaviour
         if (replayManager == null)
             return;
 
+        if (pendingReplayTransitionRoutine != null)
+        {
+            StopCoroutine(pendingReplayTransitionRoutine);
+            pendingReplayTransitionRoutine = null;
+        }
+
+        ShowReplayDialog("dialog.replay.ending_wait", "Encerrando Replay aguarde");
+        pendingReplayTransitionRoutine = StartCoroutine(StopReplayNextFrame());
+    }
+
+    private IEnumerator StopReplayNextFrame()
+    {
+        yield return null;
+
+        if (replayManager == null)
+        {
+            pendingReplayTransitionRoutine = null;
+            yield break;
+        }
+
         replayManager.StopReplay();
         replaySessionArmed = false;
         RefreshLabels();
+        pendingReplayTransitionRoutine = null;
     }
 
     private void OnFastReplayModeToggleChanged(bool enabled)
@@ -564,6 +619,7 @@ public class ReplayPanelUI : MonoBehaviour
         PanelDialogController.TrySetTransientText(text, 2.2f);
     }
 }
+
 
 
 

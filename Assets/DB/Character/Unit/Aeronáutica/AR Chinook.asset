@@ -64,8 +64,8 @@ MonoBehaviour:
     canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: 961b63e5103c5804f96d870b89696046, type: 2}
   cantUseWeaponsOnTheFollowDomain:
-  - domain: 3
-    heightLevel: 4
+  - domain: 0
+    heightLevel: 3
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0

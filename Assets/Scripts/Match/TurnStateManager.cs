@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -36,7 +36,8 @@ public partial class TurnStateManager : MonoBehaviour
         InspectingBuilding = 13,
         InspectingHotZone = 14,
         CommandService = 15,
-        RemovingUnit = 16
+        RemovingUnit = 16,
+        AircraftFuelDepletionQueue = 17
     }
 
     [Header("References")]
@@ -103,8 +104,10 @@ public partial class TurnStateManager : MonoBehaviour
     private readonly List<UnitData> shoppingUnitsForSale = new List<UnitData>();
     private int shoppingSelectedIndex = -1;
     private bool captureExecutionInProgress;
+    private bool removeUnitExecutionInProgress;
     private readonly List<UnitManager> turnStartFuelDepletionDeathQueue = new List<UnitManager>();
     private bool turnStartFuelDepletionExecutionInProgress;
+    private readonly List<PlayerActionSubStep> turnStartFuelDepletionReplaySubSteps = new List<PlayerActionSubStep>();
 
     public CursorState CurrentCursorState => cursorState;
     public UnitManager SelectedUnit => selectedUnit;
@@ -117,10 +120,15 @@ public partial class TurnStateManager : MonoBehaviour
         || landingExecutionInProgress
         || combatExecutionInProgress
         || captureExecutionInProgress
+        || removeUnitExecutionInProgress
         || mergeExecutionInProgress
         || supplyExecutionInProgress
         || transferExecutionInProgress
-        || disembarkExecutionInProgress;
+        || disembarkExecutionInProgress
+        || turnStartFuelDepletionExecutionInProgress;
+    public bool IsTurnStartFuelDepletionExecutionInProgress =>
+        turnStartFuelDepletionExecutionInProgress
+        || cursorState == CursorState.AircraftFuelDepletionQueue;
 
     private void LogStateStep(string step, bool rollback = false)
     {
@@ -966,20 +974,108 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         if (!turnStartFuelDepletionExecutionInProgress && turnStartFuelDepletionDeathQueue.Count > 0)
+        {
+            replayManager?.BeginTurnRecording();
             StartCoroutine(ExecuteTurnStartFuelDepletionDeathQueue());
+        }
     }
 
+    public bool TryStartAutomatedFuelDepletionReplayQueue(PlayerAction action)
+    {
+        if (!Application.isPlaying || action == null)
+            return false;
+
+        bool isFuelQueueAction =
+            string.Equals(action.SubStepLabel, "TurnStartFuelDepletionQueue", StringComparison.OrdinalIgnoreCase)
+            || (!string.IsNullOrWhiteSpace(action.DebugLabel) && action.DebugLabel.IndexOf("TurnStartFuelDepletionQueue", StringComparison.OrdinalIgnoreCase) >= 0);
+        if (!isFuelQueueAction)
+            return false;
+
+        List<UnitManager> resolvedUnits = ResolveFuelDepletionReplayUnits(action);
+        if (resolvedUnits.Count <= 0)
+            return false;
+
+        EnqueueTurnStartFuelDepletionDeaths(resolvedUnits);
+        return true;
+    }
+
+    private List<UnitManager> ResolveFuelDepletionReplayUnits(PlayerAction action)
+    {
+        List<UnitManager> list = new List<UnitManager>();
+
+        if (action.SubSteps != null)
+        {
+            for (int i = 0; i < action.SubSteps.Count; i++)
+            {
+                PlayerActionSubStep step = action.SubSteps[i];
+                if (!TryResolveFuelDepletionReplayTarget(step != null ? step.TargetInstanceId : null, step != null && step.HasTargetHex, step != null ? step.TargetHex : Vector3Int.zero, out UnitManager unit))
+                    continue;
+                if (!list.Contains(unit))
+                    list.Add(unit);
+            }
+        }
+
+        if (list.Count <= 0)
+        {
+            if (TryResolveFuelDepletionReplayTarget(action.TargetInstanceId, action.HasTargetHex, action.TargetHex, out UnitManager single))
+                list.Add(single);
+        }
+
+        return list;
+    }
+
+    private bool TryResolveFuelDepletionReplayTarget(string targetInstanceId, bool hasTargetHex, Vector3Int targetHex, out UnitManager unit)
+    {
+        unit = null;
+
+        if (!string.IsNullOrWhiteSpace(targetInstanceId) && int.TryParse(targetInstanceId, out int id) && id > 0)
+            unit = FindActiveUnitByInstanceId(id);
+
+        if (unit == null && hasTargetHex)
+        {
+            Vector3Int cell = targetHex;
+            cell.z = 0;
+            unit = FindUnitAtCell(cell);
+        }
+
+        return unit != null && unit.gameObject.activeInHierarchy;
+    }
+
+    private static UnitManager FindActiveUnitByInstanceId(int instanceId)
+    {
+        if (instanceId <= 0)
+            return null;
+
+        UnitManager[] activeUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < activeUnits.Length; i++)
+        {
+            UnitManager unit = activeUnits[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy)
+                continue;
+            if (unit.InstanceId == instanceId)
+                return unit;
+        }
+
+        return null;
+    }
     private IEnumerator ExecuteTurnStartFuelDepletionDeathQueue()
     {
         if (turnStartFuelDepletionExecutionInProgress)
             yield break;
 
         turnStartFuelDepletionExecutionInProgress = true;
+        EnterTurnStartFuelDepletionCursorState();
         try
         {
+            turnStartFuelDepletionReplaySubSteps.Clear();
             float initialDelay = animationManager != null ? animationManager.TurnStartFuelDeathInitialDelay : 0.20f;
             float cursorFocusDelay = animationManager != null ? animationManager.TurnStartFuelDeathCursorFocusDelay : 0.20f;
+            float replayCursorStepDelay = replayManager != null
+                ? Mathf.Max(0f, replayManager.GetEffectiveCursorTravelStepDelayForRuntimeMotion())
+                : Mathf.Max(0f, cursorFocusDelay);
             float betweenKillsDelay = animationManager != null ? animationManager.TurnStartFuelDeathBetweenKillsDelay : 0.15f;
+            int actionTurn = matchController != null ? matchController.CurrentTurn : 0;
+            TeamId actionTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
 
             if (turnStartFuelDepletionDeathQueue.Count > 0 && initialDelay > 0f)
                 yield return new WaitForSeconds(initialDelay);
@@ -992,18 +1088,22 @@ public partial class TurnStateManager : MonoBehaviour
                     continue;
 
                 if (selectedUnit == target)
-                    ClearSelectionAndReturnToNeutral();
+                    ClearSelectionForTurnStartFuelDepletionQueue();
 
                 Vector3Int targetCell = target.CurrentCellPosition;
                 targetCell.z = 0;
                 Vector3 worldPos = target.transform.position;
+                string targetInstanceId = target.InstanceId.ToString();
 
-                if (cursorController != null)
+                yield return MoveCursorToCellLikeReplayAtTurnStart(targetCell, replayCursorStepDelay);
+
+                turnStartFuelDepletionReplaySubSteps.Add(new PlayerActionSubStep
                 {
-                    cursorController.SetCell(targetCell, playMoveSfx: true, adjustCamera: true);
-                    if (cursorFocusDelay > 0f)
-                        yield return new WaitForSeconds(cursorFocusDelay);
-                }
+                    TargetHex = targetCell,
+                    HasTargetHex = true,
+                    TargetInstanceId = targetInstanceId,
+                    Label = "TurnStartFuelDepletionQueueConfirm"
+                });
 
                 target.SetCurrentHP(0);
                 target.MarkDead("morto por falta de combustivel/ queda aerea");
@@ -1015,6 +1115,7 @@ public partial class TurnStateManager : MonoBehaviour
                     worldPos,
                     applyStartDelay: false,
                     moveCursorFirst: false);
+                yield return WaitForFuelDepletionDeathVisualSettle(target);
 
                 cursorController?.PlayLoadSfx();
 
@@ -1024,12 +1125,212 @@ public partial class TurnStateManager : MonoBehaviour
                         yield return new WaitForSeconds(betweenKillsDelay);
                 }
             }
+
+            if (turnStartFuelDepletionReplaySubSteps.Count > 0)
+            {
+                PlayerActionSubStep last = turnStartFuelDepletionReplaySubSteps[turnStartFuelDepletionReplaySubSteps.Count - 1];
+                replayManager?.RecordStandaloneAction(new PlayerAction
+                {
+                    ActionType = PlayerActionType.RemoveUnit,
+                    TurnNumber = actionTurn,
+                    ActingTeam = actionTeam,
+                    CursorHex = last.TargetHex,
+                    HasCursorHex = true,
+                    TargetHex = last.TargetHex,
+                    HasTargetHex = true,
+                    TargetInstanceId = last.TargetInstanceId,
+                    SensorAction = SensorActionType.RemoveUnit,
+                    SubStepLabel = "TurnStartFuelDepletionQueue",
+                    SubSteps = new List<PlayerActionSubStep>(turnStartFuelDepletionReplaySubSteps),
+                    Confirmed = true,
+                    DebugLabel = $"TurnStartFuelDepletionQueue: {turnStartFuelDepletionReplaySubSteps.Count} removals"
+                });
+            }
         }
         finally
         {
+            turnStartFuelDepletionReplaySubSteps.Clear();
             turnStartFuelDepletionExecutionInProgress = false;
             if (turnStartFuelDepletionDeathQueue.Count > 0)
                 StartCoroutine(ExecuteTurnStartFuelDepletionDeathQueue());
+            else
+                ExitTurnStartFuelDepletionCursorState();
+        }
+    }
+
+    private void EnterTurnStartFuelDepletionCursorState()
+    {
+        if (cursorState == CursorState.AircraftFuelDepletionQueue)
+            return;
+
+        SetCursorState(CursorState.AircraftFuelDepletionQueue, "TurnStartFuelDepletionQueue: begin");
+    }
+
+    private void ExitTurnStartFuelDepletionCursorState()
+    {
+        if (cursorState != CursorState.AircraftFuelDepletionQueue)
+            return;
+
+        SetCursorState(CursorState.Neutral, "TurnStartFuelDepletionQueue: completed");
+    }
+
+    private void ClearSelectionForTurnStartFuelDepletionQueue()
+    {
+        animationManager?.StopCurrentMovement();
+        ClearCommittedPathVisual();
+        ClearSensorResults();
+        shoppingConstruction = null;
+        shoppingUnitsForSale.Clear();
+        RestorePreparedFuelCostIfAny();
+        RestorePreparedMovementCostIfAny();
+
+        if (selectedUnit != null)
+            animationManager?.ClearSelectionVisual(selectedUnit);
+
+        RestoreTemporaryTakeoffSelectionStateIfAny();
+        selectedUnit = null;
+        ClearMovementRange();
+        ClearCommittedMovement();
+    }
+
+    private IEnumerator MoveCursorToCellLikeReplayAtTurnStart(Vector3Int targetCell, float stepDelay)
+    {
+        if (cursorController == null)
+            yield break;
+
+        Vector3Int fromCell = NormalizeTurnStartCursorCell(cursorController.CurrentCell);
+        Vector3Int toCell = NormalizeTurnStartCursorCell(targetCell);
+        if (fromCell == toCell)
+        {
+            if (stepDelay > 0f)
+                yield return new WaitForSeconds(stepDelay);
+            yield break;
+        }
+
+        List<Vector3Int> path = BuildTurnStartCursorTravelPath(fromCell, toCell);
+        if (path == null || path.Count <= 0)
+            path = new List<Vector3Int> { toCell };
+
+        for (int i = 0; i < path.Count; i++)
+        {
+            Vector3Int stepCell = NormalizeTurnStartCursorCell(path[i]);
+            cursorController.SetCell(stepCell, playMoveSfx: true, adjustCamera: false);
+            cursorController.TryAdjustCameraToCursor();
+
+            if (stepDelay > 0f)
+                yield return new WaitForSeconds(stepDelay);
+            else
+                yield return null;
+        }
+    }
+
+    private List<Vector3Int> BuildTurnStartCursorTravelPath(Vector3Int fromCell, Vector3Int toCell)
+    {
+        List<Vector3Int> path = new List<Vector3Int>();
+        fromCell = NormalizeTurnStartCursorCell(fromCell);
+        toCell = NormalizeTurnStartCursorCell(toCell);
+
+        if (fromCell == toCell)
+            return path;
+
+        Tilemap board = cursorController != null ? cursorController.BoardTilemap : null;
+        if (board == null)
+        {
+            path.Add(toCell);
+            return path;
+        }
+
+        Queue<Vector3Int> queue = new Queue<Vector3Int>();
+        HashSet<Vector3Int> visited = new HashSet<Vector3Int>();
+        Dictionary<Vector3Int, Vector3Int> cameFrom = new Dictionary<Vector3Int, Vector3Int>();
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+
+        queue.Enqueue(fromCell);
+        visited.Add(fromCell);
+
+        bool found = false;
+        int guard = 0;
+        const int maxVisited = 8192;
+        while (queue.Count > 0 && guard++ < maxVisited)
+        {
+            Vector3Int current = queue.Dequeue();
+            if (current == toCell)
+            {
+                found = true;
+                break;
+            }
+
+            neighbors.Clear();
+            UnitMovementPathRules.GetImmediateHexNeighbors(board, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = NormalizeTurnStartCursorCell(neighbors[i]);
+                if (!visited.Add(next))
+                    continue;
+
+                cameFrom[next] = current;
+                queue.Enqueue(next);
+            }
+        }
+
+        if (!found)
+        {
+            path.Add(toCell);
+            return path;
+        }
+
+        List<Vector3Int> reversed = new List<Vector3Int>();
+        Vector3Int walk = toCell;
+        while (walk != fromCell)
+        {
+            reversed.Add(walk);
+            if (!cameFrom.TryGetValue(walk, out Vector3Int previous))
+            {
+                reversed.Clear();
+                reversed.Add(toCell);
+                break;
+            }
+
+            walk = previous;
+        }
+
+        for (int i = reversed.Count - 1; i >= 0; i--)
+            path.Add(reversed[i]);
+
+        return path;
+    }
+
+    private static Vector3Int NormalizeTurnStartCursorCell(Vector3Int cell)
+    {
+        cell.z = 0;
+        return cell;
+    }
+
+    private static IEnumerator WaitForFuelDepletionDeathVisualSettle(UnitManager target)
+    {
+        const float minPresentationSeconds = 0.65f;
+        const float maxWaitSeconds = 3.0f;
+
+        float start = Time.realtimeSinceStartup;
+        bool targetStillActive = target != null && target.gameObject != null && target.gameObject.activeInHierarchy;
+        while (Time.realtimeSinceStartup - start < maxWaitSeconds)
+        {
+            float elapsed = Time.realtimeSinceStartup - start;
+            bool minimumSatisfied = elapsed >= minPresentationSeconds;
+            bool isActiveNow = target != null && target.gameObject != null && target.gameObject.activeInHierarchy;
+
+            if (minimumSatisfied && !isActiveNow)
+                yield break;
+
+            // Se o alvo iniciou ativo, exige ao menos uma transicao para inativo
+            // antes de liberar o proximo item da fila.
+            if (!targetStillActive && minimumSatisfied)
+                yield break;
+
+            if (isActiveNow)
+                targetStillActive = true;
+
+            yield return null;
         }
     }
 

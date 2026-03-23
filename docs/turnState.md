@@ -16,19 +16,21 @@ Legenda:
 2. `UnitSelected`
 3. `MoveuAndando`
 4. `MoveuParado`
-5. `Capturando`
-6. `Mirando`
-7. `Pousando`
-8. `Embarcando`
-9. `Desembarcando`
-10. `Fundindo`
-11. `ShoppingAndServices`
-12. `Suprindo`
-13. `InspectingUnit`
-14. `InspectingBuilding`
-15. `InspectingHotZone`
-16. `CommandService`
-17. `RemovingUnit`
+5. `Apenas Mover`
+6. `Capturando`
+7. `Mirando`
+8. `Pousando`
+9. `Embarcando`
+10. `Desembarcando`
+11. `Fundindo`
+12. `ShoppingAndServices`
+13. `Suprindo`
+14. `InspectingUnit`
+15. `InspectingBuilding`
+16. `InspectingHotZone`
+17. `CommandService`
+18. `RemovingUnit`
+19. `AircraftFuelDepletionQueue`
 
 ## Leitura funcional
 
@@ -40,6 +42,7 @@ Legenda:
 - `MoveuParado` e `MoveuAndando` sao os dois estados apos a confirmacao de movimento.
 - Ambos reconstroem o mesmo conjunto de fluxos de sensores, mudando apenas o contexto de movimentacao.
 - `Capturando` segue como estado dedicado de execucao, e nao como substep de scanner.
+- `Apenas mover` (`M`) e uma acao valida nesse ponto (scanner), mesmo sem criar `CursorState` dedicado.
 
 ### Sensores / prompts dedicados
 - `Mirando` usa `MirandoCycleTarget` e `MirandoConfirmTarget`.
@@ -51,6 +54,7 @@ Legenda:
 - `ShoppingAndServices` e o estado de compra em construcao aliada.
 - `InspectingUnit`, `InspectingBuilding` e `InspectingHotZone` sao estados dedicados de inspecao / overlay.
 - `CommandService` e `RemovingUnit` tambem sao estados dedicados, nao fluxos inline.
+- `AircraftFuelDepletionQueue` e estado dedicado de execucao da fila de aeronaves caindo (runtime).
 
 ### Fluxos inline que continuam sem CursorState proprio
 - `transfer prompt`: pendencias de selecao / confirmacao controladas por flags e helper.
@@ -65,6 +69,7 @@ neutral [CursorState]
     inspect hot zone [CursorState + ScannerPromptStep.ThreatLayerTeamSelect]
     command service [CursorState]
     removing unit [CursorState]
+    aircraft fuel depletion queue [CursorState]
     shopping and services [CursorState]
     unit selected [CursorState]
         confirma no mesmo hex -> moveu parado [CursorState]
@@ -77,6 +82,7 @@ unit selected [CursorState]
 
 moveu parado / moveu andando [CursorState]
     mirrored scanner tree:
+        apenas mover (`M`) -> finaliza acao e retorna ao neutral
         mirar -> `MirandoCycleTarget` / `MirandoConfirmTarget`
         embarcar -> `EmbarkCycleTarget` / `EmbarkConfirmTarget`
         pousar -> `LandingCycleOption` / `LandingConfirmOption`
@@ -84,8 +90,15 @@ moveu parado / moveu andando [CursorState]
         fundir -> `MergeParticipantSelect` / `MergeTargetSelect` / `MergeConfirm`
         suprir -> fluxo proprio, com reuso parcial de selecao de merge
 
+## Contrato de neutral
+
+- Regra alvo: `Neutral -> Acao -> Neutral`.
+- Em gameplay: so gravar batch apos retorno para `Neutral`.
+- Em replay: so avancar para proximo batch apos retorno para `Neutral`.
+- Durante `AircraftFuelDepletionQueue`, Save/Load devem ficar bloqueados ate retorno para `Neutral`.
+
 ## Observacoes objetivas
-- `HandleConfirm()` e `HandleCancel()` continuam centralizados, mas o roteamento agora cobre `Inspecting*`, `CommandService` e `RemovingUnit` como estados proprios.
+- `HandleConfirm()` e `HandleCancel()` continuam centralizados, mas o roteamento agora cobre `Inspecting*`, `CommandService`, `RemovingUnit` e `AircraftFuelDepletionQueue` como estados proprios.
 - `ScannerPromptStep.MergeTargetSelect` existe no enum, mas nao e o caminho principal da maioria dos fluxos atuais.
 - O replay registra comandos de acao, nao o estado inteiro da FSM.
 - Tipos atuais de acao persistidos no replay incluem `UnitAction`, `Shopping`, `CommandService` e `RemoveUnit`, alem dos fluxos de combate / logistica ligados ao runtime.
