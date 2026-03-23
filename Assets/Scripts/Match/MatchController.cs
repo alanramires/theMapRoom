@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System;
@@ -1383,6 +1383,8 @@ public class MatchController : MonoBehaviour
         TryAutoAssignTurnStateManager();
         stageStartMs = TurnPerfNowMs();
         turnStateManager?.EnqueueTurnStartFuelDepletionDeaths(turnStartUnitsMarkedForFuelDepletionDeath);
+        if (turnStartUnitsMarkedForFuelDepletionDeath.Count <= 0)
+            turnStateManager?.TryExecuteTurnStartRallyQueueIfIdle();
         TurnPerfLog("ReleaseUnits.EnqueueFuelDepletionDeaths", stageStartMs);
 
         pendingTurnStartUpkeep = false;
@@ -3443,6 +3445,9 @@ public class MatchController : MonoBehaviour
         return false;
     }
 }
+
+
+
 
 
 

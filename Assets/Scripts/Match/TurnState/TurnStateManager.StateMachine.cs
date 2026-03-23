@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -47,7 +47,10 @@ public partial class TurnStateManager
                 return HandleConfirmWhileCommandService();
             case CursorState.RemovingUnit:
                 return HandleConfirmWhileRemovingUnit();
+            case CursorState.Planning:
+                return HandleConfirmWhilePlanning();
             case CursorState.AircraftFuelDepletionQueue:
+            case CursorState.TurnStartRallyQueue:
                 return ActionSfx.None;
         }
 
@@ -101,7 +104,10 @@ public partial class TurnStateManager
                 return HandleCancelWhileCommandService();
             case CursorState.RemovingUnit:
                 return HandleCancelWhileRemovingUnit();
+            case CursorState.Planning:
+                return HandleCancelWhilePlanning();
             case CursorState.AircraftFuelDepletionQueue:
+            case CursorState.TurnStartRallyQueue:
                 return ActionSfx.None;
         }
 
@@ -770,6 +776,18 @@ public partial class TurnStateManager
         ExitSupplyStateToMovement();
         return ActionSfx.Cancel;
     }
-}
 
+    private ActionSfx HandleConfirmWhilePlanning()
+    {
+        LogStateStep("HandleConfirmWhilePlanning");
+        return ActionSfx.None;
+    }
+
+    private ActionSfx HandleCancelWhilePlanning()
+    {
+        LogStateStep("HandleCancelWhilePlanning", rollback: true);
+        ExitPlanningStateToNeutral(rollback: true);
+        return ActionSfx.Cancel;
+    }
+}
 

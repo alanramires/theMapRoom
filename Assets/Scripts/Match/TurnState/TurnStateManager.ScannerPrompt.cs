@@ -191,6 +191,7 @@ public partial class TurnStateManager
         ProcessConstructionShoppingInput();
         ProcessScannerPromptInput();
         ProcessCommandServiceHotkeyInput();
+        ProcessPlanningHotkeyInput();
         UpdateMirandoPreviewAnimation();
         UpdateEmbarkPreviewAnimation();
         UpdateMergeQueuePreviewAnimation();
@@ -363,6 +364,22 @@ public partial class TurnStateManager
         ClearEmbarkPreview();
     }
 
+    private void ProcessPlanningHotkeyInput()
+    {
+        if (!WasLetterPressedThisFrame('P'))
+            return;
+        if (UiInputBlocker.IsTextInputFocused())
+            return;
+        if (replayManager != null && replayManager.IsReplaying)
+            return;
+
+        bool toggled = TryTogglePlanningModeByHotkey();
+        if (!toggled)
+            return;
+
+        cursorController?.PlayConfirmSfx();
+    }
+
     private void ProcessDestroyUnitHotkeyInput()
     {
         if (replayManager != null && replayManager.IsReplaying)
@@ -453,6 +470,7 @@ public partial class TurnStateManager
                 DebugLabel = "RemoveUnit: confirm"
             });
 
+            planningManager?.NotifyUnitVisibilityPossiblyChanged(target);
             ExitRemovingUnitStateToNeutral(logCanceled: false);
             cursorController?.PlayLoadSfx();
         }
@@ -2705,6 +2723,8 @@ public partial class TurnStateManager
         yield return ExecuteCombatProjectileExchange(option, attackerTrajectory, combat.counterExecuted);
         ApplyPostHitForcedLayerEffects(option, combat, attackerHpBeforeResolution, defenderHpBeforeResolution);
         ApplyPendingCombatHp(combat);
+        planningManager?.NotifyUnitInvolvedInCombat(attacker);
+        planningManager?.NotifyUnitInvolvedInCombat(defender);
         RecordAttackReplayCommand(
             attacker,
             defender,
@@ -4742,6 +4762,12 @@ public partial class TurnStateManager
 #else
                 return Input.GetKeyDown(KeyCode.T);
 #endif
+            case 'P':
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current != null && Keyboard.current.pKey.wasPressedThisFrame;
+#else
+                return Input.GetKeyDown(KeyCode.P);
+#endif
             case 'U':
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current != null && Keyboard.current.uKey.wasPressedThisFrame;
@@ -4777,5 +4803,10 @@ public partial class TurnStateManager
 #endif
     }
 }
+
+
+
+
+
 
 

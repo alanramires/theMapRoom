@@ -23,6 +23,7 @@ public class SaveGameManager : MonoBehaviour
     [SerializeField] private AnimationManager animationManager;
     [SerializeField] private CursorController cursorController;
     [SerializeField] private ReplayManager replayManager;
+    [SerializeField] private PlanningManager planningManager;
 
     [Header("Quick Save/Load")]
     [SerializeField] private bool enableHotkeys = true;
@@ -155,6 +156,12 @@ public class SaveGameManager : MonoBehaviour
                 "[Save] Bloqueado: replay ativo",
                 "dialog.replay.save_disabled",
                 "Replay :: save desativado durante replay"))
+            return;
+
+        if (TryBlockPlanningSavePersistence(
+                "[Save] Bloqueado: planning ativo",
+                "dialog.planning.save_blocked",
+                "Save bloqueado durante Planning: saia do modo P antes de salvar"))
             return;
 
         promptState = SlotPromptState.SaveSelectSlot;
@@ -387,6 +394,12 @@ public class SaveGameManager : MonoBehaviour
                 "[Save] Bloqueado: replay ativo",
                 "dialog.replay.save_disabled",
                 "Replay :: save desativado durante replay"))
+            return;
+
+        if (TryBlockPlanningSavePersistence(
+                "[Save] Bloqueado: planning ativo",
+                "dialog.planning.save_blocked",
+                "Save bloqueado durante Planning: saia do modo P antes de salvar"))
             return;
 
         int normalizedSlot = NormalizeSlot(slotIndex);
@@ -909,6 +922,9 @@ public class SaveGameManager : MonoBehaviour
                     $"importedActionStackCount={importedActionCount} importedMatchHistoryCount={importedHistoryCount}");
             }
 
+            if (planningManager != null)
+                planningManager.ImportPlanningData(data.planningConfig, data.rallyPoints, data.rallyAssignments);
+
             stage = "reset-runtime-input";
             turnStateManager?.ForceNeutral();
             cursorController?.ClearRuntimeInputLocksAfterLoad();
@@ -1043,6 +1059,14 @@ public class SaveGameManager : MonoBehaviour
         if (saveReplayData && replayManager != null)
             data.replay = replayManager.ExportReplaySaveData();
 
+        if (planningManager != null)
+        {
+            planningManager.ExportPlanningData(out PlanningConfigSaveData planningConfig, out List<RallyPointSaveData> planningPoints, out List<RallyAssignmentSaveData> planningAssignments);
+            data.planningConfig = planningConfig;
+            data.rallyPoints = planningPoints;
+            data.rallyAssignments = planningAssignments;
+        }
+
         return data;
     }
 
@@ -1105,6 +1129,23 @@ public class SaveGameManager : MonoBehaviour
     {
         TryAutoAssignReferences();
         if (replayManager == null || !replayManager.IsReplaying)
+            return false;
+
+        cursorController?.PlayErrorSfx();
+        CancelPrompt(clearDialogOverride: false);
+        string dialog = ResolveDialog(dialogId, dialogFallback);
+        PanelDialogController.TrySetTransientText(dialog, 2.8f);
+        Debug.LogWarning(logMessage);
+        return true;
+    }
+
+    private bool TryBlockPlanningSavePersistence(string logMessage, string dialogId, string dialogFallback)
+    {
+        TryAutoAssignReferences();
+        bool planningActive =
+            (planningManager != null && planningManager.IsPlanningModeActive)
+            || (turnStateManager != null && turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Planning);
+        if (!planningActive)
             return false;
 
         cursorController?.PlayErrorSfx();
@@ -1399,6 +1440,8 @@ public class SaveGameManager : MonoBehaviour
             cursorController = FindInActiveScene<CursorController>();
         if (replayManager == null)
             replayManager = FindInActiveScene<ReplayManager>();
+        if (planningManager == null)
+            planningManager = FindInActiveScene<PlanningManager>();
     }
 
     private static T FindInActiveScene<T>() where T : Component
@@ -1557,5 +1600,13 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
+
+
+
+
+
+
+
+
 
 

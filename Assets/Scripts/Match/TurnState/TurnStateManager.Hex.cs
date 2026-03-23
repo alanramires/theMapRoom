@@ -28,7 +28,7 @@ public partial class TurnStateManager
             return false;
         }
 
-        if (cursorState == CursorState.AircraftFuelDepletionQueue)
+        if (cursorState == CursorState.AircraftFuelDepletionQueue || cursorState == CursorState.TurnStartRallyQueue)
         {
             resolvedCell = currentCell;
             return false;
@@ -140,3 +140,5 @@ public partial class TurnStateManager
         return ConstructionOccupancyRules.GetConstructionAtCell(referenceTilemap, cell);
     }
 }
+
+

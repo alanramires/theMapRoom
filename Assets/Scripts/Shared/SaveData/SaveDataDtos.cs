@@ -4,7 +4,7 @@ using System.Collections.Generic;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 3;
+    public int version = 4;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
@@ -19,7 +19,34 @@ public class SaveGameData
     public List<MatchVictoryStarSaveData> victoryStars = new List<MatchVictoryStarSaveData>();
     public List<UnitSaveData> units = new List<UnitSaveData>();
     public List<ConstructionSaveData> constructions = new List<ConstructionSaveData>();
+    public PlanningConfigSaveData planningConfig = new PlanningConfigSaveData();
+    public List<RallyPointSaveData> rallyPoints = new List<RallyPointSaveData>();
+    public List<RallyAssignmentSaveData> rallyAssignments = new List<RallyAssignmentSaveData>();
     public ReplaySaveData replay;
+}
+
+[Serializable]
+public class PlanningConfigSaveData
+{
+    public int maxRallyPointsPerTeam = 5;
+}
+
+[Serializable]
+public class RallyPointSaveData
+{
+    public int id;
+    public string nome;
+    public int hexX;
+    public int hexY;
+    public int teamOwner;
+    public bool ativo;
+}
+
+[Serializable]
+public class RallyAssignmentSaveData
+{
+    public int rallyPointId;
+    public int unitId;
 }
 
 [Serializable]
@@ -144,6 +171,7 @@ public class ReplayTurnRecordSaveData
     public TurnStartSnapshot startSnapshot;
     public List<ReplayStepSaveData> steps = new List<ReplayStepSaveData>();
 }
+
 [Serializable]
 public class ReplayStepSaveData
 {
@@ -152,4 +180,3 @@ public class ReplayStepSaveData
     public string debugLabel;
     public string commandJson;
 }
-

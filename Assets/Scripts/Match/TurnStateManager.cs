@@ -37,7 +37,9 @@ public partial class TurnStateManager : MonoBehaviour
         InspectingHotZone = 14,
         CommandService = 15,
         RemovingUnit = 16,
-        AircraftFuelDepletionQueue = 17
+        Planning = 17,
+        AircraftFuelDepletionQueue = 18,
+        TurnStartRallyQueue = 19
     }
 
     [Header("References")]
@@ -47,6 +49,7 @@ public partial class TurnStateManager : MonoBehaviour
     [SerializeField] private PathManager pathManager;
     [SerializeField] private UnitSpawner unitSpawner;
     [SerializeField] private ReplayManager replayManager;
+    [SerializeField] private PlanningManager planningManager;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private WeaponPriorityData weaponPriorityData;
     [SerializeField] private DPQMatchupDatabase dpqMatchupDatabase;
@@ -107,6 +110,7 @@ public partial class TurnStateManager : MonoBehaviour
     private bool removeUnitExecutionInProgress;
     private readonly List<UnitManager> turnStartFuelDepletionDeathQueue = new List<UnitManager>();
     private bool turnStartFuelDepletionExecutionInProgress;
+    private bool turnStartRallyExecutionInProgress;
     private readonly List<PlayerActionSubStep> turnStartFuelDepletionReplaySubSteps = new List<PlayerActionSubStep>();
 
     public CursorState CurrentCursorState => cursorState;
@@ -125,10 +129,14 @@ public partial class TurnStateManager : MonoBehaviour
         || supplyExecutionInProgress
         || transferExecutionInProgress
         || disembarkExecutionInProgress
-        || turnStartFuelDepletionExecutionInProgress;
+        || turnStartFuelDepletionExecutionInProgress
+        || turnStartRallyExecutionInProgress;
     public bool IsTurnStartFuelDepletionExecutionInProgress =>
         turnStartFuelDepletionExecutionInProgress
         || cursorState == CursorState.AircraftFuelDepletionQueue;
+    public bool IsTurnStartRallyExecutionInProgress =>
+        turnStartRallyExecutionInProgress
+        || cursorState == CursorState.TurnStartRallyQueue;
 
     private void LogStateStep(string step, bool rollback = false)
     {
@@ -732,6 +740,8 @@ public partial class TurnStateManager : MonoBehaviour
 
     public void ForceNeutral()
     {
+        if (cursorState == CursorState.Planning)
+            planningManager?.ExitPlanningMode();
         ClearSelectionAndReturnToNeutral();
     }
 
@@ -1154,8 +1164,26 @@ public partial class TurnStateManager : MonoBehaviour
             if (turnStartFuelDepletionDeathQueue.Count > 0)
                 StartCoroutine(ExecuteTurnStartFuelDepletionDeathQueue());
             else
-                ExitTurnStartFuelDepletionCursorState();
+                StartCoroutine(ExecutePostFuelDepletionTurnStartQueues());
         }
+    }
+
+    private IEnumerator ExecutePostFuelDepletionTurnStartQueues()
+    {
+        if (planningManager == null)
+        {
+            ExitTurnStartFuelDepletionCursorState();
+            yield break;
+        }
+
+        TeamId team = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
+        if (!planningManager.HasActiveAssignmentsForTeam(team))
+        {
+            ExitTurnStartFuelDepletionCursorState();
+            yield break;
+        }
+
+        yield return ExecuteTurnStartRallyQueueRoutine();
     }
 
     private void EnterTurnStartFuelDepletionCursorState()
@@ -1527,6 +1555,9 @@ public partial class TurnStateManager : MonoBehaviour
         if (replayManager == null)
             replayManager = FindAnyObjectByType<ReplayManager>();
 
+        if (planningManager == null)
+            planningManager = FindAnyObjectByType<PlanningManager>();
+
         if (terrainTilemap == null)
             terrainTilemap = ResolvePreferredTerrainTilemap();
 
@@ -1736,3 +1767,11 @@ public partial class TurnStateManager : MonoBehaviour
         return (animationManager != null && animationManager.IsAnimatingMovement) || embarkExecutionInProgress || disembarkExecutionInProgress;
     }
 }
+
+
+
+
+
+
+
+
