@@ -1,4 +1,4 @@
-﻿using TMPro;
+using TMPro;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -72,8 +72,12 @@ public class PanelHelperController : MonoBehaviour
     [SerializeField] [Range(1f, 80f)] private float helperScrollStep = 24f;
 
     [Header("Coordinate Overlay")]
-    [SerializeField] private bool showCoordinateOverlay = true;
     [SerializeField] private KeyCode toggleCoordinateOverlayKey = KeyCode.F3;
+    private bool showCoordinateOverlay
+    {
+        get => cursorController != null && cursorController.ShowCoordinates;
+        set { if (cursorController != null) cursorController.ShowCoordinates = value; }
+    }
     [SerializeField] [Range(0f, 4f)] private float coordinateLabelWorldYOffset = 0.42f;
     [SerializeField] private Color cursorCoordinateColor = new Color(1f, 0.92f, 0.40f, 1f);
     [SerializeField] private Color selectedCoordinateColor = new Color(0.50f, 1f, 0.68f, 1f);
@@ -216,7 +220,7 @@ public class PanelHelperController : MonoBehaviour
 
         if (hasExternalOverrideText)
         {
-            SetVisible(panelVisible: true, title: externalOverrideTitle, body: externalOverrideBody, force: force);
+            SetVisible(panelVisible: true, title: externalOverrideTitle, body: externalOverrideBody, data: null, force: force);
             RefreshDockByCursorProximity();
             return;
         }
@@ -229,7 +233,7 @@ public class PanelHelperController : MonoBehaviour
 
         BuildHelperText(data, out string title, out string body);
 
-        SetVisible(panelVisible: true, title: title, body: body, force: force);
+        SetVisible(panelVisible: true, title: title, body: body, data: data, force: force);
         RefreshDockByCursorProximity();
     }
 
@@ -401,11 +405,17 @@ public class PanelHelperController : MonoBehaviour
                 });
         }
 
-        if (line == "Transportando")
+        if (line == "SECTION:Weapons")
+            return ResolveMessage("helper.unit_stats.section.weapons", "Armas");
+
+        if (line == "SECTION:Transporting" || line == "Transportando")
             return ResolveMessage("helper.unit_stats.section.transporting", "Transportando");
 
-        if (line == "Reserva")
-            return ResolveMessage("helper.unit_stats.section.reserve", "Reserva");
+        if (line == "SECTION:Services")
+            return ResolveMessage("helper.unit_stats.section.services", "Serviços Prestados");
+
+        if (line == "SECTION:Supplies" || line == "Suprimentos Carregados" || line == "Reserva")
+            return ResolveMessage("helper.unit_stats.section.supplies", "Suprimentos Carregados");
 
         string supplies = string.Empty;
         const string transportedSuppliesMarker = "||SUPPLIES||";
@@ -1261,7 +1271,17 @@ public class PanelHelperController : MonoBehaviour
             if (string.IsNullOrWhiteSpace(pair.Key))
                 continue;
 
-            output = output.Replace($"<{pair.Key.Trim()}>", pair.Value ?? string.Empty);
+            string key = pair.Key.Trim();
+            string val = pair.Value ?? string.Empty;
+            
+            output = output.Replace($"<{key}>", val);
+            output = output.Replace($"<{key.ToLowerInvariant()}>", val);
+            output = output.Replace($"<{key.ToUpperInvariant()}>", val);
+            if (key.Length > 0)
+            {
+                string titleCase = char.ToUpperInvariant(key[0]) + (key.Length > 1 ? key.Substring(1).ToLowerInvariant() : string.Empty);
+                output = output.Replace($"<{titleCase}>", val);
+            }
         }
 
         return output;
@@ -1274,10 +1294,10 @@ public class PanelHelperController : MonoBehaviour
         hasLastUndockedScreenRect = false;
         cursorNearUndockedDockRegion = false;
         ResetHelperScrollLayout();
-        SetVisible(panelVisible: false, title: string.Empty, body: string.Empty, force: force);
+        SetVisible(panelVisible: false, title: string.Empty, body: string.Empty, data: null, force: force);
     }
 
-    private void SetVisible(bool panelVisible, string title, string body, bool force)
+    private void SetVisible(bool panelVisible, string title, string body, TurnStateManager.HelperPanelData data, bool force)
     {
         bool textChanged = force || lastTitle != title || lastBody != body;
         if (force || panelVisible != lastPanelVisible)
@@ -1294,7 +1314,7 @@ public class PanelHelperController : MonoBehaviour
         {
             if (force || lastBody != body)
                 helperTxt.text = body ?? string.Empty;
-            Color txtColor = ResolveActiveTeamColor();
+            Color txtColor = ResolveActiveTeamColor(data);
             if (force || txtColor != lastHelperTxtColor)
             {
                 helperTxt.color = txtColor;
@@ -1356,10 +1376,15 @@ public class PanelHelperController : MonoBehaviour
         RefreshHelperScrollLayout(titleHeight, bodyHeight, targetHeight);
     }
 
-    private Color ResolveActiveTeamColor()
+    private Color ResolveActiveTeamColor(TurnStateManager.HelperPanelData data)
     {
-        TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
-        return TeamUtils.GetColor(activeTeam);
+        TeamId team = TeamId.Neutral;
+        if (data != null && data.SubjectTeamId != int.MinValue)
+            team = (TeamId)data.SubjectTeamId;
+        else if (matchController != null)
+            team = matchController.ActiveTeam;
+
+        return TeamUtils.GetColor(team);
     }
 
     public static bool TrySetExternalText(string title, string body)

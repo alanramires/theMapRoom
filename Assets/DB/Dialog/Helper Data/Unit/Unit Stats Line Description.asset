@@ -13,5 +13,13 @@ MonoBehaviour:
   m_Name: Unit Stats Line Description
   m_EditorClassIdentifier: Assembly-CSharp::HelperData
   id: helper.unit_stats.line.description
-  condition: Descricao da unidade no helper de unidade selecionada.
-  message: ---
+  condition: Descricao da unidade no helper de unidade selecionada. (Inspect)
+  message: '<basic stats>
+
+    <weapons>
+
+    <transport>
+
+    <services>
+
+    <supplies>'

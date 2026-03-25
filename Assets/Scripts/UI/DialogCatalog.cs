@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -46,8 +46,17 @@ public class DialogCatalog : ScriptableObject
             if (string.IsNullOrWhiteSpace(pair.Key))
                 continue;
 
-            string token = $"<{pair.Key.Trim()}>";
-            output = output.Replace(token, pair.Value ?? string.Empty);
+            string key = pair.Key.Trim();
+            string val = pair.Value ?? string.Empty;
+            
+            output = output.Replace($"<{key}>", val);
+            output = output.Replace($"<{key.ToLowerInvariant()}>", val);
+            output = output.Replace($"<{key.ToUpperInvariant()}>", val);
+            if (key.Length > 0)
+            {
+                string titleCase = char.ToUpperInvariant(key[0]) + (key.Length > 1 ? key.Substring(1).ToLowerInvariant() : string.Empty);
+                output = output.Replace($"<{titleCase}>", val);
+            }
         }
 
         return output;

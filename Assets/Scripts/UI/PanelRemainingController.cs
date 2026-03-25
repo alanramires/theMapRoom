@@ -8,9 +8,11 @@ public class PanelRemainingController : MonoBehaviour
     [SerializeField] private TMP_Text textActual;
     [SerializeField] private TMP_Text textMax;
     [SerializeField] private TMP_Text textUnidade;
+    [SerializeField] private TMP_Text textCap;
 
     private string lastActual = string.Empty;
     private string lastMax = string.Empty;
+    private string lastCap = string.Empty;
     private Color lastColor = new Color(float.NaN, float.NaN, float.NaN, float.NaN);
 
     private void Awake()
@@ -46,6 +48,9 @@ public class PanelRemainingController : MonoBehaviour
 
         if (textUnidade == null)
             textUnidade = FindNamedTmpText("text_unidade");
+
+        if (textCap == null)
+            textCap = FindNamedTmpText("text_cap");
     }
 
     private void Refresh(bool force)
@@ -64,9 +69,10 @@ public class PanelRemainingController : MonoBehaviour
 
         string nextActual = $"{Mathf.Max(0, readyToAct)}";
         string nextMax = $"/{Mathf.Max(0, totalInField):D2}";
+        string nextCap = matchController != null ? matchController.MaxUnitsPerTeam.ToString() : "0";
         Color teamColor = TeamUtils.GetColor(activeTeam);
 
-        if (!force && nextActual == lastActual && nextMax == lastMax && teamColor == lastColor)
+        if (!force && nextActual == lastActual && nextMax == lastMax && nextCap == lastCap && teamColor == lastColor)
             return;
 
         if (textActual != null)
@@ -84,8 +90,15 @@ public class PanelRemainingController : MonoBehaviour
         if (textUnidade != null)
             textUnidade.color = teamColor;
 
+        if (textCap != null)
+        {
+            textCap.text = nextCap;
+            textCap.color = teamColor;
+        }
+
         lastActual = nextActual;
         lastMax = nextMax;
+        lastCap = nextCap;
         lastColor = teamColor;
     }
 

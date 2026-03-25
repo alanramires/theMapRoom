@@ -15,6 +15,7 @@ public class MatchControllerEditor : Editor
     private SerializedProperty enableSpotterProp;
     private SerializedProperty enableStealthValidationProp;
     private SerializedProperty enableTotalWarProp;
+    private SerializedProperty maxUnitsPerTeamProp;
     private SerializedProperty autonomyDatabaseProp;
     private SerializedProperty activePlayerListIndexProp;
     private SerializedProperty matchMusicAudioManagerProp;
@@ -52,6 +53,7 @@ public class MatchControllerEditor : Editor
     private SerializedProperty victoryStarsByTeamProp;
     private SerializedProperty hasVictoryWinnerProp;
     private SerializedProperty victoryWinnerTeamProp;
+    private SerializedProperty helpManagerProp;
 
     private void OnEnable()
     {
@@ -66,6 +68,7 @@ public class MatchControllerEditor : Editor
         enableSpotterProp = serializedObject.FindProperty("enableSpotter");
         enableStealthValidationProp = serializedObject.FindProperty("enableStealthValidation");
         enableTotalWarProp = serializedObject.FindProperty("enableTotalWar");
+        maxUnitsPerTeamProp = serializedObject.FindProperty("maxUnitsPerTeam");
         autonomyDatabaseProp = serializedObject.FindProperty("autonomyDatabase");
         activePlayerListIndexProp = serializedObject.FindProperty("activePlayerListIndex");
         matchMusicAudioManagerProp = serializedObject.FindProperty("matchMusicAudioManager");
@@ -103,6 +106,7 @@ public class MatchControllerEditor : Editor
         victoryStarsByTeamProp = serializedObject.FindProperty("victoryStarsByTeam");
         hasVictoryWinnerProp = serializedObject.FindProperty("hasVictoryWinner");
         victoryWinnerTeamProp = serializedObject.FindProperty("victoryWinnerTeam");
+        helpManagerProp = serializedObject.FindProperty("helpManager");
     }
 
     public override void OnInspectorGUI()
@@ -119,6 +123,14 @@ public class MatchControllerEditor : Editor
         }
 
         serializedObject.Update();
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Managers", EditorStyles.boldLabel);
+        if (helpManagerProp != null)
+        {
+            EditorGUILayout.PropertyField(helpManagerProp, new GUIContent("Help Manager"));
+            EditorGUILayout.Space();
+        }
 
         EditorGUILayout.LabelField("Match State", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(currentTurnProp, new GUIContent("Current Turn"));
@@ -142,6 +154,9 @@ public class MatchControllerEditor : Editor
             if (enableTotalWarProp != null)
                 EditorGUILayout.PropertyField(enableTotalWarProp, new GUIContent("Total War"));
         }
+        if (maxUnitsPerTeamProp != null)
+            EditorGUILayout.PropertyField(maxUnitsPerTeamProp, new GUIContent("Max Units Per Team"));
+
         if (autonomyDatabaseProp != null)
             EditorGUILayout.PropertyField(autonomyDatabaseProp, new GUIContent("Autonomy Database"));
         using (new EditorGUI.DisabledScope(true))

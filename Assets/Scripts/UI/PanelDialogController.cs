@@ -1,4 +1,4 @@
-﻿using TMPro;
+using TMPro;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -420,6 +420,14 @@ public class PanelDialogController : MonoBehaviour
         return true;
     }
 
+    public static bool HasActiveFixedExternalText()
+    {
+        if (instance == null)
+            return false;
+
+        return instance.hasExternalOverrideText && instance.externalOverrideUntilUnscaledTime < 0f;
+    }
+
     public static string ResolveDialogMessage(string id, string fallback)
     {
         if (instance == null)
@@ -650,7 +658,17 @@ public class PanelDialogController : MonoBehaviour
             if (string.IsNullOrWhiteSpace(pair.Key))
                 continue;
 
-            output = output.Replace($"<{pair.Key.Trim()}>", pair.Value ?? string.Empty);
+            string key = pair.Key.Trim();
+            string val = pair.Value ?? string.Empty;
+            
+            output = output.Replace($"<{key}>", val);
+            output = output.Replace($"<{key.ToLowerInvariant()}>", val);
+            output = output.Replace($"<{key.ToUpperInvariant()}>", val);
+            if (key.Length > 0)
+            {
+                string titleCase = char.ToUpperInvariant(key[0]) + (key.Length > 1 ? key.Substring(1).ToLowerInvariant() : string.Empty);
+                output = output.Replace($"<{titleCase}>", val);
+            }
         }
 
         return output;

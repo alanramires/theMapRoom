@@ -10,6 +10,22 @@ using UnityEditor;
 public partial class TurnStateManager : MonoBehaviour
 {
     public static event Action OnSensorsReady;
+    public static event Action<UnitManager> OnUnitPurchased;
+    public static event Action<UnitManager> OnUnitInspected;
+    public static event Action<ConstructionManager> OnConstructionInspected;
+    public static event Action<UnitManager, UnitManager> OnAttackResolved;
+    public static event Action<UnitManager> OnUnitRevealedFromFog;
+    public static event Action<UnitManager> OnUnitDestroyed;
+    public static event Action<UnitManager> OnUnitMovementExecuted;
+    public static event Action<UnitManager> OnUnitSelected;
+    public static event Action<UnitManager, UnitManager> OnUnitEmbarked;
+    public static event Action<UnitManager, UnitManager> OnUnitDisembarked;
+
+    public static void NotifyUnitRevealedFromFog(UnitManager unit)
+    {
+        OnUnitRevealedFromFog?.Invoke(unit);
+    }
+
     public enum ActionSfx
     {
         None = 0,
@@ -663,6 +679,38 @@ public partial class TurnStateManager : MonoBehaviour
         return true;
     }
 
+    public bool TrySpawnUnitAtCell(string unitToken, int teamId, Vector3Int cell, out string message)
+    {
+        message = string.Empty;
+        cell.z = 0;
+
+        if (unitSpawner == null)
+        {
+            message = "UnitSpawner nao encontrado.";
+            return false;
+        }
+
+        if (!unitSpawner.TryResolveUnitDataByToken(unitToken, out UnitData unitData, out string resolveReason) || unitData == null)
+        {
+            message = resolveReason;
+            return false;
+        }
+
+        TeamId resolvedTeam = (teamId >= (int)TeamId.Green && teamId <= (int)TeamId.Yellow)
+            ? (TeamId)teamId
+            : TeamId.Green;
+
+        GameObject spawned = unitSpawner.SpawnAtCell(unitData, resolvedTeam, cell);
+        if (spawned == null)
+        {
+            message = $"Falha ao spawnar {unitToken} em {cell}.";
+            return false;
+        }
+
+        message = $"Spawnado: {unitToken} em {cell} para team {TeamUtils.GetName(resolvedTeam)}.";
+        return true;
+    }
+
     public bool TrySetConstructionTeamUnderCursorFromDebug(int teamValue, out string message)
     {
         message = string.Empty;
@@ -764,6 +812,7 @@ public partial class TurnStateManager : MonoBehaviour
         {
             animationManager?.ApplySelectionVisual(selectedUnit);
             PaintSelectedUnitMovementRange();
+            OnUnitSelected?.Invoke(selectedUnit);
         }
 
         RegisterPerfSelectionDuration((Time.realtimeSinceStartupAsDouble - perfStart) * 1000d);

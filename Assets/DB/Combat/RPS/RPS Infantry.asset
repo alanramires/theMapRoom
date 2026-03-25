@@ -145,10 +145,10 @@ MonoBehaviour:
       targetClass: 1
       unitClass: 0
       weaponCategory: 1
-      defenseBonus: 2
+      defenseBonus: 1
       notes: "Infantaria busca cobertura se jogando no ch\xE3o contra projeteis"
       rpsDefenseText: Vehicle se defende de Infantry com AntiTanque com RPS Defesa
-        +2
+        +1
   - ataque:
       unitClass: 0
       weaponCategory: 1

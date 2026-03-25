@@ -85,6 +85,7 @@ public partial class TurnStateManager
         public int CommandServiceMoneyAfter;
         public bool ThreatLayerSelectionActive;
         public int ThreatLayerInspectedTeamId = int.MinValue;
+        public int SubjectTeamId = int.MinValue;
     }
 
     private float commandServiceHelperVisibleUntil = -1f;
@@ -124,6 +125,32 @@ public partial class TurnStateManager
     private float turnStartAutonomyHelperVisibleUntil = -1f;
     private int turnStartAutonomyHelperActivatedFrame = -1;
     private Vector3Int turnStartAutonomyHelperCursorCell;
+    private Vector3Int lastHoveredCell = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
+    private float hoveredCellStartTime = -1f;
+    private bool hasTriggeredHoverAtCurrentCell = false;
+
+    private void OnEnable()
+    {
+        MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
+    }
+
+    private void OnDisable()
+    {
+        MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
+    }
+
+    private void HandleActiveTeamChanged(int teamId)
+    {
+        ResetHoverState();
+    }
+
+    public void ResetHoverState()
+    {
+        lastHoveredCell = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
+        hoveredCellStartTime = Time.unscaledTime;
+        hasTriggeredHoverAtCurrentCell = false;
+    }
+
 
     public readonly struct TurnStartAutonomyUpkeepEntry
     {
@@ -445,6 +472,7 @@ public partial class TurnStateManager
 
         data.Kind = HelperPanelKind.UnitStats;
         data.UnitStatsName = ResolveUnitRuntimeName(unit);
+        data.SubjectTeamId = (int)unit.TeamId;
 
         int hpCurrent = Mathf.Max(0, unit.CurrentHP);
         int hpMax = Mathf.Max(1, unit.GetMaxHP());
@@ -456,12 +484,15 @@ public partial class TurnStateManager
         int fuelCurrent = Mathf.Max(0, unit.CurrentFuel);
         int fuelMax = Mathf.Max(1, unit.GetMaxFuel());
 
+        // 1. Basic Stats
         data.UnitStatsLines.Add($"HP: {hpCurrent}/{hpMax}");
         data.UnitStatsLines.Add($"MOV: {movement}");
         data.UnitStatsLines.Add($"AUT: {fuelCurrent}/{fuelMax}");
-        if (selectedData != null && !string.IsNullOrWhiteSpace(selectedData.description))
-            data.UnitStatsLines.Add($"DESC: {selectedData.description.Trim()}");
 
+        // 2. Weapons
+        AppendUnitWeaponsDetailedLines(data.UnitStatsLines, unit);
+
+        // 3. Transport
         IReadOnlyList<UnitTransportSeatRuntime> seats = unit.TransportedUnitSlots;
         bool hasPassengers = false;
         if (seats != null)
@@ -480,19 +511,121 @@ public partial class TurnStateManager
         if (hasPassengers)
         {
             data.UnitStatsLines.Add(string.Empty);
-            data.UnitStatsLines.Add("Transportando");
+            data.UnitStatsLines.Add("SECTION:Transporting");
             AppendTransportedUnitStatsLines(data.UnitStatsLines, unit, depth: 0);
         }
 
-        IReadOnlyList<UnitEmbarkedSupply> resources = unit.GetEmbarkedResources();
-        if (resources != null && resources.Count > 0)
-        {
-            data.UnitStatsLines.Add(string.Empty);
-            data.UnitStatsLines.Add("Reserva");
-            AppendSupplierStockLines(data.UnitStatsLines, unit);
-        }
+        // 4. Services
+        AppendUnitServicesDetailedLines(data.UnitStatsLines, unit);
+
+        // 5. Supplies
+        AppendUnitSuppliesDetailedLines(data.UnitStatsLines, unit);
 
         return data.UnitStatsLines.Count > 0;
+    }
+
+    private void AppendUnitWeaponsDetailedLines(List<string> lines, UnitManager unit)
+    {
+        if (lines == null || unit == null)
+            return;
+
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+        if (weapons == null || weapons.Count <= 0)
+            return;
+
+        bool hasAnyWeapon = false;
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            if (weapons[i] != null && weapons[i].weapon != null)
+            {
+                hasAnyWeapon = true;
+                break;
+            }
+        }
+
+        if (!hasAnyWeapon)
+            return;
+
+        lines.Add(string.Empty);
+        lines.Add("SECTION:Weapons");
+        int weaponCounter = 0;
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = weapons[i];
+            if (embarked == null || embarked.weapon == null)
+                continue;
+
+            weaponCounter++;
+            string weaponName = !string.IsNullOrWhiteSpace(embarked.weapon.displayName) ? embarked.weapon.displayName : embarked.weapon.name;
+            int ammo = Mathf.Max(0, embarked.squadAmmunition);
+            int min = embarked.GetRangeMin();
+            int max = embarked.GetRangeMax();
+            string range = min == max ? min.ToString() : $"{min} ~ {max}";
+            lines.Add($"{weaponCounter}: {weaponName} ({ammo}) R:{range}");
+        }
+    }
+
+    private void AppendUnitServicesDetailedLines(List<string> lines, UnitManager unit)
+    {
+        if (lines == null || unit == null)
+            return;
+
+        IReadOnlyList<ServiceData> services = unit.GetEmbarkedServices();
+        if (services == null || services.Count <= 0)
+            return;
+
+        bool hasAnyService = false;
+        for (int i = 0; i < services.Count; i++)
+        {
+            if (services[i] != null && services[i].isService)
+            {
+                hasAnyService = true;
+                break;
+            }
+        }
+
+        if (!hasAnyService)
+            return;
+
+        lines.Add(string.Empty);
+        lines.Add("SECTION:Services");
+        int serviceCounter = 0;
+        for (int i = 0; i < services.Count; i++)
+        {
+            ServiceData service = services[i];
+            if (service == null || !service.isService)
+                continue;
+
+            serviceCounter++;
+            string serviceName = !string.IsNullOrWhiteSpace(service.displayName) ? service.displayName : service.name;
+            lines.Add($"{serviceCounter}: {serviceName}");
+        }
+    }
+
+    private void AppendUnitSuppliesDetailedLines(List<string> lines, UnitManager unit)
+    {
+        if (lines == null || unit == null)
+            return;
+
+        IReadOnlyList<UnitEmbarkedSupply> resources = unit.GetEmbarkedResources();
+        if (resources == null || resources.Count <= 0)
+            return;
+
+        lines.Add(string.Empty);
+        lines.Add("SECTION:Supplies");
+        int supplyCounter = 0;
+        for (int i = 0; i < resources.Count; i++)
+        {
+            UnitEmbarkedSupply runtime = resources[i];
+            if (runtime == null || runtime.supply == null)
+                continue;
+
+            supplyCounter++;
+            string supplyName = ResolveSupplyDisplayName(runtime.supply);
+            int current = Mathf.Max(0, runtime.amount);
+            int max = ResolveSupplierResourceMaxAmount(unit, runtime.supply, current);
+            lines.Add($"{supplyCounter}: {supplyName} ({current} / {max})");
+        }
     }
 
     private bool TryBuildConstructionStatsHelperPanelData(HelperPanelData data)
@@ -509,6 +642,7 @@ public partial class TurnStateManager
             : (!string.IsNullOrWhiteSpace(construction.ConstructionId) ? construction.ConstructionId : construction.name);
 
         data.Kind = HelperPanelKind.ConstructionStats;
+        data.SubjectTeamId = (int)construction.TeamId;
         data.ConstructionStatsName = constructionName;
         data.ConstructionStatsLines.Add($"Dono Atual: {TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId})");
         data.ConstructionStatsLines.Add($"Capture: {construction.CurrentCapturePoints}/{construction.CapturePointsMax}");
@@ -582,7 +716,7 @@ public partial class TurnStateManager
             Time.time <= inspectedHelperVisibleUntil;
     }
 
-    private void BeginInspectedHelper(UnitManager unit, bool paintThreatOverlay = true)
+    private void BeginInspectedHelper(UnitManager unit, bool paintThreatOverlay = true, bool triggerEvents = true)
     {
         if (unit == null || cursorController == null)
             return;
@@ -597,9 +731,12 @@ public partial class TurnStateManager
         inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, GetInspectUnitHelperDurationSeconds());
         inspectedHelperActivatedFrame = Time.frameCount;
         inspectedHelperCursorCell = cursorController.CurrentCell;
+        
+        if (triggerEvents)
+            OnUnitInspected?.Invoke(unit);
     }
 
-    private void BeginInspectedConstructionHelper(ConstructionManager construction)
+    private void BeginInspectedConstructionHelper(ConstructionManager construction, bool triggerEvents = true)
     {
         if (construction == null || cursorController == null)
             return;
@@ -611,6 +748,9 @@ public partial class TurnStateManager
         inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, GetInspectConstructionHelperDurationSeconds());
         inspectedHelperActivatedFrame = Time.frameCount;
         inspectedHelperCursorCell = cursorController.CurrentCell;
+        
+        if (triggerEvents)
+            OnConstructionInspected?.Invoke(construction);
     }
 
     private float GetInspectUnitHelperDurationSeconds()
@@ -1365,7 +1505,9 @@ public partial class TurnStateManager
 
     private void UpdateInspectedHelperAutoDismiss()
     {
+        UpdateHoverInspection();
         UpdateTurnStartAutonomyHelperAutoDismiss();
+
 
         if (!IsInspectedHelperActive())
         {
@@ -1386,6 +1528,67 @@ public partial class TurnStateManager
         bool anyInput = WasAnyInputPressedThisFrame();
         if (anyInput)
             ExitInspectStateToNeutral();
+    }
+
+    private void UpdateHoverInspection()
+    {
+        if (cursorController == null || cursorState != CursorState.Neutral)
+        {
+            lastHoveredCell = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
+            hoveredCellStartTime = -1f;
+            hasTriggeredHoverAtCurrentCell = false;
+            return;
+        }
+
+        Vector3Int currentCell = cursorController.CurrentCell;
+        if (currentCell != lastHoveredCell)
+        {
+            lastHoveredCell = currentCell;
+            hoveredCellStartTime = Time.unscaledTime;
+            hasTriggeredHoverAtCurrentCell = false;
+            return;
+        }
+
+        if (hasTriggeredHoverAtCurrentCell)
+            return;
+
+        float delay = HelpManager.Instance != null ? HelpManager.Instance.HoverHelpDelay : 0.5f;
+        // Se o usuário espera 0.5s, garantimos que não passe disso por padrão se não configurado
+        if (delay <= 0) delay = 0.5f;
+
+        if (Time.unscaledTime - hoveredCellStartTime >= delay)
+        {
+            hasTriggeredHoverAtCurrentCell = true;
+            int activeTeamId = matchController != null ? matchController.ActiveTeamId : -1;
+            TeamId activeTeam = activeTeamId >= 0 ? (TeamId)activeTeamId : TeamId.Neutral;
+
+            UnitManager unit = FindUnitAtCell(currentCell);
+            if (unit != null)
+            {
+                string unitName = ResolveUnitRuntimeName(unit);
+                bool isAlly = (int)unit.TeamId == activeTeamId;
+                bool canAct = isAlly && !unit.HasActed;
+                
+                HelpHintId hint = canAct ? HelpHintId.Act : HelpHintId.Inspect;
+                HelpManager.Instance?.TryShowHint(activeTeam, hint, unitName);
+            }
+            else
+            {
+                ConstructionManager construction = FindConstructionAtCell(currentCell);
+                if (construction != null)
+                {
+                    string constructionName = !string.IsNullOrWhiteSpace(construction.ConstructionDisplayName) 
+                        ? construction.ConstructionDisplayName 
+                        : construction.name;
+                    
+                    HelpHintId hint = construction.CanProduceUnitsForTeam(activeTeam) 
+                        ? HelpHintId.Produce 
+                        : HelpHintId.Construction;
+
+                    HelpManager.Instance?.TryShowHint(activeTeam, hint, constructionName);
+                }
+            }
+        }
     }
 
     private void UpdateTurnStartAutonomyHelperAutoDismiss()

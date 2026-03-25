@@ -29,7 +29,7 @@ public class PlanningManager : MonoBehaviour
     [Header("Visuals")]
     [SerializeField] private Sprite rallyFlagSprite;
     [SerializeField] private Color rallyFlagColor = new Color(1f, 0.95f, 0.2f, 0.95f);
-    [SerializeField] private Vector3 rallyFlagOffset = new Vector3(0f, 0.28f, 0f);
+    [SerializeField] private Vector3 rallyFlagOffset = new Vector3(0f, 0f, 0f);
     [SerializeField] private Color pulseA = new Color(1f, 0.92f, 0.25f, 1f);
     [SerializeField] private Color pulseB = new Color(1f, 0.55f, 0.15f, 1f);
     [SerializeField] private float pulseSpeed = 3.4f;
@@ -667,7 +667,8 @@ public class PlanningManager : MonoBehaviour
         queue.Enqueue(origin);
         visited.Add(origin);
         int guard = 0;
-        while (queue.Count > 0 && guard++ < 12000)
+        
+        while (queue.Count > 0 && guard++ < 200000)
         {
             Vector3Int current = queue.Dequeue();
             if (current == destination)
@@ -680,8 +681,13 @@ public class PlanningManager : MonoBehaviour
                 Vector3Int next = neighbors[i]; next.z = 0;
                 if (!visited.Add(next))
                     continue;
+                    
+                if (next == destination)
+                    return true;
+                    
                 if (!UnitMovementPathRules.TryGetEnterCellCost(terrainTilemap, unit, next, terrainDatabase, out _))
                     continue;
+                    
                 queue.Enqueue(next);
             }
         }
@@ -705,7 +711,7 @@ public class PlanningManager : MonoBehaviour
         dist[fromCell] = 0;
 
         int guard = 0;
-        while (queue.Count > 0 && guard++ < 12000)
+        while (queue.Count > 0 && guard++ < 200000)
         {
             Vector3Int current = queue.Dequeue();
             int currentDist = dist[current];
@@ -904,6 +910,7 @@ public class PlanningManager : MonoBehaviour
                 SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
                 sr.sprite = ResolveFlagSprite();
                 sr.color = rallyFlagColor;
+                sr.sortingLayerName = "SFX";
                 sr.sortingOrder = 320;
                 rallyFlags[p.id] = go;
             }

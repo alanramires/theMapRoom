@@ -189,6 +189,7 @@ public partial class TurnStateManager
         TrackRuntimeDebugLogs();
         ProcessDestroyUnitHotkeyInput();
         ProcessConstructionShoppingInput();
+        UpdateShoppingPreviewPersistence();
         ProcessScannerPromptInput();
         ProcessCommandServiceHotkeyInput();
         ProcessPlanningHotkeyInput();
@@ -2317,6 +2318,7 @@ public partial class TurnStateManager
         transporter.MarkAsActed();
 
         RecordEmbarkReplayCommand(passenger, transporter, option.transporterSlotIndex);
+        OnUnitEmbarked?.Invoke(passenger, transporter);
 
         string label = !string.IsNullOrWhiteSpace(option.displayLabel) ? option.displayLabel : transporter.name;
         message = $"Embarque concluido em: {label} | custo={embarkCost} | autonomia {fuelBeforeEmbark}->{passenger.CurrentFuel}";
@@ -2735,6 +2737,7 @@ public partial class TurnStateManager
 
         combatExecutionInProgress = false;
         cursorController?.PlayDoneSfx();
+        OnAttackResolved?.Invoke(attacker, defender);
         bool finalized = TryFinalizeSelectedUnitActionFromDebug();
         if (!finalized)
         {
@@ -3095,6 +3098,8 @@ public partial class TurnStateManager
 
         root.SetCurrentHP(0);
         root.MarkDead(deathReason);
+        
+        OnUnitDestroyed?.Invoke(root);
 
         if (detachSelf && root.EmbarkedTransporter != null)
             root.EmbarkedTransporter.RemoveEmbarkedPassenger(root);
@@ -3190,6 +3195,8 @@ public partial class TurnStateManager
             yield return new WaitForSeconds(0.12f);
 
         yield return new WaitForSeconds(0.05f);
+
+        OnUnitDestroyed?.Invoke(unit);
     }
 
     private static List<DeathTarget> BuildDeathTargets(CombatResolutionResult combat)

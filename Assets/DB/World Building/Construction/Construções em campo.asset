@@ -21,6 +21,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -38,6 +39,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -55,6 +57,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -72,6 +75,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -89,6 +93,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -98,7 +103,7 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Cidade_T-1_C247
+  - id: PortoNaval_T-1_C247
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
     initialTeamId: -1
     cellPosition: {x: 9, y: -8, z: 0}
@@ -106,6 +111,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -123,6 +129,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -140,6 +147,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -157,6 +165,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -174,6 +183,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -191,6 +201,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -208,6 +219,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -225,6 +237,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -242,6 +255,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -259,6 +273,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -276,6 +291,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -293,6 +309,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -310,6 +327,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -327,6 +345,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -344,6 +363,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -361,6 +381,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -378,6 +399,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -395,6 +417,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -412,6 +435,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -429,6 +453,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -446,6 +471,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -463,6 +489,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -480,6 +507,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -497,6 +525,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -514,6 +543,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -531,6 +561,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -548,6 +579,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 0
       capturePointsMax: 0
       capturedIncoming: 0
@@ -565,6 +597,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
@@ -592,6 +625,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 1
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 40
       capturedIncoming: 2000
@@ -621,6 +655,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 30
       capturedIncoming: 1000
@@ -640,6 +675,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 30
       capturedIncoming: 1000
@@ -660,6 +696,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 30
       capturedIncoming: 1000
@@ -696,6 +733,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
@@ -723,6 +761,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
@@ -750,6 +789,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 1
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 40
       capturedIncoming: 2000
@@ -779,6 +819,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
@@ -806,6 +847,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
@@ -833,6 +875,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
@@ -860,6 +903,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 20
       capturedIncoming: 500
@@ -879,7 +923,7 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-  - id: HQ_T0_C52
+  - id: HQ_T0_C350
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
     initialTeamId: 0
     cellPosition: {x: 0, y: 0, z: 0}
@@ -887,6 +931,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 1
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 40
       capturedIncoming: 2000
@@ -916,6 +961,7 @@ MonoBehaviour:
     useConstructionConfigurationOverride: 0
     constructionConfiguration:
       isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
       isCapturable: 1
       capturePointsMax: 30
       capturedIncoming: 1000

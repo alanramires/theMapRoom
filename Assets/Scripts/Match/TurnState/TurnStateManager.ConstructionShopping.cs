@@ -170,6 +170,7 @@ public partial class TurnStateManager
         cursorController?.PlayDoneSfx();
         if (enableTurnStateRuntimeLogs)
             Debug.Log($"[Shopping] Compra concluida: {ResolveUnitName(unit)} por ${unitCost} em {ResolveConstructionName(shoppingConstruction)}.");
+        OnUnitPurchased?.Invoke(spawnedUnitManager);
         ExitConstructionShoppingStateToNeutral(rollback: false);
         return true;
     }
@@ -274,6 +275,22 @@ public partial class TurnStateManager
         cursorController?.PlayCursorMoveSfx();
         RefreshShoppingSelectionPresentation(logOptions: true);
         return true;
+    }
+
+    private void UpdateShoppingPreviewPersistence()
+    {
+        if (cursorState != CursorState.ShoppingAndServices)
+            return;
+
+        if (shoppingConstruction == null || shoppingUnitsForSale.Count == 0)
+            return;
+
+        // Se o painel estiver vazio (mensagem transiente expirou) mas ainda estamos no estado de shopping,
+        // restaura a visualizacao do item selecionado.
+        if (!PanelDialogController.HasActiveExternalText())
+        {
+            RefreshShoppingSelectionPresentation(logOptions: false);
+        }
     }
 
     private void RefreshShoppingSelectionPresentation(bool logOptions)
@@ -676,9 +693,3 @@ public partial class TurnStateManager
     }
 
 }
-
-
-
-
-
-

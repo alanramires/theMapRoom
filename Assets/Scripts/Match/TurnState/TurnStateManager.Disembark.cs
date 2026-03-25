@@ -629,6 +629,7 @@ public partial class TurnStateManager
             cursorController?.PlayLoadSfx();
             passenger.MarkAsActed();
             RecordDisembarkReplayCommand(passenger, transporter, targetCell);
+            OnUnitDisembarked?.Invoke(passenger, transporter);
             movedPassengers.Add(passenger);
 
             // Pausa entre encerramento de um passageiro e inicio do proximo.

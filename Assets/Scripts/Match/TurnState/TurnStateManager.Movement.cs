@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -132,12 +132,14 @@ public partial class TurnStateManager
             PrepareMovementCostForCommittedPath();
             DrawCommittedPathVisual(committedMovementPath);
             RuntimeLog($"moveu para {committedDestinationCell.x},{committedDestinationCell.y}");
+            OnUnitMovementExecuted?.Invoke(selectedUnit);
             EnterSensorsState(CursorState.MoveuAndando);
             RecordConfirmedMovementReplayStep();
             return;
         }
         else if (onCompleteState == CursorState.MoveuParado)
         {
+            OnUnitMovementExecuted?.Invoke(selectedUnit);
             EnterSensorsState(CursorState.MoveuParado);
             return;
         }

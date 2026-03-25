@@ -34,7 +34,8 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 0
   eliteLevel: 0
-  combatModifiers: []
+  combatModifiers:
+  - {fileID: 11400000, guid: 03730181a775d5f48b3f1751d4d68f07, type: 2}
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
@@ -55,12 +56,14 @@ MonoBehaviour:
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: 49972c9c2056f40489317be1412c41db, type: 2}
   - weapon: {fileID: 11400000, guid: bea1f97758f951a40ad7dbad2c86ca93, type: 2}
     squadAmmunition: 3
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: bea1f97758f951a40ad7dbad2c86ca93, type: 2}
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0

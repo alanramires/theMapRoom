@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Game/UI/Helper Database", fileName = "Helper Database")]
@@ -41,7 +41,17 @@ public class HelperDatabase : ScriptableObject
             if (string.IsNullOrWhiteSpace(pair.Key))
                 continue;
 
-            output = output.Replace($"<{pair.Key.Trim()}>", pair.Value ?? string.Empty);
+            string key = pair.Key.Trim();
+            string val = pair.Value ?? string.Empty;
+            
+            output = output.Replace($"<{key}>", val);
+            output = output.Replace($"<{key.ToLowerInvariant()}>", val);
+            output = output.Replace($"<{key.ToUpperInvariant()}>", val);
+            if (key.Length > 0)
+            {
+                string titleCase = char.ToUpperInvariant(key[0]) + (key.Length > 1 ? key.Substring(1).ToLowerInvariant() : string.Empty);
+                output = output.Replace($"<{titleCase}>", val);
+            }
         }
 
         return output;

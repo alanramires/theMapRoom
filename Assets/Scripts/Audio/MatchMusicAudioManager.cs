@@ -170,6 +170,13 @@ public class MatchMusicAudioManager : MonoBehaviour
         audioSource.Stop();
     }
 
+    public void StopPlaybackPermanently()
+    {
+        isPausedByUser = true;
+        if (audioSource != null)
+            audioSource.Stop();
+    }
+
     public void BeginTurnTransition()
     {
         suppressPlaybackForTurnTransition = true;

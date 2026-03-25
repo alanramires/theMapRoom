@@ -18,13 +18,16 @@ public class CombatLargeMatrixWindow : EditorWindow
     [SerializeField] private int range = 1;
     [SerializeField] private bool includeCounterAttack = true;
     [SerializeField] private bool includeUnavailableWeapons = true;
+    [SerializeField] private int attackerClassMask = -1;
+    [SerializeField] private int defenderClassMask = -1;
     [SerializeField] private bool autoUpdate = false;
     [SerializeField] private float autoUpdateIntervalSeconds = 0.4f;
     [SerializeField] private string outputRelativePath = "docs/COMBAT_MATRIX.csv";
 
     private bool matrixReady;
     private Vector2 matrixScroll;
-    private List<UnitData> cachedUnits = new List<UnitData>();
+    private List<UnitData> cachedAttackers = new List<UnitData>();
+    private List<UnitData> cachedDefenders = new List<UnitData>();
     private CellView[,] matrixCells;
     private double lastAutoUpdateTime;
     private string lastUpdateLabel = "nunca";
@@ -61,6 +64,13 @@ public class CombatLargeMatrixWindow : EditorWindow
         range = Mathf.Max(1, EditorGUILayout.IntField("Alcance (hex)", range));
         includeCounterAttack = EditorGUILayout.ToggleLeft("Incluir revide (inv)", includeCounterAttack);
         includeUnavailableWeapons = EditorGUILayout.ToggleLeft("Listar armas indisponiveis (sem muni/layer/range)", includeUnavailableWeapons);
+
+        EditorGUILayout.BeginVertical("box");
+        string[] classNames = Enum.GetNames(typeof(GameUnitClass));
+        attackerClassMask = EditorGUILayout.MaskField("Filtrar Atacantes (Linhas)", attackerClassMask, classNames);
+        defenderClassMask = EditorGUILayout.MaskField("Filtrar Defensores (Colunas)", defenderClassMask, classNames);
+        EditorGUILayout.EndVertical();
+
         autoUpdate = EditorGUILayout.ToggleLeft("Auto Update (recalcula ao mudar dados)", autoUpdate);
         autoUpdateIntervalSeconds = Mathf.Clamp(EditorGUILayout.FloatField("Auto Update Interval (s)", autoUpdateIntervalSeconds), 0.1f, 5f);
         outputRelativePath = EditorGUILayout.TextField("Saida CSV", outputRelativePath);
@@ -75,7 +85,7 @@ public class CombatLargeMatrixWindow : EditorWindow
         }
         EditorGUILayout.LabelField($"Ultima atualizacao: {lastUpdateLabel}", EditorStyles.miniLabel);
 
-        if (!matrixReady || matrixCells == null || cachedUnits.Count == 0)
+        if (!matrixReady || matrixCells == null || cachedAttackers.Count == 0 || cachedDefenders.Count == 0)
             return;
 
         EditorGUILayout.Space(8f);
@@ -90,26 +100,26 @@ public class CombatLargeMatrixWindow : EditorWindow
     {
         EditorGUILayout.BeginHorizontal();
         GUILayout.Label("Unidade", EditorStyles.miniBoldLabel, GUILayout.Width(RowHeaderWidth));
-        for (int col = 0; col < cachedUnits.Count; col++)
+        for (int col = 0; col < cachedDefenders.Count; col++)
         {
-            GUILayout.Label(ShortLabel(cachedUnits[col]), EditorStyles.miniBoldLabel, GUILayout.Width(CellWidth));
+            GUILayout.Label(ShortLabel(cachedDefenders[col]), EditorStyles.miniBoldLabel, GUILayout.Width(CellWidth));
         }
         EditorGUILayout.EndHorizontal();
 
-        for (int row = 0; row < cachedUnits.Count; row++)
+        for (int row = 0; row < cachedAttackers.Count; row++)
         {
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label(ShortLabel(cachedUnits[row]), EditorStyles.miniBoldLabel, GUILayout.Width(RowHeaderWidth));
+            GUILayout.Label(ShortLabel(cachedAttackers[row]), EditorStyles.miniBoldLabel, GUILayout.Width(RowHeaderWidth));
 
-            for (int col = 0; col < cachedUnits.Count; col++)
+            for (int col = 0; col < cachedDefenders.Count; col++)
             {
                 CellView cell = matrixCells[row, col];
                 string label = ShortCellLabel(cell.summary);
                 if (GUILayout.Button(label, GUILayout.Width(CellWidth), GUILayout.Height(CellHeight)))
                 {
                     CombatLargePairCalculatorWindow.Open(
-                        cachedUnits[row],
-                        cachedUnits[col],
+                        cachedAttackers[row],
+                        cachedDefenders[col],
                         range,
                         includeCounterAttack,
                         cell.summary,
@@ -124,19 +134,27 @@ public class CombatLargeMatrixWindow : EditorWindow
     private void RebuildMatrix(bool writeCsv)
     {
         matrixReady = false;
-        cachedUnits.Clear();
-        matrixCells = null;
-
-        if (unitDatabase == null)
+        List<UnitData> allUnits = CollectUnits(unitDatabase);
+        if (allUnits.Count == 0)
         {
-            Debug.LogError("[MatrizCombate] UnitDatabase nao definido.");
+            Debug.LogWarning("[MatrizCombate] UnitDatabase sem unidades validas.");
             return;
         }
 
-        List<UnitData> units = CollectUnits(unitDatabase);
-        if (units.Count == 0)
+        cachedAttackers.Clear();
+        cachedDefenders.Clear();
+
+        for (int i = 0; i < allUnits.Count; i++)
         {
-            Debug.LogWarning("[MatrizCombate] UnitDatabase sem unidades validas.");
+            UnitData u = allUnits[i];
+            int bit = (1 << (int)u.unitClass);
+            if ((attackerClassMask & bit) != 0) cachedAttackers.Add(u);
+            if ((defenderClassMask & bit) != 0) cachedDefenders.Add(u);
+        }
+
+        if (cachedAttackers.Count == 0 || cachedDefenders.Count == 0)
+        {
+            Debug.LogWarning("[MatrizCombate] Filtro resultou em 0 unidades de um dos lados.");
             return;
         }
 
@@ -145,31 +163,30 @@ public class CombatLargeMatrixWindow : EditorWindow
         if (dpqMatchupDatabase != null)
             dpqMatchupDatabase.Resolve(1, 1, out atkOutcome, out defOutcome);
 
-        cachedUnits = units;
-        matrixCells = new CellView[units.Count, units.Count];
+        matrixCells = new CellView[cachedAttackers.Count, cachedDefenders.Count];
 
         StringBuilder csv = null;
         if (writeCsv)
         {
             csv = new StringBuilder(1024 * 64);
             csv.Append("Unidade");
-            for (int i = 0; i < units.Count; i++)
+            for (int i = 0; i < cachedDefenders.Count; i++)
             {
                 csv.Append(';');
-                csv.Append(CsvEscape(GetUnitLabel(units[i])));
+                csv.Append(CsvEscape(GetUnitLabel(cachedDefenders[i])));
             }
             csv.AppendLine();
         }
 
-        for (int row = 0; row < units.Count; row++)
+        for (int row = 0; row < cachedAttackers.Count; row++)
         {
-            UnitData attacker = units[row];
+            UnitData attacker = cachedAttackers[row];
             if (writeCsv)
                 csv.Append(CsvEscape(GetUnitLabel(attacker)));
 
-            for (int col = 0; col < units.Count; col++)
+            for (int col = 0; col < cachedDefenders.Count; col++)
             {
-                UnitData defender = units[col];
+                UnitData defender = cachedDefenders[col];
                 CellView cell = BuildCell(attacker, defender, range, includeCounterAttack, includeUnavailableWeapons, atkOutcome, defOutcome);
                 matrixCells[row, col] = cell;
 
@@ -193,7 +210,7 @@ public class CombatLargeMatrixWindow : EditorWindow
             File.WriteAllText(absolutePath, csv.ToString(), Encoding.UTF8);
             AssetDatabase.Refresh();
 
-            Debug.Log($"[MatrizCombate] Gerado: {absolutePath}\nUnidades={units.Count} | Range={range} | Revide={(includeCounterAttack ? "on" : "off")} | DPQ=padrao(1x1)");
+            Debug.Log($"[MatrizCombate] Gerado: {absolutePath}\nAtacantes={cachedAttackers.Count} | Defensores={cachedDefenders.Count} | Range={range} | Revide={(includeCounterAttack ? "on" : "off")} | DPQ=padrao(1x1)");
         }
 
         matrixReady = true;

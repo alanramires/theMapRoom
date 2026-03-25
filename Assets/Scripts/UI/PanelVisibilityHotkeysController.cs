@@ -11,6 +11,7 @@ using UnityEngine.InputSystem;
 [DefaultExecutionOrder(-500)]
 public class PanelVisibilityHotkeysController : MonoBehaviour
 {
+    public static event System.Action OnF6Pressed;
     private enum RetractDirection
     {
         Auto = 0,
@@ -43,6 +44,7 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
     [SerializeField] private bool animateRetract = true;
     [SerializeField] [Range(1f, 30f)] private float retractLerpSpeed = 14f;
     [Header("Display")]
+    [SerializeField] private KeyCode tutorialToggleKey = KeyCode.F6;
     [SerializeField] private KeyCode fullscreenToggleKey = KeyCode.F11;
     [SerializeField] private bool preferExclusiveFullscreen = true;
 
@@ -100,6 +102,9 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
 
         if (!textInputFocused && WasFullscreenTogglePressedThisFrame())
             ToggleFullscreenMode();
+
+        if (!textInputFocused && WasTutorialTogglePressedThisFrame())
+            OnF6Pressed?.Invoke();
 
         UpdateHotkeysRetractAnimation();
     }
@@ -614,6 +619,21 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
 #endif
 #else
         return Input.GetKeyDown(fullscreenToggleKey);
+#endif
+    }
+
+    private bool WasTutorialTogglePressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null && WasFunctionKeyPressedThisFrame(tutorialToggleKey))
+            return true;
+#if ENABLE_LEGACY_INPUT_MANAGER
+        return Input.GetKeyDown(tutorialToggleKey);
+#else
+        return false;
+#endif
+#else
+        return Input.GetKeyDown(tutorialToggleKey);
 #endif
     }
 

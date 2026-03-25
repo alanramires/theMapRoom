@@ -270,7 +270,8 @@ public class ConstructionManager : MonoBehaviour
             return;
 
         constructionId = data.id;
-        constructionDisplayName = string.IsNullOrWhiteSpace(data.displayName) ? data.id : data.displayName;
+        if (string.IsNullOrWhiteSpace(constructionDisplayName) || constructionDisplayName == "Construction")
+            constructionDisplayName = string.IsNullOrWhiteSpace(data.displayName) ? data.id : data.displayName;
 
         if (spriteRenderer == null)
             spriteRenderer = ResolvePrimarySpriteRenderer();

@@ -122,6 +122,9 @@ public class MatchController : MonoBehaviour
     [SerializeField] private AutonomyDatabase autonomyDatabase;
     [SerializeField] private CursorController cursorController;
     [SerializeField] private TurnStateManager turnStateManager;
+    [SerializeField] private HelpManager helpManager;
+
+    public HelpManager HelpManager => helpManager;
     [Header("Turn Transition")]
     [SerializeField] private MatchMusicAudioManager matchMusicAudioManager;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.1f;
@@ -579,6 +582,16 @@ public class MatchController : MonoBehaviour
         return GetDefaultFlipX(teamId);
     }
 
+    private void OnEnable()
+    {
+        TurnStateManager.OnUnitDestroyed += HandleUnitDestroyed;
+    }
+
+    private void OnDisable()
+    {
+        TurnStateManager.OnUnitDestroyed -= HandleUnitDestroyed;
+    }
+
     private void Awake()
     {
         ApplyGameSetupPreset();
@@ -607,7 +620,19 @@ public class MatchController : MonoBehaviour
     private void Start()
     {
         if (Application.isPlaying)
+        {
             ApplyActiveTeamIfChanged(force: true);
+            
+            // Garante que o painel de fim de jogo comece oculto
+            foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
+            {
+                if (go.name == "Panel_endGame" && go.scene.name != null)
+                {
+                    go.SetActive(false);
+                    break;
+                }
+            }
+        }
         TryBootstrapInitialStealthDetection();
         RunTurnStartStillObservedForActiveTeamStealthUnits();
     }
@@ -942,6 +967,121 @@ public class MatchController : MonoBehaviour
         hasVictoryWinner = true;
         victoryWinnerTeam = activeTeam;
         HandleVictoryAestheticPresentation(activeTeam, goal);
+    }
+
+    public void DeclareTutorialVictory(TutorialData tutorial = null)
+    {
+        if (hasVictoryWinner) return;
+
+        hasVictoryWinner = true;
+        victoryWinnerTeam = (TeamId)activeTeamId;
+        
+        // Parar musica permanentemente
+        if (matchMusicAudioManager != null)
+        {
+            matchMusicAudioManager.StopPlaybackPermanently(); 
+        }
+        
+        // Tocar victory SFX
+        CursorController cursor = FindAnyObjectByType<CursorController>();
+        if (cursor != null)
+        {
+            cursor.PlayVictorySfx();
+        }
+
+        // Mostrar Dialogo de Vitoria (FIXO e IMUTÁVEL)
+        string fallback = (tutorial != null && tutorial.victoryDialog != null && !string.IsNullOrWhiteSpace(tutorial.victoryDialog.message)) 
+            ? tutorial.victoryDialog.message 
+            : "TUTORIAL CONCLUÍDO! VITÓRIA!";
+
+        string victoryMsg = PanelDialogController.ResolveDialogMessage("panel_dialog.victory", fallback);
+        PanelDialogController.TrySetExternalText(victoryMsg);
+
+        // Solução simples e robusta: busca o painel mesmo que esteja desativado na cena
+        foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
+        {
+            if (go.name == "Panel_endGame" && go.scene.name != null)
+            {
+                go.SetActive(true);
+                // Tenta trocar o texto
+                var textComponent = go.GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
+                if (textComponent != null && textComponent.name == "text_endgame")
+                {
+                    textComponent.text = "VITÓRIA!";
+                }
+                break;
+            }
+        }
+    }
+
+    private void DeclareDefeat()
+    {
+        if (hasVictoryWinner) return;
+
+        hasVictoryWinner = true;
+        
+        // Parar musica permanentemente
+        if (matchMusicAudioManager != null)
+        {
+            matchMusicAudioManager.StopPlaybackPermanently(); 
+        }
+        
+        // Tocar defeat SFX
+        CursorController cursor = FindAnyObjectByType<CursorController>();
+        if (cursor != null)
+        {
+            cursor.PlayDefeatSfx();
+        }
+
+        PanelDialogController.TrySetExternalText("DERROTA! VOCÊ FICOU SEM UNIDADES.");
+
+        // Busca o painel
+        foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
+        {
+            if (go.name == "Panel_endGame" && go.scene.name != null)
+            {
+                go.SetActive(true);
+                // Busca todos os textos para atualizar titulo e descricao
+                var texts = go.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
+                foreach (var txt in texts)
+                {
+                    if (txt.name == "text_endgame")
+                    {
+                        txt.text = "DERROTA!";
+                    }
+                    else if (txt.name == "text_descrição" || txt.name == "text_description")
+                    {
+                        txt.text = "Ficou sem unidades";
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    private void HandleUnitDestroyed(UnitManager unit)
+    {
+        if (!Application.isPlaying || hasVictoryWinner || currentTurn < 2)
+            return;
+
+        if (unit == null) return;
+
+        // O usuário pediu especificamente "se você ficar sem unidades"
+        // Checamos se o time que perdeu a unidade é o time ativo (jogador)
+        if ((int)unit.TeamId != activeTeamId) return;
+
+        List<UnitManager> allUnits = GetActiveUnitsOnScene();
+        int count = 0;
+        for (int i = 0; i < allUnits.Count; i++)
+        {
+            if (allUnits[i] == unit) continue;
+            if (allUnits[i].TeamId == unit.TeamId) count++;
+        }
+
+        if (count == 0)
+        {
+            DeclareDefeat();
+        }
     }
 
     private void NormalizeState()
@@ -1311,6 +1451,23 @@ public class MatchController : MonoBehaviour
         double stageStartMs = TurnPerfNowMs();
         activeConstructions ??= GetActiveConstructionsOnScene();
         EvaluateVictoryStarsAtTurnStartForActiveTeam(activeConstructions);
+        
+        // Checagem de derrota: turno >= 2 e 0 unidades
+        if (currentTurn >= 2)
+        {
+            List<UnitManager> allUnits = GetActiveUnitsOnScene();
+            int myUnitsCount = 0;
+            for (int i = 0; i < allUnits.Count; i++)
+            {
+                if ((int)allUnits[i].TeamId == activeTeamId) myUnitsCount++;
+            }
+            if (myUnitsCount == 0)
+            {
+                DeclareDefeat();
+                return;
+            }
+        }
+
         TurnPerfLog("ReleaseUnits.EvaluateVictoryStars", stageStartMs);
 
         stageStartMs = TurnPerfNowMs();
@@ -1663,8 +1820,14 @@ public class MatchController : MonoBehaviour
         if (victoryOverlayTilemap == null)
             return;
 
-        HashSet<Vector3Int> desired = new HashSet<Vector3Int>();
+        victoryOverlayTilemap.ClearAllTiles();
+        victoryOverlayActiveCells.Clear();
+
         ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        
+        Color overlayColor = Color.white;
+        overlayColor.a = Mathf.Clamp01(victoryOverlayAlpha);
+
         for (int i = 0; i < constructions.Length; i++)
         {
             ConstructionManager construction = constructions[i];
@@ -1673,31 +1836,13 @@ public class MatchController : MonoBehaviour
 
             Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;
-            desired.Add(cell);
-        }
-
-        foreach (Vector3Int cell in victoryOverlayActiveCells)
-        {
-            if (desired.Contains(cell))
-                continue;
-
-            victoryOverlayTilemap.SetTile(cell, null);
-            victoryOverlayTilemap.SetTileFlags(cell, TileFlags.None);
-            victoryOverlayTilemap.SetColor(cell, Color.white);
-        }
-
-        Color overlayColor = Color.white;
-        overlayColor.a = Mathf.Clamp01(victoryOverlayAlpha);
-        foreach (Vector3Int cell in desired)
-        {
+            
             victoryOverlayTilemap.SetTile(cell, victoryOverlayTile);
             victoryOverlayTilemap.SetTileFlags(cell, TileFlags.None);
             victoryOverlayTilemap.SetColor(cell, overlayColor);
-        }
-
-        victoryOverlayActiveCells.Clear();
-        foreach (Vector3Int cell in desired)
+            
             victoryOverlayActiveCells.Add(cell);
+        }
 
 #if UNITY_EDITOR
         if (markDirtyInEditor && !Application.isPlaying)
@@ -1718,13 +1863,7 @@ public class MatchController : MonoBehaviour
         if (targetTilemap == null)
             return;
 
-        foreach (Vector3Int cell in victoryOverlayActiveCells)
-        {
-            targetTilemap.SetTile(cell, null);
-            targetTilemap.SetTileFlags(cell, TileFlags.None);
-            targetTilemap.SetColor(cell, Color.white);
-        }
-
+        targetTilemap.ClearAllTiles();
         victoryOverlayActiveCells.Clear();
 #if UNITY_EDITOR
         if (markDirtyInEditor && !Application.isPlaying)
@@ -3422,6 +3561,52 @@ public class MatchController : MonoBehaviour
         cell = bestHq.CurrentCellPosition;
         cell.z = 0;
         return true;
+    }
+
+    public void DeclareTutorialDefeat(TutorialData tutorial, string reason = "")
+    {
+        if (tutorial == null || hasVictoryWinner)
+            return;
+
+        hasVictoryWinner = true; // Marca como encerrado
+        victoryWinnerTeam = TeamId.Neutral; 
+
+        Debug.Log($"[MatchController] Tutorial '{tutorial.id}' FALHOU! Derrota decretada. Razao: {reason}");
+
+        // Para musica permanentemente
+        if (matchMusicAudioManager != null)
+        {
+            matchMusicAudioManager.StopPlaybackPermanently(); 
+        }
+
+        // Tocar defeat SFX
+        if (cursorController != null)
+        {
+            cursorController.PlayDefeatSfx();
+        }
+
+        // Busca o painel pelo nome (como no DeclareDefeat original)
+        foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
+        {
+            if (go.name == "Panel_endGame" && go.scene.name != null)
+            {
+                go.SetActive(true);
+                // Busca todos os textos para atualizar titulo e descricao
+                var texts = go.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
+                foreach (var txt in texts)
+                {
+                    if (txt.name == "text_endgame")
+                    {
+                        txt.text = "DERROTA!";
+                    }
+                    else if (txt.name == "text_descrição" || txt.name == "text_description" || txt.name == "txt_descricao")
+                    {
+                        txt.text = reason;
+                    }
+                }
+                break;
+            }
+        }
     }
 
     private static bool IsHeadQuarterConstruction(ConstructionManager construction)

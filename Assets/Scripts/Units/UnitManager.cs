@@ -523,6 +523,11 @@ public class UnitManager : MonoBehaviour
 
         hiddenByFogOfWar = shouldHide;
         ApplyFogOfWarVisibility();
+        
+        if (visible && matchController != null && matchController.ActiveTeamId != (int)teamId)
+        {
+            TurnStateManager.NotifyUnitRevealedFromFog(this);
+        }
     }
 
     public void ResetActed()

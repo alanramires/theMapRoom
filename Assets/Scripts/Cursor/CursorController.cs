@@ -71,6 +71,8 @@ public class CursorController : MonoBehaviour
     [SerializeField] private CameraController cameraController;
     [SerializeField] private bool adjustCameraOnMove = true;
     [Header("Overlay")]
+    [SerializeField] private bool showCoordinates = true;
+    public bool ShowCoordinates { get => showCoordinates; set => showCoordinates = value; }
     [SerializeField] [Range(60f, 400f)] private float coordinateOverlayLabelWidth = 220f;
 
     [Header("Feedback")]
@@ -95,6 +97,8 @@ public class CursorController : MonoBehaviour
     [SerializeField] private AudioClip marchaMoveSfx;
     [SerializeField] private AudioClip navalMoveSfx;
     [SerializeField] private AudioClip motorMoveSfx;
+    [SerializeField] private AudioClip victorySfx;
+    [SerializeField] private AudioClip defeatSfx;
     [Header("Movement Category SFX")]
     [Tooltip("Vinculo entre MovementCategory e AudioClip de movimento. Pode ser ajustado sem hardcode.")]
     [SerializeField] private List<MovementCategorySfxBinding> movementCategorySfx = new List<MovementCategorySfxBinding>();
@@ -611,6 +615,8 @@ public class CursorController : MonoBehaviour
             motorMoveSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/move/motor.MP3");
         if (sonarSkillSfx == null)
             sonarSkillSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/sonar.MP3");
+        if (defeatSfx == null)
+            defeatSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/derrota.mp3");
 #endif
 
         EnsureMovementCategorySfxBindings();
@@ -791,6 +797,16 @@ public class CursorController : MonoBehaviour
         }
 
         return false;
+    }
+
+    public void PlayVictorySfx()
+    {
+        PlayUiSfx(victorySfx);
+    }
+
+    public void PlayDefeatSfx()
+    {
+        PlayUiSfx(defeatSfx);
     }
 
     private bool WasConfirmPressedThisFrame()
@@ -975,22 +991,7 @@ public class CursorController : MonoBehaviour
         audioSource.PlayOneShot(moveSfx, moveSfxVolume);
     }
 
-    private void PlayUiSfx(AudioClip clip)
-    {
-        if (clip == null)
-            return;
 
-        if (clip == errorSfx && !PanelDialogController.HasActiveExternalText())
-            PanelDialogController.TrySetTransientText("Invalid action", 2f);
-
-        if (audioSource == null)
-        {
-            AudioSource.PlayClipAtPoint(clip, transform.position, uiSfxVolume);
-            return;
-        }
-
-        audioSource.PlayOneShot(clip, uiSfxVolume);
-    }
 
     private void PlayActionFeedback(TurnStateManager.ActionSfx feedback)
     {
@@ -1008,35 +1009,7 @@ public class CursorController : MonoBehaviour
         }
     }
 
-    public void PlayDoneSfx()
-    {
-        PlayUiSfx(doneSfx);
-    }
 
-    public void PlayLoadSfx()
-    {
-        PlayUiSfx(loadSfx);
-    }
-
-    public void PlayConfirmSfx()
-    {
-        PlayUiSfx(confirmSfx);
-    }
-
-    public void PlayCancelSfx()
-    {
-        PlayUiSfx(cancelSfx);
-    }
-
-    public void PlayCursorMoveSfx()
-    {
-        PlayMoveSfx();
-    }
-
-    public void PlayBeepSfx()
-    {
-        PlayUiSfx(beepSfx);
-    }
 
     public void ClearRuntimeInputLocksAfterLoad()
     {
@@ -1048,10 +1021,7 @@ public class CursorController : MonoBehaviour
 #endif
     }
 
-    public void PlayErrorSfx()
-    {
-        PlayUiSfx(errorSfx);
-    }
+
 
     public float PlayCombatAttackSfx(WeaponTrajectoryType trajectory, float volumeScale = 1f)
     {
@@ -1294,28 +1264,34 @@ public class CursorController : MonoBehaviour
         return false;
     }
 
-    private void PlayClipWithPitch(AudioClip clip, float volume, float pitch)
+    public void PlayUiSfx(AudioClip clip)
     {
-        if (clip == null)
-            return;
+        if (clip == null) return;
+        
+        if (clip == errorSfx && !PanelDialogController.HasActiveExternalText())
+            PanelDialogController.TrySetTransientText("Invalid action", 2f);
 
-        float safeVolume = Mathf.Clamp01(volume);
-        if (safeVolume <= 0f)
-            return;
-
-        float safePitch = Mathf.Clamp(pitch, 0.1f, 3f);
-        if (audioSource == null)
-        {
-            AudioSource.PlayClipAtPoint(clip, transform.position, safeVolume);
-            return;
-        }
-
-        float basePitch = audioSource.pitch;
-        audioSource.pitch = safePitch;
-        audioSource.PlayOneShot(clip, safeVolume);
-        audioSource.pitch = basePitch;
+        if (audioSource != null)
+            audioSource.PlayOneShot(clip, uiSfxVolume);
     }
 
+    public void PlayBeepSfx() => PlayUiSfx(beepSfx);
+    public void PlayErrorSfx() => PlayUiSfx(errorSfx);
+    public void PlayConfirmSfx() => PlayUiSfx(confirmSfx);
+    public void PlayCancelSfx() => PlayUiSfx(cancelSfx);
+    public void PlayDoneSfx() => PlayUiSfx(doneSfx);
+    public void PlayLoadSfx() => PlayUiSfx(loadSfx);
+    public void PlayCursorMoveSfx() => PlayMoveSfx();
+
+    private void PlayClipWithPitch(AudioClip clip, float volume, float pitch)
+    {
+        if (clip == null || audioSource == null) return;
+        float safePitch = Mathf.Clamp(pitch, 0.1f, 3f);
+        float oldPitch = audioSource.pitch;
+        audioSource.pitch = safePitch;
+        audioSource.PlayOneShot(clip, volume);
+        audioSource.pitch = oldPitch;
+    }
 }
 
 public static class TeamAnchorResolver
