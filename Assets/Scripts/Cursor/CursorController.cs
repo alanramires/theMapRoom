@@ -399,7 +399,50 @@ public class CursorController : MonoBehaviour
             target.z = 0;
         }
 
-        return SetCell(target);
+        if (SetCell(target))
+            return true;
+
+        // Neutral fallback: quando o hex direto nao existe, tenta um vizinho valido
+        // mais alinhado com a direcao desejada (ex.: cima -> esquerda/direita).
+        if (CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return false;
+
+        if (!TryResolveNeutralDirectionalFallback(delta, out Vector3Int fallbackCell))
+            return false;
+
+        return SetCell(fallbackCell);
+    }
+
+    private bool TryResolveNeutralDirectionalFallback(Vector3Int inputDelta, out Vector3Int resolvedCell)
+    {
+        resolvedCell = currentCell;
+        if (boardTilemap == null)
+            return false;
+
+        Vector3Int desiredCell = currentCell + inputDelta;
+        desiredCell.z = 0;
+
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+        UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, currentCell, neighbors);
+
+        HashSet<Vector3Int> allowedNeighbors = new HashSet<Vector3Int>();
+        for (int i = 0; i < neighbors.Count; i++)
+        {
+            Vector3Int candidate = neighbors[i];
+            candidate.z = 0;
+            if (IsCellValid(candidate))
+                allowedNeighbors.Add(candidate);
+        }
+
+        if (allowedNeighbors.Count <= 0)
+            return false;
+
+        return HexPathResolver.TryResolveDirectionalFallback(
+            boardTilemap,
+            allowedNeighbors,
+            currentCell,
+            desiredCell,
+            out resolvedCell);
     }
 
     public bool SetCell(Vector3Int cell)

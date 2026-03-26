@@ -56,6 +56,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private int currentFuel = 99;
     [SerializeField] private int maxFuel = 99;
     [SerializeField, Min(0)] private int remainingMovementPoints;
+    [SerializeField, HideInInspector] private bool usedRoadBoostOnLastMove;
     [SerializeField, Min(1)] private int visao = 3;
     [Header("Embarked Weapons Runtime")]
     [SerializeField] private List<UnitEmbarkedWeapon> embarkedWeaponsRuntime = new List<UnitEmbarkedWeapon>();
@@ -146,6 +147,7 @@ public class UnitManager : MonoBehaviour
     public UnitManager EmbarkedTransporter => embarkedTransporter;
     public int EmbarkedTransporterSlotIndex => embarkedTransporterSlotIndex;
     public IReadOnlyList<int> CurrentlyObservedByTeamIds => currentlyObservedByTeamIds;
+    public bool UsedRoadBoostOnLastMove => usedRoadBoostOnLastMove;
 
     public static void ResetActiveTeamChangedPerfCounters()
     {
@@ -558,6 +560,11 @@ public class UnitManager : MonoBehaviour
     {
         remainingMovementPoints = Mathf.Max(0, GetMovementRange());
         RefreshActedVisual();
+    }
+
+    public void SetUsedRoadBoostOnLastMove(bool value)
+    {
+        usedRoadBoostOnLastMove = value;
     }
 
     public void MarkReceivedSuppliesThisTurn()

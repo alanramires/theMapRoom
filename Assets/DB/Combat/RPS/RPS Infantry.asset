@@ -181,6 +181,20 @@ MonoBehaviour:
         +0
   - ataque:
       unitClass: 0
+      weaponCategory: 1
+      targetClass: 8
+      attackBonus: -5
+      notes: "Rifles n\xE3o destroem artilharia"
+      rpsAttackText: Infantry com AntiTanque ataca Ship com RPS Ataque -5
+    defesa:
+      targetClass: 8
+      unitClass: 0
+      weaponCategory: 1
+      defenseBonus: 5
+      notes: "Arilharia nem sente os proj\xE9teis"
+      rpsDefenseText: Ship se defende de Infantry com AntiTanque com RPS Defesa +5
+  - ataque:
+      unitClass: 0
       weaponCategory: 2
       targetClass: 4
       attackBonus: -5

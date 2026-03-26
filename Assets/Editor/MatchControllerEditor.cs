@@ -53,7 +53,8 @@ public class MatchControllerEditor : Editor
     private SerializedProperty victoryStarsByTeamProp;
     private SerializedProperty hasVictoryWinnerProp;
     private SerializedProperty victoryWinnerTeamProp;
-    private SerializedProperty helpManagerProp;
+    private SerializedProperty dialogManagerProp;
+    private SerializedProperty activeTutorialProp;
 
     private void OnEnable()
     {
@@ -106,7 +107,8 @@ public class MatchControllerEditor : Editor
         victoryStarsByTeamProp = serializedObject.FindProperty("victoryStarsByTeam");
         hasVictoryWinnerProp = serializedObject.FindProperty("hasVictoryWinner");
         victoryWinnerTeamProp = serializedObject.FindProperty("victoryWinnerTeam");
-        helpManagerProp = serializedObject.FindProperty("helpManager");
+        dialogManagerProp = serializedObject.FindProperty("dialogManager");
+        activeTutorialProp = serializedObject.FindProperty("activeTutorial");
     }
 
     public override void OnInspectorGUI()
@@ -126,9 +128,16 @@ public class MatchControllerEditor : Editor
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Managers", EditorStyles.boldLabel);
-        if (helpManagerProp != null)
+        if (dialogManagerProp != null)
         {
-            EditorGUILayout.PropertyField(helpManagerProp, new GUIContent("Help Manager"));
+            EditorGUILayout.PropertyField(dialogManagerProp, new GUIContent("Dialog Manager"));
+            EditorGUILayout.Space();
+        }
+
+        EditorGUILayout.LabelField("Tutorial", EditorStyles.boldLabel);
+        if (activeTutorialProp != null)
+        {
+            EditorGUILayout.PropertyField(activeTutorialProp, new GUIContent("Active Tutorial"));
             EditorGUILayout.Space();
         }
 

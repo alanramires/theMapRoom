@@ -217,6 +217,37 @@ public static class UnitMovementPathRules
         return Mathf.Max(0, total);
     }
 
+    public static bool DidUseRoadFullMoveBonus(
+        Tilemap terrainTilemap,
+        UnitManager unit,
+        IReadOnlyList<Vector3Int> path,
+        TerrainDatabase terrainDatabase = null)
+    {
+        if (terrainTilemap == null || unit == null || path == null || path.Count < 2)
+            return false;
+
+        MovementQueryCache cache = new MovementQueryCache(terrainTilemap, terrainDatabase);
+        int baseMove = Mathf.Max(0, unit.GetMovementRange());
+        bool canUseRoadBonus = CanUseRoadFullMoveBonus(unit, baseMove);
+        if (!canUseRoadBonus)
+            return false;
+
+        if (path.Count <= baseMove + 1)
+            return false;
+
+        for (int i = 1; i <= baseMove; i++)
+        {
+            Vector3Int roadCell = path[i];
+            roadCell.z = 0;
+            if (!cache.IsRoadBoostCell(roadCell))
+                return false;
+        }
+
+        Vector3Int bonusCell = path[baseMove + 1];
+        bonusCell.z = 0;
+        return cache.IsRoadBoostCell(bonusCell);
+    }
+
     public static bool TryGetEnterCellCost(
         Tilemap terrainTilemap,
         UnitManager unit,

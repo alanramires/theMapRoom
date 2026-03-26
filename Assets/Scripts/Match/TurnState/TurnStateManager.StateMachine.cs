@@ -147,7 +147,7 @@ public partial class TurnStateManager
                 LogEnemyUnitInspection(unit, activeTeam);
                 BeginInspectedHelper(unit);
                 SetCursorState(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: enemy inspect");
-                HelpManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Inspect);
+                DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Inspect);
                 return ActionSfx.Confirm;
             }
 
@@ -156,7 +156,7 @@ public partial class TurnStateManager
                 Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
                 BeginInspectedHelper(unit, paintThreatOverlay: false);
                 SetCursorState(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: acted ally inspect");
-                HelpManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Inspect);
+                DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Inspect);
                 return ActionSfx.Confirm;
             }
 
@@ -170,7 +170,7 @@ public partial class TurnStateManager
             SetSelectedUnit(unit);
             ClearInspectedHelper();
             SetCursorState(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
-            HelpManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Act);
+            DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Act);
             return ActionSfx.Confirm;
         }
 
@@ -188,7 +188,7 @@ public partial class TurnStateManager
 
         if (TryEnterConstructionShoppingState(construction, activeTeam))
         {
-            HelpManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Produce);
+            DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Produce);
             return ActionSfx.Confirm;
         }
 

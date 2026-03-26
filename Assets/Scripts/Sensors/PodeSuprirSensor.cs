@@ -8,6 +8,7 @@ public static class PodeSuprirSensor
         UnitManager supplier,
         Tilemap map,
         TerrainDatabase terrainDatabase,
+        MatchController matchController,
         List<PodeSuprirOption> output,
         out string reason,
         List<PodeSuprirInvalidOption> invalidOutput = null)
@@ -131,6 +132,7 @@ public static class PodeSuprirSensor
                     target,
                     boardMap,
                     terrainDatabase,
+                    matchController,
                     services,
                     stock,
                     out bool forceLandBeforeSupply,
@@ -277,6 +279,7 @@ public static class PodeSuprirSensor
         UnitManager target,
         Tilemap boardMap,
         TerrainDatabase terrainDatabase,
+        MatchController matchController,
         List<ServiceData> services,
         Dictionary<SupplyData, int> stock,
         out bool forceLandBeforeSupply,
@@ -335,6 +338,7 @@ public static class PodeSuprirSensor
         }
 
         bool hasAnyNeedMatch = false;
+        bool hasAnyStockForNeed = false;
         for (int i = 0; i < services.Count; i++)
         {
             ServiceData service = services[i];
@@ -349,14 +353,62 @@ public static class PodeSuprirSensor
                 continue;
 
             hasAnyNeedMatch = true;
-            if (HasSupplyForService(service, stock))
+            if (!HasSupplyForService(service, stock))
+                continue;
+
+            hasAnyStockForNeed = true;
+            if (IsServiceEconomyAffordableForCandidate(matchController, supplier, target, service, stock))
                 return true;
         }
 
-        reason = hasAnyNeedMatch
-            ? "Sem estoque dos suprimentos exigidos pelos servicos aplicaveis."
-            : "Unidade nao precisa de nenhum servico oferecido pelo supridor.";
+        if (!hasAnyNeedMatch)
+            reason = "Unidade nao precisa de nenhum servico oferecido pelo supridor.";
+        else if (!hasAnyStockForNeed)
+            reason = "Sem estoque dos suprimentos exigidos pelos servicos aplicaveis.";
+        else
+            reason = "Economia insuficiente para executar qualquer servico aplicavel.";
         return false;
+    }
+
+    private static bool IsServiceEconomyAffordableForCandidate(
+        MatchController matchController,
+        UnitManager supplier,
+        UnitManager target,
+        ServiceData service,
+        Dictionary<SupplyData, int> stock)
+    {
+        if (target == null || service == null)
+            return false;
+        if (matchController == null || supplier == null)
+            return true;
+
+        Dictionary<SupplyData, int> stockSnapshot = new Dictionary<SupplyData, int>(stock);
+        List<int> ammoByWeapon = new List<int>();
+        ServiceLogisticsFormula.EstimatePotentialServiceGains(
+            target,
+            service,
+            stockSnapshot,
+            out int hpGain,
+            out int fuelGain,
+            out int ammoGain,
+            ammoByWeapon);
+
+        if (hpGain <= 0 && fuelGain <= 0 && ammoGain <= 0)
+            return false;
+
+        int baseCost = ServiceCostFormula.ComputeServiceMoneyCost(
+            target,
+            service,
+            hpGain,
+            fuelGain,
+            ammoGain,
+            ammoByWeapon);
+        int finalCost = matchController.ResolveEconomyCost(baseCost);
+        if (finalCost <= 0)
+            return true;
+
+        int currentMoney = Mathf.Max(0, matchController.GetActualMoney(supplier.TeamId));
+        return currentMoney >= finalCost;
     }
 
     private static bool IsDomainCompatibleForSupply(

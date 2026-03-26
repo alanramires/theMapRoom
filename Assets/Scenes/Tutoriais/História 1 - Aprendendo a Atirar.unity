@@ -3012,10 +3012,11 @@ MonoBehaviour:
   enableStealthValidation: 1
   enableTotalWar: 1
   maxUnitsPerTeam: 60
+  activeTutorial: {fileID: 11400000, guid: 161cb573a5e6fba4fb379d0286f28866, type: 2}
   autonomyDatabase: {fileID: 11400000, guid: 7e05fa3ec99c4ef09a32a3f4f31d8e4c, type: 2}
   cursorController: {fileID: 2105919121}
   turnStateManager: {fileID: 1900915756}
-  helpManager: {fileID: 2126423041}
+  dialogManager: {fileID: 1477498056}
   matchMusicAudioManager: {fileID: 337511632}
   advanceTurnPreDelay: 1
   advanceTurnPostDelay: 0.25
@@ -3063,6 +3064,55 @@ MonoBehaviour:
   enablePodeEnxergarRuntimeLogs: 0
   enableTurnPerfLogs: 0
   fogStepPerfTopUnits: 3
+--- !u!1 &328633919
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 328633920}
+  - component: {fileID: 328633921}
+  m_Layer: 0
+  m_Name: Tutorial Manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &328633920
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 328633919}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1307941790}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &328633921
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 328633919}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a023539e93c252842a5e94d03a9f00ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialManager
+  terrainDatabase: {fileID: 0}
+  matchController: {fileID: 0}
+  turnStateManager: {fileID: 0}
+  automataDatabase: {fileID: 0}
+  enableTutorialAutomata: 1
 --- !u!1 &337511629
 GameObject:
   m_ObjectHideFlags: 0
@@ -6739,6 +6789,7 @@ MonoBehaviour:
   currentFuel: 70
   maxFuel: 70
   remainingMovementPoints: 3
+  usedRoadBoostOnLastMove: 0
   visao: 3
   embarkedWeaponsRuntime:
   - weapon: {fileID: 11400000, guid: ef5934c037728ac4093d260f60e5fb03, type: 2}
@@ -8228,7 +8279,16 @@ MonoBehaviour:
   text_titulo: {fileID: 603131193}
   text_tarefaas: {fileID: 985850230}
   canvasGroup: {fileID: 0}
+  panelRect: {fileID: 0}
+  scrollRect: {fileID: 0}
+  scrollContentRect: {fileID: 0}
+  matchController: {fileID: 0}
   panelVisivel: 1
+  autoResizeHeight: 1
+  maxScreenHeightPercent: 0.72
+  minPanelHeight: 120
+  verticalPadding: 24
+  manualScrollStep: 28
 --- !u!1 &984791705
 GameObject:
   m_ObjectHideFlags: 0
@@ -10335,7 +10395,7 @@ Transform:
   - {fileID: 1942499701}
   - {fileID: 984791706}
   - {fileID: 348386387}
-  - {fileID: 2126423040}
+  - {fileID: 328633920}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1308939562
@@ -11522,6 +11582,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af1ae9d1df52ccc4b94becd999a1e7dd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DialogManager
+  contextHelpEnabled: 1
+  hoverHelpDelay: 1
+  dialogHelpDuration: 3
+  matchController: {fileID: 0}
 --- !u!1 &1502004366
 GameObject:
   m_ObjectHideFlags: 0
@@ -18012,70 +18076,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2122313738}
   m_CullTransparentMesh: 1
---- !u!1 &2126423039
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2126423040}
-  - component: {fileID: 2126423041}
-  - component: {fileID: 2126423042}
-  m_Layer: 0
-  m_Name: Help Manager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2126423040
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2126423039}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1307941790}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2126423041
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2126423039}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d22e08a7311a8c54895fcabad00bb9e0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::HelpManager
-  activeTutorial: {fileID: 11400000, guid: 161cb573a5e6fba4fb379d0286f28866, type: 2}
-  contextHelpEnabled: 1
-  hoverHelpDelay: 1
-  dialogHelpDuration: 3
-  matchController: {fileID: 0}
---- !u!114 &2126423042
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2126423039}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a023539e93c252842a5e94d03a9f00ce, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TutorialManager
-  terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
-  matchController: {fileID: 327617512}
 --- !u!1 &2134258353
 GameObject:
   m_ObjectHideFlags: 0

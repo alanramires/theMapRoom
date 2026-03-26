@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa3089f4c9cbdf6489740b351203c6a0, type: 3}
+  m_Name: "Hist\xF3ria 4 - Ficamos sem gasolina"
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialData
+  id: tutorial 3 - APC ao resgate
+  description: Indo para Ramelle sem Gasolina
+  objectives:
+  - id: UNIT_AT_HEX
+    parameters: ST 11,1
+    description: "Leve os Suprimentos at\xE9 o local de encontro"
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 0
+    isDefeatCondition: 0
+    hasFailed: 0
+  - id: SUPPLY_UNIT
+    parameters: APC
+    description: "Reabaste\xE7a o APC"
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 0
+    isDefeatCondition: 0
+    hasFailed: 0
+  - id: INSPECT_ENEMY_UNIT
+    parameters: 
+    description: Inspecione o Obus Inimigo
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 1
+    isDefeatCondition: 0
+    hasFailed: 0
+  - id: USED_ROAD_BOOST
+    parameters: APC
+    description: Complete todo o movimento na estrada para +1 extra
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 1
+    isOptional: 1
+    isDefeatCondition: 0
+    hasFailed: 0
+  - id: UNIT_AT_HEX
+    parameters: SD && (23,1 ||24,1 ||25,1 || 26,1 || 27,0|| 27,1|| 27,2 || 27,3 ||
+      28,1)
+    description: "Leve Ryan At\xE9 Rammelle para defender a ponte"
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 0
+    isDefeatCondition: 0
+    hasFailed: 0
+  - id: DEAD_UNIT
+    parameters: Pvt.Ryan_T0_U8 || HP = 0
+    description: "O soldado Ryan n\xE3o pode ser morto"
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 1
+    isOptional: 0
+    isDefeatCondition: 1
+    hasFailed: 0
+  - id: DEAD_UNIT
+    parameters: ST || HP = 0 || AUT = 0
+    description: "O caminh\xE3o de suprimentos n\xE3o pode ser destruido"
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 1
+    isOptional: 0
+    isDefeatCondition: 1
+    hasFailed: 0
+  victoryDialog: {fileID: 0}

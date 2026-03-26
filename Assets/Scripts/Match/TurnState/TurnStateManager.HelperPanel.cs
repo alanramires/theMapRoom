@@ -132,16 +132,23 @@ public partial class TurnStateManager
     private void OnEnable()
     {
         MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
+        MatchController.OnBeforeAdvanceTurn += HandleBeforeAdvanceTurn;
     }
 
     private void OnDisable()
     {
         MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
+        MatchController.OnBeforeAdvanceTurn -= HandleBeforeAdvanceTurn;
     }
 
     private void HandleActiveTeamChanged(int teamId)
     {
         ResetHoverState();
+    }
+
+    private void HandleBeforeAdvanceTurn()
+    {
+        ClearDebugTempMoveOverridesAtTurnAdvance();
     }
 
     public void ResetHoverState()
@@ -1552,7 +1559,7 @@ public partial class TurnStateManager
         if (hasTriggeredHoverAtCurrentCell)
             return;
 
-        float delay = HelpManager.Instance != null ? HelpManager.Instance.HoverHelpDelay : 0.5f;
+        float delay = DialogManager.Instance != null ? DialogManager.Instance.HoverHelpDelay : 0.5f;
         // Se o usuário espera 0.5s, garantimos que não passe disso por padrão se não configurado
         if (delay <= 0) delay = 0.5f;
 
@@ -1570,7 +1577,7 @@ public partial class TurnStateManager
                 bool canAct = isAlly && !unit.HasActed;
                 
                 HelpHintId hint = canAct ? HelpHintId.Act : HelpHintId.Inspect;
-                HelpManager.Instance?.TryShowHint(activeTeam, hint, unitName);
+                DialogManager.Instance?.TryShowHint(activeTeam, hint, unitName);
             }
             else
             {
@@ -1585,7 +1592,7 @@ public partial class TurnStateManager
                         ? HelpHintId.Produce 
                         : HelpHintId.Construction;
 
-                    HelpManager.Instance?.TryShowHint(activeTeam, hint, constructionName);
+                    DialogManager.Instance?.TryShowHint(activeTeam, hint, constructionName);
                 }
             }
         }

@@ -651,11 +651,14 @@ public class DebugManager : MonoBehaviour
 
         const string prefixA = "SET MOVE_REMAIN ";
         const string prefixB = "SET MOVE REMAIN ";
+        const string prefixC = "SET MOVE ";
         string valueToken;
         if (normalizedCommand.StartsWith(prefixA))
             valueToken = normalizedCommand.Substring(prefixA.Length).Trim();
         else if (normalizedCommand.StartsWith(prefixB))
             valueToken = normalizedCommand.Substring(prefixB.Length).Trim();
+        else if (normalizedCommand.StartsWith(prefixC))
+            valueToken = normalizedCommand.Substring(prefixC.Length).Trim();
         else
             return false;
 
@@ -725,7 +728,8 @@ public class DebugManager : MonoBehaviour
             "set hp <v>\n" +
             "set autonomy <v>\n" +
             "set fuel <v> (alias de set autonomy)\n" +
-            "set move_remain <v>\n" +
+            "set move <v> (temporario, reseta ao virar rodada)\n" +
+            "set move_remain <v> (alias de set move)\n" +
             "set ammo <v> | set ammo:<idx> <v>\n" +
             "set galao <v> | set galoes <v> | set caixas <v> | set pecas <v>\n" +
             "refuel unit | rearm unit | repair unit\n" +

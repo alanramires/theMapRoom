@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 [Serializable]
 public class SaveGameData
@@ -22,7 +23,9 @@ public class SaveGameData
     public PlanningConfigSaveData planningConfig = new PlanningConfigSaveData();
     public List<RallyPointSaveData> rallyPoints = new List<RallyPointSaveData>();
     public List<RallyAssignmentSaveData> rallyAssignments = new List<RallyAssignmentSaveData>();
-    public ReplaySaveData replay;
+    public int fogCacheTeamId = int.MinValue;
+    public List<FogCellContributorSaveData> fogVisibleContributorsByCell = new List<FogCellContributorSaveData>();
+    public List<FogUnitVisibilitySaveData> fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>();
 }
 
 [Serializable]
@@ -180,3 +183,22 @@ public class ReplayStepSaveData
     public string debugLabel;
     public string commandJson;
 }
+
+
+[Serializable]
+public class FogCellContributorSaveData
+{
+    public int x;
+    public int y;
+    public int z;
+    public int contributors;
+}
+
+[Serializable]
+public class FogUnitVisibilitySaveData
+{
+    public int cacheIndex;
+    public bool isVisible;
+}
+
+

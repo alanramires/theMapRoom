@@ -12,6 +12,9 @@ public class CameraController : MonoBehaviour
     public Tilemap tilemap;                 // arraste aqui o seu Tilemap_Terrain
     public bool recalcBoundsOnStart = true; // se true, tenta calcular os bounds baseado nos tiles pintados no Start (pode ser custoso em mapas grandes)
     public Collider2D clampCollider;        // se setado, pan/zoom respeitam este collider
+    public bool autoFindTilemapIfMissing = true; // tenta achar um Tilemap automaticamente em cenas de gameplay
+    [Tooltip("Quando ativo, loga mensagens de fallback ao entrar em modo livre sem bounds.")]
+    public bool logNoBoundsFallbackMessages = false;
 
     [Header("Zoom")]
     public float zoomSpeed = 8f;            // sensibilidade do scroll
@@ -47,6 +50,7 @@ public class CameraController : MonoBehaviour
     private bool _dragging;
     private float _quickZoomNearSize;
     private bool _hasQuickZoomNearSize;
+    private bool _warnedNoBoundsContext;
 
     void Awake()
     {
@@ -59,6 +63,7 @@ public class CameraController : MonoBehaviour
 
     void Start()
     {
+        TryAutoResolveBoundsReferences();
         if (recalcBoundsOnStart)
             RecalculatePaintedBounds();
         ClampCamera();
@@ -292,6 +297,8 @@ public class CameraController : MonoBehaviour
     [ContextMenu("Recalculate Painted Bounds")]
     public void RecalculatePaintedBounds()
     {
+        TryAutoResolveBoundsReferences();
+
         if (clampCollider == null && tilemap != null)
             clampCollider = tilemap.GetComponent<Collider2D>();
 
@@ -312,8 +319,8 @@ public class CameraController : MonoBehaviour
 
         if (tilemap == null)
         {
-            Debug.LogError("[CameraController] Tilemap nao setado.");
             _hasBounds = false;
+            NotifyNoBoundsFallback("Sem Tilemap/Collider de clamp");
             return;
         }
 
@@ -351,8 +358,8 @@ public class CameraController : MonoBehaviour
 
         if (!found)
         {
-            Debug.LogWarning("[CameraController] Nao achei nenhum tile pintado no Tilemap.");
             _hasBounds = false;
+            NotifyNoBoundsFallback("Tilemap sem tiles pintados");
             return;
         }
 
@@ -362,6 +369,26 @@ public class CameraController : MonoBehaviour
 
         // Padding
         _paintedWorldBounds.Expand(new Vector3(padding * 2f, padding * 2f, 0f));
+    }
+
+    void TryAutoResolveBoundsReferences()
+    {
+        if (tilemap == null && autoFindTilemapIfMissing)
+            tilemap = FindAnyObjectByType<Tilemap>();
+
+        if (clampCollider == null && tilemap != null)
+            clampCollider = tilemap.GetComponent<Collider2D>();
+    }
+
+    void NotifyNoBoundsFallback(string reason)
+    {
+        if (_warnedNoBoundsContext)
+            return;
+
+        if (logNoBoundsFallbackMessages)
+            Debug.Log($"[CameraController] {reason}. Camera em modo livre (sem limites) para esta cena.");
+
+        _warnedNoBoundsContext = true;
     }
 
     void ClampCamera()

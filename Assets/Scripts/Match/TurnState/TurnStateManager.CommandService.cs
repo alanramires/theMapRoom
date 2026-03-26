@@ -558,6 +558,7 @@ public partial class TurnStateManager
                 if (fuelGain <= 0)
                     Debug.Log($"[ServicoComando][Fila] {target.name}: sem ganho de AUT no alvo (HP +{hpGain} | AUT +{fuelGain} | MUN +{ammoGain}).");
 
+                NotifyUnitSupplied(sourceSupplierUnit, target);
                 MarkUnitServedByCommandThisTurn(target);
 
                 bool embarkedHiddenAfterService = false;

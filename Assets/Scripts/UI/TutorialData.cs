@@ -7,10 +7,12 @@ public class TutorialObjective
     public string id;
     public string parameters;
     public string description;
+    public bool startHidden = false;
+    public bool isVisible = true;
     public bool isCompleted = false;
+    public bool isOptional = false;
     public bool isDefeatCondition = false;
     public bool hasFailed = false;
-    public HelpHintId hintId;
 }
 
 [CreateAssetMenu(fileName = "Novo TutorialData", menuName = "Game/Tutorial/Tutorial Data")]

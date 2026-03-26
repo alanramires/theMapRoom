@@ -6935,3 +6935,147 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: HQ_T1_C353
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: 1
+    cellPosition: {x: 8, y: 1, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 1
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 0
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 0
+      offeredSupplies: []
+      offeredServices: []
+  - id: HQ_T1_C354
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: 1
+    cellPosition: {x: 6, y: -1, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 1
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 0
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 0
+      offeredSupplies: []
+      offeredServices: []
+  - id: HQ_T1_C355
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: 1
+    cellPosition: {x: 7, y: -1, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 1
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 0
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 0
+      offeredSupplies: []
+      offeredServices: []
+  - id: HQ_T0_C356
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: 0
+    cellPosition: {x: 23, y: 1, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 1
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 0
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies: []
+      offeredServices: []
+  - id: HQ_T1_C357
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: 1
+    cellPosition: {x: 14, y: 1, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 1
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 0
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 0
+      offeredSupplies: []
+      offeredServices: []
+  - id: HQ_T1_C358
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: 1
+    cellPosition: {x: 17, y: 1, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 1
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 0
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 0
+      offeredSupplies: []
+      offeredServices: []
+  - id: HQ_T1_C359
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: 1
+    cellPosition: {x: 15, y: -1, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 1
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 0
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 0
+      offeredSupplies: []
+      offeredServices: []
+  - id: HQ_T1_C360
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialTeamId: 1
+    cellPosition: {x: 6, y: 0, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 1
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 0
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 0
+      offeredSupplies: []
+      offeredServices: []

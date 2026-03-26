@@ -20,10 +20,16 @@ public partial class TurnStateManager : MonoBehaviour
     public static event Action<UnitManager> OnUnitSelected;
     public static event Action<UnitManager, UnitManager> OnUnitEmbarked;
     public static event Action<UnitManager, UnitManager> OnUnitDisembarked;
+    public static event Action<UnitManager, UnitManager> OnUnitSupplied;
 
     public static void NotifyUnitRevealedFromFog(UnitManager unit)
     {
         OnUnitRevealedFromFog?.Invoke(unit);
+    }
+
+    public static void NotifyUnitSupplied(UnitManager supplier, UnitManager target)
+    {
+        OnUnitSupplied?.Invoke(supplier, target);
     }
 
     public enum ActionSfx
@@ -128,6 +134,7 @@ public partial class TurnStateManager : MonoBehaviour
     private bool turnStartFuelDepletionExecutionInProgress;
     private bool turnStartRallyExecutionInProgress;
     private readonly List<PlayerActionSubStep> turnStartFuelDepletionReplaySubSteps = new List<PlayerActionSubStep>();
+    private readonly HashSet<int> debugTempMoveUnitInstanceIds = new HashSet<int>();
 
     public CursorState CurrentCursorState => cursorState;
     public UnitManager SelectedUnit => selectedUnit;
@@ -527,9 +534,45 @@ public partial class TurnStateManager : MonoBehaviour
         int max = target.MaxMovementPoints;
         int clamped = Mathf.Clamp(remainingMovementValue, 0, Mathf.Max(0, max));
         target.SetRemainingMovementPoints(clamped);
-        message = $"Movimento restante atualizado: {ResolveDebugUnitName(target)} {before}->{target.RemainingMovementPoints}/{max} em {FormatMapCellWithZ(cursorCell)}.";
+        RegisterDebugTempMoveOverride(target);
+        message = $"Movimento restante temporario: {ResolveDebugUnitName(target)} {before}->{target.RemainingMovementPoints}/{max} em {FormatMapCellWithZ(cursorCell)}. Reseta ao virar rodada.";
         Debug.Log($"[Debug Command] {message}");
         return true;
+    }
+
+    private void RegisterDebugTempMoveOverride(UnitManager unit)
+    {
+        if (unit == null)
+            return;
+
+        int id = unit.InstanceId;
+        if (id <= 0)
+            return;
+
+        debugTempMoveUnitInstanceIds.Add(id);
+    }
+
+    private void ClearDebugTempMoveOverridesAtTurnAdvance()
+    {
+        if (debugTempMoveUnitInstanceIds.Count <= 0)
+            return;
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || unit.IsDead)
+                continue;
+
+            int id = unit.InstanceId;
+            if (id <= 0 || !debugTempMoveUnitInstanceIds.Contains(id))
+                continue;
+
+            int max = unit.MaxMovementPoints;
+            unit.SetRemainingMovementPoints(max);
+        }
+
+        debugTempMoveUnitInstanceIds.Clear();
     }
 
     public bool TryRefuelUnitAutonomyUnderCursorFromDebug(out string message)
@@ -674,6 +717,7 @@ public partial class TurnStateManager : MonoBehaviour
             return false;
         }
 
+        RefreshFogOfWarAfterSpawn();
         message = $"Spawnado: {ResolveDebugUnitDataName(unitData)} em {FormatMapCellWithZ(cursorCell)} para team {TeamUtils.GetName(teamId)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
@@ -707,8 +751,17 @@ public partial class TurnStateManager : MonoBehaviour
             return false;
         }
 
+        RefreshFogOfWarAfterSpawn();
         message = $"Spawnado: {unitToken} em {cell} para team {TeamUtils.GetName(resolvedTeam)}.";
         return true;
+    }
+
+    private void RefreshFogOfWarAfterSpawn()
+    {
+        if (matchController == null)
+            return;
+
+        matchController.RefreshFogOfWarForActiveTeam();
     }
 
     public bool TrySetConstructionTeamUnderCursorFromDebug(int teamValue, out string message)

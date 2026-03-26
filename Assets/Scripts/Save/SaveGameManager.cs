@@ -15,6 +15,15 @@ using UnityEngine.InputSystem;
 
 public class SaveGameManager : MonoBehaviour
 {
+    private sealed class PendingMainMenuLoadRequest
+    {
+        public int slotIndex;
+        public string sceneName;
+    }
+
+    private static PendingMainMenuLoadRequest pendingMainMenuLoad;
+    private static bool suppressNextLoadConfirmSfx;
+
     [Header("References")]
     [SerializeField] private UnitSpawner unitSpawner;
     [SerializeField] private ConstructionSpawner constructionSpawner;
@@ -43,6 +52,10 @@ public class SaveGameManager : MonoBehaviour
     [SerializeField] private bool saveReplayData = true;
     [Header("Load Performance")]
     [SerializeField] private bool enableThreatCacheWarmupOnLoad = false;
+    [SerializeField] private bool enableLoadPerfLogs = true;
+    [Header("Prompt Performance")]
+    [SerializeField] private bool enablePromptPerfLogs = false;
+    [SerializeField] [Range(0f, 1000f)] private float promptPerfWarnThresholdMs = 50f;
 
     private enum SlotPromptState
     {
@@ -59,6 +72,13 @@ public class SaveGameManager : MonoBehaviour
         public string sceneName;
         public DateTime savedAtLocal;
         public string path;
+    }
+
+    [Serializable]
+    private sealed class SaveSlotMetadataFile
+    {
+        public string sceneName;
+        public long savedAtUtcTicks;
     }
 
     private sealed class LoadPreprocessResult
@@ -81,6 +101,11 @@ public class SaveGameManager : MonoBehaviour
     {
         EnsureDefaultSaveDirectoryConfigured();
         TryAutoAssignReferences();
+    }
+
+    private void Start()
+    {
+        TryStartPendingMainMenuLoadForActiveScene();
     }
 
 #if UNITY_EDITOR
@@ -118,13 +143,13 @@ public class SaveGameManager : MonoBehaviour
 
         if (WasKeyPressedThisFrame(quickSaveKey))
         {
-            OpenSaveSlotPrompt();
+            OpenSaveSlotPrompt(PerfNowMs());
             return;
         }
 
         if (WasKeyPressedThisFrame(quickLoadKey))
         {
-            OpenLoadSlotPrompt();
+            OpenLoadSlotPrompt(PerfNowMs());
             return;
         }
     }
@@ -144,8 +169,13 @@ public class SaveGameManager : MonoBehaviour
     [ContextMenu("Save Slot 3")]
     public void SaveSlot3() => SaveSlot(3);
 
-    private void OpenSaveSlotPrompt()
+    private void OpenSaveSlotPrompt(double inputStartMs = -1d)
     {
+        double promptStartMs = inputStartMs >= 0d ? inputStartMs : PerfNowMs();
+        double refsStartMs = PerfNowMs();
+        TryAutoAssignReferences();
+        LogPromptPerf("save_prompt.auto_assign_refs", PerfNowMs() - refsStartMs);
+
         if (TryBlockAircraftFuelDepletionPersistence(
                 "[Save] Bloqueado: fila de aeronaves caindo em execucao",
                 "dialog.save_load.blocked_aircraft_depletion",
@@ -169,10 +199,16 @@ public class SaveGameManager : MonoBehaviour
         cursorController?.PlayConfirmSfx();
         PanelDialogController.ClearExternalText();
         RefreshPromptHelper();
+        LogPromptPerf("save_prompt.total_key_to_helper", PerfNowMs() - promptStartMs, forceWarning: true);
     }
 
-    private void OpenLoadSlotPrompt()
+    private void OpenLoadSlotPrompt(double inputStartMs = -1d)
     {
+        double promptStartMs = inputStartMs >= 0d ? inputStartMs : PerfNowMs();
+        double refsStartMs = PerfNowMs();
+        TryAutoAssignReferences();
+        LogPromptPerf("load_prompt.auto_assign_refs", PerfNowMs() - refsStartMs);
+
         if (TryBlockAircraftFuelDepletionPersistence(
                 "[Load] Bloqueado: fila de aeronaves caindo em execucao",
                 "dialog.save_load.blocked_aircraft_depletion",
@@ -190,6 +226,7 @@ public class SaveGameManager : MonoBehaviour
         cursorController?.PlayConfirmSfx();
         PanelDialogController.ClearExternalText();
         RefreshPromptHelper();
+        LogPromptPerf("load_prompt.total_key_to_helper", PerfNowMs() - promptStartMs, forceWarning: true);
     }
 
     private void HandlePromptInput()
@@ -275,6 +312,7 @@ public class SaveGameManager : MonoBehaviour
 
     private void RefreshPromptHelper()
     {
+        double startMs = PerfNowMs();
         if (promptState == SlotPromptState.None)
         {
             PanelHelperController.ClearExternalText();
@@ -286,10 +324,12 @@ public class SaveGameManager : MonoBehaviour
             : ResolveHelper("helper.save_prompt.title", "SAVE");
         string body = BuildPromptBody();
         PanelHelperController.TrySetExternalText(title, body);
+        LogPromptPerf($"prompt_helper.refresh.{promptState}", PerfNowMs() - startMs);
     }
 
     private string BuildPromptBody()
     {
+        double buildStartMs = PerfNowMs();
         StringBuilder sb = new StringBuilder();
         string header = promptState == SlotPromptState.LoadSelectSlot
             ? ResolveHelper("helper.load_prompt.header", "carregar jogo")
@@ -297,7 +337,9 @@ public class SaveGameManager : MonoBehaviour
         sb.AppendLine(header);
         for (int slot = 1; slot <= 3; slot++)
         {
+            double slotReadStartMs = PerfNowMs();
             SaveSlotMetadata metadata = ReadSlotMetadata(slot);
+            LogPromptPerf($"prompt_helper.read_slot_metadata.slot_{slot}", PerfNowMs() - slotReadStartMs);
             sb.AppendLine(BuildSlotDisplayLine(metadata));
         }
 
@@ -314,6 +356,7 @@ public class SaveGameManager : MonoBehaviour
             sb.Append(ResolveHelper("helper.save_prompt.footer.select", "ESC: cancelar"));
         }
 
+        LogPromptPerf("prompt_helper.build_body_total", PerfNowMs() - buildStartMs);
         return sb.ToString();
     }
 
@@ -421,7 +464,9 @@ public class SaveGameManager : MonoBehaviour
             string path = ResolveWritableSlotPath(normalizedSlot);
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ResolveSaveDirectory());
             File.WriteAllBytes(path, compressedBytes);
-            LogSaveDiagnostics(normalizedSlot, json, compressedBytes, data);
+            WriteSlotMetadataFile(path, data);
+            WriteOrDeleteReplaySidecar(path);
+            LogSaveDiagnostics(normalizedSlot, json, compressedBytes);
             cursorController?.PlayLoadSfx();
             string savedText = ResolveDialog(
                 "dialog.save_status.success",
@@ -451,6 +496,68 @@ public class SaveGameManager : MonoBehaviour
     [ContextMenu("Load Slot 3")]
     public void LoadSlot3() => LoadSlot(3);
 
+    public bool HasSaveInSlot(int slotIndex)
+    {
+        int normalizedSlot = NormalizeSlot(slotIndex);
+        string path = ResolveReadableSlotPath(normalizedSlot);
+        return File.Exists(path);
+    }
+
+    public bool BeginLoadFromMainMenuSlot(int slotIndex)
+    {
+        if (!Application.isPlaying)
+        {
+            Debug.LogWarning("[SaveGame] MainMenu load funciona apenas em Play Mode.");
+            return false;
+        }
+
+        int normalizedSlot = NormalizeSlot(slotIndex);
+        SaveSlotMetadata metadata = ReadSlotMetadata(normalizedSlot);
+        if (metadata == null || !metadata.exists)
+        {
+            Debug.LogWarning($"[SaveGame] MainMenu load bloqueado: slot {normalizedSlot} vazio.");
+            return false;
+        }
+
+        string targetScene = string.IsNullOrWhiteSpace(metadata.sceneName) ? string.Empty : metadata.sceneName.Trim();
+        if (string.IsNullOrWhiteSpace(targetScene) || string.Equals(targetScene, "Mapa desconhecido", StringComparison.OrdinalIgnoreCase))
+        {
+            Debug.LogWarning($"[SaveGame] MainMenu load bloqueado: slot {normalizedSlot} sem sceneName valido.");
+            return false;
+        }
+
+        pendingMainMenuLoad = new PendingMainMenuLoadRequest
+        {
+            slotIndex = normalizedSlot,
+            sceneName = targetScene
+        };
+        suppressNextLoadConfirmSfx = true;
+
+        string currentScene = SceneManager.GetActiveScene().name;
+        if (string.Equals(currentScene, targetScene, StringComparison.Ordinal))
+        {
+            if (verboseLogs)
+                Debug.Log($"[SaveGame] MainMenu load: slot {normalizedSlot} na mesma cena '{targetScene}'.");
+            StartCoroutine(LoadPendingMainMenuSlotNextFrame(normalizedSlot, targetScene));
+            return true;
+        }
+
+        try
+        {
+            if (verboseLogs)
+                Debug.Log($"[SaveGame] MainMenu load: trocando para cena '{targetScene}' para carregar slot {normalizedSlot}.");
+            SceneManager.LoadScene(targetScene);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            pendingMainMenuLoad = null;
+            suppressNextLoadConfirmSfx = false;
+            Debug.LogError($"[SaveGame] Falha ao trocar para cena '{targetScene}': {ex.Message}");
+            return false;
+        }
+    }
+
     public void LoadSlot(int slotIndex)
     {
         if (!Application.isPlaying)
@@ -474,7 +581,10 @@ public class SaveGameManager : MonoBehaviour
         if (loadInProgress)
             return;
 
-        cursorController?.PlayConfirmSfx();
+        if (suppressNextLoadConfirmSfx)
+            suppressNextLoadConfirmSfx = false;
+        else
+            cursorController?.PlayConfirmSfx();
         TryAutoAssignReferences();
         if (unitSpawner == null || constructionSpawner == null)
         {
@@ -507,15 +617,20 @@ public class SaveGameManager : MonoBehaviour
     private IEnumerator LoadSlotAsync(string path, int normalizedSlot)
     {
         loadInProgress = true;
+        double asyncStartMs = PerfNowMs();
+        LogLoadPerf(normalizedSlot, "load_async.start", asyncStartMs, 0d);
         try
         {
             ShowLoadingIndicator("dialog.load_status.loading_wait", "Carregando jogo, aguarde");
             // Garante pelo menos um frame para o indicador aparecer.
             yield return null;
 
+            double preprocessStartMs = PerfNowMs();
+            LogLoadPerf(normalizedSlot, "preprocess.begin", preprocessStartMs, preprocessStartMs - asyncStartMs);
             Task<LoadPreprocessResult> preprocessTask = Task.Run(() => PreprocessLoadData(path));
             while (!preprocessTask.IsCompleted)
                 yield return null;
+            LogLoadPerf(normalizedSlot, "preprocess.end", preprocessStartMs, PerfNowMs() - asyncStartMs);
 
             if (preprocessTask.IsFaulted)
             {
@@ -542,6 +657,8 @@ public class SaveGameManager : MonoBehaviour
             }
 
             SaveGameData data = null;
+            double deserializeStartMs = PerfNowMs();
+            LogLoadPerf(normalizedSlot, "deserialize_json.begin", deserializeStartMs, deserializeStartMs - asyncStartMs);
             try
             {
                 data = JsonUtility.FromJson<SaveGameData>(preprocess.json);
@@ -553,6 +670,7 @@ public class SaveGameManager : MonoBehaviour
                 PanelDialogController.ClearExternalText();
                 yield break;
             }
+            LogLoadPerf(normalizedSlot, "deserialize_json.end", deserializeStartMs, PerfNowMs() - asyncStartMs);
 
             if (data == null)
             {
@@ -576,9 +694,14 @@ public class SaveGameManager : MonoBehaviour
                 Debug.LogWarning($"[SaveGame] Save foi criado na cena '{data.sceneName}', cena atual: '{currentScene}'.");
             }
 
+            double prepareStartMs = PerfNowMs();
+            LogLoadPerf(normalizedSlot, "prepare_runtime.begin", prepareStartMs, prepareStartMs - asyncStartMs);
             PrepareRuntimeForLoad();
+            LogLoadPerf(normalizedSlot, "prepare_runtime.end", prepareStartMs, PerfNowMs() - asyncStartMs);
+
             // LoadRoutine controla loadInProgress e encerra o indicador no fim.
             yield return StartCoroutine(LoadRoutine(data, normalizedSlot));
+            LogLoadPerf(normalizedSlot, "load_async.end", asyncStartMs, PerfNowMs() - asyncStartMs);
         }
         finally
         {
@@ -639,6 +762,12 @@ public class SaveGameManager : MonoBehaviour
         }
 
         File.Delete(path);
+        string metaPath = ResolveMetaPathForSavePath(path);
+        if (File.Exists(metaPath))
+            File.Delete(metaPath);
+        string replayPath = ResolveReplayPathForSavePath(path);
+        if (File.Exists(replayPath))
+            File.Delete(replayPath);
         Debug.Log($"[SaveGame] Slot {normalizedSlot} limpo: {path}");
     }
 
@@ -656,7 +785,7 @@ public class SaveGameManager : MonoBehaviour
         cursorController?.ClearRuntimeInputLocksAfterLoad();
     }
 
-    private static void LogSaveDiagnostics(int slotIndex, string json, byte[] compressedBytes, SaveGameData data)
+    private static void LogSaveDiagnostics(int slotIndex, string json, byte[] compressedBytes)
     {
         int uncompressedBytes = string.IsNullOrEmpty(json) ? 0 : Encoding.UTF8.GetByteCount(json);
         float uncompressedKb = uncompressedBytes / 1024f;
@@ -664,27 +793,10 @@ public class SaveGameManager : MonoBehaviour
         float compressedKb = compressedSizeBytes / 1024f;
         float compressionRatio = uncompressedBytes > 0 ? (float)compressedSizeBytes / uncompressedBytes : 0f;
 
-        int actionCount = 0;
-        int nonNullActionSnapshots = 0;
-        if (data != null &&
-            data.replay != null &&
-            data.replay.actionStack != null &&
-            data.replay.actionStack.Actions != null)
-        {
-            actionCount = data.replay.actionStack.Actions.Count;
-            for (int i = 0; i < data.replay.actionStack.Actions.Count; i++)
-            {
-                PlayerAction action = data.replay.actionStack.Actions[i];
-                if (action != null && action.Snapshot != null)
-                    nonNullActionSnapshots++;
-            }
-        }
-
         Debug.Log(
             $"[SaveGame][Diagnostics] slot={slotIndex} " +
             $"jsonBytes={uncompressedBytes} jsonKB={uncompressedKb:F2} " +
-            $"compressedBytes={compressedSizeBytes} compressedKB={compressedKb:F2} compressionRatio={compressionRatio:F3} " +
-            $"actionStackCount={actionCount} actionSnapshotsNonNull={nonNullActionSnapshots}");
+            $"compressedBytes={compressedSizeBytes} compressedKB={compressedKb:F2} compressionRatio={compressionRatio:F3}");
     }
 
     private static byte[] CompressJsonToGzipBytes(string json)
@@ -748,12 +860,40 @@ public class SaveGameManager : MonoBehaviour
         }
     }
 
+    private void TryStartPendingMainMenuLoadForActiveScene()
+    {
+        if (pendingMainMenuLoad == null)
+            return;
+
+        string currentScene = SceneManager.GetActiveScene().name;
+        if (!string.Equals(currentScene, pendingMainMenuLoad.sceneName, StringComparison.Ordinal))
+            return;
+
+        int pendingSlot = pendingMainMenuLoad.slotIndex;
+        string pendingScene = pendingMainMenuLoad.sceneName;
+        pendingMainMenuLoad = null;
+        StartCoroutine(LoadPendingMainMenuSlotNextFrame(pendingSlot, pendingScene));
+    }
+
+    private IEnumerator LoadPendingMainMenuSlotNextFrame(int slotIndex, string sceneName)
+    {
+        // Aguarda 1 frame para garantir inicializacao dos managers da cena destino.
+        yield return null;
+
+        if (verboseLogs)
+            Debug.Log($"[SaveGame] MainMenu pending load: slot {slotIndex} na cena '{sceneName}'.");
+
+        LoadSlot(slotIndex);
+    }
+
     private IEnumerator LoadRoutine(SaveGameData data, int loadedSlot)
     {
         loadInProgress = true;
         string stage = "init";
         bool coreLoadSucceeded = false;
         bool suppressedFogRefresh = false;
+        double routineStartMs = PerfNowMs();
+        LogLoadPerf(loadedSlot, "load_routine.start", routineStartMs, 0d);
 
         if (matchController != null)
         {
@@ -763,8 +903,11 @@ public class SaveGameManager : MonoBehaviour
 
         // Espera um frame apos destruir para evitar residuos de lookup no mesmo frame.
         stage = "clear-runtime";
+        double clearRuntimeStartMs = PerfNowMs();
+        LogLoadPerf(loadedSlot, "clear_runtime.begin", clearRuntimeStartMs, clearRuntimeStartMs - routineStartMs);
         ClearCurrentRuntime();
         yield return null;
+        LogLoadPerf(loadedSlot, "clear_runtime.end", clearRuntimeStartMs, PerfNowMs() - routineStartMs);
 
         try
         {
@@ -773,6 +916,8 @@ public class SaveGameManager : MonoBehaviour
             int maxConstructionId = 0;
 
             stage = "spawn-constructions";
+            double spawnConstructionsStartMs = PerfNowMs();
+            LogLoadPerf(loadedSlot, "restore_constructions.begin", spawnConstructionsStartMs, spawnConstructionsStartMs - routineStartMs);
             if (data.constructions != null)
             {
                 for (int i = 0; i < data.constructions.Count; i++)
@@ -802,8 +947,11 @@ public class SaveGameManager : MonoBehaviour
                         maxConstructionId = saved.instanceId;
                 }
             }
+            LogLoadPerf(loadedSlot, "restore_constructions.end", spawnConstructionsStartMs, PerfNowMs() - routineStartMs);
 
             stage = "spawn-units";
+            double spawnUnitsStartMs = PerfNowMs();
+            LogLoadPerf(loadedSlot, "restore_units.begin", spawnUnitsStartMs, spawnUnitsStartMs - routineStartMs);
             if (data.units != null)
             {
                 for (int i = 0; i < data.units.Count; i++)
@@ -841,9 +989,12 @@ public class SaveGameManager : MonoBehaviour
                         maxUnitId = saved.instanceId;
                 }
             }
+            LogLoadPerf(loadedSlot, "restore_units.end", spawnUnitsStartMs, PerfNowMs() - routineStartMs);
 
             // Religa passageiros embarcados apos todos os spawns.
             stage = "restore-embarked";
+            double restoreEmbarkedStartMs = PerfNowMs();
+            LogLoadPerf(loadedSlot, "restore_embarked.begin", restoreEmbarkedStartMs, restoreEmbarkedStartMs - routineStartMs);
             if (data.units != null)
             {
                 for (int i = 0; i < data.units.Count; i++)
@@ -861,12 +1012,18 @@ public class SaveGameManager : MonoBehaviour
                         Debug.LogWarning($"[SaveGame] Falha embarque {saved.instanceId}->{saved.transporterInstanceId}: {reason}");
                 }
             }
+            LogLoadPerf(loadedSlot, "restore_embarked.end", restoreEmbarkedStartMs, PerfNowMs() - routineStartMs);
 
             stage = "sync-ids";
+            double syncIdsStartMs = PerfNowMs();
+            LogLoadPerf(loadedSlot, "sync_ids.begin", syncIdsStartMs, syncIdsStartMs - routineStartMs);
             unitSpawner.EnsureNextIdAbove(maxUnitId);
             constructionSpawner.EnsureNextIdAbove(maxConstructionId);
+            LogLoadPerf(loadedSlot, "sync_ids.end", syncIdsStartMs, PerfNowMs() - routineStartMs);
 
             stage = "restore-match";
+            double restoreMatchStartMs = PerfNowMs();
+            LogLoadPerf(loadedSlot, "restore_match_state.begin", restoreMatchStartMs, restoreMatchStartMs - routineStartMs);
             if (matchController != null)
             {
                 RestoreMatchPlayers(data);
@@ -877,9 +1034,12 @@ public class SaveGameManager : MonoBehaviour
                 // de credito no inicio do turno sobrescrever o snapshot salvo.
                 RestoreMatchPlayers(data);
             }
+            LogLoadPerf(loadedSlot, "restore_match_state.end", restoreMatchStartMs, PerfNowMs() - routineStartMs);
 
             // Reaplica estado de acted apos MatchController liberar equipe ativa.
             stage = "restore-unit-flags";
+            double restoreUnitFlagsStartMs = PerfNowMs();
+            LogLoadPerf(loadedSlot, "restore_unit_flags.begin", restoreUnitFlagsStartMs, restoreUnitFlagsStartMs - routineStartMs);
             if (data.units != null)
             {
                 for (int i = 0; i < data.units.Count; i++)
@@ -891,9 +1051,13 @@ public class SaveGameManager : MonoBehaviour
                     SaveDataMapper.ApplyUnitTurnFlagsFromSaveData(unit, saved);
                 }
             }
+            LogLoadPerf(loadedSlot, "restore_unit_flags.end", restoreUnitFlagsStartMs, PerfNowMs() - routineStartMs);
 
             stage = "apply-conservative-fog-visibility";
+            double conservativeFogStartMs = PerfNowMs();
+            LogLoadPerf(loadedSlot, "apply_conservative_fog.begin", conservativeFogStartMs, conservativeFogStartMs - routineStartMs);
             matchController?.ApplyConservativeFogVisibilityForLoading();
+            LogLoadPerf(loadedSlot, "apply_conservative_fog.end", conservativeFogStartMs, PerfNowMs() - routineStartMs);
 
             coreLoadSucceeded = true;
         }
@@ -904,40 +1068,36 @@ public class SaveGameManager : MonoBehaviour
 
         if (coreLoadSucceeded)
         {
-            stage = "restore-replay-history";
-            if (replayManager != null)
-            {
-                ReplaySaveData replayData = data.replay;
-                replayManager.ImportReplaySaveData(replayData);
-                int importedActionCount = replayData != null &&
-                                          replayData.actionStack != null &&
-                                          replayData.actionStack.Actions != null
-                    ? replayData.actionStack.Actions.Count
-                    : 0;
-                int importedHistoryCount = replayData != null && replayData.matchHistory != null
-                    ? replayData.matchHistory.Count
-                    : 0;
-                Debug.Log(
-                    $"[SaveGame][ReplayLoad] slot={loadedSlot} " +
-                    $"importedActionStackCount={importedActionCount} importedMatchHistoryCount={importedHistoryCount}");
-            }
-
+            double planningImportStartMs = PerfNowMs();
+            LogLoadPerf(loadedSlot, "planning_import.begin", planningImportStartMs, planningImportStartMs - routineStartMs);
             if (planningManager != null)
                 planningManager.ImportPlanningData(data.planningConfig, data.rallyPoints, data.rallyAssignments);
+            LogLoadPerf(loadedSlot, "planning_import.end", planningImportStartMs, PerfNowMs() - routineStartMs);
 
             stage = "reset-runtime-input";
+            double resetInputStartMs = PerfNowMs();
+            LogLoadPerf(loadedSlot, "reset_runtime_input.begin", resetInputStartMs, resetInputStartMs - routineStartMs);
             turnStateManager?.ForceNeutral();
             cursorController?.ClearRuntimeInputLocksAfterLoad();
             cursorController?.SnapToCurrentCell();
             PanelDialogController.ClearExternalText();
+            LogLoadPerf(loadedSlot, "reset_runtime_input.end", resetInputStartMs, PerfNowMs() - routineStartMs);
 
             if (matchController != null)
             {
                 // Ensure spawned constructions/units finished enable-cycle and static lists are up-to-date.
+                double refreshFogStartMs = PerfNowMs();
+                LogLoadPerf(loadedSlot, "refresh_fog_after_load.begin", refreshFogStartMs, refreshFogStartMs - routineStartMs);
                 yield return null;
                 matchController.SuppressFogOfWarRefresh = false;
                 suppressedFogRefresh = false;
-                matchController.RefreshFogOfWarForActiveTeam();
+                bool restoredFromCache = matchController.TryRestoreFogRuntimeCacheFromSave(
+                    data.fogCacheTeamId,
+                    data.fogVisibleContributorsByCell,
+                    data.fogUnitVisibilityByCacheIndex);
+                if (!restoredFromCache)
+                    matchController.RefreshFogOfWarForActiveTeam();
+                LogLoadPerf(loadedSlot, "refresh_fog_after_load.end", refreshFogStartMs, PerfNowMs() - routineStartMs);
             }
 
             cursorController?.PlayBeepSfx();
@@ -954,6 +1114,7 @@ public class SaveGameManager : MonoBehaviour
         if (suppressedFogRefresh && matchController != null)
             matchController.SuppressFogOfWarRefresh = false;
 
+        LogLoadPerf(loadedSlot, "load_routine.end", routineStartMs, PerfNowMs() - routineStartMs);
         loadInProgress = false;
     }
 
@@ -1025,7 +1186,10 @@ public class SaveGameManager : MonoBehaviour
             hasVictoryWinner = matchState.hasVictoryWinner,
             victoryWinnerTeamId = matchState.victoryWinnerTeamId,
             players = matchState.players != null ? matchState.players : new List<MatchPlayerSaveData>(),
-            victoryStars = matchState.victoryStars != null ? matchState.victoryStars : new List<MatchVictoryStarSaveData>()
+            victoryStars = matchState.victoryStars != null ? matchState.victoryStars : new List<MatchVictoryStarSaveData>(),
+            fogCacheTeamId = int.MinValue,
+            fogVisibleContributorsByCell = new List<FogCellContributorSaveData>(),
+            fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>()
         };
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
@@ -1056,15 +1220,20 @@ public class SaveGameManager : MonoBehaviour
                 data.constructions.Add(item);
         }
 
-        if (saveReplayData && replayManager != null)
-            data.replay = replayManager.ExportReplaySaveData();
-
         if (planningManager != null)
         {
             planningManager.ExportPlanningData(out PlanningConfigSaveData planningConfig, out List<RallyPointSaveData> planningPoints, out List<RallyAssignmentSaveData> planningAssignments);
             data.planningConfig = planningConfig;
             data.rallyPoints = planningPoints;
             data.rallyAssignments = planningAssignments;
+        }
+
+        if (matchController != null)
+        {
+            matchController.ExportFogRuntimeCacheForSave(
+                out data.fogCacheTeamId,
+                data.fogVisibleContributorsByCell,
+                data.fogUnitVisibilityByCacheIndex);
         }
 
         return data;
@@ -1127,7 +1296,6 @@ public class SaveGameManager : MonoBehaviour
 
     private bool TryBlockReplayPersistence(string logMessage, string dialogId, string dialogFallback)
     {
-        TryAutoAssignReferences();
         if (replayManager == null || !replayManager.IsReplaying)
             return false;
 
@@ -1141,7 +1309,6 @@ public class SaveGameManager : MonoBehaviour
 
     private bool TryBlockPlanningSavePersistence(string logMessage, string dialogId, string dialogFallback)
     {
-        TryAutoAssignReferences();
         bool planningActive =
             (planningManager != null && planningManager.IsPlanningModeActive)
             || (turnStateManager != null && turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Planning);
@@ -1158,7 +1325,6 @@ public class SaveGameManager : MonoBehaviour
 
     private bool TryBlockAircraftFuelDepletionPersistence(string logMessage, string dialogId, string dialogFallback)
     {
-        TryAutoAssignReferences();
         if (turnStateManager == null || !turnStateManager.IsTurnStartFuelDepletionExecutionInProgress)
             return false;
 
@@ -1201,7 +1367,7 @@ public class SaveGameManager : MonoBehaviour
     {
         int normalizedSlot = NormalizeSlot(slotIndex);
         string primaryPath = GetSlotPathFromTemplate(normalizedSlot);
-        if (File.Exists(primaryPath))
+        if (File.Exists(primaryPath) && !IsMetadataSidecarPath(primaryPath) && !IsReplaySidecarPath(primaryPath))
             return primaryPath;
 
         string saveDir = ResolveSaveDirectory();
@@ -1209,23 +1375,27 @@ public class SaveGameManager : MonoBehaviour
         {
             if (Directory.Exists(saveDir))
             {
-                string[] candidates = Directory.GetFiles(saveDir, $"*_slot{normalizedSlot}.json", SearchOption.TopDirectoryOnly);
+                string[] candidates = Directory.GetFiles(saveDir, $"*_slot{normalizedSlot}*.json", SearchOption.TopDirectoryOnly);
                 if (candidates != null && candidates.Length > 0)
                 {
-                    string latest = candidates[0];
-                    DateTime latestWrite = File.GetLastWriteTimeUtc(latest);
-                    for (int i = 1; i < candidates.Length; i++)
+                    string latest = null;
+                    DateTime latestWrite = DateTime.MinValue;
+                    for (int i = 0; i < candidates.Length; i++)
                     {
                         string current = candidates[i];
+                        if (IsMetadataSidecarPath(current) || IsReplaySidecarPath(current))
+                            continue;
+
                         DateTime currentWrite = File.GetLastWriteTimeUtc(current);
-                        if (currentWrite > latestWrite)
+                        if (latest == null || currentWrite > latestWrite)
                         {
                             latest = current;
                             latestWrite = currentWrite;
                         }
                     }
 
-                    return latest;
+                    if (!string.IsNullOrWhiteSpace(latest))
+                        return latest;
                 }
             }
         }
@@ -1334,6 +1504,25 @@ public class SaveGameManager : MonoBehaviour
         metadata.exists = true;
 
         DateTime fallbackLocalTime = File.GetLastWriteTime(metadata.path);
+        string metaPath = ResolveMetaPathForSavePath(metadata.path);
+        if (TryReadSlotMetadataFile(metaPath, out SaveSlotMetadataFile metaFile))
+        {
+            metadata.sceneName = metaFile.sceneName ?? string.Empty;
+            if (metaFile.savedAtUtcTicks > 0L)
+            {
+                DateTime utc = new DateTime(metaFile.savedAtUtcTicks, DateTimeKind.Utc);
+                metadata.savedAtLocal = utc.ToLocalTime();
+            }
+            else
+            {
+                metadata.savedAtLocal = fallbackLocalTime;
+            }
+
+            if (string.IsNullOrWhiteSpace(metadata.sceneName))
+                metadata.sceneName = "Mapa desconhecido";
+            return metadata;
+        }
+
         try
         {
             if (!TryReadSaveJson(metadata.path, out string json, out _, out _, out _, out string readError))
@@ -1359,6 +1548,9 @@ public class SaveGameManager : MonoBehaviour
                 {
                     metadata.savedAtLocal = fallbackLocalTime;
                 }
+
+                // Compatibilidade: sidecar para evitar desserializacao completa no prompt.
+                WriteSlotMetadataFileAtPath(metaPath, data);
             }
             else
             {
@@ -1376,6 +1568,129 @@ public class SaveGameManager : MonoBehaviour
             metadata.sceneName = "Mapa desconhecido";
 
         return metadata;
+    }
+
+    private void WriteSlotMetadataFile(string savePath, SaveGameData data)
+    {
+        if (string.IsNullOrWhiteSpace(savePath) || data == null)
+            return;
+
+        string metaPath = ResolveMetaPathForSavePath(savePath);
+        WriteSlotMetadataFileAtPath(metaPath, data);
+    }
+
+    private void WriteSlotMetadataFileAtPath(string metaPath, SaveGameData data)
+    {
+        if (string.IsNullOrWhiteSpace(metaPath) || data == null)
+            return;
+
+        try
+        {
+            SaveSlotMetadataFile metaFile = new SaveSlotMetadataFile
+            {
+                sceneName = data.sceneName ?? string.Empty,
+                savedAtUtcTicks = data.savedAtUtcTicks
+            };
+
+            string json = JsonUtility.ToJson(metaFile, false);
+            Directory.CreateDirectory(Path.GetDirectoryName(metaPath) ?? ResolveSaveDirectory());
+            File.WriteAllText(metaPath, json, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            if (verboseLogs)
+                Debug.LogWarning($"[SaveGame] Falha ao escrever metadata sidecar '{metaPath}': {ex.Message}");
+        }
+    }
+
+    private bool TryReadSlotMetadataFile(string metaPath, out SaveSlotMetadataFile metaFile)
+    {
+        metaFile = null;
+        if (string.IsNullOrWhiteSpace(metaPath) || !File.Exists(metaPath))
+            return false;
+
+        try
+        {
+            string json = File.ReadAllText(metaPath, Encoding.UTF8);
+            if (string.IsNullOrWhiteSpace(json))
+                return false;
+
+            metaFile = JsonUtility.FromJson<SaveSlotMetadataFile>(json);
+            return metaFile != null;
+        }
+        catch (Exception ex)
+        {
+            if (verboseLogs)
+                Debug.LogWarning($"[SaveGame] Falha ao ler metadata sidecar '{metaPath}': {ex.Message}");
+            return false;
+        }
+    }
+
+    private void WriteOrDeleteReplaySidecar(string savePath)
+    {
+        if (string.IsNullOrWhiteSpace(savePath))
+            return;
+
+        string replayPath = ResolveReplayPathForSavePath(savePath);
+        bool shouldPersistReplay =
+            saveReplayData &&
+            replayManager != null &&
+            replayManager.IsRecording;
+
+        if (!shouldPersistReplay)
+        {
+            if (File.Exists(replayPath))
+                File.Delete(replayPath);
+            return;
+        }
+
+        try
+        {
+            ReplaySaveData replayData = replayManager.ExportReplaySaveData();
+            string replayJson = JsonUtility.ToJson(replayData, false);
+            Directory.CreateDirectory(Path.GetDirectoryName(replayPath) ?? ResolveSaveDirectory());
+            File.WriteAllText(replayPath, replayJson, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[SaveGame] Falha ao salvar replay sidecar '{replayPath}': {ex.Message}");
+        }
+    }
+
+    private static bool IsReplaySidecarPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return false;
+
+        return path.EndsWith(".replay", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMetadataSidecarPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return false;
+
+        return path.EndsWith(".meta.json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string ResolveMetaPathForSavePath(string savePath)
+    {
+        if (string.IsNullOrWhiteSpace(savePath))
+            return Path.Combine(ResolveSaveDirectory(), "slot.meta.json");
+
+        string directory = Path.GetDirectoryName(savePath) ?? ResolveSaveDirectory();
+        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(savePath);
+        return Path.Combine(directory, $"{fileNameWithoutExtension}.meta.json");
+    }
+
+    private string ResolveReplayPathForSavePath(string savePath)
+    {
+        if (string.IsNullOrWhiteSpace(savePath))
+            return Path.Combine(ResolveSaveDirectory(), "slot.replay");
+
+        string directory = Path.GetDirectoryName(savePath) ?? ResolveSaveDirectory();
+        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(savePath);
+        return Path.Combine(directory, $"{fileNameWithoutExtension}.replay");
     }
 
     private static string SanitizeFileName(string raw)
@@ -1442,6 +1757,36 @@ public class SaveGameManager : MonoBehaviour
             replayManager = FindInActiveScene<ReplayManager>();
         if (planningManager == null)
             planningManager = FindInActiveScene<PlanningManager>();
+    }
+
+    private static double PerfNowMs()
+    {
+        return Time.realtimeSinceStartupAsDouble * 1000d;
+    }
+
+    private void LogLoadPerf(int slot, string stage, double stageStartMs, double totalElapsedMs)
+    {
+        if (!enableLoadPerfLogs)
+            return;
+
+        double stageElapsedMs = Math.Max(0d, PerfNowMs() - stageStartMs);
+        double totalMs = Math.Max(0d, totalElapsedMs);
+        string timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+        Debug.Log(
+            $"[SaveGame][LoadPerf][{timestamp}] slot={slot} stage={stage} " +
+            $"stageMs={stageElapsedMs:F2} totalMs={totalMs:F2}");
+    }
+
+    private void LogPromptPerf(string stage, double elapsedMs, bool forceWarning = false)
+    {
+        if (!enablePromptPerfLogs)
+            return;
+
+        string message = $"[SaveGame][PromptPerf] stage={stage} ms={Math.Max(0d, elapsedMs):F2}";
+        if (forceWarning || elapsedMs >= promptPerfWarnThresholdMs)
+            LogManager.Warning(GameLogCategory.SaveLoad, message, this);
+        else
+            LogManager.Info(GameLogCategory.SaveLoad, message, this);
     }
 
     private static T FindInActiveScene<T>() where T : Component
@@ -1600,6 +1945,8 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
+
+
 
 
 

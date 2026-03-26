@@ -128,6 +128,13 @@ public partial class TurnStateManager
         }
         else if (onCompleteState == CursorState.MoveuAndando)
         {
+            Tilemap movementTilemap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
+            bool usedRoadBoost = UnitMovementPathRules.DidUseRoadFullMoveBonus(
+                movementTilemap,
+                selectedUnit,
+                committedMovementPath,
+                terrainDatabase);
+            selectedUnit.SetUsedRoadBoostOnLastMove(usedRoadBoost);
             PrepareFuelCostForCommittedPath();
             PrepareMovementCostForCommittedPath();
             DrawCommittedPathVisual(committedMovementPath);
@@ -139,6 +146,7 @@ public partial class TurnStateManager
         }
         else if (onCompleteState == CursorState.MoveuParado)
         {
+            selectedUnit.SetUsedRoadBoostOnLastMove(false);
             OnUnitMovementExecuted?.Invoke(selectedUnit);
             EnterSensorsState(CursorState.MoveuParado);
             return;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -95,13 +95,13 @@ public class ReplayManager : MonoBehaviour
     private void ReplayLog(string message)
     {
         if (enableReplayRuntimeLogs)
-            Debug.Log(message);
+            LogManager.Info(GameLogCategory.Replay, message, this);
     }
 
     private void ReplayLogWarning(string message)
     {
         if (enableReplayRuntimeWarnings)
-            Debug.LogWarning(message);
+            LogManager.Warning(GameLogCategory.Replay, message, this);
     }
 
     public float GetEffectiveTimeBetweenBatchesForAutoplay()
@@ -1239,7 +1239,7 @@ public class ReplayManager : MonoBehaviour
         if (!int.TryParse(action.UnitInstanceId, out int expectedInstanceId))
         {
             mismatchDetails = $"UnitInstanceId invalido no replay: '{action.UnitInstanceId}'";
-            Debug.LogWarning($"[Replay] {mismatchDetails}");
+            ReplayLogWarning($"[Replay] {mismatchDetails}");
             return false;
         }
 
@@ -1251,7 +1251,7 @@ public class ReplayManager : MonoBehaviour
 
         string foundLabel = foundUnit != null ? foundInstanceId.ToString() : "none";
         mismatchDetails = $"UnitInstanceId divergiu - esperado {expectedInstanceId}, encontrado {foundLabel}";
-        Debug.LogWarning($"[Replay] {mismatchDetails}");
+        ReplayLogWarning($"[Replay] {mismatchDetails}");
         return false;
     }
 
@@ -3380,6 +3380,8 @@ public class ReplayManager : MonoBehaviour
         return resolved;
     }
 }
+
+
 
 
 

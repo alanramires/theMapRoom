@@ -557,6 +557,7 @@ public partial class TurnStateManager
             if (hpGain <= 0 && fuelGain <= 0 && ammoGain <= 0)
                 continue;
 
+            NotifyUnitSupplied(supplier, target);
             servedTargets++;
             recoveredHp += hpGain;
             recoveredFuel += fuelGain;

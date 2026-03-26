@@ -394,6 +394,7 @@ MonoBehaviour:
   currentFuel: 99
   maxFuel: 99
   remainingMovementPoints: 3
+  usedRoadBoostOnLastMove: 0
   visao: 3
   embarkedWeaponsRuntime: []
   embarkedResourcesRuntime: []

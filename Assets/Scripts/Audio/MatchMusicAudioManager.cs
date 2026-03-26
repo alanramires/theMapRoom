@@ -1,5 +1,7 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -12,7 +14,8 @@ public class MatchMusicAudioManager : MonoBehaviour
     public enum MusicPlaybackMode
     {
         Free = 0,
-        ByTeam = 1
+        ByTeam = 1,
+        Loop = 2
     }
 
     [Header("References")]
@@ -40,6 +43,12 @@ public class MatchMusicAudioManager : MonoBehaviour
     [SerializeField] private AudioClip team1Track;
     [SerializeField] private AudioClip team2Track;
     [SerializeField] private AudioClip team3Track;
+    [Header("Game Tracks")]
+    [SerializeField] private AudioClip gameOpenTrack;
+    [SerializeField] [Range(0f, 2f)] private float gameOpenMusicVolume = 1f;
+    [SerializeField] private bool playGameOpenOnStart = true;
+    [SerializeField] private bool playGameOpenOnlyInSpecificScene = true;
+    [SerializeField] private string gameOpenSceneName = "Tela de Entrada";
     [Header("Preview")]
     [SerializeField] [Range(-1, 3)] private int previewTeamId = 0;
     [SerializeField] private bool previewLoop = true;
@@ -49,9 +58,11 @@ public class MatchMusicAudioManager : MonoBehaviour
     private bool isPausedByUser;
     private bool pausedByTurnTransition;
     private bool suppressPlaybackForTurnTransition;
+    private Coroutine fadeOutRoutine;
     public bool IsPausedByUser => isPausedByUser;
     public bool IsPlaying => audioSource != null && audioSource.isPlaying;
     public bool IsFreeMode => playbackMode == MusicPlaybackMode.Free;
+    public AudioClip GameOpenTrack => gameOpenTrack;
 
     private void Awake()
     {
@@ -64,6 +75,9 @@ public class MatchMusicAudioManager : MonoBehaviour
 
     private void Start()
     {
+        if (TryPlayGameOpenTrackForMenuScene())
+            return;
+
         if (playOnStart)
         {
             StartPlaybackForCurrentMode(forceRestart: true);
@@ -172,9 +186,38 @@ public class MatchMusicAudioManager : MonoBehaviour
 
     public void StopPlaybackPermanently()
     {
+        if (fadeOutRoutine != null)
+        {
+            StopCoroutine(fadeOutRoutine);
+            fadeOutRoutine = null;
+        }
+
         isPausedByUser = true;
         if (audioSource != null)
             audioSource.Stop();
+    }
+
+    public IEnumerator FadeOutAndStop(float durationSeconds)
+    {
+        EnsureReferences();
+        if (audioSource == null)
+            yield break;
+
+        if (fadeOutRoutine != null)
+        {
+            StopCoroutine(fadeOutRoutine);
+            fadeOutRoutine = null;
+        }
+
+        if (!audioSource.isPlaying || durationSeconds <= 0f)
+        {
+            StopPlaybackPermanently();
+            RefreshOutputVolume();
+            yield break;
+        }
+
+        fadeOutRoutine = StartCoroutine(FadeOutAndStopRoutine(Mathf.Max(0.01f, durationSeconds)));
+        yield return fadeOutRoutine;
     }
 
     public void BeginTurnTransition()
@@ -235,6 +278,24 @@ public class MatchMusicAudioManager : MonoBehaviour
     [ContextMenu("Music Preview/Play Team 3")]
     public void PlayPreviewTeam3() => PlayPreviewForTeam(3, previewLoop);
 
+    [ContextMenu("Music Preview/Play Game Open")]
+    public void PlayPreviewGameOpen()
+    {
+        if (!Application.isPlaying)
+        {
+            Debug.LogWarning("[Music] Preview funciona em Play Mode.");
+            return;
+        }
+
+        if (audioSource == null || gameOpenTrack == null)
+            return;
+
+        isPausedByUser = false;
+        pausedByTurnTransition = false;
+        suppressPlaybackForTurnTransition = false;
+        PlayClip(gameOpenTrack, previewLoop, forceRestart: true);
+    }
+
     [ContextMenu("Music Preview/Stop")]
     public void StopPreview()
     {
@@ -273,10 +334,30 @@ public class MatchMusicAudioManager : MonoBehaviour
         audioSource.Play();
     }
 
+    public bool PlayGameOpenTrack(bool loop = true, bool forceRestart = true)
+    {
+        EnsureReferences();
+        if (audioSource == null || gameOpenTrack == null)
+            return false;
+
+        isPausedByUser = false;
+        pausedByTurnTransition = false;
+        suppressPlaybackForTurnTransition = false;
+        PlayClip(gameOpenTrack, loop, forceRestart);
+        return true;
+    }
+
     private void EnsurePlayback()
     {
         if (audioSource == null)
             return;
+
+        if (playbackMode == MusicPlaybackMode.Loop)
+        {
+            if (!audioSource.isPlaying)
+                PlayLoopTrack(forceRestart: false);
+            return;
+        }
 
         if (playbackMode == MusicPlaybackMode.ByTeam)
         {
@@ -301,6 +382,12 @@ public class MatchMusicAudioManager : MonoBehaviour
     {
         if (audioSource == null)
             return;
+
+        if (playbackMode == MusicPlaybackMode.Loop)
+        {
+            PlayLoopTrack(forceRestart);
+            return;
+        }
 
         if (playbackMode == MusicPlaybackMode.ByTeam)
         {
@@ -340,6 +427,36 @@ public class MatchMusicAudioManager : MonoBehaviour
         PlayClip(valid[currentFreeIndex], loop: false, forceRestart: true);
     }
 
+    private void PlayLoopTrack(bool forceRestart)
+    {
+        if (audioSource == null)
+            return;
+
+        AudioClip clip = ResolveLoopClipCandidate();
+        if (clip == null)
+        {
+            audioSource.Stop();
+            audioSource.clip = null;
+            return;
+        }
+
+        PlayClip(clip, loop: true, forceRestart: forceRestart);
+    }
+
+    private AudioClip ResolveLoopClipCandidate()
+    {
+        if (audioSource != null && audioSource.clip != null)
+            return audioSource.clip;
+        if (gameOpenTrack != null)
+            return gameOpenTrack;
+
+        List<AudioClip> valid = GetValidFreePlaylist();
+        if (valid.Count > 0)
+            return valid[0];
+
+        return team0Track;
+    }
+
     private void PlayTeamTrack(int teamId, bool forceRestart)
     {
         if (audioSource == null)
@@ -372,6 +489,27 @@ public class MatchMusicAudioManager : MonoBehaviour
         audioSource.loop = loop;
         RefreshOutputVolume();
         audioSource.Play();
+    }
+
+    private IEnumerator FadeOutAndStopRoutine(float durationSeconds)
+    {
+        float startVolume = audioSource != null ? audioSource.volume : 0f;
+        float elapsed = 0f;
+
+        while (audioSource != null && audioSource.isPlaying && elapsed < durationSeconds)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / durationSeconds);
+            audioSource.volume = Mathf.Lerp(startVolume, 0f, t);
+            yield return null;
+        }
+
+        if (audioSource != null)
+            audioSource.Stop();
+
+        isPausedByUser = true;
+        RefreshOutputVolume();
+        fadeOutRoutine = null;
     }
 
     private AudioClip GetTeamClip(int teamId)
@@ -427,6 +565,28 @@ public class MatchMusicAudioManager : MonoBehaviour
 #endif
     }
 
+    private bool TryPlayGameOpenTrackForMenuScene()
+    {
+        if (!playGameOpenOnStart)
+            return false;
+
+        if (!playGameOpenOnlyInSpecificScene)
+            return PlayGameOpenTrack(loop: true, forceRestart: true);
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (!activeScene.IsValid())
+            return false;
+
+        string configuredName = string.IsNullOrWhiteSpace(gameOpenSceneName) ? string.Empty : gameOpenSceneName.Trim();
+        if (configuredName.Length <= 0)
+            return false;
+
+        if (!string.Equals(activeScene.name, configuredName, System.StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return PlayGameOpenTrack(loop: true, forceRestart: true);
+    }
+
     private void EnsureReferences()
     {
         if (matchController == null)
@@ -467,6 +627,7 @@ public class MatchMusicAudioManager : MonoBehaviour
         team1MusicVolume = Mathf.Clamp(team1MusicVolume, 0f, 2f);
         team2MusicVolume = Mathf.Clamp(team2MusicVolume, 0f, 2f);
         team3MusicVolume = Mathf.Clamp(team3MusicVolume, 0f, 2f);
+        gameOpenMusicVolume = Mathf.Clamp(gameOpenMusicVolume, 0f, 2f);
     }
 
     private void ApplyAudioSourceDefaults()
@@ -508,6 +669,8 @@ public class MatchMusicAudioManager : MonoBehaviour
             return team2MusicVolume;
         if (team3Track != null && currentClip == team3Track)
             return team3MusicVolume;
+        if (gameOpenTrack != null && currentClip == gameOpenTrack)
+            return gameOpenMusicVolume;
 
         return 1f;
     }
@@ -576,6 +739,8 @@ public class MatchMusicAudioManager : MonoBehaviour
             string name = clip.name.ToLowerInvariant();
             if (name == "neutraltrack" || name == "neutral")
                 neutralTrack = clip;
+            else if (name == "gameopentrack" || name == "gameopen")
+                gameOpenTrack = clip;
             else if (name == "team0")
                 team0Track = clip;
             else if (name == "team1")

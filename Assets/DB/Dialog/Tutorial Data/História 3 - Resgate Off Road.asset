@@ -18,51 +18,65 @@ MonoBehaviour:
   - id: UNIT_SELECTED
     parameters: 8,12
     description: Aperte TAB e selecione o soldado Ryan
-    isCompleted: 1
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 0
     isDefeatCondition: 0
     hasFailed: 0
-    hintId: 0
   - id: UNIT_AT_HEX
     parameters: 7,10
     description: Aguarde o resgate no ponto de encontro
-    isCompleted: 1
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 0
     isDefeatCondition: 0
     hasFailed: 0
-    hintId: 0
   - id: UNIT_AT_HEX
     parameters: 5,6
     description: Aperte HOME para voltar a base. Compre um APC e cruze o desfiladeiro
       montanhoso
-    isCompleted: 1
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 0
     isDefeatCondition: 0
     hasFailed: 0
-    hintId: 0
   - id: HAS_EMBARKED_UNIT
     parameters: APC
     description: Embarque Ryan no APC quando estiver adjacente a ele
-    isCompleted: 1
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 0
     isDefeatCondition: 0
     hasFailed: 0
-    hintId: 0
   - id: DESTROY_ENEMY_UNIT
     parameters: spawn:1 SD 5,6
     description: Destrua o soldado inimigo que guarda o caminho de volta
-    isCompleted: 1
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
     isDefeatCondition: 0
     hasFailed: 0
-    hintId: 0
   - id: UNIT_AT_HEX
     parameters: SD 0,0
     description: "Desembarque o soldado no HQ para ele receber cudiados m\xE9dicos"
+    startHidden: 0
+    isVisible: 1
     isCompleted: 0
+    isOptional: 0
     isDefeatCondition: 0
     hasFailed: 0
-    hintId: 0
   - id: DEAD_UNIT
     parameters: Pvt.Ryan_T0_U8 || HP = 0 || AUT = 0
     description: "O soldado Ryan n\xE3o pode ser morto ou ficar sem movimento."
-    isCompleted: 0
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 1
+    isOptional: 0
     isDefeatCondition: 1
-    hasFailed: 1
-    hintId: 0
+    hasFailed: 0
   victoryDialog: {fileID: 0}

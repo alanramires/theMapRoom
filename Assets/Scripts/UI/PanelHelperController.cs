@@ -1002,11 +1002,12 @@ public class PanelHelperController : MonoBehaviour
                     continue;
                 sb.AppendLine(ResolveMessage(
                     "helper.supply.supplier_consumption.line",
-                    "<supply>: <before> -> <after>",
+                    "<supply>: <before> - <consumed> -> <after>",
                     new Dictionary<string, string>
                     {
                         { "supply", line.supplyName ?? "Supply" },
                         { "before", Mathf.Max(0, line.beforeAmount).ToString() },
+                        { "consumed", Mathf.Max(0, line.beforeAmount - line.afterAmount).ToString() },
                         { "after", Mathf.Max(0, line.afterAmount).ToString() }
                     }));
             }

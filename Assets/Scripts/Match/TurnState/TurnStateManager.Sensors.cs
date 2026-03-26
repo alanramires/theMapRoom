@@ -132,6 +132,7 @@ public partial class TurnStateManager
             selectedUnit,
             boardMap,
             terrainDatabase,
+            matchController,
             cachedPodeSuprirTargets,
             out cachedPodeSuprirReason,
             cachedPodeSuprirInvalidTargets);
