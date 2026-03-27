@@ -11,7 +11,7 @@ public class MainMenuCinematicController : MonoBehaviour
     [Header("References")]
     [SerializeField] private CanvasGroup panelMenuCanvasGroup;
     [SerializeField] private GameObject panelMenuRoot;
-    [SerializeField] private MainMenuKeyboardController menuKeyboardController;
+    [SerializeField] private PanelMenu panelMenu;
     [SerializeField] private MatchMusicAudioManager musicAudioManager;
     [SerializeField] private CursorController cursorController;
     [SerializeField] private VideoPlayer videoPlayer;
@@ -121,7 +121,7 @@ public class MainMenuCinematicController : MonoBehaviour
 
         SetCinematicOverlayVisible(false);
         SetMenuVisible(true);
-        menuKeyboardController?.ShowRootMenu();
+        panelMenu?.ShowRootMenu();
 
         if (cancelledByUser)
             cursorController?.PlayCancelSfx();
@@ -213,8 +213,10 @@ public class MainMenuCinematicController : MonoBehaviour
             }
         }
 
-        if (menuKeyboardController == null)
-            menuKeyboardController = GetComponent<MainMenuKeyboardController>();
+        if (panelMenu == null)
+            panelMenu = GetComponent<PanelMenu>();
+        if (panelMenu == null)
+            panelMenu = FindAnyObjectByType<PanelMenu>();
 
         if (musicAudioManager == null)
             musicAudioManager = FindAnyObjectByType<MatchMusicAudioManager>();

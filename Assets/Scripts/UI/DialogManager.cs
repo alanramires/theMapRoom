@@ -10,9 +10,14 @@ public class DialogManager : MonoBehaviour
     [SerializeField] private bool contextHelpEnabled = true;
     [SerializeField] [Range(0.2f, 5f)] private float hoverHelpDelay = 1.0f;
     [SerializeField] [Range(1f, 10f)] private float dialogHelpDuration = 3.0f;
+    [Header("Text Color Override")]
+    [SerializeField] private bool useTeamColor = true;
+    [SerializeField] private Color fallbackDialogTextColor = Color.white;
 
     public bool ContextHelpEnabled => contextHelpEnabled;
     public float HoverHelpDelay => hoverHelpDelay;
+    public bool UseTeamColor => useTeamColor;
+    public Color FallbackDialogTextColor => EnsureValidReadableColor(fallbackDialogTextColor);
 
     [Header("References")]
     [SerializeField] private MatchController matchController;
@@ -40,6 +45,11 @@ public class DialogManager : MonoBehaviour
     private void OnDisable()
     {
         MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
+    }
+
+    private void OnValidate()
+    {
+        fallbackDialogTextColor = EnsureValidReadableColor(fallbackDialogTextColor);
     }
 
     private void HandleActiveTeamChanged(int teamId)
@@ -120,5 +130,45 @@ public class DialogManager : MonoBehaviour
     private static string GetFallbackText(HelpHintId hintId, string entityName)
     {
         return entityName;
+    }
+
+    public Color ResolveDialogTextColor(TeamId team)
+    {
+        if (useTeamColor && IsRealTeam(team))
+        {
+            Color teamColor = TeamUtils.GetColor(team);
+            if (IsColorValid(teamColor))
+                return teamColor;
+        }
+
+        return EnsureValidReadableColor(fallbackDialogTextColor);
+    }
+
+    private static bool IsRealTeam(TeamId team)
+    {
+        return team == TeamId.Green ||
+               team == TeamId.Red ||
+               team == TeamId.Blue ||
+               team == TeamId.Yellow;
+    }
+
+    private static bool IsColorValid(Color color)
+    {
+        return !float.IsNaN(color.r) && !float.IsInfinity(color.r) &&
+               !float.IsNaN(color.g) && !float.IsInfinity(color.g) &&
+               !float.IsNaN(color.b) && !float.IsInfinity(color.b) &&
+               !float.IsNaN(color.a) && !float.IsInfinity(color.a);
+    }
+
+    private static Color EnsureValidReadableColor(Color color)
+    {
+        if (!IsColorValid(color))
+            return Color.white;
+
+        // Se vier totalmente transparente, evita "sumir" na UI.
+        if (color.a <= 0.001f)
+            return Color.white;
+
+        return color;
     }
 }

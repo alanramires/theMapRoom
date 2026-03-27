@@ -629,6 +629,8 @@ public class MatchController : MonoBehaviour
         if (Application.isPlaying)
         {
             ApplyActiveTeamIfChanged(force: true);
+            TryAutoAssignTurnTransitionReferences();
+            matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);
             
             // Garante que o painel de fim de jogo comece oculto
             foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())

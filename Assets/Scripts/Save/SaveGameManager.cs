@@ -503,6 +503,25 @@ public class SaveGameManager : MonoBehaviour
         return File.Exists(path);
     }
 
+    public bool TryGetSlotSceneName(int slotIndex, out string sceneName)
+    {
+        sceneName = string.Empty;
+        int normalizedSlot = NormalizeSlot(slotIndex);
+        SaveSlotMetadata metadata = ReadSlotMetadata(normalizedSlot);
+        if (metadata == null || !metadata.exists)
+            return false;
+
+        string value = string.IsNullOrWhiteSpace(metadata.sceneName) ? string.Empty : metadata.sceneName.Trim();
+        if (string.Equals(value, "Mapa desconhecido", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        sceneName = value;
+        return true;
+    }
+
     public bool BeginLoadFromMainMenuSlot(int slotIndex)
     {
         if (!Application.isPlaying)
@@ -560,6 +579,8 @@ public class SaveGameManager : MonoBehaviour
 
     public void LoadSlot(int slotIndex)
     {
+        Debug.Log($"[TRACE][SaveGameManager.LoadSlot] slotIndex={slotIndex}\n{Environment.StackTrace}");
+
         if (!Application.isPlaying)
         {
             Debug.LogWarning("[SaveGame] Load funciona apenas em Play Mode.");

@@ -49,6 +49,8 @@ public class MatchMusicAudioManager : MonoBehaviour
     [SerializeField] private bool playGameOpenOnStart = true;
     [SerializeField] private bool playGameOpenOnlyInSpecificScene = true;
     [SerializeField] private string gameOpenSceneName = "Tela de Entrada";
+    [Header("Transitions")]
+    [SerializeField] [Range(0f, 1f)] private float menuLoadTransitionMusicVolume = 0.1f;
     [Header("Preview")]
     [SerializeField] [Range(-1, 3)] private int previewTeamId = 0;
     [SerializeField] private bool previewLoop = true;
@@ -58,11 +60,14 @@ public class MatchMusicAudioManager : MonoBehaviour
     private bool isPausedByUser;
     private bool pausedByTurnTransition;
     private bool suppressPlaybackForTurnTransition;
+    private bool hasRuntimeVolumeOverride;
+    private float runtimeVolumeOverride = 1f;
     private Coroutine fadeOutRoutine;
     public bool IsPausedByUser => isPausedByUser;
     public bool IsPlaying => audioSource != null && audioSource.isPlaying;
     public bool IsFreeMode => playbackMode == MusicPlaybackMode.Free;
     public AudioClip GameOpenTrack => gameOpenTrack;
+    public float MenuLoadTransitionMusicVolume => Mathf.Clamp01(menuLoadTransitionMusicVolume);
 
     private void Awake()
     {
@@ -195,6 +200,45 @@ public class MatchMusicAudioManager : MonoBehaviour
         isPausedByUser = true;
         if (audioSource != null)
             audioSource.Stop();
+    }
+
+    public void SetRuntimeVolumeOverride(float volumeScale)
+    {
+        hasRuntimeVolumeOverride = true;
+        runtimeVolumeOverride = Mathf.Clamp(volumeScale, 0f, 1f);
+        RefreshOutputVolume();
+    }
+
+    public void ClearRuntimeVolumeOverride()
+    {
+        hasRuntimeVolumeOverride = false;
+        runtimeVolumeOverride = 1f;
+        RefreshOutputVolume();
+    }
+
+    public void PrepareForMatchStart(bool forceRestartPlayback = true)
+    {
+        EnsureReferences();
+
+        if (fadeOutRoutine != null)
+        {
+            StopCoroutine(fadeOutRoutine);
+            fadeOutRoutine = null;
+        }
+
+        ClearRuntimeVolumeOverride();
+        pausedByTurnTransition = false;
+        suppressPlaybackForTurnTransition = false;
+        isPausedByUser = false;
+
+        if (audioSource == null)
+            return;
+
+        if (audioSource.isPlaying)
+            audioSource.Stop();
+
+        if (forceRestartPlayback || playOnStart)
+            StartPlaybackForCurrentMode(forceRestart: true);
     }
 
     public IEnumerator FadeOutAndStop(float durationSeconds)
@@ -646,8 +690,8 @@ public class MatchMusicAudioManager : MonoBehaviour
             return;
 
         float teamMultiplier = ResolveCurrentClipVolumeMultiplier();
-
-        audioSource.volume = Mathf.Clamp01(musicVolume * teamMultiplier);
+        float runtimeScale = hasRuntimeVolumeOverride ? runtimeVolumeOverride : 1f;
+        audioSource.volume = Mathf.Clamp01(musicVolume * teamMultiplier * runtimeScale);
     }
 
     private float ResolveCurrentClipVolumeMultiplier()

@@ -336,7 +336,14 @@ public class PanelDialogController : MonoBehaviour
     private Color ResolveActiveTeamColor()
     {
         TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
-        return TeamUtils.GetColor(activeTeam);
+        DialogManager dialogManager = DialogManager.Instance;
+        if (dialogManager != null)
+            return dialogManager.ResolveDialogTextColor(activeTeam);
+
+        if (activeTeam == TeamId.Green || activeTeam == TeamId.Red || activeTeam == TeamId.Blue || activeTeam == TeamId.Yellow)
+            return TeamUtils.GetColor(activeTeam);
+
+        return Color.white;
     }
 
     public static bool TrySetExternalText(string text)
