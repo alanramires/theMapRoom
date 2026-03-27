@@ -78,6 +78,30 @@ public partial class TurnStateManager
             SetCursorState(CursorState.CommandService, "ProcessCommandServiceHotkeyInput");
     }
 
+    public bool TryOpenCommandServiceFromMenu(out string message)
+    {
+        message = string.Empty;
+
+        if (replayManager != null && replayManager.IsReplaying)
+        {
+            message = "Servico do Comando indisponivel durante replay.";
+            return false;
+        }
+
+        if (cursorState != CursorState.Neutral)
+        {
+            message = $"Servico do Comando exige cursor em Neutral (atual: {cursorState}).";
+            return false;
+        }
+
+        TryCloseThreatLayerHotzone();
+        if (!TryPreviewCommandServiceOrder(out message, emitLogs: true))
+            return false;
+
+        SetCursorState(CursorState.CommandService, "TryOpenCommandServiceFromMenu");
+        return true;
+    }
+
     public bool TryStartCommandServiceOrder(out string message)
     {
         return TryStartCommandServiceOrder(out message, emitLogs: true);

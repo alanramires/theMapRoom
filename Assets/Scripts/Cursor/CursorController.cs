@@ -127,6 +127,7 @@ public class CursorController : MonoBehaviour
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private MatchController matchController;
     [SerializeField] private ReplayManager replayManager;
+    [SerializeField] private MonoBehaviour battleMapMenuRootController;
     [SerializeField] private bool enableNeutralLeftClickTeleport = true;
 
     private Vector3Int heldDirection = Vector3Int.zero;
@@ -192,6 +193,14 @@ public class CursorController : MonoBehaviour
             return;
         }
 
+        // O menu de batalha precisa ter prioridade sobre o bloqueio geral de gameplay.
+        // Caso contrario, ESC pode ser "engolido" quando UiInputBlocker estiver ativo.
+        if (TryHandleBattleMapMenuInput())
+        {
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
         if (IsCursorBlocked())
         {
             heldDirection = Vector3Int.zero;
@@ -200,6 +209,13 @@ public class CursorController : MonoBehaviour
 
         HandleCycleUnitInput();
         HandleActionInput();
+
+        if (IsBattleMapMenuOpen())
+        {
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
         HandleNeutralLeftClickTeleport();
 
         if (pendingEndTurnConfirmation)
@@ -670,6 +686,8 @@ public class CursorController : MonoBehaviour
 
         TryAutoAssignMatchController();
         TryAutoAssignReplayManager();
+        if (battleMapMenuRootController == null)
+            battleMapMenuRootController = FindBattleMapMenuRootController();
     }
 
     private void TryAutoAssignMatchController()
@@ -682,6 +700,63 @@ public class CursorController : MonoBehaviour
     {
         if (replayManager == null)
             replayManager = FindAnyObjectByType<ReplayManager>();
+    }
+
+    private MonoBehaviour FindBattleMapMenuRootController()
+    {
+        MonoBehaviour[] components = FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < components.Length; i++)
+        {
+            MonoBehaviour component = components[i];
+            if (component == null)
+                continue;
+
+            Type type = component.GetType();
+            if (type != null && string.Equals(type.Name, "BattleMapMenuRootController", StringComparison.Ordinal))
+                return component;
+        }
+
+        return null;
+    }
+
+    private bool IsBattleMapMenuOpen()
+    {
+        if (battleMapMenuRootController == null)
+            battleMapMenuRootController = FindBattleMapMenuRootController();
+
+        if (battleMapMenuRootController == null)
+            return false;
+
+        Type type = battleMapMenuRootController.GetType();
+        if (type == null)
+            return false;
+
+        var property = type.GetProperty("IsMenuOpen");
+        if (property == null || property.PropertyType != typeof(bool))
+            return false;
+
+        object value = property.GetValue(battleMapMenuRootController, null);
+        return value is bool isOpen && isOpen;
+    }
+
+    private bool TryHandleBattleMapMenuInput()
+    {
+        if (battleMapMenuRootController == null)
+            battleMapMenuRootController = FindBattleMapMenuRootController();
+
+        if (battleMapMenuRootController == null)
+            return false;
+
+        Type type = battleMapMenuRootController.GetType();
+        if (type == null)
+            return false;
+
+        var method = type.GetMethod("TryHandleMenuInput", new[] { typeof(CursorController), typeof(TurnStateManager) });
+        if (method == null || method.ReturnType != typeof(bool))
+            return false;
+
+        object result = method.Invoke(battleMapMenuRootController, new object[] { this, turnStateManager });
+        return result is bool handled && handled;
     }
 
     private static Tilemap FindTilemapByName(string expectedName)
@@ -775,6 +850,21 @@ public class CursorController : MonoBehaviour
                 : TurnStateManager.ActionSfx.Cancel;
             PlayActionFeedback(feedback);
         }
+    }
+
+    public bool TryOpenEndTurnConfirmationFromMenu()
+    {
+        if (pendingEndTurnConfirmation)
+            return true;
+
+        turnStateManager?.TryCloseThreatLayerHotzone();
+        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return false;
+
+        pendingEndTurnConfirmation = true;
+        PanelDialogController.TrySetExternalText("End Turn :: Confirm");
+        PlayBeepSfx();
+        return true;
     }
 
     private void ConfirmPendingEndTurn()

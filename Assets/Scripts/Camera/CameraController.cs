@@ -83,7 +83,16 @@ public class CameraController : MonoBehaviour
         if (UiInputBlocker.IsTextInputFocused()) return;
         if (!WasQuickZoomTogglePressedThisFrame()) return;
         if (!IsQuickZoomToggleAllowed()) return;
+        ToggleQuickZoomInternal();
+    }
 
+    public void ToggleQuickZoomFromMenu()
+    {
+        ToggleQuickZoomInternal();
+    }
+
+    void ToggleQuickZoomInternal()
+    {
         if (_cursorController == null)
             _cursorController = FindAnyObjectByType<CursorController>();
 
@@ -102,7 +111,6 @@ public class CameraController : MonoBehaviour
         }
         else
         {
-            // Guarda o zoom atual antes de abrir para o "far", para restaurar no proximo N.
             _quickZoomNearSize = Mathf.Clamp(current, minOrthoSize, effectiveMax);
             _hasQuickZoomNearSize = true;
             _cam.orthographicSize = clampedFar;

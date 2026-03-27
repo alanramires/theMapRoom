@@ -169,6 +169,16 @@ public class SaveGameManager : MonoBehaviour
     [ContextMenu("Save Slot 3")]
     public void SaveSlot3() => SaveSlot(3);
 
+    public void OpenSaveSlotPromptFromMenu()
+    {
+        OpenSaveSlotPrompt(PerfNowMs());
+    }
+
+    public void OpenLoadSlotPromptFromMenu()
+    {
+        OpenLoadSlotPrompt(PerfNowMs());
+    }
+
     private void OpenSaveSlotPrompt(double inputStartMs = -1d)
     {
         double promptStartMs = inputStartMs >= 0d ? inputStartMs : PerfNowMs();

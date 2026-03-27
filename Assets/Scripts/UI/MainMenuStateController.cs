@@ -10,6 +10,7 @@ using UnityEngine.InputSystem.UI;
 [DefaultExecutionOrder(-350)]
 public class MainMenuStateController : MonoBehaviour
 {
+    private const string MainMenuSceneName = "Tela de Entrada";
     private static MainMenuStateController activeInstance;
 
     [Header("State")]
@@ -44,6 +45,10 @@ public class MainMenuStateController : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void BootstrapAfterSceneLoad()
     {
+        Scene active = SceneManager.GetActiveScene();
+        if (!IsMainMenuScene(active))
+            return;
+
         MainMenuStateController controller = EnsureSceneInstance();
         if (controller != null)
             Debug.Log($"[MainMenuState] Bootstrap scene '{SceneManager.GetActiveScene().name}'");
@@ -52,6 +57,9 @@ public class MainMenuStateController : MonoBehaviour
     public static MainMenuStateController EnsureSceneInstance()
     {
         Scene active = SceneManager.GetActiveScene();
+        if (!IsMainMenuScene(active))
+            return null;
+
         MainMenuStateController[] all = FindObjectsByType<MainMenuStateController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
         for (int i = 0; i < all.Length; i++)
@@ -71,6 +79,13 @@ public class MainMenuStateController : MonoBehaviour
         GameObject host = new GameObject("Main Menu State Controller");
         host.transform.SetParent(managers.transform, worldPositionStays: false);
         return host.AddComponent<MainMenuStateController>();
+    }
+
+    private static bool IsMainMenuScene(Scene scene)
+    {
+        return scene.IsValid() &&
+               scene.isLoaded &&
+               string.Equals(scene.name, MainMenuSceneName, StringComparison.OrdinalIgnoreCase);
     }
 
     private void Awake()

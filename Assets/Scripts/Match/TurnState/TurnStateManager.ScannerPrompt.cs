@@ -415,6 +415,42 @@ public partial class TurnStateManager
         RuntimeLog("[Destroy Unit] Confirmar com Enter | Cancelar com ESC.");
     }
 
+    public bool TryOpenDestroyUnitPromptFromMenu(out string message)
+    {
+        message = string.Empty;
+
+        if (replayManager != null && replayManager.IsReplaying)
+        {
+            message = "Destroy Unit indisponivel durante replay.";
+            return false;
+        }
+
+        if (cursorState != CursorState.Neutral)
+        {
+            message = $"Destroy Unit exige cursor em Neutral (atual: {cursorState}).";
+            return false;
+        }
+
+        if (IsMovementAnimationRunning())
+        {
+            message = "Destroy Unit indisponivel durante animacao.";
+            return false;
+        }
+
+        if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out string reason))
+        {
+            message = string.IsNullOrWhiteSpace(reason) ? "Nenhuma unidade valida no cursor." : reason;
+            return false;
+        }
+
+        string targetName = ResolveDebugUnitName(target);
+        PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
+        SetCursorState(CursorState.RemovingUnit, "TryOpenDestroyUnitPromptFromMenu");
+        message = "[Destroy Unit] Confirmar com Enter | Cancelar com ESC.";
+        RuntimeLog(message);
+        return true;
+    }
+
     private bool TryConfirmRemovingUnit()
     {
         if (cursorState != CursorState.RemovingUnit)
