@@ -8,6 +8,7 @@ using UnityEngine.UI;
 using UnityEngine.InputSystem;
 #endif
 
+[DefaultExecutionOrder(-290)]
 public class MainMenuLoadPanelController : MonoBehaviour
 {
     private const string UnknownMapSlotLabelFormat = "#{0} game nao encontrado";
@@ -18,6 +19,7 @@ public class MainMenuLoadPanelController : MonoBehaviour
     [SerializeField] private GameObject panelMenuRoot;
     [SerializeField] private GameObject panelLoadRoot;
     [SerializeField] private PanelMenu panelMenu;
+    [SerializeField] private MainMenuStateController stateController;
     [SerializeField] private SaveGameManager saveGameManager;
     [SerializeField] private MatchMusicAudioManager matchMusicAudioManager;
     [SerializeField] private CursorController cursorController;
@@ -38,6 +40,8 @@ public class MainMenuLoadPanelController : MonoBehaviour
     private bool deleteConfirmOpen;
     private int deleteConfirmSlot;
     private int panelOpenedFrame = -1;
+    private int lastOpenFrame = -1;
+    private int lastCloseFrame = -1;
 
     public bool IsOpen => !isHidden && panelLoadRoot != null && panelLoadRoot.activeInHierarchy;
     public bool IsDeleteConfirmationOpen => deleteConfirmOpen;
@@ -68,6 +72,9 @@ public class MainMenuLoadPanelController : MonoBehaviour
 
     private void Update()
     {
+        if (stateController != null)
+            return;
+
         if (!IsOpen || loadTransitionInProgress)
             return;
 
@@ -133,12 +140,20 @@ public class MainMenuLoadPanelController : MonoBehaviour
 
     public void OpenLoadPanel()
     {
+        EnterLoadMenu();
+    }
+
+    public void EnterLoadMenu()
+    {
+        if (Time.frameCount == lastOpenFrame)
+            return;
+        lastOpenFrame = Time.frameCount;
+
         ResolveReferences();
         RefreshSlotButtonsInteractable();
         CancelDeleteConfirmation(playCancelSfx: false);
-
-        SetMenuHidden(true);
         SetLoadPanelHidden(false);
+
         panelOpenedFrame = Time.frameCount;
 
         selectedIndex = FindFirstInteractableButtonIndex();
@@ -148,8 +163,22 @@ public class MainMenuLoadPanelController : MonoBehaviour
 
     public void CloseLoadPanel()
     {
+        if (Time.frameCount == lastCloseFrame)
+            return;
+        lastCloseFrame = Time.frameCount;
+
+        if (!IsOpen)
+            return;
+
+        if (stateController != null && stateController.CurrentState == MainMenuState.LoadMenu)
+        {
+            stateController.RequestState(MainMenuState.RootMenu);
+            cursorController?.PlayCancelSfx();
+            return;
+        }
+
         // Evita que o Enter usado no "Voltar" vaze para o menu raiz no mesmo frame.
-        UiInputBlocker.SuppressGameplayInputForFrames(1);
+        UiInputBlocker.SuppressGameplayInputForFrames(4);
         CancelDeleteConfirmation(playCancelSfx: false);
         RefreshSlotButtonsInteractable();
 
@@ -159,14 +188,22 @@ public class MainMenuLoadPanelController : MonoBehaviour
         cursorController?.PlayCancelSfx();
     }
 
+    public void ExitLoadMenu(bool stateDriven = false)
+    {
+        CancelDeleteConfirmation(playCancelSfx: false);
+        RefreshSlotButtonsInteractable();
+        SetLoadPanelHidden(true);
+    }
+
     public void LoadSlot1() => TryLoadSlot(1);
     public void LoadSlot2() => TryLoadSlot(2);
     public void LoadSlot3() => TryLoadSlot(3);
     public void DeleteSlot1() => OpenDeleteConfirmation(1);
     public void DeleteSlot2() => OpenDeleteConfirmation(2);
     public void DeleteSlot3() => OpenDeleteConfirmation(3);
-    public bool NavigateVertical(int direction) => MoveSelectionVertical(direction, playSfx: false);
-    public bool NavigateHorizontal(int direction) => MoveSelectionHorizontal(direction, playSfx: false);
+    public bool NavigateVertical(int direction) => MoveSelectionVertical(direction, playSfx: true);
+    public bool NavigateHorizontal(int direction) => MoveSelectionHorizontal(direction, playSfx: true);
+    public void ConfirmCurrentSelection() => ConfirmSelection();
     public void ConfirmDeleteFromKeyboard() => ConfirmDeleteSlot();
     public void CancelDeleteFromKeyboard() => CancelDeleteConfirmation(playCancelSfx: true);
 
@@ -234,6 +271,8 @@ public class MainMenuLoadPanelController : MonoBehaviour
 
         if (panelMenu == null)
             panelMenu = FindAnyObjectByType<PanelMenu>();
+        if (stateController == null)
+            stateController = MainMenuStateController.EnsureSceneInstance();
         if (saveGameManager == null)
             saveGameManager = FindAnyObjectByType<SaveGameManager>();
         if (matchMusicAudioManager == null)

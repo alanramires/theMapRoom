@@ -7,11 +7,13 @@ using UnityEngine.UI;
 using TMPro;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 #endif
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
+[DefaultExecutionOrder(-300)]
 public class PanelMenu : MonoBehaviour
 {
     [Header("Menu Buttons")]
@@ -33,12 +35,21 @@ public class PanelMenu : MonoBehaviour
     [Header("References")]
     [SerializeField] private CursorController cursorController;
     [SerializeField] private MainMenuLoadPanelController loadPanelController;
+    [SerializeField] private MainMenuCinematicController cinematicController;
+    [SerializeField] private MainMenuStateController stateController;
 
     private int currentIndex;
     private bool buttonCallbacksBound;
     private int lastConfirmSfxFrame = -1;
     private bool pendingInitialFocus;
     private bool quitConfirmOpen;
+    private Vector2 previousUiMove;
+    private bool previousUiSubmitPressed;
+    private bool previousUiCancelPressed;
+    private int ignoreInputUntilFrame = -1;
+    private int lastLoadOpenRequestFrame = -1;
+
+    public int CurrentIndex => currentIndex;
 
     protected virtual void Awake()
     {
@@ -49,6 +60,10 @@ public class PanelMenu : MonoBehaviour
             cursorController = FindAnyObjectByType<CursorController>();
         if (loadPanelController == null)
             loadPanelController = FindLoadPanelControllerIncludingInactive();
+        if (cinematicController == null)
+            cinematicController = FindAnyObjectByType<MainMenuCinematicController>();
+        if (stateController == null)
+            stateController = MainMenuStateController.EnsureSceneInstance();
         ResolvePanelReferencesIfNeeded();
 
         BindButtonCallbacksIfNeeded();
@@ -60,9 +75,6 @@ public class PanelMenu : MonoBehaviour
     {
         if (EventSystem.current != null)
             EventSystem.current.sendNavigationEvents = false;
-
-        pendingInitialFocus = true;
-        ShowRootMenu();
     }
 
     protected virtual void OnDisable()
@@ -73,26 +85,47 @@ public class PanelMenu : MonoBehaviour
 
     protected virtual void Update()
     {
+        if (stateController != null)
+            return;
+
         EnsureInitialSelectionIfNeeded();
 
         if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
             return;
 
-        if (loadPanelController != null && loadPanelController.IsOpen)
+        if (stateController != null && !stateController.IsRootMenuInteractiveState)
             return;
 
-        if (IsAnyTextInputFocusedInUi())
+        if (cinematicController != null && cinematicController.IsPlaying)
             return;
+
+        // Enquanto o menu principal estiver ativo, bloqueia atalhos de gameplay
+        // para impedir vazamento de Enter/Esc para o CursorController.
+        UiInputBlocker.SuppressGameplayInputForFrames(1);
+
+        if (Time.frameCount <= ignoreInputUntilFrame)
+            return;
+
+        if (IsFocusedOnTextInputControl())
+            return;
+
+        ReadMenuInput(
+            out bool upPressed,
+            out bool downPressed,
+            out bool leftPressed,
+            out bool rightPressed,
+            out bool confirmPressed,
+            out bool cancelPressed);
 
         if (quitConfirmOpen)
         {
-            if (WasConfirmPressed())
+            if (confirmPressed)
             {
                 ConfirmQuitGame();
                 return;
             }
 
-            if (WasCancelPressed())
+            if (cancelPressed)
             {
                 CancelQuitGame();
                 return;
@@ -101,25 +134,25 @@ public class PanelMenu : MonoBehaviour
             return;
         }
 
-        if (WasUpPressed() || WasLeftPressed())
+        if (upPressed || leftPressed)
         {
             Navigate(-1);
             return;
         }
 
-        if (WasDownPressed() || WasRightPressed())
+        if (downPressed || rightPressed)
         {
             Navigate(+1);
             return;
         }
 
-        if (WasConfirmPressed())
+        if (confirmPressed)
         {
             ConfirmCurrentSelection();
             return;
         }
 
-        if (WasCancelPressed())
+        if (cancelPressed)
             CancelToDefault();
     }
 
@@ -135,8 +168,42 @@ public class PanelMenu : MonoBehaviour
 
     public void ShowRootMenu()
     {
-        ClampCurrentIndex();
+        EnterRootMenu(resetToDefault: true);
+    }
+
+    public void EnterRootMenu(bool resetToDefault)
+    {
+        if (EventSystem.current != null)
+        {
+            EventSystem.current.sendNavigationEvents = false;
+            EventSystem.current.SetSelectedGameObject(null);
+        }
+
+        previousUiMove = Vector2.zero;
+        previousUiSubmitPressed = false;
+        previousUiCancelPressed = false;
+        ignoreInputUntilFrame = Time.frameCount + 3;
+        pendingInitialFocus = false;
+        UiInputBlocker.SuppressGameplayInputForFrames(2);
+
+        List<Button> buttons = GetRootButtons();
+        if (resetToDefault)
+            currentIndex = Mathf.Clamp(defaultButtonIndex, 0, Mathf.Max(0, buttons.Count - 1));
+        else
+            ClampCurrentIndex();
+
         SelectCurrentButton(playSfx: false);
+    }
+
+    public void ExitRootMenu()
+    {
+        if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
+            EventSystem.current.SetSelectedGameObject(null);
+
+        previousUiMove = Vector2.zero;
+        previousUiSubmitPressed = false;
+        previousUiCancelPressed = false;
+        pendingInitialFocus = false;
     }
 
     public bool Navigate(int delta)
@@ -174,6 +241,14 @@ public class PanelMenu : MonoBehaviour
         if (button == null || !button.interactable)
             return;
 
+        // "Sair" usa fluxo de confirmacao proprio (PanelDialog).
+        // Nao invoca onClick diretamente para evitar listener legado de quit imediato.
+        if (buttonSair != null && button == buttonSair)
+        {
+            OnQuitButtonClicked();
+            return;
+        }
+
         button.onClick?.Invoke();
     }
 
@@ -185,9 +260,22 @@ public class PanelMenu : MonoBehaviour
         SelectCurrentButton(playSfx: false);
     }
 
+    public bool IsQuitConfirmationOpen => quitConfirmOpen;
+
+    public void SetCurrentIndex(int index)
+    {
+        currentIndex = index;
+        ClampCurrentIndex();
+    }
+
     private void SelectCurrentButton(bool playSfx)
     {
-        Button button = GetCurrentButton();
+        List<Button> buttons = GetRootButtons();
+        if (buttons.Count <= 0)
+            return;
+
+        ClampCurrentIndex();
+        Button button = buttons[Mathf.Clamp(currentIndex, 0, buttons.Count - 1)];
         if (button == null)
             return;
 
@@ -255,6 +343,7 @@ public class PanelMenu : MonoBehaviour
         if (buttonConfig == null) buttonConfig = FindButtonByNames("button_config", "button_sobre", "config", "sobre", "about");
         if (buttonCinematic == null) buttonCinematic = FindButtonByNames("button_cinematic", "cinematic", "cinema");
         if (buttonSair == null) buttonSair = FindButtonByNames("button_sair", "sair", "quit", "exit");
+        if (buttonSair == null) buttonSair = FindButtonByLabel("sair", "quit", "exit");
     }
 
     private void ResolvePanelReferencesIfNeeded()
@@ -338,6 +427,52 @@ public class PanelMenu : MonoBehaviour
         return null;
     }
 
+    private Button FindButtonByLabel(params string[] labelKeywords)
+    {
+        if (labelKeywords == null || labelKeywords.Length == 0)
+            return null;
+
+        Scene active = SceneManager.GetActiveScene();
+        Button[] buttons = FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            Button b = buttons[i];
+            if (b == null || b.gameObject.scene != active)
+                continue;
+
+            string label = ExtractButtonLabelLower(b);
+            if (string.IsNullOrWhiteSpace(label))
+                continue;
+
+            for (int k = 0; k < labelKeywords.Length; k++)
+            {
+                string key = labelKeywords[k];
+                if (string.IsNullOrWhiteSpace(key))
+                    continue;
+                if (label.Contains(key.ToLowerInvariant()))
+                    return b;
+            }
+        }
+
+        return null;
+    }
+
+    private static string ExtractButtonLabelLower(Button button)
+    {
+        if (button == null)
+            return string.Empty;
+
+        TMP_Text tmp = button.GetComponentInChildren<TMP_Text>(includeInactive: true);
+        if (tmp != null && !string.IsNullOrWhiteSpace(tmp.text))
+            return tmp.text.ToLowerInvariant();
+
+        Text legacy = button.GetComponentInChildren<Text>(includeInactive: true);
+        if (legacy != null && !string.IsNullOrWhiteSpace(legacy.text))
+            return legacy.text.ToLowerInvariant();
+
+        return string.Empty;
+    }
+
     private void BindButtonCallbacksIfNeeded()
     {
         if (buttonCallbacksBound)
@@ -375,7 +510,8 @@ public class PanelMenu : MonoBehaviour
 
         if (buttonSair != null)
         {
-            buttonSair.onClick.RemoveListener(OnQuitButtonClicked);
+            // Blindagem contra listener persistente no Inspector que fecha o jogo direto.
+            buttonSair.onClick = new Button.ButtonClickedEvent();
             buttonSair.onClick.AddListener(OnQuitButtonClicked);
         }
 
@@ -388,18 +524,33 @@ public class PanelMenu : MonoBehaviour
             SyncCurrentIndexWithButton(buttonNew);
 
         PlayConfirmSfxOncePerFrame();
+        if (stateController != null)
+        {
+            stateController.RequestState(MainMenuState.NewGame);
+            return;
+        }
+
         OpenPanelAndHideMenu(panelNewGameRoot, "Panel_NewGame");
     }
 
     private void OnLoadButtonClicked()
     {
+        if (Time.frameCount == lastLoadOpenRequestFrame)
+            return;
+        lastLoadOpenRequestFrame = Time.frameCount;
+
         if (loadPanelController == null)
             loadPanelController = FindLoadPanelControllerIncludingInactive();
 
         if (buttonLoad != null)
             SyncCurrentIndexWithButton(buttonLoad);
 
-        PlayConfirmSfxOncePerFrame();
+        if (stateController != null)
+        {
+            stateController.RequestState(MainMenuState.LoadMenu);
+            return;
+        }
+
         if (loadPanelController != null)
         {
             loadPanelController.OpenLoadPanel();
@@ -415,6 +566,12 @@ public class PanelMenu : MonoBehaviour
             SyncCurrentIndexWithButton(buttonTutorial);
 
         PlayConfirmSfxOncePerFrame();
+        if (stateController != null)
+        {
+            stateController.RequestState(MainMenuState.Tutorial);
+            return;
+        }
+
         OpenPanelAndHideMenu(panelTutorialRoot, "Panel_Tutorial");
     }
 
@@ -424,6 +581,12 @@ public class PanelMenu : MonoBehaviour
             SyncCurrentIndexWithButton(buttonConfig);
 
         PlayConfirmSfxOncePerFrame();
+        if (stateController != null)
+        {
+            stateController.RequestState(MainMenuState.Config);
+            return;
+        }
+
         OpenPanelAndHideMenu(panelConfigRoot, "Panel_Config");
     }
 
@@ -433,6 +596,9 @@ public class PanelMenu : MonoBehaviour
             SyncCurrentIndexWithButton(buttonCinematic);
 
         PlayConfirmSfxOncePerFrame();
+
+        if (stateController != null)
+            stateController.RequestState(MainMenuState.Cinematic);
     }
 
     private void OnQuitButtonClicked()
@@ -440,8 +606,37 @@ public class PanelMenu : MonoBehaviour
         if (buttonSair != null)
             SyncCurrentIndexWithButton(buttonSair);
 
-        PlayConfirmSfxOncePerFrame();
+        if (stateController != null && stateController.CurrentState != MainMenuState.Exit)
+        {
+            stateController.RequestState(MainMenuState.Exit);
+            return;
+        }
+
         OpenQuitConfirmation();
+    }
+
+    public void RequestExitConfirmation()
+    {
+        OpenQuitConfirmation();
+    }
+
+    public void CloseExitConfirmationWithoutSfx()
+    {
+        if (!quitConfirmOpen)
+            return;
+
+        quitConfirmOpen = false;
+        PanelDialogController.ClearExternalText();
+    }
+
+    public void CancelQuitGameFromState()
+    {
+        CancelQuitGame();
+    }
+
+    public void ConfirmQuitGameFromState()
+    {
+        ConfirmQuitGame();
     }
 
     private static MainMenuLoadPanelController FindLoadPanelControllerIncludingInactive()
@@ -498,6 +693,10 @@ public class PanelMenu : MonoBehaviour
     private void OpenQuitConfirmation()
     {
         quitConfirmOpen = true;
+        // Evita auto-confirmacao no frame seguinte quando o mesmo submit
+        // (mouse/enter/gamepad) que abriu o dialogo ainda esta pressionado.
+        ignoreInputUntilFrame = Time.frameCount + 1;
+        previousUiSubmitPressed = true;
         string text = PanelDialogController.ResolveDialogMessage(
             "dialog.main_menu.quit_confirm",
             "sair para o windows?\nENTER: sim | ESC: nao");
@@ -616,94 +815,82 @@ public class PanelMenu : MonoBehaviour
         }
     }
 
-    private static bool WasUpPressed()
+    private void ReadMenuInput(
+        out bool upPressed,
+        out bool downPressed,
+        out bool leftPressed,
+        out bool rightPressed,
+        out bool confirmPressed,
+        out bool cancelPressed)
     {
+        upPressed = false;
+        downPressed = false;
+        leftPressed = false;
+        rightPressed = false;
+        confirmPressed = false;
+        cancelPressed = false;
+
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
-            return Keyboard.current.upArrowKey.wasPressedThisFrame || Keyboard.current.wKey.wasPressedThisFrame;
+        {
+            upPressed = Keyboard.current.upArrowKey.wasPressedThisFrame || Keyboard.current.wKey.wasPressedThisFrame;
+            downPressed = Keyboard.current.downArrowKey.wasPressedThisFrame || Keyboard.current.sKey.wasPressedThisFrame;
+            leftPressed = Keyboard.current.leftArrowKey.wasPressedThisFrame || Keyboard.current.aKey.wasPressedThisFrame;
+            rightPressed = Keyboard.current.rightArrowKey.wasPressedThisFrame || Keyboard.current.dKey.wasPressedThisFrame;
+            confirmPressed = Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame;
+            cancelPressed = Keyboard.current.escapeKey.wasPressedThisFrame;
+        }
+
+        InputSystemUIInputModule module = EventSystem.current != null ? EventSystem.current.currentInputModule as InputSystemUIInputModule : null;
+        if (module != null)
+        {
+            Vector2 move = module.move.action != null ? module.move.action.ReadValue<Vector2>() : Vector2.zero;
+            bool moveUpNow = move.y > 0.5f;
+            bool moveDownNow = move.y < -0.5f;
+            bool moveLeftNow = move.x < -0.5f;
+            bool moveRightNow = move.x > 0.5f;
+
+            bool moveUpPrev = previousUiMove.y > 0.5f;
+            bool moveDownPrev = previousUiMove.y < -0.5f;
+            bool moveLeftPrev = previousUiMove.x < -0.5f;
+            bool moveRightPrev = previousUiMove.x > 0.5f;
+
+            upPressed |= moveUpNow && !moveUpPrev;
+            downPressed |= moveDownNow && !moveDownPrev;
+            leftPressed |= moveLeftNow && !moveLeftPrev;
+            rightPressed |= moveRightNow && !moveRightPrev;
+
+            bool submitNow = module.submit.action != null && module.submit.action.IsPressed();
+            bool cancelNow = module.cancel.action != null && module.cancel.action.IsPressed();
+            confirmPressed |= submitNow && !previousUiSubmitPressed;
+            cancelPressed |= cancelNow && !previousUiCancelPressed;
+
+            previousUiMove = move;
+            previousUiSubmitPressed = submitNow;
+            previousUiCancelPressed = cancelNow;
+        }
 #endif
-        return Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W);
+
+        upPressed |= Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W);
+        downPressed |= Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S);
+        leftPressed |= Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A);
+        rightPressed |= Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D);
+        confirmPressed |= Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
+        cancelPressed |= Input.GetKeyDown(KeyCode.Escape);
     }
 
-    private static bool WasDownPressed()
-    {
-#if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current != null)
-            return Keyboard.current.downArrowKey.wasPressedThisFrame || Keyboard.current.sKey.wasPressedThisFrame;
-#endif
-        return Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S);
-    }
-
-    private static bool WasLeftPressed()
-    {
-#if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current != null)
-            return Keyboard.current.leftArrowKey.wasPressedThisFrame || Keyboard.current.aKey.wasPressedThisFrame;
-#endif
-        return Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A);
-    }
-
-    private static bool WasRightPressed()
-    {
-#if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current != null)
-            return Keyboard.current.rightArrowKey.wasPressedThisFrame || Keyboard.current.dKey.wasPressedThisFrame;
-#endif
-        return Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D);
-    }
-
-    private static bool WasConfirmPressed()
-    {
-#if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current != null)
-            return Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame;
-#endif
-        return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
-    }
-
-    private static bool WasCancelPressed()
-    {
-#if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current != null)
-            return Keyboard.current.escapeKey.wasPressedThisFrame;
-#endif
-        return Input.GetKeyDown(KeyCode.Escape);
-    }
-
-    private static bool IsAnyTextInputFocusedInUi()
+    private static bool IsFocusedOnTextInputControl()
     {
         EventSystem eventSystem = EventSystem.current;
-        if (eventSystem != null)
-        {
-            GameObject selected = eventSystem.currentSelectedGameObject;
-            if (selected != null)
-            {
-                InputField legacyInput = selected.GetComponentInParent<InputField>();
-                if (legacyInput != null && legacyInput.isFocused)
-                    return true;
+        if (eventSystem == null || eventSystem.currentSelectedGameObject == null)
+            return false;
 
-                TMP_InputField tmpInput = selected.GetComponentInParent<TMP_InputField>();
-                if (tmpInput != null && tmpInput.isFocused)
-                    return true;
-            }
-        }
+        GameObject selected = eventSystem.currentSelectedGameObject;
+        InputField legacyInput = selected.GetComponentInParent<InputField>();
+        if (legacyInput != null && legacyInput.isFocused)
+            return true;
 
-        TMP_InputField[] tmpInputs = FindObjectsByType<TMP_InputField>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < tmpInputs.Length; i++)
-        {
-            TMP_InputField field = tmpInputs[i];
-            if (field != null && field.isActiveAndEnabled && field.isFocused)
-                return true;
-        }
-
-        InputField[] legacyInputs = FindObjectsByType<InputField>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < legacyInputs.Length; i++)
-        {
-            InputField field = legacyInputs[i];
-            if (field != null && field.isActiveAndEnabled && field.isFocused)
-                return true;
-        }
-
-        return false;
+        TMP_InputField tmpInput = selected.GetComponentInParent<TMP_InputField>();
+        return tmpInput != null && tmpInput.isFocused;
     }
 }

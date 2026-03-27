@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DialogData
   id: dialog.load_prompt.delete_confirm
   condition: Confirmacao ao deletar save no painel de Load.
-  message: '#<slot> <scene>  Deletar este save? ENTER: confirmar | ESC: voltar'
+  message: '#<slot> <scene> :: Deletar este save? ENTER: confirmar | ESC: voltar'

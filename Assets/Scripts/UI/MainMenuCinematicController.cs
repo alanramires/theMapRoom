@@ -12,6 +12,7 @@ public class MainMenuCinematicController : MonoBehaviour
     [SerializeField] private CanvasGroup panelMenuCanvasGroup;
     [SerializeField] private GameObject panelMenuRoot;
     [SerializeField] private PanelMenu panelMenu;
+    [SerializeField] private MainMenuStateController stateController;
     [SerializeField] private MatchMusicAudioManager musicAudioManager;
     [SerializeField] private CursorController cursorController;
     [SerializeField] private VideoPlayer videoPlayer;
@@ -28,7 +29,6 @@ public class MainMenuCinematicController : MonoBehaviour
 
     private bool isPlaying;
     private float previousMusicVolume = 1f;
-    private bool cinematicButtonBound;
     private RenderTexture cinematicRenderTexture;
 
     public bool IsPlaying => isPlaying;
@@ -37,7 +37,6 @@ public class MainMenuCinematicController : MonoBehaviour
     {
         ResolveReferences();
         EnsureVideoPlayerSetup();
-        TryBindCinematicButton();
     }
 
     private void OnEnable()
@@ -56,25 +55,40 @@ public class MainMenuCinematicController : MonoBehaviour
 
     private void Update()
     {
+        if (stateController != null)
+            return;
+
         if (!isPlaying)
             return;
 
         if (WasCancelPressed())
-            StopCinematic(cancelledByUser: true);
+            StopCinematicAndCleanup(playCancelSfx: true);
     }
 
     [ContextMenu("Stop Cinematic Now")]
     public void StopCinematicNow()
     {
-        StopCinematic(cancelledByUser: true);
+        StopCinematicAndCleanup(playCancelSfx: true);
     }
 
     public void PlayCinematicFromMenu()
     {
+        ResolveReferences();
+
+        if (stateController != null)
+        {
+            stateController.RequestState(MainMenuState.Cinematic);
+            return;
+        }
+
+        EnterCinematic();
+    }
+
+    public void EnterCinematic()
+    {
         if (isPlaying)
             return;
 
-        ResolveReferences();
         EnsureVideoPlayerSetup();
 
         if (videoPlayer == null)
@@ -106,30 +120,39 @@ public class MainMenuCinematicController : MonoBehaviour
         videoPlayer.Play();
     }
 
-    private void StopCinematic(bool cancelledByUser)
+    public void ExitToNeutral()
     {
-        if (!isPlaying)
-            return;
+        StopCinematicAndCleanup(playCancelSfx: false);
+    }
 
-        isPlaying = false;
+    public void StopCinematicAndCleanup(bool playCancelSfx)
+    {
+        if (isPlaying)
+        {
+            isPlaying = false;
 
-        if (videoPlayer != null)
-            videoPlayer.Stop();
+            if (videoPlayer != null)
+                videoPlayer.Stop();
 
-        if (musicAudioManager != null && restoreMusicVolumeAfterCinematic)
-            musicAudioManager.SetMasterMusicVolume(previousMusicVolume);
+            if (musicAudioManager != null && restoreMusicVolumeAfterCinematic)
+                musicAudioManager.SetMasterMusicVolume(previousMusicVolume);
+        }
 
         SetCinematicOverlayVisible(false);
-        SetMenuVisible(true);
-        panelMenu?.ShowRootMenu();
+        SetMenuVisible(false);
 
-        if (cancelledByUser)
+        if (playCancelSfx)
             cursorController?.PlayCancelSfx();
     }
 
     private void HandleVideoLoopPointReached(VideoPlayer source)
     {
-        StopCinematic(cancelledByUser: false);
+        isPlaying = false;
+        SetCinematicOverlayVisible(false);
+        SetMenuVisible(false);
+
+        if (musicAudioManager != null && restoreMusicVolumeAfterCinematic)
+            musicAudioManager.SetMasterMusicVolume(previousMusicVolume);
     }
 
     private void SetMenuVisible(bool visible)
@@ -217,6 +240,8 @@ public class MainMenuCinematicController : MonoBehaviour
             panelMenu = GetComponent<PanelMenu>();
         if (panelMenu == null)
             panelMenu = FindAnyObjectByType<PanelMenu>();
+        if (stateController == null)
+            stateController = MainMenuStateController.EnsureSceneInstance();
 
         if (musicAudioManager == null)
             musicAudioManager = FindAnyObjectByType<MatchMusicAudioManager>();
@@ -264,54 +289,6 @@ public class MainMenuCinematicController : MonoBehaviour
         videoPlayer.SetTargetAudioSource(0, cinematicAudioSource);
         if (cinematicAudioSource != null)
             cinematicAudioSource.volume = Mathf.Clamp01(cinematicAudioVolume);
-    }
-
-    private void TryBindCinematicButton()
-    {
-        if (cinematicButtonBound)
-            return;
-
-        if (cinematicButton == null)
-        {
-            Button[] buttons = GetComponentsInChildren<Button>(includeInactive: true);
-            for (int i = 0; i < buttons.Length; i++)
-            {
-                Button candidate = buttons[i];
-                if (candidate == null)
-                    continue;
-
-                string n = candidate.name != null ? candidate.name.ToLowerInvariant() : string.Empty;
-                if (n.Contains("cinematic"))
-                {
-                    cinematicButton = candidate;
-                    break;
-                }
-            }
-
-            if (cinematicButton == null)
-            {
-                Button[] anyButtons = FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-                for (int i = 0; i < anyButtons.Length; i++)
-                {
-                    Button candidate = anyButtons[i];
-                    if (candidate == null || candidate.name == null)
-                        continue;
-
-                    string n = candidate.name.ToLowerInvariant();
-                    if (n.Contains("cinematic"))
-                    {
-                        cinematicButton = candidate;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (cinematicButton == null)
-            return;
-
-        cinematicButton.onClick.AddListener(PlayCinematicFromMenu);
-        cinematicButtonBound = true;
     }
 
     private void OnValidate()

@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DialogData
   id: dialog.main_menu.quit_confirm
   condition: Confirmacao de saida para o Windows no menu principal.
-  message: sair para o windows? ENTER: sim | ESC: nao
+  message: Sair e voltar para o Windows?
