@@ -142,6 +142,7 @@ public class CursorController : MonoBehaviour
     public TurnStateManager.CursorState CurrentCursorState => turnStateManager != null ? turnStateManager.CurrentCursorState : TurnStateManager.CursorState.Neutral;
     public TurnStateManager.CursorState CursorState => CurrentCursorState;
     public bool IsBlocked => IsCursorBlocked();
+    public bool IsEndTurnConfirmationPending => pendingEndTurnConfirmation;
 
     private void Awake()
     {

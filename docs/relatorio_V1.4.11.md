@@ -1,50 +1,53 @@
-﻿# Relatorio de Atualizacao - v1.4.11
+# Relatorio de Atualizacao - v1.4.11
 
 ## Em uma frase
-A versao v1.4.11 ajustou o menu do jogador na Battle Map, integrando abertura por ESC em neutral, navegacao por paineis, reuso dos atalhos de jogo e comportamento de dock semelhante ao panel_helper.
+A versao v1.4.11 consolidou ajustes de FoW, deteccao e diagnostico "Alguem me ve", alinhando LoS, distancia aquatica para submarinos e ferramentas de debug no menu Tools/FoW.
 
 ## O que isso trouxe na pratica
-- ESC em neutral abre o menu do jogador sem quebrar o fluxo do tabuleiro.
-- Navegacao entre `panel_menu`, `panel_options` e `panel_gerenciar` ficou consistente com sons de cursor/confirm/cancel.
-- Acoes de menu reaproveitam os fluxos existentes de gameplay (X, R, N, U), evitando duplicacao de regra.
-- O menu agora reposiciona com dock dinamico conforme proximidade do cursor, no mesmo estilo do panel_helper.
+- O calculo de visibilidade/deteccao ficou coerente entre `Pode Mirar`, `Pode Detectar`, `Pode Enxergar` e `Alguem me ve`.
+- Submarinos agora respeitam caminho aquatico no BFS (sem atravessar terra), tanto para detectar quanto para revelar FoW.
+- O controle de LoS por especializacao ficou configuravel por dominio/camada via policy (`InheritGlobal`, `ForceOn`, `ForceOff`).
+- Ferramentas de debug ganharam relatorios e linhas em cena mais claras para validar casos reais de mapa.
 
 ## Principais melhorias
-1. Fluxo de abertura/fechamento por ESC
-- `CursorController` passou a priorizar o tratamento do menu do jogador antes do bloqueio geral de input.
-- Abertura ocorre apenas em estado `Neutral`, com restauracao da celula original do cursor ao fechar.
-- Resultado percebido: ESC funcional como entrada do menu de jogador sem vazar para estados indevidos.
+1. LoS por especializacao (`losPolicy`)
+- `UnitVisionException` recebeu `LosPolicy` por especializacao.
+- `PodeDetectarSensor` passou a resolver LoS efetiva por camada detectada, em vez de depender apenas da flag global.
+- Resultado percebido: sensores especializados podem herdar, forcar ou ignorar LoS sem quebrar os demais dominios.
 
-2. Navegacao e transicao entre paineis
-- Implementado controlador dedicado para `MenuRoot` com foco inicial por painel e retorno de foco em botoes de contexto.
-- ESC dentro dos paineis respeita hierarquia de retorno (`gerenciar -> options -> menu -> jogo`).
-- Resultado percebido: navegacao previsivel e coerente com a UX definida para o menu.
+2. Distancia aquatica para Sub/Submerged
+- `BuildDistanceMapInto` passou a aceitar filtro de passabilidade.
+- Para `Submarine/Submerged`, o BFS usa apenas celulas aquaticas (agua/submerso), tratando terra como parede de percurso.
+- Aplicado em `CollectDetection`, `CanObserverObserveTarget` e `CollectVisibleCells`.
+- Resultado percebido: submarino atras de peninsula deixa de "detectar/revelar atravessando terra", mas detecta/revela ao contornar por agua dentro do alcance.
 
-3. Reuso de fluxos existentes (atalhos)
-- `btn_comando` chama o fluxo de comando existente (atalho X).
-- `btn_rodada` chama confirmacao de fim de turno (atalho R).
-- `btn_minimapa` chama toggle de minimapa/zoom rapido (atalho N).
-- `btn_destruir` chama fluxo de remover unidade (atalho U).
-- Resultado percebido: um unico ponto de regra por acao, com menor risco de divergencia.
+3. Ajuste de traco LoS no Pode Detectar
+- O traco intermediario de LoS foi alinhado ao mesmo metodo robusto do `PodeMirar` (lerp com supersampling e fronteira ambigua), evitando atalho por cube-line em diagonais.
+- Resultado percebido: menos falsos positivos de visada em casos de diagonal entre hexes bloqueadores.
 
-4. Dock dinamico do menu
-- `menuRoot` ganhou comportamento de dock por proximidade do cursor, com histerese de entrada/saida.
-- A referencia de proximidade foi ajustada para o painel ativo, evitando comportamento estranho por container amplo.
-- Resultado percebido: menu mais legivel e menos intrusivo durante a navegacao no tabuleiro.
+4. FoW e diagnosticos especializados
+- `PodeEnxergarSensorDebugWindow` recebeu o mesmo refinamento de distancia aquatica para cenarios `Sub/Submerged`.
+- `AlguemMeVeDebugWindow` foi criado para mostrar quem detecta o alvo, incluindo buckets, motivos e desenho de linha.
+- Linhas validas/invalidas em cena foram padronizadas (verde para sucesso, vermelho para falha nos contextos aplicaveis).
+- Resultado percebido: leitura rapida do motivo de sucesso/falha na deteccao e na revelacao de FoW.
 
-5. Isolamento do menu principal da Tela de Entrada
-- `MainMenuStateController` foi restringido para inicializar apenas na cena `Tela de Entrada`.
-- Resultado percebido: remove interferencia indevida do state machine do menu principal dentro da Battle Map.
+5. Organizacao do menu de ferramentas
+- Menu de debug foi reorganizado para `Tools/FoW`, centralizando:
+  - `Pode Enxergar`
+  - `Pode Detectar`
+  - `Alguem me ve`
+- Alias redundante foi removido para evitar duplicidade.
 
 ## Bloco tecnico curto
 - Scripts principais alterados:
-  - `Assets/Scripts/UI/BattleMapMenuRootController.cs`
-  - `Assets/Scripts/Cursor/CursorController.cs`
-  - `Assets/Scripts/Match/TurnState/TurnStateManager.CommandService.cs`
-  - `Assets/Scripts/Match/TurnState/TurnStateManager.ScannerPrompt.cs`
-  - `Assets/Scripts/Camera/CameraController.cs`
-  - `Assets/Scripts/Save/SaveGameManager.cs`
-  - `Assets/Scripts/UI/MainMenuStateController.cs`
+  - `Assets/Scripts/Sensors/PodeDetectarSensor.cs`
+  - `Assets/Scripts/Units/UnitData.cs`
+  - `Assets/Editor/PodeDetectarSensorDebugWindow.cs`
+  - `Assets/Editor/PodeEnxergarSensorDebugWindow.cs`
+  - `Assets/Editor/AlguemMeVeDebugWindow.cs`
+- Dados e assets relacionados:
+  - `Assets/DB/Character/Unit/Marinha/MA Submarino.asset`
+  - ajustes de cenas e unidades usadas em validacao local de sensores/FoW.
 
 ## Resultado
-A v1.4.11 fecha o ajuste do menu do jogador na Battle Map com abertura por ESC em neutral, navegacao robusta por paineis, acoes integradas ao gameplay existente e dock dinamico alinhado ao panel_helper.
+A v1.4.11 fecha um pacote consistente para FoW e deteccao: LoS configuravel por especializacao, submarino com distancia aquatica correta e ferramentas de debug mais precisas para validar comportamento em mapa real.

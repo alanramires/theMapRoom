@@ -29,18 +29,14 @@ MonoBehaviour:
   defense: 12
   armorClass: 1
   movement: 4
-  visao: 2
+  visao: 5
   visionSpecializations:
   - domain: 2
     heightLevel: 2
     vision: 7
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
-  - domain: 1
-    heightLevel: 3
-    vision: 7
-    detectUnitsWithFollowingSkills:
-    - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
+    losPolicy: 2
   - domain: 3
     heightLevel: 4
     vision: 1
@@ -82,6 +78,7 @@ MonoBehaviour:
     operationRangeMin: 1
     operationRangeMax: 3
     selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: afbb31a3d8a2c3645bf90df243540a74, type: 2}
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0

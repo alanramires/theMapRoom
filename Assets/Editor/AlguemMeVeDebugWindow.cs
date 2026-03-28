@@ -3,9 +3,16 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
-public class PodeDetectarSensorDebugWindow : EditorWindow
+public class AlguemMeVeDebugWindow : EditorWindow
 {
-    [SerializeField] private UnitManager selectedUnit;
+    private sealed class ObserverHit
+    {
+        public UnitManager observer;
+        public PodeDetectarOption option;
+        public string bucket;
+    }
+
+    [SerializeField] private UnitManager targetUnit;
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private MatchController matchController;
     [SerializeField] private Tilemap overrideTilemap;
@@ -14,24 +21,23 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
     [SerializeField] private bool useGameplaySensorContext = true;
     [SerializeField] private bool logToConsole = true;
 
-    private readonly List<PodeDetectarOption> detectedStealth = new List<PodeDetectarOption>();
-    private readonly List<PodeDetectarOption> undetectedStealth = new List<PodeDetectarOption>();
-    private readonly List<PodeDetectarOption> spottedCandidates = new List<PodeDetectarOption>();
-    private readonly List<PodeDetectarOption> inRangeButLosBlocked = new List<PodeDetectarOption>();
+    private readonly List<ObserverHit> detectedByEnemies = new List<ObserverHit>();
+    private readonly List<ObserverHit> undetectedStealthByEnemies = new List<ObserverHit>();
+    private readonly List<ObserverHit> blockedByLos = new List<ObserverHit>();
     private readonly HashSet<UnitManager> forcedDetectedIndicatorUnits = new HashSet<UnitManager>();
-    private Vector2 windowScroll;
-    private string statusMessage = "Ready.";
     private bool hasSelectedLine;
     private Vector3 selectedLineStartWorld;
     private Vector3 selectedLineEndWorld;
     private readonly List<Vector3> selectedLineWorldPoints = new List<Vector3>();
     private Color selectedLineColor = Color.green;
     private string selectedLineLabel = string.Empty;
+    private Vector2 windowScroll;
+    private string statusMessage = "Ready.";
 
-    [MenuItem("Tools/FoW/Pode Detectar")]
+    [MenuItem("Tools/FoW/Alguem me vê")]
     public static void OpenWindow()
     {
-        GetWindow<PodeDetectarSensorDebugWindow>("Pode Detectar");
+        GetWindow<AlguemMeVeDebugWindow>("Alguem me vê");
     }
 
     private void OnEnable()
@@ -50,14 +56,12 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
     private void OnGUI()
     {
         windowScroll = EditorGUILayout.BeginScrollView(windowScroll);
-
-        EditorGUILayout.LabelField("Sensor Pode Detectar", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Sensor Alguem me vê", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Scan de proximidade por visao/specialization + LOS. " +
-            "Unidades stealth so entram em \"furtivas detectadas\" quando o observador tiver especializacao para detectar stealth naquele dominio/altura.",
+            "Relatorio orientado ao alvo: quais inimigos detectam esta unidade, quais falham por stealth e quais falham por LOS.",
             MessageType.Info);
 
-        selectedUnit = (UnitManager)EditorGUILayout.ObjectField("Unidade", selectedUnit, typeof(UnitManager), true);
+        targetUnit = (UnitManager)EditorGUILayout.ObjectField("Unidade alvo", targetUnit, typeof(UnitManager), true);
         turnStateManager = (TurnStateManager)EditorGUILayout.ObjectField("TurnStateManager", turnStateManager, typeof(TurnStateManager), true);
         matchController = (MatchController)EditorGUILayout.ObjectField("MatchController", matchController, typeof(MatchController), true);
         overrideTilemap = (Tilemap)EditorGUILayout.ObjectField("Tilemap (opcional)", overrideTilemap, typeof(Tilemap), true);
@@ -79,51 +83,45 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
         EditorGUILayout.HelpBox(statusMessage, MessageType.None);
 
         EditorGUILayout.Space(6f);
-        DrawOptionList("Unidades furtivas detectadas", detectedStealth, MessageType.Info, Color.green);
+        DrawObserverList("Inimigos que me detectam", detectedByEnemies, MessageType.Info);
         EditorGUILayout.Space(6f);
-        DrawOptionList("Unidades furtivas nao detectadas", undetectedStealth, MessageType.Warning, Color.red);
+        DrawObserverList("Inimigos que me veem mas falham no stealth", undetectedStealthByEnemies, MessageType.Warning);
         EditorGUILayout.Space(6f);
-        DrawOptionList("Candidatos avistados", spottedCandidates, MessageType.None, Color.green);
-        EditorGUILayout.Space(6f);
-        DrawOptionList("Candidatos no alcance mas nao detectados por LOS", inRangeButLosBlocked, MessageType.Warning, Color.red);
+        DrawObserverList("Inimigos no alcance sem LOS", blockedByLos, MessageType.Warning);
 
         EditorGUILayout.EndScrollView();
     }
 
-    private void DrawOptionList(string title, List<PodeDetectarOption> items, MessageType emptyMessageType, Color lineColor)
+    private void DrawObserverList(string title, List<ObserverHit> items, MessageType emptyType)
     {
         EditorGUILayout.LabelField($"{title} ({items.Count})", EditorStyles.boldLabel);
         if (items.Count <= 0)
         {
-            EditorGUILayout.HelpBox("Nenhum item.", emptyMessageType);
+            EditorGUILayout.HelpBox("Nenhum item.", emptyType);
             return;
         }
 
         for (int i = 0; i < items.Count; i++)
         {
-            PodeDetectarOption item = items[i];
-            if (item == null || item.targetUnit == null)
+            ObserverHit hit = items[i];
+            if (hit == null || hit.observer == null || hit.option == null)
                 continue;
 
             EditorGUILayout.BeginVertical("box");
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"{i + 1}. {item.targetUnit.name}", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"{i + 1}. {hit.observer.name}", EditorStyles.boldLabel);
             if (GUILayout.Button("Desenhar Linha", GUILayout.Width(110f)))
-                SelectLineForDrawing(item, lineColor, $"{title}: {item.targetUnit.name}");
+                SelectLineForDrawing(hit);
             EditorGUILayout.EndHorizontal();
-            EditorGUILayout.LabelField("Hex", $"{item.targetCell.x},{item.targetCell.y}");
-            EditorGUILayout.LabelField("Distancia", $"{item.distance} / alcance {item.detectionRangeUsed}");
-            EditorGUILayout.LabelField("Camada", $"{item.targetDomain}/{item.targetHeightLevel}");
-            EditorGUILayout.LabelField("LOS direta", item.hasDirectLos ? "SIM" : "NAO");
-            if (item.usedForwardObserver)
-            {
-                string observerName = item.forwardObserverUnit != null ? item.forwardObserverUnit.name : "(desconhecido)";
-                EditorGUILayout.LabelField("Observador avancado", observerName);
-            }
-            if (item.blockedCell != Vector3Int.zero)
-                EditorGUILayout.LabelField("Bloqueio LOS", $"{item.blockedCell.x},{item.blockedCell.y}");
-            if (!string.IsNullOrWhiteSpace(item.reason))
-                EditorGUILayout.LabelField("Obs", item.reason);
+            EditorGUILayout.LabelField("Bucket", hit.bucket ?? string.Empty);
+            EditorGUILayout.LabelField("Hex alvo", $"{hit.option.targetCell.x},{hit.option.targetCell.y}");
+            EditorGUILayout.LabelField("Distancia", $"{hit.option.distance} / alcance {hit.option.detectionRangeUsed}");
+            EditorGUILayout.LabelField("Camada", $"{hit.option.targetDomain}/{hit.option.targetHeightLevel}");
+            EditorGUILayout.LabelField("LOS direta", hit.option.hasDirectLos ? "SIM" : "NAO");
+            if (hit.option.blockedCell != Vector3Int.zero)
+                EditorGUILayout.LabelField("Bloqueio LOS", $"{hit.option.blockedCell.x},{hit.option.blockedCell.y}");
+            if (!string.IsNullOrWhiteSpace(hit.option.reason))
+                EditorGUILayout.LabelField("Obs", hit.option.reason);
             EditorGUILayout.EndVertical();
         }
     }
@@ -137,21 +135,20 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
         if (unit == null)
             unit = Selection.activeGameObject.GetComponentInParent<UnitManager>();
         if (unit != null)
-            selectedUnit = unit;
+            targetUnit = unit;
     }
 
     private void RunSimulation()
     {
-        detectedStealth.Clear();
-        undetectedStealth.Clear();
-        spottedCandidates.Clear();
-        inRangeButLosBlocked.Clear();
+        detectedByEnemies.Clear();
+        undetectedStealthByEnemies.Clear();
+        blockedByLos.Clear();
         ClearForcedDetectedIndicators();
         ClearSelectedLine();
 
-        if (selectedUnit == null)
+        if (targetUnit == null)
         {
-            statusMessage = "Selecione uma unidade valida.";
+            statusMessage = "Selecione uma unidade alvo valida.";
             return;
         }
 
@@ -167,143 +164,65 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
             enableStealth = matchController.EnableStealthValidation;
         }
 
-        bool ok = PodeDetectarSensor.CollectDetection(
-            selectedUnit,
-            map,
-            db,
-            detectedStealth,
-            undetectedStealth,
-            spottedCandidates,
-            inRangeButLosBlocked,
-            out string reason,
-            dpqAirHeightConfig,
-            enableLos,
-            enableSpotter,
-            enableStealth);
+        IReadOnlyList<UnitManager> allUnits = GetUnitsForDebugQueries();
+        for (int i = 0; i < allUnits.Count; i++)
+        {
+            UnitManager observer = allUnits[i];
+            if (!IsEnemyObserverCandidate(observer))
+                continue;
 
-        string candidateSummary = BuildCandidateDebugSummary(selectedUnit, map);
-        statusMessage = ok
-            ? $"Sensor TRUE. {reason} | {candidateSummary}"
-            : $"Sensor FALSE. {reason} | {candidateSummary}";
+            List<PodeDetectarOption> detectedStealth = new List<PodeDetectarOption>();
+            List<PodeDetectarOption> undetectedStealth = new List<PodeDetectarOption>();
+            List<PodeDetectarOption> spotted = new List<PodeDetectarOption>();
+            List<PodeDetectarOption> blocked = new List<PodeDetectarOption>();
+            PodeDetectarSensor.CollectDetection(
+                observer,
+                map,
+                db,
+                detectedStealth,
+                undetectedStealth,
+                spotted,
+                blocked,
+                out _,
+                dpqAirHeightConfig,
+                enableLos,
+                enableSpotter,
+                enableStealth);
 
-        ApplyForcedDetectedIndicatorsForLayerVisibleStealthUnits();
+            AppendHitsForTarget(observer, detectedStealth, "Furtiva detectada", detectedByEnemies);
+            AppendHitsForTarget(observer, spotted, "Avistada", detectedByEnemies);
+            AppendHitsForTarget(observer, undetectedStealth, "Furtiva nao detectada", undetectedStealthByEnemies);
+            AppendHitsForTarget(observer, blocked, "Sem LOS", blockedByLos);
+        }
+
+        statusMessage =
+            $"Detectam={detectedByEnemies.Count} | FalhaStealth={undetectedStealthByEnemies.Count} | SemLOS={blockedByLos.Count} | " +
+            $"LoS={enableLos} Spotter={enableSpotter} Stealth={enableStealth}";
+
+        ApplyForcedDetectedIndicatorForTarget();
 
         if (!logToConsole)
             return;
 
-        Debug.Log($"[PodeDetectarSensorDebug] Unit={selectedUnit.name} | GameSetup(LoS={enableLos},Spotter={enableSpotter},Stealth={enableStealth}) | {reason} | {candidateSummary}");
-        LogOptionList("FURTIVAS", detectedStealth);
-        LogOptionList("FURTIVAS_NAO_DETECTADAS", undetectedStealth);
-        LogOptionList("AVISTADAS", spottedCandidates);
-        LogOptionList("SEM_LOS", inRangeButLosBlocked);
+        Debug.Log($"[AlguemMeVeDebug] target={targetUnit.name} | {statusMessage}");
     }
 
-    private static string BuildCandidateDebugSummary(UnitManager observer, Tilemap boardMap)
+    private void ApplyForcedDetectedIndicatorForTarget()
     {
-        if (observer == null)
-            return "Diag: observer=null";
-        if (boardMap == null)
-            return "Diag: boardMap=null";
+        if (targetUnit == null)
+            return;
 
-        IReadOnlyList<UnitManager> units = GetUnitsForDebugQueries();
-        int total = 0;
-        int enemyTeam = 0;
-        int enemyTeamOnMap = 0;
-        int enemyEligible = 0;
-        int enemyFilteredEmbarked = 0;
-        int enemyFilteredMap = 0;
-        int enemyFilteredScene = 0;
+        bool shouldShow = detectedByEnemies.Count > 0;
+        UnitHudController hud = ResolveOwnUnitHud(targetUnit);
+        if (hud == null)
+            return;
 
-        for (int i = 0; i < units.Count; i++)
+        if (shouldShow)
         {
-            UnitManager target = units[i];
-            if (target == null || target == observer || !target.gameObject.activeInHierarchy)
-                continue;
-
-            total++;
-            if (target.TeamId == observer.TeamId)
-                continue;
-
-            enemyTeam++;
-            if (target.IsEmbarked)
-            {
-                enemyFilteredEmbarked++;
-                continue;
-            }
-
-            if (target.BoardTilemap != boardMap)
-            {
-                enemyFilteredMap++;
-                continue;
-            }
-
-            if (target.gameObject.scene != boardMap.gameObject.scene)
-            {
-                enemyFilteredScene++;
-                continue;
-            }
-
-            enemyTeamOnMap++;
-            enemyEligible++;
-        }
-
-        return $"Diag: total={total} enemyTeam={enemyTeam} enemyEligible={enemyEligible} enemyOnMap={enemyTeamOnMap} dropEmbarked={enemyFilteredEmbarked} dropMap={enemyFilteredMap} dropScene={enemyFilteredScene}";
-    }
-
-    private static IReadOnlyList<UnitManager> GetUnitsForDebugQueries()
-    {
-        if (UnitManager.AllActive != null && UnitManager.AllActive.Count > 0)
-            return UnitManager.AllActive;
-
-        UnitManager[] fallback = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        return fallback ?? System.Array.Empty<UnitManager>();
-    }
-
-    private void ApplyForcedDetectedIndicatorsForLayerVisibleStealthUnits()
-    {
-        int marked = 0;
-        for (int i = 0; i < detectedStealth.Count; i++)
-        {
-            PodeDetectarOption option = detectedStealth[i];
-            UnitManager target = option != null ? option.targetUnit : null;
-            if (target == null)
-                continue;
-
-            UnitHudController hud = ResolveOwnUnitHud(target);
-            if (hud == null)
-                continue;
-
             hud.SetDetectedIndicatorVisible(true);
-            if (forcedDetectedIndicatorUnits.Add(target))
-                marked++;
+            forcedDetectedIndicatorUnits.Add(targetUnit);
+            statusMessage += " | Olhinho ativo no alvo.";
         }
-
-        for (int i = 0; i < spottedCandidates.Count; i++)
-        {
-            PodeDetectarOption option = spottedCandidates[i];
-            UnitManager target = option != null ? option.targetUnit : null;
-            if (target == null)
-                continue;
-
-            if (!target.TryGetUnitData(out UnitData unitData) || unitData == null)
-                continue;
-
-            bool hasAnyStealthConfigured = unitData.ResolveStealthSkillsForDetection().Count > 0;
-            bool stealthActiveAtCurrentLayer = unitData.IsStealthUnit(target.GetDomain(), target.GetHeightLevel());
-            if (!hasAnyStealthConfigured || stealthActiveAtCurrentLayer)
-                continue;
-
-            UnitHudController hud = ResolveOwnUnitHud(target);
-            if (hud == null)
-                continue;
-
-            hud.SetDetectedIndicatorVisible(true);
-            if (forcedDetectedIndicatorUnits.Add(target))
-                marked++;
-        }
-
-        if (marked > 0)
-            statusMessage += $" | Olhinho ativo em {marked} unidade(s) detectadas nesta simulacao.";
     }
 
     private void ClearForcedDetectedIndicators()
@@ -343,25 +262,26 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
         return null;
     }
 
-    private void SelectLineForDrawing(PodeDetectarOption item, Color lineColor, string label)
+    private void SelectLineForDrawing(ObserverHit hit)
     {
-        if (item == null || item.targetUnit == null)
+        if (hit == null || hit.option == null)
             return;
 
-        Tilemap map = overrideTilemap != null ? overrideTilemap : (selectedUnit != null ? selectedUnit.BoardTilemap : item.targetUnit.BoardTilemap);
-        Vector3 startWorld = item.observerUnit != null ? item.observerUnit.transform.position : Vector3.zero;
-        Vector3 endWorld = item.targetUnit.transform.position;
+        Tilemap map = ResolveBoardTilemapForSimulation();
+        Vector3 startWorld = hit.option.observerUnit != null ? hit.option.observerUnit.transform.position : Vector3.zero;
+        Vector3 endWorld = hit.option.targetUnit != null ? hit.option.targetUnit.transform.position : Vector3.zero;
+
         selectedLineWorldPoints.Clear();
         if (map != null)
         {
-            Vector3Int startCell = item.observerCell;
-            Vector3Int endCell = item.targetCell;
+            Vector3Int startCell = hit.option.observerCell;
+            Vector3Int endCell = hit.option.targetCell;
             startCell.z = 0;
             endCell.z = 0;
             startWorld = map.GetCellCenterWorld(startCell);
             endWorld = map.GetCellCenterWorld(endCell);
 
-            if (IsSubSubmergedLayer(item) &&
+            if (IsSubSubmergedLayer(hit.option) &&
                 TryBuildAquaticCellPath(map, startCell, endCell, out List<Vector3Int> cellPath))
             {
                 for (int i = 0; i < cellPath.Count; i++)
@@ -372,9 +292,21 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
         hasSelectedLine = true;
         selectedLineStartWorld = startWorld;
         selectedLineEndWorld = endWorld;
-        selectedLineColor = lineColor;
-        selectedLineLabel = label;
+        selectedLineColor = ResolveLineColorForBucket(hit.bucket);
+        selectedLineLabel = $"{hit.observer.name} -> {hit.option.targetUnit.name}";
         SceneView.RepaintAll();
+    }
+
+    private static Color ResolveLineColorForBucket(string bucket)
+    {
+        if (string.IsNullOrWhiteSpace(bucket))
+            return Color.green;
+
+        string normalized = bucket.Trim().ToLowerInvariant();
+        if (normalized.Contains("sem los") || normalized.Contains("nao detectada") || normalized.Contains("não detectada"))
+            return Color.red;
+
+        return Color.green;
     }
 
     private void ClearSelectedLine()
@@ -544,21 +476,34 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
         return false;
     }
 
-    private static void LogOptionList(string tag, List<PodeDetectarOption> items)
+    private bool IsEnemyObserverCandidate(UnitManager observer)
     {
-        for (int i = 0; i < items.Count; i++)
+        if (observer == null || targetUnit == null)
+            return false;
+        if (!observer.gameObject.activeInHierarchy || observer.IsEmbarked)
+            return false;
+        if (observer == targetUnit)
+            return false;
+        return observer.TeamId != targetUnit.TeamId;
+    }
+
+    private void AppendHitsForTarget(UnitManager observer, List<PodeDetectarOption> source, string bucket, List<ObserverHit> output)
+    {
+        if (source == null || output == null || targetUnit == null)
+            return;
+
+        for (int i = 0; i < source.Count; i++)
         {
-            PodeDetectarOption item = items[i];
-            if (item == null || item.targetUnit == null)
+            PodeDetectarOption item = source[i];
+            if (item == null || item.targetUnit != targetUnit)
                 continue;
 
-            string observerName = item.observerUnit != null ? item.observerUnit.name : "(null)";
-            string targetName = item.targetUnit.name;
-            string forwardObserverName = item.forwardObserverUnit != null ? item.forwardObserverUnit.name : "-";
-            Debug.Log(
-                $"[PodeDetectarSensorDebug][{tag}] {i + 1}. {observerName} -> {targetName} | " +
-                $"dist={item.distance}/{item.detectionRangeUsed} | layer={item.targetDomain}/{item.targetHeightLevel} | " +
-                $"losDireta={(item.hasDirectLos ? "sim" : "nao")} | forwardObserver={forwardObserverName} | motivo={item.reason}");
+            output.Add(new ObserverHit
+            {
+                observer = observer,
+                option = item,
+                bucket = bucket
+            });
         }
     }
 
@@ -574,6 +519,45 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
             terrainDatabase = FindFirstAsset<TerrainDatabase>();
         if (dpqAirHeightConfig == null)
             dpqAirHeightConfig = FindFirstAsset<DPQAirHeightConfig>();
+    }
+
+    private Tilemap ResolveBoardTilemapForSimulation()
+    {
+        if (overrideTilemap != null)
+            return overrideTilemap;
+
+        if (useGameplaySensorContext)
+        {
+            Tilemap gameplayMap = ResolveGameplayTerrainTilemap();
+            if (gameplayMap != null)
+                return gameplayMap;
+        }
+
+        if (targetUnit != null && targetUnit.BoardTilemap != null)
+            return targetUnit.BoardTilemap;
+
+        return FindPreferredTilemap();
+    }
+
+    private Tilemap ResolveGameplayTerrainTilemap()
+    {
+        if (turnStateManager == null)
+            turnStateManager = Object.FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager == null)
+            return null;
+
+        SerializedObject so = new SerializedObject(turnStateManager);
+        SerializedProperty terrainProp = so.FindProperty("terrainTilemap");
+        return terrainProp != null ? terrainProp.objectReferenceValue as Tilemap : null;
+    }
+
+    private static IReadOnlyList<UnitManager> GetUnitsForDebugQueries()
+    {
+        if (UnitManager.AllActive != null && UnitManager.AllActive.Count > 0)
+            return UnitManager.AllActive;
+
+        UnitManager[] fallback = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        return fallback ?? System.Array.Empty<UnitManager>();
     }
 
     private static Tilemap FindPreferredTilemap()
@@ -598,36 +582,6 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
         return maps[0];
     }
 
-    private Tilemap ResolveBoardTilemapForSimulation()
-    {
-        if (overrideTilemap != null)
-            return overrideTilemap;
-
-        if (useGameplaySensorContext)
-        {
-            Tilemap gameplayMap = ResolveGameplayTerrainTilemap();
-            if (gameplayMap != null)
-                return gameplayMap;
-        }
-
-        if (selectedUnit != null && selectedUnit.BoardTilemap != null)
-            return selectedUnit.BoardTilemap;
-
-        return FindPreferredTilemap();
-    }
-
-    private Tilemap ResolveGameplayTerrainTilemap()
-    {
-        if (turnStateManager == null)
-            turnStateManager = Object.FindAnyObjectByType<TurnStateManager>();
-        if (turnStateManager == null)
-            return null;
-
-        SerializedObject so = new SerializedObject(turnStateManager);
-        SerializedProperty terrainProp = so.FindProperty("terrainTilemap");
-        return terrainProp != null ? terrainProp.objectReferenceValue as Tilemap : null;
-    }
-
     private static Tilemap FindTilemapByName(string expectedName)
     {
         if (string.IsNullOrWhiteSpace(expectedName))
@@ -639,7 +593,6 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
             Tilemap map = maps[i];
             if (map == null)
                 continue;
-
             if (string.Equals(map.name, expectedName, System.StringComparison.OrdinalIgnoreCase))
                 return map;
         }

@@ -70,16 +70,10 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
     private Vector2 windowScroll;
     private string statusMessage = "Ready.";
 
-    [MenuItem("Tools/Sensors/Pode Enxergar")]
+    [MenuItem("Tools/FoW/Pode Enxergar")]
     public static void OpenWindow()
     {
         GetWindow<PodeEnxergarSensorDebugWindow>("Pode Enxergar");
-    }
-
-    [MenuItem("Tools/Sensor/Pode Enxergar")]
-    public static void OpenWindowAlias()
-    {
-        OpenWindow();
     }
 
     private void OnEnable()
@@ -153,7 +147,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField($"{index + 1}. Hex {item.cell.x},{item.cell.y}", EditorStyles.boldLabel);
         if (GUILayout.Button("Desenhar Linha", GUILayout.Width(110f)))
-            SelectLineForDrawing(item, Color.cyan, $"VAL {item.cell.x},{item.cell.y}");
+            SelectLineForDrawing(item, Color.green, $"VAL {item.cell.x},{item.cell.y}");
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.LabelField("Distancia", item.distance.ToString());
         if (!string.IsNullOrWhiteSpace(item.scenarioLabel))
@@ -350,7 +344,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
                 forceLayer: false,
                 preserveObserverLayerRange: false,
                 forcedDetectionRangeOverride: baseRange,
-                skipSpecializedTargetLayers: false);
+                skipSpecializedTargetLayers: true);
             scenarioResults.Add(defaultScenario);
         }
 
@@ -451,7 +445,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
 
         DrawAllLinesFromEntries(
             drawValid ? scenario.visibleHexes : scenario.invalidHexes,
-            drawValid ? Color.cyan : Color.red,
+            drawValid ? Color.green : Color.red,
             drawValid ? $"VAL[{scenarioIndex + 1}]" : $"INV[{scenarioIndex + 1}]");
         currentDrawBatchKey = key;
     }
@@ -544,10 +538,14 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             skipSpecializedTargetLayers: skipSpecializedTargetLayers,
             useRangeOnlyForAirHighWhenConfigured: true);
 
+        bool useAquaticDistanceForScenario = ShouldUseAquaticDistanceForScenario(domain, heightLevel);
         Dictionary<Vector3Int, int> distances = BuildDistanceMap(
             map,
             selectedUnit.CurrentCellPosition,
-            result.range);
+            result.range,
+            useAquaticDistanceForScenario
+                ? new System.Func<Vector3Int, bool>(cell => IsAquaticCellForSubmergedDetection(map, db, cell))
+                : null);
 
         foreach (Vector3Int rawCell in localVisibleCells)
         {
@@ -974,7 +972,11 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         return Mathf.Max(1, observer.Visao);
     }
 
-    private static Dictionary<Vector3Int, int> BuildDistanceMap(Tilemap tilemap, Vector3Int origin, int maxRange)
+    private static Dictionary<Vector3Int, int> BuildDistanceMap(
+        Tilemap tilemap,
+        Vector3Int origin,
+        int maxRange,
+        System.Func<Vector3Int, bool> passableFilter = null)
     {
         Dictionary<Vector3Int, int> distances = new Dictionary<Vector3Int, int>();
         if (tilemap == null || maxRange < 0)
@@ -1000,6 +1002,8 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
                 Vector3Int next = neighbors[i];
                 next.z = 0;
                 if (distances.ContainsKey(next))
+                    continue;
+                if (passableFilter != null && !passableFilter(next))
                     continue;
 
                 int nextDistance = currentDistance + 1;
@@ -1107,6 +1111,46 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
                 terrain = byGridTile;
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    private static bool ShouldUseAquaticDistanceForScenario(Domain domain, HeightLevel heightLevel)
+    {
+        return domain == Domain.Submarine && heightLevel == HeightLevel.Submerged;
+    }
+
+    private static bool IsAquaticCellForSubmergedDetection(Tilemap map, TerrainDatabase terrainDatabase, Vector3Int cell)
+    {
+        if (!TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
+            return false;
+
+        if (terrain.domain == Domain.Submarine && terrain.heightLevel == HeightLevel.Submerged)
+            return true;
+
+        if (terrain.domain == Domain.Water && terrain.heightLevel == HeightLevel.Surface)
+            return true;
+
+        if (TerrainSupportsLayerMode(terrain, Domain.Submarine, HeightLevel.Submerged))
+            return true;
+
+        if (TerrainSupportsLayerMode(terrain, Domain.Water, HeightLevel.Surface))
+            return true;
+
+        return false;
+    }
+
+    private static bool TerrainSupportsLayerMode(TerrainTypeData terrain, Domain domain, HeightLevel heightLevel)
+    {
+        if (terrain == null || terrain.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0; i < terrain.aditionalDomainsAllowed.Count; i++)
+        {
+            TerrainLayerMode mode = terrain.aditionalDomainsAllowed[i];
+            if (mode.domain == domain && mode.heightLevel == heightLevel)
+                return true;
         }
 
         return false;

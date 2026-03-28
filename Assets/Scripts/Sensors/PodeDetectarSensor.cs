@@ -350,7 +350,7 @@ public static class PodeDetectarSensor
         if (!IsUnitOnBoard(target, boardMap))
             return false;
 
-        List<UnitManager> units = UnitManager.AllActive;
+        IReadOnlyList<UnitManager> units = GetUnitsForSensorQueries();
         for (int i = 0; i < units.Count; i++)
         {
             UnitManager observer = units[i];
@@ -453,6 +453,7 @@ public static class PodeDetectarSensor
         collectVisibleCellsScratch.Clear();
         collectVisibleCellsScratch.Add(observerCell);
         DistanceMapWorkspace workspace = RentDistanceMapWorkspace();
+        DistanceMapWorkspace aquaticWorkspace = null;
         if (isFragataCollect)
             debugFragataCollectWorkspaceRents++;
         try
@@ -491,6 +492,25 @@ public static class PodeDetectarSensor
                     continue;
                 }
 
+                int effectiveDistance = distance;
+                bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(targetDomain, targetHeight) && terrainDatabase != null;
+                if (useAquaticDistance)
+                {
+                    if (aquaticWorkspace == null)
+                    {
+                        aquaticWorkspace = RentDistanceMapWorkspace();
+                        BuildDistanceMapInto(
+                            boardMap,
+                            observerCell,
+                            maxRange,
+                            aquaticWorkspace,
+                            c => IsAquaticCellForSubmergedDetection(boardMap, terrainDatabase, c));
+                    }
+
+                    if (!aquaticWorkspace.distances.TryGetValue(cell, out effectiveDistance))
+                        continue;
+                }
+
                 if (!forceVirtualTargetLayer && preserveObserverLayerRangeForHexVisibility)
                 {
                     if (CanObserveCellByAnyObserverVisionLayer(
@@ -501,7 +521,7 @@ public static class PodeDetectarSensor
                             dpqAirHeightConfig,
                             observerCell,
                             cell,
-                            distance,
+                            effectiveDistance,
                             targetDomain,
                             targetHeight,
                             enableLosValidation,
@@ -519,12 +539,14 @@ public static class PodeDetectarSensor
                     : ResolveDetectionRange(observer, observerData, null, targetDomain, targetHeight);
                 if (preserveObserverLayerRangeForHexVisibility && observerLayerRangeFloor > detectionRange)
                     detectionRange = observerLayerRangeFloor;
-                if (distance > detectionRange)
+                if (effectiveDistance > detectionRange)
                     continue;
 
+                bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
+                bool bypassLosByPolicy = !effectiveLosValidation;
                 bool skipLosForCurrentTarget = useRangeOnlyForAirHighWhenConfigured &&
                     IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
-                bool hasDirectLos = skipLosForCurrentTarget || !enableLosValidation || HasValidStraightObservationLine(
+                bool hasDirectLos = skipLosForCurrentTarget || HasValidStraightObservationLine(
                     boardMap,
                     terrainDatabase,
                     observerCell,
@@ -539,7 +561,7 @@ public static class PodeDetectarSensor
                     forcedTargetDomain: forceVirtualTargetLayer ? forcedVirtualTargetDomain : null,
                     forcedTargetHeightLevel: forceVirtualTargetLayer ? forcedVirtualTargetHeight : null);
 
-                bool hasObservation = hasDirectLos;
+                bool hasObservation = hasDirectLos || bypassLosByPolicy;
                 if (!hasObservation)
                 {
                     if (enableSpotter && ShouldUseForwardObserverRule(targetDomain, targetHeight))
@@ -560,6 +582,8 @@ public static class PodeDetectarSensor
         }
         finally
         {
+            if (aquaticWorkspace != null)
+                ReleaseDistanceMapWorkspace(aquaticWorkspace);
             ReleaseDistanceMapWorkspace(workspace);
             if (isFragataCollect)
                 debugFragataCollectWorkspaceReleases++;
@@ -664,10 +688,11 @@ public static class PodeDetectarSensor
         if (distance <= 1)
             return true;
 
+        bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
+        bool bypassLosByPolicy = !effectiveLosValidation;
         bool skipLosForCurrentTarget = useRangeOnlyForAirHighWhenConfigured &&
             IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
         bool hasDirectLos = skipLosForCurrentTarget ||
-            !enableLosValidation ||
             TryGetDirectLosCachedForRefresh(
                 boardMap,
                 terrainDatabase,
@@ -679,7 +704,7 @@ public static class PodeDetectarSensor
                 targetHeight,
                 detectionRange);
 
-        if (hasDirectLos)
+        if (hasDirectLos || bypassLosByPolicy)
             return true;
 
         if (enableSpotter && ShouldUseForwardObserverRule(targetDomain, targetHeight))
@@ -788,12 +813,13 @@ public static class PodeDetectarSensor
         Vector3Int observerCell = observer.CurrentCellPosition;
         observerCell.z = 0;
         DistanceMapWorkspace detectWorkspace = RentDistanceMapWorkspace();
+        DistanceMapWorkspace aquaticDetectWorkspace = null;
         try
         {
             BuildDistanceMapInto(boardMap, observerCell, maxRange, detectWorkspace);
-            Dictionary<Vector3Int, int> distanceMap = detectWorkspace.distances;
+            Dictionary<Vector3Int, int> defaultDistanceMap = detectWorkspace.distances;
 
-            List<UnitManager> units = UnitManager.AllActive;
+            IReadOnlyList<UnitManager> units = GetUnitsForSensorQueries();
             for (int i = 0; i < units.Count; i++)
             {
                 UnitManager target = units[i];
@@ -804,21 +830,41 @@ public static class PodeDetectarSensor
                 target.TryGetUnitData(out targetData);
                 bool isStealthTarget = targetData != null && targetData.IsStealthUnit(target.GetDomain(), target.GetHeightLevel());
 
+                Domain targetDomain = target.GetDomain();
+                HeightLevel targetHeight = target.GetHeightLevel();
+                bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(targetDomain, targetHeight) && terrainDatabase != null;
+                Dictionary<Vector3Int, int> distanceMap = defaultDistanceMap;
+                if (useAquaticDistance)
+                {
+                    if (aquaticDetectWorkspace == null)
+                    {
+                        aquaticDetectWorkspace = RentDistanceMapWorkspace();
+                        BuildDistanceMapInto(
+                            boardMap,
+                            observerCell,
+                            maxRange,
+                            aquaticDetectWorkspace,
+                            cell => IsAquaticCellForSubmergedDetection(boardMap, terrainDatabase, cell));
+                    }
+
+                    distanceMap = aquaticDetectWorkspace.distances;
+                }
+
                 Vector3Int targetCell = target.CurrentCellPosition;
                 targetCell.z = 0;
                 if (!distanceMap.TryGetValue(targetCell, out int distance))
                     continue;
 
-                Domain targetDomain = target.GetDomain();
-                HeightLevel targetHeight = target.GetHeightLevel();
                 int detectionRange = ResolveDetectionRange(observer, observerData, target, targetDomain, targetHeight);
                 if (distance > detectionRange)
                     continue;
 
                 List<Vector3Int> lineCells = new List<Vector3Int>();
                 Vector3Int blockedCell = Vector3Int.zero;
+                bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
+                bool bypassLosByPolicy = !effectiveLosValidation;
                 bool skipLosForCurrentTarget = IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
-                bool hasDirectLos = skipLosForCurrentTarget || !enableLosValidation || HasValidStraightObservationLine(
+                bool hasDirectLos = skipLosForCurrentTarget || HasValidStraightObservationLine(
                     boardMap,
                     terrainDatabase,
                     observerCell,
@@ -853,9 +899,10 @@ public static class PodeDetectarSensor
                     }
                 }
 
-                bool hasObservation = hasDirectLos || usedForwardObserver;
+                bool hasObservation = hasDirectLos || bypassLosByPolicy || usedForwardObserver;
                 if (!hasObservation)
                 {
+                    string rangeContext = useAquaticDistance ? " (distancia aquatica)" : string.Empty;
                     if (isStealthTarget)
                     {
                         undetectedStealthOutput.Add(new PodeDetectarOption
@@ -873,7 +920,7 @@ public static class PodeDetectarSensor
                             forwardObserverUnit = null,
                             lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
                             blockedCell = blockedCell,
-                            reason = "Furtiva no alcance, mas nao detectada por falta de LOS."
+                            reason = $"Furtiva no alcance{rangeContext}, mas nao detectada por falta de LOS."
                         });
                     }
 
@@ -892,7 +939,7 @@ public static class PodeDetectarSensor
                         forwardObserverUnit = null,
                         lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
                         blockedCell = blockedCell,
-                        reason = "No alcance, mas sem LOS."
+                        reason = $"No alcance{rangeContext}, mas sem LOS."
                     });
                     continue;
                 }
@@ -950,9 +997,12 @@ public static class PodeDetectarSensor
                         targetData,
                         targetDomain,
                         targetHeight);
-                    string observationModeReason = usedForwardObserver
-                        ? "via observador avancado"
-                        : "com LOS direta";
+                    string rangeContext = useAquaticDistance ? " com distancia aquatica" : string.Empty;
+                    string observationModeReason = bypassLosByPolicy
+                        ? $"com LOS ignorada pela policy da visao especializada{rangeContext}"
+                        : usedForwardObserver
+                        ? $"via observador avancado{rangeContext}"
+                        : $"com LOS direta{rangeContext}";
                     string detectedReason = string.IsNullOrWhiteSpace(stealthDetectionReason)
                         ? $"Detectado stealth {observationModeReason}."
                         : $"{stealthDetectionReason} ({observationModeReason}).";
@@ -992,12 +1042,16 @@ public static class PodeDetectarSensor
                     forwardObserverUnit = forwardObserver,
                     lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
                     blockedCell = blockedCell,
-                    reason = usedForwardObserver ? "Avistado via observador avancado." : "Avistado com LOS direta."
+                    reason = useAquaticDistance
+                        ? (usedForwardObserver ? "Avistado via observador avancado com distancia aquatica." : "Avistado com LOS direta e distancia aquatica.")
+                        : (usedForwardObserver ? "Avistado via observador avancado." : "Avistado com LOS direta.")
                 });
             }
         }
         finally
         {
+            if (aquaticDetectWorkspace != null)
+                ReleaseDistanceMapWorkspace(aquaticDetectWorkspace);
             ReleaseDistanceMapWorkspace(detectWorkspace);
         }
 
@@ -1199,7 +1253,7 @@ public static class PodeDetectarSensor
             if (localAroundTarget.Count == 0)
                 return observers;
 
-            List<UnitManager> units = UnitManager.AllActive;
+            IReadOnlyList<UnitManager> units = GetUnitsForSensorQueries();
             for (int i = 0; i < units.Count; i++)
             {
                 UnitManager ally = units[i];
@@ -1275,7 +1329,7 @@ public static class PodeDetectarSensor
             return 1;
 
         int maxRange = GetObservationRangeHexes(referenceUnit, target);
-        List<UnitManager> units = UnitManager.AllActive;
+        IReadOnlyList<UnitManager> units = GetUnitsForSensorQueries();
         for (int i = 0; i < units.Count; i++)
         {
             UnitManager ally = units[i];
@@ -1300,7 +1354,7 @@ public static class PodeDetectarSensor
             return 1;
 
         int maxRange = GetObservationRangeHexes(referenceUnit);
-        List<UnitManager> units = UnitManager.AllActive;
+        IReadOnlyList<UnitManager> units = GetUnitsForSensorQueries();
         for (int i = 0; i < units.Count; i++)
         {
             UnitManager ally = units[i];
@@ -1342,7 +1396,7 @@ public static class PodeDetectarSensor
             if (localAroundTarget.Count == 0)
                 return false;
 
-            List<UnitManager> units = UnitManager.AllActive;
+            IReadOnlyList<UnitManager> units = GetUnitsForSensorQueries();
             for (int i = 0; i < units.Count; i++)
             {
                 UnitManager ally = units[i];
@@ -1401,6 +1455,65 @@ public static class PodeDetectarSensor
         return observer.TeamId != target.TeamId;
     }
 
+    private static IReadOnlyList<UnitManager> GetUnitsForSensorQueries()
+    {
+        if (UnitManager.AllActive != null && UnitManager.AllActive.Count > 0)
+            return UnitManager.AllActive;
+
+        UnitManager[] fallback = UnityEngine.Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        return fallback ?? System.Array.Empty<UnitManager>();
+    }
+
+    private static bool ResolveEffectiveLosValidation(
+        UnitData observerData,
+        Domain targetDomain,
+        HeightLevel targetHeight,
+        bool enableLosValidationGlobal)
+    {
+        if (observerData == null)
+            return enableLosValidationGlobal;
+
+        return observerData.ResolveLosValidationFor(targetDomain, targetHeight, enableLosValidationGlobal);
+    }
+
+    private static bool ShouldUseAquaticDistanceForDetection(Domain targetDomain, HeightLevel targetHeight)
+    {
+        return targetDomain == Domain.Submarine && targetHeight == HeightLevel.Submerged;
+    }
+
+    private static bool IsAquaticCellForSubmergedDetection(Tilemap map, TerrainDatabase terrainDatabase, Vector3Int cell)
+    {
+        if (map == null || terrainDatabase == null)
+            return true;
+
+        if (!TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
+            return false;
+
+        return TerrainSupportsLayerMode(terrain, Domain.Submarine, HeightLevel.Submerged) ||
+            TerrainSupportsLayerMode(terrain, Domain.Naval, HeightLevel.Surface);
+    }
+
+    private static bool TerrainSupportsLayerMode(TerrainTypeData terrain, Domain domain, HeightLevel height)
+    {
+        if (terrain == null)
+            return false;
+
+        if (terrain.domain == domain && terrain.heightLevel == height)
+            return true;
+
+        if (terrain.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0; i < terrain.aditionalDomainsAllowed.Count; i++)
+        {
+            TerrainLayerMode mode = terrain.aditionalDomainsAllowed[i];
+            if (mode.domain == domain && mode.heightLevel == height)
+                return true;
+        }
+
+        return false;
+    }
+
     private static bool CanObserverObserveTarget(
         UnitManager observer,
         UnitManager target,
@@ -1429,12 +1542,20 @@ public static class PodeDetectarSensor
         Domain targetDomain = target.GetDomain();
         HeightLevel targetHeight = target.GetHeightLevel();
         int detectionRange = ResolveDetectionRange(observer, observerData, target, targetDomain, targetHeight);
+        bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(targetDomain, targetHeight) && terrainDatabase != null;
 
         DistanceMapWorkspace observeWorkspace = RentDistanceMapWorkspace();
         int distance;
         try
         {
-            BuildDistanceMapInto(boardMap, observerCell, detectionRange, observeWorkspace);
+            BuildDistanceMapInto(
+                boardMap,
+                observerCell,
+                detectionRange,
+                observeWorkspace,
+                useAquaticDistance
+                    ? cell => IsAquaticCellForSubmergedDetection(boardMap, terrainDatabase, cell)
+                    : null);
             Dictionary<Vector3Int, int> distanceMap = observeWorkspace.distances;
             if (!distanceMap.TryGetValue(targetCell, out distance))
                 return false;
@@ -1446,8 +1567,10 @@ public static class PodeDetectarSensor
             ReleaseDistanceMapWorkspace(observeWorkspace);
         }
 
+        bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
+        bool bypassLosByPolicy = !effectiveLosValidation;
         bool skipLosForCurrentTarget = IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
-        bool hasDirectLos = skipLosForCurrentTarget || !enableLosValidation || HasValidStraightObservationLine(
+        bool hasDirectLos = skipLosForCurrentTarget || HasValidStraightObservationLine(
             boardMap,
             terrainDatabase,
             observerCell,
@@ -1476,7 +1599,7 @@ public static class PodeDetectarSensor
             }
         }
 
-        bool hasObservation = hasDirectLos || usedForwardObserver;
+        bool hasObservation = hasDirectLos || bypassLosByPolicy || usedForwardObserver;
         if (!hasObservation)
             return false;
 
@@ -1973,13 +2096,10 @@ public static class PodeDetectarSensor
 
     private static List<Vector3Int> GetIntermediateCellsByCellLerp(Tilemap tilemap, Vector3Int originCell, Vector3Int targetCell)
     {
-        if (useLegacyLoSLerp)
-            return GetIntermediateCellsByCellLerpLegacy(tilemap, originCell, targetCell);
-
-        List<Vector3Int> cubeLine = GetIntermediateCellsByCubeLine(tilemap, originCell, targetCell);
-        if (cubeLine != null)
-            return cubeLine;
-
+        // Mantem o mesmo algoritmo robusto do PodeMirar:
+        // supersampling + expansao apenas em fronteira ambigua.
+        // O traçado por cube-line pode escolher um unico caminho em diagonais/ties
+        // e deixar passar casos de bloqueio por relevo entre hexes.
         return GetIntermediateCellsByCellLerpLegacy(tilemap, originCell, targetCell);
     }
 
@@ -2278,7 +2398,12 @@ public static class PodeDetectarSensor
         distanceMapWorkspacePool.Push(workspace);
     }
 
-    private static void BuildDistanceMapInto(Tilemap tilemap, Vector3Int origin, int maxRange, DistanceMapWorkspace workspace)
+    private static void BuildDistanceMapInto(
+        Tilemap tilemap,
+        Vector3Int origin,
+        int maxRange,
+        DistanceMapWorkspace workspace,
+        System.Func<Vector3Int, bool> passableCellFilter = null)
     {
         if (workspace == null)
             return;
@@ -2307,6 +2432,8 @@ public static class PodeDetectarSensor
                 Vector3Int next = workspace.neighbors[i];
                 next.z = 0;
                 if (workspace.distances.ContainsKey(next))
+                    continue;
+                if (passableCellFilter != null && !passableCellFilter(next))
                     continue;
 
                 int nextDistance = currentDistance + 1;

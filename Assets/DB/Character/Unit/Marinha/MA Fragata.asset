@@ -35,11 +35,7 @@ MonoBehaviour:
     vision: 6
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
-  - domain: 1
-    heightLevel: 3
-    vision: 6
-    detectUnitsWithFollowingSkills:
-    - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
+    losPolicy: 2
   movementCategory: 5
   militaryForce: 2
   unitClass: 8

@@ -49,6 +49,8 @@ public partial class TurnStateManager
                 return HandleConfirmWhileRemovingUnit();
             case CursorState.Planning:
                 return HandleConfirmWhilePlanning();
+            case CursorState.PlayerMenu:
+                return ActionSfx.None;
             case CursorState.AircraftFuelDepletionQueue:
             case CursorState.TurnStartRallyQueue:
                 return ActionSfx.None;
@@ -106,6 +108,8 @@ public partial class TurnStateManager
                 return HandleCancelWhileRemovingUnit();
             case CursorState.Planning:
                 return HandleCancelWhilePlanning();
+            case CursorState.PlayerMenu:
+                return ActionSfx.None;
             case CursorState.AircraftFuelDepletionQueue:
             case CursorState.TurnStartRallyQueue:
                 return ActionSfx.None;
@@ -794,6 +798,23 @@ public partial class TurnStateManager
         LogStateStep("HandleCancelWhilePlanning", rollback: true);
         ExitPlanningStateToNeutral(rollback: true);
         return ActionSfx.Cancel;
+    }
+
+    public bool TryEnterPlayerMenuState()
+    {
+        if (cursorState != CursorState.Neutral)
+            return false;
+
+        SetCursorState(CursorState.PlayerMenu, "TryEnterPlayerMenuState");
+        return true;
+    }
+
+    public void TryExitPlayerMenuStateToNeutral()
+    {
+        if (cursorState != CursorState.PlayerMenu)
+            return;
+
+        SetCursorState(CursorState.Neutral, "TryExitPlayerMenuStateToNeutral", rollback: true);
     }
 }
 

@@ -14,6 +14,14 @@ public class TransportStructureTerrainRule
 }
 
 [System.Serializable]
+public enum LosPolicy
+{
+    InheritGlobal = 0,
+    ForceOn = 1,
+    ForceOff = 2
+}
+
+[System.Serializable]
 public class UnitVisionException
 {
     [Tooltip("Dominio alvo para esta excecao de visao.")]
@@ -28,6 +36,9 @@ public class UnitVisionException
 
     [Tooltip("Detecta unidades que possuam qualquer skill desta lista (match por referencia ou ID).")]
     public List<SkillData> detectUnitsWithFollowingSkills = new List<SkillData>();
+
+    [Tooltip("Politica de LOS para esta especializacao. InheritGlobal usa o toggle global da partida.")]
+    public LosPolicy losPolicy = LosPolicy.InheritGlobal;
 }
 
 [System.Serializable]
@@ -308,6 +319,23 @@ public class UnitData : ScriptableObject
             return false;
 
         return HasAnySkillMatch(entry.detectUnitsWithFollowingSkills, targetStealthSkills);
+    }
+
+    public LosPolicy ResolveLosPolicyFor(Domain targetDomain, HeightLevel targetHeightLevel)
+    {
+        if (TryGetVisionException(targetDomain, targetHeightLevel, out UnitVisionException entry) && entry != null)
+            return entry.losPolicy;
+
+        return LosPolicy.InheritGlobal;
+    }
+
+    public bool ResolveLosValidationFor(Domain targetDomain, HeightLevel targetHeightLevel, bool enableLosValidationGlobal)
+    {
+        LosPolicy policy = ResolveLosPolicyFor(targetDomain, targetHeightLevel);
+        if (policy == LosPolicy.InheritGlobal)
+            return enableLosValidationGlobal;
+
+        return policy == LosPolicy.ForceOn;
     }
 
     public bool IsStealthUnit()

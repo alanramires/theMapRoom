@@ -141,6 +141,11 @@ public class BattleMapMenuRootController : MonoBehaviour
             if (IsAnyTextInputFocusedInUi())
                 return false;
 
+            // Se a confirmacao de fim de turno estiver pendente, ESC deve cancelar
+            // essa confirmacao no CursorController (nao abrir o menu do jogador).
+            if (cursorController != null && cursorController.IsEndTurnConfirmationPending)
+                return false;
+
             if (turnStateManager == null || turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
                 return false;
 
@@ -235,6 +240,8 @@ public class BattleMapMenuRootController : MonoBehaviour
     {
         if (menuRoot == null)
             return;
+        if (turnStateManager == null || !turnStateManager.TryEnterPlayerMenuState())
+            return;
 
         if (cursorController != null)
             savedCursorCell = cursorController.CurrentCell;
@@ -259,6 +266,7 @@ public class BattleMapMenuRootController : MonoBehaviour
         menuOpen = false;
         saveLoadPromptOpen = false;
         exitConfirmOpen = false;
+        turnStateManager?.TryExitPlayerMenuStateToNeutral();
         RestoreUndockedLayout();
         hasLastUndockedScreenRect = false;
         cursorNearUndockedDockRegion = false;
@@ -418,7 +426,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (button == null || !buttonActions.TryGetValue(button, out MenuAction action))
             return;
 
-        PlayConfirmSfxOncePerFrame();
+        if (action != MenuAction.Minimapa && action != MenuAction.Rodada)
+            PlayConfirmSfxOncePerFrame();
 
         switch (action)
         {
@@ -426,12 +435,14 @@ public class BattleMapMenuRootController : MonoBehaviour
                 ShowStatusSummary();
                 break;
             case MenuAction.Comando:
-                CloseMenu(restoreCursor: true);
+                if (!TryCloseMenuForDispatchAndEnsureNeutral())
+                    break;
                 if (turnStateManager != null && !turnStateManager.TryOpenCommandServiceFromMenu(out string commandMessage))
                     PanelDialogController.TrySetTransientText(commandMessage, 2.4f);
                 break;
             case MenuAction.Rodada:
-                CloseMenu(restoreCursor: true);
+                if (!TryCloseMenuForDispatchAndEnsureNeutral())
+                    break;
                 if (cursorController == null || !cursorController.TryOpenEndTurnConfirmationFromMenu())
                     cursorController?.PlayErrorSfx();
                 break;
@@ -442,7 +453,8 @@ public class BattleMapMenuRootController : MonoBehaviour
                 CloseMenu(restoreCursor: true);
                 break;
             case MenuAction.Minimapa:
-                CloseMenu(restoreCursor: true);
+                if (!TryCloseMenuForDispatchAndEnsureNeutral())
+                    break;
                 cameraController?.ToggleQuickZoomFromMenu();
                 break;
             case MenuAction.Config:
@@ -460,7 +472,8 @@ public class BattleMapMenuRootController : MonoBehaviour
                 SetPanelSelectionByButton(btnOpcoes);
                 break;
             case MenuAction.Destruir:
-                CloseMenu(restoreCursor: true);
+                if (!TryCloseMenuForDispatchAndEnsureNeutral())
+                    break;
                 if (turnStateManager != null && !turnStateManager.TryOpenDestroyUnitPromptFromMenu(out string destroyMessage))
                     PanelDialogController.TrySetTransientText(destroyMessage, 2.4f);
                 break;
@@ -501,6 +514,21 @@ public class BattleMapMenuRootController : MonoBehaviour
         int money = matchController != null ? matchController.GetActualMoney(activeTeam) : 0;
         string message = $"Status da partida\nRodada: {turnNumber}\nTime ativo: {TeamUtils.GetName(activeTeam)}\nTesouro: ${Mathf.Max(0, money)}";
         PanelDialogController.TrySetExternalText(message + "\nESC: voltar");
+    }
+
+    private bool TryCloseMenuForDispatchAndEnsureNeutral()
+    {
+        CloseMenu(restoreCursor: true);
+        if (turnStateManager == null)
+            return true;
+
+        if (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral)
+            return true;
+
+        string message = $"Menu do jogador: estado nao normalizado para Neutral (atual: {turnStateManager.CurrentCursorState}).";
+        PanelDialogController.TrySetTransientText(message, 2.8f);
+        cursorController?.PlayErrorSfx();
+        return false;
     }
 
     private void RestoreDefaultDialogForCurrentPanel()
