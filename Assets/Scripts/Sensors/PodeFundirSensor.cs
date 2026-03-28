@@ -16,6 +16,7 @@ public class PodeFundirInvalidOption
 {
     public const string ReasonIdInsufficientMovement = "fuse.invalid.insufficient_movement";
     public const string ReasonIdLayerMismatch = "fuse.invalid.layer_mismatch";
+    public const string ReasonIdCandidateHasCargo = "fuse.invalid.candidate_has_cargo";
 
     public UnitManager receiverUnit;
     public UnitManager candidateUnit;
@@ -74,6 +75,12 @@ public static class PodeFundirSensor
             return false;
         }
 
+        if (HasPassengers(selectedUnit))
+        {
+            reason = "Unidade transportando passageiros nao pode fundir.";
+            return false;
+        }
+
         if (selectedUnit.CurrentHP >= 10)
         {
             reason = "Unidade com HP maximo nao pode fundir.";
@@ -103,6 +110,24 @@ public static class PodeFundirSensor
 
             if (!IsSameTypeAndTeam(selectedUnit, other))
                 continue;
+
+            if (HasPassengers(other))
+            {
+                if (invalidOutput != null)
+                {
+                    invalidOutput.Add(new PodeFundirInvalidOption
+                    {
+                        receiverUnit = selectedUnit,
+                        candidateUnit = other,
+                        candidateCell = cell,
+                        remainingMovement = Mathf.Max(0, other.RemainingMovementPoints),
+                        requiredMovementCost = 0,
+                        reasonId = PodeFundirInvalidOption.ReasonIdCandidateHasCargo,
+                        reason = "Candidato transportando passageiros nao pode fundir."
+                    });
+                }
+                continue;
+            }
 
             Domain receiverDomain = selectedUnit.GetDomain();
             HeightLevel receiverHeight = selectedUnit.GetHeightLevel();
@@ -265,6 +290,18 @@ public static class PodeFundirSensor
         }
 
         invalidReason = "Sem caminho valido ate o receptor (bloqueio no trajeto).";
+        return false;
+    }
+
+    private static bool HasPassengers(UnitManager unit)
+    {
+        IReadOnlyList<UnitTransportSeatRuntime> seats = unit.TransportedUnitSlots;
+        if (seats == null) return false;
+        for (int i = 0; i < seats.Count; i++)
+        {
+            if (seats[i] != null && seats[i].embarkedUnit != null)
+                return true;
+        }
         return false;
     }
 

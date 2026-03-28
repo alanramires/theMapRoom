@@ -432,9 +432,10 @@ public partial class TurnStateManager
             }
             if (!isEmbarkedPassenger && order.forceSurfaceBeforeSupply)
             {
-                if (!CanUseLayerModeAtCurrentCell(target, boardMap, terrainDatabase, targetCell, Domain.Naval, HeightLevel.Surface, out string surfaceReason))
+                PodeEmergirReport emergirReport = PodeEmergirSensor.Evaluate(target, boardMap, terrainDatabase);
+                if (!emergirReport.status)
                 {
-                    Debug.Log($"[Suprimento] {target.name} ignorado: nao pode emergir para Naval/Surface no hex atual ({surfaceReason}).");
+                    Debug.Log($"[Suprimento] {target.name} ignorado: nao pode emergir para Naval/Surface no hex atual ({emergirReport.explicacao}).");
                     continue;
                 }
                 yield return ApplySupplyLayerTransitionIfNeeded(target, Domain.Naval, HeightLevel.Surface);
@@ -1903,11 +1904,12 @@ public partial class TurnStateManager
             return;
 
         passenger.BeginEmbarkedVisualPreview();
+        // Sync sprite so nested transporters show their transport sprite (not the default one).
+        passenger.RefreshSpriteForCurrentLayer();
 
         Vector3Int supplierCell = supplier.CurrentCellPosition;
         supplierCell.z = 0;
         passenger.SetCurrentCellPosition(supplierCell, enforceFinalOccupancyRule: false);
-        passenger.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface);
 
         int supplierSorting = 999;
         SpriteRenderer supplierSprite = supplier.GetMainSpriteRenderer();

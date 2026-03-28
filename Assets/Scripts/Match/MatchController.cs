@@ -199,6 +199,7 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enableServicoDoComandoSensorLogs = false;
     [SerializeField] private bool enablePodePousarSensorLogs = false;
     [SerializeField] private bool enablePodeDecolarSensorLogs = false;
+    [SerializeField] private bool enablePodeEmergirSensorLogs = false;
     [SerializeField] private bool enableAindaMeVeRuntimeLogs = false;
     [SerializeField] private bool enablePodeDetectarRuntimeLogs = false;
     [SerializeField] private bool enablePodeEnxergarRuntimeLogs = false;
@@ -260,6 +261,7 @@ public class MatchController : MonoBehaviour
     public bool EnableServicoDoComandoSensorLogs => enableSensorsRuntimeLogs || enableServicoDoComandoSensorLogs;
     public bool EnablePodePousarSensorLogs => enableSensorsRuntimeLogs || enablePodePousarSensorLogs;
     public bool EnablePodeDecolarSensorLogs => enableSensorsRuntimeLogs || enablePodeDecolarSensorLogs;
+    public bool EnablePodeEmergirSensorLogs => enableSensorsRuntimeLogs || enablePodeEmergirSensorLogs;
     public TutorialData ActiveTutorial => activeTutorial;
     public bool IsTutorialMode => activeTutorial != null;
     public TerrainDatabase TerrainDatabaseRef => ResolveFogTerrainDatabase();
@@ -1542,6 +1544,22 @@ public class MatchController : MonoBehaviour
 
             unit.ResetActed();
             unit.ClearReceivedSuppliesThisTurn();
+
+            IReadOnlyList<UnitTransportSeatRuntime> seats = unit.TransportedUnitSlots;
+            if (seats != null)
+            {
+                for (int s = 0; s < seats.Count; s++)
+                {
+                    UnitTransportSeatRuntime seat = seats[s];
+                    UnitManager passenger = seat != null ? seat.embarkedUnit : null;
+                    if (passenger == null || !passenger.IsEmbarked)
+                        continue;
+                    if ((int)passenger.TeamId != activeTeamId)
+                        continue;
+                    passenger.ResetActed();
+                    passenger.ClearReceivedSuppliesThisTurn();
+                }
+            }
         }
         TurnPerfLog("ReleaseUnits.IterateUnits", stageStartMs);
 

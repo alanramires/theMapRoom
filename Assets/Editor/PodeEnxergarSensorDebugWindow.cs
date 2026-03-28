@@ -1129,13 +1129,13 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         if (terrain.domain == Domain.Submarine && terrain.heightLevel == HeightLevel.Submerged)
             return true;
 
-        if (terrain.domain == Domain.Water && terrain.heightLevel == HeightLevel.Surface)
+        if (terrain.domain == Domain.Naval && terrain.heightLevel == HeightLevel.Surface)
             return true;
 
         if (TerrainSupportsLayerMode(terrain, Domain.Submarine, HeightLevel.Submerged))
             return true;
 
-        if (TerrainSupportsLayerMode(terrain, Domain.Water, HeightLevel.Surface))
+        if (TerrainSupportsLayerMode(terrain, Domain.Naval, HeightLevel.Surface))
             return true;
 
         return false;

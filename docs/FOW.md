@@ -43,6 +43,23 @@ Camadas adicionais:
 - **Unidade visivel**: exige observacao/deteccao valida.
 - Logo: um hex pode estar iluminado e ainda assim nao mostrar a unidade inimiga que esta nele.
 
+## 3 regras correlatas (sensores FoW)
+### 1) Pode Enxergar (FoW de hex)
+- Responsavel por liberar/iluminar hexes no FoW.
+- Avalia visibilidade por alcance + LoS/EV para um alvo virtual por hex (camada virtual do terreno/estrutura/construcao, sem vazar a camada de ocupante oculto).
+- Em resumo: determina **onde o time enxerga o mapa**, nao se uma unidade stealth foi detectada.
+
+### 2) Pode Detectar (deteccao de unidades)
+- Responsavel por tentar detectar unidades reais no mapa.
+- Para alvo stealth: exige combinacao valida de especializacao de visao/deteccao vs skill stealth do alvo (quando `Stealth=true`).
+- Para alvo nao stealth: usa alcance por camada + LoS/Spotter/policies aplicaveis.
+- Em resumo: determina **quais unidades inimigas aparecem** (ou continuam ocultas).
+
+### 3) Alguem me ve (visao reversa)
+- E o fluxo inverso do Pode Detectar: dado um alvo, lista quem ao redor consegue observar/detectar esse alvo.
+- Voltado principalmente para diagnostico de unidades furtivas (com skill stealth preenchida), mostrando quem realmente "te ve".
+- Em resumo: responde **quem me detecta agora** e por qual motivo.
+
 ## Visibilidade de terreno
 - Calculada por alcance de visao por camada (`ResolveVisionFor` + especializacoes).
 - FoW de terreno usa camada do **terreno** para o calculo do hex.
@@ -84,3 +101,41 @@ No `panel_debug`:
 ## Estado atual e prox passos
 Base de FoW tatico consolidada: terreno e unidade desacoplados, sem vazamento por empilhamento oculto.
 Itens futuros podem incluir refinamentos de sensores especiais, marcadores temporais visuais e regras adicionais por demanda.
+
+## Empilhamento de hexagono no Total War
+- No `Total War`, o empilhamento usa bandas de ocupacao (`Air`, `Sub`, `Blocking`) no `OccupancyResolver`.
+- Bandas:
+  - `Blocking`: camadas de superficie/chao (ex.: `Land/Surface`, `Naval/Surface`).
+  - `Air`: `AirLow` e `AirHigh`.
+  - `Sub`: `Submarine/Submerged`.
+- Regra de termino de movimento (`CanEndMove`):
+  - se a unidade move em banda `Air` ou `Sub`, nao ha bloqueio de termino por empilhamento nessa regra;
+  - se move em banda `Blocking`, nao pode terminar no mesmo hex de **aliado** na mesma banda;
+  - em hex com **inimigo** na mesma banda, o estado vira `hex disputado` (restricoes de acoes no scanner), em vez de bloqueio simples de empilhamento.
+- Regra de travessia (`CanPassThrough`):
+  - aliados nao bloqueiam travessia;
+  - inimigo na mesma banda `Blocking` bloqueia passagem pelo caminho.
+
+## O que acontece ao "voar" para area desconhecida
+- Enquanto a unidade esta em pre-visualizacao de movimento dentro da neblina (sem confirmar), o jogo nao vaza informacao de inimigos ocultos.
+- Nesse estado, voce pode avancar/voltar quantas vezes quiser no trajeto; nenhum dado de unidade inimiga e revelado ate a confirmacao final do movimento.
+- Se existir um inimigo vizinho na area desconhecida, voce nao consegue atacar apenas por "suspeita" durante a navegacao: primeiro precisa comprometer o movimento.
+- O refresh incremental principal de FoW para a unidade ocorre quando ela entra em `HasActed` (`MarkAsActed` -> `NotifyUnitReachedHasAct`).
+- Em outras palavras: mover e entrar em estado de sensores (`MoveuAndando/MoveuParado`) nao significa, por si so, abrir toda a intel final; a consolidacao forte acontece no compromisso da acao da unidade.
+- Resultado pratico: a intel nova entra quando a jogada foi efetivamente assumida no fluxo de acao.
+- Excecao operacional conhecida: se um desembarque for permitido porque o hex de destino aparenta vago no momento da acao, pode ocorrer um "vazamento sortudo" minimo ligado a essa validacao de ocupacao.
+
+## Pode Mirar x FoW (por que entro na nevoa e nao consigo engajar)
+- `PodeMirar` ja nasce filtrado por FoW em `IsEnemyTargetCandidate`.
+- Com `Total War` ligado, se o alvo inimigo nao estiver visivel para o time ativo (`IsUnitVisibleForActiveTeam`), ele e descartado antes mesmo das validacoes de arma/LoS.
+- Traducao pratica: o inimigo oculto nao entra na lista de alvos validos de mirar.
+
+- Para uma unidade inimiga ficar visivel no FoW, nao basta "iluminar o terreno":
+  1. o hex dela precisa estar visivel (`IsCellVisibleForActiveTeam`);
+  2. e a unidade precisa estar observada/detectada (`PodeDetectarSensor.IsTargetObservedByTeam`), com alcance por camada + LoS + stealth conforme setup.
+- Ou seja: voce pode entrar na nevoa, ver o terreno, e ainda assim nao poder engajar porque a unidade inimiga ainda nao foi detectada.
+
+- No runtime, a atualizacao forte de FoW/deteccao acontece quando a unidade entra em `HasActed` (`MarkAsActed` -> `NotifyUnitReachedHasAct`).
+- Durante navegacao/pre-commit, a intel pode ainda nao estar consolidada para liberar combate.
+
+- Regra adicional de estado: em `Total War`, se o hex estiver disputado e a unidade estiver em `MoveuAndando`, o scanner remove a acao `A` (mirar) temporariamente nesse estado.

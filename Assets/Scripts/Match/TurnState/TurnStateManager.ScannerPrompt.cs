@@ -1510,6 +1510,9 @@ public partial class TurnStateManager
             }
 
             bool isAirToGroundLanding = ShouldUseLandingActionForTransition(currentDomain, currentHeight, mode.domain, mode.heightLevel);
+            bool isSubmarineEmerge = currentDomain == Domain.Submarine && currentHeight == HeightLevel.Submerged
+                && mode.domain == Domain.Naval && mode.heightLevel == HeightLevel.Surface;
+
             LandingOptionAction action = isAirToGroundLanding
                 ? LandingOptionAction.Land
                 : LandingOptionAction.DomainTransition;
@@ -1527,6 +1530,19 @@ public partial class TurnStateManager
                         unavailableReason = !string.IsNullOrWhiteSpace(decision.reason)
                             ? decision.reason
                             : "Pouso indisponivel neste hex.";
+                    continue;
+                }
+            }
+
+            if (isSubmarineEmerge)
+            {
+                PodeEmergirReport emergirReport = PodeEmergirSensor.Evaluate(unit, boardMap, terrainDatabase);
+                if (!emergirReport.status)
+                {
+                    if (string.IsNullOrWhiteSpace(unavailableReason))
+                        unavailableReason = !string.IsNullOrWhiteSpace(emergirReport.explicacao)
+                            ? emergirReport.explicacao
+                            : "Emersao indisponivel neste hex.";
                     continue;
                 }
             }

@@ -1660,7 +1660,7 @@ public class UnitManager : MonoBehaviour
         return data;
     }
 
-    private void RefreshSpriteForCurrentLayer()
+    public void RefreshSpriteForCurrentLayer()
     {
         RefreshSpriteForCurrentLayer(TryGetUnitData());
     }
@@ -1704,7 +1704,7 @@ public class UnitManager : MonoBehaviour
 
     private bool HasAnyEmbarkedPassenger(UnitData data)
     {
-        if (data == null || !data.isTransporter || isEmbarked)
+        if (data == null || !data.isTransporter)
             return false;
 
         SyncTransportRuntimeSlotsWithData(data, preserveSeatPassengers: !Application.isPlaying);
@@ -2010,7 +2010,8 @@ public class UnitManager : MonoBehaviour
         // preview is active (e.g. temporary supply animation preview).
         if (isEmbarked && visible && !IsEmbarkedVisualPreviewActive)
             visible = false;
-        if (hiddenByFogOfWar && visible)
+        // FoW does not override an active visual preview (e.g. supply animation showing an embarked unit).
+        if (hiddenByFogOfWar && visible && !(isEmbarked && IsEmbarkedVisualPreviewActive))
             visible = false;
 
         ApplyOwnedHudVisibility(visible);
@@ -2620,7 +2621,8 @@ public class UnitManager : MonoBehaviour
         // systems request visibility (selection cleanup, blink stop, etc).
         if (isEmbarked && visible && !IsEmbarkedVisualPreviewActive)
             visible = false;
-        if (hiddenByFogOfWar && visible)
+        // FoW does not override an active visual preview (e.g. supply animation showing an embarked unit).
+        if (hiddenByFogOfWar && visible && !(isEmbarked && IsEmbarkedVisualPreviewActive))
             visible = false;
 
         if (spriteRenderer != null && spriteRenderer.GetComponentInParent<UnitManager>() == this)
@@ -2661,6 +2663,10 @@ public class UnitManager : MonoBehaviour
         {
             StopSelectionBlinkRoutine();
             isSelected = false;
+            // Don't forcibly hide an embarked unit that has an active visual preview
+            // (e.g. supply animation temporarily showing the unit above its transporter).
+            if (isEmbarked && IsEmbarkedVisualPreviewActive)
+                return;
         }
 
         SetSpriteVisible(visible);

@@ -361,9 +361,10 @@ public partial class TurnStateManager
 
                 if (!isEmbarkedPassenger && order.forceSurfaceBeforeSupply)
                 {
-                    if (!CanUseLayerModeAtCurrentCell(target, boardMap, terrainDatabase, targetCell, Domain.Naval, HeightLevel.Surface, out string surfaceReason))
+                    PodeEmergirReport emergirReport = PodeEmergirSensor.Evaluate(target, boardMap, terrainDatabase);
+                    if (!emergirReport.status)
                     {
-                        Debug.Log($"[ServicoComando] {target.name} ignorado: nao pode emergir para Naval/Surface ({surfaceReason}).");
+                        Debug.Log($"[ServicoComando] {target.name} ignorado: nao pode emergir para Naval/Surface ({emergirReport.explicacao}).");
                         continue;
                     }
 
@@ -1312,7 +1313,7 @@ public partial class TurnStateManager
                 continue;
             }
 
-            // Fallback defensivo: garante que passageiros nao selecionados permaneÃ§am ocultos.
+            // Fallback defensivo: garante que passageiros nao selecionados permaneçam ocultos.
             passenger.EndEmbarkedVisualPreview();
             SetUnitSpriteRenderersVisible(passenger, false);
 
@@ -1448,49 +1449,38 @@ public partial class TurnStateManager
 
         List<ServicoDoComandoOption> normalized = new List<ServicoDoComandoOption>(orders.Count);
         HashSet<ServicoDoComandoOption> used = new HashSet<ServicoDoComandoOption>();
-        HashSet<UnitManager> handledTransporters = new HashSet<UnitManager>();
 
+        // Identifica transportadores raiz: nao sao passageiros de outro transporter na lista.
+        var allTransporters = new HashSet<UnitManager>();
         for (int i = 0; i < orders.Count; i++)
         {
-            ServicoDoComandoOption option = orders[i];
-            UnitManager transporter = option != null ? option.sourceSupplierUnit : null;
-            UnitManager target = option != null ? option.targetUnit : null;
-            bool isEmbarked = transporter != null && target != null && target.IsEmbarked && target.EmbarkedTransporter == transporter;
-            if (!isEmbarked || handledTransporters.Contains(transporter))
-                continue;
-
-            handledTransporters.Add(transporter);
-
-            for (int j = 0; j < orders.Count; j++)
-            {
-                ServicoDoComandoOption embarkedOrder = orders[j];
-                UnitManager embarkedTransporter = embarkedOrder != null ? embarkedOrder.sourceSupplierUnit : null;
-                UnitManager embarkedTarget = embarkedOrder != null ? embarkedOrder.targetUnit : null;
-                bool sameFamilyEmbarked =
-                    embarkedTransporter == transporter &&
-                    embarkedTarget != null &&
-                    embarkedTarget.IsEmbarked &&
-                    embarkedTarget.EmbarkedTransporter == transporter;
-                if (!sameFamilyEmbarked || used.Contains(embarkedOrder))
-                    continue;
-
-                normalized.Add(embarkedOrder);
-                used.Add(embarkedOrder);
-            }
-
-            for (int j = 0; j < orders.Count; j++)
-            {
-                ServicoDoComandoOption transporterSelf = orders[j];
-                UnitManager selfTarget = transporterSelf != null ? transporterSelf.targetUnit : null;
-                if (selfTarget != transporter || used.Contains(transporterSelf))
-                    continue;
-
-                normalized.Add(transporterSelf);
-                used.Add(transporterSelf);
-                break;
-            }
+            ServicoDoComandoOption opt = orders[i];
+            if (opt != null && opt.sourceSupplierUnit != null &&
+                opt.targetUnit != null && opt.targetUnit.IsEmbarked &&
+                opt.targetUnit.EmbarkedTransporter == opt.sourceSupplierUnit)
+                allTransporters.Add(opt.sourceSupplierUnit);
         }
 
+        var handledTransporters = new HashSet<UnitManager>();
+        for (int i = 0; i < orders.Count; i++)
+        {
+            ServicoDoComandoOption opt = orders[i];
+            if (opt == null || opt.sourceSupplierUnit == null || opt.targetUnit == null)
+                continue;
+            if (!opt.targetUnit.IsEmbarked || opt.targetUnit.EmbarkedTransporter != opt.sourceSupplierUnit)
+                continue;
+
+            UnitManager transporter = opt.sourceSupplierUnit;
+            if (handledTransporters.Contains(transporter))
+                continue;
+            handledTransporters.Add(transporter);
+
+            bool isRoot = !allTransporters.Contains(transporter.EmbarkedTransporter);
+            if (isRoot)
+                AppendTransportFamilyPreOrder(transporter, orders, normalized, used);
+        }
+
+        // Demais ordens (sem familia) preservam a ordem original.
         for (int i = 0; i < orders.Count; i++)
         {
             ServicoDoComandoOption option = orders[i];
@@ -1502,6 +1492,55 @@ public partial class TurnStateManager
 
         orders.Clear();
         orders.AddRange(normalized);
+    }
+
+    private static void AppendTransportFamilyPreOrder(
+        UnitManager transporter,
+        List<ServicoDoComandoOption> source,
+        List<ServicoDoComandoOption> result,
+        HashSet<ServicoDoComandoOption> used)
+    {
+        // 1. Opcao do proprio transporter primeiro.
+        for (int i = 0; i < source.Count; i++)
+        {
+            ServicoDoComandoOption opt = source[i];
+            if (opt == null || used.Contains(opt) || opt.targetUnit != transporter)
+                continue;
+            result.Add(opt);
+            used.Add(opt);
+            break;
+        }
+
+        // 2. Filhos por ordem de assento; filhos que sao transportadores recursam.
+        IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
+        if (seats == null)
+            return;
+
+        for (int s = 0; s < seats.Count; s++)
+        {
+            UnitTransportSeatRuntime seat = seats[s];
+            UnitManager passenger = seat != null ? seat.embarkedUnit : null;
+            if (passenger == null || !passenger.IsEmbarked || passenger.EmbarkedTransporter != transporter)
+                continue;
+
+            bool passengerIsTransporter = false;
+            for (int i = 0; i < source.Count; i++)
+            {
+                ServicoDoComandoOption opt = source[i];
+                if (opt == null || used.Contains(opt))
+                    continue;
+                if (opt.sourceSupplierUnit != transporter || opt.targetUnit != passenger)
+                    continue;
+                result.Add(opt);
+                used.Add(opt);
+
+                if (!passengerIsTransporter && passenger.TransportedUnitSlots != null && passenger.TransportedUnitSlots.Count > 0)
+                {
+                    passengerIsTransporter = true;
+                    AppendTransportFamilyPreOrder(passenger, source, result, used);
+                }
+            }
+        }
     }
 
     private static string ResolveServiceLabel(ServiceData service)

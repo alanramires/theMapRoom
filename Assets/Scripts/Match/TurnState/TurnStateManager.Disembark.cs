@@ -365,14 +365,14 @@ public partial class TurnStateManager
     {
         if (scannerPromptStep == ScannerPromptStep.DisembarkLandingSelect)
             return;
-        if (!TryGetSelectedPassengerEntry(out _))
+        if (!TryGetSelectedPassengerEntry(out DisembarkPassengerEntry entry))
         {
             EnterDisembarkPassengerSelectStep();
             return;
         }
 
         scannerPromptStep = ScannerPromptStep.DisembarkLandingSelect;
-        LogDisembarkLandingSelectionPanel(disembarkPassengerEntries[disembarkSelectedPassengerIndex]);
+        LogDisembarkLandingSelectionPanel(entry);
     }
 
     private void ExitDisembarkStateToMovement()

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs wc:*)",
+      "Bash(xargs cat:*)",
+      "Bash(grep -E \"^TurnStateManager\\\\..*\\\\.cs$\")",
+      "Bash(grep -n \"output == null\" \"d:/Unity Projects/The Map Room/Assets/Scripts/Sensors/\"*.cs)"
+    ]
+  }
+}

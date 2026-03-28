@@ -110,51 +110,40 @@ public static class ServicoDoComandoSensor
 
         var result = new List<ServicoDoComandoOption>(output.Count);
         var used = new HashSet<ServicoDoComandoOption>();
-        var suppliersWithEmbarked = new HashSet<UnitManager>();
 
+        // Identifica transportadores raiz: nao sao passageiros de nenhum outro
+        // transportador presente na lista.
+        var allTransporters = new HashSet<UnitManager>();
         for (int i = 0; i < output.Count; i++)
         {
-            ServicoDoComandoOption option = output[i];
-            if (!IsEmbarkedCommandOption(option))
-                continue;
-
-            UnitManager supplier = option.sourceSupplierUnit;
-            if (supplier == null || suppliersWithEmbarked.Contains(supplier))
-                continue;
-
-            suppliersWithEmbarked.Add(supplier);
-
-            // Embarcados primeiro (ja estao ordenados por assento no sort base).
-            for (int j = 0; j < output.Count; j++)
-            {
-                ServicoDoComandoOption embarked = output[j];
-                if (!IsEmbarkedCommandOption(embarked))
-                    continue;
-                if (embarked.sourceSupplierUnit != supplier)
-                    continue;
-                if (used.Contains(embarked))
-                    continue;
-
-                result.Add(embarked);
-                used.Add(embarked);
-            }
-
-            // Em seguida o proprio transportador, se ele for elegivel na mesma ordem.
-            for (int j = 0; j < output.Count; j++)
-            {
-                ServicoDoComandoOption supplierSelf = output[j];
-                if (supplierSelf == null || used.Contains(supplierSelf))
-                    continue;
-                if (supplierSelf.targetUnit != supplier)
-                    continue;
-
-                result.Add(supplierSelf);
-                used.Add(supplierSelf);
-                break;
-            }
+            ServicoDoComandoOption opt = output[i];
+            if (opt != null && opt.sourceSupplierUnit != null && IsEmbarkedCommandOption(opt))
+                allTransporters.Add(opt.sourceSupplierUnit);
         }
 
-        // Demais opcoes preservam a ordem original ja classificada.
+        var rootTransporters = new List<UnitManager>();
+        var handledTransporters = new HashSet<UnitManager>();
+        for (int i = 0; i < output.Count; i++)
+        {
+            ServicoDoComandoOption opt = output[i];
+            if (opt == null || !IsEmbarkedCommandOption(opt))
+                continue;
+            UnitManager transporter = opt.sourceSupplierUnit;
+            if (transporter == null || handledTransporters.Contains(transporter))
+                continue;
+            handledTransporters.Add(transporter);
+
+            // É raiz se o proprio transporter nao é passageiro de outro transporter na lista.
+            bool isRoot = !allTransporters.Contains(transporter.EmbarkedTransporter);
+            if (isRoot)
+                rootTransporters.Add(transporter);
+        }
+
+        // Para cada transportador raiz, emite a arvore em pre-ordem (transporter -> filhos).
+        foreach (UnitManager root in rootTransporters)
+            AppendTransportFamilyPreOrder(root, output, result, used);
+
+        // Demais opcoes (sem familia ou ja tratadas) preservam a ordem original.
         for (int i = 0; i < output.Count; i++)
         {
             ServicoDoComandoOption option = output[i];
@@ -166,6 +155,60 @@ public static class ServicoDoComandoSensor
 
         output.Clear();
         output.AddRange(result);
+    }
+
+    // Emite em pre-ordem: primeiro a opcao do proprio transporter (se existir),
+    // depois cada filho por ordem de assento; filhos que sao transportadores
+    // recursam antes de passar ao proximo assento.
+    private static void AppendTransportFamilyPreOrder(
+        UnitManager transporter,
+        List<ServicoDoComandoOption> source,
+        List<ServicoDoComandoOption> result,
+        HashSet<ServicoDoComandoOption> used)
+    {
+        // 1. Opcao do proprio transporter.
+        for (int i = 0; i < source.Count; i++)
+        {
+            ServicoDoComandoOption opt = source[i];
+            if (opt == null || used.Contains(opt) || opt.targetUnit != transporter)
+                continue;
+            result.Add(opt);
+            used.Add(opt);
+            break;
+        }
+
+        // 2. Filhos por ordem de assento.
+        IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
+        if (seats == null)
+            return;
+
+        for (int s = 0; s < seats.Count; s++)
+        {
+            UnitTransportSeatRuntime seat = seats[s];
+            UnitManager passenger = seat != null ? seat.embarkedUnit : null;
+            if (passenger == null || !passenger.IsEmbarked || passenger.EmbarkedTransporter != transporter)
+                continue;
+
+            // Coleta a(s) opcao(oes) deste passageiro.
+            bool passengerIsTransporter = false;
+            for (int i = 0; i < source.Count; i++)
+            {
+                ServicoDoComandoOption opt = source[i];
+                if (opt == null || used.Contains(opt))
+                    continue;
+                if (opt.sourceSupplierUnit != transporter || opt.targetUnit != passenger)
+                    continue;
+                result.Add(opt);
+                used.Add(opt);
+
+                // Se este passageiro é ele mesmo um transportador com filhos, recursa.
+                if (!passengerIsTransporter && passenger.TransportedUnitSlots != null && passenger.TransportedUnitSlots.Count > 0)
+                {
+                    passengerIsTransporter = true;
+                    AppendTransportFamilyPreOrder(passenger, source, result, used);
+                }
+            }
+        }
     }
 
     private static bool IsEmbarkedCommandOption(ServicoDoComandoOption option)
