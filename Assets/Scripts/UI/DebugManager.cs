@@ -182,6 +182,14 @@ public class DebugManager : MonoBehaviour
             if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
+        else if (command == "LAND UNIT")
+        {
+            executed = turnStateManager.TryChangeAltitudeFromDebug(Domain.Land, HeightLevel.Surface, out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
         else if (TryParseSetActiveTeamCommand(command, out int activeTeamValue))
         {
             executed = turnStateManager.TrySetActiveTeamFromDebug(activeTeamValue, out string message);
@@ -742,6 +750,7 @@ public class DebugManager : MonoBehaviour
             "set money <v> | set money:<team> <v>\n" +
             "set economy on|off\n" +
             "change altitude <dominio>/<altura>\n" +
+            "land unit\n" +
             "landing | emerge | submerge | take off | fast take off\n" +
             "fow on|off\n" +
             "help";

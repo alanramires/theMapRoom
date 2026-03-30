@@ -112,7 +112,7 @@ public class ReplayPanelUI : MonoBehaviour
         switch (key)
         {
             case KeyCode.F9:
-                return Keyboard.current.f9Key.wasPressedThisFrame;
+                return false; // disabled - próxima versão (era: Keyboard.current.f9Key.wasPressedThisFrame)
             case KeyCode.RightBracket:
                 return Keyboard.current.rightBracketKey.wasPressedThisFrame;
             case KeyCode.LeftBracket:

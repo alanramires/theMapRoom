@@ -132,12 +132,14 @@ public partial class TurnStateManager
     private void OnEnable()
     {
         MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
+        MatchController.OnActiveTeamChanged += HandleAutoCommandServiceTeamChanged;
         MatchController.OnBeforeAdvanceTurn += HandleBeforeAdvanceTurn;
     }
 
     private void OnDisable()
     {
         MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
+        MatchController.OnActiveTeamChanged -= HandleAutoCommandServiceTeamChanged;
         MatchController.OnBeforeAdvanceTurn -= HandleBeforeAdvanceTurn;
     }
 

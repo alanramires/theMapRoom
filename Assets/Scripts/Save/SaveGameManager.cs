@@ -23,6 +23,7 @@ public class SaveGameManager : MonoBehaviour
 
     private static PendingMainMenuLoadRequest pendingMainMenuLoad;
     private static bool suppressNextLoadConfirmSfx;
+    private static string pendingNewGameSaveDirectory;
 
     [Header("References")]
     [SerializeField] private UnitSpawner unitSpawner;
@@ -106,6 +107,7 @@ public class SaveGameManager : MonoBehaviour
     private void Start()
     {
         TryStartPendingMainMenuLoadForActiveScene();
+        ApplyPendingNewGame();
     }
 
 #if UNITY_EDITOR
@@ -1495,6 +1497,28 @@ public class SaveGameManager : MonoBehaviour
     public void LogSaveDirectory()
     {
         Debug.Log($"[SaveGame] Diretorio atual de save: {ResolveSaveDirectory()}");
+    }
+
+    /// <summary>
+    /// Chamado por NewGamePanelController antes de LoadScene.
+    /// Transporta o diretório de save e ativa auto-save na cena de destino.
+    /// </summary>
+    public static void SetupForNewGame(string saveDirectory)
+    {
+        pendingNewGameSaveDirectory = string.IsNullOrWhiteSpace(saveDirectory)
+            ? string.Empty
+            : saveDirectory.Trim();
+    }
+
+    private void ApplyPendingNewGame()
+    {
+        if (pendingNewGameSaveDirectory == null)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(pendingNewGameSaveDirectory))
+            SetCustomSaveDirectory(pendingNewGameSaveDirectory);
+
+        pendingNewGameSaveDirectory = null;
     }
 
     private static string ResolveHelper(string id, string fallback)

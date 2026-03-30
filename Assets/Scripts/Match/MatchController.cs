@@ -74,6 +74,7 @@ public class MatchController : MonoBehaviour
     {
         public TeamId teamId;
         public bool flipX;
+        public bool isAI;
         [Min(0)] public int startMoney;
         [Min(0)] public int actualMoney;
         [Min(0)] public int incomePerTurn;
@@ -113,6 +114,7 @@ public class MatchController : MonoBehaviour
     [SerializeField, HideInInspector] private bool fogOfWar = true;
     [Header("Gameplay Setup")]
     [SerializeField] private GameSetupPreset gameSetup = GameSetupPreset.FogOfWarTotal;
+    [SerializeField] private bool commandServiceAutomatic = false;
     [SerializeField] private bool enableLdtValidation = true;
     [SerializeField] private bool enableLosValidation = true;
     [SerializeField] private bool enableSpotter = true;
@@ -245,6 +247,11 @@ public class MatchController : MonoBehaviour
     public bool IncludeNeutralTeam => includeNeutralTeam;
     public bool EconomyEnabled => economyEnabled;
     public GameSetupPreset GameSetup => gameSetup;
+    public bool CommandServiceAutomatic
+    {
+        get => commandServiceAutomatic;
+        set => commandServiceAutomatic = value;
+    }
     public bool EnableLdtValidation => enableLdtValidation;
     public bool EnableLosValidation => enableLosValidation;
     public bool EnableSpotter => enableSpotter;
@@ -603,6 +610,11 @@ public class MatchController : MonoBehaviour
 
     private void Awake()
     {
+        if (PartidaConfig.HasPending)
+        {
+            PartidaConfig.Apply(this);
+            PartidaConfig.Clear();
+        }
         ApplyGameSetupPreset();
         SyncThreatRevisionFlags();
         NormalizeState();
@@ -745,6 +757,34 @@ public class MatchController : MonoBehaviour
         gameSetup = preset;
         ApplyGameSetupPreset();
         SyncThreatRevisionFlags();
+    }
+
+    public void SetPlayerIsAI(TeamId teamId, bool isAI)
+    {
+        if (players == null)
+            return;
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i].teamId == teamId)
+            {
+                PlayerEntry e = players[i];
+                e.isAI = isAI;
+                players[i] = e;
+                return;
+            }
+        }
+    }
+
+    public bool IsPlayerAI(TeamId teamId)
+    {
+        if (players == null)
+            return false;
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i].teamId == teamId)
+                return players[i].isAI;
+        }
+        return false;
     }
 
     public void SetActiveTeamId(int teamId)

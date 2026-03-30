@@ -22,6 +22,9 @@ Comandos disponiveis no `panel_debug`.
 - `wake all units`
   - Reativa todas as unidades do time ativo.
 
+- `land unit`
+  - Pousa a unidade selecionada (ou sob o cursor) em `Land/Surface` usando o sensor `PodePousar`. Nao consome acao.
+
 ## Unidade (HP, autonomia, municao, movimento)
 
 - `set hp <valor>`
@@ -101,6 +104,9 @@ Comandos disponiveis no `panel_debug`.
 - `change altitude <dominio>/<altura>`
   - Dominios: `land`, `naval`, `submarine`, `air`.
   - Alturas: `surface`, `submerged`, `low`, `high`.
+
+- `land unit`
+  - Pousa em `Land/Surface` via sensor (ver secao "Comandos principais").
 
 - `landing`
 - `emerge`

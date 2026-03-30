@@ -50,6 +50,7 @@ public partial class TurnStateManager
     private int commandServiceServedCacheTeamId = int.MinValue;
     private int commandServicePreviewSelectedIndex = -1;
     private Coroutine commandServiceExecutionRoutine;
+    private Coroutine autoCommandServiceRoutine;
     public bool IsPlayerCursorLockedByCommandService => false;
 
     private bool IsCommandServiceState => cursorState == CursorState.CommandService;
@@ -2148,6 +2149,48 @@ public partial class TurnStateManager
         int spent = Mathf.Min(current, amount);
         stockBySupply[supply] = Mathf.Max(0, current - spent);
         return spent;
+    }
+
+    // ── Serviço do Comando automático ─────────────────────────────────────
+
+    public void HandleAutoCommandServiceTeamChanged(int teamId)
+    {
+        if (matchController == null || !matchController.CommandServiceAutomatic)
+            return;
+
+        // Turnos 0 e 1 = opener dos times: nao roda automaticamente.
+        if (matchController.CurrentTurn <= 1)
+            return;
+
+        if (autoCommandServiceRoutine != null)
+            StopCoroutine(autoCommandServiceRoutine);
+
+        autoCommandServiceRoutine = StartCoroutine(AutoCommandServiceRoutine());
+    }
+
+    private IEnumerator AutoCommandServiceRoutine()
+    {
+        // Aguarda supply queue e quaisquer outras animacoes terminarem,
+        // e cursor voltar ao Neutral.
+        while (supplyExecutionInProgress ||
+               IsCommandServiceExecutionRunning ||
+               cursorState != CursorState.Neutral)
+        {
+            yield return null;
+        }
+
+        autoCommandServiceRoutine = null;
+
+        // Simula "X": abre o preview exatamente como o jogador faria.
+        // O helper panel mostra o resumo e o cursor vai para CommandService.
+        if (!TryOpenCommandServiceFromMenu(out _))
+            yield break;
+
+        // Aguarda 1 frame para o estado se estabelecer.
+        yield return null;
+
+        // Simula "Enter": confirma e inicia a execucao com animacoes.
+        TryStartCommandServiceOrder(out _);
     }
 }
 

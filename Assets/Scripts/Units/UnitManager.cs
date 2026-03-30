@@ -539,6 +539,8 @@ public class UnitManager : MonoBehaviour
         ResetRemainingMovement();
         appliedHasActed = hasActed;
         RefreshActedVisual();
+        TryAutoAssignMatchController();
+        matchController?.NotifyUnitReachedHasAct(this);
     }
 
     public void SetRemainingMovementPoints(int value)

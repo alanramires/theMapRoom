@@ -38,7 +38,6 @@ public class BattleMapMenuRootController : MonoBehaviour
     }
 
     [Header("Scene")]
-    [SerializeField] private string battleSceneName = "Battle Map";
     [SerializeField] private string mainMenuSceneName = "Tela de Entrada";
 
     [Header("Dock")]
@@ -104,10 +103,6 @@ public class BattleMapMenuRootController : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void EnsureSceneInstance()
     {
-        Scene active = SceneManager.GetActiveScene();
-        if (!string.Equals(active.name, "Battle Map", StringComparison.OrdinalIgnoreCase))
-            return;
-
         BattleMapMenuRootController existing = FindAnyObjectByType<BattleMapMenuRootController>();
         if (existing != null)
             return;
@@ -130,7 +125,7 @@ public class BattleMapMenuRootController : MonoBehaviour
         TryAutoAssignReferences();
         EnsureButtonsCache();
 
-        if (!IsBattleMapScene() || menuRoot == null)
+        if (menuRoot == null)
             return false;
 
         if (!menuOpen)
@@ -577,9 +572,6 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     private void TryAutoAssignReferences()
     {
-        if (!IsBattleMapScene())
-            return;
-
         if (menuRoot == null)
             menuRoot = FindSceneObjectByName("menuRoot");
         if (panelMenu == null)
@@ -824,12 +816,6 @@ public class BattleMapMenuRootController : MonoBehaviour
         }
 
         return null;
-    }
-
-    private bool IsBattleMapScene()
-    {
-        Scene active = SceneManager.GetActiveScene();
-        return string.Equals(active.name, battleSceneName, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool WasUpPressedThisFrame()

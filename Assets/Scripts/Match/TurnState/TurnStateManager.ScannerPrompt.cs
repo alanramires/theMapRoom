@@ -4823,9 +4823,9 @@ public partial class TurnStateManager
 #endif
             case 'P':
 #if ENABLE_INPUT_SYSTEM
-                return Keyboard.current != null && Keyboard.current.pKey.wasPressedThisFrame;
+                return false; // disabled - próxima versão (era: Keyboard.current != null && Keyboard.current.pKey.wasPressedThisFrame)
 #else
-                return Input.GetKeyDown(KeyCode.P);
+                return false; // disabled - próxima versão (era: Input.GetKeyDown(KeyCode.P))
 #endif
             case 'U':
 #if ENABLE_INPUT_SYSTEM
@@ -4841,9 +4841,9 @@ public partial class TurnStateManager
 #endif
             case 'Z':
 #if ENABLE_INPUT_SYSTEM
-                return Keyboard.current != null && Keyboard.current.zKey.wasPressedThisFrame;
+                return false; // disabled - próxima versão (era: Keyboard.current != null && Keyboard.current.zKey.wasPressedThisFrame)
 #else
-                return Input.GetKeyDown(KeyCode.Z);
+                return false; // disabled - próxima versão (era: Input.GetKeyDown(KeyCode.Z))
 #endif
             default:
                 return false;
