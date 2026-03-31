@@ -51,6 +51,7 @@ public class MatchControllerEditor : Editor
     private SerializedProperty enableVictoryStarsProp;
     private SerializedProperty victoryStarsToWinProp;
     private SerializedProperty freezeTurnAdvanceAfterVictoryProp;
+    private SerializedProperty allowDefeatForZeroUnitsProp;
     private SerializedProperty victoryStarsByTeamProp;
     private SerializedProperty hasVictoryWinnerProp;
     private SerializedProperty victoryWinnerTeamProp;
@@ -106,6 +107,7 @@ public class MatchControllerEditor : Editor
         enableVictoryStarsProp = serializedObject.FindProperty("enableVictoryStars");
         victoryStarsToWinProp = serializedObject.FindProperty("victoryStarsToWin");
         freezeTurnAdvanceAfterVictoryProp = serializedObject.FindProperty("freezeTurnAdvanceAfterVictory");
+        allowDefeatForZeroUnitsProp = serializedObject.FindProperty("allowDefeatForZeroUnits");
         victoryStarsByTeamProp = serializedObject.FindProperty("victoryStarsByTeam");
         hasVictoryWinnerProp = serializedObject.FindProperty("hasVictoryWinner");
         victoryWinnerTeamProp = serializedObject.FindProperty("victoryWinnerTeam");
@@ -237,6 +239,8 @@ public class MatchControllerEditor : Editor
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Victory Overlay", EditorStyles.boldLabel);
+        if (allowDefeatForZeroUnitsProp != null)
+            EditorGUILayout.PropertyField(allowDefeatForZeroUnitsProp, new GUIContent("Allow Defeat For 0 Units"));
         if (showVictoryOverlayProp != null)
             EditorGUILayout.PropertyField(showVictoryOverlayProp, new GUIContent("Show Victory Overlay"));
         if (victoryOverlayTilemapProp != null)
@@ -332,7 +336,10 @@ public class MatchControllerEditor : Editor
             if (teamProp != null)
                 EditorGUILayout.PropertyField(teamProp, new GUIContent("Team"));
             if (flipXProp != null)
-                EditorGUILayout.PropertyField(flipXProp, new GUIContent("Flip X"));
+            {
+                using (new EditorGUI.DisabledScope(true))
+                    EditorGUILayout.PropertyField(flipXProp, new GUIContent("Flip X (auto)"));
+            }
             if (isAIProp != null)
                 EditorGUILayout.PropertyField(isAIProp, new GUIContent("Is AI"));
             if (startMoneyProp != null)
@@ -434,7 +441,7 @@ public class MatchControllerEditor : Editor
         SerializedProperty incomePerTurnProp = p.FindPropertyRelative("incomePerTurn");
         SerializedProperty startMoneyAppliedProp = p.FindPropertyRelative("startMoneyApplied");
 
-        if (flipXProp != null) flipXProp.boolValue = team == TeamId.Red || team == TeamId.Yellow;
+        // flipX e calculado automaticamente por AutoComputeFlipXFromHqPositions — nao resetar aqui
         if (startMoneyProp != null) startMoneyProp.intValue = 0;
         if (actualMoneyProp != null) actualMoneyProp.intValue = 0;
         if (incomePerTurnProp != null) incomePerTurnProp.intValue = 0;

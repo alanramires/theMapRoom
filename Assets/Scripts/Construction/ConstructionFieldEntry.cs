@@ -9,8 +9,8 @@ public class ConstructionFieldEntry
     [Tooltip("Tipo de construcao desta entrada.")]
     public ConstructionData construction;
 
-    [Tooltip("Time inicial desta construcao em campo.")]
-    public TeamId initialTeamId = TeamId.Neutral;
+    [Tooltip("Slot do MatchController que controla esta construcao no inicio. -1 = Neutral.")]
+    public int initialSlotIndex = -1;
 
     [Tooltip("Posicao da construcao no mapa (hex).")]
     public Vector3Int cellPosition = Vector3Int.zero;

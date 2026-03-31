@@ -12,14 +12,21 @@ public class AISnapshot
     public bool HasHq;
     public Vector3Int HqCell;
     public List<AIConstructionInfo> KnownConstructions = new List<AIConstructionInfo>();
+    // HQs dos times inimigos (atalho — subconjunto de KnownConstructions)
+    public List<AIConstructionInfo> EnemyHqs = new List<AIConstructionInfo>();
+    // Construcoes dentro do raio de defesa do proprio HQ
+    public List<AIConstructionInfo> ConstructionsNearHq = new List<AIConstructionInfo>();
+    public int HqDefendRadius;
 
     public Tilemap BoardTilemap;
     public List<UnitManager> FriendlyUnits = new List<UnitManager>();
     public List<UnitManager> VisibleEnemies = new List<UnitManager>();
 
-    public static AISnapshot Build(TeamId aiTeam, MatchController matchController)
+    public const int DefaultDefendRadius = 5;
+
+    public static AISnapshot Build(TeamId aiTeam, MatchController matchController, int defendRadius = DefaultDefendRadius)
     {
-        AISnapshot snapshot = new AISnapshot { AiTeam = aiTeam };
+        AISnapshot snapshot = new AISnapshot { AiTeam = aiTeam, HqDefendRadius = defendRadius };
 
         // Todas as construcoes sao conhecidas (intel publica)
         for (int i = 0; i < ConstructionManager.AllActive.Count; i++)
@@ -28,19 +35,29 @@ public class AISnapshot
             if (c == null)
                 continue;
 
-            snapshot.KnownConstructions.Add(new AIConstructionInfo
+            AIConstructionInfo info = new AIConstructionInfo
             {
                 Cell = c.CurrentCellPosition,
                 TeamId = c.TeamId,
                 IsHq = c.IsPlayerHeadQuarter,
-                DisplayName = c.ConstructionDisplayName
-            });
+                CanProduceUnits = c.CanProduceUnits,
+                DisplayName = c.ConstructionDisplayName,
+                Source = c
+            };
+            snapshot.KnownConstructions.Add(info);
 
-            if (c.IsPlayerHeadQuarter && c.TeamId == aiTeam)
+            if (c.IsPlayerHeadQuarter)
             {
-                snapshot.HasHq = true;
-                snapshot.HqCell = c.CurrentCellPosition;
-                snapshot.HqCell.z = 0;
+                if (c.TeamId == aiTeam)
+                {
+                    snapshot.HasHq = true;
+                    snapshot.HqCell = c.CurrentCellPosition;
+                    snapshot.HqCell.z = 0;
+                }
+                else
+                {
+                    snapshot.EnemyHqs.Add(info);
+                }
             }
         }
 
@@ -66,6 +83,20 @@ public class AISnapshot
                     snapshot.BoardTilemap = c.BoardTilemap;
                     break;
                 }
+            }
+        }
+
+        // Construcoes proximas do proprio HQ (raio hex)
+        if (snapshot.HasHq && snapshot.BoardTilemap != null)
+        {
+            Vector3Int hqCell = snapshot.HqCell;
+            for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+            {
+                AIConstructionInfo info = snapshot.KnownConstructions[i];
+                Vector3Int cell = info.Cell;
+                cell.z = 0;
+                if (HexCoordinates.IsWithinRange(snapshot.BoardTilemap, hqCell, cell, defendRadius))
+                    snapshot.ConstructionsNearHq.Add(info);
             }
         }
 
@@ -95,5 +126,7 @@ public class AIConstructionInfo
     public Vector3Int Cell;
     public TeamId TeamId;
     public bool IsHq;
+    public bool CanProduceUnits;
     public string DisplayName;
+    public ConstructionManager Source;
 }

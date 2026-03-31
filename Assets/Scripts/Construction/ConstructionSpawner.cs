@@ -47,6 +47,8 @@ public class ConstructionSpawner : MonoBehaviour
             SpawnFieldDatabase();
         if (spawnMapListOnStart)
             SpawnMapList();
+        if (matchController != null)
+            matchController.AutoComputeFlipXFromHqPositions();
     }
 
     public GameObject Spawn(string constructionId, TeamId teamId, Vector3 position, Quaternion rotation)
@@ -212,24 +214,30 @@ public class ConstructionSpawner : MonoBehaviour
                 continue;
 
             Vector3Int fixedCell = new Vector3Int(entry.cellPosition.x, entry.cellPosition.y, 0);
-            GameObject spawned = SpawnAtCell(entry.construction.id, entry.initialTeamId, fixedCell);
+            TeamId resolvedTeam = matchController != null
+                ? matchController.GetTeamIdForSlot(entry.initialSlotIndex)
+                : TeamId.Neutral;
+            GameObject spawned = SpawnAtCell(entry.construction.id, resolvedTeam, fixedCell);
             if (spawned == null)
                 continue;
 
+            ConstructionManager spawnedManager = spawned.GetComponent<ConstructionManager>();
+            if (spawnedManager != null)
+                spawnedManager.SetSlotIndex(entry.initialSlotIndex);
+
             if (!entry.useConstructionConfigurationOverride)
             {
-                ConstructionManager managerNoOverride = spawned.GetComponent<ConstructionManager>();
-                if (managerNoOverride != null)
+                if (spawnedManager != null)
                 {
                     int initialCaptureNoOverride = entry.initialCapturePoints >= 0
                         ? entry.initialCapturePoints
-                        : managerNoOverride.CapturePointsMax;
-                    managerNoOverride.SetCurrentCapturePoints(initialCaptureNoOverride);
+                        : spawnedManager.CapturePointsMax;
+                    spawnedManager.SetCurrentCapturePoints(initialCaptureNoOverride);
                 }
                 continue;
             }
 
-            ConstructionManager manager = spawned.GetComponent<ConstructionManager>();
+            ConstructionManager manager = spawnedManager;
             if (manager != null)
             {
                 manager.ApplySiteRuntime(entry.constructionConfiguration);

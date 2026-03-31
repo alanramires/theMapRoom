@@ -18,6 +18,7 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty autoSnapWhenMovedInEditorProp;
     private SerializedProperty currentCellPositionProp;
     private SerializedProperty teamIdProp;
+    private SerializedProperty slotIndexProp;
     private SerializedProperty constructionIdProp;
     private SerializedProperty instanceIdProp;
     private SerializedProperty currentPositionProp;
@@ -41,6 +42,7 @@ public class ConstructionManagerEditor : Editor
         autoSnapWhenMovedInEditorProp = serializedObject.FindProperty("autoSnapWhenMovedInEditor");
         currentCellPositionProp = serializedObject.FindProperty("currentCellPosition");
         teamIdProp = serializedObject.FindProperty("teamId");
+        slotIndexProp = serializedObject.FindProperty("slotIndex");
         constructionIdProp = serializedObject.FindProperty("constructionId");
         instanceIdProp = serializedObject.FindProperty("instanceId");
         currentPositionProp = serializedObject.FindProperty("currentPosition");
@@ -72,7 +74,7 @@ public class ConstructionManagerEditor : Editor
         EditorGUILayout.PropertyField(snapToCellCenterProp, new GUIContent("Snap To Cell Center"));
         EditorGUILayout.PropertyField(autoSnapWhenMovedInEditorProp, new GUIContent("Auto Snap When Moved In Editor"));
         EditorGUILayout.PropertyField(currentCellPositionProp, new GUIContent("Cell Position"));
-        EditorGUILayout.PropertyField(teamIdProp, new GUIContent("Team ID"));
+        DrawSlotAndTeamBlock();
 
         DrawConstructionIdPopup();
 
@@ -130,6 +132,50 @@ public class ConstructionManagerEditor : Editor
             construction.SnapToCellCenter();
         if (GUILayout.Button("Pull Cell From Transform"))
             construction.PullCellFromTransform();
+    }
+
+    private void DrawSlotAndTeamBlock()
+    {
+        if (slotIndexProp == null)
+        {
+            EditorGUILayout.PropertyField(teamIdProp, new GUIContent("Team ID"));
+            return;
+        }
+
+        MatchController mc = Object.FindAnyObjectByType<MatchController>();
+        int slotCount = mc != null ? mc.SlotCount : 0;
+
+        // Monta labels: index 0 = Neutral, indices 1..N = slots
+        int totalOptions = slotCount + 1;
+        string[] labels = new string[totalOptions];
+        labels[0] = "Neutral";
+        for (int i = 0; i < slotCount; i++)
+        {
+            TeamId t = mc.GetTeamIdForSlot(i);
+            labels[i + 1] = $"Slot {i} — {TeamUtils.GetName(t)}";
+        }
+
+        int currentSlot = slotIndexProp.intValue;
+        int popupIndex = currentSlot < 0 ? 0 : Mathf.Clamp(currentSlot + 1, 0, totalOptions - 1);
+
+        EditorGUI.BeginChangeCheck();
+        int newPopupIndex = EditorGUILayout.Popup("Slot ID", popupIndex, labels);
+        if (EditorGUI.EndChangeCheck())
+        {
+            int newSlot = newPopupIndex == 0 ? -1 : newPopupIndex - 1;
+            slotIndexProp.intValue = newSlot;
+            serializedObject.ApplyModifiedProperties();
+
+            // Resolve teamId imediatamente
+            ConstructionManager cm = (ConstructionManager)target;
+            Undo.RecordObject(cm, "Change Slot");
+            cm.SetSlotIndex(newSlot);
+            EditorUtility.SetDirty(cm);
+        }
+
+        // Team ID como read-only — derivado do slot
+        using (new EditorGUI.DisabledScope(true))
+            EditorGUILayout.PropertyField(teamIdProp, new GUIContent("Team ID (resolved)"));
     }
 
     private void DrawGlobalVictoryFallbackToggle()

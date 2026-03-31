@@ -20,6 +20,8 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private bool autoSnapWhenMovedInEditor = true;
     [SerializeField] private Vector3Int currentCellPosition = Vector3Int.zero;
     [SerializeField] private TeamId teamId = TeamId.Green;
+    [Tooltip("Slot do MatchController que controla este time. -1 = Neutral fixo (sem slot).")]
+    [SerializeField] private int slotIndex = -1;
     [SerializeField] private string constructionId;
     [SerializeField] private int instanceId;
     [SerializeField] private Vector3 currentPosition = Vector3.zero;
@@ -54,6 +56,13 @@ public class ConstructionManager : MonoBehaviour
 #endif
 
     public TeamId TeamId => teamId;
+    public int SlotIndex => slotIndex;
+
+    public void SetSlotIndex(int index)
+    {
+        slotIndex = index;
+        ResolveTeamIdFromSlot();
+    }
     public Tilemap BoardTilemap => boardTilemap;
     public Vector3Int CurrentCellPosition => currentCellPosition;
     public string ConstructionId => constructionId;
@@ -183,6 +192,7 @@ public class ConstructionManager : MonoBehaviour
         EnsureDefaults();
         TryAutoAssignMatchController();
         TryAutoAssignBoardTilemap();
+        ResolveTeamIdFromSlot();
         SyncPositionState();
         RefreshRuntimeVisualState(force: true);
     }
@@ -203,6 +213,7 @@ public class ConstructionManager : MonoBehaviour
 
         MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
         MatchController.OnUnitActedStateChanged += HandleUnitActedStateChanged;
+        MatchController.OnSlotConfigChanged += HandleSlotConfigChanged;
         UnitOccupancyRules.OnUnitOccupancyChanged += HandleUnitOccupancyChanged;
         RefreshRuntimeVisualState(force: true);
 #if UNITY_EDITOR
@@ -215,6 +226,7 @@ public class ConstructionManager : MonoBehaviour
         AllActive.Remove(this);
         MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
         MatchController.OnUnitActedStateChanged -= HandleUnitActedStateChanged;
+        MatchController.OnSlotConfigChanged -= HandleSlotConfigChanged;
         UnitOccupancyRules.OnUnitOccupancyChanged -= HandleUnitOccupancyChanged;
 #if UNITY_EDITOR
         UnregisterEditorTick();
@@ -991,6 +1003,36 @@ public class ConstructionManager : MonoBehaviour
         RefreshRuntimeVisualState(force: false);
         activeTeamChangedHandlerCount++;
         activeTeamChangedHandlerTotalMs += (Time.realtimeSinceStartupAsDouble * 1000d) - startMs;
+    }
+
+    private void HandleSlotConfigChanged()
+    {
+        ResolveTeamIdFromSlot();
+        RefreshRuntimeVisualState(force: true);
+    }
+
+    // Resolve o teamId a partir do slotIndex no MatchController.
+    // Sem efeito se slotIndex == -1 (Neutral fixo) ou se nao ha MatchController na cena.
+    private void ResolveTeamIdFromSlot()
+    {
+        if (slotIndex < 0)
+            return;
+
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+
+        if (matchController == null)
+            return;
+
+        TeamId resolved = matchController.GetTeamIdForSlot(slotIndex);
+        if (teamId != resolved)
+        {
+            teamId = resolved;
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+                UnityEditor.EditorUtility.SetDirty(this);
+#endif
+        }
     }
 
     private void HandleUnitOccupancyChanged(UnitManager unit, Vector3Int previousCell, Vector3Int currentCell)

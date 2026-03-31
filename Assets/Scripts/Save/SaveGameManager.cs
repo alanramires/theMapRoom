@@ -15,6 +15,9 @@ using UnityEngine.InputSystem;
 
 public class SaveGameManager : MonoBehaviour
 {
+    // Disparado apos o load ser concluido com sucesso (independente do time ativo).
+    public static event Action OnAfterLoadSuccess;
+
     private sealed class PendingMainMenuLoadRequest
     {
         public int slotIndex;
@@ -1149,6 +1152,12 @@ public class SaveGameManager : MonoBehaviour
 
         LogLoadPerf(loadedSlot, "load_routine.end", routineStartMs, PerfNowMs() - routineStartMs);
         loadInProgress = false;
+
+        if (coreLoadSucceeded)
+        {
+            matchController?.ForceReapplyActiveTeam();
+            OnAfterLoadSuccess?.Invoke();
+        }
     }
 
     private void SchedulePostLoadThreatWarmup()

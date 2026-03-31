@@ -3102,24 +3102,17 @@ public partial class TurnStateManager
                 continue;
 
             int childBefore = Mathf.Max(0, child.CurrentHP);
+            // Regra de sobrevida: dano proporcional em embarcados nao mata enquanto
+            // o transportador pai continua vivo.
             if (childBefore <= 0)
-            {
-                KillEntireEmbarkedChain(child, deathReason: "morto porque o transportador morreu");
                 continue;
-            }
 
             int propagatedDamage = Mathf.RoundToInt(childBefore * ratio);
             if (propagatedDamage <= 0)
                 propagatedDamage = 1;
 
-            int childAfter = Mathf.Max(0, childBefore - propagatedDamage);
+            int childAfter = Mathf.Max(1, childBefore - propagatedDamage);
             child.SetCurrentHP(childAfter);
-
-            if (childAfter <= 0)
-            {
-                KillEntireEmbarkedChain(child, deathReason: "morto porque o transportador morreu");
-                continue;
-            }
 
             ApplyRatioDamageToEmbarkedRecursive(child, ratio);
         }

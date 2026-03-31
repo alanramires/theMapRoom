@@ -19,11 +19,12 @@ public static class SaveDataMapper
 
         List<int> teamIds = new List<int>();
         List<bool> flipXs = new List<bool>();
+        List<bool> isAIs = new List<bool>();
         List<int> startMoneys = new List<int>();
         List<int> actualMoneys = new List<int>();
         List<int> incomePerTurns = new List<int>();
         List<bool> startMoneyAppliedFlags = new List<bool>();
-        matchController.ExportPlayersState(teamIds, flipXs, startMoneys, actualMoneys, incomePerTurns, startMoneyAppliedFlags);
+        matchController.ExportPlayersState(teamIds, flipXs, isAIs, startMoneys, actualMoneys, incomePerTurns, startMoneyAppliedFlags);
 
         int playerCount = teamIds.Count;
         for (int i = 0; i < playerCount; i++)
@@ -32,6 +33,7 @@ public static class SaveDataMapper
             {
                 teamId = teamIds[i],
                 flipX = i < flipXs.Count && flipXs[i],
+                isAI = i < isAIs.Count && isAIs[i],
                 startMoney = i < startMoneys.Count ? Mathf.Max(0, startMoneys[i]) : 0,
                 actualMoney = i < actualMoneys.Count ? Mathf.Max(0, actualMoneys[i]) : 0,
                 incomePerTurn = i < incomePerTurns.Count ? Mathf.Max(0, incomePerTurns[i]) : 0,
@@ -74,6 +76,7 @@ public static class SaveDataMapper
 
         List<int> teamIds = new List<int>(data.players.Count);
         List<bool> flipXs = new List<bool>(data.players.Count);
+        List<bool> isAIs = new List<bool>(data.players.Count);
         List<int> startMoneys = new List<int>(data.players.Count);
         List<int> actualMoneys = new List<int>(data.players.Count);
         List<int> incomePerTurns = new List<int>(data.players.Count);
@@ -87,6 +90,7 @@ public static class SaveDataMapper
 
             teamIds.Add(player.teamId);
             flipXs.Add(player.flipX);
+            isAIs.Add(player.isAI);
             startMoneys.Add(Mathf.Max(0, player.startMoney));
             actualMoneys.Add(Mathf.Max(0, player.actualMoney));
             incomePerTurns.Add(Mathf.Max(0, player.incomePerTurn));
@@ -96,6 +100,7 @@ public static class SaveDataMapper
         matchController.ImportPlayersState(
             teamIds,
             flipXs,
+            isAIs,
             startMoneys,
             actualMoneys,
             incomePerTurns,
@@ -462,6 +467,3 @@ public static class SaveDataMapper
         return runtime;
     }
 }
-
-
-

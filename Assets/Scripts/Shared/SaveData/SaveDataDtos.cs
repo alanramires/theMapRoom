@@ -72,6 +72,7 @@ public class MatchPlayerSaveData
 {
     public int teamId;
     public bool flipX;
+    public bool isAI;
     public int startMoney;
     public int actualMoney;
     public int incomePerTurn;

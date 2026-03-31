@@ -16,6 +16,8 @@ public class MatchController : MonoBehaviour
     public static event Action<UnitManager> OnUnitActedStateChanged;
     public static event Action OnFogOfWarUpdated;
     public static event Action OnBeforeAdvanceTurn;
+    // Disparado quando a configuracao de slots de time muda (ex: TeamId de um slot alterado no editor).
+    public static event Action OnSlotConfigChanged;
 
     private readonly struct FogOfWarUnitCacheKey : IEquatable<FogOfWarUnitCacheKey>
     {
@@ -73,7 +75,7 @@ public class MatchController : MonoBehaviour
     private struct PlayerEntry
     {
         public TeamId teamId;
-        public bool flipX;
+        [HideInInspector] public bool flipX;
         public bool isAI;
         [Min(0)] public int startMoney;
         [Min(0)] public int actualMoney;
@@ -112,6 +114,8 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool economyEnabled = true;
     // Placeholder para futura pintura de visibilidade no mapa (nao governa regras de combate no momento).
     [SerializeField, HideInInspector] private bool fogOfWar = true;
+    [Tooltip("Calcula automaticamente o flipX de cada slot com base na posicao do HQ em relacao ao centro do mapa.")]
+    [SerializeField] private bool autoFlipXFromHqPositions = true;
     [Header("Gameplay Setup")]
     [SerializeField] private GameSetupPreset gameSetup = GameSetupPreset.FogOfWarTotal;
     [SerializeField] private bool commandServiceAutomatic = false;
@@ -120,6 +124,8 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enableSpotter = true;
     [SerializeField] private bool enableStealthValidation = true;
     [SerializeField] private bool enableTotalWar = true;
+    [Tooltip("Se false, o time com 0 unidades nao e eliminado automaticamente. Util para testes sem unidades.")]
+    [SerializeField] private bool allowDefeatForZeroUnits = true;
     [SerializeField, Min(1)] private int maxUnitsPerTeam = 40;
     [Header("Tutorial")]
     [Tooltip("Tutorial ativo desta partida. Nulo = sandbox/campanha sem tutorial guiado.")]
@@ -185,6 +191,7 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private Tilemap lastVictoryOverlayTilemap;
 #if UNITY_EDITOR
     [System.NonSerialized] private bool pendingVictoryOverlayRefreshInEditor;
+    [System.NonSerialized] private bool pendingFogOfWarClearInEditor;
 #endif
     [Header("Debug")]
     [SerializeField] private bool enableFogSourceDebugLogs = false;
@@ -245,6 +252,17 @@ public class MatchController : MonoBehaviour
         }
     }
     public bool IncludeNeutralTeam => includeNeutralTeam;
+
+    // Retorna o TeamId do slot indicado. slotIndex -1 = Neutral. Fora do range = Neutral.
+    public TeamId GetTeamIdForSlot(int slotIndex)
+    {
+        if (slotIndex < 0 || players == null || slotIndex >= players.Count)
+            return TeamId.Neutral;
+        return players[slotIndex].teamId;
+    }
+
+    // Retorna quantos slots de jogador existem (excluindo Neutral).
+    public int SlotCount => players != null ? players.Count : 0;
     public bool EconomyEnabled => economyEnabled;
     public GameSetupPreset GameSetup => gameSetup;
     public bool CommandServiceAutomatic
@@ -442,16 +460,18 @@ public class MatchController : MonoBehaviour
     public void ExportPlayersState(
         List<int> teamIds,
         List<bool> flipXs,
+        List<bool> isAIs,
         List<int> startMoneys,
         List<int> actualMoneys,
         List<int> incomePerTurns,
         List<bool> startMoneyAppliedFlags)
     {
-        if (teamIds == null || flipXs == null || startMoneys == null || actualMoneys == null || incomePerTurns == null || startMoneyAppliedFlags == null)
+        if (teamIds == null || flipXs == null || isAIs == null || startMoneys == null || actualMoneys == null || incomePerTurns == null || startMoneyAppliedFlags == null)
             return;
 
         teamIds.Clear();
         flipXs.Clear();
+        isAIs.Clear();
         startMoneys.Clear();
         actualMoneys.Clear();
         incomePerTurns.Clear();
@@ -465,6 +485,7 @@ public class MatchController : MonoBehaviour
             PlayerEntry entry = players[i];
             teamIds.Add((int)entry.teamId);
             flipXs.Add(entry.flipX);
+            isAIs.Add(entry.isAI);
             startMoneys.Add(Mathf.Max(0, entry.startMoney));
             actualMoneys.Add(Mathf.Max(0, entry.actualMoney));
             incomePerTurns.Add(Mathf.Max(0, entry.incomePerTurn));
@@ -475,6 +496,7 @@ public class MatchController : MonoBehaviour
     public void ImportPlayersState(
         IList<int> teamIds,
         IList<bool> flipXs,
+        IList<bool> isAIs,
         IList<int> startMoneys,
         IList<int> actualMoneys,
         IList<int> incomePerTurns,
@@ -498,6 +520,7 @@ public class MatchController : MonoBehaviour
             {
                 teamId = team,
                 flipX = GetValueOrDefault(flipXs, i, GetDefaultFlipX(team)),
+                isAI = GetValueOrDefault(isAIs, i, false),
                 startMoney = Mathf.Max(0, GetValueOrDefault(startMoneys, i, 0)),
                 actualMoney = Mathf.Max(0, GetValueOrDefault(actualMoneys, i, 0)),
                 incomePerTurn = Mathf.Max(0, GetValueOrDefault(incomePerTurns, i, 0)),
@@ -642,6 +665,8 @@ public class MatchController : MonoBehaviour
     {
         if (Application.isPlaying)
         {
+            if (autoFlipXFromHqPositions)
+                AutoComputeFlipXFromHqPositions();
             ApplyActiveTeamIfChanged(force: true);
             TryAutoAssignTurnTransitionReferences();
             matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);
@@ -680,8 +705,12 @@ public class MatchController : MonoBehaviour
         ScheduleVictoryOverlayRefreshInEditor();
         if (enableTotalWar)
             TryAutoAssignFogOfWarReferences();
+        ScheduleFogOfWarClearInEditor();
+        if (autoFlipXFromHqPositions)
+            AutoComputeFlipXFromHqPositions();
         ApplyActiveTeamIfChanged(force: false);
         ApplyTeamFlipSettingsToSceneObjects();
+        OnSlotConfigChanged?.Invoke();
     }
 #endif
 
@@ -709,8 +738,36 @@ public class MatchController : MonoBehaviour
 
         TryRefreshVictoryOverlayFromConstructions(markDirtyInEditor: true);
     }
+
+    private void ScheduleFogOfWarClearInEditor()
+    {
+        if (Application.isPlaying)
+            return;
+
+        if (pendingFogOfWarClearInEditor)
+            return;
+
+        pendingFogOfWarClearInEditor = true;
+        EditorApplication.delayCall += ExecuteDelayedFogOfWarClearInEditor;
+    }
+
+    private void ExecuteDelayedFogOfWarClearInEditor()
+    {
+        if (this == null)
+            return;
+
+        pendingFogOfWarClearInEditor = false;
+        if (Application.isPlaying || fogOfWarTilemap == null)
+            return;
+
+        fogOfWarTilemap.ClearAllTiles();
+    }
 #else
     private void ScheduleVictoryOverlayRefreshInEditor()
+    {
+    }
+
+    private void ScheduleFogOfWarClearInEditor()
     {
     }
 #endif
@@ -787,11 +844,28 @@ public class MatchController : MonoBehaviour
         return false;
     }
 
+    // Verifica se o time ATUALMENTE ativo e IA, usando o slot index diretamente.
+    // Mais robusto que IsPlayerAI(TeamId) pois nao depende de lookup por TeamId.
+    public bool IsActiveTeamAI()
+    {
+        if (players == null || activePlayerListIndex < 0 || activePlayerListIndex >= players.Count)
+            return false;
+        return players[activePlayerListIndex].isAI;
+    }
+
     public void SetActiveTeamId(int teamId)
     {
         activeTeamId = Mathf.Clamp(teamId, -1, 3);
         SyncActivePlayerIndexFromActiveTeam();
         ApplyActiveTeamIfChanged(force: false);
+    }
+
+    // Usado apos load: garante que OnActiveTeamChanged dispare mesmo que o time ativo seja o mesmo de antes.
+    // Usa applyTurnStartEffects: false para nao reprocessar economia/upkeep que ja foram restaurados do save.
+    public void ForceReapplyActiveTeam()
+    {
+        appliedActiveTeamId = int.MinValue;
+        ApplyActiveTeamIfChanged(force: false, applyTurnStartEffects: false);
     }
 
     // Debug: troca o time ativo sem aplicar efeitos de inicio de turno
@@ -1410,9 +1484,16 @@ public class MatchController : MonoBehaviour
 
         if (enableTotalWar)
         {
-            RefreshFogOfWarForActiveTeam();
-            RefreshRuntimeUnitFogVisibility();
-            RunTurnStartStillObservedForActiveTeamStealthUnits();
+            if (Application.isPlaying)
+            {
+                RefreshFogOfWarForActiveTeam();
+                RefreshRuntimeUnitFogVisibility();
+                RunTurnStartStillObservedForActiveTeamStealthUnits();
+            }
+            else
+            {
+                ResetFogOfWarRuntime(clearTilemap: true);
+            }
         }
         else
         {
@@ -1448,6 +1529,51 @@ public class MatchController : MonoBehaviour
 
             construction.ApplyTeamVisualFlipX(GetTeamFlipX(construction.TeamId));
         }
+    }
+
+    // Calcula flipX de cada slot comparando a posicao X do HQ com o centro do mapa.
+    // HQ a direita do centro => flipX true. A esquerda => flipX false.
+    public void AutoComputeFlipXFromHqPositions()
+    {
+        if (players == null || players.Count == 0)
+            return;
+
+        float mapCenterX = GetMapCenterWorldX();
+        ConstructionManager[] managers = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            Vector3? hqPos = FindHqWorldPositionForSlot(managers, i);
+            if (!hqPos.HasValue)
+                continue;
+
+            PlayerEntry entry = players[i];
+            entry.flipX = hqPos.Value.x > mapCenterX;
+            players[i] = entry;
+        }
+    }
+
+    private float GetMapCenterWorldX()
+    {
+        if (fogOfWarTilemap != null)
+        {
+            Bounds local = fogOfWarTilemap.localBounds;
+            return fogOfWarTilemap.transform.TransformPoint(local.center).x;
+        }
+        return 0f;
+    }
+
+    private static Vector3? FindHqWorldPositionForSlot(ConstructionManager[] managers, int slotIdx)
+    {
+        for (int i = 0; i < managers.Length; i++)
+        {
+            ConstructionManager cm = managers[i];
+            if (cm == null || !cm.IsPlayerHeadQuarter)
+                continue;
+            if (cm.SlotIndex == slotIdx)
+                return cm.transform.position;
+        }
+        return null;
     }
 
     private List<UnitManager> GetActiveUnitsOnScene()
@@ -1504,7 +1630,7 @@ public class MatchController : MonoBehaviour
         EvaluateVictoryStarsAtTurnStartForActiveTeam(activeConstructions);
         
         // Checagem de derrota: turno >= 2 e 0 unidades
-        if (currentTurn >= 2)
+        if (allowDefeatForZeroUnits && currentTurn >= 2)
         {
             List<UnitManager> allUnits = GetActiveUnitsOnScene();
             int myUnitsCount = 0;

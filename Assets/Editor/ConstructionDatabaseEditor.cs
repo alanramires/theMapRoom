@@ -121,7 +121,7 @@ public class ConstructionDatabaseEditor : Editor
 
             SetString(entry, "id", src.id);
             SetObject(entry, "construction", src.construction);
-            SetInt(entry, "initialTeamId", (int)src.initialTeamId);
+            SetInt(entry, "initialSlotIndex", src.initialSlotIndex);
             SetVector3Int(entry, "cellPosition", new Vector3Int(src.cellPosition.x, src.cellPosition.y, 0));
             SetInt(entry, "initialCapturePoints", src.initialCapturePoints);
             SetBool(entry, "useConstructionConfigurationOverride", src.useConstructionConfigurationOverride);

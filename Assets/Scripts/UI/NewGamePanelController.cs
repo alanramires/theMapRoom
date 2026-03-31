@@ -451,6 +451,7 @@ public class NewGamePanelController : MonoBehaviour
 
         List<int> teamIds  = new List<int>();
         List<bool> flipXs  = new List<bool>();
+        List<bool> isAIs   = new List<bool>();
         List<int> zeros    = new List<int>();
         List<bool> falses  = new List<bool>();
 
@@ -462,11 +463,12 @@ public class NewGamePanelController : MonoBehaviour
             TeamId team = SlotTeams[i];
             teamIds.Add((int)team);
             flipXs.Add(team == TeamId.Red || team == TeamId.Yellow);
+            isAIs.Add(modes[i] == PlayerMode.IA);
             zeros.Add(0);
             falses.Add(false);
         }
 
-        draftMatchController.ImportPlayersState(teamIds, flipXs, zeros, zeros, zeros, falses, false);
+        draftMatchController.ImportPlayersState(teamIds, flipXs, isAIs, zeros, zeros, zeros, falses, false);
 
         MatchController.GameSetupPreset preset = dropPreset != null
             ? (MatchController.GameSetupPreset)dropPreset.value

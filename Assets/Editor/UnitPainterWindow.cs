@@ -7,7 +7,7 @@ public class UnitPainterWindow : EditorWindow
 {
     private UnitSpawner unitSpawner;
     private UnitDatabase unitDatabase;
-    private TeamId selectedTeamId = TeamId.Green;
+    private int selectedSlotIndex = 0;
     private int selectedUnitIndex;
     private bool isPainting;
     private bool replaceExisting = true;
@@ -74,7 +74,7 @@ public class UnitPainterWindow : EditorWindow
         }
 
         EditorGUILayout.Space(6f);
-        selectedTeamId = (TeamId)EditorGUILayout.EnumPopup("Team ID", selectedTeamId);
+        DrawSlotSelector();
         DrawUnitSelector();
         replaceExisting = EditorGUILayout.ToggleLeft("Replace Existing Unit On Cell", replaceExisting);
 
@@ -168,9 +168,21 @@ public class UnitPainterWindow : EditorWindow
         int undoGroup = Undo.GetCurrentGroup();
         Undo.SetCurrentGroupName("Paint Unit");
 
-        GameObject spawned = unitSpawner.SpawnAtCell(selectedUnit.id, selectedTeamId, cell);
+        TeamId resolvedTeam = ResolveTeamFromSlot(selectedSlotIndex);
+        GameObject spawned = unitSpawner.SpawnAtCell(selectedUnit.id, resolvedTeam, cell);
         if (spawned != null)
         {
+            UnitManager manager = spawned.GetComponent<UnitManager>();
+            if (manager != null)
+            {
+                SerializedObject so = new SerializedObject(manager);
+                SerializedProperty slotProp = so.FindProperty("slotIndex");
+                if (slotProp != null)
+                {
+                    slotProp.intValue = selectedSlotIndex;
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                }
+            }
             Undo.RegisterCreatedObjectUndo(spawned, "Paint Unit");
             EditorSceneManager.MarkSceneDirty(spawned.scene);
         }
@@ -223,6 +235,33 @@ public class UnitPainterWindow : EditorWindow
         }
 
         return resolved;
+    }
+
+    private void DrawSlotSelector()
+    {
+        MatchController mc = Object.FindAnyObjectByType<MatchController>();
+        int slotCount = mc != null ? mc.SlotCount : 0;
+
+        string[] options = new string[slotCount + 1];
+        options[0] = "Neutral (-1)";
+        for (int i = 0; i < slotCount; i++)
+        {
+            TeamId t = mc != null ? mc.GetTeamIdForSlot(i) : TeamId.Neutral;
+            options[i + 1] = $"Slot {i} — {t}";
+        }
+
+        int currentPopupIndex = selectedSlotIndex < 0 ? 0 : Mathf.Clamp(selectedSlotIndex + 1, 0, options.Length - 1);
+        int newPopupIndex = EditorGUILayout.Popup("Slot", currentPopupIndex, options);
+        selectedSlotIndex = newPopupIndex == 0 ? -1 : newPopupIndex - 1;
+    }
+
+    private TeamId ResolveTeamFromSlot(int slot)
+    {
+        if (slot < 0)
+            return TeamId.Neutral;
+
+        MatchController mc = Object.FindAnyObjectByType<MatchController>();
+        return mc != null ? mc.GetTeamIdForSlot(slot) : TeamId.Neutral;
     }
 
     private void TryAutoAssignReferences(bool force)

@@ -14,6 +14,7 @@ public class UnitManagerEditor : Editor
     private SerializedProperty autoSnapWhenMovedInEditorProp;
     private SerializedProperty currentCellPositionProp;
     private SerializedProperty teamIdProp;
+    private SerializedProperty slotIndexProp;
     private SerializedProperty unitIdProp;
     private SerializedProperty instanceIdProp;
     private SerializedProperty currentPositionProp;
@@ -59,6 +60,7 @@ public class UnitManagerEditor : Editor
         autoSnapWhenMovedInEditorProp = serializedObject.FindProperty("autoSnapWhenMovedInEditor");
         currentCellPositionProp = serializedObject.FindProperty("currentCellPosition");
         teamIdProp = serializedObject.FindProperty("teamId");
+        slotIndexProp = serializedObject.FindProperty("slotIndex");
         unitIdProp = serializedObject.FindProperty("unitId");
         instanceIdProp = serializedObject.FindProperty("instanceId");
         currentPositionProp = serializedObject.FindProperty("currentPosition");
@@ -179,7 +181,7 @@ public class UnitManagerEditor : Editor
                 EditorGUILayout.PropertyField(mergedWithUnitProp, new GUIContent("Merged With"));
         }
 
-        EditorGUILayout.PropertyField(teamIdProp, new GUIContent("Team ID"));
+        DrawSlotAndTeamBlock(unit);
 
         DrawUnitIdPopup();
 
@@ -253,6 +255,42 @@ public class UnitManagerEditor : Editor
             unit.SnapToCellCenter();
         if (GUILayout.Button("Pull Cell From Transform"))
             unit.PullCellFromTransform();
+    }
+
+    private void DrawSlotAndTeamBlock(UnitManager unit)
+    {
+        MatchController mc = matchControllerProp != null
+            ? matchControllerProp.objectReferenceValue as MatchController
+            : null;
+        if (mc == null)
+            mc = FindAnyObjectByType<MatchController>();
+
+        int slotCount = mc != null ? mc.SlotCount : 0;
+
+        // Build popup labels: "Neutral (-1)", "Slot 0 — Green", ...
+        string[] options = new string[slotCount + 1];
+        options[0] = "Neutral (-1)";
+        for (int i = 0; i < slotCount; i++)
+        {
+            TeamId t = mc != null ? mc.GetTeamIdForSlot(i) : TeamId.Neutral;
+            options[i + 1] = $"Slot {i} — {t}";
+        }
+
+        int currentSlot = slotIndexProp != null ? slotIndexProp.intValue : -1;
+        int currentPopupIndex = currentSlot < 0 ? 0 : Mathf.Clamp(currentSlot + 1, 0, options.Length - 1);
+
+        int newPopupIndex = EditorGUILayout.Popup("Slot", currentPopupIndex, options);
+        int newSlot = newPopupIndex == 0 ? -1 : newPopupIndex - 1;
+
+        if (newSlot != currentSlot && slotIndexProp != null)
+        {
+            slotIndexProp.intValue = newSlot;
+            serializedObject.ApplyModifiedProperties();
+            unit.SetSlotIndex(newSlot);
+        }
+
+        using (new EditorGUI.DisabledScope(true))
+            EditorGUILayout.PropertyField(teamIdProp, new GUIContent("Team ID (resolved)"));
     }
 
     private void DrawStealthRevealRuntimeSection(UnitManager unit)

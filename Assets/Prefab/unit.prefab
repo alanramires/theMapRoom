@@ -368,6 +368,7 @@ MonoBehaviour:
   mergedWhenTurn: -1
   mergedWithUnit: 
   teamId: 0
+  slotIndex: -1
   unitId: Soldado
   instanceId: 5
   currentPosition: {x: 0, y: 0, z: 0}

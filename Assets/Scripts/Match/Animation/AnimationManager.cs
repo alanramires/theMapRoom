@@ -238,6 +238,15 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] [Range(0.02f, 0.5f)] private float combatBumpDistance = 0.12f;
     [Tooltip("Duracao de ida (e de volta) do bico.")]
     [SerializeField] [Range(0.03f, 0.4f)] private float combatBumpDuration = 0.10f;
+    [Header("AI Turn Timing")]
+    [Tooltip("Pausa entre cada fase do turno da IA (Comando, Mover, Comprar, Passar a Vez).")]
+    [SerializeField] [Range(0f, 3f)] private float aiPhaseDuration = 0.5f;
+    [Tooltip("Pausa apos selecionar a unidade antes de mover o cursor ao destino (da tempo pro confirm.mp3 tocar).")]
+    [SerializeField] [Range(0f, 0.5f)] private float aiUnitSelectDelay = 0.12f;
+
+    public float AIPhaseDuration => aiPhaseDuration;
+    public float AIUnitSelectDelay => aiUnitSelectDelay;
+
     [Header("Ranged Attack Hit FX")]
     [Tooltip("Duracao padrao da animacao de impacto ranged no defensor.")]
     [SerializeField] [Range(0.05f, 2f)] private float rangedAttackDefenderAnimDuration = 0.55f;

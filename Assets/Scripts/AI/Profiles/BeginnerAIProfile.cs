@@ -5,7 +5,7 @@ using UnityEngine;
 // caso contrario ataca. Sem memoria entre partidas.
 public class BeginnerAIProfile : AIProfile
 {
-    private const int DefendRadius = 5;
+    public const int DefendRadius = 5;
 
     public override AIStance EvaluateStance(AISnapshot snapshot)
     {

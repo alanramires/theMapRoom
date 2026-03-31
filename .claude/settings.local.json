@@ -5,7 +5,8 @@
       "Bash(xargs cat:*)",
       "Bash(grep -E \"^TurnStateManager\\\\..*\\\\.cs$\")",
       "Bash(grep -n \"output == null\" \"d:/Unity Projects/The Map Room/Assets/Scripts/Sensors/\"*.cs)",
-      "Bash(git -C \"d:/Unity Projects/The Map Room\" log --oneline -5)"
+      "Bash(git -C \"d:/Unity Projects/The Map Room\" log --oneline -5)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

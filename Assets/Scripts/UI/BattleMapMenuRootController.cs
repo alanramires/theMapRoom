@@ -88,7 +88,6 @@ public class BattleMapMenuRootController : MonoBehaviour
     private readonly Dictionary<Button, MenuAction> buttonActions = new Dictionary<Button, MenuAction>();
     private MenuPanel activePanel = MenuPanel.Menu;
     private int currentIndex;
-    private bool listenersBound;
     private bool menuInitialized;
     private bool menuOpen;
     private bool saveLoadPromptOpen;
@@ -388,7 +387,6 @@ public class BattleMapMenuRootController : MonoBehaviour
         panelButtons[MenuPanel.Options] = BuildPanelButtons(btnMinimapa, btnConfig, btnSaveLoad, btnGerenciar, btnVoltarOptions);
         panelButtons[MenuPanel.Gerenciar] = BuildPanelButtons(btnDestruir, btnRender, btnSair, btnVoltarGerenciar);
 
-        listenersBound = true;
     }
 
     private List<Button> BuildPanelButtons(params Button[] source)

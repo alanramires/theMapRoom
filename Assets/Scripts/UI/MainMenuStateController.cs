@@ -15,6 +15,7 @@ public class MainMenuStateController : MonoBehaviour
     [Header("State")]
     [SerializeField] private MainMenuState initialState = MainMenuState.Neutral;
     [SerializeField] private int neutralDelayFrames = 2;
+    [SerializeField] private bool stateLog = false;
 
     [Header("Panels")]
     [SerializeField] private GameObject panelMenuRoot;
@@ -45,7 +46,7 @@ public class MainMenuStateController : MonoBehaviour
     private static void BootstrapAfterSceneLoad()
     {
         MainMenuStateController controller = EnsureSceneInstance();
-        if (controller != null)
+        if (controller != null && controller.stateLog)
             Debug.Log($"[MainMenuState] Bootstrap scene '{SceneManager.GetActiveScene().name}'");
     }
 
@@ -76,7 +77,7 @@ public class MainMenuStateController : MonoBehaviour
 
     private void Awake()
     {
-        Debug.Log($"[MainMenuState] Awake on '{gameObject.name}'");
+        if (stateLog) Debug.Log($"[MainMenuState] Awake on '{gameObject.name}'");
 
         if (activeInstance != null && activeInstance != this)
         {
@@ -112,7 +113,7 @@ public class MainMenuStateController : MonoBehaviour
 
     private void ChangeState(MainMenuState nextState)
     {
-        Debug.Log($"[MainMenuState] {currentState} -> {nextState}");
+        if (stateLog) Debug.Log($"[MainMenuState] {currentState} -> {nextState}");
         ExitCurrentState();
         currentState = nextState;
         EnterCurrentState();

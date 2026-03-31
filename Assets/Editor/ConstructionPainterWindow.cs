@@ -9,7 +9,7 @@ public class ConstructionPainterWindow : EditorWindow
     private ConstructionSpawner constructionSpawner;
     private ConstructionDatabase constructionDatabase;
     private MatchController matchController;
-    private TeamId selectedTeamId = TeamId.Green;
+    private int selectedSlotIndex = 0;
     private int selectedConstructionIndex;
     private bool isPainting;
     private bool replaceExisting = true;
@@ -85,7 +85,7 @@ public class ConstructionPainterWindow : EditorWindow
         }
 
         EditorGUILayout.Space(6f);
-        DrawTeamSelectorFromMatchController();
+        DrawSlotSelector();
         DrawConstructionSelector();
         TryGetSelectedConstruction(out ConstructionData selectedConstruction);
         SyncBrushWithSelection(selectedConstruction);
@@ -204,13 +204,14 @@ public class ConstructionPainterWindow : EditorWindow
         int undoGroup = Undo.GetCurrentGroup();
         Undo.SetCurrentGroupName("Paint Construction");
 
-        GameObject spawned = constructionSpawner.SpawnAtCell(selectedConstruction.id, selectedTeamId, cell);
+        TeamId resolvedTeam = ResolveTeamFromSlot(selectedSlotIndex);
+        GameObject spawned = constructionSpawner.SpawnAtCell(selectedConstruction.id, resolvedTeam, cell);
         if (spawned != null)
         {
-            ApplySpawnOverrides(spawned);
+            ApplySpawnOverrides(spawned, selectedSlotIndex);
 
             if (persistToFieldDatabase && constructionDatabase != null)
-                UpsertFieldEntry(cell, selectedConstruction, spawned.GetComponent<ConstructionManager>());
+                UpsertFieldEntry(cell, selectedConstruction, spawned.GetComponent<ConstructionManager>(), selectedSlotIndex);
 
             Undo.RegisterCreatedObjectUndo(spawned, "Paint Construction");
             EditorSceneManager.MarkSceneDirty(spawned.scene);
@@ -340,7 +341,7 @@ public class ConstructionPainterWindow : EditorWindow
         brushSiteRuntime.Sanitize();
     }
 
-    private void ApplySpawnOverrides(GameObject spawned)
+    private void ApplySpawnOverrides(GameObject spawned, int slotIdx)
     {
         if (spawned == null)
             return;
@@ -350,6 +351,14 @@ public class ConstructionPainterWindow : EditorWindow
             return;
 
         Undo.RecordObject(manager, "Apply Construction Instance Overrides");
+
+        SerializedObject so = new SerializedObject(manager);
+        so.Update();
+        SerializedProperty slotProp = so.FindProperty("slotIndex");
+        if (slotProp != null)
+            slotProp.intValue = slotIdx;
+        so.ApplyModifiedPropertiesWithoutUndo();
+
         if (useSiteConfigurationOverride && brushSiteRuntime != null)
             manager.ApplySiteRuntime(brushSiteRuntime);
 
@@ -358,7 +367,7 @@ public class ConstructionPainterWindow : EditorWindow
         EditorUtility.SetDirty(manager);
     }
 
-    private void UpsertFieldEntry(Vector3Int cell, ConstructionData selectedConstruction, ConstructionManager spawnedManager)
+    private void UpsertFieldEntry(Vector3Int cell, ConstructionData selectedConstruction, ConstructionManager spawnedManager, int slotIdx)
     {
         if (constructionDatabase == null || selectedConstruction == null)
             return;
@@ -385,19 +394,20 @@ public class ConstructionPainterWindow : EditorWindow
 
         SerializedProperty idProp = entry.FindPropertyRelative("id");
         SerializedProperty constructionProp = entry.FindPropertyRelative("construction");
-        SerializedProperty teamProp = entry.FindPropertyRelative("initialTeamId");
+        SerializedProperty teamProp = entry.FindPropertyRelative("initialSlotIndex");
         SerializedProperty cellProp = entry.FindPropertyRelative("cellPosition");
         SerializedProperty captureProp = entry.FindPropertyRelative("initialCapturePoints");
         SerializedProperty useOverrideProp = entry.FindPropertyRelative("useConstructionConfigurationOverride");
         SerializedProperty configProp = entry.FindPropertyRelative("constructionConfiguration");
 
+        TeamId resolvedTeam = ResolveTeamFromSlot(slotIdx);
         if (idProp != null)
-            idProp.stringValue = BuildFieldEntryId(selectedConstruction, selectedTeamId, spawnedManager);
+            idProp.stringValue = BuildFieldEntryId(selectedConstruction, resolvedTeam, spawnedManager);
 
         if (constructionProp != null)
             constructionProp.objectReferenceValue = selectedConstruction;
         if (teamProp != null)
-            teamProp.intValue = (int)selectedTeamId;
+            teamProp.intValue = slotIdx;
         if (cellProp != null)
             cellProp.vector3IntValue = new Vector3Int(cell.x, cell.y, 0);
         if (captureProp != null)
@@ -411,7 +421,7 @@ public class ConstructionPainterWindow : EditorWindow
         EditorUtility.SetDirty(constructionDatabase);
     }
 
-    private static string BuildFieldEntryId(ConstructionData selectedConstruction, TeamId teamId, ConstructionManager manager)
+    private static string BuildFieldEntryId(ConstructionData selectedConstruction, TeamId resolvedTeam, ConstructionManager manager)
     {
         string baseName = manager != null
             ? (!string.IsNullOrWhiteSpace(manager.ConstructionDisplayName) ? manager.ConstructionDisplayName : manager.ConstructionId)
@@ -421,8 +431,9 @@ public class ConstructionPainterWindow : EditorWindow
 
         int instanceId = manager != null ? Mathf.Max(0, manager.InstanceId) : 0;
         string sanitized = string.IsNullOrWhiteSpace(baseName) ? "Construction" : baseName.Replace(" ", string.Empty);
-        TeamId resolvedTeam = manager != null ? manager.TeamId : teamId;
-        return $"{sanitized}_T{(int)resolvedTeam}_C{instanceId}";
+        int slot = manager != null ? manager.SlotIndex : -1;
+        string slotPart = slot < 0 ? "Neutral" : $"S{slot}";
+        return $"{sanitized}_{slotPart}_C{instanceId}";
     }
 
     private void RemoveFieldEntryAtCell(Vector3Int cell)
@@ -546,65 +557,33 @@ public class ConstructionPainterWindow : EditorWindow
 
     }
 
-    private void DrawTeamSelectorFromMatchController()
+    private void DrawSlotSelector()
     {
-        List<TeamId> allowed = BuildAllowedTeams();
-        if (allowed == null || allowed.Count == 0)
+        // Slot -1 = Neutral, slots 0..N = jogadores do MatchController
+        int slotCount = matchController != null ? matchController.SlotCount : 0;
+        int totalOptions = slotCount + 1; // +1 para Neutral
+        string[] labels = new string[totalOptions];
+        labels[0] = "Neutral";
+        for (int i = 0; i < slotCount; i++)
         {
-            selectedTeamId = (TeamId)EditorGUILayout.EnumPopup("Team ID", selectedTeamId);
-            return;
+            TeamId team = matchController.GetTeamIdForSlot(i);
+            labels[i + 1] = $"Slot {i} — {TeamUtils.GetName(team)}";
         }
 
-        int selectedIndex = 0;
-        string[] labels = new string[allowed.Count];
-        for (int i = 0; i < allowed.Count; i++)
-        {
-            TeamId team = allowed[i];
-            labels[i] = team == TeamId.Neutral
-                ? "Neutral (-1)"
-                : $"{TeamUtils.GetName(team)} ({(int)team})";
+        // selectedSlotIndex -1 = Neutral → popup index 0; slot 0 → popup index 1, etc.
+        int popupIndex = selectedSlotIndex < 0 ? 0 : Mathf.Clamp(selectedSlotIndex + 1, 0, totalOptions - 1);
+        int newPopupIndex = EditorGUILayout.Popup("Slot", popupIndex, labels);
+        selectedSlotIndex = newPopupIndex == 0 ? -1 : newPopupIndex - 1;
 
-            if (team == selectedTeamId)
-                selectedIndex = i;
-        }
-
-        int newIndex = EditorGUILayout.Popup("Team ID", selectedIndex, labels);
-        if (newIndex >= 0 && newIndex < allowed.Count)
-            selectedTeamId = allowed[newIndex];
-
-        if (matchController != null)
-        {
-            EditorGUILayout.HelpBox(
-                "Times filtrados pelo MatchController.Players. Neutral permanece disponivel para pintar unidades/construcoes neutras.",
-                MessageType.None);
-        }
+        if (matchController == null)
+            EditorGUILayout.HelpBox("Sem MatchController: apenas Neutral disponivel.", MessageType.Warning);
     }
 
-    private List<TeamId> BuildAllowedTeams()
+    private TeamId ResolveTeamFromSlot(int slot)
     {
-        var result = new List<TeamId> { TeamId.Neutral };
-
-        IReadOnlyList<TeamId> players = matchController != null ? matchController.Players : null;
-        if (players == null || players.Count == 0)
-        {
-            if (matchController == null)
-                return result;
-
-            return result;
-        }
-
-        var seen = new HashSet<TeamId> { TeamId.Neutral };
-        for (int i = 0; i < players.Count; i++)
-        {
-            TeamId team = players[i];
-            if (team == TeamId.Neutral || seen.Contains(team))
-                continue;
-
-            seen.Add(team);
-            result.Add(team);
-        }
-
-        return result;
+        if (slot < 0 || matchController == null)
+            return TeamId.Neutral;
+        return matchController.GetTeamIdForSlot(slot);
     }
 
     private static void DrawConstructionConfigurationExpanded(SerializedProperty siteRuntimeProp, string label)

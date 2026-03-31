@@ -211,7 +211,8 @@ public partial class TurnStateManager : MonoBehaviour
         cursorState = nextState;
         if (nextState == CursorState.Neutral && previous != CursorState.Neutral)
         {
-            Debug.Log($"[Replay][Dispatch] OnCursorReturnedToNeutral fired previous={previous} current={nextState}");
+            if (enableTurnStateRuntimeLogs)
+                Debug.Log($"[Replay][Dispatch] OnCursorReturnedToNeutral fired previous={previous} current={nextState}");
             CursorController.NotifyCursorReturnedToNeutral();
         }
         RuntimeLog($"[FSM] Estado: {previous} -> {nextState}");

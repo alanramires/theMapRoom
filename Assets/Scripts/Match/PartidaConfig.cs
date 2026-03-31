@@ -43,6 +43,7 @@ public static class PartidaConfig
 
         List<int> teamIds = new List<int>(PlayerCount);
         List<bool> flipXs = new List<bool>(PlayerCount);
+        List<bool> isAIs = new List<bool>(PlayerCount);
         List<int> startMoneys = new List<int>(PlayerCount);
         List<int> actualMoneys = new List<int>(PlayerCount);
         List<int> incomePerTurns = new List<int>(PlayerCount);
@@ -53,22 +54,16 @@ public static class PartidaConfig
             TeamId team = (Teams != null && i < Teams.Length) ? Teams[i] : TeamId.Green;
             teamIds.Add((int)team);
             flipXs.Add((FlipX != null && i < FlipX.Length) ? FlipX[i] : DefaultFlipX(team));
+            isAIs.Add((IsAI != null && i < IsAI.Length) && IsAI[i]);
             startMoneys.Add(0);
             actualMoneys.Add(0);
             incomePerTurns.Add(0);
             startMoneyAppliedFlags.Add(false);
         }
 
-        mc.ImportPlayersState(teamIds, flipXs, startMoneys, actualMoneys, incomePerTurns, startMoneyAppliedFlags, false);
+        mc.ImportPlayersState(teamIds, flipXs, isAIs, startMoneys, actualMoneys, incomePerTurns, startMoneyAppliedFlags, false);
         mc.SetGameSetupPreset(Preset);
         mc.CommandServiceAutomatic = CommandServiceAutomatic;
-
-        for (int i = 0; i < PlayerCount; i++)
-        {
-            TeamId team = (Teams != null && i < Teams.Length) ? Teams[i] : TeamId.Green;
-            bool ai = (IsAI != null && i < IsAI.Length) && IsAI[i];
-            mc.SetPlayerIsAI(team, ai);
-        }
     }
 
     public static void Clear()

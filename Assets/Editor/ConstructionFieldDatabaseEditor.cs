@@ -99,7 +99,7 @@ public class ConstructionFieldDatabaseEditor : Editor
             if (entry == null)
                 continue;
 
-            SerializedProperty teamProp = entry.FindPropertyRelative("initialTeamId");
+            SerializedProperty teamProp = entry.FindPropertyRelative("initialSlotIndex");
             if (teamProp == null || teamProp.intValue != (int)team)
                 continue;
 
@@ -119,7 +119,7 @@ public class ConstructionFieldDatabaseEditor : Editor
     {
         SerializedProperty idProp = entry.FindPropertyRelative("id");
         SerializedProperty constructionProp = entry.FindPropertyRelative("construction");
-        SerializedProperty teamProp = entry.FindPropertyRelative("initialTeamId");
+        SerializedProperty teamProp = entry.FindPropertyRelative("initialSlotIndex");
         SerializedProperty cellProp = entry.FindPropertyRelative("cellPosition");
         SerializedProperty initialCaptureProp = entry.FindPropertyRelative("initialCapturePoints");
         SerializedProperty useOverrideProp = entry.FindPropertyRelative("useConstructionConfigurationOverride");
@@ -163,7 +163,7 @@ public class ConstructionFieldDatabaseEditor : Editor
             if (entry == null)
                 continue;
 
-            SerializedProperty teamProp = entry.FindPropertyRelative("initialTeamId");
+            SerializedProperty teamProp = entry.FindPropertyRelative("initialSlotIndex");
             if (teamProp != null && teamProp.intValue == (int)team)
                 count++;
         }
@@ -238,7 +238,7 @@ public class ConstructionFieldDatabaseEditor : Editor
 
             SerializedProperty idProp = entry.FindPropertyRelative("id");
             SerializedProperty constructionProp = entry.FindPropertyRelative("construction");
-            SerializedProperty teamProp = entry.FindPropertyRelative("initialTeamId");
+            SerializedProperty teamProp = entry.FindPropertyRelative("initialSlotIndex");
             SerializedProperty cellProp = entry.FindPropertyRelative("cellPosition");
             SerializedProperty captureProp = entry.FindPropertyRelative("initialCapturePoints");
             SerializedProperty useOverrideProp = entry.FindPropertyRelative("useConstructionConfigurationOverride");

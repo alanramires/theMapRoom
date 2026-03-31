@@ -253,6 +253,84 @@ public partial class TurnStateManager
     {
         return TryConfirmSelectedShoppingOption();
     }
+
+    // Seleciona a unidade pelo id no menu de compras atual (usado pela IA para apontar para o soldado antes de confirmar).
+    // Retorna false se nao estiver no estado ShoppingAndServices ou se a unidade nao for encontrada.
+    public bool TryAISetShoppingSelectedUnit(string unitId)
+    {
+        if (cursorState != CursorState.ShoppingAndServices)
+            return false;
+        if (shoppingUnitsForSale == null || shoppingUnitsForSale.Count == 0)
+            return false;
+
+        for (int i = 0; i < shoppingUnitsForSale.Count; i++)
+        {
+            UnitData u = shoppingUnitsForSale[i];
+            if (u != null && string.Equals(u.id, unitId, System.StringComparison.OrdinalIgnoreCase))
+            {
+                shoppingSelectedIndex = i;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Compra direta para a IA — sem estado de cursor nem UI.
+    public bool TryAIDirectPurchase(ConstructionManager construction, UnitData unit, TeamId team)
+    {
+        if (construction == null || unit == null)
+            return false;
+        if (!construction.CanProduceUnitsForTeam(team))
+            return false;
+        if (unitSpawner == null)
+            return false;
+        if (matchController != null && matchController.HasReachedMaxUnitsPerTeam(team))
+        {
+            if (enableTurnStateRuntimeLogs)
+                Debug.Log($"[AI][Shopping] Limite de unidades atingido para {team}.");
+            return false;
+        }
+
+        int cost = matchController != null ? matchController.ResolveEconomyCost(unit.cost) : Mathf.Max(0, unit.cost);
+        if (matchController != null && matchController.GetActualMoney(team) < cost)
+        {
+            if (enableTurnStateRuntimeLogs)
+                Debug.Log($"[AI][Shopping] Sem dinheiro para {ResolveUnitName(unit)}. Custo=${cost}, saldo={matchController.GetActualMoney(team)}.");
+            return false;
+        }
+
+        Vector3Int spawnCell = construction.CurrentCellPosition;
+        spawnCell.z = 0;
+        int economyBefore = matchController != null ? matchController.GetActualMoney(team) : 0;
+
+        GameObject spawned = unitSpawner.SpawnAtCell(unit, team, spawnCell);
+        if (spawned == null)
+        {
+            if (enableTurnStateRuntimeLogs)
+                Debug.Log($"[AI][Shopping] Falha ao spawnar {ResolveUnitName(unit)} em {spawnCell}.");
+            return false;
+        }
+
+        UnitManager spawnedManager = spawned.GetComponent<UnitManager>();
+        TryApplyForcedSpawnLayerFromCell(spawnedManager, spawnCell);
+
+        int remainingMoney;
+        if (matchController != null && !matchController.TrySpendActualMoney(team, cost, out remainingMoney))
+        {
+            Destroy(spawned);
+            Debug.LogError($"[AI][Shopping] Falha ao debitar custo de {ResolveUnitName(unit)}.");
+            return false;
+        }
+
+        int economyAfter = matchController != null ? matchController.GetActualMoney(team) : economyBefore;
+        RecordShoppingBuyReplayCommand(spawned, unit, team, spawnCell, economyBefore, economyAfter, 0);
+
+        if (enableTurnStateRuntimeLogs)
+            Debug.Log($"[AI][Shopping] Comprado: {ResolveUnitName(unit)} para {team} em {spawnCell}. Saldo restante: {economyAfter}.");
+
+        OnUnitPurchased?.Invoke(spawnedManager);
+        return true;
+    }
     private bool TryResolveShoppingCursorMove(Vector3Int currentCell, Vector3Int inputDelta)
     {
         if (cursorState != CursorState.ShoppingAndServices || shoppingUnitsForSale == null || shoppingUnitsForSale.Count <= 0)

@@ -29,6 +29,8 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private int mergedWhenTurn = -1;
     [SerializeField] private string mergedWithUnit = string.Empty;
     [SerializeField] private TeamId teamId = TeamId.Green;
+    [Tooltip("Slot do MatchController que controla este time. -1 = sem slot (TeamId fixo).")]
+    [SerializeField] private int slotIndex = -1;
     [SerializeField] private string unitId;
     [SerializeField] private int instanceId;
     [SerializeField] private Vector3 currentPosition = Vector3.zero;
@@ -107,6 +109,8 @@ public class UnitManager : MonoBehaviour
     [SerializeField, HideInInspector] private List<int> currentlyObservedByTeamIds = new List<int>();
 
     public TeamId TeamId => teamId;
+    public int SlotIndex => slotIndex;
+    public void SetSlotIndex(int index) { slotIndex = index; ResolveTeamIdFromSlot(); }
     public Tilemap BoardTilemap => boardTilemap;
     public Vector3Int CurrentCellPosition => currentCellPosition;
     public string UnitId => unitId;
@@ -176,6 +180,8 @@ public class UnitManager : MonoBehaviour
         TryAutoAssignHud();
         TryAutoAssignLockRenderer();
         TryAutoAssignBoardTilemap();
+        TryAutoAssignMatchController();
+        ResolveTeamIdFromSlot();
         DisableLegacyOutlineObjects();
         CacheSpriteMaterial();
         SyncPositionState();
@@ -228,6 +234,7 @@ public class UnitManager : MonoBehaviour
         MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
         MatchController.OnUnitActedStateChanged += HandleUnitActedStateChanged;
         MatchController.OnFogOfWarUpdated += HandleFogOfWarUpdated;
+        MatchController.OnSlotConfigChanged += HandleSlotConfigChanged;
         if (Application.isPlaying)
         {
             Vector3Int cell = currentCellPosition;
@@ -249,6 +256,7 @@ public class UnitManager : MonoBehaviour
         MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
         MatchController.OnUnitActedStateChanged -= HandleUnitActedStateChanged;
         MatchController.OnFogOfWarUpdated -= HandleFogOfWarUpdated;
+        MatchController.OnSlotConfigChanged -= HandleSlotConfigChanged;
         ThreatRevisionTracker.NotifyUnitDisabled(this, teamId, isEmbarked);
         StopSelectionBlinkRoutine();
         ClearTemporarySortingOrder();
@@ -1735,6 +1743,40 @@ public class UnitManager : MonoBehaviour
             currentCellPosition = HexCoordinates.WorldToCell(boardTilemap, position);
             SyncEmbarkedPassengersCellPosition();
         }
+    }
+
+    private void HandleSlotConfigChanged()
+    {
+        ResolveTeamIdFromSlot();
+    }
+
+    // Resolve teamId a partir do slotIndex no MatchController.
+    // Sem efeito se slotIndex == -1 (fixo) ou se nao ha MatchController na cena.
+    private void ResolveTeamIdFromSlot()
+    {
+        if (slotIndex < 0)
+            return;
+
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+
+        if (matchController == null)
+            return;
+
+        TeamId resolved = matchController.GetTeamIdForSlot(slotIndex);
+        if (teamId == resolved)
+            return;
+
+        TeamId previousTeam = teamId;
+        teamId = resolved;
+        if (!ApplyFromDatabase())
+            UpdateDynamicName();
+        RefreshActedVisual();
+        ThreatRevisionTracker.NotifyUnitTeamChanged(previousTeam, teamId);
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
     }
 
     public void SetTeamId(TeamId team)
