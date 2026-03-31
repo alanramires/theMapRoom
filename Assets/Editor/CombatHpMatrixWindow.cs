@@ -20,6 +20,7 @@ public class CombatHpMatrixWindow : EditorWindow
     [SerializeField] private int selectedDefenderEmbarkedWeaponIndex = -2;
     [SerializeField] private bool autoUpdate = true;
     [SerializeField] private bool logToConsole;
+    [SerializeField] private bool showRemainingHp = true;
 
     private readonly List<UnitData> units = new List<UnitData>();
     private readonly List<WeaponOption> attackWeaponOptions = new List<WeaponOption>();
@@ -74,6 +75,7 @@ public class CombatHpMatrixWindow : EditorWindow
         distance = Mathf.Max(1, EditorGUILayout.IntField("Distancia (hex)", distance));
         autoUpdate = EditorGUILayout.ToggleLeft("Auto Update (quando assets mudarem)", autoUpdate);
         logToConsole = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
+        showRemainingHp = EditorGUILayout.ToggleLeft("Exibir HP restante", showRemainingHp);
 
         if (previousUnitDatabase != unitDatabase)
         {
@@ -109,7 +111,7 @@ public class CombatHpMatrixWindow : EditorWindow
 
         if (units.Count <= 0)
         {
-            EditorGUILayout.HelpBox("Sem unidades no UnitDatabase.", MessageType.Warning);
+            EditorGUILayout.HelpBox("Sem unidades na fonte atual (UnitDatabase/scene).", MessageType.Warning);
         }
         else
         {
@@ -378,7 +380,10 @@ public class CombatHpMatrixWindow : EditorWindow
     private void DrawMatrix()
     {
         EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("Linhas = HP atacante inicial | Colunas = HP defensor inicial", EditorStyles.miniBoldLabel);
+        string matrixLegend = showRemainingHp
+            ? "Linhas = HP atacante inicial | Colunas = HP defensor inicial"
+            : "Celula = atacantes eliminados x defensores eliminados";
+        EditorGUILayout.LabelField(matrixLegend, EditorStyles.miniBoldLabel);
 
         EditorGUILayout.BeginHorizontal();
         GUILayout.Label("HP A\\D", GUILayout.Width(70f));
@@ -396,7 +401,9 @@ public class CombatHpMatrixWindow : EditorWindow
                 int row = rowHp - 1;
                 int col = colHp - 1;
                 MatrixCellResult cell = matrix[row, col];
-                string label = $"{cell.attackerHpAfter}x{cell.defenderHpAfter}";
+                string label = showRemainingHp
+                    ? $"{cell.attackerHpAfter}x{cell.defenderHpAfter}"
+                    : $"{FormatEliminated(cell.attackerEliminated)}x{FormatEliminated(cell.defenderEliminated)}";
                 bool containedByLock = cell.defenderDamageContainedByHpLock || cell.attackerDamageContainedByHpLock;
 
                 Color prevColor = GUI.color;
@@ -514,21 +521,48 @@ public class CombatHpMatrixWindow : EditorWindow
         log.AppendLine($"- HP defensor: {defenderHpBefore} -> {defenderHpAfter}");
         log.AppendLine($"- HP atacante: {attackerHpBefore} -> {attackerHpAfter}");
 
-        return new MatrixCellResult(attackerHpAfter, defenderHpAfter, defenderDamageContainedByHpLock, attackerDamageContainedByHpLock, log.ToString());
+        return new MatrixCellResult(
+            attackerHpBefore,
+            defenderHpBefore,
+            attackerHpAfter,
+            defenderHpAfter,
+            defenderDamageContainedByHpLock,
+            attackerDamageContainedByHpLock,
+            log.ToString());
     }
 
     private void RefreshUnits()
     {
         units.Clear();
-        if (unitDatabase == null || unitDatabase.Units == null)
-            return;
 
-        for (int i = 0; i < unitDatabase.Units.Count; i++)
+        HashSet<UnitData> unique = new HashSet<UnitData>();
+
+        if (unitDatabase != null && unitDatabase.Units != null)
         {
-            UnitData unit = unitDatabase.Units[i];
-            if (unit == null || string.IsNullOrWhiteSpace(unit.id))
-                continue;
-            units.Add(unit);
+            for (int i = 0; i < unitDatabase.Units.Count; i++)
+            {
+                UnitData unit = unitDatabase.Units[i];
+                if (unit == null || string.IsNullOrWhiteSpace(unit.id) || unique.Contains(unit))
+                    continue;
+                unique.Add(unit);
+                units.Add(unit);
+            }
+        }
+
+        if (units.Count <= 0)
+        {
+            List<UnitManager> sceneUnits = CollectUnitsForMatrixSource();
+            for (int i = 0; i < sceneUnits.Count; i++)
+            {
+                UnitManager manager = sceneUnits[i];
+                if (manager == null)
+                    continue;
+                if (!manager.TryGetUnitData(out UnitData data) || data == null || string.IsNullOrWhiteSpace(data.id) || unique.Contains(data))
+                    continue;
+
+                unique.Add(data);
+                units.Add(data);
+            }
         }
 
         if (units.Count <= 0)
@@ -540,6 +574,26 @@ public class CombatHpMatrixWindow : EditorWindow
 
         attackerUnitIndex = Mathf.Clamp(attackerUnitIndex, 0, units.Count - 1);
         defenderUnitIndex = Mathf.Clamp(defenderUnitIndex, 0, units.Count - 1);
+    }
+
+    private static List<UnitManager> CollectUnitsForMatrixSource()
+    {
+        if (Application.isPlaying)
+            return UnitManager.AllActive;
+
+        UnitManager[] hierarchyUnits = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        List<UnitManager> resolved = new List<UnitManager>(hierarchyUnits != null ? hierarchyUnits.Length : 0);
+        if (hierarchyUnits == null)
+            return resolved;
+
+        for (int i = 0; i < hierarchyUnits.Length; i++)
+        {
+            UnitManager unit = hierarchyUnits[i];
+            if (unit != null)
+                resolved.Add(unit);
+        }
+
+        return resolved;
     }
 
     private void RefreshAttackWeaponOptions()
@@ -947,6 +1001,11 @@ public class CombatHpMatrixWindow : EditorWindow
         return value.ToString("+0;-0;+0");
     }
 
+    private static string FormatEliminated(int value)
+    {
+        return value <= 0 ? "0" : $"-{value}";
+    }
+
     private static string GetWeaponCode(int index)
     {
         if (index == 0) return "P";
@@ -1089,21 +1148,31 @@ public class CombatHpMatrixWindow : EditorWindow
 
     private readonly struct MatrixCellResult
     {
+        public readonly int attackerHpBefore;
+        public readonly int defenderHpBefore;
         public readonly int attackerHpAfter;
         public readonly int defenderHpAfter;
+        public readonly int attackerEliminated;
+        public readonly int defenderEliminated;
         public readonly bool defenderDamageContainedByHpLock;
         public readonly bool attackerDamageContainedByHpLock;
         public readonly string log;
 
         public MatrixCellResult(
+            int attackerHpBefore,
+            int defenderHpBefore,
             int attackerHpAfter,
             int defenderHpAfter,
             bool defenderDamageContainedByHpLock,
             bool attackerDamageContainedByHpLock,
             string log)
         {
+            this.attackerHpBefore = Mathf.Max(0, attackerHpBefore);
+            this.defenderHpBefore = Mathf.Max(0, defenderHpBefore);
             this.attackerHpAfter = attackerHpAfter;
             this.defenderHpAfter = defenderHpAfter;
+            attackerEliminated = Mathf.Max(0, this.attackerHpBefore - attackerHpAfter);
+            defenderEliminated = Mathf.Max(0, this.defenderHpBefore - defenderHpAfter);
             this.defenderDamageContainedByHpLock = defenderDamageContainedByHpLock;
             this.attackerDamageContainedByHpLock = attackerDamageContainedByHpLock;
             this.log = log;

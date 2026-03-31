@@ -137,7 +137,8 @@ public partial class TurnStateManager
         target.SetCurrentHP(target.CurrentHP + recovered);
         int afterHp = target.CurrentHP;
         int actualGain = Mathf.Max(0, afterHp - beforeHp);
-        Debug.Log($"[HpRepair] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | {beforeHp}->{afterHp} (+{actualGain})");
+        int logCost = ComputeServiceMoneyCost(target, service, actualGain, 0, 0);
+        Debug.Log($"[HpRepair] modo=Suprimento | alvo={targetName} | fornecedor={supplierName} | servico={serviceLabel} | {beforeHp}->{afterHp} (+{actualGain}) | custo=${logCost}");
         return recovered;
     }
 

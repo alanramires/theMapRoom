@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System;
@@ -77,6 +77,7 @@ public class MatchController : MonoBehaviour
         public TeamId teamId;
         [HideInInspector] public bool flipX;
         public bool isAI;
+        public bool defeated;
         [Min(0)] public int startMoney;
         [Min(0)] public int actualMoney;
         [Min(0)] public int incomePerTurn;
@@ -105,10 +106,10 @@ public class MatchController : MonoBehaviour
     [FormerlySerializedAs("playerEconomy")]
     [SerializeField] private List<PlayerEntry> players = new List<PlayerEntry>
     {
-        new PlayerEntry { teamId = TeamId.Green, flipX = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
-        new PlayerEntry { teamId = TeamId.Red, flipX = true, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
-        new PlayerEntry { teamId = TeamId.Blue, flipX = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
-        new PlayerEntry { teamId = TeamId.Yellow, flipX = true, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false }
+        new PlayerEntry { teamId = TeamId.Green, flipX = false, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
+        new PlayerEntry { teamId = TeamId.Red, flipX = true, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
+        new PlayerEntry { teamId = TeamId.Blue, flipX = false, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
+        new PlayerEntry { teamId = TeamId.Yellow, flipX = true, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false }
     };
     [SerializeField] private bool includeNeutralTeam = false;
     [SerializeField] private bool economyEnabled = true;
@@ -853,6 +854,20 @@ public class MatchController : MonoBehaviour
         return players[activePlayerListIndex].isAI;
     }
 
+    // Bloqueio central de input humano durante o turno de um time controlado por IA.
+    public bool IsPlayerInputLockedByActiveAI()
+    {
+        return Application.isPlaying && IsActiveTeamAI();
+    }
+
+    public bool IsTeamDefeated(TeamId team)
+    {
+        int index = FindPlayerEconomyIndex(team);
+        if (index < 0 || players == null || index >= players.Count)
+            return false;
+        return players[index].defeated;
+    }
+
     public void SetActiveTeamId(int teamId)
     {
         activeTeamId = Mathf.Clamp(teamId, -1, 3);
@@ -889,10 +904,17 @@ public class MatchController : MonoBehaviour
 
         if (activePlayerListIndex >= 0)
         {
-            int next = activePlayerListIndex + 1;
-            if (next < players.Count)
+            int aliveNext = FindNextAlivePlayerIndex(activePlayerListIndex);
+            if (aliveNext >= 0)
             {
-                SetActivePlayerByIndex(next);
+                bool wrapped = aliveNext <= activePlayerListIndex;
+                if (wrapped && includeNeutralTeam && HasAnyNeutralUnitsInField())
+                {
+                    SetNeutralActiveTeam();
+                    return;
+                }
+
+                SetActivePlayerByIndex(aliveNext);
                 return;
             }
 
@@ -902,11 +924,15 @@ public class MatchController : MonoBehaviour
                 return;
             }
 
-            SetActivePlayerByIndex(0, forceApply: true);
+            int firstAlive = FindNextAlivePlayerIndex(-1);
+            if (firstAlive >= 0)
+                SetActivePlayerByIndex(firstAlive, forceApply: true);
             return;
         }
 
-        SetActivePlayerByIndex(0, forceApply: true);
+        int nextAliveFromNeutral = FindNextAlivePlayerIndex(-1);
+        if (nextAliveFromNeutral >= 0)
+            SetActivePlayerByIndex(nextAliveFromNeutral, forceApply: true);
     }
 
     // Avanca para o proximo membro da lista. So incrementa currentTurn ao "fechar ciclo".
@@ -928,15 +954,29 @@ public class MatchController : MonoBehaviour
             return;
         }
 
+        if (CountAlivePlayers() <= 1)
+        {
+            TryDeclareLastStandingWinner();
+            return;
+        }
+
         // Caso padrao: estamos em um player da lista.
         if (activePlayerListIndex >= 0)
         {
-            int next = activePlayerListIndex + 1;
-            if (next < players.Count)
+            int nextAlive = FindNextAlivePlayerIndex(activePlayerListIndex);
+            if (nextAlive >= 0)
             {
                 pendingTurnStartUpkeep = true;
                 pendingTurnStartEconomy = true;
-                SetActivePlayerByIndex(next);
+                bool wrapped = nextAlive <= activePlayerListIndex;
+                if (wrapped && includeNeutralTeam && HasAnyNeutralUnitsInField())
+                {
+                    SetNeutralActiveTeam();
+                    return;
+                }
+                if (wrapped)
+                    CloseRoundAndAdvanceToFirstPlayer();
+                SetActivePlayerByIndex(nextAlive, forceApply: wrapped);
                 return;
             }
 
@@ -949,19 +989,23 @@ public class MatchController : MonoBehaviour
                 return;
             }
 
-            // Sem neutral: fecha ciclo de turno.
-            CloseRoundAndAdvanceToFirstPlayer();
-            pendingTurnStartUpkeep = true;
-            pendingTurnStartEconomy = true;
-            SetActivePlayerByIndex(0, forceApply: true);
+            // Sem neutral: tenta declarar vencedor por ultimo sobrevivente.
+            TryDeclareLastStandingWinner();
             return;
         }
 
         // Estavamos em neutral (ou fora da lista): fecha ciclo de turno e volta para o primeiro player.
-        CloseRoundAndAdvanceToFirstPlayer();
-        pendingTurnStartUpkeep = true;
-        pendingTurnStartEconomy = true;
-        SetActivePlayerByIndex(0, forceApply: true);
+        int firstAlivePlayer = FindNextAlivePlayerIndex(-1);
+        if (firstAlivePlayer >= 0)
+        {
+            CloseRoundAndAdvanceToFirstPlayer();
+            pendingTurnStartUpkeep = true;
+            pendingTurnStartEconomy = true;
+            SetActivePlayerByIndex(firstAlivePlayer, forceApply: true);
+            return;
+        }
+
+        TryDeclareLastStandingWinner();
     }
 
     public void AdvanceTurnWithTransition()
@@ -1114,15 +1158,15 @@ public class MatchController : MonoBehaviour
             cursor.PlayVictorySfx();
         }
 
-        // Mostrar Dialogo de Vitoria (FIXO e IMUTÁVEL)
+        // Mostrar Dialogo de Vitoria (FIXO e IMUTÃVEL)
         string fallback = (tutorial != null && tutorial.victoryDialog != null && !string.IsNullOrWhiteSpace(tutorial.victoryDialog.message)) 
             ? tutorial.victoryDialog.message 
-            : "TUTORIAL CONCLUÍDO! VITÓRIA!";
+            : "TUTORIAL CONCLUÃDO! VITÃ“RIA!";
 
         string victoryMsg = PanelDialogController.ResolveDialogMessage("panel_dialog.victory", fallback);
         PanelDialogController.TrySetExternalText(victoryMsg);
 
-        // Solução simples e robusta: busca o painel mesmo que esteja desativado na cena
+        // SoluÃ§Ã£o simples e robusta: busca o painel mesmo que esteja desativado na cena
         foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
         {
             if (go.name == "Panel_endGame" && go.scene.name != null)
@@ -1132,7 +1176,7 @@ public class MatchController : MonoBehaviour
                 var textComponent = go.GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
                 if (textComponent != null && textComponent.name == "text_endgame")
                 {
-                    textComponent.text = "VITÓRIA!";
+                    textComponent.text = "VITÃ“RIA!";
                 }
                 break;
             }
@@ -1158,7 +1202,7 @@ public class MatchController : MonoBehaviour
             cursor.PlayDefeatSfx();
         }
 
-        PanelDialogController.TrySetExternalText("DERROTA! VOCÊ FICOU SEM UNIDADES.");
+        PanelDialogController.TrySetExternalText("DERROTA! VOCÃŠ FICOU SEM UNIDADES.");
 
         // Busca o painel
         foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
@@ -1174,7 +1218,7 @@ public class MatchController : MonoBehaviour
                     {
                         txt.text = "DERROTA!";
                     }
-                    else if (txt.name == "text_descrição" || txt.name == "text_description")
+                    else if (txt.name == "text_descriÃ§Ã£o" || txt.name == "text_description")
                     {
                         txt.text = "Ficou sem unidades";
                     }
@@ -1184,29 +1228,116 @@ public class MatchController : MonoBehaviour
         }
     }
 
+    private int CountAlivePlayers()
+    {
+        if (players == null || players.Count == 0)
+            return 0;
+
+        int count = 0;
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (!players[i].defeated)
+                count++;
+        }
+        return count;
+    }
+
+    private int FindNextAlivePlayerIndex(int fromIndex)
+    {
+        if (players == null || players.Count == 0)
+            return -1;
+
+        int count = players.Count;
+        int start = Mathf.Clamp(fromIndex + 1, 0, count);
+        for (int step = 0; step < count; step++)
+        {
+            int idx = (start + step) % count;
+            if (!players[idx].defeated)
+                return idx;
+        }
+        return -1;
+    }
+
+    private bool TryDefeatTeamIfZeroUnits(TeamId team)
+    {
+        int playerIndex = FindPlayerEconomyIndex(team);
+        if (playerIndex < 0 || players == null || playerIndex >= players.Count)
+            return false;
+        if (players[playerIndex].defeated)
+            return false;
+
+        List<UnitManager> allUnits = GetActiveUnitsOnScene();
+        for (int i = 0; i < allUnits.Count; i++)
+        {
+            UnitManager unit = allUnits[i];
+            if (unit != null && unit.TeamId == team)
+                return false;
+        }
+
+        PlayerEntry entry = players[playerIndex];
+        entry.defeated = true;
+        players[playerIndex] = entry;
+
+        NeutralizeConstructionsOwnedByTeam(team);
+        Debug.Log($"[Match] Team {TeamUtils.GetName(team)} derrotado (0 unidades). Construcoes neutralizadas.");
+        return true;
+    }
+
+    private void NeutralizeConstructionsOwnedByTeam(TeamId defeatedTeam)
+    {
+        List<ConstructionManager> constructions = GetActiveConstructionsOnScene();
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || construction.TeamId != defeatedTeam)
+                continue;
+
+            construction.SetTeamId(TeamId.Neutral);
+            construction.SetCurrentCapturePoints(construction.CapturePointsMax);
+        }
+    }
+
+    private bool TryDeclareLastStandingWinner()
+    {
+        if (hasVictoryWinner)
+            return true;
+
+        int aliveCount = CountAlivePlayers();
+        if (aliveCount != 1)
+            return false;
+
+        TeamId winner = TeamId.Neutral;
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (!players[i].defeated)
+            {
+                winner = players[i].teamId;
+                break;
+            }
+        }
+        if (winner == TeamId.Neutral)
+            return false;
+
+        hasVictoryWinner = true;
+        victoryWinnerTeam = winner;
+        HandleVictoryAestheticPresentation(winner, 0);
+        return true;
+    }
+
     private void HandleUnitDestroyed(UnitManager unit)
     {
         if (!Application.isPlaying || hasVictoryWinner || currentTurn < 2)
             return;
 
-        if (unit == null) return;
+        if (unit == null)
+            return;
+        if (!allowDefeatForZeroUnits)
+            return;
+        if (unit.TeamId == TeamId.Neutral)
+            return;
 
-        // O usuário pediu especificamente "se você ficar sem unidades"
-        // Checamos se o time que perdeu a unidade é o time ativo (jogador)
-        if ((int)unit.TeamId != activeTeamId) return;
-
-        List<UnitManager> allUnits = GetActiveUnitsOnScene();
-        int count = 0;
-        for (int i = 0; i < allUnits.Count; i++)
-        {
-            if (allUnits[i] == unit) continue;
-            if (allUnits[i].TeamId == unit.TeamId) count++;
-        }
-
-        if (count == 0)
-        {
-            DeclareDefeat();
-        }
+        TryDefeatTeamIfZeroUnits(unit.TeamId);
+        TryDeclareLastStandingWinner();
     }
 
     private void NormalizeState()
@@ -1315,6 +1446,7 @@ public class MatchController : MonoBehaviour
             entry.startMoney = Mathf.Max(0, entry.startMoney);
             entry.actualMoney = Mathf.Max(0, entry.actualMoney);
             entry.incomePerTurn = Mathf.Max(0, entry.incomePerTurn);
+            entry.defeated = entry.defeated && entry.teamId != TeamId.Neutral;
             players[i] = entry;
         }
     }
@@ -1420,6 +1552,13 @@ public class MatchController : MonoBehaviour
             return;
 
         index = Mathf.Clamp(index, 0, players.Count - 1);
+        if (players[index].defeated)
+        {
+            int aliveIndex = FindNextAlivePlayerIndex(index - 1);
+            if (aliveIndex < 0)
+                return;
+            index = aliveIndex;
+        }
         activePlayerListIndex = index;
         activeTeamId = (int)players[index].teamId;
         ApplyActiveTeamIfChanged(force: forceApply);
@@ -1436,6 +1575,25 @@ public class MatchController : MonoBehaviour
     {
         if (!force && appliedActiveTeamId == activeTeamId)
             return;
+
+        if (activeTeamId >= 0)
+        {
+            TeamId requestedTeam = ClampToTeamId(activeTeamId);
+            if (IsTeamDefeated(requestedTeam))
+            {
+                int aliveIndex = FindNextAlivePlayerIndex(-1);
+                if (aliveIndex >= 0)
+                {
+                    activePlayerListIndex = aliveIndex;
+                    activeTeamId = (int)players[aliveIndex].teamId;
+                }
+                else
+                {
+                    TryDeclareLastStandingWinner();
+                    return;
+                }
+            }
+        }
 
         double totalStartMs = TurnPerfNowMs();
         appliedActiveTeamId = activeTeamId;
@@ -1629,18 +1787,13 @@ public class MatchController : MonoBehaviour
         activeConstructions ??= GetActiveConstructionsOnScene();
         EvaluateVictoryStarsAtTurnStartForActiveTeam(activeConstructions);
         
-        // Checagem de derrota: turno >= 2 e 0 unidades
-        if (allowDefeatForZeroUnits && currentTurn >= 2)
+        // Checagem de derrota por 0 unidades: marca o time como defeated.
+        if (allowDefeatForZeroUnits && currentTurn >= 2 && activeTeamId >= 0)
         {
-            List<UnitManager> allUnits = GetActiveUnitsOnScene();
-            int myUnitsCount = 0;
-            for (int i = 0; i < allUnits.Count; i++)
+            TeamId activeTeam = ClampToTeamId(activeTeamId);
+            if (TryDefeatTeamIfZeroUnits(activeTeam))
             {
-                if ((int)allUnits[i].TeamId == activeTeamId) myUnitsCount++;
-            }
-            if (myUnitsCount == 0)
-            {
-                DeclareDefeat();
+                TryDeclareLastStandingWinner();
                 return;
             }
         }
@@ -3918,7 +4071,7 @@ public class MatchController : MonoBehaviour
                     {
                         txt.text = "DERROTA!";
                     }
-                    else if (txt.name == "text_descrição" || txt.name == "text_description" || txt.name == "txt_descricao")
+                    else if (txt.name == "text_descriÃ§Ã£o" || txt.name == "text_description" || txt.name == "txt_descricao")
                     {
                         txt.text = reason;
                     }

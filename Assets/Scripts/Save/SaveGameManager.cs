@@ -136,6 +136,9 @@ public class SaveGameManager : MonoBehaviour
         if (!Application.isPlaying || !enableHotkeys || loadInProgress)
             return;
 
+        if (IsPersistenceBlockedByActiveAI())
+            return;
+
         if (promptState != SlotPromptState.None)
         {
             UiInputBlocker.SuppressGameplayInputForFrames(1);
@@ -162,6 +165,8 @@ public class SaveGameManager : MonoBehaviour
     [ContextMenu("Save Quick Slot")]
     public void Save()
     {
+        if (IsPersistenceBlockedByActiveAI(showFeedback: true))
+            return;
         SaveSlot(1);
     }
 
@@ -176,11 +181,15 @@ public class SaveGameManager : MonoBehaviour
 
     public void OpenSaveSlotPromptFromMenu()
     {
+        if (IsPersistenceBlockedByActiveAI(showFeedback: true))
+            return;
         OpenSaveSlotPrompt(PerfNowMs());
     }
 
     public void OpenLoadSlotPromptFromMenu()
     {
+        if (IsPersistenceBlockedByActiveAI(showFeedback: true))
+            return;
         OpenLoadSlotPrompt(PerfNowMs());
     }
 
@@ -436,6 +445,9 @@ public class SaveGameManager : MonoBehaviour
 
     public void SaveSlot(int slotIndex)
     {
+        if (IsPersistenceBlockedByActiveAI(showFeedback: true))
+            return;
+
         if (!Application.isPlaying)
         {
             Debug.LogWarning("[SaveGame] Save funciona apenas em Play Mode.");
@@ -594,6 +606,9 @@ public class SaveGameManager : MonoBehaviour
 
     public void LoadSlot(int slotIndex)
     {
+        if (IsPersistenceBlockedByActiveAI(showFeedback: true))
+            return;
+
         Debug.Log($"[TRACE][SaveGameManager.LoadSlot] slotIndex={slotIndex}\n{Environment.StackTrace}");
 
         if (!Application.isPlaying)
@@ -648,6 +663,21 @@ public class SaveGameManager : MonoBehaviour
         }
 
         StartCoroutine(LoadSlotAsync(path, normalizedSlot));
+    }
+
+    private bool IsPersistenceBlockedByActiveAI(bool showFeedback = false)
+    {
+        TryAutoAssignReferences();
+        if (matchController == null || !matchController.IsPlayerInputLockedByActiveAI())
+            return false;
+
+        if (showFeedback)
+        {
+            cursorController?.PlayErrorSfx();
+            PanelDialogController.TrySetTransientText("Turno da IA em execucao: save/load bloqueado.", 2.4f);
+        }
+
+        return true;
     }
 
     private IEnumerator LoadSlotAsync(string path, int normalizedSlot)
@@ -2009,7 +2039,6 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
-
 
 
 

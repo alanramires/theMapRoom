@@ -50,7 +50,7 @@ public class CombatCalculatorWindow : EditorWindow
         logToConsole = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
 
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Auto Detect"))
+        if (GUILayout.Button("Auto Detect (Contexto + Selecao)"))
             AutoDetectContext();
         if (GUILayout.Button("Limpar Selecao"))
             ClearPairSelection();
@@ -128,6 +128,19 @@ public class CombatCalculatorWindow : EditorWindow
             return;
         }
 
+        bool enableLdt = true;
+        bool enableLos = true;
+        bool enableSpotter = true;
+        bool enableStealth = true;
+        MatchController matchController = Object.FindAnyObjectByType<MatchController>();
+        if (matchController != null)
+        {
+            enableLdt = matchController.EnableLdtValidation;
+            enableLos = matchController.EnableLosValidation;
+            enableSpotter = matchController.EnableSpotter;
+            enableStealth = matchController.EnableStealthValidation;
+        }
+
         PodeMirarSensor.CollectTargets(
             attackerUnit,
             board,
@@ -136,7 +149,12 @@ public class CombatCalculatorWindow : EditorWindow
             sensorValidResults,
             sensorInvalidResults,
             weaponPriorityData,
-            dpqAirHeightConfig);
+            dpqAirHeightConfig,
+            enableLdt,
+            enableLos,
+            enableSpotter,
+            enableStealth,
+            respectTotalWarVisibility: false);
 
         for (int i = 0; i < sensorValidResults.Count; i++)
         {
@@ -465,6 +483,50 @@ public class CombatCalculatorWindow : EditorWindow
             dpqAirHeightConfig = FindFirstAsset<DPQAirHeightConfig>();
         if (rpsDatabase == null)
             rpsDatabase = FindFirstAsset<RPSDatabase>();
+
+        TryAutoDetectUnitsFromSelection();
+    }
+
+    private void TryAutoDetectUnitsFromSelection()
+    {
+        GameObject[] selectedObjects = Selection.gameObjects;
+        if (selectedObjects == null || selectedObjects.Length == 0)
+            return;
+
+        List<UnitManager> selectedUnits = new List<UnitManager>(selectedObjects.Length);
+        for (int i = 0; i < selectedObjects.Length; i++)
+        {
+            GameObject go = selectedObjects[i];
+            if (go == null)
+                continue;
+
+            UnitManager unit = go.GetComponent<UnitManager>();
+            if (unit == null)
+                unit = go.GetComponentInParent<UnitManager>();
+            if (unit == null || selectedUnits.Contains(unit))
+                continue;
+
+            selectedUnits.Add(unit);
+        }
+
+        if (selectedUnits.Count <= 0)
+            return;
+
+        if (attackerUnit == null)
+            attackerUnit = selectedUnits[0];
+
+        if (defenderUnit == null)
+        {
+            for (int i = 0; i < selectedUnits.Count; i++)
+            {
+                UnitManager candidate = selectedUnits[i];
+                if (candidate != null && candidate != attackerUnit)
+                {
+                    defenderUnit = candidate;
+                    break;
+                }
+            }
+        }
     }
 
     private static T FindFirstAsset<T>() where T : ScriptableObject
@@ -726,13 +788,26 @@ public class CombatCalculatorWindow : EditorWindow
             resolved.opponentDefense);
     }
 
-    private static Tilemap ResolveBoardTilemap(UnitManager attacker, UnitManager defender)
+    private Tilemap ResolveBoardTilemap(UnitManager attacker, UnitManager defender)
     {
+        if (TryGetTurnStateTerrainTilemap(turnStateManager, out Tilemap turnStateBoard))
+            return turnStateBoard;
         if (attacker != null && attacker.BoardTilemap != null)
             return attacker.BoardTilemap;
         if (defender != null && defender.BoardTilemap != null)
             return defender.BoardTilemap;
         return Object.FindAnyObjectByType<Tilemap>();
+    }
+
+    private static bool TryGetTurnStateTerrainTilemap(TurnStateManager manager, out Tilemap terrainTilemap)
+    {
+        terrainTilemap = null;
+        if (manager == null)
+            return false;
+
+        SerializedObject so = new SerializedObject(manager);
+        terrainTilemap = so.FindProperty("terrainTilemap")?.objectReferenceValue as Tilemap;
+        return terrainTilemap != null;
     }
 
     private string BuildInvalidPairReport(UnitManager attacker, UnitManager defender, List<PodeMirarInvalidOption> invalidOptions)
@@ -759,7 +834,7 @@ public class CombatCalculatorWindow : EditorWindow
         if (pairInvalid.Count == 0)
         {
             sb.AppendLine("- Sem motivo especifico no retorno invalido.");
-            sb.AppendLine("- Possiveis causas: fora de alcance, alvo nao encontrado no range global, ou sem arma candidata.");
+            AppendPairPrecheckHints(sb, attacker, defender, movementMode);
             return sb.ToString();
         }
 
@@ -771,6 +846,73 @@ public class CombatCalculatorWindow : EditorWindow
         }
 
         return sb.ToString();
+    }
+
+    private void AppendPairPrecheckHints(StringBuilder sb, UnitManager attacker, UnitManager defender, SensorMovementMode mode)
+    {
+        if (sb == null)
+            return;
+
+        if (attacker == null || defender == null)
+        {
+            sb.AppendLine("- Possiveis causas: atacante/defensor nulos, fora de alcance, alvo nao encontrado no range global, ou sem arma candidata.");
+            return;
+        }
+
+        if (!defender.gameObject.activeInHierarchy)
+            sb.AppendLine("- Dica: defensor inativo na hierarquia.");
+        if (defender.IsEmbarked)
+            sb.AppendLine("- Dica: defensor embarcado (nao entra como alvo do sensor).");
+        if (attacker.TeamId == defender.TeamId)
+            sb.AppendLine("- Dica: atacante e defensor no mesmo time (sensor ignora aliados).");
+        if (!Application.isPlaying)
+            sb.AppendLine("- Dica: fora de Play Mode, o sensor usa UnitManager da hierarchy da cena atual.");
+
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = attacker.GetEmbarkedWeapons();
+        int candidateCount = 0;
+        int globalMaxRange = 0;
+        for (int i = 0; i < (weapons != null ? weapons.Count : 0); i++)
+        {
+            UnitEmbarkedWeapon embarked = weapons[i];
+            if (embarked == null || embarked.weapon == null)
+                continue;
+            if (!embarked.CanFireAtLayer(attacker.GetDomain(), attacker.GetHeightLevel()))
+                continue;
+            if (!PodeMirarSensor.TryResolveWeaponRangeCandidate(embarked, mode, requireAmmo: false, out _, out int maxRange))
+                continue;
+
+            candidateCount++;
+            if (maxRange > globalMaxRange)
+                globalMaxRange = maxRange;
+        }
+
+        if (candidateCount == 0)
+        {
+            sb.AppendLine("- Dica: sem arma candidata no atacante para o modo/layer atual.");
+        }
+        else
+        {
+            Tilemap board = ResolveBoardTilemap(attacker, defender);
+            if (board == null)
+            {
+                sb.AppendLine("- Dica: sem Tilemap de referencia para calcular distancia do par.");
+            }
+            else
+            {
+                Vector3Int attackerCell = attacker.CurrentCellPosition;
+                Vector3Int defenderCell = defender.CurrentCellPosition;
+                attackerCell.z = 0;
+                defenderCell.z = 0;
+                bool inGlobalRange = HexCoordinates.IsWithinRange(board, attackerCell, defenderCell, globalMaxRange);
+                if (!inGlobalRange)
+                    sb.AppendLine($"- Dica: defensor fora do range global do atacante neste board (dist > {globalMaxRange}).");
+            }
+        }
+
+        if (attacker.BoardTilemap != null && defender.BoardTilemap != null && attacker.BoardTilemap != defender.BoardTilemap)
+            sb.AppendLine("- Dica: atacante e defensor estao com BoardTilemap diferente; no fluxo oficial usa-se o terrainTilemap do TurnStateManager.");
+
+        sb.AppendLine("- Possiveis causas: fora de alcance, sem arma candidata/municao, layer incompativel, bloqueio LdT/LoS, ou stealth.");
     }
 
     private void TryUseCurrentSelectionAsAttacker()

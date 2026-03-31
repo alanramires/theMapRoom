@@ -27,6 +27,7 @@ public class CombatMatrixWindow : EditorWindow
     [SerializeField] private int selectedPairWeaponIndex;
     [SerializeField] private int selectedDefenderCounterIndex;
     [SerializeField] private bool logToConsole;
+    [SerializeField] private bool showRemainingHp = true;
 
     private readonly List<PodeMirarTargetOption> sensorValidResults = new List<PodeMirarTargetOption>();
     private readonly List<PodeMirarInvalidOption> sensorInvalidResults = new List<PodeMirarInvalidOption>();
@@ -64,9 +65,10 @@ public class CombatMatrixWindow : EditorWindow
         rpsDatabase = (RPSDatabase)EditorGUILayout.ObjectField("RPS Database", rpsDatabase, typeof(RPSDatabase), false);
         movementMode = (SensorMovementMode)EditorGUILayout.EnumPopup("Modo Sensor", movementMode);
         logToConsole = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
+        showRemainingHp = EditorGUILayout.ToggleLeft("Exibir HP restante", showRemainingHp);
 
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Auto Detect"))
+        if (GUILayout.Button("Auto Detect (Contexto + Selecao)"))
             AutoDetectContext();
         if (GUILayout.Button("Limpar"))
             ClearState();
@@ -165,6 +167,19 @@ public class CombatMatrixWindow : EditorWindow
             return;
         }
 
+        bool enableLdt = true;
+        bool enableLos = true;
+        bool enableSpotter = true;
+        bool enableStealth = true;
+        MatchController matchController = Object.FindAnyObjectByType<MatchController>();
+        if (matchController != null)
+        {
+            enableLdt = matchController.EnableLdtValidation;
+            enableLos = matchController.EnableLosValidation;
+            enableSpotter = matchController.EnableSpotter;
+            enableStealth = matchController.EnableStealthValidation;
+        }
+
         PodeMirarSensor.CollectTargets(
             attackerUnit,
             board,
@@ -173,7 +188,12 @@ public class CombatMatrixWindow : EditorWindow
             sensorValidResults,
             sensorInvalidResults,
             weaponPriorityData,
-            dpqAirHeightConfig);
+            dpqAirHeightConfig,
+            enableLdt,
+            enableLos,
+            enableSpotter,
+            enableStealth,
+            respectTotalWarVisibility: false);
 
         for (int i = 0; i < sensorValidResults.Count; i++)
         {
@@ -230,7 +250,9 @@ public class CombatMatrixWindow : EditorWindow
             for (int col = 0; col < DpqPresets.Length; col++)
             {
                 MatrixCellResult cell = matrix[row, col];
-                string label = $"{cell.attackerHpAfter}x{cell.defenderHpAfter}";
+                string label = showRemainingHp
+                    ? $"{cell.attackerHpAfter}x{cell.defenderHpAfter}"
+                    : $"{FormatEliminated(cell.attackerEliminated)}x{FormatEliminated(cell.defenderEliminated)}";
                 bool isBaselineCell = row == BaselineDpqIndex && col == BaselineDpqIndex;
                 GUIStyle style = isBaselineCell ? baselineCellButtonStyle : GUI.skin.button;
                 Color prevColor = GUI.color;
@@ -394,7 +416,12 @@ public class CombatMatrixWindow : EditorWindow
         log.AppendLine($"- HP defensor: {defenderHpBefore} -> {defenderHpAfter}");
         log.AppendLine($"- HP atacante: {attackerHpBefore} -> {attackerHpAfter}");
 
-        return new MatrixCellResult(attackerHpAfter, defenderHpAfter, log.ToString());
+        return new MatrixCellResult(
+            attackerHpBefore,
+            defenderHpBefore,
+            attackerHpAfter,
+            defenderHpAfter,
+            log.ToString());
     }
 
     private void AutoDetectContext()
@@ -409,6 +436,50 @@ public class CombatMatrixWindow : EditorWindow
             rpsDatabase = FindFirstAsset<RPSDatabase>();
         if (dpqAirHeightConfig == null)
             dpqAirHeightConfig = FindFirstAsset<DPQAirHeightConfig>();
+
+        TryAutoDetectUnitsFromSelection();
+    }
+
+    private void TryAutoDetectUnitsFromSelection()
+    {
+        GameObject[] selectedObjects = Selection.gameObjects;
+        if (selectedObjects == null || selectedObjects.Length == 0)
+            return;
+
+        List<UnitManager> selectedUnits = new List<UnitManager>(selectedObjects.Length);
+        for (int i = 0; i < selectedObjects.Length; i++)
+        {
+            GameObject go = selectedObjects[i];
+            if (go == null)
+                continue;
+
+            UnitManager unit = go.GetComponent<UnitManager>();
+            if (unit == null)
+                unit = go.GetComponentInParent<UnitManager>();
+            if (unit == null || selectedUnits.Contains(unit))
+                continue;
+
+            selectedUnits.Add(unit);
+        }
+
+        if (selectedUnits.Count <= 0)
+            return;
+
+        if (attackerUnit == null)
+            attackerUnit = selectedUnits[0];
+
+        if (defenderUnit == null)
+        {
+            for (int i = 0; i < selectedUnits.Count; i++)
+            {
+                UnitManager candidate = selectedUnits[i];
+                if (candidate != null && candidate != attackerUnit)
+                {
+                    defenderUnit = candidate;
+                    break;
+                }
+            }
+        }
     }
 
     private static T FindFirstAsset<T>() where T : ScriptableObject
@@ -471,11 +542,25 @@ public class CombatMatrixWindow : EditorWindow
 
     private static Tilemap ResolveBoardTilemap(UnitManager attacker, UnitManager defender)
     {
+        TurnStateManager turnState = Object.FindAnyObjectByType<TurnStateManager>();
+        if (TryGetTurnStateTerrainTilemap(turnState, out Tilemap turnStateBoard))
+            return turnStateBoard;
         if (attacker != null && attacker.BoardTilemap != null)
             return attacker.BoardTilemap;
         if (defender != null && defender.BoardTilemap != null)
             return defender.BoardTilemap;
         return Object.FindAnyObjectByType<Tilemap>();
+    }
+
+    private static bool TryGetTurnStateTerrainTilemap(TurnStateManager manager, out Tilemap terrainTilemap)
+    {
+        terrainTilemap = null;
+        if (manager == null)
+            return false;
+
+        SerializedObject so = new SerializedObject(manager);
+        terrainTilemap = so.FindProperty("terrainTilemap")?.objectReferenceValue as Tilemap;
+        return terrainTilemap != null;
     }
 
     private static int GetUnitBaseDefense(UnitManager unit)
@@ -581,20 +666,93 @@ public class CombatMatrixWindow : EditorWindow
         sb.AppendLine($"Modo sensor: {movementMode}");
 
         int reasons = 0;
-        for (int i = 0; i < invalidOptions.Count; i++)
+        if (invalidOptions != null)
         {
-            PodeMirarInvalidOption item = invalidOptions[i];
-            if (item == null || item.attackerUnit != attacker || item.targetUnit != defender)
-                continue;
+            for (int i = 0; i < invalidOptions.Count; i++)
+            {
+                PodeMirarInvalidOption item = invalidOptions[i];
+                if (item == null || item.attackerUnit != attacker || item.targetUnit != defender)
+                    continue;
 
-            reasons++;
-            sb.AppendLine($"{reasons}) arma={ResolveWeaponName(item.weapon)} | dist={item.distance} | motivo={item.reason}");
+                reasons++;
+                sb.AppendLine($"{reasons}) arma={ResolveWeaponName(item.weapon)} | dist={item.distance} | motivo={item.reason}");
+            }
         }
 
         if (reasons == 0)
-            sb.AppendLine("- Sem motivo especifico retornado. Verifique alcance/layer/municao.");
+        {
+            sb.AppendLine("- Sem motivo especifico retornado.");
+            AppendPairPrecheckHints(sb, attacker, defender, movementMode);
+        }
 
         return sb.ToString();
+    }
+
+    private static void AppendPairPrecheckHints(StringBuilder sb, UnitManager attacker, UnitManager defender, SensorMovementMode mode)
+    {
+        if (sb == null)
+            return;
+
+        if (attacker == null || defender == null)
+        {
+            sb.AppendLine("- Possiveis causas: atacante/defensor nulos, fora de alcance, alvo nao encontrado no range global, ou sem arma candidata.");
+            return;
+        }
+
+        if (!defender.gameObject.activeInHierarchy)
+            sb.AppendLine("- Dica: defensor inativo na hierarquia.");
+        if (defender.IsEmbarked)
+            sb.AppendLine("- Dica: defensor embarcado (nao entra como alvo do sensor).");
+        if (attacker.TeamId == defender.TeamId)
+            sb.AppendLine("- Dica: atacante e defensor no mesmo time (sensor ignora aliados).");
+        if (!Application.isPlaying)
+            sb.AppendLine("- Dica: fora de Play Mode, o sensor usa UnitManager da hierarchy da cena atual.");
+
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = attacker.GetEmbarkedWeapons();
+        int candidateCount = 0;
+        int globalMaxRange = 0;
+        for (int i = 0; i < (weapons != null ? weapons.Count : 0); i++)
+        {
+            UnitEmbarkedWeapon embarked = weapons[i];
+            if (embarked == null || embarked.weapon == null)
+                continue;
+            if (!embarked.CanFireAtLayer(attacker.GetDomain(), attacker.GetHeightLevel()))
+                continue;
+            if (!PodeMirarSensor.TryResolveWeaponRangeCandidate(embarked, mode, requireAmmo: false, out _, out int maxRange))
+                continue;
+
+            candidateCount++;
+            if (maxRange > globalMaxRange)
+                globalMaxRange = maxRange;
+        }
+
+        if (candidateCount == 0)
+        {
+            sb.AppendLine("- Dica: sem arma candidata no atacante para o modo/layer atual.");
+        }
+        else
+        {
+            Tilemap board = ResolveBoardTilemap(attacker, defender);
+            if (board == null)
+            {
+                sb.AppendLine("- Dica: sem Tilemap de referencia para calcular distancia do par.");
+            }
+            else
+            {
+                Vector3Int attackerCell = attacker.CurrentCellPosition;
+                Vector3Int defenderCell = defender.CurrentCellPosition;
+                attackerCell.z = 0;
+                defenderCell.z = 0;
+                bool inGlobalRange = HexCoordinates.IsWithinRange(board, attackerCell, defenderCell, globalMaxRange);
+                if (!inGlobalRange)
+                    sb.AppendLine($"- Dica: defensor fora do range global do atacante neste board (dist > {globalMaxRange}).");
+            }
+        }
+
+        if (attacker.BoardTilemap != null && defender.BoardTilemap != null && attacker.BoardTilemap != defender.BoardTilemap)
+            sb.AppendLine("- Dica: atacante e defensor estao com BoardTilemap diferente; no fluxo oficial usa-se o terrainTilemap do TurnStateManager.");
+
+        sb.AppendLine("- Possiveis causas: fora de alcance, sem arma candidata/municao, layer incompativel, bloqueio LdT/LoS, ou stealth.");
     }
 
     private static string ResolveWeaponName(WeaponData weapon)
@@ -626,6 +784,11 @@ public class CombatMatrixWindow : EditorWindow
     private static string FormatSigned(int value)
     {
         return value.ToString("+0;-0;+0");
+    }
+
+    private static string FormatEliminated(int value)
+    {
+        return value <= 0 ? "0" : $"-{value}";
     }
 
     private void RefreshDefenderCounterChoices(PodeMirarTargetOption selectedOption)
@@ -687,14 +850,22 @@ public class CombatMatrixWindow : EditorWindow
 
     private readonly struct MatrixCellResult
     {
+        public readonly int attackerHpBefore;
+        public readonly int defenderHpBefore;
         public readonly int attackerHpAfter;
         public readonly int defenderHpAfter;
+        public readonly int attackerEliminated;
+        public readonly int defenderEliminated;
         public readonly string log;
 
-        public MatrixCellResult(int attackerHpAfter, int defenderHpAfter, string log)
+        public MatrixCellResult(int attackerHpBefore, int defenderHpBefore, int attackerHpAfter, int defenderHpAfter, string log)
         {
+            this.attackerHpBefore = Mathf.Max(0, attackerHpBefore);
+            this.defenderHpBefore = Mathf.Max(0, defenderHpBefore);
             this.attackerHpAfter = attackerHpAfter;
             this.defenderHpAfter = defenderHpAfter;
+            attackerEliminated = Mathf.Max(0, this.attackerHpBefore - attackerHpAfter);
+            defenderEliminated = Mathf.Max(0, this.defenderHpBefore - defenderHpAfter);
             this.log = log;
         }
     }

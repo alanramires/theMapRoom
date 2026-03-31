@@ -26,6 +26,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField, HideInInspector] private bool hasFiredThisTurn;
     [SerializeField] private bool receivedSuppliesThisTurn;
     [SerializeField] private bool hasMerged;
+    [SerializeField, HideInInspector] private bool aiForcedToRepair;
     [SerializeField] private int mergedWhenTurn = -1;
     [SerializeField] private string mergedWithUnit = string.Empty;
     [SerializeField] private TeamId teamId = TeamId.Green;
@@ -123,6 +124,7 @@ public class UnitManager : MonoBehaviour
     public string DeadByReason => deadByReason;
     public string DiedByUnit => diedByUnit;
     public bool HasMerged => hasMerged;
+    public bool AIForcedToRepair => aiForcedToRepair;
     public int MergedWhenTurn => mergedWhenTurn;
     public string MergedWithUnit => mergedWithUnit;
     public string EmbarkedAtUnit => embarkedAtUnit;
@@ -152,6 +154,8 @@ public class UnitManager : MonoBehaviour
     public int EmbarkedTransporterSlotIndex => embarkedTransporterSlotIndex;
     public IReadOnlyList<int> CurrentlyObservedByTeamIds => currentlyObservedByTeamIds;
     public bool UsedRoadBoostOnLastMove => usedRoadBoostOnLastMove;
+
+    public void SetAIForcedToRepair(bool value) => aiForcedToRepair = value;
 
     public static void ResetActiveTeamChangedPerfCounters()
     {
@@ -2817,3 +2821,6 @@ public class UnitManager : MonoBehaviour
     }
 #endif
 }
+
+
+

@@ -126,6 +126,7 @@ public partial class TurnStateManager
     private bool landingExecutionInProgress;
     private bool combatExecutionInProgress;
     private bool mergeExecutionInProgress;
+    private bool suppressInitialMirandoAutoFocus;
     private CursorState cursorStateBeforeMirando = CursorState.MoveuParado;
     private CursorState cursorStateBeforeEmbarcando = CursorState.MoveuParado;
     private CursorState cursorStateBeforePousando = CursorState.MoveuParado;
@@ -408,6 +409,13 @@ public partial class TurnStateManager
             return;
         }
 
+        TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
+        if (!CanDestroyUnitTargetForActiveTeam(target, activeTeam, out string ownershipReason))
+        {
+            RuntimeLog($"[Destroy Unit] {ownershipReason}");
+            return;
+        }
+
         string targetName = ResolveDebugUnitName(target);
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
         SetCursorState(CursorState.RemovingUnit, "ProcessDestroyUnitHotkeyInput");
@@ -443,6 +451,13 @@ public partial class TurnStateManager
             return false;
         }
 
+        TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
+        if (!CanDestroyUnitTargetForActiveTeam(target, activeTeam, out string ownershipReason))
+        {
+            message = ownershipReason;
+            return false;
+        }
+
         string targetName = ResolveDebugUnitName(target);
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
         SetCursorState(CursorState.RemovingUnit, "TryOpenDestroyUnitPromptFromMenu");
@@ -471,8 +486,39 @@ public partial class TurnStateManager
             return true;
         }
 
+        if (!CanDestroyUnitTargetForActiveTeam(target, actionTeam, out string ownershipReason))
+        {
+            RuntimeLog($"[Destroy Unit] {ownershipReason}");
+            ExitRemovingUnitStateToNeutral(logCanceled: true);
+            return true;
+        }
+
         removeUnitExecutionInProgress = true;
         StartCoroutine(ExecuteRemoveUnitConfirmationFlow(target, actionCell, actionTurn, actionTeam));
+        return true;
+    }
+
+    private bool CanDestroyUnitTargetForActiveTeam(UnitManager target, TeamId activeTeam, out string reason)
+    {
+        reason = string.Empty;
+        if (target == null)
+        {
+            reason = "Unidade alvo invalida.";
+            return false;
+        }
+
+        if (activeTeam == TeamId.Neutral)
+        {
+            reason = "Destroy Unit exige um time ativo valido.";
+            return false;
+        }
+
+        if (target.TeamId != activeTeam)
+        {
+            reason = $"Voce so pode destruir unidades do time ativo ({activeTeam}). Alvo pertence a {target.TeamId}.";
+            return false;
+        }
+
         return true;
     }
 
@@ -866,7 +912,7 @@ public partial class TurnStateManager
 
     }
 
-    public void HandleAimActionRequested()
+    public void HandleAimActionRequested(bool automatedSelection = false)
     {
         bool canAim = availableSensorActionCodes.Contains('A');
         if (!canAim)
@@ -887,6 +933,7 @@ public partial class TurnStateManager
         cursorController?.PlayConfirmSfx();
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Attack, "AimActionRequested");
         FocusFirstOptionForAction('A');
+        suppressInitialMirandoAutoFocus = automatedSelection;
         EnterMirandoState();
     }
 
@@ -2741,6 +2788,8 @@ public partial class TurnStateManager
             selectedIndex = 0;
 
         scannerSelectedTargetIndex = selectedIndex;
+        // Semantica visual IA: cursor so foca o alvo final apos a selecao.
+        FocusCurrentMirandoTarget(logDetails: false, moveCursor: true);
         EnterMirandoConfirmStep();
         return TryConfirmScannerAttack();
     }
@@ -3303,6 +3352,9 @@ public partial class TurnStateManager
 
     private void EnterMirandoState()
     {
+        bool suppressInitialFocus = suppressInitialMirandoAutoFocus;
+        suppressInitialMirandoAutoFocus = false;
+
         if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
             cursorStateBeforeMirando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
 
@@ -3321,7 +3373,7 @@ public partial class TurnStateManager
 
         if (GetMirandoEntryCount() <= 1)
         {
-            if (GetMirandoEntryCount() == 1)
+            if (GetMirandoEntryCount() == 1 && !suppressInitialFocus)
                 FocusCurrentMirandoTarget(logDetails: true);
 
             if (GetMirandoEntryCount() == 1 &&
@@ -3338,7 +3390,8 @@ public partial class TurnStateManager
         }
 
         LogTargetSelectionPanel();
-        FocusCurrentMirandoTarget(logDetails: true);
+        if (!suppressInitialFocus)
+            FocusCurrentMirandoTarget(logDetails: true);
     }
 
     private void EnterMirandoConfirmStep()
@@ -4758,6 +4811,10 @@ public partial class TurnStateManager
 
     private static bool WasLetterPressedThisFrame(char letter)
     {
+        // Durante o turno da IA, bloqueia hotkeys de gameplay manual (U/X).
+        if ((char.ToUpperInvariant(letter) == 'U' || char.ToUpperInvariant(letter) == 'X') && IsActiveAiInputLock())
+            return false;
+
         switch (char.ToUpperInvariant(letter))
         {
             case 'A':
@@ -4841,6 +4898,12 @@ public partial class TurnStateManager
             default:
                 return false;
         }
+    }
+
+    private static bool IsActiveAiInputLock()
+    {
+        MatchController match = Object.FindAnyObjectByType<MatchController>();
+        return match != null && match.IsPlayerInputLockedByActiveAI();
     }
 
     private static bool WasFunctionKeyPressedThisFrame(KeyCode key)

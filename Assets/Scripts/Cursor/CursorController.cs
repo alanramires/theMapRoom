@@ -178,6 +178,9 @@ public class CursorController : MonoBehaviour
         if (UiInputBlocker.IsTextInputFocused())
             return true;
 
+        if (matchController != null && matchController.IsPlayerInputLockedByActiveAI())
+            return true;
+
         if (matchController != null && matchController.IsTurnTransitionInProgress)
             return true;
 
@@ -1003,6 +1006,9 @@ public class CursorController : MonoBehaviour
 
     private bool WasAdvanceTurnPressedThisFrame()
     {
+        if (matchController != null && matchController.IsPlayerInputLockedByActiveAI())
+            return false;
+
 #if ENABLE_INPUT_SYSTEM
         return Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame;
 #else

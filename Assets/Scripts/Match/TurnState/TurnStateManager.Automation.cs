@@ -12,7 +12,7 @@ public partial class TurnStateManager
             case SensorActionType.None:
                 return HandleAutomatedMoveOnlyActionRequested();
             case SensorActionType.Attack:
-                HandleAimActionRequested();
+                HandleAimActionRequested(automatedSelection: true);
                 return true;
             case SensorActionType.Embark:
                 HandleEmbarkActionRequested();
@@ -79,6 +79,11 @@ public partial class TurnStateManager
 
     public bool TryExecuteAutomatedAttackFirstTarget()
     {
+        return TryExecuteAutomatedAttackPreferredTarget(null);
+    }
+
+    public bool TryExecuteAutomatedAttackPreferredTarget(UnitManager preferredTarget)
+    {
         if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
             return false;
         if (!HandleAutomatedSensorActionRequested(SensorActionType.Attack))
@@ -90,6 +95,31 @@ public partial class TurnStateManager
             return false;
         }
 
+        bool preferredFoundInCurrentTargets = false;
+        if (preferredTarget != null)
+        {
+            for (int i = 0; i < cachedPodeMirarTargets.Count; i++)
+            {
+                PodeMirarTargetOption option = cachedPodeMirarTargets[i];
+                if (option == null || option.targetUnit == null)
+                    continue;
+                if (option.targetUnit != preferredTarget)
+                    continue;
+                preferredFoundInCurrentTargets = true;
+
+                Vector3Int preferredCell = preferredTarget.CurrentCellPosition;
+                preferredCell.z = 0;
+                if (TryExecuteAutomatedAttackReplayTarget(preferredTarget.InstanceId.ToString(), preferredCell))
+                {
+                    Debug.Log($"[AI][Attack] alvo preferido executado: {preferredTarget.name}.");
+                    return true;
+                }
+            }
+        }
+
+        if (preferredTarget != null && !preferredFoundInCurrentTargets)
+            Debug.Log($"[AI][Attack] alvo preferido fora dos alvos miraveis apos mover: {preferredTarget.name}. Aplicando fallback para primeiro alvo valido.");
+
         for (int i = 0; i < cachedPodeMirarTargets.Count; i++)
         {
             PodeMirarTargetOption option = cachedPodeMirarTargets[i];
@@ -100,7 +130,13 @@ public partial class TurnStateManager
             Vector3Int targetCell = target.CurrentCellPosition;
             targetCell.z = 0;
             if (TryExecuteAutomatedAttackReplayTarget(target.InstanceId.ToString(), targetCell))
+            {
+                if (preferredTarget != null && target != preferredTarget)
+                    Debug.Log($"[AI][Attack] fallback executado: atacando {target.name} no lugar de {preferredTarget.name}.");
+                else
+                    Debug.Log($"[AI][Attack] ataque executado em: {target.name}.");
                 return true;
+            }
         }
 
         HandleCancel();
@@ -115,6 +151,225 @@ public partial class TurnStateManager
     public bool HasAutomatedMoveAvailable()
     {
         return cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
+    }
+
+    public float GetAutomatedPhaseDelay()
+    {
+        if (replayManager != null)
+        {
+            float batchDelay = Mathf.Max(0f, replayManager.GetEffectiveTimeBetweenBatchesForAutoplay());
+            float confirmDelay = Mathf.Max(0f, replayManager.GetEffectiveReplayConfirmVisualDelayForRuntimeMotion());
+            return Mathf.Max(batchDelay, confirmDelay);
+        }
+        return AnimationManager.Instance != null ? AnimationManager.Instance.AIPhaseDuration : 0.5f;
+    }
+
+    public float GetAutomatedConfirmDelay()
+    {
+        if (replayManager != null)
+            return Mathf.Max(0f, replayManager.GetEffectiveReplayConfirmVisualDelayForRuntimeMotion());
+        return AnimationManager.Instance != null ? AnimationManager.Instance.AIUnitSelectDelay : 0.12f;
+    }
+
+    public float GetAutomatedShoppingNavDelay()
+    {
+        if (replayManager != null)
+            return Mathf.Max(0f, replayManager.GetEffectiveShoppingNavDelayForRuntimeMotion());
+        return GetAutomatedConfirmDelay();
+    }
+
+    // Abre ShoppingAndServices diretamente na construcao indicada,
+    // mesmo quando ha unidade aliada (inclusive ja agida) sobre o hex.
+    public bool TryAutomatedEnterShoppingAtConstruction(ConstructionManager construction)
+    {
+        if (construction == null || cursorController == null)
+            return false;
+        if (cursorState != CursorState.Neutral)
+            return false;
+
+        Vector3Int constructionCell = construction.CurrentCellPosition;
+        constructionCell.z = 0;
+        cursorController.SetCell(constructionCell, playMoveSfx: false, adjustCamera: false);
+
+        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        if (!TryEnterConstructionShoppingState(construction, activeTeam))
+            return false;
+
+        // Mantem a semantica audiovisual do "Confirm" usada no fluxo normal/replay.
+        cursorController.PlayConfirmSfx();
+
+        return cursorState == CursorState.ShoppingAndServices;
+    }
+
+    // Intel da IA (Fase 0): verifica via PodeMirarSensor (MoveuParado) se a unidade
+    // pode atacar QUALQUER inimigo visivel da posicao atual, sem precisar mover.
+    // Retorna o primeiro alvo valido encontrado em 'firstTarget' (ou null se nenhum).
+    public bool CanUnitFireAtAnyTargetFromCurrentPosition(UnitManager attacker, out UnitManager firstTarget)
+    {
+        firstTarget = null;
+        if (attacker == null)
+            return false;
+
+        Tilemap map = terrainTilemap != null ? terrainTilemap : attacker.BoardTilemap;
+        var tempTargets = new List<PodeMirarTargetOption>();
+        bool canAim = PodeMirarSensor.CollectTargets(
+            attacker,
+            map,
+            terrainDatabase,
+            SensorMovementMode.MoveuParado,
+            tempTargets);
+
+        if (!canAim || tempTargets.Count == 0)
+            return false;
+
+        firstTarget = tempTargets[0]?.targetUnit;
+        return true;
+    }
+    public bool CanUnitCaptureFromCurrentPosition(
+        UnitManager unit,
+        out ConstructionManager targetConstruction,
+        out PodeCapturarSensor.CaptureOperationType operationType,
+        out string reason)
+    {
+        targetConstruction = null;
+        operationType = PodeCapturarSensor.CaptureOperationType.None;
+        reason = string.Empty;
+
+        if (unit == null)
+            return false;
+
+        Tilemap map = terrainTilemap != null ? terrainTilemap : unit.BoardTilemap;
+        return PodeCapturarSensor.TryGetCaptureTarget(
+            unit,
+            map,
+            SensorMovementMode.MoveuParado,
+            out targetConstruction,
+            out operationType,
+            out reason);
+    }
+
+    public bool TryExecuteAutomatedSupplyPreferredTarget(UnitManager preferredTarget)
+    {
+        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            return false;
+        if (!HandleAutomatedSensorActionRequested(SensorActionType.Supply))
+            return false;
+
+        string targetId = preferredTarget != null ? preferredTarget.InstanceId.ToString() : null;
+        if (!TryQueueAutomatedSupplyReplayOrder(targetId))
+        {
+            HandleCancel();
+            return false;
+        }
+
+        if (!TryStartAutomatedSupplyReplayExecution())
+        {
+            HandleCancel();
+            return false;
+        }
+
+        return true;
+    }
+
+    public bool TryExecuteAutomatedTransferReceive(
+        ConstructionManager preferredConstruction = null,
+        UnitManager preferredUnit = null)
+    {
+        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            return false;
+        if (!HandleAutomatedSensorActionRequested(SensorActionType.Transfer))
+            return false;
+        if (!IsTransferPromptActive() || transferPromptOptions.Count <= 0)
+        {
+            HandleCancel();
+            return false;
+        }
+
+        int selectedIndex = -1;
+
+        // 1) Preferencia explicita por construcao.
+        if (preferredConstruction != null)
+        {
+            for (int i = 0; i < transferPromptOptions.Count; i++)
+            {
+                PodeTransferirOption option = transferPromptOptions[i];
+                if (option == null)
+                    continue;
+                if (option.flowMode != TransferFlowMode.Recebedor)
+                    continue;
+                if (option.targetConstruction != preferredConstruction)
+                    continue;
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        // 2) Preferencia explicita por unidade hub.
+        if (selectedIndex < 0 && preferredUnit != null)
+        {
+            for (int i = 0; i < transferPromptOptions.Count; i++)
+            {
+                PodeTransferirOption option = transferPromptOptions[i];
+                if (option == null)
+                    continue;
+                if (option.flowMode != TransferFlowMode.Recebedor)
+                    continue;
+                if (option.targetUnit != preferredUnit)
+                    continue;
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        // 3) Primeiro Recebedor valido.
+        if (selectedIndex < 0)
+        {
+            for (int i = 0; i < transferPromptOptions.Count; i++)
+            {
+                PodeTransferirOption option = transferPromptOptions[i];
+                if (option == null)
+                    continue;
+                if (option.flowMode != TransferFlowMode.Recebedor)
+                    continue;
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        if (selectedIndex < 0)
+        {
+            HandleCancel();
+            return false;
+        }
+
+        transferPromptSelectedIndex = selectedIndex;
+        FocusTransferOptionByIndex(transferPromptSelectedIndex, playSfx: false);
+
+        PodeTransferirOption selected = transferPromptOptions[selectedIndex];
+        string targetId = selected != null && selected.targetUnit != null
+            ? selected.targetUnit.InstanceId.ToString()
+            : null;
+        Vector3Int targetCell = selected != null ? selected.targetCell : Vector3Int.zero;
+        targetCell.z = 0;
+
+        // Usa o mesmo caminho oficial de replay/execucao do transfer automatizado.
+        if (!TryExecuteAutomatedTransferReplayOrder(targetId, targetCell))
+        {
+            HandleCancel();
+            return false;
+        }
+
+        return true;
+    }
+    public bool TryExecuteAutomatedCaptureIfAvailable()
+    {
+        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            return false;
+        if (availableSensorActionCodes == null || !availableSensorActionCodes.Contains('C'))
+            return false;
+
+        HandleAutomatedSensorActionRequested(SensorActionType.Capture);
+        return true;
     }
 
     public IEnumerator WaitUntilAutomatedNeutralReady(float timeoutSeconds)
@@ -137,9 +392,88 @@ public partial class TurnStateManager
                 ? Mathf.Max(0f, replayManager.GetEffectiveCursorTravelStepDelayForRuntimeMotion())
                 : 0.08f);
 
+        if (TryBuildAutomatedTravelPathForSelectedUnit(targetCell, out List<Vector3Int> selectedUnitPath)
+            && selectedUnitPath != null
+            && selectedUnitPath.Count > 0)
+        {
+            for (int i = 0; i < selectedUnitPath.Count; i++)
+            {
+                Vector3Int stepCell = selectedUnitPath[i];
+                stepCell.z = 0;
+                cursorController.SetCell(stepCell, playMoveSfx: true, adjustCamera: false);
+                cursorController.TryAdjustCameraToCursor();
+
+                if (resolvedStepDelay > 0f)
+                    yield return new WaitForSeconds(resolvedStepDelay);
+                else
+                    yield return null;
+            }
+
+            yield break;
+        }
+
         yield return MoveCursorToCellLikeReplayAtTurnStart(targetCell, resolvedStepDelay);
     }
 
+    private bool TryBuildAutomatedTravelPathForSelectedUnit(Vector3Int targetCell, out List<Vector3Int> path)
+    {
+        path = null;
+        if (cursorController == null)
+            return false;
+        if (cursorState != CursorState.UnitSelected || selectedUnit == null)
+            return false;
+        if (movementPathsByCell == null || movementPathsByCell.Count == 0)
+            return false;
+
+        targetCell.z = 0;
+        if (!movementPathsByCell.TryGetValue(targetCell, out List<Vector3Int> movementPath)
+            || movementPath == null
+            || movementPath.Count == 0)
+            return false;
+
+        Vector3Int currentCell = cursorController.CurrentCell;
+        currentCell.z = 0;
+
+        int startIndex = -1;
+        for (int i = 0; i < movementPath.Count; i++)
+        {
+            Vector3Int p = movementPath[i];
+            p.z = 0;
+            if (p == currentCell)
+            {
+                startIndex = i;
+                break;
+            }
+        }
+
+        if (startIndex < 0)
+        {
+            Vector3Int origin = selectedUnit.CurrentCellPosition;
+            origin.z = 0;
+            if (currentCell != origin)
+                cursorController.SetCell(origin, playMoveSfx: false, adjustCamera: false);
+            startIndex = 0;
+        }
+
+        path = new List<Vector3Int>();
+        for (int i = startIndex + 1; i < movementPath.Count; i++)
+        {
+            Vector3Int step = movementPath[i];
+            step.z = 0;
+            path.Add(step);
+        }
+
+        return true;
+    }
+
+    public bool IsAutomatedMovementCellReachable(Vector3Int cell)
+    {
+        if (movementPathsByCell == null || movementPathsByCell.Count == 0)
+            return false;
+
+        cell.z = 0;
+        return movementPathsByCell.ContainsKey(cell);
+    }
     // Retorna os pontos de DPQ da celula para a unidade (terreno/estrutura/construcao).
     // Default = 1. Usado pela IA para preferir terreno defensivo.
     public int GetCellDpqPoints(Vector3Int cell, UnitManager unit)
@@ -260,7 +594,8 @@ public partial class TurnStateManager
         HashSet<Vector3Int> occupiedByAllies,
         out Vector3Int bestCell,
         bool prioritizeDpq = false,
-        UnitManager unit = null)
+        UnitManager unit = null,
+        bool preferLongerAdvanceOnTie = false)
     {
         bestCell = default;
         if (movementPathsByCell == null || movementPathsByCell.Count == 0)
@@ -272,6 +607,10 @@ public partial class TurnStateManager
         int bestHexDistance = int.MaxValue;
         int bestDpqBand = int.MinValue;
         int bestDpqPoints = int.MinValue;
+        int bestAdvanceLen = int.MinValue;
+        Vector3Int originCell = default;
+        int originHexDistance = int.MaxValue;
+        bool originResolved = false;
         bool found = false;
 
         foreach (var kvp in movementPathsByCell)
@@ -287,6 +626,13 @@ public partial class TurnStateManager
 
             int dpqPoints = 1;
             int dpqBand = 0;
+            int advanceLen = kvp.Value != null ? Mathf.Max(0, kvp.Value.Count - 1) : 0;
+            if (!originResolved && advanceLen == 0)
+            {
+                originCell = cell;
+                originHexDistance = dist;
+                originResolved = true;
+            }
             if (prioritizeDpq && unit != null)
             {
                 dpqPoints = GetCellDpqPoints(cell, unit);
@@ -295,15 +641,85 @@ public partial class TurnStateManager
 
             bool better = dist < bestHexDistance
                 || (dist == bestHexDistance && dpqBand > bestDpqBand)
-                || (dist == bestHexDistance && dpqBand == bestDpqBand && dpqPoints > bestDpqPoints);
+                || (dist == bestHexDistance && dpqBand == bestDpqBand && dpqPoints > bestDpqPoints)
+                || (preferLongerAdvanceOnTie
+                    && dist == bestHexDistance
+                    && dpqBand == bestDpqBand
+                    && dpqPoints == bestDpqPoints
+                    && advanceLen > bestAdvanceLen);
             if (!better)
                 continue;
 
             bestHexDistance = dist;
             bestDpqBand = dpqBand;
             bestDpqPoints = dpqPoints;
+            bestAdvanceLen = advanceLen;
             bestCell = cell;
             found = true;
+        }
+
+        // Destrava avancos em ataque quando o melhor local ainda eh "ficar parado".
+        // Permite um pequeno detour (ex.: 1 hex para tras/lado) para preparar progresso no turno seguinte.
+        if (preferLongerAdvanceOnTie
+            && found
+            && bestAdvanceLen <= 0
+            && originResolved
+            && bestCell == originCell)
+        {
+            int detourBestDist = int.MaxValue;
+            int detourBestAdvance = int.MinValue;
+            int detourBestDpqBand = int.MinValue;
+            int detourBestDpqPoints = int.MinValue;
+            Vector3Int detourCell = default;
+            bool detourFound = false;
+
+            foreach (var kvp in movementPathsByCell)
+            {
+                Vector3Int cell = kvp.Key;
+                cell.z = 0;
+                if (cell == originCell)
+                    continue;
+                if (occupiedByAllies != null && occupiedByAllies.Contains(cell))
+                    continue;
+
+                int dist = GetHexDistance(boardTilemap, cell, targetCell, 64);
+                if (dist == int.MaxValue)
+                    continue;
+
+                // Limita detour para nao andar aleatoriamente para longe do objetivo.
+                if (dist > originHexDistance + 2)
+                    continue;
+
+                int advanceLen = kvp.Value != null ? Mathf.Max(0, kvp.Value.Count - 1) : 0;
+                int dpqPoints = 1;
+                int dpqBand = 0;
+                if (prioritizeDpq && unit != null)
+                {
+                    dpqPoints = GetCellDpqPoints(cell, unit);
+                    dpqBand = ResolveDpqBand(dpqPoints);
+                }
+
+                bool better = !detourFound
+                    || dist < detourBestDist
+                    || (dist == detourBestDist && advanceLen > detourBestAdvance)
+                    || (dist == detourBestDist && advanceLen == detourBestAdvance && dpqBand > detourBestDpqBand)
+                    || (dist == detourBestDist && advanceLen == detourBestAdvance && dpqBand == detourBestDpqBand && dpqPoints > detourBestDpqPoints);
+                if (!better)
+                    continue;
+
+                detourBestDist = dist;
+                detourBestAdvance = advanceLen;
+                detourBestDpqBand = dpqBand;
+                detourBestDpqPoints = dpqPoints;
+                detourCell = cell;
+                detourFound = true;
+            }
+
+            if (detourFound)
+            {
+                bestCell = detourCell;
+                return true;
+            }
         }
 
         return found;
@@ -493,3 +909,8 @@ public partial class TurnStateManager
         return true;
     }
 }
+
+
+
+
+

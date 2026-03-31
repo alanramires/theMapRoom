@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -112,6 +112,16 @@ public class ReplayManager : MonoBehaviour
     public float GetEffectiveCursorTravelStepDelayForRuntimeMotion()
     {
         return GetEffectiveCursorTravelStepDelay();
+    }
+
+    public float GetEffectiveShoppingNavDelayForRuntimeMotion()
+    {
+        return GetEffectiveShoppingNavDelay();
+    }
+
+    public float GetEffectiveReplayConfirmVisualDelayForRuntimeMotion()
+    {
+        return GetEffectiveReplayConfirmVisualDelay();
     }
 
     public string GetReplayStepExecutionBusyReason()

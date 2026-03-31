@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -140,6 +140,9 @@ public partial class TurnStateManager : MonoBehaviour
     public CursorState CurrentCursorState => cursorState;
     public UnitManager SelectedUnit => selectedUnit;
     public TerrainDatabase TerrainDatabaseRef => terrainDatabase;
+    public WeaponPriorityData WeaponPriorityDataRef => weaponPriorityData;
+    public DPQMatchupDatabase DpqMatchupDatabaseRef => dpqMatchupDatabase;
+    public RPSDatabase RpsDatabaseRef => rpsDatabase;
     public DPQAirHeightConfig DpqAirHeightConfigRef => dpqAirHeightConfig;
     public float AdvanceTurnPreDelay => Mathf.Max(0f, advanceTurnPreDelay);
     public float AdvanceTurnPostDelay => Mathf.Max(0f, advanceTurnPostDelay);
@@ -385,7 +388,7 @@ public partial class TurnStateManager : MonoBehaviour
 
         if (!keepSelection)
         {
-            // Evita estado selecionado de outra equipe durante o switch forÃ¯Â¿Â½ado.
+            // Evita estado selecionado de outra equipe durante o switch forÃƒÂ¯Ã‚Â¿Ã‚Â½ado.
             ForceNeutral();
         }
 
@@ -1372,6 +1375,13 @@ public partial class TurnStateManager : MonoBehaviour
             return path;
         }
 
+        // Mantem o travel do cursor dentro da area pintada do tabuleiro.
+        if (!board.HasTile(fromCell) || !board.HasTile(toCell))
+        {
+            path.Add(toCell);
+            return path;
+        }
+
         Queue<Vector3Int> queue = new Queue<Vector3Int>();
         HashSet<Vector3Int> visited = new HashSet<Vector3Int>();
         Dictionary<Vector3Int, Vector3Int> cameFrom = new Dictionary<Vector3Int, Vector3Int>();
@@ -1397,6 +1407,8 @@ public partial class TurnStateManager : MonoBehaviour
             for (int i = 0; i < neighbors.Count; i++)
             {
                 Vector3Int next = NormalizeTurnStartCursorCell(neighbors[i]);
+                if (!board.HasTile(next))
+                    continue;
                 if (!visited.Add(next))
                     continue;
 
