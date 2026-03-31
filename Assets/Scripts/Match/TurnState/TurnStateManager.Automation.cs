@@ -77,6 +77,23 @@ public partial class TurnStateManager
         return cursorState == CursorState.MoveuParado || cursorState == CursorState.MoveuAndando;
     }
 
+    // Seleciona a unidade e mantem em UnitSelected (sem confirmar "moveu parado").
+    // Uso recomendado para IA quando ainda vai escolher destino de movimento.
+    public bool TryAutomatedSelectUnitOnly(UnitManager unit)
+    {
+        if (unit == null || cursorController == null)
+            return false;
+        if (cursorState != CursorState.Neutral)
+            return false;
+
+        Vector3Int unitCell = unit.CurrentCellPosition;
+        unitCell.z = 0;
+        cursorController.SetCell(unitCell, playMoveSfx: false);
+
+        HandleConfirm();
+        return selectedUnit == unit && cursorState == CursorState.UnitSelected;
+    }
+
     public bool TryExecuteAutomatedAttackFirstTarget()
     {
         return TryExecuteAutomatedAttackPreferredTarget(null);
@@ -374,12 +391,21 @@ public partial class TurnStateManager
 
     public IEnumerator WaitUntilAutomatedNeutralReady(float timeoutSeconds)
     {
-        float endTime = Time.time + Mathf.Max(0.2f, timeoutSeconds);
-        while (Time.time < endTime)
+        float timeout = Mathf.Max(0.2f, timeoutSeconds);
+        float elapsed = 0f;
+        while (elapsed < timeout)
         {
             if (cursorState == CursorState.Neutral && !IsScannerActionExecutionInProgress && !IsMovementAnimationRunning())
                 yield break;
 
+            // PlayerMenu pausa a simulacao automatica sem consumir timeout.
+            if (cursorState == CursorState.PlayerMenu)
+            {
+                yield return null;
+                continue;
+            }
+
+            elapsed += Time.deltaTime;
             yield return null;
         }
     }

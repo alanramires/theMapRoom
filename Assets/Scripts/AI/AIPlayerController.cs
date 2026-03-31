@@ -37,6 +37,12 @@ public class AIPlayerController : MonoBehaviour
     private string T(TeamId team, int fase) =>
         $"[AI][T{(matchController != null ? matchController.CurrentTurn : 0)}][{team}][Fase {fase}]";
 
+    private static string FormatCellLC(Vector3Int cell)
+    {
+        cell.z = 0;
+        return $"L{cell.y}, C{cell.x}";
+    }
+
     private void Awake()
     {
         EnsureAIDataDefaults();
@@ -239,10 +245,13 @@ public class AIPlayerController : MonoBehaviour
         float delay = turnStateManager != null ? turnStateManager.GetAutomatedPhaseDelay() : (AnimationManager.Instance != null ? AnimationManager.Instance.AIPhaseDuration : 0.5f);
 
         // Fase 0 inicial + Fase 1
+        yield return StartCoroutine(WaitIfPlayerMenuOpen());
         yield return null; // aguarda FoW ser atualizada
         AISnapshot snapshot = TakeSnapshot(aiTeam);
 
+        yield return StartCoroutine(WaitIfPlayerMenuOpen());
         yield return StartCoroutine(Phase1_CommandService(aiTeam, snapshot));
+        yield return StartCoroutine(WaitIfPlayerMenuOpen());
         yield return new WaitForSeconds(delay);
 
         // Fase 2: 1 unidade por vez
@@ -252,8 +261,12 @@ public class AIPlayerController : MonoBehaviour
 
         for (int i = 0; i < unitInstanceIds.Count; i++)
         {
+            yield return StartCoroutine(WaitIfPlayerMenuOpen());
+
             // Garante neutro antes de escanear e decidir
             yield return StartCoroutine(turnStateManager.WaitUntilAutomatedNeutralReady(3f));
+
+            yield return StartCoroutine(WaitIfPlayerMenuOpen());
 
             // Scan fresco: FoW atualizada, inimigos possivelmente diferentes
             snapshot = TakeSnapshot(aiTeam);
@@ -265,16 +278,28 @@ public class AIPlayerController : MonoBehaviour
             // Atribui alvo a partir do snapshot atual
             UnitManager assignedEnemy = AssignTargetForUnit(unit, snapshot, unitInstanceIds, i);
 
+            yield return StartCoroutine(WaitIfPlayerMenuOpen());
             yield return StartCoroutine(Phase2_MoveUnit(aiTeam, snapshot, unit, assignedEnemy));
+            yield return StartCoroutine(WaitIfPlayerMenuOpen());
             yield return new WaitForSeconds(delay);
         }
 
         // Fase 3 + Fase 4
+        yield return StartCoroutine(WaitIfPlayerMenuOpen());
         snapshot = TakeSnapshot(aiTeam);
+        yield return StartCoroutine(WaitIfPlayerMenuOpen());
         yield return StartCoroutine(Phase3_BuyUnits(aiTeam, snapshot));
+        yield return StartCoroutine(WaitIfPlayerMenuOpen());
         yield return new WaitForSeconds(delay);
 
+        yield return StartCoroutine(WaitIfPlayerMenuOpen());
         Phase4_EndTurn(aiTeam);
+    }
+
+    private IEnumerator WaitIfPlayerMenuOpen()
+    {
+        while (turnStateManager != null && turnStateManager.CurrentCursorState == TurnStateManager.CursorState.PlayerMenu)
+            yield return null;
     }
 
     private AISnapshot TakeSnapshot(TeamId aiTeam)
@@ -350,9 +375,11 @@ public class AIPlayerController : MonoBehaviour
         unitCell.z = 0;
         float selectDelay = turnStateManager != null ? turnStateManager.GetAutomatedConfirmDelay() : (AnimationManager.Instance != null ? AnimationManager.Instance.AIUnitSelectDelay : 0.12f);
 
-        if (!turnStateManager.TryAutomatedSelectUnitAndEnterMoveuParado(unit))
+        yield return StartCoroutine(turnStateManager.MoveCursorToCellWithAutomatedTravel(unitCell));
+        turnStateManager.HandleConfirmWithFeedback();
+        if (turnStateManager.SelectedUnit != unit || turnStateManager.CurrentCursorState != TurnStateManager.CursorState.UnitSelected)
         {
-            if (aiLog) Debug.Log($"{T(aiTeam, 2)} falha ao selecionar unidade {unit.name}; encerrando unidade");
+            if (aiLog) Debug.Log($"{T(aiTeam, 2)} falha ao selecionar unidade {unit.name} via fluxo replay; encerrando unidade");
             turnStateManager.HandleCancel();
             yield break;
         }
@@ -378,6 +405,8 @@ public class AIPlayerController : MonoBehaviour
         string repairObjectiveLabel = string.Empty;
 
         bool supplyTruckMode = IsSupplyTruckUnit(unit);
+        if (supplyTruckMode)
+            defendMode = true;
         bool supplyObjectiveActive = false;
         bool supplyRefillMode = false;
         bool supplyActionNow = false;
@@ -453,7 +482,7 @@ public class AIPlayerController : MonoBehaviour
         }
 
         UnitManager targetEnemy = null;
-        if (!supplyObjectiveActive && !repairModeActive && !captureObjectiveActive)
+        if (!supplyObjectiveActive && !repairModeActive && !captureObjectiveActive && !supplyTruckMode)
         {
             targetEnemy = assignedEnemy != null && !assignedEnemy.IsDead
                 ? assignedEnemy
@@ -471,6 +500,24 @@ public class AIPlayerController : MonoBehaviour
         {
             moveTarget = supplyObjectiveCell;
             moveTarget.z = 0;
+        }
+        else if (supplyTruckMode)
+        {
+            repositioningForDefense = true;
+            if (TryGetSupplyTruckDefensivePatrolCell(unit, snapshot, out Vector3Int stDefensiveCell))
+            {
+                moveTarget = stDefensiveCell;
+                moveTarget.z = 0;
+            }
+            else if (snapshot.HasHq)
+            {
+                moveTarget = snapshot.HqCell;
+                moveTarget.z = 0;
+            }
+            else
+            {
+                moveTarget = unitCell;
+            }
         }
         else if (repairModeActive)
         {
@@ -744,9 +791,9 @@ public class AIPlayerController : MonoBehaviour
                         : (engagingEnemy && targetEnemy != null ? targetEnemy.name : "reposicionar")));
 
             if (intelCanFire && intelFireTarget != null)
-                Debug.Log($"{T(aiTeam, 2)} [intel] {unit.name} @ ({unitCell.x},{unitCell.y}) | PODE MIRAR {intelFireTarget.name} @ ({intelFireTarget.CurrentCellPosition.x},{intelFireTarget.CurrentCellPosition.y}) | plano: {detailLabel}");
+                Debug.Log($"{T(aiTeam, 2)} [intel] {unit.name} @ {FormatCellLC(unitCell)} | PODE MIRAR {intelFireTarget.name} @ {FormatCellLC(intelFireTarget.CurrentCellPosition)} | plano: {detailLabel}");
             else
-                Debug.Log($"{T(aiTeam, 2)} [intel] {unit.name} @ ({unitCell.x},{unitCell.y}) | sem alcance na posicao atual -> plano: {detailLabel}");
+                Debug.Log($"{T(aiTeam, 2)} [intel] {unit.name} @ {FormatCellLC(unitCell)} | sem alcance na posicao atual -> plano: {detailLabel}");
 
             string outcome = supplied
                 ? "supriu aliado"
@@ -757,7 +804,7 @@ public class AIPlayerController : MonoBehaviour
                         : (engagingEnemy
                             ? (attacked ? "atacou" : "moveu sem ataque")
                             : (repositioningForDefense ? "reposicionou defesa" : (repairModeActive ? "retornou para reparo" : (captureObjectiveActive ? "avancou para captura" : (supplyObjectiveActive ? "avancou para suprir" : "avancou HQ")))))));
-            Debug.Log($"{T(aiTeam, 2)} {unitCell} -> {bestDest} (alvo: {moveTarget}) | {outcome}");
+            Debug.Log($"{T(aiTeam, 2)} {FormatCellLC(unitCell)} -> {FormatCellLC(bestDest)} (alvo: {FormatCellLC(moveTarget)}) | {outcome}");
         }
     }
     // Atribui o melhor inimigo para a unidade atual.
@@ -1331,10 +1378,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             if (ally == null || ally == supplier || ally.IsDead || ally.IsEmbarked)
                 continue;
 
-            int hpMissing = Mathf.Max(0, ally.GetMaxHP() - ally.CurrentHP);
-            int fuelMissing = Mathf.Max(0, ally.GetMaxFuel() - ally.CurrentFuel);
-            int score = hpMissing * 100 + fuelMissing * 40;
-            if (score <= 0)
+            if (!IsSupplyTruckTargetThresholdMet(ally, out int score))
                 continue;
 
             Vector3Int allyCell = ally.CurrentCellPosition;
@@ -1354,6 +1398,174 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
 
         return target != null;
     }
+
+    private static bool IsSupplyTruckTargetThresholdMet(UnitManager ally, out int score)
+    {
+        score = 0;
+        if (ally == null || ally.IsDead)
+            return false;
+
+        bool lowHp = ally.CurrentHP <= 5;
+
+        bool lowAmmo = false;
+        int ammoCurrentTotal = 0;
+        int ammoMaxTotal = 0;
+        IReadOnlyList<UnitEmbarkedWeapon> runtimeWeapons = ally.GetEmbarkedWeapons();
+        if (runtimeWeapons != null && runtimeWeapons.Count > 0)
+        {
+            if (ally.TryGetUnitData(out UnitData allyData) && allyData != null && allyData.embarkedWeapons != null)
+            {
+                int count = Mathf.Min(runtimeWeapons.Count, allyData.embarkedWeapons.Count);
+                for (int i = 0; i < count; i++)
+                {
+                    UnitEmbarkedWeapon runtime = runtimeWeapons[i];
+                    UnitEmbarkedWeapon baseline = allyData.embarkedWeapons[i];
+                    if (runtime == null || baseline == null || baseline.weapon == null)
+                        continue;
+
+                    int maxAmmo = Mathf.Max(0, baseline.squadAmmunition);
+                    if (maxAmmo <= 0)
+                        continue;
+
+                    ammoMaxTotal += maxAmmo;
+                    ammoCurrentTotal += Mathf.Clamp(runtime.squadAmmunition, 0, maxAmmo);
+                }
+            }
+        }
+
+        if (ammoMaxTotal > 0)
+            lowAmmo = (ammoCurrentTotal * 2) < ammoMaxTotal;
+
+        if (!lowHp && !lowAmmo)
+            return false;
+
+        int hpMissing = Mathf.Max(0, ally.GetMaxHP() - ally.CurrentHP);
+        int ammoMissing = Mathf.Max(0, ammoMaxTotal - ammoCurrentTotal);
+        score = hpMissing * 120 + ammoMissing * 45 + (lowHp ? 5000 : 0) + (lowAmmo ? 3000 : 0);
+        return true;
+    }
+
+    private bool TryGetSupplyTruckDefensivePatrolCell(UnitManager unit, AISnapshot snapshot, out Vector3Int targetCell)
+    {
+        targetCell = default;
+        if (unit == null || snapshot == null || snapshot.BoardTilemap == null || !snapshot.HasHq)
+            return false;
+
+        Vector3Int unitCell = unit.CurrentCellPosition;
+        unitCell.z = 0;
+        Vector3Int hqCell = snapshot.HqCell;
+        hqCell.z = 0;
+
+        List<Vector3Int> frontier = new List<Vector3Int> { hqCell };
+        HashSet<Vector3Int> visited = new HashSet<Vector3Int> { hqCell };
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+
+        int bestDistToUnit = int.MaxValue;
+        int bestDistToHq = int.MaxValue;
+        Vector3Int best = default;
+        bool found = false;
+
+        for (int depth = 0; depth < 3; depth++)
+        {
+            List<Vector3Int> nextFrontier = new List<Vector3Int>();
+            for (int i = 0; i < frontier.Count; i++)
+            {
+                Vector3Int current = frontier[i];
+                UnitMovementPathRules.GetImmediateHexNeighbors(snapshot.BoardTilemap, current, neighbors);
+                for (int n = 0; n < neighbors.Count; n++)
+                {
+                    Vector3Int cell = neighbors[n];
+                    cell.z = 0;
+                    if (visited.Contains(cell))
+                        continue;
+                    visited.Add(cell);
+                    nextFrontier.Add(cell);
+
+                    if (IsFriendlyConstructionCell(snapshot, unit.TeamId, cell))
+                        continue;
+
+                    int distToHq = GetHexDistance(snapshot.BoardTilemap, hqCell, cell, 32);
+                    if (distToHq == int.MaxValue || distToHq <= 0 || distToHq > 2)
+                        continue;
+
+                    int distToUnit = GetHexDistance(snapshot.BoardTilemap, unitCell, cell, 64);
+                    if (distToUnit == int.MaxValue)
+                        continue;
+
+                    bool better = !found
+                        || distToUnit < bestDistToUnit
+                        || (distToUnit == bestDistToUnit && distToHq < bestDistToHq);
+                    if (!better)
+                        continue;
+
+                    found = true;
+                    bestDistToUnit = distToUnit;
+                    bestDistToHq = distToHq;
+                    best = cell;
+                }
+            }
+
+            frontier = nextFrontier;
+            if (frontier.Count <= 0)
+                break;
+        }
+
+        if (!found)
+            return false;
+
+        targetCell = best;
+        targetCell.z = 0;
+        return true;
+    }
+
+    private static bool IsFriendlyConstructionCell(AISnapshot snapshot, TeamId team, Vector3Int cell)
+    {
+        if (snapshot == null || snapshot.KnownConstructions == null)
+            return false;
+
+        cell.z = 0;
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo info = snapshot.KnownConstructions[i];
+            if (info == null || info.Source == null)
+                continue;
+            if (info.TeamId != team)
+                continue;
+
+            Vector3Int c = info.Cell;
+            c.z = 0;
+            if (c == cell)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsFriendlyInfantryOccupyingCell(AISnapshot snapshot, UnitManager requester, Vector3Int cell)
+    {
+        if (snapshot == null || requester == null || snapshot.FriendlyUnits == null)
+            return false;
+
+        cell.z = 0;
+        for (int i = 0; i < snapshot.FriendlyUnits.Count; i++)
+        {
+            UnitManager ally = snapshot.FriendlyUnits[i];
+            if (ally == null || ally == requester || ally.IsDead || ally.IsEmbarked)
+                continue;
+            if (ally.TeamId != requester.TeamId)
+                continue;
+            if (!IsCapturePriorityUnit(ally))
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            if (allyCell == cell)
+                return true;
+        }
+
+        return false;
+    }
+
     private static bool ShouldKeepUnitInRepairMode(UnitManager unit)
     {
         if (unit == null || unit.IsDead)
@@ -1519,13 +1731,19 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             if (distance == int.MaxValue)
                 distance = 64;
 
-            bool better = category < bestCategory
-                || (category == bestCategory && distance < bestDistance);
+            bool occupiedByOtherInfantry = IsFriendlyInfantryOccupyingCell(snapshot, unit, cell);
+            int effectiveDistance = distance + (occupiedByOtherInfantry ? 3 : 0);
+
+            // Captura de infantaria: prioridade pratica = objetivo mais proximo.
+            // Se ja existe outro aliado capturando esse mesmo hex, aplica penalidade para espalhar captura.
+            // Categoria (HQ/outros/recuperacao) entra como desempate.
+            bool better = effectiveDistance < bestDistance
+                || (effectiveDistance == bestDistance && category < bestCategory);
             if (!better)
                 continue;
 
             bestCategory = category;
-            bestDistance = distance;
+            bestDistance = effectiveDistance;
             bestInfo = info;
         }
 
@@ -2205,6 +2423,29 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         Debug.Log(sb.ToString());
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

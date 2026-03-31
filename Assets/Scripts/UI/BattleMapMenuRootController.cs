@@ -92,6 +92,7 @@ public class BattleMapMenuRootController : MonoBehaviour
     private bool menuOpen;
     private bool saveLoadPromptOpen;
     private bool exitConfirmOpen;
+    private bool pendingOpenOnNextNeutral;
     private bool eventSystemNavStateCaptured;
     private bool previousSendNavigationEvents;
     private int lastConfirmSfxFrame = -1;
@@ -129,6 +130,21 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         if (!menuOpen)
         {
+            if (pendingOpenOnNextNeutral)
+            {
+                if (CanOpenMenuNow())
+                {
+                    OpenMenu();
+                    pendingOpenOnNextNeutral = false;
+                    PlayConfirmSfxOncePerFrame();
+                    return true;
+                }
+
+                // Mantem o pedido pendente ate o proximo estado neutro.
+                UiInputBlocker.SuppressGameplayInputForFrames(1);
+                return true;
+            }
+
             if (!WasEscapePressedThisFrame())
                 return false;
 
@@ -140,8 +156,17 @@ public class BattleMapMenuRootController : MonoBehaviour
             if (cursorController != null && cursorController.IsEndTurnConfirmationPending)
                 return false;
 
-            if (turnStateManager == null || turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
-                return false;
+            if (!CanOpenMenuNow())
+            {
+                bool aiTurn = matchController != null && matchController.IsPlayerInputLockedByActiveAI();
+                if (!aiTurn)
+                    return false;
+
+                pendingOpenOnNextNeutral = true;
+                PanelDialogController.TrySetTransientText("Pausa da simulacao solicitada. Abrindo menu no proximo Neutral.", 2.4f);
+                cursorController?.PlayBeepSfx();
+                return true;
+            }
 
             OpenMenu();
             PlayConfirmSfxOncePerFrame();
@@ -242,6 +267,7 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         menuRoot.SetActive(true);
         menuOpen = true;
+        pendingOpenOnNextNeutral = false;
         saveLoadPromptOpen = false;
         exitConfirmOpen = false;
         RestoreUndockedLayout();
@@ -258,6 +284,7 @@ public class BattleMapMenuRootController : MonoBehaviour
             menuRoot.SetActive(false);
 
         menuOpen = false;
+        pendingOpenOnNextNeutral = false;
         saveLoadPromptOpen = false;
         exitConfirmOpen = false;
         turnStateManager?.TryExitPlayerMenuStateToNeutral();
@@ -277,6 +304,7 @@ public class BattleMapMenuRootController : MonoBehaviour
             menuRoot.SetActive(false);
 
         menuOpen = false;
+        pendingOpenOnNextNeutral = false;
         saveLoadPromptOpen = false;
         exitConfirmOpen = false;
     }
@@ -527,6 +555,20 @@ public class BattleMapMenuRootController : MonoBehaviour
     private void RestoreDefaultDialogForCurrentPanel()
     {
         PanelDialogController.ClearExternalText();
+    }
+
+    private bool CanOpenMenuNow()
+    {
+        if (turnStateManager == null)
+            return false;
+
+        if (turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return false;
+
+        if (turnStateManager.IsScannerActionExecutionInProgress)
+            return false;
+
+        return true;
     }
 
     private void PlayConfirmSfxOncePerFrame()

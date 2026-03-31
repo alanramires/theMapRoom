@@ -95,6 +95,7 @@ public class SaveGameManager : MonoBehaviour
     }
 
     private bool loadInProgress;
+    private bool promptUsingPlayerMenuState;
     private Coroutine postLoadThreatWarmupRoutine;
     private SlotPromptState promptState;
     private int overwritePendingSlot;
@@ -129,6 +130,7 @@ public class SaveGameManager : MonoBehaviour
         }
 
         CancelPrompt(clearDialogOverride: true);
+        ExitPlayerMenuStateForPersistencePromptIfNeeded();
     }
 
     private void Update()
@@ -181,15 +183,23 @@ public class SaveGameManager : MonoBehaviour
 
     public void OpenSaveSlotPromptFromMenu()
     {
+        EnterPlayerMenuStateForPersistencePrompt();
         if (IsPersistenceBlockedByActiveAI(showFeedback: true))
+        {
+            ExitPlayerMenuStateForPersistencePromptIfNeeded();
             return;
+        }
         OpenSaveSlotPrompt(PerfNowMs());
     }
 
     public void OpenLoadSlotPromptFromMenu()
     {
+        EnterPlayerMenuStateForPersistencePrompt();
         if (IsPersistenceBlockedByActiveAI(showFeedback: true))
+        {
+            ExitPlayerMenuStateForPersistencePromptIfNeeded();
             return;
+        }
         OpenLoadSlotPrompt(PerfNowMs());
     }
 
@@ -332,6 +342,7 @@ public class SaveGameManager : MonoBehaviour
         PanelHelperController.ClearExternalText();
         if (clearDialogOverride)
             PanelDialogController.ClearExternalText();
+        ExitPlayerMenuStateForPersistencePromptIfNeeded();
     }
 
     private void RefreshPromptHelper()
@@ -668,6 +679,10 @@ public class SaveGameManager : MonoBehaviour
     private bool IsPersistenceBlockedByActiveAI(bool showFeedback = false)
     {
         TryAutoAssignReferences();
+        bool playerMenuScoped = turnStateManager != null && turnStateManager.CurrentCursorState == TurnStateManager.CursorState.PlayerMenu;
+        if (playerMenuScoped)
+            return false;
+
         if (matchController == null || !matchController.IsPlayerInputLockedByActiveAI())
             return false;
 
@@ -678,6 +693,33 @@ public class SaveGameManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    private void EnterPlayerMenuStateForPersistencePrompt()
+    {
+        if (turnStateManager == null)
+            return;
+
+        if (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.PlayerMenu)
+        {
+            promptUsingPlayerMenuState = true;
+            return;
+        }
+
+        if (turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return;
+
+        if (turnStateManager.TryEnterPlayerMenuState())
+            promptUsingPlayerMenuState = true;
+    }
+
+    private void ExitPlayerMenuStateForPersistencePromptIfNeeded()
+    {
+        if (!promptUsingPlayerMenuState)
+            return;
+
+        promptUsingPlayerMenuState = false;
+        turnStateManager?.TryExitPlayerMenuStateToNeutral();
     }
 
     private IEnumerator LoadSlotAsync(string path, int normalizedSlot)
@@ -2039,8 +2081,6 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
-
-
 
 
 
