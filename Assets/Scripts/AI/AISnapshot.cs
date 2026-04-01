@@ -35,11 +35,17 @@ public class AISnapshot
             if (c == null)
                 continue;
 
+            // Intel publica: posicao, dono e pontos de captura sao sempre conhecidos.
+            // Quem ocupa a construcao NAO e copiado — sujeito ao FoW.
             AIConstructionInfo info = new AIConstructionInfo
             {
                 Cell = c.CurrentCellPosition,
                 TeamId = c.TeamId,
                 IsHq = c.IsPlayerHeadQuarter,
+                IsCapturable = c.IsCapturable,
+                CapturePoints = c.CurrentCapturePoints,
+                CapturePointsMax = c.CapturePointsMax,
+                IsVictoryBuilding = c.IsVictoryBuilding,
                 CanProduceUnits = c.CanProduceUnits,
                 DisplayName = c.ConstructionDisplayName,
                 Source = c
@@ -145,7 +151,13 @@ public class AIConstructionInfo
     public Vector3Int Cell;
     public TeamId TeamId;
     public bool IsHq;
+    public bool IsVictoryBuilding;
+    public bool IsCapturable;
+    public int CapturePoints;
+    public int CapturePointsMax;
     public bool CanProduceUnits;
     public string DisplayName;
+    // Referencia viva — usar apenas para operacoes que exigem acesso ao runtime
+    // (ex: comprar unidade). Nao usar para decisoes taticas baseadas em estado.
     public ConstructionManager Source;
 }
