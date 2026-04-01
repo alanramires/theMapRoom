@@ -165,6 +165,34 @@ public partial class TurnStateManager
         return availableSensorActionCodes != null && availableSensorActionCodes.Contains('A');
     }
 
+    public bool HasAutomatedMergeAvailable()
+    {
+        return availableSensorActionCodes != null && availableSensorActionCodes.Contains('F');
+    }
+
+    public bool TryExecuteAutomatedMergePreferredTarget(UnitManager preferredTarget)
+    {
+        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            return false;
+        if (!HandleAutomatedSensorActionRequested(SensorActionType.Merge))
+            return false;
+
+        string targetId = preferredTarget != null ? preferredTarget.InstanceId.ToString() : null;
+        if (!TryQueueAutomatedMergeReplayOrder(targetId))
+        {
+            HandleCancel();
+            return false;
+        }
+
+        if (!TryStartAutomatedMergeReplayExecution())
+        {
+            HandleCancel();
+            return false;
+        }
+
+        return true;
+    }
+
     public bool HasAutomatedMoveAvailable()
     {
         return cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
