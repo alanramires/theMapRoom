@@ -40,6 +40,15 @@ public class AIUnitProfile : ScriptableObject
     [Tooltip("Quando estiver em modo de defesa e cair em reposicionamento, emite Fallback ao inves de Reposition.")]
     public bool preferFallbackWhenDefend = true;
 
+    [Header("Repair")]
+    [Tooltip("HP maximo (inclusivo) para entrar em modo reparo automatico. 0 = nunca busca reparo.")]
+    [Range(0, 10)]
+    public int hpRepairThreshold = 3;
+
+    [Tooltip("HP minimo (inclusivo) para sair do modo reparo e voltar ao front.")]
+    [Range(1, 10)]
+    public int hpRepairExitThreshold = 8;
+
     public IReadOnlyList<AIUnitSensorKind> SensorPriority => sensorPriority;
 
     public int GetTargetPreferenceBonus(BazookaTargetPriority priority)
@@ -99,6 +108,8 @@ public class AIUnitProfile : ScriptableObject
 
         minDamageDealtPercent = Mathf.Clamp(minDamageDealtPercent, 0f, 100f);
         maxDamageReceivedPercent = Mathf.Clamp(maxDamageReceivedPercent, 0f, 100f);
+        hpRepairThreshold = Mathf.Clamp(hpRepairThreshold, 0, 10);
+        hpRepairExitThreshold = Mathf.Max(hpRepairThreshold + 1, hpRepairExitThreshold);
     }
 }
 

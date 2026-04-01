@@ -1,14 +1,17 @@
-﻿# AI Player refactor 1
+﻿# AI Player Planner
 
 ## Resumo
-- Ajuste incremental no AI Player com foco em estabilização de base para refactor.
-- Inclusão de caminho explícito de visibilidade por time sem depender de cache ativo (`NoCache`) no `MatchController`.
-- Mantido escopo de correção (sem introduzir novo sistema de AI Plan nesta etapa).
+- Evolução do AI Player com foco em base de planejamento.
+- Reativação do atalho `F9` para painel de replay.
+- Introdução do estado dedicado `Replay` no TurnState para pausar automação e IA enquanto o replay está ativo.
 
-## Arquivos relevantes
-- `Assets/Scripts/Match/MatchController.cs`
-- `Assets/Scripts/AI/AIPlayerController.cs`
-- `Assets/Scripts/AI/AISnapshot.cs`
+## Alterações principais
+- `TurnStateManager`: novo estado `CursorState.Replay`.
+- `TurnStateManager.StateMachine`: entrada/saída de estado replay (`TryEnterReplayState`, `TryExitReplayStateToNeutral`).
+- `TurnStateManager.Automation`: pausa de automação no estado replay, no mesmo modelo do player menu.
+- `AIPlayerController`: espera quando cursor está em `PlayerMenu` ou `Replay`.
+- `ReplayPanelUI`: F9 reativado e sincronização com estado replay.
+- `PanelVisibilityHotkeysController`: F9 reativado no mapeamento de function keys.
 
 ## Validação
-- Build `Assembly-CSharp` executado com sucesso, sem erros.
+- Build `Assembly-CSharp` executado com sucesso (0 erros, 0 warnings).

@@ -10,6 +10,7 @@ public class ReplayPanelUI : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private ReplayManager replayManager;
+    [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private CanvasGroup panelCanvasGroup;
 
     [Header("Texts")]
@@ -55,6 +56,8 @@ public class ReplayPanelUI : MonoBehaviour
     {
         if (replayManager == null)
             replayManager = FindAnyObjectByType<ReplayManager>();
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
         if (panelCanvasGroup == null)
             panelCanvasGroup = GetComponent<CanvasGroup>();
         if (panelCanvasGroup == null)
@@ -79,12 +82,15 @@ public class ReplayPanelUI : MonoBehaviour
     private void OnDisable()
     {
         TryAutoPauseReplayOnPanelClose(showDialog: false);
+        TryExitReplayCursorStateIfNeeded();
     }
 
     private void Update()
     {
         if (WasKeyPressedThisFrame(togglePanelKey) && IsReplayPanelToggleAllowed())
             TogglePanel();
+
+        SyncReplayCursorStateWithPlayback();
 
         if (isOpen)
             RefreshLabels();
@@ -112,7 +118,7 @@ public class ReplayPanelUI : MonoBehaviour
         switch (key)
         {
             case KeyCode.F9:
-                return false; // disabled - próxima versão (era: Keyboard.current.f9Key.wasPressedThisFrame)
+                return Keyboard.current.f9Key.wasPressedThisFrame;
             case KeyCode.RightBracket:
                 return Keyboard.current.rightBracketKey.wasPressedThisFrame;
             case KeyCode.LeftBracket:
@@ -374,12 +380,14 @@ public class ReplayPanelUI : MonoBehaviour
 
         if (!started)
         {
+            TryExitReplayCursorStateIfNeeded();
             replaySessionArmed = false;
             RefreshLabels();
             pendingReplayTransitionRoutine = null;
             yield break;
         }
 
+        TryEnterReplayCursorState();
         replaySessionArmed = replayManager.IsReplaying;
         replayManager.PausePlayback();
         RefreshLabels();
@@ -455,9 +463,46 @@ public class ReplayPanelUI : MonoBehaviour
         }
 
         replayManager.StopReplay();
+        TryExitReplayCursorStateIfNeeded();
         replaySessionArmed = false;
         RefreshLabels();
         pendingReplayTransitionRoutine = null;
+    }
+
+    private void SyncReplayCursorStateWithPlayback()
+    {
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager == null || replayManager == null)
+            return;
+
+        if (replayManager.IsReplaying)
+        {
+            if (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral)
+                turnStateManager.TryEnterReplayState();
+        }
+        else
+        {
+            TryExitReplayCursorStateIfNeeded();
+        }
+    }
+
+    private void TryEnterReplayCursorState()
+    {
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager == null)
+            return;
+
+        if (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral)
+            turnStateManager.TryEnterReplayState();
+    }
+
+    private void TryExitReplayCursorStateIfNeeded()
+    {
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        turnStateManager?.TryExitReplayStateToNeutral();
     }
 
     private void OnFastReplayModeToggleChanged(bool enabled)

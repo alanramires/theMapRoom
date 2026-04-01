@@ -46,6 +46,10 @@ public class PlayerAction
 
     public bool Confirmed;
 
+    // true quando a acao foi gerada pela IA (nao por input humano).
+    // Usado para filtragem no debug e para anotacoes visuais no replay.
+    public bool IsAIGenerated;
+
     // Snapshot do estado do mapa associado a esta acao na timeline.
     public TurnStartSnapshot Snapshot;
 

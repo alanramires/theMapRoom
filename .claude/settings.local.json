@@ -12,7 +12,10 @@
       "Bash(git -C \"d:/Unity Projects/The Map Room\" show ea982c6 --name-only --format=\"\")",
       "Bash(grep -E \"\\\\.cs$\")",
       "Bash(grep -l \"static.*bool.*Collect\\\\|static.*List.*Collect\" \"/d/Unity Projects/The Map Room/Assets/Scripts/Sensors\"/*.cs)",
-      "Bash(grep -n \"ExecuteAlways\\\\|ExecuteInEditMode\" \"/d/Unity Projects/The Map Room/Assets/Scripts/Sensors\"/*.cs)"
+      "Bash(grep -n \"ExecuteAlways\\\\|ExecuteInEditMode\" \"/d/Unity Projects/The Map Room/Assets/Scripts/Sensors\"/*.cs)",
+      "Bash(find \"d:/Unity Projects/The Map Room/Assets/Scripts\" -type f -name \"*.cs\" -exec grep -l \"PromoteCurrentBuffer\" {} \\\\;)",
+      "Bash(find \"d:/Unity Projects/The Map Room/Assets/Scripts/Match/TurnState\" -name \"*.cs\" -exec grep -l \"HandleConfirmWithFeedback\\\\|HandleAutomatedSensorActionRequested\" {} \\\\;)",
+      "Bash(find \"d:/Unity Projects/The Map Room/Assets/Scripts/Match/TurnState\" -name \"*.cs\" -exec grep -l \"RecordAttackReplayCommand\" {} \\\\;)"
     ]
   }
 }

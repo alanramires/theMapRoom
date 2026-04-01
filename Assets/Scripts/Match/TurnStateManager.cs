@@ -62,7 +62,8 @@ public partial class TurnStateManager : MonoBehaviour
         Planning = 17,
         PlayerMenu = 18,
         AircraftFuelDepletionQueue = 19,
-        TurnStartRallyQueue = 20
+        TurnStartRallyQueue = 20,
+        Replay = 21
     }
 
     [Header("References")]

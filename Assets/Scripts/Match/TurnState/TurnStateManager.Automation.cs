@@ -480,6 +480,32 @@ public partial class TurnStateManager
             out reason);
     }
 
+    // Retorna os alvos de suprimento validos para 'supplier' na posicao atual.
+    // Delega para PodeSuprirSensor — mesma validacao usada pelo botao S do jogador.
+    // A IA usa esta lista como candidatos e aplica seu proprio scoring de prioridade.
+    public bool TryGetSupplyTargets(
+        UnitManager supplier,
+        List<PodeSuprirOption> output,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (output == null || supplier == null)
+            return false;
+
+        Tilemap map = terrainTilemap != null ? terrainTilemap : supplier.BoardTilemap;
+        return PodeSuprirSensor.CollectOptions(
+            supplier, map, terrainDatabase, matchController,
+            output, out reason);
+    }
+
+    // Marca a acao corrente no buffer de replay como gerada pela IA.
+    // Chamar logo apos confirmar a selecao de uma unidade no turno da IA.
+    public void MarkCurrentActionAsAIGenerated()
+    {
+        if (replayManager != null && replayManager.CurrentBuffer != null)
+            replayManager.CurrentBuffer.IsAIGenerated = true;
+    }
+
     public bool TryExecuteAutomatedSupplyPreferredTarget(UnitManager preferredTarget)
     {
         if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
@@ -613,8 +639,8 @@ public partial class TurnStateManager
             if (cursorState == CursorState.Neutral && !IsScannerActionExecutionInProgress && !IsMovementAnimationRunning())
                 yield break;
 
-            // PlayerMenu pausa a simulacao automatica sem consumir timeout.
-            if (cursorState == CursorState.PlayerMenu)
+            // PlayerMenu/Replay pausam a simulacao automatica sem consumir timeout.
+            if (cursorState == CursorState.PlayerMenu || cursorState == CursorState.Replay)
             {
                 yield return null;
                 continue;
