@@ -708,6 +708,7 @@ MonoBehaviour:
   currentCellPosition: {x: 0, y: 0, z: 0}
   teamId: 0
   slotIndex: -1
+  sector: 0
   constructionId: hq
   instanceId: 0
   currentPosition: {x: 0, y: 0, z: 0}

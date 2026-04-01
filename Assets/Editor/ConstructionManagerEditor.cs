@@ -1,4 +1,4 @@
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 
 [CustomEditor(typeof(ConstructionManager))]
@@ -31,7 +31,32 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty originalOwnerTeamIdProp;
     private SerializedProperty firstOwnerTeamIdProp;
     private SerializedProperty firstOwnerInitializedProp;
+    private SerializedProperty sectorProp;
     private ForceCopyFilter forceCopyFilter = ForceCopyFilter.Army;
+
+    private static readonly Color[] SectorColors = new Color[]
+    {
+        new Color(0.30f, 0.60f, 1.00f), // Alpha
+        new Color(0.20f, 0.75f, 0.35f), // Bravo
+        new Color(1.00f, 0.55f, 0.10f), // Charlie
+        new Color(0.85f, 0.20f, 0.20f), // Delta
+        new Color(0.75f, 0.35f, 0.90f), // Echo
+        new Color(0.15f, 0.80f, 0.85f), // Foxtrot
+        new Color(1.00f, 0.85f, 0.10f), // Golf
+        new Color(0.95f, 0.40f, 0.65f), // Hotel
+        new Color(0.48f, 0.48f, 0.95f), // India
+        new Color(0.40f, 0.85f, 0.55f), // Juliet
+        new Color(0.85f, 0.65f, 0.25f), // Kilo
+        new Color(0.65f, 0.30f, 0.80f), // Lima
+        new Color(0.25f, 0.70f, 0.95f), // Mike
+        new Color(0.90f, 0.45f, 0.35f), // November
+        new Color(0.55f, 0.70f, 0.25f), // Oscar
+        new Color(0.95f, 0.70f, 0.45f), // Papa
+        new Color(0.30f, 0.60f, 0.55f), // Quebec
+        new Color(0.85f, 0.35f, 0.50f), // Romeo
+        new Color(0.70f, 0.70f, 0.70f), // Tango
+        new Color(0.95f, 0.95f, 0.95f), // BaseTeam
+    };
 
     private void OnEnable()
     {
@@ -55,6 +80,7 @@ public class ConstructionManagerEditor : Editor
         originalOwnerTeamIdProp = serializedObject.FindProperty("originalOwnerTeamId");
         firstOwnerTeamIdProp = serializedObject.FindProperty("firstOwnerTeamId");
         firstOwnerInitializedProp = serializedObject.FindProperty("firstOwnerInitialized");
+        sectorProp = serializedObject.FindProperty("sector");
     }
 
     public override void OnInspectorGUI()
@@ -75,6 +101,7 @@ public class ConstructionManagerEditor : Editor
         EditorGUILayout.PropertyField(autoSnapWhenMovedInEditorProp, new GUIContent("Auto Snap When Moved In Editor"));
         EditorGUILayout.PropertyField(currentCellPositionProp, new GUIContent("Cell Position"));
         DrawSlotAndTeamBlock();
+        DrawSectorPopup();
 
         DrawConstructionIdPopup();
 
@@ -134,6 +161,29 @@ public class ConstructionManagerEditor : Editor
             construction.PullCellFromTransform();
     }
 
+    private void DrawSectorPopup()
+    {
+        if (sectorProp == null)
+            return;
+
+        int current = sectorProp.enumValueIndex;
+        string[] names = sectorProp.enumNames;
+
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.PrefixLabel("Sector");
+
+        Color prev = GUI.backgroundColor;
+        if (current >= 0 && current < SectorColors.Length)
+            GUI.backgroundColor = SectorColors[current];
+
+        int next = EditorGUILayout.Popup(current, names);
+        GUI.backgroundColor = prev;
+        EditorGUILayout.EndHorizontal();
+
+        if (next != current)
+            sectorProp.enumValueIndex = next;
+    }
+
     private void DrawSlotAndTeamBlock()
     {
         if (slotIndexProp == null)
@@ -152,7 +202,7 @@ public class ConstructionManagerEditor : Editor
         for (int i = 0; i < slotCount; i++)
         {
             TeamId t = mc.GetTeamIdForSlot(i);
-            labels[i + 1] = $"Slot {i} — {TeamUtils.GetName(t)}";
+            labels[i + 1] = $"Slot {i} â€” {TeamUtils.GetName(t)}";
         }
 
         int currentSlot = slotIndexProp.intValue;
@@ -173,7 +223,7 @@ public class ConstructionManagerEditor : Editor
             EditorUtility.SetDirty(cm);
         }
 
-        // Team ID como read-only — derivado do slot
+        // Team ID como read-only â€” derivado do slot
         using (new EditorGUI.DisabledScope(true))
             EditorGUILayout.PropertyField(teamIdProp, new GUIContent("Team ID (resolved)"));
     }
@@ -419,3 +469,4 @@ public class ConstructionManagerEditor : Editor
     }
 
 }
+

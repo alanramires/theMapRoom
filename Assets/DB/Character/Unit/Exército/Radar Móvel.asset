@@ -35,17 +35,21 @@ MonoBehaviour:
     heightLevel: 4
     vision: 5
     detectUnitsWithFollowingSkills: []
+    losPolicy: 0
   - domain: 3
     heightLevel: 5
     vision: 6
     detectUnitsWithFollowingSkills: []
+    losPolicy: 0
   - domain: 2
     heightLevel: 2
     vision: 0
     detectUnitsWithFollowingSkills: []
+    losPolicy: 0
   movementCategory: 6
   militaryForce: 0
   unitClass: 1
+  aiUnitProfile: {fileID: 11400000, guid: 626e71f53bedacc409de7c3bae53de83, type: 2}
   eliteLevel: 0
   combatModifiers: []
   domain: 0

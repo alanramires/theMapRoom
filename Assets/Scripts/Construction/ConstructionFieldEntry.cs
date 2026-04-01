@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 [System.Serializable]
 public class ConstructionFieldEntry
@@ -12,6 +12,9 @@ public class ConstructionFieldEntry
     [Tooltip("Slot do MatchController que controla esta construcao no inicio. -1 = Neutral.")]
     public int initialSlotIndex = -1;
 
+    [Tooltip("Setor estrategico ao qual esta construcao pertence. Use BaseTeam para HQ/arredores fora dos setores de missao (Alpha-Tango).")]
+    public ConstructionSector sector = ConstructionSector.Alpha;
+
     [Tooltip("Posicao da construcao no mapa (hex).")]
     public Vector3Int cellPosition = Vector3Int.zero;
 
@@ -24,3 +27,4 @@ public class ConstructionFieldEntry
     public bool useConstructionConfigurationOverride = false;
     public ConstructionSiteRuntime constructionConfiguration = new ConstructionSiteRuntime();
 }
+

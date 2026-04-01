@@ -34,6 +34,16 @@ MonoBehaviour:
   movementCategory: 0
   militaryForce: 1
   unitClass: 5
+  aiUnitProfile: {fileID: 0}
+  aiTargetPreferenceByClass:
+  - targetClass: 0
+    priority: 2
+  - targetClass: 3
+    priority: 2
+  - targetClass: 1
+    priority: 1
+  - targetClass: 2
+    priority: 1
   eliteLevel: 1
   combatModifiers:
   - {fileID: 11400000, guid: c65db4d4fa1bf5447bfda0fe08c66a17, type: 2}

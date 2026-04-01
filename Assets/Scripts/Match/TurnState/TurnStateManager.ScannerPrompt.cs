@@ -2785,7 +2785,7 @@ public partial class TurnStateManager
         }
 
         if (selectedIndex < 0)
-            selectedIndex = 0;
+            return false;
 
         scannerSelectedTargetIndex = selectedIndex;
         // Semantica visual IA: cursor so foca o alvo final apos a selecao.

@@ -16,6 +16,8 @@ public class UnitDataEditor : Editor
     private SerializedProperty supplierResourcesProperty;
     private SerializedProperty stealthSkillRulesProperty;
     private SerializedProperty stealthSkillsLegacyProperty;
+    private SerializedProperty aiUnitProfileProperty;
+    private SerializedProperty aiTargetPreferenceByClassProperty;
 
     private void OnEnable()
     {
@@ -30,6 +32,8 @@ public class UnitDataEditor : Editor
         supplierResourcesProperty = serializedObject.FindProperty("supplierResources");
         stealthSkillRulesProperty = serializedObject.FindProperty("stealthSkillRules");
         stealthSkillsLegacyProperty = serializedObject.FindProperty("stealthSkills");
+        aiUnitProfileProperty = serializedObject.FindProperty("aiUnitProfile");
+        aiTargetPreferenceByClassProperty = serializedObject.FindProperty("aiTargetPreferenceByClass");
     }
 
     public override void OnInspectorGUI()
@@ -38,6 +42,7 @@ public class UnitDataEditor : Editor
 
         DrawPrimaryIdentitySection();
         DrawTopAttributesSection();
+        DrawAiSection();
         DrawAirPreferenceSection();
         DrawNavalPreferenceSection();
         DrawStealthSection();
@@ -56,6 +61,9 @@ public class UnitDataEditor : Editor
             "movementCategory",
             "autonomia",
             "cost",
+            "bazookaTargetPriority",
+            "aiUnitProfile",
+            "aiTargetPreferenceByClass",
             "stealthSkills",
             "stealthSkillRules",
             "useExplicitPreferredAirHeight",
@@ -91,6 +99,79 @@ public class UnitDataEditor : Editor
         DrawLogisticsSection();
 
         serializedObject.ApplyModifiedProperties();
+    }
+
+    private void DrawAiSection()
+    {
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("AI", EditorStyles.boldLabel);
+
+        if (aiUnitProfileProperty != null)
+            EditorGUILayout.PropertyField(aiUnitProfileProperty, new GUIContent("AI Unit Profile"));
+
+        if (aiTargetPreferenceByClassProperty != null)
+            DrawAiTargetPreferenceByClassSection(aiTargetPreferenceByClassProperty);
+    }
+
+    private static void DrawAiTargetPreferenceByClassSection(SerializedProperty listProperty)
+    {
+        EditorGUILayout.LabelField("AI Target Preference (By Class)", EditorStyles.boldLabel);
+
+        for (int i = 0; i < listProperty.arraySize; i++)
+        {
+            SerializedProperty element = listProperty.GetArrayElementAtIndex(i);
+            if (element == null)
+                continue;
+
+            SerializedProperty targetClassProperty = element.FindPropertyRelative("targetClass");
+            SerializedProperty priorityProperty = element.FindPropertyRelative("priority");
+
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField($"Element {i}", EditorStyles.boldLabel);
+            if (GUILayout.Button("-", GUILayout.Width(28f)))
+            {
+                listProperty.DeleteArrayElementAtIndex(i);
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.EndVertical();
+                break;
+            }
+            EditorGUILayout.EndHorizontal();
+
+            if (targetClassProperty != null)
+                EditorGUILayout.PropertyField(targetClassProperty, new GUIContent("Target Class"));
+
+            if (priorityProperty != null)
+            {
+                int[] priorityValues = { (int)BazookaTargetPriority.Primary, (int)BazookaTargetPriority.Secondary };
+                string[] priorityLabels = { "Primary", "Secondary" };
+
+                int currentValue = priorityProperty.intValue;
+                int selectedIndex = currentValue == (int)BazookaTargetPriority.Secondary ? 1 : 0;
+                int newIndex = EditorGUILayout.Popup("Priority", selectedIndex, priorityLabels);
+                priorityProperty.intValue = priorityValues[Mathf.Clamp(newIndex, 0, priorityValues.Length - 1)];
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        if (GUILayout.Button("+ Add Target Preference"))
+        {
+            int index = listProperty.arraySize;
+            listProperty.InsertArrayElementAtIndex(index);
+
+            SerializedProperty newElement = listProperty.GetArrayElementAtIndex(index);
+            if (newElement != null)
+            {
+                SerializedProperty targetClassProperty = newElement.FindPropertyRelative("targetClass");
+                SerializedProperty priorityProperty = newElement.FindPropertyRelative("priority");
+
+                if (targetClassProperty != null)
+                    targetClassProperty.intValue = (int)GameUnitClass.Infantry;
+                if (priorityProperty != null)
+                    priorityProperty.intValue = (int)BazookaTargetPriority.Primary;
+            }
+        }
     }
 
     private void DrawAirPreferenceSection()

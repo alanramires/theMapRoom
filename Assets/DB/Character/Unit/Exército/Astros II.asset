@@ -33,6 +33,12 @@ MonoBehaviour:
   movementCategory: 6
   militaryForce: 0
   unitClass: 1
+  aiUnitProfile: {fileID: 11400000, guid: ac91d7b2d6b1747438b7f2210c28d5b2, type: 2}
+  aiTargetPreferenceByClass:
+  - targetClass: 0
+    priority: 2
+  - targetClass: 1
+    priority: 1
   eliteLevel: 0
   combatModifiers: []
   domain: 0
@@ -53,6 +59,7 @@ MonoBehaviour:
     operationRangeMin: 2
     operationRangeMax: 3
     selectedTrajectory: 1
+    canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: 45305bb45ee8d8b489e50ac1a17ff374, type: 2}
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0

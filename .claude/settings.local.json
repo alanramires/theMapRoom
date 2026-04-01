@@ -9,7 +9,10 @@
       "Bash(xargs grep:*)",
       "Bash(grep -n \"public.*Combat\\\\|public.*Predict\\\\|public.*Estimate\" \"d:/Unity Projects/The Map Room/Assets/Scripts/Match/TurnState/TurnStateManager\"*.cs)",
       "Bash(git -C \"d:/Unity Projects/The Map Room\" log --oneline -10)",
-      "Bash(git -C \"d:/Unity Projects/The Map Room\" show ea982c6 --name-only --format=\"\")"
+      "Bash(git -C \"d:/Unity Projects/The Map Room\" show ea982c6 --name-only --format=\"\")",
+      "Bash(grep -E \"\\\\.cs$\")",
+      "Bash(grep -l \"static.*bool.*Collect\\\\|static.*List.*Collect\" \"/d/Unity Projects/The Map Room/Assets/Scripts/Sensors\"/*.cs)",
+      "Bash(grep -n \"ExecuteAlways\\\\|ExecuteInEditMode\" \"/d/Unity Projects/The Map Room/Assets/Scripts/Sensors\"/*.cs)"
     ]
   }
 }

@@ -96,7 +96,194 @@ public partial class TurnStateManager
 
     public bool TryExecuteAutomatedAttackFirstTarget()
     {
-        return TryExecuteAutomatedAttackPreferredTarget(null);
+        return TryExecuteAutomatedAttackBestTarget(null, null);
+    }
+
+    public bool TryExecuteAutomatedAttackBestTarget(UnitManager preferredTarget = null, AIUnitProfile attackerProfile = null)
+    {
+        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            return false;
+        if (selectedUnit == null || selectedUnit.HasActed)
+            return false;
+        if (!HasAutomatedAttackAvailable())
+            return false;
+        if (!HandleAutomatedSensorActionRequested(SensorActionType.Attack))
+            return false;
+
+        if (cachedPodeMirarTargets == null || cachedPodeMirarTargets.Count <= 0)
+        {
+            HandleCancel();
+            return false;
+        }
+
+        List<(UnitManager target, int score, int order)> rankedTargets = new List<(UnitManager target, int score, int order)>();
+        HashSet<UnitManager> seenTargets = new HashSet<UnitManager>();
+
+        for (int i = 0; i < cachedPodeMirarTargets.Count; i++)
+        {
+            PodeMirarTargetOption option = cachedPodeMirarTargets[i];
+            if (option == null || option.targetUnit == null)
+                continue;
+
+            UnitManager target = option.targetUnit;
+            if (seenTargets.Contains(target))
+                continue;
+            seenTargets.Add(target);
+
+            if (!IsAutomatedAttackCandidateStillValid(selectedUnit, target))
+                continue;
+
+            int distance = Mathf.Max(1, option.distance);
+            if (!TryEvaluateAutomatedAttackCandidateScore(
+                    selectedUnit,
+                    target,
+                    distance,
+                    attackerProfile,
+                    out int candidateScore))
+            {
+                continue;
+            }
+
+            if (preferredTarget != null && target == preferredTarget)
+                candidateScore += 1;
+
+            rankedTargets.Add((target, candidateScore, i));
+        }
+
+        if (rankedTargets.Count <= 0)
+        {
+            HandleCancel();
+            return false;
+        }
+
+        rankedTargets.Sort((a, b) =>
+        {
+            int scoreCompare = b.score.CompareTo(a.score);
+            if (scoreCompare != 0)
+                return scoreCompare;
+
+            // Tie-break deterministico: preserva a ordem original da fila.
+            return a.order.CompareTo(b.order);
+        });
+
+        for (int i = 0; i < rankedTargets.Count; i++)
+        {
+            UnitManager target = rankedTargets[i].target;
+            if (target == null || target.IsDead)
+                continue;
+            if (!IsAutomatedAttackCandidateStillValid(selectedUnit, target))
+                continue;
+
+            Vector3Int targetCell = target.CurrentCellPosition;
+            targetCell.z = 0;
+            if (TryExecuteAutomatedAttackReplayTarget(target.InstanceId.ToString(), targetCell))
+            {
+                Debug.Log($"[AI][Attack] melhor alvo executado: {target.name} (score={rankedTargets[i].score}).");
+                return true;
+            }
+        }
+
+        HandleCancel();
+        return false;
+    }
+
+    private bool IsAutomatedAttackCandidateStillValid(UnitManager attacker, UnitManager target)
+    {
+        if (attacker == null || target == null)
+            return false;
+        if (target.IsDead)
+            return false;
+        if (matchController != null && !matchController.IsUnitVisibleForActiveTeam(target))
+            return false;
+        if (attacker.HasActed)
+            return false;
+        if (!HasAutomatedAttackAvailable())
+            return false;
+
+        for (int i = 0; i < cachedPodeMirarTargets.Count; i++)
+        {
+            PodeMirarTargetOption option = cachedPodeMirarTargets[i];
+            if (option == null || option.targetUnit == null)
+                continue;
+            if (option.targetUnit != target)
+                continue;
+            if (option.attackerUnit != null && option.attackerUnit != attacker)
+                continue;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryEvaluateAutomatedAttackCandidateScore(
+        UnitManager attacker,
+        UnitManager target,
+        int distance,
+        AIUnitProfile attackerProfile,
+        out int score)
+    {
+        score = int.MinValue;
+        if (attacker == null || target == null)
+            return false;
+        if (!attacker.TryGetUnitData(out UnitData attackerData) || attackerData == null)
+            return false;
+        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
+            return false;
+        if (rpsDatabase == null || dpqMatchupDatabase == null || weaponPriorityData == null)
+            return false;
+
+        if (attackerProfile == null)
+            attackerProfile = attackerData.aiUnitProfile;
+
+        AICombatHpSimulator.AICombatHpResult sim = AICombatHpSimulator.Simulate(
+            attackerData,
+            targetData,
+            attacker.CurrentHP,
+            target.CurrentHP,
+            Mathf.Max(1, distance),
+            rpsDatabase,
+            dpqMatchupDatabase,
+            weaponPriorityData);
+
+        if (!sim.isValid)
+            return false;
+
+        int attackerMaxHp = Mathf.Max(1, attackerData.maxHP);
+        int targetMaxHp = Mathf.Max(1, targetData.maxHP);
+        int dealt = Mathf.Max(0, target.CurrentHP - sim.defenderHpAfter);
+        int received = Mathf.Max(0, attacker.CurrentHP - sim.attackerHpAfter);
+        bool surviveGate = sim.attackerHpAfter > 0;
+
+        BazookaTargetPriority targetPriority = attackerData.ResolveAiTargetPriorityForTargetClass(targetData.unitClass);
+
+        float dealtPercent = targetMaxHp > 0 ? (dealt * 100f) / targetMaxHp : 0f;
+        float receivedPercent = attackerMaxHp > 0 ? (received * 100f) / attackerMaxHp : 0f;
+
+        int targetPreferenceBonus = 0;
+        if (attackerProfile != null)
+        {
+            targetPreferenceBonus = attackerProfile.GetTargetPreferenceBonus(targetPriority);
+
+            if (!attackerProfile.PassesAttackThresholds(dealtPercent, receivedPercent, surviveGate))
+                return false;
+        }
+        else
+        {
+            bool dealtGate = dealt >= Mathf.CeilToInt(targetMaxHp * 0.10f);
+            bool receivedGate = received <= Mathf.FloorToInt(attackerMaxHp * 0.50f);
+            if (!dealtGate || !receivedGate || !surviveGate)
+                return false;
+        }
+
+        float damageRelative = targetMaxHp > 0 ? (float)dealt / targetMaxHp : 0f;
+        float tieBreak = target.CurrentHP > 0 ? (1f / target.CurrentHP) : 1f;
+
+        score = targetPreferenceBonus;
+        if (sim.defenderHpAfter <= 0)
+            score += 1000000;
+        score += Mathf.RoundToInt(damageRelative * 10000f);
+        score += Mathf.RoundToInt(tieBreak * 1000f);
+        return true;
     }
 
     public bool TryExecuteAutomatedAttackPreferredTarget(UnitManager preferredTarget)
@@ -963,6 +1150,11 @@ public partial class TurnStateManager
         return true;
     }
 }
+
+
+
+
+
 
 
 

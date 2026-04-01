@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -821,7 +821,10 @@ public class AIPlayerController : MonoBehaviour
         }
 
         if (!supplied && !transferred)
-            captured = !repairModeActive && capturePriorityUnit && turnStateManager.TryExecuteAutomatedCaptureIfAvailable();
+        {
+            bool captureEnabledForUnit = capturePriorityUnit || canUseCapturePlan;
+            captured = !repairModeActive && captureEnabledForUnit && turnStateManager.TryExecuteAutomatedCaptureIfAvailable();
+        }
 
         if (!supplyObjectiveActive && !repairModeActive && !captureObjectiveActive && bestDest == unitCell && intelCanFire && intelFireTarget != null)
             targetEnemy = intelFireTarget;
@@ -2773,6 +2776,8 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             : "ATAQUE";
         int turn = matchController != null ? matchController.CurrentTurn : 0;
         sb.AppendLine($"[AI][T{turn}][{aiTeam}][Fase 0] postura: {stanceLabel} | amigos: {snapshot.FriendlyUnits.Count} | inimigos visiveis: {snapshot.VisibleEnemies.Count}");
+        if (matchController != null)
+            sb.AppendLine($"  FoW: TotalWar={matchController.EnableTotalWar} | LoS={matchController.EnableLosValidation} | Stealth={matchController.EnableStealthValidation}");
         if (snapshot.HasHq)
             sb.AppendLine($"  HQ proprio: ({snapshot.HqCell.x},{snapshot.HqCell.y})");
         else

@@ -1,6 +1,16 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
+
+[System.Serializable]
+public class AITargetPreferenceByClassRule
+{
+    [Tooltip("Classe de unidade alvo para esta regra de prioridade.")]
+    public GameUnitClass targetClass = GameUnitClass.Infantry;
+
+    [Tooltip("Prioridade t�tica aplicada ao atacar esta classe.")]
+    public BazookaTargetPriority priority = BazookaTargetPriority.Tertiary;
+}
 
 [System.Serializable]
 public class TransportStructureTerrainRule
@@ -89,6 +99,11 @@ public class UnitData : ScriptableObject
     public MovementCategory movementCategory = MovementCategory.Marcha;
     public MilitaryForce militaryForce = MilitaryForce.Army;
     public GameUnitClass unitClass = GameUnitClass.Infantry;
+    [Header("AI")]
+    [Tooltip("Perfil de decisao da unidade para a IA (pipeline de sensores).")]
+    public AIUnitProfile aiUnitProfile;
+    [Tooltip("Preferencia de alvo por classe (usada pelo gate de Target Preference no AI Unit Profile).")]
+    public List<AITargetPreferenceByClassRule> aiTargetPreferenceByClass = new List<AITargetPreferenceByClassRule>();
     [Header("Elite")]
     [Tooltip("Nivel de elite da unidade (padrao: 0).")]
     [Min(0)] public int eliteLevel = 0;
@@ -208,6 +223,8 @@ public class UnitData : ScriptableObject
             stealthSkillRules = new List<UnitStealthSkillRule>();
         if (visionSpecializations == null)
             visionSpecializations = new List<UnitVisionException>();
+        if (aiTargetPreferenceByClass == null)
+            aiTargetPreferenceByClass = new List<AITargetPreferenceByClassRule>();
         if (transportSlots == null)
             transportSlots = new List<UnitTransportSlotRule>();
         if (allowedEmbarkWhenTransporterAtTerrains == null)
@@ -274,6 +291,12 @@ public class UnitData : ScriptableObject
             slot.EnsureDefaults();
         }
 
+        for (int i = aiTargetPreferenceByClass.Count - 1; i >= 0; i--)
+        {
+            if (aiTargetPreferenceByClass[i] == null)
+                aiTargetPreferenceByClass.RemoveAt(i);
+        }
+
     }
 
     public bool IsAircraft()
@@ -304,6 +327,39 @@ public class UnitData : ScriptableObject
             return Mathf.Max(0, entry.vision);
 
         return Mathf.Max(1, visao);
+    }
+
+    public BazookaTargetPriority ResolveAiTargetPriorityForTargetClass(GameUnitClass targetClass)
+    {
+        if (aiTargetPreferenceByClass == null || aiTargetPreferenceByClass.Count == 0)
+            return BazookaTargetPriority.Tertiary;
+
+        for (int i = 0; i < aiTargetPreferenceByClass.Count; i++)
+        {
+            AITargetPreferenceByClassRule entry = aiTargetPreferenceByClass[i];
+            if (entry == null || entry.targetClass != targetClass)
+                continue;
+            return entry.priority;
+        }
+
+        return BazookaTargetPriority.Tertiary;
+    }
+
+    public bool HasAnyAiTargetPreferenceConfigured()
+    {
+        if (aiTargetPreferenceByClass == null || aiTargetPreferenceByClass.Count == 0)
+            return false;
+
+        for (int i = 0; i < aiTargetPreferenceByClass.Count; i++)
+        {
+            AITargetPreferenceByClassRule entry = aiTargetPreferenceByClass[i];
+            if (entry == null)
+                continue;
+            if (entry.priority != BazookaTargetPriority.Tertiary)
+                return true;
+        }
+
+        return false;
     }
 
     public bool CanDetectStealthFor(Domain targetDomain, HeightLevel targetHeightLevel, UnitData targetData = null)
@@ -517,3 +573,7 @@ public class UnitData : ScriptableObject
         armorClass = ArmorClass.Light;
     }
 }
+
+
+
+
