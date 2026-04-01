@@ -2985,6 +2985,68 @@ public class MatchController : MonoBehaviour
         return ComputeIsUnitVisibleForActiveTeam(unit);
     }
 
+    public bool IsUnitVisibleForTeam(UnitManager unit, TeamId observerTeam)
+    {
+        if (!debugFogOfWarEnabled)
+            return true;
+
+        if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+            return false;
+
+        if (unit.TeamId == observerTeam)
+            return true;
+
+        if (!enableTotalWar)
+            return true;
+
+        if ((int)observerTeam == activeTeamId)
+        {
+            int cacheIndex = ResolveFogCacheIndex(unit);
+            if (fogCachedTeamId == activeTeamId &&
+                fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible))
+            {
+                return cachedVisible;
+            }
+        }
+
+        return ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
+    }
+
+    public bool IsUnitVisibleForTeamNoCache(UnitManager unit, TeamId observerTeam)
+    {
+        if (!debugFogOfWarEnabled)
+            return true;
+
+        if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+            return false;
+
+        if (unit.TeamId == observerTeam)
+            return true;
+
+        if (!enableTotalWar)
+            return true;
+
+        return ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
+    }
+
+    private bool ComputeIsUnitVisibleForTeamWithoutCache(UnitManager unit, TeamId observerTeam)
+    {
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return false;
+
+        bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn;
+        return PodeDetectarSensor.IsTargetObservedByTeam(
+            unit,
+            (int)observerTeam,
+            boardMap,
+            ResolveFogTerrainDatabase(),
+            ResolveFogDpqAirHeightConfig(),
+            enableLosValidation,
+            enableSpotter: false,
+            enforceStealthValidation);
+    }
+
     private bool ComputeIsUnitVisibleForActiveTeam(UnitManager unit)
     {
         if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
