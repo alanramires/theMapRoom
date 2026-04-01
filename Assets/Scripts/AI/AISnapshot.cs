@@ -111,9 +111,28 @@ public class AISnapshot
             {
                 snapshot.FriendlyUnits.Add(u);
             }
-            else if (matchController == null || matchController.IsUnitVisibleForActiveTeam(u))
+            else if (matchController == null)
             {
                 snapshot.VisibleEnemies.Add(u);
+            }
+            else
+            {
+                // Usa o sensor diretamente (sem cache FOW) para garantir que
+                // VisibleEnemies reflita o estado real da cena no momento do snapshot.
+                // HasFiredThisTurn: unidade que atirou neste turno perde stealth.
+                bool enforceStealthValidation = matchController.EnableStealthValidation
+                    && !u.HasFiredThisTurn;
+                bool visible = PodeDetectarSensor.IsTargetObservedByTeam(
+                    u,
+                    (int)aiTeam,
+                    snapshot.BoardTilemap,
+                    matchController.TerrainDatabaseRef,
+                    null,
+                    matchController.EnableLosValidation,
+                    matchController.EnableSpotter,
+                    enforceStealthValidation);
+                if (visible)
+                    snapshot.VisibleEnemies.Add(u);
             }
         }
 
