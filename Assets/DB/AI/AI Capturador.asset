@@ -16,4 +16,7 @@ MonoBehaviour:
   allowCapture: 1
   allowAttack: 1
   allowReposition: 1
+  canEscort: 0
   preferFallbackWhenDefend: 1
+
+

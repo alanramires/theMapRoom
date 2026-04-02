@@ -64,6 +64,10 @@ public class UnitHudController : MonoBehaviour
     [SerializeField] private Transform transportIndicatorRoot;
     [SerializeField] private Transform detectedIndicatorRoot;
 
+    [Header("Debug")]
+    [SerializeField] private Transform planDebugRoot;
+    [SerializeField] private TMP_Text planDebugText;
+
     [Header("Sorting")]
     [SerializeField] private bool applyHudSorting = true;
     [SerializeField] private string hudSortingLayerName = "SFX";
@@ -118,6 +122,18 @@ public class UnitHudController : MonoBehaviour
         AutoAssignCommonReferences();
         DisableLegacyLockVisuals();
         ApplySorting();
+    }
+
+    public void SetPlanDebugBadge(bool visible, string text)
+    {
+        if (planDebugRoot == null || planDebugText == null)
+            AutoAssignCommonReferences();
+
+        if (planDebugText != null)
+            planDebugText.text = string.IsNullOrWhiteSpace(text) ? string.Empty : text.Trim();
+
+        if (planDebugRoot != null && planDebugRoot.gameObject.activeSelf != visible)
+            planDebugRoot.gameObject.SetActive(visible);
     }
 
     public UnitManager ResolveOwnerUnit()
@@ -418,6 +434,7 @@ public class UnitHudController : MonoBehaviour
         if (altitudeSubmergedSprite == null)
             altitudeSubmergedSprite = FindSpriteByName("submerged");
 
+        TryAutoAssignPlanDebugReferences();
     }
 
     private void RefreshWeaponAmmoVisuals()
@@ -675,6 +692,19 @@ public class UnitHudController : MonoBehaviour
         }
 
         ApplySortingToRenderer(fuelFillRenderer, layerId, order);
+    }
+
+    private void TryAutoAssignPlanDebugReferences()
+    {
+        if (planDebugRoot == null)
+        {
+            Transform candidate = FindChildRecursive(transform, "plan");
+            if (candidate != null)
+                planDebugRoot = candidate;
+        }
+
+        if (planDebugText == null && planDebugRoot != null)
+            planDebugText = planDebugRoot.GetComponent<TMP_Text>() ?? planDebugRoot.GetComponentInChildren<TMP_Text>(true);
     }
 
     private static void ApplySortingToRenderer(SpriteRenderer renderer, int sortingLayerId, int sortingOrder)

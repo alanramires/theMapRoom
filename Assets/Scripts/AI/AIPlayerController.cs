@@ -20,6 +20,9 @@ public class AIPlayerController : MonoBehaviour
     [SerializeField] private MatchController matchController;
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private bool aiLog = true;
+    [Header("AI Debug")]
+    [SerializeField, Tooltip("Mostra no UnitHUD uma letra/simbolo do plano atual da unidade (debug).")]
+    private bool showPlanDebugAtUnit = false;
 
     [Header("AI Data")]
     [SerializeField, Tooltip("Catalogo oficial de perfis de IA.")]
@@ -39,6 +42,15 @@ public class AIPlayerController : MonoBehaviour
     private readonly List<AIPlanIntent> currentTurnPlans = new List<AIPlanIntent>();
     private readonly Dictionary<int, AIPlanIntent> currentTurnUnitRoles = new Dictionary<int, AIPlanIntent>();
     private readonly Dictionary<int, AIPlanAssignment> currentTurnUnitAssignments = new Dictionary<int, AIPlanAssignment>();
+    private readonly Dictionary<int, AIPlanEvaluator.MissionAssignmentMemory> previousAssignmentsByUnitId = new Dictionary<int, AIPlanEvaluator.MissionAssignmentMemory>();
+    private readonly List<string> currentPlannerLifecycleLogs = new List<string>();
+    private readonly Dictionary<string, PlanMetricState> previousPlanMetricsByKey = new Dictionary<string, PlanMetricState>();
+
+    private struct PlanMetricState
+    {
+        public int OutstandingCaptures;
+        public int VisibleThreats;
+    }
 
     public AIStance CurrentStance => currentStance;
     public IReadOnlyList<AIPlanIntent> CurrentTurnPlans => currentTurnPlans;
@@ -365,11 +377,24 @@ public class AIPlayerController : MonoBehaviour
         currentTurnPlans.Clear();
         currentTurnUnitRoles.Clear();
         currentTurnUnitAssignments.Clear();
+        currentPlannerLifecycleLogs.Clear();
 
         if (aiPlanDatabase == null)
+        {
+            ApplyUnitPlanDebugBadges(aiTeam);
             return;
+        }
 
-        List<AIPlanIntent> plans = AIPlanEvaluator.Evaluate(aiPlanDatabase, snapshot);
+        AIPlanEvaluator.PlannerRuntimeConfig plannerConfig = BuildPlannerRuntimeConfig(aiTeam);
+        List<AIPlanEvaluator.MissionAssignmentMemory> previous = new List<AIPlanEvaluator.MissionAssignmentMemory>(previousAssignmentsByUnitId.Values);
+
+        List<AIPlanIntent> plans = AIPlanEvaluator.Evaluate(
+            aiPlanDatabase,
+            snapshot,
+            previous,
+            plannerConfig,
+            currentPlannerLifecycleLogs);
+
         currentTurnPlans.AddRange(plans);
 
         for (int p = 0; p < plans.Count; p++)
@@ -383,6 +408,325 @@ public class AIPlayerController : MonoBehaviour
             }
         }
 
+        UpdateMissionPersistenceMemory(snapshot, plannerConfig.CurrentTurn);
+        ApplyUnitPlanDebugBadges(aiTeam);
+
+        for (int i = 0; i < currentPlannerLifecycleLogs.Count; i++)
+            Debug.Log($"{T(aiTeam, 0)} [planner] {currentPlannerLifecycleLogs[i]}");
+    }
+
+    private void ApplyUnitPlanDebugBadges(TeamId aiTeam)
+    {
+        for (int i = 0; i < UnitManager.AllActive.Count; i++)
+        {
+            UnitManager unit = UnitManager.AllActive[i];
+            if (unit == null || unit.TeamId != aiTeam)
+                continue;
+
+            UnitHudController hud = FindOwnedUnitHud(unit);
+            if (hud != null)
+                hud.SetPlanDebugBadge(false, string.Empty);
+        }
+
+        if (!showPlanDebugAtUnit)
+            return;
+
+        foreach (var kv in currentTurnUnitAssignments)
+        {
+            AIPlanAssignment assignment = kv.Value;
+            if (assignment == null)
+                continue;
+
+            UnitManager unit = FindUnitById(assignment.UnitInstanceId);
+            if (unit == null || unit.IsDead || unit.TeamId != aiTeam)
+                continue;
+
+            UnitHudController hud = FindOwnedUnitHud(unit);
+            if (hud == null)
+                continue;
+
+            string badge = BuildPlanBadgeSymbol(assignment);
+            if (string.IsNullOrWhiteSpace(badge))
+                continue;
+
+            hud.SetPlanDebugBadge(true, badge);
+        }
+    }
+
+    private static UnitHudController FindOwnedUnitHud(UnitManager unit)
+    {
+        if (unit == null)
+            return null;
+
+        UnitHudController[] huds = unit.GetComponentsInChildren<UnitHudController>(true);
+        for (int i = 0; i < huds.Length; i++)
+        {
+            UnitHudController hud = huds[i];
+            if (hud == null)
+                continue;
+
+            if (hud.ResolveOwnerUnit() == unit)
+                return hud;
+        }
+
+        return null;
+    }
+
+    private string BuildPlanBadgeSymbol(AIPlanAssignment assignment)
+    {
+        if (assignment == null || assignment.Intent == null)
+            return string.Empty;
+
+        AIPlanIntent intent = assignment.Intent;
+        AIPlanData plan = intent.Plan;
+
+        if (plan != null)
+        {
+            if (IsSamePlan(plan, aiPlanDatabase != null ? aiPlanDatabase.defensePlan : null))
+                return "0";
+            if (IsSamePlan(plan, aiPlanDatabase != null ? aiPlanDatabase.attackPlan : null))
+                return ">";
+        }
+
+        return GetSectorInitial(intent.Sector);
+    }
+
+    private static bool IsSamePlan(AIPlanData a, AIPlanData b)
+    {
+        if (a == null || b == null)
+            return false;
+
+        if (ReferenceEquals(a, b))
+            return true;
+
+        if (!string.IsNullOrWhiteSpace(a.planId) && !string.IsNullOrWhiteSpace(b.planId))
+            return string.Equals(a.planId.Trim(), b.planId.Trim(), System.StringComparison.OrdinalIgnoreCase);
+
+        return string.Equals(a.displayName, b.displayName, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetSectorInitial(ConstructionSector sector)
+    {
+        if (sector == ConstructionSector.BaseTeam)
+            return "?";
+
+        string name = sector.ToString();
+        if (string.IsNullOrWhiteSpace(name))
+            return "?";
+
+        return char.ToUpperInvariant(name[0]).ToString();
+    }
+
+    private AIPlanEvaluator.PlannerRuntimeConfig BuildPlannerRuntimeConfig(TeamId aiTeam)
+    {
+        const int defaultDefensePullRadius = 6;
+        const int defaultMaxAttackReassignPerTurn = 2;
+        const int defaultStagnationTurns = 2;
+
+        AIGeneralProfile profileForTeam = GetAssignedProfileForTeam(aiTeam);
+
+        int defensePullRadius = defaultDefensePullRadius;
+        int maxAttackReassignPerTurn = defaultMaxAttackReassignPerTurn;
+        int stagnationTurns = defaultStagnationTurns;
+
+        if (profileForTeam != null)
+        {
+            defensePullRadius = Mathf.Max(1, profileForTeam.defensePullRadius);
+            maxAttackReassignPerTurn = Mathf.Max(0, profileForTeam.maxAttackReassignPerTurn);
+            stagnationTurns = Mathf.Max(0, profileForTeam.stagnationTurns);
+        }
+
+        return new AIPlanEvaluator.PlannerRuntimeConfig
+        {
+            DefensePullRadius = defensePullRadius,
+            MaxAttackReassignPerTurn = maxAttackReassignPerTurn,
+            StagnationTurns = stagnationTurns,
+            CurrentStance = currentStance,
+            CurrentTurn = matchController != null ? matchController.CurrentTurn : 0
+        };
+    }
+
+    private void UpdateMissionPersistenceMemory(AISnapshot snapshot, int currentTurn)
+    {
+        var nextAssignments = new Dictionary<int, AIPlanEvaluator.MissionAssignmentMemory>();
+        var nextPlanMetrics = new Dictionary<string, PlanMetricState>();
+
+        for (int p = 0; p < currentTurnPlans.Count; p++)
+        {
+            AIPlanIntent intent = currentTurnPlans[p];
+            if (intent == null)
+                continue;
+
+            string planKey = AIPlanEvaluator.BuildPlanKey(intent);
+            bool planProgress = DetectPlanProgress(snapshot, intent, planKey, out int currentOutstanding, out int currentThreats);
+            nextPlanMetrics[planKey] = new PlanMetricState
+            {
+                OutstandingCaptures = currentOutstanding,
+                VisibleThreats = currentThreats
+            };
+
+            for (int a = 0; a < intent.Assignments.Count; a++)
+            {
+                AIPlanAssignment assignment = intent.Assignments[a];
+                if (assignment == null)
+                    continue;
+
+                UnitManager unit = FindUnitById(assignment.UnitInstanceId);
+                if (unit == null || unit.IsDead)
+                    continue;
+
+                int distance = GetDistanceToPlanTarget(unit, intent, snapshot);
+                int lastProgressTurn = currentTurn;
+                if (previousAssignmentsByUnitId.TryGetValue(unit.InstanceId, out AIPlanEvaluator.MissionAssignmentMemory previous)
+                    && string.Equals(previous.PlanKey, planKey, System.StringComparison.Ordinal))
+                {
+                    bool distanceReduced = distance < previous.LastDistanceToTarget;
+                    bool progressed = distanceReduced || planProgress;
+                    lastProgressTurn = progressed ? currentTurn : previous.LastProgressTurn;
+                }
+
+                nextAssignments[unit.InstanceId] = new AIPlanEvaluator.MissionAssignmentMemory
+                {
+                    UnitInstanceId = unit.InstanceId,
+                    PlanKey = planKey,
+                    Role = assignment.Role,
+                    LastProgressTurn = lastProgressTurn,
+                    LastDistanceToTarget = distance
+                };
+            }
+        }
+
+        previousAssignmentsByUnitId.Clear();
+        foreach (var kv in nextAssignments)
+            previousAssignmentsByUnitId[kv.Key] = kv.Value;
+
+        previousPlanMetricsByKey.Clear();
+        foreach (var kv in nextPlanMetrics)
+            previousPlanMetricsByKey[kv.Key] = kv.Value;
+    }
+
+    private bool DetectPlanProgress(AISnapshot snapshot, AIPlanIntent intent, string planKey, out int currentOutstanding, out int currentThreats)
+    {
+        currentOutstanding = CountOutstandingCaptureTargets(snapshot, intent.Sector);
+        currentThreats = CountVisibleEnemiesNearSector(snapshot, intent.Sector);
+
+        if (!previousPlanMetricsByKey.TryGetValue(planKey, out PlanMetricState previousMetric))
+            return false;
+
+        if (currentOutstanding < previousMetric.OutstandingCaptures)
+            return true;
+
+        if (currentThreats < previousMetric.VisibleThreats)
+            return true;
+
+        return false;
+    }
+
+    private static int CountOutstandingCaptureTargets(AISnapshot snapshot, ConstructionSector sector)
+    {
+        if (snapshot == null)
+            return 0;
+
+        int count = 0;
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo info = snapshot.KnownConstructions[i];
+            if (info == null || !info.IsCapturable)
+                continue;
+            if (info.Sector != sector)
+                continue;
+
+            bool ownedFully = info.TeamId == snapshot.AiTeam && info.CapturePoints >= info.CapturePointsMax;
+            if (!ownedFully)
+                count++;
+        }
+
+        return count;
+    }
+
+    private static int CountVisibleEnemiesNearSector(AISnapshot snapshot, ConstructionSector sector)
+    {
+        if (snapshot == null)
+            return 0;
+
+        if (sector == ConstructionSector.BaseTeam)
+        {
+            if (!snapshot.HasHq)
+                return 0;
+
+            int aroundHq = 0;
+            for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
+            {
+                UnitManager enemy = snapshot.VisibleEnemies[i];
+                if (enemy == null || enemy.IsDead)
+                    continue;
+
+                int dist = GetHexDistance(snapshot.HqCell, enemy.CurrentCellPosition);
+                if (dist <= AISnapshot.DefaultDefendRadius)
+                    aroundHq++;
+            }
+
+            return aroundHq;
+        }
+
+        Vector2 centroid = Vector2.zero;
+        int centroidCount = 0;
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo info = snapshot.KnownConstructions[i];
+            if (info == null || info.Sector != sector)
+                continue;
+
+            centroid += new Vector2(info.Cell.x, info.Cell.y);
+            centroidCount++;
+        }
+
+        if (centroidCount <= 0)
+            return 0;
+
+        centroid /= centroidCount;
+
+        int threats = 0;
+        for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
+        {
+            UnitManager enemy = snapshot.VisibleEnemies[i];
+            if (enemy == null || enemy.IsDead)
+                continue;
+
+            Vector3Int ec = enemy.CurrentCellPosition;
+            float sqrDist = (new Vector2(ec.x, ec.y) - centroid).sqrMagnitude;
+            if (sqrDist <= 36f)
+                threats++;
+        }
+
+        return threats;
+    }
+
+    private static int GetDistanceToPlanTarget(UnitManager unit, AIPlanIntent intent, AISnapshot snapshot)
+    {
+        if (unit == null || intent == null)
+            return int.MaxValue;
+
+        Vector3Int from = unit.CurrentCellPosition;
+        from.z = 0;
+
+        Vector3Int target;
+        if (intent.HasCaptureTarget)
+            target = intent.CaptureTargetCell;
+        else if (snapshot != null && snapshot.HasHq)
+            target = snapshot.HqCell;
+        else
+            target = from;
+
+        target.z = 0;
+        return GetHexDistance(from, target);
+    }
+
+    private static int GetHexDistance(Vector3Int a, Vector3Int b)
+    {
+        a.z = 0;
+        b.z = 0;
+        return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
     }
 
     private static List<int> CollectFriendlyUnitIds(AISnapshot snapshot)
@@ -469,9 +813,8 @@ public class AIPlayerController : MonoBehaviour
 
         unit.TryGetUnitData(out UnitData unitData);
         AIUnitProfile aiProfile = unitData != null ? unitData.aiUnitProfile : null;
-        bool isInfantry = unitData != null && unitData.unitClass == GameUnitClass.Infantry;
         // Attack-first: threshold menor para abandonar captura por ataque ("morder no caminho").
-        bool bazookaSkirmisherUnit = isInfantry && aiProfile != null
+        bool bazookaSkirmisherUnit = aiProfile != null
             && aiProfile.SensorPriority.Count > 0 && aiProfile.SensorPriority[0] == AIUnitSensorKind.Attack;
         bool captureObjectiveActive = false;
         bool captureActionNow = false;
@@ -499,15 +842,15 @@ public class AIPlayerController : MonoBehaviour
                 : (unitIntent.Plan != null && !string.IsNullOrWhiteSpace(unitIntent.Plan.displayName)
                     ? unitIntent.Plan.displayName
                     : (unitIntent.Plan != null ? unitIntent.Plan.name : unitIntent.Sector.ToString()));
-            string planRole = unitAssignment != null && !string.IsNullOrWhiteSpace(unitAssignment.Role)
-                ? unitAssignment.Role
+            string planRole = unitAssignment != null
+                ? unitAssignment.Role.ToDebugLabel()
                 : "sem papel";
             planAllocationLabel = $"{planName} [{planRole}]";
         }
         bool planCohesionActive = false;
         Vector3Int planCohesionCell = unitCell;
         string planCohesionLabel = string.Empty;
-        if (unitIntent != null && unitAssignment != null && unitAssignment.Role != "capturador")
+        if (unitIntent != null && unitAssignment != null && unitAssignment.Role != AIPlanRole.Capture)
         {
             planCohesionActive = TryGetPlanCohesionObjective(unit, snapshot, unitIntent, unitAssignment, out planCohesionCell, out planCohesionLabel);
         }
@@ -828,22 +1171,26 @@ public class AIPlayerController : MonoBehaviour
         }
 
         bool canRepositionWhileFiring = unit.RemainingMovementPoints > 1;
-        if (!supplyObjectiveActive && !repairModeActive && !captureObjectiveActive && intelCanFire && engagingEnemy && TryGetPreferredEngagementRangeForTarget(unit, targetEnemy, out int engageMinRange, out int engageMaxRange))
+        if (!supplyObjectiveActive && !repairModeActive && !captureObjectiveActive && engagingEnemy && TryGetPreferredEngagementRangeForTarget(unit, targetEnemy, out int engageMinRange, out int engageMaxRange))
         {
+            bool artilleryProfile = engageMinRange > 1;
+            bool hybridProfile = !artilleryProfile && engageMaxRange > 1;
+            bool preferStationaryFirst = intelCanFire && (artilleryProfile || hybridProfile);
+
             int currentDistToAssignedTarget = GetHexDistance(snapshot.BoardTilemap, unitCell, moveTarget, 64);
             bool alreadyInAssignedTargetBand =
                 currentDistToAssignedTarget != int.MaxValue &&
                 currentDistToAssignedTarget >= engageMinRange &&
                 currentDistToAssignedTarget <= engageMaxRange;
 
-            if (alreadyInAssignedTargetBand)
+            if (preferStationaryFirst || alreadyInAssignedTargetBand)
             {
                 foundDestination = true;
                 bestDest = unitCell;
             }
             else if (canRepositionWhileFiring)
             {
-                bool preferMaxRangeWhenAlreadyFiring = engageMinRange > 1;
+                bool preferMaxRangeWhenAlreadyFiring = artilleryProfile;
                 foundDestination = turnStateManager.TryGetBestReachableCellAtHexDistanceBand(
                     snapshot.BoardTilemap,
                     moveTarget,
@@ -1799,7 +2146,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         return false;
     }
 
-    private static bool IsFriendlyInfantryOccupyingCell(AISnapshot snapshot, UnitManager requester, Vector3Int cell)
+    private static bool IsFriendlyCaptureUnitOccupyingCell(AISnapshot snapshot, UnitManager requester, Vector3Int cell)
     {
         if (snapshot == null || requester == null || snapshot.FriendlyUnits == null)
             return false;
@@ -1813,7 +2160,6 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             if (ally.TeamId != requester.TeamId)
                 continue;
             if (!(ally.TryGetUnitData(out UnitData allyData) && allyData != null
-                && allyData.unitClass == GameUnitClass.Infantry
                 && allyData.aiUnitProfile != null && allyData.aiUnitProfile.allowCapture
                 && (allyData.aiUnitProfile.SensorPriority.Count == 0 || allyData.aiUnitProfile.SensorPriority[0] == AIUnitSensorKind.Capture)))
                 continue;
@@ -2232,7 +2578,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
                 AIPlanAssignment asgn = unitIntent.Assignments[i];
                 if (asgn == null || asgn.UnitInstanceId == unit.InstanceId)
                     continue;
-                if (!string.Equals(asgn.Role, "capturador", System.StringComparison.Ordinal))
+                if (asgn.Role != AIPlanRole.Capture)
                     continue;
 
                 Vector3Int candidate = asgn.HasPlannedCaptureTarget
@@ -2360,8 +2706,8 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             if (distance == int.MaxValue)
                 distance = 64;
 
-            bool occupiedByOtherInfantry = IsFriendlyInfantryOccupyingCell(snapshot, unit, cell);
-            int effectiveDistance = distance + (occupiedByOtherInfantry ? 3 : 0);
+            bool occupiedByOtherCaptureUnit = IsFriendlyCaptureUnitOccupyingCell(snapshot, unit, cell);
+            int effectiveDistance = distance + (occupiedByOtherCaptureUnit ? 3 : 0);
 
             // Captura de infantaria: prioridade pratica = objetivo mais proximo.
             // Se ja existe outro aliado capturando esse mesmo hex, aplica penalidade para espalhar captura.
@@ -2580,6 +2926,16 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         Dictionary<AIDataGroup, int> countsByGroup = CountFriendlyUnitsByConfiguredGroup(snapshot, orderedGroups);
         int totalUnits = snapshot != null && snapshot.FriendlyUnits != null ? snapshot.FriendlyUnits.Count : 0;
         int denominator = Mathf.Max(1, totalUnits);
+        int missingCapturePlans = CountPlansMissingCaptureRole(snapshot);
+
+        // Urgencia de abertura: se existem planos de captura sem capturador, prioriza
+        // comprar qualquer unidade com perfil allowCapture=true antes da composicao percentual.
+        if (missingCapturePlans > 0 &&
+            TryResolveFirstAffordableCaptureCapableFromGroups(construction, orderedGroups, currentMoney, out targetIndex, out plannedUnitId))
+        {
+            plannedReason = $"urgencia-captura | planos-sem-capturador={missingCapturePlans}";
+            return true;
+        }
 
         for (int i = 0; i < orderedGroups.Count; i++)
         {
@@ -2657,6 +3013,77 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         return false;
     }
 
+    private static int CountPlansMissingCaptureRole(AISnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.ActivePlans == null || snapshot.ActivePlans.Count == 0)
+            return 0;
+
+        int missing = 0;
+        for (int i = 0; i < snapshot.ActivePlans.Count; i++)
+        {
+            AIPlanIntent intent = snapshot.ActivePlans[i];
+            if (intent == null || !intent.HasCaptureTarget || intent.Sector == ConstructionSector.BaseTeam)
+                continue;
+
+            bool hasCapture = false;
+            if (intent.Assignments != null)
+            {
+                for (int a = 0; a < intent.Assignments.Count; a++)
+                {
+                    AIPlanAssignment assignment = intent.Assignments[a];
+                    if (assignment != null && assignment.Role == AIPlanRole.Capture)
+                    {
+                        hasCapture = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!hasCapture)
+                missing++;
+        }
+
+        return missing;
+    }
+
+    private static bool TryResolveFirstAffordableCaptureCapableFromGroups(
+        ConstructionManager construction,
+        IReadOnlyList<AIDataGroup> orderedGroups,
+        int currentMoney,
+        out int targetIndex,
+        out string plannedUnitId)
+    {
+        targetIndex = -1;
+        plannedUnitId = null;
+
+        if (construction == null || orderedGroups == null)
+            return false;
+
+        for (int g = 0; g < orderedGroups.Count; g++)
+        {
+            AIDataGroup group = orderedGroups[g];
+            if (group == null || group.specificUnits == null || group.specificUnits.Count == 0)
+                continue;
+
+            for (int i = 0; i < group.specificUnits.Count; i++)
+            {
+                UnitData wantedUnit = group.specificUnits[i];
+                if (wantedUnit == null || string.IsNullOrWhiteSpace(wantedUnit.id))
+                    continue;
+                if (wantedUnit.aiUnitProfile == null || !wantedUnit.aiUnitProfile.allowCapture)
+                    continue;
+
+                if (!TryGetAffordableOfferIndex(construction, wantedUnit, currentMoney, out int index, out UnitData offer))
+                    continue;
+
+                targetIndex = index;
+                plannedUnitId = offer != null ? offer.id : wantedUnit.id;
+                return true;
+            }
+        }
+
+        return false;
+    }
     private static List<AIDataGroup> GetGroupsByPriority(List<AIDataGroup> groups)
     {
         List<AIDataGroup> ordered = new List<AIDataGroup>();
@@ -3080,7 +3507,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
                         AIPlanAssignment asgn = intent.Assignments[a];
                         UnitManager u = FindUnitById(asgn.UnitInstanceId);
                         string uName = u != null ? u.name : $"#{asgn.UnitInstanceId}";
-                        string role = string.IsNullOrWhiteSpace(asgn.Role) ? "—" : asgn.Role;
+                        string role = asgn.Role.ToDebugLabel();
                         sb.Append($" {uName}({role})");
                     }
                 }
@@ -3091,6 +3518,23 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         Debug.Log(sb.ToString());
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

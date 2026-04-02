@@ -51,6 +51,7 @@ public class ConstructionManager : MonoBehaviour
     [Header("Editor")]
     [SerializeField] private bool continuousEditorVisualRefresh = false;
     [System.NonSerialized] private int cachedOccupantInstanceId = int.MinValue;
+    [System.NonSerialized] private bool cachedOccupantVisible;
     [System.NonSerialized] private bool cachedOccupantReadySameTeam;
     [System.NonSerialized] private bool cachedShowFlagThreatOutline;
 #if UNITY_EDITOR
@@ -215,6 +216,7 @@ public class ConstructionManager : MonoBehaviour
             AllActive.Add(this);
 
         MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
+        MatchController.OnFogOfWarUpdated += HandleFogOfWarUpdated;
         MatchController.OnUnitActedStateChanged += HandleUnitActedStateChanged;
         MatchController.OnSlotConfigChanged += HandleSlotConfigChanged;
         UnitOccupancyRules.OnUnitOccupancyChanged += HandleUnitOccupancyChanged;
@@ -228,6 +230,7 @@ public class ConstructionManager : MonoBehaviour
     {
         AllActive.Remove(this);
         MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
+        MatchController.OnFogOfWarUpdated -= HandleFogOfWarUpdated;
         MatchController.OnUnitActedStateChanged -= HandleUnitActedStateChanged;
         MatchController.OnSlotConfigChanged -= HandleSlotConfigChanged;
         UnitOccupancyRules.OnUnitOccupancyChanged -= HandleUnitOccupancyChanged;
@@ -851,7 +854,7 @@ public class ConstructionManager : MonoBehaviour
         Color baseColor = TeamUtils.GetColor(teamId);
         Color targetColor = baseColor;
 
-        bool sameTeam = occupant != null && occupant.TeamId == teamId;
+        bool sameTeam = occupant != null && IsOccupantVisibleForHud(occupant) && occupant.TeamId == teamId;
         if (sameTeam && !occupant.HasActed)
         {
             float darken = Mathf.Clamp01(occupiedByReadyUnitDarkenFactor);
@@ -869,8 +872,10 @@ public class ConstructionManager : MonoBehaviour
         if (hudController == null)
             return;
 
-        bool hasUnitOnTop = occupant != null;
+        bool occupantVisible = IsOccupantVisibleForHud(occupant);
+        bool hasUnitOnTop = occupant != null && occupantVisible;
         bool showFlagThreatOutline = occupant != null
+            && occupantVisible
             && occupant.TeamId != teamId
             && currentCapturePoints <= Mathf.Max(0, occupant.CurrentHP);
 
@@ -889,13 +894,16 @@ public class ConstructionManager : MonoBehaviour
 
         UnitManager occupant = TryGetOccupantOnTop();
         int occupantId = occupant != null ? occupant.GetInstanceID() : 0;
-        bool sameTeamReady = occupant != null && occupant.TeamId == teamId && !occupant.HasActed;
+        bool occupantVisible = IsOccupantVisibleForHud(occupant);
+        bool sameTeamReady = occupant != null && occupantVisible && occupant.TeamId == teamId && !occupant.HasActed;
         bool showFlagThreatOutline = occupant != null
+            && occupantVisible
             && occupant.TeamId != teamId
             && currentCapturePoints <= Mathf.Max(0, occupant.CurrentHP);
 
         if (!force
             && cachedOccupantInstanceId == occupantId
+            && cachedOccupantVisible == occupantVisible
             && cachedOccupantReadySameTeam == sameTeamReady
             && cachedShowFlagThreatOutline == showFlagThreatOutline)
         {
@@ -903,10 +911,21 @@ public class ConstructionManager : MonoBehaviour
         }
 
         cachedOccupantInstanceId = occupantId;
+        cachedOccupantVisible = occupantVisible;
         cachedOccupantReadySameTeam = sameTeamReady;
         cachedShowFlagThreatOutline = showFlagThreatOutline;
         RefreshOccupancyVisualTint(occupant);
         RefreshHud(occupant);
+    }
+
+    private static bool IsOccupantVisibleForHud(UnitManager occupant)
+    {
+        if (occupant == null)
+            return false;
+        if (!Application.isPlaying)
+            return true;
+
+        return !occupant.IsHiddenByFogOfWar;
     }
 
     private void RefreshVictoryBuildingOverlayVisual()
@@ -1012,6 +1031,11 @@ public class ConstructionManager : MonoBehaviour
     {
         ResolveTeamIdFromSlot();
         RefreshRuntimeVisualState(force: true);
+    }
+
+    private void HandleFogOfWarUpdated()
+    {
+        RefreshRuntimeVisualState(force: false);
     }
 
     // Resolve o teamId a partir do slotIndex no MatchController.

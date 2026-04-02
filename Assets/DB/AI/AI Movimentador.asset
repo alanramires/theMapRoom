@@ -16,9 +16,11 @@ MonoBehaviour:
   allowCapture: 0
   allowAttack: 0
   allowReposition: 1
-  targetPriority: 0
+  canEscort: 0
   minDamageDealtPercent: 0
   maxDamageReceivedPercent: 0
   mustSurvive: 1
   targetPreference: 0
   preferFallbackWhenDefend: 1
+  hpRepairThreshold: 3
+  hpRepairExitThreshold: 8

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-
+using UnityEngine.Serialization;
 
 public enum AIPlanKind
 {
@@ -10,16 +10,78 @@ public enum AIPlanKind
 }
 
 [Serializable]
-public class AIPlanParticipantDefinition
+public class AIPlanParticipantDefinition : ISerializationCallbackReceiver
 {
     [Tooltip("Unidade especifica para o papel. Opcional.")]
     public UnitData unitData;
 
-    [Tooltip("Classe preferida quando nao houver UnitData fixa.")]
-    public GameUnitClass preferredClass = GameUnitClass.Infantry;
+    [Tooltip("Papel tatico no plano.")]
+    public AIPlanRole role = AIPlanRole.Assault;
 
-    [Tooltip("Papel tatico no plano (capturador, cobertura, transportador etc).")]
-    public string role = string.Empty;
+    [FormerlySerializedAs("role")]
+    [SerializeField, HideInInspector] private string legacyRole = string.Empty;
+
+    [SerializeField, HideInInspector] private bool legacyRoleMigrated;
+
+    public void OnBeforeSerialize()
+    {
+    }
+
+    public void OnAfterDeserialize()
+    {
+        if (legacyRoleMigrated || string.IsNullOrWhiteSpace(legacyRole))
+            return;
+
+        if (TryParseLegacyRole(legacyRole, out AIPlanRole parsed))
+            role = parsed;
+
+        legacyRoleMigrated = true;
+        legacyRole = string.Empty;
+    }
+
+    private static bool TryParseLegacyRole(string value, out AIPlanRole parsed)
+    {
+        parsed = AIPlanRole.Assault;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        string normalized = value.Trim().ToLowerInvariant();
+        switch (normalized)
+        {
+            case "capturador":
+            case "capture":
+                parsed = AIPlanRole.Capture;
+                return true;
+
+            case "escolta blindada":
+            case "escolta leve":
+            case "escort":
+                parsed = AIPlanRole.Escort;
+                return true;
+
+            case "apoio artilharia":
+            case "artillery":
+                parsed = AIPlanRole.Artillery;
+                return true;
+
+            case "transporte escolta":
+            case "support":
+                parsed = AIPlanRole.Support;
+                return true;
+
+            case "assault":
+                parsed = AIPlanRole.Assault;
+                return true;
+
+            default:
+                if (Enum.TryParse(value, true, out AIPlanRole enumRole))
+                {
+                    parsed = enumRole;
+                    return true;
+                }
+                return false;
+        }
+    }
 }
 
 [CreateAssetMenu(menuName = "Game/AI/AI Plan Data", fileName = "AIPlan_")]
@@ -34,7 +96,7 @@ public class AIPlanData : ScriptableObject
     public ConstructionSector targetSector = ConstructionSector.BaseTeam;
 
     [Header("Rules")]
-    [Tooltip("Condições de ativação — todas devem ser verdadeiras para o plano ser ativado.")]
+    [Tooltip("Condicoes de ativacao - todas devem ser verdadeiras para o plano ser ativado.")]
     public List<PlanCondition> activationConditions = new List<PlanCondition>();
     [TextArea]
     public string objectiveCompletedWhen = string.Empty;

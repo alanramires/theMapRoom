@@ -66,9 +66,10 @@ public static class PodeCapturarSensor
             return false;
         }
 
-        if (unitData.unitClass != GameUnitClass.Infantry)
+        AIUnitProfile profile = unitData.aiUnitProfile;
+        if (profile == null || !profile.allowCapture)
         {
-            reason = "Apenas infantaria pode capturar.";
+            reason = "Perfil da unidade nao permite captura.";
             return false;
         }
 

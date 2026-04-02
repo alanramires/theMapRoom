@@ -814,6 +814,12 @@ public class MatchController : MonoBehaviour
     {
         gameSetup = preset;
         ApplyGameSetupPreset();
+        if (gameSetup == GameSetupPreset.FogOfWarTotal)
+        {
+            // Hard guard: the Total FoW preset must always start with FoW enabled.
+            fogOfWar = true;
+            debugFogOfWarEnabled = true;
+        }
         SyncThreatRevisionFlags();
     }
 
@@ -1342,6 +1348,8 @@ public class MatchController : MonoBehaviour
 
     private void NormalizeState()
     {
+        if (gameSetup == GameSetupPreset.FogOfWarTotal)
+            fogOfWar = true;
         debugFogOfWarEnabled = fogOfWar;
         currentTurn = Mathf.Max(0, currentTurn);
         activeTeamId = Mathf.Clamp(activeTeamId, -1, 3);

@@ -655,7 +655,7 @@ public class AIIntelDebugWindow : EditorWindow
                     AIPlanAssignment asgn = intent.Assignments[a];
                     UnitManager u = FindUnitByInstanceId(asgn.UnitInstanceId);
                     string unitName = u != null ? u.UnitDisplayName : $"#{asgn.UnitInstanceId}";
-                    string role = string.IsNullOrWhiteSpace(asgn.Role) ? "—" : asgn.Role;
+                    string role = asgn.Role.ToDebugLabel();
                     EditorGUILayout.LabelField($"  · [{role}] {unitName}", EditorStyles.miniLabel);
                 }
             }
@@ -958,3 +958,4 @@ public class AIIntelDebugWindow : EditorWindow
         }
     }
 }
+

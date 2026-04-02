@@ -21,6 +21,9 @@ public class AIUnitProfile : ScriptableObject
     [Tooltip("Permite o sensor de reposicionamento nesta unidade.")]
     public bool allowReposition = true;
 
+    [Tooltip("Permite que a unidade seja designada como escolta pelo planner.")]
+    public bool canEscort = false;
+
 
     [Header("Attack Decision")]
     [Tooltip("Dano minimo em percentual do HP maximo do alvo para considerar engajar. 0 ignora.")]
@@ -112,4 +115,5 @@ public class AIUnitProfile : ScriptableObject
         hpRepairExitThreshold = Mathf.Max(hpRepairThreshold + 1, hpRepairExitThreshold);
     }
 }
+
 

@@ -8,6 +8,7 @@ public class AIPlayerControllerEditor : Editor
     private SerializedProperty matchControllerProp;
     private SerializedProperty turnStateManagerProp;
     private SerializedProperty aiLogProp;
+    private SerializedProperty showPlanDebugAtUnitProp;
     private SerializedProperty aiDatabaseProp;
     private SerializedProperty aiPlanDatabaseProp;
 
@@ -16,6 +17,7 @@ public class AIPlayerControllerEditor : Editor
         matchControllerProp = serializedObject.FindProperty("matchController");
         turnStateManagerProp = serializedObject.FindProperty("turnStateManager");
         aiLogProp = serializedObject.FindProperty("aiLog");
+        showPlanDebugAtUnitProp = serializedObject.FindProperty("showPlanDebugAtUnit");
         aiDatabaseProp = serializedObject.FindProperty("aiDatabase");
         aiPlanDatabaseProp = serializedObject.FindProperty("aiPlanDatabase");
     }
@@ -27,6 +29,7 @@ public class AIPlayerControllerEditor : Editor
         EditorGUILayout.PropertyField(matchControllerProp);
         EditorGUILayout.PropertyField(turnStateManagerProp);
         EditorGUILayout.PropertyField(aiLogProp);
+        EditorGUILayout.PropertyField(showPlanDebugAtUnitProp, new GUIContent("Show Plan (Debug) At Unit"));
 
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("AI Setup", EditorStyles.boldLabel);

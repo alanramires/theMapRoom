@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 // Avaliador stateless de planos da IA.
@@ -6,7 +6,44 @@ using UnityEngine;
 // Planos variaveis sao gerados dinamicamente a partir do snapshot.
 public static class AIPlanEvaluator
 {
+    public struct MissionAssignmentMemory
+    {
+        public int UnitInstanceId;
+        public string PlanKey;
+        public AIPlanRole Role;
+        public int LastProgressTurn;
+        public int LastDistanceToTarget;
+    }
+
+    public struct PlannerRuntimeConfig
+    {
+        public int DefensePullRadius;
+        public int MaxAttackReassignPerTurn;
+        public int StagnationTurns;
+        public AIStance CurrentStance;
+        public int CurrentTurn;
+    }
+
     public static List<AIPlanIntent> Evaluate(AIPlanDatabase database, AISnapshot snapshot)
+    {
+        PlannerRuntimeConfig config = new PlannerRuntimeConfig
+        {
+            DefensePullRadius = 6,
+            MaxAttackReassignPerTurn = 2,
+            StagnationTurns = 2,
+            CurrentStance = AIStance.Attack,
+            CurrentTurn = 0
+        };
+
+        return Evaluate(database, snapshot, null, config, null);
+    }
+
+    public static List<AIPlanIntent> Evaluate(
+        AIPlanDatabase database,
+        AISnapshot snapshot,
+        IReadOnlyCollection<MissionAssignmentMemory> previousAssignments,
+        PlannerRuntimeConfig config,
+        List<string> plannerLogs)
     {
         var result = new List<AIPlanIntent>();
         if (database == null || snapshot == null)
@@ -18,8 +55,10 @@ public static class AIPlanEvaluator
         var assignedUnits = new HashSet<int>();
 
         // Planos fixos: defesa primeiro, depois ataque.
-        TryActivateFixedPlan(database.defensePlan, snapshot, assignedUnits, result);
-        TryActivateFixedPlan(database.attackPlan, snapshot, assignedUnits, result);
+        if (ShouldActivateDefensePlan(database.defensePlan, snapshot))
+            TryActivateFixedPlan(database.defensePlan, snapshot, assignedUnits, result);
+        if (ShouldActivateAttackPlan(database.attackPlan, snapshot))
+            TryActivateFixedPlan(database.attackPlan, snapshot, assignedUnits, result);
 
         // Planos variaveis: gerados em runtime por setor.
         GenerateDynamicVariablePlans(
@@ -27,6 +66,8 @@ public static class AIPlanEvaluator
             database.maxVariablePlans,
             assignedUnits,
             result);
+
+        ApplyMissionPersistenceAndReallocation(database, snapshot, result, previousAssignments, config, plannerLogs);
 
         return result;
     }
@@ -47,6 +88,50 @@ public static class AIPlanEvaluator
         AssignUnitsFromParticipants(intent, plan, snapshot, assignedUnits);
         result.Add(intent);
         return true;
+    }
+
+    private static bool ShouldActivateDefensePlan(AIPlanData defensePlan, AISnapshot snapshot)
+    {
+        if (defensePlan == null || snapshot == null || !snapshot.HasHq)
+            return false;
+
+        for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
+        {
+            UnitManager enemy = snapshot.VisibleEnemies[i];
+            if (enemy == null || enemy.IsDead)
+                continue;
+
+            int dist = Mathf.Abs(enemy.CurrentCellPosition.x - snapshot.HqCell.x)
+                + Mathf.Abs(enemy.CurrentCellPosition.y - snapshot.HqCell.y);
+            if (dist <= AISnapshot.DefaultDefendRadius)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool ShouldActivateAttackPlan(AIPlanData attackPlan, AISnapshot snapshot)
+    {
+        if (attackPlan == null || snapshot == null)
+            return false;
+
+        int total = 0;
+        int owned = 0;
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo c = snapshot.KnownConstructions[i];
+            if (c == null || !c.IsCapturable)
+                continue;
+
+            total++;
+            if (c.TeamId == snapshot.AiTeam)
+                owned++;
+        }
+
+        if (total <= 0)
+            return false;
+
+        return ((float)owned / total) >= 0.5f;
     }
 
     private static void GenerateDynamicVariablePlans(
@@ -129,7 +214,7 @@ public static class AIPlanEvaluator
         for (int i = 0; i < supportPriority.Count; i++)
         {
             DynamicPlanDraft draft = supportPriority[i];
-            if (!HasAssignedRole(draft.Intent, "capturador"))
+            if (!HasAssignedRole(draft.Intent, AIPlanRole.Capture))
                 continue;
 
             AssignDynamicSupportForces(draft, snapshot, assignedUnits);
@@ -491,7 +576,7 @@ public static class AIPlanEvaluator
                 }
                 else
                 {
-                    if (unitData == null || unitData.unitClass != def.preferredClass) continue;
+                    if (!CanUnitPerformRole(unitData, def.role)) continue;
                 }
 
                 Vector3Int uc = unit.CurrentCellPosition;
@@ -560,11 +645,8 @@ public static class AIPlanEvaluator
                 continue;
 
             unit.TryGetUnitData(out UnitData data);
-            if (data == null || data.unitClass != GameUnitClass.Infantry)
+            if (!CanUnitPerformRole(data, AIPlanRole.Capture))
                 continue;
-            if (data.aiUnitProfile != null && !data.aiUnitProfile.allowCapture)
-                continue;
-
             infantryUnits.Add(unit);
         }
 
@@ -644,7 +726,7 @@ public static class AIPlanEvaluator
                 slot.Draft.Intent.Assignments.Add(new AIPlanAssignment
                 {
                     UnitInstanceId = unit.InstanceId,
-                    Role = "capturador",
+                    Role = AIPlanRole.Capture,
                     Intent = slot.Draft.Intent,
                     HasPlannedCaptureTarget = true,
                     PlannedCaptureCell = slot.Cell,
@@ -664,17 +746,12 @@ public static class AIPlanEvaluator
         PlannedForce force = draft.Force;
         Vector3Int targetCell = intent.HasCaptureTarget ? intent.CaptureTargetCell : snapshot.HqCell;
 
-        int armoredAssigned = AssignClosestByClass(intent, snapshot, assignedUnits, targetCell, GameUnitClass.Armored, force.ArmoredEscort, "escolta blindada");
-        int armoredMissing = force.ArmoredEscort - armoredAssigned;
-        if (armoredMissing > 0)
-            AssignClosestByClass(intent, snapshot, assignedUnits, targetCell, GameUnitClass.Vehicle, armoredMissing, "escolta leve");
-
-        AssignClosestByClass(intent, snapshot, assignedUnits, targetCell, GameUnitClass.Artillery, force.Artillery, "apoio artilharia");
+        AssignClosestEscortUnits(intent, snapshot, assignedUnits, targetCell, force.ArmoredEscort, AIPlanRole.Escort);
+        AssignClosestEscortUnits(intent, snapshot, assignedUnits, targetCell, force.Artillery, AIPlanRole.Artillery);
 
         if (force.ApcEscort > 0)
-            AssignClosestTransporters(intent, snapshot, assignedUnits, targetCell, force.ApcEscort, "transporte escolta");
+            AssignClosestEscortUnits(intent, snapshot, assignedUnits, targetCell, force.ApcEscort, AIPlanRole.Support);
     }
-
     private sealed class FlowEdge
     {
         public int To;
@@ -798,7 +875,7 @@ public static class AIPlanEvaluator
         return score;
     }
 
-    private static bool HasAssignedRole(AIPlanIntent intent, string role)
+    private static bool HasAssignedRole(AIPlanIntent intent, AIPlanRole role)
     {
         if (intent == null || intent.Assignments == null || intent.Assignments.Count == 0)
             return false;
@@ -812,15 +889,43 @@ public static class AIPlanEvaluator
 
         return false;
     }
-    private static int AssignClosestByClass(
+
+    private static bool CanUnitPerformRole(UnitData unitData, AIPlanRole role)
+    {
+        if (unitData == null)
+            return false;
+
+        AIUnitProfile profile = unitData.aiUnitProfile;
+        if (profile == null)
+            return false;
+
+        switch (role)
+        {
+            case AIPlanRole.Capture:
+                return profile.allowCapture;
+
+            case AIPlanRole.Escort:
+                return profile.canEscort;
+
+            case AIPlanRole.Artillery:
+                return profile.canEscort && profile.allowAttack;
+
+            case AIPlanRole.Support:
+                return profile.canEscort || profile.allowReposition;
+
+            case AIPlanRole.Assault:
+            default:
+                return profile.allowAttack;
+        }
+    }
+
+    private static int AssignClosestEscortUnits(
         AIPlanIntent intent,
         AISnapshot snapshot,
         HashSet<int> assignedUnits,
         Vector3Int targetCell,
-        GameUnitClass unitClass,
         int wanted,
-        string role,
-        bool requireCaptureCapable = false)
+        AIPlanRole role)
     {
         if (wanted <= 0)
             return 0;
@@ -829,13 +934,13 @@ public static class AIPlanEvaluator
         for (int u = 0; u < snapshot.FriendlyUnits.Count; u++)
         {
             UnitManager unit = snapshot.FriendlyUnits[u];
-            if (unit == null || unit.IsDead) continue;
-            if (assignedUnits.Contains(unit.InstanceId)) continue;
+            if (unit == null || unit.IsDead)
+                continue;
+            if (assignedUnits.Contains(unit.InstanceId))
+                continue;
 
             unit.TryGetUnitData(out UnitData unitData);
-            if (unitData == null || unitData.unitClass != unitClass) continue;
-
-            if (requireCaptureCapable && unitData.aiUnitProfile != null && !unitData.aiUnitProfile.allowCapture)
+            if (unitData == null || unitData.aiUnitProfile == null || !unitData.aiUnitProfile.canEscort)
                 continue;
 
             Vector3Int uc = unit.CurrentCellPosition;
@@ -861,52 +966,651 @@ public static class AIPlanEvaluator
 
         return assigned;
     }
-
-    private static int AssignClosestTransporters(
-        AIPlanIntent intent,
-        AISnapshot snapshot,
-        HashSet<int> assignedUnits,
-        Vector3Int targetCell,
-        int wanted,
-        string role)
+    public static string BuildPlanKey(AIPlanIntent intent)
     {
-        if (wanted <= 0)
+        if (intent == null)
+            return string.Empty;
+
+        if (intent.Plan != null)
+        {
+            string stableId = !string.IsNullOrWhiteSpace(intent.Plan.planId)
+                ? intent.Plan.planId
+                : (!string.IsNullOrWhiteSpace(intent.Plan.displayName) ? intent.Plan.displayName : intent.Plan.name);
+            return $"fixed:{stableId}";
+        }
+
+        return $"dynamic:capture:{intent.Sector}";
+    }
+
+    private static void ApplyMissionPersistenceAndReallocation(
+        AIPlanDatabase database,
+        AISnapshot snapshot,
+        List<AIPlanIntent> plans,
+        IReadOnlyCollection<MissionAssignmentMemory> previousAssignments,
+        PlannerRuntimeConfig config,
+        List<string> plannerLogs)
+    {
+        if (plans == null || plans.Count == 0)
+            return;
+
+        var desiredRoleCounts = CaptureDesiredRoleCounts(plans);
+        var unitById = BuildFriendlyUnitIndex(snapshot);
+        var planByKey = BuildPlanByKey(plans);
+        var unitAssignments = BuildUnitAssignments(plans);
+        var stagnatedPlans = ComputeStagnatedPlans(previousAssignments, planByKey, config);
+
+        foreach (string stagnatedKey in stagnatedPlans)
+            AddPlannerLog(plannerLogs, $"liberado-estagnacao | {stagnatedKey} | sem progresso > {config.StagnationTurns} turnos");
+
+        if (previousAssignments != null)
+        {
+            foreach (MissionAssignmentMemory memory in previousAssignments)
+            {
+                if (!unitById.ContainsKey(memory.UnitInstanceId))
+                    continue;
+                if (string.IsNullOrWhiteSpace(memory.PlanKey))
+                    continue;
+                if (!planByKey.TryGetValue(memory.PlanKey, out AIPlanIntent targetPlan))
+                    continue;
+
+                if (unitAssignments.TryGetValue(memory.UnitInstanceId, out AIPlanAssignment existing) && existing != null && existing.Intent == targetPlan && existing.Role == memory.Role)
+                {
+                    AddPlannerLog(plannerLogs, $"preservado | {unitById[memory.UnitInstanceId].name} -> {memory.PlanKey} [{memory.Role.ToDebugLabel()}]");
+                    continue;
+                }
+
+                if (TryMoveUnitToPlan(snapshot, unitById[memory.UnitInstanceId], targetPlan, memory.Role, unitAssignments, plannerLogs, "preservado", null))
+                    continue;
+            }
+        }
+
+        bool defenseGate = IsDefenseGateOpen(snapshot);
+        bool invasionGate = IsInvasionGateOpen(snapshot);
+        AIPlanIntent defensePlan = FindFixedIntent(plans, database != null ? database.defensePlan : null);
+        AIPlanIntent invasionPlan = FindFixedIntent(plans, database != null ? database.attackPlan : null);
+
+        if (defenseGate && config.CurrentStance == AIStance.Defend && defensePlan != null)
+        {
+            int wanted = Mathf.Max(1, CountVisibleEnemiesNearHq(snapshot, AISnapshot.DefaultDefendRadius));
+            int current = CountAssignments(defensePlan, null);
+            int missing = Mathf.Max(0, wanted - current);
+            if (missing > 0)
+            {
+                var candidates = CollectCandidatesForReassignment(plans, defensePlan, unitById, snapshot.HqCell, onlyNonCapture: false);
+                for (int i = 0; i < candidates.Count && missing > 0; i++)
+                {
+                    ReassignCandidate candidate = candidates[i];
+                    if (candidate.DistanceToDestination > Mathf.Max(1, config.DefensePullRadius))
+                    {
+                        AddPlannerLog(plannerLogs, $"bloqueado-realocacao | {candidate.Unit.name} -> defesa | motivo=fora do raio ({candidate.DistanceToDestination}>{config.DefensePullRadius})");
+                        continue;
+                    }
+
+                    bool originCritical = IsPlanCritical(snapshot, candidate.SourcePlan, planByKey, stagnatedPlans);
+                    if (originCritical && !CanSourcePlanSpareRole(candidate.SourcePlan, candidate.Role))
+                    {
+                        AddPlannerLog(plannerLogs, $"bloqueado-realocacao | {candidate.Unit.name} {BuildPlanKey(candidate.SourcePlan)} -> defesa | motivo=plano origem critico");
+                        continue;
+                    }
+
+                    if (TryMoveUnitToPlan(snapshot, candidate.Unit, defensePlan, candidate.Role, unitAssignments, plannerLogs, "realocado-defesa", candidate.SourcePlan))
+                        missing--;
+                }
+            }
+        }
+
+        if (invasionGate && config.CurrentStance == AIStance.Attack && invasionPlan != null)
+        {
+            int pulled = 0;
+            int maxPull = Mathf.Max(0, config.MaxAttackReassignPerTurn);
+            Vector3Int invasionAnchor = GetIntentAnchorCell(invasionPlan, snapshot);
+            var candidates = CollectCandidatesForReassignment(plans, invasionPlan, unitById, invasionAnchor, onlyNonCapture: true);
+            for (int i = 0; i < candidates.Count && pulled < maxPull; i++)
+            {
+                ReassignCandidate candidate = candidates[i];
+                bool originCritical = IsPlanCritical(snapshot, candidate.SourcePlan, planByKey, stagnatedPlans);
+                if (originCritical && !CanSourcePlanSpareRole(candidate.SourcePlan, candidate.Role))
+                {
+                    AddPlannerLog(plannerLogs, $"bloqueado-realocacao | {candidate.Unit.name} {BuildPlanKey(candidate.SourcePlan)} -> invasao | motivo=plano origem critico");
+                    continue;
+                }
+
+                if (TryMoveUnitToPlan(snapshot, candidate.Unit, invasionPlan, candidate.Role, unitAssignments, plannerLogs, "realocado-invasao", candidate.SourcePlan))
+                    pulled++;
+            }
+        }
+
+        RefillMissingRoles(snapshot, plans, desiredRoleCounts, unitAssignments, unitById, plannerLogs);
+    }
+
+    private static Dictionary<string, Dictionary<AIPlanRole, int>> CaptureDesiredRoleCounts(List<AIPlanIntent> plans)
+    {
+        var desired = new Dictionary<string, Dictionary<AIPlanRole, int>>();
+        for (int i = 0; i < plans.Count; i++)
+        {
+            AIPlanIntent plan = plans[i];
+            if (plan == null)
+                continue;
+
+            string key = BuildPlanKey(plan);
+            if (!desired.TryGetValue(key, out Dictionary<AIPlanRole, int> roles))
+            {
+                roles = new Dictionary<AIPlanRole, int>();
+                desired[key] = roles;
+            }
+
+            for (int a = 0; a < plan.Assignments.Count; a++)
+            {
+                AIPlanAssignment assignment = plan.Assignments[a];
+                if (assignment == null)
+                    continue;
+
+                if (!roles.ContainsKey(assignment.Role))
+                    roles[assignment.Role] = 0;
+                roles[assignment.Role]++;
+            }
+        }
+
+        return desired;
+    }
+
+    private static Dictionary<int, UnitManager> BuildFriendlyUnitIndex(AISnapshot snapshot)
+    {
+        var map = new Dictionary<int, UnitManager>();
+        if (snapshot == null)
+            return map;
+
+        for (int i = 0; i < snapshot.FriendlyUnits.Count; i++)
+        {
+            UnitManager unit = snapshot.FriendlyUnits[i];
+            if (unit == null || unit.IsDead)
+                continue;
+            map[unit.InstanceId] = unit;
+        }
+
+        return map;
+    }
+
+    private static Dictionary<string, AIPlanIntent> BuildPlanByKey(List<AIPlanIntent> plans)
+    {
+        var map = new Dictionary<string, AIPlanIntent>();
+        if (plans == null)
+            return map;
+
+        for (int i = 0; i < plans.Count; i++)
+        {
+            AIPlanIntent intent = plans[i];
+            if (intent == null)
+                continue;
+            map[BuildPlanKey(intent)] = intent;
+        }
+
+        return map;
+    }
+
+    private static Dictionary<int, AIPlanAssignment> BuildUnitAssignments(List<AIPlanIntent> plans)
+    {
+        var map = new Dictionary<int, AIPlanAssignment>();
+        if (plans == null)
+            return map;
+
+        for (int i = 0; i < plans.Count; i++)
+        {
+            AIPlanIntent intent = plans[i];
+            if (intent == null)
+                continue;
+
+            for (int a = 0; a < intent.Assignments.Count; a++)
+            {
+                AIPlanAssignment assignment = intent.Assignments[a];
+                if (assignment == null)
+                    continue;
+                assignment.Intent = intent;
+                map[assignment.UnitInstanceId] = assignment;
+            }
+        }
+
+        return map;
+    }
+
+    private static HashSet<string> ComputeStagnatedPlans(
+        IReadOnlyCollection<MissionAssignmentMemory> previousAssignments,
+        Dictionary<string, AIPlanIntent> activePlanByKey,
+        PlannerRuntimeConfig config)
+    {
+        var stagnated = new HashSet<string>();
+        if (previousAssignments == null || previousAssignments.Count == 0)
+            return stagnated;
+
+        var allOld = new Dictionary<string, int>();
+        var recent = new Dictionary<string, int>();
+
+        foreach (MissionAssignmentMemory memory in previousAssignments)
+        {
+            if (string.IsNullOrWhiteSpace(memory.PlanKey))
+                continue;
+            if (!activePlanByKey.ContainsKey(memory.PlanKey))
+                continue;
+
+            if (!allOld.ContainsKey(memory.PlanKey))
+                allOld[memory.PlanKey] = 0;
+            allOld[memory.PlanKey]++;
+
+            int turnsWithoutProgress = Mathf.Max(0, config.CurrentTurn - memory.LastProgressTurn);
+            if (turnsWithoutProgress <= Mathf.Max(0, config.StagnationTurns))
+            {
+                if (!recent.ContainsKey(memory.PlanKey))
+                    recent[memory.PlanKey] = 0;
+                recent[memory.PlanKey]++;
+            }
+        }
+
+        foreach (KeyValuePair<string, int> kv in allOld)
+        {
+            if (!recent.ContainsKey(kv.Key))
+                stagnated.Add(kv.Key);
+        }
+
+        return stagnated;
+    }
+
+    private static bool TryMoveUnitToPlan(
+        AISnapshot snapshot,
+        UnitManager unit,
+        AIPlanIntent targetPlan,
+        AIPlanRole role,
+        Dictionary<int, AIPlanAssignment> unitAssignments,
+        List<string> plannerLogs,
+        string eventTag,
+        AIPlanIntent sourceOverride)
+    {
+        if (unit == null || unit.IsDead || targetPlan == null)
+            return false;
+
+        unit.TryGetUnitData(out UnitData unitData);
+        if (!CanUnitPerformRole(unitData, role))
+            return false;
+
+        AIPlanIntent sourcePlan = sourceOverride;
+        AIPlanAssignment oldAssignment = null;
+        if (unitAssignments.TryGetValue(unit.InstanceId, out AIPlanAssignment existing))
+        {
+            oldAssignment = existing;
+            sourcePlan = existing.Intent;
+
+            if (existing.Intent == targetPlan && existing.Role == role)
+                return false;
+
+            if (sourcePlan != null)
+                sourcePlan.Assignments.Remove(existing);
+            unitAssignments.Remove(unit.InstanceId);
+        }
+
+        AIPlanAssignment moved = new AIPlanAssignment
+        {
+            UnitInstanceId = unit.InstanceId,
+            Role = role,
+            Intent = targetPlan
+        };
+
+        if (role == AIPlanRole.Capture)
+            ResolvePlannedCaptureForAssignment(snapshot, targetPlan, moved);
+
+        targetPlan.Assignments.Add(moved);
+        unitAssignments[unit.InstanceId] = moved;
+
+        string sourceKey = sourcePlan != null ? BuildPlanKey(sourcePlan) : "(livre)";
+        string targetKey = BuildPlanKey(targetPlan);
+        int dist = GetHexDistance(unit.CurrentCellPosition, GetIntentAnchorCell(targetPlan, snapshot));
+        AddPlannerLog(plannerLogs, $"{eventTag} | {unit.name} {sourceKey} -> {targetKey} [{role.ToDebugLabel()}] dist={dist}");
+        return true;
+    }
+
+    private static void ResolvePlannedCaptureForAssignment(AISnapshot snapshot, AIPlanIntent intent, AIPlanAssignment assignment)
+    {
+        if (snapshot == null || intent == null || assignment == null)
+            return;
+
+        List<AIConstructionInfo> targets = CollectUncapturedTargetsInSector(intent.Sector, snapshot);
+        var occupiedTargets = new HashSet<Vector3Int>();
+        for (int i = 0; i < intent.Assignments.Count; i++)
+        {
+            AIPlanAssignment existing = intent.Assignments[i];
+            if (existing == null || !existing.HasPlannedCaptureTarget)
+                continue;
+            Vector3Int occupied = existing.PlannedCaptureCell;
+            occupied.z = 0;
+            occupiedTargets.Add(occupied);
+        }
+
+        for (int i = 0; i < targets.Count; i++)
+        {
+            Vector3Int cell = targets[i].Cell;
+            cell.z = 0;
+            if (occupiedTargets.Contains(cell))
+                continue;
+
+            assignment.HasPlannedCaptureTarget = true;
+            assignment.PlannedCaptureCell = cell;
+            assignment.PlannedCaptureLabel = !string.IsNullOrWhiteSpace(targets[i].DisplayName)
+                ? targets[i].DisplayName
+                : intent.Sector.ToString();
+            return;
+        }
+
+        if (intent.HasCaptureTarget)
+        {
+            assignment.HasPlannedCaptureTarget = true;
+            assignment.PlannedCaptureCell = intent.CaptureTargetCell;
+            assignment.PlannedCaptureLabel = intent.CaptureTargetLabel;
+        }
+    }
+
+    private static bool IsDefenseGateOpen(AISnapshot snapshot)
+    {
+        return snapshot != null && snapshot.HasHq && CountVisibleEnemiesNearHq(snapshot, AISnapshot.DefaultDefendRadius) > 0;
+    }
+
+    private static bool IsInvasionGateOpen(AISnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.KnownConstructions.Count == 0)
+            return false;
+
+        int owned = 0;
+        int total = 0;
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo construction = snapshot.KnownConstructions[i];
+            if (construction == null || !construction.IsCapturable)
+                continue;
+
+            total++;
+            if (construction.TeamId == snapshot.AiTeam)
+                owned++;
+        }
+
+        if (total <= 0)
+            return false;
+
+        float control = (float)owned / total;
+        return control >= 0.5f;
+    }
+
+    private static AIPlanIntent FindFixedIntent(List<AIPlanIntent> plans, AIPlanData fixedPlan)
+    {
+        if (plans == null || fixedPlan == null)
+            return null;
+
+        for (int i = 0; i < plans.Count; i++)
+        {
+            AIPlanIntent intent = plans[i];
+            if (intent != null && intent.Plan == fixedPlan)
+                return intent;
+        }
+
+        return null;
+    }
+
+    private static int CountVisibleEnemiesNearHq(AISnapshot snapshot, int radius)
+    {
+        if (snapshot == null || !snapshot.HasHq)
             return 0;
 
-        var candidates = new List<(UnitManager unit, int dist)>();
-        for (int u = 0; u < snapshot.FriendlyUnits.Count; u++)
+        int count = 0;
+        for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
         {
-            UnitManager unit = snapshot.FriendlyUnits[u];
-            if (unit == null || unit.IsDead) continue;
-            if (assignedUnits.Contains(unit.InstanceId)) continue;
+            UnitManager enemy = snapshot.VisibleEnemies[i];
+            if (enemy == null || enemy.IsDead)
+                continue;
 
-            unit.TryGetUnitData(out UnitData unitData);
-            if (unitData == null || !unitData.isTransporter) continue;
-
-            Vector3Int uc = unit.CurrentCellPosition;
-            int dist = Mathf.Abs(uc.x - targetCell.x) + Mathf.Abs(uc.y - targetCell.y);
-            candidates.Add((unit, dist));
+            Vector3Int enemyCell = enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            int distance = GetHexDistance(snapshot.HqCell, enemyCell);
+            if (distance <= radius)
+                count++;
         }
 
-        candidates.Sort((a, b) => a.dist.CompareTo(b.dist));
+        return count;
+    }
 
-        int assigned = 0;
-        for (int i = 0; i < candidates.Count && assigned < wanted; i++)
+    private sealed class ReassignCandidate
+    {
+        public UnitManager Unit;
+        public AIPlanIntent SourcePlan;
+        public AIPlanRole Role;
+        public int DistanceToDestination;
+    }
+
+    private static List<ReassignCandidate> CollectCandidatesForReassignment(
+        List<AIPlanIntent> plans,
+        AIPlanIntent destination,
+        Dictionary<int, UnitManager> unitById,
+        Vector3Int destinationCell,
+        bool onlyNonCapture)
+    {
+        var candidates = new List<ReassignCandidate>();
+        if (plans == null)
+            return candidates;
+
+        for (int i = 0; i < plans.Count; i++)
         {
-            UnitManager unit = candidates[i].unit;
-            assignedUnits.Add(unit.InstanceId);
-            intent.Assignments.Add(new AIPlanAssignment
+            AIPlanIntent source = plans[i];
+            if (source == null || source == destination)
+                continue;
+
+            for (int a = 0; a < source.Assignments.Count; a++)
             {
-                UnitInstanceId = unit.InstanceId,
-                Role = role,
-                Intent = intent,
-            });
-            assigned++;
+                AIPlanAssignment assignment = source.Assignments[a];
+                if (assignment == null)
+                    continue;
+                if (onlyNonCapture && assignment.Role == AIPlanRole.Capture)
+                    continue;
+
+                if (!unitById.TryGetValue(assignment.UnitInstanceId, out UnitManager unit))
+                    continue;
+
+                int distance = GetHexDistance(unit.CurrentCellPosition, destinationCell);
+                candidates.Add(new ReassignCandidate
+                {
+                    Unit = unit,
+                    SourcePlan = source,
+                    Role = assignment.Role,
+                    DistanceToDestination = distance
+                });
+            }
         }
 
-        return assigned;
+        candidates.Sort((a, b) => a.DistanceToDestination.CompareTo(b.DistanceToDestination));
+        return candidates;
+    }
+
+    private static bool IsPlanCritical(
+        AISnapshot snapshot,
+        AIPlanIntent plan,
+        Dictionary<string, AIPlanIntent> activePlans,
+        HashSet<string> stagnatedPlans)
+    {
+        if (plan == null)
+            return false;
+
+        string key = BuildPlanKey(plan);
+        if (stagnatedPlans != null && stagnatedPlans.Contains(key))
+            return false;
+
+        bool hasSectorThreat = HasVisibleEnemyNearSector(snapshot, plan.Sector);
+        bool hasCaptureGap = plan.HasCaptureTarget && !HasAssignedRole(plan, AIPlanRole.Capture);
+        return hasSectorThreat || hasCaptureGap;
+    }
+
+    private static bool HasVisibleEnemyNearSector(AISnapshot snapshot, ConstructionSector sector)
+    {
+        if (snapshot == null || snapshot.VisibleEnemies.Count == 0)
+            return false;
+        if (sector == ConstructionSector.BaseTeam)
+            return CountVisibleEnemiesNearHq(snapshot, AISnapshot.DefaultDefendRadius) > 0;
+
+        Vector2 centroid = ComputeSectorCentroid(sector, snapshot);
+        for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
+        {
+            UnitManager enemy = snapshot.VisibleEnemies[i];
+            if (enemy == null || enemy.IsDead)
+                continue;
+
+            Vector3Int cell = enemy.CurrentCellPosition;
+            float sqrDist = (new Vector2(cell.x, cell.y) - centroid).sqrMagnitude;
+            if (sqrDist <= 36f)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool CanSourcePlanSpareRole(AIPlanIntent sourcePlan, AIPlanRole role)
+    {
+        if (sourcePlan == null)
+            return true;
+
+        int sameRole = CountAssignments(sourcePlan, role);
+        if (role == AIPlanRole.Capture)
+            return sameRole > 1;
+
+        return sourcePlan.Assignments.Count > 1 || sameRole > 1;
+    }
+
+    private static int CountAssignments(AIPlanIntent intent, AIPlanRole? role)
+    {
+        if (intent == null)
+            return 0;
+
+        int count = 0;
+        for (int i = 0; i < intent.Assignments.Count; i++)
+        {
+            AIPlanAssignment assignment = intent.Assignments[i];
+            if (assignment == null)
+                continue;
+            if (role.HasValue && assignment.Role != role.Value)
+                continue;
+            count++;
+        }
+
+        return count;
+    }
+
+    private static void RefillMissingRoles(
+        AISnapshot snapshot,
+        List<AIPlanIntent> plans,
+        Dictionary<string, Dictionary<AIPlanRole, int>> desiredRoleCounts,
+        Dictionary<int, AIPlanAssignment> unitAssignments,
+        Dictionary<int, UnitManager> unitById,
+        List<string> plannerLogs)
+    {
+        if (snapshot == null || plans == null || desiredRoleCounts == null)
+            return;
+
+        for (int i = 0; i < plans.Count; i++)
+        {
+            AIPlanIntent plan = plans[i];
+            if (plan == null)
+                continue;
+
+            string key = BuildPlanKey(plan);
+            if (!desiredRoleCounts.TryGetValue(key, out Dictionary<AIPlanRole, int> desiredByRole))
+                continue;
+
+            foreach (KeyValuePair<AIPlanRole, int> roleDemand in desiredByRole)
+            {
+                int current = CountAssignments(plan, roleDemand.Key);
+                int missing = Mathf.Max(0, roleDemand.Value - current);
+                for (int m = 0; m < missing; m++)
+                {
+                    if (!TryAssignClosestFreeUnit(snapshot, plan, roleDemand.Key, unitAssignments, unitById, plannerLogs))
+                        break;
+                }
+            }
+        }
+    }
+
+    private static bool TryAssignClosestFreeUnit(
+        AISnapshot snapshot,
+        AIPlanIntent plan,
+        AIPlanRole role,
+        Dictionary<int, AIPlanAssignment> unitAssignments,
+        Dictionary<int, UnitManager> unitById,
+        List<string> plannerLogs)
+    {
+        UnitManager bestUnit = null;
+        int bestDistance = int.MaxValue;
+        Vector3Int anchor = GetIntentAnchorCell(plan, snapshot);
+
+        foreach (KeyValuePair<int, UnitManager> kv in unitById)
+        {
+            int unitId = kv.Key;
+            UnitManager unit = kv.Value;
+            if (unit == null || unit.IsDead)
+                continue;
+            if (unitAssignments.ContainsKey(unitId))
+                continue;
+
+            unit.TryGetUnitData(out UnitData data);
+            if (!CanUnitPerformRole(data, role))
+                continue;
+
+            int distance = GetHexDistance(unit.CurrentCellPosition, anchor);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestUnit = unit;
+            }
+        }
+
+        if (bestUnit == null)
+            return false;
+
+        AIPlanAssignment assignment = new AIPlanAssignment
+        {
+            UnitInstanceId = bestUnit.InstanceId,
+            Role = role,
+            Intent = plan
+        };
+        if (role == AIPlanRole.Capture)
+            ResolvePlannedCaptureForAssignment(snapshot, plan, assignment);
+
+        plan.Assignments.Add(assignment);
+        unitAssignments[bestUnit.InstanceId] = assignment;
+        AddPlannerLog(plannerLogs, $"preenchido-livre | {bestUnit.name} -> {BuildPlanKey(plan)} [{role.ToDebugLabel()}] dist={bestDistance}");
+        return true;
+    }
+
+    private static Vector3Int GetIntentAnchorCell(AIPlanIntent intent, AISnapshot snapshot)
+    {
+        if (intent != null && intent.HasCaptureTarget)
+            return intent.CaptureTargetCell;
+        if (snapshot != null && snapshot.HasHq)
+            return snapshot.HqCell;
+        return Vector3Int.zero;
+    }
+
+    private static int GetHexDistance(Vector3Int a, Vector3Int b)
+    {
+        a.z = 0;
+        b.z = 0;
+        return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
+    }
+
+    private static void AddPlannerLog(List<string> plannerLogs, string message)
+    {
+        if (plannerLogs == null || string.IsNullOrWhiteSpace(message))
+            return;
+        plannerLogs.Add(message);
     }
 }
+
+
+
+
+
+
+
 
 
 

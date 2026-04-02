@@ -141,6 +141,7 @@ public class UnitManager : MonoBehaviour
     public bool IsEmbarked => isEmbarked;
     public bool IsEmbarkedVisualPreviewActive => embarkedVisualPreviewDepth > 0;
     public bool IsSelected => isSelected;
+    public bool IsHiddenByFogOfWar => hiddenByFogOfWar;
     public UnitDatabase UnitDatabase => unitDatabase;
     public bool IsAircraftGrounded => GetAircraftType() != AircraftType.None && currentDomain != Domain.Air;
     public bool IsAircraftEmbarkedInCarrier => isEmbarked;
