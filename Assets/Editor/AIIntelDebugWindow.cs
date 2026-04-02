@@ -84,7 +84,6 @@ public class AIIntelDebugWindow : EditorWindow
     private string statusMessage     = "Pronto.";
     private string activePlayerBlock = string.Empty;
     private Vector2 scroll;
-    private bool fowRefreshedByWindow = false;
 
     // ── menu ───────────────────────────────────────────────────────────────────
     [MenuItem("Tools/AI/AI Intel")]
@@ -93,7 +92,6 @@ public class AIIntelDebugWindow : EditorWindow
     // ── lifecycle ──────────────────────────────────────────────────────────────
     private void OnEnable()
     {
-        fowRefreshedByWindow = false;
         AutoDetectContext();
         SceneView.duringSceneGui += OnSceneGUI;
     }
@@ -103,12 +101,6 @@ public class AIIntelDebugWindow : EditorWindow
         SceneView.duringSceneGui -= OnSceneGUI;
         highlightedSectors.Clear();
         SceneView.RepaintAll();
-
-        if (fowRefreshedByWindow && !Application.isPlaying && matchController != null)
-        {
-            matchController.SetFogOfWarDebugEnabled(false);
-            fowRefreshedByWindow = false;
-        }
     }
 
     // ── scene overlay ──────────────────────────────────────────────────────────
@@ -695,7 +687,7 @@ public class AIIntelDebugWindow : EditorWindow
         EditorGUILayout.BeginVertical("box");
         EditorGUILayout.LabelField("[Variaveis dinamicos] Runtime", EditorStyles.boldLabel);
         EditorGUILayout.LabelField($"  Max planos por turno: {db.maxVariablePlans}", EditorStyles.miniLabel);
-        EditorGUILayout.LabelField($"  Max infantaria por plano: {db.maxUnitsPerVariablePlan}", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField("  Composicao: heuristica por setor (INF/ARM/ART/APC)", EditorStyles.miniLabel);
         EditorGUILayout.EndVertical();
     }
 
@@ -809,7 +801,6 @@ public class AIIntelDebugWindow : EditorWindow
     {
         if (matchController == null) { statusMessage = "MatchController não encontrado."; return; }
         matchController.RefreshFogOfWarForActiveTeam();
-        fowRefreshedByWindow = true;
         statusMessage = $"FOW atualizado para {TeamUtils.GetName(matchController.ActiveTeam)}.";
     }
 

@@ -3809,7 +3809,6 @@ public class MatchController : MonoBehaviour
             return;
 
         debugFogOfWarEnabled = enabled;
-        fogOfWar = enabled;
         if (!enabled)
         {
             ResetFogOfWarRuntime(clearTilemap: true);

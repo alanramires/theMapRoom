@@ -27,6 +27,8 @@ public class AISnapshot
     public List<AIPlanIntent> ActivePlans = new List<AIPlanIntent>();
     // Papel de cada unidade (InstanceId → intent do plano que a designou)
     public Dictionary<int, AIPlanIntent> UnitRoles = new Dictionary<int, AIPlanIntent>();
+    // Designacao detalhada por unidade (inclui alvo individual de captura quando existir).
+    public Dictionary<int, AIPlanAssignment> UnitPlanAssignments = new Dictionary<int, AIPlanAssignment>();
 
     public const int DefaultDefendRadius = 5;
 

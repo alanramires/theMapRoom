@@ -12,7 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 512af7557f4beb14caae1076222f5af4, type: 3}
   m_Name: AIPlanDatabase_Default
   m_EditorClassIdentifier: Assembly-CSharp::AIPlanDatabase
-  defensePlan: {fileID: 11400000, guid: b4c199937cf34fc4886ebd31eacfdb86, type: 2}
-  attackPlan: {fileID: 11400000, guid: aa472b2b00000d94b970deef9e5c4070, type: 2}
+  defensePlan: {fileID: 11400000, guid: 6b5d645ef11f8f348ac8735b56558048, type: 2}
+  attackPlan: {fileID: 11400000, guid: b80ec38520d0a414a8849a6b9aeea76e, type: 2}
   maxVariablePlans: 3
-  variablePlans: []

@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: 'PLAN: ATAQUE'
   kind: 0
   targetSector: 100
-  activationCondition: Construcoes capturadas > 50% do total em campo.
+  activationConditions: []
   objectiveCompletedWhen: HQ inimigo capturado.
   objectiveFailedWhen: Infantaria aliada destruida.
   selectionCriteria:

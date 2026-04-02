@@ -9,6 +9,7 @@ public class AIPlayerControllerEditor : Editor
     private SerializedProperty turnStateManagerProp;
     private SerializedProperty aiLogProp;
     private SerializedProperty aiDatabaseProp;
+    private SerializedProperty aiPlanDatabaseProp;
 
     private void OnEnable()
     {
@@ -16,6 +17,7 @@ public class AIPlayerControllerEditor : Editor
         turnStateManagerProp = serializedObject.FindProperty("turnStateManager");
         aiLogProp = serializedObject.FindProperty("aiLog");
         aiDatabaseProp = serializedObject.FindProperty("aiDatabase");
+        aiPlanDatabaseProp = serializedObject.FindProperty("aiPlanDatabase");
     }
 
     public override void OnInspectorGUI()
@@ -29,6 +31,7 @@ public class AIPlayerControllerEditor : Editor
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("AI Setup", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(aiDatabaseProp, new GUIContent("AI Database"));
+        EditorGUILayout.PropertyField(aiPlanDatabaseProp, new GUIContent("AI Plan Database"));
 
         AIPlayerController controller = target as AIPlayerController;
         MatchController match = matchControllerProp != null ? matchControllerProp.objectReferenceValue as MatchController : null;
