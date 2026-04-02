@@ -11,6 +11,7 @@ public class AIPlayerControllerEditor : Editor
     private SerializedProperty showPlanDebugAtUnitProp;
     private SerializedProperty aiDatabaseProp;
     private SerializedProperty aiPlanDatabaseProp;
+    private SerializedProperty plannerDebugViewProp;
 
     private void OnEnable()
     {
@@ -20,6 +21,7 @@ public class AIPlayerControllerEditor : Editor
         showPlanDebugAtUnitProp = serializedObject.FindProperty("showPlanDebugAtUnit");
         aiDatabaseProp = serializedObject.FindProperty("aiDatabase");
         aiPlanDatabaseProp = serializedObject.FindProperty("aiPlanDatabase");
+        plannerDebugViewProp = serializedObject.FindProperty("plannerDebugView");
     }
 
     public override void OnInspectorGUI()
@@ -53,6 +55,17 @@ public class AIPlayerControllerEditor : Editor
         EditorGUILayout.EndHorizontal();
 
         DrawDetectedAssignments(controller, match);
+
+        EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField("Planner Runtime (Debug)", EditorStyles.boldLabel);
+        if (GUILayout.Button("Refresh Planner Debug View"))
+        {
+            controller?.RefreshPlannerDebugViewNow();
+            EditorUtility.SetDirty(controller);
+            serializedObject.Update();
+        }
+        if (plannerDebugViewProp != null)
+            EditorGUILayout.PropertyField(plannerDebugViewProp, new GUIContent("Planner Debug View"), true);
 
         serializedObject.ApplyModifiedProperties();
     }
@@ -109,5 +122,3 @@ public class AIPlayerControllerEditor : Editor
             EditorGUILayout.HelpBox("Nenhum time com isAI=true detectado no MatchController.", MessageType.Info);
     }
 }
-
-

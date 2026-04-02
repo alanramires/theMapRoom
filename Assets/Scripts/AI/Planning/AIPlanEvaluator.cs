@@ -56,9 +56,9 @@ public static class AIPlanEvaluator
 
         // Planos fixos: defesa primeiro, depois ataque.
         if (ShouldActivateDefensePlan(database.defensePlan, snapshot))
-            TryActivateFixedPlan(database.defensePlan, snapshot, assignedUnits, result);
+            TryActivateFixedPlan(database.defensePlan, snapshot, assignedUnits, result, "0");
         if (ShouldActivateAttackPlan(database.attackPlan, snapshot))
-            TryActivateFixedPlan(database.attackPlan, snapshot, assignedUnits, result);
+            TryActivateFixedPlan(database.attackPlan, snapshot, assignedUnits, result, ">");
 
         // Planos variaveis: gerados em runtime por setor.
         GenerateDynamicVariablePlans(
@@ -76,7 +76,8 @@ public static class AIPlanEvaluator
         AIPlanData plan,
         AISnapshot snapshot,
         HashSet<int> assignedUnits,
-        List<AIPlanIntent> result)
+        List<AIPlanIntent> result,
+        string fixedBadgeSymbol)
     {
         if (plan == null)
             return false;
@@ -84,7 +85,7 @@ public static class AIPlanEvaluator
         if (!EvaluateConditions(plan, snapshot))
             return false;
 
-        AIPlanIntent intent = BuildIntentFromPlan(plan, snapshot);
+        AIPlanIntent intent = BuildIntentFromPlan(plan, snapshot, fixedBadgeSymbol);
         AssignUnitsFromParticipants(intent, plan, snapshot, assignedUnits);
         result.Add(intent);
         return true;
@@ -434,13 +435,14 @@ public static class AIPlanEvaluator
         }
     }
 
-    private static AIPlanIntent BuildIntentFromPlan(AIPlanData plan, AISnapshot snapshot)
+    private static AIPlanIntent BuildIntentFromPlan(AIPlanData plan, AISnapshot snapshot, string fixedBadgeSymbol)
     {
         var intent = new AIPlanIntent
         {
             Plan = plan,
             Sector = plan.targetSector,
             DisplayName = plan.displayName,
+            BadgeSymbol = fixedBadgeSymbol ?? string.Empty,
         };
 
         FillCaptureTarget(intent, plan.targetSector, snapshot);
@@ -450,11 +452,15 @@ public static class AIPlanEvaluator
 
     private static AIPlanIntent BuildDynamicIntent(ConstructionSector sector, AISnapshot snapshot)
     {
+        string sectorName = sector.ToString();
+        string badge = !string.IsNullOrWhiteSpace(sectorName) ? sectorName.Substring(0, 1).ToUpperInvariant() : string.Empty;
+
         var intent = new AIPlanIntent
         {
             Plan = null,
             Sector = sector,
             DisplayName = $"Captura {sector}",
+            BadgeSymbol = badge,
         };
 
         FillCaptureTarget(intent, sector, snapshot);

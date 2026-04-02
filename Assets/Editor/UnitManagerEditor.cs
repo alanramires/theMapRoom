@@ -49,6 +49,12 @@ public class UnitManagerEditor : Editor
     private SerializedProperty useExplicitPreferredNavalHeightRuntimeProp;
     private SerializedProperty preferredNavalHeightRuntimeProp;
     private SerializedProperty currentlyObservedByTeamIdsProp;
+    private SerializedProperty aiHasAssignedPlanProp;
+    private SerializedProperty aiAssignedPlanKeyProp;
+    private SerializedProperty aiAssignedPlanNameProp;
+    private SerializedProperty aiAssignedPlanBadgeProp;
+    private SerializedProperty aiAssignedPlanRoleProp;
+    private SerializedProperty aiAssignedPlanBadgeVisibleProp;
 
     private void OnEnable()
     {
@@ -95,6 +101,12 @@ public class UnitManagerEditor : Editor
         useExplicitPreferredNavalHeightRuntimeProp = serializedObject.FindProperty("useExplicitPreferredNavalHeightRuntime");
         preferredNavalHeightRuntimeProp = serializedObject.FindProperty("preferredNavalHeightRuntime");
         currentlyObservedByTeamIdsProp = serializedObject.FindProperty("currentlyObservedByTeamIds");
+        aiHasAssignedPlanProp = serializedObject.FindProperty("aiHasAssignedPlan");
+        aiAssignedPlanKeyProp = serializedObject.FindProperty("aiAssignedPlanKey");
+        aiAssignedPlanNameProp = serializedObject.FindProperty("aiAssignedPlanName");
+        aiAssignedPlanBadgeProp = serializedObject.FindProperty("aiAssignedPlanBadge");
+        aiAssignedPlanRoleProp = serializedObject.FindProperty("aiAssignedPlanRole");
+        aiAssignedPlanBadgeVisibleProp = serializedObject.FindProperty("aiAssignedPlanBadgeVisible");
     }
 
     public override void OnInspectorGUI()
@@ -244,6 +256,7 @@ public class UnitManagerEditor : Editor
         }
 
         DrawStealthRevealRuntimeSection(unit);
+        DrawAIPlanSection();
 
         serializedObject.ApplyModifiedProperties();
 
@@ -316,6 +329,30 @@ public class UnitManagerEditor : Editor
             string teamLabel = TeamUtils.GetName((TeamId)teamId);
             using (new EditorGUI.DisabledScope(true))
                 EditorGUILayout.TextField($"Team {teamId} ({teamLabel})", "observando");
+        }
+    }
+
+    private void DrawAIPlanSection()
+    {
+        if (aiHasAssignedPlanProp == null)
+            return;
+
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField("AI", EditorStyles.boldLabel);
+
+        using (new EditorGUI.DisabledScope(true))
+        {
+            EditorGUILayout.PropertyField(aiHasAssignedPlanProp, new GUIContent("Has Assigned Plan"));
+            if (aiAssignedPlanKeyProp != null)
+                EditorGUILayout.PropertyField(aiAssignedPlanKeyProp, new GUIContent("Plan Key"));
+            if (aiAssignedPlanNameProp != null)
+                EditorGUILayout.PropertyField(aiAssignedPlanNameProp, new GUIContent("Plan Name"));
+            if (aiAssignedPlanRoleProp != null)
+                EditorGUILayout.PropertyField(aiAssignedPlanRoleProp, new GUIContent("Plan Role"));
+            if (aiAssignedPlanBadgeProp != null)
+                EditorGUILayout.PropertyField(aiAssignedPlanBadgeProp, new GUIContent("Plan Badge"));
+            if (aiAssignedPlanBadgeVisibleProp != null)
+                EditorGUILayout.PropertyField(aiAssignedPlanBadgeVisibleProp, new GUIContent("Badge Visible"));
         }
     }
 

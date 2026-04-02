@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -157,7 +157,13 @@ public static class SaveDataMapper
             transporterInstanceId = unit.EmbarkedTransporter != null ? unit.EmbarkedTransporter.InstanceId : 0,
             transporterSlotIndex = unit.IsEmbarked ? unit.EmbarkedTransporterSlotIndex : -1,
             domain = (int)unit.GetDomain(),
-            heightLevel = (int)unit.GetHeightLevel()
+            heightLevel = (int)unit.GetHeightLevel(),
+            aiHasAssignedPlan = unit.AIHasAssignedPlan,
+            aiAssignedPlanKey = unit.AIAssignedPlanKey,
+            aiAssignedPlanName = unit.AIAssignedPlanName,
+            aiAssignedPlanBadge = unit.AIAssignedPlanBadge,
+            aiAssignedPlanRole = (int)unit.AIAssignedPlanRole,
+            aiAssignedPlanBadgeVisible = unit.AIAssignedPlanBadgeVisible
         };
 
         IReadOnlyList<UnitEmbarkedWeapon> embarkedWeapons = unit.GetEmbarkedWeapons();
@@ -225,6 +231,11 @@ public static class SaveDataMapper
         }
 
         ApplySavedEmbarkedSupplies(unit, saved.embarkedSupplies);
+
+        if (saved.aiHasAssignedPlan)
+            unit.SetAIAssignedPlan(saved.aiAssignedPlanKey, saved.aiAssignedPlanName, saved.aiAssignedPlanBadge, (AIPlanRole)saved.aiAssignedPlanRole, saved.aiAssignedPlanBadgeVisible);
+        else
+            unit.ClearAIAssignedPlan();
     }
 
     public static void ApplyUnitTurnFlagsFromSaveData(UnitManager unit, UnitSaveData saved)
@@ -467,3 +478,4 @@ public static class SaveDataMapper
         return runtime;
     }
 }
+

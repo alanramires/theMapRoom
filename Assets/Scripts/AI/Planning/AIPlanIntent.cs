@@ -35,6 +35,8 @@ public class AIPlanIntent
     public ConstructionSector Sector;
     // Nome legivel - preenchido tanto para planos fixos quanto para planos gerados dinamicamente
     public string DisplayName;
+    // Simbolo visual de debug usado no HUD da unidade.
+    public string BadgeSymbol;
 
     // Alvo de captura resolvido para este plano (construcao capturavel no setor)
     public bool HasCaptureTarget;

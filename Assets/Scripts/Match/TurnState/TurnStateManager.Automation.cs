@@ -862,7 +862,8 @@ public partial class TurnStateManager
         out Vector3Int bestCell,
         bool prioritizeDpq = false,
         UnitManager unit = null,
-        bool preferLongerAdvanceOnTie = false)
+        bool preferLongerAdvanceOnTie = false,
+        bool preferShorterAdvanceOnTie = false)
     {
         bestCell = default;
         if (movementPathsByCell == null || movementPathsByCell.Count == 0)
@@ -913,7 +914,12 @@ public partial class TurnStateManager
                     && dist == bestHexDistance
                     && dpqBand == bestDpqBand
                     && dpqPoints == bestDpqPoints
-                    && advanceLen > bestAdvanceLen);
+                    && advanceLen > bestAdvanceLen)
+                || (preferShorterAdvanceOnTie
+                    && dist == bestHexDistance
+                    && dpqBand == bestDpqBand
+                    && dpqPoints == bestDpqPoints
+                    && (bestAdvanceLen < 0 || advanceLen < bestAdvanceLen));
             if (!better)
                 continue;
 
@@ -1176,7 +1182,6 @@ public partial class TurnStateManager
         return true;
     }
 }
-
 
 
 

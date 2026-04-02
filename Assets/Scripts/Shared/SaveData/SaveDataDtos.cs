@@ -109,6 +109,12 @@ public class UnitSaveData
     public int transporterSlotIndex;
     public int domain;
     public int heightLevel;
+    public bool aiHasAssignedPlan;
+    public string aiAssignedPlanKey;
+    public string aiAssignedPlanName;
+    public string aiAssignedPlanBadge;
+    public int aiAssignedPlanRole = (int)AIPlanRole.Assault;
+    public bool aiAssignedPlanBadgeVisible;
     public List<int> embarkedWeaponAmmo = new List<int>();
     public List<RuntimeSupplySaveData> embarkedSupplies = new List<RuntimeSupplySaveData>();
 }
@@ -201,5 +207,6 @@ public class FogUnitVisibilitySaveData
     public int cacheIndex;
     public bool isVisible;
 }
+
 
 

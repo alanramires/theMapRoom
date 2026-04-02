@@ -108,6 +108,13 @@ public class UnitManager : MonoBehaviour
     [SerializeField, HideInInspector] private int embarkedTransporterSlotIndex = -1;
     [Header("Stealth Runtime")]
     [SerializeField, HideInInspector] private List<int> currentlyObservedByTeamIds = new List<int>();
+    [Header("AI")]
+    [SerializeField] private bool aiHasAssignedPlan;
+    [SerializeField] private string aiAssignedPlanKey = string.Empty;
+    [SerializeField] private string aiAssignedPlanName = string.Empty;
+    [SerializeField] private string aiAssignedPlanBadge = string.Empty;
+    [SerializeField] private AIPlanRole aiAssignedPlanRole = AIPlanRole.Assault;
+    [SerializeField] private bool aiAssignedPlanBadgeVisible;
 
     public TeamId TeamId => teamId;
     public int SlotIndex => slotIndex;
@@ -155,8 +162,40 @@ public class UnitManager : MonoBehaviour
     public int EmbarkedTransporterSlotIndex => embarkedTransporterSlotIndex;
     public IReadOnlyList<int> CurrentlyObservedByTeamIds => currentlyObservedByTeamIds;
     public bool UsedRoadBoostOnLastMove => usedRoadBoostOnLastMove;
+    public bool AIHasAssignedPlan => aiHasAssignedPlan;
+    public string AIAssignedPlanKey => aiAssignedPlanKey ?? string.Empty;
+    public string AIAssignedPlanName => aiAssignedPlanName ?? string.Empty;
+    public string AIAssignedPlanBadge => aiAssignedPlanBadge ?? string.Empty;
+    public AIPlanRole AIAssignedPlanRole => aiAssignedPlanRole;
+    public bool AIAssignedPlanBadgeVisible => aiAssignedPlanBadgeVisible;
+
+    public void RefreshAIAssignedPlanDebugBadge()
+    {
+        RefreshAIAssignedPlanBadge();
+    }
 
     public void SetAIForcedToRepair(bool value) => aiForcedToRepair = value;
+    public void SetAIAssignedPlan(string planKey, string planName, string badge, AIPlanRole role, bool badgeVisible)
+    {
+        aiHasAssignedPlan = !string.IsNullOrWhiteSpace(planKey) || !string.IsNullOrWhiteSpace(planName);
+        aiAssignedPlanKey = planKey ?? string.Empty;
+        aiAssignedPlanName = planName ?? string.Empty;
+        aiAssignedPlanBadge = badge ?? string.Empty;
+        aiAssignedPlanRole = role;
+        aiAssignedPlanBadgeVisible = badgeVisible;
+        RefreshAIAssignedPlanBadge();
+    }
+
+    public void ClearAIAssignedPlan()
+    {
+        aiHasAssignedPlan = false;
+        aiAssignedPlanKey = string.Empty;
+        aiAssignedPlanName = string.Empty;
+        aiAssignedPlanBadge = string.Empty;
+        aiAssignedPlanRole = AIPlanRole.Assault;
+        aiAssignedPlanBadgeVisible = false;
+        RefreshAIAssignedPlanBadge();
+    }
 
     public static void ResetActiveTeamChangedPerfCounters()
     {
@@ -230,6 +269,7 @@ public class UnitManager : MonoBehaviour
         appliedActiveTeamId = matchController != null ? matchController.ActiveTeamId : int.MinValue;
         RefreshActedVisual();
         RefreshDetectedIndicator();
+        RefreshAIAssignedPlanBadge();
     }
 
     private void OnEnable()
@@ -2568,6 +2608,19 @@ public class UnitManager : MonoBehaviour
 
         bool shouldShow = ShouldShowDetectedIndicator(TryGetUnitData());
         unitHud.SetDetectedIndicatorVisible(shouldShow);
+    }
+
+    private void RefreshAIAssignedPlanBadge()
+    {
+        if (unitHud == null)
+            TryAutoAssignHud();
+        if (unitHud == null)
+            return;
+
+        bool shouldShow = aiHasAssignedPlan
+            && aiAssignedPlanBadgeVisible
+            && !string.IsNullOrWhiteSpace(aiAssignedPlanBadge);
+        unitHud.SetPlanDebugBadge(shouldShow, shouldShow ? aiAssignedPlanBadge : string.Empty);
     }
 
     private void HandleActiveTeamChanged(int newTeamId)

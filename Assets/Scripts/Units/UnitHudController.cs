@@ -67,6 +67,7 @@ public class UnitHudController : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private Transform planDebugRoot;
     [SerializeField] private TMP_Text planDebugText;
+    [SerializeField] private Text planDebugLegacyText;
 
     [Header("Sorting")]
     [SerializeField] private bool applyHudSorting = true;
@@ -88,6 +89,7 @@ public class UnitHudController : MonoBehaviour
         EnforceFuelDefaultColor();
         AutoAssignCommonReferences();
         DisableLegacyLockVisuals();
+        SetPlanDebugBadge(false, string.Empty);
         ApplySorting();
     }
 
@@ -126,11 +128,14 @@ public class UnitHudController : MonoBehaviour
 
     public void SetPlanDebugBadge(bool visible, string text)
     {
-        if (planDebugRoot == null || planDebugText == null)
+        if (planDebugRoot == null || (planDebugText == null && planDebugLegacyText == null))
             AutoAssignCommonReferences();
 
+        string badgeText = string.IsNullOrWhiteSpace(text) ? string.Empty : text.Trim();
         if (planDebugText != null)
-            planDebugText.text = string.IsNullOrWhiteSpace(text) ? string.Empty : text.Trim();
+            planDebugText.text = badgeText;
+        if (planDebugLegacyText != null)
+            planDebugLegacyText.text = badgeText;
 
         if (planDebugRoot != null && planDebugRoot.gameObject.activeSelf != visible)
             planDebugRoot.gameObject.SetActive(visible);
@@ -705,6 +710,9 @@ public class UnitHudController : MonoBehaviour
 
         if (planDebugText == null && planDebugRoot != null)
             planDebugText = planDebugRoot.GetComponent<TMP_Text>() ?? planDebugRoot.GetComponentInChildren<TMP_Text>(true);
+
+        if (planDebugLegacyText == null && planDebugRoot != null)
+            planDebugLegacyText = planDebugRoot.GetComponent<Text>() ?? planDebugRoot.GetComponentInChildren<Text>(true);
     }
 
     private static void ApplySortingToRenderer(SpriteRenderer renderer, int sortingLayerId, int sortingOrder)

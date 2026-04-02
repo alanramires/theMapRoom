@@ -551,7 +551,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -3.87, y: -3.84}
+  m_AnchoredPosition: {x: -1.96, y: -2.62}
   m_SizeDelta: {x: 9.49, y: 10.698}
   m_Pivot: {x: 0.5, y: 0.49999997}
 --- !u!222 &786458386560933241
@@ -582,7 +582,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: A
+  m_text: 
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -739,6 +739,8 @@ MonoBehaviour:
   altitudeSubmergedSprite: {fileID: 21300000, guid: 8b13116408a07fa468aabc08c23c5f85, type: 3}
   transportIndicatorRoot: {fileID: 5439601904325997685}
   detectedIndicatorRoot: {fileID: 3877593226262197472}
+  planDebugRoot: {fileID: 7308030096459325100}
+  planDebugText: {fileID: 7419370883366544334}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 500
