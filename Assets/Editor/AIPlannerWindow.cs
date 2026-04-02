@@ -23,7 +23,7 @@ public class AIPlannerWindow : EditorWindow
 
         EditorGUILayout.LabelField("AI Planner", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Painel de preparacao de planos da IA. Nesta fase ele fornece a base de dados (2 fixos + ate N variaveis) e nao executa o planner runtime ainda.",
+            "Painel de preparacao de planos da IA. Defesa e ataque sao fixos; planos variaveis sao gerados em runtime.",
             MessageType.Info);
 
         EditorGUILayout.Space(4f);
@@ -54,11 +54,11 @@ public class AIPlannerWindow : EditorWindow
         DrawPlanField("Attack Plan", database.attackPlan);
 
         EditorGUILayout.Space(6f);
-        EditorGUILayout.LabelField("Variable Plans", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Dynamic Variable Plans", EditorStyles.boldLabel);
         SerializedObject so = new SerializedObject(database);
         so.Update();
         EditorGUILayout.PropertyField(so.FindProperty("maxVariablePlans"));
-        EditorGUILayout.PropertyField(so.FindProperty("variablePlans"), includeChildren: true);
+        EditorGUILayout.PropertyField(so.FindProperty("maxUnitsPerVariablePlan"));
         so.ApplyModifiedProperties();
 
         if (GUI.changed)
@@ -71,10 +71,9 @@ public class AIPlannerWindow : EditorWindow
     {
         string path = AssetDatabase.GetAssetPath(database);
         int fixedCount = (database.defensePlan != null ? 1 : 0) + (database.attackPlan != null ? 1 : 0);
-        int variableCount = database.variablePlans != null ? database.variablePlans.Count : 0;
 
         EditorGUILayout.HelpBox(
-            $"Asset: {path}\nFixed: {fixedCount}/2 | Variable: {variableCount}/{database.maxVariablePlans}",
+            $"Asset: {path}\nFixed: {fixedCount}/2 | Dynamic Variable Budget: {database.maxVariablePlans} planos, {database.maxUnitsPerVariablePlan} infantaria/plano",
             MessageType.None);
     }
 
@@ -137,7 +136,6 @@ public class AIPlannerWindow : EditorWindow
             "PLAN: DEFESA",
             AIPlanKind.Fixed,
             ConstructionSector.BaseTeam,
-            "Unidades inimigas visiveis a 5 hex do HQ.",
             "Nao ha unidades inimigas visiveis a 5 hex do HQ.",
             "HQ capturado.");
 
@@ -157,7 +155,6 @@ public class AIPlannerWindow : EditorWindow
             "PLAN: ATAQUE",
             AIPlanKind.Fixed,
             ConstructionSector.BaseTeam,
-            "Construcoes capturadas > 50% do total em campo.",
             "HQ inimigo capturado.",
             "Infantaria aliada destruida.");
 
@@ -191,7 +188,6 @@ public class AIPlannerWindow : EditorWindow
         string displayName,
         AIPlanKind kind,
         ConstructionSector targetSector,
-        string activation,
         string completedWhen,
         string failedWhen)
     {
@@ -207,7 +203,6 @@ public class AIPlannerWindow : EditorWindow
         plan.displayName = displayName;
         plan.kind = kind;
         plan.targetSector = targetSector;
-        plan.activationCondition = activation;
         plan.objectiveCompletedWhen = completedWhen;
         plan.objectiveFailedWhen = failedWhen;
 

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine.Tilemaps;
 using UnityEngine;
 
+
 // Foto do estado do jogo do ponto de vista da IA no inicio do turno.
 // Construida uma vez por turno via Build() e passada para o perfil de IA.
 public class AISnapshot
@@ -21,6 +22,11 @@ public class AISnapshot
     public Tilemap BoardTilemap;
     public List<UnitManager> FriendlyUnits = new List<UnitManager>();
     public List<UnitManager> VisibleEnemies = new List<UnitManager>();
+
+    // Planos ativos neste turno (preenchido pelo AIPlayerController após EvaluatePlanner)
+    public List<AIPlanIntent> ActivePlans = new List<AIPlanIntent>();
+    // Papel de cada unidade (InstanceId → intent do plano que a designou)
+    public Dictionary<int, AIPlanIntent> UnitRoles = new Dictionary<int, AIPlanIntent>();
 
     public const int DefaultDefendRadius = 5;
 
@@ -48,6 +54,7 @@ public class AISnapshot
                 IsVictoryBuilding = c.IsVictoryBuilding,
                 CanProduceUnits = c.CanProduceUnits,
                 DisplayName = c.ConstructionDisplayName,
+                Sector = c.Sector,
                 Source = c
             };
             snapshot.KnownConstructions.Add(info);
@@ -157,6 +164,7 @@ public class AIConstructionInfo
     public int CapturePointsMax;
     public bool CanProduceUnits;
     public string DisplayName;
+    public ConstructionSector Sector;
     // Referencia viva — usar apenas para operacoes que exigem acesso ao runtime
     // (ex: comprar unidade). Nao usar para decisoes taticas baseadas em estado.
     public ConstructionManager Source;

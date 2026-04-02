@@ -57,6 +57,7 @@ public class AIIntelDebugWindow : EditorWindow
     [SerializeField] private Tilemap overrideTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
+    [SerializeField] private AIPlanDatabase planDatabase;
     [SerializeField] private bool useGameplaySensorContext = true;
     [SerializeField] private bool logToConsole = true;
 
@@ -67,6 +68,7 @@ public class AIIntelDebugWindow : EditorWindow
     private bool foldBaseTeam     = true;
     private bool foldAllConstr    = true;
     private bool foldSectors      = true;
+    private bool foldPlans        = true;
 
     // ── results ────────────────────────────────────────────────────────────────
     private readonly List<UnitManager>       alliedUnits       = new List<UnitManager>();
@@ -129,6 +131,36 @@ public class AIIntelDebugWindow : EditorWindow
                 Vector3 pos = cm.transform.position;
                 pos.z = 0f;
                 Handles.DrawWireDisc(pos, Vector3.forward, SectorCircleRadius);
+            }
+        }
+
+        // Plan SceneGUI: linhas de unidades designadas até centroide do setor
+        if (Application.isPlaying)
+        {
+            AIPlayerController aiController = Object.FindAnyObjectByType<AIPlayerController>();
+            IReadOnlyList<AIPlanIntent> activePlans = aiController?.CurrentTurnPlans;
+            if (activePlans != null)
+            {
+                for (int p = 0; p < activePlans.Count; p++)
+                {
+                    AIPlanIntent intent = activePlans[p];
+                    if (intent?.Assignments == null || intent.Assignments.Count == 0) continue;
+
+                    Color planColor = GetSectorColor(intent.Sector);
+                    Vector3 targetPos = intent.HasCaptureTarget
+                        ? new Vector3(intent.CaptureTargetCell.x + 0.5f, intent.CaptureTargetCell.y + 0.5f, 0f)
+                        : ComputeSectorCentroidWorld(intent.Sector);
+
+                    Handles.color = new Color(planColor.r, planColor.g, planColor.b, 0.7f);
+                    for (int a = 0; a < intent.Assignments.Count; a++)
+                    {
+                        UnitManager u = FindUnitByInstanceId(intent.Assignments[a].UnitInstanceId);
+                        if (u == null) continue;
+                        Vector3 from = u.transform.position;
+                        from.z = 0f;
+                        Handles.DrawLine(from, targetPos);
+                    }
+                }
             }
         }
 
@@ -196,6 +228,9 @@ public class AIIntelDebugWindow : EditorWindow
         EditorGUILayout.Space(6f);
         DrawSectorsSection();
 
+        EditorGUILayout.Space(6f);
+        DrawPlansSection();
+
         EditorGUILayout.EndScrollView();
     }
 
@@ -206,6 +241,7 @@ public class AIIntelDebugWindow : EditorWindow
         overrideTilemap    = (Tilemap)EditorGUILayout.ObjectField("Tilemap (opcional)",         overrideTilemap,    typeof(Tilemap),             true);
         terrainDatabase    = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database",   terrainDatabase,    typeof(TerrainDatabase),    false);
         dpqAirHeightConfig = (DPQAirHeightConfig)EditorGUILayout.ObjectField("DPQ Air Height", dpqAirHeightConfig, typeof(DPQAirHeightConfig), false);
+        planDatabase       = (AIPlanDatabase)EditorGUILayout.ObjectField("Plan Database",       planDatabase,       typeof(AIPlanDatabase),     false);
         useGameplaySensorContext = EditorGUILayout.ToggleLeft("Usar contexto do gameplay (MatchController)", useGameplaySensorContext);
         logToConsole             = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
     }
@@ -559,6 +595,131 @@ public class AIIntelDebugWindow : EditorWindow
         EditorGUI.indentLevel--;
     }
 
+    // ── plans section ──────────────────────────────────────────────────────────
+    private void DrawPlansSection()
+    {
+        // Tenta encontrar o AIPlayerController na cena para ler os planos do turno
+        AIPlayerController aiController = Object.FindAnyObjectByType<AIPlayerController>();
+        IReadOnlyList<AIPlanIntent> activePlans = aiController?.CurrentTurnPlans;
+
+        int planCount = activePlans != null ? activePlans.Count : 0;
+        string header = planDatabase != null
+            ? $"Planos Ativos  ({planCount} / {CountConfiguredPlans(planDatabase)} configurados)"
+            : $"Planos Ativos  ({planCount})";
+
+        foldPlans = EditorGUILayout.Foldout(foldPlans, header, true, EditorStyles.foldoutHeader);
+        if (!foldPlans) return;
+
+        EditorGUI.indentLevel++;
+
+        if (planDatabase == null)
+        {
+            EditorGUILayout.HelpBox("Plan Database não configurado.", MessageType.None);
+            EditorGUI.indentLevel--;
+            return;
+        }
+
+        if (!Application.isPlaying || activePlans == null || activePlans.Count == 0)
+        {
+            // Modo editoria / sem planos ativos: mostra configuração do banco
+            DrawPlanDatabaseConfig(planDatabase);
+            EditorGUI.indentLevel--;
+            return;
+        }
+
+        // Runtime: mostra os planos ativos com unidades designadas
+        for (int i = 0; i < activePlans.Count; i++)
+        {
+            AIPlanIntent intent = activePlans[i];
+            if (intent == null) continue;
+
+            Color planColor = GetSectorColor(intent.Sector);
+            GUIStyle headerStyle = new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = planColor } };
+            string planName = !string.IsNullOrWhiteSpace(intent.DisplayName)
+                ? intent.DisplayName
+                : (intent.Plan != null ? intent.Plan.displayName : "(plano dinamico)");
+
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.LabelField(
+                $"{i + 1}. {planName}  [{intent.Sector}]",
+                headerStyle);
+
+            if (intent.HasCaptureTarget)
+                EditorGUILayout.LabelField($"  Alvo: {intent.CaptureTargetLabel}  [{intent.CaptureTargetCell.x},{intent.CaptureTargetCell.y}]",
+                    EditorStyles.miniLabel);
+
+            if (intent.SectorEnemy != null && !intent.SectorEnemy.IsDead)
+                EditorGUILayout.LabelField($"  Inimigo no setor: {intent.SectorEnemy.UnitDisplayName}",
+                    EditorStyles.miniLabel);
+
+            if (intent.Assignments.Count == 0)
+            {
+                EditorGUILayout.LabelField("  (sem unidades designadas)", EditorStyles.miniLabel);
+            }
+            else
+            {
+                for (int a = 0; a < intent.Assignments.Count; a++)
+                {
+                    AIPlanAssignment asgn = intent.Assignments[a];
+                    UnitManager u = FindUnitByInstanceId(asgn.UnitInstanceId);
+                    string unitName = u != null ? u.UnitDisplayName : $"#{asgn.UnitInstanceId}";
+                    string role = string.IsNullOrWhiteSpace(asgn.Role) ? "—" : asgn.Role;
+                    EditorGUILayout.LabelField($"  · [{role}] {unitName}", EditorStyles.miniLabel);
+                }
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        EditorGUI.indentLevel--;
+    }
+
+    private static void DrawPlanDatabaseConfig(AIPlanDatabase db)
+    {
+        db.EnsureDefaults();
+
+        void DrawPlanRow(AIPlanData plan, string tag)
+        {
+            if (plan == null) return;
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.LabelField($"[{tag}] {plan.displayName}  [{plan.targetSector}]", EditorStyles.boldLabel);
+            int cc = plan.activationConditions != null ? plan.activationConditions.Count : 0;
+            EditorGUILayout.LabelField($"  Condições: {(cc == 0 ? "AlwaysActive" : cc.ToString())}", EditorStyles.miniLabel);
+            int pc = plan.participants != null ? plan.participants.Count : 0;
+            EditorGUILayout.LabelField($"  Participantes: {pc}", EditorStyles.miniLabel);
+            EditorGUILayout.EndVertical();
+        }
+
+        DrawPlanRow(db.defensePlan, "Defesa");
+        DrawPlanRow(db.attackPlan,  "Ataque");
+        EditorGUILayout.BeginVertical("box");
+        EditorGUILayout.LabelField("[Variaveis dinamicos] Runtime", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField($"  Max planos por turno: {db.maxVariablePlans}", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField($"  Max infantaria por plano: {db.maxUnitsPerVariablePlan}", EditorStyles.miniLabel);
+        EditorGUILayout.EndVertical();
+    }
+
+    private static int CountConfiguredPlans(AIPlanDatabase db)
+    {
+        if (db == null) return 0;
+        int n = 0;
+        if (db.defensePlan != null) n++;
+        if (db.attackPlan  != null) n++;
+        n += db.maxVariablePlans;
+        return n;
+    }
+
+    private static UnitManager FindUnitByInstanceId(int instanceId)
+    {
+        if (UnitManager.AllActive == null) return null;
+        for (int i = 0; i < UnitManager.AllActive.Count; i++)
+        {
+            UnitManager u = UnitManager.AllActive[i];
+            if (u != null && u.InstanceId == instanceId) return u;
+        }
+        return null;
+    }
+
     // Botão de toggle de highlight para um setor — inline, sem quebrar layout
     private void DrawSectorHighlightButton(ConstructionSector sector, bool isHighlighted, Color sectorColor)
     {
@@ -653,6 +814,21 @@ public class AIIntelDebugWindow : EditorWindow
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────
+    private static Vector3 ComputeSectorCentroidWorld(ConstructionSector sector)
+    {
+        IReadOnlyList<ConstructionManager> all = GetAllConstructions();
+        Vector3 sum = Vector3.zero;
+        int count = 0;
+        for (int i = 0; i < all.Count; i++)
+        {
+            ConstructionManager c = all[i];
+            if (c == null || c.Sector != sector) continue;
+            sum += c.transform.position;
+            count++;
+        }
+        return count > 0 ? sum / count : Vector3.zero;
+    }
+
     private static string BuildFlags(ConstructionManager c)
     {
         string f = string.Empty;

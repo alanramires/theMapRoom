@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+
 public enum AIPlanKind
 {
     Fixed = 0,
@@ -33,8 +34,8 @@ public class AIPlanData : ScriptableObject
     public ConstructionSector targetSector = ConstructionSector.BaseTeam;
 
     [Header("Rules")]
-    [TextArea]
-    public string activationCondition = string.Empty;
+    [Tooltip("Condições de ativação — todas devem ser verdadeiras para o plano ser ativado.")]
+    public List<PlanCondition> activationConditions = new List<PlanCondition>();
     [TextArea]
     public string objectiveCompletedWhen = string.Empty;
     [TextArea]
@@ -48,6 +49,8 @@ public class AIPlanData : ScriptableObject
 
     private void OnValidate()
     {
+        if (activationConditions == null)
+            activationConditions = new List<PlanCondition>();
         if (selectionCriteria == null)
             selectionCriteria = new List<string>();
         if (participants == null)

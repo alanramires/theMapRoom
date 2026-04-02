@@ -15,7 +15,9 @@
       "Bash(grep -n \"ExecuteAlways\\\\|ExecuteInEditMode\" \"/d/Unity Projects/The Map Room/Assets/Scripts/Sensors\"/*.cs)",
       "Bash(find \"d:/Unity Projects/The Map Room/Assets/Scripts\" -type f -name \"*.cs\" -exec grep -l \"PromoteCurrentBuffer\" {} \\\\;)",
       "Bash(find \"d:/Unity Projects/The Map Room/Assets/Scripts/Match/TurnState\" -name \"*.cs\" -exec grep -l \"HandleConfirmWithFeedback\\\\|HandleAutomatedSensorActionRequested\" {} \\\\;)",
-      "Bash(find \"d:/Unity Projects/The Map Room/Assets/Scripts/Match/TurnState\" -name \"*.cs\" -exec grep -l \"RecordAttackReplayCommand\" {} \\\\;)"
+      "Bash(find \"d:/Unity Projects/The Map Room/Assets/Scripts/Match/TurnState\" -name \"*.cs\" -exec grep -l \"RecordAttackReplayCommand\" {} \\\\;)",
+      "Bash(python3)",
+      "Bash(python)"
     ]
   }
 }

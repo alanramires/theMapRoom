@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Game/AI/AI Plan Database", fileName = "AIPlanDatabase")]
@@ -8,22 +7,17 @@ public class AIPlanDatabase : ScriptableObject
     public AIPlanData defensePlan;
     public AIPlanData attackPlan;
 
-    [Header("Variable Plans")]
+    [Header("Dynamic Variable Plans")]
     [Min(0)] public int maxVariablePlans = 3;
-    public List<AIPlanData> variablePlans = new List<AIPlanData>();
+    [Min(1), Tooltip("Maximo de unidades de infantaria designadas por plano variavel dinamico.")]
+    public int maxUnitsPerVariablePlan = 2;
 
     public void EnsureDefaults()
     {
         if (maxVariablePlans < 0)
             maxVariablePlans = 0;
-        if (variablePlans == null)
-            variablePlans = new List<AIPlanData>();
-
-        for (int i = variablePlans.Count - 1; i >= 0; i--)
-        {
-            if (variablePlans[i] == null)
-                variablePlans.RemoveAt(i);
-        }
+        if (maxUnitsPerVariablePlan < 1)
+            maxUnitsPerVariablePlan = 1;
     }
 
     private void OnValidate()
