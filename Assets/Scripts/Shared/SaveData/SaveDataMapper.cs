@@ -303,6 +303,7 @@ public static class SaveDataMapper
             constructionId = construction.ConstructionId,
             isActiveInHierarchy = construction.gameObject.activeInHierarchy,
             teamId = (int)construction.TeamId,
+            sector = (int)construction.Sector,
             cellX = construction.CurrentCellPosition.x,
             cellY = construction.CurrentCellPosition.y,
             worldX = construction.transform.position.x,
@@ -326,6 +327,7 @@ public static class SaveDataMapper
             return;
 
         manager.AssignSpawnInstanceId(saved.instanceId);
+        manager.SetSector(System.Enum.IsDefined(typeof(ConstructionSector), saved.sector) ? (ConstructionSector)saved.sector : manager.Sector);
         manager.SetCurrentCellPosition(new Vector3Int(saved.cellX, saved.cellY, 0));
         manager.ApplyOwnershipState(
             (TeamId)saved.teamId,

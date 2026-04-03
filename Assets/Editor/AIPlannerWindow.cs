@@ -7,13 +7,14 @@ public class AIPlannerWindow : EditorWindow
 {
     [SerializeField] private AIPlanDatabase database;
     [SerializeField] private MatchController previewMatchController;
+    [SerializeField] private AIPlayerController previewAiController;
     [SerializeField] private TeamId previewTeam = TeamId.Blue;
     [SerializeField] private bool previewUseFogVisibility;
     [SerializeField] private bool previewShowSceneOverlay = true;
-    [SerializeField] private int previewSelectedPlanIndex = -1;
-    [SerializeField] private int previewSelectedAssignmentIndex = -1;
+    [SerializeField] private TeamId previewSelectedPlanTeam = TeamId.Neutral;
+    [SerializeField] private string previewSelectedPlanKey = string.Empty;
+    [SerializeField] private int previewSelectedAssignmentUnitId = -1;
     [SerializeField] private Vector2 scroll;
-    [SerializeField] private List<AIPlanIntent> previewPlans = new List<AIPlanIntent>();
     [SerializeField] private string previewStatus = "Sem preview.";
 
     [MenuItem("Tools/AI/AI Planner")]
@@ -40,7 +41,7 @@ public class AIPlannerWindow : EditorWindow
 
         EditorGUILayout.LabelField("AI Planner", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Painel de preparacao de planos da IA. Defesa e ataque sao fixos; planos variaveis sao gerados em runtime.",
+            "Painel de preparacao de planos da IA. Usa o mesmo catalogo/runtime do AI Manager: Fixed Plans, Active Plans e Inactive Plans por time IA.",
             MessageType.Info);
 
         EditorGUILayout.Space(4f);
@@ -71,7 +72,7 @@ public class AIPlannerWindow : EditorWindow
         DrawPlanField("Attack Plan", database.attackPlan);
 
         EditorGUILayout.Space(6f);
-        EditorGUILayout.LabelField("Dynamic Variable Plans", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Variable Sector Plans Budget", EditorStyles.boldLabel);
         SerializedObject so = new SerializedObject(database);
         so.Update();
         EditorGUILayout.PropertyField(so.FindProperty("maxVariablePlans"));
@@ -92,7 +93,7 @@ public class AIPlannerWindow : EditorWindow
         int fixedCount = (database.defensePlan != null ? 1 : 0) + (database.attackPlan != null ? 1 : 0);
 
         EditorGUILayout.HelpBox(
-            $"Asset: {path}\nFixed: {fixedCount}/2 | Dynamic Variable Budget: {database.maxVariablePlans} planos por turno",
+            $"Asset: {path}\nFixed: {fixedCount}/2 | Variable Active Budget: {database.maxVariablePlans} setores ativos por turno",
             MessageType.None);
     }
 
@@ -104,15 +105,17 @@ public class AIPlannerWindow : EditorWindow
             "Gera planos usando as unidades e construcoes da cena atual para prever o comportamento da IA no opener.",
             MessageType.None);
 
+        previewAiController = (AIPlayerController)EditorGUILayout.ObjectField(
+            "AI Player Controller",
+            previewAiController,
+            typeof(AIPlayerController),
+            true);
         previewMatchController = (MatchController)EditorGUILayout.ObjectField(
             "Match Controller (opcional)",
             previewMatchController,
             typeof(MatchController),
             true);
-        previewTeam = (TeamId)EditorGUILayout.EnumPopup("Preview Team", previewTeam);
-        previewUseFogVisibility = EditorGUILayout.ToggleLeft(
-            "Usar visibilidade/FoW (quando houver MatchController em runtime)",
-            previewUseFogVisibility);
+        previewTeam = (TeamId)EditorGUILayout.EnumPopup("Overlay Team", previewTeam);
         previewShowSceneOverlay = EditorGUILayout.ToggleLeft(
             "Mostrar overlay no Scene (circulos e participantes)",
             previewShowSceneOverlay);
@@ -120,74 +123,14 @@ public class AIPlannerWindow : EditorWindow
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Auto Detect Context"))
             AutoDetectPreviewContext();
-        if (GUILayout.Button("Generate Preview"))
+        if (GUILayout.Button("Generate Preview (All AI)"))
             GeneratePreview();
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.HelpBox(previewStatus, MessageType.None);
 
-        if (previewPlans != null && previewPlans.Count > 0)
-        {
-            for (int i = 0; i < previewPlans.Count; i++)
-            {
-                AIPlanIntent intent = previewPlans[i];
-                if (intent == null)
-                    continue;
-
-                EditorGUILayout.BeginVertical("box");
-                string title = $"[{i}] {GetIntentTitle(intent)}";
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
-                bool isSelectedPlan = previewSelectedPlanIndex == i;
-                if (GUILayout.Button(isSelectedPlan ? "Hide" : "Show", GUILayout.Width(64f)))
-                {
-                    previewSelectedPlanIndex = isSelectedPlan ? -1 : i;
-                    previewSelectedAssignmentIndex = -1;
-                    SceneView.RepaintAll();
-                }
-                EditorGUILayout.EndHorizontal();
-                EditorGUILayout.LabelField("Sector", intent.Sector.ToString());
-                EditorGUILayout.LabelField("Assignments", intent.Assignments != null ? intent.Assignments.Count.ToString() : "0");
-                if (intent.HasCaptureTarget)
-                    EditorGUILayout.LabelField("Capture Target", FormatCell(intent.CaptureTargetCell));
-
-                if (intent.Assignments != null)
-                {
-                    for (int a = 0; a < intent.Assignments.Count; a++)
-                    {
-                        AIPlanAssignment assignment = intent.Assignments[a];
-                        if (assignment == null)
-                            continue;
-
-                        string unitName = FindUnitNameByInstanceId(assignment.UnitInstanceId);
-                        string target = assignment.HasPlannedCaptureTarget
-                            ? $" -> {assignment.PlannedCaptureLabel} {FormatCell(assignment.PlannedCaptureCell)}"
-                            : string.Empty;
-                        EditorGUILayout.BeginHorizontal();
-                        bool isSelectedAssignment = isSelectedPlan && previewSelectedAssignmentIndex == a;
-                        if (GUILayout.Button(isSelectedAssignment ? "On" : "Sel", GUILayout.Width(36f)))
-                        {
-                            previewSelectedPlanIndex = i;
-                            previewSelectedAssignmentIndex = isSelectedAssignment ? -1 : a;
-                            UnitManager unit = FindUnitByInstanceId(assignment.UnitInstanceId);
-                            if (unit != null)
-                            {
-                                Selection.activeObject = unit.gameObject;
-                                EditorGUIUtility.PingObject(unit.gameObject);
-                            }
-                            SceneView.RepaintAll();
-                        }
-                        EditorGUILayout.LabelField(
-                            $"- {unitName} ({assignment.Role}){target}",
-                            EditorStyles.miniLabel);
-                        EditorGUILayout.EndHorizontal();
-                    }
-                }
-
-                EditorGUILayout.EndVertical();
-            }
-        }
+        DrawPreviewTeams();
 
         EditorGUILayout.EndVertical();
     }
@@ -218,6 +161,214 @@ public class AIPlannerWindow : EditorWindow
         EditorGUILayout.EndVertical();
     }
 
+    private void DrawPreviewTeams()
+    {
+        if (previewAiController == null)
+        {
+            EditorGUILayout.HelpBox("Defina um AIPlayerController para usar o preview do planner atual.", MessageType.Info);
+            return;
+        }
+
+        IReadOnlyList<AIPlayerController.TeamPlannerDebugView> teams = previewAiController.PlannerDebugView;
+        if (teams == null || teams.Count == 0)
+        {
+            EditorGUILayout.HelpBox("Nenhum plano gerado. Clique em Generate Preview (All AI).", MessageType.None);
+            return;
+        }
+
+        for (int i = 0; i < teams.Count; i++)
+        {
+            AIPlayerController.TeamPlannerDebugView team = teams[i];
+            if (team == null)
+                continue;
+
+            DrawPreviewTeamBlock(team);
+        }
+    }
+
+    private void DrawPreviewTeamBlock(AIPlayerController.TeamPlannerDebugView team)
+    {
+        string teamLabel = TeamUtils.GetName(team.team);
+        string teamKey = $"AIPlannerWindow.Team.{team.team}";
+        bool expanded = SessionState.GetBool(teamKey, true);
+        expanded = EditorGUILayout.Foldout(expanded, teamLabel, true);
+        SessionState.SetBool(teamKey, expanded);
+        if (!expanded)
+            return;
+
+        EditorGUI.indentLevel++;
+        DrawPreviewPlanGroup(team, "Fixed Plans", IsFixedPlan);
+        DrawPreviewPlanGroup(team, "Active Plans", IsActiveVariablePlan);
+        DrawPreviewPlanGroup(team, "Inactive Plans", IsInactiveVariablePlan);
+        EditorGUI.indentLevel--;
+    }
+
+    private void DrawPreviewPlanGroup(AIPlayerController.TeamPlannerDebugView team, string label, System.Func<AIPlayerController.PlanDebugView, bool> predicate)
+    {
+        List<AIPlayerController.PlanDebugView> plans = new List<AIPlayerController.PlanDebugView>();
+        if (team.plans != null)
+        {
+            for (int i = 0; i < team.plans.Count; i++)
+            {
+                AIPlayerController.PlanDebugView plan = team.plans[i];
+                if (plan != null && predicate(plan))
+                    plans.Add(plan);
+            }
+        }
+
+        string sectionKey = $"AIPlannerWindow.Team.{team.team}.{label}";
+        bool expanded = SessionState.GetBool(sectionKey, true);
+        expanded = EditorGUILayout.Foldout(expanded, $"{label} ({plans.Count})", true);
+        SessionState.SetBool(sectionKey, expanded);
+        if (!expanded)
+            return;
+
+        EditorGUI.indentLevel++;
+        if (plans.Count == 0)
+        {
+            EditorGUILayout.LabelField("(nenhum)", EditorStyles.miniLabel);
+            EditorGUI.indentLevel--;
+            return;
+        }
+
+        for (int i = 0; i < plans.Count; i++)
+            DrawPreviewPlanRow(team.team, plans[i]);
+        EditorGUI.indentLevel--;
+    }
+
+    private void DrawPreviewPlanRow(TeamId team, AIPlayerController.PlanDebugView plan)
+    {
+        EditorGUILayout.BeginVertical("box");
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField($"{plan.displayName} [{plan.status}]", EditorStyles.boldLabel);
+        bool isSelectedPlan = previewSelectedPlanTeam == team && string.Equals(previewSelectedPlanKey, plan.planKey, System.StringComparison.Ordinal);
+        bool canOverlay = TryFindIntentForPlan(team, plan.planKey, out AIPlanIntent _);
+        EditorGUI.BeginDisabledGroup(!canOverlay);
+        if (GUILayout.Button(isSelectedPlan ? "Hide" : "Show", GUILayout.Width(64f)))
+        {
+            if (isSelectedPlan)
+                ClearPreviewSelection();
+            else
+            {
+                previewSelectedPlanTeam = team;
+                previewSelectedPlanKey = plan.planKey ?? string.Empty;
+                previewSelectedAssignmentUnitId = -1;
+                previewTeam = team;
+            }
+            SceneView.RepaintAll();
+        }
+        EditorGUI.EndDisabledGroup();
+        EditorGUILayout.EndHorizontal();
+
+        string riskText = plan.tacticalRiskScore > 0 ? $" | risk={plan.tacticalRiskScore}" : string.Empty;
+        EditorGUILayout.LabelField($"Sector: {plan.sector} | progresso={plan.progressCurrent}/{plan.progressMax} | conquistado={plan.conquered}{riskText}", EditorStyles.miniLabel);
+        if (!string.IsNullOrWhiteSpace(plan.selectionReason))
+            EditorGUILayout.LabelField($"criteria: {plan.selectionReason}", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField($"key={plan.planKey}", EditorStyles.miniLabel);
+
+        if (plan.assignments == null || plan.assignments.Count == 0)
+        {
+            EditorGUILayout.LabelField("participantes: (nenhum)", EditorStyles.miniLabel);
+            EditorGUILayout.EndVertical();
+            return;
+        }
+
+        for (int i = 0; i < plan.assignments.Count; i++)
+        {
+            AIPlayerController.AssignmentDebugView assignment = plan.assignments[i];
+            if (assignment == null)
+                continue;
+
+            EditorGUILayout.BeginHorizontal();
+            bool isSelectedAssignment = isSelectedPlan && previewSelectedAssignmentUnitId == assignment.unitInstanceId;
+            if (GUILayout.Button(isSelectedAssignment ? "On" : "Sel", GUILayout.Width(36f)))
+            {
+                previewSelectedPlanTeam = team;
+                previewSelectedPlanKey = plan.planKey ?? string.Empty;
+                previewSelectedAssignmentUnitId = isSelectedAssignment ? -1 : assignment.unitInstanceId;
+                UnitManager unit = FindUnitByInstanceId(assignment.unitInstanceId);
+                if (unit != null)
+                {
+                    Selection.activeObject = unit.gameObject;
+                    EditorGUIUtility.PingObject(unit.gameObject);
+                }
+                SceneView.RepaintAll();
+            }
+            EditorGUILayout.LabelField($"- {assignment.unitName} ({assignment.role})", EditorStyles.miniLabel);
+            EditorGUILayout.EndHorizontal();
+        }
+
+        EditorGUILayout.EndVertical();
+    }
+
+    private static bool IsFixedPlan(AIPlayerController.PlanDebugView plan)
+    {
+        return plan != null && string.Equals(plan.sector, ConstructionSector.BaseTeam.ToString(), System.StringComparison.Ordinal);
+    }
+
+    private static bool IsActiveVariablePlan(AIPlayerController.PlanDebugView plan)
+    {
+        return plan != null && !IsFixedPlan(plan) && string.Equals(plan.status, "Active", System.StringComparison.Ordinal);
+    }
+
+    private static bool IsInactiveVariablePlan(AIPlayerController.PlanDebugView plan)
+    {
+        return plan != null && !IsFixedPlan(plan) && !string.Equals(plan.status, "Active", System.StringComparison.Ordinal);
+    }
+
+    private void ClearPreviewSelection()
+    {
+        previewSelectedPlanTeam = TeamId.Neutral;
+        previewSelectedPlanKey = string.Empty;
+        previewSelectedAssignmentUnitId = -1;
+    }
+
+    private static int CountPreviewPlans(IReadOnlyList<AIPlayerController.TeamPlannerDebugView> teams)
+    {
+        int count = 0;
+        if (teams == null)
+            return count;
+
+        for (int i = 0; i < teams.Count; i++)
+        {
+            AIPlayerController.TeamPlannerDebugView team = teams[i];
+            if (team?.plans != null)
+                count += team.plans.Count;
+        }
+
+        return count;
+    }
+
+    private bool TryGetSelectedPreviewIntent(out AIPlanIntent intent)
+    {
+        return TryFindIntentForPlan(previewSelectedPlanTeam, previewSelectedPlanKey, out intent);
+    }
+
+    private bool TryFindIntentForPlan(TeamId team, string planKey, out AIPlanIntent intent)
+    {
+        intent = null;
+        if (previewAiController == null || string.IsNullOrWhiteSpace(planKey))
+            return false;
+
+        IReadOnlyList<AIPlanIntent> plans = previewAiController.GetCurrentTurnPlansForDebugTeam(team);
+        if (plans == null)
+            return false;
+
+        for (int i = 0; i < plans.Count; i++)
+        {
+            AIPlanIntent candidate = plans[i];
+            if (candidate == null)
+                continue;
+            if (string.Equals(AIPlanEvaluator.BuildPlanKey(candidate), planKey, System.StringComparison.Ordinal))
+            {
+                intent = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void AutoDetect()
     {
         if (database != null)
@@ -239,8 +390,28 @@ public class AIPlannerWindow : EditorWindow
 
     private void AutoDetectPreviewContext()
     {
+        if (previewAiController == null)
+            previewAiController = Object.FindAnyObjectByType<AIPlayerController>();
         if (previewMatchController == null)
             previewMatchController = Object.FindAnyObjectByType<MatchController>();
+    }
+
+    private void SyncControllerPlanDatabase()
+    {
+        if (previewAiController == null || database == null)
+            return;
+
+        SerializedObject controllerSo = new SerializedObject(previewAiController);
+        SerializedProperty planDbProp = controllerSo.FindProperty("aiPlanDatabase");
+        if (planDbProp == null)
+            return;
+
+        if (planDbProp.objectReferenceValue == database)
+            return;
+
+        planDbProp.objectReferenceValue = database;
+        controllerSo.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(previewAiController);
     }
 
     private void GeneratePreview()
@@ -248,21 +419,28 @@ public class AIPlannerWindow : EditorWindow
         if (database == null)
         {
             previewStatus = "Selecione um AIPlanDatabase.";
-            previewPlans.Clear();
+            ClearPreviewSelection();
             Repaint();
             return;
         }
 
-        database.EnsureDefaults();
-        AISnapshot snapshot = BuildEditorSnapshot(previewTeam, previewMatchController, previewUseFogVisibility);
-        previewPlans = AIPlanEvaluator.Evaluate(database, snapshot);
-        previewSelectedPlanIndex = -1;
-        previewSelectedAssignmentIndex = -1;
+        AutoDetectPreviewContext();
+        if (previewAiController == null)
+        {
+            previewStatus = "Nenhum AIPlayerController encontrado na cena.";
+            ClearPreviewSelection();
+            Repaint();
+            return;
+        }
+
+        SyncControllerPlanDatabase();
+        previewAiController.SimulatePlannerGenerationForDebugAllAiTeams();
+        IReadOnlyList<AIPlayerController.TeamPlannerDebugView> teams = previewAiController.PlannerDebugView;
+        int teamCount = teams != null ? teams.Count : 0;
+        int totalPlans = CountPreviewPlans(teams);
 
         previewStatus =
-            $"Team={TeamUtils.GetName(previewTeam)} | Friendly={snapshot.FriendlyUnits.Count} " +
-            $"| Enemies={snapshot.VisibleEnemies.Count} | Constructions={snapshot.KnownConstructions.Count} " +
-            $"| Plans={previewPlans.Count}";
+            $"AI Controller={previewAiController.name} | Times IA={teamCount} | Planos catalogados={totalPlans} | Overlay Team={TeamUtils.GetName(previewTeam)}";
         SceneView.RepaintAll();
         Repaint();
     }
@@ -271,13 +449,9 @@ public class AIPlannerWindow : EditorWindow
     {
         if (!previewShowSceneOverlay)
             return;
-        if (previewPlans == null || previewPlans.Count == 0)
+        if (previewAiController == null)
             return;
-        if (previewSelectedPlanIndex < 0 || previewSelectedPlanIndex >= previewPlans.Count)
-            return;
-
-        AIPlanIntent intent = previewPlans[previewSelectedPlanIndex];
-        if (intent == null)
+        if (!TryGetSelectedPreviewIntent(out AIPlanIntent intent))
             return;
         if (intent.Assignments == null || intent.Assignments.Count == 0)
             return;
@@ -319,7 +493,7 @@ public class AIPlannerWindow : EditorWindow
                 : fallbackTarget;
             to.z = 0f;
 
-            bool selected = previewSelectedAssignmentIndex == a;
+            bool selected = previewSelectedAssignmentUnitId == assignment.UnitInstanceId;
             Handles.color = selected
                 ? new Color(1f, 0.95f, 0.2f, 1f)
                 : new Color(planColor.r, planColor.g, planColor.b, 0.7f);

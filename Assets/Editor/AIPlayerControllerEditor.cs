@@ -12,6 +12,7 @@ public class AIPlayerControllerEditor : Editor
     private SerializedProperty aiDatabaseProp;
     private SerializedProperty aiPlanDatabaseProp;
     private SerializedProperty plannerDebugViewProp;
+    private SerializedProperty plannerDebugSimulationTeamProp;
 
     private void OnEnable()
     {
@@ -22,6 +23,7 @@ public class AIPlayerControllerEditor : Editor
         aiDatabaseProp = serializedObject.FindProperty("aiDatabase");
         aiPlanDatabaseProp = serializedObject.FindProperty("aiPlanDatabase");
         plannerDebugViewProp = serializedObject.FindProperty("plannerDebugView");
+        plannerDebugSimulationTeamProp = serializedObject.FindProperty("plannerDebugSimulationTeam");
     }
 
     public override void OnInspectorGUI()
@@ -58,14 +60,32 @@ public class AIPlayerControllerEditor : Editor
 
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("Planner Runtime (Debug)", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox("A simulacao principal monta a lista de planos para todos os times com isAI=true no MatchController.", MessageType.None);
+        if (plannerDebugSimulationTeamProp != null)
+            EditorGUILayout.PropertyField(plannerDebugSimulationTeamProp, new GUIContent("Simulation Team (Manual)"));
+
+        EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Refresh Planner Debug View"))
         {
             controller?.RefreshPlannerDebugViewNow();
             EditorUtility.SetDirty(controller);
             serializedObject.Update();
         }
-        if (plannerDebugViewProp != null)
-            EditorGUILayout.PropertyField(plannerDebugViewProp, new GUIContent("Planner Debug View"), true);
+        if (GUILayout.Button("Simular Planos (Todos IA)"))
+        {
+            controller?.SimulatePlannerGenerationForDebugAllAiTeams();
+            EditorUtility.SetDirty(controller);
+            serializedObject.Update();
+        }
+        if (GUILayout.Button("Simular Time Manual"))
+        {
+            controller?.SimulatePlannerGenerationForDebugSelectedTeam();
+            EditorUtility.SetDirty(controller);
+            serializedObject.Update();
+        }
+        EditorGUILayout.EndHorizontal();
+
+        DrawPlannerDebugView(controller, plannerDebugViewProp);
 
         serializedObject.ApplyModifiedProperties();
     }
@@ -120,5 +140,182 @@ public class AIPlayerControllerEditor : Editor
 
         if (!anyAi)
             EditorGUILayout.HelpBox("Nenhum time com isAI=true detectado no MatchController.", MessageType.Info);
+    }
+
+    private static void DrawPlannerDebugView(AIPlayerController controller, SerializedProperty plannerDebugViewProperty)
+    {
+        if (controller == null)
+        {
+            EditorGUILayout.HelpBox("AIPlayerController invalido.", MessageType.Warning);
+            return;
+        }
+
+        IReadOnlyList<AIPlayerController.TeamPlannerDebugView> teams = controller.PlannerDebugView;
+        if ((teams == null || teams.Count == 0) && (plannerDebugViewProperty == null || !plannerDebugViewProperty.isArray || plannerDebugViewProperty.arraySize == 0))
+        {
+            EditorGUILayout.HelpBox("Nenhum plano em debug. Clique em Simular Planos (Todos IA).", MessageType.None);
+            return;
+        }
+
+        if (plannerDebugViewProperty == null)
+        {
+            EditorGUILayout.HelpBox("plannerDebugView nao encontrado para desenhar a lista.", MessageType.Warning);
+            return;
+        }
+
+        DrawPlannerDebugTeamsList(plannerDebugViewProperty);
+    }
+
+    private static void DrawPlannerDebugTeamsList(SerializedProperty plannerDebugViewProperty)
+    {
+        plannerDebugViewProperty.isExpanded = EditorGUILayout.Foldout(plannerDebugViewProperty.isExpanded, $"Planner Debug View ({plannerDebugViewProperty.arraySize})", true);
+        if (!plannerDebugViewProperty.isExpanded)
+            return;
+
+        EditorGUI.indentLevel++;
+        for (int i = 0; i < plannerDebugViewProperty.arraySize; i++)
+        {
+            SerializedProperty teamElement = plannerDebugViewProperty.GetArrayElementAtIndex(i);
+            if (teamElement == null)
+                continue;
+
+            DrawPlannerTeamElement(teamElement, i);
+        }
+        EditorGUI.indentLevel--;
+    }
+
+    private static void DrawPlannerTeamElement(SerializedProperty teamElement, int index)
+    {
+        SerializedProperty teamProp = teamElement.FindPropertyRelative("team");
+        SerializedProperty plansProp = teamElement.FindPropertyRelative("plans");
+        string teamLabel = ResolveTeamElementLabel(teamProp, index);
+
+        teamElement.isExpanded = EditorGUILayout.Foldout(teamElement.isExpanded, teamLabel, true);
+        if (!teamElement.isExpanded)
+            return;
+
+        EditorGUI.indentLevel++;
+        if (teamProp != null)
+            EditorGUILayout.PropertyField(teamProp);
+
+        if (plansProp == null || !plansProp.isArray)
+        {
+            EditorGUILayout.LabelField("Plans", "(indisponivel)");
+            EditorGUI.indentLevel--;
+            return;
+        }
+
+        DrawPlanSection(plansProp, "Fixed Plans", IsFixedPlanElement);
+        DrawPlanSection(plansProp, "Active Plans", IsActiveVariablePlanElement);
+        DrawPlanSection(plansProp, "Inactive Plans", IsInactiveVariablePlanElement);
+        EditorGUI.indentLevel--;
+    }
+
+    private static void DrawPlanSection(SerializedProperty plansProp, string label, System.Func<SerializedProperty, bool> predicate)
+    {
+        List<int> indexes = new List<int>();
+        for (int i = 0; i < plansProp.arraySize; i++)
+        {
+            SerializedProperty planElement = plansProp.GetArrayElementAtIndex(i);
+            if (planElement != null && predicate(planElement))
+                indexes.Add(i);
+        }
+
+        bool expanded = SessionState.GetBool(GetPlanSectionStateKey(plansProp.propertyPath, label), true);
+        expanded = EditorGUILayout.Foldout(expanded, $"{label} ({indexes.Count})", true);
+        SessionState.SetBool(GetPlanSectionStateKey(plansProp.propertyPath, label), expanded);
+        if (!expanded)
+            return;
+
+        EditorGUI.indentLevel++;
+        if (indexes.Count == 0)
+        {
+            EditorGUILayout.LabelField("(nenhum)", EditorStyles.miniLabel);
+            EditorGUI.indentLevel--;
+            return;
+        }
+
+        for (int i = 0; i < indexes.Count; i++)
+        {
+            SerializedProperty planElement = plansProp.GetArrayElementAtIndex(indexes[i]);
+            if (planElement == null)
+                continue;
+
+            string planLabel = ResolvePlanElementLabel(planElement, indexes[i]);
+            EditorGUILayout.PropertyField(planElement, new GUIContent(planLabel), true);
+        }
+        EditorGUI.indentLevel--;
+    }
+
+    private static string GetPlanSectionStateKey(string propertyPath, string label)
+    {
+        return $"AIPlayerControllerEditor.{propertyPath}.{label}";
+    }
+
+    private static bool IsFixedPlanElement(SerializedProperty planElement)
+    {
+        string sector = GetStringRelative(planElement, "sector");
+        return string.Equals(sector, "BaseTeam", System.StringComparison.Ordinal);
+    }
+
+    private static bool IsActiveVariablePlanElement(SerializedProperty planElement)
+    {
+        return !IsFixedPlanElement(planElement)
+            && string.Equals(GetStringRelative(planElement, "status"), "Active", System.StringComparison.Ordinal);
+    }
+
+    private static bool IsInactiveVariablePlanElement(SerializedProperty planElement)
+    {
+        return !IsFixedPlanElement(planElement)
+            && !string.Equals(GetStringRelative(planElement, "status"), "Active", System.StringComparison.Ordinal);
+    }
+
+    private static string ResolvePlanElementLabel(SerializedProperty planElement, int index)
+    {
+        string displayName = GetStringRelative(planElement, "displayName");
+        string status = GetStringRelative(planElement, "status");
+        int risk = GetIntRelative(planElement, "tacticalRiskScore");
+        string riskSuffix = risk > 0 ? $" | risk={risk}" : string.Empty;
+        if (!string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrWhiteSpace(status))
+            return $"{displayName} [{status}]{riskSuffix}";
+        if (!string.IsNullOrWhiteSpace(displayName))
+            return displayName + riskSuffix;
+        return $"Plan {index}{riskSuffix}";
+    }
+
+    private static string GetStringRelative(SerializedProperty property, string relativeName)
+    {
+        SerializedProperty child = property != null ? property.FindPropertyRelative(relativeName) : null;
+        return child != null ? child.stringValue ?? string.Empty : string.Empty;
+    }
+
+    private static int GetIntRelative(SerializedProperty property, string relativeName)
+    {
+        SerializedProperty child = property != null ? property.FindPropertyRelative(relativeName) : null;
+        return child != null ? child.intValue : 0;
+    }
+
+    private static string ResolveTeamElementLabel(SerializedProperty teamProp, int index)
+    {
+        if (teamProp == null)
+            return $"Time {index}";
+
+        if (teamProp.propertyType == SerializedPropertyType.Enum)
+        {
+            string enumName = teamProp.enumDisplayNames != null
+                && teamProp.enumValueIndex >= 0
+                && teamProp.enumValueIndex < teamProp.enumDisplayNames.Length
+                ? teamProp.enumDisplayNames[teamProp.enumValueIndex]
+                : teamProp.enumNames != null
+                    && teamProp.enumValueIndex >= 0
+                    && teamProp.enumValueIndex < teamProp.enumNames.Length
+                        ? teamProp.enumNames[teamProp.enumValueIndex]
+                        : string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(enumName))
+                return enumName;
+        }
+
+        return $"Time {index}";
     }
 }

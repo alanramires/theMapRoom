@@ -28,6 +28,8 @@ public class AIPlayerController : MonoBehaviour
     [SerializeField, Tooltip("Apos o load, forca Build()+EvaluatePlanner sem consumir estado restaurado para o time configurado.")]
     private bool debugRunPostLoadPlannerRebuildTest = false;
     [SerializeField] private TeamId debugPostLoadPlannerTeam = TeamId.Blue;
+    [SerializeField, Tooltip("Time usado pelo botao de simulacao manual do planner no inspector.")]
+    private TeamId plannerDebugSimulationTeam = TeamId.Green;
 
     [Header("AI Data")]
     [SerializeField, Tooltip("Catalogo oficial de perfis de IA.")]
@@ -51,8 +53,100 @@ public class AIPlayerController : MonoBehaviour
         public readonly Dictionary<int, AIPlanEvaluator.MissionAssignmentMemory> previousAssignmentsByUnitId = new Dictionary<int, AIPlanEvaluator.MissionAssignmentMemory>();
         public readonly List<string> currentPlannerLifecycleLogs = new List<string>();
         public readonly Dictionary<string, PlanMetricState> previousPlanMetricsByKey = new Dictionary<string, PlanMetricState>();
+        public readonly Dictionary<string, PlannerCatalogPlanState> planCatalogByKey = new Dictionary<string, PlannerCatalogPlanState>();
         public bool hasRestoredStatePendingUse = false;
         public int restoredTurn = -1;
+    }
+
+    private enum PlannerCatalogStatus
+    {
+        Inactive = 0,
+        Active = 1,
+        Completed = 2
+    }
+
+    private sealed class PlannerCatalogPlanState
+    {
+        public string planKey;
+        public string displayName;
+        public ConstructionSector sector;
+        public bool isFixedPlan;
+        public string fixedPlanKind;
+        public PlannerCatalogStatus status;
+        public bool conquered;
+        public int progressCurrent;
+        public int progressMax;
+        public int lastActivationTurn = -1;
+        public int lastCompletionTurn = -1;
+        public int tacticalRiskScore;
+        public string selectionReason;
+        public readonly List<AIPlanAssignment> assignments = new List<AIPlanAssignment>();
+    }
+
+
+    private static SavedCatalogPlan BuildSavedCatalogPlan(PlannerCatalogPlanState planState)
+    {
+        if (planState == null || string.IsNullOrWhiteSpace(planState.planKey))
+            return null;
+
+        return new SavedCatalogPlan
+        {
+            planKey = planState.planKey,
+            displayName = planState.displayName ?? string.Empty,
+            sector = planState.sector.ToString(),
+            isFixedPlan = planState.isFixedPlan,
+            fixedPlanKind = planState.fixedPlanKind ?? string.Empty,
+            status = (int)planState.status,
+            statusName = planState.status.ToString(),
+            conquered = planState.conquered,
+            progressCurrent = planState.progressCurrent,
+            progressMax = planState.progressMax,
+            lastActivationTurn = planState.lastActivationTurn,
+            lastCompletionTurn = planState.lastCompletionTurn,
+            tacticalRiskScore = planState.tacticalRiskScore
+        };
+    }
+
+    private static PlannerCatalogStatus TryParseCatalogStatus(int value, string name)
+    {
+        if (System.Enum.IsDefined(typeof(PlannerCatalogStatus), value))
+            return (PlannerCatalogStatus)value;
+
+        if (!string.IsNullOrWhiteSpace(name) && System.Enum.TryParse(name, true, out PlannerCatalogStatus parsed))
+            return parsed;
+
+        return PlannerCatalogStatus.Inactive;
+    }
+
+    private static bool TryApplySavedCatalogPlan(TeamPlannerRuntimeState state, SavedCatalogPlan savedPlan)
+    {
+        if (state == null || savedPlan == null || string.IsNullOrWhiteSpace(savedPlan.planKey))
+            return false;
+
+        ConstructionSector sector = ConstructionSector.BaseTeam;
+        if (!string.IsNullOrWhiteSpace(savedPlan.sector) && System.Enum.TryParse(savedPlan.sector, true, out ConstructionSector parsedSector))
+            sector = parsedSector;
+
+        EnsureCatalogPlan(
+            state,
+            savedPlan.planKey,
+            !string.IsNullOrWhiteSpace(savedPlan.displayName) ? savedPlan.displayName : sector.ToString(),
+            sector,
+            savedPlan.isFixedPlan,
+            savedPlan.fixedPlanKind);
+
+        if (!state.planCatalogByKey.TryGetValue(savedPlan.planKey, out PlannerCatalogPlanState planState) || planState == null)
+            return false;
+
+        planState.status = TryParseCatalogStatus(savedPlan.status, savedPlan.statusName);
+        planState.conquered = savedPlan.conquered;
+        planState.progressCurrent = Mathf.Max(0, savedPlan.progressCurrent);
+        planState.progressMax = Mathf.Max(0, savedPlan.progressMax);
+        planState.lastActivationTurn = savedPlan.lastActivationTurn;
+        planState.lastCompletionTurn = savedPlan.lastCompletionTurn;
+        planState.tacticalRiskScore = Mathf.Max(0, savedPlan.tacticalRiskScore);
+        planState.selectionReason = savedPlan.selectionReason ?? string.Empty;
+        return true;
     }
 
     [System.Serializable]
@@ -69,6 +163,14 @@ public class AIPlayerController : MonoBehaviour
         public string planKey;
         public string displayName;
         public string sector;
+        public string status;
+        public bool conquered;
+        public int progressCurrent;
+        public int progressMax;
+        public int lastActivationTurn;
+        public int lastCompletionTurn;
+        public int tacticalRiskScore;
+        public string selectionReason;
         public List<AssignmentDebugView> assignments = new List<AssignmentDebugView>();
     }
 
@@ -103,6 +205,79 @@ public class AIPlayerController : MonoBehaviour
     public IReadOnlyList<AIPlanIntent> CurrentTurnPlans => GetOrCreatePlannerState(GetDebugReferenceTeam()).currentTurnPlans;
     public IReadOnlyDictionary<int, AIPlanIntent> CurrentTurnUnitRoles => GetOrCreatePlannerState(GetDebugReferenceTeam()).unitRoles;
     public IReadOnlyList<TeamPlannerDebugView> PlannerDebugView => plannerDebugView;
+
+    public IReadOnlyList<AIPlanIntent> GetCurrentTurnPlansForDebugTeam(TeamId team)
+    {
+        return GetOrCreatePlannerState(team).currentTurnPlans;
+    }
+
+    public void SimulatePlannerGenerationForDebugSelectedTeam()
+    {
+        SimulatePlannerGenerationForDebug(plannerDebugSimulationTeam);
+    }
+
+    public void SimulatePlannerGenerationForDebugAllAiTeams()
+    {
+        EnsureAIDataDefaults();
+        SectorManager.RequestRebuildFromActiveConstructions("planner-debug-sim-all");
+
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+
+        if (matchController == null)
+        {
+            Debug.LogWarning("[AI][planner-debug] simulacao abortada: MatchController nao encontrado.");
+            return;
+        }
+
+        IReadOnlyList<TeamId> players = matchController.Players;
+        bool simulatedAny = false;
+        for (int i = 0; i < players.Count; i++)
+        {
+            TeamId team = players[i];
+            if (!matchController.IsPlayerAI(team))
+                continue;
+
+            if (SimulatePlannerGenerationForDebug(team))
+                simulatedAny = true;
+        }
+
+        if (!simulatedAny)
+            Debug.LogWarning("[AI][planner-debug] simulacao abortada: nenhum time IA disponivel para simular.");
+    }
+
+    public bool SimulatePlannerGenerationForDebug(TeamId aiTeam)
+    {
+        EnsureAIDataDefaults();
+        SectorManager.RequestRebuildFromActiveConstructions($"planner-debug-sim-{aiTeam}");
+
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+
+        if (matchController == null)
+        {
+            Debug.LogWarning($"[AI][planner-debug][{aiTeam}] simulacao abortada: MatchController nao encontrado.");
+            return false;
+        }
+
+        if (aiPlanDatabase == null)
+        {
+            Debug.LogWarning($"[AI][planner-debug][{aiTeam}] simulacao abortada: AIPlanDatabase nao configurado.");
+            return false;
+        }
+
+        if (!matchController.IsPlayerAI(aiTeam))
+        {
+            Debug.LogWarning($"[AI][planner-debug][{aiTeam}] simulacao abortada: time nao esta configurado como IA no MatchController.");
+            return false;
+        }
+
+        AISnapshot snapshot = AISnapshot.Build(aiTeam, matchController, AISnapshot.DefaultDefendRadius);
+        EvaluatePlanner(aiTeam, snapshot, allowRestoredStateConsume: false);
+        RefreshPlannerDebugViewNow();
+        Debug.Log($"[AI][planner-debug][{aiTeam}] simulacao concluida | amigos={snapshot.FriendlyUnits.Count} inimigosVisiveis={snapshot.VisibleEnemies.Count} planos={GetOrCreatePlannerState(aiTeam).currentTurnPlans.Count}");
+        return true;
+    }
 
     private string T(TeamId team, int fase) =>
         $"[AI][T{(matchController != null ? matchController.CurrentTurn : 0)}][{team}][Fase {fase}]";
@@ -157,12 +332,242 @@ public class AIPlayerController : MonoBehaviour
         plannerDebugViewDirty = true;
     }
 
+    private void RefreshPlanCatalogForTeam(TeamId team, TeamPlannerRuntimeState state)
+    {
+        if (state == null)
+            return;
+
+        EnsureFixedCatalogPlans(state);
+        EnsureSectorCatalogPlans(state);
+
+        Dictionary<string, AIPlanIntent> activePlanByKey = new Dictionary<string, AIPlanIntent>();
+        for (int i = 0; i < state.currentTurnPlans.Count; i++)
+        {
+            AIPlanIntent intent = state.currentTurnPlans[i];
+            string key = AIPlanEvaluator.BuildPlanKey(intent);
+            if (intent == null || string.IsNullOrWhiteSpace(key))
+                continue;
+            activePlanByKey[key] = intent;
+        }
+
+        Dictionary<ConstructionSector, SectorManager.SectorInfo> sectorInfoBySector = BuildSectorInfoMap();
+        int currentTurn = matchController != null ? matchController.CurrentTurn : 0;
+
+        foreach (PlannerCatalogPlanState planState in state.planCatalogByKey.Values)
+        {
+            if (planState == null)
+                continue;
+
+            PlannerCatalogStatus previousStatus = planState.status;
+            planState.assignments.Clear();
+
+            if (activePlanByKey.TryGetValue(planState.planKey, out AIPlanIntent activeIntent) && activeIntent != null)
+            {
+                planState.status = PlannerCatalogStatus.Active;
+                planState.displayName = ResolveCatalogDisplayName(planState, activeIntent);
+                planState.selectionReason = activeIntent.SelectionReason ?? string.Empty;
+                planState.tacticalRiskScore = Mathf.Max(0, activeIntent.TacticalRiskScore);
+                for (int a = 0; a < activeIntent.Assignments.Count; a++)
+                {
+                    AIPlanAssignment assignment = activeIntent.Assignments[a];
+                    if (assignment != null)
+                        planState.assignments.Add(assignment);
+                }
+            }
+            else
+            {
+                planState.status = PlannerCatalogStatus.Inactive;
+                planState.displayName = ResolveCatalogDisplayName(planState, null);
+                planState.selectionReason = string.Empty;
+                planState.tacticalRiskScore = 0;
+            }
+
+            if (!planState.isFixedPlan && sectorInfoBySector.TryGetValue(planState.sector, out SectorManager.SectorInfo sectorInfo) && sectorInfo != null)
+            {
+                int teamProgress = 0;
+                IReadOnlyList<SectorManager.SectorConstructionInfo> constructions = sectorInfo.Constructions;
+                for (int i = 0; i < constructions.Count; i++)
+                {
+                    SectorManager.SectorConstructionInfo construction = constructions[i];
+                    if (construction == null)
+                        continue;
+
+                    int maxCapture = Mathf.Max(0, construction.CapturePointsMax);
+                    int currentCapture = Mathf.Clamp(construction.CurrentCapturePoints, 0, maxCapture);
+                    int contribution = construction.OwnerTeam == team
+                        ? currentCapture
+                        : Mathf.Max(0, maxCapture - currentCapture);
+
+                    teamProgress += contribution;
+                }
+
+                planState.progressCurrent = teamProgress;
+                planState.progressMax = Mathf.Max(0, sectorInfo.TotalCapturePointsMax);
+                planState.conquered = sectorInfo.IsFullyControlled && sectorInfo.ControllingTeam == team;
+                if (planState.conquered && planState.status != PlannerCatalogStatus.Active)
+                    planState.status = PlannerCatalogStatus.Completed;
+            }
+            else if (planState.isFixedPlan)
+            {
+                planState.progressCurrent = 0;
+                planState.progressMax = 0;
+                planState.conquered = false;
+            }
+            else
+            {
+                planState.progressCurrent = 0;
+                planState.progressMax = 0;
+                planState.conquered = false;
+            }
+
+            if (planState.status == PlannerCatalogStatus.Active && previousStatus != PlannerCatalogStatus.Active)
+                planState.lastActivationTurn = currentTurn;
+            if (planState.status == PlannerCatalogStatus.Completed && previousStatus != PlannerCatalogStatus.Completed)
+                planState.lastCompletionTurn = currentTurn;
+        }
+    }
+
+    private void EnsureFixedCatalogPlans(TeamPlannerRuntimeState state)
+    {
+        EnsureCatalogPlan(state, GetFixedDefensePlanKey(), "Defesa HQ", ConstructionSector.BaseTeam, true, "defense");
+        EnsureCatalogPlan(state, GetFixedAttackPlanKey(), "Ataque HQ", ConstructionSector.BaseTeam, true, "attack");
+    }
+
+    private void EnsureSectorCatalogPlans(TeamPlannerRuntimeState state)
+    {
+        IReadOnlyList<SectorManager.SectorInfo> sectors = SectorManager.GetAllSectorInfos();
+        for (int i = 0; i < sectors.Count; i++)
+        {
+            SectorManager.SectorInfo sectorInfo = sectors[i];
+            if (sectorInfo == null)
+                continue;
+
+            string key = BuildSectorCatalogPlanKey(sectorInfo.Sector);
+            EnsureCatalogPlan(state, key, sectorInfo.Sector.ToString(), sectorInfo.Sector, false, string.Empty);
+        }
+    }
+
+    private static void EnsureCatalogPlan(TeamPlannerRuntimeState state, string key, string displayName, ConstructionSector sector, bool isFixedPlan, string fixedPlanKind)
+    {
+        if (state == null || string.IsNullOrWhiteSpace(key))
+            return;
+
+        if (!state.planCatalogByKey.TryGetValue(key, out PlannerCatalogPlanState planState) || planState == null)
+        {
+            planState = new PlannerCatalogPlanState { planKey = key };
+            state.planCatalogByKey[key] = planState;
+        }
+
+        planState.displayName = displayName ?? string.Empty;
+        planState.sector = sector;
+        planState.isFixedPlan = isFixedPlan;
+        planState.fixedPlanKind = fixedPlanKind ?? string.Empty;
+    }
+
+    private static Dictionary<ConstructionSector, SectorManager.SectorInfo> BuildSectorInfoMap()
+    {
+        Dictionary<ConstructionSector, SectorManager.SectorInfo> result = new Dictionary<ConstructionSector, SectorManager.SectorInfo>();
+        IReadOnlyList<SectorManager.SectorInfo> sectors = SectorManager.GetAllSectorInfos();
+        for (int i = 0; i < sectors.Count; i++)
+        {
+            SectorManager.SectorInfo sectorInfo = sectors[i];
+            if (sectorInfo != null)
+                result[sectorInfo.Sector] = sectorInfo;
+        }
+
+        return result;
+    }
+
+    private static int CompareCatalogPlansForDebug(PlannerCatalogPlanState a, PlannerCatalogPlanState b)
+    {
+        int statusCompare = CompareStatusForDebug(a != null ? a.status : PlannerCatalogStatus.Inactive, b != null ? b.status : PlannerCatalogStatus.Inactive);
+        if (statusCompare != 0)
+            return statusCompare;
+
+        int fixedCompare = (a != null && a.isFixedPlan ? 0 : 1).CompareTo(b != null && b.isFixedPlan ? 0 : 1);
+        if (fixedCompare != 0)
+            return fixedCompare;
+
+        return string.CompareOrdinal(a != null ? a.planKey : string.Empty, b != null ? b.planKey : string.Empty);
+    }
+
+    private static int CompareStatusForDebug(PlannerCatalogStatus a, PlannerCatalogStatus b)
+    {
+        int rankA = a == PlannerCatalogStatus.Active ? 0
+            : a == PlannerCatalogStatus.Inactive ? 1
+            : a == PlannerCatalogStatus.Completed ? 2
+            : 3;
+        int rankB = b == PlannerCatalogStatus.Active ? 0
+            : b == PlannerCatalogStatus.Inactive ? 1
+            : b == PlannerCatalogStatus.Completed ? 2
+            : 3;
+        return rankA.CompareTo(rankB);
+    }
+
+    private string ResolveCatalogDisplayName(PlannerCatalogPlanState planState, AIPlanIntent activeIntent)
+    {
+        if (planState == null)
+            return string.Empty;
+        if (!string.IsNullOrWhiteSpace(planState.displayName))
+            return planState.displayName;
+        if (activeIntent != null)
+            return ResolvePlanDisplayName(activeIntent);
+        return planState.sector.ToString();
+    }
+
+    private string GetFixedDefensePlanKey()
+    {
+        if (aiPlanDatabase != null && aiPlanDatabase.defensePlan != null)
+            return AIPlanEvaluator.BuildPlanKey(new AIPlanIntent { Plan = aiPlanDatabase.defensePlan, Sector = aiPlanDatabase.defensePlan.targetSector });
+        return "fixed:defense-hq";
+    }
+
+    private string GetFixedAttackPlanKey()
+    {
+        if (aiPlanDatabase != null && aiPlanDatabase.attackPlan != null)
+            return AIPlanEvaluator.BuildPlanKey(new AIPlanIntent { Plan = aiPlanDatabase.attackPlan, Sector = aiPlanDatabase.attackPlan.targetSector });
+        return "fixed:attack-hq";
+    }
+
+    private static string BuildSectorCatalogPlanKey(ConstructionSector sector)
+    {
+        return $"dynamic:capture:{sector}";
+    }
+
+    private List<TeamId> GetPlannerDebugTeams()
+    {
+        EnsureAIDataDefaults();
+
+        List<TeamId> teams = new List<TeamId>();
+        if (matchController != null)
+        {
+            IReadOnlyList<TeamId> players = matchController.Players;
+            if (players != null)
+            {
+                for (int i = 0; i < players.Count; i++)
+                {
+                    TeamId team = players[i];
+                    if (!matchController.IsPlayerAI(team))
+                        continue;
+
+                    GetOrCreatePlannerState(team);
+                    teams.Add(team);
+                }
+            }
+        }
+
+        if (teams.Count == 0)
+            teams.AddRange(plannerStateByTeam.Keys);
+
+        teams.Sort((a, b) => ((int)a).CompareTo((int)b));
+        return teams;
+    }
+
     public void RefreshPlannerDebugViewNow()
     {
         plannerDebugView.Clear();
 
-        List<TeamId> teams = new List<TeamId>(plannerStateByTeam.Keys);
-        teams.Sort((a, b) => ((int)a).CompareTo((int)b));
+        List<TeamId> teams = GetPlannerDebugTeams();
 
         for (int t = 0; t < teams.Count; t++)
         {
@@ -170,30 +575,33 @@ public class AIPlayerController : MonoBehaviour
             TeamPlannerRuntimeState state = plannerStateByTeam[team];
             TeamPlannerDebugView teamView = new TeamPlannerDebugView { team = team };
 
-            var planItems = new List<(string key, AIPlanIntent intent)>();
-            for (int i = 0; i < state.currentTurnPlans.Count; i++)
-            {
-                AIPlanIntent intent = state.currentTurnPlans[i];
-                string key = AIPlanEvaluator.BuildPlanKey(intent);
-                planItems.Add((key, intent));
-            }
+            RefreshPlanCatalogForTeam(team, state);
 
-            planItems.Sort((x, y) => string.CompareOrdinal(x.key, y.key));
+            List<PlannerCatalogPlanState> catalogPlans = new List<PlannerCatalogPlanState>(state.planCatalogByKey.Values);
+            catalogPlans.Sort(CompareCatalogPlansForDebug);
 
-            for (int i = 0; i < planItems.Count; i++)
+            for (int i = 0; i < catalogPlans.Count; i++)
             {
-                AIPlanIntent intent = planItems[i].intent;
-                if (intent == null)
+                PlannerCatalogPlanState planState = catalogPlans[i];
+                if (planState == null)
                     continue;
 
                 PlanDebugView planView = new PlanDebugView
                 {
-                    planKey = planItems[i].key,
-                    displayName = ResolvePlanDisplayName(intent),
-                    sector = intent.Sector.ToString()
+                    planKey = planState.planKey,
+                    displayName = planState.displayName,
+                    sector = planState.sector.ToString(),
+                    status = planState.status.ToString(),
+                    conquered = planState.conquered,
+                    progressCurrent = planState.progressCurrent,
+                    progressMax = planState.progressMax,
+                    lastActivationTurn = planState.lastActivationTurn,
+                    lastCompletionTurn = planState.lastCompletionTurn,
+                    tacticalRiskScore = planState.tacticalRiskScore,
+                    selectionReason = planState.selectionReason
                 };
 
-                List<AIPlanAssignment> assignments = new List<AIPlanAssignment>(intent.Assignments);
+                List<AIPlanAssignment> assignments = new List<AIPlanAssignment>(planState.assignments);
                 assignments.Sort((a, b) => a.UnitInstanceId.CompareTo(b.UnitInstanceId));
                 for (int a = 0; a < assignments.Count; a++)
                 {
@@ -304,9 +712,17 @@ public class AIPlayerController : MonoBehaviour
             TeamPlannerSaveBlock teamBlock = new TeamPlannerSaveBlock
             {
                 teamId = (int)team,
-                hasRestoredStatePendingUse = false,
-                restoredTurn = -1
+                hasRestoredStatePendingUse = state.hasRestoredStatePendingUse,
+                restoredTurn = state.restoredTurn
             };
+
+            RefreshPlanCatalogForTeam(team, state);
+            foreach (var catalogKvp in state.planCatalogByKey)
+            {
+                SavedCatalogPlan savedCatalog = BuildSavedCatalogPlan(catalogKvp.Value);
+                if (savedCatalog != null)
+                    teamBlock.catalogPlans.Add(savedCatalog);
+            }
 
             for (int i = 0; i < state.currentTurnPlans.Count; i++)
             {
@@ -324,6 +740,8 @@ public class AIPlayerController : MonoBehaviour
                     displayName = ResolvePlanDisplayName(intent),
                     sector = intent.Sector.ToString(),
                     badgeSymbol = intent.BadgeSymbol,
+                    tacticalRiskScore = intent.TacticalRiskScore,
+                    selectionReason = intent.SelectionReason,
                     hasCaptureTarget = intent.HasCaptureTarget,
                     captureX = intent.CaptureTargetCell.x,
                     captureY = intent.CaptureTargetCell.y,
@@ -404,7 +822,16 @@ public class AIPlayerController : MonoBehaviour
             state.previousAssignmentsByUnitId.Clear();
             state.currentPlannerLifecycleLogs.Clear();
             state.previousPlanMetricsByKey.Clear();
-            state.restoredTurn = matchController != null ? matchController.CurrentTurn : 0;
+            state.planCatalogByKey.Clear();
+            state.restoredTurn = teamBlock.restoredTurn >= 0 ? teamBlock.restoredTurn : (matchController != null ? matchController.CurrentTurn : 0);
+
+            EnsureFixedCatalogPlans(state);
+            EnsureSectorCatalogPlans(state);
+            if (teamBlock.catalogPlans != null)
+            {
+                for (int c = 0; c < teamBlock.catalogPlans.Count; c++)
+                    TryApplySavedCatalogPlan(state, teamBlock.catalogPlans[c]);
+            }
 
             Dictionary<string, AIPlanIntent> planByKey = new Dictionary<string, AIPlanIntent>(System.StringComparer.Ordinal);
             if (teamBlock.activePlans != null)
@@ -492,7 +919,11 @@ public class AIPlayerController : MonoBehaviour
                 }
             }
 
-            state.hasRestoredStatePendingUse = state.currentTurnPlans.Count > 0 && (int)team == activeTeamIdAtLoad;
+            state.hasRestoredStatePendingUse = teamBlock.hasRestoredStatePendingUse
+                && state.currentTurnPlans.Count > 0
+                && (int)team == activeTeamIdAtLoad;
+            if (!teamBlock.hasRestoredStatePendingUse && state.currentTurnPlans.Count > 0)
+                state.hasRestoredStatePendingUse = state.currentTurnPlans.Count > 0 && (int)team == activeTeamIdAtLoad;
             if (state.restoredTurn < 0 && matchController != null)
                 state.restoredTurn = matchController.CurrentTurn;
 
@@ -526,7 +957,9 @@ public class AIPlayerController : MonoBehaviour
                 Plan = fixedPlan,
                 Sector = fixedPlan.targetSector,
                 DisplayName = !string.IsNullOrWhiteSpace(savedPlan.displayName) ? savedPlan.displayName : fixedPlan.displayName,
-                BadgeSymbol = !string.IsNullOrWhiteSpace(savedPlan.badgeSymbol) ? savedPlan.badgeSymbol : ResolveFixedPlanBadge(fixedPlan)
+                BadgeSymbol = !string.IsNullOrWhiteSpace(savedPlan.badgeSymbol) ? savedPlan.badgeSymbol : ResolveFixedPlanBadge(fixedPlan),
+                TacticalRiskScore = Mathf.Max(0, savedPlan.tacticalRiskScore),
+                SelectionReason = savedPlan.selectionReason
             };
         }
         else if (TryParseDynamicCapturePlanKey(savedPlan.planKey, out ConstructionSector dynamicSector))
@@ -536,7 +969,9 @@ public class AIPlayerController : MonoBehaviour
                 Plan = null,
                 Sector = dynamicSector,
                 DisplayName = !string.IsNullOrWhiteSpace(savedPlan.displayName) ? savedPlan.displayName : $"Captura {dynamicSector}",
-                BadgeSymbol = !string.IsNullOrWhiteSpace(savedPlan.badgeSymbol) ? savedPlan.badgeSymbol : GetSectorBadgeSymbol(dynamicSector)
+                BadgeSymbol = !string.IsNullOrWhiteSpace(savedPlan.badgeSymbol) ? savedPlan.badgeSymbol : GetSectorBadgeSymbol(dynamicSector),
+                TacticalRiskScore = Mathf.Max(0, savedPlan.tacticalRiskScore),
+                SelectionReason = savedPlan.selectionReason
             };
         }
         else if (System.Enum.TryParse(savedPlan.sector, true, out ConstructionSector sectorFromSave))
@@ -546,7 +981,9 @@ public class AIPlayerController : MonoBehaviour
                 Plan = null,
                 Sector = sectorFromSave,
                 DisplayName = !string.IsNullOrWhiteSpace(savedPlan.displayName) ? savedPlan.displayName : sectorFromSave.ToString(),
-                BadgeSymbol = !string.IsNullOrWhiteSpace(savedPlan.badgeSymbol) ? savedPlan.badgeSymbol : GetSectorBadgeSymbol(sectorFromSave)
+                BadgeSymbol = !string.IsNullOrWhiteSpace(savedPlan.badgeSymbol) ? savedPlan.badgeSymbol : GetSectorBadgeSymbol(sectorFromSave),
+                TacticalRiskScore = Mathf.Max(0, savedPlan.tacticalRiskScore),
+                SelectionReason = savedPlan.selectionReason
             };
         }
 
@@ -1730,10 +2167,12 @@ public class AIPlayerController : MonoBehaviour
         bool engagingEnemy = false;
         bool repositioningForDefense = false;
         Vector3Int moveTarget = unitCell;
+        UnitManager artilleryRepositionAnchorEnemy = null;
         bool defendMode = currentStance == AIStance.Defend;
 
         unit.TryGetUnitData(out UnitData unitData);
         AIUnitProfile aiProfile = unitData != null ? unitData.aiUnitProfile : null;
+        UnitCombatClassification combatClassification = unit != null ? unit.CombatClassification : UnitCombatClassification.Civil;
         // Attack-first: threshold menor para abandonar captura por ataque ("morder no caminho").
         bool bazookaSkirmisherUnit = aiProfile != null
             && aiProfile.SensorPriority.Count > 0 && aiProfile.SensorPriority[0] == AIUnitSensorKind.Attack;
@@ -1911,13 +2350,29 @@ public class AIPlayerController : MonoBehaviour
                         candidate = FindClosestVisibleEnemy(unit, snapshot, restrictToDefenseRadius: false);
                     }
 
+                    if (combatClassification == UnitCombatClassification.Artilheiro)
+                    {
+                        if (candidate == null || !CanUnitFireAtTargetFromCurrentPosition(unit, candidate))
+                        {
+                            if (candidate != null)
+                                artilleryRepositionAnchorEnemy = candidate;
+
+                            if (aiLog)
+                            {
+                                string anchorLabel = candidate != null ? candidate.name : "sem ancora";
+                                Debug.Log($"{T(aiTeam, 2)} [intel] {unit.name} eh artilheiro e nao tem tiro parado valido; Attack falhou e vai para o proximo sensor. ancora={anchorLabel}");
+                            }
+                            candidate = null;
+                        }
+                    }
+
                     if (candidate != null)
                     {
                         targetEnemy = candidate;
                         engagingEnemy = true;
                         break;
                     }
-                    // Sensor Attack falhou (sem inimigo visivel) ? tenta proximo.
+                    // Sensor Attack falhou (sem inimigo engajavel agora) ? tenta proximo.
                 }
                 else if (sensor == AIUnitSensorKind.Reposition)
                 {
@@ -1926,7 +2381,7 @@ public class AIPlayerController : MonoBehaviour
             }
         }
 
-        bool escortRoleActive = unitAssignment != null && unitAssignment.Role == AIPlanRole.Escort;
+        bool escortRoleActive = unitAssignment != null && IsEscortMissionRole(unitAssignment.Role);
         if (!supplyObjectiveActive
             && !repairModeActive
             && escortRoleActive
@@ -1967,6 +2422,40 @@ public class AIPlayerController : MonoBehaviour
                 }
             }
         }
+
+        // Se a captura nao pode ser concluida agora, mas ja existe alvo atribuido com ataque viavel,
+        // promove a unidade para o branch de engajamento antes do movimento para preservar DPQ.
+        if (!supplyObjectiveActive
+            && !repairModeActive
+            && captureObjectiveActive
+            && !captureActionNow
+            && !engagingEnemy
+            && assignedEnemy != null
+            && !assignedEnemy.IsDead
+            && (matchController == null || IsEnemyVisibleForAiTeam(assignedEnemy, aiTeam))
+            && TryEvaluateReachableAttackScore(unit, assignedEnemy, snapshot, occupiedByAllies, out int capturePivotAttackScore))
+        {
+            captureObjectiveActive = false;
+            captureActionNow = false;
+            targetEnemy = assignedEnemy;
+            engagingEnemy = true;
+            if (aiLog)
+                Debug.Log($"{T(aiTeam, 2)} [intel] captura sem conclusao imediata: promovendo para branch de combate com DPQ -> {assignedEnemy.name} (score={capturePivotAttackScore})");
+        }
+        if (!supplyObjectiveActive
+            && !repairModeActive
+            && !captureObjectiveActive
+            && combatClassification == UnitCombatClassification.Artilheiro
+            && targetEnemy != null
+            && !CanUnitFireAtTargetFromCurrentPosition(unit, targetEnemy))
+        {
+            if (aiLog)
+                Debug.Log($"{T(aiTeam, 2)} [intel] {unit.name} descartou alvo de engajamento sem tiro parado valido ({targetEnemy.name}); retomando coesao/reposicionamento.");
+
+            targetEnemy = null;
+            engagingEnemy = false;
+        }
+
         if (supplyObjectiveActive)
         {
             moveTarget = supplyObjectiveCell;
@@ -2109,13 +2598,20 @@ public class AIPlayerController : MonoBehaviour
         bool canRepositionWhileFiring = unit.RemainingMovementPoints > 1;
         if (!supplyObjectiveActive && !repairModeActive && !captureObjectiveActive && engagingEnemy && TryGetPreferredEngagementRangeForTarget(unit, targetEnemy, out int engageMinRange, out int engageMaxRange))
         {
-            UnitCombatClassification combatClassification = unit.CombatClassification;
             bool canFireAssignedTargetFromCurrent = targetEnemy != null && CanUnitFireAtTargetFromCurrentPosition(unit, targetEnemy);
 
             if (combatClassification == UnitCombatClassification.Artilheiro)
             {
-                foundDestination = true;
-                bestDest = unitCell;
+                if (canFireAssignedTargetFromCurrent)
+                {
+                    foundDestination = true;
+                    bestDest = unitCell;
+                }
+                else
+                {
+                    engagingEnemy = false;
+                    targetEnemy = null;
+                }
             }
             else if (combatClassification == UnitCombatClassification.Hibrido && canFireAssignedTargetFromCurrent)
             {
@@ -2174,6 +2670,36 @@ public class AIPlayerController : MonoBehaviour
                 prioritizeDpq: true,
                 unit: unit,
                 preferMaxDistance: true);
+        }
+
+        if (!supplyObjectiveActive
+            && !repairModeActive
+            && !captureObjectiveActive
+            && !engagingEnemy
+            && !foundDestination
+            && combatClassification == UnitCombatClassification.Artilheiro
+            && artilleryRepositionAnchorEnemy != null
+            && !artilleryRepositionAnchorEnemy.IsDead
+            && TryGetPreferredArtilleryRange(unit, out int artilleryRepositionMinRange, out int artilleryRepositionMaxRange))
+        {
+            Vector3Int artilleryAnchorCell = artilleryRepositionAnchorEnemy.CurrentCellPosition;
+            artilleryAnchorCell.z = 0;
+
+            foundDestination = turnStateManager.TryGetBestReachableCellAtHexDistanceBand(
+                snapshot.BoardTilemap,
+                artilleryAnchorCell,
+                artilleryRepositionMinRange,
+                artilleryRepositionMaxRange,
+                occupiedByAllies,
+                out bestDest,
+                prioritizeDpq: true,
+                unit: unit,
+                preferMaxDistance: true);
+
+            if (foundDestination && aiLog)
+            {
+                Debug.Log($"{T(aiTeam, 2)} [reposition] {unit.name} (artilharia) escolheu reposicionamento tatico em faixa {artilleryRepositionMinRange}-{artilleryRepositionMaxRange} de {artilleryRepositionAnchorEnemy.name}.");
+            }
         }
 
         if (!foundDestination)
@@ -2272,7 +2798,7 @@ public class AIPlayerController : MonoBehaviour
             captured = !repairModeActive && captureObjectiveActive && turnStateManager.TryExecuteAutomatedCaptureIfAvailable();
         }
 
-        if (!supplyObjectiveActive && !repairModeActive && !captureObjectiveActive && bestDest == unitCell && intelCanFire && intelFireTarget != null)
+        if (!supplyObjectiveActive && !repairModeActive && !captureObjectiveActive && bestDest == unitCell && intelCanFire && intelFireTarget != null && targetEnemy == null)
             targetEnemy = intelFireTarget;
 
         if (!supplied && !transferred && !captured && captureObjectiveActive)
@@ -2378,7 +2904,7 @@ public class AIPlayerController : MonoBehaviour
 
         snapshot.UnitRoles.TryGetValue(unit.InstanceId, out AIPlanIntent unitIntent);
         snapshot.UnitPlanAssignments.TryGetValue(unit.InstanceId, out AIPlanAssignment unitAssignment);
-        bool escortRoleActive = unitAssignment != null && unitAssignment.Role == AIPlanRole.Escort;
+        bool escortRoleActive = unitAssignment != null && IsEscortMissionRole(unitAssignment.Role);
         Vector3Int escortPlanCohesionCell = friendlyCell;
         string escortPlanCohesionLabel = string.Empty;
         bool escortPlanCohesionActive = escortRoleActive
@@ -3591,6 +4117,13 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             out _);
 
         return score > (int.MinValue / 8);
+    }
+
+    private static bool IsEscortMissionRole(AIPlanRole role)
+    {
+        return role == AIPlanRole.Escort
+            || role == AIPlanRole.Artillery
+            || role == AIPlanRole.Support;
     }
 
     private static bool IsEnemyInCaptureLane(

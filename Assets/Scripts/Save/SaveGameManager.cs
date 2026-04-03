@@ -753,7 +753,7 @@ public class SaveGameManager : MonoBehaviour
 
             if (preprocessTask.IsFaulted)
             {
-                Debug.LogError($"[SaveGame] Falha no preprocess assíncrono: {preprocessTask.Exception?.GetBaseException().Message}");
+                Debug.LogError($"[SaveGame] Falha no preprocess assÃ­ncrono: {preprocessTask.Exception?.GetBaseException().Message}");
                 cursorController?.PlayErrorSfx();
                 PanelDialogController.ClearExternalText();
                 yield break;
@@ -1069,6 +1069,7 @@ public class SaveGameManager : MonoBehaviour
                 }
             }
             LogLoadPerf(loadedSlot, "restore_constructions.end", spawnConstructionsStartMs, PerfNowMs() - routineStartMs);
+            SectorManager.RequestRebuildFromActiveConstructions("post-restore-constructions");
 
             stage = "spawn-units";
             double spawnUnitsStartMs = PerfNowMs();
@@ -1608,7 +1609,7 @@ public class SaveGameManager : MonoBehaviour
 
     /// <summary>
     /// Chamado por NewGamePanelController antes de LoadScene.
-    /// Transporta o diretório de save e ativa auto-save na cena de destino.
+    /// Transporta o diretÃ³rio de save e ativa auto-save na cena de destino.
     /// </summary>
     public static void SetupForNewGame(string saveDirectory)
     {

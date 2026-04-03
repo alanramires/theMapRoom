@@ -19,8 +19,8 @@ public static class AIPlanRoleExtensions
             case AIPlanRole.Capture: return "capture";
             case AIPlanRole.Escort: return "escort";
             case AIPlanRole.Assault: return "assault";
-            case AIPlanRole.Support: return "support";
-            case AIPlanRole.Artillery: return "artillery";
+            case AIPlanRole.Support: return "escort";
+            case AIPlanRole.Artillery: return "escort";
             default: return role.ToString();
         }
     }
@@ -49,6 +49,9 @@ public class AIPlanIntent
     // Score de risco tatico calculado no planner (usado no log/debug).
     // 0 = nao calculado/nao aplicavel (ex: planos fixos).
     public int TacticalRiskScore;
+
+    // Motivo resumido pelo qual este plano ficou ativo no turno.
+    public string SelectionReason;
 
     // Unidades designadas a este plano neste turno
     public List<AIPlanAssignment> Assignments = new List<AIPlanAssignment>();

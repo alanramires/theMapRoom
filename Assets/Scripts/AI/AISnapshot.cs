@@ -32,14 +32,38 @@ public class AISnapshot
 
     public const int DefaultDefendRadius = 5;
 
+    private static IReadOnlyList<ConstructionManager> GetConstructionsForBuild()
+    {
+        if (ConstructionManager.AllActive.Count > 0)
+            return ConstructionManager.AllActive;
+
+        if (!Application.isPlaying)
+            return Object.FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        return ConstructionManager.AllActive;
+    }
+
+    private static IReadOnlyList<UnitManager> GetUnitsForBuild()
+    {
+        if (UnitManager.AllActive.Count > 0)
+            return UnitManager.AllActive;
+
+        if (!Application.isPlaying)
+            return Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        return UnitManager.AllActive;
+    }
+
     public static AISnapshot Build(TeamId aiTeam, MatchController matchController, int defendRadius = DefaultDefendRadius)
     {
         AISnapshot snapshot = new AISnapshot { AiTeam = aiTeam, HqDefendRadius = defendRadius };
+        IReadOnlyList<ConstructionManager> constructions = GetConstructionsForBuild();
+        IReadOnlyList<UnitManager> units = GetUnitsForBuild();
 
         // Todas as construcoes sao conhecidas (intel publica)
-        for (int i = 0; i < ConstructionManager.AllActive.Count; i++)
+        for (int i = 0; i < constructions.Count; i++)
         {
-            ConstructionManager c = ConstructionManager.AllActive[i];
+            ConstructionManager c = constructions[i];
             if (c == null)
                 continue;
 
@@ -77,9 +101,9 @@ public class AISnapshot
         }
 
         // Tilemap (pego do primeiro unit ativo com referencia)
-        for (int i = 0; i < UnitManager.AllActive.Count; i++)
+        for (int i = 0; i < units.Count; i++)
         {
-            UnitManager u = UnitManager.AllActive[i];
+            UnitManager u = units[i];
             if (u != null && u.BoardTilemap != null)
             {
                 snapshot.BoardTilemap = u.BoardTilemap;
@@ -90,9 +114,9 @@ public class AISnapshot
         // Tilemap fallback via construcoes
         if (snapshot.BoardTilemap == null)
         {
-            for (int i = 0; i < ConstructionManager.AllActive.Count; i++)
+            for (int i = 0; i < constructions.Count; i++)
             {
-                ConstructionManager c = ConstructionManager.AllActive[i];
+                ConstructionManager c = constructions[i];
                 if (c != null && c.BoardTilemap != null)
                 {
                     snapshot.BoardTilemap = c.BoardTilemap;
@@ -116,9 +140,9 @@ public class AISnapshot
         }
 
         // Unidades amigas e inimigos visiveis
-        for (int i = 0; i < UnitManager.AllActive.Count; i++)
+        for (int i = 0; i < units.Count; i++)
         {
-            UnitManager u = UnitManager.AllActive[i];
+            UnitManager u = units[i];
             if (u == null || u.IsDead || u.IsEmbarked)
                 continue;
 

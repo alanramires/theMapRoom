@@ -445,6 +445,12 @@ public class ConstructionManager : MonoBehaviour
         RefreshRuntimeVisualState(force: true);
     }
 
+    public void SetSector(ConstructionSector value)
+    {
+        sector = value;
+        RefreshRuntimeVisualState(force: true);
+    }
+
     public void SetInfiniteSuppliesOverride(bool value)
     {
         hasInfiniteSuppliesOverride = value;

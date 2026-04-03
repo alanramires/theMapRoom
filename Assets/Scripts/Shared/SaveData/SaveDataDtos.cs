@@ -149,6 +149,7 @@ public class ConstructionSaveData
     public string constructionId;
     public bool isActiveInHierarchy = true;
     public int teamId;
+    public int sector;
     public int cellX;
     public int cellY;
     public float worldX;
@@ -217,7 +218,7 @@ public class FogUnitVisibilitySaveData
 [Serializable]
 public class AIPlannerMultiTeamSaveData
 {
-    public int dataVersion = 1;
+    public int dataVersion = 2;
     public List<TeamPlannerSaveBlock> teams = new List<TeamPlannerSaveBlock>();
 }
 
@@ -227,9 +228,29 @@ public class TeamPlannerSaveBlock
     public int teamId;
     public bool hasRestoredStatePendingUse;
     public int restoredTurn = -1;
+    public List<SavedCatalogPlan> catalogPlans = new List<SavedCatalogPlan>();
     public List<SavedPlan> activePlans = new List<SavedPlan>();
     public List<SavedAssignment> assignments = new List<SavedAssignment>();
     public List<SavedPreviousAssignmentMemory> previousAssignments = new List<SavedPreviousAssignmentMemory>();
+}
+
+[Serializable]
+public class SavedCatalogPlan
+{
+    public string planKey;
+    public string displayName;
+    public string sector;
+    public bool isFixedPlan;
+    public string fixedPlanKind;
+    public int status;
+    public string statusName;
+    public bool conquered;
+    public int progressCurrent;
+    public int progressMax;
+    public int lastActivationTurn = -1;
+    public int lastCompletionTurn = -1;
+    public int tacticalRiskScore;
+    public string selectionReason;
 }
 
 [Serializable]
@@ -239,6 +260,8 @@ public class SavedPlan
     public string displayName;
     public string sector;
     public string badgeSymbol;
+    public int tacticalRiskScore;
+    public string selectionReason;
     public bool hasCaptureTarget;
     public int captureX;
     public int captureY;

@@ -8,7 +8,7 @@ public class AIPlanDatabase : ScriptableObject
     public AIPlanData defensePlan;
     public AIPlanData attackPlan;
 
-    [Header("Dynamic Variable Plans")]
+    [Header("Active Sector Plans Budget")]
     [Min(0)] public int maxVariablePlans = 3;
 
     public AIPlanData GetPlanByKey(string planKey)

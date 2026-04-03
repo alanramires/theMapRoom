@@ -18,6 +18,7 @@ public class AIIntelDebugWindow : EditorWindow
         public readonly List<ConstructionIntel> entries = new List<ConstructionIntel>();
         public ConstructionIntel representative;
         public int sectorDistance = -1;
+        public SectorManager.SectorInfo sectorInfo;
     }
 
     // ── sector colors (mesma ordem ordinal do enum: Alpha=0 … Tango=18, BaseTeam=19) ──
@@ -324,52 +325,69 @@ public class AIIntelDebugWindow : EditorWindow
     // ── sector builder ─────────────────────────────────────────────────────────
     private void BuildSectorIntel(Tilemap map)
     {
-        Dictionary<ConstructionSector, SectorIntel> bySetor = new Dictionary<ConstructionSector, SectorIntel>();
+        sectorIntel.Clear();
+
+        IReadOnlyList<SectorManager.SectorInfo> sectors = SectorManager.GetAllSectorInfos();
+        if (sectors == null || sectors.Count == 0)
+            return;
+
+        Dictionary<int, ConstructionIntel> intelByInstanceId = new Dictionary<int, ConstructionIntel>();
         for (int i = 0; i < allSortedConstr.Count; i++)
         {
-            ConstructionSector s = allSortedConstr[i].construction.Sector;
-            if (!bySetor.TryGetValue(s, out SectorIntel si))
-            {
-                si = new SectorIntel { sector = s };
-                bySetor[s] = si;
-            }
-            si.entries.Add(allSortedConstr[i]);
+            ConstructionIntel intel = allSortedConstr[i];
+            if (intel?.construction == null)
+                continue;
+
+            intelByInstanceId[intel.construction.InstanceId] = intel;
         }
 
-        foreach (KeyValuePair<ConstructionSector, SectorIntel> kv in bySetor)
+        for (int i = 0; i < sectors.Count; i++)
         {
-            SectorIntel si = kv.Value;
-            si.representative = ElectSectorRepresentative(si.entries);
+            SectorManager.SectorInfo source = sectors[i];
+            if (source == null)
+                continue;
+
+            SectorIntel si = new SectorIntel
+            {
+                sector = source.Sector,
+                sectorInfo = source
+            };
+
+            IReadOnlyList<SectorManager.SectorConstructionInfo> constructions = source.Constructions;
+            for (int j = 0; j < constructions.Count; j++)
+            {
+                SectorManager.SectorConstructionInfo entry = constructions[j];
+                if (entry == null)
+                    continue;
+
+                if (!intelByInstanceId.TryGetValue(entry.InstanceId, out ConstructionIntel intel))
+                {
+                    ConstructionManager construction = entry.Source;
+                    intel = new ConstructionIntel
+                    {
+                        construction = construction,
+                        distanceFromNearestAlly = construction != null
+                            ? ComputeNearestAllyDistance(construction.CurrentCellPosition, alliedUnits, map)
+                            : -1
+                    };
+                }
+
+                si.entries.Add(intel);
+
+                if (source.RepresentativeConstruction != null
+                    && intel?.construction != null
+                    && intel.construction.InstanceId == source.RepresentativeConstruction.InstanceId)
+                {
+                    si.representative = intel;
+                }
+            }
+
+            if (si.representative == null && si.entries.Count > 0)
+                si.representative = si.entries[0];
+
             si.sectorDistance = si.representative?.distanceFromNearestAlly ?? -1;
             sectorIntel.Add(si);
         }
-
-        sectorIntel.Sort((a, b) => ((int)a.sector).CompareTo((int)b.sector));
-    }
-
-    private static ConstructionIntel ElectSectorRepresentative(List<ConstructionIntel> entries)
-    {
-        if (entries == null || entries.Count == 0) return null;
-        if (entries.Count == 1) return entries[0];
-
-        float cx = 0f, cy = 0f;
-        for (int i = 0; i < entries.Count; i++)
-        {
-            cx += entries[i].construction.CurrentCellPosition.x;
-            cy += entries[i].construction.CurrentCellPosition.y;
-        }
-        cx /= entries.Count;
-        cy /= entries.Count;
-
-        ConstructionIntel best = entries[0];
-        float bestDist = float.MaxValue;
-        for (int i = 0; i < entries.Count; i++)
-        {
-            Vector3Int cell = entries[i].construction.CurrentCellPosition;
-            float d = (cell.x - cx) * (cell.x - cx) + (cell.y - cy) * (cell.y - cy);
-            if (d < bestDist) { bestDist = d; best = entries[i]; }
-        }
-        return best;
     }
 
     // ── draw sections ──────────────────────────────────────────────────────────
@@ -556,6 +574,17 @@ public class AIIntelDebugWindow : EditorWindow
                 new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = sc } });
             DrawSectorHighlightButton(si.sector, isHighlighted, sc);
             EditorGUILayout.EndHorizontal();
+
+            SectorManager.SectorInfo sectorInfo = si.sectorInfo;
+            if (sectorInfo != null)
+            {
+                EditorGUILayout.LabelField(
+                    $"Status: {sectorInfo.StatusText} | controleTotal={sectorInfo.IsFullyControlled} | disputa={sectorInfo.IsDisputed}",
+                    EditorStyles.miniLabel);
+                EditorGUILayout.LabelField(
+                    $"Captura: {sectorInfo.TotalCurrentCapturePoints}/{sectorInfo.TotalCapturePointsMax} | dono={TeamUtils.GetName(sectorInfo.ControllingTeam)}",
+                    EditorStyles.miniLabel);
+            }
 
             // representante
             if (si.representative?.construction != null)
@@ -954,7 +983,9 @@ public class AIIntelDebugWindow : EditorWindow
         {
             SectorIntel si = sectorIntel[i];
             string rep = si.representative?.construction?.ConstructionDisplayName ?? "(nenhum)";
-            Debug.Log($"[AIIntel][SETOR] {si.sector} | qtd={si.entries.Count} rep={rep} dist={si.sectorDistance}");
+            string status = si.sectorInfo != null ? si.sectorInfo.StatusText : "(sem-status)";
+            string capture = si.sectorInfo != null ? $"{si.sectorInfo.TotalCurrentCapturePoints}/{si.sectorInfo.TotalCapturePointsMax}" : "0/0";
+            Debug.Log($"[AIIntel][SETOR] {si.sector} | qtd={si.entries.Count} rep={rep} dist={si.sectorDistance} status={status} capture={capture}");
         }
     }
 }
