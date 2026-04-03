@@ -28,6 +28,10 @@ public class AIDataMode
     public bool saveForNextRound = true;
     [Tooltip("Mesmo economizando, permite fallback imediato de contingencia se houver unidade acessivel.")]
     public bool allowFallbackWhenSaving = true;
+    [Tooltip("Quando allowFallbackWhenSaving estiver ativo, limita o fallback de economia a uma unica compra por turno.")]
+    public bool allowFallbackWhenSavingButOnce = true;
+    [Tooltip("Em modo de defesa, permite ignorar o limite de uma unica compra e comprar fallback enquanto economiza.")]
+    public bool buyFallbackWhenSavingOnDefenseMode = true;
     [Tooltip("Fallback de contingencia (UnitData). Ordem importa.")]
     public List<UnitData> fallbackUnits = new List<UnitData>();
     public List<AIDataGroup> groups = new List<AIDataGroup>();
@@ -75,6 +79,8 @@ public class AIData : ScriptableObject
             label = "Attack",
             saveForNextRound = true,
             allowFallbackWhenSaving = true,
+            allowFallbackWhenSavingButOnce = true,
+            buyFallbackWhenSavingOnDefenseMode = true,
             fallbackUnits = new List<UnitData>(),
             groups = new List<AIDataGroup>
             {
@@ -89,6 +95,8 @@ public class AIData : ScriptableObject
             label = "Defense",
             saveForNextRound = true,
             allowFallbackWhenSaving = true,
+            allowFallbackWhenSavingButOnce = true,
+            buyFallbackWhenSavingOnDefenseMode = true,
             fallbackUnits = new List<UnitData>(),
             groups = new List<AIDataGroup>
             {

@@ -16,7 +16,9 @@ MonoBehaviour:
   displayName: 'PLAN: DEFESA'
   kind: 0
   targetSector: 100
-  activationCondition: Unidades inimigas visiveis a 5 hex do HQ.
+  activationConditions:
+  - type: 0
+    threshold: 0
   objectiveCompletedWhen: Nao ha unidades inimigas visiveis a 5 hex do HQ.
   objectiveFailedWhen: HQ capturado.
   selectionCriteria:

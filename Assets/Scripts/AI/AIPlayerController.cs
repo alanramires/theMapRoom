@@ -2238,6 +2238,15 @@ public class AIPlayerController : MonoBehaviour
         bool foundDestination = false;
         Vector3Int bestDest = unitCell;
         HashSet<Vector3Int> occupiedByAllies = BuildAllyCellSet(snapshot, unit);
+        bool supportSafetyMode = combatClassification == UnitCombatClassification.Artilheiro
+            || combatClassification == UnitCombatClassification.Civil
+            || supplyTruckMode;
+        HashSet<Vector3Int> preferredSupportCells = supportSafetyMode
+            ? BuildFriendlySupportPreferenceCells(snapshot, unit, supportOnlyCombatAnchors: combatClassification != UnitCombatClassification.Civil)
+            : null;
+        HashSet<Vector3Int> dangerPenaltyCells = supportSafetyMode
+            ? BuildEnemyDangerCells(snapshot, combatClassification == UnitCombatClassification.Civil ? 2 : 1)
+            : null;
 
         if (supplyTruckMode)
         {
@@ -2382,6 +2391,10 @@ public class AIPlayerController : MonoBehaviour
         }
 
         bool escortRoleActive = unitAssignment != null && IsEscortMissionRole(unitAssignment.Role);
+        HashSet<Vector3Int> penalizedCaptureCells = escortRoleActive && !repairModeActive && !captureObjectiveActive
+            ? BuildReservedCaptureCellsForEscort(unit, unitIntent)
+            : null;
+        HashSet<Vector3Int> penalizedMovementCells = MergeCellSets(penalizedCaptureCells, dangerPenaltyCells);
         if (!supplyObjectiveActive
             && !repairModeActive
             && escortRoleActive
@@ -2553,7 +2566,9 @@ public class AIPlayerController : MonoBehaviour
                     prioritizeDpq: false,
                     unit: unit,
                     preferLongerAdvanceOnTie: false,
-                    preferShorterAdvanceOnTie: true);
+                    preferShorterAdvanceOnTie: true,
+                    penalizedCells: penalizedMovementCells,
+                preferredCells: preferredSupportCells);
             }
         }
         else if (repairModeActive)
@@ -2572,7 +2587,9 @@ public class AIPlayerController : MonoBehaviour
                     out bestDest,
                     prioritizeDpq: false,
                     unit: unit,
-                    preferLongerAdvanceOnTie: true);
+                    preferLongerAdvanceOnTie: true,
+                    penalizedCells: penalizedMovementCells,
+                preferredCells: preferredSupportCells);
             }
         }
         else if (captureObjectiveActive)
@@ -2591,7 +2608,9 @@ public class AIPlayerController : MonoBehaviour
                     out bestDest,
                     prioritizeDpq: false,
                     unit: unit,
-                    preferLongerAdvanceOnTie: true);
+                    preferLongerAdvanceOnTie: true,
+                    penalizedCells: penalizedMovementCells,
+                preferredCells: preferredSupportCells);
             }
         }
 
@@ -2630,11 +2649,15 @@ public class AIPlayerController : MonoBehaviour
                     out bestDest,
                     prioritizeDpq: true,
                     unit: unit,
-                    preferMaxDistance: preferMaxRangeWhenAlreadyFiring);
+                    preferMaxDistance: preferMaxRangeWhenAlreadyFiring,
+                    penalizedCells: penalizedMovementCells,
+                preferredCells: preferredSupportCells);
 
                 if (foundDestination)
                 {
                     bestDest.z = 0;
+
+
                     if (bestDest != unitCell)
                     {
                         int currentDpq = turnStateManager.GetCellDpqPoints(unitCell, unit);
@@ -2669,7 +2692,9 @@ public class AIPlayerController : MonoBehaviour
                 out bestDest,
                 prioritizeDpq: true,
                 unit: unit,
-                preferMaxDistance: true);
+                preferMaxDistance: true,
+                penalizedCells: penalizedMovementCells,
+                preferredCells: preferredSupportCells);
         }
 
         if (!supplyObjectiveActive
@@ -2694,7 +2719,9 @@ public class AIPlayerController : MonoBehaviour
                 out bestDest,
                 prioritizeDpq: true,
                 unit: unit,
-                preferMaxDistance: true);
+                preferMaxDistance: true,
+                penalizedCells: penalizedMovementCells,
+                preferredCells: preferredSupportCells);
 
             if (foundDestination && aiLog)
             {
@@ -2711,13 +2738,26 @@ public class AIPlayerController : MonoBehaviour
                 out bestDest,
                 prioritizeDpq: engagingEnemy,
                 unit: unit,
-                preferLongerAdvanceOnTie: supplyObjectiveActive || repairModeActive || captureObjectiveActive || (!defendMode && !intelCanFire));
+                preferLongerAdvanceOnTie: supplyObjectiveActive || repairModeActive || captureObjectiveActive || (!defendMode && !intelCanFire),
+                penalizedCells: penalizedMovementCells,
+                preferredCells: preferredSupportCells);
         }
 
         if (!foundDestination)
             bestDest = unitCell;
 
         bestDest.z = 0;
+
+        if (combatClassification == UnitCombatClassification.Civil
+            && !repairDislodgeActive
+            && bestDest != unitCell
+            && IsCellTooDangerousForSupport(snapshot, bestDest))
+        {
+            if (aiLog)
+                Debug.Log($"{T(aiTeam, 2)} [support] {unit.name} evitou avancar para {FormatCellLC(bestDest)} por risco alto; mantendo posicao segura.");
+            bestDest = unitCell;
+        }
+
 
         if (occupiedByAllies != null && bestDest != unitCell && occupiedByAllies.Contains(bestDest))
         {
@@ -4354,6 +4394,172 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
     }
 
 
+    private HashSet<Vector3Int> BuildFriendlySupportPreferenceCells(
+        AISnapshot snapshot,
+        UnitManager requester,
+        bool supportOnlyCombatAnchors)
+    {
+        if (snapshot == null || snapshot.BoardTilemap == null || requester == null || snapshot.FriendlyUnits == null)
+            return null;
+
+        HashSet<Vector3Int> seeds = null;
+        for (int i = 0; i < snapshot.FriendlyUnits.Count; i++)
+        {
+            UnitManager ally = snapshot.FriendlyUnits[i];
+            if (ally == null || ally.IsDead || ally == requester)
+                continue;
+
+            if (supportOnlyCombatAnchors)
+            {
+                UnitCombatClassification allyClass = ally.CombatClassification;
+                if (allyClass != UnitCombatClassification.Combatente && allyClass != UnitCombatClassification.Hibrido)
+                    continue;
+            }
+
+            if (seeds == null)
+                seeds = new HashSet<Vector3Int>();
+
+            Vector3Int cell = ally.CurrentCellPosition;
+            cell.z = 0;
+            seeds.Add(cell);
+        }
+
+        if (seeds == null || seeds.Count == 0)
+            return null;
+
+        return ExpandCellsByHexRadius(snapshot.BoardTilemap, seeds, 1);
+    }
+
+    private HashSet<Vector3Int> BuildEnemyDangerCells(AISnapshot snapshot, int radius)
+    {
+        if (snapshot == null || snapshot.BoardTilemap == null || snapshot.VisibleEnemies == null || snapshot.VisibleEnemies.Count == 0)
+            return null;
+
+        HashSet<Vector3Int> seeds = null;
+        for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
+        {
+            UnitManager enemy = snapshot.VisibleEnemies[i];
+            if (enemy == null || enemy.IsDead)
+                continue;
+
+            if (seeds == null)
+                seeds = new HashSet<Vector3Int>();
+
+            Vector3Int cell = enemy.CurrentCellPosition;
+            cell.z = 0;
+            seeds.Add(cell);
+        }
+
+        if (seeds == null || seeds.Count == 0)
+            return null;
+
+        return ExpandCellsByHexRadius(snapshot.BoardTilemap, seeds, Mathf.Max(0, radius));
+    }
+
+    private static HashSet<Vector3Int> ExpandCellsByHexRadius(Tilemap boardTilemap, HashSet<Vector3Int> seeds, int radius)
+    {
+        if (boardTilemap == null || seeds == null || seeds.Count == 0)
+            return null;
+
+        HashSet<Vector3Int> visited = new HashSet<Vector3Int>();
+        Queue<Vector3Int> frontier = new Queue<Vector3Int>();
+        Queue<int> depths = new Queue<int>();
+        foreach (Vector3Int seed in seeds)
+        {
+            Vector3Int normalized = seed;
+            normalized.z = 0;
+            if (!visited.Add(normalized))
+                continue;
+
+            frontier.Enqueue(normalized);
+            depths.Enqueue(0);
+        }
+
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+        while (frontier.Count > 0)
+        {
+            Vector3Int current = frontier.Dequeue();
+            int depth = depths.Dequeue();
+            if (depth >= radius)
+                continue;
+
+            neighbors.Clear();
+            UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = neighbors[i];
+                next.z = 0;
+                if (!visited.Add(next))
+                    continue;
+
+                frontier.Enqueue(next);
+                depths.Enqueue(depth + 1);
+            }
+        }
+
+        return visited;
+    }
+
+    private static HashSet<Vector3Int> MergeCellSets(HashSet<Vector3Int> primary, HashSet<Vector3Int> secondary)
+    {
+        if (primary == null || primary.Count == 0)
+            return secondary;
+        if (secondary == null || secondary.Count == 0)
+            return primary;
+
+        HashSet<Vector3Int> merged = new HashSet<Vector3Int>(primary);
+        merged.UnionWith(secondary);
+        return merged;
+    }
+
+    private bool IsCellTooDangerousForSupport(AISnapshot snapshot, Vector3Int cell)
+    {
+        if (snapshot == null || snapshot.BoardTilemap == null || snapshot.VisibleEnemies == null)
+            return false;
+
+        cell.z = 0;
+        int nearbyThreats = 0;
+        for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
+        {
+            UnitManager enemy = snapshot.VisibleEnemies[i];
+            if (enemy == null || enemy.IsDead)
+                continue;
+
+            Vector3Int enemyCell = enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            int dist = GetHexDistance(snapshot.BoardTilemap, cell, enemyCell, 64);
+            if (dist == int.MaxValue)
+                continue;
+            if (dist <= 2)
+                return true;
+            if (dist <= 4)
+                nearbyThreats++;
+        }
+
+        return nearbyThreats >= 2;
+    }
+    private HashSet<Vector3Int> BuildReservedCaptureCellsForEscort(UnitManager unit, AIPlanIntent unitIntent)
+    {
+        if (unit == null || unitIntent == null || unitIntent.Assignments == null || unitIntent.Assignments.Count == 0)
+            return null;
+
+        HashSet<Vector3Int> reserved = null;
+        for (int i = 0; i < unitIntent.Assignments.Count; i++)
+        {
+            AIPlanAssignment asgn = unitIntent.Assignments[i];
+            if (asgn == null || asgn.UnitInstanceId == unit.InstanceId || asgn.Role != AIPlanRole.Capture || !asgn.HasPlannedCaptureTarget)
+                continue;
+
+            if (reserved == null)
+                reserved = new HashSet<Vector3Int>();
+
+            Vector3Int cell = asgn.PlannedCaptureCell;
+            cell.z = 0;
+            reserved.Add(cell);
+        }
+
+        return reserved;
+    }
     private bool TryGetBestCaptureObjectiveForInfantry(
         UnitManager unit,
         AISnapshot snapshot,
@@ -4468,6 +4674,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         }
 
         int bought = 0;
+        int savingFallbackPurchases = 0;
         for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
         {
             AIConstructionInfo info = snapshot.KnownConstructions[i];
@@ -4491,7 +4698,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             int currentMoney = matchController != null ? matchController.GetActualMoney(aiTeam) : 0;
             int incomePerTurn = matchController != null ? matchController.GetIncomePerTurn(aiTeam) : 0;
 
-            if (!TryResolveShoppingPlan(aiTeam, current, info.Source, currentMoney, incomePerTurn, out int targetIndex, out string plannedUnitId, out string plannedReason))
+            if (!TryResolveShoppingPlan(aiTeam, current, info.Source, currentMoney, incomePerTurn, savingFallbackPurchases, out int targetIndex, out string plannedUnitId, out string plannedReason, out bool usedSavingFallback))
             {
                 if (aiLog) Debug.Log($"{T(aiTeam, 3)} sem compra planejada em {info.DisplayName} (saldo={currentMoney}) | motivo: {plannedReason}");
                 continue;
@@ -4551,6 +4758,8 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             if (success)
             {
                 bought++;
+                if (usedSavingFallback)
+                    savingFallbackPurchases++;
             }
 
             yield return StartCoroutine(turnStateManager.WaitUntilAutomatedNeutralReady(2f));
@@ -4608,13 +4817,16 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         ConstructionManager construction,
         int currentMoney,
         int incomePerTurn,
+        int savingFallbackPurchasesThisTurn,
         out int targetIndex,
         out string plannedUnitId,
-        out string plannedReason)
+        out string plannedReason,
+        out bool usedSavingFallback)
     {
         targetIndex = -1;
         plannedUnitId = null;
         plannedReason = "nenhum";
+        usedSavingFallback = false;
 
         if (construction == null)
         {
@@ -4627,7 +4839,8 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             ? effectiveData.defenseMode
             : effectiveData.attackMode;
 
-        return TryResolveShoppingPlanFromMode(snapshot, construction, currentMoney, incomePerTurn, mode, out targetIndex, out plannedUnitId, out plannedReason);
+        bool defenseMode = currentStance == AIStance.Defend;
+        return TryResolveShoppingPlanFromMode(snapshot, construction, currentMoney, incomePerTurn, mode, defenseMode, savingFallbackPurchasesThisTurn, out targetIndex, out plannedUnitId, out plannedReason, out usedSavingFallback);
     }
 
     private bool TryResolveShoppingPlanFromMode(
@@ -4636,13 +4849,17 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         int currentMoney,
         int incomePerTurn,
         AIDataMode mode,
+        bool defenseMode,
+        int savingFallbackPurchasesThisTurn,
         out int targetIndex,
         out string plannedUnitId,
-        out string plannedReason)
+        out string plannedReason,
+        out bool usedSavingFallback)
     {
         targetIndex = -1;
         plannedUnitId = null;
         plannedReason = "nenhum";
+        usedSavingFallback = false;
 
         if (mode == null || mode.groups == null || mode.groups.Count == 0)
         {
@@ -4686,14 +4903,22 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
 
             if (mode.saveForNextRound)
             {
-                if (mode.allowFallbackWhenSaving &&
+                bool allowUnlimitedDefenseFallback = defenseMode && mode.buyFallbackWhenSavingOnDefenseMode;
+                bool fallbackAlreadyConsumed = mode.allowFallbackWhenSavingButOnce && savingFallbackPurchasesThisTurn > 0;
+                bool canUseSavingFallback = mode.allowFallbackWhenSaving
+                    && (!mode.allowFallbackWhenSavingButOnce || allowUnlimitedDefenseFallback || !fallbackAlreadyConsumed);
+
+                if (canUseSavingFallback &&
                     TryResolveFirstAffordableFromUnitList(construction, mode.fallbackUnits, currentMoney, out targetIndex, out plannedUnitId))
                 {
+                    usedSavingFallback = true;
                     plannedReason = $"fallback-save | modo={mode.label} | motivo=guardando para composicao de grupo {group.label}";
                     return true;
                 }
 
-                plannedReason = $"economizou para proxima rodada | grupo pendente={group.label} | composicao={currentCount}/{denominator} ({currentRatio:P0}) | alvo={targetRatio:P0}";
+                plannedReason = fallbackAlreadyConsumed && !allowUnlimitedDefenseFallback
+                    ? $"economizou para proxima rodada | fallback-save ja usado no turno | grupo pendente={group.label} | composicao={currentCount}/{denominator} ({currentRatio:P0}) | alvo={targetRatio:P0}"
+                    : $"economizou para proxima rodada | grupo pendente={group.label} | composicao={currentCount}/{denominator} ({currentRatio:P0}) | alvo={targetRatio:P0}";
                 return false;
             }
         }
@@ -5246,144 +5471,6 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         Debug.Log(sb.ToString());
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -290,6 +290,10 @@ public partial class TurnStateManager
     {
         if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
             return false;
+        if (selectedUnit == null || selectedUnit.HasActed)
+            return false;
+        if (!HasAutomatedAttackAvailable())
+            return false;
         if (!HandleAutomatedSensorActionRequested(SensorActionType.Attack))
             return false;
 
@@ -299,30 +303,9 @@ public partial class TurnStateManager
             return false;
         }
 
+        List<(UnitManager target, int score, int order)> rankedTargets = new List<(UnitManager target, int score, int order)>();
+        HashSet<UnitManager> seenTargets = new HashSet<UnitManager>();
         bool preferredFoundInCurrentTargets = false;
-        if (preferredTarget != null)
-        {
-            for (int i = 0; i < cachedPodeMirarTargets.Count; i++)
-            {
-                PodeMirarTargetOption option = cachedPodeMirarTargets[i];
-                if (option == null || option.targetUnit == null)
-                    continue;
-                if (option.targetUnit != preferredTarget)
-                    continue;
-                preferredFoundInCurrentTargets = true;
-
-                Vector3Int preferredCell = preferredTarget.CurrentCellPosition;
-                preferredCell.z = 0;
-                if (TryExecuteAutomatedAttackReplayTarget(preferredTarget.InstanceId.ToString(), preferredCell))
-                {
-                    Debug.Log($"[AI][Attack] alvo preferido executado: {preferredTarget.name}.");
-                    return true;
-                }
-            }
-        }
-
-        if (preferredTarget != null && !preferredFoundInCurrentTargets)
-            Debug.Log($"[AI][Attack] alvo preferido fora dos alvos miraveis apos mover: {preferredTarget.name}. Aplicando fallback para primeiro alvo valido.");
 
         for (int i = 0; i < cachedPodeMirarTargets.Count; i++)
         {
@@ -331,14 +314,69 @@ public partial class TurnStateManager
                 continue;
 
             UnitManager target = option.targetUnit;
+            if (seenTargets.Contains(target))
+                continue;
+            seenTargets.Add(target);
+
+            if (target == preferredTarget)
+                preferredFoundInCurrentTargets = true;
+
+            if (!IsAutomatedAttackCandidateStillValid(selectedUnit, target))
+                continue;
+
+            int distance = Mathf.Max(1, option.distance);
+            if (!TryEvaluateAutomatedAttackCandidateScore(
+                    selectedUnit,
+                    target,
+                    distance,
+                    null,
+                    out int candidateScore))
+            {
+                continue;
+            }
+
+            if (preferredTarget != null && target == preferredTarget)
+                candidateScore += 1;
+
+            rankedTargets.Add((target, candidateScore, i));
+        }
+
+        if (rankedTargets.Count <= 0)
+        {
+            HandleCancel();
+            return false;
+        }
+
+        rankedTargets.Sort((a, b) =>
+        {
+            int scoreCompare = b.score.CompareTo(a.score);
+            if (scoreCompare != 0)
+                return scoreCompare;
+
+            return a.order.CompareTo(b.order);
+        });
+
+        if (preferredTarget != null && !preferredFoundInCurrentTargets)
+            Debug.Log($"[AI][Attack] alvo preferido fora dos alvos miraveis apos mover: {preferredTarget.name}. Aplicando fallback para melhor alvo valido.");
+
+        for (int i = 0; i < rankedTargets.Count; i++)
+        {
+            UnitManager target = rankedTargets[i].target;
+            if (target == null || target.IsDead)
+                continue;
+            if (!IsAutomatedAttackCandidateStillValid(selectedUnit, target))
+                continue;
+
             Vector3Int targetCell = target.CurrentCellPosition;
             targetCell.z = 0;
             if (TryExecuteAutomatedAttackReplayTarget(target.InstanceId.ToString(), targetCell))
             {
-                if (preferredTarget != null && target != preferredTarget)
-                    Debug.Log($"[AI][Attack] fallback executado: atacando {target.name} no lugar de {preferredTarget.name}.");
+                if (preferredTarget != null && target == preferredTarget)
+                    Debug.Log($"[AI][Attack] alvo preferido executado: {target.name} (score={rankedTargets[i].score}).");
+                else if (preferredTarget != null)
+                    Debug.Log($"[AI][Attack] fallback executado: atacando {target.name} no lugar de {preferredTarget.name} (score={rankedTargets[i].score}).");
                 else
-                    Debug.Log($"[AI][Attack] ataque executado em: {target.name}.");
+                    Debug.Log($"[AI][Attack] ataque executado em: {target.name} (score={rankedTargets[i].score}).");
                 return true;
             }
         }
@@ -793,7 +831,9 @@ public partial class TurnStateManager
         HashSet<Vector3Int> occupiedByAllies,
         out Vector3Int bestCell,
         bool prioritizeDpq = false,
-        UnitManager unit = null)
+        UnitManager unit = null,
+        HashSet<Vector3Int> penalizedCells = null,
+        HashSet<Vector3Int> preferredCells = null)
     {
         bestCell = default;
         if (movementPathsByCell == null || movementPathsByCell.Count == 0)
@@ -842,6 +882,10 @@ public partial class TurnStateManager
             float score = prioritizeDpq
                 ? proximityScore * 0.6f + dpqScore * 0.4f
                 : proximityScore;
+            if (penalizedCells != null && penalizedCells.Contains(cell))
+                score -= 0.2f;
+            if (preferredCells != null && preferredCells.Contains(cell))
+                score += 0.12f;
 
             if (score > bestScore)
             {
@@ -863,13 +907,15 @@ public partial class TurnStateManager
         bool prioritizeDpq = false,
         UnitManager unit = null,
         bool preferLongerAdvanceOnTie = false,
-        bool preferShorterAdvanceOnTie = false)
+        bool preferShorterAdvanceOnTie = false,
+        HashSet<Vector3Int> penalizedCells = null,
+        HashSet<Vector3Int> preferredCells = null)
     {
         bestCell = default;
         if (movementPathsByCell == null || movementPathsByCell.Count == 0)
             return false;
         if (boardTilemap == null)
-            return TryGetBestReachableCellTowards(targetCell, occupiedByAllies, out bestCell, prioritizeDpq, unit);
+            return TryGetBestReachableCellTowards(targetCell, occupiedByAllies, out bestCell, prioritizeDpq, unit, penalizedCells, preferredCells);
 
         targetCell.z = 0;
         int bestHexDistance = int.MaxValue;
@@ -907,16 +953,26 @@ public partial class TurnStateManager
                 dpqBand = ResolveDpqBand(dpqPoints);
             }
 
+            bool cellPenalized = penalizedCells != null && penalizedCells.Contains(cell);
+            bool bestPenalized = penalizedCells != null && found && penalizedCells.Contains(bestCell);
+            bool cellPreferred = preferredCells != null && preferredCells.Contains(cell);
+            bool bestPreferred = preferredCells != null && found && preferredCells.Contains(bestCell);
             bool better = dist < bestHexDistance
-                || (dist == bestHexDistance && dpqBand > bestDpqBand)
-                || (dist == bestHexDistance && dpqBand == bestDpqBand && dpqPoints > bestDpqPoints)
+                || (dist == bestHexDistance && cellPenalized != bestPenalized && !cellPenalized)
+                || (dist == bestHexDistance && cellPenalized == bestPenalized && cellPreferred != bestPreferred && cellPreferred)
+                || (dist == bestHexDistance && cellPenalized == bestPenalized && cellPreferred == bestPreferred && dpqBand > bestDpqBand)
+                || (dist == bestHexDistance && cellPenalized == bestPenalized && cellPreferred == bestPreferred && dpqBand == bestDpqBand && dpqPoints > bestDpqPoints)
                 || (preferLongerAdvanceOnTie
                     && dist == bestHexDistance
+                    && cellPenalized == bestPenalized
+                    && cellPreferred == bestPreferred
                     && dpqBand == bestDpqBand
                     && dpqPoints == bestDpqPoints
                     && advanceLen > bestAdvanceLen)
                 || (preferShorterAdvanceOnTie
                     && dist == bestHexDistance
+                    && cellPenalized == bestPenalized
+                    && cellPreferred == bestPreferred
                     && dpqBand == bestDpqBand
                     && dpqPoints == bestDpqPoints
                     && (bestAdvanceLen < 0 || advanceLen < bestAdvanceLen));
@@ -972,11 +1028,17 @@ public partial class TurnStateManager
                     dpqBand = ResolveDpqBand(dpqPoints);
                 }
 
+                bool cellPenalized = penalizedCells != null && penalizedCells.Contains(cell);
+                bool detourBestPenalized = penalizedCells != null && detourFound && penalizedCells.Contains(detourCell);
+                bool cellPreferred = preferredCells != null && preferredCells.Contains(cell);
+                bool detourBestPreferred = preferredCells != null && detourFound && preferredCells.Contains(detourCell);
                 bool better = !detourFound
                     || dist < detourBestDist
-                    || (dist == detourBestDist && advanceLen > detourBestAdvance)
-                    || (dist == detourBestDist && advanceLen == detourBestAdvance && dpqBand > detourBestDpqBand)
-                    || (dist == detourBestDist && advanceLen == detourBestAdvance && dpqBand == detourBestDpqBand && dpqPoints > detourBestDpqPoints);
+                    || (dist == detourBestDist && cellPenalized != detourBestPenalized && !cellPenalized)
+                    || (dist == detourBestDist && cellPenalized == detourBestPenalized && cellPreferred != detourBestPreferred && cellPreferred)
+                    || (dist == detourBestDist && cellPenalized == detourBestPenalized && cellPreferred == detourBestPreferred && advanceLen > detourBestAdvance)
+                    || (dist == detourBestDist && cellPenalized == detourBestPenalized && cellPreferred == detourBestPreferred && advanceLen == detourBestAdvance && dpqBand > detourBestDpqBand)
+                    || (dist == detourBestDist && cellPenalized == detourBestPenalized && cellPreferred == detourBestPreferred && advanceLen == detourBestAdvance && dpqBand == detourBestDpqBand && dpqPoints > detourBestDpqPoints);
                 if (!better)
                     continue;
 
@@ -1009,7 +1071,9 @@ public partial class TurnStateManager
         out Vector3Int bestCell,
         bool prioritizeDpq = false,
         UnitManager unit = null,
-        bool preferMaxDistance = true)
+        bool preferMaxDistance = true,
+        HashSet<Vector3Int> penalizedCells = null,
+        HashSet<Vector3Int> preferredCells = null)
     {
         bestCell = default;
         if (movementPathsByCell == null || movementPathsByCell.Count == 0)
@@ -1039,6 +1103,10 @@ public partial class TurnStateManager
 
             int dpqPoints = 1;
             int dpqBand = 0;
+            bool cellPenalized = penalizedCells != null && penalizedCells.Contains(cell);
+            bool bestPenalized = penalizedCells != null && found && penalizedCells.Contains(bestCell);
+            bool cellPreferred = preferredCells != null && preferredCells.Contains(cell);
+            bool bestPreferred = preferredCells != null && found && preferredCells.Contains(bestCell);
             if (prioritizeDpq && unit != null)
             {
                 dpqPoints = GetCellDpqPoints(cell, unit);
@@ -1053,14 +1121,18 @@ public partial class TurnStateManager
             else if (preferMaxDistance)
             {
                 better = dist > bestHexDistance
-                    || (dist == bestHexDistance && dpqBand > bestDpqBand)
-                    || (dist == bestHexDistance && dpqBand == bestDpqBand && dpqPoints > bestDpqPoints);
+                    || (dist == bestHexDistance && cellPenalized != bestPenalized && !cellPenalized)
+                    || (dist == bestHexDistance && cellPenalized == bestPenalized && cellPreferred != bestPreferred && cellPreferred)
+                    || (dist == bestHexDistance && cellPenalized == bestPenalized && cellPreferred == bestPreferred && dpqBand > bestDpqBand)
+                    || (dist == bestHexDistance && cellPenalized == bestPenalized && cellPreferred == bestPreferred && dpqBand == bestDpqBand && dpqPoints > bestDpqPoints);
             }
             else
             {
                 better = dist < bestHexDistance
-                    || (dist == bestHexDistance && dpqBand > bestDpqBand)
-                    || (dist == bestHexDistance && dpqBand == bestDpqBand && dpqPoints > bestDpqPoints);
+                    || (dist == bestHexDistance && cellPenalized != bestPenalized && !cellPenalized)
+                    || (dist == bestHexDistance && cellPenalized == bestPenalized && cellPreferred != bestPreferred && cellPreferred)
+                    || (dist == bestHexDistance && cellPenalized == bestPenalized && cellPreferred == bestPreferred && dpqBand > bestDpqBand)
+                    || (dist == bestHexDistance && cellPenalized == bestPenalized && cellPreferred == bestPreferred && dpqBand == bestDpqBand && dpqPoints > bestDpqPoints);
             }
 
             if (!better)
@@ -1182,9 +1254,6 @@ public partial class TurnStateManager
         return true;
     }
 }
-
-
-
 
 
 
