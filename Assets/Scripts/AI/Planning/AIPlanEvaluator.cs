@@ -65,7 +65,8 @@ public static class AIPlanEvaluator
             snapshot,
             database.maxVariablePlans,
             assignedUnits,
-            result);
+            result,
+            plannerLogs);
 
         ApplyMissionPersistenceAndReallocation(database, snapshot, result, previousAssignments, config, plannerLogs);
 
@@ -139,7 +140,8 @@ public static class AIPlanEvaluator
         AISnapshot snapshot,
         int maxPlans,
         HashSet<int> assignedUnits,
-        List<AIPlanIntent> result)
+        List<AIPlanIntent> result,
+        List<string> plannerLogs)
     {
         var candidateSectors = new List<SectorCandidate>();
         var seenSectors = new HashSet<ConstructionSector>();
@@ -152,7 +154,13 @@ public static class AIPlanEvaluator
             if (!seenSectors.Add(info.Sector)) continue;
 
             int uncaptured = CountUncapturedInSector(info.Sector, snapshot);
-            if (uncaptured == 0) continue;
+            if (uncaptured == 0)
+            {
+                AddPlannerLog(
+                    plannerLogs,
+                    $"setor-candidato | setor={info.Sector} excluido=ja-conquistado constr=[{BuildSectorConstructionsDebug(info.Sector, snapshot)}]");
+                continue;
+            }
 
             bool hasEnemyHq = SectorHasEnemyHq(info.Sector, snapshot);
             int distToOwnHq = ComputeSectorDistanceToOwnHq(info.Sector, snapshot);
@@ -168,6 +176,10 @@ public static class AIPlanEvaluator
                 EnemyPressure = enemyPressure,
                 DistToEnemyHq = distToEnemyHq,
             });
+
+            AddPlannerLog(
+                plannerLogs,
+                $"setor-candidato | setor={info.Sector} incluido=sim uncaptured={uncaptured} distOwnHq={distToOwnHq} distEnemyHq={distToEnemyHq} pressure={enemyPressure} hasEnemyHq={hasEnemyHq} constr=[{BuildSectorConstructionsDebug(info.Sector, snapshot)}]");
         }
 
         // Priorizacao: mais proximo do HQ proprio > mais construcoes > pressao inimiga > HQ inimigo.
@@ -202,6 +214,10 @@ public static class AIPlanEvaluator
             // Ajusta nome para facilitar leitura no log/debug.
             intent.DisplayName = $"Captura {sector.Sector} [INF {force.Infantry}, ARM {force.ArmoredEscort}, ART {force.Artillery}, APC {force.ApcEscort}]";
             intent.TacticalRiskScore = ComputeSupportRiskScore(sector);
+
+            AddPlannerLog(
+                plannerLogs,
+                $"setor-plano | setor={sector.Sector} rank={generated + 1} score={intent.TacticalRiskScore} force=INF{force.Infantry}/ARM{force.ArmoredEscort}/ART{force.Artillery}/APC{force.ApcEscort} targets={draft.CaptureTargets.Count}");
 
             drafts.Add(draft);
             generated++;
@@ -259,6 +275,25 @@ public static class AIPlanEvaluator
         public int PriorityPenalty;
     }
 
+
+    private static string BuildSectorConstructionsDebug(ConstructionSector sector, AISnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.KnownConstructions == null || snapshot.KnownConstructions.Count == 0)
+            return string.Empty;
+
+        var chunks = new List<string>();
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo info = snapshot.KnownConstructions[i];
+            if (info == null || info.Sector != sector || !info.IsCapturable)
+                continue;
+
+            string name = !string.IsNullOrWhiteSpace(info.DisplayName) ? info.DisplayName : sector.ToString();
+            chunks.Add($"{name}(team={info.TeamId},cp={info.CapturePoints}/{info.CapturePointsMax})");
+        }
+
+        return chunks.Count > 0 ? string.Join(" | ", chunks) : "sem-construcoes-capturaveis";
+    }
     private static PlannedForce ComputePlannedForce(SectorCandidate sector)
     {
         bool distant = sector.DistToOwnHq >= 8;
@@ -1610,6 +1645,9 @@ public static class AIPlanEvaluator
         plannerLogs.Add(message);
     }
 }
+
+
+
 
 
 

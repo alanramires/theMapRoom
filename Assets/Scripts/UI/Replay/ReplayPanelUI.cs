@@ -44,6 +44,7 @@ public class ReplayPanelUI : MonoBehaviour
     [Header("View Selection")]
     [SerializeField] [Range(-1, 3)] private int viewUnderSpecificTeam = -1;
     private Coroutine pendingReplayTransitionRoutine;
+    private bool pendingOpenOnNextNeutral;
 
     private void OnValidate()
     {
@@ -83,12 +84,35 @@ public class ReplayPanelUI : MonoBehaviour
     {
         TryAutoPauseReplayOnPanelClose(showDialog: false);
         TryExitReplayCursorStateIfNeeded();
+        pendingOpenOnNextNeutral = false;
     }
 
     private void Update()
     {
+        if (pendingOpenOnNextNeutral)
+        {
+            if (CanOpenReplayPanelNow())
+            {
+                SetPanelOpen(true);
+                pendingOpenOnNextNeutral = false;
+            }
+
+            UiInputBlocker.SuppressGameplayInputForFrames(1);
+        }
+
         if (WasKeyPressedThisFrame(togglePanelKey) && IsReplayPanelToggleAllowed())
-            TogglePanel();
+        {
+            if (!isOpen && !CanOpenReplayPanelNow())
+            {
+                pendingOpenOnNextNeutral = true;
+                ShowReplayDialog("dialog.replay.open_pending", "Pausa da simulacao solicitada. Abrindo replay no proximo Neutral.");
+            }
+            else
+            {
+                pendingOpenOnNextNeutral = false;
+                TogglePanel();
+            }
+        }
 
         SyncReplayCursorStateWithPlayback();
 
@@ -107,6 +131,22 @@ public class ReplayPanelUI : MonoBehaviour
 
         // Keep panel accessible when replay data was loaded from save even before recording resumes.
         return replayManager.IsRecording || replayManager.IsReplaying || hasReplayHistory || hasReplayBatches || hasCurrentRecord;
+    }
+
+    private bool CanOpenReplayPanelNow()
+    {
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager == null)
+            return false;
+
+        if (turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return false;
+
+        if (turnStateManager.IsScannerActionExecutionInProgress)
+            return false;
+
+        return true;
     }
 
     private static bool WasKeyPressedThisFrame(KeyCode key)
@@ -151,9 +191,16 @@ public class ReplayPanelUI : MonoBehaviour
         }
 
         if (open)
+        {
+            TryEnterReplayCursorState();
             ApplyReplayViewSelection();
+        }
         else if (wasOpen)
+        {
             TryAutoPauseReplayOnPanelClose(showDialog: true);
+            if (replayManager == null || !replayManager.IsReplaying)
+                TryExitReplayCursorStateIfNeeded();
+        }
 
         RefreshLabels();
     }

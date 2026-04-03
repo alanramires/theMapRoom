@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -17,6 +17,7 @@ public class SaveGameManager : MonoBehaviour
 {
     // Disparado apos o load ser concluido com sucesso (independente do time ativo).
     public static event Action OnAfterLoadSuccess;
+    public static bool IsAnyLoadInProgress { get; private set; }
 
     private sealed class PendingMainMenuLoadRequest
     {
@@ -28,15 +29,24 @@ public class SaveGameManager : MonoBehaviour
     private static bool suppressNextLoadConfirmSfx;
     private static string pendingNewGameSaveDirectory;
 
-    [Header("References")]
+    
     [SerializeField] private UnitSpawner unitSpawner;
+    
     [SerializeField] private ConstructionSpawner constructionSpawner;
+    
     [SerializeField] private MatchController matchController;
+    
     [SerializeField] private TurnStateManager turnStateManager;
+    
     [SerializeField] private AnimationManager animationManager;
+    
     [SerializeField] private CursorController cursorController;
+    
     [SerializeField] private ReplayManager replayManager;
+    
     [SerializeField] private PlanningManager planningManager;
+    
+    [SerializeField] private AIPlayerController aiPlayerController;
 
     [Header("Quick Save/Load")]
     [SerializeField] private bool enableHotkeys = true;
@@ -725,6 +735,7 @@ public class SaveGameManager : MonoBehaviour
     private IEnumerator LoadSlotAsync(string path, int normalizedSlot)
     {
         loadInProgress = true;
+        IsAnyLoadInProgress = true;
         double asyncStartMs = PerfNowMs();
         LogLoadPerf(normalizedSlot, "load_async.start", asyncStartMs, 0d);
         try
@@ -742,7 +753,7 @@ public class SaveGameManager : MonoBehaviour
 
             if (preprocessTask.IsFaulted)
             {
-                Debug.LogError($"[SaveGame] Falha no preprocess assÃ­ncrono: {preprocessTask.Exception?.GetBaseException().Message}");
+                Debug.LogError($"[SaveGame] Falha no preprocess assíncrono: {preprocessTask.Exception?.GetBaseException().Message}");
                 cursorController?.PlayErrorSfx();
                 PanelDialogController.ClearExternalText();
                 yield break;
@@ -815,6 +826,7 @@ public class SaveGameManager : MonoBehaviour
         {
             // Em casos de erro antes de entrar no LoadRoutine, garante desbloqueio.
             loadInProgress = false;
+            IsAnyLoadInProgress = false;
         }
     }
 
@@ -997,6 +1009,7 @@ public class SaveGameManager : MonoBehaviour
     private IEnumerator LoadRoutine(SaveGameData data, int loadedSlot)
     {
         loadInProgress = true;
+        IsAnyLoadInProgress = true;
         string stage = "init";
         bool coreLoadSucceeded = false;
         bool suppressedFogRefresh = false;
@@ -1137,8 +1150,8 @@ public class SaveGameManager : MonoBehaviour
                 RestoreMatchPlayers(data);
                 matchController.SetEconomyEnabled(data.economyEnabled);
                 matchController.SetCurrentTurn(data.currentTurn);
-                matchController.SetActiveTeamId(data.activeTeamId);
-                // Reaplica economia/flip apos SetActiveTeamId para evitar side effects
+                matchController.SetActiveTeamIdWithoutTurnStart(data.activeTeamId);
+                // Reaplica economia/flip apos SetActiveTeamIdWithoutTurnStart para evitar side effects
                 // de credito no inicio do turno sobrescrever o snapshot salvo.
                 RestoreMatchPlayers(data);
             }
@@ -1160,6 +1173,15 @@ public class SaveGameManager : MonoBehaviour
                 }
             }
             LogLoadPerf(loadedSlot, "restore_unit_flags.end", restoreUnitFlagsStartMs, PerfNowMs() - routineStartMs);
+            stage = "restore-ai-planner";
+            double restoreAiPlannerStartMs = PerfNowMs();
+            LogLoadPerf(loadedSlot, "restore_ai_planner.begin", restoreAiPlannerStartMs, restoreAiPlannerStartMs - routineStartMs);
+            if (aiPlayerController != null)
+            {
+                aiPlayerController.RestorePlannerSaveData(data.aiPlannerState);
+                aiPlayerController.DebugLogRestoredPlannerSnapshots("post-restore");
+            }
+            LogLoadPerf(loadedSlot, "restore_ai_planner.end", restoreAiPlannerStartMs, PerfNowMs() - routineStartMs);
 
             stage = "apply-conservative-fog-visibility";
             double conservativeFogStartMs = PerfNowMs();
@@ -1224,6 +1246,7 @@ public class SaveGameManager : MonoBehaviour
 
         LogLoadPerf(loadedSlot, "load_routine.end", routineStartMs, PerfNowMs() - routineStartMs);
         loadInProgress = false;
+        IsAnyLoadInProgress = false;
 
         if (coreLoadSucceeded)
         {
@@ -1349,6 +1372,9 @@ public class SaveGameManager : MonoBehaviour
                 data.fogVisibleContributorsByCell,
                 data.fogUnitVisibilityByCacheIndex);
         }
+
+        if (aiPlayerController != null)
+            data.aiPlannerState = aiPlayerController.BuildPlannerSaveData();
 
         return data;
     }
@@ -1582,7 +1608,7 @@ public class SaveGameManager : MonoBehaviour
 
     /// <summary>
     /// Chamado por NewGamePanelController antes de LoadScene.
-    /// Transporta o diretÃ³rio de save e ativa auto-save na cena de destino.
+    /// Transporta o diretório de save e ativa auto-save na cena de destino.
     /// </summary>
     public static void SetupForNewGame(string saveDirectory)
     {
@@ -1889,10 +1915,12 @@ public class SaveGameManager : MonoBehaviour
             animationManager = FindInActiveScene<AnimationManager>();
         if (cursorController == null)
             cursorController = FindInActiveScene<CursorController>();
-        if (replayManager == null)
-            replayManager = FindInActiveScene<ReplayManager>();
+        
         if (planningManager == null)
             planningManager = FindInActiveScene<PlanningManager>();
+        
+        if (aiPlayerController == null)
+            aiPlayerController = FindInActiveScene<AIPlayerController>();
     }
 
     private static double PerfNowMs()
@@ -2081,6 +2109,25 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
 public class SaveGameData
 {
-    public int version = 4;
+    public int version = 5;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
@@ -26,6 +26,7 @@ public class SaveGameData
     public int fogCacheTeamId = int.MinValue;
     public List<FogCellContributorSaveData> fogVisibleContributorsByCell = new List<FogCellContributorSaveData>();
     public List<FogUnitVisibilitySaveData> fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>();
+    public AIPlannerMultiTeamSaveData aiPlannerState;
 }
 
 [Serializable]
@@ -210,3 +211,56 @@ public class FogUnitVisibilitySaveData
 
 
 
+
+
+
+[Serializable]
+public class AIPlannerMultiTeamSaveData
+{
+    public int dataVersion = 1;
+    public List<TeamPlannerSaveBlock> teams = new List<TeamPlannerSaveBlock>();
+}
+
+[Serializable]
+public class TeamPlannerSaveBlock
+{
+    public int teamId;
+    public bool hasRestoredStatePendingUse;
+    public int restoredTurn = -1;
+    public List<SavedPlan> activePlans = new List<SavedPlan>();
+    public List<SavedAssignment> assignments = new List<SavedAssignment>();
+    public List<SavedPreviousAssignmentMemory> previousAssignments = new List<SavedPreviousAssignmentMemory>();
+}
+
+[Serializable]
+public class SavedPlan
+{
+    public string planKey;
+    public string displayName;
+    public string sector;
+    public string badgeSymbol;
+    public bool hasCaptureTarget;
+    public int captureX;
+    public int captureY;
+    public string captureLabel;
+}
+
+[Serializable]
+public class SavedAssignment
+{
+    public int unitInstanceId;
+    public string planKey;
+    public int role;
+    public string roleName;
+}
+
+[Serializable]
+public class SavedPreviousAssignmentMemory
+{
+    public int unitInstanceId;
+    public string planKey;
+    public int role;
+    public string roleName;
+    public int lastProgressTurn;
+    public int lastDistanceToTarget;
+}

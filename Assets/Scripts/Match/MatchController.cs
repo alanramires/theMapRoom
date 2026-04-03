@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System;
@@ -18,6 +18,7 @@ public class MatchController : MonoBehaviour
     public static event Action OnBeforeAdvanceTurn;
     // Disparado quando a configuracao de slots de time muda (ex: TeamId de um slot alterado no editor).
     public static event Action OnSlotConfigChanged;
+    public static event Action<TeamId> OnTeamDefeated;
 
     private readonly struct FogOfWarUnitCacheKey : IEquatable<FogOfWarUnitCacheKey>
     {
@@ -1164,15 +1165,15 @@ public class MatchController : MonoBehaviour
             cursor.PlayVictorySfx();
         }
 
-        // Mostrar Dialogo de Vitoria (FIXO e IMUTÃVEL)
+        // Mostrar Dialogo de Vitoria (FIXO e IMUTÁVEL)
         string fallback = (tutorial != null && tutorial.victoryDialog != null && !string.IsNullOrWhiteSpace(tutorial.victoryDialog.message)) 
             ? tutorial.victoryDialog.message 
-            : "TUTORIAL CONCLUÃDO! VITÃ“RIA!";
+            : "TUTORIAL CONCLUÍDO! VITÓRIA!";
 
         string victoryMsg = PanelDialogController.ResolveDialogMessage("panel_dialog.victory", fallback);
         PanelDialogController.TrySetExternalText(victoryMsg);
 
-        // SoluÃ§Ã£o simples e robusta: busca o painel mesmo que esteja desativado na cena
+        // Solução simples e robusta: busca o painel mesmo que esteja desativado na cena
         foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
         {
             if (go.name == "Panel_endGame" && go.scene.name != null)
@@ -1182,7 +1183,7 @@ public class MatchController : MonoBehaviour
                 var textComponent = go.GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
                 if (textComponent != null && textComponent.name == "text_endgame")
                 {
-                    textComponent.text = "VITÃ“RIA!";
+                    textComponent.text = "VITÓRIA!";
                 }
                 break;
             }
@@ -1208,7 +1209,7 @@ public class MatchController : MonoBehaviour
             cursor.PlayDefeatSfx();
         }
 
-        PanelDialogController.TrySetExternalText("DERROTA! VOCÃŠ FICOU SEM UNIDADES.");
+        PanelDialogController.TrySetExternalText("DERROTA! VOCÊ FICOU SEM UNIDADES.");
 
         // Busca o painel
         foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
@@ -1224,7 +1225,7 @@ public class MatchController : MonoBehaviour
                     {
                         txt.text = "DERROTA!";
                     }
-                    else if (txt.name == "text_descriÃ§Ã£o" || txt.name == "text_description")
+                    else if (txt.name == "text_descrição" || txt.name == "text_description")
                     {
                         txt.text = "Ficou sem unidades";
                     }
@@ -1286,6 +1287,7 @@ public class MatchController : MonoBehaviour
 
         NeutralizeConstructionsOwnedByTeam(team);
         Debug.Log($"[Match] Team {TeamUtils.GetName(team)} derrotado (0 unidades). Construcoes neutralizadas.");
+        OnTeamDefeated?.Invoke(team);
         return true;
     }
 
@@ -4140,7 +4142,7 @@ public class MatchController : MonoBehaviour
                     {
                         txt.text = "DERROTA!";
                     }
-                    else if (txt.name == "text_descriÃ§Ã£o" || txt.name == "text_description" || txt.name == "txt_descricao")
+                    else if (txt.name == "text_descrição" || txt.name == "text_description" || txt.name == "txt_descricao")
                     {
                         txt.text = reason;
                     }
@@ -4171,6 +4173,8 @@ public class MatchController : MonoBehaviour
         return false;
     }
 }
+
+
 
 
 

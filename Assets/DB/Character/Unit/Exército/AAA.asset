@@ -33,6 +33,7 @@ MonoBehaviour:
   movementCategory: 6
   militaryForce: 0
   unitClass: 2
+  combatClassification: 0
   aiUnitProfile: {fileID: 11400000, guid: f53a337e34f42324ca4e39763ce12943, type: 2}
   aiTargetPreferenceByClass:
   - targetClass: 6

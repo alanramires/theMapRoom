@@ -32,6 +32,15 @@ public enum LosPolicy
 }
 
 [System.Serializable]
+public enum UnitCombatClassification
+{
+    Combatente = 0,
+    Artilheiro = 1,
+    Hibrido = 2,
+    Civil = 3
+}
+
+[System.Serializable]
 public class UnitVisionException
 {
     [Tooltip("Dominio alvo para esta excecao de visao.")]
@@ -99,6 +108,7 @@ public class UnitData : ScriptableObject
     public MovementCategory movementCategory = MovementCategory.Marcha;
     public MilitaryForce militaryForce = MilitaryForce.Army;
     public GameUnitClass unitClass = GameUnitClass.Infantry;
+    [SerializeField] private UnitCombatClassification combatClassification = UnitCombatClassification.Civil;
     [Header("AI")]
     [Tooltip("Perfil de decisao da unidade para a IA (pipeline de sensores).")]
     public AIUnitProfile aiUnitProfile;
@@ -198,6 +208,7 @@ public class UnitData : ScriptableObject
     public int cost = 100;
 
     public ArmorClass ArmorClass => armorClass;
+    public UnitCombatClassification CombatClassification => combatClassification;
 
     private void OnValidate()
     {
@@ -296,7 +307,52 @@ public class UnitData : ScriptableObject
             if (aiTargetPreferenceByClass[i] == null)
                 aiTargetPreferenceByClass.RemoveAt(i);
         }
+        RecomputeCombatClassification();
+    }
 
+    public void RecomputeCombatClassification()
+    {
+        combatClassification = ResolveCombatClassification();
+    }
+
+    private UnitCombatClassification ResolveCombatClassification()
+    {
+        if (embarkedWeapons == null || embarkedWeapons.Count == 0)
+            return UnitCombatClassification.Civil;
+
+        bool hasWeapon = false;
+        bool allDirect = true;
+        bool allIndirect = true;
+        bool allHybrid = true;
+
+        for (int i = 0; i < embarkedWeapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = embarkedWeapons[i];
+            if (embarked == null || embarked.weapon == null)
+                continue;
+
+            hasWeapon = true;
+            int minRange = embarked.GetRangeMin();
+            int maxRange = embarked.GetRangeMax();
+            bool isDirect = minRange == 1 && maxRange == 1;
+            bool isIndirect = minRange > 1 && maxRange > 1;
+            bool isHybrid = minRange == 1 && maxRange > 1;
+
+            allDirect &= isDirect;
+            allIndirect &= isIndirect;
+            allHybrid &= isHybrid;
+        }
+
+        if (!hasWeapon)
+            return UnitCombatClassification.Civil;
+        if (allDirect)
+            return UnitCombatClassification.Combatente;
+        if (allIndirect)
+            return UnitCombatClassification.Artilheiro;
+        if (allHybrid)
+            return UnitCombatClassification.Hibrido;
+
+        return UnitCombatClassification.Hibrido;
     }
 
     public bool IsAircraft()

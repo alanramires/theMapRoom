@@ -168,6 +168,10 @@ public class UnitManager : MonoBehaviour
     public string AIAssignedPlanBadge => aiAssignedPlanBadge ?? string.Empty;
     public AIPlanRole AIAssignedPlanRole => aiAssignedPlanRole;
     public bool AIAssignedPlanBadgeVisible => aiAssignedPlanBadgeVisible;
+    public UnitCombatClassification CombatClassification
+        => TryGetUnitData(out UnitData data) && data != null
+            ? data.CombatClassification
+            : UnitCombatClassification.Civil;
 
     public void RefreshAIAssignedPlanDebugBadge()
     {

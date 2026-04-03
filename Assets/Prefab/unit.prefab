@@ -440,6 +440,12 @@ MonoBehaviour:
   embarkedTransporter: {fileID: 0}
   embarkedTransporterSlotIndex: -1
   currentlyObservedByTeamIds: 
+  aiHasAssignedPlan: 0
+  aiAssignedPlanKey: 
+  aiAssignedPlanName: 
+  aiAssignedPlanBadge: 
+  aiAssignedPlanRole: 2
+  aiAssignedPlanBadgeVisible: 0
 --- !u!1 &1880344687583074483
 GameObject:
   m_ObjectHideFlags: 0
@@ -741,6 +747,7 @@ MonoBehaviour:
   detectedIndicatorRoot: {fileID: 3877593226262197472}
   planDebugRoot: {fileID: 7308030096459325100}
   planDebugText: {fileID: 7419370883366544334}
+  planDebugLegacyText: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 500
