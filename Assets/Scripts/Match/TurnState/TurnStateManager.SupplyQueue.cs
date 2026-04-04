@@ -1670,7 +1670,11 @@ public partial class TurnStateManager
         }
 
         if (selectedIndex < 0)
+        {
+            if (!string.IsNullOrWhiteSpace(targetInstanceId))
+                return false;
             selectedIndex = 0;
+        }
 
         supplySelectedCandidateIndex = selectedIndex;
 
@@ -2051,6 +2055,7 @@ public partial class TurnStateManager
         return null;
     }
 }
+
 
 
 

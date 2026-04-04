@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
+// observacao: esta classe partial contem apenas a logica relacionada ao Servico do Comando, para manter o foco e facilitar a navegacao.
 public partial class TurnStateManager
 {
+    // classes auxiliares para o Servico do Comando.
     private sealed class CommandServiceTargetReport
     {
         public UnitManager target;
@@ -14,6 +16,7 @@ public partial class TurnStateManager
         public int ammoRecovered;
     }
 
+    // classe auxiliar para compilar informacoes de estimativa do Servico do Comando durante a fase de confirmacao, para alimentar a UI de resumo e preview.
     private sealed class CommandServiceEstimateSummary
     {
         public int servedTargets;
@@ -32,6 +35,7 @@ public partial class TurnStateManager
         public readonly List<CommandServicePreviewEntry> previewEntries = new List<CommandServicePreviewEntry>();
     }
 
+    // classe auxiliar para alimentar a visualizacao de preview das ordens do Servico do Comando durante a fase de confirmacao, associando unidades, celulas e linhas de relatorio.
     private sealed class CommandServicePreviewEntry
     {
         public UnitManager targetUnit;
@@ -60,6 +64,7 @@ public partial class TurnStateManager
         !IsCommandServiceExecutionRunning &&
         commandServiceQueuedOrders.Count > 0;
 
+    // logica de input para acionar o Servico do Comando via hotkey.
     private void ProcessCommandServiceHotkeyInput()
     {
         if (replayManager != null && replayManager.IsReplaying)
@@ -79,6 +84,7 @@ public partial class TurnStateManager
             SetCursorState(CursorState.CommandService, "ProcessCommandServiceHotkeyInput");
     }
 
+    // logica para acionar o Servico do Comando a partir do menu de unidade no painel lateral, com mensagens de feedback mais especificas para o contexto de uso via menu.
     public bool TryOpenCommandServiceFromMenu(out string message)
     {
         message = string.Empty;
@@ -103,11 +109,13 @@ public partial class TurnStateManager
         return true;
     }
 
+    // logica para confirmar a ordem do Servico do Comando apos a fase de preview/confirmacao, com mensagens de feedback mais especificas para o contexto de uso via menu.
     public bool TryStartCommandServiceOrder(out string message)
     {
         return TryStartCommandServiceOrder(out message, emitLogs: true);
     }
 
+    // logica para confirmar a ordem do Servico do Comando apos a fase de preview/confirmacao, sem emitir mensagens de feedback redundantes, para o caso de uso via hotkey, onde as mensagens ja sao emitidas durante a fase de preview.
     private bool TryStartCommandServiceOrder(out string message, bool emitLogs)
     {
         if (!TryPrepareCommandServiceOrders(out message, emitLogs))
@@ -127,6 +135,7 @@ public partial class TurnStateManager
         return true;
     }
 
+    // logica para cancelar a ordem do Servico do Comando durante a fase de preview/confirmacao, com mensagens de feedback mais especificas para o contexto de uso via menu.
     private bool TryPreviewCommandServiceOrder(out string message, bool emitLogs)
     {
         if (!TryPrepareCommandServiceOrders(out message, emitLogs))
@@ -156,6 +165,7 @@ public partial class TurnStateManager
         return true;
     }
 
+    // logica para preparar a execucao do Servico do Comando, validando as condicoes de disparo e coletando as ordens a serem executadas, com mensagens de feedback mais especificas para o contexto de uso via menu.
     private bool TryPrepareCommandServiceOrders(out string message, bool emitLogs)
     {
         message = string.Empty;

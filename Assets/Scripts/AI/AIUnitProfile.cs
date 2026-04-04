@@ -18,11 +18,17 @@ public class AIUnitProfile : ScriptableObject
     [Tooltip("Permite o sensor de ataque nesta unidade.")]
     public bool allowAttack = true;
 
+    [Tooltip("Permite o sensor de suprimento nesta unidade (requer isSupplier no UnitData).")]
+    public bool allowSupply = false;
+
     [Tooltip("Permite o sensor de reposicionamento nesta unidade.")]
     public bool allowReposition = true;
 
     [Tooltip("Permite que a unidade seja designada como escolta pelo planner.")]
     public bool canEscort = false;
+
+    [Tooltip("Forca modo defesa: unidade prefere ficar em territorio aliado e usa patrulha defensiva quando sem objetivo.")]
+    public bool preferDefendMode = false;
 
 
     [Header("Attack Decision")]
@@ -44,6 +50,9 @@ public class AIUnitProfile : ScriptableObject
     public bool preferFallbackWhenDefend = true;
 
     [Header("Repair")]
+    [Tooltip("Se true, permite fusao com aliados feridos durante o retorno para reparo.")]
+    public bool fuseWhileOnRepairMode = true;
+
     [Tooltip("HP maximo (inclusivo) para entrar em modo reparo automatico. 0 = nunca busca reparo.")]
     [Range(0, 10)]
     public int hpRepairThreshold = 3;
@@ -51,6 +60,32 @@ public class AIUnitProfile : ScriptableObject
     [Tooltip("HP minimo (inclusivo) para sair do modo reparo e voltar ao front.")]
     [Range(1, 10)]
     public int hpRepairExitThreshold = 8;
+
+    [Header("Restock Decision")]
+    [Tooltip("Limiar de galoes na carroceria (%) para voltar a base e reabastecer. 0 = apenas quando zerado.")]
+    [Range(0, 100)]
+    public int restockFuelThresholdPercent = 0;
+
+    [Tooltip("Limiar de caixas de municao na carroceria (%) para voltar a base e reabastecer. 0 = apenas quando zerado.")]
+    [Range(0, 100)]
+    public int restockAmmoThresholdPercent = 0;
+
+    [Tooltip("Limiar de pecas na carroceria (%) para voltar a base e reabastecer. 0 = apenas quando zerado.")]
+    [Range(0, 100)]
+    public int restockPartsThresholdPercent = 0;
+
+    [Header("Supply Decision")]
+    [Tooltip("Limiar de combustivel do aliado (%) para considerar reabastecimento. 0 = ignora combustivel.")]
+    [Range(0, 100)]
+    public int supplyAllyFuelThresholdPercent = 25;
+
+    [Tooltip("Limiar de municao do aliado (%) para considerar reabastecimento. 0 = apenas quando completamente sem municao em qualquer arma embarcada.")]
+    [Range(0, 100)]
+    public int supplyAllyAmmoThresholdPercent = 0;
+
+    [Tooltip("Limiar de HP do aliado (%) para priorizar como alvo de suprimento. 0 = ignora HP.")]
+    [Range(0, 100)]
+    public int supplyAllyHpThresholdPercent = 50;
 
     public IReadOnlyList<AIUnitSensorKind> SensorPriority => sensorPriority;
 
@@ -93,6 +128,7 @@ public class AIUnitProfile : ScriptableObject
         {
             sensorPriority.Add(AIUnitSensorKind.Capture);
             sensorPriority.Add(AIUnitSensorKind.Attack);
+            sensorPriority.Add(AIUnitSensorKind.Supply);
             sensorPriority.Add(AIUnitSensorKind.Reposition);
             return;
         }

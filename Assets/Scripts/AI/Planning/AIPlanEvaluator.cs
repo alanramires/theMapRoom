@@ -21,6 +21,9 @@ public static class AIPlanEvaluator
         public int DefensePullRadius;
         public int MaxAttackReassignPerTurn;
         public int StagnationTurns;
+        public int MinimumRangeForDefensePlan;
+        public float MinimumConstructionControlledForFinalAttackPlan;
+        public int MaxVariablePlans;
         public AIStance CurrentStance;
         public int CurrentTurn;
     }
@@ -32,6 +35,9 @@ public static class AIPlanEvaluator
             DefensePullRadius = 6,
             MaxAttackReassignPerTurn = 2,
             StagnationTurns = 2,
+            MinimumRangeForDefensePlan = AIGeneralProfile.DefaultMinimumRangeForDefensePlan,
+            MinimumConstructionControlledForFinalAttackPlan = AIGeneralProfile.DefaultMinimumConstructionControlledForFinalAttackPlan,
+            MaxVariablePlans = 3,
             CurrentStance = AIStance.Attack,
             CurrentTurn = 0
         };
@@ -50,21 +56,19 @@ public static class AIPlanEvaluator
         if (database == null || snapshot == null)
             return result;
 
-        database.EnsureDefaults();
-
         // Impede que a mesma unidade entre em dois planos.
         var assignedUnits = new HashSet<int>();
 
         // Planos fixos: defesa primeiro, depois ataque.
-        if (ShouldActivateDefensePlan(database.defensePlan, snapshot))
-            TryActivateFixedPlan(database.defensePlan, snapshot, assignedUnits, result, "0");
-        if (ShouldActivateAttackPlan(database.attackPlan, snapshot))
-            TryActivateFixedPlan(database.attackPlan, snapshot, assignedUnits, result, ">");
+        if (ShouldActivateDefensePlan(database.defensePlan, snapshot, config))
+            TryActivateFixedPlan(database.defensePlan, snapshot, assignedUnits, result, "0", config);
+        if (ShouldActivateAttackPlan(database.attackPlan, snapshot, config))
+            TryActivateFixedPlan(database.attackPlan, snapshot, assignedUnits, result, ">", config);
 
         // Planos de setor: seleciona os setores ativos do turno.
         SelectActiveSectorPlans(
             snapshot,
-            database.maxVariablePlans,
+            config.MaxVariablePlans,
             assignedUnits,
             result,
             plannerLogs);
@@ -79,7 +83,8 @@ public static class AIPlanEvaluator
         AISnapshot snapshot,
         HashSet<int> assignedUnits,
         List<AIPlanIntent> result,
-        string fixedBadgeSymbol)
+        string fixedBadgeSymbol,
+        PlannerRuntimeConfig config)
     {
         if (plan == null)
             return false;
@@ -88,17 +93,18 @@ public static class AIPlanEvaluator
             return false;
 
         AIPlanIntent intent = BuildIntentFromPlan(plan, snapshot, fixedBadgeSymbol);
-        intent.SelectionReason = BuildFixedPlanSelectionReason(fixedBadgeSymbol, snapshot);
+        intent.SelectionReason = BuildFixedPlanSelectionReason(fixedBadgeSymbol, snapshot, config);
         AssignUnitsFromParticipants(intent, plan, snapshot, assignedUnits);
         result.Add(intent);
         return true;
     }
 
-    private static bool ShouldActivateDefensePlan(AIPlanData defensePlan, AISnapshot snapshot)
+    private static bool ShouldActivateDefensePlan(AIPlanData defensePlan, AISnapshot snapshot, PlannerRuntimeConfig config)
     {
         if (defensePlan == null || snapshot == null || !snapshot.HasHq)
             return false;
 
+        int radius = Mathf.Max(1, config.MinimumRangeForDefensePlan);
         for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
         {
             UnitManager enemy = snapshot.VisibleEnemies[i];
@@ -107,14 +113,14 @@ public static class AIPlanEvaluator
 
             int dist = Mathf.Abs(enemy.CurrentCellPosition.x - snapshot.HqCell.x)
                 + Mathf.Abs(enemy.CurrentCellPosition.y - snapshot.HqCell.y);
-            if (dist <= AISnapshot.DefaultDefendRadius)
+            if (dist <= radius)
                 return true;
         }
 
         return false;
     }
 
-    private static bool ShouldActivateAttackPlan(AIPlanData attackPlan, AISnapshot snapshot)
+    private static bool ShouldActivateAttackPlan(AIPlanData attackPlan, AISnapshot snapshot, PlannerRuntimeConfig config)
     {
         if (attackPlan == null || snapshot == null)
             return false;
@@ -135,16 +141,16 @@ public static class AIPlanEvaluator
         if (total <= 0)
             return false;
 
-        return ((float)owned / total) >= 0.5f;
+        return ((float)owned / total) >= Mathf.Clamp01(config.MinimumConstructionControlledForFinalAttackPlan);
     }
 
-
-    private static string BuildFixedPlanSelectionReason(string fixedBadgeSymbol, AISnapshot snapshot)
+    private static string BuildFixedPlanSelectionReason(string fixedBadgeSymbol, AISnapshot snapshot, PlannerRuntimeConfig config)
     {
         if (string.Equals(fixedBadgeSymbol, "0", System.StringComparison.Ordinal))
         {
-            int nearbyEnemies = CountVisibleEnemiesNearHq(snapshot, AISnapshot.DefaultDefendRadius);
-            return $"near HQ | visible-enemies<={AISnapshot.DefaultDefendRadius}hex={nearbyEnemies}";
+            int radius = Mathf.Max(1, config.MinimumRangeForDefensePlan);
+            int nearbyEnemies = CountVisibleEnemiesNearHq(snapshot, radius);
+            return $"near HQ | visible-enemies<={radius}hex={nearbyEnemies}";
         }
 
         if (string.Equals(fixedBadgeSymbol, ">", System.StringComparison.Ordinal))
@@ -164,7 +170,8 @@ public static class AIPlanEvaluator
                 }
             }
 
-            return $"map control >= 50% | owned={owned}/{total}";
+            int percent = Mathf.RoundToInt(Mathf.Clamp01(config.MinimumConstructionControlledForFinalAttackPlan) * 100f);
+            return $"map control >= {percent}% | owned={owned}/{total}";
         }
 
         return "fixed-plan gate";
@@ -1246,14 +1253,14 @@ public static class AIPlanEvaluator
             }
         }
 
-        bool defenseGate = IsDefenseGateOpen(snapshot);
-        bool invasionGate = IsInvasionGateOpen(snapshot);
+        bool defenseGate = IsDefenseGateOpen(snapshot, config);
+        bool invasionGate = IsInvasionGateOpen(snapshot, config);
         AIPlanIntent defensePlan = FindFixedIntent(plans, database != null ? database.defensePlan : null);
         AIPlanIntent invasionPlan = FindFixedIntent(plans, database != null ? database.attackPlan : null);
 
         if (defenseGate && config.CurrentStance == AIStance.Defend && defensePlan != null)
         {
-            int wanted = Mathf.Max(1, CountVisibleEnemiesNearHq(snapshot, AISnapshot.DefaultDefendRadius));
+            int wanted = Mathf.Max(1, CountVisibleEnemiesNearHq(snapshot, Mathf.Max(1, config.MinimumRangeForDefensePlan)));
             int current = CountAssignments(defensePlan, null);
             int missing = Mathf.Max(0, wanted - current);
             if (missing > 0)
@@ -1268,7 +1275,7 @@ public static class AIPlanEvaluator
                         continue;
                     }
 
-                    bool originCritical = IsPlanCritical(snapshot, candidate.SourcePlan, planByKey, stagnatedPlans);
+                    bool originCritical = IsPlanCritical(snapshot, candidate.SourcePlan, planByKey, stagnatedPlans, config);
                     if (originCritical && !CanSourcePlanSpareRole(candidate.SourcePlan, candidate.Role))
                     {
                         AddPlannerLog(plannerLogs, $"bloqueado-realocacao | {candidate.Unit.name} {BuildPlanKey(candidate.SourcePlan)} -> defesa | motivo=plano origem critico");
@@ -1290,7 +1297,7 @@ public static class AIPlanEvaluator
             for (int i = 0; i < candidates.Count && pulled < maxPull; i++)
             {
                 ReassignCandidate candidate = candidates[i];
-                bool originCritical = IsPlanCritical(snapshot, candidate.SourcePlan, planByKey, stagnatedPlans);
+                bool originCritical = IsPlanCritical(snapshot, candidate.SourcePlan, planByKey, stagnatedPlans, config);
                 if (originCritical && !CanSourcePlanSpareRole(candidate.SourcePlan, candidate.Role))
                 {
                     AddPlannerLog(plannerLogs, $"bloqueado-realocacao | {candidate.Unit.name} {BuildPlanKey(candidate.SourcePlan)} -> invasao | motivo=plano origem critico");
@@ -1528,12 +1535,12 @@ public static class AIPlanEvaluator
         }
     }
 
-    private static bool IsDefenseGateOpen(AISnapshot snapshot)
+    private static bool IsDefenseGateOpen(AISnapshot snapshot, PlannerRuntimeConfig config)
     {
-        return snapshot != null && snapshot.HasHq && CountVisibleEnemiesNearHq(snapshot, AISnapshot.DefaultDefendRadius) > 0;
+        return snapshot != null && snapshot.HasHq && CountVisibleEnemiesNearHq(snapshot, Mathf.Max(1, config.MinimumRangeForDefensePlan)) > 0;
     }
 
-    private static bool IsInvasionGateOpen(AISnapshot snapshot)
+    private static bool IsInvasionGateOpen(AISnapshot snapshot, PlannerRuntimeConfig config)
     {
         if (snapshot == null || snapshot.KnownConstructions.Count == 0)
             return false;
@@ -1555,7 +1562,7 @@ public static class AIPlanEvaluator
             return false;
 
         float control = (float)owned / total;
-        return control >= 0.5f;
+        return control >= Mathf.Clamp01(config.MinimumConstructionControlledForFinalAttackPlan);
     }
 
     private static AIPlanIntent FindFixedIntent(List<AIPlanIntent> plans, AIPlanData fixedPlan)
@@ -1650,7 +1657,8 @@ public static class AIPlanEvaluator
         AISnapshot snapshot,
         AIPlanIntent plan,
         Dictionary<string, AIPlanIntent> activePlans,
-        HashSet<string> stagnatedPlans)
+        HashSet<string> stagnatedPlans,
+        PlannerRuntimeConfig config)
     {
         if (plan == null)
             return false;
@@ -1659,17 +1667,17 @@ public static class AIPlanEvaluator
         if (stagnatedPlans != null && stagnatedPlans.Contains(key))
             return false;
 
-        bool hasSectorThreat = HasVisibleEnemyNearSector(snapshot, plan.Sector);
+        bool hasSectorThreat = HasVisibleEnemyNearSector(snapshot, plan.Sector, config);
         bool hasCaptureGap = plan.HasCaptureTarget && !HasAssignedRole(plan, AIPlanRole.Capture);
         return hasSectorThreat || hasCaptureGap;
     }
 
-    private static bool HasVisibleEnemyNearSector(AISnapshot snapshot, ConstructionSector sector)
+    private static bool HasVisibleEnemyNearSector(AISnapshot snapshot, ConstructionSector sector, PlannerRuntimeConfig config)
     {
         if (snapshot == null || snapshot.VisibleEnemies.Count == 0)
             return false;
         if (sector == ConstructionSector.BaseTeam)
-            return CountVisibleEnemiesNearHq(snapshot, AISnapshot.DefaultDefendRadius) > 0;
+            return CountVisibleEnemiesNearHq(snapshot, Mathf.Max(1, config.MinimumRangeForDefensePlan)) > 0;
 
         Vector2 centroid = ComputeSectorCentroid(sector, snapshot);
         for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
@@ -1826,6 +1834,10 @@ public static class AIPlanEvaluator
         plannerLogs.Add(message);
     }
 }
+
+
+
+
 
 
 

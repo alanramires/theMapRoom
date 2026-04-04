@@ -8,9 +8,6 @@ public class AIPlanDatabase : ScriptableObject
     public AIPlanData defensePlan;
     public AIPlanData attackPlan;
 
-    [Header("Active Sector Plans Budget")]
-    [Min(0)] public int maxVariablePlans = 3;
-
     public AIPlanData GetPlanByKey(string planKey)
     {
         if (string.IsNullOrWhiteSpace(planKey))
@@ -41,16 +38,5 @@ public class AIPlanDatabase : ScriptableObject
         }
 
         return null;
-    }
-
-    public void EnsureDefaults()
-    {
-        if (maxVariablePlans < 0)
-            maxVariablePlans = 0;
-    }
-
-    private void OnValidate()
-    {
-        EnsureDefaults();
     }
 }

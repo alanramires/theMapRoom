@@ -697,8 +697,6 @@ public class AIIntelDebugWindow : EditorWindow
 
     private static void DrawPlanDatabaseConfig(AIPlanDatabase db)
     {
-        db.EnsureDefaults();
-
         void DrawPlanRow(AIPlanData plan, string tag)
         {
             if (plan == null) return;
@@ -715,7 +713,6 @@ public class AIIntelDebugWindow : EditorWindow
         DrawPlanRow(db.attackPlan,  "Ataque");
         EditorGUILayout.BeginVertical("box");
         EditorGUILayout.LabelField("[Variaveis dinamicos] Runtime", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField($"  Max planos por turno: {db.maxVariablePlans}", EditorStyles.miniLabel);
         EditorGUILayout.LabelField("  Composicao: heuristica por setor (INF/ARM/ART/APC)", EditorStyles.miniLabel);
         EditorGUILayout.EndVertical();
     }
@@ -726,7 +723,6 @@ public class AIIntelDebugWindow : EditorWindow
         int n = 0;
         if (db.defensePlan != null) n++;
         if (db.attackPlan  != null) n++;
-        n += db.maxVariablePlans;
         return n;
     }
 

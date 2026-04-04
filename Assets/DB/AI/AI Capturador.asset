@@ -12,11 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b727c8034f5128b4d927a31ba2d46d01, type: 3}
   m_Name: AI Capturador
   m_EditorClassIdentifier: Assembly-CSharp::AIUnitProfile
-  sensorPriority: 000000000100000002000000
+  sensorPriority: 000000000100000003000000
   allowCapture: 1
   allowAttack: 1
+  allowSupply: 0
   allowReposition: 1
   canEscort: 0
+  preferDefendMode: 0
+  minDamageDealtPercent: 10
+  maxDamageReceivedPercent: 50
+  mustSurvive: 1
+  targetPreference: 0
   preferFallbackWhenDefend: 1
-
-
+  fuseWhileOnRepairMode: 1
+  hpRepairThreshold: 3
+  hpRepairExitThreshold: 8
+  supplyAllyFuelThresholdPercent: 25
+  supplyAllyAmmoThresholdPercent: 0
+  supplyAllyHpThresholdPercent: 50

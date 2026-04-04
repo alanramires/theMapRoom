@@ -10,17 +10,23 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b727c8034f5128b4d927a31ba2d46d01, type: 3}
-  m_Name: AI Movimentador
+  m_Name: AI Supridor
   m_EditorClassIdentifier: Assembly-CSharp::AIUnitProfile
-  sensorPriority: 00000000
+  sensorPriority: 0200000003000000
   allowCapture: 0
   allowAttack: 0
+  allowSupply: 1
   allowReposition: 1
   canEscort: 0
+  preferDefendMode: 1
   minDamageDealtPercent: 0
   maxDamageReceivedPercent: 0
   mustSurvive: 1
   targetPreference: 0
   preferFallbackWhenDefend: 1
+  fuseWhileOnRepairMode: 1
   hpRepairThreshold: 3
   hpRepairExitThreshold: 8
+  supplyAllyFuelThresholdPercent: 25
+  supplyAllyAmmoThresholdPercent: 0
+  supplyAllyHpThresholdPercent: 50

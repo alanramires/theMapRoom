@@ -136,6 +136,20 @@ public class AIPlayerControllerEditor : Editor
             EditorGUILayout.LabelField(
                 TeamUtils.GetName(team),
                 "Profile: " + profileName + " | AIData: " + dataName + " | PreferedTeam: " + prefered);
+
+            if (profile != null)
+            {
+                EditorGUI.indentLevel++;
+                int originalMaxPlans = profile.maxVariablePlans;
+                int newMaxPlans = EditorGUILayout.IntField("Max Variable Plans", originalMaxPlans);
+                if (newMaxPlans != originalMaxPlans)
+                {
+                    Undo.RecordObject(profile, "Alterar Max Variable Plans");
+                    profile.maxVariablePlans = Mathf.Max(0, newMaxPlans);
+                    EditorUtility.SetDirty(profile);
+                }
+                EditorGUI.indentLevel--;
+            }
         }
 
         if (!anyAi)

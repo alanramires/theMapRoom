@@ -66,17 +66,9 @@ public class AIPlannerWindow : EditorWindow
             return;
         }
 
-        database.EnsureDefaults();
         DrawDatabaseSummary();
         DrawPlanField("Defense Plan", database.defensePlan);
         DrawPlanField("Attack Plan", database.attackPlan);
-
-        EditorGUILayout.Space(6f);
-        EditorGUILayout.LabelField("Variable Sector Plans Budget", EditorStyles.boldLabel);
-        SerializedObject so = new SerializedObject(database);
-        so.Update();
-        EditorGUILayout.PropertyField(so.FindProperty("maxVariablePlans"));
-        so.ApplyModifiedProperties();
 
         EditorGUILayout.Space(10f);
         DrawPreviewSection();
@@ -93,7 +85,7 @@ public class AIPlannerWindow : EditorWindow
         int fixedCount = (database.defensePlan != null ? 1 : 0) + (database.attackPlan != null ? 1 : 0);
 
         EditorGUILayout.HelpBox(
-            $"Asset: {path}\nFixed: {fixedCount}/2 | Variable Active Budget: {database.maxVariablePlans} setores ativos por turno",
+            $"Asset: {path}\nFixed: {fixedCount}/2",
             MessageType.None);
     }
 
@@ -147,7 +139,6 @@ public class AIPlannerWindow : EditorWindow
         }
 
         EditorGUILayout.LabelField("Name", string.IsNullOrWhiteSpace(plan.displayName) ? plan.name : plan.displayName);
-        EditorGUILayout.LabelField("Kind", plan.kind.ToString());
         EditorGUILayout.LabelField("Target Sector", plan.targetSector.ToString());
         EditorGUILayout.LabelField("Participants", plan.participants != null ? plan.participants.Count.ToString() : "0");
 
@@ -619,7 +610,7 @@ public class AIPlannerWindow : EditorWindow
         if (intent.Plan != null && !string.IsNullOrWhiteSpace(intent.Plan.planId))
             return intent.Plan.planId;
         if (intent.Plan != null)
-            return intent.Plan.kind.ToString();
+            return intent.Plan.name;
         return "Dynamic";
     }
 
@@ -711,36 +702,14 @@ public class AIPlannerWindow : EditorWindow
             "AIPlan_Defense.asset",
             "defense",
             "PLAN: DEFESA",
-            AIPlanKind.Fixed,
-            ConstructionSector.BaseTeam,
-            "Nao ha unidades inimigas visiveis a 5 hex do HQ.",
-            "HQ capturado.");
-
-        if (defense.selectionCriteria.Count == 0)
-        {
-            defense.selectionCriteria.Add("chave-fechadura");
-            defense.selectionCriteria.Add("unidades proximas disponiveis");
-            defense.selectionCriteria.Add("realocacao de unidades rapidas de outros planos");
-            defense.selectionCriteria.Add("unidades compradas");
-            EditorUtility.SetDirty(defense);
-        }
+            ConstructionSector.BaseTeam);
 
         AIPlanData attack = CreatePlanAsset(
             folder,
             "AIPlan_Attack.asset",
             "attack",
             "PLAN: ATAQUE",
-            AIPlanKind.Fixed,
-            ConstructionSector.BaseTeam,
-            "HQ inimigo capturado.",
-            "Infantaria aliada destruida.");
-
-        if (attack.selectionCriteria.Count == 0)
-        {
-            attack.selectionCriteria.Add("unidades compradas");
-            attack.selectionCriteria.Add("unidades de outros planos que podem ser realocadas");
-            EditorUtility.SetDirty(attack);
-        }
+            ConstructionSector.BaseTeam);
 
         if (database == null)
         {
@@ -750,7 +719,6 @@ public class AIPlannerWindow : EditorWindow
 
         database.defensePlan = defense;
         database.attackPlan = attack;
-        database.EnsureDefaults();
         EditorUtility.SetDirty(database);
 
         AssetDatabase.SaveAssets();
@@ -763,10 +731,7 @@ public class AIPlannerWindow : EditorWindow
         string fileName,
         string planId,
         string displayName,
-        AIPlanKind kind,
-        ConstructionSector targetSector,
-        string completedWhen,
-        string failedWhen)
+        ConstructionSector targetSector)
     {
         string path = folder + "/" + fileName;
         AIPlanData plan = AssetDatabase.LoadAssetAtPath<AIPlanData>(path);
@@ -778,10 +743,7 @@ public class AIPlannerWindow : EditorWindow
 
         plan.planId = planId;
         plan.displayName = displayName;
-        plan.kind = kind;
         plan.targetSector = targetSector;
-        plan.objectiveCompletedWhen = completedWhen;
-        plan.objectiveFailedWhen = failedWhen;
 
         EditorUtility.SetDirty(plan);
         return plan;

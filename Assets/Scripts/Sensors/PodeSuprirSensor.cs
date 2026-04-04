@@ -110,6 +110,8 @@ public static class PodeSuprirSensor
             bool isEmbarkedPassenger = target != null && target.IsEmbarked && target.EmbarkedTransporter == supplier;
             if (target == null || target == supplier || (!target.gameObject.activeInHierarchy && !isEmbarkedPassenger))
                 continue;
+            if (target.IsEmbarked && !isEmbarkedPassenger)
+                continue;
 
             Vector3Int cell = target.CurrentCellPosition;
             cell.z = 0;

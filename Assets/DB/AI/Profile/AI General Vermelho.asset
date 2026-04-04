@@ -14,4 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AIGeneralProfile
   profileName: General Vermelho
   preferedTeamAssignment: 1
-  aiData: {fileID: 11400000, guid: 19af2c42da7e8fe44826cdf76eb0b911, type: 2}
+  aiData: {fileID: 11400000, guid: bc5996fe89b55014ba48b38a208135a3, type: 2}
+  defensePullRadius: 6
+  maxAttackReassignPerTurn: 2
+  stagnationTurns: 2
+  maxVariablePlans: 4
+  minimumRangeForDefensePlan: 4
+  minimumConstructionControlledForFinalAttackPlan: 0.5

@@ -567,6 +567,41 @@ public partial class TurnStateManager
         return true;
     }
 
+    public bool TryExecuteAutomatedSupplyPreferredTargets(List<UnitManager> preferredTargets)
+    {
+        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            return false;
+        if (preferredTargets == null || preferredTargets.Count <= 0)
+            return false;
+        if (!HandleAutomatedSensorActionRequested(SensorActionType.Supply))
+            return false;
+
+        bool queuedAny = false;
+        HashSet<int> seenTargets = new HashSet<int>();
+        for (int i = 0; i < preferredTargets.Count; i++)
+        {
+            UnitManager target = preferredTargets[i];
+            if (target == null || target.IsDead)
+                continue;
+            if (!seenTargets.Add(target.InstanceId))
+                continue;
+
+            if (TryQueueAutomatedSupplyReplayOrder(target.InstanceId.ToString()))
+                queuedAny = true;
+        }
+
+        if (!queuedAny)
+        {
+            HandleCancel();
+            return false;
+        }
+
+        if (TryStartAutomatedSupplyReplayExecution())
+            return true;
+
+        return true;
+    }
+
     public bool TryExecuteAutomatedTransferReceive(
         ConstructionManager preferredConstruction = null,
         UnitManager preferredUnit = null)
@@ -1254,6 +1289,7 @@ public partial class TurnStateManager
         return true;
     }
 }
+
 
 
 

@@ -540,7 +540,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &7308030096459325100
 RectTransform:
   m_ObjectHideFlags: 0
@@ -710,6 +710,7 @@ MonoBehaviour:
   heartSprite: {fileID: 21300000, guid: f57def376d2a5e04c9920b624aa8a7d0, type: 3}
   halfHeartSprite: {fileID: 21300000, guid: 9c5f4d0b3482e0a4e8a3e550723122a9, type: 3}
   emptyHeartSprite: {fileID: 21300000, guid: 4c29d13173e6e014595c0415e8ece2da, type: 3}
+  deadHeartSprite: {fileID: 21300000, guid: 918c72e53e6160349aa3d28fda336a63, type: 3}
   ammoPips:
     worldPips: []
     uiPips: []

@@ -3,12 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-public enum AIPlanKind
-{
-    Fixed = 0,
-    Variable = 1
-}
-
 [Serializable]
 public class AIPlanParticipantDefinition : ISerializationCallbackReceiver
 {
@@ -90,7 +84,6 @@ public class AIPlanData : ScriptableObject
     [Header("Identity")]
     public string planId = string.Empty;
     public string displayName = string.Empty;
-    public AIPlanKind kind = AIPlanKind.Variable;
 
     [Header("Target")]
     public ConstructionSector targetSector = ConstructionSector.BaseTeam;
@@ -98,13 +91,6 @@ public class AIPlanData : ScriptableObject
     [Header("Rules")]
     [Tooltip("Condicoes de ativacao - todas devem ser verdadeiras para o plano ser ativado.")]
     public List<PlanCondition> activationConditions = new List<PlanCondition>();
-    [TextArea]
-    public string objectiveCompletedWhen = string.Empty;
-    [TextArea]
-    public string objectiveFailedWhen = string.Empty;
-
-    [Header("Selection Criteria")]
-    public List<string> selectionCriteria = new List<string>();
 
     [Header("Participants")]
     public List<AIPlanParticipantDefinition> participants = new List<AIPlanParticipantDefinition>();
@@ -113,8 +99,6 @@ public class AIPlanData : ScriptableObject
     {
         if (activationConditions == null)
             activationConditions = new List<PlanCondition>();
-        if (selectionCriteria == null)
-            selectionCriteria = new List<string>();
         if (participants == null)
             participants = new List<AIPlanParticipantDefinition>();
     }

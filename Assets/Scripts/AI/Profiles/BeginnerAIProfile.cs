@@ -1,11 +1,10 @@
 using UnityEngine;
 
 // Perfil de IA iniciante (IA Burra).
-// Logica reativa simples: defende o HQ se houver inimigo visivel a <= 5 hexagonos,
+// Logica reativa simples: defende o HQ se houver inimigo visivel dentro do raio configurado no snapshot,
 // caso contrario ataca. Sem memoria entre partidas.
 public class BeginnerAIProfile : AIProfile
 {
-    public const int DefendRadius = 5;
 
     public override AIStance EvaluateStance(AISnapshot snapshot)
     {
@@ -24,10 +23,11 @@ public class BeginnerAIProfile : AIProfile
             Vector3Int enemyCell = enemy.CurrentCellPosition;
             enemyCell.z = 0;
 
-            if (HexCoordinates.IsWithinRange(snapshot.BoardTilemap, hqCell, enemyCell, DefendRadius))
+            if (HexCoordinates.IsWithinRange(snapshot.BoardTilemap, hqCell, enemyCell, snapshot.HqDefendRadius))
                 return AIStance.Defend;
         }
 
         return AIStance.Attack;
     }
 }
+

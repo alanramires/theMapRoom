@@ -24,6 +24,7 @@ public class UnitHudController : MonoBehaviour
     [SerializeField] private Sprite heartSprite;
     [SerializeField] private Sprite halfHeartSprite;
     [SerializeField] private Sprite emptyHeartSprite;
+    [SerializeField] private Sprite deadHeartSprite;
 
     [Header("Ammo")]
     [SerializeField] private PipGroup ammoPips = new PipGroup();
@@ -284,15 +285,14 @@ public class UnitHudController : MonoBehaviour
             return;
 
         Sprite target;
-        if (currentHP >= 5)
+        if (currentHP <= 0)
+            target = deadHeartSprite;
+        else if (currentHP >= 9)
+            target = heartSprite;
+        else if (currentHP >= 5)
             target = halfHeartSprite;
-        else if (currentHP >= 1)
-            target = emptyHeartSprite;
         else
             target = emptyHeartSprite;
-
-        if (currentHP >= 9)
-            target = heartSprite;
 
         // Fallbacks if alguma sprite nao foi setada no inspector.
         if (target == null)

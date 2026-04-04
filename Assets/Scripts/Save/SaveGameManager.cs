@@ -1251,7 +1251,7 @@ public class SaveGameManager : MonoBehaviour
 
         if (coreLoadSucceeded)
         {
-            matchController?.ForceReapplyActiveTeam();
+            matchController?.ForceReapplyActiveTeamWithTurnStart();
             OnAfterLoadSuccess?.Invoke();
         }
     }

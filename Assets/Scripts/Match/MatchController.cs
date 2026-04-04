@@ -890,6 +890,13 @@ public class MatchController : MonoBehaviour
         ApplyActiveTeamIfChanged(force: false, applyTurnStartEffects: false);
     }
 
+    // Versao para load: aplica efeitos de inicio de turno.
+    public void ForceReapplyActiveTeamWithTurnStart()
+    {
+        appliedActiveTeamId = int.MinValue;
+        ApplyActiveTeamIfChanged(force: false, applyTurnStartEffects: true);
+    }
+
     // Debug: troca o time ativo sem aplicar efeitos de inicio de turno
     // (economia/upkeep/reset acted), mas atualiza musica/FoW/cursor/UI.
     public void SetActiveTeamIdWithoutTurnStart(int teamId)
@@ -1165,10 +1172,10 @@ public class MatchController : MonoBehaviour
             cursor.PlayVictorySfx();
         }
 
-        // Mostrar Dialogo de Vitoria (FIXO e IMUTÁVEL)
+        // Mostrar Dialogo de Vitoria (FIXO e IMUTÝVEL)
         string fallback = (tutorial != null && tutorial.victoryDialog != null && !string.IsNullOrWhiteSpace(tutorial.victoryDialog.message)) 
             ? tutorial.victoryDialog.message 
-            : "TUTORIAL CONCLUÍDO! VITÓRIA!";
+            : "TUTORIAL CONCLUÝDO! VITÓRIA!";
 
         string victoryMsg = PanelDialogController.ResolveDialogMessage("panel_dialog.victory", fallback);
         PanelDialogController.TrySetExternalText(victoryMsg);

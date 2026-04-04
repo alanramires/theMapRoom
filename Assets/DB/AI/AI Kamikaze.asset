@@ -12,15 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b727c8034f5128b4d927a31ba2d46d01, type: 3}
   m_Name: AI Kamikaze
   m_EditorClassIdentifier: Assembly-CSharp::AIUnitProfile
-  sensorPriority: 0100000002000000
+  sensorPriority: 0100000003000000
   allowCapture: 0
   allowAttack: 1
+  allowSupply: 0
   allowReposition: 1
   canEscort: 0
+  preferDefendMode: 0
   minDamageDealtPercent: 0
   maxDamageReceivedPercent: 0
   mustSurvive: 0
   targetPreference: 1
   preferFallbackWhenDefend: 1
-  hpRepairThreshold: 3
-  hpRepairExitThreshold: 8
+  fuseWhileOnRepairMode: 1
+  hpRepairThreshold: 0
+  hpRepairExitThreshold: 1
+  supplyAllyFuelThresholdPercent: 25
+  supplyAllyAmmoThresholdPercent: 0
+  supplyAllyHpThresholdPercent: 50

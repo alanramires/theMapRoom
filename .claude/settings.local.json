@@ -17,7 +17,9 @@
       "Bash(find \"d:/Unity Projects/The Map Room/Assets/Scripts/Match/TurnState\" -name \"*.cs\" -exec grep -l \"HandleConfirmWithFeedback\\\\|HandleAutomatedSensorActionRequested\" {} \\\\;)",
       "Bash(find \"d:/Unity Projects/The Map Room/Assets/Scripts/Match/TurnState\" -name \"*.cs\" -exec grep -l \"RecordAttackReplayCommand\" {} \\\\;)",
       "Bash(python3)",
-      "Bash(python)"
+      "Bash(python)",
+      "Bash(grep -n \"SetPlayerIsAI\" \"d:/Unity Projects/The Map Room/Assets/Scripts/\"*.cs)",
+      "Bash(grep -v \"//.*isAI\\\\|IsPlayerAI\\\\|IsActiveTeamAI\\\\|IsAI\\\\b\")"
     ]
   }
 }

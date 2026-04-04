@@ -1,6 +1,7 @@
-﻿public enum AIUnitSensorKind
+public enum AIUnitSensorKind
 {
     Capture = 0,
     Attack = 1,
-    Reposition = 2
+    Supply = 2,
+    Reposition = 3
 }
