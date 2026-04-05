@@ -22,7 +22,7 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private TeamId teamId = TeamId.Green;
     [Tooltip("Slot do MatchController que controla este time. -1 = Neutral fixo (sem slot).")]
     [SerializeField] private int slotIndex = -1;
-    [Tooltip("Setor estratégico ao qual esta construção pertence. Use BaseTeam para HQ/arredores fora dos setores de missão (Alpha-Tango).")]
+    [Tooltip("Setor estratégico ao qual esta construção pertence. Use Base1-Base4 para areas de base de cada jogador.")]
     [SerializeField] private ConstructionSector sector = ConstructionSector.Alpha;
     [SerializeField] private string constructionId;
     [SerializeField] private int instanceId;

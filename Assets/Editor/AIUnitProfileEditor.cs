@@ -10,7 +10,7 @@ public class AIUnitProfileEditor : Editor
     private SerializedProperty allowSupplyProperty;
     private SerializedProperty allowRepositionProperty;
     private SerializedProperty canEscortProperty;
-    private SerializedProperty preferDefendModeProperty;
+    private SerializedProperty preferConservativeStanceProperty;
 
     private SerializedProperty minDamageDealtPercentProperty;
     private SerializedProperty maxDamageReceivedPercentProperty;
@@ -21,6 +21,8 @@ public class AIUnitProfileEditor : Editor
     private SerializedProperty fuseWhileOnRepairModeProperty;
     private SerializedProperty hpRepairThresholdProperty;
     private SerializedProperty hpRepairExitThresholdProperty;
+    private SerializedProperty repairAutonomyThresholdPercentProperty;
+    private SerializedProperty repairWhenAnyWeaponOutOfAmmoProperty;
 
     private SerializedProperty restockFuelThresholdPercentProperty;
     private SerializedProperty restockAmmoThresholdPercentProperty;
@@ -46,7 +48,7 @@ public class AIUnitProfileEditor : Editor
         allowSupplyProperty          = serializedObject.FindProperty("allowSupply");
         allowRepositionProperty      = serializedObject.FindProperty("allowReposition");
         canEscortProperty            = serializedObject.FindProperty("canEscort");
-        preferDefendModeProperty     = serializedObject.FindProperty("preferDefendMode");
+        preferConservativeStanceProperty     = serializedObject.FindProperty("preferConservativeStance");
 
         minDamageDealtPercentProperty    = serializedObject.FindProperty("minDamageDealtPercent");
         maxDamageReceivedPercentProperty = serializedObject.FindProperty("maxDamageReceivedPercent");
@@ -54,9 +56,11 @@ public class AIUnitProfileEditor : Editor
         targetPreferenceProperty         = serializedObject.FindProperty("targetPreference");
         preferFallbackWhenDefendProperty = serializedObject.FindProperty("preferFallbackWhenDefend");
 
-        fuseWhileOnRepairModeProperty = serializedObject.FindProperty("fuseWhileOnRepairMode");
-        hpRepairThresholdProperty     = serializedObject.FindProperty("hpRepairThreshold");
-        hpRepairExitThresholdProperty = serializedObject.FindProperty("hpRepairExitThreshold");
+        fuseWhileOnRepairModeProperty            = serializedObject.FindProperty("fuseWhileOnRepairMode");
+        hpRepairThresholdProperty                = serializedObject.FindProperty("hpRepairThreshold");
+        hpRepairExitThresholdProperty            = serializedObject.FindProperty("hpRepairExitThreshold");
+        repairAutonomyThresholdPercentProperty   = serializedObject.FindProperty("repairAutonomyThresholdPercent");
+        repairWhenAnyWeaponOutOfAmmoProperty     = serializedObject.FindProperty("repairWhenAnyWeaponOutOfAmmo");
 
         restockFuelThresholdPercentProperty  = serializedObject.FindProperty("restockFuelThresholdPercent");
         restockAmmoThresholdPercentProperty  = serializedObject.FindProperty("restockAmmoThresholdPercent");
@@ -92,7 +96,7 @@ public class AIUnitProfileEditor : Editor
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.PropertyField(canEscortProperty,        new GUIContent("Can Escort"));
-        EditorGUILayout.PropertyField(preferDefendModeProperty, new GUIContent("Prefer Defend Mode"));
+        EditorGUILayout.PropertyField(preferConservativeStanceProperty, new GUIContent("Prefer Conservative Stance"));
 
         // ── Attack Decision ───────────────────────────────────────────────
         EditorGUILayout.Space(6f);
@@ -106,9 +110,11 @@ public class AIUnitProfileEditor : Editor
         // ── Return to Base / Repair ───────────────────────────────────────
         EditorGUILayout.Space(6f);
         EditorGUILayout.LabelField("Return to Base / Repair", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(hpRepairThresholdProperty,     new GUIContent("HP Repair Threshold"));
-        EditorGUILayout.PropertyField(hpRepairExitThresholdProperty, new GUIContent("HP Repair Exit Threshold"));
-        EditorGUILayout.PropertyField(fuseWhileOnRepairModeProperty, new GUIContent("Fuse with Nearby Units While Repairing"));
+        EditorGUILayout.PropertyField(hpRepairThresholdProperty,              new GUIContent("HP Repair Threshold"));
+        EditorGUILayout.PropertyField(hpRepairExitThresholdProperty,           new GUIContent("HP Repair Exit Threshold"));
+        EditorGUILayout.PropertyField(repairAutonomyThresholdPercentProperty,  new GUIContent("Autonomy Repair Threshold %"));
+        EditorGUILayout.PropertyField(repairWhenAnyWeaponOutOfAmmoProperty,    new GUIContent("Repair When Any Weapon Out of Ammo"));
+        EditorGUILayout.PropertyField(fuseWhileOnRepairModeProperty,           new GUIContent("Fuse with Nearby Units While Repairing"));
 
         // ── Restock Decision ─────────────────────────────────────────────
         EditorGUILayout.Space(6f);

@@ -10,7 +10,7 @@ public class AIPlayerControllerEditor : Editor
     private SerializedProperty aiLogProp;
     private SerializedProperty showPlanDebugAtUnitProp;
     private SerializedProperty aiDatabaseProp;
-    private SerializedProperty aiPlanDatabaseProp;
+    private SerializedProperty battleStanceDatabaseProp;
     private SerializedProperty plannerDebugViewProp;
     private SerializedProperty plannerDebugSimulationTeamProp;
 
@@ -21,7 +21,7 @@ public class AIPlayerControllerEditor : Editor
         aiLogProp = serializedObject.FindProperty("aiLog");
         showPlanDebugAtUnitProp = serializedObject.FindProperty("showPlanDebugAtUnit");
         aiDatabaseProp = serializedObject.FindProperty("aiDatabase");
-        aiPlanDatabaseProp = serializedObject.FindProperty("aiPlanDatabase");
+        battleStanceDatabaseProp = serializedObject.FindProperty("battleStanceDatabase");
         plannerDebugViewProp = serializedObject.FindProperty("plannerDebugView");
         plannerDebugSimulationTeamProp = serializedObject.FindProperty("plannerDebugSimulationTeam");
     }
@@ -38,7 +38,7 @@ public class AIPlayerControllerEditor : Editor
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("AI Setup", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(aiDatabaseProp, new GUIContent("AI Database"));
-        EditorGUILayout.PropertyField(aiPlanDatabaseProp, new GUIContent("AI Plan Database"));
+        EditorGUILayout.PropertyField(battleStanceDatabaseProp, new GUIContent("Battle Stance Database"));
 
         AIPlayerController controller = target as AIPlayerController;
         MatchController match = matchControllerProp != null ? matchControllerProp.objectReferenceValue as MatchController : null;
@@ -219,7 +219,6 @@ public class AIPlayerControllerEditor : Editor
             return;
         }
 
-        DrawPlanSection(plansProp, "Fixed Plans", IsFixedPlanElement);
         DrawPlanSection(plansProp, "Active Plans", IsActiveVariablePlanElement);
         DrawPlanSection(plansProp, "Inactive Plans", IsInactiveVariablePlanElement);
         EditorGUI.indentLevel--;
@@ -266,22 +265,14 @@ public class AIPlayerControllerEditor : Editor
         return $"AIPlayerControllerEditor.{propertyPath}.{label}";
     }
 
-    private static bool IsFixedPlanElement(SerializedProperty planElement)
-    {
-        string sector = GetStringRelative(planElement, "sector");
-        return string.Equals(sector, "BaseTeam", System.StringComparison.Ordinal);
-    }
-
     private static bool IsActiveVariablePlanElement(SerializedProperty planElement)
     {
-        return !IsFixedPlanElement(planElement)
-            && string.Equals(GetStringRelative(planElement, "status"), "Active", System.StringComparison.Ordinal);
+        return string.Equals(GetStringRelative(planElement, "status"), "Active", System.StringComparison.Ordinal);
     }
 
     private static bool IsInactiveVariablePlanElement(SerializedProperty planElement)
     {
-        return !IsFixedPlanElement(planElement)
-            && !string.Equals(GetStringRelative(planElement, "status"), "Active", System.StringComparison.Ordinal);
+        return !string.Equals(GetStringRelative(planElement, "status"), "Active", System.StringComparison.Ordinal);
     }
 
     private static string ResolvePlanElementLabel(SerializedProperty planElement, int index)

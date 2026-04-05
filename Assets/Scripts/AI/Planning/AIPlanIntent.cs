@@ -30,10 +30,7 @@ public static class AIPlanRoleExtensions
 // Criado pelo AIPlanEvaluator, copiado para AISnapshot.
 public class AIPlanIntent
 {
-    // Plano ScriptableObject que originou este intent (null para planos dinamicos)
-    public AIPlanData Plan;
     public ConstructionSector Sector;
-    // Nome legivel - preenchido tanto para planos fixos quanto para planos gerados dinamicamente
     public string DisplayName;
     // Simbolo visual de debug usado no HUD da unidade.
     public string BadgeSymbol;
@@ -47,7 +44,6 @@ public class AIPlanIntent
     public UnitManager SectorEnemy;
 
     // Score de risco tatico calculado no planner (usado no log/debug).
-    // 0 = nao calculado/nao aplicavel (ex: planos fixos).
     public int TacticalRiskScore;
 
     // Motivo resumido pelo qual este plano ficou ativo no turno.

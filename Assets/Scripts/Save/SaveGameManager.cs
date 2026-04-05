@@ -1030,9 +1030,11 @@ public class SaveGameManager : MonoBehaviour
         yield return null;
         LogLoadPerf(loadedSlot, "clear_runtime.end", clearRuntimeStartMs, PerfNowMs() - routineStartMs);
 
+        // Hoisted para ficar acessivel apos o try-catch (necessario para reaplicar flags depois de ForceReapplyActiveTeamWithTurnStart).
+        Dictionary<int, UnitManager> unitsById = new Dictionary<int, UnitManager>();
+
         try
         {
-            Dictionary<int, UnitManager> unitsById = new Dictionary<int, UnitManager>();
             int maxUnitId = 0;
             int maxConstructionId = 0;
 
@@ -1252,6 +1254,20 @@ public class SaveGameManager : MonoBehaviour
         if (coreLoadSucceeded)
         {
             matchController?.ForceReapplyActiveTeamWithTurnStart();
+
+            // ForceReapplyActiveTeamWithTurnStart chama ReleaseUnitsForActiveTeam, que zera hasActed/movementPoints
+            // de todas as unidades do time ativo. Reaplica os flags salvos para restaurar o estado correto.
+            if (data?.units != null)
+            {
+                for (int i = 0; i < data.units.Count; i++)
+                {
+                    UnitSaveData saved = data.units[i];
+                    if (saved == null || !unitsById.TryGetValue(saved.instanceId, out UnitManager unit) || unit == null)
+                        continue;
+                    SaveDataMapper.ApplyUnitTurnFlagsFromSaveData(unit, saved);
+                }
+            }
+
             OnAfterLoadSuccess?.Invoke();
         }
     }

@@ -43,12 +43,12 @@ public class AIIntelDebugWindow : EditorWindow
         new Color(0.30f, 0.60f, 0.55f), // Quebec
         new Color(0.85f, 0.35f, 0.50f), // Romeo
         new Color(0.70f, 0.70f, 0.70f), // Tango
-        new Color(0.95f, 0.95f, 0.95f), // BaseTeam (índice 19)
+        new Color(0.95f, 0.95f, 0.95f), // Base1-Base4 (índice 19, cor compartilhada)
     };
 
     private static Color GetSectorColor(ConstructionSector sector)
     {
-        int idx = sector == ConstructionSector.BaseTeam ? 19 : (int)sector;
+        int idx = ConstructionSectorHelper.IsBase(sector) ? 19 : (int)sector;
         return idx >= 0 && idx < SectorColors.Length ? SectorColors[idx] : Color.white;
     }
 
@@ -58,7 +58,6 @@ public class AIIntelDebugWindow : EditorWindow
     [SerializeField] private Tilemap overrideTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
-    [SerializeField] private AIPlanDatabase planDatabase;
     [SerializeField] private bool useGameplaySensorContext = true;
     [SerializeField] private bool logToConsole = true;
 
@@ -157,10 +156,13 @@ public class AIIntelDebugWindow : EditorWindow
             }
         }
 
-        // BaseTeam highlight separado (se marcado)
-        if (highlightedSectors.Contains(ConstructionSector.BaseTeam))
+        // Base sectors highlight separado (se marcado)
+        if (highlightedSectors.Contains(ConstructionSector.Base1)
+            || highlightedSectors.Contains(ConstructionSector.Base2)
+            || highlightedSectors.Contains(ConstructionSector.Base3)
+            || highlightedSectors.Contains(ConstructionSector.Base4))
         {
-            Color c = GetSectorColor(ConstructionSector.BaseTeam);
+            Color c = GetSectorColor(ConstructionSector.Base1);
             Handles.color = new Color(c.r, c.g, c.b, 0.85f);
             for (int i = 0; i < baseTeamConstr.Count; i++)
             {
@@ -234,7 +236,6 @@ public class AIIntelDebugWindow : EditorWindow
         overrideTilemap    = (Tilemap)EditorGUILayout.ObjectField("Tilemap (opcional)",         overrideTilemap,    typeof(Tilemap),             true);
         terrainDatabase    = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database",   terrainDatabase,    typeof(TerrainDatabase),    false);
         dpqAirHeightConfig = (DPQAirHeightConfig)EditorGUILayout.ObjectField("DPQ Air Height", dpqAirHeightConfig, typeof(DPQAirHeightConfig), false);
-        planDatabase       = (AIPlanDatabase)EditorGUILayout.ObjectField("Plan Database",       planDatabase,       typeof(AIPlanDatabase),     false);
         useGameplaySensorContext = EditorGUILayout.ToggleLeft("Usar contexto do gameplay (MatchController)", useGameplaySensorContext);
         logToConsole             = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
     }
@@ -285,7 +286,7 @@ public class AIIntelDebugWindow : EditorWindow
                 distanceFromNearestAlly = ComputeNearestAllyDistance(c.CurrentCellPosition, alliedUnits, map)
             };
 
-            if (c.Sector == ConstructionSector.BaseTeam)
+            if (ConstructionSectorHelper.IsBase(c.Sector))
                 baseTeamConstr.Add(intel);
             else
                 allSortedConstr.Add(intel);
@@ -309,7 +310,7 @@ public class AIIntelDebugWindow : EditorWindow
         statusMessage =
             $"Time: {TeamUtils.GetName(activeTeam)} | Turno {matchController.CurrentTurn} | " +
             $"Aliados={alliedUnits.Count} InimVis={visibleEnemyUnits.Count} | " +
-            $"BaseTeam={baseTeamConstr.Count} OutrasConstr={allSortedConstr.Count} Setores={sectorIntel.Count}";
+            $"Bases={baseTeamConstr.Count} OutrasConstr={allSortedConstr.Count} Setores={sectorIntel.Count}";
 
         if (logToConsole)
         {
@@ -442,14 +443,17 @@ public class AIIntelDebugWindow : EditorWindow
 
     private void DrawBaseTeamSection()
     {
-        Color btColor = GetSectorColor(ConstructionSector.BaseTeam);
-        bool isHighlighted = highlightedSectors.Contains(ConstructionSector.BaseTeam);
+        Color btColor = GetSectorColor(ConstructionSector.Base1);
+        bool isHighlighted = highlightedSectors.Contains(ConstructionSector.Base1)
+            || highlightedSectors.Contains(ConstructionSector.Base2)
+            || highlightedSectors.Contains(ConstructionSector.Base3)
+            || highlightedSectors.Contains(ConstructionSector.Base4);
 
         // header com botão de highlight
         EditorGUILayout.BeginHorizontal();
         foldBaseTeam = EditorGUILayout.Foldout(foldBaseTeam,
-            $"Base Team  ({baseTeamConstr.Count})", true, EditorStyles.foldoutHeader);
-        DrawSectorHighlightButton(ConstructionSector.BaseTeam, isHighlighted, btColor);
+            $"Base Sectors  ({baseTeamConstr.Count})", true, EditorStyles.foldoutHeader);
+        DrawSectorHighlightButton(ConstructionSector.Base1, isHighlighted, btColor);
         EditorGUILayout.EndHorizontal();
 
         if (!foldBaseTeam) return;
@@ -457,7 +461,7 @@ public class AIIntelDebugWindow : EditorWindow
         EditorGUI.indentLevel++;
         if (baseTeamConstr.Count == 0)
         {
-            EditorGUILayout.HelpBox("Nenhuma construção com setor BaseTeam.", MessageType.None);
+            EditorGUILayout.HelpBox("Nenhuma construção com setor Base1-Base4.", MessageType.None);
             EditorGUI.indentLevel--;
             return;
         }
@@ -493,7 +497,7 @@ public class AIIntelDebugWindow : EditorWindow
         EditorGUI.indentLevel++;
         if (allSortedConstr.Count == 0)
         {
-            EditorGUILayout.HelpBox("Nenhuma construção (exceto BaseTeam).", MessageType.None);
+            EditorGUILayout.HelpBox("Nenhuma construção (exceto Base1-Base4).", MessageType.None);
             EditorGUI.indentLevel--;
             return;
         }
@@ -624,26 +628,16 @@ public class AIIntelDebugWindow : EditorWindow
         IReadOnlyList<AIPlanIntent> activePlans = aiController?.CurrentTurnPlans;
 
         int planCount = activePlans != null ? activePlans.Count : 0;
-        string header = planDatabase != null
-            ? $"Planos Ativos  ({planCount} / {CountConfiguredPlans(planDatabase)} configurados)"
-            : $"Planos Ativos  ({planCount})";
+        string header = $"Planos Ativos  ({planCount})";
 
         foldPlans = EditorGUILayout.Foldout(foldPlans, header, true, EditorStyles.foldoutHeader);
         if (!foldPlans) return;
 
         EditorGUI.indentLevel++;
 
-        if (planDatabase == null)
-        {
-            EditorGUILayout.HelpBox("Plan Database não configurado.", MessageType.None);
-            EditorGUI.indentLevel--;
-            return;
-        }
-
         if (!Application.isPlaying || activePlans == null || activePlans.Count == 0)
         {
-            // Modo editoria / sem planos ativos: mostra configuração do banco
-            DrawPlanDatabaseConfig(planDatabase);
+            EditorGUILayout.LabelField("(sem planos ativos)", EditorStyles.miniLabel);
             EditorGUI.indentLevel--;
             return;
         }
@@ -658,7 +652,7 @@ public class AIIntelDebugWindow : EditorWindow
             GUIStyle headerStyle = new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = planColor } };
             string planName = !string.IsNullOrWhiteSpace(intent.DisplayName)
                 ? intent.DisplayName
-                : (intent.Plan != null ? intent.Plan.displayName : "(plano dinamico)");
+                : "(plano dinamico)";
 
             EditorGUILayout.BeginVertical("box");
             EditorGUILayout.LabelField(
@@ -693,37 +687,6 @@ public class AIIntelDebugWindow : EditorWindow
         }
 
         EditorGUI.indentLevel--;
-    }
-
-    private static void DrawPlanDatabaseConfig(AIPlanDatabase db)
-    {
-        void DrawPlanRow(AIPlanData plan, string tag)
-        {
-            if (plan == null) return;
-            EditorGUILayout.BeginVertical("box");
-            EditorGUILayout.LabelField($"[{tag}] {plan.displayName}  [{plan.targetSector}]", EditorStyles.boldLabel);
-            int cc = plan.activationConditions != null ? plan.activationConditions.Count : 0;
-            EditorGUILayout.LabelField($"  Condições: {(cc == 0 ? "AlwaysActive" : cc.ToString())}", EditorStyles.miniLabel);
-            int pc = plan.participants != null ? plan.participants.Count : 0;
-            EditorGUILayout.LabelField($"  Participantes: {pc}", EditorStyles.miniLabel);
-            EditorGUILayout.EndVertical();
-        }
-
-        DrawPlanRow(db.defensePlan, "Defesa");
-        DrawPlanRow(db.attackPlan,  "Ataque");
-        EditorGUILayout.BeginVertical("box");
-        EditorGUILayout.LabelField("[Variaveis dinamicos] Runtime", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField("  Composicao: heuristica por setor (INF/ARM/ART/APC)", EditorStyles.miniLabel);
-        EditorGUILayout.EndVertical();
-    }
-
-    private static int CountConfiguredPlans(AIPlanDatabase db)
-    {
-        if (db == null) return 0;
-        int n = 0;
-        if (db.defensePlan != null) n++;
-        if (db.attackPlan  != null) n++;
-        return n;
     }
 
     private static UnitManager FindUnitByInstanceId(int instanceId)

@@ -109,12 +109,15 @@ public sealed class SectorManager : MonoBehaviour
 
     [SerializeField] private bool sectorLog;
     [SerializeField] private List<SectorInfo> sectorInfos = new List<SectorInfo>();
+    [SerializeField] private List<SectorInfo> baseInfos   = new List<SectorInfo>();
 
     private readonly Dictionary<ConstructionSector, SectorInfo> sectorInfoBySector = new Dictionary<ConstructionSector, SectorInfo>();
+    private readonly Dictionary<ConstructionSector, SectorInfo> baseInfoBySector   = new Dictionary<ConstructionSector, SectorInfo>();
     private Coroutine pendingRebuildRoutine;
 
     public static SectorManager Instance => EnsureInstance();
     public IReadOnlyList<SectorInfo> SectorInfos => sectorInfos;
+    public IReadOnlyList<SectorInfo> BaseInfos   => baseInfos;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void BootstrapAfterSceneLoad()
@@ -147,6 +150,33 @@ public sealed class SectorManager : MonoBehaviour
             manager.RebuildFromActiveConstructions("first-query");
 
         return manager.sectorInfoBySector.TryGetValue(sector, out info);
+    }
+
+    public static IReadOnlyList<SectorInfo> GetAllBaseInfos()
+    {
+        SectorManager manager = EnsureInstance();
+        if (manager == null)
+            return System.Array.Empty<SectorInfo>();
+
+        if (manager.sectorInfos.Count == 0 && manager.baseInfos.Count == 0)
+            manager.RebuildFromActiveConstructions("first-query");
+
+        return manager.baseInfos;
+    }
+
+    public static bool TryGetBaseInfo(ConstructionSector sector, out SectorInfo info)
+    {
+        SectorManager manager = EnsureInstance();
+        if (manager == null)
+        {
+            info = null;
+            return false;
+        }
+
+        if (manager.sectorInfos.Count == 0 && manager.baseInfos.Count == 0)
+            manager.RebuildFromActiveConstructions("first-query");
+
+        return manager.baseInfoBySector.TryGetValue(sector, out info);
     }
 
     public static void RequestRebuildFromActiveConstructions(string reason = null)
@@ -268,6 +298,8 @@ public sealed class SectorManager : MonoBehaviour
     {
         sectorInfos.Clear();
         sectorInfoBySector.Clear();
+        baseInfos.Clear();
+        baseInfoBySector.Clear();
 
         var grouped = new Dictionary<ConstructionSector, List<ConstructionManager>>();
         IReadOnlyList<ConstructionManager> constructions = GetTrackedConstructions();
@@ -275,8 +307,6 @@ public sealed class SectorManager : MonoBehaviour
         {
             ConstructionManager construction = constructions[i];
             if (construction == null || !construction.IsCapturable || construction.CapturePointsMax <= 0)
-                continue;
-            if (construction.Sector == ConstructionSector.BaseTeam)
                 continue;
 
             if (!grouped.TryGetValue(construction.Sector, out List<ConstructionManager> list))
@@ -341,12 +371,20 @@ public sealed class SectorManager : MonoBehaviour
                 statusText,
                 entries);
 
-            sectorInfos.Add(info);
-            sectorInfoBySector[sector] = info;
+            if (ConstructionSectorHelper.IsBase(sector))
+            {
+                baseInfos.Add(info);
+                baseInfoBySector[sector] = info;
+            }
+            else
+            {
+                sectorInfos.Add(info);
+                sectorInfoBySector[sector] = info;
+            }
         }
 
         if (sectorLog)
-            Debug.Log($"[SectorManager] rebuild reason={reason ?? "none"} sectors={sectorInfos.Count} constructions={constructions.Count}");
+            Debug.Log($"[SectorManager] rebuild reason={reason ?? "none"} sectors={sectorInfos.Count} bases={baseInfos.Count} constructions={constructions.Count}");
     }
 
     private static IReadOnlyList<ConstructionManager> GetTrackedConstructions()

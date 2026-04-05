@@ -65,6 +65,9 @@ public class UnitHudController : MonoBehaviour
     [SerializeField] private Transform transportIndicatorRoot;
     [SerializeField] private Transform detectedIndicatorRoot;
 
+    [Header("AI Stance")]
+    [SerializeField] private Image stanceIconImage;
+
     [Header("Debug")]
     [SerializeField] private Transform planDebugRoot;
     [SerializeField] private TMP_Text planDebugText;
@@ -140,6 +143,17 @@ public class UnitHudController : MonoBehaviour
 
         if (planDebugRoot != null && planDebugRoot.gameObject.activeSelf != visible)
             planDebugRoot.gameObject.SetActive(visible);
+    }
+
+    public void SetStanceIcon(Sprite sprite)
+    {
+        if (stanceIconImage == null)
+            return;
+
+        bool hasIcon = sprite != null;
+        stanceIconImage.sprite = sprite;
+        if (stanceIconImage.gameObject.activeSelf != hasIcon)
+            stanceIconImage.gameObject.SetActive(hasIcon);
     }
 
     public UnitManager ResolveOwnerUnit()

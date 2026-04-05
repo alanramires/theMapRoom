@@ -27,6 +27,11 @@ MonoBehaviour:
   fuseWhileOnRepairMode: 1
   hpRepairThreshold: 3
   hpRepairExitThreshold: 8
+  repairAutonomyThresholdPercent: 25
+  repairWhenAnyWeaponOutOfAmmo: 1
+  restockFuelThresholdPercent: 20
+  restockAmmoThresholdPercent: 10
+  restockPartsThresholdPercent: 10
   supplyAllyFuelThresholdPercent: 25
   supplyAllyAmmoThresholdPercent: 0
   supplyAllyHpThresholdPercent: 50

@@ -5,7 +5,6 @@ using UnityEngine.Tilemaps;
 
 public class AIPlannerWindow : EditorWindow
 {
-    [SerializeField] private AIPlanDatabase database;
     [SerializeField] private MatchController previewMatchController;
     [SerializeField] private AIPlayerController previewAiController;
     [SerializeField] private TeamId previewTeam = TeamId.Blue;
@@ -25,7 +24,6 @@ public class AIPlannerWindow : EditorWindow
 
     private void OnEnable()
     {
-        AutoDetect();
         AutoDetectPreviewContext();
         SceneView.duringSceneGui += OnSceneGUI;
     }
@@ -41,52 +39,13 @@ public class AIPlannerWindow : EditorWindow
 
         EditorGUILayout.LabelField("AI Planner", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Painel de preparacao de planos da IA. Usa o mesmo catalogo/runtime do AI Manager: Fixed Plans, Active Plans e Inactive Plans por time IA.",
+            "Painel de planos da IA. Exibe Active Plans e Inactive Plans por time IA.",
             MessageType.Info);
 
-        EditorGUILayout.Space(4f);
-        database = (AIPlanDatabase)EditorGUILayout.ObjectField(
-            "Plan Database",
-            database,
-            typeof(AIPlanDatabase),
-            false);
-
-        EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Auto Detect"))
-            AutoDetect();
-        if (GUILayout.Button("Create Defaults"))
-            CreateDefaultAssets();
-        EditorGUILayout.EndHorizontal();
-
         EditorGUILayout.Space(6f);
-        if (database == null)
-        {
-            EditorGUILayout.HelpBox("Nenhum AIPlanDatabase selecionado.", MessageType.Warning);
-            EditorGUILayout.EndScrollView();
-            return;
-        }
-
-        DrawDatabaseSummary();
-        DrawPlanField("Defense Plan", database.defensePlan);
-        DrawPlanField("Attack Plan", database.attackPlan);
-
-        EditorGUILayout.Space(10f);
         DrawPreviewSection();
 
-        if (GUI.changed)
-            EditorUtility.SetDirty(database);
-
         EditorGUILayout.EndScrollView();
-    }
-
-    private void DrawDatabaseSummary()
-    {
-        string path = AssetDatabase.GetAssetPath(database);
-        int fixedCount = (database.defensePlan != null ? 1 : 0) + (database.attackPlan != null ? 1 : 0);
-
-        EditorGUILayout.HelpBox(
-            $"Asset: {path}\nFixed: {fixedCount}/2",
-            MessageType.None);
     }
 
     private void DrawPreviewSection()
@@ -127,31 +86,6 @@ public class AIPlannerWindow : EditorWindow
         EditorGUILayout.EndVertical();
     }
 
-    private static void DrawPlanField(string label, AIPlanData plan)
-    {
-        EditorGUILayout.BeginVertical("box");
-        EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
-        if (plan == null)
-        {
-            EditorGUILayout.LabelField("(not assigned)");
-            EditorGUILayout.EndVertical();
-            return;
-        }
-
-        EditorGUILayout.LabelField("Name", string.IsNullOrWhiteSpace(plan.displayName) ? plan.name : plan.displayName);
-        EditorGUILayout.LabelField("Target Sector", plan.targetSector.ToString());
-        EditorGUILayout.LabelField("Participants", plan.participants != null ? plan.participants.Count.ToString() : "0");
-
-        EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Select", GUILayout.Width(80f)))
-            Selection.activeObject = plan;
-        if (GUILayout.Button("Ping", GUILayout.Width(80f)))
-            EditorGUIUtility.PingObject(plan);
-        EditorGUILayout.EndHorizontal();
-
-        EditorGUILayout.EndVertical();
-    }
-
     private void DrawPreviewTeams()
     {
         if (previewAiController == null)
@@ -188,7 +122,6 @@ public class AIPlannerWindow : EditorWindow
             return;
 
         EditorGUI.indentLevel++;
-        DrawPreviewPlanGroup(team, "Fixed Plans", IsFixedPlan);
         DrawPreviewPlanGroup(team, "Active Plans", IsActiveVariablePlan);
         DrawPreviewPlanGroup(team, "Inactive Plans", IsInactiveVariablePlan);
         EditorGUI.indentLevel--;
@@ -292,19 +225,14 @@ public class AIPlannerWindow : EditorWindow
         EditorGUILayout.EndVertical();
     }
 
-    private static bool IsFixedPlan(AIPlayerController.PlanDebugView plan)
-    {
-        return plan != null && string.Equals(plan.sector, ConstructionSector.BaseTeam.ToString(), System.StringComparison.Ordinal);
-    }
-
     private static bool IsActiveVariablePlan(AIPlayerController.PlanDebugView plan)
     {
-        return plan != null && !IsFixedPlan(plan) && string.Equals(plan.status, "Active", System.StringComparison.Ordinal);
+        return plan != null && string.Equals(plan.status, "Active", System.StringComparison.Ordinal);
     }
 
     private static bool IsInactiveVariablePlan(AIPlayerController.PlanDebugView plan)
     {
-        return plan != null && !IsFixedPlan(plan) && !string.Equals(plan.status, "Active", System.StringComparison.Ordinal);
+        return plan != null && !string.Equals(plan.status, "Active", System.StringComparison.Ordinal);
     }
 
     private void ClearPreviewSelection()
@@ -360,25 +288,6 @@ public class AIPlannerWindow : EditorWindow
         return false;
     }
 
-    private void AutoDetect()
-    {
-        if (database != null)
-            return;
-
-        string[] guids = AssetDatabase.FindAssets("t:AIPlanDatabase");
-        for (int i = 0; i < guids.Length; i++)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
-            AIPlanDatabase found = AssetDatabase.LoadAssetAtPath<AIPlanDatabase>(path);
-            if (found == null)
-                continue;
-
-            database = found;
-            Repaint();
-            return;
-        }
-    }
-
     private void AutoDetectPreviewContext()
     {
         if (previewAiController == null)
@@ -387,34 +296,8 @@ public class AIPlannerWindow : EditorWindow
             previewMatchController = Object.FindAnyObjectByType<MatchController>();
     }
 
-    private void SyncControllerPlanDatabase()
-    {
-        if (previewAiController == null || database == null)
-            return;
-
-        SerializedObject controllerSo = new SerializedObject(previewAiController);
-        SerializedProperty planDbProp = controllerSo.FindProperty("aiPlanDatabase");
-        if (planDbProp == null)
-            return;
-
-        if (planDbProp.objectReferenceValue == database)
-            return;
-
-        planDbProp.objectReferenceValue = database;
-        controllerSo.ApplyModifiedPropertiesWithoutUndo();
-        EditorUtility.SetDirty(previewAiController);
-    }
-
     private void GeneratePreview()
     {
-        if (database == null)
-        {
-            previewStatus = "Selecione um AIPlanDatabase.";
-            ClearPreviewSelection();
-            Repaint();
-            return;
-        }
-
         AutoDetectPreviewContext();
         if (previewAiController == null)
         {
@@ -424,7 +307,6 @@ public class AIPlannerWindow : EditorWindow
             return;
         }
 
-        SyncControllerPlanDatabase();
         previewAiController.SimulatePlannerGenerationForDebugAllAiTeams();
         IReadOnlyList<AIPlayerController.TeamPlannerDebugView> teams = previewAiController.PlannerDebugView;
         int teamCount = teams != null ? teams.Count : 0;
@@ -493,141 +375,6 @@ public class AIPlannerWindow : EditorWindow
         }
     }
 
-    private static AISnapshot BuildEditorSnapshot(TeamId aiTeam, MatchController matchController, bool respectFogVisibility)
-    {
-        AISnapshot snapshot = new AISnapshot
-        {
-            AiTeam = aiTeam,
-            HqDefendRadius = AISnapshot.DefaultDefendRadius
-        };
-
-        ConstructionManager[] constructions =
-            Object.FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        UnitManager[] units =
-            Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-
-        for (int i = 0; i < constructions.Length; i++)
-        {
-            ConstructionManager c = constructions[i];
-            if (c == null || !c.gameObject.activeInHierarchy)
-                continue;
-
-            AIConstructionInfo info = new AIConstructionInfo
-            {
-                Cell = c.CurrentCellPosition,
-                TeamId = c.TeamId,
-                IsHq = c.IsPlayerHeadQuarter,
-                IsCapturable = c.IsCapturable,
-                CapturePoints = c.CurrentCapturePoints,
-                CapturePointsMax = c.CapturePointsMax,
-                IsVictoryBuilding = c.IsVictoryBuilding,
-                CanProduceUnits = c.CanProduceUnits,
-                DisplayName = c.ConstructionDisplayName,
-                Sector = c.Sector,
-                Source = c
-            };
-
-            snapshot.KnownConstructions.Add(info);
-
-            if (c.IsPlayerHeadQuarter)
-            {
-                if (c.TeamId == aiTeam)
-                {
-                    snapshot.HasHq = true;
-                    snapshot.HqCell = c.CurrentCellPosition;
-                    snapshot.HqCell.z = 0;
-                }
-                else
-                {
-                    snapshot.EnemyHqs.Add(info);
-                }
-            }
-        }
-
-        for (int i = 0; i < units.Length; i++)
-        {
-            UnitManager u = units[i];
-            if (u != null && u.BoardTilemap != null)
-            {
-                snapshot.BoardTilemap = u.BoardTilemap;
-                break;
-            }
-        }
-
-        if (snapshot.BoardTilemap == null)
-        {
-            for (int i = 0; i < constructions.Length; i++)
-            {
-                ConstructionManager c = constructions[i];
-                if (c != null && c.BoardTilemap != null)
-                {
-                    snapshot.BoardTilemap = c.BoardTilemap;
-                    break;
-                }
-            }
-        }
-
-        if (snapshot.HasHq && snapshot.BoardTilemap != null)
-        {
-            Vector3Int hqCell = snapshot.HqCell;
-            for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
-            {
-                AIConstructionInfo info = snapshot.KnownConstructions[i];
-                Vector3Int cell = info.Cell;
-                cell.z = 0;
-                if (HexCoordinates.IsWithinRange(snapshot.BoardTilemap, hqCell, cell, snapshot.HqDefendRadius))
-                    snapshot.ConstructionsNearHq.Add(info);
-            }
-        }
-
-        for (int i = 0; i < units.Length; i++)
-        {
-            UnitManager u = units[i];
-            if (u == null || !u.gameObject.activeInHierarchy || u.IsDead || u.IsEmbarked)
-                continue;
-
-            if (u.TeamId == aiTeam)
-            {
-                snapshot.FriendlyUnits.Add(u);
-                continue;
-            }
-
-            bool visible = true;
-            if (respectFogVisibility && Application.isPlaying && matchController != null)
-                visible = matchController.IsUnitVisibleForTeam(u, aiTeam);
-
-            if (visible)
-                snapshot.VisibleEnemies.Add(u);
-        }
-
-        return snapshot;
-    }
-
-    private static string GetIntentTitle(AIPlanIntent intent)
-    {
-        if (!string.IsNullOrWhiteSpace(intent.DisplayName))
-            return intent.DisplayName;
-        if (intent.Plan != null && !string.IsNullOrWhiteSpace(intent.Plan.planId))
-            return intent.Plan.planId;
-        if (intent.Plan != null)
-            return intent.Plan.name;
-        return "Dynamic";
-    }
-
-    private static string FindUnitNameByInstanceId(int instanceId)
-    {
-        UnitManager[] units =
-            Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
-        {
-            UnitManager u = units[i];
-            if (u != null && u.InstanceId == instanceId)
-                return u.name;
-        }
-
-        return $"Unit#{instanceId}";
-    }
-
     private static UnitManager FindUnitByInstanceId(int instanceId)
     {
         UnitManager[] units =
@@ -686,83 +433,5 @@ public class AIPlannerWindow : EditorWindow
             count++;
         }
         return count > 0 ? (sum / count) : Vector3.zero;
-    }
-
-    private static string FormatCell(Vector3Int cell) => $"({cell.x},{cell.y})";
-
-    private void CreateDefaultAssets()
-    {
-        const string folder = "Assets/Data/AI/Plans";
-        EnsureFolder("Assets/Data");
-        EnsureFolder("Assets/Data/AI");
-        EnsureFolder(folder);
-
-        AIPlanData defense = CreatePlanAsset(
-            folder,
-            "AIPlan_Defense.asset",
-            "defense",
-            "PLAN: DEFESA",
-            ConstructionSector.BaseTeam);
-
-        AIPlanData attack = CreatePlanAsset(
-            folder,
-            "AIPlan_Attack.asset",
-            "attack",
-            "PLAN: ATAQUE",
-            ConstructionSector.BaseTeam);
-
-        if (database == null)
-        {
-            database = ScriptableObject.CreateInstance<AIPlanDatabase>();
-            AssetDatabase.CreateAsset(database, folder + "/AIPlanDatabase_Default.asset");
-        }
-
-        database.defensePlan = defense;
-        database.attackPlan = attack;
-        EditorUtility.SetDirty(database);
-
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
-        Repaint();
-    }
-
-    private static AIPlanData CreatePlanAsset(
-        string folder,
-        string fileName,
-        string planId,
-        string displayName,
-        ConstructionSector targetSector)
-    {
-        string path = folder + "/" + fileName;
-        AIPlanData plan = AssetDatabase.LoadAssetAtPath<AIPlanData>(path);
-        if (plan == null)
-        {
-            plan = ScriptableObject.CreateInstance<AIPlanData>();
-            AssetDatabase.CreateAsset(plan, path);
-        }
-
-        plan.planId = planId;
-        plan.displayName = displayName;
-        plan.targetSector = targetSector;
-
-        EditorUtility.SetDirty(plan);
-        return plan;
-    }
-
-    private static void EnsureFolder(string path)
-    {
-        if (AssetDatabase.IsValidFolder(path))
-            return;
-
-        int slash = path.LastIndexOf('/');
-        if (slash <= 0)
-            return;
-
-        string parent = path.Substring(0, slash);
-        string name = path.Substring(slash + 1);
-        if (!AssetDatabase.IsValidFolder(parent))
-            EnsureFolder(parent);
-
-        AssetDatabase.CreateFolder(parent, name);
     }
 }

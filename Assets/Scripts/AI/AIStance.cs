@@ -1,5 +1,6 @@
 public enum AIStance
 {
     Attack,
-    Defend
+    Defend,
+    Invasion
 }

@@ -2,5 +2,5 @@
 // Cada perfil implementa como avaliar a postura e (futuramente) como construir o plano de turno.
 public abstract class AIProfile
 {
-    public abstract AIStance EvaluateStance(AISnapshot snapshot);
+    public abstract AIStance EvaluateStance(AISnapshot snapshot, BattleStanceDatabase stanceDatabase);
 }

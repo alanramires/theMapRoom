@@ -6,11 +6,13 @@ public class SectorManagerEditor : Editor
 {
     private SerializedProperty sectorLogProp;
     private SerializedProperty sectorInfosProp;
+    private SerializedProperty baseInfosProp;
 
     private void OnEnable()
     {
-        sectorLogProp = serializedObject.FindProperty("sectorLog");
+        sectorLogProp   = serializedObject.FindProperty("sectorLog");
         sectorInfosProp = serializedObject.FindProperty("sectorInfos");
+        baseInfosProp   = serializedObject.FindProperty("baseInfos");
     }
 
     public override void OnInspectorGUI()
@@ -31,17 +33,23 @@ public class SectorManagerEditor : Editor
 
         EditorGUILayout.Space(6f);
 
-        if (sectorInfosProp == null)
-        {
-            serializedObject.ApplyModifiedProperties();
-            return;
-        }
+        DrawSectorList(sectorInfosProp, "Sector Infos");
+        EditorGUILayout.Space(4f);
+        DrawSectorList(baseInfosProp, "Base Infos");
 
-        EditorGUILayout.LabelField($"Sector Infos ({sectorInfosProp.arraySize})", EditorStyles.boldLabel);
+        serializedObject.ApplyModifiedProperties();
+    }
+
+    private static void DrawSectorList(SerializedProperty prop, string label)
+    {
+        if (prop == null)
+            return;
+
+        EditorGUILayout.LabelField($"{label} ({prop.arraySize})", EditorStyles.boldLabel);
         EditorGUI.indentLevel++;
-        for (int i = 0; i < sectorInfosProp.arraySize; i++)
+        for (int i = 0; i < prop.arraySize; i++)
         {
-            SerializedProperty element = sectorInfosProp.GetArrayElementAtIndex(i);
+            SerializedProperty element = prop.GetArrayElementAtIndex(i);
             if (element == null)
                 continue;
 
@@ -53,7 +61,5 @@ public class SectorManagerEditor : Editor
             EditorGUILayout.PropertyField(element, new GUIContent(sectorLabel), includeChildren: true);
         }
         EditorGUI.indentLevel--;
-
-        serializedObject.ApplyModifiedProperties();
     }
 }

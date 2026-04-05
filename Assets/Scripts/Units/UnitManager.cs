@@ -115,6 +115,10 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private string aiAssignedPlanBadge = string.Empty;
     [SerializeField] private AIPlanRole aiAssignedPlanRole = AIPlanRole.Assault;
     [SerializeField] private bool aiAssignedPlanBadgeVisible;
+    [SerializeField] private bool aiHasStance;
+    [SerializeField] private AIStance aiStance = AIStance.Attack;
+    [SerializeField] private bool aiStanceVisible;
+    private Sprite aiStanceIcon;
 
     public TeamId TeamId => teamId;
     public int SlotIndex => slotIndex;
@@ -198,6 +202,24 @@ public class UnitManager : MonoBehaviour
         aiAssignedPlanBadge = string.Empty;
         aiAssignedPlanRole = AIPlanRole.Assault;
         aiAssignedPlanBadgeVisible = false;
+        RefreshAIAssignedPlanBadge();
+    }
+
+    public void SetAIStance(AIStance stance, Sprite icon = null, bool visible = false)
+    {
+        aiHasStance = true;
+        aiStance = stance;
+        aiStanceVisible = visible;
+        aiStanceIcon = icon;
+        RefreshAIAssignedPlanBadge();
+    }
+
+    public void ClearAIStance()
+    {
+        aiHasStance = false;
+        aiStance = AIStance.Attack;
+        aiStanceVisible = false;
+        aiStanceIcon = null;
         RefreshAIAssignedPlanBadge();
     }
 
@@ -2620,6 +2642,23 @@ public class UnitManager : MonoBehaviour
             TryAutoAssignHud();
         if (unitHud == null)
             return;
+
+        if (aiHasStance && aiStanceVisible)
+        {
+            string stanceLabel = aiStance == AIStance.Defend   ? "DEF"
+                               : aiStance == AIStance.Invasion ? "INV"
+                               :                                 "ATK";
+
+            bool hasPlan = aiHasAssignedPlan && aiAssignedPlanBadgeVisible
+                && !string.IsNullOrWhiteSpace(aiAssignedPlanBadge);
+
+            string text = hasPlan ? $"{stanceLabel}/{aiAssignedPlanBadge}" : stanceLabel;
+            unitHud.SetPlanDebugBadge(true, text);
+            unitHud.SetStanceIcon(aiStanceIcon);
+            return;
+        }
+
+        unitHud.SetStanceIcon(null);
 
         bool shouldShow = aiHasAssignedPlan
             && aiAssignedPlanBadgeVisible

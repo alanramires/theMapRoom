@@ -36,8 +36,8 @@ public class AIPlayerController : MonoBehaviour
     private AIDatabase aiDatabase;
     [SerializeField, Tooltip("Bindings auto-gerados: time IA -> AI Profile.")]
     private List<TeamProfileAssignment> teamProfileAssignments = new List<TeamProfileAssignment>();
-    [SerializeField, Tooltip("Banco de planos do AI Planner. Opcional - deixe null para desativar o planejamento.")]
-    private AIPlanDatabase aiPlanDatabase;
+    [SerializeField, Tooltip("Banco de posturas de batalha. Define comportamento modificador por stance (ataque, defesa, invasao).")]
+    private BattleStanceDatabase battleStanceDatabase;
 
     private AIProfile profile;
     private AIStance currentStance = AIStance.Attack;
@@ -123,7 +123,7 @@ public class AIPlayerController : MonoBehaviour
         if (state == null || savedPlan == null || string.IsNullOrWhiteSpace(savedPlan.planKey))
             return false;
 
-        ConstructionSector sector = ConstructionSector.BaseTeam;
+        ConstructionSector sector = ConstructionSector.Base1;
         if (!string.IsNullOrWhiteSpace(savedPlan.sector) && System.Enum.TryParse(savedPlan.sector, true, out ConstructionSector parsedSector))
             sector = parsedSector;
 
@@ -260,11 +260,6 @@ public class AIPlayerController : MonoBehaviour
             return false;
         }
 
-        if (aiPlanDatabase == null)
-        {
-            Debug.LogWarning($"[AI][planner-debug][{aiTeam}] simulacao abortada: AIPlanDatabase nao configurado.");
-            return false;
-        }
 
         if (!matchController.IsPlayerAI(aiTeam))
         {
@@ -337,8 +332,8 @@ public class AIPlayerController : MonoBehaviour
         if (state == null)
             return;
 
-        EnsureFixedCatalogPlans(state);
         EnsureSectorCatalogPlans(state);
+        EnsureInvasionCatalogPlans(state, team);
 
         Dictionary<string, AIPlanIntent> activePlanByKey = new Dictionary<string, AIPlanIntent>();
         for (int i = 0; i < state.currentTurnPlans.Count; i++)
@@ -427,12 +422,6 @@ public class AIPlayerController : MonoBehaviour
         }
     }
 
-    private void EnsureFixedCatalogPlans(TeamPlannerRuntimeState state)
-    {
-        EnsureCatalogPlan(state, GetFixedDefensePlanKey(), "Defesa HQ", ConstructionSector.BaseTeam, true, "defense");
-        EnsureCatalogPlan(state, GetFixedAttackPlanKey(), "Ataque HQ", ConstructionSector.BaseTeam, true, "attack");
-    }
-
     private void EnsureSectorCatalogPlans(TeamPlannerRuntimeState state)
     {
         IReadOnlyList<SectorManager.SectorInfo> sectors = SectorManager.GetAllSectorInfos();
@@ -445,6 +434,30 @@ public class AIPlayerController : MonoBehaviour
             string key = BuildSectorCatalogPlanKey(sectorInfo.Sector);
             EnsureCatalogPlan(state, key, sectorInfo.Sector.ToString(), sectorInfo.Sector, false, string.Empty);
         }
+    }
+
+    private void EnsureInvasionCatalogPlans(TeamPlannerRuntimeState state, TeamId aiTeam)
+    {
+        IReadOnlyList<SectorManager.SectorInfo> bases = SectorManager.GetAllBaseInfos();
+        for (int i = 0; i < bases.Count; i++)
+        {
+            SectorManager.SectorInfo baseInfo = bases[i];
+            if (baseInfo == null)
+                continue;
+
+            // Ignora a propria base da IA.
+            if (baseInfo.ControllingTeam == aiTeam)
+                continue;
+
+            string key = BuildInvasionPlanKey(baseInfo.Sector);
+            string displayName = $"Invasão {baseInfo.Sector}";
+            EnsureCatalogPlan(state, key, displayName, baseInfo.Sector, false, string.Empty);
+        }
+    }
+
+    private static string BuildInvasionPlanKey(ConstructionSector sector)
+    {
+        return $"invasion:{sector}";
     }
 
     private static void EnsureCatalogPlan(TeamPlannerRuntimeState state, string key, string displayName, ConstructionSector sector, bool isFixedPlan, string fixedPlanKind)
@@ -513,20 +526,6 @@ public class AIPlayerController : MonoBehaviour
         if (activeIntent != null)
             return ResolvePlanDisplayName(activeIntent);
         return planState.sector.ToString();
-    }
-
-    private string GetFixedDefensePlanKey()
-    {
-        if (aiPlanDatabase != null && aiPlanDatabase.defensePlan != null)
-            return AIPlanEvaluator.BuildPlanKey(new AIPlanIntent { Plan = aiPlanDatabase.defensePlan, Sector = aiPlanDatabase.defensePlan.targetSector });
-        return "fixed:defense-hq";
-    }
-
-    private string GetFixedAttackPlanKey()
-    {
-        if (aiPlanDatabase != null && aiPlanDatabase.attackPlan != null)
-            return AIPlanEvaluator.BuildPlanKey(new AIPlanIntent { Plan = aiPlanDatabase.attackPlan, Sector = aiPlanDatabase.attackPlan.targetSector });
-        return "fixed:attack-hq";
     }
 
     private static string BuildSectorCatalogPlanKey(ConstructionSector sector)
@@ -831,8 +830,8 @@ public class AIPlayerController : MonoBehaviour
             state.planCatalogByKey.Clear();
             state.restoredTurn = teamBlock.restoredTurn >= 0 ? teamBlock.restoredTurn : (matchController != null ? matchController.CurrentTurn : 0);
 
-            EnsureFixedCatalogPlans(state);
             EnsureSectorCatalogPlans(state);
+            EnsureInvasionCatalogPlans(state, team);
             if (teamBlock.catalogPlans != null)
             {
                 for (int c = 0; c < teamBlock.catalogPlans.Count; c++)
@@ -952,23 +951,7 @@ public class AIPlayerController : MonoBehaviour
         if (savedPlan == null || string.IsNullOrWhiteSpace(savedPlan.planKey))
             return false;
 
-        if (savedPlan.planKey.StartsWith("fixed:", System.StringComparison.OrdinalIgnoreCase))
-        {
-            AIPlanData fixedPlan = aiPlanDatabase != null ? aiPlanDatabase.GetPlanByKey(savedPlan.planKey) : null;
-            if (fixedPlan == null)
-                return false;
-
-            intent = new AIPlanIntent
-            {
-                Plan = fixedPlan,
-                Sector = fixedPlan.targetSector,
-                DisplayName = !string.IsNullOrWhiteSpace(savedPlan.displayName) ? savedPlan.displayName : fixedPlan.displayName,
-                BadgeSymbol = !string.IsNullOrWhiteSpace(savedPlan.badgeSymbol) ? savedPlan.badgeSymbol : ResolveFixedPlanBadge(fixedPlan),
-                TacticalRiskScore = Mathf.Max(0, savedPlan.tacticalRiskScore),
-                SelectionReason = savedPlan.selectionReason
-            };
-        }
-        else if (TryParseDynamicCapturePlanKey(savedPlan.planKey, out ConstructionSector dynamicSector))
+        if (TryParseDynamicCapturePlanKey(savedPlan.planKey, out ConstructionSector dynamicSector))
         {
             intent = new AIPlanIntent
             {
@@ -1013,17 +996,7 @@ public class AIPlayerController : MonoBehaviour
         return AIPlanRole.Assault;
     }
 
-    private string ResolveFixedPlanBadge(AIPlanData fixedPlan)
-    {
-        if (fixedPlan == null || aiPlanDatabase == null)
-            return string.Empty;
-
-        if (fixedPlan == aiPlanDatabase.defensePlan)
-            return "0";
-        if (fixedPlan == aiPlanDatabase.attackPlan)
-            return ">";
-        return string.Empty;
-    }    private void Awake()
+    private void Awake()
     {
         EnsureAIDataDefaults();
         profile = new BeginnerAIProfile();
@@ -1327,7 +1300,7 @@ public class AIPlayerController : MonoBehaviour
             matchController.RefreshFogOfWarForActiveTeam();
 
         AISnapshot snapshot = BuildSnapshotForTeam(aiTeam);
-        currentStance = profile.EvaluateStance(snapshot);
+        currentStance = profile.EvaluateStance(snapshot, battleStanceDatabase);
 
         snapshot.ActivePlans.Clear();
         snapshot.ActivePlans.AddRange(currentTurnPlans);
@@ -1578,17 +1551,10 @@ public class AIPlayerController : MonoBehaviour
         currentTurnUnitAssignments.Clear();
         currentPlannerLifecycleLogs.Clear();
 
-        if (aiPlanDatabase == null)
-        {
-            ApplyUnitPlanDebugBadges(aiTeam);
-            return;
-        }
-
         AIPlanEvaluator.PlannerRuntimeConfig plannerConfig = BuildPlannerRuntimeConfig(aiTeam);
         List<AIPlanEvaluator.MissionAssignmentMemory> previous = new List<AIPlanEvaluator.MissionAssignmentMemory>(previousAssignmentsByUnitId.Values);
 
         List<AIPlanIntent> plans = AIPlanEvaluator.Evaluate(
-            aiPlanDatabase,
             snapshot,
             previous,
             plannerConfig,
@@ -1690,7 +1656,7 @@ public class AIPlayerController : MonoBehaviour
 
     private static bool TryParseDynamicCapturePlanKey(string planKey, out ConstructionSector sector)
     {
-        sector = ConstructionSector.BaseTeam;
+        sector = ConstructionSector.Base1;
         if (string.IsNullOrWhiteSpace(planKey))
             return false;
 
@@ -1814,6 +1780,8 @@ public class AIPlayerController : MonoBehaviour
                 continue;
 
             unit.ClearAIAssignedPlan();
+            BattleStanceData stanceData = battleStanceDatabase != null ? battleStanceDatabase.GetStanceData(currentStance) : null;
+            unit.SetAIStance(currentStance, stanceData?.stanceIcon, showPlanDebugAtUnit);
         }
 
         foreach (var kv in currentTurnUnitAssignments)
@@ -1871,37 +1839,26 @@ public class AIPlayerController : MonoBehaviour
 
     private AIPlanEvaluator.PlannerRuntimeConfig BuildPlannerRuntimeConfig(TeamId aiTeam)
     {
-        const int defaultDefensePullRadius = 6;
-        const int defaultMaxAttackReassignPerTurn = 2;
         const int defaultStagnationTurns = 2;
         const int defaultMaxVariablePlans = 3;
 
         AIGeneralProfile profileForTeam = GetAssignedProfileForTeam(aiTeam);
 
-        int defensePullRadius = defaultDefensePullRadius;
-        int maxAttackReassignPerTurn = defaultMaxAttackReassignPerTurn;
         int stagnationTurns = defaultStagnationTurns;
         int minimumRangeForDefensePlan = AIGeneralProfile.DefaultMinimumRangeForDefensePlan;
-        float minimumConstructionControlledForFinalAttackPlan = AIGeneralProfile.DefaultMinimumConstructionControlledForFinalAttackPlan;
         int maxVariablePlans = defaultMaxVariablePlans;
 
         if (profileForTeam != null)
         {
-            defensePullRadius = Mathf.Max(1, profileForTeam.defensePullRadius);
-            maxAttackReassignPerTurn = Mathf.Max(0, profileForTeam.maxAttackReassignPerTurn);
             stagnationTurns = Mathf.Max(0, profileForTeam.stagnationTurns);
             minimumRangeForDefensePlan = Mathf.Max(1, profileForTeam.minimumRangeForDefensePlan);
-            minimumConstructionControlledForFinalAttackPlan = Mathf.Clamp01(profileForTeam.minimumConstructionControlledForFinalAttackPlan);
             maxVariablePlans = Mathf.Max(0, profileForTeam.maxVariablePlans);
         }
 
         return new AIPlanEvaluator.PlannerRuntimeConfig
         {
-            DefensePullRadius = defensePullRadius,
-            MaxAttackReassignPerTurn = maxAttackReassignPerTurn,
             StagnationTurns = stagnationTurns,
             MinimumRangeForDefensePlan = minimumRangeForDefensePlan,
-            MinimumConstructionControlledForFinalAttackPlan = minimumConstructionControlledForFinalAttackPlan,
             MaxVariablePlans = maxVariablePlans,
             CurrentStance = currentStance,
             CurrentTurn = matchController != null ? matchController.CurrentTurn : 0
@@ -2036,7 +1993,7 @@ public class AIPlayerController : MonoBehaviour
         if (snapshot == null)
             return 0;
 
-        if (sector == ConstructionSector.BaseTeam)
+        if (ConstructionSectorHelper.IsBase(sector))
         {
             if (!snapshot.HasHq)
                 return 0;
@@ -2198,6 +2155,7 @@ public class AIPlayerController : MonoBehaviour
         Vector3Int moveTarget = unitCell;
         UnitManager artilleryRepositionAnchorEnemy = null;
         bool defendMode = currentStance == AIStance.Defend;
+        BattleStanceData activeStanceData = battleStanceDatabase != null ? battleStanceDatabase.GetStanceData(currentStance) : null;
 
         unit.TryGetUnitData(out UnitData unitData);
         AIUnitProfile aiProfile = unitData != null ? unitData.aiUnitProfile : null;
@@ -2218,7 +2176,7 @@ public class AIPlayerController : MonoBehaviour
         else if (unitIntent != null && unitIntent.HasCaptureTarget)
             plannedCaptureCell = unitIntent.CaptureTargetCell;
         ConstructionSector? plannedCaptureSector = null;
-        if (unitIntent != null && unitIntent.Sector != ConstructionSector.BaseTeam)
+        if (unitIntent != null && !ConstructionSectorHelper.IsBase(unitIntent.Sector))
             plannedCaptureSector = unitIntent.Sector;
         if (unitIntent?.SectorEnemy != null && !unitIntent.SectorEnemy.IsDead && assignedEnemy == null)
             assignedEnemy = unitIntent.SectorEnemy;
@@ -2257,8 +2215,8 @@ public class AIPlayerController : MonoBehaviour
         string repairDislodgeReason = string.Empty;
 
         bool isSupplierUnit = unitData != null && unitData.isSupplier;
-        bool preferDefendMode = aiProfile != null && aiProfile.preferDefendMode;
-        if (preferDefendMode)
+        bool preferConservativeStance = aiProfile != null && aiProfile.preferConservativeStance;
+        if (preferConservativeStance)
             defendMode = true;
         bool supplyObjectiveActive = false;
         bool supplyRefillMode = false;
@@ -2273,7 +2231,7 @@ public class AIPlayerController : MonoBehaviour
         HashSet<Vector3Int> occupiedByAllies = BuildAllyCellSet(snapshot, unit);
         bool supportSafetyMode = combatClassification == UnitCombatClassification.Artilheiro
             || combatClassification == UnitCombatClassification.Civil
-            || preferDefendMode;
+            || preferConservativeStance;
         HashSet<Vector3Int> preferredSupportCells = supportSafetyMode
             ? BuildFriendlySupportPreferenceCells(snapshot, unit, supportOnlyCombatAnchors: combatClassification != UnitCombatClassification.Civil)
             : null;
@@ -2282,7 +2240,7 @@ public class AIPlayerController : MonoBehaviour
             : null;
 
         // Refill forcado: sem estoque ou autonomia propria baixa, precisa reabastecer antes de qualquer acao (analogo ao repairMode).
-        if (isSupplierUnit && (IsSupplyTruckOutOfReserves(unit, aiProfile) || IsLowAutonomy(unit)))
+        if (isSupplierUnit && (IsSupplyTruckOutOfReserves(unit, aiProfile) || IsLowAutonomy(unit, aiProfile)))
         {
             supplyObjectiveActive = true;
             supplyRefillMode = true;
@@ -2449,6 +2407,45 @@ public class AIPlayerController : MonoBehaviour
             }
         }
 
+        // Aplica flags de postura do plano ativo: suspende captura e/ou coesao de escolta se configurado.
+        // Excecoes: reparo e suprimento sao logistica de sobrevivencia, nao papeis taticos.
+        if (activeStanceData != null && !supplyObjectiveActive && !repairModeActive)
+        {
+            if (activeStanceData.suspendCaptureObjective && captureObjectiveActive)
+            {
+                if (aiLog) Debug.Log($"{T(aiTeam, 2)} [postura] {unit.name}: captura suspensa pelo plano ativo ({currentStance}).");
+                captureObjectiveActive = false;
+            }
+            if (activeStanceData.suspendEscortCohesion && planCohesionActive)
+            {
+                if (aiLog) Debug.Log($"{T(aiTeam, 2)} [postura] {unit.name}: coesao suspensa pelo plano ativo ({currentStance}).");
+                planCohesionActive = false;
+            }
+        }
+
+        // Convocacao defensiva: se defenderPullRadius > 0 e a unidade esta fora do perimetro do HQ,
+        // descarta objetivos taticos pendentes e a chama de volta para o perimetro.
+        // Unidades dentro do raio mantem seu comportamento modificado pela postura (ex: sem captura).
+        // Excecoes: logistica de sobrevivencia (supply, repair, merge) nao e interrompida.
+        if (activeStanceData != null && activeStanceData.defenderPullRadius > 0
+            && snapshot.HasHq && snapshot.BoardTilemap != null
+            && !supplyObjectiveActive && !repairModeActive && !mergeObjectiveActive)
+        {
+            Vector3Int hqCell = snapshot.HqCell;
+            hqCell.z = 0;
+            int distUnitToHq = GetHexDistance(snapshot.BoardTilemap, hqCell, unitCell, 64);
+            if (distUnitToHq > activeStanceData.defenderPullRadius)
+            {
+                bool hadObjective = captureObjectiveActive || planCohesionActive || targetEnemy != null;
+                captureObjectiveActive = false;
+                planCohesionActive = false;
+                targetEnemy = null;
+                engagingEnemy = false;
+                if (aiLog)
+                    Debug.Log($"{T(aiTeam, 2)} [postura] {unit.name}: convocado para perimetro defensivo (dist={distUnitToHq} > pullRadius={activeStanceData.defenderPullRadius}){(hadObjective ? " — objetivos taticos descartados" : "")}.");
+            }
+        }
+
         bool escortRoleActive = unitAssignment != null && IsEscortMissionRole(unitAssignment.Role);
         HashSet<Vector3Int> penalizedCaptureCells = escortRoleActive && !repairModeActive && !mergeObjectiveActive && !captureObjectiveActive
             ? BuildReservedCaptureCellsForEscort(unit, unitIntent)
@@ -2459,6 +2456,7 @@ public class AIPlayerController : MonoBehaviour
             && escortRoleActive
             && planCohesionActive
             && targetEnemy != null
+            && !defendMode  // Em defesa, qualquer ameaca no territorio e relevante — nao filtrar por contexto do plano.
             && !IsEscortThreatRelevant(unit, targetEnemy, snapshot, unitIntent, planCohesionCell))
         {
             if (aiLog)
@@ -2487,7 +2485,7 @@ public class AIPlayerController : MonoBehaviour
             moveTarget = supplyObjectiveCell;
             moveTarget.z = 0;
         }
-        else if (isSupplierUnit && preferDefendMode)
+        else if (isSupplierUnit && preferConservativeStance)
         {
             repositioningForDefense = true;
             if (TryGetSupplyTruckDefensivePatrolCell(unit, snapshot, out Vector3Int stDefensiveCell))
@@ -2774,7 +2772,7 @@ public class AIPlayerController : MonoBehaviour
         if (combatClassification == UnitCombatClassification.Civil
             && !repairDislodgeActive
             && bestDest != unitCell
-            && IsCellTooDangerousForSupport(snapshot, bestDest))
+            && IsCellTooDangerousForSupport(snapshot, bestDest, allowModerateRiskForSupply: supplyObjectiveActive))
         {
             if (aiLog)
                 Debug.Log($"{T(aiTeam, 2)} [support] {unit.name} evitou avancar para {FormatCellLC(bestDest)} por risco alto; mantendo posicao segura.");
@@ -2913,6 +2911,21 @@ public class AIPlayerController : MonoBehaviour
             }
         }
 
+        // Revalida o alvo apos o movimento real: cohesion ou bloqueio podem ter levado a unidade
+        // para longe do alvo calculado no scoring (que assumia movimento em direcao a ele).
+        if (engagingEnemy && targetEnemy != null)
+        {
+            Vector3Int postMoveCell = unit.CurrentCellPosition;
+            postMoveCell.z = 0;
+            if (!CanReachAndAttackThisTurn(unit, targetEnemy, snapshot, occupiedByAllies, postMoveCell))
+            {
+                if (aiLog)
+                    Debug.Log($"{T(aiTeam, 2)} [revalida] {unit.name}: alvo {targetEnemy.name} nao alcancavel da posicao final {FormatCellLC(postMoveCell)}; descartando.");
+                engagingEnemy = false;
+                targetEnemy = null;
+            }
+        }
+
         bool attacked = !merged
             && !supplied
             && !transferred
@@ -2923,6 +2936,18 @@ public class AIPlayerController : MonoBehaviour
             && engagingEnemy
             && turnStateManager.HasAutomatedAttackAvailable()
             && turnStateManager.TryExecuteAutomatedAttackPreferredTarget(targetEnemy);
+
+        // Fallback intel fire: ataque falhou (ex: hibrido nao alcancou o alvo apos cohesion bloquear movimento),
+        // mas a unidade pode mirar outro alvo da posicao atual.
+        // Respeita as mesmas guards do bloco principal: nao atira em modo reparo, suprimento ou fusao.
+        if (!attacked && !merged && !supplied && !transferred && !captured
+            && !supplyObjectiveActive && !mergeObjectiveActive
+            && (!repairModeActive || repairDislodgeActive)
+            && intelCanFire && intelFireTarget != null
+            && turnStateManager.HasAutomatedAttackAvailable())
+        {
+            attacked = turnStateManager.TryExecuteAutomatedAttackPreferredTarget(intelFireTarget);
+        }
 
         if (!merged && !supplied && !transferred && !captured && !attacked)
             turnStateManager.HandleAutomatedMoveOnlyActionRequested();
@@ -2985,6 +3010,7 @@ public class AIPlayerController : MonoBehaviour
         bool defendMode = currentStance == AIStance.Defend && snapshot.HasHq && snapshot.BoardTilemap != null;
         Vector3Int defenseReferenceCell = defendMode ? snapshot.HqCell : friendlyCell;
         defenseReferenceCell.z = 0;
+        BattleStanceData activeStanceData = battleStanceDatabase != null ? battleStanceDatabase.GetStanceData(currentStance) : null;
 
         snapshot.UnitRoles.TryGetValue(unit.InstanceId, out AIPlanIntent unitIntent);
         snapshot.UnitPlanAssignments.TryGetValue(unit.InstanceId, out AIPlanAssignment unitAssignment);
@@ -3059,6 +3085,20 @@ public class AIPlayerController : MonoBehaviour
 
             Vector3Int enemyCell = enemy.CurrentCellPosition;
             enemyCell.z = 0;
+
+            // Aplica raio de engajamento do plano ativo (hqEngagementRadius > 0 = limite ativo).
+            if (activeStanceData != null && activeStanceData.hqEngagementRadius > 0 && snapshot.HasHq)
+            {
+                Vector3Int hqCell = snapshot.HqCell;
+                hqCell.z = 0;
+                int distToHq = GetHexDistance(snapshot.BoardTilemap, hqCell, enemyCell, 64);
+                if (distToHq > activeStanceData.hqEngagementRadius)
+                {
+                    if (aiLog)
+                        Debug.Log($"{T(snapshot.AiTeam, 2)} [score] {unit.name} -> {enemy.name} | descartado: fora do raio de engajamento do plano (d={distToHq} > {activeStanceData.hqEngagementRadius})");
+                    continue;
+                }
+            }
 
             int escortThreatBand = int.MaxValue;
             string escortThreatReason = string.Empty;
@@ -4161,16 +4201,16 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
 
         if (!forced && unit.CurrentHP <= enterThreshold)
             forced = true;
-        if (!forced && IsLowAutonomy(unit) && !(data != null && data.isSupplier))
+        if (!forced && IsLowAutonomy(unit, profile) && !(data != null && data.isSupplier))
             forced = true;
-        if (!forced && IsOutOfCombatAmmo(unit))
+        if (!forced && IsOutOfCombatAmmo(unit, profile))
             forced = true;
 
         if (forced)
         {
             bool hpOk   = unit.CurrentHP >= exitThreshold;
-            bool fuelOk = !IsLowAutonomy(unit);
-            bool ammoOk = !IsOutOfCombatAmmo(unit);
+            bool fuelOk = !IsLowAutonomy(unit, profile);
+            bool ammoOk = !IsOutOfCombatAmmo(unit, profile);
             if (hpOk && fuelOk && ammoOk)
                 forced = false;
         }
@@ -4181,19 +4221,25 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         return forced;
     }
 
-    private static bool IsLowAutonomy(UnitManager unit)
+    private static bool IsLowAutonomy(UnitManager unit, AIUnitProfile profile = null)
     {
         if (unit == null)
             return false;
         int maxFuel = unit.GetMaxFuel();
         if (maxFuel <= 0)
             return false;
-        return unit.CurrentFuel * 4 <= maxFuel; // <= 25%
+        int threshold = profile != null ? profile.repairAutonomyThresholdPercent : 25;
+        if (threshold <= 0)
+            return false;
+        return unit.CurrentFuel * 100 <= maxFuel * threshold;
     }
-    private static bool IsOutOfCombatAmmo(UnitManager unit)
+
+    private static bool IsOutOfCombatAmmo(UnitManager unit, AIUnitProfile profile = null)
     {
         if (unit == null)
             return false;
+
+        bool anyWeapon = profile == null || profile.repairWhenAnyWeaponOutOfAmmo;
 
         IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
         if (weapons == null || weapons.Count == 0)
@@ -4207,11 +4253,19 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
                 continue;
 
             hasAmmoBasedWeapon = true;
-            if (w.squadAmmunition > 0)
-                return false;
+            if (w.squadAmmunition <= 0)
+            {
+                if (anyWeapon)
+                    return true; // qualquer arma zerada ja dispara
+            }
+            else if (!anyWeapon)
+            {
+                return false; // todas precisam estar zeradas; esta nao esta
+            }
         }
 
-        return hasAmmoBasedWeapon;
+        // anyWeapon=true e nenhuma zerada → false. anyWeapon=false e todas zeradas → hasAmmoBasedWeapon.
+        return !anyWeapon && hasAmmoBasedWeapon;
     }
 
     private bool CanReachAndAttackThisTurn(
@@ -4656,7 +4710,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
 
         if (unit == null || snapshot == null || unitIntent == null || unitAssignment == null)
             return false;
-        if (unitIntent.Sector == ConstructionSector.BaseTeam)
+        if (ConstructionSectorHelper.IsBase(unitIntent.Sector))
             return false;
 
         Vector3Int unitCell = unit.CurrentCellPosition;
@@ -4870,7 +4924,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         return merged;
     }
 
-    private bool IsCellTooDangerousForSupport(AISnapshot snapshot, Vector3Int cell)
+    private bool IsCellTooDangerousForSupport(AISnapshot snapshot, Vector3Int cell, bool allowModerateRiskForSupply = false)
     {
         if (snapshot == null || snapshot.BoardTilemap == null || snapshot.VisibleEnemies == null)
             return false;
@@ -4888,13 +4942,18 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             int dist = GetHexDistance(snapshot.BoardTilemap, cell, enemyCell, 64);
             if (dist == int.MaxValue)
                 continue;
+
+            // Bloqueia sempre se inimigo esta adjacente ou a 2 hexes.
+            if (dist <= 1)
+                return true;
             if (dist <= 2)
                 return true;
             if (dist <= 4)
                 nearbyThreats++;
         }
 
-        return nearbyThreats >= 2;
+        // Em missao de suprimento tolera ate 2 ameacas distantes (dist 3-4); fora disso exige menos de 2.
+        return nearbyThreats >= (allowModerateRiskForSupply ? 3 : 2);
     }
     private HashSet<Vector3Int> BuildReservedCaptureCellsForEscort(UnitManager unit, AIPlanIntent unitIntent)
     {
@@ -5333,7 +5392,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         for (int i = 0; i < snapshot.ActivePlans.Count; i++)
         {
             AIPlanIntent intent = snapshot.ActivePlans[i];
-            if (intent == null || !intent.HasCaptureTarget || intent.Sector == ConstructionSector.BaseTeam)
+            if (intent == null || !intent.HasCaptureTarget || ConstructionSectorHelper.IsBase(intent.Sector))
                 continue;
 
             bool hasCapture = false;
@@ -5648,7 +5707,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
                 continue;
             if (!PodeMirarSensor.TryResolveWeaponRangeCandidate(
                     embarked,
-                    SensorMovementMode.MoveuParado,
+                    SensorMovementMode.MoveuAndando,
                     requireAmmo: true,
                     out int wMin,
                     out int wMax))

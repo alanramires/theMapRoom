@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Avaliador stateless do planner da IA.
-// Planos fixos (defesa/ataque) sao ScriptableObjects configurados no editor.
 // Planos de setor sao selecionados como ativos a partir da intel publica do turno.
 public static class AIPlanEvaluator
 {
@@ -18,163 +17,146 @@ public static class AIPlanEvaluator
 
     public struct PlannerRuntimeConfig
     {
-        public int DefensePullRadius;
-        public int MaxAttackReassignPerTurn;
         public int StagnationTurns;
         public int MinimumRangeForDefensePlan;
-        public float MinimumConstructionControlledForFinalAttackPlan;
         public int MaxVariablePlans;
         public AIStance CurrentStance;
         public int CurrentTurn;
     }
 
-    public static List<AIPlanIntent> Evaluate(AIPlanDatabase database, AISnapshot snapshot)
+    public static List<AIPlanIntent> Evaluate(AISnapshot snapshot)
     {
         PlannerRuntimeConfig config = new PlannerRuntimeConfig
         {
-            DefensePullRadius = 6,
-            MaxAttackReassignPerTurn = 2,
             StagnationTurns = 2,
             MinimumRangeForDefensePlan = AIGeneralProfile.DefaultMinimumRangeForDefensePlan,
-            MinimumConstructionControlledForFinalAttackPlan = AIGeneralProfile.DefaultMinimumConstructionControlledForFinalAttackPlan,
             MaxVariablePlans = 3,
             CurrentStance = AIStance.Attack,
             CurrentTurn = 0
         };
 
-        return Evaluate(database, snapshot, null, config, null);
+        return Evaluate(snapshot, null, config, null);
     }
 
     public static List<AIPlanIntent> Evaluate(
-        AIPlanDatabase database,
         AISnapshot snapshot,
         IReadOnlyCollection<MissionAssignmentMemory> previousAssignments,
         PlannerRuntimeConfig config,
         List<string> plannerLogs)
     {
         var result = new List<AIPlanIntent>();
-        if (database == null || snapshot == null)
+        if (snapshot == null)
             return result;
 
         // Impede que a mesma unidade entre em dois planos.
         var assignedUnits = new HashSet<int>();
 
-        // Planos fixos: defesa primeiro, depois ataque.
-        if (ShouldActivateDefensePlan(database.defensePlan, snapshot, config))
-            TryActivateFixedPlan(database.defensePlan, snapshot, assignedUnits, result, "0", config);
-        if (ShouldActivateAttackPlan(database.attackPlan, snapshot, config))
-            TryActivateFixedPlan(database.attackPlan, snapshot, assignedUnits, result, ">", config);
+        // Invasion stance: ativa plano de invasão com prioridade máxima antes dos setores.
+        int sectorPlanSlots = config.MaxVariablePlans;
+        if (config.CurrentStance == AIStance.Invasion)
+        {
+            if (TryActivateInvasionPlan(snapshot, assignedUnits, result, plannerLogs))
+                sectorPlanSlots = Mathf.Max(0, sectorPlanSlots - 1);
+        }
 
         // Planos de setor: seleciona os setores ativos do turno.
         SelectActiveSectorPlans(
             snapshot,
-            config.MaxVariablePlans,
+            sectorPlanSlots,
             assignedUnits,
             result,
             plannerLogs);
 
-        ApplyMissionPersistenceAndReallocation(database, snapshot, result, previousAssignments, config, plannerLogs);
+        ApplyMissionPersistenceAndReallocation(snapshot, result, previousAssignments, config, plannerLogs);
 
         return result;
     }
 
-    private static bool TryActivateFixedPlan(
-        AIPlanData plan,
+    private static bool TryActivateInvasionPlan(
         AISnapshot snapshot,
         HashSet<int> assignedUnits,
         List<AIPlanIntent> result,
-        string fixedBadgeSymbol,
-        PlannerRuntimeConfig config)
+        List<string> plannerLogs)
     {
-        if (plan == null)
-            return false;
+        // Coleta bases inimigas com construcoes capturaveis.
+        ConstructionSector bestSector = default;
+        int bestScore = int.MinValue;
+        bool found = false;
 
-        if (!EvaluateConditions(plan, snapshot))
-            return false;
+        var seenBases = new System.Collections.Generic.HashSet<ConstructionSector>();
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo info = snapshot.KnownConstructions[i];
+            if (info == null || !info.IsCapturable) continue;
+            if (!ConstructionSectorHelper.IsBase(info.Sector)) continue;
+            if (info.TeamId == snapshot.AiTeam) continue; // ignora propria base
+            if (!seenBases.Add(info.Sector)) continue;
 
-        AIPlanIntent intent = BuildIntentFromPlan(plan, snapshot, fixedBadgeSymbol);
-        intent.SelectionReason = BuildFixedPlanSelectionReason(fixedBadgeSymbol, snapshot, config);
-        AssignUnitsFromParticipants(intent, plan, snapshot, assignedUnits);
+            // Score: prefere base com menos pontos de captura inimigos (mais fraca) e mais perto do HQ.
+            int enemyCapture = CountEnemyCaptureInBase(info.Sector, snapshot);
+            int distToHq = snapshot.HasHq
+                ? (Mathf.Abs(info.Cell.x - snapshot.HqCell.x) + Mathf.Abs(info.Cell.y - snapshot.HqCell.y))
+                : 0;
+            int score = -enemyCapture - distToHq;
+
+            if (!found || score > bestScore)
+            {
+                bestScore = score;
+                bestSector = info.Sector;
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            AddPlannerLog(plannerLogs, "invasao | nenhuma base inimiga encontrada");
+            return false;
+        }
+
+        int uncaptured = CountUncapturedInSector(bestSector, snapshot);
+        AIPlanIntent intent = BuildSectorPlanIntent(bestSector, snapshot);
+        intent.DisplayName = $"Invasão {bestSector}";
+        intent.BadgeSymbol = ">>";
+        intent.SelectionReason = $"invasion | stance=Invasion | target={bestSector} | uncaptured={uncaptured} | score={bestScore}";
+
+        // Aloca infantaria como plano de setor prioritario.
+        PlannedForce force = new PlannedForce { Infantry = 2, ArmoredEscort = 1, Artillery = 0, ApcEscort = 0 };
+        var draft = new ActiveSectorDraft
+        {
+            Candidate = new SectorCandidate { Sector = bestSector, Uncaptured = uncaptured },
+            Force = force,
+            Intent = intent,
+            PlanOrder = 0,
+        };
+        draft.CaptureTargets = CollectUncapturedTargetsInSector(bestSector, snapshot);
+        draft.InfantryDemand = Mathf.Max(0, Mathf.Min(force.Infantry, draft.CaptureTargets.Count));
+
+        var singleDraft = new System.Collections.Generic.List<ActiveSectorDraft> { draft };
+        AssignSectorPlanInfantryAcrossActivePlans(singleDraft, snapshot, assignedUnits);
+        AssignSectorPlanSupportForcesAcrossActivePlans(singleDraft, snapshot, assignedUnits);
+
+        if (!HasAssignedRole(intent, AIPlanRole.Capture))
+        {
+            AddPlannerLog(plannerLogs, $"invasao | {bestSector} sem capturadores disponiveis — plano nao ativado");
+            return false;
+        }
+
+        AddPlannerLog(plannerLogs, $"invasao | ativado | target={bestSector} uncaptured={uncaptured}");
         result.Add(intent);
         return true;
     }
 
-    private static bool ShouldActivateDefensePlan(AIPlanData defensePlan, AISnapshot snapshot, PlannerRuntimeConfig config)
+    private static int CountEnemyCaptureInBase(ConstructionSector sector, AISnapshot snapshot)
     {
-        if (defensePlan == null || snapshot == null || !snapshot.HasHq)
-            return false;
-
-        int radius = Mathf.Max(1, config.MinimumRangeForDefensePlan);
-        for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
-        {
-            UnitManager enemy = snapshot.VisibleEnemies[i];
-            if (enemy == null || enemy.IsDead)
-                continue;
-
-            int dist = Mathf.Abs(enemy.CurrentCellPosition.x - snapshot.HqCell.x)
-                + Mathf.Abs(enemy.CurrentCellPosition.y - snapshot.HqCell.y);
-            if (dist <= radius)
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool ShouldActivateAttackPlan(AIPlanData attackPlan, AISnapshot snapshot, PlannerRuntimeConfig config)
-    {
-        if (attackPlan == null || snapshot == null)
-            return false;
-
         int total = 0;
-        int owned = 0;
         for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
         {
-            AIConstructionInfo c = snapshot.KnownConstructions[i];
-            if (c == null || !c.IsCapturable)
-                continue;
-
-            total++;
-            if (c.TeamId == snapshot.AiTeam)
-                owned++;
+            AIConstructionInfo info = snapshot.KnownConstructions[i];
+            if (info == null || info.Sector != sector || !info.IsCapturable) continue;
+            if (info.TeamId != snapshot.AiTeam)
+                total += Mathf.Max(0, info.CapturePoints);
         }
-
-        if (total <= 0)
-            return false;
-
-        return ((float)owned / total) >= Mathf.Clamp01(config.MinimumConstructionControlledForFinalAttackPlan);
-    }
-
-    private static string BuildFixedPlanSelectionReason(string fixedBadgeSymbol, AISnapshot snapshot, PlannerRuntimeConfig config)
-    {
-        if (string.Equals(fixedBadgeSymbol, "0", System.StringComparison.Ordinal))
-        {
-            int radius = Mathf.Max(1, config.MinimumRangeForDefensePlan);
-            int nearbyEnemies = CountVisibleEnemiesNearHq(snapshot, radius);
-            return $"near HQ | visible-enemies<={radius}hex={nearbyEnemies}";
-        }
-
-        if (string.Equals(fixedBadgeSymbol, ">", System.StringComparison.Ordinal))
-        {
-            int total = 0;
-            int owned = 0;
-            if (snapshot != null)
-            {
-                for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
-                {
-                    AIConstructionInfo c = snapshot.KnownConstructions[i];
-                    if (c == null || !c.IsCapturable)
-                        continue;
-                    total++;
-                    if (c.TeamId == snapshot.AiTeam)
-                        owned++;
-                }
-            }
-
-            int percent = Mathf.RoundToInt(Mathf.Clamp01(config.MinimumConstructionControlledForFinalAttackPlan) * 100f);
-            return $"map control >= {percent}% | owned={owned}/{total}";
-        }
-
-        return "fixed-plan gate";
+        return total;
     }
 
     private static string BuildSectorSelectionReason(SectorCandidate sector, int rank)
@@ -242,7 +224,7 @@ public static class AIPlanEvaluator
         {
             AIConstructionInfo info = snapshot.KnownConstructions[i];
             if (info == null || !info.IsCapturable) continue;
-            if (info.Sector == ConstructionSector.BaseTeam) continue;
+            if (ConstructionSectorHelper.IsBase(info.Sector)) continue;
             if (!seenSectors.Add(info.Sector)) continue;
 
             int uncaptured = CountUncapturedInSector(info.Sector, snapshot);
@@ -552,90 +534,6 @@ public static class AIPlanEvaluator
         return pressure;
     }
 
-    private static bool EvaluateConditions(AIPlanData plan, AISnapshot snapshot)
-    {
-        if (plan.activationConditions == null || plan.activationConditions.Count == 0)
-            return true;
-
-        for (int i = 0; i < plan.activationConditions.Count; i++)
-        {
-            if (!EvaluateCondition(plan.activationConditions[i], plan.targetSector, snapshot))
-                return false;
-        }
-        return true;
-    }
-
-    private static bool EvaluateCondition(PlanCondition cond, ConstructionSector sector, AISnapshot snapshot)
-    {
-        switch (cond.type)
-        {
-            case PlanConditionType.AlwaysActive:
-                return true;
-
-            case PlanConditionType.SectorNotControlledByAI:
-            {
-                for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
-                {
-                    AIConstructionInfo info = snapshot.KnownConstructions[i];
-                    if (info == null || info.Sector != sector || !info.IsCapturable) continue;
-                    if (info.TeamId != snapshot.AiTeam)
-                        return true;
-                }
-                return false;
-            }
-
-            case PlanConditionType.SectorPartiallyControlledByAI:
-            {
-                bool hasAI = false;
-                bool hasOther = false;
-                for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
-                {
-                    AIConstructionInfo info = snapshot.KnownConstructions[i];
-                    if (info == null || info.Sector != sector || !info.IsCapturable) continue;
-                    if (info.TeamId == snapshot.AiTeam) hasAI = true;
-                    else hasOther = true;
-                }
-                return hasAI && hasOther;
-            }
-
-            case PlanConditionType.EnemyUnitsVisibleInSector:
-            {
-                Vector2 centroid = ComputeSectorCentroid(sector, snapshot);
-                for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
-                {
-                    UnitManager enemy = snapshot.VisibleEnemies[i];
-                    if (enemy == null || enemy.IsDead) continue;
-                    Vector3Int ec = enemy.CurrentCellPosition;
-                    float sqrDist = (new Vector2(ec.x, ec.y) - centroid).sqrMagnitude;
-                    if (sqrDist <= 16f)
-                        return true;
-                }
-                return false;
-            }
-
-            case PlanConditionType.FriendlyStrengthBelowPercent:
-                return false; // MVP
-
-            default:
-                return true;
-        }
-    }
-
-    private static AIPlanIntent BuildIntentFromPlan(AIPlanData plan, AISnapshot snapshot, string fixedBadgeSymbol)
-    {
-        var intent = new AIPlanIntent
-        {
-            Plan = plan,
-            Sector = plan.targetSector,
-            DisplayName = plan.displayName,
-            BadgeSymbol = fixedBadgeSymbol ?? string.Empty,
-        };
-
-        FillCaptureTarget(intent, plan.targetSector, snapshot);
-        FillSectorEnemy(intent, plan.targetSector, snapshot);
-        return intent;
-    }
-
     private static AIPlanIntent BuildSectorPlanIntent(ConstructionSector sector, AISnapshot snapshot)
     {
         string sectorName = sector.ToString();
@@ -698,7 +596,7 @@ public static class AIPlanEvaluator
 
     private static void FillSectorEnemy(AIPlanIntent intent, ConstructionSector sector, AISnapshot snapshot)
     {
-        if (snapshot.VisibleEnemies.Count == 0 || sector == ConstructionSector.BaseTeam)
+        if (snapshot.VisibleEnemies.Count == 0 || ConstructionSectorHelper.IsBase(sector))
             return;
 
         Vector2 centroid = ComputeSectorCentroid(sector, snapshot);
@@ -733,63 +631,6 @@ public static class AIPlanEvaluator
         }
 
         return count > 0 ? sum / count : Vector2.zero;
-    }
-
-    private static void AssignUnitsFromParticipants(
-        AIPlanIntent intent,
-        AIPlanData plan,
-        AISnapshot snapshot,
-        HashSet<int> assignedUnits)
-    {
-        if (plan.participants == null || plan.participants.Count == 0)
-            return;
-
-        Vector3Int targetCell = intent.HasCaptureTarget ? intent.CaptureTargetCell : snapshot.HqCell;
-
-        for (int p = 0; p < plan.participants.Count; p++)
-        {
-            AIPlanParticipantDefinition def = plan.participants[p];
-            if (def == null) continue;
-
-            UnitManager bestUnit = null;
-            int bestDist = int.MaxValue;
-
-            for (int u = 0; u < snapshot.FriendlyUnits.Count; u++)
-            {
-                UnitManager unit = snapshot.FriendlyUnits[u];
-                if (unit == null || unit.IsDead) continue;
-                if (assignedUnits.Contains(unit.InstanceId)) continue;
-
-                unit.TryGetUnitData(out UnitData unitData);
-
-                if (def.unitData != null)
-                {
-                    if (unitData != def.unitData) continue;
-                }
-                else
-                {
-                    if (!CanUnitPerformRole(unitData, def.role)) continue;
-                }
-
-                Vector3Int uc = unit.CurrentCellPosition;
-                int dist = Mathf.Abs(uc.x - targetCell.x) + Mathf.Abs(uc.y - targetCell.y);
-                if (dist < bestDist)
-                {
-                    bestDist = dist;
-                    bestUnit = unit;
-                }
-            }
-
-            if (bestUnit == null) continue;
-
-            assignedUnits.Add(bestUnit.InstanceId);
-            intent.Assignments.Add(new AIPlanAssignment
-            {
-                UnitInstanceId = bestUnit.InstanceId,
-                Role = def.role,
-                Intent = intent,
-            });
-        }
     }
 
     private static List<AIConstructionInfo> CollectUncapturedTargetsInSector(ConstructionSector sector, AISnapshot snapshot)
@@ -1200,19 +1041,13 @@ public static class AIPlanEvaluator
         if (intent == null)
             return string.Empty;
 
-        if (intent.Plan != null)
-        {
-            string stableId = !string.IsNullOrWhiteSpace(intent.Plan.planId)
-                ? intent.Plan.planId
-                : (!string.IsNullOrWhiteSpace(intent.Plan.displayName) ? intent.Plan.displayName : intent.Plan.name);
-            return $"fixed:{stableId}";
-        }
+        if (ConstructionSectorHelper.IsBase(intent.Sector))
+            return $"invasion:{intent.Sector}";
 
         return $"dynamic:capture:{intent.Sector}";
     }
 
     private static void ApplyMissionPersistenceAndReallocation(
-        AIPlanDatabase database,
         AISnapshot snapshot,
         List<AIPlanIntent> plans,
         IReadOnlyCollection<MissionAssignmentMemory> previousAssignments,
@@ -1250,62 +1085,6 @@ public static class AIPlanEvaluator
 
                 if (TryMoveUnitToPlan(snapshot, unitById[memory.UnitInstanceId], targetPlan, memory.Role, unitAssignments, plannerLogs, "preservado", null))
                     continue;
-            }
-        }
-
-        bool defenseGate = IsDefenseGateOpen(snapshot, config);
-        bool invasionGate = IsInvasionGateOpen(snapshot, config);
-        AIPlanIntent defensePlan = FindFixedIntent(plans, database != null ? database.defensePlan : null);
-        AIPlanIntent invasionPlan = FindFixedIntent(plans, database != null ? database.attackPlan : null);
-
-        if (defenseGate && config.CurrentStance == AIStance.Defend && defensePlan != null)
-        {
-            int wanted = Mathf.Max(1, CountVisibleEnemiesNearHq(snapshot, Mathf.Max(1, config.MinimumRangeForDefensePlan)));
-            int current = CountAssignments(defensePlan, null);
-            int missing = Mathf.Max(0, wanted - current);
-            if (missing > 0)
-            {
-                var candidates = CollectCandidatesForReassignment(plans, defensePlan, unitById, snapshot.HqCell, onlyNonCapture: false);
-                for (int i = 0; i < candidates.Count && missing > 0; i++)
-                {
-                    ReassignCandidate candidate = candidates[i];
-                    if (candidate.DistanceToDestination > Mathf.Max(1, config.DefensePullRadius))
-                    {
-                        AddPlannerLog(plannerLogs, $"bloqueado-realocacao | {candidate.Unit.name} -> defesa | motivo=fora do raio ({candidate.DistanceToDestination}>{config.DefensePullRadius})");
-                        continue;
-                    }
-
-                    bool originCritical = IsPlanCritical(snapshot, candidate.SourcePlan, planByKey, stagnatedPlans, config);
-                    if (originCritical && !CanSourcePlanSpareRole(candidate.SourcePlan, candidate.Role))
-                    {
-                        AddPlannerLog(plannerLogs, $"bloqueado-realocacao | {candidate.Unit.name} {BuildPlanKey(candidate.SourcePlan)} -> defesa | motivo=plano origem critico");
-                        continue;
-                    }
-
-                    if (TryMoveUnitToPlan(snapshot, candidate.Unit, defensePlan, candidate.Role, unitAssignments, plannerLogs, "realocado-defesa", candidate.SourcePlan))
-                        missing--;
-                }
-            }
-        }
-
-        if (invasionGate && config.CurrentStance == AIStance.Attack && invasionPlan != null)
-        {
-            int pulled = 0;
-            int maxPull = Mathf.Max(0, config.MaxAttackReassignPerTurn);
-            Vector3Int invasionAnchor = GetIntentAnchorCell(invasionPlan, snapshot);
-            var candidates = CollectCandidatesForReassignment(plans, invasionPlan, unitById, invasionAnchor, onlyNonCapture: true);
-            for (int i = 0; i < candidates.Count && pulled < maxPull; i++)
-            {
-                ReassignCandidate candidate = candidates[i];
-                bool originCritical = IsPlanCritical(snapshot, candidate.SourcePlan, planByKey, stagnatedPlans, config);
-                if (originCritical && !CanSourcePlanSpareRole(candidate.SourcePlan, candidate.Role))
-                {
-                    AddPlannerLog(plannerLogs, $"bloqueado-realocacao | {candidate.Unit.name} {BuildPlanKey(candidate.SourcePlan)} -> invasao | motivo=plano origem critico");
-                    continue;
-                }
-
-                if (TryMoveUnitToPlan(snapshot, candidate.Unit, invasionPlan, candidate.Role, unitAssignments, plannerLogs, "realocado-invasao", candidate.SourcePlan))
-                    pulled++;
             }
         }
 
@@ -1535,51 +1314,6 @@ public static class AIPlanEvaluator
         }
     }
 
-    private static bool IsDefenseGateOpen(AISnapshot snapshot, PlannerRuntimeConfig config)
-    {
-        return snapshot != null && snapshot.HasHq && CountVisibleEnemiesNearHq(snapshot, Mathf.Max(1, config.MinimumRangeForDefensePlan)) > 0;
-    }
-
-    private static bool IsInvasionGateOpen(AISnapshot snapshot, PlannerRuntimeConfig config)
-    {
-        if (snapshot == null || snapshot.KnownConstructions.Count == 0)
-            return false;
-
-        int owned = 0;
-        int total = 0;
-        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
-        {
-            AIConstructionInfo construction = snapshot.KnownConstructions[i];
-            if (construction == null || !construction.IsCapturable)
-                continue;
-
-            total++;
-            if (construction.TeamId == snapshot.AiTeam)
-                owned++;
-        }
-
-        if (total <= 0)
-            return false;
-
-        float control = (float)owned / total;
-        return control >= Mathf.Clamp01(config.MinimumConstructionControlledForFinalAttackPlan);
-    }
-
-    private static AIPlanIntent FindFixedIntent(List<AIPlanIntent> plans, AIPlanData fixedPlan)
-    {
-        if (plans == null || fixedPlan == null)
-            return null;
-
-        for (int i = 0; i < plans.Count; i++)
-        {
-            AIPlanIntent intent = plans[i];
-            if (intent != null && intent.Plan == fixedPlan)
-                return intent;
-        }
-
-        return null;
-    }
-
     private static int CountVisibleEnemiesNearHq(AISnapshot snapshot, int radius)
     {
         if (snapshot == null || !snapshot.HasHq)
@@ -1676,7 +1410,7 @@ public static class AIPlanEvaluator
     {
         if (snapshot == null || snapshot.VisibleEnemies.Count == 0)
             return false;
-        if (sector == ConstructionSector.BaseTeam)
+        if (ConstructionSectorHelper.IsBase(sector))
             return CountVisibleEnemiesNearHq(snapshot, Mathf.Max(1, config.MinimumRangeForDefensePlan)) > 0;
 
         Vector2 centroid = ComputeSectorCentroid(sector, snapshot);

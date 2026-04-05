@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea6149ea2f36cf34e916c9b20781b71c, type: 3}
+  m_Name: "Cat\xE1logo de Battle Stance"
+  m_EditorClassIdentifier: Assembly-CSharp::BattleStanceDatabase
+  attackStance: {fileID: 11400000, guid: ea4d7397fefaf7d42808828df00f7c13, type: 2}
+  defendStance: {fileID: 11400000, guid: 9de29821cf7219c488585cc51bfd220d, type: 2}
+  invasionStance: {fileID: 11400000, guid: 8aa944392dd85d647ad4fa5881054aed, type: 2}

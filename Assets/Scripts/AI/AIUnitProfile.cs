@@ -27,8 +27,8 @@ public class AIUnitProfile : ScriptableObject
     [Tooltip("Permite que a unidade seja designada como escolta pelo planner.")]
     public bool canEscort = false;
 
-    [Tooltip("Forca modo defesa: unidade prefere ficar em territorio aliado e usa patrulha defensiva quando sem objetivo.")]
-    public bool preferDefendMode = false;
+    [Tooltip("Postura conservadora: unidade prefere ficar em territorio aliado e usa patrulha defensiva quando sem objetivo. Diferente do modo de defesa do time (ativado automaticamente por proximidade do HQ inimigo).")]
+    public bool preferConservativeStance = false;
 
 
     [Header("Attack Decision")]
@@ -60,6 +60,13 @@ public class AIUnitProfile : ScriptableObject
     [Tooltip("HP minimo (inclusivo) para sair do modo reparo e voltar ao front.")]
     [Range(1, 10)]
     public int hpRepairExitThreshold = 8;
+
+    [Tooltip("Autonomia propria (%) para entrar em modo reparo. 0 = ignora autonomia.")]
+    [Range(0, 100)]
+    public int repairAutonomyThresholdPercent = 25;
+
+    [Tooltip("Se true, entra em modo reparo quando qualquer arma embarcada zerar municao.")]
+    public bool repairWhenAnyWeaponOutOfAmmo = true;
 
     [Header("Restock Decision")]
     [Tooltip("Limiar de galoes na carroceria (%) para voltar a base e reabastecer. 0 = apenas quando zerado.")]
