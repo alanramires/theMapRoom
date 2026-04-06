@@ -27,6 +27,7 @@ MonoBehaviour:
     retreatToHqWhenIdle: 0
     playConservative: 0
     engageNearestEnemies: 1
+    captureInterruptBias: 1
     holdGroundWhenIdle: 1
     requireSightlineBeforeEngaging: 1
     holdPositionWhenInRange: 1
@@ -45,10 +46,13 @@ MonoBehaviour:
     retreatToHqWhenIdle: 1
     playConservative: 0
     engageNearestEnemies: 1
+    captureInterruptBias: 1
+    holdGroundWhenIdle: 0
     requireSightlineBeforeEngaging: 1
     holdPositionWhenInRange: 1
     repositionToFireRange: 1
     preferMaxEngagementRange: 1
+  initiative: 0
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
   hpRepairThreshold: 3

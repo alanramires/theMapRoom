@@ -119,6 +119,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private AIStance aiStance = AIStance.Attack;
     [SerializeField] private bool aiStanceVisible;
     private Sprite aiStanceIcon;
+    [SerializeField] private bool aiMaintenanceActive;
 
     public TeamId TeamId => teamId;
     public int SlotIndex => slotIndex;
@@ -220,6 +221,12 @@ public class UnitManager : MonoBehaviour
         aiStance = AIStance.Attack;
         aiStanceVisible = false;
         aiStanceIcon = null;
+        RefreshAIAssignedPlanBadge();
+    }
+
+    public void SetAIMaintenanceActive(bool active)
+    {
+        aiMaintenanceActive = active;
         RefreshAIAssignedPlanBadge();
     }
 
@@ -2645,6 +2652,7 @@ public class UnitManager : MonoBehaviour
 
         // Stance icon is independent of the plan badge.
         unitHud.SetStanceIcon(aiHasStance && aiStanceVisible ? aiStanceIcon : null);
+        unitHud.SetMaintenanceIconVisible(aiMaintenanceActive && aiStanceVisible);
 
         // Plan badge: only show when a plan is actually assigned.
         bool hasPlan = aiHasAssignedPlan && aiAssignedPlanBadgeVisible

@@ -27,6 +27,12 @@ MonoBehaviour:
     retreatToHqWhenIdle: 0
     playConservative: 0
     engageNearestEnemies: 1
+    captureInterruptBias: 1
+    holdGroundWhenIdle: 0
+    requireSightlineBeforeEngaging: 0
+    holdPositionWhenInRange: 0
+    repositionToFireRange: 0
+    preferMaxEngagementRange: 0
   - stances:
     - {fileID: 11400000, guid: 9de29821cf7219c488585cc51bfd220d, type: 2}
     sensorPriority: 0100000003000000
@@ -40,6 +46,13 @@ MonoBehaviour:
     retreatToHqWhenIdle: 0
     playConservative: 0
     engageNearestEnemies: 1
+    captureInterruptBias: 1
+    holdGroundWhenIdle: 0
+    requireSightlineBeforeEngaging: 0
+    holdPositionWhenInRange: 0
+    repositionToFireRange: 0
+    preferMaxEngagementRange: 0
+  initiative: 1
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
   hpRepairThreshold: 3

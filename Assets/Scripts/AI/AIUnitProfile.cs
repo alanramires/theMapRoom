@@ -83,6 +83,10 @@ public class AIUnitProfile : ScriptableObject
     [Tooltip("Comportamento por postura. Cada elemento cobre uma ou mais stances. A primeira entrada que contiver a stance ativa e usada.")]
     public List<AIUnitStanceBehavior> stanceBehaviors = new List<AIUnitStanceBehavior>();
 
+    [Header("Turn Order")]
+    [Tooltip("Prioridade de ação dentro do turno. Priority age primeiro (artilharia), High em seguida (escoltas, combatentes), Low por último (capturadores).")]
+    public AIInitiative initiative = AIInitiative.Medium;
+
     [Header("Return to Base / Repair")]
     [Tooltip("Quando estiver em modo de defesa e cair em reposicionamento, emite Fallback ao inves de Reposition.")]
     public bool preferFallbackWhenDefend = true;

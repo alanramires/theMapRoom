@@ -10,7 +10,7 @@ A ordem dos sensores define o que a unidade tenta fazer a cada turno. O primeiro
 
 | Sensor | O que faz |
 |---|---|
-| **Capture** | Procura o prédio capturável mais prioritário no setor e marcha até ele. Com setor planejado: prefere prédios livres sobre ocupados independente da distância. Avança com cautela (DPQ + movimento mínimo) quando o alvo é território inimigo sem visibilidade (FoW). |
+| **Capture** | Procura o prédio capturável mais prioritário no setor e marcha até ele. Com setor planejado: prefere prédios livres sobre ocupados independente da distância. Avança com cautela (DPQ + movimento mínimo) quando o alvo é território inimigo sem visibilidade (FoW) — exceto se um aliado já ocupar o objetivo (FoW não se aplica, avança normalmente). |
 | **Attack** | Procura o melhor inimigo para engajar com base nos critérios de Attack Decision e planeja o movimento para atacar. O planejamento ocorre mesmo que a unidade ainda não esteja em alcance de tiro — ela move-se em direção ao alvo e ataca ao chegar. |
 | **Supply** | Procura aliados para reabastecer (combustível, munição, peças) dentro dos limiares configurados. |
 | **Reposition** | Fallback: move para a melhor célula disponível sem objetivo específico. |
@@ -79,11 +79,12 @@ Define o limiar de score mínimo para interromper a marcha de captura e atacar u
 
 | Valor | Score mínimo | Comportamento |
 |---|---|---|
-| **Passive** | 38.000 | Raramente abandona captura para brigar. Só ataca alvos muito vantajosos. |
-| **Normal** | 28.000 | Limiar padrão. Ataca se o score justificar. |
+| **None** | — | Nunca interrompe a captura por iniciativa própria. Sem "morde no caminho", sem fallback oportunista. Exceção: inimigo **no próprio prédio objetivo** sempre é atacado para desbloqueá-lo. |
+| **Passive** | 38.000 | Raramente abandona captura para brigar. Só ataca alvos muito vantajosos no corredor. Sem fallback oportunista pós-movimento. |
+| **Normal** | 28.000 | Limiar padrão. Ataca se o score justificar. Fallback oportunista ativo. |
 | **Aggressive** | 22.000 | Interrompe captura com facilidade. Ataca quase qualquer inimigo no caminho. |
 
-> Capturador deve usar **Passive** (prioriza missão). Bazooka skirmisher deve usar **Aggressive** (oportunista). Padrão é Normal.
+> Capturador puro deve usar **None** (rush total, só ataca quem bloqueia o objetivo). Bazooka skirmisher deve usar **Aggressive** (oportunista). Padrão é Normal.
 
 #### holdGroundWhenIdle
 Sem objetivo ativo (sem inimigo, sem captura, sem supply, sem plano), **ancora na posição atual** em vez de avançar em direção ao HQ inimigo (que é o fallback padrão). Com `prioritizeDpqDuringTravel`, o path planning ainda escolhe a melhor célula DPQ dentro do alcance de movimento — na prática a unidade gravita para o prédio ou cobertura mais próximos e fica lá.
@@ -108,6 +109,23 @@ Diferença em relação a `retreatToHqWhenIdle`: em vez de marchar até o HQ ali
 | `retreatToHqWhenIdle` + `playConservative` | **Defensor absoluto** | Recua ao HQ quando ocioso E joga conservadoramente. Nunca avança território inimigo voluntariamente. |
 | `holdPositionWhenInRange` + `holdGroundWhenIdle` + `prioritizeDpqDuringTravel` | **Entrincheirada** | Sem alvo, gravita para o melhor DPQ próximo (prédio, cobertura) e fica lá. Com alvo, atira parada. Nunca avança nem recua — segura a linha. |
 | `holdPositionWhenInRange` + `retreatToHqWhenIdle` | **Guardiã de base** | Fica onde está se puder atirar. Quando sem alvo, volta ao HQ. Atira mesmo em reparo na construção. |
+
+---
+
+### Turn Order (Initiative)
+
+Define a **prioridade de ação dentro do turno** da IA. Antes de iniciar o loop de unidades, o sistema ordena a fila por `initiative` (crescente) e, dentro do mesmo nível, por **HP atual decrescente** (mais inteiras agem primeiro).
+
+| Valor | Ordem | Quem usa |
+|---|---|---|
+| **Priority** | 1º | Artilharia, SAM/AAA, Estacionaria, Kamikaze |
+| **High** | 2º | Escoltas, Lutadores, combatentes de linha |
+| **Medium** | 3º | Padrão — Bazooka, Híbrido, Supridor |
+| **Low** | 4º | Capturadores |
+
+**Tiebreaker de HP:** unidades com o mesmo `initiative` são ordenadas por HP atual decrescente. As mais inteiras agem primeiro — garantindo que as que têm mais capacidade operacional executem as missões críticas (ex: captura de prédio). Unidades mais fracas do mesmo grupo ficam como reserva.
+
+> **Exemplo:** dois capturadores no mesmo turno — o de HP 10 captura o prédio mais próximo, o de HP 4 vai para o segundo objetivo ou fica de reserva.
 
 ---
 
@@ -141,9 +159,40 @@ Não existe uso prático para todas as flags juntas. Use combinações específi
 
 ---
 
+## Unidades Rogue (Sem Plano)
+
+Uma unidade é **rogue** quando o planner não conseguiu atribuí-la a nenhuma missão — sem captura planejada, sem papel de escolta, sem intent de supply ou merge. Isso pode acontecer porque o time tem mais unidades do que slots de plano disponíveis, ou porque a unidade foi criada/movida fora de um ciclo de planejamento.
+
+Unidades rogue ainda executam a IA normalmente, mas a cascata de `moveTarget` cai para o fallback genérico no final:
+
+| Prioridade | Condição | Destino |
+|---|---|---|
+| 1 | Supply ativo | Alvo de supply |
+| 2 | Merge ativo | Posição atual |
+| 3 | Reparo ativo | Construção de reparo |
+| 4 | Captura ativa (`captureObjectiveActive`) | Célula do objetivo de captura |
+| 5 | Inimigo designado (`targetEnemy != null`) | Posição do inimigo |
+| 6 | `retreatToHqWhenIdle` ou modo defesa | HQ aliado |
+| 7 | Coesão de plano (`planCohesionActive`) | Célula de coesão |
+| 8 | `holdGroundWhenIdle` | Posição atual |
+| **9** | **Fallback rogue** | **HQ inimigo mais próximo** |
+
+Se a unidade não ativar nenhum dos sensores acima (sem captura viável, sem inimigo, sem flags de idle), ela marchará diretamente para o HQ inimigo mais próximo. Esse comportamento é deliberado — a unidade exerce pressão mesmo sem plano — mas pode ser indesejado para artilharia e unidades de suporte.
+
+**Como mitigar o comportamento rogue indesejado:**
+- `holdGroundWhenIdle`: ancora onde está em vez de avançar.
+- `retreatToHqWhenIdle`: recua ao HQ aliado em vez de avançar.
+- Sensor `Attack` ativo: se houver inimigos visíveis, a unidade os engajará antes de cair no fallback.
+
+> **Exemplo real:** o AI Artilheiro sem plano entrava no cluster inimigo porque a cascata caía no fallback rogue (HQ inimigo) sem passar por `holdGroundWhenIdle`. Corrigido com `holdGroundWhenIdle: true` na stance de Ataque.
+
+---
+
 ## Modo Reparo
 
 A unidade entra em modo reparo quando HP ≤ `hpRepairThreshold`, autonomia baixa ou munição de combate zerada. Sai quando HP ≥ `hpRepairExitThreshold` E autonomia E munição estiverem ok. O modo reparo **não é interrompido por mudança de postura** — o time pode cair em Defense e a unidade continua o retorno à base até estar apta.
+
+**Ícone de manutenção (debug):** quando `showPlanDebugAtUnit` estiver marcado no `AIPlayerController`, unidades em modo reparo exibem um ícone de chave+martelo sobre o sprite. Ferramenta de desenvolvimento — não aparece em build final. Os limiares de entrada (`hpRepairThreshold`) e saída (`hpRepairExitThreshold`) vêm do `AIUnitProfile` de cada unidade.
 
 | Situação | Comportamento |
 |---|---|
@@ -162,6 +211,7 @@ A unidade entra em modo reparo quando HP ≤ `hpRepairThreshold`, autonomia baix
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
+| **Initiative** | **Priority** | **Priority** |
 | Sensores | Attack > Reposition | Attack > Reposition |
 | Dano mín/máx | 10% / 50% | 10% / 20% |
 | Must Survive | Sim | Não |
@@ -183,6 +233,7 @@ A unidade entra em modo reparo quando HP ≤ `hpRepairThreshold`, autonomia baix
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
+| **Initiative** | **Medium** | **Medium** |
 | Sensores | Attack > Capture > Reposition | Attack > Capture > Reposition |
 | Dano mín/máx | 0% / 0% | 0% / 0% |
 | Must Survive | Sim | Não |
@@ -204,16 +255,24 @@ A unidade entra em modo reparo quando HP ≤ `hpRepairThreshold`, autonomia baix
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
+| **Initiative** | **Low** | **Low** |
 | Sensores | Capture > Attack > Reposition | Capture > Attack > Reposition |
 | Dano mín/máx | 10% / 50% | 10% / 20% |
 | Must Survive | Sim | Não |
 | canEscort | Não | Não |
 | engageNearestEnemies | Não | Não |
-| captureInterruptBias | Passive | Passive |
+| captureInterruptBias | None | None |
 | retreatToHqWhenIdle | Não | Sim |
 | prioritizeDpq (battle/travel) | Sim / Não | Sim / Sim |
 
-**Comportamento:** Rush puro para captura. Com `engageNearestEnemies` desligado, ignora inimigos durante a marcha — `captureInterruptBias` não tem efeito prático aqui, mas está em Passive como declaração de intenção: se `engageNearestEnemies` for ativado no futuro, a missão quase nunca será abandonada por brigas de oportunidade — não morde no caminho, não faz fallback oportunista. Quando o objetivo está em território inimigo sem visibilidade (FoW), avança com cautela preferindo DPQ e movimento mínimo para revelar antes de entrar. Quando o objetivo está ocupado por inimigo visível, posiciona em DPQ adjacente e engaja. Com setor planejado, prefere prédios livres sobre ocupados mesmo que mais distantes. Em defesa, recua ao HQ quando sem objetivo.
+**Comportamento:** Rush puro para captura. Fluxo de decisão por turno:
+- **Não alcança o objetivo este turno** → move em direção a ele. Com `engageNearestEnemies` desligado, ignora inimigos no caminho.
+- **Alcança o objetivo e está vazio** → captura.
+- **Alcança o objetivo e tem aliado** → o planner designa outro prédio no setor; se não houver, avança para o mesmo objetivo (aliado sai do caminho no turno seguinte).
+- **Alcança o objetivo e tem inimigo visível** → posiciona em DPQ adjacente e ataca para desbloquear, independente de `captureInterruptBias`. `None` não impede este ataque — ele é parte da missão de captura, não uma interrupção dela.
+- **Objetivo em território inimigo sem visibilidade (FoW)** → avança com cautela preferindo DPQ e movimento mínimo para revelar antes de entrar, exceto se um aliado já ocupa o prédio.
+
+`captureInterruptBias: None` garante que a unidade nunca abandona a missão por oportunismo — nem "morde no caminho", nem fallback oportunista pós-movimento. Em defesa, recua ao HQ quando sem objetivo.
 
 ---
 
@@ -221,6 +280,7 @@ A unidade entra em modo reparo quando HP ≤ `hpRepairThreshold`, autonomia baix
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
+| **Initiative** | **Priority** | **Priority** |
 | Sensores | Attack > Reposition | Attack > Reposition |
 | Dano mín/máx | 10% / 20% | 10% / 20% |
 | Must Survive | Não | Não |
@@ -246,6 +306,7 @@ A unidade entra em modo reparo quando HP ≤ `hpRepairThreshold`, autonomia baix
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
+| **Initiative** | **Medium** | **Medium** |
 | Sensores | Attack > Reposition | Attack > Reposition |
 | Dano mín/máx | 10% / 50% | 10% / 20% |
 | Must Survive | Sim | Não |
@@ -264,6 +325,7 @@ A unidade entra em modo reparo quando HP ≤ `hpRepairThreshold`, autonomia baix
 
 | Postura | Única (Ataque, Invasão e Defesa) |
 |---|---|
+| **Initiative** | **Priority** |
 | Sensores | Attack > Reposition |
 | Dano mín/máx | 0% / 0% |
 | Must Survive | Não |
@@ -280,6 +342,7 @@ A unidade entra em modo reparo quando HP ≤ `hpRepairThreshold`, autonomia baix
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
+| **Initiative** | **High** | **High** |
 | Sensores | Attack > Reposition | Attack > Reposition |
 | Dano mín/máx | 10% / 50% | 10% / 20% |
 | Must Survive | Sim | Não |
@@ -295,6 +358,7 @@ A unidade entra em modo reparo quando HP ≤ `hpRepairThreshold`, autonomia baix
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
+| **Initiative** | **Medium** | **Medium** |
 | Sensores | Supply > Reposition | Supply > Reposition |
 | Must Survive | Sim | Sim |
 | canEscort | Não | Não |

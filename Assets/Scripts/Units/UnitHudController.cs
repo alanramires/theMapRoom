@@ -67,6 +67,7 @@ public class UnitHudController : MonoBehaviour
 
     [Header("AI Stance")]
     [SerializeField] private Image stanceIconImage;
+    [SerializeField] private Image maintenanceIconImage;
 
     [Header("Debug")]
     [SerializeField] private Transform planDebugRoot;
@@ -154,6 +155,14 @@ public class UnitHudController : MonoBehaviour
         stanceIconImage.sprite = sprite;
         if (stanceIconImage.gameObject.activeSelf != hasIcon)
             stanceIconImage.gameObject.SetActive(hasIcon);
+    }
+
+    public void SetMaintenanceIconVisible(bool visible)
+    {
+        if (maintenanceIconImage == null)
+            return;
+        if (maintenanceIconImage.gameObject.activeSelf != visible)
+            maintenanceIconImage.gameObject.SetActive(visible);
     }
 
     public UnitManager ResolveOwnerUnit()

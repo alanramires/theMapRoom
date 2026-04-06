@@ -352,13 +352,22 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         int original = currentIndex;
         int count = list.Count;
-        currentIndex = (currentIndex + delta) % count;
-        if (currentIndex < 0)
-            currentIndex += count;
+        int next = currentIndex;
 
-        if (currentIndex == original)
+        for (int i = 0; i < count; i++)
+        {
+            next = (next + delta + count) % count;
+            if (next == original)
+                return; // voltou ao inicio sem achar nenhum habilitado
+            Button candidate = list[next];
+            if (candidate != null && candidate.interactable)
+                break;
+        }
+
+        if (next == original)
             return;
 
+        currentIndex = next;
         SelectCurrentButton();
         cursorController?.PlayCursorMoveSfx();
     }
@@ -390,7 +399,13 @@ public class BattleMapMenuRootController : MonoBehaviour
         }
 
         if (resetIndex || currentIndex < 0 || currentIndex >= list.Count)
+        {
             currentIndex = 0;
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] != null && list[i].interactable) { currentIndex = i; break; }
+            }
+        }
 
         SelectCurrentButton();
     }

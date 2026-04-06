@@ -1260,6 +1260,23 @@ public class AIPlayerController : MonoBehaviour
         yield return new WaitForSeconds(delay);
 
         List<int> unitInstanceIds = CollectFriendlyUnitIds(snapshot);
+        // Ordena por initiative (Priority→Low), desempate por HP decrescente (mais saudável age primeiro).
+        unitInstanceIds.Sort((a, b) =>
+        {
+            UnitManager ua = FindUnitById(a);
+            UnitManager ub = FindUnitById(b);
+            AIInitiative ia = AIInitiative.Medium;
+            AIInitiative ib = AIInitiative.Medium;
+            if (ua != null && ua.TryGetUnitData(out UnitData dataA) && dataA?.aiUnitProfile != null)
+                ia = dataA.aiUnitProfile.initiative;
+            if (ub != null && ub.TryGetUnitData(out UnitData dataB) && dataB?.aiUnitProfile != null)
+                ib = dataB.aiUnitProfile.initiative;
+            int cmp = ((int)ia).CompareTo((int)ib);
+            if (cmp != 0) return cmp;
+            int hpA = ua != null ? ua.CurrentHP : 0;
+            int hpB = ub != null ? ub.CurrentHP : 0;
+            return hpB.CompareTo(hpA); // decrescente: maior HP age primeiro
+        });
         for (int i = 0; i < unitInstanceIds.Count; i++)
         {
             yield return StartCoroutine(WaitIfPlayerMenuOpen());
@@ -2203,6 +2220,21 @@ public class AIPlayerController : MonoBehaviour
         bool planCohesionActive = false;
         Vector3Int planCohesionCell = unitCell;
         string planCohesionLabel = string.Empty;
+        bool captureRoleFilter = unitAssignment != null
+            && unitAssignment.Role == AIPlanRole.Capture
+            && unitAssignment.Intent != null
+            && unitAssignment.Intent.HasCaptureTarget;
+
+        // SectorEnemy pode ter ressuscitado assignedEnemy que AssignTargetForUnit zerou via captureInterruptBias.
+        // Reaplicar o mesmo gate aqui para garantir coerência.
+        if (captureRoleFilter && assignedEnemy != null && stanceBehavior.captureInterruptBias == CaptureInterruptBias.None)
+        {
+            Vector3Int enemyCell = assignedEnemy.CurrentCellPosition; enemyCell.z = 0;
+            Vector3Int objCell   = unitAssignment.Intent.CaptureTargetCell; objCell.z = 0;
+            if (enemyCell != objCell)
+                assignedEnemy = null;
+        }
+
         if (unitIntent != null && unitAssignment != null && unitAssignment.Role != AIPlanRole.Capture)
         {
             planCohesionActive = TryGetPlanCohesionObjective(unit, snapshot, unitIntent, unitAssignment, out planCohesionCell, out planCohesionLabel);
@@ -2210,6 +2242,7 @@ public class AIPlayerController : MonoBehaviour
 
 
         bool repairModeActive = ShouldKeepUnitInRepairMode(unit);
+        unit.SetAIMaintenanceActive(repairModeActive);
         bool mergeObjectiveActive = false;
         UnitManager mergeTargetUnit = null;
         string mergeObjectiveLabel = string.Empty;
@@ -2340,9 +2373,12 @@ public class AIPlayerController : MonoBehaviour
                 }
                 else if (sensor == AIUnitSensorKind.Attack)
                 {
+                    // Capturador com captureRoleFilter: nao faz fallback para FindClosestVisibleEnemy.
+                    // Se assignedEnemy foi descartado pelo captureInterruptBias em AssignTargetForUnit,
+                    // o sensor Attack deve falhar aqui tambem — a unidade segue para o proximo sensor (Reposition).
                     UnitManager candidate = assignedEnemy != null && !assignedEnemy.IsDead
                         ? assignedEnemy
-                        : FindClosestVisibleEnemy(unit, snapshot, restrictToDefenseRadius: false);
+                        : (captureRoleFilter ? null : FindClosestVisibleEnemy(unit, snapshot, restrictToDefenseRadius: false));
 
                     if (candidate != null && matchController != null && !IsEnemyVisibleForAiTeam(candidate, aiTeam))
                     {
@@ -2671,34 +2707,38 @@ public class AIPlayerController : MonoBehaviour
                     bestDest = unitCell;
                 }
                 else if (!captureActionNow && HasVisibleEnemyOnCell(snapshot, captureObjectiveCell)
-                    && assignedEnemy != null && !assignedEnemy.IsDead
-                    && unit.RemainingMovementPoints > 1
-                    && TryGetPreferredEngagementRangeForTarget(unit, assignedEnemy, out int capEngMinRange, out int capEngMaxRange))
+                    && unit.RemainingMovementPoints > 1)
                 {
-                    // Objetivo ocupado por inimigo: posiciona em celula DPQ adjacente e ataca.
-                    // Nao entra no predio enquanto ha combatente inimigo la.
-                    bool capEngFound = turnStateManager.TryGetBestReachableCellAtHexDistanceBand(
-                        snapshot.BoardTilemap,
-                        captureObjectiveCell,
-                        capEngMinRange,
-                        capEngMaxRange,
-                        occupiedByAllies,
-                        out bestDest,
-                        prioritizeDpq: true,
-                        unit: unit,
-                        preferMaxDistance: false,
-                        penalizedCells: penalizedMovementCells,
-                        preferredCells: preferredSupportCells);
-
-                    if (capEngFound)
+                    // Objetivo ocupado por inimigo visível: usa assignedEnemy se disponível,
+                    // O alvo é sempre o inimigo NA célula do objetivo (o bloqueador real).
+                    // assignedEnemy pode ser um inimigo próximo mas fora do prédio — não serve aqui.
+                    UnitManager capEngTarget = GetVisibleEnemyOnCell(snapshot, captureObjectiveCell);
+                    bool capEngFound = false;
+                    if (capEngTarget != null && TryGetPreferredEngagementRangeForTarget(unit, capEngTarget, out int capEngMinRange, out int capEngMaxRange))
                     {
-                        foundDestination = true;
-                        targetEnemy = assignedEnemy;
-                        engagingEnemy = true;
-                        if (aiLog)
-                            Debug.Log($"{T(aiTeam, 2)} [engage] {unit.name} objetivo ocupado por inimigo — posicionando em DPQ adjacente ({FormatCellLC(captureObjectiveCell)}).");
+                        // Posiciona em celula DPQ adjacente e ataca. Nao entra no predio enquanto ha combatente inimigo la.
+                        capEngFound = turnStateManager.TryGetBestReachableCellAtHexDistanceBand(
+                            snapshot.BoardTilemap,
+                            captureObjectiveCell,
+                            capEngMinRange,
+                            capEngMaxRange,
+                            occupiedByAllies,
+                            out bestDest,
+                            prioritizeDpq: true,
+                            unit: unit,
+                            preferMaxDistance: false,
+                            penalizedCells: penalizedMovementCells,
+                            preferredCells: preferredSupportCells);
+                        if (capEngFound)
+                        {
+                            foundDestination = true;
+                            targetEnemy = capEngTarget;
+                            engagingEnemy = true;
+                            if (aiLog)
+                                Debug.Log($"{T(aiTeam, 2)} [engage] {unit.name} objetivo ocupado por inimigo — posicionando em DPQ adjacente ({FormatCellLC(captureObjectiveCell)}).");
+                        }
                     }
-                    // Se nao encontrou celula DPQ, cai no march normal abaixo.
+                    // Se nao encontrou celula DPQ ou sem alvo valido, marcha normal em direcao ao objetivo.
                     if (!foundDestination)
                     {
                         foundDestination = turnStateManager.TryGetBestReachableCellTowardsHexDistance(
@@ -2713,7 +2753,7 @@ public class AIPlayerController : MonoBehaviour
                             preferredCells: preferredSupportCells);
                     }
                 }
-                else if (captureObjectiveIsEnemyTerritory && !HasVisibleEnemyOnCell(snapshot, captureObjectiveCell))
+                else if (captureObjectiveIsEnemyTerritory && !HasVisibleEnemyOnCell(snapshot, captureObjectiveCell) && !occupiedByAllies.Contains(captureObjectiveCell))
                 {
                     // FoW intel: objetivo e territorio inimigo mas sem visibilidade direta.
                     // Avanca o minimo necessario priorizando DPQ para revelar e cobrir o objetivo.
@@ -2997,7 +3037,8 @@ public class AIPlayerController : MonoBehaviour
         if (!supplyObjectiveActive && !repairModeActive && !mergeObjectiveActive && !captureObjectiveActive && bestDest == unitCell && intelCanFire && intelFireTarget != null && targetEnemy == null)
             targetEnemy = intelFireTarget;
 
-        if (!merged && !supplied && !transferred && !captured && captureObjectiveActive && stanceBehavior.engageNearestEnemies)
+        if (!merged && !supplied && !transferred && !captured && captureObjectiveActive && stanceBehavior.engageNearestEnemies
+            && stanceBehavior.captureInterruptBias != CaptureInterruptBias.None)
         {
             bool postMoveCanFire = turnStateManager.CanUnitFireAtAnyTargetFromCurrentPosition(unit, out UnitManager postMoveFireTarget);
             if (postMoveCanFire && postMoveFireTarget != null)
@@ -3026,8 +3067,9 @@ public class AIPlayerController : MonoBehaviour
                             Debug.Log($"{T(aiTeam, 2)} [intel] captura interrompida por alvo no caminho: {postMoveFireTarget.name} (score={captureSkirmishScore})");
                     }
                 }
-                // Fallback oportunista: qualquer alvo alcancavel apos mover (so com engageNearestEnemies).
-                if (!engagingEnemy)
+                // Fallback oportunista: qualquer alvo alcancavel apos mover.
+                // None ja foi filtrado acima. Passive nao dispara o fallback — so morde no caminho com score alto.
+                if (!engagingEnemy && stanceBehavior.captureInterruptBias != CaptureInterruptBias.Passive)
                 {
                     targetEnemy = postMoveFireTarget;
                     engagingEnemy = true;
@@ -3089,6 +3131,7 @@ public class AIPlayerController : MonoBehaviour
         if (!attacked && !merged && !supplied && !transferred && !captured
             && !supplyObjectiveActive && !mergeObjectiveActive
             && (!repairModeActive || repairDislodgeActive || canFireWhileRepairing)
+            && engagingEnemy
             && intelCanFire && intelFireTarget != null
             && turnStateManager.HasAutomatedAttackAvailable())
         {
@@ -3402,21 +3445,40 @@ public class AIPlayerController : MonoBehaviour
         }
 
         // Capturador: aplica captureInterruptBias ao score do vencedor pre-movimento.
-        // Mesmo filtro do "morde no caminho" pos-movimento — garante coerencia entre as duas fases.
+        // Exceção: inimigo no próprio prédio objetivo sempre é mantido — está bloqueando a captura.
+        // None desabilita completamente (nunca engaja por iniciativa propria).
         if (best != null && captureRoleFilter)
         {
-            int minPreMoveBias = stanceBehaviorAssign.captureInterruptBias switch
+            Vector3Int bestCell = best.CurrentCellPosition;
+            bestCell.z = 0;
+            Vector3Int filterCell = captureFilterTarget;
+            filterCell.z = 0;
+            bool isBlockingObjective = bestCell == filterCell;
+
+            if (!isBlockingObjective)
             {
-                CaptureInterruptBias.Aggressive => 22000,
-                CaptureInterruptBias.Normal     => 28000,
-                CaptureInterruptBias.Passive    => 38000,
-                _                               => 28000
-            };
-            if (bestScore < minPreMoveBias)
-            {
-                if (aiLog)
-                    Debug.Log($"{T(snapshot.AiTeam, 2)} [score] {unit.name} -> {best.name} | descartado: captureInterruptBias ({stanceBehaviorAssign.captureInterruptBias}, min={minPreMoveBias}) > score={bestScore}");
-                best = null;
+                if (stanceBehaviorAssign.captureInterruptBias == CaptureInterruptBias.None)
+                {
+                    if (aiLog)
+                        Debug.Log($"{T(snapshot.AiTeam, 2)} [score] {unit.name} -> {best.name} | descartado: captureInterruptBias=None");
+                    best = null;
+                }
+                else
+                {
+                    int minPreMoveBias = stanceBehaviorAssign.captureInterruptBias switch
+                    {
+                        CaptureInterruptBias.Aggressive => 22000,
+                        CaptureInterruptBias.Normal     => 28000,
+                        CaptureInterruptBias.Passive    => 38000,
+                        _                               => 28000
+                    };
+                    if (bestScore < minPreMoveBias)
+                    {
+                        if (aiLog)
+                            Debug.Log($"{T(snapshot.AiTeam, 2)} [score] {unit.name} -> {best.name} | descartado: captureInterruptBias ({stanceBehaviorAssign.captureInterruptBias}, min={minPreMoveBias}) > score={bestScore}");
+                        best = null;
+                    }
+                }
             }
         }
 
@@ -4774,6 +4836,21 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         return false;
     }
 
+    private static UnitManager GetVisibleEnemyOnCell(AISnapshot snapshot, Vector3Int cell)
+    {
+        if (snapshot?.VisibleEnemies == null) return null;
+        cell.z = 0;
+        for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
+        {
+            UnitManager e = snapshot.VisibleEnemies[i];
+            if (e == null || e.IsDead) continue;
+            Vector3Int ec = e.CurrentCellPosition;
+            ec.z = 0;
+            if (ec == cell) return e;
+        }
+        return null;
+    }
+
     private static bool IsEnemyInCaptureLane(
         Tilemap board,
         Vector3Int unitCell,
@@ -5191,7 +5268,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         if (unit == null || snapshot == null || snapshot.KnownConstructions == null || snapshot.KnownConstructions.Count == 0)
             return false;
 
-        // Se o planner designou uma c?lula espec?fica, verifica se ainda ? v?lida/captur?vel e retorna ela.
+        // Se o planner designou uma célula específica, verifica se ainda é válida/capturável e retorna ela.
         if (plannedObjective.HasValue)
         {
             Vector3Int planned = plannedObjective.Value;
@@ -5203,14 +5280,15 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
                 Vector3Int cell = info.Cell;
                 cell.z = 0;
                 if (cell != planned) continue;
-                if (!info.IsCapturable || info.CapturePointsMax <= 0) break; // c?lula n?o captur?vel
-                if (info.TeamId == unit.TeamId && info.CapturePoints >= info.CapturePointsMax) break; // j? nossa
+                if (!info.IsCapturable || info.CapturePointsMax <= 0) break; // célula não capturável
+                if (info.TeamId == unit.TeamId && info.CapturePoints >= info.CapturePointsMax) break; // já nossa
                 targetConstruction = info.Source;
                 targetCell = cell;
                 targetLabel = !string.IsNullOrWhiteSpace(info.DisplayName) ? info.DisplayName : info.Source.name;
+                targetIsEnemyTerritory = info.TeamId != unit.TeamId;
                 return true;
             }
-            // Objetivo planejado inv?lido ? cai para sele??o normal
+            // Objetivo planejado inválido — cai para seleção normal.
         }
 
         Vector3Int unitCell = unit.CurrentCellPosition;
