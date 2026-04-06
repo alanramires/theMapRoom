@@ -3,6 +3,7 @@ using UnityEngine;
 // Perfil de IA iniciante (IA Burra).
 // Avalia a postura lendo do BattleStanceDatabase: Invasion -> Defend -> Attack (fallback).
 // Sem memoria entre partidas.
+[CreateAssetMenu(menuName = "Game/AI/Behavior Profile/Beginner", fileName = "BehaviorProfile_Beginner")]
 public class BeginnerAIProfile : AIProfile
 {
     public override AIStance EvaluateStance(AISnapshot snapshot, BattleStanceDatabase stanceDatabase)
@@ -32,7 +33,7 @@ public class BeginnerAIProfile : AIProfile
         if (snapshot.HasHq && snapshot.BoardTilemap != null
             && (defend == null || defend.activationType == PlanConditionType.EnemyUnitsNearHQ))
         {
-            int defendRadius = defend != null ? defend.hqEngagementRadius : snapshot.HqDefendRadius;
+            int defendRadius = snapshot.HqDefendRadius;
 
             if (defendRadius > 0)
             {

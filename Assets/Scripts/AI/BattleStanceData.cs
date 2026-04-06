@@ -18,6 +18,9 @@ public class BattleStanceData : ScriptableObject
     [Tooltip("Nome legivel exibido no debug e UI.")]
     public string displayName;
 
+    [Tooltip("Enum AIStance correspondente a esta postura. Usado pelo sistema de comportamento por unidade.")]
+    public AIStance stanceType;
+
     [Header("Battle Stance Activation")]
     [Tooltip("Tipo da condicao que ativa esta postura.")]
     public PlanConditionType activationType = PlanConditionType.AlwaysActive;
@@ -26,16 +29,4 @@ public class BattleStanceData : ScriptableObject
     [Range(0f, 100f)]
     public float threshold = 50f;
 
-    [Header("Stance Behavior")]
-    [Tooltip("Suspende objetivo de captura enquanto esta postura estiver ativa. Unidades capturadoras defendem ao inves de avancar.")]
-    public bool suspendCaptureObjective = false;
-
-    [Tooltip("Suspende coesao de escolta enquanto esta postura estiver ativa. Escoltas agem de forma independente.")]
-    public bool suspendEscortCohesion = false;
-
-    [Tooltip("Raio de engajamento a partir do HQ proprio (hexes). Ativa o modo de defesa quando inimigo entra neste raio. Unidades ignoram inimigos alem dele. 0 = sem limite.")]
-    public int hqEngagementRadius = 0;
-
-    [Tooltip("Raio a partir do HQ (hexes) dentro do qual unidades sao convocadas como reforco de defesa. Deve ser >= hqEngagementRadius. 0 = desativado.")]
-    public int defenderPullRadius = 0;
 }

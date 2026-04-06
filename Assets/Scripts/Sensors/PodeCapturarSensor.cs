@@ -67,7 +67,7 @@ public static class PodeCapturarSensor
         }
 
         AIUnitProfile profile = unitData.aiUnitProfile;
-        if (profile == null || !profile.allowCapture)
+        if (profile == null || !profile.HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Capture))
         {
             reason = "Perfil da unidade nao permite captura.";
             return false;

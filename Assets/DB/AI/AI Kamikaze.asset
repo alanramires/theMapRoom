@@ -12,21 +12,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b727c8034f5128b4d927a31ba2d46d01, type: 3}
   m_Name: AI Kamikaze
   m_EditorClassIdentifier: Assembly-CSharp::AIUnitProfile
-  sensorPriority: 0100000003000000
-  allowCapture: 0
-  allowAttack: 1
-  allowSupply: 0
-  allowReposition: 1
-  canEscort: 0
-  preferDefendMode: 0
-  minDamageDealtPercent: 0
-  maxDamageReceivedPercent: 0
-  mustSurvive: 0
-  targetPreference: 1
+  stanceBehaviors:
+  - stances:
+    - {fileID: 11400000, guid: ea4d7397fefaf7d42808828df00f7c13, type: 2}
+    - {fileID: 11400000, guid: 8aa944392dd85d647ad4fa5881054aed, type: 2}
+    - {fileID: 11400000, guid: 9de29821cf7219c488585cc51bfd220d, type: 2}
+    sensorPriority: 0100000003000000
+    minDamageDealtPercent: 0
+    maxDamageReceivedPercent: 0
+    mustSurvive: 0
+    targetPreference: 1
+    canEscort: 0
+    prioritizeDpqAtBattle: 1
+    prioritizeDpqDuringTravel: 0
+    retreatToHqWhenIdle: 0
+    playConservative: 0
+    engageNearestEnemies: 0
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
-  hpRepairThreshold: 0
-  hpRepairExitThreshold: 1
+  hpRepairThreshold: 1
+  hpRepairExitThreshold: 2
+  repairAutonomyThresholdPercent: 10
+  repairWhenAnyWeaponOutOfAmmo: 1
+  restockFuelThresholdPercent: 0
+  restockAmmoThresholdPercent: 0
+  restockPartsThresholdPercent: 0
   supplyAllyFuelThresholdPercent: 25
   supplyAllyAmmoThresholdPercent: 0
   supplyAllyHpThresholdPercent: 50

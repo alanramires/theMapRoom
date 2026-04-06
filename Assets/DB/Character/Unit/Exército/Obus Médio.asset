@@ -34,7 +34,7 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 2
   combatClassification: 1
-  aiUnitProfile: {fileID: 11400000, guid: ac91d7b2d6b1747438b7f2210c28d5b2, type: 2}
+  aiUnitProfile: {fileID: 11400000, guid: 3c876cae5eb72c74bb785e3b493f09ba, type: 2}
   aiTargetPreferenceByClass:
   - targetClass: 3
     priority: 2

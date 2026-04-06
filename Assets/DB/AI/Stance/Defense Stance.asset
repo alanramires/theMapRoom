@@ -12,11 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7b1626acbac60dc40983b2821d2cf49d, type: 3}
   m_Name: Defense Stance
   m_EditorClassIdentifier: Assembly-CSharp::BattleStanceData
+  stanceIcon: {fileID: 21300000, guid: edca29f8527a21f4fbb6013cdfe87b4b, type: 3}
   battleId: defense
   displayName: Defense Stance
+  stanceType: 1
   activationType: 6
   threshold: 0
   suspendCaptureObjective: 1
   suspendEscortCohesion: 1
-  hqEngagementRadius: 6
-  defenderPullRadius: 8
+  hqEngagementRadius: 4
+  defenderPullRadius: 6

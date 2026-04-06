@@ -12,8 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7b1626acbac60dc40983b2821d2cf49d, type: 3}
   m_Name: Invasion Stance
   m_EditorClassIdentifier: Assembly-CSharp::BattleStanceData
+  stanceIcon: {fileID: 21300000, guid: 0112cadeb70eff24c999775fe57a5125, type: 3}
   battleId: invasion
   displayName: Invasion Stance
+  stanceType: 2
   activationType: 5
   threshold: 50
   suspendCaptureObjective: 0

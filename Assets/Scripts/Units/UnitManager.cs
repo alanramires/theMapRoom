@@ -2643,27 +2643,13 @@ public class UnitManager : MonoBehaviour
         if (unitHud == null)
             return;
 
-        if (aiHasStance && aiStanceVisible)
-        {
-            string stanceLabel = aiStance == AIStance.Defend   ? "DEF"
-                               : aiStance == AIStance.Invasion ? "INV"
-                               :                                 "ATK";
+        // Stance icon is independent of the plan badge.
+        unitHud.SetStanceIcon(aiHasStance && aiStanceVisible ? aiStanceIcon : null);
 
-            bool hasPlan = aiHasAssignedPlan && aiAssignedPlanBadgeVisible
-                && !string.IsNullOrWhiteSpace(aiAssignedPlanBadge);
-
-            string text = hasPlan ? $"{stanceLabel}/{aiAssignedPlanBadge}" : stanceLabel;
-            unitHud.SetPlanDebugBadge(true, text);
-            unitHud.SetStanceIcon(aiStanceIcon);
-            return;
-        }
-
-        unitHud.SetStanceIcon(null);
-
-        bool shouldShow = aiHasAssignedPlan
-            && aiAssignedPlanBadgeVisible
+        // Plan badge: only show when a plan is actually assigned.
+        bool hasPlan = aiHasAssignedPlan && aiAssignedPlanBadgeVisible
             && !string.IsNullOrWhiteSpace(aiAssignedPlanBadge);
-        unitHud.SetPlanDebugBadge(shouldShow, shouldShow ? aiAssignedPlanBadge : string.Empty);
+        unitHud.SetPlanDebugBadge(hasPlan, hasPlan ? aiAssignedPlanBadge : string.Empty);
     }
 
     private void HandleActiveTeamChanged(int newTeamId)

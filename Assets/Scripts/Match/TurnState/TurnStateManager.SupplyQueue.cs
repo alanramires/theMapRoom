@@ -536,6 +536,9 @@ public partial class TurnStateManager
                     startFuel = desiredFuel;
                 }
 
+                if (ammoStep > 0)
+                    RefreshUnitHudImmediate(target);
+
                 RecordSupplyReplayCommand(
                     supplier,
                     sourceConstruction: null,

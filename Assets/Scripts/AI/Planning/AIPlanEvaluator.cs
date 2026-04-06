@@ -541,7 +541,6 @@ public static class AIPlanEvaluator
 
         var intent = new AIPlanIntent
         {
-            Plan = null,
             Sector = sector,
             DisplayName = $"Captura {sector}",
             BadgeSymbol = badge,
@@ -976,16 +975,16 @@ public static class AIPlanEvaluator
         switch (role)
         {
             case AIPlanRole.Capture:
-                return profile.allowCapture;
+                return profile.HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Capture);
 
             case AIPlanRole.Escort:
             case AIPlanRole.Artillery:
             case AIPlanRole.Support:
-                return profile.canEscort;
+                return profile.GetStanceBehavior(AIStance.Attack).canEscort;
 
             case AIPlanRole.Assault:
             default:
-                return profile.allowAttack;
+                return profile.HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Attack);
         }
     }
 
@@ -1010,7 +1009,7 @@ public static class AIPlanEvaluator
                 continue;
 
             unit.TryGetUnitData(out UnitData unitData);
-            if (unitData == null || unitData.aiUnitProfile == null || !unitData.aiUnitProfile.canEscort)
+            if (unitData == null || unitData.aiUnitProfile == null || !unitData.aiUnitProfile.GetStanceBehavior(AIStance.Attack).canEscort)
                 continue;
 
             Vector3Int uc = unit.CurrentCellPosition;

@@ -18,51 +18,62 @@ MonoBehaviour:
     saveForNextRound: 1
     allowFallbackWhenSaving: 0
     allowFallbackWhenSavingButOnce: 1
-    buyFallbackWhenSavingOnDefenseMode: 1
+    buyFallbackWhenSavingOnDefenseMode: 0
     fallbackUnits:
     - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
     groups:
-    - label: Infantaria
-      targetPercentage: 40
-      priority: 1
-      specificUnits:
-      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
     - label: Basic Tank
-      targetPercentage: 20
-      priority: 2
+      targetPercentage: 10
+      priority: 1
       specificUnits:
       - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
     - label: Basic Artillery
       targetPercentage: 10
-      priority: 3
+      priority: 2
       specificUnits:
       - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
       - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-    - label: "Ve\xEDculos"
+    - label: Elite Tank
       targetPercentage: 10
       priority: 3
       specificUnits:
-      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-    - label: Elite Tank
-      targetPercentage: 5
-      priority: 4
-      specificUnits:
       - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - label: Elite Artillery
-      targetPercentage: 5
-      priority: 5
-      specificUnits:
-      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
-    - label: Suprimentos
       targetPercentage: 10
       priority: 6
       specificUnits:
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+    - label: Basic Tank
+      targetPercentage: 10
+      priority: 4
+      specificUnits:
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - label: Basic Artillery
+      targetPercentage: 10
+      priority: 5
+      specificUnits:
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+    - label: Basic Vehicle
+      targetPercentage: 10
+      priority: 7
+      specificUnits:
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+    - label: Suprimentos
+      targetPercentage: 10
+      priority: 8
+      specificUnits:
       - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+    - label: Elite Tank
+      targetPercentage: 20
+      priority: 9
+      specificUnits:
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
   defenseMode:
     label: Defesa
-    saveForNextRound: 1
+    saveForNextRound: 0
     allowFallbackWhenSaving: 1
-    allowFallbackWhenSavingButOnce: 1
+    allowFallbackWhenSavingButOnce: 0
     buyFallbackWhenSavingOnDefenseMode: 1
     fallbackUnits:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
@@ -75,19 +86,24 @@ MonoBehaviour:
       - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
       - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
       - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-    - label: Tanques
-      targetPercentage: 30
+    - label: Bazooka
+      targetPercentage: 5
       priority: 2
+      specificUnits:
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+    - label: Tanques
+      targetPercentage: 35
+      priority: 3
       specificUnits:
       - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
       - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-    - label: Suprimentos
-      targetPercentage: 10
-      priority: 3
-      specificUnits:
-      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
     - label: "Ve\xEDculos"
-      targetPercentage: 20
+      targetPercentage: 10
       priority: 4
       specificUnits:
       - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+    - label: Suprimentos
+      targetPercentage: 10
+      priority: 5
+      specificUnits:
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}

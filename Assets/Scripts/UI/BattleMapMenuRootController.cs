@@ -274,8 +274,25 @@ public class BattleMapMenuRootController : MonoBehaviour
         hasLastUndockedScreenRect = false;
         cursorNearUndockedDockRegion = false;
         CaptureAndDisableEventSystemNavigation();
+        RefreshButtonInteractability();
         SetPanel(MenuPanel.Menu, resetIndex: true);
         PanelDialogController.ClearExternalText();
+    }
+
+    private void RefreshButtonInteractability()
+    {
+        bool isAiTurn = matchController != null && matchController.IsPlayerInputLockedByActiveAI();
+        SetButtonInteractable(btnStatus,   !isAiTurn);
+        SetButtonInteractable(btnComando,  !isAiTurn);
+        SetButtonInteractable(btnRodada,   !isAiTurn);
+        SetButtonInteractable(btnDestruir, !isAiTurn);
+        SetButtonInteractable(btnRender,   !isAiTurn);
+    }
+
+    private static void SetButtonInteractable(Button button, bool interactable)
+    {
+        if (button != null)
+            button.interactable = interactable;
     }
 
     private void CloseMenu(bool restoreCursor)

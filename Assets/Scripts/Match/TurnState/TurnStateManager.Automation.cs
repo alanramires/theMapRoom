@@ -99,7 +99,7 @@ public partial class TurnStateManager
         return TryExecuteAutomatedAttackBestTarget(null, null);
     }
 
-    public bool TryExecuteAutomatedAttackBestTarget(UnitManager preferredTarget = null, AIUnitProfile attackerProfile = null)
+    public bool TryExecuteAutomatedAttackBestTarget(UnitManager preferredTarget = null, AIUnitStanceBehavior attackerProfile = null)
     {
         if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
             return false;
@@ -219,7 +219,7 @@ public partial class TurnStateManager
         UnitManager attacker,
         UnitManager target,
         int distance,
-        AIUnitProfile attackerProfile,
+        AIUnitStanceBehavior attackerProfile,
         out int score)
     {
         score = int.MinValue;
@@ -231,9 +231,6 @@ public partial class TurnStateManager
             return false;
         if (rpsDatabase == null || dpqMatchupDatabase == null || weaponPriorityData == null)
             return false;
-
-        if (attackerProfile == null)
-            attackerProfile = attackerData.aiUnitProfile;
 
         AICombatHpSimulator.AICombatHpResult sim = AICombatHpSimulator.Simulate(
             attackerData,

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BattleStanceData
   battleId: attack
   displayName: Attack Stance
+  stanceType: 0
   activationType: 0
   threshold: 0
   suspendCaptureObjective: 0

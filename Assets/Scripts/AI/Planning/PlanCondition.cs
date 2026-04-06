@@ -10,7 +10,7 @@ public enum PlanConditionType
     FriendlyStrengthBelowPercent = 4,
     /// <summary>Verdadeiro quando a IA controla mais de X% de todas as construcoes capturaveis no mapa.</summary>
     TotalConstructionsControlledAbovePercent = 5,
-    /// <summary>Verdadeiro quando ha inimigo visivel dentro do raio hqEngagementRadius do HQ proprio.</summary>
+    /// <summary>Verdadeiro quando ha inimigo visivel dentro do raio de defesa do HQ proprio.</summary>
     EnemyUnitsNearHQ = 6,
 }
 

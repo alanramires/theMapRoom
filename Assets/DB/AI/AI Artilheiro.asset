@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b727c8034f5128b4d927a31ba2d46d01, type: 3}
-  m_Name: AI Lutador
+  m_Name: AI Artilheiro
   m_EditorClassIdentifier: Assembly-CSharp::AIUnitProfile
   stanceBehaviors:
   - stances:
@@ -25,7 +25,7 @@ MonoBehaviour:
     prioritizeDpqAtBattle: 1
     prioritizeDpqDuringTravel: 0
     retreatToHqWhenIdle: 0
-    playConservative: 0
+    playConservative: 1
     engageNearestEnemies: 1
   - stances:
     - {fileID: 11400000, guid: 9de29821cf7219c488585cc51bfd220d, type: 2}
@@ -38,7 +38,7 @@ MonoBehaviour:
     prioritizeDpqAtBattle: 1
     prioritizeDpqDuringTravel: 0
     retreatToHqWhenIdle: 0
-    playConservative: 0
+    playConservative: 1
     engageNearestEnemies: 1
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
