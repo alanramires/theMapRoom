@@ -10,46 +10,44 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b727c8034f5128b4d927a31ba2d46d01, type: 3}
-  m_Name: AI Bazooka
+  m_Name: AI Hibrido
   m_EditorClassIdentifier: Assembly-CSharp::AIUnitProfile
   stanceBehaviors:
   - stances:
     - {fileID: 11400000, guid: ea4d7397fefaf7d42808828df00f7c13, type: 2}
     - {fileID: 11400000, guid: 8aa944392dd85d647ad4fa5881054aed, type: 2}
-    sensorPriority: 010000000000000003000000
-    minDamageDealtPercent: 0
-    maxDamageReceivedPercent: 0
+    sensorPriority: 0100000003000000
+    minDamageDealtPercent: 10
+    maxDamageReceivedPercent: 50
     mustSurvive: 1
-    targetPreference: 1
-    canEscort: 0
+    targetPreference: 0
+    canEscort: 1
     prioritizeDpqAtBattle: 1
-    prioritizeDpqDuringTravel: 1
+    prioritizeDpqDuringTravel: 0
     retreatToHqWhenIdle: 0
     playConservative: 0
     engageNearestEnemies: 1
     requireSightlineBeforeEngaging: 0
-    holdPositionWhenInRange: 0
-    repositionToFireRange: 0
+    holdPositionWhenInRange: 1
+    repositionToFireRange: 1
     preferMaxEngagementRange: 0
-    captureInterruptBias: 2
   - stances:
     - {fileID: 11400000, guid: 9de29821cf7219c488585cc51bfd220d, type: 2}
-    sensorPriority: 010000000000000003000000
-    minDamageDealtPercent: 0
-    maxDamageReceivedPercent: 0
+    sensorPriority: 0100000003000000
+    minDamageDealtPercent: 10
+    maxDamageReceivedPercent: 20
     mustSurvive: 0
-    targetPreference: 1
+    targetPreference: 0
     canEscort: 0
     prioritizeDpqAtBattle: 1
-    prioritizeDpqDuringTravel: 1
+    prioritizeDpqDuringTravel: 0
     retreatToHqWhenIdle: 0
     playConservative: 0
     engageNearestEnemies: 1
     requireSightlineBeforeEngaging: 0
-    holdPositionWhenInRange: 0
-    repositionToFireRange: 0
+    holdPositionWhenInRange: 1
+    repositionToFireRange: 1
     preferMaxEngagementRange: 0
-    captureInterruptBias: 2
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
   hpRepairThreshold: 3

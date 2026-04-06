@@ -18,15 +18,20 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 8aa944392dd85d647ad4fa5881054aed, type: 2}
     sensorPriority: 0100000003000000
     minDamageDealtPercent: 10
-    maxDamageReceivedPercent: 50
-    mustSurvive: 1
+    maxDamageReceivedPercent: 20
+    mustSurvive: 0
     targetPreference: 0
-    canEscort: 1
+    canEscort: 0
     prioritizeDpqAtBattle: 1
-    prioritizeDpqDuringTravel: 0
+    prioritizeDpqDuringTravel: 1
     retreatToHqWhenIdle: 0
-    playConservative: 1
+    playConservative: 0
     engageNearestEnemies: 1
+    holdGroundWhenIdle: 0
+    requireSightlineBeforeEngaging: 1
+    holdPositionWhenInRange: 1
+    repositionToFireRange: 1
+    preferMaxEngagementRange: 0
   - stances:
     - {fileID: 11400000, guid: 9de29821cf7219c488585cc51bfd220d, type: 2}
     sensorPriority: 0100000003000000
@@ -36,10 +41,15 @@ MonoBehaviour:
     targetPreference: 0
     canEscort: 0
     prioritizeDpqAtBattle: 1
-    prioritizeDpqDuringTravel: 0
+    prioritizeDpqDuringTravel: 1
     retreatToHqWhenIdle: 0
-    playConservative: 1
+    playConservative: 0
     engageNearestEnemies: 1
+    holdGroundWhenIdle: 1
+    requireSightlineBeforeEngaging: 1
+    holdPositionWhenInRange: 1
+    repositionToFireRange: 1
+    preferMaxEngagementRange: 0
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
   hpRepairThreshold: 3

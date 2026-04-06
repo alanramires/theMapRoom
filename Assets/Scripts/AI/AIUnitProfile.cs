@@ -30,12 +30,26 @@ public class AIUnitStanceBehavior
     public bool prioritizeDpqAtBattle;
     [Tooltip("Prioriza celulas DPQ mesmo durante a viagem (sem inimigo engajado).")]
     public bool prioritizeDpqDuringTravel;
-    [Tooltip("Sem objetivo ativo, a unidade recua ao proprio HQ. Tem prioridade sobre coesao de plano.")]
+    [Tooltip("Volta porra! — Sem sensor ativo nem inimigo para engajar, a unidade abandona a coesao do plano e marcha de volta ao HQ aliado. Ideal para tropas de elite que defendem a base e nao devem vagar pelo mapa ociosamente.")]
     public bool retreatToHqWhenIdle;
     [Tooltip("Joga de forma conservadora: move em celulas seguras, patrulha territorio aliado e prioriza sobrevivencia sobre kill no scoring de combate.")]
     public bool playConservative;
     [Tooltip("Ataca qualquer inimigo visivel sem restringir ao contexto do plano de escolta.")]
     public bool engageNearestEnemies;
+    [Tooltip("Define o limiar de score para interromper captura e atacar inimigos de passagem. Passive=38000 (raramente abandona), Normal=28000, Aggressive=22000 (interrompe com facilidade).")]
+    public CaptureInterruptBias captureInterruptBias = CaptureInterruptBias.Normal;
+    [Tooltip("Sem objetivo ativo, ancora na posicao atual em vez de avancar. Com prioritizeDpqDuringTravel, gravita para a melhor celula DPQ proxima (ex: predio) e fica la. Ideal para defesa posicional sem recuar ao HQ.")]
+    public bool holdGroundWhenIdle;
+
+    [Header("Combat Style")]
+    [Tooltip("Exige linha de tiro da posicao atual para considerar um alvo valido. Descarta o alvo se nao puder atirar parado. Tipico de artilharia indireta.")]
+    public bool requireSightlineBeforeEngaging;
+    [Tooltip("Quando ja esta em alcance de tiro, para de mover e atira da posicao atual. Combatentes continuam avancando.")]
+    public bool holdPositionWhenInRange;
+    [Tooltip("Sem alvo alcancavel agora, reposiciona-se ate entrar em alcance de tiro em vez de avançar ate o inimigo. Tipico de artilharia indireta.")]
+    public bool repositionToFireRange;
+    [Tooltip("Ao reposicionar durante o engajamento, prefere a distancia maxima de tiro em vez da minima. Tipico de artilharia indireta.")]
+    public bool preferMaxEngagementRange;
 
     public bool PassesAttackThresholds(float dealtPercent, float receivedPercent, bool survives)
     {

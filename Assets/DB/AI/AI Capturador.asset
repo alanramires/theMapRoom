@@ -27,6 +27,7 @@ MonoBehaviour:
     retreatToHqWhenIdle: 0
     playConservative: 0
     engageNearestEnemies: 0
+    captureInterruptBias: 0
   - stances:
     - {fileID: 11400000, guid: 9de29821cf7219c488585cc51bfd220d, type: 2}
     sensorPriority: 000000000100000003000000
@@ -39,7 +40,8 @@ MonoBehaviour:
     prioritizeDpqDuringTravel: 1
     retreatToHqWhenIdle: 1
     playConservative: 0
-    engageNearestEnemies: 1
+    engageNearestEnemies: 0
+    captureInterruptBias: 0
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
   hpRepairThreshold: 3

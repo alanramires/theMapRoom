@@ -2170,15 +2170,11 @@ public class AIPlayerController : MonoBehaviour
             : new AIUnitStanceBehavior();
         bool defendMode = stanceBehavior.playConservative;
         UnitCombatClassification combatClassification = unit != null ? unit.CombatClassification : UnitCombatClassification.Civil;
-        // Attack-first: threshold menor para abandonar captura por ataque ("morder no caminho").
-        // Usa a sensorPriority efetiva da stance para detectar se ataque vem primeiro.
-        IReadOnlyList<AIUnitSensorKind> effectiveSensorPriority = stanceBehavior.sensorPriority;
-        bool bazookaSkirmisherUnit = effectiveSensorPriority != null
-            && effectiveSensorPriority.Count > 0 && effectiveSensorPriority[0] == AIUnitSensorKind.Attack;
         bool captureObjectiveActive = false;
         bool captureActionNow = false;
         Vector3Int captureObjectiveCell = unitCell;
         string captureObjectiveLabel = string.Empty;
+        bool captureObjectiveIsEnemyTerritory = false;
         // Le o papel planejado para esta unidade neste turno (pode ser null)
         snapshot.UnitRoles.TryGetValue(unit.InstanceId, out AIPlanIntent unitIntent);
         snapshot.UnitPlanAssignments.TryGetValue(unit.InstanceId, out AIPlanAssignment unitAssignment);
@@ -2236,15 +2232,16 @@ public class AIPlayerController : MonoBehaviour
         bool foundDestination = false;
         Vector3Int bestDest = unitCell;
         HashSet<Vector3Int> occupiedByAllies = BuildAllyCellSet(snapshot, unit);
-        bool supportSafetyMode = combatClassification == UnitCombatClassification.Artilheiro
-            || combatClassification == UnitCombatClassification.Hibrido
-            || combatClassification == UnitCombatClassification.Civil
+        bool supportSafetyMode = stanceBehavior.requireSightlineBeforeEngaging
+            || stanceBehavior.holdPositionWhenInRange
+            || stanceBehavior.repositionToFireRange
+            || stanceBehavior.holdGroundWhenIdle
             || defendMode;
         HashSet<Vector3Int> preferredSupportCells = supportSafetyMode
-            ? BuildFriendlySupportPreferenceCells(snapshot, unit, supportOnlyCombatAnchors: combatClassification != UnitCombatClassification.Civil)
+            ? BuildFriendlySupportPreferenceCells(snapshot, unit, supportOnlyCombatAnchors: !isSupplierUnit)
             : null;
         HashSet<Vector3Int> dangerPenaltyCells = supportSafetyMode
-            ? BuildEnemyDangerCells(snapshot, combatClassification == UnitCombatClassification.Civil ? 2 : 1)
+            ? BuildEnemyDangerCells(snapshot, isSupplierUnit ? 2 : 1)
             : null;
 
         // Refill forcado: sem estoque ou autonomia propria baixa, precisa reabastecer antes de qualquer acao (analogo ao repairMode).
@@ -2311,7 +2308,7 @@ public class AIPlayerController : MonoBehaviour
             // Itera sensorPriority e executa o primeiro sensor cujas condicoes sao atendidas.
             // Supply e Repair sao pre-filtros de papel — nao entram no loop.
             // Usa a lista da stance atual quando disponivel; fallback para a lista global do perfil.
-            IReadOnlyList<AIUnitSensorKind> priority = effectiveSensorPriority;
+            IReadOnlyList<AIUnitSensorKind> priority = stanceBehavior.sensorPriority;
             int priorityCount = priority != null ? priority.Count : 0;
 
             for (int s = 0; s < priorityCount; s++)
@@ -2333,7 +2330,7 @@ public class AIPlayerController : MonoBehaviour
                         captureObjectiveLabel = captureNowConstruction.ConstructionDisplayName;
                         break;
                     }
-                    if (TryGetBestCaptureObjectiveForInfantry(unit, snapshot, out _, out captureObjectiveCell, out captureObjectiveLabel, plannedCaptureCell, plannedCaptureSector))
+                    if (TryGetBestCaptureObjectiveForInfantry(unit, snapshot, out _, out captureObjectiveCell, out captureObjectiveLabel, out captureObjectiveIsEnemyTerritory, plannedCaptureCell, plannedCaptureSector))
                     {
                         captureObjectiveActive = true;
                         captureUsedPlanner = plannedCaptureCell.HasValue && captureObjectiveCell == plannedCaptureCell.Value;
@@ -2341,7 +2338,7 @@ public class AIPlayerController : MonoBehaviour
                     }
                     // Sensor Capture falhou (sem alvo alcancavel) ? tenta proximo.
                 }
-                else if (sensor == AIUnitSensorKind.Attack && turnStateManager.HasAutomatedAttackAvailable())
+                else if (sensor == AIUnitSensorKind.Attack)
                 {
                     UnitManager candidate = assignedEnemy != null && !assignedEnemy.IsDead
                         ? assignedEnemy
@@ -2354,25 +2351,25 @@ public class AIPlayerController : MonoBehaviour
                         candidate = FindClosestVisibleEnemy(unit, snapshot, restrictToDefenseRadius: false);
                     }
 
-                    if (combatClassification == UnitCombatClassification.Artilheiro)
+                    if (stanceBehavior.requireSightlineBeforeEngaging)
                     {
                         if (candidate == null || !CanUnitFireAtTargetFromCurrentPosition(unit, candidate))
                         {
-                            if (candidate != null)
+                            if (candidate != null && stanceBehavior.repositionToFireRange)
                                 artilleryRepositionAnchorEnemy = candidate;
 
                             if (aiLog)
                             {
                                 string anchorLabel = candidate != null ? candidate.name : "sem ancora";
-                                Debug.Log($"{T(aiTeam, 2)} [intel] {unit.name} eh artilheiro e nao tem tiro parado valido; Attack falhou e vai para o proximo sensor. ancora={anchorLabel}");
+                                Debug.Log($"{T(aiTeam, 2)} [intel] {unit.name} exige linha de tiro e nao tem tiro parado valido; Attack falhou e vai para o proximo sensor. ancora={anchorLabel}");
                             }
                             candidate = null;
                         }
                     }
-                    else if (combatClassification == UnitCombatClassification.Hibrido && candidate != null)
+                    else if (stanceBehavior.repositionToFireRange && candidate != null)
                     {
-                        // Hibrido: marca ancora agora. Se ao final nao engajar (sem tiro parado e sem alcance),
-                        // o bloco de reposicionamento artilheiro usa este anchor para se aproximar do alvo.
+                        // Marca ancora agora. Se ao final nao engajar (sem tiro parado e sem alcance),
+                        // o bloco de reposicionamento usa este anchor para se aproximar do alvo.
                         artilleryRepositionAnchorEnemy = candidate;
                     }
 
@@ -2441,7 +2438,7 @@ public class AIPlayerController : MonoBehaviour
             && !repairModeActive
             && !mergeObjectiveActive
             && !captureObjectiveActive
-            && combatClassification == UnitCombatClassification.Artilheiro
+            && stanceBehavior.requireSightlineBeforeEngaging
             && targetEnemy != null
             && !CanUnitFireAtTargetFromCurrentPosition(unit, targetEnemy))
         {
@@ -2535,6 +2532,13 @@ public class AIPlayerController : MonoBehaviour
         {
             moveTarget = planCohesionCell;
             moveTarget.z = 0;
+        }
+        else if (stanceBehavior.holdGroundWhenIdle)
+        {
+            // Ancora na posicao atual. Com prioritizeDpqDuringTravel, o path planning
+            // gravita para a melhor celula DPQ proxima (predio, cobertura) e fica la.
+            repositioningForDefense = true;
+            moveTarget = unitCell;
         }
         else if (snapshot.EnemyHqs != null && snapshot.EnemyHqs.Count > 0)
         {
@@ -2709,6 +2713,23 @@ public class AIPlayerController : MonoBehaviour
                             preferredCells: preferredSupportCells);
                     }
                 }
+                else if (captureObjectiveIsEnemyTerritory && !HasVisibleEnemyOnCell(snapshot, captureObjectiveCell))
+                {
+                    // FoW intel: objetivo e territorio inimigo mas sem visibilidade direta.
+                    // Avanca o minimo necessario priorizando DPQ para revelar e cobrir o objetivo.
+                    foundDestination = turnStateManager.TryGetBestReachableCellTowardsHexDistance(
+                        snapshot.BoardTilemap,
+                        moveTarget,
+                        occupiedByAllies,
+                        out bestDest,
+                        prioritizeDpq: true,
+                        unit: unit,
+                        preferShorterAdvanceOnTie: true,
+                        penalizedCells: penalizedMovementCells,
+                        preferredCells: preferredSupportCells);
+                    if (aiLog)
+                        Debug.Log($"{T(aiTeam, 2)} [intel] {unit.name} avancando com cautela (FoW) para {FormatCellLC(captureObjectiveCell)}: priorizando DPQ e movimento minimo.");
+                }
                 else
                 {
                     foundDestination = turnStateManager.TryGetBestReachableCellTowardsHexDistance(
@@ -2730,27 +2751,19 @@ public class AIPlayerController : MonoBehaviour
         {
             bool canFireAssignedTargetFromCurrent = targetEnemy != null && CanUnitFireAtTargetFromCurrentPosition(unit, targetEnemy);
 
-            if (combatClassification == UnitCombatClassification.Artilheiro)
-            {
-                if (canFireAssignedTargetFromCurrent)
-                {
-                    foundDestination = true;
-                    bestDest = unitCell;
-                }
-                else
-                {
-                    engagingEnemy = false;
-                    targetEnemy = null;
-                }
-            }
-            else if (combatClassification == UnitCombatClassification.Hibrido && canFireAssignedTargetFromCurrent)
+            if (stanceBehavior.holdPositionWhenInRange && canFireAssignedTargetFromCurrent)
             {
                 foundDestination = true;
                 bestDest = unitCell;
             }
+            else if (stanceBehavior.requireSightlineBeforeEngaging && !canFireAssignedTargetFromCurrent)
+            {
+                engagingEnemy = false;
+                targetEnemy = null;
+            }
             else if (canRepositionWhileFiring)
             {
-                bool preferMaxRangeWhenAlreadyFiring = combatClassification == UnitCombatClassification.Artilheiro;
+                bool preferMaxRangeWhenAlreadyFiring = stanceBehavior.preferMaxEngagementRange;
                 foundDestination = turnStateManager.TryGetBestReachableCellAtHexDistanceBand(
                     snapshot.BoardTilemap,
                     moveTarget,
@@ -2814,7 +2827,7 @@ public class AIPlayerController : MonoBehaviour
             && !captureObjectiveActive
             && !engagingEnemy
             && !foundDestination
-            && (combatClassification == UnitCombatClassification.Artilheiro || combatClassification == UnitCombatClassification.Hibrido)
+            && stanceBehavior.repositionToFireRange
             && artilleryRepositionAnchorEnemy != null
             && !artilleryRepositionAnchorEnemy.IsDead
             && TryGetPreferredArtilleryRange(unit, out int artilleryRepositionMinRange, out int artilleryRepositionMaxRange))
@@ -2839,10 +2852,11 @@ public class AIPlayerController : MonoBehaviour
             {
                 Debug.Log($"{T(aiTeam, 2)} [reposition] {unit.name} (artilharia) escolheu reposicionamento tatico em faixa {artilleryRepositionMinRange}-{artilleryRepositionMaxRange} de {artilleryRepositionAnchorEnemy.name}.");
             }
-            else if (!foundDestination)
+            else if (!foundDestination && !stanceBehavior.holdGroundWhenIdle)
             {
                 // Nenhuma celula na faixa de alcance atingivel: avanca em direcao ao ancora
                 // para reduzir a distancia nos proximos turnos (em vez de seguir coesao de plano).
+                // Com holdGroundWhenIdle: nao avanca; ancora onde esta e aguarda.
                 Vector3Int advanceTowardAnchor = artilleryRepositionAnchorEnemy.CurrentCellPosition;
                 advanceTowardAnchor.z = 0;
                 moveTarget = advanceTowardAnchor;
@@ -2853,8 +2867,7 @@ public class AIPlayerController : MonoBehaviour
 
         if (!foundDestination)
         {
-            bool isIndirectUnit = combatClassification == UnitCombatClassification.Artilheiro
-                || combatClassification == UnitCombatClassification.Hibrido;
+            bool isIndirectUnit = stanceBehavior.repositionToFireRange;
             foundDestination = turnStateManager.TryGetBestReachableCellTowardsHexDistance(
                 snapshot.BoardTilemap,
                 moveTarget,
@@ -2874,7 +2887,7 @@ public class AIPlayerController : MonoBehaviour
 
         bestDest.z = 0;
 
-        if (combatClassification == UnitCombatClassification.Civil
+        if (isSupplierUnit
             && !repairDislodgeActive
             && bestDest != unitCell
             && IsCellTooDangerousForSupport(snapshot, bestDest, allowModerateRiskForSupply: supplyObjectiveActive))
@@ -2984,7 +2997,7 @@ public class AIPlayerController : MonoBehaviour
         if (!supplyObjectiveActive && !repairModeActive && !mergeObjectiveActive && !captureObjectiveActive && bestDest == unitCell && intelCanFire && intelFireTarget != null && targetEnemy == null)
             targetEnemy = intelFireTarget;
 
-        if (!merged && !supplied && !transferred && !captured && captureObjectiveActive)
+        if (!merged && !supplied && !transferred && !captured && captureObjectiveActive && stanceBehavior.engageNearestEnemies)
         {
             bool postMoveCanFire = turnStateManager.CanUnitFireAtAnyTargetFromCurrentPosition(unit, out UnitManager postMoveFireTarget);
             if (postMoveCanFire && postMoveFireTarget != null)
@@ -2994,10 +3007,17 @@ public class AIPlayerController : MonoBehaviour
                 Vector3Int fireTargetCell = postMoveFireTarget.CurrentCellPosition;
                 fireTargetCell.z = 0;
 
+                // Morde no caminho: ataca inimigo dentro do corredor de captura se o score justifica.
                 if (IsEnemyInCaptureLane(snapshot.BoardTilemap, postMoveCell, captureObjectiveCell, fireTargetCell)
                     && TryEvaluateReachableAttackScore(unit, postMoveFireTarget, snapshot, occupiedByAllies, out int captureSkirmishScore))
                 {
-                    int minCaptureSkirmishScore = bazookaSkirmisherUnit ? 22000 : 28000;
+                    int minCaptureSkirmishScore = stanceBehavior.captureInterruptBias switch
+                    {
+                        CaptureInterruptBias.Aggressive => 22000,
+                        CaptureInterruptBias.Normal     => 28000,
+                        CaptureInterruptBias.Passive    => 38000,
+                        _                               => 28000
+                    };
                     if (captureSkirmishScore >= minCaptureSkirmishScore)
                     {
                         targetEnemy = postMoveFireTarget;
@@ -3006,13 +3026,29 @@ public class AIPlayerController : MonoBehaviour
                             Debug.Log($"{T(aiTeam, 2)} [intel] captura interrompida por alvo no caminho: {postMoveFireTarget.name} (score={captureSkirmishScore})");
                     }
                 }
+                // Fallback oportunista: qualquer alvo alcancavel apos mover (so com engageNearestEnemies).
                 if (!engagingEnemy)
                 {
                     targetEnemy = postMoveFireTarget;
                     engagingEnemy = true;
                     if (aiLog)
-                        Debug.Log($"{T(aiTeam, 2)} [intel] captura sem acao concluida; fallback para ataque de oportunidade em {postMoveFireTarget.name}");
+                        Debug.Log($"{T(aiTeam, 2)} [intel] captura oportunista pos-movimento: {postMoveFireTarget.name}");
                 }
+            }
+        }
+
+        // Post-move rescan para escolta com engageNearestEnemies: mesmo que tenha movido por coesao,
+        // verifica se ha inimigos alcancaveis da nova posicao e engaja de oportunidade.
+        if (!merged && !supplied && !transferred && !captured && !engagingEnemy
+            && escortRoleActive && stanceBehavior.engageNearestEnemies)
+        {
+            bool postMoveCanFire = turnStateManager.CanUnitFireAtAnyTargetFromCurrentPosition(unit, out UnitManager postMoveEscortTarget);
+            if (postMoveCanFire && postMoveEscortTarget != null)
+            {
+                targetEnemy = postMoveEscortTarget;
+                engagingEnemy = true;
+                if (aiLog)
+                    Debug.Log($"{T(aiTeam, 2)} [intel] escolta engageNearestEnemies: oportunidade pos-movimento em {postMoveEscortTarget.name}");
             }
         }
 
@@ -3031,13 +3067,18 @@ public class AIPlayerController : MonoBehaviour
             }
         }
 
+        // Unidades com holdPositionWhenInRange (artilharia) atiram paradas mesmo em modo reparo,
+        // desde que nao tenham movido (bestDest == unitCell = ja estao na construcao).
+        // Combatentes em reparo nao revidiam: priorizam chegar a base.
+        bool canFireWhileRepairing = repairModeActive && stanceBehavior.holdPositionWhenInRange && bestDest == unitCell;
+
         bool attacked = !merged
             && !supplied
             && !transferred
             && !captured
             && !supplyObjectiveActive
             && !mergeObjectiveActive
-            && (!repairModeActive || repairDislodgeActive)
+            && (!repairModeActive || repairDislodgeActive || canFireWhileRepairing)
             && engagingEnemy
             && turnStateManager.HasAutomatedAttackAvailable()
             && turnStateManager.TryExecuteAutomatedAttackPreferredTarget(targetEnemy);
@@ -3047,7 +3088,7 @@ public class AIPlayerController : MonoBehaviour
         // Respeita as mesmas guards do bloco principal: nao atira em modo reparo, suprimento ou fusao.
         if (!attacked && !merged && !supplied && !transferred && !captured
             && !supplyObjectiveActive && !mergeObjectiveActive
-            && (!repairModeActive || repairDislodgeActive)
+            && (!repairModeActive || repairDislodgeActive || canFireWhileRepairing)
             && intelCanFire && intelFireTarget != null
             && turnStateManager.HasAutomatedAttackAvailable())
         {
@@ -3142,7 +3183,11 @@ public class AIPlayerController : MonoBehaviour
         int bestEffectiveAttackDistance = int.MaxValue;
 
         int moveBudget = Mathf.Max(0, unit.RemainingMovementPoints);
-        UnitCombatClassification combatClassification = unit != null ? unit.CombatClassification : UnitCombatClassification.Civil;
+        unit.TryGetUnitData(out UnitData unitDataAssign);
+        AIUnitProfile aiProfileAssign = unitDataAssign != null ? unitDataAssign.aiUnitProfile : null;
+        AIUnitStanceBehavior stanceBehaviorAssign = aiProfileAssign != null
+            ? aiProfileAssign.GetStanceBehavior(currentStance)
+            : new AIUnitStanceBehavior();
         bool hasAttackerData = unit.TryGetUnitData(out UnitData attackerData) && attackerData != null;
         TerrainDatabase terrainDb = turnStateManager != null ? turnStateManager.TerrainDatabaseRef : null;
         RPSDatabase rpsDb = turnStateManager != null ? turnStateManager.RpsDatabaseRef : null;
@@ -3163,7 +3208,7 @@ public class AIPlayerController : MonoBehaviour
 
         HashSet<int> stationaryFireTargets = null;
         bool hasAnyStationaryFireTarget = false;
-        if (combatClassification == UnitCombatClassification.Artilheiro || combatClassification == UnitCombatClassification.Hibrido)
+        if (stanceBehaviorAssign.requireSightlineBeforeEngaging || stanceBehaviorAssign.holdPositionWhenInRange)
         {
             stationaryFireTargets = new HashSet<int>();
             for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
@@ -3217,15 +3262,16 @@ public class AIPlayerController : MonoBehaviour
             bool canReachAndFire = false;
             reachableAttackDistances.Clear();
             bool canFireFromCurrentPosition = stationaryFireTargets != null && stationaryFireTargets.Contains(enemy.InstanceId);
-            if (combatClassification == UnitCombatClassification.Artilheiro)
+            if (stanceBehaviorAssign.requireSightlineBeforeEngaging)
             {
+                // Artilheiro: so pontua inimigos com tiro parado valido.
                 canReachAndFire = canFireFromCurrentPosition;
                 if (canReachAndFire)
                     reachableAttackDistances.Add(Mathf.Max(1, GetHexDistance(snapshot.BoardTilemap, friendlyCell, enemyCell, 64)));
             }
-            else if (combatClassification == UnitCombatClassification.Hibrido)
+            else if (stanceBehaviorAssign.holdPositionWhenInRange)
             {
-                // 1. Tenta artilheiro: tiro parado tem prioridade quando possivel.
+                // Hibrido: prefere tiro parado quando possivel; fallback combatente.
                 if (hasAnyStationaryFireTarget && canFireFromCurrentPosition)
                 {
                     canReachAndFire = true;
@@ -3233,7 +3279,6 @@ public class AIPlayerController : MonoBehaviour
                 }
                 else
                 {
-                    // 2. Fallback combatente: tenta alcançar e disparar este turno.
                     canReachAndFire = TryCollectReachableAttackDistances(
                         snapshot.BoardTilemap,
                         unit,
@@ -3354,6 +3399,25 @@ public class AIPlayerController : MonoBehaviour
             bestTieDistance = tieDistance;
             bestEffectiveAttackDistance = effectiveAttackDistance;
             best = enemy;
+        }
+
+        // Capturador: aplica captureInterruptBias ao score do vencedor pre-movimento.
+        // Mesmo filtro do "morde no caminho" pos-movimento — garante coerencia entre as duas fases.
+        if (best != null && captureRoleFilter)
+        {
+            int minPreMoveBias = stanceBehaviorAssign.captureInterruptBias switch
+            {
+                CaptureInterruptBias.Aggressive => 22000,
+                CaptureInterruptBias.Normal     => 28000,
+                CaptureInterruptBias.Passive    => 38000,
+                _                               => 28000
+            };
+            if (bestScore < minPreMoveBias)
+            {
+                if (aiLog)
+                    Debug.Log($"{T(snapshot.AiTeam, 2)} [score] {unit.name} -> {best.name} | descartado: captureInterruptBias ({stanceBehaviorAssign.captureInterruptBias}, min={minPreMoveBias}) > score={bestScore}");
+                best = null;
+            }
         }
 
         if (best != null && aiLog)
@@ -5115,12 +5179,14 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         out ConstructionManager targetConstruction,
         out Vector3Int targetCell,
         out string targetLabel,
+        out bool targetIsEnemyTerritory,
         Vector3Int? plannedObjective = null,
         ConstructionSector? plannedSector = null)
     {
         targetConstruction = null;
         targetCell = default;
         targetLabel = string.Empty;
+        targetIsEnemyTerritory = false;
 
         if (unit == null || snapshot == null || snapshot.KnownConstructions == null || snapshot.KnownConstructions.Count == 0)
             return false;
@@ -5194,11 +5260,14 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             bool occupiedByOtherCaptureUnit = IsFriendlyCaptureUnitOccupyingCell(snapshot, unit, cell);
             int effectiveDistance = distance + (occupiedByOtherCaptureUnit ? 3 : 0);
 
-            // Captura de infantaria: prioridade pratica = objetivo mais proximo.
-            // Se ja existe outro aliado capturando esse mesmo hex, aplica penalidade para espalhar captura.
-            // Categoria (HQ/outros/recuperacao) entra como desempate.
-            bool better = effectiveDistance < bestDistance
-                || (effectiveDistance == bestDistance && category < bestCategory);
+            // Com setor planejado: prioridade por categoria (livre > ocupado), distancia eh desempate.
+            // Sem setor: prioridade por distancia, categoria eh desempate (comportamento original freelance).
+            bool better;
+            if (plannedSector.HasValue)
+                better = category < bestCategory || (category == bestCategory && effectiveDistance < bestDistance);
+            else
+                better = effectiveDistance < bestDistance || (effectiveDistance == bestDistance && category < bestCategory);
+
             if (!better)
                 continue;
 
@@ -5214,6 +5283,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         targetCell = bestInfo.Cell;
         targetCell.z = 0;
         targetLabel = !string.IsNullOrWhiteSpace(bestInfo.DisplayName) ? bestInfo.DisplayName : bestInfo.Source.name;
+        targetIsEnemyTerritory = bestInfo.TeamId != unit.TeamId;
         return true;
     }
     private IEnumerator Phase3_BuyUnits(TeamId aiTeam, AISnapshot snapshot)
