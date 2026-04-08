@@ -201,8 +201,9 @@ public class AIPlayerControllerEditor : Editor
     private static void DrawPlannerTeamElement(SerializedProperty teamElement, int index)
     {
         SerializedProperty teamProp = teamElement.FindPropertyRelative("team");
+        SerializedProperty stanceProp = teamElement.FindPropertyRelative("currentStanceName");
         SerializedProperty plansProp = teamElement.FindPropertyRelative("plans");
-        string teamLabel = ResolveTeamElementLabel(teamProp, index);
+        string teamLabel = ResolveTeamElementLabel(teamProp, index, stanceProp);
 
         teamElement.isExpanded = EditorGUILayout.Foldout(teamElement.isExpanded, teamLabel, true);
         if (!teamElement.isExpanded)
@@ -347,10 +348,15 @@ public class AIPlayerControllerEditor : Editor
         return child != null ? child.intValue : 0;
     }
 
-    private static string ResolveTeamElementLabel(SerializedProperty teamProp, int index)
+    private static string ResolveTeamElementLabel(SerializedProperty teamProp, int index, SerializedProperty stanceProp = null)
     {
+        string fallbackLabel = $"Time {index}";
+        string stanceName = stanceProp != null ? stanceProp.stringValue : string.Empty;
+
         if (teamProp == null)
-            return $"Time {index}";
+            return !string.IsNullOrWhiteSpace(stanceName)
+                ? $"{fallbackLabel} [{stanceName}]"
+                : fallbackLabel;
 
         if (teamProp.propertyType == SerializedPropertyType.Enum)
         {
@@ -365,9 +371,13 @@ public class AIPlayerControllerEditor : Editor
                         : string.Empty;
 
             if (!string.IsNullOrWhiteSpace(enumName))
-                return enumName;
+                return !string.IsNullOrWhiteSpace(stanceName)
+                    ? $"{enumName} [{stanceName}]"
+                    : enumName;
         }
 
-        return $"Time {index}";
+        return !string.IsNullOrWhiteSpace(stanceName)
+            ? $"{fallbackLabel} [{stanceName}]"
+            : fallbackLabel;
     }
 }

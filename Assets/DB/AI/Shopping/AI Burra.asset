@@ -28,7 +28,7 @@ MonoBehaviour:
       specificUnits:
       - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
     - label: Basic Tank
-      targetPercentage: 5
+      targetPercentage: 1
       priority: 2
       specificUnits:
       - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}

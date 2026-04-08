@@ -96,6 +96,8 @@ public class AIUnitProfile : ScriptableObject
     public bool preferFallbackWhenDefend = true;
     [Tooltip("Se true, permite fusao com aliados feridos durante o retorno para reparo.")]
     public bool fuseWhileOnRepairMode = true;
+    [Tooltip("Se true, permite atirar enquanto estiver em modo reparo, desde que a unidade esteja parada na construcao/posicao final do turno.")]
+    public bool canShootFromDistanceWhileRepairing = false;
     [Tooltip("HP maximo (inclusivo) para entrar em modo reparo automatico. 0 = nunca busca reparo.")]
     [Range(0, 10)]
     public int hpRepairThreshold = 3;

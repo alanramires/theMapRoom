@@ -19,6 +19,13 @@ inicio do turno
 - loop de unidades por initiative efetiva + HP
 - snapshot por unidade
 - cada unidade executa seu papel conforme AIPlanAssignment
+
+Postura durante o turno:
+- a Battle Stance e avaliada no inicio do turno, antes do planner
+- a postura fica **travada durante todo o turno**; ela nao muda mais a cada TakeSnapshot() no meio do loop de unidades
+- isso evita o caso de a unidade ganhar icone de Invasion no meio da execucao sem replanning correspondente
+- se a IA cruzar o threshold de Invasion durante o turno, a nova postura so vale no turno seguinte
+
 FoW durante o turno da IA:
 - o snapshot de decisao nao dispara RefreshFogOfWarForActiveTeam() antes de cada unidade
 - a IA decide com base no estado observado pelo sensor/time
@@ -92,7 +99,15 @@ Resumo pratico da formula atual:
    - `Artillery` (`FireSupport`)
    - `Support` (`Logistics`)
    - `Escort` (`Escort`)
-5. Se um plano nao conseguir ao menos um `Capture`, ele nao entra como plano ativo final.
+
+**Debug de alocacao por papel:**
+- o AI Manager e a janela AI Planner mostram contadores por papel no cabecalho do plano
+- `CAP` = `Capture`
+- `ESC` = `Escort`
+- ART = Artillery (FireSupport)
+- SUP = Support (Logistics)
+- esses contadores agora refletem o papel real da assignment; `Artillery` e `Support` nao aparecem mais como `escort`
+
 
 > **Ponto importante:** `ComputePlannedForce()` nao pensa mais em `APC`, `ArmoredEscort` ou tipos fixos. Ele pede funcao tatica, e quem pode cumprir cada funcao vem de `planCapabilities` no `AIUnitProfile`.
 
@@ -114,8 +129,16 @@ O planner registra ao final de cada turno quais unidades estavam em qual plano e
 **Estagnacao (`stagnationTurns`):**
 Se uma unidade esta no mesmo plano ha N turnos sem progresso, ela fica elegivel para **realocacao**. Padrao: 2 turnos. Configuravel em `AIGeneralProfile.stagnationTurns`.
 
+
 **Fallback de plano salvo:**
 Se uma unidade tinha um plano no turno anterior mas o setor nao foi reselecionado, o planner cria um **plano fantasma** para manter a unidade em missao ate que o setor seja reincorporado ou a unidade seja necessaria em outro lugar.
+
+**Relacao entre stance e plano de invasao:**
+- o icone de `Invasion` na unidade significa que a `Battle Stance` do time entrou em `Invasion`
+- isso nao garante, por si so, que exista um plano Invasao <Base> ativo naquele turno
+- os planos `Invasao BaseX` aparecem sempre no catalogo interno como candidatos; se nao forem ativados no turno, ficam como `Inactive`
+- quando a postura esta em Invasion e o planner consegue ativar o plano correspondente, ele aparece em Active Plans com assignments reais
+
 
 ---
 
@@ -281,7 +304,14 @@ Isso significa que a IA pode:
 Mesmo assim, existe uma trava importante:
 - `fallback-save` não pode furar `massa mínima` quando houver `critical capture gap`.
 
-### Leitura dos logs de compra
+### Leitura dos logs
+
+A postura exibida nos logs agora respeita a stance real do time:
+- ATAQUE
+- DEFESA
+- INVASAO
+
+Ou seja, `Invasion` nao aparece mais colapsada como `Attack` no texto do log.
 
 Com `aiLog` ligado no `AIPlayerController`, a compra tende a sair assim no console:
 - `demanda=Capture | missing=2/4 | unidade=Soldado | origem=grupo:Capture | custo=...`

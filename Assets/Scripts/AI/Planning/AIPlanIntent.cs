@@ -19,8 +19,8 @@ public static class AIPlanRoleExtensions
             case AIPlanRole.Capture: return "capture";
             case AIPlanRole.Escort: return "escort";
             case AIPlanRole.Assault: return "assault";
-            case AIPlanRole.Support: return "escort";
-            case AIPlanRole.Artillery: return "escort";
+            case AIPlanRole.Support: return "support";
+            case AIPlanRole.Artillery: return "artillery";
             default: return role.ToString();
         }
     }

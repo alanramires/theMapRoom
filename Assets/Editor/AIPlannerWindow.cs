@@ -113,7 +113,7 @@ public class AIPlannerWindow : EditorWindow
 
     private void DrawPreviewTeamBlock(AIPlayerController.TeamPlannerDebugView team)
     {
-        string teamLabel = TeamUtils.GetName(team.team);
+        string teamLabel = !string.IsNullOrWhiteSpace(team.currentStanceName) ? $"{TeamUtils.GetName(team.team)} [{team.currentStanceName}]" : TeamUtils.GetName(team.team);
         string teamKey = $"AIPlannerWindow.Team.{team.team}";
         bool expanded = SessionState.GetBool(teamKey, true);
         expanded = EditorGUILayout.Foldout(expanded, teamLabel, true);
