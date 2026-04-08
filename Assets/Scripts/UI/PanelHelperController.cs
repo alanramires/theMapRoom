@@ -727,33 +727,6 @@ public class PanelHelperController : MonoBehaviour
             return string.Empty;
 
         StringBuilder sb = new StringBuilder();
-        sb.AppendLine(ResolveMessage("helper.merge.section.queue", "Queue"));
-
-        if (data.MergeQueueLines != null && data.MergeQueueLines.Count > 0)
-        {
-            for (int i = 0; i < data.MergeQueueLines.Count; i++)
-            {
-                TurnStateManager.HelperMergeQueueLine line = data.MergeQueueLines[i];
-                if (line == null)
-                    continue;
-
-                sb.AppendLine(ResolveMessage(
-                    "helper.merge.queue.line",
-                    "<index> - <unit> (<stats>)",
-                    new Dictionary<string, string>
-                    {
-                        { "index", line.index.ToString() },
-                        { "unit", line.unitName ?? string.Empty },
-                        { "stats", line.stats ?? string.Empty }
-                    }));
-            }
-        }
-        else
-        {
-            sb.AppendLine(ResolveMessage("helper.merge.queue.empty", "0 - (empty)"));
-        }
-
-        sb.AppendLine();
         sb.AppendLine(ResolveMessage("helper.merge.section.select", "Select Unit"));
 
         if (data.MergeCandidateLines != null && data.MergeCandidateLines.Count > 0)
@@ -806,17 +779,6 @@ public class PanelHelperController : MonoBehaviour
                         { "preview", data.MergeConfirmPreview }
                     }));
             }
-        }
-        else if (data.MergeQueueLines != null && data.MergeQueueLines.Count > 0)
-        {
-            sb.AppendLine();
-            sb.Append(ResolveMessage(
-                "helper.merge.process_order.line",
-                "0 - Process Queue | <preview>",
-                new Dictionary<string, string>
-                {
-                    { "preview", data.MergeQueuePreview ?? string.Empty }
-                }));
         }
 
         return sb.ToString().TrimEnd();

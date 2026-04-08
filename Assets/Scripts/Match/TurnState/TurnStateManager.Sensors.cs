@@ -118,6 +118,7 @@ public partial class TurnStateManager
             selectedUnit,
             boardMap,
             terrainDatabase,
+            Mathf.Max(0, selectedUnit != null ? selectedUnit.RemainingMovementPoints : 0),
             cachedPodeFundirTargets,
             out cachedPodeFundirReason,
             cachedPodeFundirInvalidTargets);

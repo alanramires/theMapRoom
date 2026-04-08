@@ -17,6 +17,8 @@ public class PodeFundirInvalidOption
     public const string ReasonIdInsufficientMovement = "fuse.invalid.insufficient_movement";
     public const string ReasonIdLayerMismatch = "fuse.invalid.layer_mismatch";
     public const string ReasonIdCandidateHasCargo = "fuse.invalid.candidate_has_cargo";
+    public const string ReasonIdDifferentTeam = "fuse.invalid.different_team";
+    public const string ReasonIdDifferentType = "fuse.invalid.different_type";
 
     public UnitManager receiverUnit;
     public UnitManager candidateUnit;
@@ -40,6 +42,7 @@ public static class PodeFundirSensor
             selectedUnit,
             boardTilemap,
             terrainDatabase: null,
+            remainingMovementPoints: selectedUnit != null ? Mathf.Max(0, selectedUnit.RemainingMovementPoints) : 0,
             output: options,
             reason: out reason,
             invalidOutput: null);
@@ -51,6 +54,7 @@ public static class PodeFundirSensor
         UnitManager selectedUnit,
         Tilemap boardTilemap,
         TerrainDatabase terrainDatabase,
+        int remainingMovementPoints,
         List<PodeFundirOption> output,
         out string reason,
         List<PodeFundirInvalidOption> invalidOutput = null)
@@ -61,7 +65,7 @@ public static class PodeFundirSensor
         invalidOutput?.Clear();
 
         if (sensorLogs)
-            SensorLogGate.Log("PodeFundirSensor", $"collect receiver={(selectedUnit != null ? selectedUnit.name : "(null)")}");
+            SensorLogGate.Log("PodeFundirSensor", $"collect receiver={(selectedUnit != null ? selectedUnit.name : "(null)")} remainingMove={remainingMovementPoints}");
 
         if (selectedUnit == null)
         {
@@ -108,8 +112,41 @@ public static class PodeFundirSensor
             if (other == null || other == selectedUnit || !other.gameObject.activeInHierarchy || other.IsEmbarked)
                 continue;
 
-            if (!IsSameTypeAndTeam(selectedUnit, other))
+            if ((int)selectedUnit.TeamId != (int)other.TeamId)
+            {
+                if (invalidOutput != null)
+                {
+                    invalidOutput.Add(new PodeFundirInvalidOption
+                    {
+                        receiverUnit = selectedUnit,
+                        candidateUnit = other,
+                        candidateCell = cell,
+                        remainingMovement = Mathf.Max(0, remainingMovementPoints),
+                        requiredMovementCost = 0,
+                        reasonId = PodeFundirInvalidOption.ReasonIdDifferentTeam,
+                        reason = "Unidade adjacente eh de outro time."
+                    });
+                }
                 continue;
+            }
+
+            if (!IsSameType(selectedUnit, other))
+            {
+                if (invalidOutput != null)
+                {
+                    invalidOutput.Add(new PodeFundirInvalidOption
+                    {
+                        receiverUnit = selectedUnit,
+                        candidateUnit = other,
+                        candidateCell = cell,
+                        remainingMovement = Mathf.Max(0, remainingMovementPoints),
+                        requiredMovementCost = 0,
+                        reasonId = PodeFundirInvalidOption.ReasonIdDifferentType,
+                        reason = "Unidade adjacente nao eh do mesmo tipo."
+                    });
+                }
+                continue;
+            }
 
             if (HasPassengers(other))
             {
@@ -120,7 +157,7 @@ public static class PodeFundirSensor
                         receiverUnit = selectedUnit,
                         candidateUnit = other,
                         candidateCell = cell,
-                        remainingMovement = Mathf.Max(0, other.RemainingMovementPoints),
+                        remainingMovement = Mathf.Max(0, selectedUnit.RemainingMovementPoints),
                         requiredMovementCost = 0,
                         reasonId = PodeFundirInvalidOption.ReasonIdCandidateHasCargo,
                         reason = "Candidato transportando passageiros nao pode fundir."
@@ -143,7 +180,7 @@ public static class PodeFundirSensor
                         receiverUnit = selectedUnit,
                         candidateUnit = other,
                         candidateCell = cell,
-                        remainingMovement = Mathf.Max(0, other.RemainingMovementPoints),
+                        remainingMovement = Mathf.Max(0, selectedUnit.RemainingMovementPoints),
                         requiredMovementCost = 0,
                         reasonId = PodeFundirInvalidOption.ReasonIdLayerMismatch,
                         reason = "Camada/altura diferente do receptor."
@@ -158,6 +195,7 @@ public static class PodeFundirSensor
                 other,
                 map,
                 terrainDatabase,
+                remainingMovementPoints,
                 out string invalidReasonId,
                 out string invalidReason,
                 out int requiredMovementCost,
@@ -217,10 +255,11 @@ public static class PodeFundirSensor
     }
 
     public static bool EvaluateCandidateMovement(
-        UnitManager receiver,
-        UnitManager candidate,
+        UnitManager mover,
+        UnitManager target,
         Tilemap map,
         TerrainDatabase terrainDatabase,
+        int remainingMovementPoints,
         out string invalidReasonId,
         out string invalidReason,
         out int requiredMovementCost,
@@ -231,30 +270,30 @@ public static class PodeFundirSensor
         requiredMovementCost = 0;
         remainingMovement = 0;
 
-        if (receiver == null || candidate == null || map == null)
+        if (mover == null || target == null || map == null)
         {
             invalidReason = "Contexto de fusao invalido.";
             return false;
         }
 
-        remainingMovement = Mathf.Max(0, candidate.RemainingMovementPoints);
-        Vector3Int receiverCell = receiver.CurrentCellPosition;
-        receiverCell.z = 0;
+        remainingMovement = Mathf.Max(0, remainingMovementPoints);
+        Vector3Int targetCell = target.CurrentCellPosition;
+        targetCell.z = 0;
 
         Dictionary<Vector3Int, List<Vector3Int>> validPaths = UnitMovementPathRules.CalcularCaminhosValidos(
             map,
-            candidate,
+            mover,
             remainingMovement,
             terrainDatabase);
 
         if (validPaths != null &&
-            validPaths.TryGetValue(receiverCell, out List<Vector3Int> mergePath) &&
+            validPaths.TryGetValue(targetCell, out List<Vector3Int> mergePath) &&
             mergePath != null &&
             mergePath.Count >= 2)
         {
             requiredMovementCost = Mathf.Max(0, UnitMovementPathRules.CalculateAutonomyCostForPath(
                 map,
-                candidate,
+                mover,
                 mergePath,
                 terrainDatabase,
                 applyOperationalAutonomyModifier: false));
@@ -269,15 +308,17 @@ public static class PodeFundirSensor
             return true;
         }
 
-        if (!UnitMovementPathRules.TryGetEnterCellCost(
+        if (!TryResolveMergeEnterCost(
                 map,
-                candidate,
-                receiverCell,
                 terrainDatabase,
-                applyOperationalAutonomyModifier: false,
-                out requiredMovementCost))
+                mover,
+                targetCell,
+                out requiredMovementCost,
+                out string enterCostReason))
         {
-            invalidReason = "Nao consegue entrar no hex do receptor (terreno/camada bloqueia).";
+            invalidReason = string.IsNullOrWhiteSpace(enterCostReason)
+                ? "Nao consegue entrar no hex do alvo (terreno/camada bloqueia)."
+                : enterCostReason;
             return false;
         }
 
@@ -289,8 +330,235 @@ public static class PodeFundirSensor
             return false;
         }
 
-        invalidReason = "Sem caminho valido ate o receptor (bloqueio no trajeto).";
+        invalidReason = "Sem caminho valido ate o alvo (bloqueio no trajeto).";
         return false;
+    }
+
+    private static bool TryResolveMergeEnterCost(
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        UnitManager mover,
+        Vector3Int targetCell,
+        out int cost,
+        out string reason)
+    {
+        cost = 0;
+        reason = string.Empty;
+        if (map == null || mover == null)
+        {
+            reason = "Contexto invalido para calcular custo de fusao.";
+            return false;
+        }
+
+        targetCell.z = 0;
+        if (UnitMovementPathRules.TryGetEnterCellCost(
+                map,
+                mover,
+                targetCell,
+                terrainDatabase,
+                applyOperationalAutonomyModifier: false,
+                out int normalCost))
+        {
+            cost = Mathf.Max(1, normalCost);
+            return true;
+        }
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(map, targetCell);
+        if (construction != null)
+        {
+            if (!ConstructionAllowsUnitBySkillRules(construction, mover))
+            {
+                reason = "Unidade ativa nao cumpre as regras da construcao para fundir neste hex.";
+                return false;
+            }
+
+            cost = GetAutonomyCostWithSkillOverrides(construction.GetBaseMovementCost(), construction.GetSkillCostOverrides(), mover);
+            cost = Mathf.Max(1, cost);
+            return true;
+        }
+
+        if (!TryResolveTerrainAtCell(map, terrainDatabase, targetCell, out TerrainTypeData terrain) || terrain == null)
+        {
+            reason = "Sem terreno valido para fallback de custo da fusao.";
+            return false;
+        }
+
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(map, targetCell);
+        if (structure != null)
+        {
+            if (!StructureAllowsUnitBySkillRules(structure, terrain, mover))
+            {
+                reason = "Unidade ativa nao cumpre as regras da estrutura para fundir neste hex.";
+                return false;
+            }
+
+            cost = GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, structure.GetSkillCostOverrides(terrain), mover);
+            cost = GetAutonomyCostWithSkillOverrides(cost, terrain.skillCostOverrides, mover);
+            cost = Mathf.Max(1, cost);
+            return true;
+        }
+
+        if (!UnitPassesTerrainSkillRequirement(mover, terrain))
+        {
+            reason = "Unidade ativa nao cumpre skill minima do terreno para fundir neste hex.";
+            return false;
+        }
+
+        cost = GetAutonomyCostWithSkillOverrides(terrain.basicAutonomyCost, terrain.skillCostOverrides, mover);
+        cost = Mathf.Max(1, cost);
+        return true;
+    }
+
+    private static bool TryResolveTerrainAtCell(
+        Tilemap terrainTilemap,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        out TerrainTypeData terrain)
+    {
+        terrain = null;
+        if (terrainTilemap == null || terrainDatabase == null)
+            return false;
+
+        cell.z = 0;
+        TileBase tile = terrainTilemap.GetTile(cell);
+        if (tile != null && terrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData byMainTile) && byMainTile != null)
+        {
+            terrain = byMainTile;
+            return true;
+        }
+
+        GridLayout grid = terrainTilemap.layoutGrid;
+        if (grid == null)
+            return false;
+
+        Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            Tilemap map = maps[i];
+            if (map == null)
+                continue;
+
+            TileBase other = map.GetTile(cell);
+            if (other == null)
+                continue;
+
+            if (terrainDatabase.TryGetByPaletteTile(other, out TerrainTypeData byGridTile) && byGridTile != null)
+            {
+                terrain = byGridTile;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool UnitPassesTerrainSkillRequirement(UnitManager unit, TerrainTypeData terrain)
+    {
+        if (unit == null || terrain == null)
+            return false;
+
+        if (terrain.requiredSkillsToEnter == null || terrain.requiredSkillsToEnter.Count == 0)
+            return true;
+
+        for (int i = 0; i < terrain.requiredSkillsToEnter.Count; i++)
+        {
+            SkillData skill = terrain.requiredSkillsToEnter[i];
+            if (skill == null)
+                continue;
+            if (unit.HasSkill(skill))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool UnitBlockedByAnySkill(UnitManager unit, IReadOnlyList<SkillData> blockedSkills)
+    {
+        if (unit == null || blockedSkills == null || blockedSkills.Count == 0)
+            return false;
+
+        for (int i = 0; i < blockedSkills.Count; i++)
+        {
+            SkillData skill = blockedSkills[i];
+            if (skill == null)
+                continue;
+            if (unit.HasSkill(skill))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool ConstructionAllowsUnitBySkillRules(ConstructionManager construction, UnitManager unit)
+    {
+        if (construction == null || unit == null)
+            return false;
+
+        IReadOnlyList<SkillData> required = construction.GetRequiredSkillsToEnter();
+        IReadOnlyList<SkillData> blocked = construction.GetBlockedSkillsToEnter();
+        if (UnitBlockedByAnySkill(unit, blocked))
+            return false;
+
+        if (required == null || required.Count == 0)
+            return true;
+
+        for (int i = 0; i < required.Count; i++)
+        {
+            SkillData skill = required[i];
+            if (skill == null)
+                continue;
+            if (unit.HasSkill(skill))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool StructureAllowsUnitBySkillRules(StructureData structure, TerrainTypeData terrain, UnitManager unit)
+    {
+        if (structure == null || unit == null)
+            return false;
+
+        IReadOnlyList<SkillData> required = structure.GetRequiredSkillsToEnter(terrain);
+        IReadOnlyList<SkillData> blocked = structure.GetBlockedSkillsToEnter(terrain);
+        if (UnitBlockedByAnySkill(unit, blocked))
+            return false;
+
+        if (required == null || required.Count == 0)
+            return true;
+
+        for (int i = 0; i < required.Count; i++)
+        {
+            SkillData skill = required[i];
+            if (skill == null)
+                continue;
+            if (unit.HasSkill(skill))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static int GetAutonomyCostWithSkillOverrides(
+        int baseCost,
+        IReadOnlyList<TerrainSkillCostOverride> overrides,
+        UnitManager unit)
+    {
+        int safeBase = Mathf.Max(1, baseCost);
+        if (unit == null || overrides == null)
+            return safeBase;
+
+        for (int i = 0; i < overrides.Count; i++)
+        {
+            TerrainSkillCostOverride entry = overrides[i];
+            if (entry == null || entry.skill == null)
+                continue;
+
+            if (unit.HasSkill(entry.skill))
+                return Mathf.Max(1, entry.autonomyCost);
+        }
+
+        return safeBase;
     }
 
     private static bool HasPassengers(UnitManager unit)
@@ -305,12 +573,9 @@ public static class PodeFundirSensor
         return false;
     }
 
-    private static bool IsSameTypeAndTeam(UnitManager a, UnitManager b)
+    private static bool IsSameType(UnitManager a, UnitManager b)
     {
         if (a == null || b == null)
-            return false;
-
-        if ((int)a.TeamId != (int)b.TeamId)
             return false;
 
         string aId = a.UnitId;

@@ -100,14 +100,7 @@ public partial class TurnStateManager
 
             if (number == 0)
             {
-                if (mergeQueuedUnits.Count > 0)
-                {
-                    LogMergeDebug("Digit 0 -> StartMergeExecution");
-                    StartMergeExecution();
-                    return;
-                }
-
-                Debug.Log("[Fusao] Nenhuma ordem em fila para executar.");
+                Debug.Log("[Fusao] A fusao executa imediatamente ao confirmar o candidato.");
                 return;
             }
 
@@ -221,24 +214,13 @@ public partial class TurnStateManager
             return true;
         }
 
+        mergeQueuedUnits.Clear();
         mergeQueuedUnits.Add(target.unit);
         replayManager?.UpdateCurrentBufferTarget(target.unit, null, target.unit.CurrentCellPosition, "MergeQueueConfirm");
-        LogMergeDebug($"Queued candidate={ResolveUnitRuntimeName(target.unit)} queueCount={mergeQueuedUnits.Count}");
-        mergeSuppressDefaultConfirmSfxOnce = true;
-        cursorController?.PlayLoadSfx();
+        LogMergeDebug($"Confirmed candidate={ResolveUnitRuntimeName(target.unit)} -> immediate execution");
         RebuildMergeQueuePreviewTracks();
-
-        int remaining = CountRemainingMergeCandidates();
-        LogMergeDebug($"AfterQueue remainingValidCandidates={remaining}");
-        if (remaining <= 0)
-        {
-            LogMergeDebug("No remaining valid candidates -> StartMergeExecution");
-            StartMergeExecution();
-            return true;
-        }
-
-        Debug.Log($"[Fusao] Ordem adicionada: {ResolveUnitRuntimeName(target.unit)} -> {ResolveUnitRuntimeName(selectedUnit)}.");
-        EnterMergeParticipantSelectStep();
+        Debug.Log($"[Fusao] Confirmado: {ResolveUnitRuntimeName(selectedUnit)} funde em {ResolveUnitRuntimeName(target.unit)}.");
+        StartMergeExecution();
         return true;
     }
 
@@ -263,7 +245,7 @@ public partial class TurnStateManager
         {
             LogMergeDebug("No candidates in participant select");
             if (mergeQueuedUnits.Count > 0)
-                StartMergeExecution();
+                LogMergeParticipantSelectionPanel();
             else
                 ExitMergeStateToMovement();
             return;
@@ -413,6 +395,14 @@ public partial class TurnStateManager
         }
         LogMergeDebug($"ExecuteQueuedMergeOrdersSequence participants={participants.Count}");
 
+        UnitManager mergeTarget = participants[0];
+        if (mergeTarget == null || !mergeTarget.gameObject.activeInHierarchy)
+        {
+            mergeExecutionInProgress = false;
+            ExitMergeStateToMovement();
+            yield break;
+        }
+
         List<UnitManager> mergeMembers = BuildMergeMembersForLayerPlan(receiver, participants);
         MergeLayerPlan layerPlan = ResolveMergeLayerPlanForExecution(mergeMembers, boardMap);
         bool hasFusionLayer = TryGetFusionLayerFromPlan(layerPlan, out Domain fusionDomain, out HeightLevel fusionHeight);
@@ -461,86 +451,79 @@ public partial class TurnStateManager
         Dictionary<SupplyData, int> supplyStepsByType = BuildMergeSupplyStepTotals(receiver, participants);
         int missingSupplySlots = ApplyMergedSupplyAmountsToBaseUnit(receiver, supplyStepsByType, resultHp);
 
-        List<UnitManager> consumedParticipants = new List<UnitManager>(participants.Count);
+        List<UnitManager> consumedParticipants = new List<UnitManager>(1);
 
         float mergeStepDuration = GetMergeMoveStepDuration();
         float cursorHopDelay = GetMergeCursorHopDelay();
         float afterParticipantMoveDelay = GetMergeAfterParticipantMoveDelay();
         float afterParticipantLoadDelay = GetMergeAfterParticipantLoadDelay();
 
-        for (int i = 0; i < participants.Count; i++)
+        bool receiverNeedsLayerTransition = hasFusionLayer && !IsUnitOnLayer(receiver, fusionDomain, fusionHeight);
+        receiver.SetTemporarySortingOrder(1000);
+        mergeTarget.SetTemporarySortingOrder(999);
+
+        Vector3Int fromCell = receiver.CurrentCellPosition;
+        fromCell.z = 0;
+        Vector3Int targetMergeCell = mergeTarget.CurrentCellPosition;
+        targetMergeCell.z = 0;
+        List<Vector3Int> receiverPath = new List<Vector3Int>(2) { fromCell, targetMergeCell };
+
+        if (cursorController != null)
         {
-            UnitManager participant = participants[i];
-            if (participant == null || !participant.gameObject.activeInHierarchy)
-                continue;
-
-            bool participantNeedsLayerTransition = hasFusionLayer && !IsUnitOnLayer(participant, fusionDomain, fusionHeight);
-
-            participant.SetTemporarySortingOrder(1000 + i);
-            Vector3Int fromCell = participant.CurrentCellPosition;
-            fromCell.z = 0;
-            Vector3Int targetCell = receiver.CurrentCellPosition;
-            targetCell.z = 0;
-            List<Vector3Int> path = new List<Vector3Int>(2) { fromCell, targetCell };
-
-            if (cursorController != null)
-            {
-                Vector3Int cell = fromCell;
-                cell.z = 0;
-                cursorController.SetCell(cell, playMoveSfx: i > 0);
-                if (i > 0 && cursorHopDelay > 0f)
-                    yield return new WaitForSeconds(cursorHopDelay);
-            }
-
-            bool finished = false;
-            if (animationManager != null)
-            {
-                animationManager.PlayMovement(
-                    participant,
-                    boardMap,
-                    path,
-                    playStartSfx: true,
-                    onAnimationStart: () =>
-                    {
-                        if (participantNeedsLayerTransition)
-                            participant.TrySetCurrentLayerMode(fusionDomain, fusionHeight);
-                        PlayMovementStartSfx(participant);
-                    },
-                    onAnimationFinished: () => finished = true,
-                    onCellReached: reachedCell =>
-                    {
-                        if (cursorController == null)
-                            return;
-
-                        Vector3Int c = reachedCell;
-                        c.z = 0;
-                        cursorController.SetCell(c, playMoveSfx: false);
-                    },
-                    stepDurationOverride: mergeStepDuration);
-                while (!finished)
-                    yield return null;
-            }
-            else
-            {
-                if (participantNeedsLayerTransition)
-                    participant.TrySetCurrentLayerMode(fusionDomain, fusionHeight);
-                PlayMovementStartSfx(participant);
-                participant.SetCurrentCellPosition(targetCell, enforceFinalOccupancyRule: false);
-                if (cursorController != null)
-                    cursorController.SetCell(targetCell, playMoveSfx: false);
-            }
-
-            if (afterParticipantMoveDelay > 0f)
-                yield return new WaitForSeconds(afterParticipantMoveDelay);
-
-            participant.ClearTemporarySortingOrder();
-            cursorController?.PlayLoadSfx();
-            KillEntireEmbarkedChain(participant, detachSelf: true, deathReason: "morto porque fundiu");
-            consumedParticipants.Add(participant);
-
-            if (afterParticipantLoadDelay > 0f)
-                yield return new WaitForSeconds(afterParticipantLoadDelay);
+            cursorController.SetCell(fromCell, playMoveSfx: false);
+            if (cursorHopDelay > 0f)
+                yield return new WaitForSeconds(cursorHopDelay);
         }
+
+        bool receiverFinished = false;
+        if (animationManager != null)
+        {
+            animationManager.PlayMovement(
+                receiver,
+                boardMap,
+                receiverPath,
+                playStartSfx: true,
+                onAnimationStart: () =>
+                {
+                    if (receiverNeedsLayerTransition)
+                        receiver.TrySetCurrentLayerMode(fusionDomain, fusionHeight);
+                    PlayMovementStartSfx(receiver);
+                },
+                onAnimationFinished: () => receiverFinished = true,
+                onCellReached: reachedCell =>
+                {
+                    if (cursorController == null)
+                        return;
+
+                    Vector3Int c = reachedCell;
+                    c.z = 0;
+                    cursorController.SetCell(c, playMoveSfx: false);
+                },
+                stepDurationOverride: mergeStepDuration);
+            while (!receiverFinished)
+                yield return null;
+        }
+        else
+        {
+            if (receiverNeedsLayerTransition)
+                receiver.TrySetCurrentLayerMode(fusionDomain, fusionHeight);
+            PlayMovementStartSfx(receiver);
+            receiver.SetCurrentCellPosition(targetMergeCell, enforceFinalOccupancyRule: false);
+            if (cursorController != null)
+                cursorController.SetCell(targetMergeCell, playMoveSfx: false);
+        }
+
+        if (afterParticipantMoveDelay > 0f)
+            yield return new WaitForSeconds(afterParticipantMoveDelay);
+
+        receiver.ClearTemporarySortingOrder();
+        mergeTarget.ClearTemporarySortingOrder();
+        cursorController?.PlayLoadSfx();
+        KillEntireEmbarkedChain(mergeTarget, detachSelf: true, deathReason: "morto porque fundiu", killer: receiver);
+        consumedParticipants.Add(mergeTarget);
+
+        if (afterParticipantLoadDelay > 0f)
+            yield return new WaitForSeconds(afterParticipantLoadDelay);
 
         receiver.SetCurrentHP(resultHp);
         receiver.MarkMergedWith(consumedParticipants);
@@ -803,6 +786,8 @@ public partial class TurnStateManager
         mergeCandidateEntries.Clear();
         mergeCandidateIndexByCell.Clear();
         if (selectedUnit == null)
+            return;
+        if (mergeQueuedUnits.Count > 0)
             return;
 
         Tilemap map = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
@@ -1074,16 +1059,8 @@ public partial class TurnStateManager
 
         string text = $"[Fusao] Candidatos: total={mergeCandidateEntries.Count} | validos={validCount} | invalidos={invalidCount}\n";
         text += "Use numero (1..9) ou mova o cursor entre os hexes pintados.\n";
-        text += "Enter confirma o candidato atual e avanca para o proximo substep.\n";
-        if (mergeQueuedUnits.Count > 0)
-        {
-            text += "Digite 0 para executar as ordens em fila.\n";
-            text += "ESC desfaz a ultima ordem e volta para editar.\n";
-        }
-        else
-        {
-            text += "ESC volta para sensores.\n";
-        }
+        text += "Enter confirma o candidato atual e executa a fusao.\n";
+        text += "ESC volta para sensores.\n";
 
         for (int i = 0; i < mergeCandidateEntries.Count; i++)
         {
@@ -1112,7 +1089,7 @@ public partial class TurnStateManager
             return;
         }
 
-        Debug.Log($"[Fusao] Confirmar adicionar {ResolveUnitRuntimeName(entry.unit)} na fila? (Enter=sim, ESC=voltar)");
+        Debug.Log($"[Fusao] Confirmar fusao em {ResolveUnitRuntimeName(entry.unit)}? (Enter=sim, ESC=voltar)");
     }
 
     private string ResolveMergeInvalidReason(MergeCandidateEntry entry)
@@ -1216,6 +1193,7 @@ public partial class TurnStateManager
             selectedUnit,
             map,
             terrainDatabase,
+            Mathf.Max(0, selectedUnit.RemainingMovementPoints),
             validNow,
             out string sensorReason,
             invalidNow);
@@ -1265,6 +1243,7 @@ public partial class TurnStateManager
             selectedUnit,
             map,
             terrainDatabase,
+            Mathf.Max(0, selectedUnit.RemainingMovementPoints),
             cachedPodeFundirTargets,
             out cachedPodeFundirReason,
             cachedPodeFundirInvalidTargets);
@@ -1373,8 +1352,8 @@ public partial class TurnStateManager
                 continue;
             }
 
-            Vector3 from = donor.transform.position;
-            Vector3 to = selectedUnit.transform.position;
+            Vector3 from = selectedUnit.transform.position;
+            Vector3 to = donor.transform.position;
             from.z = to.z;
             track.pathPoints.Clear();
             track.pathPoints.Add(from);
@@ -1502,8 +1481,8 @@ public partial class TurnStateManager
             ? baseColor
             : new Color(0.55f, 0.55f, 0.55f, Mathf.Clamp01(baseColor.a * 0.95f));
 
-        Vector3 from = donor.transform.position;
-        Vector3 to = selectedUnit.transform.position;
+        Vector3 from = selectedUnit.transform.position;
+        Vector3 to = donor.transform.position;
         from.z = to.z;
         mergeConfirmPreviewTrack.pathPoints.Clear();
         mergeConfirmPreviewTrack.pathPoints.Add(from);
@@ -1698,10 +1677,12 @@ public partial class TurnStateManager
 
     public bool TryStartAutomatedMergeReplayExecution()
     {
-        if (cursorState != CursorState.Fundindo || mergeExecutionInProgress)
-            return false;
+        if (mergeExecutionInProgress)
+            return true;
+        if (cursorState != CursorState.Fundindo)
+            return CurrentCursorState == CursorState.Neutral || IsScannerActionExecutionInProgress;
         if (mergeQueuedUnits.Count <= 0)
-            return false;
+            return IsScannerActionExecutionInProgress;
 
         StartMergeExecution();
         return true;

@@ -2308,21 +2308,8 @@ public class UnitManager : MonoBehaviour
 
     private void UpdateDynamicName()
     {
-#if UNITY_EDITOR
-        if (IsEditingPrefabContext())
-            return;
-#endif
-
-        string baseName = !string.IsNullOrWhiteSpace(unitDisplayName) ? unitDisplayName : unitId;
-        if (string.IsNullOrWhiteSpace(baseName))
-            baseName = "Unit";
-
-        baseName = baseName.Replace(" ", string.Empty);
-        int team = (int)teamId;
-        int uid = instanceId > 0 ? instanceId : 0;
-        string receivedShortcut = receivedSuppliesThisTurn ? "_X" : string.Empty;
-        string deadShortcut = isDead ? "_D" : string.Empty;
-        gameObject.name = $"{baseName}_T{team}_U{uid}{receivedShortcut}{deadShortcut}";
+        // Intencionalmente desativado: nomes dinamicos quebram rastreabilidade
+        // de logs/auditoria quando o mesmo objeto muda de nome ao longo da partida.
     }
 
     private void SyncRuntimeFlagInspectorView()
@@ -2387,7 +2374,9 @@ public class UnitManager : MonoBehaviour
             return string.Empty;
         if (!string.IsNullOrWhiteSpace(killer.UnitId))
             return killer.UnitId.Trim();
-        return killer.ResolveRuntimeUnitName();
+        if (killer.InstanceId > 0)
+            return $"instance:{killer.InstanceId}";
+        return string.Empty;
     }
 
     private void TryAutoAssignLockRenderer()
@@ -2912,6 +2901,4 @@ public class UnitManager : MonoBehaviour
     }
 #endif
 }
-
-
 

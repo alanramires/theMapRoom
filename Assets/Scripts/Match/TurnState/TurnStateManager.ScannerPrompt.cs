@@ -3167,7 +3167,11 @@ public partial class TurnStateManager
         }
     }
 
-    private void KillEntireEmbarkedChain(UnitManager root, bool detachSelf = true, string deathReason = "morto porque o transportador morreu")
+    private void KillEntireEmbarkedChain(
+        UnitManager root,
+        bool detachSelf = true,
+        string deathReason = "morto porque o transportador morreu",
+        UnitManager killer = null)
     {
         if (root == null)
             return;
@@ -3187,11 +3191,11 @@ public partial class TurnStateManager
             }
 
             for (int i = 0; i < children.Count; i++)
-                KillEntireEmbarkedChain(children[i], detachSelf: true, deathReason: deathReason);
+                KillEntireEmbarkedChain(children[i], detachSelf: true, deathReason: deathReason, killer: killer);
         }
 
         root.SetCurrentHP(0);
-        root.MarkDead(deathReason);
+        root.MarkDead(deathReason, killer);
         
         OnUnitDestroyed?.Invoke(root);
 
