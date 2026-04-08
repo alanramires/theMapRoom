@@ -175,6 +175,8 @@ Se `planCapabilities` estiver vazio, o codigo ainda usa inferencia legada a part
 
 O sistema de compra agora é **capability-driven**. Em vez de usar o atalho antigo de "faltou capturador, compra qualquer capturador", o shopping passa a ler a demanda exportada pelo planner do turno.
 
+Veja mais em `docs/shopping.md`.
+
 ### De onde vem a demanda de compra?
 
 Depois do `EvaluatePlanner()`, cada `AIPlanIntent` carrega sua demanda planejada por papel:
@@ -250,29 +252,11 @@ Então:
 
 ### Regra de economia: Massa mínima
 
-O `Shopping v2` ganhou uma trava para impedir colapso por save ganancioso no early game.
+O `Shopping v2` ganhou uma trava para impedir colapso por save ganancioso.
 
 A IA **não pode guardar dinheiro para uma unidade premium** se isso deixar o exército com pouca massa no momento errado.
 
-Janela de abertura:
-- turnos `1..4`
-
-Bloqueia save se qualquer uma for verdade:
-- `friendlyUnitCount < 2 * activeProductionBuildings`
-- `friendlyUnitCount < totalCaptureDemand + 2`
-- `hasCriticalCaptureGap == true`
-
-Janela curta de estabilização:
-- turnos `5..6`
-
-Bloqueia save se qualquer uma for verdade:
-- `friendlyUnitCount < totalCaptureDemand + totalEscortDemand`
-- `TotalMissingCount >= 2`
-
-Efeito prático:
-- opener com pouca massa continua comprando corpo de mapa;
-- a IA para de "greedar" MBT ou artilharia cara cedo demais;
-- save só acontece quando a presença no mapa já está saudável.
+Hoje essa decisão é baseada no estado real da partida, não mais em faixas fixas de turno. Para a fórmula atual, os campos de debug e a lógica de `mass floor`, veja `docs/shopping.md`.
 
 ### Quando a IA guarda dinheiro?
 
@@ -350,7 +334,7 @@ A ordem dos sensores define o que a unidade tenta fazer a cada turno. O primeiro
 |---|---|
 | **Capture** | Procura o prédio capturável mais prioritário no setor e marcha até ele. Com setor planejado: prefere prédios livres sobre ocupados independente da distância. Avança com cautela (DPQ + movimento mínimo) quando o alvo é território inimigo sem visibilidade (FoW) — exceto se um aliado já ocupar o objetivo (FoW não se aplica, avança normalmente). |
 | **Attack** | Procura o melhor inimigo para engajar com base nos critérios de Attack Decision e planeja o movimento para atacar. O planejamento ocorre mesmo que a unidade ainda não esteja em alcance de tiro — ela move-se em direção ao alvo e ataca ao chegar. |
-| **Supply** | Procura aliados para reabastecer (combustivel, municao, pecas) dentro dos limiares configurados. Primeiro tenta suprir sem mover; se nao houver alvo imediato, navega ate o aliado valido mais proximo. Criticidade so desempata. |
+| **Supply** | Procura aliados para reabastecer (combustivel, municao, pecas) dentro dos limiares configurados. Primeiro tenta suprir sem mover; se nao houver alvo imediato, navega ate o aliado valido mais proximo. Criticidade so desempata. Sem servico util, a unidade logistica recua para a retaguarda/HQ proprio em vez de vagar rumo ao HQ inimigo. |
 | **Reposition** | Fallback: move para a melhor célula disponível sem objetivo específico. |
 
 > A ordem importa: `Capture > Attack > Reposition` = capturador que só briga se necessário. `Attack > Capture > Reposition` = combatente que captura se não tiver inimigo.
@@ -538,7 +522,7 @@ Unidades rogue ainda executam a IA normalmente, mas a cascata de `moveTarget` ca
 | Prioridade | Condicao | Destino |
 |---|---|---|
 | 1 | Supply ativo | Alvo de supply |
-| 2 | Merge ativo | Posicao atual |
+| 2 | Merge ativo | Fusao imediata ou aproximacao valida de fusao |
 | 3 | Reparo ativo | Construcao de reparo |
 | 4 | Captura ativa (`captureObjectiveActive`) | Celula do objetivo de captura |
 | 5 | Inimigo designado (`targetEnemy != null`) | Posicao do inimigo |
@@ -569,11 +553,20 @@ Icone de manutencao (debug):
 - os limiares de entrada (hpRepairThreshold) e saida (hpRepairExitThreshold) vem do AIUnitProfile de cada unidade
 | Situacao | Comportamento |
 |---|---|
+| Unidade com fusao imediata valida | Executa a fusao no proprio turno como atalho de reparo. |
+| Unidade sem fusao imediata, mas com aproximacao valida | Marcha ate um hex adjacente que ainda preserve PM para fundir, e tenta a fusao automatica ao fim do movimento. |
+| Candidato de fusao cuja aproximacao so permite atravessar, mas nao encerrar movimento | E descartado do ranking; nao conta como aproximacao valida. |
 | Unidade com holdPositionWhenInRange, ja na construcao | Atira parada se tiver alvo em alcance. Nao move. |
 | Unidade com holdPositionWhenInRange, ainda marchando para a base | Foca em chegar. Nao atira durante a marcha. |
 | Combatente sem holdPositionWhenInRange | Recua sem revidar. Prioriza chegar a base intacto. |
 | Qualquer unidade com inimigo bloqueando o caminho | repairDislodgeActive: luta para desocupar o caminho, depois retoma o retorno. |
 > Artilharia danificada continua atirando da construcao. O modo reparo significa "nao me move daqui", nao "paro de combater".
+
+Detalhes da fusao em reparo:
+- a IA consulta o `PodeFundirSensor` antes de abandonar o ciclo para reparo puro
+- se houver mais de um candidato, o ranking favorece a aproximacao de menor custo real
+- a celula escolhida para aproximacao precisa ser um hex onde a unidade possa **terminar** o movimento, nao apenas atravessar
+- se o candidato preferido ficar invalido apos o movimento, a IA nao confirma a fusao a forca
 ---
 
 ## Perfis Ativos
@@ -753,7 +746,7 @@ Planner Capability: `Logistics`
 | retreatToHqWhenIdle | Não | Sim |
 | playConservative | Sim | Sim |
 
-**Comportamento:** Civil puro. Nunca ataca proativamente (sem sensor Attack). Joga conservadoramente em ambas as posturas — prefere celulas seguras e evita perigo. Em defesa, recua ao HQ quando sem aliados para suprir. Quando o sensor `Supply` encontra mais de um aliado valido, prioriza o **mais proximo**; se houver empate de distancia, desempata pela criticidade (HP, municao e combustivel). Primeiro tenta suprir sem mover; se nao houver alvo imediato, navega ate o aliado escolhido. Retorna a base para reabastecer quando combustivel, municao ou pecas da propria carroceria caem abaixo dos limiares de restock do profile.
+**Comportamento:** Civil puro. Nunca ataca proativamente (sem sensor Attack). Joga conservadoramente em ambas as posturas — prefere celulas seguras e evita perigo. Quando nao ha aliado para suprir, recua para a retaguarda/HQ proprio em vez de cair no fallback ofensivo generico. Quando o sensor `Supply` encontra mais de um aliado valido, prioriza o **mais proximo**; se houver empate de distancia, desempata pela criticidade (HP, municao e combustivel). Primeiro tenta suprir sem mover; se nao houver alvo imediato, navega ate o aliado escolhido. Retorna a base para reabastecer quando combustivel, municao ou pecas da propria carroceria caem abaixo dos limiares de restock do profile.
 
 
 

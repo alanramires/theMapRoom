@@ -176,6 +176,32 @@ public class AIPlayerController : MonoBehaviour
     }
 
     [System.Serializable]
+    public sealed class ShoppingOrderDebugView
+    {
+        public string orderId;
+        public string planLabel;
+        public string capability;
+        public int remainingCount;
+        public int priorityScore;
+        public bool critical;
+        public string reason;
+    }
+
+    [System.Serializable]
+    public sealed class ShoppingDecisionDebugView
+    {
+        public string constructionLabel;
+        public string kind;
+        public string plannedUnitId;
+        public int targetIndex;
+        public int cost;
+        public bool usedSavingFallback;
+        public string planKey;
+        public string capability;
+        public string reason;
+    }
+
+    [System.Serializable]
     public sealed class TeamPlannerDebugView
     {
         public TeamId team;
@@ -183,8 +209,37 @@ public class AIPlayerController : MonoBehaviour
         public List<PlanDebugView> plans = new List<PlanDebugView>();
     }
 
+    [System.Serializable]
+    public sealed class TeamShoppingDebugView
+    {
+        public TeamId team;
+        public string currentStanceName;
+        public int turnNumber;
+        public int totalMoney;
+        public int reservedMoney;
+        public int freeMoney;
+        public int saveTargetMoney;
+        public int strategicReserveMoney;
+        public bool massFloorBlocked;
+        public int massFloorCurrentUnits;
+        public int massFloorRequiredUnits;
+        public string massFloorReason;
+        public bool hasCriticalCaptureGap;
+        public bool strategicSaveActive;
+        public string strategicSaveUnitId;
+        public string strategicSaveSourceLabel;
+        public int strategicSaveCost;
+        public int strategicSaveTurnsToAfford;
+        public int strategicSaveDeferredOrders;
+        public string strategicSaveReason;
+        public List<ShoppingOrderDebugView> orders = new List<ShoppingOrderDebugView>();
+        public List<ShoppingDecisionDebugView> decisions = new List<ShoppingDecisionDebugView>();
+    }
+
     [SerializeField, Tooltip("Visao consolidada dos planos por time IA (debug). Atualizada sob demanda.")]
     private List<TeamPlannerDebugView> plannerDebugView = new List<TeamPlannerDebugView>();
+    [SerializeField, Tooltip("Ultimo plano central de compras por time IA (debug).")]
+    private List<TeamShoppingDebugView> shoppingDebugView = new List<TeamShoppingDebugView>();
 
     private readonly Dictionary<TeamId, TeamPlannerRuntimeState> plannerStateByTeam = new Dictionary<TeamId, TeamPlannerRuntimeState>();
     private TeamId plannerContextTeam = TeamId.Neutral;
@@ -243,10 +298,97 @@ public class AIPlayerController : MonoBehaviour
     public IReadOnlyList<AIPlanIntent> CurrentTurnPlans => GetOrCreatePlannerState(GetDebugReferenceTeam()).currentTurnPlans;
     public IReadOnlyDictionary<int, AIPlanIntent> CurrentTurnUnitRoles => GetOrCreatePlannerState(GetDebugReferenceTeam()).unitRoles;
     public IReadOnlyList<TeamPlannerDebugView> PlannerDebugView => plannerDebugView;
+    public IReadOnlyList<TeamShoppingDebugView> ShoppingDebugView => shoppingDebugView;
 
     public IReadOnlyList<AIPlanIntent> GetCurrentTurnPlansForDebugTeam(TeamId team)
     {
         return GetOrCreatePlannerState(team).currentTurnPlans;
+    }
+
+    private void UpdateShoppingDebugView(TeamId team, AIShoppingTurnPlan shoppingPlan)
+    {
+        if (shoppingDebugView == null)
+            shoppingDebugView = new List<TeamShoppingDebugView>();
+
+        int index = -1;
+        for (int i = 0; i < shoppingDebugView.Count; i++)
+        {
+            if (shoppingDebugView[i] != null && shoppingDebugView[i].team == team)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        TeamShoppingDebugView view = new TeamShoppingDebugView
+        {
+            team = team,
+            currentStanceName = currentStance.ToString(),
+            turnNumber = shoppingPlan != null ? shoppingPlan.turnNumber : 0,
+            totalMoney = shoppingPlan != null ? shoppingPlan.budget.totalMoney : 0,
+            reservedMoney = shoppingPlan != null ? shoppingPlan.budget.reservedMoney : 0,
+            freeMoney = shoppingPlan != null ? shoppingPlan.budget.freeMoney : 0,
+            saveTargetMoney = shoppingPlan != null ? shoppingPlan.budget.saveTargetMoney : 0,
+            strategicReserveMoney = shoppingPlan != null ? shoppingPlan.budget.strategicReserveMoney : 0,
+            massFloorBlocked = shoppingPlan != null && shoppingPlan.budget.massFloorBlocked,
+            massFloorCurrentUnits = shoppingPlan != null ? shoppingPlan.friendlyUnitCount : 0,
+            massFloorRequiredUnits = shoppingPlan != null ? shoppingPlan.massFloorRequiredUnits : 0,
+            massFloorReason = shoppingPlan != null ? shoppingPlan.massFloorReason : null,
+            hasCriticalCaptureGap = shoppingPlan != null && shoppingPlan.hasCriticalCaptureGap,
+            strategicSaveActive = shoppingPlan != null && shoppingPlan.strategicSaveActive,
+            strategicSaveUnitId = shoppingPlan != null ? shoppingPlan.strategicSaveUnitId : null,
+            strategicSaveSourceLabel = shoppingPlan != null ? shoppingPlan.strategicSaveSourceLabel : null,
+            strategicSaveCost = shoppingPlan != null ? shoppingPlan.strategicSaveCost : 0,
+            strategicSaveTurnsToAfford = shoppingPlan != null ? shoppingPlan.strategicSaveTurnsToAfford : 0,
+            strategicSaveDeferredOrders = shoppingPlan != null ? shoppingPlan.strategicSaveDeferredOrders : 0,
+            strategicSaveReason = shoppingPlan != null ? shoppingPlan.strategicSaveReason : null
+        };
+
+        if (shoppingPlan != null)
+        {
+            for (int i = 0; i < shoppingPlan.orders.Count; i++)
+            {
+                AIShoppingOrder order = shoppingPlan.orders[i];
+                if (order == null)
+                    continue;
+
+                view.orders.Add(new ShoppingOrderDebugView
+                {
+                    orderId = order.orderId,
+                    planLabel = order.planLabel,
+                    capability = order.capability.ToString(),
+                    remainingCount = order.remainingCount,
+                    priorityScore = order.priorityScore,
+                    critical = order.critical,
+                    reason = order.reason
+                });
+            }
+
+            for (int i = 0; i < shoppingPlan.constructionDecisions.Count; i++)
+            {
+                AIShoppingConstructionDecision decision = shoppingPlan.constructionDecisions[i];
+                if (decision == null)
+                    continue;
+
+                view.decisions.Add(new ShoppingDecisionDebugView
+                {
+                    constructionLabel = decision.constructionLabel,
+                    kind = decision.kind.ToString(),
+                    plannedUnitId = decision.plannedUnitId,
+                    targetIndex = decision.targetIndex,
+                    cost = decision.cost,
+                    usedSavingFallback = decision.usedSavingFallback,
+                    planKey = decision.planKey,
+                    capability = decision.capability.ToString(),
+                    reason = decision.plannedReason
+                });
+            }
+        }
+
+        if (index >= 0)
+            shoppingDebugView[index] = view;
+        else
+            shoppingDebugView.Add(view);
     }
 
     public void SimulatePlannerGenerationForDebugSelectedTeam()
@@ -2595,10 +2737,15 @@ public class AIPlayerController : MonoBehaviour
             moveTarget = supplyObjectiveCell;
             moveTarget.z = 0;
         }
-        else if (isSupplierUnit && defendMode)
+        else if (isSupplierUnit && (defendMode || stanceBehavior.retreatToHqWhenIdle))
         {
             repositioningForDefense = true;
-            if (TryGetSupplyTruckDefensivePatrolCell(unit, snapshot, out Vector3Int stDefensiveCell))
+            if (TryGetSupplierIdleParkingCell(unit, snapshot, occupiedByAllies, out Vector3Int supplierParkingCell))
+            {
+                moveTarget = supplierParkingCell;
+                moveTarget.z = 0;
+            }
+            else if (defendMode && TryGetSupplyTruckDefensivePatrolCell(unit, snapshot, out Vector3Int stDefensiveCell))
             {
                 moveTarget = stDefensiveCell;
                 moveTarget.z = 0;
@@ -2616,8 +2763,8 @@ public class AIPlayerController : MonoBehaviour
         else if (isSupplierUnit)
         {
             // Supply truck sem objetivo de supply e sem postura conservativa:
-            // move-se em direÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o ÃƒÆ’Ã‚Â  unidade amiga mais prÃƒÆ’Ã‚Â³xima para ficar em posiÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o de apoio.
-            // Evita o fallback genÃƒÆ’Ã‚Â©rico de avanÃƒÆ’Ã‚Â§ar rumo ao HQ inimigo.
+            // move-se em direcao a unidade amiga mais proxima para ficar em posicao de apoio.
+            // Evita o fallback generico de avancar rumo ao HQ inimigo.
             repositioningForDefense = true;
             Vector3Int anchor = snapshot.HasHq ? snapshot.HqCell : unitCell;
             if (snapshot.FriendlyUnits != null)
@@ -3046,9 +3193,24 @@ public class AIPlayerController : MonoBehaviour
             && bestDest != unitCell
             && IsCellTooDangerousForSupport(snapshot, bestDest, allowModerateRiskForSupply: supplyObjectiveActive))
         {
-            if (aiLog)
-                Debug.Log($"{T(aiTeam, 2)} [support] {unit.name} evitou avancar para {FormatCellLC(bestDest)} por risco alto; mantendo posicao segura.");
-            bestDest = unitCell;
+            if (TryFindSaferSupplierStagingCell(unit, snapshot, moveTarget, occupiedByAllies, preferredSupportCells, penalizedMovementCells, out Vector3Int saferSupportCell))
+            {
+                if (aiLog)
+                    Debug.Log($"{T(aiTeam, 2)} [support] {unit.name} evitou avancar para {FormatCellLC(bestDest)} por risco alto; redirecionando para staging seguro em {FormatCellLC(saferSupportCell)}.");
+                bestDest = saferSupportCell;
+            }
+            else if (supplyObjectiveActive && !supplyActionNow && IsFriendlyConstructionCell(snapshot, unit.TeamId, unitCell) && TryGetSupplierIdleParkingCell(unit, snapshot, occupiedByAllies, out Vector3Int supplierParkingCell))
+            {
+                if (aiLog)
+                    Debug.Log($"{T(aiTeam, 2)} [support] {unit.name} evitou avancar para {FormatCellLC(bestDest)} por risco alto; saindo da construcao para estacionamento seguro em {FormatCellLC(supplierParkingCell)}.");
+                bestDest = supplierParkingCell;
+            }
+            else
+            {
+                if (aiLog)
+                    Debug.Log($"{T(aiTeam, 2)} [support] {unit.name} evitou avancar para {FormatCellLC(bestDest)} por risco alto; mantendo posicao segura.");
+                bestDest = unitCell;
+            }
         }
 
 
@@ -4166,6 +4328,73 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         return false;
     }
 
+    private bool TryFindSaferSupplierStagingCell(
+        UnitManager supplier,
+        AISnapshot snapshot,
+        Vector3Int moveTarget,
+        HashSet<Vector3Int> occupiedByAllies,
+        HashSet<Vector3Int> preferredCells,
+        HashSet<Vector3Int> penalizedCells,
+        out Vector3Int safeCell)
+    {
+        safeCell = default;
+        if (supplier == null || snapshot == null || snapshot.BoardTilemap == null)
+            return false;
+
+        TerrainDatabase terrainDb = turnStateManager != null ? turnStateManager.TerrainDatabaseRef : null;
+        int moveBudget = Mathf.Max(0, supplier.RemainingMovementPoints);
+        Dictionary<Vector3Int, List<Vector3Int>> paths = UnitMovementPathRules.CalcularCaminhosValidos(
+            snapshot.BoardTilemap,
+            supplier,
+            moveBudget,
+            terrainDb);
+        if (paths == null || paths.Count <= 0)
+            return false;
+
+        Vector3Int origin = supplier.CurrentCellPosition;
+        origin.z = 0;
+        moveTarget.z = 0;
+
+        bool found = false;
+        int bestScore = int.MinValue;
+        int bestDistanceToTarget = int.MaxValue;
+
+        foreach (var kv in paths)
+        {
+            Vector3Int candidate = kv.Key;
+            candidate.z = 0;
+            if (candidate == origin)
+                continue;
+            if (occupiedByAllies != null && occupiedByAllies.Contains(candidate))
+                continue;
+            if (IsCellTooDangerousForSupport(snapshot, candidate, allowModerateRiskForSupply: true))
+                continue;
+
+            int distanceToTarget = GetHexDistance(snapshot.BoardTilemap, candidate, moveTarget, 64);
+            if (distanceToTarget == int.MaxValue)
+                distanceToTarget = 64;
+
+            int score = -distanceToTarget * 100;
+            if (preferredCells != null && preferredCells.Contains(candidate))
+                score += 350;
+            if (penalizedCells != null && penalizedCells.Contains(candidate))
+                score -= 500;
+            if (IsFriendlyConstructionCell(snapshot, supplier.TeamId, candidate))
+                score -= 800;
+
+            bool better = !found || score > bestScore || (score == bestScore && distanceToTarget < bestDistanceToTarget);
+            if (!better)
+                continue;
+
+            found = true;
+            bestScore = score;
+            bestDistanceToTarget = distanceToTarget;
+            safeCell = candidate;
+        }
+
+        return found;
+    }
+
     private bool TryResolveSupplyObjectiveCell(
         UnitManager supplier,
         UnitManager target,
@@ -4635,6 +4864,70 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             + (lowHp ? 5000 : 0) + (lowAmmo ? 3000 : 0) + (lowAutonomy ? 2500 : 0);
         return true;
     }
+    private bool TryGetSupplierIdleParkingCell(UnitManager unit, AISnapshot snapshot, HashSet<Vector3Int> occupiedByAllies, out Vector3Int targetCell)
+    {
+        targetCell = default;
+        if (unit == null || snapshot == null || snapshot.BoardTilemap == null)
+            return false;
+
+        Vector3Int unitCell = unit.CurrentCellPosition;
+        unitCell.z = 0;
+
+        Vector3Int anchorCell;
+        if (TryGetNearestOwnedConstruction(unit, snapshot, out _, out anchorCell, out _))
+        {
+            anchorCell.z = 0;
+        }
+        else if (snapshot.HasHq)
+        {
+            anchorCell = snapshot.HqCell;
+            anchorCell.z = 0;
+        }
+        else
+        {
+            return false;
+        }
+
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+        UnitMovementPathRules.GetImmediateHexNeighbors(snapshot.BoardTilemap, anchorCell, neighbors);
+
+        bool found = false;
+        int bestDistance = int.MaxValue;
+        Vector3Int bestCell = default;
+
+        for (int i = 0; i < neighbors.Count; i++)
+        {
+            Vector3Int candidate = neighbors[i];
+            candidate.z = 0;
+            if (IsFriendlyConstructionCell(snapshot, unit.TeamId, candidate))
+                continue;
+            if (occupiedByAllies != null && occupiedByAllies.Contains(candidate))
+                continue;
+            if (IsCellOccupiedBySnapshotUnit(snapshot, unit, null, candidate))
+                continue;
+            if (!CanAiUnitEndMoveAtCell(unit, snapshot.BoardTilemap, candidate))
+                continue;
+
+            int distance = GetHexDistance(snapshot.BoardTilemap, unitCell, candidate, 64);
+            if (distance == int.MaxValue)
+                continue;
+
+            if (!found || distance < bestDistance)
+            {
+                found = true;
+                bestDistance = distance;
+                bestCell = candidate;
+            }
+        }
+
+        if (!found)
+            return false;
+
+        targetCell = bestCell;
+        targetCell.z = 0;
+        return true;
+    }
+
     private bool TryGetSupplyTruckDefensivePatrolCell(UnitManager unit, AISnapshot snapshot, out Vector3Int targetCell)
     {
         targetCell = default;
@@ -5721,21 +6014,12 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
 
         int bought = 0;
         int savingFallbackPurchases = 0;
+        AIShoppingManager shoppingManager = new AIShoppingManager();
         for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
         {
             AIConstructionInfo info = snapshot.KnownConstructions[i];
             if (info.TeamId != aiTeam || !info.CanProduceUnits || info.Source == null)
                 continue;
-            if (TryGetBlockingShoppingOccupant(info.Source, out UnitManager blocker))
-            {
-                if (aiLog)
-                {
-                    Debug.Log(
-                        $"{T(aiTeam, 3)} sem compra planejada em {info.DisplayName} | " +
-                        $"motivo: construcao bloqueada por {blocker.name} ({blocker.GetDomain()}/{blocker.GetHeightLevel()})");
-                }
-                continue;
-            }
 
             yield return StartCoroutine(turnStateManager.WaitUntilAutomatedNeutralReady(2f));
 
@@ -5743,12 +6027,40 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             AISnapshot current = TakeSnapshot(aiTeam, refreshStance: false);
             int currentMoney = matchController != null ? matchController.GetActualMoney(aiTeam) : 0;
             int incomePerTurn = matchController != null ? matchController.GetIncomePerTurn(aiTeam) : 0;
+            AIData effectiveData = GetEffectiveAIData(aiTeam);
+            AIDataMode mode = currentStance == AIStance.Defend
+                ? effectiveData.defenseMode
+                : effectiveData.attackMode;
+            bool defenseMode = currentStance == AIStance.Defend;
+            int maxVariablePlans = BuildPlannerRuntimeConfig(aiTeam).MaxVariablePlans;
+            AIShoppingTurnPlan shoppingPlan = shoppingManager.BuildTurnPlan(
+                aiTeam,
+                current,
+                mode,
+                defenseMode,
+                currentMoney,
+                incomePerTurn,
+                matchController != null ? matchController.CurrentTurn : 0,
+                maxVariablePlans,
+                savingFallbackPurchases);
+            UpdateShoppingDebugView(aiTeam, shoppingPlan);
 
-            if (!TryResolveShoppingPlan(aiTeam, current, info.Source, currentMoney, incomePerTurn, savingFallbackPurchases, out int targetIndex, out string plannedUnitId, out string plannedReason, out bool usedSavingFallback))
+            if (!shoppingPlan.TryGetDecision(info.Source, out AIShoppingConstructionDecision shoppingDecision) || shoppingDecision == null)
             {
-                if (aiLog) Debug.Log($"{T(aiTeam, 3)} sem compra planejada em {info.DisplayName} (saldo={currentMoney}) | motivo: {plannedReason}");
+                if (aiLog) Debug.Log($"{T(aiTeam, 3)} sem compra planejada em {info.DisplayName} (saldo={currentMoney}) | motivo: sem decisao central de shopping");
                 continue;
             }
+
+            if (shoppingDecision.kind != AIShoppingDecisionKind.Buy)
+            {
+                if (aiLog) Debug.Log($"{T(aiTeam, 3)} sem compra planejada em {info.DisplayName} (saldo={currentMoney}) | motivo: {shoppingDecision.plannedReason}");
+                continue;
+            }
+
+            int targetIndex = shoppingDecision.targetIndex;
+            string plannedUnitId = shoppingDecision.plannedUnitId;
+            string plannedReason = shoppingDecision.plannedReason;
+            bool usedSavingFallback = shoppingDecision.usedSavingFallback;
 
             Vector3Int cell = info.Source.CurrentCellPosition;
             cell.z = 0;

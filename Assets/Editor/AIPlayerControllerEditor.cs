@@ -12,6 +12,7 @@ public class AIPlayerControllerEditor : Editor
     private SerializedProperty aiDatabaseProp;
     private SerializedProperty battleStanceDatabaseProp;
     private SerializedProperty plannerDebugViewProp;
+    private SerializedProperty shoppingDebugViewProp;
     private SerializedProperty plannerDebugSimulationTeamProp;
 
     private void OnEnable()
@@ -23,6 +24,7 @@ public class AIPlayerControllerEditor : Editor
         aiDatabaseProp = serializedObject.FindProperty("aiDatabase");
         battleStanceDatabaseProp = serializedObject.FindProperty("battleStanceDatabase");
         plannerDebugViewProp = serializedObject.FindProperty("plannerDebugView");
+        shoppingDebugViewProp = serializedObject.FindProperty("shoppingDebugView");
         plannerDebugSimulationTeamProp = serializedObject.FindProperty("plannerDebugSimulationTeam");
     }
 
@@ -86,6 +88,10 @@ public class AIPlayerControllerEditor : Editor
         EditorGUILayout.EndHorizontal();
 
         DrawPlannerDebugView(controller, plannerDebugViewProp);
+
+        EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField("Shopping Runtime (Debug)", EditorStyles.boldLabel);
+        DrawShoppingDebugView(controller, shoppingDebugViewProp);
 
         serializedObject.ApplyModifiedProperties();
     }
@@ -196,6 +202,155 @@ public class AIPlayerControllerEditor : Editor
             DrawPlannerTeamElement(teamElement, i);
         }
         EditorGUI.indentLevel--;
+    }
+
+    private static void DrawShoppingDebugView(AIPlayerController controller, SerializedProperty shoppingDebugViewProperty)
+    {
+        if (controller == null)
+        {
+            EditorGUILayout.HelpBox("AIPlayerController invalido.", MessageType.Warning);
+            return;
+        }
+
+        IReadOnlyList<AIPlayerController.TeamShoppingDebugView> teams = controller.ShoppingDebugView;
+        if ((teams == null || teams.Count == 0) && (shoppingDebugViewProperty == null || !shoppingDebugViewProperty.isArray || shoppingDebugViewProperty.arraySize == 0))
+        {
+            EditorGUILayout.HelpBox("Nenhum plano de compras em debug ainda. A lista aparece depois que a IA monta a Fase 3.", MessageType.None);
+            return;
+        }
+
+        if (shoppingDebugViewProperty == null)
+        {
+            EditorGUILayout.HelpBox("shoppingDebugView nao encontrado para desenhar a lista.", MessageType.Warning);
+            return;
+        }
+
+        shoppingDebugViewProperty.isExpanded = EditorGUILayout.Foldout(shoppingDebugViewProperty.isExpanded, $"Shopping Debug View ({shoppingDebugViewProperty.arraySize})", true);
+        if (!shoppingDebugViewProperty.isExpanded)
+            return;
+
+        EditorGUI.indentLevel++;
+        for (int i = 0; i < shoppingDebugViewProperty.arraySize; i++)
+        {
+            SerializedProperty teamElement = shoppingDebugViewProperty.GetArrayElementAtIndex(i);
+            if (teamElement == null)
+                continue;
+
+            DrawShoppingTeamElement(teamElement, i);
+        }
+        EditorGUI.indentLevel--;
+    }
+
+    private static void DrawShoppingTeamElement(SerializedProperty teamElement, int index)
+    {
+        SerializedProperty teamProp = teamElement.FindPropertyRelative("team");
+        SerializedProperty stanceProp = teamElement.FindPropertyRelative("currentStanceName");
+        SerializedProperty turnProp = teamElement.FindPropertyRelative("turnNumber");
+        SerializedProperty totalMoneyProp = teamElement.FindPropertyRelative("totalMoney");
+        SerializedProperty reservedMoneyProp = teamElement.FindPropertyRelative("reservedMoney");
+        SerializedProperty freeMoneyProp = teamElement.FindPropertyRelative("freeMoney");
+        SerializedProperty saveTargetMoneyProp = teamElement.FindPropertyRelative("saveTargetMoney");
+        SerializedProperty strategicReserveMoneyProp = teamElement.FindPropertyRelative("strategicReserveMoney");
+        SerializedProperty massFloorBlockedProp = teamElement.FindPropertyRelative("massFloorBlocked");
+        SerializedProperty massFloorCurrentUnitsProp = teamElement.FindPropertyRelative("massFloorCurrentUnits");
+        SerializedProperty massFloorRequiredUnitsProp = teamElement.FindPropertyRelative("massFloorRequiredUnits");
+        SerializedProperty massFloorReasonProp = teamElement.FindPropertyRelative("massFloorReason");
+        SerializedProperty criticalGapProp = teamElement.FindPropertyRelative("hasCriticalCaptureGap");
+        SerializedProperty strategicSaveActiveProp = teamElement.FindPropertyRelative("strategicSaveActive");
+        SerializedProperty strategicSaveUnitIdProp = teamElement.FindPropertyRelative("strategicSaveUnitId");
+        SerializedProperty strategicSaveSourceLabelProp = teamElement.FindPropertyRelative("strategicSaveSourceLabel");
+        SerializedProperty strategicSaveCostProp = teamElement.FindPropertyRelative("strategicSaveCost");
+        SerializedProperty strategicSaveTurnsProp = teamElement.FindPropertyRelative("strategicSaveTurnsToAfford");
+        SerializedProperty strategicSaveDeferredOrdersProp = teamElement.FindPropertyRelative("strategicSaveDeferredOrders");
+        SerializedProperty strategicSaveReasonProp = teamElement.FindPropertyRelative("strategicSaveReason");
+        SerializedProperty ordersProp = teamElement.FindPropertyRelative("orders");
+        SerializedProperty decisionsProp = teamElement.FindPropertyRelative("decisions");
+        string teamLabel = ResolveTeamElementLabel(teamProp, index, stanceProp);
+
+        teamElement.isExpanded = EditorGUILayout.Foldout(teamElement.isExpanded, teamLabel, true);
+        if (!teamElement.isExpanded)
+            return;
+
+        EditorGUI.indentLevel++;
+        if (turnProp != null) EditorGUILayout.PropertyField(turnProp);
+        if (totalMoneyProp != null) EditorGUILayout.PropertyField(totalMoneyProp);
+        if (reservedMoneyProp != null) EditorGUILayout.PropertyField(reservedMoneyProp);
+        if (freeMoneyProp != null) EditorGUILayout.PropertyField(freeMoneyProp);
+        if (saveTargetMoneyProp != null) EditorGUILayout.PropertyField(saveTargetMoneyProp);
+        if (strategicReserveMoneyProp != null) EditorGUILayout.PropertyField(strategicReserveMoneyProp);
+        if (massFloorBlockedProp != null) EditorGUILayout.PropertyField(massFloorBlockedProp);
+        if (massFloorCurrentUnitsProp != null) EditorGUILayout.PropertyField(massFloorCurrentUnitsProp);
+        if (massFloorRequiredUnitsProp != null) EditorGUILayout.PropertyField(massFloorRequiredUnitsProp);
+        if (massFloorReasonProp != null) EditorGUILayout.PropertyField(massFloorReasonProp);
+        if (criticalGapProp != null) EditorGUILayout.PropertyField(criticalGapProp);
+        if (strategicSaveActiveProp != null) EditorGUILayout.PropertyField(strategicSaveActiveProp);
+        if (strategicSaveUnitIdProp != null) EditorGUILayout.PropertyField(strategicSaveUnitIdProp);
+        if (strategicSaveSourceLabelProp != null) EditorGUILayout.PropertyField(strategicSaveSourceLabelProp);
+        if (strategicSaveCostProp != null) EditorGUILayout.PropertyField(strategicSaveCostProp);
+        if (strategicSaveTurnsProp != null) EditorGUILayout.PropertyField(strategicSaveTurnsProp);
+        if (strategicSaveDeferredOrdersProp != null) EditorGUILayout.PropertyField(strategicSaveDeferredOrdersProp);
+        if (strategicSaveReasonProp != null) EditorGUILayout.PropertyField(strategicSaveReasonProp);
+
+        if (ordersProp != null)
+            DrawSimpleArray(ordersProp, "Orders");
+        if (decisionsProp != null)
+            DrawSimpleArray(decisionsProp, "Decisions");
+        EditorGUI.indentLevel--;
+    }
+
+    private static void DrawSimpleArray(SerializedProperty arrayProp, string label)
+    {
+        if (arrayProp == null || !arrayProp.isArray)
+        {
+            EditorGUILayout.LabelField(label, "(indisponivel)");
+            return;
+        }
+
+        arrayProp.isExpanded = EditorGUILayout.Foldout(arrayProp.isExpanded, $"{label} ({arrayProp.arraySize})", true);
+        if (!arrayProp.isExpanded)
+            return;
+
+        EditorGUI.indentLevel++;
+        for (int i = 0; i < arrayProp.arraySize; i++)
+        {
+            SerializedProperty element = arrayProp.GetArrayElementAtIndex(i);
+            if (element == null)
+                continue;
+
+            string itemLabel = BuildArrayElementLabel(element, i, label);
+            element.isExpanded = EditorGUILayout.Foldout(element.isExpanded, itemLabel, true);
+            if (!element.isExpanded)
+                continue;
+
+            EditorGUI.indentLevel++;
+            SerializedProperty iterator = element.Copy();
+            SerializedProperty end = iterator.GetEndProperty();
+            bool enterChildren = true;
+            while (iterator.NextVisible(enterChildren) && !SerializedProperty.EqualContents(iterator, end))
+            {
+                EditorGUILayout.PropertyField(iterator, true);
+                enterChildren = false;
+            }
+            EditorGUI.indentLevel--;
+        }
+        EditorGUI.indentLevel--;
+    }
+
+    private static string BuildArrayElementLabel(SerializedProperty element, int index, string fallbackLabel)
+    {
+        SerializedProperty orderId = element.FindPropertyRelative("orderId");
+        if (orderId != null && !string.IsNullOrWhiteSpace(orderId.stringValue))
+            return $"[{index}] {orderId.stringValue}";
+
+        SerializedProperty constructionLabel = element.FindPropertyRelative("constructionLabel");
+        if (constructionLabel != null && !string.IsNullOrWhiteSpace(constructionLabel.stringValue))
+            return $"[{index}] {constructionLabel.stringValue}";
+
+        SerializedProperty planLabel = element.FindPropertyRelative("planLabel");
+        if (planLabel != null && !string.IsNullOrWhiteSpace(planLabel.stringValue))
+            return $"[{index}] {planLabel.stringValue}";
+
+        return $"{fallbackLabel} {index}";
     }
 
     private static void DrawPlannerTeamElement(SerializedProperty teamElement, int index)
