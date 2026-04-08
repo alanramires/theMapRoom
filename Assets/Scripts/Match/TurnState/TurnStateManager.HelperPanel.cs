@@ -2041,7 +2041,7 @@ public partial class TurnStateManager
             for (int i = 0; i < mergeCandidateEntries.Count; i++)
             {
                 MergeCandidateEntry entry = mergeCandidateEntries[i];
-                if (entry == null || entry.unit == null)
+                if (entry == null || entry.unit == null || !entry.isValid)
                     continue;
 
                 data.MergeCandidateLines.Add(new HelperMergeCandidateLine

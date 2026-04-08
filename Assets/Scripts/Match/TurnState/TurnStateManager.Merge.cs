@@ -231,7 +231,7 @@ public partial class TurnStateManager
         RebuildMergeCandidateEntries();
         PaintMergeCandidateOptions();
         scannerPromptStep = ScannerPromptStep.MergeParticipantSelect;
-        mergeSelectedCandidateIndex = mergeCandidateEntries.Count > 0 ? 0 : -1;
+        mergeSelectedCandidateIndex = FindFirstValidMergeCandidateIndex();
         mergeTargetAutoEntered = false;
 
         if (cursorController != null && mergeSelectedCandidateIndex >= 0 && mergeSelectedCandidateIndex < mergeCandidateEntries.Count)
@@ -277,7 +277,7 @@ public partial class TurnStateManager
         RebuildMergeCandidateEntries();
         PaintMergeCandidateOptions();
         if (mergeSelectedCandidateIndex < 0 || mergeSelectedCandidateIndex >= mergeCandidateEntries.Count)
-            mergeSelectedCandidateIndex = mergeCandidateEntries.Count > 0 ? 0 : -1;
+            mergeSelectedCandidateIndex = FindFirstValidMergeCandidateIndex();
         LogMergeParticipantSelectionPanel();
     }
 
@@ -861,18 +861,17 @@ public partial class TurnStateManager
 
         Color teamColor = TeamUtils.GetColor(selectedUnit.TeamId);
         Color overlayColorValid = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(movementRangeAlpha));
-        Color overlayColorInvalid = new Color(0.45f, 0.45f, 0.45f, Mathf.Clamp01(movementRangeAlpha * 0.9f));
         for (int i = 0; i < mergeCandidateEntries.Count; i++)
         {
             MergeCandidateEntry candidate = mergeCandidateEntries[i];
-            if (candidate == null)
+            if (candidate == null || !candidate.isValid)
                 continue;
 
             Vector3Int cell = candidate.cell;
             cell.z = 0;
             rangeMapTilemap.SetTile(cell, rangeOverlayTile);
             rangeMapTilemap.SetTileFlags(cell, TileFlags.None);
-            rangeMapTilemap.SetColor(cell, candidate.isValid ? overlayColorValid : overlayColorInvalid);
+            rangeMapTilemap.SetColor(cell, overlayColorValid);
             paintedRangeCells.Add(cell);
             paintedRangeLookup.Add(cell);
         }
@@ -950,11 +949,16 @@ public partial class TurnStateManager
 
         int currentIndex = mergeSelectedCandidateIndex;
         if (currentIndex < 0 || currentIndex >= mergeCandidateEntries.Count)
-            currentIndex = 0;
+            currentIndex = FindFirstValidMergeCandidateIndex();
+        if (currentIndex < 0)
+            return false;
 
-        int nextIndex = (currentIndex + step + mergeCandidateEntries.Count) % mergeCandidateEntries.Count;
+        int nextIndex = FindNextValidMergeCandidateIndex(currentIndex, step);
+        if (nextIndex < 0)
+            return false;
+
         MergeCandidateEntry next = mergeCandidateEntries[nextIndex];
-        if (next == null)
+        if (next == null || !next.isValid)
             return false;
 
         mergeSelectedCandidateIndex = nextIndex;
@@ -981,7 +985,41 @@ public partial class TurnStateManager
             return;
         if (index < 0 || index >= mergeCandidateEntries.Count)
             return;
+        MergeCandidateEntry entry = mergeCandidateEntries[index];
+        if (entry == null || !entry.isValid)
+            return;
         mergeSelectedCandidateIndex = index;
+    }
+
+    private int FindFirstValidMergeCandidateIndex()
+    {
+        for (int i = 0; i < mergeCandidateEntries.Count; i++)
+        {
+            MergeCandidateEntry entry = mergeCandidateEntries[i];
+            if (entry == null || entry.unit == null || !entry.isValid)
+                continue;
+            return i;
+        }
+
+        return -1;
+    }
+
+    private int FindNextValidMergeCandidateIndex(int currentIndex, int step)
+    {
+        if (mergeCandidateEntries.Count <= 0)
+            return -1;
+
+        int direction = step >= 0 ? 1 : -1;
+        for (int offset = 1; offset <= mergeCandidateEntries.Count; offset++)
+        {
+            int candidateIndex = (currentIndex + (direction * offset) + mergeCandidateEntries.Count) % mergeCandidateEntries.Count;
+            MergeCandidateEntry entry = mergeCandidateEntries[candidateIndex];
+            if (entry == null || entry.unit == null || !entry.isValid)
+                continue;
+            return candidateIndex;
+        }
+
+        return -1;
     }
 
     private void SetMergeSelectedTargetCell(Vector3Int cell, bool moveCursor)

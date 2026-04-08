@@ -2346,7 +2346,9 @@ public class AIPlayerController : MonoBehaviour
         bool repairModeActive = ShouldKeepUnitInRepairMode(unit);
         unit.SetAIMaintenanceActive(repairModeActive);
         bool mergeObjectiveActive = false;
+        bool mergeActionNow = false;
         UnitManager mergeTargetUnit = null;
+        Vector3Int mergeObjectiveCell = unitCell;
         string mergeObjectiveLabel = string.Empty;
         bool repairActionNow = false;
         Vector3Int repairObjectiveCell = unitCell;
@@ -2397,7 +2399,7 @@ public class AIPlayerController : MonoBehaviour
         if (!supplyObjectiveActive
             && repairModeActive
             && (aiProfile == null || aiProfile.fuseWhileOnRepairMode)
-            && TryGetImmediateMergeTargetForRepairingUnit(unit, snapshot, out mergeTargetUnit, out mergeObjectiveLabel))
+            && TryResolveMergeObjectiveForRepairingUnit(unit, snapshot, out mergeTargetUnit, out mergeObjectiveCell, out mergeActionNow, out mergeObjectiveLabel))
         {
             mergeObjectiveActive = true;
             // Fusao aqui e um atalho de reparo; a unidade continua em maintenance mode se a fusao nao acontecer.
@@ -2635,7 +2637,8 @@ public class AIPlayerController : MonoBehaviour
         }
         else if (mergeObjectiveActive)
         {
-            moveTarget = unitCell;
+            moveTarget = mergeActionNow ? unitCell : mergeObjectiveCell;
+            moveTarget.z = 0;
         }
         else if (repairModeActive)
         {
@@ -2725,8 +2728,24 @@ public class AIPlayerController : MonoBehaviour
         }
         else if (mergeObjectiveActive)
         {
-            foundDestination = true;
-            bestDest = unitCell;
+            if (mergeActionNow || moveTarget == unitCell)
+            {
+                foundDestination = true;
+                bestDest = unitCell;
+            }
+            else
+            {
+                foundDestination = turnStateManager.TryGetBestReachableCellTowardsHexDistance(
+                    snapshot.BoardTilemap,
+                    moveTarget,
+                    occupiedByAllies,
+                    out bestDest,
+                    prioritizeDpq: false,
+                    unit: unit,
+                    preferLongerAdvanceOnTie: true,
+                    penalizedCells: penalizedMovementCells,
+                    preferredCells: preferredSupportCells);
+            }
         }
         else if (repairModeActive)
         {
@@ -4258,6 +4277,31 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         return false;
     }
 
+    private bool TryResolveMergeObjectiveForRepairingUnit(UnitManager unit, AISnapshot snapshot, out UnitManager target, out Vector3Int objectiveCell, out bool actionNow, out string label)
+    {
+        target = null;
+        objectiveCell = unit != null ? unit.CurrentCellPosition : Vector3Int.zero;
+        actionNow = false;
+        label = string.Empty;
+        if (unit == null || snapshot == null || snapshot.BoardTilemap == null)
+            return false;
+
+        if (TryGetImmediateMergeTargetForRepairingUnit(unit, snapshot, out target, out label))
+        {
+            objectiveCell = unit.CurrentCellPosition;
+            objectiveCell.z = 0;
+            actionNow = true;
+            return true;
+        }
+
+        if (!TryGetMergeApproachTargetForRepairingUnit(unit, snapshot, out target, out objectiveCell, out label))
+            return false;
+
+        objectiveCell.z = 0;
+        actionNow = false;
+        return true;
+    }
+
     private bool TryGetImmediateMergeTargetForRepairingUnit(UnitManager unit, AISnapshot snapshot, out UnitManager target, out string label)
     {
         target = null;
@@ -4293,6 +4337,141 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
 
         label = $"fusao com {target.name} (hp total={Mathf.Max(0, unit.CurrentHP) + Mathf.Max(0, target.CurrentHP)})";
         return true;
+    }
+
+    private bool TryGetMergeApproachTargetForRepairingUnit(UnitManager unit, AISnapshot snapshot, out UnitManager target, out Vector3Int objectiveCell, out string label)
+    {
+        target = null;
+        objectiveCell = unit != null ? unit.CurrentCellPosition : Vector3Int.zero;
+        label = string.Empty;
+        if (unit == null || snapshot == null || snapshot.BoardTilemap == null)
+            return false;
+
+        Tilemap boardTilemap = snapshot.BoardTilemap;
+        TerrainDatabase terrainDb = turnStateManager != null ? turnStateManager.TerrainDatabaseRef : null;
+        int remainingMovement = Mathf.Max(0, unit.RemainingMovementPoints);
+        if (remainingMovement <= 0)
+            return false;
+
+        Dictionary<Vector3Int, List<Vector3Int>> reachablePaths = UnitMovementPathRules.CalcularCaminhosValidos(
+            boardTilemap,
+            unit,
+            remainingMovement,
+            terrainDb);
+        if (reachablePaths == null || reachablePaths.Count <= 0)
+            return false;
+
+        int bestApproachCost = int.MaxValue;
+        int bestCandidateDistance = int.MaxValue;
+        int bestCombinedHp = int.MinValue;
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+        IReadOnlyList<UnitManager> friendlyUnits = snapshot.FriendlyUnits;
+        for (int i = 0; friendlyUnits != null && i < friendlyUnits.Count; i++)
+        {
+            UnitManager candidate = friendlyUnits[i];
+            if (!CanRepairModeMergeWithCandidate(unit, candidate))
+                continue;
+
+            int combinedHp = Mathf.Max(0, unit.CurrentHP) + Mathf.Max(0, candidate.CurrentHP);
+            if (combinedHp > 10)
+                continue;
+
+            Vector3Int candidateCell = candidate.CurrentCellPosition;
+            candidateCell.z = 0;
+            if (!UnitMovementPathRules.TryGetEnterCellCost(
+                    boardTilemap,
+                    unit,
+                    candidateCell,
+                    terrainDb,
+                    applyOperationalAutonomyModifier: false,
+                    out int enterCost))
+                continue;
+
+            UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, candidateCell, neighbors);
+            for (int n = 0; n < neighbors.Count; n++)
+            {
+                Vector3Int approachCell = neighbors[n];
+                approachCell.z = 0;
+                if (!reachablePaths.TryGetValue(approachCell, out List<Vector3Int> path) || path == null || path.Count <= 0)
+                    continue;
+
+                int approachCost = Mathf.Max(0, UnitMovementPathRules.CalculateAutonomyCostForPath(
+                    boardTilemap,
+                    unit,
+                    path,
+                    terrainDb,
+                    applyOperationalAutonomyModifier: false));
+                int remainingAfterApproach = Mathf.Max(0, remainingMovement - approachCost);
+                if (remainingAfterApproach < enterCost)
+                    continue;
+
+                int candidateDistance = GetHexDistance(boardTilemap, unit.CurrentCellPosition, candidateCell, 64);
+                bool better = approachCost < bestApproachCost
+                    || (approachCost == bestApproachCost && candidateDistance < bestCandidateDistance)
+                    || (approachCost == bestApproachCost && candidateDistance == bestCandidateDistance && combinedHp > bestCombinedHp);
+                if (!better)
+                    continue;
+
+                bestApproachCost = approachCost;
+                bestCandidateDistance = candidateDistance;
+                bestCombinedHp = combinedHp;
+                target = candidate;
+                objectiveCell = candidateCell;
+            }
+        }
+
+        if (target == null)
+            return false;
+
+        label = $"aproximar para fusao com {target.name} (hp total={Mathf.Max(0, unit.CurrentHP) + Mathf.Max(0, target.CurrentHP)})";
+        return true;
+    }
+
+    private static bool CanRepairModeMergeWithCandidate(UnitManager unit, UnitManager candidate)
+    {
+        if (unit == null || candidate == null || candidate == unit || candidate.IsDead || candidate.IsEmbarked)
+            return false;
+        if (!candidate.gameObject.activeInHierarchy)
+            return false;
+        if ((int)unit.TeamId != (int)candidate.TeamId)
+            return false;
+        if (!AreUnitsSameTypeForAiMerge(unit, candidate))
+            return false;
+        if (HasAnyTransportedPassenger(candidate))
+            return false;
+        return unit.GetDomain() == candidate.GetDomain()
+            && unit.GetHeightLevel() == candidate.GetHeightLevel();
+    }
+
+    private static bool AreUnitsSameTypeForAiMerge(UnitManager a, UnitManager b)
+    {
+        if (a == null || b == null)
+            return false;
+
+        string aId = a.UnitId;
+        string bId = b.UnitId;
+        if (!string.IsNullOrWhiteSpace(aId) && !string.IsNullOrWhiteSpace(bId))
+            return string.Equals(aId.Trim(), bId.Trim(), System.StringComparison.OrdinalIgnoreCase);
+
+        if (a.TryGetUnitData(out UnitData aData) && b.TryGetUnitData(out UnitData bData))
+            return aData != null && bData != null && aData == bData;
+
+        return false;
+    }
+
+    private static bool HasAnyTransportedPassenger(UnitManager unit)
+    {
+        IReadOnlyList<UnitTransportSeatRuntime> seats = unit != null ? unit.TransportedUnitSlots : null;
+        if (seats == null)
+            return false;
+
+        for (int i = 0; i < seats.Count; i++)
+        {
+            if (seats[i] != null && seats[i].embarkedUnit != null)
+                return true;
+        }
+
+        return false;
     }
 
     private bool TryGetImmediateSupplyTargetsNow(UnitManager supplier, out List<UnitManager> targets)

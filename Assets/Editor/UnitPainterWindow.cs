@@ -157,7 +157,7 @@ public class UnitPainterWindow : EditorWindow
 
         if (replaceExisting)
             RemoveUnitAtCell(tilemap, cell);
-        else if (UnitOccupancyRules.GetUnitAtCell(tilemap, cell) != null)
+        else if (ResolveUnitAtCell(tilemap, cell) != null)
         {
             ShowNotification(new GUIContent("Hex ja ocupado por unidade"));
             e.Use();
@@ -208,7 +208,7 @@ public class UnitPainterWindow : EditorWindow
 
     private void RemoveUnitAtCell(Tilemap tilemap, Vector3Int cell)
     {
-        UnitManager existing = UnitOccupancyRules.GetUnitAtCell(tilemap, cell);
+        UnitManager existing = ResolveUnitAtCell(tilemap, cell);
         if (existing == null)
             return;
 
@@ -216,6 +216,34 @@ public class UnitPainterWindow : EditorWindow
         Undo.DestroyObjectImmediate(existing.gameObject);
         if (scene.IsValid())
             EditorSceneManager.MarkSceneDirty(scene);
+    }
+
+    private static UnitManager ResolveUnitAtCell(Tilemap tilemap, Vector3Int cell)
+    {
+        cell.z = 0;
+
+        UnitManager existing = UnitOccupancyRules.GetUnitAtCell(tilemap, cell);
+        if (existing != null)
+            return existing;
+
+        UnitManager[] sceneUnits = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < sceneUnits.Length; i++)
+        {
+            UnitManager unit = sceneUnits[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+            if (unit.BoardTilemap != tilemap)
+                continue;
+            if (unit.gameObject.scene != tilemap.gameObject.scene)
+                continue;
+
+            Vector3Int occupiedCell = unit.CurrentCellPosition;
+            occupiedCell.z = 0;
+            if (occupiedCell == cell)
+                return unit;
+        }
+
+        return null;
     }
 
     private Tilemap GetSpawnerBoardTilemap()
