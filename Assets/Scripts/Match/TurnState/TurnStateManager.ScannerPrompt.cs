@@ -964,6 +964,17 @@ public partial class TurnStateManager
             return;
         }
 
+        EnsureMergeSensorSnapshot();
+        if (cachedPodeFundirTargets == null || cachedPodeFundirTargets.Count <= 0)
+        {
+            string reason = !string.IsNullOrWhiteSpace(cachedPodeFundirReason)
+                ? cachedPodeFundirReason
+                : "nao ha candidatos validos para fusao.";
+            RuntimeLog($"Pode Fundir (\"F\"): {reason}");
+            LogScannerPanel();
+            return;
+        }
+
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Merge, "MergeActionRequested");
         EnterMergeStateFromSensors();
     }

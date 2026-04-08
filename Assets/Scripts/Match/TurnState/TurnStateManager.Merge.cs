@@ -53,7 +53,10 @@ public partial class TurnStateManager
 
     private void LogMergeDebug(string message)
     {
-        Debug.Log($"[FusaoDBG] state={cursorState} step={scannerPromptStep} | {message}");
+        string selectedLabel = selectedUnit != null
+            ? ResolveUnitRuntimeName(selectedUnit)
+            : "(null)";
+        Debug.Log($"[FusaoDBG] state={cursorState} step={scannerPromptStep} selected={selectedLabel} | {message}");
     }
 
     private string DescribeMergeCandidate(MergeCandidateEntry entry)
@@ -1675,6 +1678,9 @@ public partial class TurnStateManager
             return false;
 
         EnsureMergeSensorSnapshot();
+        if (cachedPodeFundirTargets == null || cachedPodeFundirTargets.Count <= 0)
+            return false;
+
         RebuildMergeCandidateEntries();
         if (mergeCandidateEntries.Count <= 0)
             return false;
@@ -1688,6 +1694,9 @@ public partial class TurnStateManager
                 if (entry == null || entry.unit == null)
                     continue;
 
+                if (!entry.isValid)
+                    continue;
+
                 if (entry.unit.InstanceId.ToString() == targetInstanceId)
                 {
                     selectedIndex = i;
@@ -1697,7 +1706,9 @@ public partial class TurnStateManager
         }
 
         if (selectedIndex < 0)
-            selectedIndex = 0;
+            selectedIndex = FindFirstValidMergeCandidateIndex();
+        if (selectedIndex < 0)
+            return false;
 
         mergeSelectedCandidateIndex = selectedIndex;
 

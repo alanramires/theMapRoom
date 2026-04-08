@@ -667,6 +667,7 @@ public class MatchController : MonoBehaviour
     {
         if (Application.isPlaying)
         {
+            FindAnyObjectByType<ReplayManager>()?.CleanupReplayArtifactsForMatchStart();
             if (autoFlipXFromHqPositions)
                 AutoComputeFlipXFromHqPositions();
             ApplyActiveTeamIfChanged(force: true);
@@ -4180,6 +4181,7 @@ public class MatchController : MonoBehaviour
         return false;
     }
 }
+
 
 
 

@@ -2308,8 +2308,13 @@ public class UnitManager : MonoBehaviour
 
     private void UpdateDynamicName()
     {
-        // Intencionalmente desativado: nomes dinamicos quebram rastreabilidade
-        // de logs/auditoria quando o mesmo objeto muda de nome ao longo da partida.
+        string baseName = !string.IsNullOrWhiteSpace(unitDisplayName)
+            ? unitDisplayName.Trim()
+            : (!string.IsNullOrWhiteSpace(unitId) ? unitId.Trim() : "unit");
+
+        string slotSuffix = slotIndex >= 0 ? $"_T{slotIndex}" : string.Empty;
+        string instanceSuffix = instanceId > 0 ? $"_U{instanceId}" : string.Empty;
+        gameObject.name = $"{baseName}{slotSuffix}{instanceSuffix}";
     }
 
     private void SyncRuntimeFlagInspectorView()
@@ -2372,8 +2377,12 @@ public class UnitManager : MonoBehaviour
     {
         if (killer == null)
             return string.Empty;
-        if (!string.IsNullOrWhiteSpace(killer.UnitId))
-            return killer.UnitId.Trim();
+
+        string baseName = !string.IsNullOrWhiteSpace(killer.UnitDisplayName)
+            ? killer.UnitDisplayName.Trim()
+            : (!string.IsNullOrWhiteSpace(killer.UnitId) ? killer.UnitId.Trim() : "Unit");
+        if (killer.SlotIndex >= 0 && killer.InstanceId > 0)
+            return $"{baseName}_T{killer.SlotIndex}_U{killer.InstanceId}";
         if (killer.InstanceId > 0)
             return $"instance:{killer.InstanceId}";
         return string.Empty;
@@ -2901,4 +2910,3 @@ public class UnitManager : MonoBehaviour
     }
 #endif
 }
-

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -145,6 +145,19 @@ public class ReplayManager : MonoBehaviour
     private void Awake()
     {
         TryAutoAssignReferences();
+    }
+
+    public void CleanupReplayArtifactsForMatchStart()
+    {
+        if (isReplaying)
+            return;
+
+        DestroyReplaySpawnedUnits();
+        DestroyOrphanReplayUnitClonesInActiveScene();
+        replayUnitPool.Clear();
+        replayConstructionPool.Clear();
+        replayPoolsInitialized = false;
+        replayPoolSceneHandle = -1;
     }
 
     private void OnEnable()
@@ -3143,15 +3156,38 @@ public class ReplayManager : MonoBehaviour
             if (unit == null)
                 continue;
 
-            if (unit.gameObject.activeSelf)
-                SetReplayObjectActive(unit.gameObject, false);
-
             int id = unit.InstanceId;
             if (id > 0 && replayUnitPool.TryGetValue(id, out UnitManager mapped) && mapped == unit)
                 replayUnitPool.Remove(id);
+
+            if (Application.isPlaying)
+                Destroy(unit.gameObject);
+            else
+                DestroyImmediate(unit.gameObject);
         }
 
         replaySpawnedUnits.Clear();
+    }
+
+    private void DestroyOrphanReplayUnitClonesInActiveScene()
+    {
+        Scene activeScene = SceneManager.GetActiveScene();
+        UnitManager[] allUnits = Resources.FindObjectsOfTypeAll<UnitManager>();
+        for (int i = 0; i < allUnits.Length; i++)
+        {
+            UnitManager unit = allUnits[i];
+            if (unit == null || unit.gameObject == null || unit.gameObject.scene != activeScene)
+                continue;
+
+            string objectName = unit.gameObject.name;
+            if (!string.Equals(objectName, "unit(Clone)", StringComparison.Ordinal))
+                continue;
+
+            if (Application.isPlaying)
+                Destroy(unit.gameObject);
+            else
+                DestroyImmediate(unit.gameObject);
+        }
     }
     private void QueueFogRefreshForNextFrame()
     {
@@ -3390,6 +3426,8 @@ public class ReplayManager : MonoBehaviour
         return resolved;
     }
 }
+
+
 
 
 
