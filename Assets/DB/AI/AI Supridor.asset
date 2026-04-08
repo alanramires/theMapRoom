@@ -53,6 +53,7 @@ MonoBehaviour:
     repositionToFireRange: 0
     preferMaxEngagementRange: 0
   initiative: 2
+  planCapabilities: 03000000
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
   hpRepairThreshold: 3
@@ -62,6 +63,6 @@ MonoBehaviour:
   restockFuelThresholdPercent: 20
   restockAmmoThresholdPercent: 10
   restockPartsThresholdPercent: 10
-  supplyAllyFuelThresholdPercent: 50
-  supplyAllyAmmoThresholdPercent: 50
+  supplyAllyFuelThresholdPercent: 25
+  supplyAllyAmmoThresholdPercent: 10
   supplyAllyHpThresholdPercent: 50

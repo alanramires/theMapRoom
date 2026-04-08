@@ -120,7 +120,7 @@ public static class AIPlanEvaluator
         intent.SelectionReason = $"invasion | stance=Invasion | target={bestSector} | uncaptured={uncaptured} | score={bestScore}";
 
         // Aloca infantaria como plano de setor prioritario.
-        PlannedForce force = new PlannedForce { Infantry = 2, ArmoredEscort = 1, Artillery = 0, ApcEscort = 0 };
+        PlannedForce force = new PlannedForce { Capture = 2, Escort = 1, FireSupport = 0, Logistics = 0 };
         var draft = new ActiveSectorDraft
         {
             Candidate = new SectorCandidate { Sector = bestSector, Uncaptured = uncaptured },
@@ -129,7 +129,7 @@ public static class AIPlanEvaluator
             PlanOrder = 0,
         };
         draft.CaptureTargets = CollectUncapturedTargetsInSector(bestSector, snapshot);
-        draft.InfantryDemand = Mathf.Max(0, Mathf.Min(force.Infantry, draft.CaptureTargets.Count));
+        draft.InfantryDemand = Mathf.Max(0, Mathf.Min(force.Capture, draft.CaptureTargets.Count));
 
         var singleDraft = new System.Collections.Generic.List<ActiveSectorDraft> { draft };
         AssignSectorPlanInfantryAcrossActivePlans(singleDraft, snapshot, assignedUnits);
@@ -287,17 +287,17 @@ public static class AIPlanEvaluator
             };
 
             draft.CaptureTargets = CollectUncapturedTargetsInSector(sector.Sector, snapshot);
-            draft.InfantryDemand = Mathf.Max(0, Mathf.Min(force.Infantry, draft.CaptureTargets.Count));
+            draft.InfantryDemand = Mathf.Max(0, Mathf.Min(force.Capture, draft.CaptureTargets.Count));
 
             // Ajusta nome para facilitar leitura no log/debug.
-            int escortDemand = force.ArmoredEscort + force.Artillery + force.ApcEscort;
-            intent.DisplayName = $"Captura {sector.Sector} [INF {force.Infantry}, ESC {escortDemand}]";
+            int escortDemand = force.Escort + force.FireSupport + force.Logistics;
+            intent.DisplayName = $"Captura {sector.Sector} [CAP {force.Capture}, ESC {escortDemand}]";
             intent.TacticalRiskScore = ComputeSupportRiskScore(sector);
             intent.SelectionReason = BuildSectorSelectionReason(sector, generated + 1);
 
             AddPlannerLog(
                 plannerLogs,
-                $"setor-ativo | setor={sector.Sector} rank={generated + 1} score={intent.TacticalRiskScore} force=INF{force.Infantry}/ESC{(force.ArmoredEscort + force.Artillery + force.ApcEscort)} targets={draft.CaptureTargets.Count}");
+                $"setor-ativo | setor={sector.Sector} rank={generated + 1} score={intent.TacticalRiskScore} force=CAP{force.Capture}/ESC{force.Escort}/FS{force.FireSupport}/LOG{force.Logistics} targets={draft.CaptureTargets.Count}");
 
             activeSectorDrafts.Add(draft);
             generated++;
@@ -334,12 +334,11 @@ public static class AIPlanEvaluator
 
     private struct PlannedForce
     {
-        public int Infantry;
-        public int ArmoredEscort;
-        public int Artillery;
-        public int ApcEscort;
+        public int Capture;
+        public int Escort;
+        public int FireSupport;
+        public int Logistics;
     }
-
     private sealed class ActiveSectorDraft
     {
         public SectorCandidate Candidate;
@@ -349,7 +348,6 @@ public static class AIPlanEvaluator
         public int InfantryDemand;
         public int PlanOrder;
     }
-
     private sealed class CaptureSlot
     {
         public ActiveSectorDraft Draft;
@@ -358,61 +356,53 @@ public static class AIPlanEvaluator
         public int PriorityPenalty;
     }
 
-
     private static string BuildSectorConstructionsDebug(ConstructionSector sector, AISnapshot snapshot)
     {
         if (snapshot == null || snapshot.KnownConstructions == null || snapshot.KnownConstructions.Count == 0)
             return string.Empty;
-
         var chunks = new List<string>();
         for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
         {
             AIConstructionInfo info = snapshot.KnownConstructions[i];
             if (info == null || info.Sector != sector || !info.IsCapturable)
                 continue;
-
             string name = !string.IsNullOrWhiteSpace(info.DisplayName) ? info.DisplayName : sector.ToString();
             chunks.Add($"{name}(team={info.TeamId},cp={info.CapturePoints}/{info.CapturePointsMax})");
         }
-
         return chunks.Count > 0 ? string.Join(" | ", chunks) : "sem-construcoes-capturaveis";
     }
+
     private static PlannedForce ComputePlannedForce(SectorCandidate sector)
     {
         bool distant = sector.DistToOwnHq >= 8;
         bool enemyHqProximity = sector.HasEnemyHq || sector.DistToEnemyHq <= 6;
         bool multiEnemyHqPressure = sector.EnemyHqNearbyCount >= 2 || sector.EnemyHqThreatSum >= 10;
-
-        int infantry = Mathf.Max(1, sector.Uncaptured);
-        if (distant) infantry += 1;
-        if (sector.EnemyPressure >= 2) infantry += 1 + (sector.EnemyPressure - 2);
-        if (enemyHqProximity) infantry += 1;
-        if (multiEnemyHqPressure) infantry += 1;
-
-        int armored = 0;
-        if (sector.Uncaptured >= 2 || distant || sector.EnemyPressure > 0) armored += 1;
-        armored += sector.Uncaptured / 3;
-        armored += sector.EnemyPressure / 2;
-        if (enemyHqProximity) armored += 1;
-        if (multiEnemyHqPressure) armored += 1;
-
-        int artillery = 0;
-        if (sector.Uncaptured >= 4 || sector.EnemyPressure >= 2 || enemyHqProximity) artillery += 1;
-        artillery += sector.Uncaptured / 4;
-        artillery += sector.EnemyPressure / 2;
-        if (multiEnemyHqPressure) artillery += 1;
-
-        int apc = 0;
-        if (infantry >= 3 && (distant || sector.Uncaptured >= 4)) apc += 1;
-        apc += sector.Uncaptured / 5;
-        if (sector.EnemyPressure >= 3) apc += 1;
-
+        int capture = Mathf.Max(1, sector.Uncaptured);
+        if (distant) capture += 1;
+        if (sector.EnemyPressure >= 2) capture += 1 + (sector.EnemyPressure - 2);
+        if (enemyHqProximity) capture += 1;
+        if (multiEnemyHqPressure) capture += 1;
+        int escort = 0;
+        if (sector.Uncaptured >= 2 || distant || sector.EnemyPressure > 0) escort += 1;
+        escort += sector.Uncaptured / 3;
+        escort += sector.EnemyPressure / 2;
+        if (enemyHqProximity) escort += 1;
+        if (multiEnemyHqPressure) escort += 1;
+        int fireSupport = 0;
+        if (sector.Uncaptured >= 4 || sector.EnemyPressure >= 2 || enemyHqProximity) fireSupport += 1;
+        fireSupport += sector.Uncaptured / 4;
+        fireSupport += sector.EnemyPressure / 2;
+        if (multiEnemyHqPressure) fireSupport += 1;
+        int logistics = 0;
+        if (capture >= 3 && (distant || sector.Uncaptured >= 4)) logistics += 1;
+        if (sector.EnemyPressure >= 3) logistics += 1;
+        if (multiEnemyHqPressure) logistics += 1;
         return new PlannedForce
         {
-            Infantry = Mathf.Max(1, infantry),
-            ArmoredEscort = Mathf.Max(0, armored),
-            Artillery = Mathf.Max(0, artillery),
-            ApcEscort = Mathf.Max(0, apc),
+            Capture = Mathf.Max(1, capture),
+            Escort = Mathf.Max(0, escort),
+            FireSupport = Mathf.Max(0, fireSupport),
+            Logistics = Mathf.Max(0, logistics),
         };
     }
 
@@ -776,15 +766,25 @@ public static class AIPlanEvaluator
     {
         if (drafts == null || drafts.Count == 0 || snapshot == null)
             return;
-
+        AssignSupportRoleAcrossDrafts(
+            drafts,
+            snapshot,
+            assignedUnits,
+            AIPlanRole.Artillery,
+            d => d.Force.FireSupport);
+        AssignSupportRoleAcrossDrafts(
+            drafts,
+            snapshot,
+            assignedUnits,
+            AIPlanRole.Support,
+            d => d.Force.Logistics);
         AssignSupportRoleAcrossDrafts(
             drafts,
             snapshot,
             assignedUnits,
             AIPlanRole.Escort,
-            d => d.Force.ArmoredEscort + d.Force.Artillery + d.Force.ApcEscort);
+            d => d.Force.Escort);
     }
-
     private static void AssignSupportRoleAcrossDrafts(
         List<ActiveSectorDraft> drafts,
         AISnapshot snapshot,
@@ -794,7 +794,6 @@ public static class AIPlanEvaluator
     {
         if (drafts == null || drafts.Count == 0 || getWantedCount == null)
             return;
-
         bool assignedInWave = true;
         while (assignedInWave)
         {
@@ -806,22 +805,20 @@ public static class AIPlanEvaluator
                     continue;
                 if (!HasAssignedRole(draft.Intent, AIPlanRole.Capture))
                     continue;
-
                 int wanted = Mathf.Max(0, getWantedCount(draft));
                 if (wanted <= 0)
                     continue;
-
                 int current = CountAssignments(draft.Intent, role);
                 if (current >= wanted)
                     continue;
-
                 Vector3Int targetCell = draft.Intent.HasCaptureTarget ? draft.Intent.CaptureTargetCell : snapshot.HqCell;
-                int assignedNow = AssignClosestEscortUnits(draft.Intent, snapshot, assignedUnits, targetCell, 1, role);
+                int assignedNow = AssignClosestUnitsForRole(draft.Intent, snapshot, assignedUnits, targetCell, 1, role);
                 if (assignedNow > 0)
                     assignedInWave = true;
             }
         }
     }
+
     private sealed class FlowEdge
     {
         public int To;
@@ -967,28 +964,27 @@ public static class AIPlanEvaluator
     {
         if (unitData == null)
             return false;
-
         AIUnitProfile profile = unitData.aiUnitProfile;
         if (profile == null)
             return false;
-
         switch (role)
         {
             case AIPlanRole.Capture:
-                return profile.HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Capture);
-
+                return profile.HasPlanCapability(AIPlanCapability.Capture, unitData);
             case AIPlanRole.Escort:
+                return profile.HasPlanCapability(AIPlanCapability.Escort, unitData);
             case AIPlanRole.Artillery:
+                return profile.HasPlanCapability(AIPlanCapability.FireSupport, unitData);
             case AIPlanRole.Support:
-                return profile.GetStanceBehavior(AIStance.Attack).canEscort;
-
+                return profile.HasPlanCapability(AIPlanCapability.Logistics, unitData);
             case AIPlanRole.Assault:
+                return profile.HasPlanCapability(AIPlanCapability.Assault, unitData);
             default:
                 return profile.HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Attack);
         }
     }
 
-    private static int AssignClosestEscortUnits(
+    private static int AssignClosestUnitsForRole(
         AIPlanIntent intent,
         AISnapshot snapshot,
         HashSet<int> assignedUnits,
@@ -998,7 +994,6 @@ public static class AIPlanEvaluator
     {
         if (wanted <= 0)
             return 0;
-
         var candidates = new List<(UnitManager unit, int dist)>();
         for (int u = 0; u < snapshot.FriendlyUnits.Count; u++)
         {
@@ -1007,18 +1002,14 @@ public static class AIPlanEvaluator
                 continue;
             if (assignedUnits.Contains(unit.InstanceId))
                 continue;
-
             unit.TryGetUnitData(out UnitData unitData);
-            if (unitData == null || unitData.aiUnitProfile == null || !unitData.aiUnitProfile.GetStanceBehavior(AIStance.Attack).canEscort)
+            if (!CanUnitPerformRole(unitData, role))
                 continue;
-
             Vector3Int uc = unit.CurrentCellPosition;
             int dist = Mathf.Abs(uc.x - targetCell.x) + Mathf.Abs(uc.y - targetCell.y);
             candidates.Add((unit, dist));
         }
-
         candidates.Sort((a, b) => a.dist.CompareTo(b.dist));
-
         int assigned = 0;
         for (int i = 0; i < candidates.Count && assigned < wanted; i++)
         {
@@ -1032,9 +1023,9 @@ public static class AIPlanEvaluator
             });
             assigned++;
         }
-
         return assigned;
     }
+
     public static string BuildPlanKey(AIPlanIntent intent)
     {
         if (intent == null)
@@ -1567,20 +1558,6 @@ public static class AIPlanEvaluator
         plannerLogs.Add(message);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

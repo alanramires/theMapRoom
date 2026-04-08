@@ -53,6 +53,7 @@ MonoBehaviour:
     repositionToFireRange: 0
     preferMaxEngagementRange: 0
   initiative: 2
+  planCapabilities: 04000000
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
   hpRepairThreshold: 3

@@ -30,7 +30,7 @@ public class AIUnitStanceBehavior
     public bool prioritizeDpqAtBattle;
     [Tooltip("Prioriza celulas DPQ mesmo durante a viagem (sem inimigo engajado).")]
     public bool prioritizeDpqDuringTravel;
-    [Tooltip("Volta porra! — Sem sensor ativo nem inimigo para engajar, a unidade abandona a coesao do plano e marcha de volta ao HQ aliado. Ideal para tropas de elite que defendem a base e nao devem vagar pelo mapa ociosamente.")]
+    [Tooltip("Volta porra! - Sem sensor ativo nem inimigo para engajar, a unidade abandona a coesao do plano e marcha de volta ao HQ aliado. Ideal para tropas de elite que defendem a base e nao devem vagar pelo mapa ociosamente.")]
     public bool retreatToHqWhenIdle;
     [Tooltip("Joga de forma conservadora: move em celulas seguras, patrulha territorio aliado e prioriza sobrevivencia sobre kill no scoring de combate.")]
     public bool playConservative;
@@ -46,7 +46,7 @@ public class AIUnitStanceBehavior
     public bool requireSightlineBeforeEngaging;
     [Tooltip("Quando ja esta em alcance de tiro, para de mover e atira da posicao atual. Combatentes continuam avancando.")]
     public bool holdPositionWhenInRange;
-    [Tooltip("Sem alvo alcancavel agora, reposiciona-se ate entrar em alcance de tiro em vez de avançar ate o inimigo. Tipico de artilharia indireta.")]
+    [Tooltip("Sem alvo alcancavel agora, reposiciona-se ate entrar em alcance de tiro em vez de avancar ate o inimigo. Tipico de artilharia indireta.")]
     public bool repositionToFireRange;
     [Tooltip("Ao reposicionar durante o engajamento, prefere a distancia maxima de tiro em vez da minima. Tipico de artilharia indireta.")]
     public bool preferMaxEngagementRange;
@@ -84,8 +84,12 @@ public class AIUnitProfile : ScriptableObject
     public List<AIUnitStanceBehavior> stanceBehaviors = new List<AIUnitStanceBehavior>();
 
     [Header("Turn Order")]
-    [Tooltip("Prioridade de ação dentro do turno. Priority age primeiro (artilharia), High em seguida (escoltas, combatentes), Low por último (capturadores).")]
+    [Tooltip("Prioridade de acao dentro do turno. Priority age primeiro (artilharia), High em seguida (escoltas, combatentes), Low por ultimo (capturadores).")]
     public AIInitiative initiative = AIInitiative.Medium;
+
+    [Header("Planner Capabilities")]
+    [Tooltip("Capacidades taticas que esta unidade oferece ao planner. Se vazio, a IA usa inferencia legada a partir do profile atual.")]
+    public List<AIPlanCapability> planCapabilities = new List<AIPlanCapability>();
 
     [Header("Return to Base / Repair")]
     [Tooltip("Quando estiver em modo de defesa e cair em reposicionamento, emite Fallback ao inves de Reposition.")]
@@ -146,14 +150,54 @@ public class AIUnitProfile : ScriptableObject
 
     public bool HasSensorInStance(AIStance stance, AIUnitSensorKind sensor)
     {
-        var b = GetStanceBehavior(stance);
+        AIUnitStanceBehavior b = GetStanceBehavior(stance);
         return b.sensorPriority != null && b.sensorPriority.Contains(sensor);
+    }
+
+    public bool HasPlanCapability(AIPlanCapability capability, UnitData ownerData = null)
+    {
+        if (planCapabilities != null)
+        {
+            for (int i = 0; i < planCapabilities.Count; i++)
+            {
+                if (planCapabilities[i] == capability)
+                    return true;
+            }
+        }
+
+        return InferLegacyPlanCapability(capability, ownerData);
+    }
+
+    private bool InferLegacyPlanCapability(AIPlanCapability capability, UnitData ownerData)
+    {
+        AIUnitStanceBehavior attackBehavior = GetStanceBehavior(AIStance.Attack);
+        switch (capability)
+        {
+            case AIPlanCapability.Capture:
+                return HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Capture);
+            case AIPlanCapability.Escort:
+                return attackBehavior.canEscort;
+            case AIPlanCapability.FireSupport:
+                return HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Attack)
+                    && attackBehavior.canEscort
+                    && (attackBehavior.requireSightlineBeforeEngaging
+                        || attackBehavior.preferMaxEngagementRange);
+            case AIPlanCapability.Logistics:
+                return (ownerData != null && ownerData.isSupplier)
+                    || HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Supply);
+            case AIPlanCapability.Assault:
+                return HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Attack);
+            default:
+                return false;
+        }
     }
 
     private void OnValidate()
     {
         if (stanceBehaviors == null)
             stanceBehaviors = new List<AIUnitStanceBehavior>();
+        if (planCapabilities == null)
+            planCapabilities = new List<AIPlanCapability>();
 
         for (int i = 0; i < stanceBehaviors.Count; i++)
         {

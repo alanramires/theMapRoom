@@ -28,73 +28,98 @@ FoW durante o turno da IA:
 ### Quais setores capturar? (`maxVariablePlans`)
 
 O planner avalia **todos os setores** conhecidos e descarta:
-- Setores completamente controlados pela IA (sem construções a capturar)
-- Setores de base (tratados separadamente pelo plano de invasão)
+- Setores completamente controlados pela IA (sem construcoes a capturar)
+- Setores de base (tratados separadamente pelo plano de invasao)
 
-Os candidatos restantes são pontuados e ordenados por:
+Os candidatos restantes sao pontuados e ordenados por:
 
-| Critério | Direção | Peso |
+| Criterio | Direcao | Peso |
 |---|---|---|
-| Distância ao próprio HQ | Menor = melhor | 1º |
-| Construções não capturadas | Mais = melhor | 2º |
-| Pressão inimiga no setor | Mais = melhor | 3º |
-| Possui HQ inimigo | Sim = melhor | 4º |
+| Distancia ao proprio HQ | Menor = melhor | 1o |
+| Construcoes nao capturadas | Mais = melhor | 2o |
+| Pressao inimiga no setor | Mais = melhor | 3o |
+| Possui HQ inimigo | Sim = melhor | 4o |
 
-Os `maxVariablePlans` setores mais bem rankeados são ativados como planos do turno. **Padrão: 3.** Configurável em `AIGeneralProfile.maxVariablePlans`.
+Os `maxVariablePlans` setores mais bem rankeados sao ativados como planos do turno. **Padrao: 3.** Configuravel em `AIGeneralProfile.maxVariablePlans`.
 
-> **Postura Invasão:** ativa primeiro um plano especial de invasão da melhor base inimiga (a com menos pontos de captura acumulados e mais próxima). Esse plano consome um slot de `maxVariablePlans`.
+> **Postura Invasao:** ativa primeiro um plano especial de invasao da melhor base inimiga. Esse plano consome um slot de `maxVariablePlans`.
 
 ---
 
 ### Quantas unidades por papel? (`ComputePlannedForce`)
 
-Para cada setor ativo, o planner calcula uma **força planejada** com base nas características do setor:
+Para cada setor ativo, o planner calcula uma **forca planejada por capability**, nao mais por tipo hardcoded de unidade.
 
-| Situação | Efeito na força |
+As demandas calculadas sao:
+- `Capture`
+- `Escort`
+- `FireSupport`
+- `Logistics`
+
+A heuristica atual funciona assim:
+
+| Situacao | Efeito na forca planejada |
 |---|---|
-| Setor distante do HQ (≥ 8 hexes) | +1 infantaria |
-| Cada construção não capturada | +1 infantaria, +⅓ escolta blindada |
-| Pressão inimiga ≥ 2 unidades | +1 infantaria por unidade extra, +½ escolta |
-| Setor tem HQ inimigo ou está a ≤ 6 hexes dele | +1 infantaria, +1 escolta, +1 artilharia |
-| Múltiplos HQs inimigos próximos (≥ 2 ou ameaça ≥ 10) | +1 de tudo |
-| ≥ 3 infantaria + setor distante ou ≥ 4 construções | +1 APC |
+| Cada construcao nao capturada | +1 `Capture` |
+| Setor distante do HQ (`DistToOwnHq >= 8`) | +1 `Capture`, +1 `Escort` |
+| Pressao inimiga `>= 2` | +1 `Capture` base, mais extras conforme a pressao; +`Escort`; +`FireSupport` |
+| Setor com HQ inimigo ou a ate 6 hexes dele | +1 `Capture`, +1 `Escort`, +1 `FireSupport` |
+| Multiplos HQs inimigos proximos (`EnemyHqNearbyCount >= 2` ou `EnemyHqThreatSum >= 10`) | +1 `Capture`, +1 `Escort`, +1 `FireSupport`, +1 `Logistics` |
+| Operacao longa (`Capture >= 3` e setor distante ou com muitas construcoes) | +1 `Logistics` |
+| Pressao inimiga muito alta (`>= 3`) | +1 `Logistics` |
 
-**Papéis resultantes:**
+Resumo pratico da formula atual:
+- `Capture`: cresce com quantidade de objetivos, distancia, pressao e proximidade de HQ inimigo.
+- `Escort`: cresce para acompanhar a captura quando o setor e grande, distante ou contestado.
+- `FireSupport`: entra quando o setor pede apoio ofensivo mais pesado.
+- `Logistics`: entra quando a operacao fica longa ou muito pressionada.
 
-| `AIPlanRole` | Quem assume | Como é designado |
+**Como a alocacao acontece:**
+
+| `AIPlanRole` | Capability exigida | Como o planner aloca |
 |---|---|---|
-| `Capture` | Infantaria com `allowCapture=true` no perfil | MinCostMaxFlow — menor distância total ao alvo |
-| `Escort` | Blindados, APC, unidades com `canEscort=true` | Greedy por waves — mais próximo ao alvo de captura |
-| `Artillery` | Artilharia com `canEscort=true` | Mesmo pool de escolta, papel interno Artillery |
-| `Support` | Supridores com `canEscort=true` | Mesmo pool de escolta |
-| `Assault` | Qualquer unidade sem plano (rogue) | Não atribuído — fallback automático |
+| `Capture` | `AIPlanCapability.Capture` | `MinCostMaxFlow`, minimizando a soma das distancias para os alvos de captura |
+| `Escort` | `AIPlanCapability.Escort` | Alocacao em waves, sempre pegando a unidade livre mais proxima do alvo do plano |
+| `Artillery` | `AIPlanCapability.FireSupport` | Mesmo metodo greedy por proximidade, mas em wave separada de `Escort` |
+| `Support` | `AIPlanCapability.Logistics` | Mesmo metodo greedy por proximidade, em wave propria |
+| `Assault` | `AIPlanCapability.Assault` | Nao entra no `ComputePlannedForce`; fica como papel disponivel para unidades ofensivas fora dessa composicao de captura |
 
-> **MinCostMaxFlow para infantaria:** o planner resolve a atribuição de capturadores como um problema de fluxo de custo mínimo — minimiza a soma das distâncias de todas as unidades aos seus respectivos alvos simultaneamente. Isso evita que dois capturadores corram para o mesmo prédio enquanto outro fica desguarnecido.
+**Ordem real de alocacao dentro do plano:**
+1. O planner escolhe os setores ativos.
+2. Calcula a `PlannedForce` de cada setor.
+3. Aloca `Capture` primeiro via `MinCostMaxFlow`.
+4. So depois aloca suporte por waves separadas nesta ordem:
+   - `Artillery` (`FireSupport`)
+   - `Support` (`Logistics`)
+   - `Escort` (`Escort`)
+5. Se um plano nao conseguir ao menos um `Capture`, ele nao entra como plano ativo final.
+
+> **Ponto importante:** `ComputePlannedForce()` nao pensa mais em `APC`, `ArmoredEscort` ou tipos fixos. Ele pede funcao tatica, e quem pode cumprir cada funcao vem de `planCapabilities` no `AIUnitProfile`.
 
 ---
 
 ### Ciclo de vida dos planos
 
-Cada plano tem um estado no catálogo interno (`PlannerCatalogStatus`):
+Cada plano tem um estado no catalogo interno (`PlannerCatalogStatus`):
 
-| Estado | Condição |
+| Estado | Condicao |
 |---|---|
-| **Inactive** | Setor não selecionado no turno atual (sem slots disponíveis ou não priorizado) |
+| **Inactive** | Setor nao selecionado no turno atual (sem slots disponiveis ou nao priorizado) |
 | **Active** | Selecionado e com pelo menos um capturador designado |
 | **Completed** | Setor totalmente controlado pela IA |
 
-**Persistência entre turnos (`MissionAssignmentMemory`):**
-O planner registra ao final de cada turno quais unidades estavam em qual plano e qual era a distância ao alvo. No próximo turno, ao montar os novos planos, ele tenta **manter as atribuições anteriores** antes de redistribuir — evita troca desnecessária de missão a cada turno.
+**Persistencia entre turnos (`MissionAssignmentMemory`):**
+O planner registra ao final de cada turno quais unidades estavam em qual plano e qual era a distancia ao alvo. No proximo turno, ao montar os novos planos, ele tenta **manter as atribuicoes anteriores** antes de redistribuir.
 
-**Estagnação (`stagnationTurns`):**
-Se uma unidade está no mesmo plano há N turnos sem progresso (distância ao alvo não diminuiu e nenhum prédio foi capturado), ela fica elegível para **realocação**. Padrão: 2 turnos. Configurável em `AIGeneralProfile.stagnationTurns`.
+**Estagnacao (`stagnationTurns`):**
+Se uma unidade esta no mesmo plano ha N turnos sem progresso, ela fica elegivel para **realocacao**. Padrao: 2 turnos. Configuravel em `AIGeneralProfile.stagnationTurns`.
 
 **Fallback de plano salvo:**
-Se uma unidade tinha um plano no turno anterior mas o setor não foi reselecionado (ex: limite de `maxVariablePlans` excedido), o planner cria um **plano fantasma** para manter a unidade em missão até que o setor seja reincorporado ou a unidade seja necessária em outro lugar.
+Se uma unidade tinha um plano no turno anterior mas o setor nao foi reselecionado, o planner cria um **plano fantasma** para manter a unidade em missao ate que o setor seja reincorporado ou a unidade seja necessaria em outro lugar.
 
 ---
 
-### Parâmetros configuráveis (`AIGeneralProfile`)
+### Parametros configuraveis (`AIGeneralProfile`)
 
 | Campo | Padrão | Efeito |
 |---|---|---|
@@ -103,6 +128,23 @@ Se uma unidade tinha um plano no turno anterior mas o setor não foi reseleciona
 | `minimumRangeForDefensePlan` | 5 | Raio mínimo para considerar ameaça próxima ao HQ (plano defensivo) |
 
 ---
+
+## Planner Capabilities
+
+`planCapabilities` define **para quais papeis o planner pode escalar uma unidade**. Isso e separado do comportamento tatico da unidade durante o turno.
+
+Capabilities atuais:
+- `Capture`: unidade elegivel para ocupar slots de captura de setor.
+- `Escort`: unidade elegivel para acompanhar planos de captura como escolta de linha.
+- `FireSupport`: unidade elegivel para o papel `Artillery` do planner.
+- `Logistics`: unidade elegivel para o papel `Support` do planner.
+- `Assault`: unidade ofensiva pura. Existe como capability valida, mas **nao entra no `ComputePlannedForce()`** dos planos de captura.
+
+Regra pratica:
+- `planCapabilities` responde "em que papel o planner pode me usar?"
+- `sensorPriority` e flags como `holdPositionWhenInRange`, `playConservative` e `retreatToHqWhenIdle` respondem "como eu ajo quando chegar a minha vez?"
+
+Se `planCapabilities` estiver vazio, o codigo ainda usa inferencia legada a partir do profile atual. O objetivo do modelo novo e preencher os assets explicitamente e depender menos dessa inferencia.
 
 ## Referência de Flags
 
@@ -137,7 +179,9 @@ Critérios aplicados quando o sensor Attack avalia se vale a pena engajar um ini
 ### Behavior Flags
 
 #### canEscort
-Permite que o planner designe esta unidade como **escolta** de um capturador. Como escolta, a unidade segue a coesão do plano (fica perto do capturador) em vez de agir livremente. Sem esta flag, a unidade nunca será designada como escolta.
+`canEscort` **nao e mais a fonte primaria do planner**. A elegibilidade formal para escolta agora vem de `planCapabilities = Escort`.
+
+Hoje essa flag continua relevante para comportamento legado e para a inferencia automatica quando um asset ainda nao foi migrado. Em termos de design, ela deve ser lida como uma pista de comportamento de unidade combatente/escolta, nao como a definicao oficial de papeis do planner.
 
 #### engageNearestEnemies
 Flag com três efeitos cumulativos, todos ativados ou desativados juntos:
@@ -267,33 +311,39 @@ Não existe uso prático para todas as flags juntas. Use combinações específi
 
 ## Unidades Rogue (Sem Plano)
 
-Uma unidade é **rogue** quando o planner não conseguiu atribuí-la a nenhuma missão — sem captura planejada, sem papel de escolta, sem intent de supply ou merge. Isso pode acontecer porque o time tem mais unidades do que slots de plano disponíveis, ou porque a unidade foi criada/movida fora de um ciclo de planejamento.
+Uma unidade e **rogue** quando o planner nao conseguiu atribui-la a nenhuma missao formal de `Capture`, `Escort`, `Artillery` ou `Support` naquele turno, e tambem nao ha intent relevante de supply, merge ou reparo para ela naquele ciclo.
 
-Unidades rogue ainda executam a IA normalmente, mas a cascata de `moveTarget` cai para o fallback genérico no final:
+No modelo novo, isso acontece com mais frequencia em dois casos:
+- unidades com capability `Assault`, porque `Assault` nao entra no `ComputePlannedForce()` dos planos de captura;
+- unidades que ate tem capability planejavel, mas sobraram fora dos slots do turno por distancia, prioridade ou falta de demanda.
 
-| Prioridade | Condição | Destino |
+Isso significa que **ate um capturador pode ficar rogue**. Quando isso acontece, ele continua usando o proprio profile e seus sensores normais, so que sem uma missao formal do planner. Na pratica, um capturador rogue pode acabar parecendo um skirmisher oportunista: sem plano de captura travando a unidade, ela reage ao que encontrar no caminho e pode sair atacando se o sensor/estado atual apontar para isso. Se isso estiver te parecendo interessante no gameplay, vale tratar como comportamento emergente valido, nao necessariamente como bug.
+
+Unidades rogue ainda executam a IA normalmente, mas a cascata de `moveTarget` cai para o fallback generico no final:
+
+| Prioridade | Condicao | Destino |
 |---|---|---|
 | 1 | Supply ativo | Alvo de supply |
-| 2 | Merge ativo | Posição atual |
-| 3 | Reparo ativo | Construção de reparo |
-| 4 | Captura ativa (`captureObjectiveActive`) | Célula do objetivo de captura |
-| 5 | Inimigo designado (`targetEnemy != null`) | Posição do inimigo |
+| 2 | Merge ativo | Posicao atual |
+| 3 | Reparo ativo | Construcao de reparo |
+| 4 | Captura ativa (`captureObjectiveActive`) | Celula do objetivo de captura |
+| 5 | Inimigo designado (`targetEnemy != null`) | Posicao do inimigo |
 | 6 | `retreatToHqWhenIdle` ou modo defesa | HQ aliado |
-| 7 | Coesão de plano (`planCohesionActive`) | Célula de coesão |
-| 8 | `holdGroundWhenIdle` | Posição atual |
-| **9** | **Fallback rogue** | **HQ inimigo mais próximo** |
+| 7 | Coesao de plano (`planCohesionActive`) | Celula de coesao |
+| 8 | `holdGroundWhenIdle` | Posicao atual |
+| **9** | **Fallback rogue** | **HQ inimigo mais proximo** |
 
-Se a unidade não ativar nenhum dos sensores acima (sem captura viável, sem inimigo, sem flags de idle), ela marchará diretamente para o HQ inimigo mais próximo. Esse comportamento é deliberado — a unidade exerce pressão mesmo sem plano — mas pode ser indesejado para artilharia e unidades de suporte.
+Se a unidade nao ativar nenhum dos sensores acima, ela marchara diretamente para o HQ inimigo mais proximo. Esse comportamento e deliberado: a unidade continua exercendo pressao mesmo sem plano formal. Isso costuma ser bom para `Assault`, mas pode ser indesejado para artilharia, suporte logistico ou outros perfis que deveriam permanecer sob controle mais rigido.
 
-**Como mitigar o comportamento rogue indesejado:**
-- `holdGroundWhenIdle`: ancora onde está em vez de avançar.
-- `retreatToHqWhenIdle`: recua ao HQ aliado em vez de avançar.
-- Sensor `Attack` ativo: se houver inimigos visíveis, a unidade os engajará antes de cair no fallback.
+**Como mitigar comportamento rogue indesejado:**
+- `holdGroundWhenIdle`: ancora onde esta em vez de avancar.
+- `retreatToHqWhenIdle`: recua ao HQ aliado em vez de avancar.
+- Sensor `Attack` ativo: se houver inimigos visiveis, a unidade os engajara antes de cair no fallback.
+- Mais oferta de planos/capabilities: reduz a chance de sobras fora da composicao.
 
-> **Exemplo real:** o AI Artilheiro sem plano entrava no cluster inimigo porque a cascata caía no fallback rogue (HQ inimigo) sem passar por `holdGroundWhenIdle`. Corrigido com `holdGroundWhenIdle: true` na stance de Ataque.
+> **Exemplos praticos:** `AI Bazooka` e `AI Kamikaze` tendem a ficar rogue por desenho, porque sao `Assault`. Ja um `AI Capturador` rogue nao era o objetivo principal do modelo, mas pode gerar um comportamento emergente util: unidade leve sobrando do planner e brigando por conta propria no corredor.
 
 ---
-
 ## Modo Reparo
 A unidade entra em modo reparo quando HP <= hpRepairThreshold, autonomia baixa ou municao de combate zerada. Sai quando HP >= hpRepairExitThreshold e autonomia e municao estiverem ok. O modo reparo nao e interrompido por mudanca de postura.
 Efeito na ordem do turno:
@@ -315,6 +365,8 @@ Icone de manutencao (debug):
 ## Perfis Ativos
 
 ### AI Artilheiro
+Planner Capability: `FireSupport`
+
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
@@ -337,6 +389,8 @@ Icone de manutencao (debug):
 ---
 
 ### AI Bazooka
+Planner Capability: `Assault`
+
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
@@ -359,6 +413,8 @@ Icone de manutencao (debug):
 ---
 
 ### AI Capturador
+Planner Capability: `Capture`
+
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
@@ -384,6 +440,8 @@ Icone de manutencao (debug):
 ---
 
 ### AI Estacionaria
+Planner Capability: `FireSupport`
+
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
@@ -410,6 +468,8 @@ Icone de manutencao (debug):
 ---
 
 ### AI Hibrido
+Planner Capability: `FireSupport`
+
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
@@ -424,11 +484,13 @@ Icone de manutencao (debug):
 | repositionToFireRange | Sim | Sim |
 | preferMaxEngagementRange | Não | Não |
 
-**Comportamento:** Prefere tiro parado quando já está em alcance. Se não conseguir linha de tiro, avança e ataca no range 1 (porrada) no mesmo turno — sem o atraso de um turno que o Artilheiro puro teria. Em ataque pode ser designado como escolta — após mover por coesão, faz rescan e ataca adjacentes via `engageNearestEnemies`. Em defesa não escolta.
+**Comportamento:** Prefere tiro parado quando já está em alcance. Se não conseguir linha de tiro, avança e ataca no range 1 (porrada) no mesmo turno — sem o atraso de um turno que o Artilheiro puro teria. No modelo novo, entra no planner como `FireSupport`, nao como escolta de linha. Continua podendo agir como apoio ofensivo e fazer rescan apos mover via `engageNearestEnemies`. Em defesa nao escolta.
 
 ---
 
 ### AI Kamikaze
+Planner Capability: `Assault`
+
 
 | Postura | Única (Ataque, Invasão e Defesa) |
 |---|---|
@@ -446,6 +508,8 @@ Icone de manutencao (debug):
 ---
 
 ### AI Lutador
+Planner Capability: `Escort`
+
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
@@ -457,11 +521,13 @@ Icone de manutencao (debug):
 | engageNearestEnemies | Sim | Sim |
 | prioritizeDpq (battle) | Sim | Sim |
 
-**Comportamento:** Combatente direto. O sensor Attack planeja o movimento em direção ao inimigo designado mesmo que ainda esteja fora de alcance — o engajamento acontece ao chegar, não exige linha de tiro prévia. Em ataque pode ser designado como escolta — segue o capturador por coesão e, com `engageNearestEnemies`, ataca qualquer inimigo adjacente após cada movimento. Em defesa não escolta e aceita mais risco (must survive desligado, threshold de dano recebido menor).
+**Comportamento:** Combatente direto. O sensor Attack planeja o movimento em direção ao inimigo designado mesmo que ainda esteja fora de alcance — o engajamento acontece ao chegar, não exige linha de tiro prévia. Como `Escort`, pode ser designado para acompanhar o capturador por coesao e, com `engageNearestEnemies`, ataca qualquer inimigo adjacente apos cada movimento. Em defesa não escolta e aceita mais risco (must survive desligado, threshold de dano recebido menor).
 
 ---
 
 ### AI Supridor
+Planner Capability: `Logistics`
+
 
 | Postura | Ataque/Invasão | Defesa |
 |---|---|---|
@@ -474,4 +540,9 @@ Icone de manutencao (debug):
 | playConservative | Sim | Sim |
 
 **Comportamento:** Civil puro. Nunca ataca proativamente (sem sensor Attack). Joga conservadoramente em ambas as posturas — prefere celulas seguras e evita perigo. Em defesa, recua ao HQ quando sem aliados para suprir. Quando o sensor `Supply` encontra mais de um aliado valido, prioriza o **mais proximo**; se houver empate de distancia, desempata pela criticidade (HP, municao e combustivel). Primeiro tenta suprir sem mover; se nao houver alvo imediato, navega ate o aliado escolhido. Retorna a base para reabastecer quando combustivel, municao ou pecas da propria carroceria caem abaixo dos limiares de restock do profile.
+
+
+
+
+
 

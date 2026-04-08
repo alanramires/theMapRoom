@@ -23,7 +23,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
     groups:
     - label: Basic Tank
-      targetPercentage: 1
+      targetPercentage: 5
       priority: 1
       specificUnits:
       - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
@@ -32,8 +32,9 @@ MonoBehaviour:
       priority: 2
       specificUnits:
       - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
     - label: Suprimentos
-      targetPercentage: 1
+      targetPercentage: 5
       priority: 3
       specificUnits:
       - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
@@ -52,17 +53,6 @@ MonoBehaviour:
       priority: 6
       specificUnits:
       - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
-    - label: 2nd tank
-      targetPercentage: 5
-      priority: 7
-      specificUnits:
-      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-    - label: 2nd Artillery
-      targetPercentage: 5
-      priority: 8
-      specificUnits:
-      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
   defenseMode:
     label: Defesa
     saveForNextRound: 1
