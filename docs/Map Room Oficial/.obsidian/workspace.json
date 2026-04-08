@@ -55,12 +55,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "AI Unit Profile.md",
+                "file": "The Map Room.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "AI Unit Profile"
+              "title": "The Map Room"
             }
           }
         ],
@@ -199,13 +199,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "AI Unit Profile.md",
+                "file": "The Map Room.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Sumário de AI Unit Profile"
+              "title": "Sumário de The Map Room"
             }
           }
         ],
@@ -228,9 +228,9 @@
   },
   "active": "7538b4fe4320d359",
   "lastOpenFiles": [
-    "Unidades.md",
     "AI Unit Profile.md",
     "The Map Room.md",
+    "Unidades.md",
     "The Map Room 2027 - Pitch.md",
     "dicas"
   ]

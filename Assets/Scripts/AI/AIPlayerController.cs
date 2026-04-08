@@ -282,11 +282,38 @@ public class AIPlayerController : MonoBehaviour
             return false;
         if (matchController == null)
             return true;
+        if (enemy.IsDead || enemy.IsEmbarked)
+            return false;
 
-        bool isAiTeamActive = matchController.ActiveTeam == aiTeam;
-        return isAiTeamActive
-            ? matchController.IsUnitVisibleForActiveTeam(enemy)
-            : matchController.IsUnitVisibleForTeam(enemy, aiTeam);
+        Tilemap boardTilemap = enemy.BoardTilemap;
+        if (boardTilemap == null)
+        {
+            IReadOnlyList<UnitManager> units = UnitManager.AllActive;
+            for (int i = 0; i < units.Count; i++)
+            {
+                UnitManager unit = units[i];
+                if (unit != null && unit.BoardTilemap != null)
+                {
+                    boardTilemap = unit.BoardTilemap;
+                    break;
+                }
+            }
+        }
+
+        if (boardTilemap == null)
+            return true;
+
+        bool enforceStealthValidation = matchController.EnableStealthValidation
+            && !enemy.HasFiredThisTurn;
+        return PodeDetectarSensor.IsTargetObservedByTeam(
+            enemy,
+            (int)aiTeam,
+            boardTilemap,
+            matchController.TerrainDatabaseRef,
+            null,
+            matchController.EnableLosValidation,
+            matchController.EnableSpotter,
+            enforceStealthValidation);
     }
 
     private static string FormatCellLC(Vector3Int cell)
@@ -1260,17 +1287,13 @@ public class AIPlayerController : MonoBehaviour
         yield return new WaitForSeconds(delay);
 
         List<int> unitInstanceIds = CollectFriendlyUnitIds(snapshot);
-        // Ordena por initiative (Priority→Low), desempate por HP decrescente (mais saudável age primeiro).
+        // Ordena por initiative efetiva (Priority->Retreat), desempate por HP decrescente (mais saudavel age primeiro).
         unitInstanceIds.Sort((a, b) =>
         {
             UnitManager ua = FindUnitById(a);
             UnitManager ub = FindUnitById(b);
-            AIInitiative ia = AIInitiative.Medium;
-            AIInitiative ib = AIInitiative.Medium;
-            if (ua != null && ua.TryGetUnitData(out UnitData dataA) && dataA?.aiUnitProfile != null)
-                ia = dataA.aiUnitProfile.initiative;
-            if (ub != null && ub.TryGetUnitData(out UnitData dataB) && dataB?.aiUnitProfile != null)
-                ib = dataB.aiUnitProfile.initiative;
+            AIInitiative ia = GetEffectiveInitiative(ua);
+            AIInitiative ib = GetEffectiveInitiative(ub);
             int cmp = ((int)ia).CompareTo((int)ib);
             if (cmp != 0) return cmp;
             int hpA = ua != null ? ua.CurrentHP : 0;
@@ -1319,8 +1342,6 @@ public class AIPlayerController : MonoBehaviour
     private AISnapshot TakeSnapshot(TeamId aiTeam, bool suppressLog = false)
     {
         SetPlannerContextTeam(aiTeam);
-        if (matchController != null && matchController.ActiveTeam == aiTeam)
-            matchController.RefreshFogOfWarForActiveTeam();
 
         AISnapshot snapshot = BuildSnapshotForTeam(aiTeam);
         AIStance previousStance = currentStance;
@@ -3957,13 +3978,17 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         if (supplier.TryGetUnitData(out UnitData supplierDataNav) && supplierDataNav != null)
             supplierProfile = supplierDataNav.aiUnitProfile;
 
+        Vector3Int supplierCell = supplier.CurrentCellPosition;
+        supplierCell.z = 0;
+
         // Prioridade 1: alvos validados pelo sensor (adjacentes/alcance valido agora).
-        // Usa a mesma logica do botao S do jogador ? sem duplicacao de regras de alcance.
+        // Entre eles, escolhe o mais proximo; criticidade desempata.
         if (turnStateManager != null)
         {
             var sensorOptions = new List<PodeSuprirOption>();
             if (turnStateManager.TryGetSupplyTargets(supplier, sensorOptions, out _) && sensorOptions.Count > 0)
             {
+                int bestDistance = int.MaxValue;
                 int bestScore = int.MinValue;
                 for (int i = 0; i < sensorOptions.Count; i++)
                 {
@@ -3972,26 +3997,33 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
                         continue;
                     if (!IsSupplyTruckTargetThresholdMet(candidate, out int score, supplierProfile))
                         continue;
-                    if (score > bestScore)
-                    {
-                        bestScore = score;
-                        target = candidate;
-                    }
+
+                    Vector3Int candidateCell = candidate.CurrentCellPosition;
+                    candidateCell.z = 0;
+                    int distance = GetHexDistance(snapshot.BoardTilemap, supplierCell, candidateCell, 64);
+                    if (distance == int.MaxValue)
+                        distance = 64;
+
+                    bool better = distance < bestDistance || (distance == bestDistance && score > bestScore);
+                    if (!better)
+                        continue;
+
+                    bestDistance = distance;
+                    bestScore = score;
+                    target = candidate;
                 }
                 if (target != null)
                     return true;
             }
         }
 
-        // Prioridade 2: objetivo de navegacao ? aliado mais critico no snapshot
-        // (pode nao estar no alcance ainda; a unidade se movera ate ele).
+        // Prioridade 2: objetivo de navegacao ? aliado mais proximo no snapshot.
+        // Criticidade entra apenas como desempate.
         if (snapshot.FriendlyUnits == null)
             return false;
 
-        Vector3Int supplierCell = supplier.CurrentCellPosition;
-        supplierCell.z = 0;
-        int navBestScore = int.MinValue;
         int navBestDistance = int.MaxValue;
+        int navBestScore = int.MinValue;
 
         for (int i = 0; i < snapshot.FriendlyUnits.Count; i++)
         {
@@ -4007,18 +4039,17 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             if (distance == int.MaxValue)
                 distance = 64;
 
-            bool better = score > navBestScore || (score == navBestScore && distance < navBestDistance);
+            bool better = distance < navBestDistance || (distance == navBestDistance && score > navBestScore);
             if (!better)
                 continue;
 
-            navBestScore = score;
             navBestDistance = distance;
+            navBestScore = score;
             target = ally;
         }
 
         return target != null;
     }
-
     private bool CanSupplyTargetNow(UnitManager supplier, UnitManager target)
     {
         if (supplier == null || target == null || turnStateManager == null)
@@ -4206,7 +4237,10 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             supplierProfile = supplierData.aiUnitProfile;
         }
 
-        List<(UnitManager target, int score)> ranked = new List<(UnitManager target, int score)>();
+        Vector3Int supplierCell = supplier.CurrentCellPosition;
+        supplierCell.z = 0;
+
+        List<(UnitManager target, int distance, int score)> ranked = new List<(UnitManager target, int distance, int score)>();
         HashSet<int> seen = new HashSet<int>();
         for (int i = 0; i < sensorOptions.Count; i++)
         {
@@ -4221,9 +4255,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
                 if (!isPreferred)
                     continue;
 
-                // Mantem coerencia entre a decisao tomada antes do movimento e a execucao final:
-                // se o alvo preferido ainda e suprivel agora pelo sensor, ele entra na fila mesmo
-                // quando ja nao for o mais critico pelo threshold local.
+                // Mantem coerencia entre a decisao tomada antes do movimento e a execucao final.
                 score = 100000;
             }
             else if (isPreferred)
@@ -4231,16 +4263,30 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
                 score += 100000;
             }
 
-            ranked.Add((candidate, score));
+            Tilemap boardTilemap = supplier.BoardTilemap != null ? supplier.BoardTilemap : candidate.BoardTilemap;
+            Vector3Int candidateCell = candidate.CurrentCellPosition;
+            candidateCell.z = 0;
+            int distance = boardTilemap != null
+                ? GetHexDistance(boardTilemap, supplierCell, candidateCell, 64)
+                : 64;
+            if (distance == int.MaxValue)
+                distance = 64;
+
+            ranked.Add((candidate, distance, score));
         }
 
-        ranked.Sort((a, b) => b.score.CompareTo(a.score));
+        ranked.Sort((a, b) =>
+        {
+            int distanceCompare = a.distance.CompareTo(b.distance);
+            if (distanceCompare != 0)
+                return distanceCompare;
+            return b.score.CompareTo(a.score);
+        });
         for (int i = 0; i < ranked.Count && targets.Count < queueLimit; i++)
             targets.Add(ranked[i].target);
 
         return targets.Count > 0;
     }
-
     private static bool IsSupplyTruckTargetThresholdMet(UnitManager ally, out int score, AIUnitProfile supplierProfile = null)
     {
         score = 0;
@@ -4464,6 +4510,19 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         return forced;
     }
 
+    private AIInitiative GetEffectiveInitiative(UnitManager unit)
+    {
+        if (unit == null)
+            return AIInitiative.Medium;
+
+        if (ShouldKeepUnitInRepairMode(unit))
+            return AIInitiative.Retreat;
+
+        if (unit.TryGetUnitData(out UnitData data) && data?.aiUnitProfile != null)
+            return data.aiUnitProfile.initiative;
+
+        return AIInitiative.Medium;
+    }
     private static bool IsLowAutonomy(UnitManager unit, AIUnitProfile profile = null)
     {
         if (unit == null)
@@ -6244,27 +6303,4 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         Debug.Log(sb.ToString());
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

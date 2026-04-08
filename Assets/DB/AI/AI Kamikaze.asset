@@ -34,7 +34,7 @@ MonoBehaviour:
     holdPositionWhenInRange: 0
     repositionToFireRange: 0
     preferMaxEngagementRange: 0
-  initiative: 0
+  initiative: 1
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
   hpRepairThreshold: 1

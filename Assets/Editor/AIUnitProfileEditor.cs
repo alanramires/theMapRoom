@@ -7,7 +7,47 @@ public class AIUnitProfileEditor : Editor
 {
     public override void OnInspectorGUI()
     {
-        DrawDefaultInspector();
+        serializedObject.Update();
+
+        SerializedProperty property = serializedObject.GetIterator();
+        bool enterChildren = true;
+        while (property.NextVisible(enterChildren))
+        {
+            enterChildren = false;
+            if (property.name == "m_Script")
+            {
+                using (new EditorGUI.DisabledScope(true))
+                    EditorGUILayout.PropertyField(property, true);
+                continue;
+            }
+
+            if (property.name == "initiative")
+            {
+                DrawInitiativeProperty(property);
+                continue;
+            }
+
+            EditorGUILayout.PropertyField(property, true);
+        }
+
+        serializedObject.ApplyModifiedProperties();
+    }
+
+    private static void DrawInitiativeProperty(SerializedProperty property)
+    {
+        AIInitiative currentValue = (AIInitiative)property.enumValueIndex;
+        AIInitiative displayedValue = currentValue == AIInitiative.Retreat
+            ? AIInitiative.Medium
+            : currentValue;
+
+        EditorGUI.BeginChangeCheck();
+        AIInitiative nextValue = (AIInitiative)EditorGUILayout.EnumPopup(
+            new GUIContent(property.displayName, property.tooltip),
+            displayedValue,
+            value => (AIInitiative)value != AIInitiative.Retreat,
+            false);
+        if (EditorGUI.EndChangeCheck())
+            property.enumValueIndex = (int)nextValue;
     }
 }
 

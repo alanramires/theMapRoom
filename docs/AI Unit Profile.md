@@ -2,6 +2,108 @@
 
 ---
 
+## Sistema de Planejamento
+
+O planejamento da IA ocorre **uma vez por turno**, antes do loop de movimentação das unidades. O componente responsável é o `AIPlanEvaluator` (stateless) chamado por `EvaluatePlanner()` no `AIPlayerController`.
+
+---
+
+### Fluxo geral por turno
+inicio do turno
+- EvaluatePlanner()
+- TryActivateInvasionPlan() quando a postura for Invasao
+- SelectActiveSectorPlans()
+- AssignSectorPlanInfantryAcrossActivePlans()
+- AssignSectorPlanSupportForcesAcrossActivePlans()
+- ApplyMissionPersistenceAndReallocation()
+- loop de unidades por initiative efetiva + HP
+- snapshot por unidade
+- cada unidade executa seu papel conforme AIPlanAssignment
+FoW durante o turno da IA:
+- o snapshot de decisao nao dispara RefreshFogOfWarForActiveTeam() antes de cada unidade
+- a IA decide com base no estado observado pelo sensor/time
+- o refresh visual/global de FoW fica fora desse loop interno
+---
+
+### Quais setores capturar? (`maxVariablePlans`)
+
+O planner avalia **todos os setores** conhecidos e descarta:
+- Setores completamente controlados pela IA (sem construções a capturar)
+- Setores de base (tratados separadamente pelo plano de invasão)
+
+Os candidatos restantes são pontuados e ordenados por:
+
+| Critério | Direção | Peso |
+|---|---|---|
+| Distância ao próprio HQ | Menor = melhor | 1º |
+| Construções não capturadas | Mais = melhor | 2º |
+| Pressão inimiga no setor | Mais = melhor | 3º |
+| Possui HQ inimigo | Sim = melhor | 4º |
+
+Os `maxVariablePlans` setores mais bem rankeados são ativados como planos do turno. **Padrão: 3.** Configurável em `AIGeneralProfile.maxVariablePlans`.
+
+> **Postura Invasão:** ativa primeiro um plano especial de invasão da melhor base inimiga (a com menos pontos de captura acumulados e mais próxima). Esse plano consome um slot de `maxVariablePlans`.
+
+---
+
+### Quantas unidades por papel? (`ComputePlannedForce`)
+
+Para cada setor ativo, o planner calcula uma **força planejada** com base nas características do setor:
+
+| Situação | Efeito na força |
+|---|---|
+| Setor distante do HQ (≥ 8 hexes) | +1 infantaria |
+| Cada construção não capturada | +1 infantaria, +⅓ escolta blindada |
+| Pressão inimiga ≥ 2 unidades | +1 infantaria por unidade extra, +½ escolta |
+| Setor tem HQ inimigo ou está a ≤ 6 hexes dele | +1 infantaria, +1 escolta, +1 artilharia |
+| Múltiplos HQs inimigos próximos (≥ 2 ou ameaça ≥ 10) | +1 de tudo |
+| ≥ 3 infantaria + setor distante ou ≥ 4 construções | +1 APC |
+
+**Papéis resultantes:**
+
+| `AIPlanRole` | Quem assume | Como é designado |
+|---|---|---|
+| `Capture` | Infantaria com `allowCapture=true` no perfil | MinCostMaxFlow — menor distância total ao alvo |
+| `Escort` | Blindados, APC, unidades com `canEscort=true` | Greedy por waves — mais próximo ao alvo de captura |
+| `Artillery` | Artilharia com `canEscort=true` | Mesmo pool de escolta, papel interno Artillery |
+| `Support` | Supridores com `canEscort=true` | Mesmo pool de escolta |
+| `Assault` | Qualquer unidade sem plano (rogue) | Não atribuído — fallback automático |
+
+> **MinCostMaxFlow para infantaria:** o planner resolve a atribuição de capturadores como um problema de fluxo de custo mínimo — minimiza a soma das distâncias de todas as unidades aos seus respectivos alvos simultaneamente. Isso evita que dois capturadores corram para o mesmo prédio enquanto outro fica desguarnecido.
+
+---
+
+### Ciclo de vida dos planos
+
+Cada plano tem um estado no catálogo interno (`PlannerCatalogStatus`):
+
+| Estado | Condição |
+|---|---|
+| **Inactive** | Setor não selecionado no turno atual (sem slots disponíveis ou não priorizado) |
+| **Active** | Selecionado e com pelo menos um capturador designado |
+| **Completed** | Setor totalmente controlado pela IA |
+
+**Persistência entre turnos (`MissionAssignmentMemory`):**
+O planner registra ao final de cada turno quais unidades estavam em qual plano e qual era a distância ao alvo. No próximo turno, ao montar os novos planos, ele tenta **manter as atribuições anteriores** antes de redistribuir — evita troca desnecessária de missão a cada turno.
+
+**Estagnação (`stagnationTurns`):**
+Se uma unidade está no mesmo plano há N turnos sem progresso (distância ao alvo não diminuiu e nenhum prédio foi capturado), ela fica elegível para **realocação**. Padrão: 2 turnos. Configurável em `AIGeneralProfile.stagnationTurns`.
+
+**Fallback de plano salvo:**
+Se uma unidade tinha um plano no turno anterior mas o setor não foi reselecionado (ex: limite de `maxVariablePlans` excedido), o planner cria um **plano fantasma** para manter a unidade em missão até que o setor seja reincorporado ou a unidade seja necessária em outro lugar.
+
+---
+
+### Parâmetros configuráveis (`AIGeneralProfile`)
+
+| Campo | Padrão | Efeito |
+|---|---|---|
+| `maxVariablePlans` | 3 | Máximo de setores ativos por turno |
+| `stagnationTurns` | 2 | Turnos sem progresso antes de elegibilidade para realocação |
+| `minimumRangeForDefensePlan` | 5 | Raio mínimo para considerar ameaça próxima ao HQ (plano defensivo) |
+
+---
+
 ## Referência de Flags
 
 ### Sensor Priority
@@ -12,7 +114,7 @@ A ordem dos sensores define o que a unidade tenta fazer a cada turno. O primeiro
 |---|---|
 | **Capture** | Procura o prédio capturável mais prioritário no setor e marcha até ele. Com setor planejado: prefere prédios livres sobre ocupados independente da distância. Avança com cautela (DPQ + movimento mínimo) quando o alvo é território inimigo sem visibilidade (FoW) — exceto se um aliado já ocupar o objetivo (FoW não se aplica, avança normalmente). |
 | **Attack** | Procura o melhor inimigo para engajar com base nos critérios de Attack Decision e planeja o movimento para atacar. O planejamento ocorre mesmo que a unidade ainda não esteja em alcance de tiro — ela move-se em direção ao alvo e ataca ao chegar. |
-| **Supply** | Procura aliados para reabastecer (combustível, munição, peças) dentro dos limiares configurados. |
+| **Supply** | Procura aliados para reabastecer (combustivel, municao, pecas) dentro dos limiares configurados. Primeiro tenta suprir sem mover; se nao houver alvo imediato, navega ate o aliado valido mais proximo. Criticidade so desempata. |
 | **Reposition** | Fallback: move para a melhor célula disponível sem objetivo específico. |
 
 > A ordem importa: `Capture > Attack > Reposition` = capturador que só briga se necessário. `Attack > Capture > Reposition` = combatente que captura se não tiver inimigo.
@@ -113,20 +215,24 @@ Diferença em relação a `retreatToHqWhenIdle`: em vez de marchar até o HQ ali
 ---
 
 ### Turn Order (Initiative)
-
-Define a **prioridade de ação dentro do turno** da IA. Antes de iniciar o loop de unidades, o sistema ordena a fila por `initiative` (crescente) e, dentro do mesmo nível, por **HP atual decrescente** (mais inteiras agem primeiro).
-
+Define a prioridade de acao dentro do turno da IA. Antes de iniciar o loop de unidades, o sistema ordena a fila por initiative efetiva (crescente) e, dentro do mesmo nivel, por HP atual decrescente (mais inteiras agem primeiro).
 | Valor | Ordem | Quem usa |
 |---|---|---|
-| **Priority** | 1º | Artilharia, SAM/AAA, Estacionaria, Kamikaze |
-| **High** | 2º | Escoltas, Lutadores, combatentes de linha |
-| **Medium** | 3º | Padrão — Bazooka, Híbrido, Supridor |
-| **Low** | 4º | Capturadores |
-
-**Tiebreaker de HP:** unidades com o mesmo `initiative` são ordenadas por HP atual decrescente. As mais inteiras agem primeiro — garantindo que as que têm mais capacidade operacional executem as missões críticas (ex: captura de prédio). Unidades mais fracas do mesmo grupo ficam como reserva.
-
-> **Exemplo:** dois capturadores no mesmo turno — o de HP 10 captura o prédio mais próximo, o de HP 4 vai para o segundo objetivo ou fica de reserva.
-
+| Priority | 1o | Artilharia, SAM/AAA, Estacionaria, Kamikaze |
+| High | 2o | Escoltas, Lutadores, combatentes de linha |
+| Medium | 3o | Padrao - Bazooka, Hibrido, Supridor |
+| Low | 4o | Capturadores |
+| Retreat | 5o | Estado temporario de unidades em Return to Base / Repair |
+Initiative efetiva:
+- Retreat nao e configuravel no AIUnitProfile
+- ela e aplicada temporariamente quando a unidade entra em Return to Base / Repair
+- ao sair desse modo, a unidade volta automaticamente para a initiative do profile
+Tiebreaker de HP:
+- unidades com o mesmo initiative sao ordenadas por HP atual decrescente
+- as mais inteiras agem primeiro
+- unidades mais fracas do mesmo grupo ficam como reserva
+Exemplo:
+- dois capturadores no mesmo turno: o de HP 10 captura o predio mais proximo, o de HP 4 vai para o segundo objetivo ou fica de reserva
 ---
 
 ### 0 Flags Ativadas
@@ -189,20 +295,21 @@ Se a unidade não ativar nenhum dos sensores acima (sem captura viável, sem ini
 ---
 
 ## Modo Reparo
-
-A unidade entra em modo reparo quando HP ≤ `hpRepairThreshold`, autonomia baixa ou munição de combate zerada. Sai quando HP ≥ `hpRepairExitThreshold` E autonomia E munição estiverem ok. O modo reparo **não é interrompido por mudança de postura** — o time pode cair em Defense e a unidade continua o retorno à base até estar apta.
-
-**Ícone de manutenção (debug):** quando `showPlanDebugAtUnit` estiver marcado no `AIPlayerController`, unidades em modo reparo exibem um ícone de chave+martelo sobre o sprite. Ferramenta de desenvolvimento — não aparece em build final. Os limiares de entrada (`hpRepairThreshold`) e saída (`hpRepairExitThreshold`) vêm do `AIUnitProfile` de cada unidade.
-
-| Situação | Comportamento |
+A unidade entra em modo reparo quando HP <= hpRepairThreshold, autonomia baixa ou municao de combate zerada. Sai quando HP >= hpRepairExitThreshold e autonomia e municao estiverem ok. O modo reparo nao e interrompido por mudanca de postura.
+Efeito na ordem do turno:
+- enquanto essa flag estiver ativa, a unidade passa a usar a iniciativa temporaria Retreat, sempre abaixo de Low
+- ao sair do modo reparo, volta automaticamente para a initiative configurada no AIUnitProfile
+Icone de manutencao (debug):
+- quando showPlanDebugAtUnit estiver marcado no AIPlayerController, unidades em modo reparo exibem um icone de chave+martelo sobre o sprite
+- ferramenta de desenvolvimento; nao aparece em build final
+- os limiares de entrada (hpRepairThreshold) e saida (hpRepairExitThreshold) vem do AIUnitProfile de cada unidade
+| Situacao | Comportamento |
 |---|---|
-| Unidade com `holdPositionWhenInRange`, já na construção | Atira parada se tiver alvo em alcance. Não move. |
-| Unidade com `holdPositionWhenInRange`, ainda marchando para a base | Foca em chegar. Não atira durante a marcha. |
-| Combatente sem `holdPositionWhenInRange` | Recua sem revidar. Prioriza chegar à base intacto. |
-| Qualquer unidade com inimigo bloqueando o caminho | `repairDislodgeActive`: luta para desocupar o caminho, depois retoma o retorno. |
-
-> Artilharia danificada continua atirando da construção — exatamente como no gameplay manual. O modo reparo significa "não me move daqui", não "paro de combater".
-
+| Unidade com holdPositionWhenInRange, ja na construcao | Atira parada se tiver alvo em alcance. Nao move. |
+| Unidade com holdPositionWhenInRange, ainda marchando para a base | Foca em chegar. Nao atira durante a marcha. |
+| Combatente sem holdPositionWhenInRange | Recua sem revidar. Prioriza chegar a base intacto. |
+| Qualquer unidade com inimigo bloqueando o caminho | repairDislodgeActive: luta para desocupar o caminho, depois retoma o retorno. |
+> Artilharia danificada continua atirando da construcao. O modo reparo significa "nao me move daqui", nao "paro de combater".
 ---
 
 ## Perfis Ativos
@@ -366,4 +473,5 @@ A unidade entra em modo reparo quando HP ≤ `hpRepairThreshold`, autonomia baix
 | retreatToHqWhenIdle | Não | Sim |
 | playConservative | Sim | Sim |
 
-**Comportamento:** Civil puro. Nunca ataca proativamente (sem sensor Attack). Joga conservadoramente em ambas as posturas — prefere células seguras e evita perigo. Em defesa, recua ao HQ quando sem aliados para suprir. Retorna à base para reabastecer quando combustível ≤20%, munição ≤10% ou peças ≤10%.
+**Comportamento:** Civil puro. Nunca ataca proativamente (sem sensor Attack). Joga conservadoramente em ambas as posturas — prefere celulas seguras e evita perigo. Em defesa, recua ao HQ quando sem aliados para suprir. Quando o sensor `Supply` encontra mais de um aliado valido, prioriza o **mais proximo**; se houver empate de distancia, desempata pela criticidade (HP, municao e combustivel). Primeiro tenta suprir sem mover; se nao houver alvo imediato, navega ate o aliado escolhido. Retorna a base para reabastecer quando combustivel, municao ou pecas da propria carroceria caem abaixo dos limiares de restock do profile.
+

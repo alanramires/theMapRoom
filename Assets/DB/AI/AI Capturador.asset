@@ -37,7 +37,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 9de29821cf7219c488585cc51bfd220d, type: 2}
     sensorPriority: 000000000100000003000000
     minDamageDealtPercent: 10
-    maxDamageReceivedPercent: 20
+    maxDamageReceivedPercent: 0
     mustSurvive: 0
     targetPreference: 0
     canEscort: 0

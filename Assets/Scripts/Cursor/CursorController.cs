@@ -123,6 +123,18 @@ public class CursorController : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float skillSfxVolume = 1f;
 
+    [Header("Cursor Blink")]
+    [Tooltip("SpriteRenderer do cursor (branco com borda preta). Deixe vazio para desativar o blink.")]
+    [SerializeField] private SpriteRenderer cursorRenderer;
+    [Tooltip("Cor A do blink (ex: branco).")]
+    [SerializeField] private Color cursorColorA = Color.white;
+    [Tooltip("Cor B do blink (ex: preto).")]
+    [SerializeField] private Color cursorColorB = Color.black;
+    [Tooltip("Duração de cada fase do blink em segundos.")]
+    [SerializeField] [Range(0.1f, 2f)] private float cursorBlinkInterval = 0.4f;
+    [Tooltip("Se true, Color A é substituída pela cor do time ativo no lugar de cursorColorA.")]
+    [SerializeField] private bool useActiveTeamColor = false;
+
     [Header("State")]
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private MatchController matchController;
@@ -189,6 +201,7 @@ public class CursorController : MonoBehaviour
 
     private void Update()
     {
+        UpdateCursorBlink();
         TryAutoAssignMatchController();
         TryAutoAssignReplayManager();
         if (replayManager != null && replayManager.IsReplaying)
@@ -496,6 +509,16 @@ public class CursorController : MonoBehaviour
         SnapToCell(currentCell);
         if (adjustCameraOnMove)
             TryAdjustCameraToCursor();
+    }
+
+    private void UpdateCursorBlink()
+    {
+        if (cursorRenderer == null) return;
+        Color colorA = useActiveTeamColor && matchController != null
+            ? TeamUtils.GetColor(matchController.ActiveTeam)
+            : cursorColorA;
+        float phase = Time.time % (cursorBlinkInterval * 2f);
+        cursorRenderer.color = phase < cursorBlinkInterval ? colorA : cursorColorB;
     }
 
     private void SnapToCell(Vector3Int cell)
