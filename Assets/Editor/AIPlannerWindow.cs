@@ -164,7 +164,7 @@ public class AIPlannerWindow : EditorWindow
     {
         EditorGUILayout.BeginVertical("box");
         EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.LabelField($"{plan.displayName} [{plan.status}]", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField($"{plan.displayName} [{plan.status}]{BuildAssignmentCountSuffix(plan)}", EditorStyles.boldLabel);
         bool isSelectedPlan = previewSelectedPlanTeam == team && string.Equals(previewSelectedPlanKey, plan.planKey, System.StringComparison.Ordinal);
         bool canOverlay = TryFindIntentForPlan(team, plan.planKey, out AIPlanIntent _);
         EditorGUI.BeginDisabledGroup(!canOverlay);
@@ -223,6 +223,50 @@ public class AIPlannerWindow : EditorWindow
         }
 
         EditorGUILayout.EndVertical();
+    }
+
+    private static string BuildAssignmentCountSuffix(AIPlayerController.PlanDebugView plan)
+    {
+        int capture = 0;
+        int escort = 0;
+        int artillery = 0;
+        int support = 0;
+
+        if (plan?.assignments != null)
+        {
+            for (int i = 0; i < plan.assignments.Count; i++)
+            {
+                AIPlayerController.AssignmentDebugView assignment = plan.assignments[i];
+                CountRole(assignment != null ? assignment.role : null, ref capture, ref escort, ref artillery, ref support);
+            }
+        }
+
+        return $" | CAP={capture} ESC={escort} ART={artillery} SUP={support}";
+    }
+
+    private static void CountRole(string role, ref int capture, ref int escort, ref int artillery, ref int support)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+            return;
+
+        switch (role.Trim().ToLowerInvariant())
+        {
+            case "capture":
+                capture++;
+                break;
+            case "escort":
+                escort++;
+                break;
+            case "artillery":
+            case "firesupport":
+            case "fire support":
+                artillery++;
+                break;
+            case "support":
+            case "logistics":
+                support++;
+                break;
+        }
     }
 
     private static bool IsActiveVariablePlan(AIPlayerController.PlanDebugView plan)

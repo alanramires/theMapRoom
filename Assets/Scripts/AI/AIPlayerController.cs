@@ -201,6 +201,42 @@ public class AIPlayerController : MonoBehaviour
         public int VisibleThreats;
     }
 
+    private struct AIShoppingCapabilityDemand
+    {
+        public AIPlanCapability capability;
+        public int missingCount;
+        public int totalDemand;
+    }
+
+    private struct AIShoppingDemandSummary
+    {
+        public int missingCapture;
+        public int missingEscort;
+        public int missingFireSupport;
+        public int missingLogistics;
+        public int totalCaptureDemand;
+        public int totalEscortDemand;
+        public int totalFireSupportDemand;
+        public int totalLogisticsDemand;
+        public bool hasCriticalCaptureGap;
+        public int turnNumber;
+        public int friendlyUnitCount;
+        public int activeProductionBuildings;
+
+        public int TotalMissingCount => missingCapture + missingEscort + missingFireSupport + missingLogistics;
+    }
+
+    private struct AIShoppingCandidate
+    {
+        public UnitData unit;
+        public int offerIndex;
+        public int cost;
+        public int groupPriority;
+        public bool affordableNow;
+        public int turnsToAfford;
+        public bool fromFallback;
+        public string sourceLabel;
+    }
     public AIStance CurrentStance => currentStance;
     public IReadOnlyList<AIPlanIntent> CurrentTurnPlans => GetOrCreatePlannerState(GetDebugReferenceTeam()).currentTurnPlans;
     public IReadOnlyDictionary<int, AIPlanIntent> CurrentTurnUnitRoles => GetOrCreatePlannerState(GetDebugReferenceTeam()).unitRoles;
@@ -5631,20 +5667,40 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         Dictionary<AIDataGroup, int> countsByGroup = CountFriendlyUnitsByConfiguredGroup(snapshot, orderedGroups);
         int totalUnits = snapshot != null && snapshot.FriendlyUnits != null ? snapshot.FriendlyUnits.Count : 0;
         int denominator = Mathf.Max(1, totalUnits);
-        int missingCapturePlans = CountPlansMissingCaptureRole(snapshot, maxVariablePlans);
+        AIShoppingDemandSummary demandSummary = BuildShoppingDemandSummary(snapshot, snapshot != null ? snapshot.ActivePlans : null, maxVariablePlans);
 
-        // Urgencia de abertura: se existem planos de captura sem capturador, prioriza
-        // comprar qualquer unidade com perfil allowCapture=true — primeiro nos grupos, depois no catalogo completo.
-        if (missingCapturePlans > 0)
+        if (TryResolveMostUrgentCapabilityDemand(demandSummary, out AIPlanCapability urgentCapability, out string urgentReason))
         {
-            bool foundCapturer =
-                TryResolveFirstAffordableCaptureCapableFromGroups(construction, orderedGroups, currentMoney, out targetIndex, out plannedUnitId) ||
-                TryResolveFirstAffordableCaptureCapableFromCatalog(construction, currentMoney, out targetIndex, out plannedUnitId);
-
-            if (foundCapturer)
+            if (TryResolveBestUnitForCapability(
+                    construction,
+                    mode,
+                    orderedGroups,
+                    urgentCapability,
+                    currentMoney,
+                    incomePerTurn,
+                    demandSummary,
+                    defenseMode,
+                    out targetIndex,
+                    out plannedUnitId,
+                    out plannedReason,
+                    out usedSavingFallback))
             {
-                plannedReason = $"urgencia-captura | planos-sem-capturador={missingCapturePlans}";
+                plannedReason = BuildShoppingReason("capability-buy", demandSummary, $"demanda={urgentCapability} | {urgentReason} | {plannedReason}");
                 return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(plannedReason) && plannedReason.StartsWith("save=", System.StringComparison.Ordinal))
+            {
+                string saveReason = plannedReason;
+                if (TryResolveSavingFallbackPurchase(construction, mode, currentMoney, defenseMode, savingFallbackPurchasesThisTurn, demandSummary, out targetIndex, out plannedUnitId, out string fallbackReason))
+                {
+                    usedSavingFallback = true;
+                    plannedReason = BuildShoppingReason("capability-save-fallback", demandSummary, $"demanda={urgentCapability} | {urgentReason} | {saveReason} | {fallbackReason}");
+                    return true;
+                }
+
+                plannedReason = BuildShoppingReason("capability-save", demandSummary, $"demanda={urgentCapability} | {urgentReason} | {saveReason}");
+                return false;
             }
         }
 
@@ -5663,34 +5719,25 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
 
             if (TryResolveFirstAffordableFromGroup(construction, group, currentMoney, out targetIndex, out plannedUnitId))
             {
-                plannedReason = $"grupo={group.label} | composicao={currentCount}/{denominator} ({currentRatio:P0}) | alvo={targetRatio:P0} | prioridade={group.priority}";
+                plannedReason = BuildShoppingReason("composition-target", demandSummary, $"grupo={group.label} | composicao={currentCount}/{denominator} ({currentRatio:P0}) | alvo={targetRatio:P0} | prioridade={group.priority}");
                 return true;
             }
 
             if (mode.saveForNextRound)
             {
-                bool allowUnlimitedDefenseFallback = defenseMode && mode.buyFallbackWhenSavingOnDefenseMode;
-                bool fallbackAlreadyConsumed = mode.allowFallbackWhenSavingButOnce && savingFallbackPurchasesThisTurn > 0;
-                bool canUseSavingFallback = mode.allowFallbackWhenSaving
-                    && (!mode.allowFallbackWhenSavingButOnce || allowUnlimitedDefenseFallback || !fallbackAlreadyConsumed);
-
-                if (canUseSavingFallback &&
-                    TryResolveFirstAffordableFromUnitList(construction, mode.fallbackUnits, currentMoney, out targetIndex, out plannedUnitId))
+                string saveReason = $"economizou para proxima rodada | grupo pendente={group.label} | composicao={currentCount}/{denominator} ({currentRatio:P0}) | alvo={targetRatio:P0}";
+                if (TryResolveSavingFallbackPurchase(construction, mode, currentMoney, defenseMode, savingFallbackPurchasesThisTurn, demandSummary, out targetIndex, out plannedUnitId, out string fallbackReason))
                 {
                     usedSavingFallback = true;
-                    plannedReason = $"fallback-save | modo={mode.label} | motivo=guardando para composicao de grupo {group.label}";
+                    plannedReason = BuildShoppingReason("composition-save-fallback", demandSummary, $"{saveReason} | {fallbackReason}");
                     return true;
                 }
 
-                plannedReason = fallbackAlreadyConsumed && !allowUnlimitedDefenseFallback
-                    ? $"economizou para proxima rodada | fallback-save ja usado no turno | grupo pendente={group.label} | composicao={currentCount}/{denominator} ({currentRatio:P0}) | alvo={targetRatio:P0}"
-                    : $"economizou para proxima rodada | grupo pendente={group.label} | composicao={currentCount}/{denominator} ({currentRatio:P0}) | alvo={targetRatio:P0}";
+                plannedReason = BuildShoppingReason("composition-save", demandSummary, saveReason);
                 return false;
             }
         }
 
-        // Se todas as metas ja foram atendidas (ou nao havia compra possivel na meta),
-        // compra pela ordem de prioridade/lista configurada.
         for (int i = 0; i < orderedGroups.Count; i++)
         {
             AIDataGroup group = orderedGroups[i];
@@ -5702,116 +5749,340 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
                 int currentCount = countsByGroup.TryGetValue(group, out int value) ? value : 0;
                 float currentRatio = Mathf.Clamp01((float)currentCount / denominator);
                 float targetRatio = Mathf.Clamp01(group.targetPercentage / 100f);
-                plannedReason = $"grupo-prioridade={group.label} | composicao={currentCount}/{denominator} ({currentRatio:P0}) | alvo={targetRatio:P0} | prioridade={group.priority}";
+                plannedReason = BuildShoppingReason("composition-priority", demandSummary, $"grupo-prioridade={group.label} | composicao={currentCount}/{denominator} ({currentRatio:P0}) | alvo={targetRatio:P0} | prioridade={group.priority}");
                 return true;
             }
         }
 
-        // Sem nada acessivel nos grupos: tenta fallback de contingencia configurado no modo.
-        if (TryResolveFirstAffordableFromUnitList(construction, mode.fallbackUnits, currentMoney, out targetIndex, out plannedUnitId))
+        bool allowFallbackPurchase = !(demandSummary.hasCriticalCaptureGap && !PassesEarlyGameMassFloor(demandSummary, demandSummary.turnNumber));
+        if (allowFallbackPurchase && TryResolveFirstAffordableFromUnitList(construction, mode.fallbackUnits, currentMoney, out targetIndex, out plannedUnitId))
         {
-            plannedReason = $"fallback-modo={mode.label} | motivo=sem oferta acessivel nos grupos";
+            plannedReason = BuildShoppingReason("fallback-mode", demandSummary, $"fallback-modo={mode.label} | motivo=sem oferta acessivel nos grupos");
             return true;
         }
 
-        // Sem nada acessivel agora: opcionalmente poupa para o proximo turno.
         if (mode.saveForNextRound)
         {
-            plannedReason = "economizou para proxima rodada | sem ofertas acessiveis nos grupos/fallback";
+            plannedReason = BuildShoppingReason("fallback-save", demandSummary, allowFallbackPurchase
+                ? "economizou para proxima rodada | sem ofertas acessiveis nos grupos/fallback"
+                : "economizou para proxima rodada | fallback bloqueado pela massa minima");
             return false;
         }
 
-        // Fallback final: tenta qualquer oferta acessivel no catalogo.
         if (TryResolveAnyAffordableOffer(construction, currentMoney, out targetIndex, out plannedUnitId))
         {
-            plannedReason = "fallback-catalogo | motivo=qualquer oferta acessivel";
+            plannedReason = BuildShoppingReason("fallback-catalog", demandSummary, "fallback-catalogo | motivo=qualquer oferta acessivel");
             return true;
         }
 
-        plannedReason = "nenhuma oferta acessivel no catalogo";
+        plannedReason = BuildShoppingReason("no-offer", demandSummary, "nenhuma oferta acessivel no catalogo");
         return false;
     }
 
-    private static int CountPlansMissingCaptureRole(AISnapshot snapshot, int maxVariablePlans = int.MaxValue)
+    private static string BuildShoppingReason(string branch, AIShoppingDemandSummary summary, string detail)
     {
-        if (snapshot == null)
-            return 0;
-
-        var coveredSectors = new HashSet<ConstructionSector>();
-        int missing = 0;
-
-        // Para cada plano ativo: déficit = construções não capturadas no setor - capturadores atribuídos.
-        if (snapshot.ActivePlans != null)
-        {
-            for (int i = 0; i < snapshot.ActivePlans.Count; i++)
-            {
-                AIPlanIntent intent = snapshot.ActivePlans[i];
-                if (intent == null || !intent.HasCaptureTarget || ConstructionSectorHelper.IsBase(intent.Sector))
-                    continue;
-
-                coveredSectors.Add(intent.Sector);
-
-                int assignedCapturers = 0;
-                if (intent.Assignments != null)
-                {
-                    for (int a = 0; a < intent.Assignments.Count; a++)
-                    {
-                        AIPlanAssignment assignment = intent.Assignments[a];
-                        if (assignment != null && assignment.Role == AIPlanRole.Capture)
-                            assignedCapturers++;
-                    }
-                }
-
-                int neededCapturers = 0;
-                if (snapshot.KnownConstructions != null)
-                {
-                    for (int c = 0; c < snapshot.KnownConstructions.Count; c++)
-                    {
-                        AIConstructionInfo info = snapshot.KnownConstructions[c];
-                        if (info == null || !info.IsCapturable || info.Sector != intent.Sector) continue;
-                        if (info.TeamId == snapshot.AiTeam && info.CapturePoints >= info.CapturePointsMax) continue;
-                        neededCapturers++;
-                    }
-                }
-
-                missing += Mathf.Max(0, neededCapturers - assignedCapturers);
-            }
-        }
-
-        // Cold start: setores capturáveis sem nenhum plano ativo, até o limite de maxVariablePlans.
-        int activePlanCount = snapshot.ActivePlans != null ? snapshot.ActivePlans.Count : 0;
-        int slotsAvailable = Mathf.Max(0, maxVariablePlans - activePlanCount);
-        if (slotsAvailable > 0 && snapshot.KnownConstructions != null)
-        {
-            for (int i = 0; i < snapshot.KnownConstructions.Count && slotsAvailable > 0; i++)
-            {
-                AIConstructionInfo info = snapshot.KnownConstructions[i];
-                if (info == null || !info.IsCapturable) continue;
-                if (ConstructionSectorHelper.IsBase(info.Sector)) continue;
-                if (info.TeamId == snapshot.AiTeam && info.CapturePoints >= info.CapturePointsMax) continue;
-                if (coveredSectors.Contains(info.Sector)) continue;
-
-                coveredSectors.Add(info.Sector);
-                missing++;
-                slotsAvailable--;
-            }
-        }
-
-        return missing;
+        return $"shopping-demand: CAP={summary.missingCapture}/{summary.totalCaptureDemand} ESC={summary.missingEscort}/{summary.totalEscortDemand} FS={summary.missingFireSupport}/{summary.totalFireSupportDemand} LOG={summary.missingLogistics}/{summary.totalLogisticsDemand} crit={(summary.hasCriticalCaptureGap ? 1 : 0)} units={summary.friendlyUnitCount} prod={summary.activeProductionBuildings} | branch={branch} | {detail}";
     }
 
-    private static bool TryResolveFirstAffordableCaptureCapableFromGroups(
+    private AIShoppingDemandSummary BuildShoppingDemandSummary(
+        AISnapshot snapshot,
+        IReadOnlyList<AIPlanIntent> plans,
+        int maxVariablePlans)
+    {
+        AIShoppingDemandSummary summary = new AIShoppingDemandSummary
+        {
+            turnNumber = matchController != null ? matchController.CurrentTurn : 0,
+            friendlyUnitCount = snapshot != null && snapshot.FriendlyUnits != null ? snapshot.FriendlyUnits.Count : 0,
+            activeProductionBuildings = CountActiveProductionBuildings(snapshot)
+        };
+
+        if (plans == null)
+            return summary;
+
+        for (int i = 0; i < plans.Count; i++)
+        {
+            AIPlanIntent intent = plans[i];
+            if (intent == null)
+                continue;
+
+            int desiredCapture = Mathf.Max(intent.DesiredCaptureCount, intent.HasCaptureTarget ? CountOutstandingCaptureTargets(snapshot, intent.Sector) : 0);
+            int desiredEscort = Mathf.Max(0, intent.DesiredEscortCount);
+            int desiredArtillery = Mathf.Max(0, intent.DesiredArtilleryCount);
+            int desiredSupport = Mathf.Max(0, intent.DesiredSupportCount);
+
+            int assignedCapture = CountAssignedRole(intent, AIPlanRole.Capture);
+            int assignedEscort = CountAssignedRole(intent, AIPlanRole.Escort);
+            int assignedArtillery = CountAssignedRole(intent, AIPlanRole.Artillery);
+            int assignedSupport = CountAssignedRole(intent, AIPlanRole.Support);
+
+            summary.totalCaptureDemand += desiredCapture;
+            summary.totalEscortDemand += desiredEscort;
+            summary.totalFireSupportDemand += desiredArtillery;
+            summary.totalLogisticsDemand += desiredSupport;
+
+            summary.missingCapture += Mathf.Max(0, desiredCapture - assignedCapture);
+            summary.missingEscort += Mathf.Max(0, desiredEscort - assignedEscort);
+            summary.missingFireSupport += Mathf.Max(0, desiredArtillery - assignedArtillery);
+            summary.missingLogistics += Mathf.Max(0, desiredSupport - assignedSupport);
+
+            if (desiredCapture > 0 && assignedCapture <= 0)
+                summary.hasCriticalCaptureGap = true;
+        }
+
+        return summary;
+    }
+
+    private static bool TryResolveMostUrgentCapabilityDemand(
+        AIShoppingDemandSummary summary,
+        out AIPlanCapability capability,
+        out string reason)
+    {
+        capability = AIPlanCapability.Capture;
+        reason = string.Empty;
+
+        if (summary.hasCriticalCaptureGap && summary.missingCapture > 0)
+        {
+            capability = AIPlanCapability.Capture;
+            reason = $"critical-capture-gap={summary.missingCapture}";
+            return true;
+        }
+
+        List<AIShoppingCapabilityDemand> demands = new List<AIShoppingCapabilityDemand>
+        {
+            new AIShoppingCapabilityDemand { capability = AIPlanCapability.Capture, missingCount = summary.missingCapture, totalDemand = summary.totalCaptureDemand },
+            new AIShoppingCapabilityDemand { capability = AIPlanCapability.Escort, missingCount = summary.missingEscort, totalDemand = summary.totalEscortDemand },
+            new AIShoppingCapabilityDemand { capability = AIPlanCapability.FireSupport, missingCount = summary.missingFireSupport, totalDemand = summary.totalFireSupportDemand },
+            new AIShoppingCapabilityDemand { capability = AIPlanCapability.Logistics, missingCount = summary.missingLogistics, totalDemand = summary.totalLogisticsDemand }
+        };
+
+        AIShoppingCapabilityDemand best = default;
+        bool found = false;
+        for (int i = 0; i < demands.Count; i++)
+        {
+            AIShoppingCapabilityDemand candidate = demands[i];
+            if (candidate.missingCount <= 0)
+                continue;
+
+            if (!found || candidate.missingCount > best.missingCount)
+            {
+                best = candidate;
+                found = true;
+            }
+        }
+
+        if (!found)
+            return false;
+
+        capability = best.capability;
+        reason = $"missing={best.missingCount}/{best.totalDemand}";
+        return true;
+    }
+
+    private bool TryResolveBestUnitForCapability(
         ConstructionManager construction,
+        AIDataMode mode,
         IReadOnlyList<AIDataGroup> orderedGroups,
+        AIPlanCapability capability,
         int currentMoney,
+        int incomePerTurn,
+        AIShoppingDemandSummary summary,
+        bool defenseMode,
         out int targetIndex,
-        out string plannedUnitId)
+        out string plannedUnitId,
+        out string plannedReason,
+        out bool usedSavingFallback)
     {
         targetIndex = -1;
         plannedUnitId = null;
+        plannedReason = $"demanda={capability} | sem-oferta-compativel";
+        usedSavingFallback = false;
 
-        if (construction == null || orderedGroups == null)
+        List<AIShoppingCandidate> candidates = CollectCapabilityCandidatesFromGroups(construction, orderedGroups, capability, currentMoney, incomePerTurn);
+        if (candidates.Count <= 0)
+        {
+            candidates = CollectCapabilityCandidatesFromFallback(construction, mode, capability, currentMoney, incomePerTurn);
+            if (candidates.Count > 0)
+                usedSavingFallback = true;
+        }
+
+        if (candidates.Count <= 0)
             return false;
+
+        AIShoppingCandidate? bestAffordableNow = null;
+        AIShoppingCandidate? bestPreferredFuture = null;
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            AIShoppingCandidate candidate = candidates[i];
+            if (!bestPreferredFuture.HasValue || IsCandidateBetter(candidate, bestPreferredFuture.Value))
+                bestPreferredFuture = candidate;
+            if (candidate.affordableNow && (!bestAffordableNow.HasValue || IsCandidateBetter(candidate, bestAffordableNow.Value)))
+                bestAffordableNow = candidate;
+        }
+
+        if (mode.saveForNextRound && bestPreferredFuture.HasValue && ShouldSaveForCapabilityPurchase(bestAffordableNow, bestPreferredFuture.Value, currentMoney, incomePerTurn, summary, defenseMode, summary.turnNumber))
+        {
+            plannedReason = $"save={bestPreferredFuture.Value.unit.id} | demanda={capability} | turns={bestPreferredFuture.Value.turnsToAfford} | massa-minima-ok";
+            usedSavingFallback = false;
+            return false;
+        }
+
+        if (bestAffordableNow.HasValue)
+        {
+            AIShoppingCandidate pick = bestAffordableNow.Value;
+            targetIndex = pick.offerIndex;
+            plannedUnitId = pick.unit != null ? pick.unit.id : null;
+            plannedReason = $"unidade={plannedUnitId} | origem={pick.sourceLabel} | custo={pick.cost}";
+            return true;
+        }
+
+        if (bestPreferredFuture.HasValue && mode.saveForNextRound && bestPreferredFuture.Value.turnsToAfford <= 2 && PassesEarlyGameMassFloor(summary, summary.turnNumber))
+        {
+            plannedReason = $"save={bestPreferredFuture.Value.unit.id} | demanda={capability} | turns={bestPreferredFuture.Value.turnsToAfford} | aguardando-melhor-unidade";
+            usedSavingFallback = false;
+            return false;
+        }
+
+        plannedReason = $"demanda={capability} | sem-oferta-acessivel";
+        return false;
+    }
+
+    private static bool ShouldSaveForCapabilityPurchase(
+        AIShoppingCandidate? bestAffordableNow,
+        AIShoppingCandidate bestPreferredFuture,
+        int currentMoney,
+        int incomePerTurn,
+        AIShoppingDemandSummary summary,
+        bool defenseMode,
+        int currentTurn)
+    {
+        if (bestPreferredFuture.unit == null)
+            return false;
+        if (bestPreferredFuture.affordableNow)
+            return false;
+        if (!PassesEarlyGameMassFloor(summary, currentTurn))
+            return false;
+        if (summary.hasCriticalCaptureGap)
+            return false;
+        if (summary.missingCapture > 0)
+            return false;
+        if (bestPreferredFuture.turnsToAfford > 2)
+            return false;
+        if (defenseMode && (summary.missingCapture > 0 || summary.missingEscort > 0))
+            return false;
+        if (!bestAffordableNow.HasValue)
+            return true;
+        return IsCandidateBetter(bestPreferredFuture, bestAffordableNow.Value);
+    }
+
+    private bool TryResolveSavingFallbackPurchase(
+        ConstructionManager construction,
+        AIDataMode mode,
+        int currentMoney,
+        bool defenseMode,
+        int savingFallbackPurchasesThisTurn,
+        AIShoppingDemandSummary summary,
+        out int targetIndex,
+        out string plannedUnitId,
+        out string plannedReason)
+    {
+        targetIndex = -1;
+        plannedUnitId = null;
+        plannedReason = "fallback-save indisponivel";
+
+        if (construction == null || mode == null || !mode.allowFallbackWhenSaving)
+            return false;
+
+        bool allowUnlimitedDefenseFallback = defenseMode && mode.buyFallbackWhenSavingOnDefenseMode;
+        bool fallbackAlreadyConsumed = mode.allowFallbackWhenSavingButOnce && savingFallbackPurchasesThisTurn > 0;
+        if (fallbackAlreadyConsumed && !allowUnlimitedDefenseFallback)
+        {
+            plannedReason = "fallback-save bloqueado | limite-por-turno";
+            return false;
+        }
+
+        if (summary.hasCriticalCaptureGap && !PassesEarlyGameMassFloor(summary, summary.turnNumber))
+        {
+            plannedReason = "fallback-save bloqueado | massa-minima";
+            return false;
+        }
+
+        if (!TryResolveFirstAffordableFromUnitList(construction, mode.fallbackUnits, currentMoney, out targetIndex, out plannedUnitId))
+        {
+            plannedReason = "fallback-save indisponivel | sem-oferta-acessivel";
+            return false;
+        }
+
+        plannedReason = $"fallback-save | modo={mode.label}";
+        return true;
+    }
+
+    private static bool PassesEarlyGameMassFloor(AIShoppingDemandSummary summary, int currentTurn)
+    {
+        if (currentTurn <= 4)
+        {
+            if (summary.friendlyUnitCount < (2 * Mathf.Max(1, summary.activeProductionBuildings)))
+                return false;
+            if (summary.friendlyUnitCount < summary.totalCaptureDemand + 2)
+                return false;
+            if (summary.hasCriticalCaptureGap)
+                return false;
+        }
+        else if (currentTurn <= 6)
+        {
+            if (summary.friendlyUnitCount < summary.totalCaptureDemand + summary.totalEscortDemand)
+                return false;
+            if (summary.TotalMissingCount >= 2)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static int CountActiveProductionBuildings(AISnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.KnownConstructions == null)
+            return 0;
+
+        int count = 0;
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo info = snapshot.KnownConstructions[i];
+            if (info == null || info.Source == null)
+                continue;
+            if (info.TeamId != snapshot.AiTeam || !info.CanProduceUnits)
+                continue;
+            count++;
+        }
+
+        return count;
+    }
+
+    private static int CountAssignedRole(AIPlanIntent intent, AIPlanRole role)
+    {
+        if (intent == null || intent.Assignments == null)
+            return 0;
+
+        int count = 0;
+        for (int i = 0; i < intent.Assignments.Count; i++)
+        {
+            AIPlanAssignment assignment = intent.Assignments[i];
+            if (assignment != null && assignment.Role == role)
+                count++;
+        }
+
+        return count;
+    }
+
+    private List<AIShoppingCandidate> CollectCapabilityCandidatesFromGroups(
+        ConstructionManager construction,
+        IReadOnlyList<AIDataGroup> orderedGroups,
+        AIPlanCapability capability,
+        int currentMoney,
+        int incomePerTurn)
+    {
+        List<AIShoppingCandidate> candidates = new List<AIShoppingCandidate>();
+        if (construction == null || orderedGroups == null)
+            return candidates;
 
         for (int g = 0; g < orderedGroups.Count; g++)
         {
@@ -5819,26 +6090,95 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             if (group == null || group.specificUnits == null || group.specificUnits.Count == 0)
                 continue;
 
+            List<AIShoppingCandidate> groupCandidates = new List<AIShoppingCandidate>();
             for (int i = 0; i < group.specificUnits.Count; i++)
             {
                 UnitData wantedUnit = group.specificUnits[i];
                 if (wantedUnit == null || string.IsNullOrWhiteSpace(wantedUnit.id))
                     continue;
-                if (wantedUnit.aiUnitProfile == null || !wantedUnit.aiUnitProfile.HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Capture))
+                if (!TryGetOfferIndex(construction, wantedUnit, out int offerIndex, out UnitData offer) || offer == null)
+                    continue;
+                if (offer.aiUnitProfile == null || !offer.aiUnitProfile.HasPlanCapability(capability, offer))
                     continue;
 
-                if (!TryGetAffordableOfferIndex(construction, wantedUnit, currentMoney, out int index, out UnitData offer))
-                    continue;
-
-                targetIndex = index;
-                plannedUnitId = offer != null ? offer.id : wantedUnit.id;
-                return true;
+                int cost = Mathf.Max(0, offer.cost);
+                groupCandidates.Add(new AIShoppingCandidate
+                {
+                    unit = offer,
+                    offerIndex = offerIndex,
+                    cost = cost,
+                    groupPriority = group.priority,
+                    affordableNow = cost <= currentMoney,
+                    turnsToAfford = CalculateTurnsToAfford(cost, currentMoney, incomePerTurn),
+                    fromFallback = false,
+                    sourceLabel = $"grupo:{group.label}"
+                });
             }
+
+            if (groupCandidates.Count > 0)
+                return groupCandidates;
         }
 
-        return false;
+        return candidates;
     }
-    private static List<AIDataGroup> GetGroupsByPriority(List<AIDataGroup> groups)
+
+    private List<AIShoppingCandidate> CollectCapabilityCandidatesFromFallback(
+        ConstructionManager construction,
+        AIDataMode mode,
+        AIPlanCapability capability,
+        int currentMoney,
+        int incomePerTurn)
+    {
+        List<AIShoppingCandidate> candidates = new List<AIShoppingCandidate>();
+        if (construction == null || mode == null || mode.fallbackUnits == null)
+            return candidates;
+
+        for (int i = 0; i < mode.fallbackUnits.Count; i++)
+        {
+            UnitData wantedUnit = mode.fallbackUnits[i];
+            if (wantedUnit == null || string.IsNullOrWhiteSpace(wantedUnit.id))
+                continue;
+            if (!TryGetOfferIndex(construction, wantedUnit, out int offerIndex, out UnitData offer) || offer == null)
+                continue;
+            if (offer.aiUnitProfile == null || !offer.aiUnitProfile.HasPlanCapability(capability, offer))
+                continue;
+
+            int cost = Mathf.Max(0, offer.cost);
+            candidates.Add(new AIShoppingCandidate
+            {
+                unit = offer,
+                offerIndex = offerIndex,
+                cost = cost,
+                groupPriority = int.MaxValue,
+                affordableNow = cost <= currentMoney,
+                turnsToAfford = CalculateTurnsToAfford(cost, currentMoney, incomePerTurn),
+                fromFallback = true,
+                sourceLabel = "fallback"
+            });
+        }
+
+        return candidates;
+    }
+
+    private static int CalculateTurnsToAfford(int cost, int currentMoney, int incomePerTurn)
+    {
+        int safeCost = Mathf.Max(0, cost);
+        if (currentMoney >= safeCost)
+            return 0;
+
+        int safeIncome = Mathf.Max(1, incomePerTurn);
+        return Mathf.CeilToInt((safeCost - currentMoney) / (float)safeIncome);
+    }
+
+    private static bool IsCandidateBetter(AIShoppingCandidate a, AIShoppingCandidate b)
+    {
+        if (a.cost != b.cost)
+            return a.cost > b.cost;
+        if (a.groupPriority != b.groupPriority)
+            return a.groupPriority < b.groupPriority;
+        return a.offerIndex < b.offerIndex;
+    }
+    private static List<AIDataGroup> GetGroupsByPriority(IReadOnlyList<AIDataGroup> groups)
     {
         List<AIDataGroup> ordered = new List<AIDataGroup>();
         for (int i = 0; i < groups.Count; i++)
@@ -5970,37 +6310,6 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
 
             targetIndex = index;
             plannedUnitId = offer != null ? offer.id : wantedUnit.id;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryResolveFirstAffordableCaptureCapableFromCatalog(
-        ConstructionManager construction,
-        int currentMoney,
-        out int targetIndex,
-        out string plannedUnitId)
-    {
-        targetIndex = -1;
-        plannedUnitId = null;
-
-        if (construction == null)
-            return false;
-
-        IReadOnlyList<UnitData> offered = construction.OfferedUnits;
-        if (offered == null)
-            return false;
-
-        for (int i = 0; i < offered.Count; i++)
-        {
-            UnitData unit = offered[i];
-            if (unit == null) continue;
-            if (unit.aiUnitProfile == null || !unit.aiUnitProfile.HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Capture)) continue;
-            if (Mathf.Max(0, unit.cost) > currentMoney) continue;
-
-            targetIndex = i;
-            plannedUnitId = unit.id;
             return true;
         }
 

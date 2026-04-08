@@ -280,12 +280,59 @@ public class AIPlayerControllerEditor : Editor
         string displayName = GetStringRelative(planElement, "displayName");
         string status = GetStringRelative(planElement, "status");
         int risk = GetIntRelative(planElement, "tacticalRiskScore");
+        string roleSuffix = BuildAssignmentCountSuffix(planElement != null ? planElement.FindPropertyRelative("assignments") : null);
         string riskSuffix = risk > 0 ? $" | risk={risk}" : string.Empty;
+        string suffix = roleSuffix + riskSuffix;
         if (!string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrWhiteSpace(status))
-            return $"{displayName} [{status}]{riskSuffix}";
+            return $"{displayName} [{status}]{suffix}";
         if (!string.IsNullOrWhiteSpace(displayName))
-            return displayName + riskSuffix;
-        return $"Plan {index}{riskSuffix}";
+            return displayName + suffix;
+        return $"Plan {index}{suffix}";
+    }
+
+    private static string BuildAssignmentCountSuffix(SerializedProperty assignmentsProp)
+    {
+        int capture = 0;
+        int escort = 0;
+        int artillery = 0;
+        int support = 0;
+
+        if (assignmentsProp != null && assignmentsProp.isArray)
+        {
+            for (int i = 0; i < assignmentsProp.arraySize; i++)
+            {
+                SerializedProperty assignmentProp = assignmentsProp.GetArrayElementAtIndex(i);
+                string role = GetStringRelative(assignmentProp, "role");
+                CountRole(role, ref capture, ref escort, ref artillery, ref support);
+            }
+        }
+
+        return $" | CAP={capture} ESC={escort} ART={artillery} SUP={support}";
+    }
+
+    private static void CountRole(string role, ref int capture, ref int escort, ref int artillery, ref int support)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+            return;
+
+        switch (role.Trim().ToLowerInvariant())
+        {
+            case "capture":
+                capture++;
+                break;
+            case "escort":
+                escort++;
+                break;
+            case "artillery":
+            case "firesupport":
+            case "fire support":
+                artillery++;
+                break;
+            case "support":
+            case "logistics":
+                support++;
+                break;
+        }
     }
 
     private static string GetStringRelative(SerializedProperty property, string relativeName)

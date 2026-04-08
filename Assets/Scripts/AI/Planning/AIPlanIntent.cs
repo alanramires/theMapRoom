@@ -49,6 +49,12 @@ public class AIPlanIntent
     // Motivo resumido pelo qual este plano ficou ativo no turno.
     public string SelectionReason;
 
+    // Demanda planejada por papel para este setor.
+    public int DesiredCaptureCount;
+    public int DesiredEscortCount;
+    public int DesiredArtilleryCount;
+    public int DesiredSupportCount;
+
     // Unidades designadas a este plano neste turno
     public List<AIPlanAssignment> Assignments = new List<AIPlanAssignment>();
 }
@@ -66,3 +72,4 @@ public class AIPlanAssignment
     public Vector3Int PlannedCaptureCell;
     public string PlannedCaptureLabel;
 }
+

@@ -146,6 +146,170 @@ Regra pratica:
 
 Se `planCapabilities` estiver vazio, o codigo ainda usa inferencia legada a partir do profile atual. O objetivo do modelo novo e preencher os assets explicitamente e depender menos dessa inferencia.
 
+---
+
+## Shopping v2
+
+O sistema de compra agora é **capability-driven**. Em vez de usar o atalho antigo de "faltou capturador, compra qualquer capturador", o shopping passa a ler a demanda exportada pelo planner do turno.
+
+### De onde vem a demanda de compra?
+
+Depois do `EvaluatePlanner()`, cada `AIPlanIntent` carrega sua demanda planejada por papel:
+- `DesiredCaptureCount`
+- `DesiredEscortCount`
+- `DesiredArtilleryCount`
+- `DesiredSupportCount`
+
+O shopping consolida isso em um resumo interno (`AIShoppingDemandSummary`) com:
+- `missingCapture`
+- `missingEscort`
+- `missingFireSupport`
+- `missingLogistics`
+- `totalCaptureDemand`
+- `totalEscortDemand`
+- `totalFireSupportDemand`
+- `totalLogisticsDemand`
+- `hasCriticalCaptureGap`
+- `friendlyUnitCount`
+- `activeProductionBuildings`
+
+Regra mental:
+- `missing` = o planner queria X slots daquela função, mas não conseguiu preencher com as unidades atuais.
+- `hasCriticalCaptureGap` = existe pelo menos um plano ativo de captura sem nenhum `Capture` atribuído.
+
+### Ordem da decisão de compra
+
+A compra agora segue esta prioridade:
+1. Ler a capability mais urgente do turno.
+2. Procurar unidades da construção atual que cumpram essa capability.
+3. Tentar comprar agora.
+4. Se houver unidade melhor da mesma capability e a espera for curta, decidir entre comprar agora ou guardar.
+5. Se nada atender a demanda da capability, cair para a composição normal dos grupos do `AIData`.
+6. Só depois disso usar fallback do modo ou fallback de catálogo.
+
+A capability urgente é escolhida por maior déficit:
+- `Capture`
+- `Escort`
+- `FireSupport`
+- `Logistics`
+
+Desempate: segue essa mesma ordem.
+
+Exceção:
+- se `hasCriticalCaptureGap` estiver ativo, `Capture` vence imediatamente.
+
+### Como o shopping filtra as unidades
+
+O shopping não usa mais sensor de captura como filtro principal. Ele olha `planCapabilities` da unidade:
+- `Capture` -> `AIPlanCapability.Capture`
+- `Escort` -> `AIPlanCapability.Escort`
+- `FireSupport` -> `AIPlanCapability.FireSupport`
+- `Logistics` -> `AIPlanCapability.Logistics`
+
+Se o asset ainda estiver sem `planCapabilities`, o fallback legado de `HasPlanCapability(...)` continua valendo.
+
+### Papel do `AIData`
+
+O `AIData` continua existindo, mas mudou de papel conceitual.
+
+Antes:
+- os grupos praticamente mandavam na compra;
+- e o shopping só era atropelado por hardcode de capturador.
+
+Agora:
+- o planner decide **qual função está faltando**;
+- o `AIData` decide **qual unidade daquela função a IA prefere comprar**.
+
+Então:
+- `groups` = preferência dentro da capability;
+- `fallbackUnits` = contingência do modo;
+- `saveForNextRound` e flags relacionadas = controle de economia.
+
+### Regra de economia: Massa mínima
+
+O `Shopping v2` ganhou uma trava para impedir colapso por save ganancioso no early game.
+
+A IA **não pode guardar dinheiro para uma unidade premium** se isso deixar o exército com pouca massa no momento errado.
+
+Janela de abertura:
+- turnos `1..4`
+
+Bloqueia save se qualquer uma for verdade:
+- `friendlyUnitCount < 2 * activeProductionBuildings`
+- `friendlyUnitCount < totalCaptureDemand + 2`
+- `hasCriticalCaptureGap == true`
+
+Janela curta de estabilização:
+- turnos `5..6`
+
+Bloqueia save se qualquer uma for verdade:
+- `friendlyUnitCount < totalCaptureDemand + totalEscortDemand`
+- `TotalMissingCount >= 2`
+
+Efeito prático:
+- opener com pouca massa continua comprando corpo de mapa;
+- a IA para de "greedar" MBT ou artilharia cara cedo demais;
+- save só acontece quando a presença no mapa já está saudável.
+
+### Quando a IA guarda dinheiro?
+
+A IA pode guardar para a melhor unidade da mesma capability quando:
+- `saveForNextRound` está ligado no modo atual;
+- a unidade premium da capability está a no máximo `2` turnos de distância;
+- a regra de `massa mínima` passou;
+- não existe `critical capture gap`;
+- em defesa, não há déficit ativo de `Capture` ou `Escort`.
+
+Heurística do `v2`:
+- dentro da mesma capability, a unidade mais cara é tratada como "melhor";
+- se empatar em custo, vence a de grupo mais prioritário;
+- se ainda empatar, vence a primeira oferta encontrada na construção.
+
+Ainda não existe aqui leitura refinada de counter inimigo. Isso fica para o `Shopping v3`.
+
+### `fallback-save`
+
+Os flags antigos de economia do `AIDataMode` continuam funcionando:
+- `allowFallbackWhenSaving`
+- `allowFallbackWhenSavingButOnce`
+- `buyFallbackWhenSavingOnDefenseMode`
+
+Isso significa que a IA pode:
+- decidir guardar para uma unidade melhor;
+- mas ainda assim fazer uma compra de contingência do `fallbackUnits` naquele turno, se o modo permitir.
+
+Mesmo assim, existe uma trava importante:
+- `fallback-save` não pode furar `massa mínima` quando houver `critical capture gap`.
+
+### Leitura dos logs de compra
+
+Com `aiLog` ligado no `AIPlayerController`, a compra tende a sair assim no console:
+- `demanda=Capture | missing=2/4 | unidade=Soldado | origem=grupo:Capture | custo=...`
+- `demanda=Escort | missing=1/2 | save=Tanque A | turns=2 | massa-minima-ok`
+- `economizou para proxima rodada | fallback bloqueado pela massa minima`
+- `fallback-save | modo=Ataque`
+- `fallback-modo=Defesa | motivo=sem oferta acessivel nos grupos`
+
+Leitura rápida:
+- `demanda=...` -> capability que o planner está cobrando do shopping.
+- `missing=X/Y` -> déficit atual daquela função.
+- `save=...` -> decidiu segurar dinheiro.
+- `fallback-save` -> guardou, mas ainda comprou uma contingência do fallback.
+- `fallback bloqueado pela massa minima` -> a economia foi barrada pela regra anti-colapso do opener.
+
+### Exemplo de configuração mínima para testar
+
+Para o `Shopping v2` responder bem, o ideal é:
+- `AIUnitProfile` com `planCapabilities` coerentes;
+- `AIData` com pelo menos um grupo que represente `Capture`;
+- `fallbackUnits` contendo uma unidade de emergência válida para o modo.
+
+Exemplo prático do `AI Burra` atualizado:
+- `attackMode` agora tem grupo `Capture` com `Soldado`;
+- `defenseMode` agora também tem grupo `Capture`;
+- o fallback defensivo inclui `Soldado` antes de `Bazooka`.
+
+Isso evita que o teste do shopping fique contaminado por um perfil legado incapaz de responder demanda de captura.
 ## Referência de Flags
 
 ### Sensor Priority
@@ -165,7 +329,7 @@ A ordem dos sensores define o que a unidade tenta fazer a cada turno. O primeiro
 
 ### Attack Decision
 
-Critérios aplicados quando o sensor Attack avalia se vale a pena engajar um inimigo.
+Critérios aplicados quando o sensor Attack avalia se vale a pena engajar um inimigo. O mesmo gate agora tambem e reaproveitado em casos especiais, como capturador tentando desalojar um ocupante do predio-alvo.
 
 | Campo | Efeito |
 |---|---|
@@ -221,16 +385,36 @@ Sem alvo alcançável agora, reposiciona-se em direção ao alvo até entrar em 
 Ao reposicionar durante o engajamento, prefere a **distância máxima** de tiro em vez da mínima. Mantém a artilharia o mais longe possível do inimigo. **Típico de artilharia pura.**
 
 #### captureInterruptBias
-Define o limiar de score mínimo para interromper a marcha de captura e atacar um inimigo no corredor ("morde no caminho"). Aplicado tanto no planejamento pré-movimento quanto no fallback pós-movimento. Só tem efeito quando `engageNearestEnemies` está ativo.
+Controla **o quanto uma unidade em modo de captura aceita abandonar temporariamente a captura para brigar**.
 
-| Valor | Score mínimo | Comportamento |
+Ele **nao decide sozinho se o combate e bom**. Antes, o ataque ainda precisa passar no `Attack Decision` (dano minimo, dano recebido maximo, sobrevivencia, etc.). So depois disso o `captureInterruptBias` decide se esse ataque bom o bastante tambem merece **interromper a marcha de captura**.
+
+Em outras palavras:
+1. `Attack Decision`: "esse combate presta?"
+2. `captureInterruptBias`: "mesmo prestando, vale parar de capturar para fazer isso agora?"
+
+Ele so tem efeito quando:
+- o sensor `Capture` esta ativo
+- `engageNearestEnemies` esta ligado
+- existe um inimigo relevante no corredor da captura ou no contexto pos-movimento
+
+| Valor | Score minimo | Comportamento |
 |---|---|---|
-| **None** | — | Nunca interrompe a captura por iniciativa própria. Sem "morde no caminho", sem fallback oportunista. Exceção: inimigo **no próprio prédio objetivo** sempre é atacado para desbloqueá-lo. |
-| **Passive** | 38.000 | Raramente abandona captura para brigar. Só ataca alvos muito vantajosos no corredor. Sem fallback oportunista pós-movimento. |
-| **Normal** | 28.000 | Limiar padrão. Ataca se o score justificar. Fallback oportunista ativo. |
-| **Aggressive** | 22.000 | Interrompe captura com facilidade. Ataca quase qualquer inimigo no caminho. |
+| **None** | - | Nunca interrompe a captura por iniciativa propria. Sem "morde no caminho" e sem fallback oportunista. |
+| **Passive** | 38.000 | Raramente abandona captura para brigar. So aceita oportunidades muito vantajosas. |
+| **Normal** | 28.000 | Limiar padrao. Interrompe a captura quando o ataque e razoavelmente bom. |
+| **Aggressive** | 22.000 | Interrompe a captura com facilidade. Quase qualquer oportunidade aceitavel vira combate. |
 
-> Capturador puro deve usar **None** (rush total, só ataca quem bloqueia o objetivo). Bazooka skirmisher deve usar **Aggressive** (oportunista). Padrão é Normal.
+**Exemplo pratico:**
+- um capturador esta marchando para um predio
+- aparece um inimigo no corredor
+- se o ataque for ruim, o `Attack Decision` barra tudo e a unidade continua a marcha
+- se o ataque for bom, o `captureInterruptBias` decide se ainda assim compensa largar a captura por um turno para brigar
+
+**Importante:** isso e diferente de um inimigo em cima do proprio predio-alvo.
+Esse caso e tratado como **bloqueio do objetivo**, nao como interrupcao oportunista pura. Mesmo assim, agora esse desbloqueio tambem respeita o `Attack Decision`, para evitar suicidio contra alvo pesado em trade ruim.
+
+> Capturador puro deve usar **None**. Bazooka skirmisher ou capturador oportunista pode usar **Aggressive**. O valor padrao mais equilibrado e **Normal**.
 
 #### holdGroundWhenIdle
 Sem objetivo ativo (sem inimigo, sem captura, sem supply, sem plano), **ancora na posição atual** em vez de avançar em direção ao HQ inimigo (que é o fallback padrão). Com `prioritizeDpqDuringTravel`, o path planning ainda escolhe a melhor célula DPQ dentro do alcance de movimento — na prática a unidade gravita para o prédio ou cobertura mais próximos e fica lá.
@@ -432,10 +616,10 @@ Planner Capability: `Capture`
 - **Não alcança o objetivo este turno** → move em direção a ele. Com `engageNearestEnemies` desligado, ignora inimigos no caminho.
 - **Alcança o objetivo e está vazio** → captura.
 - **Alcança o objetivo e tem aliado** → o planner designa outro prédio no setor; se não houver, avança para o mesmo objetivo (aliado sai do caminho no turno seguinte).
-- **Alcança o objetivo e tem inimigo visível** → posiciona em DPQ adjacente e ataca para desbloquear, independente de `captureInterruptBias`. `None` não impede este ataque — ele é parte da missão de captura, não uma interrupção dela.
+- **Alcança o objetivo e tem inimigo visivel** -> tenta posicionar em DPQ adjacente e atacar para desbloquear, mas agora esse combate tambem precisa passar no `Attack Decision`. Se reprovar (ex: tanque pesado em trade ruim), a unidade mantem pressao sem se jogar no combate.
 - **Objetivo em território inimigo sem visibilidade (FoW)** → avança com cautela preferindo DPQ e movimento mínimo para revelar antes de entrar, exceto se um aliado já ocupa o prédio.
 
-`captureInterruptBias: None` garante que a unidade nunca abandona a missão por oportunismo — nem "morde no caminho", nem fallback oportunista pós-movimento. Em defesa, recua ao HQ quando sem objetivo.
+`captureInterruptBias: None` garante que a unidade nunca abandona a missao por oportunismo - nem "morde no caminho", nem fallback oportunista pos-movimento. Isso nao impede o desbloqueio de objetivo ocupado, mas esse desbloqueio agora tambem respeita o `Attack Decision`. Em defesa, recua ao HQ quando sem objetivo.
 
 ---
 
@@ -540,6 +724,7 @@ Planner Capability: `Logistics`
 | playConservative | Sim | Sim |
 
 **Comportamento:** Civil puro. Nunca ataca proativamente (sem sensor Attack). Joga conservadoramente em ambas as posturas — prefere celulas seguras e evita perigo. Em defesa, recua ao HQ quando sem aliados para suprir. Quando o sensor `Supply` encontra mais de um aliado valido, prioriza o **mais proximo**; se houver empate de distancia, desempata pela criticidade (HP, municao e combustivel). Primeiro tenta suprir sem mover; se nao houver alvo imediato, navega ate o aliado escolhido. Retorna a base para reabastecer quando combustivel, municao ou pecas da propria carroceria caem abaixo dos limiares de restock do profile.
+
 
 
 

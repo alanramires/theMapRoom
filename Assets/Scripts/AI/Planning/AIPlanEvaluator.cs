@@ -130,6 +130,7 @@ public static class AIPlanEvaluator
         };
         draft.CaptureTargets = CollectUncapturedTargetsInSector(bestSector, snapshot);
         draft.InfantryDemand = Mathf.Max(0, Mathf.Min(force.Capture, draft.CaptureTargets.Count));
+        ApplyPlannedForceToIntent(intent, force, draft.InfantryDemand);
 
         var singleDraft = new System.Collections.Generic.List<ActiveSectorDraft> { draft };
         AssignSectorPlanInfantryAcrossActivePlans(singleDraft, snapshot, assignedUnits);
@@ -288,6 +289,7 @@ public static class AIPlanEvaluator
 
             draft.CaptureTargets = CollectUncapturedTargetsInSector(sector.Sector, snapshot);
             draft.InfantryDemand = Mathf.Max(0, Mathf.Min(force.Capture, draft.CaptureTargets.Count));
+            ApplyPlannedForceToIntent(intent, force, draft.InfantryDemand);
 
             // Ajusta nome para facilitar leitura no log/debug.
             int escortDemand = force.Escort + force.FireSupport + force.Logistics;
@@ -539,6 +541,17 @@ public static class AIPlanEvaluator
         FillCaptureTarget(intent, sector, snapshot);
         FillSectorEnemy(intent, sector, snapshot);
         return intent;
+    }
+
+    private static void ApplyPlannedForceToIntent(AIPlanIntent intent, PlannedForce force, int resolvedCaptureDemand)
+    {
+        if (intent == null)
+            return;
+
+        intent.DesiredCaptureCount = Mathf.Max(0, resolvedCaptureDemand);
+        intent.DesiredEscortCount = Mathf.Max(0, force.Escort);
+        intent.DesiredArtilleryCount = Mathf.Max(0, force.FireSupport);
+        intent.DesiredSupportCount = Mathf.Max(0, force.Logistics);
     }
 
     private static void FillCaptureTarget(AIPlanIntent intent, ConstructionSector sector, AISnapshot snapshot)
@@ -1558,6 +1571,8 @@ public static class AIPlanEvaluator
         plannerLogs.Add(message);
     }
 }
+
+
 
 
 
