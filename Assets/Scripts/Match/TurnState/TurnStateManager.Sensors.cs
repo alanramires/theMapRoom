@@ -35,6 +35,8 @@ public partial class TurnStateManager
     public IReadOnlyList<PodeSuprirInvalidOption> CachedPodeSuprirInvalidTargets => cachedPodeSuprirInvalidTargets;
     public IReadOnlyList<PodeTransferirOption> CachedPodeTransferirTargets => cachedPodeTransferirTargets;
     public IReadOnlyList<PodeTransferirInvalidOption> CachedPodeTransferirInvalidTargets => cachedPodeTransferirInvalidTargets;
+    public ConstructionManager CachedPodeCapturarConstruction => cachedPodeCapturarConstruction;
+    public string CachedPodeCapturarReason => cachedPodeCapturarReason;
 
     private void RefreshSensorsForCurrentState()
     {

@@ -263,6 +263,20 @@ public class MatchController : MonoBehaviour
         return players[slotIndex].teamId;
     }
 
+    public int GetSlotIndexForTeam(TeamId teamId)
+    {
+        if (teamId == TeamId.Neutral || players == null)
+            return -1;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i].teamId == teamId)
+                return i;
+        }
+
+        return -1;
+    }
+
     // Retorna quantos slots de jogador existem (excluindo Neutral).
     public int SlotCount => players != null ? players.Count : 0;
     public bool EconomyEnabled => economyEnabled;

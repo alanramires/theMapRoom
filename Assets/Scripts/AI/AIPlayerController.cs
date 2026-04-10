@@ -199,6 +199,31 @@ public class AIPlayerController : MonoBehaviour
     }
 
     [System.Serializable]
+    public sealed class ShoppingCapabilityPressureDebugView
+    {
+        public string capability;
+        public int orderCount;
+        public int basePressure;
+        public int missingPressure;
+        public int riskPressure;
+        public int criticalPressure;
+        public int dynamicPressure;
+        public int totalPressure;
+        public string criteriaSummary;
+        public bool urgentLogisticsNeed;
+        public int supplyChainPressureScore;
+        public int supplyChainAvailableSuppliers;
+        public int supplyChainTargetSuppliers;
+        public int supplyChainAdditionalSuppliersNeeded;
+        public int supplyChainPlansMissingLogistics;
+        public int supplyChainLowAutonomyUnits;
+        public int supplyChainOutOfAmmoUnits;
+        public int supplyChainDamagedUnits;
+        public int supplyChainFrontlineCriticalUnits;
+        public string supplyChainReason;
+    }
+
+    [System.Serializable]
     public sealed class ShoppingDecisionDebugView
     {
         public string constructionLabel;
@@ -243,6 +268,7 @@ public class AIPlayerController : MonoBehaviour
         public int strategicSaveTurnsToAfford;
         public int strategicSaveDeferredOrders;
         public string strategicSaveReason;
+        public List<ShoppingCapabilityPressureDebugView> capabilityPressures = new List<ShoppingCapabilityPressureDebugView>();
         public List<ShoppingOrderDebugView> orders = new List<ShoppingOrderDebugView>();
         public List<ShoppingDecisionDebugView> decisions = new List<ShoppingDecisionDebugView>();
     }
@@ -352,11 +378,42 @@ public class AIPlayerController : MonoBehaviour
             strategicSaveCost = shoppingPlan != null ? shoppingPlan.strategicSaveCost : 0,
             strategicSaveTurnsToAfford = shoppingPlan != null ? shoppingPlan.strategicSaveTurnsToAfford : 0,
             strategicSaveDeferredOrders = shoppingPlan != null ? shoppingPlan.strategicSaveDeferredOrders : 0,
-            strategicSaveReason = shoppingPlan != null ? shoppingPlan.strategicSaveReason : null
+            strategicSaveReason = shoppingPlan != null ? shoppingPlan.strategicSaveReason : null,
         };
 
         if (shoppingPlan != null)
         {
+            for (int i = 0; i < shoppingPlan.capabilityPressures.Count; i++)
+            {
+                AIShoppingCapabilityPressure pressure = shoppingPlan.capabilityPressures[i];
+                if (pressure == null)
+                    continue;
+
+                view.capabilityPressures.Add(new ShoppingCapabilityPressureDebugView
+                {
+                    capability = pressure.capability.ToString(),
+                    orderCount = pressure.orderCount,
+                    basePressure = pressure.basePressure,
+                    missingPressure = pressure.missingPressure,
+                    riskPressure = pressure.riskPressure,
+                    criticalPressure = pressure.criticalPressure,
+                    dynamicPressure = pressure.dynamicPressure,
+                    totalPressure = pressure.totalPressure,
+                    criteriaSummary = pressure.criteriaSummary,
+                    urgentLogisticsNeed = shoppingPlan != null && pressure.capability == AIPlanCapability.Logistics && shoppingPlan.urgentLogisticsNeed,
+                    supplyChainPressureScore = shoppingPlan != null && pressure.capability == AIPlanCapability.Logistics ? shoppingPlan.supplyChainPressureScore : 0,
+                    supplyChainAvailableSuppliers = shoppingPlan != null && pressure.capability == AIPlanCapability.Logistics ? shoppingPlan.supplyChainAvailableSuppliers : 0,
+                    supplyChainTargetSuppliers = shoppingPlan != null && pressure.capability == AIPlanCapability.Logistics ? shoppingPlan.supplyChainTargetSuppliers : 0,
+                    supplyChainAdditionalSuppliersNeeded = shoppingPlan != null && pressure.capability == AIPlanCapability.Logistics ? shoppingPlan.supplyChainAdditionalSuppliersNeeded : 0,
+                    supplyChainPlansMissingLogistics = shoppingPlan != null && pressure.capability == AIPlanCapability.Logistics ? shoppingPlan.supplyChainPlansMissingLogistics : 0,
+                    supplyChainLowAutonomyUnits = shoppingPlan != null && pressure.capability == AIPlanCapability.Logistics ? shoppingPlan.supplyChainLowAutonomyUnits : 0,
+                    supplyChainOutOfAmmoUnits = shoppingPlan != null && pressure.capability == AIPlanCapability.Logistics ? shoppingPlan.supplyChainOutOfAmmoUnits : 0,
+                    supplyChainDamagedUnits = shoppingPlan != null && pressure.capability == AIPlanCapability.Logistics ? shoppingPlan.supplyChainDamagedUnits : 0,
+                    supplyChainFrontlineCriticalUnits = shoppingPlan != null && pressure.capability == AIPlanCapability.Logistics ? shoppingPlan.supplyChainFrontlineCriticalUnits : 0,
+                    supplyChainReason = shoppingPlan != null && pressure.capability == AIPlanCapability.Logistics ? shoppingPlan.supplyChainReason : null
+                });
+            }
+
             for (int i = 0; i < shoppingPlan.orders.Count; i++)
             {
                 AIShoppingOrder order = shoppingPlan.orders[i];
@@ -2109,8 +2166,8 @@ public class AIPlayerController : MonoBehaviour
             if (info == null || !info.IsCapturable || info.Sector != sector)
                 continue;
 
-            bool ownedFully = info.TeamId == snapshot.AiTeam && info.CapturePoints >= info.CapturePointsMax;
-            if (ownedFully)
+            bool ownedByAi = info.TeamId == snapshot.AiTeam;
+            if (ownedByAi)
                 continue;
 
             int dist = Mathf.Abs(unitCell.x - info.Cell.x) + Mathf.Abs(unitCell.y - info.Cell.y);
@@ -2310,6 +2367,14 @@ public class AIPlayerController : MonoBehaviour
                 friendlyById[friendly.InstanceId] = friendly;
             }
         }
+        IReadOnlyList<UnitManager> allUnits = UnitManager.AllActive;
+        for (int i = 0; allUnits != null && i < allUnits.Count; i++)
+        {
+            UnitManager friendly = allUnits[i];
+            if (friendly == null || friendly.IsDead || friendly.TeamId != plannerContextTeam)
+                continue;
+            friendlyById[friendly.InstanceId] = friendly;
+        }
 
 
         for (int p = 0; p < currentTurnPlans.Count; p++)
@@ -2399,8 +2464,8 @@ public class AIPlayerController : MonoBehaviour
             if (info.Sector != sector)
                 continue;
 
-            bool ownedFully = info.TeamId == snapshot.AiTeam && info.CapturePoints >= info.CapturePointsMax;
-            if (!ownedFully)
+            bool ownedByAi = info.TeamId == snapshot.AiTeam;
+            if (!ownedByAi)
                 count++;
         }
 
@@ -2642,6 +2707,7 @@ public class AIPlayerController : MonoBehaviour
             && unitAssignment.Role == AIPlanRole.Capture
             && unitAssignment.Intent != null
             && unitAssignment.Intent.HasCaptureTarget;
+        bool protectCaptureDiscipline = captureRoleFilter && IsProtectIntent(unitIntent);
 
         // SectorEnemy pode ter ressuscitado assignedEnemy que AssignTargetForUnit zerou via captureInterruptBias.
         // Reaplicar o mesmo gate aqui para garantir coerÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âªncia.
@@ -2682,6 +2748,20 @@ public class AIPlayerController : MonoBehaviour
         ConstructionManager supplyReceiveConstruction = null;
         Vector3Int supplyObjectiveCell = unitCell;
         string supplyObjectiveLabel = string.Empty;
+        bool supplierParkingRequested = false;
+        bool supplierPlanCohesionRequested = false;
+        bool transportIdlePickupRequested = false;
+        bool transportPickupObjectiveActive = false;
+        bool transportCarryObjectiveActive = false;
+        bool transportEmbarkNow = false;
+        bool transportDisembarkNow = false;
+        UnitManager transportTargetTransporter = null;
+        UnitManager transportPassengerUnit = null;
+        Vector3Int transportObjectiveCell = unitCell;
+        Vector3Int transportPassengerTargetCell = unitCell;
+        string transportObjectiveLabel = string.Empty;
+        bool isTransporterUnit = unitData != null && unitData.isTransporter;
+        bool hasTransportBehavior = HasTransportSensor(unitData != null ? unitData.aiUnitProfile : null);
 
         bool foundDestination = false;
         Vector3Int bestDest = unitCell;
@@ -2769,7 +2849,23 @@ public class AIPlayerController : MonoBehaviour
             {
                 AIUnitSensorKind sensor = priority[s];
 
-                if (sensor == AIUnitSensorKind.Capture)
+                if (sensor == AIUnitSensorKind.Transport)
+                {
+                    if (unitData != null && unitData.isTransporter)
+                    {
+                        if (TryGetTransportCarryObjective(unit, snapshot, out transportPassengerUnit, out transportPassengerTargetCell, out transportObjectiveCell, out transportObjectiveLabel, out transportDisembarkNow))
+                        {
+                            transportCarryObjectiveActive = true;
+                            break;
+                        }
+                    }
+                    else if (TryGetTransportPickupObjective(unit, snapshot, unitIntent, unitAssignment, plannedCaptureCell, out transportTargetTransporter, out transportObjectiveCell, out transportObjectiveLabel, out transportEmbarkNow))
+                    {
+                        transportPickupObjectiveActive = true;
+                        break;
+                    }
+                }
+                else if (sensor == AIUnitSensorKind.Capture)
                 {
                     if (turnStateManager.CanUnitCaptureFromCurrentPosition(
                         unit,
@@ -2852,14 +2948,29 @@ public class AIPlayerController : MonoBehaviour
                         break;
                     }
                     // Alvo nao-adjacente: navega ate ele.
-                    if (TryGetMostCriticalAllyForSupply(unit, snapshot, out UnitManager navSupplyTarget)
-                        && TryResolveSupplyObjectiveCell(unit, navSupplyTarget, snapshot, occupiedByAllies, preferredSupportCells, dangerPenaltyCells, out supplyObjectiveCell, out supplyActionNow))
+                    if (TryCollectSupplyNavigationCandidates(unit, snapshot, out List<UnitManager> navSupplyTargets) && navSupplyTargets.Count > 0)
                     {
-                        supplyObjectiveActive = true;
-                        supplyRefillMode = false;
-                        supplyTargetUnit = navSupplyTarget;
-                        supplyObjectiveLabel = navSupplyTarget.name;
-                        break;
+                        for (int navIndex = 0; navIndex < navSupplyTargets.Count; navIndex++)
+                        {
+                            UnitManager navSupplyTarget = navSupplyTargets[navIndex];
+                            if (navSupplyTarget == null)
+                                continue;
+
+                            if (!TryResolveSupplyObjectiveCell(unit, navSupplyTarget, snapshot, occupiedByAllies, preferredSupportCells, dangerPenaltyCells, out supplyObjectiveCell, out supplyActionNow))
+                                continue;
+
+                            supplyObjectiveActive = true;
+                            supplyRefillMode = false;
+                            supplyTargetUnit = navSupplyTarget;
+                            supplyObjectiveLabel = navSupplyTarget.name;
+
+                            if (aiLog && navIndex > 0)
+                                Debug.Log($"{T(aiTeam, 2)} [support] {unit.name} pulou alvo de supply mais critico/bloqueado e caiu para fallback util: {navSupplyTarget.name}.");
+                            break;
+                        }
+
+                        if (supplyObjectiveActive)
+                            break;
                     }
                     // Sensor Supply falhou (sem aliado que precise) ? tenta proximo.
                 }
@@ -2914,8 +3025,15 @@ public class AIPlayerController : MonoBehaviour
         else if (isSupplierUnit && (defendMode || stanceBehavior.retreatToHqWhenIdle))
         {
             repositioningForDefense = true;
-            if (TryGetSupplierIdleParkingCell(unit, snapshot, occupiedByAllies, out Vector3Int supplierParkingCell))
+            if (planCohesionActive)
             {
+                supplierPlanCohesionRequested = true;
+                moveTarget = planCohesionCell;
+                moveTarget.z = 0;
+            }
+            else if (TryGetSupplierIdleParkingCell(unit, snapshot, occupiedByAllies, out Vector3Int supplierParkingCell))
+            {
+                supplierParkingRequested = true;
                 moveTarget = supplierParkingCell;
                 moveTarget.z = 0;
             }
@@ -2956,6 +3074,37 @@ public class AIPlayerController : MonoBehaviour
             }
             moveTarget = anchor;
             moveTarget.z = 0;
+        }
+        else if (isTransporterUnit
+            && hasTransportBehavior
+            && !HasAnyTransportedPassenger(unit)
+            && unitIntent == null
+            && unitAssignment == null)
+        {
+            // APC/transporte vazio e sem plano: fica na zona de pickup perto da base
+            // para embarques futuros, em vez de disparar para o fallback de avancar HQ.
+            repositioningForDefense = true;
+            if (TryGetTransportIdlePickupCell(unit, snapshot, occupiedByAllies, out Vector3Int transportParkingCell))
+            {
+                transportIdlePickupRequested = true;
+                moveTarget = transportParkingCell;
+                moveTarget.z = 0;
+            }
+            else if (snapshot.HasHq)
+            {
+                moveTarget = snapshot.HqCell;
+                moveTarget.z = 0;
+            }
+            else
+            {
+                moveTarget = unitCell;
+            }
+
+            if (moveTarget == unitCell)
+            {
+                foundDestination = true;
+                bestDest = unitCell;
+            }
         }
         else if (mergeObjectiveActive)
         {
@@ -3057,6 +3206,13 @@ public class AIPlayerController : MonoBehaviour
             moveTarget = unitCell;
         }
 
+        if (transportPickupObjectiveActive && transportEmbarkNow)
+        {
+            foundDestination = true;
+            bestDest = unitCell;
+            moveTarget = unitCell;
+        }
+
         if (supplyObjectiveActive)
         {
             if (supplyActionNow || moveTarget == unitCell)
@@ -3118,7 +3274,8 @@ public class AIPlayerController : MonoBehaviour
             // Desvio tatico: se assignedEnemy esta no corredor de captura, posiciona em celula DPQ
             // adjacente ao inimigo e ataca antes de retomar a marcha no proximo turno.
             bool skirmishDivert = false;
-            if (!captureActionNow && moveTarget != unitCell
+            if (!protectCaptureDiscipline
+                && !captureActionNow && moveTarget != unitCell
                 && assignedEnemy != null && !assignedEnemy.IsDead
                 && unit.RemainingMovementPoints > 1
                 && TryGetPreferredEngagementRangeForTarget(unit, assignedEnemy, out int skirmMinRange, out int skirmMaxRange))
@@ -3163,6 +3320,10 @@ public class AIPlayerController : MonoBehaviour
                         }
                     }
                 }
+            }
+            else if (protectCaptureDiscipline && aiLog && assignedEnemy != null && !assignedEnemy.IsDead)
+            {
+                Debug.Log($"{T(aiTeam, 2)} [protect] {unit.name} ignorou desvio tatico lateral em plano Protect; mantendo foco em {captureObjectiveLabel}.");
             }
 
             if (!skirmishDivert)
@@ -3374,6 +3535,8 @@ public class AIPlayerController : MonoBehaviour
         if (!foundDestination)
         {
             bool isIndirectUnit = stanceBehavior.repositionToFireRange;
+            if (transportPickupObjectiveActive || transportCarryObjectiveActive)
+                moveTarget = transportObjectiveCell;
             foundDestination = turnStateManager.TryGetBestReachableCellTowardsHexDistance(
                 snapshot.BoardTilemap,
                 moveTarget,
@@ -3383,7 +3546,8 @@ public class AIPlayerController : MonoBehaviour
                     ? stanceBehavior.prioritizeDpqAtBattle || engagingEnemy || isIndirectUnit
                     : stanceBehavior.prioritizeDpqDuringTravel,
                 unit: unit,
-                preferLongerAdvanceOnTie: supplyObjectiveActive || repairModeActive || captureObjectiveActive || (!defendMode && !intelCanFire),
+                preferLongerAdvanceOnTie: supplyObjectiveActive || repairModeActive || captureObjectiveActive || supplierParkingRequested || (!defendMode && !intelCanFire),
+                preferShorterAdvanceOnTie: supplierPlanCohesionRequested,
                 penalizedCells: penalizedMovementCells,
                 preferredCells: preferredSupportCells);
         }
@@ -3479,6 +3643,27 @@ public class AIPlayerController : MonoBehaviour
         bool transferred = false;
         bool supplied = false;
         bool captured = false;
+        bool embarked = false;
+        bool disembarked = false;
+        bool opportunisticCaptureActive = false;
+        string opportunisticCaptureLabel = string.Empty;
+
+        if (!repairModeActive
+            && !mergeObjectiveActive
+            && !supplyObjectiveActive
+            && !transportPickupObjectiveActive
+            && !transportCarryObjectiveActive
+            && !captureObjectiveActive
+            && turnStateManager.CanUnitCaptureFromCurrentPosition(
+                unit,
+                out ConstructionManager opportunisticConstruction,
+                out _,
+                out _)
+            && opportunisticConstruction != null)
+        {
+            opportunisticCaptureActive = true;
+            opportunisticCaptureLabel = opportunisticConstruction.ConstructionDisplayName;
+        }
 
         if (mergeObjectiveActive && mergeTargetUnit != null)
         {
@@ -3510,9 +3695,50 @@ public class AIPlayerController : MonoBehaviour
             }
         }
 
+        if (!merged && !supplied && !transferred && !captured && transportPickupObjectiveActive && transportTargetTransporter != null && turnStateManager.CachedPodeEmbarcarTargets != null && turnStateManager.CachedPodeEmbarcarTargets.Count > 0)
+        {
+            if (turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.Embark))
+            {
+                Vector3Int transporterCell = transportTargetTransporter.CurrentCellPosition;
+                transporterCell.z = 0;
+                embarked = turnStateManager.TryExecuteAutomatedEmbarkReplayTarget(transportTargetTransporter.InstanceId.ToString(), transporterCell);
+                if (aiLog && embarked)
+                    Debug.Log($"{T(aiTeam, 2)} [transport] {unit.name} embarcou em {transportTargetTransporter.name} para apoiar captura em {transportObjectiveLabel}.");
+            }
+        }
+
+        bool shouldTryTransportDisembark =
+            !merged &&
+            !supplied &&
+            !transferred &&
+            !captured &&
+            !embarked &&
+            transportCarryObjectiveActive &&
+            transportPassengerUnit != null &&
+            (transportDisembarkNow || ShouldTransportDisembarkNow(
+                unit,
+                transportPassengerUnit,
+                transportPassengerTargetCell,
+                transportObjectiveCell,
+                Mathf.Max(1, transportPassengerUnit.GetMovementRange())));
+
+        if (shouldTryTransportDisembark)
+        {
+            if (TryExecuteAutomatedTransportDisembark(transportPassengerUnit, transportPassengerTargetCell, out Vector3Int chosenDisembarkCell))
+            {
+                disembarked = true;
+                if (aiLog)
+                    Debug.Log($"{T(aiTeam, 2)} [transport] {unit.name} desembarcou {transportPassengerUnit.name} em {FormatCellLC(chosenDisembarkCell)} para captura.");
+            }
+        }
+
         if (!merged && !supplied && !transferred)
         {
-            captured = !repairModeActive && !mergeObjectiveActive && captureObjectiveActive && turnStateManager.TryExecuteAutomatedCaptureIfAvailable();
+            captured =
+                !repairModeActive &&
+                !mergeObjectiveActive &&
+                (captureObjectiveActive || opportunisticCaptureActive) &&
+                turnStateManager.TryExecuteAutomatedCaptureIfAvailable();
         }
 
         if (!supplyObjectiveActive && !repairModeActive && !mergeObjectiveActive && !captureObjectiveActive && bestDest == unitCell && intelCanFire && intelFireTarget != null && targetEnemy == null)
@@ -3599,6 +3825,8 @@ public class AIPlayerController : MonoBehaviour
             && !supplied
             && !transferred
             && !captured
+            && !embarked
+            && !disembarked
             && !supplyObjectiveActive
             && !mergeObjectiveActive
             && (!repairModeActive || repairDislodgeActive || canFireWhileRepairing)
@@ -3609,7 +3837,7 @@ public class AIPlayerController : MonoBehaviour
         // Fallback intel fire: ataque falhou (ex: hibrido nao alcancou o alvo apos cohesion bloquear movimento),
         // mas a unidade pode mirar outro alvo da posicao atual.
         // Respeita as mesmas guards do bloco principal: nao atira em modo reparo, suprimento ou fusao.
-        if (!attacked && !merged && !supplied && !transferred && !captured
+        if (!attacked && !merged && !supplied && !transferred && !captured && !embarked && !disembarked
             && !supplyObjectiveActive && !mergeObjectiveActive
             && (!repairModeActive || repairDislodgeActive || canFireWhileRepairing)
             && engagingEnemy
@@ -3619,7 +3847,7 @@ public class AIPlayerController : MonoBehaviour
             attacked = turnStateManager.TryExecuteAutomatedAttackPreferredTarget(intelFireTarget);
         }
 
-        if (!merged && !supplied && !transferred && !captured && !attacked)
+        if (!merged && !supplied && !transferred && !captured && !embarked && !disembarked && !attacked)
             turnStateManager.HandleAutomatedMoveOnlyActionRequested();
 
         yield return StartCoroutine(turnStateManager.WaitUntilAutomatedNeutralReady(12f));
@@ -3634,7 +3862,9 @@ public class AIPlayerController : MonoBehaviour
                         ? $"reparo em {repairObjectiveLabel}"
                         : (captureObjectiveActive
                             ? $"captura em {captureObjectiveLabel}{(captureUsedPlanner ? " [planner]" : " [sensor]")}"
-                            : (engagingEnemy && targetEnemy != null ? targetEnemy.name : (planCohesionActive ? $"coesao em {planCohesionLabel}" : "reposicionar")))));
+                            : (opportunisticCaptureActive
+                                ? $"captura em {opportunisticCaptureLabel} [oportunista]"
+                            : (engagingEnemy && targetEnemy != null ? targetEnemy.name : (planCohesionActive ? $"coesao em {planCohesionLabel}" : (transportIdlePickupRequested ? "aguarda pickup" : "reposicionar"))))));
 
             if (intelCanFire && intelFireTarget != null)
                 Debug.Log($"{T(aiTeam, 2)} [intel] {unit.name} @ {FormatCellLC(unitCell)} | PODE MIRAR {intelFireTarget.name} @ {FormatCellLC(intelFireTarget.CurrentCellPosition)} | acao: {detailLabel} | alocado: {planAllocationLabel}");
@@ -3660,10 +3890,14 @@ public class AIPlayerController : MonoBehaviour
                 outcome = "retornou para reparo";
             else if (captureObjectiveActive)
                 outcome = "avancou para captura";
+            else if (opportunisticCaptureActive)
+                outcome = "captura oportunista";
             else if (supplyObjectiveActive)
                 outcome = "avancou para suprir";
             else if (planCohesionActive)
                 outcome = "manteve coesao do plano";
+            else if (transportIdlePickupRequested)
+                outcome = "aguardou pickup";
             else
                 outcome = "avancou HQ";
             Debug.Log($"{T(aiTeam, 2)} {FormatCellLC(unitCell)} -> {FormatCellLC(bestDest)} (alvo: {FormatCellLC(moveTarget)}) | {outcome}");
@@ -3702,6 +3936,7 @@ public class AIPlayerController : MonoBehaviour
         Vector3Int captureFilterTarget = captureRoleFilter ? unitAssignment.Intent.CaptureTargetCell : default;
 
         UnitManager best = null;
+        int bestTargetPriorityRank = int.MinValue;
         int bestEscortThreatBand = int.MaxValue;
         int bestBand = int.MaxValue;
         int bestScore = int.MinValue;
@@ -3866,6 +4101,14 @@ public class AIPlayerController : MonoBehaviour
                     effectiveAttackDistance = candidateDist;
             }
 
+            BazookaTargetPriority targetPriority = BazookaTargetPriority.Tertiary;
+            int targetPriorityRank = 0;
+            if (hasAttackerData && enemy.TryGetUnitData(out UnitData targetPriorityData) && targetPriorityData != null)
+            {
+                targetPriority = attackerData.ResolveAiTargetPriorityForTargetClass(targetPriorityData.unitClass);
+                targetPriorityRank = ResolveAttackTargetPreferenceRank(aiProfileAssign, targetPriority);
+            }
+
             int score;
             string scoreDetail = "fallback-sem-simulacao";
 
@@ -3894,6 +4137,7 @@ public class AIPlayerController : MonoBehaviour
             {
                 Debug.Log(
                     $"{T(snapshot.AiTeam, 2)} [score] {unit.name} -> {enemy.name} | " +
+                    $"prefMode={(aiProfileAssign != null ? aiProfileAssign.targetPreference.ToString() : AIAttackTargetPreference.Either.ToString())} pref={targetPriority}/{targetPriorityRank} " +
                     $"{(escortPlanCohesionActive ? $"escortBand={(escortThreatBand == int.MaxValue ? "off-plan" : escortThreatBand.ToString())} " : string.Empty)}" +
                     $"band={defenseBand} dist={tieDistance}->{effectiveAttackDistance} score={score} | {scoreDetail}" +
                     $"{(escortPlanCohesionActive && !string.IsNullOrWhiteSpace(escortThreatReason) ? $" | escort={escortThreatReason}" : string.Empty)}");
@@ -3911,14 +4155,17 @@ public class AIPlayerController : MonoBehaviour
                 continue;
             }
 
-            bool better = escortThreatBand < bestEscortThreatBand
-                || (escortThreatBand == bestEscortThreatBand
-                    && (defenseBand < bestBand
-                        || (defenseBand == bestBand && IsBetterTargetInBand(defendMode, score, tieDistance, bestScore, bestTieDistance))));
+            bool better = targetPriorityRank > bestTargetPriorityRank
+                || (targetPriorityRank == bestTargetPriorityRank
+                    && (escortThreatBand < bestEscortThreatBand
+                        || (escortThreatBand == bestEscortThreatBand
+                            && (defenseBand < bestBand
+                                || (defenseBand == bestBand && IsBetterTargetInBand(defendMode, score, tieDistance, bestScore, bestTieDistance))))));
 
             if (!better)
                 continue;
 
+            bestTargetPriorityRank = targetPriorityRank;
             bestEscortThreatBand = escortThreatBand;
             bestBand = defenseBand;
             bestScore = score;
@@ -3970,10 +4217,38 @@ public class AIPlayerController : MonoBehaviour
             string escortWinnerLabel = escortPlanCohesionActive
                 ? $" escortBand={(bestEscortThreatBand == int.MaxValue ? "off-plan" : bestEscortThreatBand.ToString())}"
                 : string.Empty;
-            Debug.Log($"{T(snapshot.AiTeam, 2)} [score] vencedor: {best.name} | score={bestScore}{escortWinnerLabel} band={bestBand} dist={bestTieDistance}->{bestEffectiveAttackDistance}");
+            Debug.Log($"{T(snapshot.AiTeam, 2)} [score] vencedor: {best.name} | prefRank={bestTargetPriorityRank} score={bestScore}{escortWinnerLabel} band={bestBand} dist={bestTieDistance}->{bestEffectiveAttackDistance}");
         }
 
         return best;
+    }
+
+    private static int ResolveAttackTargetPreferenceRank(AIUnitProfile profile, BazookaTargetPriority priority)
+    {
+        switch (profile != null ? profile.targetPreference : AIAttackTargetPreference.Either)
+        {
+            case AIAttackTargetPreference.Primary:
+                return priority switch
+                {
+                    BazookaTargetPriority.Primary => 3,
+                    BazookaTargetPriority.Secondary => 2,
+                    _ => 1
+                };
+            case AIAttackTargetPreference.Secondary:
+                return priority switch
+                {
+                    BazookaTargetPriority.Secondary => 3,
+                    BazookaTargetPriority.Primary => 2,
+                    _ => 1
+                };
+            default:
+                return priority switch
+                {
+                    BazookaTargetPriority.Primary => 3,
+                    BazookaTargetPriority.Secondary => 2,
+                    _ => 1
+                };
+        }
     }
 
     private bool CanUnitFireAtTargetFromCurrentPosition(UnitManager attacker, UnitManager target)
@@ -4432,6 +4707,16 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
     private bool TryGetMostCriticalAllyForSupply(UnitManager supplier, AISnapshot snapshot, out UnitManager target)
     {
         target = null;
+        if (!TryCollectSupplyNavigationCandidates(supplier, snapshot, out List<UnitManager> targets) || targets.Count <= 0)
+            return false;
+
+        target = targets[0];
+        return target != null;
+    }
+
+    private bool TryCollectSupplyNavigationCandidates(UnitManager supplier, AISnapshot snapshot, out List<UnitManager> targets)
+    {
+        targets = new List<UnitManager>();
         if (supplier == null || snapshot == null)
             return false;
 
@@ -4483,8 +4768,7 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         if (snapshot.FriendlyUnits == null)
             return false;
 
-        int navBestDistance = int.MaxValue;
-        int navBestScore = int.MinValue;
+        List<(UnitManager unit, int score, int distance)> ranked = new List<(UnitManager unit, int score, int distance)>();
 
         for (int i = 0; i < snapshot.FriendlyUnits.Count; i++)
         {
@@ -4500,16 +4784,24 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
             if (distance == int.MaxValue)
                 distance = 64;
 
-            bool better = distance < navBestDistance || (distance == navBestDistance && score > navBestScore);
-            if (!better)
-                continue;
-
-            navBestDistance = distance;
-            navBestScore = score;
-            target = ally;
+            ranked.Add((ally, score, distance));
         }
 
-        return target != null;
+        if (ranked.Count <= 0)
+            return false;
+
+        ranked.Sort((a, b) =>
+        {
+            int scoreCompare = b.score.CompareTo(a.score);
+            if (scoreCompare != 0)
+                return scoreCompare;
+            return a.distance.CompareTo(b.distance);
+        });
+
+        for (int i = 0; i < ranked.Count; i++)
+            targets.Add(ranked[i].unit);
+
+        return targets.Count > 0;
     }
     private bool CanSupplyTargetNow(UnitManager supplier, UnitManager target)
     {
@@ -5207,6 +5499,145 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
         return true;
     }
 
+    private bool TryGetTransportIdlePickupCell(UnitManager unit, AISnapshot snapshot, HashSet<Vector3Int> occupiedByAllies, out Vector3Int targetCell)
+    {
+        targetCell = default;
+        if (unit == null || snapshot == null || snapshot.BoardTilemap == null)
+            return false;
+
+        Vector3Int unitCell = unit.CurrentCellPosition;
+        unitCell.z = 0;
+
+        Vector3Int anchorCell;
+        if (TryGetNearestOwnedConstruction(unit, snapshot, out _, out anchorCell, out _))
+        {
+            anchorCell.z = 0;
+        }
+        else if (snapshot.HasHq)
+        {
+            anchorCell = snapshot.HqCell;
+            anchorCell.z = 0;
+        }
+        else
+        {
+            return false;
+        }
+
+        int distToAnchor = GetHexDistance(snapshot.BoardTilemap, unitCell, anchorCell, 16);
+        bool alreadyInPickupZone = distToAnchor != int.MaxValue
+            && distToAnchor > 0
+            && distToAnchor <= 2
+            && !IsAnyConstructionCell(snapshot, unitCell);
+
+        if (alreadyInPickupZone)
+        {
+            targetCell = unitCell;
+            return true;
+        }
+
+        TerrainDatabase terrainDb = turnStateManager != null ? turnStateManager.TerrainDatabaseRef : null;
+        List<Vector3Int> frontier = new List<Vector3Int> { anchorCell };
+        HashSet<Vector3Int> visited = new HashSet<Vector3Int> { anchorCell };
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+
+        bool found = false;
+        int bestDistToUnit = int.MaxValue;
+        int bestDistToAnchor = int.MaxValue;
+        int bestEnterCost = int.MaxValue;
+        Vector3Int bestCell = default;
+
+        for (int depth = 0; depth < 2; depth++)
+        {
+            List<Vector3Int> nextFrontier = new List<Vector3Int>();
+            for (int i = 0; i < frontier.Count; i++)
+            {
+                Vector3Int current = frontier[i];
+                UnitMovementPathRules.GetImmediateHexNeighbors(snapshot.BoardTilemap, current, neighbors);
+                for (int n = 0; n < neighbors.Count; n++)
+                {
+                    Vector3Int candidate = neighbors[n];
+                    candidate.z = 0;
+                    if (!visited.Add(candidate))
+                        continue;
+
+                    nextFrontier.Add(candidate);
+
+                    if (IsAnyConstructionCell(snapshot, candidate))
+                        continue;
+                    if (occupiedByAllies != null && occupiedByAllies.Contains(candidate))
+                        continue;
+                    if (IsCellOccupiedBySnapshotUnit(snapshot, unit, null, candidate))
+                        continue;
+                    if (!CanAiUnitEndMoveAtCell(unit, snapshot.BoardTilemap, candidate))
+                        continue;
+
+                    int distToAnchorCandidate = GetHexDistance(snapshot.BoardTilemap, anchorCell, candidate, 16);
+                    if (distToAnchorCandidate == int.MaxValue || distToAnchorCandidate <= 0 || distToAnchorCandidate > 2)
+                        continue;
+
+                    int distToUnit = GetHexDistance(snapshot.BoardTilemap, unitCell, candidate, 64);
+                    if (distToUnit == int.MaxValue)
+                        continue;
+
+                    int enterCost = int.MaxValue;
+                    if (!UnitMovementPathRules.TryGetEnterCellCost(
+                            snapshot.BoardTilemap,
+                            unit,
+                            candidate,
+                            terrainDb,
+                            applyOperationalAutonomyModifier: false,
+                            out enterCost))
+                        continue;
+
+                    bool better = !found
+                        || distToUnit < bestDistToUnit
+                        || (distToUnit == bestDistToUnit && distToAnchorCandidate < bestDistToAnchor)
+                        || (distToUnit == bestDistToUnit && distToAnchorCandidate == bestDistToAnchor && enterCost < bestEnterCost);
+                    if (!better)
+                        continue;
+
+                    found = true;
+                    bestDistToUnit = distToUnit;
+                    bestDistToAnchor = distToAnchorCandidate;
+                    bestEnterCost = enterCost;
+                    bestCell = candidate;
+                }
+            }
+
+            frontier = nextFrontier;
+            if (frontier.Count <= 0)
+                break;
+        }
+
+        if (!found)
+            return false;
+
+        targetCell = bestCell;
+        targetCell.z = 0;
+        return true;
+    }
+
+    private static bool IsAnyConstructionCell(AISnapshot snapshot, Vector3Int cell)
+    {
+        if (snapshot == null || snapshot.KnownConstructions == null)
+            return false;
+
+        cell.z = 0;
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo info = snapshot.KnownConstructions[i];
+            if (info == null || info.Source == null)
+                continue;
+
+            Vector3Int c = info.Cell;
+            c.z = 0;
+            if (c == cell)
+                return true;
+        }
+
+        return false;
+    }
+
     private static bool IsFriendlyConstructionCell(AISnapshot snapshot, TeamId team, Vector3Int cell)
     {
         if (snapshot == null || snapshot.KnownConstructions == null)
@@ -5355,6 +5786,446 @@ private static bool IsEnemyWithinDefendRadius(AISnapshot snapshot, UnitManager e
 
         // anyWeapon=true e nenhuma zerada ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¾ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ false. anyWeapon=false e todas zeradas ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¾ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ hasAmmoBasedWeapon.
         return !anyWeapon && hasAmmoBasedWeapon;
+    }
+
+    private bool TryGetTransportPickupObjective(
+        UnitManager passenger,
+        AISnapshot snapshot,
+        AIPlanIntent unitIntent,
+        AIPlanAssignment unitAssignment,
+        Vector3Int? plannedCaptureCell,
+        out UnitManager transporter,
+        out Vector3Int pickupObjectiveCell,
+        out string objectiveLabel,
+        out bool embarkNow)
+    {
+        transporter = null;
+        pickupObjectiveCell = passenger != null ? passenger.CurrentCellPosition : Vector3Int.zero;
+        objectiveLabel = string.Empty;
+        embarkNow = false;
+
+        if (passenger == null || snapshot == null || passenger.IsEmbarked)
+            return false;
+        if (unitAssignment == null || unitAssignment.Role != AIPlanRole.Capture)
+            return false;
+
+        Vector3Int captureTarget = plannedCaptureCell ?? (unitIntent != null && unitIntent.HasCaptureTarget ? unitIntent.CaptureTargetCell : pickupObjectiveCell);
+        captureTarget.z = 0;
+        Vector3Int passengerCell = passenger.CurrentCellPosition;
+        passengerCell.z = 0;
+        int distanceToTarget = GetHexDistance(passengerCell, captureTarget);
+        int passengerMove = Mathf.Max(1, passenger.GetMovementRange());
+        int worthwhileThreshold = Mathf.CeilToInt(passengerMove * 1.5f);
+        if (distanceToTarget < 8 || distanceToTarget <= passengerMove || distanceToTarget <= worthwhileThreshold)
+            return false;
+
+        if (TryGetBestEmbarkTargetNow(passenger, snapshot, unitIntent, captureTarget, out transporter))
+        {
+            pickupObjectiveCell = passengerCell;
+            embarkNow = true;
+            objectiveLabel = !string.IsNullOrWhiteSpace(unitIntent?.DisplayName) ? unitIntent.DisplayName : "captura distante";
+            return true;
+        }
+
+        transporter = FindBestTransporterForPassenger(passenger, snapshot, unitIntent, captureTarget);
+        if (transporter == null)
+            return false;
+
+        pickupObjectiveCell = transporter.CurrentCellPosition;
+        pickupObjectiveCell.z = 0;
+        embarkNow = GetHexDistance(passengerCell, pickupObjectiveCell) <= 1;
+        objectiveLabel = !string.IsNullOrWhiteSpace(unitIntent?.DisplayName) ? unitIntent.DisplayName : "captura distante";
+        return true;
+    }
+
+    private bool TryGetBestEmbarkTargetNow(UnitManager passenger, AISnapshot snapshot, AIPlanIntent passengerIntent, Vector3Int captureTargetCell, out UnitManager transporter)
+    {
+        transporter = null;
+        if (passenger == null || snapshot == null || turnStateManager == null)
+            return false;
+
+        List<PodeEmbarcarOption> options = new List<PodeEmbarcarOption>();
+        if (!PodeEmbarcarSensor.CollectOptions(
+                passenger,
+                passenger.BoardTilemap,
+                turnStateManager.TerrainDatabaseRef,
+                Mathf.Max(0, passenger.RemainingMovementPoints),
+                options)
+            || options.Count <= 0)
+            return false;
+
+        int bestScore = int.MinValue;
+        for (int i = 0; i < options.Count; i++)
+        {
+            PodeEmbarcarOption option = options[i];
+            UnitManager candidate = option != null ? option.transporterUnit : null;
+            if (candidate == null)
+                continue;
+
+            Vector3Int candidateCell = candidate.CurrentCellPosition;
+            candidateCell.z = 0;
+            int score = -GetHexDistance(candidateCell, captureTargetCell) * 100;
+            if (snapshot.UnitPlanAssignments != null
+                && snapshot.UnitPlanAssignments.TryGetValue(candidate.InstanceId, out AIPlanAssignment candidateAssignment)
+                && candidateAssignment != null
+                && candidateAssignment.Intent == passengerIntent)
+            {
+                score += 2500;
+            }
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                transporter = candidate;
+            }
+        }
+
+        return transporter != null;
+    }
+
+    private bool TryGetTransportCarryObjective(
+        UnitManager transporter,
+        AISnapshot snapshot,
+        out UnitManager passenger,
+        out Vector3Int passengerTargetCell,
+        out Vector3Int moveObjectiveCell,
+        out string objectiveLabel,
+        out bool disembarkNow)
+    {
+        passenger = null;
+        passengerTargetCell = transporter != null ? transporter.CurrentCellPosition : Vector3Int.zero;
+        moveObjectiveCell = passengerTargetCell;
+        objectiveLabel = string.Empty;
+        disembarkNow = false;
+
+        if (transporter == null || snapshot == null || !TryGetEmbarkedCapturePassenger(transporter, snapshot, out passenger, out passengerTargetCell, out objectiveLabel))
+            return false;
+
+        if (!TryGetTransportStagingCellNearObjective(transporter, snapshot, passengerTargetCell, out moveObjectiveCell))
+        {
+            moveObjectiveCell = passengerTargetCell;
+            moveObjectiveCell.z = 0;
+        }
+
+        Vector3Int transporterCell = transporter.CurrentCellPosition;
+        transporterCell.z = 0;
+        int passengerMove = Mathf.Max(1, passenger.GetMovementRange());
+        disembarkNow = ShouldTransportDisembarkNow(
+            transporter,
+            passenger,
+            passengerTargetCell,
+            moveObjectiveCell,
+            passengerMove);
+        return true;
+    }
+
+    private bool ShouldTransportDisembarkNow(
+        UnitManager transporter,
+        UnitManager passenger,
+        Vector3Int passengerTargetCell,
+        Vector3Int stagingCell,
+        int passengerMove)
+    {
+        if (transporter == null || passenger == null)
+            return false;
+
+        Tilemap boardMap = transporter.BoardTilemap;
+        TerrainDatabase terrainDb = turnStateManager != null ? turnStateManager.TerrainDatabaseRef : null;
+        if (boardMap == null)
+            return false;
+
+        List<PodeDesembarcarOption> validOptions = new List<PodeDesembarcarOption>();
+        if (!PodeDesembarcarSensor.CollectOptions(transporter, boardMap, terrainDb, validOptions) || validOptions.Count <= 0)
+            return false;
+
+        Vector3Int transporterCell = transporter.CurrentCellPosition;
+        transporterCell.z = 0;
+        passengerTargetCell.z = 0;
+        stagingCell.z = 0;
+
+        int bestDropDistance = int.MaxValue;
+        for (int i = 0; i < validOptions.Count; i++)
+        {
+            PodeDesembarcarOption option = validOptions[i];
+            if (option == null || option.passengerUnit != passenger)
+                continue;
+
+            Vector3Int dropCell = option.disembarkCell;
+            dropCell.z = 0;
+            int dist = GetHexDistance(dropCell, passengerTargetCell);
+            if (dist < bestDropDistance)
+                bestDropDistance = dist;
+        }
+
+        if (bestDropDistance == int.MaxValue)
+            return false;
+
+        if (bestDropDistance <= passengerMove + 1)
+            return true;
+
+        if (transporterCell == stagingCell)
+            return true;
+
+        return false;
+    }
+
+    private UnitManager FindBestTransporterForPassenger(UnitManager passenger, AISnapshot snapshot, AIPlanIntent passengerIntent, Vector3Int captureTargetCell)
+    {
+        if (passenger == null || snapshot == null || snapshot.FriendlyUnits == null)
+            return null;
+
+        UnitManager best = null;
+        int bestScore = int.MinValue;
+        Vector3Int passengerCell = passenger.CurrentCellPosition;
+        passengerCell.z = 0;
+
+        for (int i = 0; i < snapshot.FriendlyUnits.Count; i++)
+        {
+            UnitManager candidate = snapshot.FriendlyUnits[i];
+            if (candidate == null || candidate == passenger || candidate.IsDead || candidate.IsEmbarked)
+                continue;
+            if (!candidate.TryGetUnitData(out UnitData candidateData) || candidateData == null || !candidateData.isTransporter)
+                continue;
+            if (!HasTransportSensor(candidateData.aiUnitProfile))
+                continue;
+            if (!HasAvailableTransportSeatForPassenger(candidate, passenger))
+                continue;
+
+            Vector3Int candidateCell = candidate.CurrentCellPosition;
+            candidateCell.z = 0;
+            int score = -GetHexDistance(candidateCell, passengerCell) * 1000 - GetHexDistance(candidateCell, captureTargetCell) * 100;
+            if (snapshot.UnitPlanAssignments != null && snapshot.UnitPlanAssignments.TryGetValue(candidate.InstanceId, out AIPlanAssignment candidateAssignment) && candidateAssignment != null && candidateAssignment.Intent == passengerIntent)
+                score += 2500;
+            if (candidate.CombatClassification != UnitCombatClassification.Civil)
+                score -= 250;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = candidate;
+            }
+        }
+
+        return best;
+    }
+
+    private bool TryGetEmbarkedCapturePassenger(UnitManager transporter, AISnapshot snapshot, out UnitManager passenger, out Vector3Int captureTargetCell, out string objectiveLabel)
+    {
+        passenger = null;
+        captureTargetCell = transporter != null ? transporter.CurrentCellPosition : Vector3Int.zero;
+        objectiveLabel = string.Empty;
+
+        if (transporter == null)
+            return false;
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
+        if (seats == null)
+            return false;
+
+        int bestDistance = int.MinValue;
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            UnitManager seatPassenger = seat != null ? seat.embarkedUnit : null;
+            if (seatPassenger == null || !seatPassenger.IsEmbarked)
+                continue;
+            if (snapshot.UnitPlanAssignments == null || !snapshot.UnitPlanAssignments.TryGetValue(seatPassenger.InstanceId, out AIPlanAssignment assignment) || assignment == null)
+                continue;
+            if (assignment.Role != AIPlanRole.Capture || assignment.Intent == null || !assignment.Intent.HasCaptureTarget)
+                continue;
+
+            Vector3Int target = assignment.HasPlannedCaptureTarget ? assignment.PlannedCaptureCell : assignment.Intent.CaptureTargetCell;
+            target.z = 0;
+            int dist = GetHexDistance(transporter.CurrentCellPosition, target);
+            if (dist > bestDistance)
+            {
+                bestDistance = dist;
+                passenger = seatPassenger;
+                captureTargetCell = target;
+                objectiveLabel = !string.IsNullOrWhiteSpace(assignment.Intent.DisplayName) ? assignment.Intent.DisplayName : assignment.Intent.Sector.ToString();
+            }
+        }
+
+        return passenger != null;
+    }
+
+    private bool TryExecuteAutomatedTransportDisembark(UnitManager passenger, Vector3Int captureTargetCell, out Vector3Int chosenCell)
+    {
+        chosenCell = Vector3Int.zero;
+        if (turnStateManager == null || passenger == null)
+            return false;
+        if (!turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.Disembark))
+            return false;
+
+        IReadOnlyList<PodeDesembarcarOption> options = turnStateManager.CachedPodeDesembarcarTargets;
+        if (options == null || options.Count <= 0)
+            return false;
+
+        PodeDesembarcarOption best = null;
+        int bestDist = int.MaxValue;
+        for (int i = 0; i < options.Count; i++)
+        {
+            PodeDesembarcarOption option = options[i];
+            if (option == null || option.passengerUnit != passenger)
+                continue;
+            Vector3Int cell = option.disembarkCell;
+            cell.z = 0;
+            int dist = GetHexDistance(cell, captureTargetCell);
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                best = option;
+            }
+        }
+
+        if (best == null)
+            return false;
+
+        chosenCell = best.disembarkCell;
+        chosenCell.z = 0;
+        if (!turnStateManager.TryQueueAutomatedDisembarkReplayOrder(passenger.InstanceId.ToString(), chosenCell))
+            return false;
+        return turnStateManager.TryStartAutomatedDisembarkReplayExecution();
+    }
+
+    private bool TryGetTransportStagingCellNearObjective(UnitManager transporter, AISnapshot snapshot, Vector3Int objectiveCell, out Vector3Int stagingCell)
+    {
+        stagingCell = objectiveCell;
+        if (transporter == null || snapshot == null || snapshot.BoardTilemap == null)
+            return false;
+
+        objectiveCell.z = 0;
+        Vector3Int transporterCell = transporter.CurrentCellPosition;
+        transporterCell.z = 0;
+
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+        UnitMovementPathRules.GetImmediateHexNeighbors(snapshot.BoardTilemap, objectiveCell, neighbors);
+
+        bool found = false;
+        int bestDistToTransporter = int.MaxValue;
+        int bestEnterCost = int.MaxValue;
+        TerrainDatabase terrainDb = turnStateManager != null ? turnStateManager.TerrainDatabaseRef : null;
+
+        for (int i = 0; i < neighbors.Count; i++)
+        {
+            Vector3Int candidate = neighbors[i];
+            candidate.z = 0;
+            if (IsAnyConstructionCell(snapshot, candidate))
+                continue;
+            if (IsCellOccupiedBySnapshotUnit(snapshot, transporter, null, candidate))
+                continue;
+            if (!CanAiUnitEndMoveAtCell(transporter, snapshot.BoardTilemap, candidate))
+                continue;
+
+            int distToTransporter = GetHexDistance(snapshot.BoardTilemap, transporterCell, candidate, 64);
+            if (distToTransporter == int.MaxValue)
+                continue;
+
+            if (!UnitMovementPathRules.TryGetEnterCellCost(
+                    snapshot.BoardTilemap,
+                    transporter,
+                    candidate,
+                    terrainDb,
+                    applyOperationalAutonomyModifier: false,
+                    out int enterCost))
+                continue;
+
+            bool better = !found
+                || distToTransporter < bestDistToTransporter
+                || (distToTransporter == bestDistToTransporter && enterCost < bestEnterCost);
+            if (!better)
+                continue;
+
+            found = true;
+            bestDistToTransporter = distToTransporter;
+            bestEnterCost = enterCost;
+            stagingCell = candidate;
+        }
+
+        return found;
+    }
+
+    private bool HasTransportSensor(AIUnitProfile profile)
+    {
+        return profile != null && profile.HasSensorInStance(currentStance, AIUnitSensorKind.Transport);
+    }
+
+    private static bool HasAvailableTransportSeatForPassenger(UnitManager transporter, UnitManager passenger)
+    {
+        if (transporter == null || passenger == null)
+            return false;
+        if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null || !transporterData.isTransporter || transporterData.transportSlots == null)
+            return false;
+        if (!passenger.TryGetUnitData(out UnitData passengerData) || passengerData == null)
+            return false;
+
+        for (int slotIndex = 0; slotIndex < transporterData.transportSlots.Count; slotIndex++)
+        {
+            UnitTransportSlotRule slot = transporterData.transportSlots[slotIndex];
+            if (slot == null)
+                continue;
+            slot.EnsureDefaults();
+            if (!TransportSlotSupportsPassenger(slot, passenger, passengerData))
+                continue;
+            int occupied = transporter.GetOccupiedTransportSeatCountForSlot(slotIndex);
+            if (occupied < Mathf.Max(1, slot.capacity))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool TransportSlotSupportsPassenger(UnitTransportSlotRule slot, UnitManager passenger, UnitData passengerData)
+    {
+        if (slot == null || passenger == null || passengerData == null)
+            return false;
+
+        bool layerAllowed = false;
+        if (slot.allowedLayerModes != null)
+        {
+            for (int i = 0; i < slot.allowedLayerModes.Count; i++)
+            {
+                TransportSlotLayerMode mode = slot.allowedLayerModes[i];
+                if (mode.domain == passenger.GetDomain() && mode.heightLevel == passenger.GetHeightLevel())
+                {
+                    layerAllowed = true;
+                    break;
+                }
+            }
+        }
+        if (!layerAllowed)
+            return false;
+
+        if (slot.allowedClasses != null && slot.allowedClasses.Count > 0 && !slot.allowedClasses.Contains(passengerData.unitClass))
+            return false;
+
+        if (slot.requiredSkills != null && slot.requiredSkills.Count > 0)
+        {
+            bool hasAny = false;
+            for (int i = 0; i < slot.requiredSkills.Count; i++)
+            {
+                SkillData required = slot.requiredSkills[i];
+                if (required != null && passenger.HasSkill(required))
+                {
+                    hasAny = true;
+                    break;
+                }
+            }
+            if (!hasAny)
+                return false;
+        }
+
+        if (slot.blockedSkills != null)
+        {
+            for (int i = 0; i < slot.blockedSkills.Count; i++)
+            {
+                SkillData blocked = slot.blockedSkills[i];
+                if (blocked != null && passenger.HasSkill(blocked))
+                    return false;
+            }
+        }
+
+        return true;
     }
 
     private bool CanReachAndAttackThisTurn(

@@ -288,8 +288,7 @@ public class ConstructionManager : MonoBehaviour
             return;
 
         constructionId = data.id;
-        if (string.IsNullOrWhiteSpace(constructionDisplayName) || constructionDisplayName == "Construction")
-            constructionDisplayName = string.IsNullOrWhiteSpace(data.displayName) ? data.id : data.displayName;
+        constructionDisplayName = string.IsNullOrWhiteSpace(data.displayName) ? data.id : data.displayName;
 
         if (spriteRenderer == null)
             spriteRenderer = ResolvePrimarySpriteRenderer();
@@ -323,6 +322,8 @@ public class ConstructionManager : MonoBehaviour
     {
         TeamId previousTeam = teamId;
         teamId = team;
+        TryAutoAssignMatchController();
+        slotIndex = matchController != null ? matchController.GetSlotIndexForTeam(team) : (team == TeamId.Neutral ? -1 : slotIndex);
         if (!originalOwnerInitialized)
         {
             originalOwnerTeamId = team;
@@ -1045,22 +1046,42 @@ public class ConstructionManager : MonoBehaviour
     }
 
     // Resolve o teamId a partir do slotIndex no MatchController.
-    // Sem efeito se slotIndex == -1 (Neutral fixo) ou se nao ha MatchController na cena.
+    // slotIndex == -1 forca Neutral fixo; sem MatchController, mantem o teamId atual.
     private void ResolveTeamIdFromSlot()
     {
+        TeamId resolved = teamId;
+        bool canResolve = true;
+
         if (slotIndex < 0)
+        {
+            resolved = TeamId.Neutral;
+        }
+        else
+        {
+            if (matchController == null)
+                matchController = FindAnyObjectByType<MatchController>();
+
+            if (matchController == null)
+            {
+                canResolve = false;
+            }
+            else
+            {
+                resolved = matchController.GetTeamIdForSlot(slotIndex);
+            }
+        }
+
+        if (!canResolve)
             return;
 
-        if (matchController == null)
-            matchController = FindAnyObjectByType<MatchController>();
-
-        if (matchController == null)
-            return;
-
-        TeamId resolved = matchController.GetTeamIdForSlot(slotIndex);
         if (teamId != resolved)
         {
             teamId = resolved;
+
+            if (!ApplyFromDatabase())
+                UpdateDynamicName();
+
+            RefreshRuntimeVisualState(force: true);
 #if UNITY_EDITOR
             if (!Application.isPlaying)
                 UnityEditor.EditorUtility.SetDirty(this);

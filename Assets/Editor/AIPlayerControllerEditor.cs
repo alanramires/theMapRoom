@@ -263,6 +263,7 @@ public class AIPlayerControllerEditor : Editor
         SerializedProperty strategicSaveTurnsProp = teamElement.FindPropertyRelative("strategicSaveTurnsToAfford");
         SerializedProperty strategicSaveDeferredOrdersProp = teamElement.FindPropertyRelative("strategicSaveDeferredOrders");
         SerializedProperty strategicSaveReasonProp = teamElement.FindPropertyRelative("strategicSaveReason");
+        SerializedProperty capabilityPressuresProp = teamElement.FindPropertyRelative("capabilityPressures");
         SerializedProperty ordersProp = teamElement.FindPropertyRelative("orders");
         SerializedProperty decisionsProp = teamElement.FindPropertyRelative("decisions");
         string teamLabel = ResolveTeamElementLabel(teamProp, index, stanceProp);
@@ -290,12 +291,93 @@ public class AIPlayerControllerEditor : Editor
         if (strategicSaveTurnsProp != null) EditorGUILayout.PropertyField(strategicSaveTurnsProp);
         if (strategicSaveDeferredOrdersProp != null) EditorGUILayout.PropertyField(strategicSaveDeferredOrdersProp);
         if (strategicSaveReasonProp != null) EditorGUILayout.PropertyField(strategicSaveReasonProp);
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Capability Pressure", EditorStyles.boldLabel);
+        if (capabilityPressuresProp != null)
+            DrawCapabilityPressureArray(capabilityPressuresProp);
 
         if (ordersProp != null)
             DrawSimpleArray(ordersProp, "Orders");
         if (decisionsProp != null)
             DrawSimpleArray(decisionsProp, "Decisions");
         EditorGUI.indentLevel--;
+    }
+
+    private static void DrawCapabilityPressureArray(SerializedProperty arrayProp)
+    {
+        if (arrayProp == null || !arrayProp.isArray)
+        {
+            EditorGUILayout.LabelField("Capability Pressure", "(indisponivel)");
+            return;
+        }
+
+        arrayProp.isExpanded = EditorGUILayout.Foldout(arrayProp.isExpanded, $"Capability Pressure ({arrayProp.arraySize})", true);
+        if (!arrayProp.isExpanded)
+            return;
+
+        EditorGUI.indentLevel++;
+        for (int i = 0; i < arrayProp.arraySize; i++)
+        {
+            SerializedProperty element = arrayProp.GetArrayElementAtIndex(i);
+            if (element == null)
+                continue;
+
+            SerializedProperty capabilityProp = element.FindPropertyRelative("capability");
+            SerializedProperty totalPressureProp = element.FindPropertyRelative("totalPressure");
+            SerializedProperty supplyChainPressureScoreProp = element.FindPropertyRelative("supplyChainPressureScore");
+            string capabilityLabel = capabilityProp != null && !string.IsNullOrWhiteSpace(capabilityProp.stringValue)
+                ? capabilityProp.stringValue
+                : $"Capability {i}";
+            int labelPressure = totalPressureProp != null ? totalPressureProp.intValue : 0;
+            bool isLogistics = capabilityProp != null && string.Equals(capabilityProp.stringValue, "Logistics", System.StringComparison.OrdinalIgnoreCase);
+            if (isLogistics && supplyChainPressureScoreProp != null)
+                labelPressure = Mathf.Max(labelPressure, supplyChainPressureScoreProp.intValue);
+
+            element.isExpanded = EditorGUILayout.Foldout(element.isExpanded, $"[{i}] {capabilityLabel} [{labelPressure}]", true);
+            if (!element.isExpanded)
+                continue;
+
+            EditorGUI.indentLevel++;
+            DrawIfPresent(element, "capability");
+            DrawIfPresent(element, "orderCount");
+            DrawIfPresent(element, "basePressure");
+            DrawIfPresent(element, "missingPressure");
+            DrawIfPresent(element, "riskPressure");
+            DrawIfPresent(element, "criticalPressure");
+            DrawIfPresent(element, "dynamicPressure");
+            DrawIfPresent(element, "totalPressure");
+            DrawIfPresent(element, "criteriaSummary");
+
+            if (isLogistics)
+            {
+                EditorGUILayout.Space(2f);
+                EditorGUILayout.LabelField("Supply Chain", EditorStyles.boldLabel);
+                DrawIfPresent(element, "urgentLogisticsNeed");
+                DrawIfPresent(element, "supplyChainPressureScore");
+                DrawIfPresent(element, "supplyChainAvailableSuppliers");
+                DrawIfPresent(element, "supplyChainTargetSuppliers");
+                DrawIfPresent(element, "supplyChainAdditionalSuppliersNeeded");
+                DrawIfPresent(element, "supplyChainPlansMissingLogistics");
+                DrawIfPresent(element, "supplyChainLowAutonomyUnits");
+                DrawIfPresent(element, "supplyChainOutOfAmmoUnits");
+                DrawIfPresent(element, "supplyChainDamagedUnits");
+                DrawIfPresent(element, "supplyChainFrontlineCriticalUnits");
+                DrawIfPresent(element, "supplyChainReason");
+            }
+
+            EditorGUI.indentLevel--;
+        }
+        EditorGUI.indentLevel--;
+    }
+
+    private static void DrawIfPresent(SerializedProperty parent, string relativeName)
+    {
+        if (parent == null)
+            return;
+
+        SerializedProperty prop = parent.FindPropertyRelative(relativeName);
+        if (prop != null)
+            EditorGUILayout.PropertyField(prop);
     }
 
     private static void DrawSimpleArray(SerializedProperty arrayProp, string label)
@@ -349,6 +431,10 @@ public class AIPlayerControllerEditor : Editor
         SerializedProperty planLabel = element.FindPropertyRelative("planLabel");
         if (planLabel != null && !string.IsNullOrWhiteSpace(planLabel.stringValue))
             return $"[{index}] {planLabel.stringValue}";
+
+        SerializedProperty capability = element.FindPropertyRelative("capability");
+        if (capability != null && !string.IsNullOrWhiteSpace(capability.stringValue))
+            return $"[{index}] {capability.stringValue}";
 
         return $"{fallbackLabel} {index}";
     }

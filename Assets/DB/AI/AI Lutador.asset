@@ -14,13 +14,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AIUnitProfile
   stanceBehaviors:
   - stances:
-    - {fileID: 11400000, guid: ea4d7397fefaf7d42808828df00f7c13, type: 2}
     - {fileID: 11400000, guid: 8aa944392dd85d647ad4fa5881054aed, type: 2}
     sensorPriority: 0100000003000000
     minDamageDealtPercent: 10
-    maxDamageReceivedPercent: 50
+    maxDamageReceivedPercent: 80
     mustSurvive: 1
-    targetPreference: 0
+    targetPreference: 1
+    canEscort: 1
+    prioritizeDpqAtBattle: 1
+    prioritizeDpqDuringTravel: 0
+    retreatToHqWhenIdle: 0
+    playConservative: 0
+    engageNearestEnemies: 1
+    captureInterruptBias: 1
+    holdGroundWhenIdle: 0
+    requireSightlineBeforeEngaging: 0
+    holdPositionWhenInRange: 0
+    repositionToFireRange: 0
+    preferMaxEngagementRange: 0
+  - stances:
+    - {fileID: 11400000, guid: ea4d7397fefaf7d42808828df00f7c13, type: 2}
+    sensorPriority: 0100000003000000
+    minDamageDealtPercent: 10
+    maxDamageReceivedPercent: 50
+    mustSurvive: 0
+    targetPreference: 1
     canEscort: 1
     prioritizeDpqAtBattle: 1
     prioritizeDpqDuringTravel: 0
@@ -39,7 +57,7 @@ MonoBehaviour:
     minDamageDealtPercent: 10
     maxDamageReceivedPercent: 20
     mustSurvive: 0
-    targetPreference: 0
+    targetPreference: 1
     canEscort: 0
     prioritizeDpqAtBattle: 1
     prioritizeDpqDuringTravel: 0
@@ -56,6 +74,7 @@ MonoBehaviour:
   planCapabilities: 01000000
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
+  canShootFromDistanceWhileRepairing: 0
   hpRepairThreshold: 3
   hpRepairExitThreshold: 8
   repairAutonomyThresholdPercent: 25

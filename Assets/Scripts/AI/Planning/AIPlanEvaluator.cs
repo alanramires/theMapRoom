@@ -20,6 +20,7 @@ public static class AIPlanEvaluator
         public int StagnationTurns;
         public int MinimumRangeForDefensePlan;
         public int MaxVariablePlans;
+        public int MaxBackupPlans;
         public AIStance CurrentStance;
         public int CurrentTurn;
     }
@@ -31,6 +32,7 @@ public static class AIPlanEvaluator
             StagnationTurns = 2,
             MinimumRangeForDefensePlan = AIGeneralProfile.DefaultMinimumRangeForDefensePlan,
             MaxVariablePlans = 3,
+            MaxBackupPlans = 0,
             CurrentStance = AIStance.Attack,
             CurrentTurn = 0
         };
@@ -51,7 +53,7 @@ public static class AIPlanEvaluator
         // Impede que a mesma unidade entre em dois planos.
         var assignedUnits = new HashSet<int>();
 
-        // Invasion stance: ativa plano de invasão com prioridade máxima antes dos setores.
+        // Invasion stance: ativa plano de invasao com prioridade maxima antes dos setores.
         int sectorPlanSlots = config.MaxVariablePlans;
         if (config.CurrentStance == AIStance.Invasion)
         {
@@ -64,6 +66,27 @@ public static class AIPlanEvaluator
             snapshot,
             sectorPlanSlots,
             assignedUnits,
+            result,
+            plannerLogs);
+
+        SelectSectorHoldPlans(
+            snapshot,
+            previousAssignments,
+            result,
+            plannerLogs);
+
+        // Planos backup: setores proprios ja conquistados mas atualmente contestados.
+        SelectBackupSectorPlans(
+            snapshot,
+            Mathf.Max(0, config.MaxBackupPlans),
+            assignedUnits,
+            result,
+            plannerLogs);
+
+        EnsurePreviousActivePlansPersist(
+            snapshot,
+            previousAssignments,
+            config,
             result,
             plannerLogs);
 
@@ -115,7 +138,7 @@ public static class AIPlanEvaluator
 
         int uncaptured = CountUncapturedInSector(bestSector, snapshot);
         AIPlanIntent intent = BuildSectorPlanIntent(bestSector, snapshot);
-        intent.DisplayName = $"Invasão {bestSector}";
+        intent.DisplayName = $"Invasao {bestSector}";
         intent.BadgeSymbol = ">>";
         intent.SelectionReason = $"invasion | stance=Invasion | target={bestSector} | uncaptured={uncaptured} | score={bestScore}";
 
@@ -138,13 +161,77 @@ public static class AIPlanEvaluator
 
         if (!HasAssignedRole(intent, AIPlanRole.Capture))
         {
-            AddPlannerLog(plannerLogs, $"invasao | {bestSector} sem capturadores disponiveis — plano nao ativado");
+            AddPlannerLog(plannerLogs, $"invasao | {bestSector} sem capturadores disponiveis - plano nao ativado");
             return false;
         }
 
         AddPlannerLog(plannerLogs, $"invasao | ativado | target={bestSector} uncaptured={uncaptured}");
         result.Add(intent);
         return true;
+    }
+
+    private static void EnsurePreviousActivePlansPersist(
+        AISnapshot snapshot,
+        IReadOnlyCollection<MissionAssignmentMemory> previousAssignments,
+        PlannerRuntimeConfig config,
+        List<AIPlanIntent> result,
+        List<string> plannerLogs)
+    {
+        if (snapshot == null || previousAssignments == null || previousAssignments.Count == 0 || result == null)
+            return;
+
+        var existingPlanKeys = new HashSet<string>();
+        for (int i = 0; i < result.Count; i++)
+        {
+            AIPlanIntent intent = result[i];
+            if (intent == null)
+                continue;
+            existingPlanKeys.Add(BuildPlanKey(intent));
+        }
+
+        var activePlanByKey = BuildPlanByKey(result);
+        var stagnatedPlans = ComputeStagnatedPlans(previousAssignments, activePlanByKey, config);
+        var seenMissingKeys = new HashSet<string>();
+
+        foreach (MissionAssignmentMemory memory in previousAssignments)
+        {
+            if (string.IsNullOrWhiteSpace(memory.PlanKey))
+                continue;
+            if (existingPlanKeys.Contains(memory.PlanKey))
+                continue;
+            if (!seenMissingKeys.Add(memory.PlanKey))
+                continue;
+            if (stagnatedPlans.Contains(memory.PlanKey))
+            {
+                AddPlannerLog(plannerLogs, $"persistencia-plano | ignorado {memory.PlanKey} por estagnacao");
+                continue;
+            }
+            if (!TryParseDynamicCapturePlanKey(memory.PlanKey, out ConstructionSector sector))
+                continue;
+            if (IsSectorCompletedAndClear(snapshot, sector, config))
+            {
+                AddPlannerLog(plannerLogs, $"persistencia-plano | liberado {memory.PlanKey} setor-concluido-clear");
+                continue;
+            }
+
+            AIPlanIntent intent = BuildSectorPlanIntent(sector, snapshot);
+            if (intent == null || !intent.HasCaptureTarget)
+                continue;
+
+            List<AIConstructionInfo> captureTargets = CollectUncapturedTargetsInSector(sector, snapshot);
+            int uncaptured = CountUncapturedInSector(sector, snapshot);
+            SectorCandidate sectorInfo = BuildPersistedSectorCandidate(snapshot, sector, uncaptured);
+            PlannedForce force = ComputePlannedForce(sectorInfo);
+            int infantryDemand = Mathf.Max(0, Mathf.Min(force.Capture, captureTargets.Count));
+            ApplyPlannedForceToIntent(intent, force, infantryDemand);
+            intent.SelectionReason = $"persisted-active-plan | setor={sector} | reason=sticky-assignment";
+            intent.DisplayName = $"Captura {sector} [CAP {force.Capture}, ESC {force.Escort}, ART {force.FireSupport}, SUP {force.Logistics}]";
+            intent.TacticalRiskScore = ComputeSupportRiskScore(sectorInfo);
+
+            result.Add(intent);
+            existingPlanKeys.Add(memory.PlanKey);
+            AddPlannerLog(plannerLogs, $"persistencia-plano | manteve {memory.PlanKey} ativo ate conclusao/falha");
+        }
     }
 
     private static int CountEnemyCaptureInBase(ConstructionSector sector, AISnapshot snapshot)
@@ -225,7 +312,6 @@ public static class AIPlanEvaluator
         {
             AIConstructionInfo info = snapshot.KnownConstructions[i];
             if (info == null || !info.IsCapturable) continue;
-            if (ConstructionSectorHelper.IsBase(info.Sector)) continue;
             if (!seenSectors.Add(info.Sector)) continue;
 
             int uncaptured = CountUncapturedInSector(info.Sector, snapshot);
@@ -291,9 +377,8 @@ public static class AIPlanEvaluator
             draft.InfantryDemand = Mathf.Max(0, Mathf.Min(force.Capture, draft.CaptureTargets.Count));
             ApplyPlannedForceToIntent(intent, force, draft.InfantryDemand);
 
-            // Ajusta nome para facilitar leitura no log/debug.
-            int escortDemand = force.Escort + force.FireSupport + force.Logistics;
-            intent.DisplayName = $"Captura {sector.Sector} [CAP {force.Capture}, ESC {escortDemand}]";
+            // Ajusta nome para facilitar leitura no log/debug sem colapsar logistica em escolta.
+            intent.DisplayName = $"Captura {sector.Sector} [CAP {force.Capture}, ESC {force.Escort}, ART {force.FireSupport}, SUP {force.Logistics}]";
             intent.TacticalRiskScore = ComputeSupportRiskScore(sector);
             intent.SelectionReason = BuildSectorSelectionReason(sector, generated + 1);
 
@@ -322,6 +407,257 @@ public static class AIPlanEvaluator
         }
     }
 
+    private static void SelectSectorHoldPlans(
+        AISnapshot snapshot,
+        IReadOnlyCollection<MissionAssignmentMemory> previousAssignments,
+        List<AIPlanIntent> result,
+        List<string> plannerLogs)
+    {
+        if (snapshot == null || previousAssignments == null || previousAssignments.Count == 0)
+            return;
+
+        var activeKeys = new HashSet<string>();
+        for (int i = 0; i < result.Count; i++)
+        {
+            AIPlanIntent existing = result[i];
+            if (existing == null)
+                continue;
+            activeKeys.Add(BuildPlanKey(existing));
+        }
+
+        var addedSectors = new HashSet<ConstructionSector>();
+        foreach (MissionAssignmentMemory memory in previousAssignments)
+        {
+            if (string.IsNullOrWhiteSpace(memory.PlanKey))
+                continue;
+            if (!TryGetDynamicSectorFromPlanKey(memory.PlanKey, out ConstructionSector sector))
+                continue;
+            if (activeKeys.Contains(memory.PlanKey) || addedSectors.Contains(sector))
+                continue;
+            if (!ShouldKeepSectorHoldPlan(snapshot, sector, out int nearbyThreats, out Vector3Int representativeCell, out string representativeLabel))
+                continue;
+
+            AIPlanIntent intent = BuildSectorPlanIntent(sector, snapshot);
+            if (intent == null)
+                continue;
+
+            intent.DisplayName = $"Captura {sector} [hold]";
+            intent.HasCaptureTarget = true;
+            intent.CaptureTargetCell = representativeCell;
+            intent.CaptureTargetLabel = !string.IsNullOrWhiteSpace(representativeLabel) ? representativeLabel : sector.ToString();
+            intent.DesiredCaptureCount = 0;
+            intent.DesiredEscortCount = 0;
+            intent.DesiredArtilleryCount = 0;
+            intent.DesiredSupportCount = 0;
+            intent.TacticalRiskScore = nearbyThreats * 20;
+            intent.SelectionReason = $"sector-hold | conquered-not-clear | threats={nearbyThreats}";
+            intent.SectorClear = false;
+
+            result.Add(intent);
+            activeKeys.Add(memory.PlanKey);
+            addedSectors.Add(sector);
+            AddPlannerLog(plannerLogs, $"setor-hold | setor={sector} representante={intent.CaptureTargetLabel} threats={nearbyThreats}");
+        }
+    }
+
+    private static bool TryGetDynamicSectorFromPlanKey(string planKey, out ConstructionSector sector)
+    {
+        sector = default;
+        const string prefix = "dynamic:capture:";
+        if (string.IsNullOrWhiteSpace(planKey) || !planKey.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string sectorName = planKey.Substring(prefix.Length);
+        return !string.IsNullOrWhiteSpace(sectorName)
+            && Enum.TryParse(sectorName, true, out sector);
+    }
+
+    private static bool ShouldKeepSectorHoldPlan(
+        AISnapshot snapshot,
+        ConstructionSector sector,
+        out int nearbyThreats,
+        out Vector3Int representativeCell,
+        out string representativeLabel)
+    {
+        nearbyThreats = 0;
+        representativeCell = default;
+        representativeLabel = string.Empty;
+
+        if (snapshot == null)
+            return false;
+
+        SectorManager.SectorInfo sectorInfo;
+        bool hasInfo = SectorManager.TryGetSectorInfo(sector, out sectorInfo) || SectorManager.TryGetBaseInfo(sector, out sectorInfo);
+        if (!hasInfo || sectorInfo == null)
+            return false;
+
+        if (!sectorInfo.IsFullyControlled || sectorInfo.ControllingTeam != snapshot.AiTeam)
+            return false;
+
+        if (sectorInfo.IsDisputed || sectorInfo.HasPartialCapture)
+            return false;
+
+        representativeCell = sectorInfo.RepresentativeCell;
+        representativeCell.z = 0;
+        representativeLabel = sectorInfo.RepresentativeLabel ?? string.Empty;
+
+        for (int i = 0; i < snapshot.VisibleEnemies.Count; i++)
+        {
+            UnitManager enemy = snapshot.VisibleEnemies[i];
+            if (enemy == null || enemy.IsDead)
+                continue;
+            Vector3Int enemyCell = enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            if (GetHexDistance(representativeCell, enemyCell) <= 2)
+                nearbyThreats++;
+        }
+
+        return nearbyThreats > 0;
+    }
+    private static void SelectBackupSectorPlans(
+        AISnapshot snapshot,
+        int maxBackupPlans,
+        HashSet<int> assignedUnits,
+        List<AIPlanIntent> result,
+        List<string> plannerLogs)
+    {
+        if (snapshot == null || maxBackupPlans <= 0)
+            return;
+
+        var candidateSectors = new List<SectorCandidate>();
+        var seenSectors = new HashSet<ConstructionSector>();
+        var activeKeys = new HashSet<string>();
+        for (int i = 0; i < result.Count; i++)
+        {
+            AIPlanIntent existing = result[i];
+            if (existing == null)
+                continue;
+            activeKeys.Add(BuildPlanKey(existing));
+        }
+
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo info = snapshot.KnownConstructions[i];
+            if (info == null || !info.IsCapturable) continue;
+            if (!seenSectors.Add(info.Sector)) continue;
+            if (!IsOwnedSectorContested(info.Sector, snapshot)) continue;
+
+            AIPlanIntent probe = BuildSectorPlanIntent(info.Sector, snapshot);
+            if (probe == null || activeKeys.Contains(BuildPlanKey(probe)))
+                continue;
+
+            bool hasEnemyHq = SectorHasEnemyHq(info.Sector, snapshot);
+            int distToOwnHq = ComputeSectorDistanceToOwnHq(info.Sector, snapshot);
+            int enemyPressure = EstimateEnemyPressure(info.Sector, snapshot);
+            int distToEnemyHq = ComputeSectorDistanceToNearestEnemyHq(info.Sector, snapshot);
+            int enemyHqNearbyCount = CountEnemyHqsWithinRange(info.Sector, snapshot, 8);
+            int enemyHqThreatSum = ComputeEnemyHqThreatSum(info.Sector, snapshot, 12);
+
+            candidateSectors.Add(new SectorCandidate
+            {
+                Sector = info.Sector,
+                Uncaptured = CountOwnedContestedTargetsInSector(info.Sector, snapshot),
+                HasEnemyHq = hasEnemyHq,
+                DistToOwnHq = distToOwnHq,
+                EnemyPressure = enemyPressure,
+                DistToEnemyHq = distToEnemyHq,
+                EnemyHqNearbyCount = enemyHqNearbyCount,
+                EnemyHqThreatSum = enemyHqThreatSum,
+            });
+        }
+
+        candidateSectors.Sort((a, b) =>
+        {
+            if (a.EnemyPressure != b.EnemyPressure) return b.EnemyPressure.CompareTo(a.EnemyPressure);
+            if (a.Uncaptured != b.Uncaptured) return b.Uncaptured.CompareTo(a.Uncaptured);
+            return a.DistToOwnHq.CompareTo(b.DistToOwnHq);
+        });
+
+        int generated = 0;
+        for (int i = 0; i < candidateSectors.Count && generated < maxBackupPlans; i++)
+        {
+            SectorCandidate sector = candidateSectors[i];
+            AIPlanIntent intent = BuildSectorPlanIntent(sector.Sector, snapshot);
+            if (intent == null)
+                continue;
+
+            PlannedForce force = new PlannedForce { Capture = 1, Escort = sector.EnemyPressure > 0 ? 1 : 0, FireSupport = 0, Logistics = 0 };
+            var draft = new ActiveSectorDraft
+            {
+                Candidate = sector,
+                Force = force,
+                Intent = intent,
+                PlanOrder = generated,
+                CaptureTargets = CollectOwnedContestedTargetsInSector(sector.Sector, snapshot),
+            };
+            draft.InfantryDemand = Mathf.Max(1, Mathf.Min(force.Capture, draft.CaptureTargets.Count));
+            ApplyPlannedForceToIntent(intent, force, draft.InfantryDemand);
+            intent.DisplayName = $"Retomada {sector.Sector} [backup]";
+            intent.TacticalRiskScore = ComputeSupportRiskScore(sector) + 25;
+            intent.SelectionReason = $"backup-retake | contested-owned | pressure={sector.EnemyPressure} | uncaptured={sector.Uncaptured}";
+
+            var singleDraft = new List<ActiveSectorDraft> { draft };
+            AssignSectorPlanInfantryAcrossActivePlans(singleDraft, snapshot, assignedUnits);
+            AssignSectorPlanSupportForcesAcrossActivePlans(singleDraft, snapshot, assignedUnits);
+
+            if (!HasAssignedRole(intent, AIPlanRole.Capture))
+            {
+                AddPlannerLog(plannerLogs, $"setor-backup | setor={sector.Sector} sem capturador disponivel");
+                continue;
+            }
+
+            AddPlannerLog(plannerLogs, $"setor-backup | setor={sector.Sector} rank={generated + 1} force=CAP{force.Capture}/ESC{force.Escort}");
+            result.Add(intent);
+            generated++;
+        }
+    }
+
+    private static bool IsOwnedSectorContested(ConstructionSector sector, AISnapshot snapshot)
+    {
+        return CountOwnedContestedTargetsInSector(sector, snapshot) > 0;
+    }
+
+    private static int CountOwnedContestedTargetsInSector(ConstructionSector sector, AISnapshot snapshot)
+    {
+        int count = 0;
+        if (snapshot == null || snapshot.KnownConstructions == null)
+            return 0;
+
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo info = snapshot.KnownConstructions[i];
+            if (info == null || !info.IsCapturable || info.Sector != sector)
+                continue;
+            if (info.TeamId != snapshot.AiTeam)
+                continue;
+            if (info.CapturePoints >= info.CapturePointsMax)
+                continue;
+            count++;
+        }
+
+        return count;
+    }
+
+    private static List<AIConstructionInfo> CollectOwnedContestedTargetsInSector(ConstructionSector sector, AISnapshot snapshot)
+    {
+        var targets = new List<AIConstructionInfo>();
+        if (snapshot == null || snapshot.KnownConstructions == null)
+            return targets;
+
+        for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
+        {
+            AIConstructionInfo info = snapshot.KnownConstructions[i];
+            if (info == null || !info.IsCapturable || info.Sector != sector)
+                continue;
+            if (info.TeamId != snapshot.AiTeam)
+                continue;
+            if (info.CapturePoints >= info.CapturePointsMax)
+                continue;
+            targets.Add(info);
+        }
+
+        return targets;
+    }
     private struct SectorCandidate
     {
         public ConstructionSector Sector;
@@ -416,8 +752,8 @@ public static class AIPlanEvaluator
             AIConstructionInfo c = snapshot.KnownConstructions[i];
             if (c == null || c.Sector != sector || !c.IsCapturable) continue;
 
-            bool aiOwnsFully = c.TeamId == snapshot.AiTeam && c.CapturePoints >= c.CapturePointsMax;
-            if (!aiOwnsFully)
+            bool ownedByAi = c.TeamId == snapshot.AiTeam;
+            if (!ownedByAi)
                 uncaptured++;
         }
         return uncaptured;
@@ -973,6 +1309,45 @@ public static class AIPlanEvaluator
         return false;
     }
 
+    private static bool TryParseDynamicCapturePlanKey(string planKey, out ConstructionSector sector)
+    {
+        sector = default;
+        if (string.IsNullOrWhiteSpace(planKey))
+            return false;
+
+        const string prefix = "dynamic:capture:";
+        if (!planKey.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string sectorName = planKey.Substring(prefix.Length);
+        return Enum.TryParse(sectorName, true, out sector);
+    }
+
+    private static bool IsSectorCompletedAndClear(AISnapshot snapshot, ConstructionSector sector, PlannerRuntimeConfig config)
+    {
+        if (snapshot == null)
+            return true;
+
+        bool fullyCaptured = CountUncapturedInSector(sector, snapshot) <= 0;
+        bool hasThreat = HasVisibleEnemyNearSector(snapshot, sector, config);
+        return fullyCaptured && !hasThreat;
+    }
+
+    private static SectorCandidate BuildPersistedSectorCandidate(AISnapshot snapshot, ConstructionSector sector, int uncaptured)
+    {
+        return new SectorCandidate
+        {
+            Sector = sector,
+            Uncaptured = Mathf.Max(0, uncaptured),
+            DistToOwnHq = ComputeSectorDistanceToOwnHq(sector, snapshot),
+            DistToEnemyHq = ComputeSectorDistanceToNearestEnemyHq(sector, snapshot),
+            EnemyPressure = EstimateEnemyPressure(sector, snapshot),
+            HasEnemyHq = SectorHasEnemyHq(sector, snapshot),
+            EnemyHqNearbyCount = CountEnemyHqsWithinRange(sector, snapshot, 8),
+            EnemyHqThreatSum = ComputeEnemyHqThreatSum(sector, snapshot, 12)
+        };
+    }
+
     private static bool CanUnitPerformRole(UnitData unitData, AIPlanRole role)
     {
         if (unitData == null)
@@ -1092,6 +1467,7 @@ public static class AIPlanEvaluator
         }
 
         RefillMissingRoles(snapshot, plans, desiredRoleCounts, unitAssignments, unitById, plannerLogs);
+        RefillMinimumPlanOccupancy(snapshot, plans, unitAssignments, unitById, plannerLogs);
     }
 
     private static Dictionary<string, Dictionary<AIPlanRole, int>> CaptureDesiredRoleCounts(List<AIPlanIntent> plans)
@@ -1135,6 +1511,15 @@ public static class AIPlanEvaluator
         {
             UnitManager unit = snapshot.FriendlyUnits[i];
             if (unit == null || unit.IsDead)
+                continue;
+            map[unit.InstanceId] = unit;
+        }
+
+        IReadOnlyList<UnitManager> allUnits = UnitManager.AllActive;
+        for (int i = 0; allUnits != null && i < allUnits.Count; i++)
+        {
+            UnitManager unit = allUnits[i];
+            if (unit == null || unit.IsDead || unit.TeamId != snapshot.AiTeam)
                 continue;
             map[unit.InstanceId] = unit;
         }
@@ -1473,17 +1858,14 @@ public static class AIPlanEvaluator
     {
         if (snapshot == null || plans == null || desiredRoleCounts == null)
             return;
-
         for (int i = 0; i < plans.Count; i++)
         {
             AIPlanIntent plan = plans[i];
             if (plan == null)
                 continue;
-
             string key = BuildPlanKey(plan);
             if (!desiredRoleCounts.TryGetValue(key, out Dictionary<AIPlanRole, int> desiredByRole))
                 continue;
-
             foreach (KeyValuePair<AIPlanRole, int> roleDemand in desiredByRole)
             {
                 int current = CountAssignments(plan, roleDemand.Key);
@@ -1496,32 +1878,57 @@ public static class AIPlanEvaluator
             }
         }
     }
-
+    private static void RefillMinimumPlanOccupancy(
+        AISnapshot snapshot,
+        List<AIPlanIntent> plans,
+        Dictionary<int, AIPlanAssignment> unitAssignments,
+        Dictionary<int, UnitManager> unitById,
+        List<string> plannerLogs)
+    {
+        if (snapshot == null || plans == null)
+            return;
+        const int minimumParticipants = 2;
+        for (int i = 0; i < plans.Count; i++)
+        {
+            AIPlanIntent plan = plans[i];
+            if (plan == null || !plan.HasCaptureTarget)
+                continue;
+            int currentParticipants = CountAssignments(plan, null);
+            int missingParticipants = Mathf.Max(0, minimumParticipants - currentParticipants);
+            for (int m = 0; m < missingParticipants; m++)
+            {
+                bool filled = TryAssignClosestFreeUnit(snapshot, plan, AIPlanRole.Escort, unitAssignments, unitById, plannerLogs, "ocupacao-minima")
+                    || TryAssignClosestFreeUnit(snapshot, plan, AIPlanRole.Capture, unitAssignments, unitById, plannerLogs, "ocupacao-minima");
+                if (!filled)
+                    break;
+            }
+        }
+    }
     private static bool TryAssignClosestFreeUnit(
         AISnapshot snapshot,
         AIPlanIntent plan,
         AIPlanRole role,
         Dictionary<int, AIPlanAssignment> unitAssignments,
         Dictionary<int, UnitManager> unitById,
-        List<string> plannerLogs)
+        List<string> plannerLogs,
+        string eventTag = "preenchido-livre")
     {
         UnitManager bestUnit = null;
         int bestDistance = int.MaxValue;
         Vector3Int anchor = GetIntentAnchorCell(plan, snapshot);
-
         foreach (KeyValuePair<int, UnitManager> kv in unitById)
         {
             int unitId = kv.Key;
             UnitManager unit = kv.Value;
             if (unit == null || unit.IsDead)
                 continue;
+            if (unit.IsEmbarked)
+                continue;
             if (unitAssignments.ContainsKey(unitId))
                 continue;
-
             unit.TryGetUnitData(out UnitData data);
             if (!CanUnitPerformRole(data, role))
                 continue;
-
             int distance = GetHexDistance(unit.CurrentCellPosition, anchor);
             if (distance < bestDistance)
             {
@@ -1529,10 +1936,8 @@ public static class AIPlanEvaluator
                 bestUnit = unit;
             }
         }
-
         if (bestUnit == null)
             return false;
-
         AIPlanAssignment assignment = new AIPlanAssignment
         {
             UnitInstanceId = bestUnit.InstanceId,
@@ -1541,10 +1946,9 @@ public static class AIPlanEvaluator
         };
         if (role == AIPlanRole.Capture)
             ResolvePlannedCaptureForAssignment(snapshot, plan, assignment);
-
         plan.Assignments.Add(assignment);
         unitAssignments[bestUnit.InstanceId] = assignment;
-        AddPlannerLog(plannerLogs, $"preenchido-livre | {bestUnit.name} -> {BuildPlanKey(plan)} [{role.ToDebugLabel()}] dist={bestDistance}");
+        AddPlannerLog(plannerLogs, $"{eventTag} | {bestUnit.name} -> {BuildPlanKey(plan)} [{role.ToDebugLabel()}] dist={bestDistance}");
         return true;
     }
 
@@ -1571,11 +1975,5 @@ public static class AIPlanEvaluator
         plannerLogs.Add(message);
     }
 }
-
-
-
-
-
-
 
 

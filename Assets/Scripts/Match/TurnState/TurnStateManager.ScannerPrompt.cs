@@ -2115,16 +2115,21 @@ public partial class TurnStateManager
 
         if (passenger != null)
         {
-            passenger.SetTemporarySortingOrder();
+            // Keep the passenger visually above the transporter during embark.
+            passenger.SetTemporarySortingOrder(1000);
             passengerSortingRaised = true;
         }
 
         try
         {
+            if (transporter != null)
+            {
+                transporter.SetTemporarySortingOrder(999);
+                transporterSortingRaised = true;
+            }
+
             if (transporter != null && transporter.GetDomain() == Domain.Air)
             {
-                transporter.SetTemporarySortingOrder();
-                transporterSortingRaised = true;
                 AircraftOperationDecision landingDecision = AircraftOperationRules.Evaluate(
                     transporter,
                     movementTilemap,

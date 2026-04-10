@@ -352,7 +352,7 @@ public sealed class SectorManager : MonoBehaviour
 
             bool isFullyControlled = !hasMixedOwners && !hasPartialCapture && constructionsInSector.Count > 0;
             bool isDisputed = hasMixedOwners || hasPartialCapture;
-            TeamId controllingTeam = isFullyControlled ? firstOwner : TeamId.Neutral;
+            TeamId controllingTeam = hasMixedOwners || constructionsInSector.Count == 0 ? TeamId.Neutral : firstOwner;
             string statusText = BuildStatusText(isFullyControlled, hasMixedOwners, hasPartialCapture, controllingTeam);
 
             SectorInfo info = new SectorInfo();

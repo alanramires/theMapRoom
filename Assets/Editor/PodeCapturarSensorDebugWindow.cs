@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -5,9 +6,16 @@ using UnityEngine.Tilemaps;
 
 public class PodeCapturarSensorDebugWindow : EditorWindow
 {
+    private enum EvaluationMode
+    {
+        RuntimeStrict = 0,
+        SceneManual = 1
+    }
+
     [SerializeField] private UnitManager selectedUnit;
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private Tilemap overrideTilemap;
+    [SerializeField] private EvaluationMode evaluationMode = EvaluationMode.SceneManual;
     [SerializeField] private SensorMovementMode movementMode = SensorMovementMode.MoveuParado;
 
     private ConstructionManager targetConstruction;
@@ -15,6 +23,14 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
     private PodeCapturarSensor.CaptureOperationType operationType = PodeCapturarSensor.CaptureOperationType.None;
     private string sensorReason = "Ready.";
     private string statusMessage = "Ready.";
+    private bool runtimeCanCapture;
+    private ConstructionManager runtimeTargetConstruction;
+    private PodeCapturarSensor.CaptureOperationType runtimeOperationType = PodeCapturarSensor.CaptureOperationType.None;
+    private string runtimeReason = string.Empty;
+    private bool sceneCanCapture;
+    private ConstructionManager sceneTargetConstruction;
+    private PodeCapturarSensor.CaptureOperationType sceneOperationType = PodeCapturarSensor.CaptureOperationType.None;
+    private string sceneReason = string.Empty;
 
     private bool hasSelectedMarker;
     private Vector3Int selectedMarkerCell;
@@ -46,15 +62,16 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Sensor Pode Capturar", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Regras:\n" +
-            "1) Apenas infantaria\n" +
-            "2) Moveu Parado/Andando\n" +
-            "3) Unidade em construcao inimiga/neutra captura\n" +
-            "4) Unidade em construcao aliada danificada recupera",
+            "1) Unidade com sensor de captura habilitado no perfil\n" +
+            "2) Runtime: exige estado real Moveu Parado/Andando e acao C disponivel\n" +
+            "3) Scene Manual: usa o sensor puro no modo escolhido, sem fingir estado do TurnState\n" +
+            "4) Unidade em construcao inimiga/neutra captura; aliada danificada recupera",
             MessageType.Info);
 
         selectedUnit = (UnitManager)EditorGUILayout.ObjectField("Unidade", selectedUnit, typeof(UnitManager), true);
         turnStateManager = (TurnStateManager)EditorGUILayout.ObjectField("TurnStateManager", turnStateManager, typeof(TurnStateManager), true);
         overrideTilemap = (Tilemap)EditorGUILayout.ObjectField("Tilemap (opcional)", overrideTilemap, typeof(Tilemap), true);
+        evaluationMode = (EvaluationMode)EditorGUILayout.EnumPopup("Avaliacao", evaluationMode);
         movementMode = (SensorMovementMode)EditorGUILayout.EnumPopup("Modo", movementMode);
 
         EditorGUILayout.BeginHorizontal();
@@ -96,29 +113,55 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Unidade", unitName);
         EditorGUILayout.LabelField("HP Atual", selectedUnit.CurrentHP.ToString());
         EditorGUILayout.LabelField("Team", $"{TeamUtils.GetName(selectedUnit.TeamId)} ({(int)selectedUnit.TeamId})");
-        EditorGUILayout.LabelField("Modo", movementMode.ToString());
+        EditorGUILayout.LabelField("Avaliacao Ativa", evaluationMode.ToString());
+        EditorGUILayout.LabelField("Modo Manual", movementMode.ToString());
         EditorGUILayout.LabelField("Pode Capturar", canCapture ? "SIM" : "NAO");
         EditorGUILayout.LabelField("Operacao", operationType.ToString());
 
-        if (targetConstruction != null)
+        DrawDiagnosticBlock(
+            "Runtime",
+            runtimeCanCapture,
+            runtimeOperationType,
+            runtimeReason,
+            runtimeTargetConstruction);
+        DrawDiagnosticBlock(
+            "Scene Manual",
+            sceneCanCapture,
+            sceneOperationType,
+            sceneReason,
+            sceneTargetConstruction);
+    }
+
+    private void DrawDiagnosticBlock(
+        string label,
+        bool canRun,
+        PodeCapturarSensor.CaptureOperationType opType,
+        string reason,
+        ConstructionManager construction)
+    {
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Pode Capturar", canRun ? "SIM" : "NAO");
+        EditorGUILayout.LabelField("Operacao", opType.ToString());
+        if (!string.IsNullOrWhiteSpace(reason))
+            EditorGUILayout.LabelField("Motivo", reason);
+
+        if (construction != null)
         {
-            string cName = !string.IsNullOrWhiteSpace(targetConstruction.ConstructionDisplayName)
-                ? targetConstruction.ConstructionDisplayName
-                : targetConstruction.name;
+            string cName = !string.IsNullOrWhiteSpace(construction.ConstructionDisplayName)
+                ? construction.ConstructionDisplayName
+                : construction.name;
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField("Construcao Alvo", cName);
-            EditorGUILayout.LabelField("Team", $"{TeamUtils.GetName(targetConstruction.TeamId)} ({(int)targetConstruction.TeamId})");
-            EditorGUILayout.LabelField("Capture", $"{targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}");
+            EditorGUILayout.LabelField("Team", $"{TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId})");
+            EditorGUILayout.LabelField("Capture", $"{construction.CurrentCapturePoints}/{construction.CapturePointsMax}");
             EditorGUILayout.LabelField("Dano de Captura", Mathf.Max(0, selectedUnit.CurrentHP).ToString());
         }
     }
 
     private void RunSimulation()
     {
-        targetConstruction = null;
-        canCapture = false;
-        operationType = PodeCapturarSensor.CaptureOperationType.None;
-        sensorReason = string.Empty;
+        ClearSimulationResult();
         ClearSelectedMarker();
 
         if (selectedUnit == null)
@@ -134,50 +177,150 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
             return;
         }
 
-        canCapture = PodeCapturarSensor.TryGetCaptureTarget(
-            selectedUnit,
-            map,
-            movementMode,
-            out targetConstruction,
-            out operationType,
-            out sensorReason);
+        EvaluateRuntime(map);
+        EvaluateSceneManual(map);
+
+        if (evaluationMode == EvaluationMode.RuntimeStrict)
+        {
+            canCapture = runtimeCanCapture;
+            targetConstruction = runtimeTargetConstruction;
+            operationType = runtimeOperationType;
+            sensorReason = runtimeReason;
+        }
+        else
+        {
+            canCapture = sceneCanCapture;
+            targetConstruction = sceneTargetConstruction;
+            operationType = sceneOperationType;
+            sensorReason = sceneReason;
+        }
 
         if (canCapture && targetConstruction != null)
         {
             Vector3Int cell = targetConstruction.CurrentCellPosition;
             cell.z = 0;
-            SetSelectedMarker(cell, Color.yellow, "Captura valida");
-            statusMessage = operationType == PodeCapturarSensor.CaptureOperationType.RecoverAlly
-                ? "Sensor TRUE. Recuperacao de base aliada disponivel."
-                : "Sensor TRUE. Captura disponivel.";
+            SetSelectedMarker(cell, Color.yellow, evaluationMode == EvaluationMode.RuntimeStrict ? "Captura valida (Runtime)" : "Captura valida (Scene)");
+            statusMessage = BuildSuccessStatusMessage();
         }
         else
         {
-            statusMessage = "Sensor FALSE. Captura indisponivel.";
+            statusMessage = evaluationMode == EvaluationMode.RuntimeStrict
+                ? "Runtime FALSE. Captura indisponivel no estado atual."
+                : "Scene Manual FALSE. Captura indisponivel.";
         }
 
         Debug.Log(
             $"[PodeCapturarSensorDebug] unit={(selectedUnit != null ? selectedUnit.name : "(null)")} | " +
-            $"canCapture={canCapture} | op={operationType} | reason={sensorReason}");
+            $"runtime={runtimeCanCapture}/{runtimeOperationType} reason={runtimeReason} | " +
+            $"scene={sceneCanCapture}/{sceneOperationType} reason={sceneReason}");
+    }
+
+    private void EvaluateRuntime(Tilemap map)
+    {
+        runtimeTargetConstruction = null;
+        runtimeCanCapture = false;
+        runtimeOperationType = PodeCapturarSensor.CaptureOperationType.None;
+        runtimeReason = string.Empty;
+
+        if (turnStateManager == null)
+        {
+            runtimeReason = "TurnStateManager nao encontrado.";
+            return;
+        }
+
+        if (turnStateManager.SelectedUnit != selectedUnit)
+        {
+            runtimeReason = "A unidade precisa ser a SelectedUnit real do TurnStateManager.";
+            return;
+        }
+
+        TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
+        if (state != TurnStateManager.CursorState.MoveuAndando && state != TurnStateManager.CursorState.MoveuParado)
+        {
+            runtimeReason = $"Estado atual invalido para captura: {state}.";
+            return;
+        }
+
+        if (!turnStateManager.AvailableSensorActionCodes.Contains('C'))
+        {
+            runtimeTargetConstruction = turnStateManager.CachedPodeCapturarConstruction;
+            runtimeReason = string.IsNullOrWhiteSpace(turnStateManager.CachedPodeCapturarReason)
+                ? "Acao C nao esta disponivel."
+                : turnStateManager.CachedPodeCapturarReason;
+            return;
+        }
+
+        SensorMovementMode runtimeMovementMode = state == TurnStateManager.CursorState.MoveuAndando
+            ? SensorMovementMode.MoveuAndando
+            : SensorMovementMode.MoveuParado;
+        runtimeCanCapture = PodeCapturarSensor.TryGetCaptureTarget(
+            selectedUnit,
+            map,
+            runtimeMovementMode,
+            out runtimeTargetConstruction,
+            out runtimeOperationType,
+            out runtimeReason);
+    }
+
+    private void EvaluateSceneManual(Tilemap map)
+    {
+        sceneTargetConstruction = null;
+        sceneCanCapture = PodeCapturarSensor.TryGetCaptureTarget(
+            selectedUnit,
+            map,
+            movementMode,
+            out sceneTargetConstruction,
+            out sceneOperationType,
+            out sceneReason);
+    }
+
+    private string BuildSuccessStatusMessage()
+    {
+        if (evaluationMode == EvaluationMode.RuntimeStrict)
+        {
+            return operationType == PodeCapturarSensor.CaptureOperationType.RecoverAlly
+                ? "Runtime TRUE. Recuperacao de base aliada disponivel."
+                : "Runtime TRUE. Captura disponivel.";
+        }
+
+        return operationType == PodeCapturarSensor.CaptureOperationType.RecoverAlly
+            ? "Scene Manual TRUE. Recuperacao de base aliada disponivel."
+            : "Scene Manual TRUE. Captura disponivel.";
     }
 
     private void ExecuteDebugCapture()
     {
-        if (!canCapture || selectedUnit == null || targetConstruction == null)
+        if (selectedUnit == null)
         {
-            statusMessage = "Nao ha captura valida para executar.";
+            statusMessage = "Selecione uma unidade valida.";
+            return;
+        }
+
+        Tilemap map = ResolveTilemap();
+        if (map == null)
+        {
+            statusMessage = "Tilemap base nao encontrado.";
+            return;
+        }
+
+        if (!TryRevalidateSelectedEvaluation(map, out ConstructionManager validatedConstruction, out PodeCapturarSensor.CaptureOperationType validatedOperation, out string validatedReason))
+        {
+            statusMessage = string.IsNullOrWhiteSpace(validatedReason)
+                ? "Nao ha captura valida para executar."
+                : validatedReason;
+            RunSimulation();
             return;
         }
 
         Undo.RecordObject(selectedUnit, "Pode Capturar (Debug)");
-        Undo.RecordObject(targetConstruction, "Pode Capturar (Debug)");
+        Undo.RecordObject(validatedConstruction, "Pode Capturar (Debug)");
 
         int captureDamage = Mathf.Max(0, selectedUnit.CurrentHP);
-        int before = Mathf.Max(0, targetConstruction.CurrentCapturePoints);
-        int safeMax = Mathf.Max(0, targetConstruction.CapturePointsMax);
+        int before = Mathf.Max(0, validatedConstruction.CurrentCapturePoints);
+        int safeMax = Mathf.Max(0, validatedConstruction.CapturePointsMax);
         int after = before;
         bool concluded = false;
-        if (operationType == PodeCapturarSensor.CaptureOperationType.RecoverAlly)
+        if (validatedOperation == PodeCapturarSensor.CaptureOperationType.RecoverAlly)
         {
             after = Mathf.Min(safeMax, before + captureDamage);
             concluded = after >= safeMax;
@@ -188,25 +331,25 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
             concluded = after <= 0;
         }
 
-        targetConstruction.SetCurrentCapturePoints(after);
+        validatedConstruction.SetCurrentCapturePoints(after);
 
-        if (operationType == PodeCapturarSensor.CaptureOperationType.CaptureEnemy && concluded)
+        if (validatedOperation == PodeCapturarSensor.CaptureOperationType.CaptureEnemy && concluded)
         {
-            targetConstruction.SetTeamId(selectedUnit.TeamId);
-            targetConstruction.SetCurrentCapturePoints(targetConstruction.CapturePointsMax);
+            validatedConstruction.SetTeamId(selectedUnit.TeamId);
+            validatedConstruction.SetCurrentCapturePoints(validatedConstruction.CapturePointsMax);
         }
 
         selectedUnit.MarkAsActed();
 
         EditorUtility.SetDirty(selectedUnit);
-        EditorUtility.SetDirty(targetConstruction);
+        EditorUtility.SetDirty(validatedConstruction);
         if (selectedUnit.gameObject != null && selectedUnit.gameObject.scene.IsValid())
             EditorSceneManager.MarkSceneDirty(selectedUnit.gameObject.scene);
 
-        string cName = !string.IsNullOrWhiteSpace(targetConstruction.ConstructionDisplayName)
-            ? targetConstruction.ConstructionDisplayName
-            : targetConstruction.name;
-        if (operationType == PodeCapturarSensor.CaptureOperationType.RecoverAlly)
+        string cName = !string.IsNullOrWhiteSpace(validatedConstruction.ConstructionDisplayName)
+            ? validatedConstruction.ConstructionDisplayName
+            : validatedConstruction.name;
+        if (validatedOperation == PodeCapturarSensor.CaptureOperationType.RecoverAlly)
         {
             statusMessage = concluded
                 ? $"Recuperacao concluida: {cName} voltou ao maximo ({after}/{safeMax})."
@@ -220,6 +363,66 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
         }
 
         RunSimulation();
+    }
+
+    private bool TryRevalidateSelectedEvaluation(
+        Tilemap map,
+        out ConstructionManager validatedConstruction,
+        out PodeCapturarSensor.CaptureOperationType validatedOperation,
+        out string validatedReason)
+    {
+        validatedConstruction = null;
+        validatedOperation = PodeCapturarSensor.CaptureOperationType.None;
+        validatedReason = string.Empty;
+
+        if (evaluationMode == EvaluationMode.RuntimeStrict)
+        {
+            if (turnStateManager == null)
+            {
+                validatedReason = "TurnStateManager nao encontrado.";
+                return false;
+            }
+
+            if (turnStateManager.SelectedUnit != selectedUnit)
+            {
+                validatedReason = "A unidade nao e a SelectedUnit atual do runtime.";
+                return false;
+            }
+
+            TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
+            if (state != TurnStateManager.CursorState.MoveuAndando && state != TurnStateManager.CursorState.MoveuParado)
+            {
+                validatedReason = $"Estado atual invalido para captura: {state}.";
+                return false;
+            }
+
+            if (!turnStateManager.AvailableSensorActionCodes.Contains('C'))
+            {
+                validatedReason = string.IsNullOrWhiteSpace(turnStateManager.CachedPodeCapturarReason)
+                    ? "Acao C nao esta disponivel."
+                    : turnStateManager.CachedPodeCapturarReason;
+                return false;
+            }
+
+            SensorMovementMode runtimeMovementMode = state == TurnStateManager.CursorState.MoveuAndando
+                ? SensorMovementMode.MoveuAndando
+                : SensorMovementMode.MoveuParado;
+            return PodeCapturarSensor.TryGetCaptureTarget(
+                selectedUnit,
+                map,
+                runtimeMovementMode,
+                out validatedConstruction,
+                out validatedOperation,
+                out validatedReason);
+        }
+
+        return PodeCapturarSensor.TryGetCaptureTarget(
+            selectedUnit,
+            map,
+            movementMode,
+            out validatedConstruction,
+            out validatedOperation,
+            out validatedReason);
     }
 
     private void TryUseCurrentSelection()
@@ -256,11 +459,27 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
             TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
             if (state == TurnStateManager.CursorState.MoveuAndando)
                 movementMode = SensorMovementMode.MoveuAndando;
-            else
+            else if (state == TurnStateManager.CursorState.MoveuParado)
                 movementMode = SensorMovementMode.MoveuParado;
         }
 
         statusMessage = "Contexto detectado.";
+    }
+
+    private void ClearSimulationResult()
+    {
+        targetConstruction = null;
+        canCapture = false;
+        operationType = PodeCapturarSensor.CaptureOperationType.None;
+        sensorReason = string.Empty;
+        runtimeCanCapture = false;
+        runtimeTargetConstruction = null;
+        runtimeOperationType = PodeCapturarSensor.CaptureOperationType.None;
+        runtimeReason = string.Empty;
+        sceneCanCapture = false;
+        sceneTargetConstruction = null;
+        sceneOperationType = PodeCapturarSensor.CaptureOperationType.None;
+        sceneReason = string.Empty;
     }
 
     private Tilemap ResolveTilemap()
