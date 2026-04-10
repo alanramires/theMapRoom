@@ -245,6 +245,8 @@ public class SavedCatalogPlan
     public int status;
     public string statusName;
     public bool conquered;
+    public bool sectorClear;
+    public string controllingTeam;
     public int progressCurrent;
     public int progressMax;
     public int lastActivationTurn = -1;

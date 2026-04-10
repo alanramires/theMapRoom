@@ -15,7 +15,7 @@ MonoBehaviour:
   stanceBehaviors:
   - stances:
     - {fileID: 11400000, guid: 8aa944392dd85d647ad4fa5881054aed, type: 2}
-    sensorPriority: 04000000000000000100000003000000
+    sensorPriority: 04000000010000000000000003000000
     minDamageDealtPercent: 10
     maxDamageReceivedPercent: 80
     mustSurvive: 1

@@ -19,7 +19,7 @@ MonoBehaviour:
     minDamageDealtPercent: 10
     maxDamageReceivedPercent: 80
     mustSurvive: 0
-    targetPreference: 0
+    targetPreference: 1
     canEscort: 0
     prioritizeDpqAtBattle: 1
     prioritizeDpqDuringTravel: 0
@@ -38,7 +38,7 @@ MonoBehaviour:
     minDamageDealtPercent: 10
     maxDamageReceivedPercent: 50
     mustSurvive: 1
-    targetPreference: 0
+    targetPreference: 1
     canEscort: 1
     prioritizeDpqAtBattle: 1
     prioritizeDpqDuringTravel: 0
@@ -57,7 +57,7 @@ MonoBehaviour:
     minDamageDealtPercent: 10
     maxDamageReceivedPercent: 20
     mustSurvive: 0
-    targetPreference: 0
+    targetPreference: 1
     canEscort: 1
     prioritizeDpqAtBattle: 1
     prioritizeDpqDuringTravel: 0

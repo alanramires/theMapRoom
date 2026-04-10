@@ -49,6 +49,10 @@ public class AIPlanIntent
     // Motivo resumido pelo qual este plano ficou ativo no turno.
     public string SelectionReason;
 
+    // Estado de controle do setor para debug/persistencia.
+    public bool SectorClear;
+    public TeamId ControllingTeam = TeamId.Neutral;
+
     // Demanda planejada por papel para este setor.
     public int DesiredCaptureCount;
     public int DesiredEscortCount;

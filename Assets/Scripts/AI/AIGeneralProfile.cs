@@ -19,6 +19,8 @@ public class AIGeneralProfile : ScriptableObject
     public int stagnationTurns = 2;
     [Min(0), Tooltip("Maximo de planos de setor variaveis ativos simultaneamente.")]
     public int maxVariablePlans = 3;
+    [Min(0), Tooltip("Maximo de planos de backup/protect ativos simultaneamente.")]
+    public int maxBackupPlans = 0;
 
     [Header("Planner Gates")]
     [Min(1), Tooltip("Raio minimo em hexes para detectar ameaca proxima ao HQ (usado em HasVisibleEnemyNearSector para setores de base).")]
