@@ -131,6 +131,22 @@ public class AIUnitProfile : ScriptableObject
     [Tooltip("Limiar de HP do aliado (%) para priorizar como alvo de suprimento. 0 = ignora HP.")]
     [Range(0, 100)]
     public int supplyAllyHpThresholdPercent = 50;
+    [Tooltip("Raio de perigo duro para supply. Inimigo dentro deste raio em torno do ponto de atendimento bloqueia a aproximacao.")]
+    [Range(0, 8)]
+    public int supplyHardDangerRadius = 2;
+    [Tooltip("Raio de perigo moderado para supply. Ameacas dentro deste raio contam para a tolerancia do supridor.")]
+    [Range(0, 12)]
+    public int supplySoftDangerRadius = 4;
+    [Tooltip("Quantidade de ameacas no raio moderado tolerada quando NAO esta indo atender alguem.")]
+    [Range(0, 8)]
+    public int supplySoftThreatToleranceIdle = 1;
+    [Tooltip("Quantidade de ameacas no raio moderado tolerada quando esta indo atender alguem.")]
+    [Range(0, 8)]
+    public int supplySoftThreatToleranceServing = 2;
+
+    [Header("Transporter")]
+    [Tooltip("Se true, ao terminar um desembarque e ficar vazio, o transportador prefere voltar para a zona de pickup/base em vez de permanecer avancado.")]
+    public bool returnToPickupAfterDisembark = true;
 
     private static readonly AIUnitStanceBehavior _emptyBehavior = new AIUnitStanceBehavior();
 
@@ -187,6 +203,10 @@ public class AIUnitProfile : ScriptableObject
             case AIPlanCapability.Logistics:
                 return (ownerData != null && ownerData.isSupplier)
                     || HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Supply);
+            case AIPlanCapability.Transport:
+                return ownerData != null
+                    && ownerData.isTransporter
+                    && ownerData.domain == Domain.Land;
             case AIPlanCapability.Assault:
                 return HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Attack);
             default:
@@ -213,5 +233,7 @@ public class AIUnitProfile : ScriptableObject
 
         hpRepairThreshold = Mathf.Clamp(hpRepairThreshold, 0, 10);
         hpRepairExitThreshold = Mathf.Max(hpRepairThreshold + 1, hpRepairExitThreshold);
+        supplyHardDangerRadius = Mathf.Clamp(supplyHardDangerRadius, 0, 8);
+        supplySoftDangerRadius = Mathf.Max(supplyHardDangerRadius, supplySoftDangerRadius);
     }
 }

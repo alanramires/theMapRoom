@@ -75,7 +75,7 @@ MonoBehaviour:
   - weapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
     squadAmmunition: 9
     operationRangeMin: 1
-    operationRangeMax: 1
+    operationRangeMax: 2
     selectedTrajectory: 0
     canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}

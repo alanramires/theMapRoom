@@ -7,6 +7,13 @@ public class CombatHpMatrixWindow : EditorWindow
 {
     private const int HpGridSize = 10;
 
+    private enum MatrixDisplayMode
+    {
+        RemainingHp = 0,
+        DamageReceived = 1,
+        DamageCaused = 2
+    }
+
     [SerializeField] private UnitDatabase unitDatabase;
     [SerializeField] private RPSDatabase rpsDatabase;
     [SerializeField] private DPQMatchupDatabase dpqMatchupDatabase;
@@ -20,7 +27,7 @@ public class CombatHpMatrixWindow : EditorWindow
     [SerializeField] private int selectedDefenderEmbarkedWeaponIndex = -2;
     [SerializeField] private bool autoUpdate = true;
     [SerializeField] private bool logToConsole;
-    [SerializeField] private bool showRemainingHp = true;
+    [SerializeField] private MatrixDisplayMode matrixDisplayMode = MatrixDisplayMode.RemainingHp;
 
     private readonly List<UnitData> units = new List<UnitData>();
     private readonly List<WeaponOption> attackWeaponOptions = new List<WeaponOption>();
@@ -75,7 +82,7 @@ public class CombatHpMatrixWindow : EditorWindow
         distance = Mathf.Max(1, EditorGUILayout.IntField("Distancia (hex)", distance));
         autoUpdate = EditorGUILayout.ToggleLeft("Auto Update (quando assets mudarem)", autoUpdate);
         logToConsole = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
-        showRemainingHp = EditorGUILayout.ToggleLeft("Exibir HP restante", showRemainingHp);
+        matrixDisplayMode = (MatrixDisplayMode)EditorGUILayout.EnumPopup("Exibicao da matriz", matrixDisplayMode);
 
         if (previousUnitDatabase != unitDatabase)
         {
@@ -380,9 +387,12 @@ public class CombatHpMatrixWindow : EditorWindow
     private void DrawMatrix()
     {
         EditorGUILayout.Space(8f);
-        string matrixLegend = showRemainingHp
-            ? "Linhas = HP atacante inicial | Colunas = HP defensor inicial"
-            : "Celula = atacantes eliminados x defensores eliminados";
+        string matrixLegend = matrixDisplayMode switch
+        {
+            MatrixDisplayMode.RemainingHp => "Linhas = HP atacante inicial | Colunas = HP defensor inicial | Celula = HP restante A x HP restante D",
+            MatrixDisplayMode.DamageReceived => "Linhas = HP atacante inicial | Colunas = HP defensor inicial | Celula = dano recebido A x dano recebido D",
+            _ => "Linhas = HP atacante inicial | Colunas = HP defensor inicial | Celula = dano causado A x dano causado D"
+        };
         EditorGUILayout.LabelField(matrixLegend, EditorStyles.miniBoldLabel);
 
         EditorGUILayout.BeginHorizontal();
@@ -401,9 +411,12 @@ public class CombatHpMatrixWindow : EditorWindow
                 int row = rowHp - 1;
                 int col = colHp - 1;
                 MatrixCellResult cell = matrix[row, col];
-                string label = showRemainingHp
-                    ? $"{cell.attackerHpAfter}x{cell.defenderHpAfter}"
-                    : $"{FormatEliminated(cell.attackerEliminated)}x{FormatEliminated(cell.defenderEliminated)}";
+                string label = matrixDisplayMode switch
+                {
+                    MatrixDisplayMode.RemainingHp => $"{cell.attackerHpAfter}x{cell.defenderHpAfter}",
+                    MatrixDisplayMode.DamageReceived => $"{FormatEliminated(cell.attackerEliminated)}x{FormatEliminated(cell.defenderEliminated)}",
+                    _ => $"{cell.defenderEliminated}x{cell.attackerEliminated}"
+                };
                 bool containedByLock = cell.defenderDamageContainedByHpLock || cell.attackerDamageContainedByHpLock;
 
                 Color prevColor = GUI.color;

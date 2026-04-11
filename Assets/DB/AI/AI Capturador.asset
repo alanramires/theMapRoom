@@ -26,7 +26,7 @@ MonoBehaviour:
     retreatToHqWhenIdle: 0
     playConservative: 0
     engageNearestEnemies: 1
-    captureInterruptBias: 1
+    captureInterruptBias: 0
     holdGroundWhenIdle: 0
     requireSightlineBeforeEngaging: 0
     holdPositionWhenInRange: 0
@@ -85,3 +85,8 @@ MonoBehaviour:
   supplyAllyFuelThresholdPercent: 25
   supplyAllyAmmoThresholdPercent: 0
   supplyAllyHpThresholdPercent: 50
+  supplyHardDangerRadius: 2
+  supplySoftDangerRadius: 4
+  supplySoftThreatToleranceIdle: 1
+  supplySoftThreatToleranceServing: 2
+  returnToPickupAfterDisembark: 0

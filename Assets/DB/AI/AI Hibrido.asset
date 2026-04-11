@@ -75,7 +75,7 @@ MonoBehaviour:
   preferFallbackWhenDefend: 1
   fuseWhileOnRepairMode: 1
   canShootFromDistanceWhileRepairing: 1
-  hpRepairThreshold: 3
+  hpRepairThreshold: 4
   hpRepairExitThreshold: 8
   repairAutonomyThresholdPercent: 25
   repairWhenAnyWeaponOutOfAmmo: 1
@@ -85,3 +85,8 @@ MonoBehaviour:
   supplyAllyFuelThresholdPercent: 25
   supplyAllyAmmoThresholdPercent: 0
   supplyAllyHpThresholdPercent: 50
+  supplyHardDangerRadius: 2
+  supplySoftDangerRadius: 4
+  supplySoftThreatToleranceIdle: 1
+  supplySoftThreatToleranceServing: 2
+  returnToPickupAfterDisembark: 0

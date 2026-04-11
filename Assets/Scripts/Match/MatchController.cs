@@ -3068,14 +3068,13 @@ public class MatchController : MonoBehaviour
             return false;
 
         bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn;
-        return PodeDetectarSensor.IsTargetObservedByTeam(
+        return PodeDetectarSensor.IsTargetObservedByTeamWithoutForwardObserver(
             unit,
             (int)observerTeam,
             boardMap,
             ResolveFogTerrainDatabase(),
             ResolveFogDpqAirHeightConfig(),
             enableLosValidation,
-            enableSpotter: false,
             enforceStealthValidation);
     }
 
@@ -3101,14 +3100,13 @@ public class MatchController : MonoBehaviour
             return false;
 
         bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn;
-        return PodeDetectarSensor.IsTargetObservedByTeam(
+        return PodeDetectarSensor.IsTargetObservedByTeamWithoutForwardObserver(
             unit,
             activeTeamId,
             boardMap,
             ResolveFogTerrainDatabase(),
             ResolveFogDpqAirHeightConfig(),
             enableLosValidation,
-            enableSpotter: false,
             enforceStealthValidation);
     }
 
@@ -3574,17 +3572,13 @@ public class MatchController : MonoBehaviour
 
         fogUnitVisibleScratchBuffer.Clear();
         double collectStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
-        PodeDetectarSensor.CollectVisibleCells(
+        PodeDetectarSensor.CollectVisibleCellsForFogOfWar(
             unit,
             boardMap,
             ResolveFogTerrainDatabase(),
             fogUnitVisibleScratchBuffer,
             ResolveFogDpqAirHeightConfig(),
-            enableLosValidation,
-            enableSpotter: false,
-            useOccupantLayerForTarget: false,
-            preserveObserverLayerRangeForHexVisibility: true,
-            useRangeOnlyForAirHighWhenConfigured: true);
+            enableLosValidation);
         collectExecuted = true;
         visibleCellsCollected = fogUnitVisibleScratchBuffer.Count;
         if (enableFogStepPerfLogs)

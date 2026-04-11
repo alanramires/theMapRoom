@@ -256,52 +256,33 @@ public static class PodeMirarSensor
                     }
                     if (!hasDirectLos)
                     {
-                        if (hasValidLdtPath && enableLosValidation && enableSpotter && TryFindForwardObserverForIndirectFire(
-                                attacker,
-                                target,
-                                map,
-                                terrainDatabase,
-                                dpqAirHeightConfig,
-                                out UnitManager blockerBypassObserver,
-                                enableLosValidation))
+                        string invalidReason;
+                        if (!hasValidLdtPath)
                         {
-                            hasDirectLos = true;
-                            usedForwardObserver = blockerBypassObserver != null;
-                            forwardObserver = blockerBypassObserver;
-                            if (usedForwardObserver)
-                                forwardObserverReason = "Forward observer confirmou LoS apesar de bloqueio direto.";
+                            invalidReason = InvalidReasonLdtBlocked;
                         }
-
-                        if (!hasDirectLos)
+                        else if (enableLosValidation)
                         {
-                            string invalidReason;
-                            if (!hasValidLdtPath)
-                            {
-                                invalidReason = InvalidReasonLdtBlocked;
-                            }
-                            else if (enableLosValidation)
-                            {
-                                invalidReason = $"{InvalidReasonLosBlocked} ({blockedCell.x},{blockedCell.y}) | {InvalidReasonNoForwardObserver}";
-                            }
-                            else
-                            {
-                                invalidReason = InvalidReasonLdtBlocked;
-                            }
-                            AppendInvalid(
-                                invalidOutput,
-                                attacker,
-                                target,
-                                weapon,
-                                weaponCandidate.index,
-                                distance,
-                                attackerPositionLabel,
-                                defenderPositionLabel,
-                                invalidReason,
-                                blockedCell,
-                                intermediateCells,
-                                evPath);
-                            continue;
+                            invalidReason = $"{InvalidReasonLosBlocked} ({blockedCell.x},{blockedCell.y})";
                         }
+                        else
+                        {
+                            invalidReason = InvalidReasonLdtBlocked;
+                        }
+                        AppendInvalid(
+                            invalidOutput,
+                            attacker,
+                            target,
+                            weapon,
+                            weaponCandidate.index,
+                            distance,
+                            attackerPositionLabel,
+                            defenderPositionLabel,
+                            invalidReason,
+                            blockedCell,
+                            intermediateCells,
+                            evPath);
+                        continue;
                     }
 
                     int attackerObservationRange = GetObservationRangeHexes(attacker, target);
@@ -857,21 +838,7 @@ public static class PodeMirarSensor
             }
 
             if (!hasDirectLos)
-            {
-                if (hasValidLdtPath && enableSpotter && TryFindForwardObserverForVirtualCell(
-                        attacker,
-                        targetCell,
-                        map,
-                        terrainDatabase,
-                        dpqAirHeightConfig,
-                        enableLosValidation))
-                {
-                    hasDirectLos = true;
-                }
-
-                if (!hasDirectLos)
-                    return false;
-            }
+                return false;
 
             int attackerObservationRange = GetObservationRangeHexes(attacker);
             bool requiresForwardObserver = distanceFromAttacker > 1 && enableSpotter && distanceFromAttacker > attackerObservationRange;

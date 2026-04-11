@@ -394,10 +394,17 @@ public partial class AIPlayerController
         return merged;
     }
 
-    private bool IsCellTooDangerousForSupport(AISnapshot snapshot, Vector3Int cell, bool allowModerateRiskForSupply = false)
+    private bool IsCellTooDangerousForSupport(AISnapshot snapshot, Vector3Int cell, bool allowModerateRiskForSupply = false, AIUnitProfile supplierProfile = null)
     {
         if (snapshot == null || snapshot.BoardTilemap == null || snapshot.VisibleEnemies == null)
             return false;
+
+        int hardDangerRadius = supplierProfile != null ? supplierProfile.supplyHardDangerRadius : 2;
+        int softDangerRadius = supplierProfile != null ? supplierProfile.supplySoftDangerRadius : 4;
+        int softThreatTolerance = supplierProfile != null
+            ? (allowModerateRiskForSupply ? supplierProfile.supplySoftThreatToleranceServing : supplierProfile.supplySoftThreatToleranceIdle)
+            : (allowModerateRiskForSupply ? 2 : 1);
+        int softThreatLimit = softThreatTolerance + 1;
 
         cell.z = 0;
         int nearbyThreats = 0;
@@ -413,15 +420,13 @@ public partial class AIPlayerController
             if (dist == int.MaxValue)
                 continue;
 
-            if (dist <= 1)
+            if (hardDangerRadius > 0 && dist <= hardDangerRadius)
                 return true;
-            if (dist <= 2)
-                return true;
-            if (dist <= 4)
+            if (softDangerRadius > hardDangerRadius && dist <= softDangerRadius)
                 nearbyThreats++;
         }
 
-        return nearbyThreats >= (allowModerateRiskForSupply ? 3 : 2);
+        return nearbyThreats >= softThreatLimit;
     }
 
     private HashSet<Vector3Int> BuildReservedCaptureCellsForEscort(UnitManager unit, AIPlanIntent unitIntent)

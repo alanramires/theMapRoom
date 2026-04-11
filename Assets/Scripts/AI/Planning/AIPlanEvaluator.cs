@@ -91,6 +91,7 @@ public static class AIPlanEvaluator
             plannerLogs);
 
         ApplyMissionPersistenceAndReallocation(snapshot, result, previousAssignments, config, plannerLogs);
+        ResolveTransportDemand(snapshot, result, plannerLogs);
 
         return result;
     }
@@ -225,7 +226,7 @@ public static class AIPlanEvaluator
             int infantryDemand = Mathf.Max(0, Mathf.Min(force.Capture, captureTargets.Count));
             ApplyPlannedForceToIntent(intent, force, infantryDemand);
             intent.SelectionReason = $"persisted-active-plan | setor={sector} | reason=sticky-assignment";
-            intent.DisplayName = $"Captura {sector} [CAP {force.Capture}, ESC {force.Escort}, ART {force.FireSupport}, SUP {force.Logistics}]";
+            intent.DisplayName = $"Captura {sector} [CAP {force.Capture}, ESC {force.Escort}, ART {force.FireSupport}, TRN 0, SUP {force.Logistics}]";
             intent.TacticalRiskScore = ComputeSupportRiskScore(sectorInfo);
 
             result.Add(intent);
@@ -378,13 +379,13 @@ public static class AIPlanEvaluator
             ApplyPlannedForceToIntent(intent, force, draft.InfantryDemand);
 
             // Ajusta nome para facilitar leitura no log/debug sem colapsar logistica em escolta.
-            intent.DisplayName = $"Captura {sector.Sector} [CAP {force.Capture}, ESC {force.Escort}, ART {force.FireSupport}, SUP {force.Logistics}]";
+            intent.DisplayName = $"Captura {sector.Sector} [CAP {force.Capture}, ESC {force.Escort}, ART {force.FireSupport}, TRN 0, SUP {force.Logistics}]";
             intent.TacticalRiskScore = ComputeSupportRiskScore(sector);
             intent.SelectionReason = BuildSectorSelectionReason(sector, generated + 1);
 
             AddPlannerLog(
                 plannerLogs,
-                $"setor-ativo | setor={sector.Sector} rank={generated + 1} score={intent.TacticalRiskScore} force=CAP{force.Capture}/ESC{force.Escort}/FS{force.FireSupport}/LOG{force.Logistics} targets={draft.CaptureTargets.Count}");
+                $"setor-ativo | setor={sector.Sector} rank={generated + 1} score={intent.TacticalRiskScore} force=CAP{force.Capture}/ESC{force.Escort}/FS{force.FireSupport}/TRN0/LOG{force.Logistics} targets={draft.CaptureTargets.Count}");
 
             activeSectorDrafts.Add(draft);
             generated++;
@@ -887,7 +888,103 @@ public static class AIPlanEvaluator
         intent.DesiredCaptureCount = Mathf.Max(0, resolvedCaptureDemand);
         intent.DesiredEscortCount = Mathf.Max(0, force.Escort);
         intent.DesiredArtilleryCount = Mathf.Max(0, force.FireSupport);
+        intent.DesiredTransportCount = 0;
         intent.DesiredSupportCount = Mathf.Max(0, force.Logistics);
+    }
+
+    private static void ResolveTransportDemand(
+        AISnapshot snapshot,
+        List<AIPlanIntent> plans,
+        List<string> plannerLogs)
+    {
+        if (snapshot == null || plans == null || plans.Count == 0)
+            return;
+
+        var unitById = BuildFriendlyUnitById(snapshot);
+        for (int i = 0; i < plans.Count; i++)
+        {
+            AIPlanIntent intent = plans[i];
+            if (intent == null)
+                continue;
+
+            intent.DesiredTransportCount = ComputeDesiredTransportCount(snapshot, intent, unitById);
+            RefreshIntentDisplayTransportDemand(intent);
+            if (intent.DesiredTransportCount > 0)
+            {
+                AddPlannerLog(
+                    plannerLogs,
+                    $"transporte-demanda | plano={BuildPlanKey(intent)} setor={intent.Sector} desired={intent.DesiredTransportCount}");
+            }
+        }
+    }
+
+    private static int ComputeDesiredTransportCount(
+        AISnapshot snapshot,
+        AIPlanIntent intent,
+        Dictionary<int, UnitManager> unitById)
+    {
+        if (snapshot == null || intent == null || unitById == null || intent.Assignments == null || intent.Assignments.Count == 0)
+            return 0;
+
+        int transportWorthyCapturers = 0;
+        for (int i = 0; i < intent.Assignments.Count; i++)
+        {
+            AIPlanAssignment assignment = intent.Assignments[i];
+            if (assignment == null || assignment.Role != AIPlanRole.Capture)
+                continue;
+            if (!unitById.TryGetValue(assignment.UnitInstanceId, out UnitManager unit) || unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null)
+                continue;
+            if (data.domain != Domain.Land || !data.aiUnitProfile.HasPlanCapability(AIPlanCapability.Capture, data))
+                continue;
+
+            Vector3Int targetCell = assignment.HasPlannedCaptureTarget
+                ? assignment.PlannedCaptureCell
+                : (intent.HasCaptureTarget ? intent.CaptureTargetCell : unit.CurrentCellPosition);
+            targetCell.z = 0;
+
+            Vector3Int unitCell = unit.CurrentCellPosition;
+            unitCell.z = 0;
+            int distanceToTarget = GetHexDistance(unitCell, targetCell);
+            int move = Mathf.Max(1, unit.GetMovementRange());
+            int worthwhileThreshold = Mathf.CeilToInt(move * 1.5f);
+            if (distanceToTarget < 8 || distanceToTarget <= move || distanceToTarget <= worthwhileThreshold)
+                continue;
+
+            transportWorthyCapturers++;
+        }
+
+        return Mathf.CeilToInt(transportWorthyCapturers / 2f);
+    }
+
+    private static void RefreshIntentDisplayTransportDemand(AIPlanIntent intent)
+    {
+        if (intent == null || string.IsNullOrWhiteSpace(intent.DisplayName))
+            return;
+
+        const string token = "TRN 0";
+        if (intent.DisplayName.IndexOf(token, StringComparison.OrdinalIgnoreCase) < 0)
+            return;
+
+        intent.DisplayName = intent.DisplayName.Replace(token, $"TRN {Mathf.Max(0, intent.DesiredTransportCount)}");
+    }
+
+    private static Dictionary<int, UnitManager> BuildFriendlyUnitById(AISnapshot snapshot)
+    {
+        var map = new Dictionary<int, UnitManager>();
+        if (snapshot == null || snapshot.FriendlyUnits == null)
+            return map;
+
+        for (int i = 0; i < snapshot.FriendlyUnits.Count; i++)
+        {
+            UnitManager unit = snapshot.FriendlyUnits[i];
+            if (unit == null || unit.IsDead)
+                continue;
+            map[unit.InstanceId] = unit;
+        }
+
+        return map;
     }
 
     private static void FillCaptureTarget(AIPlanIntent intent, ConstructionSector sector, AISnapshot snapshot)

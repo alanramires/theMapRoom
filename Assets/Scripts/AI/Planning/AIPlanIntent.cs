@@ -57,6 +57,7 @@ public class AIPlanIntent
     public int DesiredCaptureCount;
     public int DesiredEscortCount;
     public int DesiredArtilleryCount;
+    public int DesiredTransportCount;
     public int DesiredSupportCount;
 
     // Unidades designadas a este plano neste turno

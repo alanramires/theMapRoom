@@ -4,5 +4,6 @@ public enum AIPlanCapability
     Escort = 1,
     FireSupport = 2,
     Logistics = 3,
-    Assault = 4
+    Transport = 4,
+    Assault = 5
 }

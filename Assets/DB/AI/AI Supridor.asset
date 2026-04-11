@@ -24,7 +24,7 @@ MonoBehaviour:
     prioritizeDpqAtBattle: 0
     prioritizeDpqDuringTravel: 0
     retreatToHqWhenIdle: 0
-    playConservative: 1
+    playConservative: 0
     engageNearestEnemies: 0
     captureInterruptBias: -1
     holdGroundWhenIdle: 0
@@ -43,7 +43,7 @@ MonoBehaviour:
     prioritizeDpqAtBattle: 0
     prioritizeDpqDuringTravel: 0
     retreatToHqWhenIdle: 0
-    playConservative: 1
+    playConservative: 0
     engageNearestEnemies: 0
     captureInterruptBias: -1
     holdGroundWhenIdle: 0
@@ -85,3 +85,8 @@ MonoBehaviour:
   supplyAllyFuelThresholdPercent: 25
   supplyAllyAmmoThresholdPercent: 10
   supplyAllyHpThresholdPercent: 50
+  supplyHardDangerRadius: 1
+  supplySoftDangerRadius: 3
+  supplySoftThreatToleranceIdle: 1
+  supplySoftThreatToleranceServing: 2
+  returnToPickupAfterDisembark: 0

@@ -31,7 +31,7 @@ public sealed class AIShoppingManager {
         blockingUnit = null; if (construction == null) return false; var constructionCell = construction.CurrentCellPosition; constructionCell.z = 0; for (int i = 0; i < UnitManager.AllActive.Count; i++) { var unit = UnitManager.AllActive[i]; if (unit == null || unit.IsDead || unit.IsEmbarked || !unit.gameObject.activeInHierarchy) continue; var unitCell = unit.CurrentCellPosition; unitCell.z = 0; if (unitCell != constructionCell) continue; if (!IsBlockingUnitForConstructionShopping(unit)) continue; blockingUnit = unit; return true; } return false; }
     public static bool IsBlockingUnitForConstructionShopping(UnitManager unit) { if (unit == null) return false; if (unit.GetHeightLevel() != HeightLevel.Surface) return false; Domain d = unit.GetDomain(); return d == Domain.Land || d == Domain.Naval; }
 
-    private static void BuildDemands(Ctx ctx, AIShoppingTurnPlan plan) { var byCap = new Dictionary<AIPlanCapability, AIShoppingCapabilityDemand>(); var activePlans = ctx.snapshot.ActivePlans; if (activePlans == null) return; for (int i = 0; i < activePlans.Count; i++) { var p = activePlans[i]; if (p == null) continue; AddDemand(ctx.snapshot, plan, byCap, p, AIPlanCapability.Capture, Mathf.Max(p.DesiredCaptureCount, p.HasCaptureTarget ? CountOutstandingCaptureTargets(ctx.snapshot, p.Sector) : 0), CountAssignedRole(p, AIPlanRole.Capture)); AddDemand(ctx.snapshot, plan, byCap, p, AIPlanCapability.Escort, Mathf.Max(0, p.DesiredEscortCount), CountAssignedRole(p, AIPlanRole.Escort)); AddDemand(ctx.snapshot, plan, byCap, p, AIPlanCapability.FireSupport, Mathf.Max(0, p.DesiredArtilleryCount), CountAssignedRole(p, AIPlanRole.Artillery)); AddDemand(ctx.snapshot, plan, byCap, p, AIPlanCapability.Logistics, Mathf.Max(0, p.DesiredSupportCount), CountAssignedRole(p, AIPlanRole.Support)); } foreach (var kv in byCap) plan.capabilityDemands.Add(kv.Value); }
+    private static void BuildDemands(Ctx ctx, AIShoppingTurnPlan plan) { var byCap = new Dictionary<AIPlanCapability, AIShoppingCapabilityDemand>(); var activePlans = ctx.snapshot.ActivePlans; if (activePlans == null) return; Dictionary<string, int> assignedTransportByPlan = BuildAssignedTransportCoverageByPlan(ctx.snapshot, activePlans); for (int i = 0; i < activePlans.Count; i++) { var p = activePlans[i]; if (p == null) continue; string planKey = PlanKey(p); int assignedTransport = assignedTransportByPlan.TryGetValue(planKey, out int transportCount) ? transportCount : 0; AddDemand(ctx.snapshot, plan, byCap, p, AIPlanCapability.Capture, Mathf.Max(p.DesiredCaptureCount, p.HasCaptureTarget ? CountOutstandingCaptureTargets(ctx.snapshot, p.Sector) : 0), CountAssignedRole(p, AIPlanRole.Capture)); AddDemand(ctx.snapshot, plan, byCap, p, AIPlanCapability.Escort, Mathf.Max(0, p.DesiredEscortCount), CountAssignedRole(p, AIPlanRole.Escort)); AddDemand(ctx.snapshot, plan, byCap, p, AIPlanCapability.FireSupport, Mathf.Max(0, p.DesiredArtilleryCount), CountAssignedRole(p, AIPlanRole.Artillery)); AddDemand(ctx.snapshot, plan, byCap, p, AIPlanCapability.Transport, Mathf.Max(0, p.DesiredTransportCount), assignedTransport); AddDemand(ctx.snapshot, plan, byCap, p, AIPlanCapability.Logistics, Mathf.Max(0, p.DesiredSupportCount), CountAssignedRole(p, AIPlanRole.Support)); } foreach (var kv in byCap) plan.capabilityDemands.Add(kv.Value); }
     private static void AddDemand(AISnapshot snapshot, AIShoppingTurnPlan plan, Dictionary<AIPlanCapability, AIShoppingCapabilityDemand> byCap, AIPlanIntent intent, AIPlanCapability cap, int desired, int assigned) { int miss = Mathf.Max(0, desired - assigned); plan.planDemands.Add(new AIShoppingPlanDemand { planKey = PlanKey(intent), planLabel = PlanLabel(intent), sector = intent.Sector, capability = cap, desiredCount = Mathf.Max(0, desired), assignedCount = Mathf.Max(0, assigned), missingCount = miss, tacticalRiskScore = intent.TacticalRiskScore, hasCaptureTarget = intent.HasCaptureTarget }); if (!byCap.TryGetValue(cap, out var agg)) { agg = new AIShoppingCapabilityDemand { capability = cap }; byCap[cap] = agg; } agg.totalDemand += Mathf.Max(0, desired); agg.totalAssigned += Mathf.Max(0, assigned); agg.missingCount += miss; if (cap == AIPlanCapability.Capture && desired > 0 && assigned <= 0 && !IsProtectPlan(intent)) plan.hasCriticalCaptureGap = true; }
     private static void EvaluateUrgentLogisticsNeed(Ctx ctx, AIShoppingTurnPlan plan) {
         if (ctx == null || plan == null || ctx.snapshot == null || ctx.snapshot.FriendlyUnits == null) return;
@@ -140,11 +140,11 @@ public sealed class AIShoppingManager {
             && (lowAutonomyUnits > 0 || outOfAmmoUnits > 0 || frontlineCriticalUnits > 0 || availableSuppliers <= 0);
     }
     private static void BuildOrders(AIShoppingTurnPlan plan) { int remainingAdditionalSuppliers = plan != null ? Mathf.Max(0, plan.supplyChainAdditionalSuppliersNeeded) : 0; for (int i = 0; i < plan.planDemands.Count; i++) { var d = plan.planDemands[i]; if (d == null || d.missingCount <= 0) continue; int effectiveMissing = d.missingCount; if (d.capability == AIPlanCapability.Logistics) { effectiveMissing = Mathf.Min(effectiveMissing, remainingAdditionalSuppliers); remainingAdditionalSuppliers = Mathf.Max(0, remainingAdditionalSuppliers - effectiveMissing); } if (effectiveMissing <= 0) continue; plan.orders.Add(new AIShoppingOrder { orderId = d.planKey + "|" + d.capability, planKey = d.planKey, planLabel = d.planLabel, sector = d.sector, capability = d.capability, desiredCount = d.desiredCount, assignedCount = d.assignedCount, remainingCount = effectiveMissing, critical = d.capability == AIPlanCapability.Capture && d.hasCaptureTarget && d.assignedCount <= 0, priorityScore = Priority(d, plan), reason = string.Format("plan={0} capability={1} missing={2}/{3}", d.planLabel, d.capability, effectiveMissing, d.desiredCount) }); } plan.orders.Sort((a, b) => b.priorityScore.CompareTo(a.priorityScore)); }
-    private static int Priority(AIShoppingPlanDemand d, AIShoppingTurnPlan plan) { int p = d.capability == AIPlanCapability.Capture ? 40000 : d.capability == AIPlanCapability.Escort ? 30000 : d.capability == AIPlanCapability.FireSupport ? 20000 : 10000; if (d.capability == AIPlanCapability.Capture && d.hasCaptureTarget && d.assignedCount <= 0) p += 20000; if (d.capability == AIPlanCapability.Logistics && plan != null) p += Mathf.Min(plan.urgentLogisticsNeed ? 22000 : 0, 22000) + Mathf.Min(26000, Mathf.Max(0, plan.supplyChainPressureScore)); p += d.missingCount * 500 + Mathf.Max(0, d.tacticalRiskScore) * 10; return p; }
+    private static int Priority(AIShoppingPlanDemand d, AIShoppingTurnPlan plan) { int p = BasePriority(d.capability); if (d.capability == AIPlanCapability.Capture && d.hasCaptureTarget && d.assignedCount <= 0) p += 20000; if (d.capability == AIPlanCapability.Logistics && plan != null) p += Mathf.Min(plan.urgentLogisticsNeed ? 22000 : 0, 22000) + Mathf.Min(26000, Mathf.Max(0, plan.supplyChainPressureScore)); if (d.capability == AIPlanCapability.Transport) p += GetTransportDynamicPriority(d, plan); p += d.missingCount * 500 + Mathf.Max(0, d.tacticalRiskScore) * 10; return p; }
     private static void BuildCapabilityPressures(AIShoppingTurnPlan plan) {
         if (plan == null) return;
         plan.capabilityPressures.Clear();
-        AIPlanCapability[] capabilities = new[] { AIPlanCapability.Capture, AIPlanCapability.Escort, AIPlanCapability.FireSupport, AIPlanCapability.Logistics };
+        AIPlanCapability[] capabilities = new[] { AIPlanCapability.Capture, AIPlanCapability.Escort, AIPlanCapability.FireSupport, AIPlanCapability.Transport, AIPlanCapability.Logistics };
         for (int ci = 0; ci < capabilities.Length; ci++)
         {
             AIPlanCapability capability = capabilities[ci];
@@ -162,10 +162,14 @@ public sealed class AIShoppingManager {
                     criticalPressure += 20000;
                 if (capability == AIPlanCapability.Logistics)
                     dynamicPressure += Mathf.Min(plan.urgentLogisticsNeed ? 22000 : 0, 22000) + Mathf.Min(26000, Mathf.Max(0, plan.supplyChainPressureScore));
+                else if (capability == AIPlanCapability.Transport)
+                    dynamicPressure += GetTransportDynamicPriority(d, plan);
             }
 
             string criteria = capability == AIPlanCapability.Logistics
                 ? string.Format("orders={0} base={1} missing={2} risk={3} urgent={4} pressure={5}", orderCount, basePressure, missingPressure, riskPressure, plan.urgentLogisticsNeed ? 22000 : 0, Mathf.Min(26000, Mathf.Max(0, plan.supplyChainPressureScore)))
+                : capability == AIPlanCapability.Transport
+                    ? string.Format("orders={0} base={1} missing={2} risk={3} dynamic={4}", orderCount, basePressure, missingPressure, riskPressure, dynamicPressure)
                 : capability == AIPlanCapability.Capture
                     ? string.Format("orders={0} base={1} missing={2} risk={3} critical={4}", orderCount, basePressure, missingPressure, riskPressure, criticalPressure)
                     : string.Format("orders={0} base={1} missing={2} risk={3}", orderCount, basePressure, missingPressure, riskPressure);
@@ -183,7 +187,7 @@ public sealed class AIShoppingManager {
             });
         }
     }
-    private static int BasePriority(AIPlanCapability capability) { return capability == AIPlanCapability.Capture ? 40000 : capability == AIPlanCapability.Escort ? 30000 : capability == AIPlanCapability.FireSupport ? 20000 : 10000; }
+    private static int BasePriority(AIPlanCapability capability) { return capability == AIPlanCapability.Capture ? 40000 : capability == AIPlanCapability.Escort ? 30000 : capability == AIPlanCapability.FireSupport ? 20000 : capability == AIPlanCapability.Transport ? 14000 : 10000; }
     private static void EvaluateStrategicSave(Ctx ctx, AIShoppingTurnPlan plan) { if (ctx.mode == null || !ctx.mode.saveForNextRound) return; Candidate best = default; bool found = false; for (int i = 0; i < ctx.producers.Count; i++) { var info = ctx.producers[i]; if (info == null || info.Source == null) continue; if (!TryCollectStrategicCandidateForConstruction(ctx, plan, info.Source, out var candidate)) continue; if (!found || BetterStrategic(candidate, best)) { best = candidate; found = true; } } if (!found || best.turnsToAfford > 2) return; bool canForceImmediateTopBuy = plan.hasCriticalCaptureGap && best.affordableNow; if (!canForceImmediateTopBuy && !PassesMassFloor(plan, ctx.turn)) return; ctx.strategicSaveCandidate = best; ctx.strategicReservedMoney = Mathf.Max(0, best.cost - ctx.money); ctx.saveTargetMoney = Mathf.Max(ctx.saveTargetMoney, best.cost); if (best.affordableNow) { ctx.saveModeActive = false; ctx.saveModeReason = string.Empty; ctx.strategicSaveReason = Reason(plan, canForceImmediateTopBuy ? "strategic-ready-gap-override" : "strategic-ready", string.Format("alvo={0} | capability={1} | origem={2} | custo={3} | score={4}", best.unit != null ? best.unit.id : "(null)", best.capability, best.sourceLabel, best.cost, best.strategicScore)); } else { ctx.saveModeActive = true; ctx.saveModeReason = Reason(plan, "strategic-save", string.Format("alvo={0} | capability={1} | origem={2} | custo={3} | turns={4} | score={5}", best.unit != null ? best.unit.id : "(null)", best.capability, best.sourceLabel, best.cost, best.turnsToAfford, best.strategicScore)); ctx.strategicSaveReason = ctx.saveModeReason; } }
     private static bool TryCollectStrategicCandidateForConstruction(Ctx ctx, AIShoppingTurnPlan plan, ConstructionManager construction, out Candidate strategic) { strategic = default; bool found = false; for (int capabilityIndex = 0; capabilityIndex < 2; capabilityIndex++) { var capability = capabilityIndex == 0 ? AIPlanCapability.Escort : AIPlanCapability.FireSupport; var ladder = CollectCapabilityCandidatesFromGroups(construction, ctx.groups, capability, ctx.money, ctx.income); if (!HasRealLadderChoice(ladder)) continue; Candidate? baseline = PickBestAffordableCandidate(ladder); for (int i = 0; i < ladder.Count; i++) { var option = ladder[i]; if (option.unit == null) continue; if (baseline.HasValue && !IsMeaningfulUpgrade(baseline.Value, option)) continue; if (!baseline.HasValue && option.turnsToAfford > 2) continue; option.capability = capability; option.strategicScore = StrategicPressureScore(plan, capability) + UpgradeValueScore(baseline, option) - WaitPenaltyScore(option.turnsToAfford); if (option.strategicScore <= 0) continue; if (!found || BetterStrategic(option, strategic)) { strategic = option; found = true; } } } return found; }
     private static void Assign(Ctx ctx, AIShoppingTurnPlan plan) { bool massFloorAllowsFallback = !(plan.hasCriticalCaptureGap && !PassesMassFloor(plan, ctx.turn)); for (int i = 0; i < ctx.producers.Count; i++) { var info = ctx.producers[i]; if (info == null || info.Source == null) continue; var d = new AIShoppingConstructionDecision { construction = info.Source, constructionLabel = !string.IsNullOrWhiteSpace(info.DisplayName) ? info.DisplayName : info.Source.name, kind = AIShoppingDecisionKind.None, plannedReason = "sem decisao" }; if (TryGetBlockingShoppingOccupant(info.Source, out var blocker)) { d.kind = AIShoppingDecisionKind.Blocked; d.blockingUnit = blocker; d.plannedReason = string.Format("construcao bloqueada por {0}", blocker != null ? blocker.name : "(null)"); plan.constructionDecisions.Add(d); continue; } if (TryAssignStrategicPurchase(ctx, plan, info.Source, d) || TryAssignOverflowPressurePurchase(ctx, plan, info.Source, d) || TryAssignOrder(ctx, plan, info.Source, d) || TryAssignSaveFallback(ctx, plan, info.Source, d, massFloorAllowsFallback) || TryAssignComposition(ctx, plan, info.Source, d) || TryAssignFallback(ctx, plan, info.Source, d, massFloorAllowsFallback)) { plan.constructionDecisions.Add(d); continue; } d.kind = ctx.saveModeActive ? AIShoppingDecisionKind.Save : AIShoppingDecisionKind.NoOffer; d.plannedReason = ctx.saveModeActive ? ctx.saveModeReason : "nenhuma oferta acessivel no catalogo"; plan.constructionDecisions.Add(d); } }
@@ -200,17 +204,208 @@ public sealed class AIShoppingManager {
     private static Candidate? PickBestUnaffordableCandidate(List<Candidate> candidates) { if (candidates == null || candidates.Count <= 0) return null; bool found = false; Candidate best = default; for (int i = 0; i < candidates.Count; i++) { var candidate = candidates[i]; if (candidate.affordableNow) continue; if (!found || Better(candidate, best)) { best = candidate; found = true; } } return found ? best : (Candidate?)null; }
     private static bool HasRealLadderChoice(List<Candidate> ladder) { if (ladder == null) return false; string firstUnitId = null; int distinct = 0; for (int i = 0; i < ladder.Count; i++) { var unitId = ladder[i].unit != null ? ladder[i].unit.id : null; if (string.IsNullOrWhiteSpace(unitId)) continue; if (string.Equals(firstUnitId, unitId, StringComparison.OrdinalIgnoreCase)) continue; if (firstUnitId == null) firstUnitId = unitId; distinct++; if (distinct >= 2) return true; } return false; }
     private static bool IsMeaningfulUpgrade(Candidate buyNow, Candidate future) { if (future.unit == null) return false; if (buyNow.unit == null) return true; string buyId = buyNow.unit.id; string futureId = future.unit.id; if (!string.IsNullOrWhiteSpace(buyId) && !string.IsNullOrWhiteSpace(futureId) && string.Equals(buyId, futureId, StringComparison.OrdinalIgnoreCase)) return false; if (future.cost <= buyNow.cost) return false; return future.cost >= (buyNow.cost + 4000); }
-    private static int StrategicPressureScore(AIShoppingTurnPlan plan, AIPlanCapability capability) { if (plan == null) return 0; int missing = 0; int planCount = 0; int risk = 0; for (int i = 0; i < plan.planDemands.Count; i++) { var demand = plan.planDemands[i]; if (demand == null || demand.capability != capability || demand.missingCount <= 0) continue; missing += demand.missingCount; planCount++; risk += Mathf.Max(0, demand.tacticalRiskScore); } int capabilityBias = capability == AIPlanCapability.Escort ? 1500 : capability == AIPlanCapability.FireSupport ? 1000 : 0; return (missing * 12000) + (planCount * 5000) + (risk * 10) + capabilityBias; }
+    private static int StrategicPressureScore(AIShoppingTurnPlan plan, AIPlanCapability capability) { if (plan == null) return 0; int missing = 0; int planCount = 0; int risk = 0; for (int i = 0; i < plan.planDemands.Count; i++) { var demand = plan.planDemands[i]; if (demand == null || demand.capability != capability || demand.missingCount <= 0) continue; missing += demand.missingCount; planCount++; risk += Mathf.Max(0, demand.tacticalRiskScore); } int capabilityBias = capability == AIPlanCapability.Escort ? 1500 : capability == AIPlanCapability.FireSupport ? 1000 : capability == AIPlanCapability.Transport ? 250 : 0; int score = (missing * 12000) + (planCount * 5000) + (risk * 10) + capabilityBias; if (capability == AIPlanCapability.Transport && plan.hasCriticalCaptureGap) score = Mathf.RoundToInt(score * 0.5f); return score; }
     private static int UpgradeValueScore(Candidate? buyNow, Candidate future) { if (future.unit == null) return 0; if (!buyNow.HasValue || buyNow.Value.unit == null) return 12000 + Mathf.Max(0, future.cost / 2); int delta = Mathf.Max(0, future.cost - buyNow.Value.cost); return 6000 + (delta * 2); }
     private static int WaitPenaltyScore(int turnsToAfford) { return Mathf.Max(0, turnsToAfford) * 4000; }
     private static bool TryFindOverflowPressureCandidate(Ctx ctx, ConstructionManager construction, int money, out Candidate best) { best = default; if (ctx == null || construction == null) return false; bool found = false; int maxCatalogCost = 0; AIPlanCapability[] preferredCapabilities = new[] { AIPlanCapability.Escort, AIPlanCapability.FireSupport, AIPlanCapability.Assault }; for (int c = 0; c < preferredCapabilities.Length; c++) { var capability = preferredCapabilities[c]; var ladder = CollectCapabilityCandidatesFromGroups(construction, ctx.groups, capability, money, ctx.income); for (int i = 0; i < ladder.Count; i++) { var candidate = ladder[i]; if (candidate.unit == null) continue; candidate.capability = capability; maxCatalogCost = Mathf.Max(maxCatalogCost, candidate.cost); if (!candidate.affordableNow) continue; if (!found || BetterOverflow(candidate, best)) { best = candidate; found = true; } } } if (!found) return false; return money >= maxCatalogCost; }
     private static bool BetterOverflow(Candidate a, Candidate b) { int rankA = OverflowCapabilityPriority(a.capability); int rankB = OverflowCapabilityPriority(b.capability); if (rankA != rankB) return rankA < rankB; if (a.cost != b.cost) return a.cost > b.cost; if (a.ladderRank != b.ladderRank) return a.ladderRank < b.ladderRank; return a.offerIndex < b.offerIndex; }
-    private static int OverflowCapabilityPriority(AIPlanCapability capability) { return capability == AIPlanCapability.Escort ? 0 : capability == AIPlanCapability.FireSupport ? 1 : capability == AIPlanCapability.Assault ? 2 : 3; }
+    private static int OverflowCapabilityPriority(AIPlanCapability capability) { return capability == AIPlanCapability.Escort ? 0 : capability == AIPlanCapability.FireSupport ? 1 : capability == AIPlanCapability.Assault ? 2 : capability == AIPlanCapability.Transport ? 3 : 4; }
+    private static int GetTransportDynamicPriority(AIShoppingPlanDemand demand, AIShoppingTurnPlan plan)
+    {
+        if (demand == null || demand.capability != AIPlanCapability.Transport || demand.missingCount <= 0)
+            return 0;
+
+        int bonus = demand.missingCount * 1200;
+        bonus += Mathf.Min(3000, Mathf.Max(0, demand.tacticalRiskScore) * 8);
+
+        if (demand.desiredCount <= 1)
+            bonus = Mathf.RoundToInt(bonus * 0.75f);
+
+        if (plan != null && plan.hasCriticalCaptureGap)
+            bonus = Mathf.RoundToInt(bonus * 0.35f);
+
+        return Mathf.Clamp(bonus, 0, 6000);
+    }
     private static bool BetterStrategic(Candidate a, Candidate b) { if (a.strategicScore != b.strategicScore) return a.strategicScore > b.strategicScore; if (a.turnsToAfford != b.turnsToAfford) return a.turnsToAfford < b.turnsToAfford; if (a.cost != b.cost) return a.cost > b.cost; if (a.fromFallback != b.fromFallback) return !a.fromFallback; if (a.ladderRank != b.ladderRank) return a.ladderRank < b.ladderRank; return a.offerIndex < b.offerIndex; }
     private static bool ShouldSave(Candidate? bestNow, Candidate bestFuture, AIShoppingTurnPlan plan, bool defenseMode, int turn) { if (bestFuture.unit == null || bestFuture.affordableNow || !PassesMassFloor(plan, turn) || plan.hasCriticalCaptureGap) return false; var cap = FindCapabilityDemand(plan, AIPlanCapability.Capture); var esc = FindCapabilityDemand(plan, AIPlanCapability.Escort); if (cap != null && cap.missingCount > 0) return false; if (bestFuture.turnsToAfford > 2) return false; if (defenseMode && ((cap != null && cap.missingCount > 0) || (esc != null && esc.missingCount > 0))) return false; if (!bestNow.HasValue) return true; return Better(bestFuture, bestNow.Value); }
     private static bool PassesMassFloor(AIShoppingTurnPlan plan, int turn) { return EvaluateMassFloor(plan, turn, out _, out _); }
-    private static bool EvaluateMassFloor(AIShoppingTurnPlan plan, int turn, out int requiredUnits, out string reason) { requiredUnits = 0; reason = "mass-floor ok"; if (plan == null) { reason = "mass-floor: plan nulo"; return false; } int totalCap = 0, totalEsc = 0, totalFs = 0, totalLog = 0, missing = 0, activePlanCount = 0; for (int i = 0; i < plan.capabilityDemands.Count; i++) { var d = plan.capabilityDemands[i]; if (d == null) continue; missing += d.missingCount; if (d.capability == AIPlanCapability.Capture) totalCap += d.totalDemand; else if (d.capability == AIPlanCapability.Escort) totalEsc += d.totalDemand; else if (d.capability == AIPlanCapability.FireSupport) totalFs += d.totalDemand; else if (d.capability == AIPlanCapability.Logistics) totalLog += d.totalDemand; } for (int i = 0; i < plan.planDemands.Count; i++) { var demand = plan.planDemands[i]; if (demand != null && demand.missingCount > 0) activePlanCount++; } int structuralFloor = Mathf.Max(2 * Mathf.Max(1, plan.activeProductionBuildings), Mathf.Max(4, activePlanCount)); int captureEscortFloor = totalCap + Mathf.CeilToInt(totalEsc * 0.75f); int supportTailFloor = Mathf.CeilToInt((totalFs + totalLog) * 0.25f); requiredUnits = Mathf.Max(structuralFloor, captureEscortFloor + supportTailFloor); if (plan.hasCriticalCaptureGap) { reason = "state-based: critical capture gap ativo"; return false; } if (plan.friendlyUnitCount < structuralFloor) { reason = string.Format("state-based: unidades abaixo do minimo estrutural ({0}/{1})", plan.friendlyUnitCount, structuralFloor); return false; } if (plan.friendlyUnitCount < requiredUnits) { reason = string.Format("state-based: unidades abaixo do minimo dinamico ({0}/{1})", plan.friendlyUnitCount, requiredUnits); return false; } int missingLimit = Mathf.Max(2, Mathf.CeilToInt(activePlanCount * 0.75f)); int surplusUnits = Mathf.Max(0, plan.friendlyUnitCount - requiredUnits); int surplusThreshold = Mathf.Max(2, Mathf.CeilToInt(requiredUnits * 0.20f)); if (missing > missingLimit && surplusUnits < surplusThreshold) { reason = string.Format("state-based: faltas taticas acima do limite (missing={0}, limit={1}, surplus={2}/{3})", missing, missingLimit, surplusUnits, surplusThreshold); return false; } if (missing > missingLimit) { reason = string.Format("mass-floor ok: backlog tatico tolerado com folga de massa (missing={0}, limit={1}, surplus={2}/{3})", missing, missingLimit, surplusUnits, surplusThreshold); } return true; }
+    private static bool EvaluateMassFloor(AIShoppingTurnPlan plan, int turn, out int requiredUnits, out string reason) { requiredUnits = 0; reason = "mass-floor ok"; if (plan == null) { reason = "mass-floor: plan nulo"; return false; } int totalCap = 0, totalEsc = 0, totalFs = 0, totalTransport = 0, totalLog = 0, missing = 0, activePlanCount = 0; for (int i = 0; i < plan.capabilityDemands.Count; i++) { var d = plan.capabilityDemands[i]; if (d == null) continue; missing += d.missingCount; if (d.capability == AIPlanCapability.Capture) totalCap += d.totalDemand; else if (d.capability == AIPlanCapability.Escort) totalEsc += d.totalDemand; else if (d.capability == AIPlanCapability.FireSupport) totalFs += d.totalDemand; else if (d.capability == AIPlanCapability.Transport) totalTransport += d.totalDemand; else if (d.capability == AIPlanCapability.Logistics) totalLog += d.totalDemand; } for (int i = 0; i < plan.planDemands.Count; i++) { var demand = plan.planDemands[i]; if (demand != null && demand.missingCount > 0) activePlanCount++; } int structuralFloor = Mathf.Max(2 * Mathf.Max(1, plan.activeProductionBuildings), Mathf.Max(4, activePlanCount)); int captureEscortFloor = totalCap + Mathf.CeilToInt(totalEsc * 0.75f); int supportTailFloor = Mathf.CeilToInt((totalFs + totalTransport + totalLog) * 0.25f); requiredUnits = Mathf.Max(structuralFloor, captureEscortFloor + supportTailFloor); if (plan.hasCriticalCaptureGap) { reason = "state-based: critical capture gap ativo"; return false; } if (plan.friendlyUnitCount < structuralFloor) { reason = string.Format("state-based: unidades abaixo do minimo estrutural ({0}/{1})", plan.friendlyUnitCount, structuralFloor); return false; } if (plan.friendlyUnitCount < requiredUnits) { reason = string.Format("state-based: unidades abaixo do minimo dinamico ({0}/{1})", plan.friendlyUnitCount, requiredUnits); return false; } int missingLimit = Mathf.Max(2, Mathf.CeilToInt(activePlanCount * 0.75f)); int surplusUnits = Mathf.Max(0, plan.friendlyUnitCount - requiredUnits); int surplusThreshold = Mathf.Max(2, Mathf.CeilToInt(requiredUnits * 0.20f)); if (missing > missingLimit && surplusUnits < surplusThreshold) { reason = string.Format("state-based: faltas taticas acima do limite (missing={0}, limit={1}, surplus={2}/{3})", missing, missingLimit, surplusUnits, surplusThreshold); return false; } if (missing > missingLimit) { reason = string.Format("mass-floor ok: backlog tatico tolerado com folga de massa (missing={0}, limit={1}, surplus={2}/{3})", missing, missingLimit, surplusUnits, surplusThreshold); } return true; }
     private static AIShoppingCapabilityDemand FindCapabilityDemand(AIShoppingTurnPlan plan, AIPlanCapability capability) { for (int i = 0; i < plan.capabilityDemands.Count; i++) { var d = plan.capabilityDemands[i]; if (d != null && d.capability == capability) return d; } return null; }
+    private static bool HasTransportCapability(UnitData data) { if (data == null || !data.isTransporter || data.domain != Domain.Land) return false; return data.aiUnitProfile != null && data.aiUnitProfile.HasPlanCapability(AIPlanCapability.Transport, data); }
+    private static Dictionary<string, int> BuildAssignedTransportCoverageByPlan(AISnapshot snapshot, IReadOnlyList<AIPlanIntent> activePlans)
+    {
+        var coverage = new Dictionary<string, int>(StringComparer.Ordinal);
+        if (snapshot == null || activePlans == null || activePlans.Count == 0 || snapshot.FriendlyUnits == null)
+            return coverage;
+
+        var transporters = new List<UnitManager>();
+        for (int i = 0; i < snapshot.FriendlyUnits.Count; i++)
+        {
+            UnitManager unit = snapshot.FriendlyUnits[i];
+            if (unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || !HasTransportCapability(data))
+                continue;
+            transporters.Add(unit);
+        }
+
+        var consumedTransporters = new HashSet<int>();
+        for (int i = 0; i < activePlans.Count; i++)
+        {
+            AIPlanIntent plan = activePlans[i];
+            if (plan == null)
+                continue;
+
+            string planKey = PlanKey(plan);
+            int desired = Mathf.Max(0, plan.DesiredTransportCount);
+            if (desired <= 0)
+            {
+                coverage[planKey] = 0;
+                continue;
+            }
+
+            int assigned = 0;
+            while (assigned < desired)
+            {
+                UnitManager best = null;
+                int bestScore = int.MinValue;
+                for (int t = 0; t < transporters.Count; t++)
+                {
+                    UnitManager transporter = transporters[t];
+                    if (transporter == null || consumedTransporters.Contains(transporter.InstanceId))
+                        continue;
+
+                    int score = ScoreTransporterCoverageForPlan(snapshot, transporter, plan, planKey);
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        best = transporter;
+                    }
+                }
+
+                if (best == null || bestScore <= int.MinValue / 2)
+                    break;
+
+                consumedTransporters.Add(best.InstanceId);
+                assigned++;
+            }
+
+            coverage[planKey] = assigned;
+        }
+
+        return coverage;
+    }
+
+    private static int ScoreTransporterCoverageForPlan(AISnapshot snapshot, UnitManager transporter, AIPlanIntent plan, string planKey)
+    {
+        if (snapshot == null || transporter == null || plan == null || string.IsNullOrWhiteSpace(planKey))
+            return int.MinValue;
+
+        string committedPlanKey = GetTransporterCommittedPlanKey(snapshot, transporter);
+        if (!string.IsNullOrWhiteSpace(committedPlanKey) && !string.Equals(committedPlanKey, planKey, StringComparison.Ordinal))
+            return int.MinValue;
+
+        Vector3Int anchor = GetTransportPlanAnchorCell(plan);
+        Vector3Int transporterCell = transporter.CurrentCellPosition;
+        transporterCell.z = 0;
+        int distToAnchor = GetHexDistance(transporterCell, anchor);
+
+        int score = -distToAnchor * 100;
+        if (string.Equals(committedPlanKey, planKey, StringComparison.Ordinal))
+            score += 100000;
+        else if (HasAnyTransportPassenger(transporter))
+            return int.MinValue;
+        else if (HasAnyAvailableTransportSeat(transporter))
+            score += 1000;
+        else
+            return int.MinValue;
+
+        return score;
+    }
+
+    private static string GetTransporterCommittedPlanKey(AISnapshot snapshot, UnitManager transporter)
+    {
+        if (snapshot == null || transporter == null)
+            return null;
+
+        if (snapshot.UnitPlanAssignments != null
+            && snapshot.UnitPlanAssignments.TryGetValue(transporter.InstanceId, out AIPlanAssignment transporterAssignment)
+            && transporterAssignment != null
+            && transporterAssignment.Intent != null)
+        {
+            return AIPlanEvaluator.BuildPlanKey(transporterAssignment.Intent);
+        }
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
+        if (seats == null)
+            return null;
+
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            UnitManager passenger = seat != null ? seat.embarkedUnit : null;
+            if (passenger == null || !passenger.IsEmbarked)
+                continue;
+            if (snapshot.UnitPlanAssignments == null
+                || !snapshot.UnitPlanAssignments.TryGetValue(passenger.InstanceId, out AIPlanAssignment assignment)
+                || assignment == null
+                || assignment.Intent == null)
+                continue;
+
+            return AIPlanEvaluator.BuildPlanKey(assignment.Intent);
+        }
+
+        return null;
+    }
+
+    private static bool HasAnyTransportPassenger(UnitManager transporter)
+    {
+        if (transporter == null)
+            return false;
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
+        if (seats == null)
+            return false;
+
+        for (int i = 0; i < seats.Count; i++)
+        {
+            if (seats[i] != null && seats[i].embarkedUnit != null)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasAnyAvailableTransportSeat(UnitManager transporter)
+    {
+        if (transporter == null || !transporter.TryGetUnitData(out UnitData data) || data == null || data.transportSlots == null)
+            return false;
+
+        for (int i = 0; i < data.transportSlots.Count; i++)
+        {
+            UnitTransportSlotRule slot = data.transportSlots[i];
+            if (slot == null || slot.capacity <= 0)
+                continue;
+            if (transporter.GetOccupiedTransportSeatCountForSlot(i) < slot.capacity)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static int GetHexDistance(Vector3Int a, Vector3Int b)
+    {
+        a.z = 0;
+        b.z = 0;
+        return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
+    }
+
+    private static Vector3Int GetTransportPlanAnchorCell(AIPlanIntent plan)
+    {
+        Vector3Int anchor = plan != null && plan.HasCaptureTarget ? plan.CaptureTargetCell : Vector3Int.zero;
+        anchor.z = 0;
+        return anchor;
+    }
     private static bool HasLogisticsCapability(UnitManager unit, UnitData data) { if (unit == null || data == null) return false; if (data.isSupplier) return true; return data.aiUnitProfile != null && data.aiUnitProfile.HasPlanCapability(AIPlanCapability.Logistics, data); }
     private static bool IsCombatRelevantForSupplyPressure(UnitData data) { if (data == null || data.isSupplier) return false; return data.CombatClassification == UnitCombatClassification.Combatente || data.CombatClassification == UnitCombatClassification.Artilheiro || data.CombatClassification == UnitCombatClassification.Hibrido; }
     private static bool IsLowAutonomyForSupplyPressure(UnitManager unit) { if (unit == null) return false; int maxFuel = unit.GetMaxFuel(); if (maxFuel <= 0) return false; int threshold = Mathf.Max(5, Mathf.CeilToInt(maxFuel * 0.25f)); return unit.CurrentFuel <= threshold; }
@@ -250,12 +445,12 @@ public sealed class AIShoppingManager {
         return unit.GetMaxAmmo() > 0 && unit.CurrentAmmo <= 0;
     }
     private static bool IsFrontlineAssignedUnit(AISnapshot snapshot, UnitManager unit) { if (snapshot == null || unit == null || snapshot.UnitPlanAssignments == null) return false; if (!snapshot.UnitPlanAssignments.TryGetValue(unit.InstanceId, out AIPlanAssignment assignment) || assignment == null) return false; return assignment.Role == AIPlanRole.Capture || assignment.Role == AIPlanRole.Escort || assignment.Role == AIPlanRole.Artillery || assignment.Role == AIPlanRole.Assault; }
-    private static List<Candidate> CollectCapabilityCandidatesFromGroups(ConstructionManager construction, IReadOnlyList<AIDataGroup> groups, AIPlanCapability capability, int currentMoney, int incomePerTurn) { var list = new List<Candidate>(); if (construction == null || groups == null) return list; int ladderRank = 0; for (int g = 0; g < groups.Count; g++) { var group = groups[g]; if (group == null || group.specificUnits == null || group.specificUnits.Count == 0) continue; for (int i = 0; i < group.specificUnits.Count; i++) { var wanted = group.specificUnits[i]; if (wanted == null || string.IsNullOrWhiteSpace(wanted.id)) continue; if (!TryGetOfferIndex(construction, wanted, out int offerIndex, out UnitData offer) || offer == null) continue; if (offer.aiUnitProfile == null || !offer.aiUnitProfile.HasPlanCapability(capability, offer)) continue; int cost = Mathf.Max(0, offer.cost); list.Add(new Candidate { unit = offer, offerIndex = offerIndex, cost = cost, groupPriority = group.priority, affordableNow = cost <= currentMoney, turnsToAfford = TurnsToAfford(cost, currentMoney, incomePerTurn), ladderRank = ladderRank++, sourceLabel = "grupo:" + group.label, fromFallback = false }); } } return list; }
-    private static List<Candidate> CollectCapabilityCandidatesFromFallback(ConstructionManager construction, AIDataMode mode, AIPlanCapability capability, int currentMoney, int incomePerTurn) { var list = new List<Candidate>(); if (construction == null || mode == null || mode.fallbackUnits == null) return list; int ladderRank = 100000; for (int i = 0; i < mode.fallbackUnits.Count; i++) { var wanted = mode.fallbackUnits[i]; if (wanted == null || string.IsNullOrWhiteSpace(wanted.id)) continue; if (!TryGetOfferIndex(construction, wanted, out int offerIndex, out UnitData offer) || offer == null) continue; if (offer.aiUnitProfile == null || !offer.aiUnitProfile.HasPlanCapability(capability, offer)) continue; int cost = Mathf.Max(0, offer.cost); list.Add(new Candidate { unit = offer, offerIndex = offerIndex, cost = cost, groupPriority = int.MaxValue, affordableNow = cost <= currentMoney, turnsToAfford = TurnsToAfford(cost, currentMoney, incomePerTurn), ladderRank = ladderRank++, sourceLabel = "fallback", fromFallback = true }); } return list; }
+    private static List<Candidate> CollectCapabilityCandidatesFromGroups(ConstructionManager construction, IReadOnlyList<AIDataGroup> groups, AIPlanCapability capability, int currentMoney, int incomePerTurn) { var list = new List<Candidate>(); if (construction == null || groups == null) return list; int ladderRank = 0; for (int g = 0; g < groups.Count; g++) { var group = groups[g]; if (group == null || group.specificUnits == null || group.specificUnits.Count == 0) continue; for (int i = 0; i < group.specificUnits.Count; i++) { var wanted = group.specificUnits[i]; if (wanted == null || string.IsNullOrWhiteSpace(wanted.id)) continue; if (!TryGetOfferIndex(construction, wanted, out int offerIndex, out UnitData offer) || offer == null) continue; if (offer.aiUnitProfile == null || !offer.aiUnitProfile.HasPlanCapability(capability, offer)) continue; if (capability == AIPlanCapability.Transport && !HasTransportCapability(offer)) continue; int cost = Mathf.Max(0, offer.cost); list.Add(new Candidate { unit = offer, offerIndex = offerIndex, cost = cost, groupPriority = group.priority, affordableNow = cost <= currentMoney, turnsToAfford = TurnsToAfford(cost, currentMoney, incomePerTurn), ladderRank = ladderRank++, sourceLabel = "grupo:" + group.label, fromFallback = false }); } } return list; }
+    private static List<Candidate> CollectCapabilityCandidatesFromFallback(ConstructionManager construction, AIDataMode mode, AIPlanCapability capability, int currentMoney, int incomePerTurn) { var list = new List<Candidate>(); if (construction == null || mode == null || mode.fallbackUnits == null) return list; int ladderRank = 100000; for (int i = 0; i < mode.fallbackUnits.Count; i++) { var wanted = mode.fallbackUnits[i]; if (wanted == null || string.IsNullOrWhiteSpace(wanted.id)) continue; if (!TryGetOfferIndex(construction, wanted, out int offerIndex, out UnitData offer) || offer == null) continue; if (offer.aiUnitProfile == null || !offer.aiUnitProfile.HasPlanCapability(capability, offer)) continue; if (capability == AIPlanCapability.Transport && !HasTransportCapability(offer)) continue; int cost = Mathf.Max(0, offer.cost); list.Add(new Candidate { unit = offer, offerIndex = offerIndex, cost = cost, groupPriority = int.MaxValue, affordableNow = cost <= currentMoney, turnsToAfford = TurnsToAfford(cost, currentMoney, incomePerTurn), ladderRank = ladderRank++, sourceLabel = "fallback", fromFallback = true }); } return list; }
     private static bool Better(Candidate a, Candidate b) { if (a.fromFallback != b.fromFallback) return !a.fromFallback; if (a.ladderRank != b.ladderRank) return a.ladderRank < b.ladderRank; if (a.cost != b.cost) return a.cost > b.cost; if (a.groupPriority != b.groupPriority) return a.groupPriority < b.groupPriority; return a.offerIndex < b.offerIndex; }
     private static int TurnsToAfford(int cost, int currentMoney, int incomePerTurn) { if (currentMoney >= cost) return 0; return Mathf.CeilToInt((Mathf.Max(0, cost) - currentMoney) / (float)Mathf.Max(1, incomePerTurn)); }
     private static bool TryFindFutureGroupCandidate(Ctx ctx, AIDataGroup group, int currentMoney, out Candidate future) { future = default; if (ctx == null || group == null || group.specificUnits == null) return false; bool found = false; int groupIndex = 0; for (int i = 0; i < ctx.groups.Count; i++) { if (ctx.groups[i] == group) { groupIndex = i; break; } } for (int i = 0; i < ctx.producers.Count; i++) { var info = ctx.producers[i]; if (info == null || info.Source == null) continue; for (int u = 0; u < group.specificUnits.Count; u++) { var wanted = group.specificUnits[u]; if (wanted == null || string.IsNullOrWhiteSpace(wanted.id)) continue; if (!TryGetOfferIndex(info.Source, wanted, out int index, out UnitData offer) || offer == null) continue; int cost = Mathf.Max(0, offer.cost); var c = new Candidate { unit = offer, offerIndex = index, cost = cost, groupPriority = group.priority, affordableNow = cost <= currentMoney, turnsToAfford = TurnsToAfford(cost, currentMoney, ctx.income), ladderRank = (groupIndex * 1000) + u, sourceLabel = "grupo:" + group.label, fromFallback = false }; if (c.affordableNow) continue; if (!found || Better(c, future)) { future = c; found = true; } } } return found; }
-    private static string Reason(AIShoppingTurnPlan plan, string branch, string detail) { var cap = FindCapabilityDemand(plan, AIPlanCapability.Capture); var esc = FindCapabilityDemand(plan, AIPlanCapability.Escort); var fs = FindCapabilityDemand(plan, AIPlanCapability.FireSupport); var log = FindCapabilityDemand(plan, AIPlanCapability.Logistics); return string.Format("shopping-demand: CAP={0}/{1} ESC={2}/{3} FS={4}/{5} LOG={6}/{7} crit={8} units={9} prod={10} budget={11}/{12} strategic={13} | branch={14} | {15}", cap != null ? cap.missingCount : 0, cap != null ? cap.totalDemand : 0, esc != null ? esc.missingCount : 0, esc != null ? esc.totalDemand : 0, fs != null ? fs.missingCount : 0, fs != null ? fs.totalDemand : 0, log != null ? log.missingCount : 0, log != null ? log.totalDemand : 0, plan.hasCriticalCaptureGap ? 1 : 0, plan.friendlyUnitCount, plan.activeProductionBuildings, plan.budget.reservedMoney, plan.budget.totalMoney, plan.budget.strategicReserveMoney, branch, detail); }
+    private static string Reason(AIShoppingTurnPlan plan, string branch, string detail) { var cap = FindCapabilityDemand(plan, AIPlanCapability.Capture); var esc = FindCapabilityDemand(plan, AIPlanCapability.Escort); var fs = FindCapabilityDemand(plan, AIPlanCapability.FireSupport); var trn = FindCapabilityDemand(plan, AIPlanCapability.Transport); var log = FindCapabilityDemand(plan, AIPlanCapability.Logistics); return string.Format("shopping-demand: CAP={0}/{1} ESC={2}/{3} FS={4}/{5} TRN={6}/{7} LOG={8}/{9} crit={10} units={11} prod={12} budget={13}/{14} strategic={15} | branch={16} | {17}", cap != null ? cap.missingCount : 0, cap != null ? cap.totalDemand : 0, esc != null ? esc.missingCount : 0, esc != null ? esc.totalDemand : 0, fs != null ? fs.missingCount : 0, fs != null ? fs.totalDemand : 0, trn != null ? trn.missingCount : 0, trn != null ? trn.totalDemand : 0, log != null ? log.missingCount : 0, log != null ? log.totalDemand : 0, plan.hasCriticalCaptureGap ? 1 : 0, plan.friendlyUnitCount, plan.activeProductionBuildings, plan.budget.reservedMoney, plan.budget.totalMoney, plan.budget.strategicReserveMoney, branch, detail); }
     private static void TrackReserved(Ctx ctx, string unitId) { if (string.IsNullOrWhiteSpace(unitId)) return; if (!ctx.reservedUnitCounts.TryGetValue(unitId, out int c)) c = 0; ctx.reservedUnitCounts[unitId] = c + 1; }
     private static int GroupCount(Ctx ctx, AIDataGroup group) { int count = ctx.groupCounts.TryGetValue(group, out int c) ? c : 0; foreach (var kv in ctx.reservedUnitCounts) if (kv.Value > 0 && GroupContainsUnitId(group, kv.Key)) count += kv.Value; return count; }
     private static List<AIConstructionInfo> CollectProducers(AISnapshot snapshot, TeamId aiTeam) { var list = new List<AIConstructionInfo>(); if (snapshot == null || snapshot.KnownConstructions == null) return list; for (int i = 0; i < snapshot.KnownConstructions.Count; i++) { var info = snapshot.KnownConstructions[i]; if (info == null || info.Source == null) continue; if (info.TeamId != aiTeam || !info.CanProduceUnits) continue; list.Add(info); } list.Sort((a, b) => GetProducerPriority(a).CompareTo(GetProducerPriority(b))); return list; }
