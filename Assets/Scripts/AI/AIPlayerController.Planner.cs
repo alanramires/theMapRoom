@@ -43,6 +43,8 @@ public partial class AIPlayerController
         public int lastActivationTurn = -1;
         public int lastCompletionTurn = -1;
         public int tacticalRiskScore;
+        public int desiredTransportCount;
+        public int distToObjective = -1;
         public string selectionReason;
         public readonly List<AIPlanAssignment> assignments = new List<AIPlanAssignment>();
     }
@@ -187,11 +189,43 @@ public partial class AIPlayerController
                 planState.displayName = ResolveCatalogDisplayName(planState, activeIntent);
                 planState.selectionReason = activeIntent.SelectionReason ?? string.Empty;
                 planState.tacticalRiskScore = Mathf.Max(0, activeIntent.TacticalRiskScore);
+                planState.desiredTransportCount = Mathf.Max(0, activeIntent.DesiredTransportCount);
                 for (int a = 0; a < activeIntent.Assignments.Count; a++)
                 {
                     AIPlanAssignment assignment = activeIntent.Assignments[a];
                     if (assignment != null)
                         planState.assignments.Add(assignment);
+                }
+
+                // Distancia maxima entre qualquer capturer atribuido e o objetivo de captura.
+                // Usa o mais afastado (recem comprado, perto do HQ) — e esse que o APC deve buscar.
+                // Usa GetHexDistance com tilemap (caminho valido) para ser consistente com Sensor Medir.
+                planState.distToObjective = -1;
+                if (activeIntent.HasCaptureTarget && sectorClearSnapshot?.FriendlyUnits != null)
+                {
+                    Vector3Int capTarget = activeIntent.CaptureTargetCell;
+                    capTarget.z = 0;
+                    UnityEngine.Tilemaps.Tilemap boardMap = sectorClearSnapshot.BoardTilemap;
+                    for (int a = 0; a < activeIntent.Assignments.Count; a++)
+                    {
+                        AIPlanAssignment assignment = activeIntent.Assignments[a];
+                        if (assignment == null || assignment.Role != AIPlanRole.Capture)
+                            continue;
+                        for (int u = 0; u < sectorClearSnapshot.FriendlyUnits.Count; u++)
+                        {
+                            UnitManager unit = sectorClearSnapshot.FriendlyUnits[u];
+                            if (unit == null || unit.InstanceId != assignment.UnitInstanceId)
+                                continue;
+                            Vector3Int unitCell = unit.CurrentCellPosition;
+                            unitCell.z = 0;
+                            int dist = boardMap != null
+                                ? GetHexDistance(boardMap, unitCell, capTarget, 64)
+                                : GetHexDistance(unitCell, capTarget);
+                            if (dist != int.MaxValue && dist > planState.distToObjective)
+                                planState.distToObjective = dist;
+                            break;
+                        }
+                    }
                 }
             }
             else
@@ -200,6 +234,8 @@ public partial class AIPlayerController
                 planState.displayName = ResolveCatalogDisplayName(planState, null);
                 planState.selectionReason = string.Empty;
                 planState.tacticalRiskScore = 0;
+                planState.desiredTransportCount = 0;
+                planState.distToObjective = -1;
             }
 
             if (!planState.isFixedPlan && sectorInfoBySector.TryGetValue(planState.sector, out SectorManager.SectorInfo sectorInfo) && sectorInfo != null)
@@ -442,6 +478,8 @@ public partial class AIPlayerController
                     lastActivationTurn = planState.lastActivationTurn,
                     lastCompletionTurn = planState.lastCompletionTurn,
                     tacticalRiskScore = planState.tacticalRiskScore,
+                    desiredTransportCount = planState.desiredTransportCount,
+                    distToObjective = planState.distToObjective,
                     selectionReason = planState.selectionReason
                 };
 

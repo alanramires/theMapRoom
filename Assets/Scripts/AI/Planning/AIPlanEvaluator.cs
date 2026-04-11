@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 // Avaliador stateless do planner da IA.
 // Planos de setor sao selecionados como ativos a partir da intel publica do turno.
@@ -907,13 +908,13 @@ public static class AIPlanEvaluator
             if (intent == null)
                 continue;
 
-            intent.DesiredTransportCount = ComputeDesiredTransportCount(snapshot, intent, unitById);
+            intent.DesiredTransportCount = ComputeDesiredTransportCount(snapshot, intent, unitById, out int worthyCapturers);
             RefreshIntentDisplayTransportDemand(intent);
-            if (intent.DesiredTransportCount > 0)
+            if (worthyCapturers > 0)
             {
                 AddPlannerLog(
                     plannerLogs,
-                    $"transporte-demanda | plano={BuildPlanKey(intent)} setor={intent.Sector} desired={intent.DesiredTransportCount}");
+                    $"transporte-demanda | plano={BuildPlanKey(intent)} setor={intent.Sector} worthyCapturers={worthyCapturers} desired={intent.DesiredTransportCount}");
             }
         }
     }
@@ -921,12 +922,17 @@ public static class AIPlanEvaluator
     private static int ComputeDesiredTransportCount(
         AISnapshot snapshot,
         AIPlanIntent intent,
-        Dictionary<int, UnitManager> unitById)
+        Dictionary<int, UnitManager> unitById,
+        out int transportWorthyCapturers)
     {
+        transportWorthyCapturers = 0;
         if (snapshot == null || intent == null || unitById == null || intent.Assignments == null || intent.Assignments.Count == 0)
             return 0;
 
-        int transportWorthyCapturers = 0;
+        AIUnitProfile transporterProfile = FindAnyTransporterProfile(snapshot);
+        int minTransportDist = transporterProfile?.minTransportDistanceHexes ?? 8;
+        float worthwhileMult = transporterProfile?.transportWorthwhileMultiplier ?? 1.5f;
+
         for (int i = 0; i < intent.Assignments.Count; i++)
         {
             AIPlanAssignment assignment = intent.Assignments[i];
@@ -946,10 +952,10 @@ public static class AIPlanEvaluator
 
             Vector3Int unitCell = unit.CurrentCellPosition;
             unitCell.z = 0;
-            int distanceToTarget = GetHexDistance(unitCell, targetCell);
+            int distanceToTarget = GetHexDistance(snapshot.BoardTilemap, unitCell, targetCell);
             int move = Mathf.Max(1, unit.GetMovementRange());
-            int worthwhileThreshold = Mathf.CeilToInt(move * 1.5f);
-            if (distanceToTarget < 8 || distanceToTarget <= move || distanceToTarget <= worthwhileThreshold)
+            int worthwhileThreshold = Mathf.CeilToInt(move * worthwhileMult);
+            if (distanceToTarget < minTransportDist || distanceToTarget <= move || distanceToTarget <= worthwhileThreshold)
                 continue;
 
             transportWorthyCapturers++;
@@ -968,6 +974,20 @@ public static class AIPlanEvaluator
             return;
 
         intent.DisplayName = intent.DisplayName.Replace(token, $"TRN {Mathf.Max(0, intent.DesiredTransportCount)}");
+    }
+
+    private static AIUnitProfile FindAnyTransporterProfile(AISnapshot snapshot)
+    {
+        if (snapshot?.FriendlyUnits == null) return null;
+        for (int i = 0; i < snapshot.FriendlyUnits.Count; i++)
+        {
+            UnitManager u = snapshot.FriendlyUnits[i];
+            if (u == null || u.IsDead || !u.TryGetUnitData(out UnitData d) || d == null || !d.isTransporter)
+                continue;
+            if (d.aiUnitProfile != null)
+                return d.aiUnitProfile;
+        }
+        return null;
     }
 
     private static Dictionary<int, UnitManager> BuildFriendlyUnitById(AISnapshot snapshot)
@@ -2058,11 +2078,61 @@ public static class AIPlanEvaluator
         return Vector3Int.zero;
     }
 
-    private static int GetHexDistance(Vector3Int a, Vector3Int b)
+    // BFS com tilemap — mesma logica do Sensor Medir (caminho valido).
+    // Usar sempre que o tilemap estiver disponivel para garantir consistencia com a ferramenta de medicao.
+    private static int GetHexDistance(Tilemap tilemap, Vector3Int a, Vector3Int b, int maxDist = 64)
     {
+        if (tilemap == null)
+            return GetHexDistance(a, b);
+
         a.z = 0;
         b.z = 0;
-        return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
+        if (a == b)
+            return 0;
+
+        Queue<Vector3Int> frontier = new Queue<Vector3Int>();
+        Dictionary<Vector3Int, int> dist = new Dictionary<Vector3Int, int>();
+        frontier.Enqueue(a);
+        dist[a] = 0;
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+
+        while (frontier.Count > 0)
+        {
+            Vector3Int current = frontier.Dequeue();
+            int currentDist = dist[current];
+            if (currentDist >= maxDist)
+                continue;
+
+            UnitMovementPathRules.GetImmediateHexNeighbors(tilemap, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int neighbor = neighbors[i];
+                neighbor.z = 0;
+                if (dist.ContainsKey(neighbor))
+                    continue;
+                if (tilemap.GetTile(neighbor) == null)
+                    continue;
+
+                int newDist = currentDist + 1;
+                dist[neighbor] = newDist;
+                if (neighbor == b)
+                    return newDist;
+                frontier.Enqueue(neighbor);
+            }
+        }
+
+        return int.MaxValue;
+    }
+
+    private static int GetHexDistance(Vector3Int a, Vector3Int b)
+    {
+        // Distancia hex em coordenadas axiais: max(|dx|, |dy|, |dx+dy|).
+        // Fallback quando tilemap nao esta disponivel.
+        a.z = 0;
+        b.z = 0;
+        int dx = a.x - b.x;
+        int dy = a.y - b.y;
+        return Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy), Mathf.Abs(dx + dy));
     }
 
     private static void AddPlannerLog(List<string> plannerLogs, string message)

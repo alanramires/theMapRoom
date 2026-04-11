@@ -241,7 +241,9 @@ public class AIPlannerWindow : EditorWindow
             }
         }
 
-        return $" | CAP={capture} ESC={escort} ART={artillery} SUP={support}";
+        int dist = plan?.distToObjective ?? -1;
+        string distStr = dist >= 0 ? dist.ToString() : "?";
+        return $" | CAP={capture} ESC={escort} ART={artillery} TRA={plan?.desiredTransportCount ?? 0} SUP={support} DIST={distStr}";
     }
 
     private static void CountRole(string role, ref int capture, ref int escort, ref int artillery, ref int support)

@@ -135,6 +135,7 @@ public partial class AIPlayerController
         bool transportIdlePickupRequested = false;
         bool transportPickupObjectiveActive = false;
         bool transportCarryObjectiveActive = false;
+        bool transportRendezvousObjectiveActive = false;
         bool transportEmbarkNow = false;
         bool transportDisembarkNow = false;
         UnitManager transportTargetTransporter = null;
@@ -159,7 +160,7 @@ public partial class AIPlayerController
         HashSet<Vector3Int> preferredSupportCells = supportSafetyMode
             ? BuildFriendlySupportPreferenceCells(snapshot, unit, supportOnlyCombatAnchors: !isSupplierUnit)
             : null;
-        HashSet<Vector3Int> dangerPenaltyCells = supportSafetyMode
+        HashSet<Vector3Int> dangerPenaltyCells = (supportSafetyMode || isTransporterUnit)
             ? BuildEnemyDangerCells(snapshot, isSupplierUnit ? 2 : 1)
             : null;
 
@@ -243,8 +244,23 @@ public partial class AIPlayerController
                             transportCarryObjectiveActive = true;
                             break;
                         }
+                        if (TryGetTransportRendezvousObjective(unit, snapshot, out transportObjectiveCell, out transportObjectiveLabel))
+                        {
+                            transportRendezvousObjectiveActive = true;
+                            break;
+                        }
+                        if (TryGetTransportRoguePickupObjective(unit, snapshot, out transportObjectiveCell, out transportObjectiveLabel))
+                        {
+                            transportRendezvousObjectiveActive = true;
+                            break;
+                        }
                     }
                     else if (TryGetTransportPickupObjective(unit, snapshot, unitIntent, unitAssignment, plannedCaptureCell, out transportTargetTransporter, out transportObjectiveCell, out transportObjectiveLabel, out transportEmbarkNow))
+                    {
+                        transportPickupObjectiveActive = true;
+                        break;
+                    }
+                    else if (TryGetTransportPickupObjectiveForRogue(unit, snapshot, out transportTargetTransporter, out transportObjectiveCell, out transportObjectiveLabel, out transportEmbarkNow))
                     {
                         transportPickupObjectiveActive = true;
                         break;
@@ -463,14 +479,23 @@ public partial class AIPlayerController
         else if (isTransporterUnit
             && hasTransportBehavior
             && !HasAnyTransportedPassenger(unit)
-            && unitIntent == null
-            && unitAssignment == null)
+            && !transportCarryObjectiveActive
+            && !transportRendezvousObjectiveActive
+            && !mergeObjectiveActive
+            && !repairModeActive)
         {
             repositioningForDefense = true;
 
-            if (returnTransporterToPickupAfterDisembark
+            if (!defendMode && TryGetTransportForwardStagingCell(unit, snapshot, out Vector3Int transportForwardCell))
+            {
+                // Modo agressivo: avanca em direcao ao objetivo de captura mais relevante.
+                moveTarget = transportForwardCell;
+                moveTarget.z = 0;
+            }
+            else if (returnTransporterToPickupAfterDisembark
                 && TryGetTransportIdlePickupCell(unit, snapshot, occupiedByAllies, out Vector3Int transportParkingCell))
             {
+                // Modo conservador: aguarda na zona de embarque proxima a base.
                 transportIdlePickupRequested = true;
                 moveTarget = transportParkingCell;
                 moveTarget.z = 0;
@@ -920,7 +945,7 @@ public partial class AIPlayerController
         if (!foundDestination)
         {
             bool isIndirectUnit = stanceBehavior.repositionToFireRange;
-            if (transportPickupObjectiveActive || transportCarryObjectiveActive)
+            if (transportPickupObjectiveActive || transportCarryObjectiveActive || transportRendezvousObjectiveActive)
                 moveTarget = transportObjectiveCell;
             foundDestination = turnStateManager.TryGetBestReachableCellTowardsHexDistance(
                 snapshot.BoardTilemap,
@@ -931,7 +956,7 @@ public partial class AIPlayerController
                     ? stanceBehavior.prioritizeDpqAtBattle || engagingEnemy || isIndirectUnit
                     : stanceBehavior.prioritizeDpqDuringTravel,
                 unit: unit,
-                preferLongerAdvanceOnTie: supplyObjectiveActive || repairModeActive || captureObjectiveActive || supplierParkingRequested || (!defendMode && !intelCanFire),
+                preferLongerAdvanceOnTie: supplyObjectiveActive || repairModeActive || captureObjectiveActive || supplierParkingRequested || transportRendezvousObjectiveActive || (!defendMode && !intelCanFire),
                 preferShorterAdvanceOnTie: supplierPlanCohesionRequested,
                 penalizedCells: penalizedMovementCells,
                 preferredCells: preferredSupportCells);
@@ -1042,6 +1067,7 @@ public partial class AIPlayerController
             && !supplyObjectiveActive
             && !transportPickupObjectiveActive
             && !transportCarryObjectiveActive
+            && !transportRendezvousObjectiveActive
             && !captureObjectiveActive
             && turnStateManager.CanUnitCaptureFromCurrentPosition(
                 unit,
@@ -1198,6 +1224,22 @@ public partial class AIPlayerController
             }
         }
 
+        // Post-move rescan para transportador (rendezvous, carry ou idle): aproveita inimigos atacaveis
+        // da posicao atual sem cancelar o objetivo de transporte.
+        if (!merged && !supplied && !transferred && !captured && !engagingEnemy
+            && (transportRendezvousObjectiveActive || transportCarryObjectiveActive || transportIdlePickupRequested)
+            && stanceBehavior.engageNearestEnemies)
+        {
+            bool postMoveCanFire = turnStateManager.CanUnitFireAtAnyTargetFromCurrentPosition(unit, out UnitManager postMoveTransportTarget);
+            if (postMoveCanFire && postMoveTransportTarget != null)
+            {
+                targetEnemy = postMoveTransportTarget;
+                engagingEnemy = true;
+                if (aiLog)
+                    Debug.Log($"{T(aiTeam, 2)} [intel] transporte: oportunidade de ataque pos-movimento em {postMoveTransportTarget.name}");
+            }
+        }
+
         // Revalida o alvo apos o movimento real: cohesion ou bloqueio podem ter levado a unidade
         // para longe do alvo calculado no scoring (que assumia movimento em direcao a ele).
         if (engagingEnemy && targetEnemy != null)
@@ -1265,7 +1307,9 @@ public partial class AIPlayerController
                                     ? targetEnemy.name
                                     : (planCohesionActive
                                         ? $"coesao em {planCohesionLabel}"
-                                        : (transportIdlePickupRequested ? "aguarda pickup" : "reposicionar")))))));
+                                        : (transportRendezvousObjectiveActive
+                                            ? $"rendezvous transporte: {transportObjectiveLabel}"
+                                            : (transportIdlePickupRequested ? "aguarda pickup" : "reposicionar"))))))));
 
             if (intelCanFire && intelFireTarget != null)
                 Debug.Log($"{T(aiTeam, 2)} [intel] {unit.name} @ {FormatCellLC(unitCell)} | PODE MIRAR {intelFireTarget.name} @ {FormatCellLC(intelFireTarget.CurrentCellPosition)} | acao: {detailLabel} | alocado: {planAllocationLabel}");
@@ -1297,6 +1341,8 @@ public partial class AIPlayerController
                 outcome = "avancou para suprir";
             else if (planCohesionActive)
                 outcome = "manteve coesao do plano";
+            else if (transportRendezvousObjectiveActive)
+                outcome = "rendezvous com passageiro";
             else if (transportIdlePickupRequested)
                 outcome = "aguardou pickup";
             else

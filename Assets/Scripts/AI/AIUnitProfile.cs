@@ -147,6 +147,15 @@ public class AIUnitProfile : ScriptableObject
     [Header("Transporter")]
     [Tooltip("Se true, ao terminar um desembarque e ficar vazio, o transportador prefere voltar para a zona de pickup/base em vez de permanecer avancado.")]
     public bool returnToPickupAfterDisembark = true;
+    [Tooltip("Raio em hexes ao redor da construcao/HQ onde o transportador aguarda passageiros enquanto ocioso.")]
+    [Range(1, 6)]
+    public int pickupZoneRadius = 2;
+    [Tooltip("Distancia minima (hexes) entre o passageiro e o alvo de captura para o transporte ser considerado valido. Abaixo disso a unidade vai a pe.")]
+    [Range(3, 20)]
+    public int minTransportDistanceHexes = 8;
+    [Tooltip("Multiplicador do alcance de movimento do passageiro para o segundo threshold de transporte. O passageiro so embarca se dist > ceil(move * multiplier).")]
+    [Range(1f, 4f)]
+    public float transportWorthwhileMultiplier = 1.5f;
 
     private static readonly AIUnitStanceBehavior _emptyBehavior = new AIUnitStanceBehavior();
 

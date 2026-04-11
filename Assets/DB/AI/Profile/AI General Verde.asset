@@ -17,6 +17,6 @@ MonoBehaviour:
   aiData: {fileID: 11400000, guid: bc5996fe89b55014ba48b38a208135a3, type: 2}
   behaviorProfile: {fileID: 11400000, guid: b5e95d22d0338f3449826727c3b4ca55, type: 2}
   stagnationTurns: 2
-  maxVariablePlans: 3
+  maxVariablePlans: 4
   maxBackupPlans: 2
   minimumRangeForDefensePlan: 2

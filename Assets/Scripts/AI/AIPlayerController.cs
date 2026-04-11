@@ -67,6 +67,8 @@ public partial class AIPlayerController : MonoBehaviour
         public int lastActivationTurn;
         public int lastCompletionTurn;
         public int tacticalRiskScore;
+        public int desiredTransportCount;
+        public int distToObjective;
         public string selectionReason;
         public List<AssignmentDebugView> assignments = new List<AssignmentDebugView>();
     }

@@ -170,6 +170,8 @@ public partial class AIPlayerController
 
         int bought = 0;
         int savingFallbackPurchases = 0;
+        int totalSpent = 0;
+        int initialMoney = matchController != null ? matchController.GetActualMoney(aiTeam) : 0;
         AIShoppingManager shoppingManager = new AIShoppingManager();
         for (int i = 0; i < snapshot.KnownConstructions.Count; i++)
         {
@@ -193,12 +195,14 @@ public partial class AIPlayerController
             if (!shoppingPlan.TryGetDecision(info.Source, out AIShoppingConstructionDecision shoppingDecision) || shoppingDecision == null)
             {
                 if (aiLog) Debug.Log($"{T(aiTeam, 3)} sem compra planejada em {info.DisplayName} (saldo={currentMoney}) | motivo: sem decisao central de shopping");
+                Debug.Log($"[BUDGET] {info.DisplayName}: sem-decisao | saldo={currentMoney} | strategic={shoppingPlan.strategicSaveActive} alvo={shoppingPlan.strategicSaveUnitId} custo={shoppingPlan.strategicSaveCost}");
                 continue;
             }
 
             if (shoppingDecision.kind != AIShoppingDecisionKind.Buy)
             {
                 if (aiLog) Debug.Log($"{T(aiTeam, 3)} sem compra planejada em {info.DisplayName} (saldo={currentMoney}) | motivo: {shoppingDecision.plannedReason}");
+                Debug.Log($"[BUDGET] {info.DisplayName}: {shoppingDecision.kind} | saldo={currentMoney} | motivo={shoppingDecision.plannedReason}");
                 continue;
             }
 
@@ -259,14 +263,21 @@ public partial class AIPlayerController
             if (success)
             {
                 bought++;
+                totalSpent += shoppingDecision.cost;
                 if (usedSavingFallback)
                     savingFallbackPurchases++;
+            }
+            else
+            {
+                Debug.Log($"[BUDGET] {info.DisplayName}: compra-falhou | unidade={plannedUnitId} | custo={shoppingDecision.cost} | saldo={currentMoney}");
             }
 
             yield return StartCoroutine(turnStateManager.WaitUntilAutomatedNeutralReady(2f));
         }
 
+        int finalMoney = matchController != null ? matchController.GetActualMoney(aiTeam) : 0;
         if (aiLog) Debug.Log($"{T(aiTeam, 3)} total comprado: {bought}");
+        Debug.Log($"[BUDGET] resumo | inicial={initialMoney} gasto={totalSpent} final={finalMoney} nao-gasto={initialMoney - totalSpent} compras={bought}");
     }
 
     private static bool TryGetBlockingShoppingOccupant(ConstructionManager construction, out UnitManager blockingUnit)

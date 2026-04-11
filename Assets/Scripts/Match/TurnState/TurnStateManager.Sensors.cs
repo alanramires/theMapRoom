@@ -128,7 +128,7 @@ public partial class TurnStateManager
         if (!canMerge)
             cachedPodeFundirReason = string.IsNullOrWhiteSpace(cachedPodeFundirReason) ? "Sem candidatos para fusao." : cachedPodeFundirReason;
         availableSensorActionCodes.Remove('F');
-        if (canMerge)
+        if (cachedPodeFundirTargets.Count > 0)
             availableSensorActionCodes.Add('F');
 
         bool canSupply = PodeSuprirSensor.CollectOptions(

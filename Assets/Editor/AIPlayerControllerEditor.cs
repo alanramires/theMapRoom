@@ -522,7 +522,9 @@ public class AIPlayerControllerEditor : Editor
         string displayName = GetStringRelative(planElement, "displayName");
         string status = GetStringRelative(planElement, "status");
         int risk = GetIntRelative(planElement, "tacticalRiskScore");
-        string roleSuffix = BuildAssignmentCountSuffix(planElement != null ? planElement.FindPropertyRelative("assignments") : null);
+        int desiredTransport = planElement != null ? planElement.FindPropertyRelative("desiredTransportCount")?.intValue ?? 0 : 0;
+        int distToObjective = planElement != null ? planElement.FindPropertyRelative("distToObjective")?.intValue ?? -1 : -1;
+        string roleSuffix = BuildAssignmentCountSuffix(planElement != null ? planElement.FindPropertyRelative("assignments") : null, desiredTransport, distToObjective);
         string riskSuffix = risk > 0 ? $" | risk={risk}" : string.Empty;
         string suffix = roleSuffix + riskSuffix;
         if (!string.IsNullOrWhiteSpace(displayName) && !string.IsNullOrWhiteSpace(status))
@@ -532,7 +534,7 @@ public class AIPlayerControllerEditor : Editor
         return $"Plan {index}{suffix}";
     }
 
-    private static string BuildAssignmentCountSuffix(SerializedProperty assignmentsProp)
+    private static string BuildAssignmentCountSuffix(SerializedProperty assignmentsProp, int desiredTransport = 0, int distToObjective = -1)
     {
         int capture = 0;
         int escort = 0;
@@ -549,7 +551,8 @@ public class AIPlayerControllerEditor : Editor
             }
         }
 
-        return $" | CAP={capture} ESC={escort} ART={artillery} SUP={support}";
+        string distStr = distToObjective >= 0 ? distToObjective.ToString() : "?";
+        return $" | CAP={capture} ESC={escort} ART={artillery} TRA={desiredTransport} SUP={support} DIST={distStr}";
     }
 
     private static void CountRole(string role, ref int capture, ref int escort, ref int artillery, ref int support)

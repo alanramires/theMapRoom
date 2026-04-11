@@ -24,7 +24,7 @@ public class AICombatHpSimulatorWindow : EditorWindow
     private Vector2 scroll;
     private string report = "Ready.";
 
-    [MenuItem("Tools/AI Combat/AI Combat HP Simulator")]
+    [MenuItem("Tools/AI/AI Combat HP Simulator")]
     private static void OpenWindow()
     {
         GetWindow<AICombatHpSimulatorWindow>("AI Combat HP Simulator");

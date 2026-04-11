@@ -90,3 +90,6 @@ MonoBehaviour:
   supplySoftThreatToleranceIdle: 1
   supplySoftThreatToleranceServing: 2
   returnToPickupAfterDisembark: 1
+  pickupZoneRadius: 2
+  minTransportDistanceHexes: 7
+  transportWorthwhileMultiplier: 2
