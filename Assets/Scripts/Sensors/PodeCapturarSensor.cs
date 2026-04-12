@@ -66,10 +66,9 @@ public static class PodeCapturarSensor
             return false;
         }
 
-        AIUnitProfile profile = unitData.aiUnitProfile;
-        if (profile == null || !profile.HasSensorInStance(AIStance.Attack, AIUnitSensorKind.Capture))
+        if (unitData.roles == null || !unitData.roles.Contains(UnitRole.Capturador))
         {
-            reason = "Perfil da unidade nao permite captura.";
+            reason = "Apenas unidades com o papel de Capturador podem capturar.";
             return false;
         }
 

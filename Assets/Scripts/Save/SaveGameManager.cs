@@ -46,7 +46,7 @@ public class SaveGameManager : MonoBehaviour
     
     [SerializeField] private PlanningManager planningManager;
     
-    [SerializeField] private AIPlayerController aiPlayerController;
+    // [SerializeField] private AIPlayerController aiPlayerController;
 
     [Header("Quick Save/Load")]
     [SerializeField] private bool enableHotkeys = true;
@@ -1179,11 +1179,11 @@ public class SaveGameManager : MonoBehaviour
             stage = "restore-ai-planner";
             double restoreAiPlannerStartMs = PerfNowMs();
             LogLoadPerf(loadedSlot, "restore_ai_planner.begin", restoreAiPlannerStartMs, restoreAiPlannerStartMs - routineStartMs);
-            if (aiPlayerController != null)
+            /*if (aiPlayerController != null)
             {
                 aiPlayerController.RestorePlannerSaveData(data.aiPlannerState);
                 aiPlayerController.DebugLogRestoredPlannerSnapshots("post-restore");
-            }
+            }*/
             LogLoadPerf(loadedSlot, "restore_ai_planner.end", restoreAiPlannerStartMs, PerfNowMs() - routineStartMs);
 
             stage = "apply-conservative-fog-visibility";
@@ -1390,8 +1390,8 @@ public class SaveGameManager : MonoBehaviour
                 data.fogUnitVisibilityByCacheIndex);
         }
 
-        if (aiPlayerController != null)
-            data.aiPlannerState = aiPlayerController.BuildPlannerSaveData();
+        // if (aiPlayerController != null)
+        //     data.aiPlannerState = aiPlayerController.BuildPlannerSaveData();
 
         return data;
     }
@@ -1936,8 +1936,8 @@ public class SaveGameManager : MonoBehaviour
         if (planningManager == null)
             planningManager = FindInActiveScene<PlanningManager>();
         
-        if (aiPlayerController == null)
-            aiPlayerController = FindInActiveScene<AIPlayerController>();
+        // if (aiPlayerController == null)
+        //     aiPlayerController = FindInActiveScene<AIPlayerController>();
     }
 
     private static double PerfNowMs()

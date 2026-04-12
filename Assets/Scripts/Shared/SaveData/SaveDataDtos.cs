@@ -114,7 +114,7 @@ public class UnitSaveData
     public string aiAssignedPlanKey;
     public string aiAssignedPlanName;
     public string aiAssignedPlanBadge;
-    public int aiAssignedPlanRole = (int)AIPlanRole.Assault;
+    public int aiAssignedPlanRole = 0;
     public bool aiAssignedPlanBadgeVisible;
     public List<int> embarkedWeaponAmmo = new List<int>();
     public List<RuntimeSupplySaveData> embarkedSupplies = new List<RuntimeSupplySaveData>();

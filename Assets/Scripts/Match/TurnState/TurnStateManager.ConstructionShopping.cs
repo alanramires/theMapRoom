@@ -602,26 +602,7 @@ public partial class TurnStateManager
                 if (mode.domain != Domain.Naval || mode.heightLevel != HeightLevel.Surface)
                     continue;
 
-                bool hasTeamVariant = false;
-                Sprite teamVariant = null;
-                switch (team)
-                {
-                    case TeamId.Green:
-                        teamVariant = mode.spriteGreen;
-                        break;
-                    case TeamId.Red:
-                        teamVariant = mode.spriteRed;
-                        break;
-                    case TeamId.Blue:
-                        teamVariant = mode.spriteBlue;
-                        break;
-                    case TeamId.Yellow:
-                        teamVariant = mode.spriteYellow;
-                        break;
-                }
-
-                hasTeamVariant = teamVariant != null;
-                Sprite surfacedSprite = hasTeamVariant ? teamVariant : mode.spriteDefault;
+                Sprite surfacedSprite = TeamUtils.GetTeamSprite(mode, team);
                 if (surfacedSprite != null)
                 {
                     return surfacedSprite;
@@ -631,27 +612,7 @@ public partial class TurnStateManager
             }
         }
 
-        Sprite teamSprite = null;
-        switch (team)
-        {
-            case TeamId.Green:
-                teamSprite = unit.spriteGreen;
-                break;
-            case TeamId.Red:
-                teamSprite = unit.spriteRed;
-                break;
-            case TeamId.Blue:
-                teamSprite = unit.spriteBlue;
-                break;
-            case TeamId.Yellow:
-                teamSprite = unit.spriteYellow;
-                break;
-        }
-
-        if (teamSprite != null)
-            return teamSprite;
-
-        return unit.spriteDefault;
+        return TeamUtils.GetTeamSprite(unit, team, preferTransportSprite: false);
     }
 
     private void LogConstructionShoppingPanel()

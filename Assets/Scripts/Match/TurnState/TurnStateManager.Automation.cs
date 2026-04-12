@@ -96,10 +96,10 @@ public partial class TurnStateManager
 
     public bool TryExecuteAutomatedAttackFirstTarget()
     {
-        return TryExecuteAutomatedAttackBestTarget(null, null);
+        return TryExecuteAutomatedAttackBestTarget(null);
     }
 
-    public bool TryExecuteAutomatedAttackBestTarget(UnitManager preferredTarget = null, AIUnitStanceBehavior attackerProfile = null)
+    public bool TryExecuteAutomatedAttackBestTarget(UnitManager preferredTarget = null)
     {
         if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
             return false;
@@ -138,7 +138,7 @@ public partial class TurnStateManager
                     selectedUnit,
                     target,
                     distance,
-                    attackerProfile,
+                    // attackerProfile,
                     out int candidateScore))
             {
                 continue;
@@ -219,7 +219,7 @@ public partial class TurnStateManager
         UnitManager attacker,
         UnitManager target,
         int distance,
-        AIUnitStanceBehavior attackerProfile,
+        // AIUnitStanceBehavior attackerProfile,
         out int score)
     {
         score = int.MinValue;
@@ -257,14 +257,14 @@ public partial class TurnStateManager
         float receivedPercent = attackerMaxHp > 0 ? (received * 100f) / attackerMaxHp : 0f;
 
         int targetPreferenceBonus = 0;
-        if (attackerProfile != null)
+        /*if (attackerProfile != null)
         {
             targetPreferenceBonus = attackerProfile.GetTargetPreferenceBonus(targetPriority);
 
             if (!attackerProfile.PassesAttackThresholds(dealtPercent, receivedPercent, surviveGate))
                 return false;
         }
-        else
+        else*/
         {
             bool dealtGate = dealt >= Mathf.CeilToInt(targetMaxHp * 0.10f);
             bool receivedGate = received <= Mathf.FloorToInt(attackerMaxHp * 0.50f);
@@ -326,7 +326,7 @@ public partial class TurnStateManager
                     selectedUnit,
                     target,
                     distance,
-                    null,
+                    // null,
                     out int candidateScore))
             {
                 continue;

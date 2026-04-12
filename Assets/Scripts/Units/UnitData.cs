@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -88,13 +88,9 @@ public class UnitData : ScriptableObject
     [TextArea]
     public string description;
 
-    [Header("Visuals")]
     [FormerlySerializedAs("sprite")]
     public Sprite spriteDefault;
-    public Sprite spriteGreen;
-    public Sprite spriteRed;
-    public Sprite spriteBlue;
-    public Sprite spriteYellow;
+    public List<TeamVariantSprite> teamVariantSprites = new List<TeamVariantSprite>();
 
     [Header("Attributes")]
     public int maxHP = 10;
@@ -109,9 +105,11 @@ public class UnitData : ScriptableObject
     public MilitaryForce militaryForce = MilitaryForce.Army;
     public GameUnitClass unitClass = GameUnitClass.Infantry;
     [SerializeField] private UnitCombatClassification combatClassification = UnitCombatClassification.Civil;
+    [Header("Roles")]
+    [Tooltip("Papeis assumidos por esta unidade (ex: Capturador, Assalto, Transporte).")]
+    public List<UnitRole> roles = new List<UnitRole>();
+    
     [Header("AI")]
-    [Tooltip("Perfil de decisao da unidade para a IA (pipeline de sensores).")]
-    public AIUnitProfile aiUnitProfile;
     [Tooltip("Preferencia de alvo por classe (usada pelo gate de Target Preference no AI Unit Profile).")]
     public List<AITargetPreferenceByClassRule> aiTargetPreferenceByClass = new List<AITargetPreferenceByClassRule>();
     [Header("Elite")]
@@ -145,7 +143,6 @@ public class UnitData : ScriptableObject
     public List<SkillData> stealthSkills = new List<SkillData>();
     [Tooltip("Versao por dominio/altura das stealth skills. Se houver match na camada atual, esta lista tem prioridade.")]
     public List<UnitStealthSkillRule> stealthSkillRules = new List<UnitStealthSkillRule>();
-    [Header("Autonomy")]
     [Tooltip("Perfil de autonomia usado pelas regras da skill Operational Autonomy.")]
     public AutonomyData autonomyData;
     [Header("Embarked Weapons")]
@@ -357,9 +354,29 @@ public class UnitData : ScriptableObject
 
     public bool IsAircraft()
     {
-        return unitClass == GameUnitClass.Jet ||
-               unitClass == GameUnitClass.Plane ||
-               unitClass == GameUnitClass.Helicopter;
+        if (domain == Domain.Air) return true;
+        if (aditionalDomainsAllowed != null)
+        {
+            for (int i = 0; i < aditionalDomainsAllowed.Count; i++)
+            {
+                if (aditionalDomainsAllowed[i].domain == Domain.Air) return true;
+            }
+        }
+        return false;
+    }
+
+    public bool IsMaritime()
+    {
+        if (domain == Domain.Naval || domain == Domain.Submarine) return true;
+        if (aditionalDomainsAllowed != null)
+        {
+            for (int i = 0; i < aditionalDomainsAllowed.Count; i++)
+            {
+                var d = aditionalDomainsAllowed[i].domain;
+                if (d == Domain.Naval || d == Domain.Submarine) return true;
+            }
+        }
+        return false;
     }
 
     public bool IsWeaponUseBlockedAt(Domain currentDomain, HeightLevel currentHeightLevel)

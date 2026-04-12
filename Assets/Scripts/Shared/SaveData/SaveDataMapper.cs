@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -162,7 +162,7 @@ public static class SaveDataMapper
             aiAssignedPlanKey = unit.AIAssignedPlanKey,
             aiAssignedPlanName = unit.AIAssignedPlanName,
             aiAssignedPlanBadge = unit.AIAssignedPlanBadge,
-            aiAssignedPlanRole = (int)unit.AIAssignedPlanRole,
+            aiAssignedPlanRole = 0, // (int)unit.AIAssignedPlanRole,
             aiAssignedPlanBadgeVisible = unit.AIAssignedPlanBadgeVisible
         };
 
@@ -233,7 +233,7 @@ public static class SaveDataMapper
         ApplySavedEmbarkedSupplies(unit, saved.embarkedSupplies);
 
         if (saved.aiHasAssignedPlan)
-            unit.SetAIAssignedPlan(saved.aiAssignedPlanKey, saved.aiAssignedPlanName, saved.aiAssignedPlanBadge, (AIPlanRole)saved.aiAssignedPlanRole, saved.aiAssignedPlanBadgeVisible);
+            unit.SetAIAssignedPlan(saved.aiAssignedPlanKey, saved.aiAssignedPlanName, saved.aiAssignedPlanBadge, saved.aiAssignedPlanRole, saved.aiAssignedPlanBadgeVisible);
         else
             unit.ClearAIAssignedPlan();
     }

@@ -1,4 +1,12 @@
+using System.Collections.Generic;
 using UnityEngine;
+
+[System.Serializable]
+public struct TeamVariantSprite
+{
+    public TeamId teamId;
+    public Sprite sprite;
+}
 
 public enum TeamId
 {
@@ -52,26 +60,28 @@ public static class TeamUtils
         if (preferTransportSprite && data.spriteTransport != null)
             return data.spriteTransport;
 
-        switch (teamId)
+        if (data.teamVariantSprites != null)
         {
-            case TeamId.Green: return data.spriteGreen != null ? data.spriteGreen : data.spriteDefault;
-            case TeamId.Red: return data.spriteRed != null ? data.spriteRed : data.spriteDefault;
-            case TeamId.Blue: return data.spriteBlue != null ? data.spriteBlue : data.spriteDefault;
-            case TeamId.Yellow: return data.spriteYellow != null ? data.spriteYellow : data.spriteDefault;
-            default: return data.spriteDefault;
+            for (int i = 0; i < data.teamVariantSprites.Count; i++)
+            {
+                if (data.teamVariantSprites[i].teamId == teamId && data.teamVariantSprites[i].sprite != null)
+                    return data.teamVariantSprites[i].sprite;
+            }
         }
+        return data.spriteDefault;
     }
 
     public static Sprite GetTeamSprite(UnitLayerMode mode, TeamId teamId, Sprite fallbackDefault = null)
     {
-        switch (teamId)
+        if (mode.teamVariantSprites != null)
         {
-            case TeamId.Green: return mode.spriteGreen != null ? mode.spriteGreen : (mode.spriteDefault != null ? mode.spriteDefault : fallbackDefault);
-            case TeamId.Red: return mode.spriteRed != null ? mode.spriteRed : (mode.spriteDefault != null ? mode.spriteDefault : fallbackDefault);
-            case TeamId.Blue: return mode.spriteBlue != null ? mode.spriteBlue : (mode.spriteDefault != null ? mode.spriteDefault : fallbackDefault);
-            case TeamId.Yellow: return mode.spriteYellow != null ? mode.spriteYellow : (mode.spriteDefault != null ? mode.spriteDefault : fallbackDefault);
-            default: return mode.spriteDefault != null ? mode.spriteDefault : fallbackDefault;
+            for (int i = 0; i < mode.teamVariantSprites.Count; i++)
+            {
+                if (mode.teamVariantSprites[i].teamId == teamId && mode.teamVariantSprites[i].sprite != null)
+                    return mode.teamVariantSprites[i].sprite;
+            }
         }
+        return mode.spriteDefault != null ? mode.spriteDefault : fallbackDefault;
     }
 
     public static Sprite GetTeamSprite(ConstructionData data, TeamId teamId)

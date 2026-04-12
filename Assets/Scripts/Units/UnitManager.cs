@@ -113,10 +113,10 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private string aiAssignedPlanKey = string.Empty;
     [SerializeField] private string aiAssignedPlanName = string.Empty;
     [SerializeField] private string aiAssignedPlanBadge = string.Empty;
-    [SerializeField] private AIPlanRole aiAssignedPlanRole = AIPlanRole.Assault;
+    [SerializeField] private int aiAssignedPlanRole = 0;
     [SerializeField] private bool aiAssignedPlanBadgeVisible;
     [SerializeField] private bool aiHasStance;
-    [SerializeField] private AIStance aiStance = AIStance.Attack;
+    [SerializeField] private int aiStance = 0;
     [SerializeField] private bool aiStanceVisible;
     private Sprite aiStanceIcon;
     [SerializeField] private bool aiMaintenanceActive;
@@ -171,7 +171,7 @@ public class UnitManager : MonoBehaviour
     public string AIAssignedPlanKey => aiAssignedPlanKey ?? string.Empty;
     public string AIAssignedPlanName => aiAssignedPlanName ?? string.Empty;
     public string AIAssignedPlanBadge => aiAssignedPlanBadge ?? string.Empty;
-    public AIPlanRole AIAssignedPlanRole => aiAssignedPlanRole;
+    // public AIPlanRole AIAssignedPlanRole => aiAssignedPlanRole;
     public bool AIAssignedPlanBadgeVisible => aiAssignedPlanBadgeVisible;
     public UnitCombatClassification CombatClassification
         => TryGetUnitData(out UnitData data) && data != null
@@ -184,7 +184,7 @@ public class UnitManager : MonoBehaviour
     }
 
     public void SetAIForcedToRepair(bool value) => aiForcedToRepair = value;
-    public void SetAIAssignedPlan(string planKey, string planName, string badge, AIPlanRole role, bool badgeVisible)
+    public void SetAIAssignedPlan(string planKey, string planName, string badge, int role, bool badgeVisible)
     {
         aiHasAssignedPlan = !string.IsNullOrWhiteSpace(planKey) || !string.IsNullOrWhiteSpace(planName);
         aiAssignedPlanKey = planKey ?? string.Empty;
@@ -201,12 +201,12 @@ public class UnitManager : MonoBehaviour
         aiAssignedPlanKey = string.Empty;
         aiAssignedPlanName = string.Empty;
         aiAssignedPlanBadge = string.Empty;
-        aiAssignedPlanRole = AIPlanRole.Assault;
+        aiAssignedPlanRole = 0;
         aiAssignedPlanBadgeVisible = false;
         RefreshAIAssignedPlanBadge();
     }
 
-    public void SetAIStance(AIStance stance, Sprite icon = null, bool visible = false)
+    public void SetAIStance(int stance, Sprite icon = null, bool visible = false)
     {
         aiHasStance = true;
         aiStance = stance;
@@ -218,7 +218,7 @@ public class UnitManager : MonoBehaviour
     public void ClearAIStance()
     {
         aiHasStance = false;
-        aiStance = AIStance.Attack;
+        aiStance = 0;
         aiStanceVisible = false;
         aiStanceIcon = null;
         RefreshAIAssignedPlanBadge();
