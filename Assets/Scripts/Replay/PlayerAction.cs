@@ -28,6 +28,9 @@ public class PlayerAction
     public bool HasMoveFrom;
     public Vector3Int MoveTo;
     public bool HasMoveTo;
+    // Caminho real de movimento (células em ordem). Quando preenchido, o cursor de replay
+    // segue este caminho em vez de calcular um BFS geográfico livre.
+    public List<Vector3Int> MovementPath;
     public UnitLayerMode LayerBefore;
     public UnitLayerMode LayerAfter;
 

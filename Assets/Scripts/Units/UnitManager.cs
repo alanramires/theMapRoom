@@ -25,6 +25,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private bool hasActed;
     [SerializeField, HideInInspector] private bool hasFiredThisTurn;
     [SerializeField] private bool receivedSuppliesThisTurn;
+    [SerializeField] private bool isUnderRepair;
     [SerializeField] private bool hasMerged;
     [SerializeField, HideInInspector] private bool aiForcedToRepair;
     [SerializeField] private int mergedWhenTurn = -1;
@@ -150,6 +151,7 @@ public class UnitManager : MonoBehaviour
     public bool HasActed => hasActed;
     public bool HasFiredThisTurn => hasFiredThisTurn;
     public bool ReceivedSuppliesThisTurn => receivedSuppliesThisTurn;
+    public bool IsUnderRepair => isUnderRepair;
     public bool IsEmbarked => isEmbarked;
     public bool IsEmbarkedVisualPreviewActive => embarkedVisualPreviewDepth > 0;
     public bool IsSelected => isSelected;
@@ -184,6 +186,7 @@ public class UnitManager : MonoBehaviour
     }
 
     public void SetAIForcedToRepair(bool value) => aiForcedToRepair = value;
+    public void SetIsUnderRepair(bool value) => isUnderRepair = value;
     public void SetAIAssignedPlan(string planKey, string planName, string badge, int role, bool badgeVisible)
     {
         aiHasAssignedPlan = !string.IsNullOrWhiteSpace(planKey) || !string.IsNullOrWhiteSpace(planName);
@@ -2650,7 +2653,7 @@ public class UnitManager : MonoBehaviour
 
         // Stance icon is independent of the plan badge.
         unitHud.SetStanceIcon(aiHasStance && aiStanceVisible ? aiStanceIcon : null);
-        unitHud.SetMaintenanceIconVisible(aiMaintenanceActive && aiStanceVisible);
+        unitHud.SetMaintenanceIconVisible(aiMaintenanceActive);
 
         // Plan badge: only show when a plan is actually assigned.
         bool hasPlan = aiHasAssignedPlan && aiAssignedPlanBadgeVisible

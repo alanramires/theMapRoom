@@ -32,11 +32,14 @@ MonoBehaviour:
   unitClass: 2
   combatClassification: 0
   roles: 02000000
+  aiInitiative: 0
   aiTargetPreferenceByClass:
   - targetClass: 6
     priority: 2
   - targetClass: 4
     priority: 1
+  aiSensorPriority: 0000000002000000
+  prioritizeDpqAtBattle: 1
   eliteLevel: 0
   combatModifiers:
   - {fileID: 11400000, guid: cae64e256d2ce3b459cbc9e546b4402c, type: 2}

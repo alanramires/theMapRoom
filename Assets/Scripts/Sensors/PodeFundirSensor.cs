@@ -57,7 +57,8 @@ public static class PodeFundirSensor
         int remainingMovementPoints,
         List<PodeFundirOption> output,
         out string reason,
-        List<PodeFundirInvalidOption> invalidOutput = null)
+        List<PodeFundirInvalidOption> invalidOutput = null,
+        Vector3Int? fromCell = null)
     {
         reason = string.Empty;
         bool sensorLogs = SensorLogGate.IsPodeFundirEnabled();
@@ -98,7 +99,7 @@ public static class PodeFundirSensor
             return false;
         }
 
-        Vector3Int origin = selectedUnit.CurrentCellPosition;
+        Vector3Int origin = fromCell.HasValue ? fromCell.Value : selectedUnit.CurrentCellPosition;
         origin.z = 0;
         List<Vector3Int> neighbors = new List<Vector3Int>(6);
         UnitMovementPathRules.GetImmediateHexNeighbors(map, origin, neighbors);

@@ -110,12 +110,33 @@ public class UnitData : ScriptableObject
     public List<UnitRole> roles = new List<UnitRole>();
     
     [Header("AI")]
+    [Tooltip("Ordem de iniciativa na fila de ação da IA. Priority age primeiro, Retreat age por último. Desempate: mais HP age antes.")]
+    public AiInitiative aiInitiative = AiInitiative.Medium;
     [Tooltip("Preferencia de alvo por classe (usada pelo gate de Target Preference no AI Unit Profile).")]
     public List<AITargetPreferenceByClassRule> aiTargetPreferenceByClass = new List<AITargetPreferenceByClassRule>();
 
     [Header("Combat Behavior")]
+    [Tooltip("Ordem de prioridade das acoes que a IA executara com esta unidade. A IA tenta cada entrada em sequencia e executa a primeira que for possivel.")]
+    public List<AISensorPriority> aiSensorPriority = new List<AISensorPriority> { AISensorPriority.Attack, AISensorPriority.Reposition };
     [Tooltip("Ao se posicionar para combate (inimigo engajado), prioriza celulas DPQ favoraveis (construcoes, estruturas) em vez de avancar em linha reta.")]
     public bool prioritizeDpqAtBattle = false;
+
+    [Header("Repair Decision")]
+    // Decision data lives here (UnitData). Runtime state lives in UnitManager.isUnderRepair.
+    // --- Trigger (activate isUnderRepair) ---
+    [Tooltip("TRIGGER — Enter repair mode when HP is at or below this value (1–9). Set 0 to disable.")]
+    [Range(0, 9)] public int repairTriggerHpBelow = 0;
+    [Tooltip("TRIGGER — Enter repair mode when operational autonomy remaining is at or below this percentage (0–100). Set 0 to disable.")]
+    [Range(0, 100)] public int repairTriggerAutonomyPct = 0;
+    [Tooltip("TRIGGER — Enable ammo as a repair trigger.")]
+    public bool repairTriggerAmmoEnabled = false;
+    [Tooltip("TRIGGER — Enter repair mode when any embarked weapon ammo is at or below this percentage (0 = completely out of ammo). Only evaluated when the toggle above is enabled.")]
+    [Range(0, 100)] public int repairTriggerAmmoPct = 0;
+    // --- Recovery (deactivate isUnderRepair) ---
+    [Tooltip("RECOVERY — Leave repair mode when HP reaches this value or above AND autonomy/ammo (if they were triggers) are also above their thresholds.")]
+    [Range(1, 10)] public int repairRecoverHpAbove = 8;
+    [Tooltip("BEHAVIOR — While under repair, attempt to fuse with a damaged allied unit of the same type nearby instead of waiting passively.")]
+    public bool fuseWhileInRepair = false;
 
     [Header("Elite")]
     [Tooltip("Nivel de elite da unidade (padrao: 0).")]

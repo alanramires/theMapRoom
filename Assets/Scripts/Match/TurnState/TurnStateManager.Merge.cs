@@ -1672,6 +1672,49 @@ public partial class TurnStateManager
         }
     }
 
+    public int GetMergeCurrentIndexForReplay() => mergeSelectedCandidateIndex;
+
+    public int FindMergeTargetIndexForReplay(string targetInstanceId)
+    {
+        if (cursorState != CursorState.Fundindo) return -1;
+        EnsureMergeSensorSnapshot();
+        RebuildMergeCandidateEntries();
+        for (int i = 0; i < mergeCandidateEntries.Count; i++)
+        {
+            MergeCandidateEntry entry = mergeCandidateEntries[i];
+            if (entry == null || entry.unit == null || !entry.isValid) continue;
+            if (entry.unit.InstanceId.ToString() == targetInstanceId) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Avança um passo na lista de candidatos de fusão, movendo o cursor com som.
+    /// Chame repetidamente com sensorListNavDelay entre chamadas para emular navegação humana.
+    /// </summary>
+    public bool StepMergeForReplay()
+    {
+        if (cursorState != CursorState.Fundindo) return false;
+        if (scannerPromptStep != ScannerPromptStep.MergeParticipantSelect) return false;
+        EnsureMergeSensorSnapshot();
+        RebuildMergeCandidateEntries();
+        if (mergeCandidateEntries.Count <= 1) return false;
+
+        int current = mergeSelectedCandidateIndex;
+        if (current < 0) current = FindFirstValidMergeCandidateIndex();
+        if (current < 0) return false;
+
+        int next = FindNextValidMergeCandidateIndex(current, 1);
+        if (next < 0) return false;
+
+        mergeSelectedCandidateIndex = next;
+        MergeCandidateEntry entry = mergeCandidateEntries[next];
+        Vector3Int nextCell = entry.cell;
+        nextCell.z = 0;
+        cursorController?.SetCell(nextCell, playMoveSfx: true);
+        return true;
+    }
+
     public bool TryQueueAutomatedMergeReplayOrder(string targetInstanceId)
     {
         if (cursorState != CursorState.Fundindo || selectedUnit == null)

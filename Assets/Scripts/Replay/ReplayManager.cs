@@ -259,7 +259,7 @@ public class ReplayManager : MonoBehaviour
         yield return MoveCursorToCellWithTravel(targetCursorCell);
     }
 
-    private IEnumerator MoveCursorToCellWithTravel(Vector3Int targetCell)
+    private IEnumerator MoveCursorToCellWithTravel(Vector3Int targetCell, List<Vector3Int> precomputedPath = null)
     {
         if (cursorController == null)
             yield break;
@@ -272,7 +272,12 @@ public class ReplayManager : MonoBehaviour
             yield break;
         }
 
-        List<Vector3Int> travelPath = BuildReplayCursorTravelPath(fromCell, toCell);
+        // Usa o caminho real de movimento quando disponível (ex: gerado pela IA via CalcularCaminhosValidos).
+        // Isso garante que o cursor segue o mesmo trajeto que a unidade percorrerá,
+        // sem atravessar hexes inválidos ou unidades inimigas.
+        List<Vector3Int> travelPath = (precomputedPath != null && precomputedPath.Count > 0)
+            ? precomputedPath
+            : BuildReplayCursorTravelPath(fromCell, toCell);
         if (travelPath == null || travelPath.Count <= 0)
             travelPath = new List<Vector3Int> { toCell };
 
@@ -465,7 +470,7 @@ public class ReplayManager : MonoBehaviour
             destinationCell = NormalizeCell(destinationCell);
             ReplayLog($"[Replay][CursorTravel] phase=unit-batch-destination current={FormatReplayCell(NormalizeCell(cursorController.CurrentCell))} destination={FormatReplayCell(destinationCell)}");
             if (!hasOriginCell || destinationCell != originCell)
-                yield return MoveCursorToCellWithTravel(destinationCell);
+                yield return MoveCursorToCellWithTravel(destinationCell, action.MovementPath);
             ExecuteReplayConfirmInput();
             yield return null;
             yield return WaitForSensorsReadyAfterMovementConfirmEvent();
@@ -766,6 +771,20 @@ public class ReplayManager : MonoBehaviour
                 continue;
             }
 
+            // Ciclar pela lista até o candidato escolhido, emulando navegação humana com cursor.mp3
+            int mergeTargetIndex = turnStateManager.FindMergeTargetIndexForReplay(step.TargetInstanceId);
+            if (mergeTargetIndex >= 0)
+            {
+                int guard = 0;
+                while (turnStateManager.GetMergeCurrentIndexForReplay() != mergeTargetIndex && guard++ < 64)
+                {
+                    turnStateManager.StepMergeForReplay();
+                    float navDelay = GetEffectiveSensorListNavDelay();
+                    if (navDelay > 0f)
+                        yield return new WaitForSecondsRealtime(navDelay);
+                }
+            }
+
             if (!turnStateManager.TryQueueAutomatedMergeReplayOrder(step.TargetInstanceId))
             {
                 ReplayLogWarning($"[Replay][Merge] Could not queue merge participant id={step.TargetInstanceId} label={step.Label ?? "(null)"}");
@@ -923,7 +942,9 @@ public class ReplayManager : MonoBehaviour
                 }
 
                 // Entra no confirm step — exibe linha de mira/preview
+                // Equivale ao primeiro confirm humano (MirandoCycleTarget → MirandoConfirmTarget)
                 turnStateManager.EnterMirandoConfirmStepForReplay();
+                cursorController?.PlayConfirmSfx();
 
                 // Pausa para o jogador ver o preview antes de confirmar
                 float previewDelay = GetEffectiveBeforeConfirmDelay();
@@ -1813,7 +1834,7 @@ public class ReplayManager : MonoBehaviour
             currentBuffer.TurnNumber = matchController.CurrentTurn;
     }
 
-    public void UpdateCurrentBufferMovement(Vector3Int moveFrom, Vector3Int moveTo, UnitLayerMode layerBefore, UnitLayerMode layerAfter)
+    public void UpdateCurrentBufferMovement(Vector3Int moveFrom, Vector3Int moveTo, UnitLayerMode layerBefore, UnitLayerMode layerAfter, List<Vector3Int> movementPath = null)
     {
         if (isReplaying)
             return;
@@ -1825,6 +1846,7 @@ public class ReplayManager : MonoBehaviour
         currentBuffer.LayerBefore = layerBefore;
         currentBuffer.LayerAfter = layerAfter;
         currentBuffer.ActionType = PlayerActionType.UnitAction;
+        currentBuffer.MovementPath = movementPath;
     }
 
     public void UpdateCurrentBufferSensorAction(SensorActionType sensorAction, string subStepLabel = null)

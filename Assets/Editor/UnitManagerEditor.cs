@@ -28,6 +28,7 @@ public class UnitManagerEditor : Editor
     private SerializedProperty embarkedResourcesRuntimeProp;
     private SerializedProperty embarkedServicesRuntimeProp;
     private SerializedProperty hasActedProp;
+    private SerializedProperty isUnderRepairProp;
     private SerializedProperty hasFiredThisTurnProp;
     private SerializedProperty receivedSuppliesThisTurnProp;
     private SerializedProperty hasMergedProp;
@@ -80,6 +81,7 @@ public class UnitManagerEditor : Editor
         embarkedResourcesRuntimeProp = serializedObject.FindProperty("embarkedResourcesRuntime");
         embarkedServicesRuntimeProp = serializedObject.FindProperty("embarkedServicesRuntime");
         hasActedProp = serializedObject.FindProperty("hasActed");
+        isUnderRepairProp = serializedObject.FindProperty("isUnderRepair");
         hasFiredThisTurnProp = serializedObject.FindProperty("hasFiredThisTurn");
         receivedSuppliesThisTurnProp = serializedObject.FindProperty("receivedSuppliesThisTurn");
         hasMergedProp = serializedObject.FindProperty("hasMerged");
@@ -129,17 +131,16 @@ public class UnitManagerEditor : Editor
         EditorGUILayout.PropertyField(snapToCellCenterProp, new GUIContent("Snap To Cell Center"));
         EditorGUILayout.PropertyField(autoSnapWhenMovedInEditorProp, new GUIContent("Auto Snap When Moved In Editor"));
         EditorGUILayout.PropertyField(currentCellPositionProp, new GUIContent("Cell Position"));
-        using (new EditorGUILayout.HorizontalScope())
+        EditorGUILayout.PropertyField(hasActedProp, new GUIContent("Has Acted"));
+        if (isUnderRepairProp != null)
+            EditorGUILayout.PropertyField(isUnderRepairProp, new GUIContent("Is Under Repair"));
+        if (hasFiredThisTurnProp != null)
         {
-            EditorGUILayout.PropertyField(hasActedProp, new GUIContent("Has Acted"));
-            if (hasFiredThisTurnProp != null)
-            {
-                using (new EditorGUI.DisabledScope(true))
-                    EditorGUILayout.PropertyField(hasFiredThisTurnProp, new GUIContent("Has Fired (Runtime)"));
-            }
-            if (receivedSuppliesThisTurnProp != null)
-                EditorGUILayout.PropertyField(receivedSuppliesThisTurnProp, new GUIContent("Received Supply This Turn"));
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.PropertyField(hasFiredThisTurnProp, new GUIContent("Has Fired (Runtime)"));
         }
+        if (receivedSuppliesThisTurnProp != null)
+            EditorGUILayout.PropertyField(receivedSuppliesThisTurnProp, new GUIContent("Received Supply This Turn"));
         using (new EditorGUI.DisabledScope(true))
         {
             EditorGUILayout.IntField("Movement Max", Mathf.Max(0, unit.MaxMovementPoints));

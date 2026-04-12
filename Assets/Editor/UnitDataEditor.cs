@@ -80,7 +80,16 @@ public class UnitDataEditor : Editor
             "teamVariantSprites",
             "bazookaTargetPriority",
             "aiUnitProfile",
+            "aiInitiative",
             "aiTargetPreferenceByClass",
+            "aiSensorPriority",
+            "prioritizeDpqAtBattle",
+            "repairTriggerHpBelow",
+            "repairTriggerAutonomyPct",
+            "repairTriggerAmmoEnabled",
+            "repairTriggerAmmoPct",
+            "repairRecoverHpAbove",
+            "fuseWhileInRepair",
             "stealthSkills",
             "stealthSkillRules",
             "useExplicitPreferredAirHeight",
@@ -110,6 +119,8 @@ public class UnitDataEditor : Editor
             "passengersCanDisembarkAndGoesToConstructions",
             "transportSlots");
         EditorGUILayout.Space();
+        DrawAISection();
+        EditorGUILayout.Space();
         DrawWeaponsSection();
         EditorGUILayout.Space();
         DrawTransportSection();
@@ -117,6 +128,65 @@ public class UnitDataEditor : Editor
         DrawLogisticsSection();
 
         serializedObject.ApplyModifiedProperties();
+    }
+
+    private void DrawAISection()
+    {
+        EditorGUILayout.LabelField("AI", EditorStyles.boldLabel);
+
+        SerializedProperty aiInitiativeProp      = serializedObject.FindProperty("aiInitiative");
+        SerializedProperty aiTargetPrefProp      = serializedObject.FindProperty("aiTargetPreferenceByClass");
+        SerializedProperty sensorPriorityProp    = serializedObject.FindProperty("aiSensorPriority");
+        SerializedProperty dpqAtBattleProp       = serializedObject.FindProperty("prioritizeDpqAtBattle");
+
+        if (aiInitiativeProp != null)
+            EditorGUILayout.PropertyField(aiInitiativeProp, new GUIContent("Ai Initiative"));
+        if (aiTargetPrefProp != null)
+            DrawAiTargetPreferenceByClassSection(aiTargetPrefProp);
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Combat Behavior", EditorStyles.boldLabel);
+        if (sensorPriorityProp != null)
+            EditorGUILayout.PropertyField(sensorPriorityProp, new GUIContent("Ai Sensor Priority"), includeChildren: true);
+        if (dpqAtBattleProp != null)
+            EditorGUILayout.PropertyField(dpqAtBattleProp, new GUIContent("Prioritize Dpq At Battle"));
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Repair Decision", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Runtime flag 'isUnderRepair' lives on UnitManager (per instance).\n" +
+            "These thresholds (UnitData) drive when to activate and deactivate it.\n\n" +
+            "ACTIVATE: unit falls to Retreat initiative, skips all sensor priorities and seeks the nearest available allied captured building with no unit on it.\n" +
+            "DEACTIVATE: unit recovers its normal initiative and resumes sensor priorities.",
+            MessageType.None);
+
+        SerializedProperty hpBelowProp        = serializedObject.FindProperty("repairTriggerHpBelow");
+        SerializedProperty autonomyPctProp    = serializedObject.FindProperty("repairTriggerAutonomyPct");
+        SerializedProperty ammoEnabledProp    = serializedObject.FindProperty("repairTriggerAmmoEnabled");
+        SerializedProperty ammoPctProp        = serializedObject.FindProperty("repairTriggerAmmoPct");
+        SerializedProperty recoverHpProp      = serializedObject.FindProperty("repairRecoverHpAbove");
+
+        EditorGUILayout.LabelField("Trigger (activate isUnderRepair)", EditorStyles.miniBoldLabel);
+        if (hpBelowProp != null)
+            EditorGUILayout.PropertyField(hpBelowProp, new GUIContent("HP ≤", "Enter repair when HP drops to this value or below. Set 0 to disable."));
+        if (autonomyPctProp != null)
+            EditorGUILayout.PropertyField(autonomyPctProp, new GUIContent("Autonomy Left ≤ %", "Enter repair when autonomy remaining is at or below this %. Set 0 to disable."));
+        if (ammoEnabledProp != null)
+            EditorGUILayout.PropertyField(ammoEnabledProp, new GUIContent("Ammo Trigger Enabled"));
+        if (ammoEnabledProp != null && ammoEnabledProp.boolValue && ammoPctProp != null)
+        {
+            using (new EditorGUI.IndentLevelScope())
+                EditorGUILayout.PropertyField(ammoPctProp, new GUIContent("Any Weapon Ammo ≤ %", "Enter repair when any embarked weapon ammo is at or below this %. 0 = completely out of ammo."));
+        }
+
+        EditorGUILayout.Space(2f);
+        EditorGUILayout.LabelField("Recovery (deactivate isUnderRepair)", EditorStyles.miniBoldLabel);
+        if (recoverHpProp != null)
+            EditorGUILayout.PropertyField(recoverHpProp, new GUIContent("HP ≥", "Leave repair mode when HP reaches or above this value AND autonomy/ammo (if they were triggers) are also above their thresholds."));
+
+        SerializedProperty fuseWhileInRepairProp = serializedObject.FindProperty("fuseWhileInRepair");
+        if (fuseWhileInRepairProp != null)
+            EditorGUILayout.PropertyField(fuseWhileInRepairProp, new GUIContent("Fuse While In Repair", "While under repair, attempt to fuse with a damaged allied unit of the same type nearby instead of waiting passively."));
     }
 
     private void DrawNativeDomainSection()

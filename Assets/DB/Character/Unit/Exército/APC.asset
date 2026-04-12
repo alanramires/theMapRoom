@@ -33,6 +33,7 @@ MonoBehaviour:
   unitClass: 1
   combatClassification: 0
   roles: 03000000
+  aiInitiative: 2
   aiTargetPreferenceByClass:
   - targetClass: 0
     priority: 2
@@ -40,6 +41,8 @@ MonoBehaviour:
     priority: 1
   - targetClass: 2
     priority: 1
+  aiSensorPriority: 0000000002000000
+  prioritizeDpqAtBattle: 1
   eliteLevel: 0
   combatModifiers: []
   domain: 0

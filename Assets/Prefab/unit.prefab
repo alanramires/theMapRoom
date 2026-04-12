@@ -442,6 +442,7 @@ MonoBehaviour:
   hasActed: 0
   hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
+  isUnderRepair: 0
   hasMerged: 0
   aiForcedToRepair: 0
   mergedWhenTurn: -1

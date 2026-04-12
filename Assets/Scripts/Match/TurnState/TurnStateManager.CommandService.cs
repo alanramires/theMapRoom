@@ -57,6 +57,13 @@ public partial class TurnStateManager
     private Coroutine autoCommandServiceRoutine;
     public bool IsPlayerCursorLockedByCommandService => false;
 
+    /// <summary>
+    /// Verdadeiro enquanto o Serviço do Comando automático (início de turno) ainda
+    /// está aguardando janela ou executando. A IA espera este flag zerar antes de
+    /// iniciar seus batches, para não conflitar com o cursor em CursorState.CommandService.
+    /// </summary>
+    public bool IsAutoCommandServiceBusy => autoCommandServiceRoutine != null || IsCommandServiceExecutionRunning;
+
     private bool IsCommandServiceState => cursorState == CursorState.CommandService;
     private bool IsCommandServiceExecutionRunning => commandServiceExecutionRoutine != null;
     private bool IsCommandServiceAwaitingConfirmation =>
@@ -2165,11 +2172,12 @@ public partial class TurnStateManager
 
     public void HandleAutoCommandServiceTeamChanged(int teamId)
     {
-        if (matchController == null || !matchController.CommandServiceAutomatic)
+        if (matchController == null) return;
+        if (!matchController.IsPlayerCommandServiceAutomatic((TeamId)teamId))
             return;
 
-        // Turnos 0 e 1 = opener dos times: nao roda automaticamente.
-        if (matchController.CurrentTurn <= 1)
+        // Turno 0 = frame de inicializacao: nao roda automaticamente.
+        if (matchController.CurrentTurn < 1)
             return;
 
         if (autoCommandServiceRoutine != null)
@@ -2180,6 +2188,10 @@ public partial class TurnStateManager
 
     private IEnumerator AutoCommandServiceRoutine()
     {
+        // Aguarda ao menos um frame para que todos os Start() das unidades
+        // tenham sido executados antes de consultar UnitManager.AllActive.
+        yield return null;
+
         // Aguarda supply queue e quaisquer outras animacoes terminarem,
         // e cursor voltar ao Neutral.
         while (supplyExecutionInProgress ||
@@ -2189,18 +2201,25 @@ public partial class TurnStateManager
             yield return null;
         }
 
-        autoCommandServiceRoutine = null;
-
         // Simula "X": abre o preview exatamente como o jogador faria.
         // O helper panel mostra o resumo e o cursor vai para CommandService.
         if (!TryOpenCommandServiceFromMenu(out _))
+        {
+            autoCommandServiceRoutine = null;
             yield break;
+        }
 
         // Aguarda 1 frame para o estado se estabelecer.
         yield return null;
 
-        // Simula "Enter": confirma e inicia a execucao com animacoes.
-        TryStartCommandServiceOrder(out _);
+        // Simula "Enter": confirma usando os orders ja populados pelo preview,
+        // sem re-executar o sensor nem limpar a fila (exatamente como o jogador faria).
+        TryConfirmPendingCommandServiceOrder();
+
+        // Só nula depois de TryStartCommandServiceOrder, garantindo que
+        // IsCommandServiceExecutionRunning já esteja true antes de IsAutoCommandServiceBusy
+        // retornar false — sem janela de race condition para a IA escapar.
+        autoCommandServiceRoutine = null;
     }
 }
 

@@ -78,6 +78,7 @@ public class MatchController : MonoBehaviour
         public TeamId teamId;
         [HideInInspector] public bool flipX;
         public bool isAI;
+        public bool commandServiceAutomatic;
         public bool defeated;
         [Min(0)] public int startMoney;
         [Min(0)] public int actualMoney;
@@ -120,7 +121,6 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool autoFlipXFromHqPositions = true;
     [Header("Gameplay Setup")]
     [SerializeField] private GameSetupPreset gameSetup = GameSetupPreset.FogOfWarTotal;
-    [SerializeField] private bool commandServiceAutomatic = false;
     [SerializeField] private bool enableLdtValidation = true;
     [SerializeField] private bool enableLosValidation = true;
     [SerializeField] private bool enableSpotter = true;
@@ -281,10 +281,52 @@ public class MatchController : MonoBehaviour
     public int SlotCount => players != null ? players.Count : 0;
     public bool EconomyEnabled => economyEnabled;
     public GameSetupPreset GameSetup => gameSetup;
+    /// <summary>
+    /// Getter: true se pelo menos um jogador tem Command Service Automatic ativo.
+    /// Setter: aplica o valor a todos os slots de jogador (usado pelo PartidaConfig).
+    /// Para controle por time, use IsPlayerCommandServiceAutomatic / SetPlayerCommandServiceAutomatic.
+    /// </summary>
     public bool CommandServiceAutomatic
     {
-        get => commandServiceAutomatic;
-        set => commandServiceAutomatic = value;
+        get
+        {
+            if (players == null) return false;
+            foreach (var p in players)
+                if (p.commandServiceAutomatic) return true;
+            return false;
+        }
+        set
+        {
+            if (players == null) return;
+            for (int i = 0; i < players.Count; i++)
+            {
+                PlayerEntry e = players[i];
+                e.commandServiceAutomatic = value;
+                players[i] = e;
+            }
+        }
+    }
+
+    public bool IsPlayerCommandServiceAutomatic(TeamId teamId)
+    {
+        if (players == null) return false;
+        for (int i = 0; i < players.Count; i++)
+            if (players[i].teamId == teamId)
+                return players[i].commandServiceAutomatic;
+        return false;
+    }
+
+    public void SetPlayerCommandServiceAutomatic(TeamId teamId, bool value)
+    {
+        if (players == null) return;
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i].teamId != teamId) continue;
+            PlayerEntry e = players[i];
+            e.commandServiceAutomatic = value;
+            players[i] = e;
+            return;
+        }
     }
     public bool EnableLdtValidation => enableLdtValidation;
     public bool EnableLosValidation => enableLosValidation;
@@ -879,6 +921,7 @@ public class MatchController : MonoBehaviour
     // Bloqueio central de input humano durante o turno de um time controlado por IA.
     public bool IsPlayerInputLockedByActiveAI()
     {
+        if (AIPlayerOrchestrator.IsDebugPaused) return false;
         return Application.isPlaying && IsActiveTeamAI();
     }
 

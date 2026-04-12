@@ -33,9 +33,17 @@ MonoBehaviour:
   unitClass: 0
   combatClassification: 0
   roles: 01000000
+  aiInitiative: 3
   aiTargetPreferenceByClass:
   - targetClass: 0
     priority: 2
+  aiSensorPriority: 010000000000000002000000
+  prioritizeDpqAtBattle: 1
+  repairTriggerHpBelow: 3
+  repairTriggerAutonomyPct: 25
+  repairTriggerAmmoEnabled: 1
+  repairTriggerAmmoPct: 0
+  repairRecoverHpAbove: 8
   eliteLevel: 0
   combatModifiers: []
   domain: 0

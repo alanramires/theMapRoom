@@ -35,11 +35,22 @@ public static class ServicoDoComandoSensor
             return false;
         }
 
-        List<UnitManager> units = UnitManager.AllActive;
+        IReadOnlyList<UnitManager> units = UnitManager.AllActive;
         if (units == null || units.Count <= 0)
         {
+#if UNITY_EDITOR
+            // Fora do play mode AllActive é vazio — usa FindObjectsByType como fallback.
+            UnitManager[] found = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            if (found == null || found.Length <= 0)
+            {
+                reason = "Nenhuma unidade em cena.";
+                return false;
+            }
+            units = found;
+#else
             reason = "Nenhuma unidade em cena.";
             return false;
+#endif
         }
 
         Dictionary<Vector3Int, List<UnitManager>> unitsByCell = BuildUnitsByCell(units);
@@ -249,29 +260,55 @@ public static class ServicoDoComandoSensor
         if (constructions == null || constructions.Length <= 0)
             return;
 
+        bool logs = SensorLogGate.IsServicoDoComandoEnabled();
+
         for (int i = 0; i < constructions.Length; i++)
         {
             ConstructionManager construction = constructions[i];
             if (construction == null || (int)construction.TeamId != (int)activeTeam)
                 continue;
             if (!construction.TryResolveConstructionData(out ConstructionData data) || data == null || !data.isSupplier)
+            {
+                if (construction != null && logs)
+                    SensorLogGate.Log("ServicoDoComandoSensor", $"skip {construction.name}: isSupplier=false ou sem ConstructionData");
                 continue;
+            }
             if (!construction.CanProvideSupplies)
+            {
+                if (logs)
+                    SensorLogGate.Log("ServicoDoComandoSensor", $"skip {construction.name}: CanProvideSupplies=false");
                 continue;
+            }
 
             List<ServiceData> services = GetDistinctServicesFromConstruction(construction);
             if (services.Count <= 0)
+            {
+                if (logs)
+                    SensorLogGate.Log("ServicoDoComandoSensor", $"skip {construction.name}: sem servicos configurados");
                 continue;
+            }
             if (!HasAtLeastOneOperationalServiceWithStock(construction, services))
+            {
+                if (logs)
+                    SensorLogGate.Log("ServicoDoComandoSensor", $"skip {construction.name}: nenhum servico operacional com estoque");
                 continue;
+            }
 
             int limit = Mathf.Max(0, data.maxUnitsServedPerTurn);
             if (limit <= 0)
+            {
+                if (logs)
+                    SensorLogGate.Log("ServicoDoComandoSensor", $"skip {construction.name}: maxUnitsServedPerTurn=0");
                 continue;
+            }
 
             Dictionary<SupplyData, int> stock = BuildStockMap(construction);
             if (stock.Count <= 0)
+            {
+                if (logs)
+                    SensorLogGate.Log("ServicoDoComandoSensor", $"skip {construction.name}: stock vazio");
                 continue;
+            }
 
             Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;

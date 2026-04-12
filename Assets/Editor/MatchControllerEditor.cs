@@ -8,7 +8,6 @@ public class MatchControllerEditor : Editor
     private SerializedProperty activeTeamIdProp;
     private SerializedProperty playersProp;
     private SerializedProperty includeNeutralTeamProp;
-    private SerializedProperty commandServiceAutomaticProp;
     private SerializedProperty economyEnabledProp;
     private SerializedProperty gameSetupProp;
     private SerializedProperty enableLdtValidationProp;
@@ -64,7 +63,6 @@ public class MatchControllerEditor : Editor
         activeTeamIdProp = serializedObject.FindProperty("activeTeamId");
         playersProp = serializedObject.FindProperty("players");
         includeNeutralTeamProp = serializedObject.FindProperty("includeNeutralTeam");
-        commandServiceAutomaticProp = serializedObject.FindProperty("commandServiceAutomatic");
         economyEnabledProp = serializedObject.FindProperty("economyEnabled");
         gameSetupProp = serializedObject.FindProperty("gameSetup");
         enableLdtValidationProp = serializedObject.FindProperty("enableLdtValidation");
@@ -150,8 +148,6 @@ public class MatchControllerEditor : Editor
         EditorGUILayout.PropertyField(activeTeamIdProp, new GUIContent("Active Team ID"));
         DrawPlayersList();
         EditorGUILayout.PropertyField(includeNeutralTeamProp, new GUIContent("Include Neutral Team"));
-        if (commandServiceAutomaticProp != null)
-            EditorGUILayout.PropertyField(commandServiceAutomaticProp, new GUIContent("Command Service Automatic"));
         if (economyEnabledProp != null)
             EditorGUILayout.PropertyField(economyEnabledProp, new GUIContent("Economy Enabled"));
         if (gameSetupProp != null)
@@ -326,6 +322,7 @@ public class MatchControllerEditor : Editor
             SerializedProperty teamProp = player.FindPropertyRelative("teamId");
             SerializedProperty flipXProp = player.FindPropertyRelative("flipX");
             SerializedProperty isAIProp = player.FindPropertyRelative("isAI");
+            SerializedProperty commandServiceAutomaticProp = player.FindPropertyRelative("commandServiceAutomatic");
             SerializedProperty startMoneyProp = player.FindPropertyRelative("startMoney");
             SerializedProperty actualMoneyProp = player.FindPropertyRelative("actualMoney");
             SerializedProperty incomePerTurnProp = player.FindPropertyRelative("incomePerTurn");
@@ -351,6 +348,8 @@ public class MatchControllerEditor : Editor
             }
             if (isAIProp != null)
                 EditorGUILayout.PropertyField(isAIProp, new GUIContent("Is AI"));
+            if (commandServiceAutomaticProp != null)
+                EditorGUILayout.PropertyField(commandServiceAutomaticProp, new GUIContent("Automated Command Service"));
             if (startMoneyProp != null)
             {
                 startMoneyProp.intValue = Mathf.Max(0, EditorGUILayout.IntField("Start Money", startMoneyProp.intValue));

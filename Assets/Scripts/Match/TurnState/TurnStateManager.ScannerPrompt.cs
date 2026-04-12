@@ -2831,6 +2831,7 @@ public partial class TurnStateManager
         if (cursorState != CursorState.Mirando || count == 0) return false;
         scannerSelectedTargetIndex = (scannerSelectedTargetIndex + 1 + count) % count;
         FocusCurrentMirandoTarget(logDetails: false, moveCursor: true);
+        cursorController?.PlayCursorMoveSfx();
         return true;
     }
 

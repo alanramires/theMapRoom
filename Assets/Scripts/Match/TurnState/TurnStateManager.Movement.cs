@@ -186,7 +186,8 @@ public partial class TurnStateManager
             originCell,
             destinationCell,
             new UnitLayerMode(layerBeforeDomain, layerBeforeHeight),
-            selectedUnit.GetCurrentLayerMode());
+            selectedUnit.GetCurrentLayerMode(),
+            committedMovementPath);
     }
     private void TryApplyForcedEndMovementLayerBeforeSensors(CursorState movementState)
     {
