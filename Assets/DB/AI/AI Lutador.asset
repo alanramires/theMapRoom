@@ -55,7 +55,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 9de29821cf7219c488585cc51bfd220d, type: 2}
     sensorPriority: 0100000003000000
     minDamageDealtPercent: 10
-    maxDamageReceivedPercent: 20
+    maxDamageReceivedPercent: 0
     mustSurvive: 0
     targetPreference: 1
     canEscort: 0
@@ -85,3 +85,11 @@ MonoBehaviour:
   supplyAllyFuelThresholdPercent: 25
   supplyAllyAmmoThresholdPercent: 0
   supplyAllyHpThresholdPercent: 50
+  supplyHardDangerRadius: 2
+  supplySoftDangerRadius: 4
+  supplySoftThreatToleranceIdle: 1
+  supplySoftThreatToleranceServing: 2
+  returnToPickupAfterDisembark: 1
+  pickupZoneRadius: 2
+  minTransportDistanceHexes: 8
+  transportWorthwhileMultiplier: 1.5

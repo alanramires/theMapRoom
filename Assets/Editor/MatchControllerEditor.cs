@@ -269,19 +269,28 @@ public class MatchControllerEditor : Editor
         serializedObject.ApplyModifiedProperties();
 
         EditorGUILayout.Space();
-        EditorGUILayout.HelpBox("Advance Turn: avanca para o proximo player da lista. So incrementa Current Turn ao fechar ciclo.\nSe Include Neutral Team estiver ativo, passa por Neutral antes de fechar ciclo.", MessageType.Info);
+        EditorGUILayout.LabelField("Controles de Turno", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Advance Turn: avanca para o proximo player, incrementa Current Turn ao fechar ciclo e credita a renda do turno (+ start money se for a primeira vez).\n" +
+            "Emular Game Start: aplica start money + renda do primeiro jogador da lista, como se o jogo tivesse comecado agora.",
+            MessageType.Info);
 
         if (GUILayout.Button("Advance Turn"))
         {
             Undo.RecordObject(match, "Advance Turn");
             match.AdvanceTurn();
+            serializedObject.Update();
+            ApplyEconomyToActivePlayer();
+            serializedObject.ApplyModifiedProperties();
             EditorUtility.SetDirty(match);
         }
 
-        if (GUILayout.Button("Advance Team (Debug)"))
+        if (GUILayout.Button("Emular Game Start"))
         {
-            Undo.RecordObject(match, "Advance Team");
-            match.AdvanceTeam();
+            Undo.RecordObject(match, "Emular Game Start");
+            serializedObject.Update();
+            ApplyGameStartEconomyToFirstPlayer();
+            serializedObject.ApplyModifiedProperties();
             EditorUtility.SetDirty(match);
         }
 
@@ -499,5 +508,60 @@ public class MatchControllerEditor : Editor
         }
 
         prop.intValue = (int)team;
+    }
+
+    // Credita renda (e start money se ainda nao foi aplicado) para o player ativo apos AdvanceTurn.
+    private void ApplyEconomyToActivePlayer()
+    {
+        if (playersProp == null || activeTeamIdProp == null)
+            return;
+
+        int activeId = activeTeamIdProp.intValue;
+
+        for (int i = 0; i < playersProp.arraySize; i++)
+        {
+            SerializedProperty player = playersProp.GetArrayElementAtIndex(i);
+            SerializedProperty teamProp = player.FindPropertyRelative("teamId");
+            if (teamProp == null || teamProp.intValue != activeId)
+                continue;
+
+            SerializedProperty actualMoneyProp   = player.FindPropertyRelative("actualMoney");
+            SerializedProperty incomeProp        = player.FindPropertyRelative("incomePerTurn");
+            SerializedProperty startMoneyProp    = player.FindPropertyRelative("startMoney");
+            SerializedProperty startAppliedProp  = player.FindPropertyRelative("startMoneyApplied");
+
+            if (actualMoneyProp == null || incomeProp == null || startMoneyProp == null || startAppliedProp == null)
+                break;
+
+            int credit = Mathf.Max(0, incomeProp.intValue);
+            if (!startAppliedProp.boolValue)
+            {
+                credit += Mathf.Max(0, startMoneyProp.intValue);
+                startAppliedProp.boolValue = true;
+            }
+
+            actualMoneyProp.intValue = Mathf.Max(0, actualMoneyProp.intValue + credit);
+            break;
+        }
+    }
+
+    // Aplica start money + renda do primeiro player da lista como se o jogo acabasse de comecar.
+    private void ApplyGameStartEconomyToFirstPlayer()
+    {
+        if (playersProp == null || playersProp.arraySize == 0)
+            return;
+
+        SerializedProperty player          = playersProp.GetArrayElementAtIndex(0);
+        SerializedProperty actualMoneyProp = player.FindPropertyRelative("actualMoney");
+        SerializedProperty incomeProp      = player.FindPropertyRelative("incomePerTurn");
+        SerializedProperty startMoneyProp  = player.FindPropertyRelative("startMoney");
+        SerializedProperty startAppliedProp = player.FindPropertyRelative("startMoneyApplied");
+
+        if (actualMoneyProp == null || incomeProp == null || startMoneyProp == null || startAppliedProp == null)
+            return;
+
+        int credit = Mathf.Max(0, incomeProp.intValue) + Mathf.Max(0, startMoneyProp.intValue);
+        actualMoneyProp.intValue = Mathf.Max(0, actualMoneyProp.intValue + credit);
+        startAppliedProp.boolValue = true;
     }
 }
