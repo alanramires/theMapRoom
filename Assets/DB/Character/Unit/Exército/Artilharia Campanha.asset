@@ -20,10 +20,7 @@ MonoBehaviour:
     de spotters para alcance m\xE1ximo e log\xEDstica para operar. Vulner\xE1vel
     a aproxima\xE7\xF5es curtas e \xE0 perda de observadores."
   spriteDefault: {fileID: 21300000, guid: 15f6d8eabcc24eb41a8ca606fd780207, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 16
   armorClass: 2
@@ -34,7 +31,7 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 2
   combatClassification: 1
-  aiUnitProfile: {fileID: 11400000, guid: 8d06f0a52e1a5fb4db9a63d784dc7dbb, type: 2}
+  roles: 05000000
   aiTargetPreferenceByClass:
   - targetClass: 3
     priority: 2

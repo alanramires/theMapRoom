@@ -21,10 +21,7 @@ MonoBehaviour:
     pressionar o inimigo e manter presen\xE7a no mapa. Depende de log\xEDstica em
     avan\xE7os longos."
   spriteDefault: {fileID: 21300000, guid: 7a4e98efb59da8447b1de4d056a57e79, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 10
   armorClass: 0
@@ -35,7 +32,7 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 0
   combatClassification: 0
-  aiUnitProfile: {fileID: 11400000, guid: 6f1dc83d9ddfe1f459e5b21d7f292a20, type: 2}
+  roles: 01000000
   aiTargetPreferenceByClass:
   - targetClass: 0
     priority: 2

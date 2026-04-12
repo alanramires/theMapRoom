@@ -21,10 +21,7 @@ MonoBehaviour:
     constante. Vulner\xE1vel no front, deve ser protegido, pois sua perda pode colapsar
     rapidamente a linha de combate."
   spriteDefault: {fileID: 21300000, guid: 7bb9e34a5859e51449deab8a27150dd5, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 8
   armorClass: 0
@@ -35,7 +32,8 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 1
   combatClassification: 3
-  aiUnitProfile: {fileID: 11400000, guid: 626e71f53bedacc409de7c3bae53de83, type: 2}
+  roles: 04000000
+  aiTargetPreferenceByClass: []
   eliteLevel: 0
   combatModifiers: []
   domain: 0

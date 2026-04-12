@@ -21,10 +21,7 @@ MonoBehaviour:
     enquanto permanece no ar, sendo ideal para defesa local. N\xE3o substitui ca\xE7as
     de superioridade a\xE9rea."
   spriteDefault: {fileID: 21300000, guid: 768b0fc7023579940830ef3c4125ecd2, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 12
   armorClass: 1
@@ -35,7 +32,7 @@ MonoBehaviour:
   militaryForce: 1
   unitClass: 4
   combatClassification: 0
-  aiUnitProfile: {fileID: 11400000, guid: ac91d7b2d6b1747438b7f2210c28d5b2, type: 2}
+  roles: 02000000
   aiTargetPreferenceByClass:
   - targetClass: 5
     priority: 2
@@ -49,10 +46,7 @@ MonoBehaviour:
   - domain: 0
     heightLevel: 3
     spriteDefault: {fileID: 21300000, guid: ffa634c9bd2da724993143a2d3e8db74, type: 3}
-    spriteGreen: {fileID: 0}
-    spriteRed: {fileID: 0}
-    spriteBlue: {fileID: 0}
-    spriteYellow: {fileID: 0}
+    teamVariantSprites: []
   useExplicitPreferredAirHeight: 0
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0

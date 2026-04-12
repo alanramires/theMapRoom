@@ -21,10 +21,7 @@ MonoBehaviour:
     infantaria exposta, mas seu valor real est\xE1 em reposicionar tropas e antecipar
     capturas, emboscadas e respostas t\xE1ticas."
   spriteDefault: {fileID: 21300000, guid: eb47016b4b81a574eb99e655c0ae0803, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 12
   armorClass: 1
@@ -35,7 +32,7 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 1
   combatClassification: 0
-  aiUnitProfile: {fileID: 11400000, guid: 2b1b10cd7ab132a48966cfc0a8ff37d0, type: 2}
+  roles: 03000000
   aiTargetPreferenceByClass:
   - targetClass: 0
     priority: 2

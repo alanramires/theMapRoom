@@ -21,10 +21,7 @@ MonoBehaviour:
     curtas e planejamento de retorno. Ideal para garantir dom\xEDnio a\xE9reo em
     momentos decisivos."
   spriteDefault: {fileID: 21300000, guid: ab4dd6fb73168824ca05fc40a270a71a, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 15
   armorClass: 2
@@ -35,7 +32,7 @@ MonoBehaviour:
   militaryForce: 1
   unitClass: 4
   combatClassification: 0
-  aiUnitProfile: {fileID: 11400000, guid: ac91d7b2d6b1747438b7f2210c28d5b2, type: 2}
+  roles: 02000000
   aiTargetPreferenceByClass:
   - targetClass: 6
     priority: 2
@@ -51,17 +48,11 @@ MonoBehaviour:
   - domain: 3
     heightLevel: 4
     spriteDefault: {fileID: 21300000, guid: 72ec5f2c5995ee746972615303dddb01, type: 3}
-    spriteGreen: {fileID: 0}
-    spriteRed: {fileID: 0}
-    spriteBlue: {fileID: 0}
-    spriteYellow: {fileID: 0}
+    teamVariantSprites: []
   - domain: 0
     heightLevel: 3
     spriteDefault: {fileID: 21300000, guid: 6d668a2538038af449f596df1c66b18b, type: 3}
-    spriteGreen: {fileID: 0}
-    spriteRed: {fileID: 0}
-    spriteBlue: {fileID: 0}
-    spriteYellow: {fileID: 0}
+    teamVariantSprites: []
   useExplicitPreferredAirHeight: 0
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0

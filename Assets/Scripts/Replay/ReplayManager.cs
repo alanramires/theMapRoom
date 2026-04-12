@@ -39,6 +39,7 @@ public class ReplayManager : MonoBehaviour
     [SerializeField] private bool animateCursorTravelBetweenActions = true;
     [SerializeField, Range(0.01f, 1f)] private float cursorTravelStepDelay = 0.15f;
     [SerializeField, Range(0f, 1f), Tooltip("Delay between sensor substeps during replay automation (seconds).") ] private float sensorSubstepDelay = 0.08f;
+    [SerializeField, Range(0f, 2f), Tooltip("Pausa apos selecionar a unidade antes de comecar a mover o cursor ao destino (seconds).") ] private float unitSelectionHoldDelay = 0.3f;
     [SerializeField, Range(0f, 2f)] private float replayConfirmVisualDelay = 0.25f;
     [SerializeField, Range(0.5f, 8f), Tooltip("Tempo minimo de exibicao das mensagens de transicao do replay (segundos).") ] private float replayTransitionMinDisplaySeconds = 3f;
     [SerializeField, Range(0.01f, 1f), Tooltip("Delay between shopping menu items during replay automation (seconds).") ] private float shoppingNavDelay = 0.15f;
@@ -450,6 +451,10 @@ public class ReplayManager : MonoBehaviour
 
             ExecuteReplayConfirmInput();
             yield return null;
+
+            float selectionHold = GetEffectiveUnitSelectionHoldDelay();
+            if (selectionHold > 0f)
+                yield return new WaitForSecondsRealtime(selectionHold);
         }
 
         bool hasDestinationCell = TryResolveRecordedDestinationCell(action, hasOriginCell, originCell, out Vector3Int destinationCell);
@@ -571,7 +576,7 @@ public class ReplayManager : MonoBehaviour
                 sensorsReady = true;
             }
 
-            while (isReplaying && !replayBatchAbortRequested && !sensorsReady && !cursorReturnedToNeutral)
+            while ((isReplaying || isLiveAIBatchExecution) && !replayBatchAbortRequested && !sensorsReady && !cursorReturnedToNeutral)
                 yield return null;
 
             ReplayLog($"[Replay][Listener] wait movement->sensor finished sensorsReady={sensorsReady} cursorNeutralFallback={cursorReturnedToNeutral} state={turnStateManager.CurrentCursorState}");
@@ -617,7 +622,7 @@ public class ReplayManager : MonoBehaviour
 
                 // Avoid race: replay can be marked inactive one frame before scanner execution
                 // finishes and returns cursor to Neutral (notably in merge flows).
-                if (!isReplaying && !scannerBusy && !movementBusy)
+                if (!isReplaying && !isLiveAIBatchExecution && !scannerBusy && !movementBusy)
                     break;
 
                 yield return null;
@@ -2020,6 +2025,29 @@ public class ReplayManager : MonoBehaviour
         fastReplayMode = enabled;
     }
 
+    private bool isLiveAIBatchExecution = false;
+
+    public void ExecuteLiveAIBatch(PlayerAction action)
+    {
+        if (action == null || actionStepExecutionRoutine != null)
+            return;
+
+        actionStepExecutionRoutine = StartCoroutine(ExecuteLiveAIBatchRoutine(action));
+    }
+
+    private IEnumerator ExecuteLiveAIBatchRoutine(PlayerAction action)
+    {
+        replayBatchAbortRequested = false;
+        isLiveAIBatchExecution = true;
+
+        bool canEmulateAction = action != null && CanReplayActionAsLiveInputs(action.ActionType);
+        if (canEmulateAction)
+            yield return ExecuteRecordedActionBatch(action, null);
+
+        actionStepExecutionRoutine = null;
+        isLiveAIBatchExecution = false;
+    }
+
     public bool ExecuteNextReplayBatch()
     {
         if (!isReplaying || !isPlaying || currentRecord == null)
@@ -2264,6 +2292,11 @@ public class ReplayManager : MonoBehaviour
     private float GetEffectiveSensorSubstepDelay()
     {
         return fastReplayMode ? 0f : Mathf.Max(0f, sensorSubstepDelay);
+    }
+
+    private float GetEffectiveUnitSelectionHoldDelay()
+    {
+        return fastReplayMode ? 0f : Mathf.Max(0f, unitSelectionHoldDelay);
     }
 
     private IEnumerator WaitForSensorSubstepDelay()

@@ -1,4 +1,4 @@
-﻿[Ll]ibrary/
+[Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
 [Bb]uild/
@@ -30,3 +30,11 @@ Assets/AssetStoreTools*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Ignored legacy and temp folders
+*~
+*~.meta
+*_legacy/
+*_Legacy/
+*_legacy.meta
+*_Legacy.meta

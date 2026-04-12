@@ -20,10 +20,7 @@ MonoBehaviour:
     eficazes. Posicione m\xFAltiplas unidades cobrindo pontos cegos. Vulner\xE1vel
     a ataques terrestres e dependente de posicionamento estrat\xE9gico."
   spriteDefault: {fileID: 21300000, guid: 0b38e614f48c0a74aacb439821d77c9c, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 13
   armorClass: 1
@@ -34,7 +31,7 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 2
   combatClassification: 1
-  aiUnitProfile: {fileID: 11400000, guid: ac91d7b2d6b1747438b7f2210c28d5b2, type: 2}
+  roles: 05000000
   aiTargetPreferenceByClass:
   - targetClass: 6
     priority: 2

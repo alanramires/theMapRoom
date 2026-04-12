@@ -21,10 +21,7 @@ MonoBehaviour:
     ar, exigindo planejamento. Vulner\xE1vel a defesas anti-a\xE9reas e pouco eficiente
     contra artilharia e marinha."
   spriteDefault: {fileID: 21300000, guid: e0ff29246df3f7e478a2fae93fbbaf2e, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 15
   armorClass: 2
@@ -35,7 +32,7 @@ MonoBehaviour:
   militaryForce: 1
   unitClass: 5
   combatClassification: 0
-  aiUnitProfile: {fileID: 11400000, guid: ac91d7b2d6b1747438b7f2210c28d5b2, type: 2}
+  roles: 02000000
   aiTargetPreferenceByClass:
   - targetClass: 0
     priority: 2
@@ -54,10 +51,7 @@ MonoBehaviour:
   - domain: 0
     heightLevel: 3
     spriteDefault: {fileID: 21300000, guid: cffe93a69a0417d4ba7b192151593e5d, type: 3}
-    spriteGreen: {fileID: 0}
-    spriteRed: {fileID: 0}
-    spriteBlue: {fileID: 0}
-    spriteYellow: {fileID: 0}
+    teamVariantSprites: []
   useExplicitPreferredAirHeight: 1
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0

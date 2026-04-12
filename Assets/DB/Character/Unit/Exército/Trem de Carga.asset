@@ -22,10 +22,7 @@ MonoBehaviour:
     interrup\xE7\xF5es na linha podem atrasar refor\xE7os e comprometer toda a cadeia
     de suprimentos. Possui prote\xE7\xE3o limitada e requer escolta em \xE1reas contestadas."
   spriteDefault: {fileID: 21300000, guid: 867592e92dfef1948a0e46f4c664642e, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 12
   armorClass: 1
@@ -36,7 +33,8 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 3
   combatClassification: 3
-  aiUnitProfile: {fileID: 11400000, guid: 626e71f53bedacc409de7c3bae53de83, type: 2}
+  roles: 04000000
+  aiTargetPreferenceByClass: []
   eliteLevel: 0
   combatModifiers: []
   domain: 0

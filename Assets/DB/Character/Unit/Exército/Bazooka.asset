@@ -20,10 +20,7 @@ MonoBehaviour:
     Ideal para trocas eficientes contra unidades caras. Use para punir avan\xE7os
     de blindados e proteger posi\xE7\xF5es cr\xEDticas com baixo custo."
   spriteDefault: {fileID: 21300000, guid: 5fe376938140a9a4180ef4bad9915343, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 12
   armorClass: 1
@@ -34,7 +31,7 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 0
   combatClassification: 0
-  aiUnitProfile: {fileID: 11400000, guid: 03d8c46a57bd73d41990776efce90ce2, type: 2}
+  roles: 01000000
   aiTargetPreferenceByClass:
   - targetClass: 1
     priority: 2

@@ -20,10 +20,7 @@ MonoBehaviour:
     da base. Tamb\xE9m pode apoiar helic\xF3pteros com combust\xEDvel. Vulner\xE1vel
     e sem capacidade ofensiva, deve operar protegido e fora do alcance inimigo."
   spriteDefault: {fileID: 21300000, guid: 38a846ce0549df1408b70c042c03b5dc, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 12
   armorClass: 1
@@ -34,7 +31,7 @@ MonoBehaviour:
   militaryForce: 1
   unitClass: 6
   combatClassification: 3
-  aiUnitProfile: {fileID: 11400000, guid: 626e71f53bedacc409de7c3bae53de83, type: 2}
+  roles: 04000000
   aiTargetPreferenceByClass: []
   eliteLevel: 0
   combatModifiers: []
@@ -44,17 +41,11 @@ MonoBehaviour:
   - domain: 3
     heightLevel: 4
     spriteDefault: {fileID: 21300000, guid: ca95d24ebc735654eab4e3009218cd72, type: 3}
-    spriteGreen: {fileID: 0}
-    spriteRed: {fileID: 0}
-    spriteBlue: {fileID: 0}
-    spriteYellow: {fileID: 0}
+    teamVariantSprites: []
   - domain: 0
     heightLevel: 3
     spriteDefault: {fileID: 21300000, guid: 595ba76fbef00324dbfbeec9ea474bb6, type: 3}
-    spriteGreen: {fileID: 0}
-    spriteRed: {fileID: 0}
-    spriteBlue: {fileID: 0}
-    spriteYellow: {fileID: 0}
+    teamVariantSprites: []
   useExplicitPreferredAirHeight: 0
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0

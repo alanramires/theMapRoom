@@ -21,10 +21,7 @@ MonoBehaviour:
     de ataque. Combine com SAMs e AAA para criar setores de nega\xE7\xE3o a\xE9rea.
     Vulner\xE1vel se avan\xE7ar sem escolta."
   spriteDefault: {fileID: 21300000, guid: e86a7f2475fd74b4c9f898e444cf0c69, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 12
   armorClass: 1
@@ -50,7 +47,8 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 1
   combatClassification: 3
-  aiUnitProfile: {fileID: 11400000, guid: 626e71f53bedacc409de7c3bae53de83, type: 2}
+  roles: 04000000
+  aiTargetPreferenceByClass: []
   eliteLevel: 0
   combatModifiers: []
   domain: 0
