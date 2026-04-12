@@ -61,7 +61,8 @@ public static class PodeMirarSensor
         bool enableLosValidation = true,
         bool enableSpotter = true,
         bool enableStealthValidation = true,
-        bool respectTotalWarVisibility = true)
+        bool respectTotalWarVisibility = true,
+        Vector3Int? fromCell = null)
     {
         if (output == null)
             return false;
@@ -102,7 +103,9 @@ public static class PodeMirarSensor
         if (map == null)
             return false;
 
-        Vector3Int origin = attacker.CurrentCellPosition;
+        // fromCell permite consulta hipotética ("e se eu estivesse aqui?").
+        // Somente a origem espacial muda — armas, layer, munição e stats vêm do attacker real.
+        Vector3Int origin = fromCell.HasValue ? fromCell.Value : attacker.CurrentCellPosition;
         origin.z = 0;
 
         bool attackerWeaponUseBlockedByLayer =

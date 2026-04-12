@@ -2810,6 +2810,109 @@ public partial class TurnStateManager
         return TryConfirmScannerAttack();
     }
 
+    // -------------------------------------------------------------------------
+    // API de replay para navegação em listas de sensor (genérica)
+    // Usada por: Mirando (ataque). Futuramente: Embark, Supply, Transfer...
+    // -------------------------------------------------------------------------
+
+    /// <summary>Quantidade de entradas na lista de alvos do Mirando atual.</summary>
+    public int GetMirandoCountForReplay() => GetMirandoEntryCount();
+
+    /// <summary>Índice atualmente selecionado na lista do Mirando.</summary>
+    public int GetMirandoCurrentIndexForReplay() => scannerSelectedTargetIndex;
+
+    /// <summary>
+    /// Avança um passo na lista do Mirando e foca o novo alvo (highlight visual).
+    /// Chame repetidamente com sensorListNavDelay entre chamadas para simular navegação.
+    /// </summary>
+    public bool StepMirandoForReplay()
+    {
+        int count = GetMirandoEntryCount();
+        if (cursorState != CursorState.Mirando || count == 0) return false;
+        scannerSelectedTargetIndex = (scannerSelectedTargetIndex + 1 + count) % count;
+        FocusCurrentMirandoTarget(logDetails: false, moveCursor: true);
+        return true;
+    }
+
+    /// <summary>
+    /// Retorna o índice do alvo na lista atual, ou -1 se não encontrado.
+    /// Usado pelo replay para saber quantos passos de navegação são necessários.
+    /// </summary>
+    public int FindMirandoTargetIndexForReplay(string targetInstanceId, Vector3Int targetCell)
+    {
+        targetCell.z = 0;
+        for (int i = 0; i < GetMirandoEntryCount(); i++)
+        {
+            MirandoSelectionEntry entry = cachedMirandoSelectionEntries[i];
+            if (!entry.isValid || entry.validOption == null || entry.validOption.targetUnit == null)
+                continue;
+            UnitManager target = entry.validOption.targetUnit;
+            bool idMatch = !string.IsNullOrWhiteSpace(targetInstanceId)
+                && target.InstanceId.ToString() == targetInstanceId;
+            Vector3Int optionCell = target.CurrentCellPosition;
+            optionCell.z = 0;
+            if (idMatch || optionCell == targetCell)
+                return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Entra no confirm step do alvo atualmente selecionado — exibe a linha de mira/preview.
+    /// Chame antes do beforeConfirmDelay.
+    /// </summary>
+    public void EnterMirandoConfirmStepForReplay() => EnterMirandoConfirmStep();
+
+    /// <summary>
+    /// Primeira metade do ataque automatizado: seleciona o alvo e exibe a linha de mira.
+    /// Chame ConfirmAutomatedAttackTarget() depois do delay visual desejado.
+    /// </summary>
+    public bool SelectAutomatedAttackTarget(string targetInstanceId, Vector3Int targetCell)
+    {
+        if (cursorState != CursorState.Mirando)
+            return false;
+        if (GetMirandoEntryCount() <= 0)
+            return false;
+
+        int selectedIndex = -1;
+        for (int i = 0; i < GetMirandoEntryCount(); i++)
+        {
+            MirandoSelectionEntry entry = cachedMirandoSelectionEntries[i];
+            if (!entry.isValid || entry.validOption == null || entry.validOption.targetUnit == null)
+                continue;
+
+            UnitManager target = entry.validOption.targetUnit;
+            bool idMatch = !string.IsNullOrWhiteSpace(targetInstanceId)
+                && target.InstanceId.ToString() == targetInstanceId;
+            Vector3Int optionCell = target.CurrentCellPosition;
+            optionCell.z = 0;
+            Vector3Int desiredCell = targetCell;
+            desiredCell.z = 0;
+            bool cellMatch = optionCell == desiredCell;
+            if (!idMatch && !cellMatch)
+                continue;
+
+            selectedIndex = i;
+            break;
+        }
+
+        if (selectedIndex < 0)
+            return false;
+
+        scannerSelectedTargetIndex = selectedIndex;
+        FocusCurrentMirandoTarget(logDetails: false, moveCursor: true);
+        EnterMirandoConfirmStep();
+        return true;
+    }
+
+    /// <summary>
+    /// Segunda metade do ataque automatizado: confirma o alvo ja selecionado por SelectAutomatedAttackTarget.
+    /// </summary>
+    public bool ConfirmAutomatedAttackTarget()
+    {
+        return TryConfirmScannerAttack();
+    }
+
     private IEnumerator ExecuteConfirmedAttackSequence(
         PodeMirarTargetOption option,
         WeaponTrajectoryType attackerTrajectory,

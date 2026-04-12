@@ -40,6 +40,8 @@ public class ReplayManager : MonoBehaviour
     [SerializeField, Range(0.01f, 1f)] private float cursorTravelStepDelay = 0.15f;
     [SerializeField, Range(0f, 1f), Tooltip("Delay between sensor substeps during replay automation (seconds).") ] private float sensorSubstepDelay = 0.08f;
     [SerializeField, Range(0f, 2f), Tooltip("Pausa apos selecionar a unidade antes de comecar a mover o cursor ao destino (seconds).") ] private float unitSelectionHoldDelay = 0.3f;
+    [SerializeField, Range(0f, 2f), Tooltip("Pausa entre selecionar uma acao de sensor (alvo visivel, linha de mira, etc.) e o confirma final. Aplicado em todos os sensores (ataque, captura, embarque...) (seconds).") ] private float beforeConfirmDelay = 0.15f;
+    [SerializeField, Range(0f, 1f), Tooltip("Pausa entre cada item navegado em uma lista de sensor (alvos de ataque, destinos de embarque, etc.) durante replay automatizado (seconds).") ] private float sensorListNavDelay = 0.12f;
     [SerializeField, Range(0f, 2f)] private float replayConfirmVisualDelay = 0.25f;
     [SerializeField, Range(0.5f, 8f), Tooltip("Tempo minimo de exibicao das mensagens de transicao do replay (segundos).") ] private float replayTransitionMinDisplaySeconds = 3f;
     [SerializeField, Range(0.01f, 1f), Tooltip("Delay between shopping menu items during replay automation (seconds).") ] private float shoppingNavDelay = 0.15f;
@@ -903,10 +905,34 @@ public class ReplayManager : MonoBehaviour
             if (cursorController != null && NormalizeCell(cursorController.CurrentCell) != targetCell)
                 yield return MoveCursorToCellWithTravel(targetCell);
 
-            if (!turnStateManager.TryExecuteAutomatedAttackReplayTarget(step.TargetInstanceId, targetCell))
+            int targetIndex = turnStateManager.FindMirandoTargetIndexForReplay(step.TargetInstanceId, targetCell);
+            if (targetIndex < 0)
+            {
                 yield return ExecuteDoubleConfirmFallback();
+            }
             else
+            {
+                // Navega pela lista até o alvo, um passo por vez
+                int guard = 0;
+                while (turnStateManager.GetMirandoCurrentIndexForReplay() != targetIndex && guard++ < 64)
+                {
+                    turnStateManager.StepMirandoForReplay();
+                    float navDelay = GetEffectiveSensorListNavDelay();
+                    if (navDelay > 0f)
+                        yield return new WaitForSecondsRealtime(navDelay);
+                }
+
+                // Entra no confirm step — exibe linha de mira/preview
+                turnStateManager.EnterMirandoConfirmStepForReplay();
+
+                // Pausa para o jogador ver o preview antes de confirmar
+                float previewDelay = GetEffectiveBeforeConfirmDelay();
+                if (previewDelay > 0f)
+                    yield return new WaitForSecondsRealtime(previewDelay);
+
+                turnStateManager.ConfirmAutomatedAttackTarget();
                 yield return WaitForSensorSubstepDelay();
+            }
 
             executedAny = true;
         }
@@ -2297,6 +2323,16 @@ public class ReplayManager : MonoBehaviour
     private float GetEffectiveUnitSelectionHoldDelay()
     {
         return fastReplayMode ? 0f : Mathf.Max(0f, unitSelectionHoldDelay);
+    }
+
+    private float GetEffectiveBeforeConfirmDelay()
+    {
+        return fastReplayMode ? 0f : Mathf.Max(0f, beforeConfirmDelay);
+    }
+
+    private float GetEffectiveSensorListNavDelay()
+    {
+        return fastReplayMode ? 0f : Mathf.Max(0f, sensorListNavDelay);
     }
 
     private IEnumerator WaitForSensorSubstepDelay()

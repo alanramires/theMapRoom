@@ -112,6 +112,11 @@ public class UnitData : ScriptableObject
     [Header("AI")]
     [Tooltip("Preferencia de alvo por classe (usada pelo gate de Target Preference no AI Unit Profile).")]
     public List<AITargetPreferenceByClassRule> aiTargetPreferenceByClass = new List<AITargetPreferenceByClassRule>();
+
+    [Header("Combat Behavior")]
+    [Tooltip("Ao se posicionar para combate (inimigo engajado), prioriza celulas DPQ favoraveis (construcoes, estruturas) em vez de avancar em linha reta.")]
+    public bool prioritizeDpqAtBattle = false;
+
     [Header("Elite")]
     [Tooltip("Nivel de elite da unidade (padrao: 0).")]
     [Min(0)] public int eliteLevel = 0;

@@ -1,0 +1,11 @@
+﻿  Determinando os projetos a serem restaurados...
+  Todos os projetos est├úo atualizados para restaura├º├úo.
+d:\Unity Projects\The Map Room\Assets\Scripts\Match\MatchController.cs(866,17): error CS0111: Tipo "MatchController" j├í define um membro chamado "IsPlayerAI" com os mesmos tipos de par├ómetro [d:\Unity Projects\The Map Room\Assembly-CSharp.csproj]
+
+FALHA da compila├º├úo.
+
+d:\Unity Projects\The Map Room\Assets\Scripts\Match\MatchController.cs(866,17): error CS0111: Tipo "MatchController" j├í define um membro chamado "IsPlayerAI" com os mesmos tipos de par├ómetro [d:\Unity Projects\The Map Room\Assembly-CSharp.csproj]
+    0 Aviso(s)
+    1 Erro(s)
+
+Tempo Decorrido 00:00:05.93
