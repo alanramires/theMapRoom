@@ -497,6 +497,13 @@ public class UnitManager : MonoBehaviour
         UpdateDynamicName();
     }
 
+    public void MarkAsDonorMergedInto(UnitManager receiver)
+    {
+        hasMerged = true;
+        mergedWhenTurn = ResolveCurrentTurnNumber();
+        mergedWithUnit = receiver != null ? receiver.ResolveRuntimeUnitName() : "(unknown)";
+    }
+
     public void MarkMergedWith(IReadOnlyList<UnitManager> donors)
     {
         hasMerged = true;

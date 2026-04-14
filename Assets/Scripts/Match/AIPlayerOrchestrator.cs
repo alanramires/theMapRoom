@@ -108,15 +108,57 @@ public partial class AIPlayerOrchestrator : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // Loop principal
+    // Loop principal — sequenciador de fases
     // -------------------------------------------------------------------------
 
     private IEnumerator AIBatchExecutionLoop()
     {
-        // Aguarda o Serviço do Comando automático terminar antes de iniciar os batches,
-        // para não conflitar com o cursor em CursorState.CommandService.
+        yield return Phase0_TurnStart();
+        yield return Phase1_UnitActions();
+        yield return Phase2_Shopping();
+        Phase3_EndTurn();
+
+        aiExecutionRoutine = null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Fase 0: Procedimentos de início de turno
+    // Aguarda serviços automáticos (Command Service, supply queue, etc.)
+    // antes de o AI assumir o cursor.
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Phase0_TurnStart()
+    {
+        Debug.Log("[AI] Fase 0 — aguardando serviços de início de turno.");
+
+        // Aguarda ao menos um frame para que todos os handlers de OnActiveTeamChanged
+        // (supply queue, auto command service, rally queue, etc.) tenham sido registrados
+        // e iniciado suas coroutines — evita race condition onde IsAutoCommandServiceBusy
+        // ainda é false porque a coroutine do TurnStateManager não começou.
+        yield return null;
+
         if (turnStateManager != null)
+        {
+            // Aguarda o Serviço do Comando automático terminar (se a flag estiver ligada).
             yield return new WaitUntil(() => !turnStateManager.IsAutoCommandServiceBusy);
+
+            // Aguarda o cursor voltar ao Neutral — cobre supply queue, rally queue,
+            // fuel depletion queue e qualquer outro estado de início de turno.
+            yield return new WaitUntil(() =>
+                turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral);
+        }
+
+        Debug.Log("[AI] Fase 0 — concluída.");
+    }
+
+    // -------------------------------------------------------------------------
+    // Fase 1: AI age
+    // Loop sobre unidades disponíveis até não restar nenhuma.
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Phase1_UnitActions()
+    {
+        Debug.Log("[AI] Fase 1 — iniciando ações de unidades.");
 
         while (isActiveAndPlaying)
         {
@@ -138,21 +180,15 @@ public partial class AIPlayerOrchestrator : MonoBehaviour
                 .ToList();
 
             if (myAvailableUnits.Count == 0)
-            {
-                Debug.Log("[AI] Nenhuma unidade apta restante. Passando o Turno.");
-                isActiveAndPlaying = false;
-                matchController.AdvanceTurnWithTransition();
                 break;
-            }
 
-            UnitManager selectedUnit = myAvailableUnits[0]; // TODO: priorizar por tática
+            UnitManager selectedUnit = myAvailableUnits[0];
 
             EvaluateRepairState(selectedUnit);
             if (selectedUnit.IsUnderRepair)
             {
                 Vector3Int repairFrom = selectedUnit.CurrentCellPosition; repairFrom.z = 0;
 
-                // Tenta fundir antes de marchar pra casa
                 if (selectedUnit.TryGetUnitData(out UnitData repairUd) && repairUd != null && repairUd.fuseWhileInRepair)
                 {
                     PlayerAction fuseBatch = TryDecideFuse(selectedUnit, myTeam, repairFrom);
@@ -178,14 +214,13 @@ public partial class AIPlayerOrchestrator : MonoBehaviour
                 continue;
             }
 
-            PlayerAction actionBatch = DecideBatch(selectedUnit, myTeam);
-
             if (replayManager == null)
             {
                 Debug.LogError("[AI] ReplayManager nulo!");
-                break;
+                yield break;
             }
 
+            PlayerAction actionBatch = DecideBatch(selectedUnit, myTeam);
             replayManager.ExecuteLiveAIBatch(actionBatch);
             yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
 
@@ -198,7 +233,32 @@ public partial class AIPlayerOrchestrator : MonoBehaviour
             }
         }
 
-        aiExecutionRoutine = null;
+        Debug.Log("[AI] Fase 1 — concluída.");
+    }
+
+    // -------------------------------------------------------------------------
+    // Fase 2: Shopping
+    // Compra unidades nas construções aliadas desocupadas.
+    // Só executa após todas as unidades terem agido.
+    // -------------------------------------------------------------------------
+
+    private IEnumerator Phase2_Shopping()
+    {
+        Debug.Log("[AI] Fase 2 — shopping.");
+        TeamId myTeam = matchController.ActiveTeam;
+        yield return DoShoppingPhase(myTeam);
+        Debug.Log("[AI] Fase 2 — concluída.");
+    }
+
+    // -------------------------------------------------------------------------
+    // Fase 3: Passa a vez
+    // -------------------------------------------------------------------------
+
+    private void Phase3_EndTurn()
+    {
+        Debug.Log("[AI] Fase 3 — passando a vez.");
+        isActiveAndPlaying = false;
+        matchController.AdvanceTurnWithTransition();
     }
 
     // -------------------------------------------------------------------------

@@ -522,6 +522,7 @@ public partial class TurnStateManager
         receiver.ClearTemporarySortingOrder();
         mergeTarget.ClearTemporarySortingOrder();
         cursorController?.PlayLoadSfx();
+        mergeTarget.MarkAsDonorMergedInto(receiver);
         KillEntireEmbarkedChain(mergeTarget, detachSelf: true, deathReason: "morto porque fundiu", killer: receiver);
         consumedParticipants.Add(mergeTarget);
 

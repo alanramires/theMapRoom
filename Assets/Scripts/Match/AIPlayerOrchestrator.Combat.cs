@@ -75,6 +75,36 @@ public partial class AIPlayerOrchestrator
         return true;
     }
 
+    /// <summary>
+    /// Simula ataque a partir de fromCell e retorna true se encontrar opção que atinge o alvo específico.
+    /// </summary>
+    private bool TryFindAttackTargeting(UnitManager unit, Vector3Int fromCell, SensorMovementMode mode,
+        UnitManager specificTarget, out PodeMirarTargetOption result)
+    {
+        result = default;
+        _targetBuffer.Clear();
+
+        bool hasTargets = PodeMirarSensor.CollectTargets(
+            attacker: unit,
+            boardTilemap: boardTilemap,
+            terrainDatabase: terrainDatabase,
+            movementMode: mode,
+            output: _targetBuffer,
+            fromCell: fromCell);
+
+        if (!hasTargets) return false;
+
+        foreach (PodeMirarTargetOption opt in _targetBuffer)
+        {
+            if (opt.targetUnit == specificTarget)
+            {
+                result = opt;
+                return true;
+            }
+        }
+        return false;
+    }
+
     private PlayerAction BuildAttackBatch(UnitManager unit, TeamId myTeam,
         Vector3Int moveFrom, Vector3Int moveTo, PodeMirarTargetOption target)
     {

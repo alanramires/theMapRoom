@@ -44,6 +44,7 @@ MonoBehaviour:
   repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
+  fuseWhileInRepair: 1
   eliteLevel: 0
   combatModifiers: []
   domain: 0
