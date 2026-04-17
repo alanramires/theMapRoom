@@ -182,6 +182,12 @@ public class PanelDialogController : MonoBehaviour
 
         string unitName = ResolveUnitDisplayName(selectedUnit);
         string nextText = BuildStateText(unitName, turnStateManager.CurrentCursorState);
+        if (turnStateManager != null &&
+            (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandService ||
+             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandServiceExecuting))
+        {
+            nextText = turnStateManager.CurrentCursorStateStackDebugText;
+        }
         Color textColor = ResolveActiveTeamColor();
         SetVisible(panelVisible: true, textVisible: true, textValue: nextText, textColor: textColor, force: force);
         RefreshPreviewVisual();

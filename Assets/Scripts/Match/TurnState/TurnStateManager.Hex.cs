@@ -8,6 +8,12 @@ public partial class TurnStateManager
         resolvedCell = currentCell + inputDelta;
         resolvedCell.z = 0;
 
+        if (IsBoardCursorMovementLockedByCurrentState())
+        {
+            resolvedCell = currentCell;
+            return false;
+        }
+
         if (IsInspectingState())
         {
             if (resolvedCell != currentCell)
@@ -113,6 +119,19 @@ public partial class TurnStateManager
             currentCell,
             resolvedCell,
             out resolvedCell);
+    }
+
+    private bool IsBoardCursorMovementLockedByCurrentState()
+    {
+        switch (cursorState)
+        {
+            case CursorState.PlayerMenu:
+            case CursorState.CommandService:
+            case CursorState.CommandServiceExecuting:
+                return true;
+            default:
+                return false;
+        }
     }
 
     private UnitManager FindUnitAtCell(Vector3Int cell)

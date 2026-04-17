@@ -12,7 +12,7 @@ public partial class TurnStateManager
             : CursorState.MoveuParado;
 
         TryApplyForcedEndMovementLayerBeforeSensors(resolvedMovementState);
-        SetCursorState(resolvedMovementState, $"EnterSensorsState(anchor={resolvedMovementState})");
+        Advance(resolvedMovementState, $"EnterSensorsState(anchor={resolvedMovementState})");
         // Garante que o scanner sempre volta ao passo base ao finalizar movimento.
         // Evita herdar substep de fluxos anteriores (suprir/fundir/etc).
         scannerPromptStep = ScannerPromptStep.AwaitingAction;
@@ -152,7 +152,11 @@ public partial class TurnStateManager
             return;
         }
 
-        SetCursorState(onCompleteState, $"HandleMovementAnimationCompleted(target={onCompleteState})", rollback: onCompleteState == CursorState.UnitSelected);
+        if (onCompleteState == CursorState.UnitSelected)
+            Retreat($"HandleMovementAnimationCompleted(target={onCompleteState})");
+        else
+            Advance(onCompleteState, $"HandleMovementAnimationCompleted(target={onCompleteState})");
+
         if (cursorState == CursorState.UnitSelected)
         {
             ClearSensorResults();
@@ -506,7 +510,6 @@ public partial class TurnStateManager
         cursorController.PlayUnitMovementSfx(unit.GetMovementCategory());
     }
 }
-
 
 
 

@@ -55,7 +55,7 @@ public partial class TurnStateManager
     private int commandServicePreviewSelectedIndex = -1;
     private Coroutine commandServiceExecutionRoutine;
     private Coroutine autoCommandServiceRoutine;
-    public bool IsPlayerCursorLockedByCommandService => false;
+    public bool IsPlayerCursorLockedByCommandService => IsCommandServiceExecutingState || IsCommandServiceExecutionRunning;
 
     /// <summary>
     /// Verdadeiro enquanto o Serviço do Comando automático (início de turno) ainda
@@ -65,11 +65,29 @@ public partial class TurnStateManager
     public bool IsAutoCommandServiceBusy => autoCommandServiceRoutine != null || IsCommandServiceExecutionRunning;
 
     private bool IsCommandServiceState => cursorState == CursorState.CommandService;
+    private bool IsCommandServiceExecutingState => cursorState == CursorState.CommandServiceExecuting;
     private bool IsCommandServiceExecutionRunning => commandServiceExecutionRoutine != null;
     private bool IsCommandServiceAwaitingConfirmation =>
         IsCommandServiceState &&
         !IsCommandServiceExecutionRunning &&
         commandServiceQueuedOrders.Count > 0;
+
+    private void EnterCommandServiceState(string reason)
+    {
+        if (CurrentCursorState != CursorState.CommandService)
+            Advance(CursorState.CommandService, reason);
+    }
+
+    private void EnterCommandServiceExecutingState(string reason)
+    {
+        if (CurrentCursorState == CursorState.CommandServiceExecuting)
+            return;
+
+        if (CurrentCursorState != CursorState.CommandService)
+            EnterCommandServiceState($"{reason}: ensure Command");
+
+        Advance(CursorState.CommandServiceExecuting, reason);
+    }
 
     // logica de input para acionar o Servico do Comando via hotkey.
     private void ProcessCommandServiceHotkeyInput()
@@ -88,7 +106,7 @@ public partial class TurnStateManager
 
         TryCloseThreatLayerHotzone();
         if (TryPreviewCommandServiceOrder(out _, emitLogs: true))
-            SetCursorState(CursorState.CommandService, "ProcessCommandServiceHotkeyInput");
+            EnterCommandServiceState("ProcessCommandServiceHotkeyInput");
     }
 
     // logica para acionar o Servico do Comando a partir do menu de unidade no painel lateral, com mensagens de feedback mais especificas para o contexto de uso via menu.
@@ -102,9 +120,9 @@ public partial class TurnStateManager
             return false;
         }
 
-        if (cursorState != CursorState.Neutral)
+        if (cursorState != CursorState.Neutral && cursorState != CursorState.PlayerMenu)
         {
-            message = $"Servico do Comando exige cursor em Neutral (atual: {cursorState}).";
+            message = $"Servico do Comando exige cursor em Neutral/PlayerMenu (atual: {cursorState}).";
             return false;
         }
 
@@ -112,7 +130,7 @@ public partial class TurnStateManager
         if (!TryPreviewCommandServiceOrder(out message, emitLogs: true))
             return false;
 
-        SetCursorState(CursorState.CommandService, "TryOpenCommandServiceFromMenu");
+        EnterCommandServiceState("TryOpenCommandServiceFromMenu");
         return true;
     }
 
@@ -137,7 +155,8 @@ public partial class TurnStateManager
                 "command_service.executing",
                 "Servico do comando: executando"),
             2.2f);
-        SetCursorState(CursorState.CommandService, "TryStartCommandServiceOrder");
+        EnterCommandServiceState("TryStartCommandServiceOrder");
+        EnterCommandServiceExecutingState("TryStartCommandServiceOrder: executing");
         commandServiceExecutionRoutine = StartCoroutine(ExecuteCommandServiceOrderSequence());
         return true;
     }
@@ -196,9 +215,11 @@ public partial class TurnStateManager
             return false;
         }
 
-        if (cursorState != CursorState.Neutral && cursorState != CursorState.CommandService)
+        if (cursorState != CursorState.Neutral &&
+            cursorState != CursorState.PlayerMenu &&
+            cursorState != CursorState.CommandService)
         {
-            message = $"Servico do Comando (\"X\") exige cursor em Neutral/CommandService (atual: {cursorState}).";
+            message = $"Servico do Comando (\"X\") exige cursor em Neutral/PlayerMenu/CommandService (atual: {cursorState}).";
             if (emitLogs)
                 Debug.Log(message);
             ClearPendingCommandServiceConfirmation();
@@ -232,6 +253,9 @@ public partial class TurnStateManager
             out string reason,
             commandServiceInvalidOrders);
 
+        int collectedOrderCount = commandServiceQueuedOrders.Count;
+        int filteredAlreadyServedCount = 0;
+        List<string> filteredAlreadyServedNames = null;
         for (int i = commandServiceQueuedOrders.Count - 1; i >= 0; i--)
         {
             ServicoDoComandoOption order = commandServiceQueuedOrders[i];
@@ -243,13 +267,29 @@ public partial class TurnStateManager
             }
 
             if (target.ReceivedSuppliesThisTurn || WasUnitServedByCommandThisTurn(target))
+            {
+                filteredAlreadyServedCount++;
+                filteredAlreadyServedNames ??= new List<string>();
+                if (filteredAlreadyServedNames.Count < 4)
+                    filteredAlreadyServedNames.Add(ResolveUnitRuntimeName(target));
                 commandServiceQueuedOrders.RemoveAt(i);
+            }
         }
 
         if (commandServiceQueuedOrders.Count <= 0 &&
             (canRun || string.IsNullOrWhiteSpace(reason)))
         {
-            reason = "Todas as unidades elegiveis ja receberam servico nesta rodada.";
+            if (filteredAlreadyServedCount > 0 && filteredAlreadyServedCount >= collectedOrderCount)
+            {
+                string examples = filteredAlreadyServedNames != null && filteredAlreadyServedNames.Count > 0
+                    ? $" Ex.: {string.Join(", ", filteredAlreadyServedNames)}."
+                    : string.Empty;
+                reason = $"Todas as unidades elegiveis ja receberam servico nesta rodada ({filteredAlreadyServedCount}).{examples}";
+            }
+            else
+            {
+                reason = "Todas as unidades elegiveis foram filtradas antes da execucao.";
+            }
         }
 
         if (!canRun || commandServiceQueuedOrders.Count <= 0)
@@ -665,7 +705,7 @@ public partial class TurnStateManager
                     2.6f);
             }
             cursorController?.PlayLoadSfx();
-            SetCursorState(CursorState.Neutral, "ExecuteCommandServiceOrderSequence: no served targets");
+            ExecuteAndReset("ExecuteCommandServiceOrderSequence: no served targets");
             yield break;
         }
 
@@ -701,7 +741,7 @@ public partial class TurnStateManager
         }
             Debug.Log(BuildCommandServiceDetailedReportLog(detailedReport));
             cursorController?.PlayLoadSfx();
-            SetCursorState(CursorState.Neutral, "ExecuteCommandServiceOrderSequence: completed");
+            ExecuteAndReset("ExecuteCommandServiceOrderSequence: completed");
         }
         finally
         {
@@ -714,7 +754,7 @@ public partial class TurnStateManager
             ClearCommandServicePreviewDimmedUnits();
             RestoreSupplyEmbarkedSelectionVisuals();
             commandServiceExecutionRoutine = null;
-            SetCursorState(CursorState.Neutral, "ExecuteCommandServiceOrderSequence: cleanup");
+            ExecuteAndReset("ExecuteCommandServiceOrderSequence: cleanup");
         }
     }
 
@@ -750,6 +790,7 @@ public partial class TurnStateManager
             Confirmed = true,
             DebugLabel = "CommandService: confirm"
         });
+        EnterCommandServiceExecutingState("TryConfirmPendingCommandServiceOrder");
         commandServiceExecutionRoutine = StartCoroutine(ExecuteCommandServiceOrderSequence());
         return true;
     }
@@ -759,7 +800,7 @@ public partial class TurnStateManager
         if (!IsCommandServiceState)
             return;
         ClearPendingCommandServiceConfirmation();
-        SetCursorState(CursorState.Neutral, "ExitCommandServiceStateToNeutral", rollback: true);
+        Retreat("ExitCommandServiceStateToNeutral");
     }
 
     private void ClearPendingCommandServiceConfirmation()
@@ -784,6 +825,8 @@ public partial class TurnStateManager
         commandServiceServedUnitInstanceIds.Clear();
         ClearPendingCommandServiceConfirmation();
         ClearCommandServicePreviewNavigation();
+        if (cursorState == CursorState.CommandService || cursorState == CursorState.CommandServiceExecuting)
+            ExecuteAndReset("ResetCommandServiceReplayTransientState");
     }
 
     private void RefreshCommandServiceServedCacheScope()
@@ -2222,8 +2265,3 @@ public partial class TurnStateManager
         autoCommandServiceRoutine = null;
     }
 }
-
-
-
-
-

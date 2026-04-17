@@ -58,7 +58,11 @@ public class LogManager : MonoBehaviour
 
         instance = this;
         if (dontDestroyOnLoad)
+        {
+            if (transform.parent != null)
+                transform.SetParent(null);
             DontDestroyOnLoad(gameObject);
+        }
 
         EnsureCategoriesComplete();
         RebuildCache();

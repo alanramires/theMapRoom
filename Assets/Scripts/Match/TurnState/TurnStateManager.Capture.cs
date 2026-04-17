@@ -35,7 +35,7 @@ public partial class TurnStateManager
 
         cursorController?.PlayConfirmSfx();
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Capture, "CaptureActionRequested");
-        SetCursorState(CursorState.Capturando, "HandleCaptureActionRequested");
+        Advance(CursorState.Capturando, "HandleCaptureActionRequested");
         ClearCommittedPathVisual();
         StartCoroutine(ExecuteCaptureSequence(target));
     }

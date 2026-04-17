@@ -115,7 +115,7 @@ public partial class TurnStateManager
         cursorController?.PlayConfirmSfx();
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Disembark, "DisembarkActionRequested");
         cursorStateBeforeDesembarcando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        SetCursorState(CursorState.Desembarcando, "HandleDisembarkActionRequested");
+        Advance(CursorState.Desembarcando, "HandleDisembarkActionRequested");
         ClearCommittedPathVisual();
         disembarkQueuedOrders.Clear();
         EnterDisembarkPassengerSelectStep();
@@ -380,8 +380,8 @@ public partial class TurnStateManager
         if (cursorState != CursorState.Desembarcando)
             return;
 
-        CursorState targetMovementState = cursorStateBeforeDesembarcando == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        SetCursorState(targetMovementState, "ExitDisembarkStateToMovement", rollback: true);
+        Retreat("ExitDisembarkStateToMovement");
+        CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
         if (cursorController != null && selectedUnit != null)
@@ -1187,7 +1187,5 @@ public partial class TurnStateManager
         return true;
     }
 }
-
-
 
 

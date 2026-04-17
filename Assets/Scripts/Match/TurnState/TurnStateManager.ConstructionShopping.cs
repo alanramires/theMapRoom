@@ -37,7 +37,7 @@ public partial class TurnStateManager
 
         shoppingConstruction = construction;
         shoppingSelectedIndex = 0;
-        SetCursorState(CursorState.ShoppingAndServices, "TryEnterConstructionShoppingState: ally construction with units for sale");
+        Advance(CursorState.ShoppingAndServices, "TryEnterConstructionShoppingState: ally construction with units for sale");
         RefreshShoppingSelectionPresentation(logOptions: false);
         LogConstructionShoppingPanel();
         return true;
@@ -49,7 +49,10 @@ public partial class TurnStateManager
         shoppingUnitsForSale.Clear();
         shoppingSelectedIndex = -1;
         PanelDialogController.ClearExternalText();
-        SetCursorState(CursorState.Neutral, "ExitConstructionShoppingStateToNeutral", rollback: rollback);
+        if (rollback)
+            Retreat("ExitConstructionShoppingStateToNeutral");
+        else
+            ExecuteAndReset("ExitConstructionShoppingStateToNeutral");
     }
 
     private void ProcessConstructionShoppingInput()

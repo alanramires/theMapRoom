@@ -185,6 +185,14 @@ public class DebugManager : MonoBehaviour
             if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
+        else if (command == "SET POSITION")
+        {
+            executed = turnStateManager.TrySyncDebugSelectedUnitPositionFromTransform(out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
         else if (command == "LAND UNIT")
         {
             executed = turnStateManager.TryChangeAltitudeFromDebug(Domain.Land, HeightLevel.Surface, out string message);
@@ -766,6 +774,7 @@ public class DebugManager : MonoBehaviour
             "wake unit - acorda unidade no cursor\n" +
             "wake all units - acorda todas unidades do time ativo\n" +
             "destroy unit - destroi unidade no cursor\n" +
+            "set position - sincroniza a unidade selecionada no Scene/Hierarchy com o hex do Transform\n" +
             "set hp <v>\n" +
             "set autonomy <v>\n" +
             "set fuel <v> (alias de set autonomy)\n" +

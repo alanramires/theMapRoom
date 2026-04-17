@@ -29,7 +29,7 @@ public partial class TurnStateManager
             return false;
         }
 
-        SetCursorState(CursorState.Planning, "TryTogglePlanningModeByHotkey: enter");
+        Advance(CursorState.Planning, "TryTogglePlanningModeByHotkey: enter");
         PanelDialogController.TrySetExternalText("Planning ativo: clique no mapa para destino / unidade. P ou ESC para sair.");
         return true;
     }
@@ -38,7 +38,10 @@ public partial class TurnStateManager
     {
         planningManager?.ExitPlanningMode();
         PanelDialogController.ClearExternalText();
-        SetCursorState(CursorState.Neutral, "ExitPlanningStateToNeutral", rollback: rollback);
+        if (rollback)
+            Retreat("ExitPlanningStateToNeutral");
+        else
+            ExecuteAndReset("ExitPlanningStateToNeutral");
     }
 
     public bool TryExecuteTurnStartRallyQueueIfIdle()
@@ -89,7 +92,7 @@ public partial class TurnStateManager
         if (cursorState == CursorState.TurnStartRallyQueue)
             return;
 
-        SetCursorState(CursorState.TurnStartRallyQueue, "TurnStartRallyQueue: begin");
+        Advance(CursorState.TurnStartRallyQueue, "TurnStartRallyQueue: begin");
     }
 
     private void ExitTurnStartRallyCursorState()
@@ -97,7 +100,7 @@ public partial class TurnStateManager
         if (cursorState != CursorState.TurnStartRallyQueue)
             return;
 
-        SetCursorState(CursorState.Neutral, "TurnStartRallyQueue: completed");
+        ExecuteAndReset("TurnStartRallyQueue: completed");
     }
 
     public IEnumerator ExecutePlanningMoveOnlyAlongPath(
@@ -132,7 +135,7 @@ public partial class TurnStateManager
             replayManager?.EnsureCurrentUnitActionBuffer(unit, originCell);
 
             SetSelectedUnit(unit);
-            SetCursorState(CursorState.UnitSelected, "ExecutePlanningMoveOnlyAlongPath: select");
+            Advance(CursorState.UnitSelected, "ExecutePlanningMoveOnlyAlongPath: select");
 
             BeginMovementToSelectedCell(path);
 

@@ -216,7 +216,7 @@ public sealed class SectorManager : MonoBehaviour
         }
 
         instance = this;
-        if (Application.isPlaying)
+        if (Application.isPlaying && transform.parent == null)
             DontDestroyOnLoad(gameObject);
     }
 

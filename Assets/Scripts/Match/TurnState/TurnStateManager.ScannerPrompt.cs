@@ -127,7 +127,6 @@ public partial class TurnStateManager
     private bool combatExecutionInProgress;
     private bool mergeExecutionInProgress;
     private bool suppressInitialMirandoAutoFocus;
-    private CursorState cursorStateBeforeMirando = CursorState.MoveuParado;
     private CursorState cursorStateBeforeEmbarcando = CursorState.MoveuParado;
     private CursorState cursorStateBeforePousando = CursorState.MoveuParado;
     private CursorState lastLoggedCursorState = (CursorState)(-1);
@@ -418,7 +417,7 @@ public partial class TurnStateManager
 
         string targetName = ResolveDebugUnitName(target);
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
-        SetCursorState(CursorState.RemovingUnit, "ProcessDestroyUnitHotkeyInput");
+        Advance(CursorState.RemovingUnit, "ProcessDestroyUnitHotkeyInput");
         cursorController?.PlayConfirmSfx();
         RuntimeLog("[Destroy Unit] Confirmar com Enter | Cancelar com ESC.");
     }
@@ -460,7 +459,7 @@ public partial class TurnStateManager
 
         string targetName = ResolveDebugUnitName(target);
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
-        SetCursorState(CursorState.RemovingUnit, "TryOpenDestroyUnitPromptFromMenu");
+        Advance(CursorState.RemovingUnit, "TryOpenDestroyUnitPromptFromMenu");
         message = "[Destroy Unit] Confirmar com Enter | Cancelar com ESC.";
         RuntimeLog(message);
         return true;
@@ -568,7 +567,10 @@ public partial class TurnStateManager
         if (logCanceled)
             RuntimeLog("[Destroy Unit] Cancelado.");
         PanelDialogController.ClearExternalText();
-        SetCursorState(CursorState.Neutral, "ExitRemovingUnitStateToNeutral", rollback: logCanceled);
+        if (logCanceled)
+            Retreat("ExitRemovingUnitStateToNeutral");
+        else
+            ExecuteAndReset("ExitRemovingUnitStateToNeutral");
     }
 
     private bool HandleScannerPromptCancel()
@@ -708,7 +710,7 @@ public partial class TurnStateManager
             ClearEnemyThreatLayersOverlay();
             scannerPromptStep = ScannerPromptStep.AwaitingAction;
             if (cursorState == CursorState.InspectingHotZone)
-                SetCursorState(CursorState.Neutral, "HandleScannerPromptCancel: threat hot zone close", rollback: true);
+                Retreat("HandleScannerPromptCancel: threat hot zone close");
             return true;
         }
 
@@ -742,7 +744,7 @@ public partial class TurnStateManager
                     handledThreatLayerInput = true;
                     TryCloseThreatLayerHotzone();
                     if (cursorState == CursorState.InspectingHotZone)
-                        SetCursorState(CursorState.Neutral, "ProcessScannerPromptInput: hot zone closed by Z", rollback: true);
+                        Retreat("ProcessScannerPromptInput: hot zone closed by Z");
                     return;
                 }
 
@@ -777,7 +779,7 @@ public partial class TurnStateManager
                 {
                     TryCloseThreatLayerHotzone();
                     if (cursorState != CursorState.Neutral)
-                        SetCursorState(CursorState.Neutral, "ProcessScannerPromptInput: hot zone auto-dismiss by input", rollback: true);
+                        Retreat("ProcessScannerPromptInput: hot zone auto-dismiss by input");
                 }
                 return;
             }
@@ -1000,7 +1002,7 @@ public partial class TurnStateManager
 
         cursorStateBeforePousando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Land, "LandActionRequested");
-        SetCursorState(CursorState.Pousando, "HandleLandingSensorRequested");
+        Advance(CursorState.Pousando, "HandleLandingSensorRequested");
         ClearCommittedPathVisual();
         scannerSelectedLandingIndex = 0;
         if (cachedLandingOptions.Count == 1)
@@ -1040,7 +1042,7 @@ public partial class TurnStateManager
         }
 
         scannerPromptStep = ScannerPromptStep.ThreatLayerTeamSelect;
-        SetCursorState(CursorState.InspectingHotZone, "HandleThreatLayersActionRequested");
+        Advance(CursorState.InspectingHotZone, "HandleThreatLayersActionRequested");
         cursorController?.PlayConfirmSfx();
         RuntimeLog(PanelDialogController.ResolveDialogMessage(
             "threat_layers.open",
@@ -1062,7 +1064,7 @@ public partial class TurnStateManager
                 return false;
 
             SetSelectedUnit(unitUnderCursor);
-            SetCursorState(CursorState.UnitSelected, "TryChangeAltitudeFromDebug(auto-select)");
+            Advance(CursorState.UnitSelected, "TryChangeAltitudeFromDebug(auto-select)");
             message = $"Unidade auto-selecionada no cursor {FormatMapCellWithZ(cursorCell)}.";
         }
 
@@ -1104,7 +1106,7 @@ public partial class TurnStateManager
         if (cursorState != CursorState.Pousando)
         {
             cursorStateBeforePousando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-            SetCursorState(CursorState.Pousando, "TryChangeAltitudeFromDebug");
+            Advance(CursorState.Pousando, "TryChangeAltitudeFromDebug");
             ClearCommittedPathVisual();
         }
 
@@ -1135,7 +1137,7 @@ public partial class TurnStateManager
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Embark, "EmbarkActionRequested");
         // Mesma regra do Mirando: ao entrar em um submenu de sensor, oculta o preview de movimento.
         cursorStateBeforeEmbarcando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        SetCursorState(CursorState.Embarcando, "HandleEmbarkActionRequested");
+        Advance(CursorState.Embarcando, "HandleEmbarkActionRequested");
         ClearCommittedPathVisual();
         scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
         scannerSelectedEmbarkIndex = 0;
@@ -1478,12 +1480,13 @@ public partial class TurnStateManager
                 return true;
             }
 
-            ExitLandingStateToMovement(rollback: false);
+            ExitLandingStateToMovement();
             RefreshSensorsForCurrentState();
             return false;
         }
 
-        SetCursorState(CursorState.UnitSelected, "ExecuteLandingOptionSequence: debug keep turn");
+        ExecuteAndReset("ExecuteLandingOptionSequence: debug keep turn reset");
+        Advance(CursorState.UnitSelected, "ExecuteLandingOptionSequence: debug keep turn");
         scannerPromptStep = ScannerPromptStep.AwaitingAction;
         ClearSensorResults();
         PaintSelectedUnitMovementRange();
@@ -3479,9 +3482,6 @@ public partial class TurnStateManager
         bool suppressInitialFocus = suppressInitialMirandoAutoFocus;
         suppressInitialMirandoAutoFocus = false;
 
-        if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
-            cursorStateBeforeMirando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-
         BuildMirandoSelectionEntries();
         if (GetMirandoEntryCount() <= 0)
             return;
@@ -3489,7 +3489,7 @@ public partial class TurnStateManager
         // Ao sair do fluxo de movimento para mirar, oculta o rastro legado do caminho comprometido.
         ClearCommittedPathVisual();
 
-        SetCursorState(CursorState.Mirando, "EnterMirandoState");
+        Advance(CursorState.Mirando, "EnterMirandoState");
         if (cursorController != null)
             RecordCinematicAimAction(cursorController.CurrentCell);
         scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
@@ -3833,13 +3833,13 @@ public partial class TurnStateManager
         return SensorMovementMode.MoveuParado;
     }
 
-    private void ExitLandingStateToMovement(bool rollback = true)
+    private void ExitLandingStateToMovement()
     {
         if (cursorState != CursorState.Pousando)
             return;
 
-        CursorState targetMovementState = cursorStateBeforePousando == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        SetCursorState(targetMovementState, "ExitLandingStateToMovement", rollback: rollback);
+        Retreat("ExitLandingStateToMovement");
+        CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
         if (cursorController != null && selectedUnit != null)
@@ -3860,8 +3860,8 @@ public partial class TurnStateManager
         if (cursorState != CursorState.Embarcando)
             return;
 
-        CursorState targetMovementState = cursorStateBeforeEmbarcando == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        SetCursorState(targetMovementState, "ExitEmbarkStateToMovement", rollback: true);
+        Retreat("ExitEmbarkStateToMovement");
+        CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
         if (cursorController != null && selectedUnit != null)
@@ -3882,8 +3882,8 @@ public partial class TurnStateManager
         if (cursorState != CursorState.Mirando)
             return;
 
-        CursorState targetMovementState = cursorStateBeforeMirando == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        SetCursorState(targetMovementState, "ExitMirandoStateToMovement", rollback: true);
+        Retreat("ExitMirandoStateToMovement");
+        CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
         if (cursorController != null && selectedUnit != null)

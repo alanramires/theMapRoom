@@ -67,7 +67,7 @@ public partial class TurnStateManager
 
         cursorController?.PlayConfirmSfx();
         cursorStateBeforeSuprindo = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        SetCursorState(CursorState.Suprindo, "EnterSupplyStateFromSensors");
+        Advance(CursorState.Suprindo, "EnterSupplyStateFromSensors");
         ClearCommittedPathVisual();
         supplyQueuedOrders.Clear();
         RebuildSupplyQueuePreviewTracks();
@@ -286,8 +286,8 @@ public partial class TurnStateManager
         if (cursorState != CursorState.Suprindo)
             return;
 
-        CursorState targetMovementState = cursorStateBeforeSuprindo == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        SetCursorState(targetMovementState, "ExitSupplyStateToMovement", rollback: true);
+        Retreat("ExitSupplyStateToMovement");
+        CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
         if (cursorController != null && selectedUnit != null)
@@ -2058,7 +2058,5 @@ public partial class TurnStateManager
         return null;
     }
 }
-
-
 
 

@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using UnityEngine.UIElements;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -63,7 +65,8 @@ public partial class TurnStateManager : MonoBehaviour
         PlayerMenu = 18,
         AircraftFuelDepletionQueue = 19,
         TurnStartRallyQueue = 20,
-        Replay = 21
+        Replay = 21,
+        CommandServiceExecuting = 22
     }
 
     [Header("References")]
@@ -88,13 +91,15 @@ public partial class TurnStateManager : MonoBehaviour
     // Audio de combate agora e centralizado no CursorController.
 
     [Header("State")]
-    [SerializeField] private CursorState cursorState = CursorState.Neutral;
     [SerializeField] private UnitManager selectedUnit;
     [SerializeField] [Range(0.05f, 1f)] private float movementRangeAlpha = 0.6f;
     [SerializeField] [Range(0.05f, 1f)] private float lineOfFireAlpha = 0.45f;
     [Header("Turn Transition")]
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.1f;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPostDelay = 0f;
+    [Header("FSM Debug UI")]
+    [SerializeField] private UIDocument fsmDebugDocument;
+    [SerializeField] private string fsmDebugElementName = "FSM";
 
     private readonly List<Vector3Int> paintedRangeCells = new List<Vector3Int>();
     private readonly HashSet<Vector3Int> paintedRangeLookup = new HashSet<Vector3Int>();
@@ -137,8 +142,12 @@ public partial class TurnStateManager : MonoBehaviour
     private bool turnStartRallyExecutionInProgress;
     private readonly List<PlayerActionSubStep> turnStartFuelDepletionReplaySubSteps = new List<PlayerActionSubStep>();
     private readonly HashSet<int> debugTempMoveUnitInstanceIds = new HashSet<int>();
+    private readonly Stack<CursorState> stateStack = new Stack<CursorState>();
+    private TextElement fsmDebugText;
 
-    public CursorState CurrentCursorState => cursorState;
+    public CursorState CurrentCursorState => stateStack.Count > 0 ? stateStack.Peek() : CursorState.Neutral;
+    public string CurrentCursorStateStackDebugText => BuildFsmDebugText(horizontal: true);
+    private CursorState cursorState => CurrentCursorState;
     public UnitManager SelectedUnit => selectedUnit;
     public TerrainDatabase TerrainDatabaseRef => terrainDatabase;
     public WeaponPriorityData WeaponPriorityDataRef => weaponPriorityData;
@@ -161,10 +170,10 @@ public partial class TurnStateManager : MonoBehaviour
         || turnStartRallyExecutionInProgress;
     public bool IsTurnStartFuelDepletionExecutionInProgress =>
         turnStartFuelDepletionExecutionInProgress
-        || cursorState == CursorState.AircraftFuelDepletionQueue;
+        || CurrentCursorState == CursorState.AircraftFuelDepletionQueue;
     public bool IsTurnStartRallyExecutionInProgress =>
         turnStartRallyExecutionInProgress
-        || cursorState == CursorState.TurnStartRallyQueue;
+        || CurrentCursorState == CursorState.TurnStartRallyQueue;
 
     private void LogStateStep(string step, bool rollback = false)
     {
@@ -173,7 +182,7 @@ public partial class TurnStateManager : MonoBehaviour
 
         string rollbackTag = rollback ? " [roll back]" : string.Empty;
         string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
-        Debug.Log($"[TurnState]{rollbackTag} state={cursorState} | step={step} | selected={selectedName}");
+        Debug.Log($"[TurnState]{rollbackTag} state={CurrentCursorState} | step={step} | selected={selectedName}");
     }
 
     private void RuntimeLog(string message)
@@ -199,9 +208,8 @@ public partial class TurnStateManager : MonoBehaviour
         PanelDialogController.TrySetTransientText(normalized, durationSeconds);
     }
 
-    private void SetCursorState(CursorState nextState, string reason, bool rollback = false)
+    private void ApplyStateTransition(CursorState previous, CursorState nextState, string reason, bool rollback = false)
     {
-        CursorState previous = cursorState;
         bool shouldClearThreatOverlayOnTransition =
             nextState != CursorState.Neutral &&
             nextState != CursorState.InspectingHotZone;
@@ -212,7 +220,6 @@ public partial class TurnStateManager : MonoBehaviour
             ClearEnemyThreatLayersOverlay();
         }
 
-        cursorState = nextState;
         if (nextState == CursorState.Neutral && previous != CursorState.Neutral)
         {
             if (enableTurnStateRuntimeLogs)
@@ -226,12 +233,195 @@ public partial class TurnStateManager : MonoBehaviour
 
         string rollbackTag = rollback ? " [roll back]" : string.Empty;
         string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
-        Debug.Log($"[TurnState]{rollbackTag} transition={previous} -> {nextState} | reason={reason} | selected={selectedName}");
+        Debug.Log($"[TurnState]{rollbackTag} transition={previous} -> {nextState} | reason={reason} | selected={selectedName} | stack={FormatStateStack()}");
     }
+
+    private void Advance(CursorState nextState, string reason)
+    {
+        EnsureStateStackInitialized();
+        CursorState previous = CurrentCursorState;
+        stateStack.Push(nextState);
+        ApplyStateTransition(previous, nextState, reason, rollback: false);
+        HandleStateAdvanced(previous, nextState, reason);
+        RefreshFsmDebugText();
+    }
+
+    private void Retreat(string reason)
+    {
+        EnsureStateStackInitialized();
+        CursorState previous = CurrentCursorState;
+        if (stateStack.Count > 1)
+            stateStack.Pop();
+        CursorState revealed = CurrentCursorState;
+        ApplyStateTransition(previous, revealed, reason, rollback: true);
+        HandleStateRevealedByRetreat(previous, revealed, reason);
+        RefreshFsmDebugText();
+    }
+
+    private void ExecuteAndReset(string reason)
+    {
+        CursorState previous = CurrentCursorState;
+        stateStack.Clear();
+        stateStack.Push(CursorState.Neutral);
+        ApplyStateTransition(previous, CursorState.Neutral, reason, rollback: false);
+        HandleStateStackReset(previous, reason);
+        RefreshFsmDebugText();
+    }
+
+    private void EnsureStateStackInitialized()
+    {
+        if (stateStack.Count == 0)
+            stateStack.Push(CursorState.Neutral);
+    }
+
+    private string FormatStateStack()
+    {
+        if (stateStack.Count == 0)
+            return "(empty)";
+
+        CursorState[] states = stateStack.ToArray();
+        StringBuilder sb = new StringBuilder();
+        for (int i = states.Length - 1; i >= 0; i--)
+        {
+            if (sb.Length > 0)
+                sb.Append(" > ");
+            sb.Append(states[i]);
+        }
+
+        return sb.ToString();
+    }
+
+    private void BindFsmDebugText()
+    {
+        fsmDebugText = null;
+        if (string.IsNullOrWhiteSpace(fsmDebugElementName))
+            return;
+
+        if (TryBindFsmDebugText(fsmDebugDocument))
+            return;
+
+        UIDocument[] documents = FindObjectsByType<UIDocument>(FindObjectsInactive.Include);
+        foreach (UIDocument document in documents)
+        {
+            if (TryBindFsmDebugText(document))
+                return;
+        }
+    }
+
+    private bool TryBindFsmDebugText(UIDocument document)
+    {
+        if (document == null || document.rootVisualElement == null)
+            return false;
+
+        fsmDebugText = document.rootVisualElement.Q<TextElement>(fsmDebugElementName);
+        if (fsmDebugText == null)
+            fsmDebugText = FindFsmDebugTextIgnoreCase(document.rootVisualElement, fsmDebugElementName);
+        return fsmDebugText != null;
+    }
+
+    private static TextElement FindFsmDebugTextIgnoreCase(VisualElement root, string elementName)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(elementName))
+            return null;
+
+        if (root is TextElement rootText &&
+            string.Equals(root.name, elementName, StringComparison.OrdinalIgnoreCase))
+        {
+            return rootText;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            TextElement childMatch = FindFsmDebugTextIgnoreCase(root[i], elementName);
+            if (childMatch != null)
+                return childMatch;
+        }
+
+        return null;
+    }
+
+    private void RefreshFsmDebugText()
+    {
+        if (fsmDebugText == null || fsmDebugText.panel == null)
+            BindFsmDebugText();
+        if (fsmDebugText == null)
+            return;
+
+        fsmDebugText.text = BuildFsmDebugText();
+    }
+
+    private string BuildFsmDebugText()
+    {
+        return BuildFsmDebugText(horizontal: true);
+    }
+
+    private string BuildFsmDebugText(bool horizontal)
+    {
+        EnsureStateStackInitialized();
+        CursorState[] states = stateStack.ToArray();
+        if (states.Length == 0)
+            return CursorState.Neutral.ToString();
+
+        StringBuilder sb = new StringBuilder();
+        if (horizontal)
+        {
+            for (int i = states.Length - 1; i >= 0; i--)
+            {
+                if (sb.Length > 0)
+                    sb.Append(" > ");
+                sb.Append(FormatCursorStateForDebug(states[i]));
+            }
+            return sb.ToString();
+        }
+
+        for (int i = 0; i < states.Length; i++)
+        {
+            if (sb.Length > 0)
+                sb.AppendLine();
+            sb.Append(FormatCursorStateForDebug(states[i]));
+        }
+        return sb.ToString();
+    }
+
+    private static string FormatCursorStateForDebug(CursorState state)
+    {
+        switch (state)
+        {
+            case CursorState.UnitSelected:
+                return "Unit Selected";
+            case CursorState.MoveuAndando:
+                return "Moveu Andando";
+            case CursorState.MoveuParado:
+                return "Moveu Parado";
+            case CursorState.InspectingUnit:
+                return "Inspecting Unit";
+            case CursorState.InspectingBuilding:
+                return "Inspecting Building";
+            case CursorState.InspectingHotZone:
+                return "Inspecting Hot Zone";
+            case CursorState.CommandService:
+                return "Command";
+            case CursorState.CommandServiceExecuting:
+                return "Executing";
+            case CursorState.RemovingUnit:
+                return "Removing Unit";
+            case CursorState.PlayerMenu:
+                return "Player Menu";
+            case CursorState.AircraftFuelDepletionQueue:
+                return "Aircraft Fuel Depletion Queue";
+            case CursorState.TurnStartRallyQueue:
+                return "Turn Start Rally Queue";
+            case CursorState.ShoppingAndServices:
+                return "Shopping And Services";
+            default:
+                return state.ToString();
+        }
+    }
+
     private void NotifySensorsReady()
     {
         string selectedId = selectedUnit != null ? selectedUnit.InstanceId.ToString() : "none";
-        Debug.Log($"[Replay][Dispatch] OnSensorsReady fired state={cursorState} selected={selectedId}");
+        Debug.Log($"[Replay][Dispatch] OnSensorsReady fired state={CurrentCursorState} selected={selectedId}");
         OnSensorsReady?.Invoke();
     }
 
@@ -354,6 +544,55 @@ public partial class TurnStateManager : MonoBehaviour
 
         message = $"Wake all units: time ativo {TeamUtils.GetName(activeTeam)} | reativadas {wokeUnits}/{totalTeamUnits}.";
         Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    public bool TrySyncDebugSelectedUnitPositionFromTransform(out string message)
+    {
+        message = string.Empty;
+        UnitManager target = null;
+
+#if UNITY_EDITOR
+        GameObject selectedObject = Selection.activeGameObject;
+        if (selectedObject != null)
+        {
+            target = selectedObject.GetComponent<UnitManager>();
+            if (target == null)
+                target = selectedObject.GetComponentInParent<UnitManager>();
+            if (target == null)
+                target = selectedObject.GetComponentInChildren<UnitManager>();
+        }
+#endif
+
+        if (target == null)
+            target = selectedUnit;
+
+        if (target == null)
+        {
+            message = "Nenhuma unidade selecionada no Scene/Hierarchy nem no TurnStateManager.";
+            return false;
+        }
+
+        Tilemap boardMap = target.BoardTilemap != null
+            ? target.BoardTilemap
+            : terrainTilemap != null ? terrainTilemap : cursorController != null ? cursorController.BoardTilemap : null;
+        if (boardMap == null)
+        {
+            message = $"Tilemap nao encontrado para sincronizar {ResolveDebugUnitName(target)}.";
+            return false;
+        }
+
+        Vector3Int previousCell = target.CurrentCellPosition;
+        previousCell.z = 0;
+        Vector3Int targetCell = HexCoordinates.WorldToCell(boardMap, target.transform.position);
+        targetCell.z = 0;
+
+        if (target.BoardTilemap == null)
+            target.SetBoardTilemap(boardMap);
+        target.SetCurrentCellPosition(targetCell, enforceFinalOccupancyRule: false);
+        target.RefreshRuntimeVisualState();
+
+        message = $"Posicao sincronizada: {ResolveDebugUnitName(target)} {FormatMapCellWithZ(previousCell)} -> {FormatMapCellWithZ(targetCell)}.";
         return true;
     }
 
@@ -835,7 +1074,11 @@ public partial class TurnStateManager : MonoBehaviour
 
     private void Awake()
     {
+        stateStack.Clear();
+        stateStack.Push(CursorState.Neutral);
         TryAutoAssignReferences();
+        BindFsmDebugText();
+        RefreshFsmDebugText();
     }
 
 #if UNITY_EDITOR
@@ -905,7 +1148,7 @@ public partial class TurnStateManager : MonoBehaviour
             RestoreTemporaryTakeoffSelectionStateIfAny();
 
         selectedUnit = null;
-        SetCursorState(CursorState.Neutral, "ClearSelectionAndReturnToNeutral", rollback: !keepPreparedFuelCost);
+        ExecuteAndReset("ClearSelectionAndReturnToNeutral");
         ClearMovementRange();
         ClearCommittedMovement();
     }
@@ -1299,7 +1542,7 @@ public partial class TurnStateManager : MonoBehaviour
         if (cursorState == CursorState.AircraftFuelDepletionQueue)
             return;
 
-        SetCursorState(CursorState.AircraftFuelDepletionQueue, "TurnStartFuelDepletionQueue: begin");
+        Advance(CursorState.AircraftFuelDepletionQueue, "TurnStartFuelDepletionQueue: begin");
     }
 
     private void ExitTurnStartFuelDepletionCursorState()
@@ -1307,7 +1550,7 @@ public partial class TurnStateManager : MonoBehaviour
         if (cursorState != CursorState.AircraftFuelDepletionQueue)
             return;
 
-        SetCursorState(CursorState.Neutral, "TurnStartFuelDepletionQueue: completed");
+        ExecuteAndReset("TurnStartFuelDepletionQueue: completed");
     }
 
     private void ClearSelectionForTurnStartFuelDepletionQueue()

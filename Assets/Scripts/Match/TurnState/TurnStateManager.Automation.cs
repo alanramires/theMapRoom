@@ -1268,7 +1268,7 @@ public partial class TurnStateManager
         if (!TryPreviewCommandServiceOrder(out _, emitLogs: false))
             return false;
 
-        SetCursorState(CursorState.CommandService, "HandleAutomatedCommandServiceRequested");
+        EnterCommandServiceState("HandleAutomatedCommandServiceRequested");
         return true;
     }
 
@@ -1282,12 +1282,10 @@ public partial class TurnStateManager
 
         string targetName = ResolveDebugUnitName(target);
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
-        SetCursorState(CursorState.RemovingUnit, "HandleAutomatedRemoveUnitRequested");
+        Advance(CursorState.RemovingUnit, "HandleAutomatedRemoveUnitRequested");
         return true;
     }
 }
-
-
 
 
 

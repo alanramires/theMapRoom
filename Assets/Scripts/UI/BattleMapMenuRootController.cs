@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -97,8 +98,25 @@ public class BattleMapMenuRootController : MonoBehaviour
     private bool previousSendNavigationEvents;
     private int lastConfirmSfxFrame = -1;
     private Vector3Int savedCursorCell;
+    private Coroutine restoreSelectionRoutine;
 
     public bool IsMenuOpen => menuOpen;
+
+    public static bool TryRestoreMenuFromStateStack()
+    {
+        bool restored = false;
+        BattleMapMenuRootController[] controllers = FindObjectsByType<BattleMapMenuRootController>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        for (int i = 0; i < controllers.Length; i++)
+        {
+            BattleMapMenuRootController controller = controllers[i];
+            if (controller != null && controller.RestoreMenuFromStateStack())
+                restored = true;
+        }
+
+        return restored;
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void EnsureSceneInstance()
@@ -279,6 +297,36 @@ public class BattleMapMenuRootController : MonoBehaviour
         PanelDialogController.ClearExternalText();
     }
 
+    private bool RestoreMenuFromStateStack()
+    {
+        TryAutoAssignReferences();
+        EnsureButtonsCache();
+
+        if (menuRoot == null || turnStateManager == null)
+            return false;
+        if (turnStateManager.CurrentCursorState != TurnStateManager.CursorState.PlayerMenu)
+            return false;
+
+        if (cursorController != null)
+            savedCursorCell = cursorController.CurrentCell;
+
+        menuRoot.SetActive(true);
+        menuOpen = true;
+        pendingOpenOnNextNeutral = false;
+        saveLoadPromptOpen = false;
+        exitConfirmOpen = false;
+        RestoreUndockedLayout();
+        hasLastUndockedScreenRect = false;
+        cursorNearUndockedDockRegion = false;
+        CaptureAndDisableEventSystemNavigation();
+        RefreshButtonInteractability();
+        SetPanel(activePanel, resetIndex: false);
+        SelectCurrentButton();
+        ScheduleRestoreSelectionNextFrame();
+        PanelDialogController.ClearExternalText();
+        return true;
+    }
+
     private void RefreshButtonInteractability()
     {
         bool isAiTurn = matchController != null && matchController.IsPlayerInputLockedByActiveAI();
@@ -297,6 +345,11 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     private void CloseMenu(bool restoreCursor)
     {
+        CloseMenu(restoreCursor, exitPlayerMenuState: true);
+    }
+
+    private void CloseMenu(bool restoreCursor, bool exitPlayerMenuState)
+    {
         if (menuRoot != null)
             menuRoot.SetActive(false);
 
@@ -304,7 +357,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         pendingOpenOnNextNeutral = false;
         saveLoadPromptOpen = false;
         exitConfirmOpen = false;
-        turnStateManager?.TryExitPlayerMenuStateToNeutral();
+        if (exitPlayerMenuState)
+            turnStateManager?.TryExitPlayerMenuStateToNeutral();
         RestoreUndockedLayout();
         hasLastUndockedScreenRect = false;
         cursorNearUndockedDockRegion = false;
@@ -421,6 +475,27 @@ public class BattleMapMenuRootController : MonoBehaviour
             return;
 
         EventSystem.current.SetSelectedGameObject(button.gameObject);
+        button.Select();
+    }
+
+    private void ScheduleRestoreSelectionNextFrame()
+    {
+        if (!isActiveAndEnabled)
+            return;
+
+        if (restoreSelectionRoutine != null)
+            StopCoroutine(restoreSelectionRoutine);
+        restoreSelectionRoutine = StartCoroutine(RestoreSelectionNextFrame());
+    }
+
+    private IEnumerator RestoreSelectionNextFrame()
+    {
+        yield return null;
+        restoreSelectionRoutine = null;
+        if (!menuOpen)
+            yield break;
+
+        SelectCurrentButton();
     }
 
     private void EnsureButtonsCache()
@@ -488,10 +563,13 @@ public class BattleMapMenuRootController : MonoBehaviour
                 ShowStatusSummary();
                 break;
             case MenuAction.Comando:
-                if (!TryCloseMenuForDispatchAndEnsureNeutral())
+                if (!TryCloseMenuForCommandServiceDispatch())
                     break;
                 if (turnStateManager != null && !turnStateManager.TryOpenCommandServiceFromMenu(out string commandMessage))
+                {
+                    turnStateManager.TryExitPlayerMenuStateToNeutral();
                     PanelDialogController.TrySetTransientText(commandMessage, 2.4f);
+                }
                 break;
             case MenuAction.Rodada:
                 if (!TryCloseMenuForDispatchAndEnsureNeutral())
@@ -514,6 +592,8 @@ public class BattleMapMenuRootController : MonoBehaviour
                 PanelDialogController.TrySetTransientText("Config de partida: em desenvolvimento.", 2.4f);
                 break;
             case MenuAction.SaveLoad:
+                if (!CanOpenSaveLoadPromptFromMenu())
+                    break;
                 saveLoadPromptOpen = true;
                 PanelDialogController.TrySetExternalText("Save/Load :: I: salvar | O: carregar | ESC: voltar");
                 break;
@@ -580,6 +660,36 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         string message = $"Menu do jogador: estado nao normalizado para Neutral (atual: {turnStateManager.CurrentCursorState}).";
         PanelDialogController.TrySetTransientText(message, 2.8f);
+        cursorController?.PlayErrorSfx();
+        return false;
+    }
+
+    private bool TryCloseMenuForCommandServiceDispatch()
+    {
+        CloseMenu(restoreCursor: true, exitPlayerMenuState: false);
+        if (turnStateManager == null)
+            return true;
+
+        TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
+        if (state == TurnStateManager.CursorState.PlayerMenu ||
+            state == TurnStateManager.CursorState.Neutral)
+            return true;
+
+        string message = $"Menu do jogador: estado invalido para Servico do Comando (atual: {state}).";
+        PanelDialogController.TrySetTransientText(message, 2.8f);
+        cursorController?.PlayErrorSfx();
+        return false;
+    }
+
+    private bool CanOpenSaveLoadPromptFromMenu()
+    {
+        if (turnStateManager == null)
+            return true;
+
+        if (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral)
+            return true;
+
+        PanelDialogController.TrySetTransientText($"Save/Load bloqueado em {turnStateManager.CurrentCursorState}: volte ao Neutral.", 2.4f);
         cursorController?.PlayErrorSfx();
         return false;
     }

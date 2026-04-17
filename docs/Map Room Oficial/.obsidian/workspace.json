@@ -4,67 +4,20 @@
     "type": "split",
     "children": [
       {
-        "id": "23514136e93de443",
+        "id": "181e4aa7bc0dca21",
         "type": "tabs",
         "children": [
           {
-            "id": "7a690809c8fd2743",
+            "id": "9582886bfd86933b",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "The Map Room.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "The Map Room"
-            }
-          },
-          {
-            "id": "59f499f045fcc63d",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Unidades.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Unidades"
-            }
-          },
-          {
-            "id": "6c9c94f3fc48c559",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "The Map Room 2027 - Pitch.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "The Map Room 2027 - Pitch"
-            }
-          },
-          {
-            "id": "7538b4fe4320d359",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "The Map Room.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "The Map Room"
+              "title": "Nova aba"
             }
           }
-        ],
-        "currentTab": 3
+        ]
       }
     ],
     "direction": "vertical"
@@ -199,13 +152,12 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "The Map Room.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Sumário de The Map Room"
+              "title": "Sumário"
             }
           }
         ],
@@ -226,12 +178,12 @@
       "bases:Criar nova base": false
     }
   },
-  "active": "7538b4fe4320d359",
+  "active": "9582886bfd86933b",
   "lastOpenFiles": [
-    "AI Unit Profile.md",
     "The Map Room.md",
     "Unidades.md",
     "The Map Room 2027 - Pitch.md",
+    "AI Unit Profile.md",
     "dicas"
   ]
 }

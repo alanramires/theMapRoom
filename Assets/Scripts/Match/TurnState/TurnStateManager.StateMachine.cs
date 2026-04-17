@@ -45,6 +45,8 @@ public partial class TurnStateManager
                 return HandleConfirmWhileSuprindo();
             case CursorState.CommandService:
                 return HandleConfirmWhileCommandService();
+            case CursorState.CommandServiceExecuting:
+                return ActionSfx.None;
             case CursorState.RemovingUnit:
                 return HandleConfirmWhileRemovingUnit();
             case CursorState.Planning:
@@ -105,6 +107,8 @@ public partial class TurnStateManager
                 return HandleCancelWhileSuprindo();
             case CursorState.CommandService:
                 return HandleCancelWhileCommandService();
+            case CursorState.CommandServiceExecuting:
+                return ActionSfx.None;
             case CursorState.RemovingUnit:
                 return HandleCancelWhileRemovingUnit();
             case CursorState.Planning:
@@ -136,7 +140,7 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmFromNeutralLikeState()
     {
         if (cursorState != CursorState.Neutral)
-            SetCursorState(CursorState.Neutral, "HandleConfirmFromNeutralLikeState: normalize");
+            ExecuteAndReset("HandleConfirmFromNeutralLikeState: normalize");
 
         if (cursorController == null)
             return ActionSfx.None;
@@ -152,7 +156,7 @@ public partial class TurnStateManager
             {
                 LogEnemyUnitInspection(unit, activeTeam);
                 BeginInspectedHelper(unit);
-                SetCursorState(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: enemy inspect");
+                Advance(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: enemy inspect");
                 DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Inspect);
                 return ActionSfx.Confirm;
             }
@@ -161,7 +165,7 @@ public partial class TurnStateManager
             {
                 Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
                 BeginInspectedHelper(unit, paintThreatOverlay: false);
-                SetCursorState(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: acted ally inspect");
+                Advance(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: acted ally inspect");
                 DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Inspect);
                 return ActionSfx.Confirm;
             }
@@ -175,7 +179,7 @@ public partial class TurnStateManager
             replayManager?.EnsureCurrentUnitActionBuffer(unit, cursorCell);
             SetSelectedUnit(unit);
             ClearInspectedHelper();
-            SetCursorState(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
+            Advance(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
             DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Act);
             return ActionSfx.Confirm;
         }
@@ -188,7 +192,7 @@ public partial class TurnStateManager
         if (!isConstructionAlly)
         {
             BeginInspectedConstructionHelper(construction);
-            SetCursorState(CursorState.InspectingBuilding, "HandleConfirmFromNeutralLikeState: enemy construction inspect");
+            Advance(CursorState.InspectingBuilding, "HandleConfirmFromNeutralLikeState: enemy construction inspect");
             return ActionSfx.Confirm;
         }
 
@@ -199,7 +203,7 @@ public partial class TurnStateManager
         }
 
         BeginInspectedConstructionHelper(construction);
-        SetCursorState(CursorState.InspectingBuilding, "HandleConfirmFromNeutralLikeState: ally construction inspect");
+        Advance(CursorState.InspectingBuilding, "HandleConfirmFromNeutralLikeState: ally construction inspect");
         return ActionSfx.Confirm;
     }
 
@@ -570,7 +574,7 @@ public partial class TurnStateManager
         if (!hasCommittedMovement || committedMovementPath.Count < 2)
         {
             RuntimeLog("[Rollback] Sem caminho comprometido valido. Fallback para UnitSelected.");
-            SetCursorState(CursorState.UnitSelected, "HandleCancelWhileMoveuAndando: fallback without committed path", rollback: true);
+            Retreat("HandleCancelWhileMoveuAndando: fallback without committed path");
             ClearSensorResults();
             PaintSelectedUnitMovementRange();
             return ActionSfx.Cancel;
@@ -581,7 +585,7 @@ public partial class TurnStateManager
         if (!BeginRollbackToSelection())
         {
             RuntimeLog("[Rollback] Falha ao iniciar animacao de rollback. Fallback para UnitSelected.");
-            SetCursorState(CursorState.UnitSelected, "HandleCancelWhileMoveuAndando: rollback animation failed", rollback: true);
+            Retreat("HandleCancelWhileMoveuAndando: rollback animation failed");
             ClearCommittedMovement();
             ClearSensorResults();
             PaintSelectedUnitMovementRange();
@@ -597,7 +601,7 @@ public partial class TurnStateManager
     {
         LogStateStep("HandleCancelWhileMoveuParado", rollback: true);
         RestoreForcedLayerAfterRollbackIfNeeded();
-        SetCursorState(CursorState.UnitSelected, "HandleCancelWhileMoveuParado", rollback: true);
+        Retreat("HandleCancelWhileMoveuParado");
         ClearSensorResults();
         PaintSelectedUnitMovementRange();
         return ActionSfx.Cancel;
@@ -807,7 +811,7 @@ public partial class TurnStateManager
         if (cursorState != CursorState.Neutral)
             return false;
 
-        SetCursorState(CursorState.PlayerMenu, "TryEnterPlayerMenuState");
+        Advance(CursorState.PlayerMenu, "TryEnterPlayerMenuState");
         return true;
     }
 
@@ -816,7 +820,7 @@ public partial class TurnStateManager
         if (cursorState != CursorState.PlayerMenu)
             return;
 
-        SetCursorState(CursorState.Neutral, "TryExitPlayerMenuStateToNeutral", rollback: true);
+        Retreat("TryExitPlayerMenuStateToNeutral");
     }
 
     public bool TryEnterReplayState()
@@ -827,7 +831,7 @@ public partial class TurnStateManager
         if (cursorState != CursorState.Neutral)
             return false;
 
-        SetCursorState(CursorState.Replay, "TryEnterReplayState");
+        Advance(CursorState.Replay, "TryEnterReplayState");
         return true;
     }
 
@@ -836,7 +840,7 @@ public partial class TurnStateManager
         if (cursorState != CursorState.Replay)
             return;
 
-        SetCursorState(CursorState.Neutral, "TryExitReplayStateToNeutral", rollback: true);
+        Retreat("TryExitReplayStateToNeutral");
     }
 }
 

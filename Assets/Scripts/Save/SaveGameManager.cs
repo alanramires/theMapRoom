@@ -151,6 +151,9 @@ public class SaveGameManager : MonoBehaviour
         if (IsPersistenceBlockedByActiveAI())
             return;
 
+        if (promptState == SlotPromptState.None && IsPersistenceBlockedByTurnState())
+            return;
+
         if (promptState != SlotPromptState.None)
         {
             UiInputBlocker.SuppressGameplayInputForFrames(1);
@@ -179,6 +182,8 @@ public class SaveGameManager : MonoBehaviour
     {
         if (IsPersistenceBlockedByActiveAI(showFeedback: true))
             return;
+        if (IsPersistenceBlockedByTurnState(showFeedback: true))
+            return;
         SaveSlot(1);
     }
 
@@ -193,6 +198,9 @@ public class SaveGameManager : MonoBehaviour
 
     public void OpenSaveSlotPromptFromMenu()
     {
+        if (IsPersistenceBlockedByTurnState(showFeedback: true))
+            return;
+
         EnterPlayerMenuStateForPersistencePrompt();
         if (IsPersistenceBlockedByActiveAI(showFeedback: true))
         {
@@ -204,6 +212,9 @@ public class SaveGameManager : MonoBehaviour
 
     public void OpenLoadSlotPromptFromMenu()
     {
+        if (IsPersistenceBlockedByTurnState(showFeedback: true))
+            return;
+
         EnterPlayerMenuStateForPersistencePrompt();
         if (IsPersistenceBlockedByActiveAI(showFeedback: true))
         {
@@ -219,6 +230,9 @@ public class SaveGameManager : MonoBehaviour
         double refsStartMs = PerfNowMs();
         TryAutoAssignReferences();
         LogPromptPerf("save_prompt.auto_assign_refs", PerfNowMs() - refsStartMs);
+
+        if (IsPersistenceBlockedByTurnState(showFeedback: true))
+            return;
 
         if (TryBlockAircraftFuelDepletionPersistence(
                 "[Save] Bloqueado: fila de aeronaves caindo em execucao",
@@ -252,6 +266,9 @@ public class SaveGameManager : MonoBehaviour
         double refsStartMs = PerfNowMs();
         TryAutoAssignReferences();
         LogPromptPerf("load_prompt.auto_assign_refs", PerfNowMs() - refsStartMs);
+
+        if (IsPersistenceBlockedByTurnState(showFeedback: true))
+            return;
 
         if (TryBlockAircraftFuelDepletionPersistence(
                 "[Load] Bloqueado: fila de aeronaves caindo em execucao",
@@ -468,6 +485,8 @@ public class SaveGameManager : MonoBehaviour
     {
         if (IsPersistenceBlockedByActiveAI(showFeedback: true))
             return;
+        if (IsPersistenceBlockedByTurnState(showFeedback: true))
+            return;
 
         if (!Application.isPlaying)
         {
@@ -629,6 +648,8 @@ public class SaveGameManager : MonoBehaviour
     {
         if (IsPersistenceBlockedByActiveAI(showFeedback: true))
             return;
+        if (IsPersistenceBlockedByTurnState(showFeedback: true))
+            return;
 
         Debug.Log($"[TRACE][SaveGameManager.LoadSlot] slotIndex={slotIndex}\n{Environment.StackTrace}");
 
@@ -702,6 +723,31 @@ public class SaveGameManager : MonoBehaviour
             PanelDialogController.TrySetTransientText("Turno da IA em execucao: save/load bloqueado.", 2.4f);
         }
 
+        return true;
+    }
+
+    private bool IsPersistenceBlockedByTurnState(bool showFeedback = false)
+    {
+        TryAutoAssignReferences();
+        if (turnStateManager == null)
+            return false;
+
+        TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
+        bool blocked =
+            state == TurnStateManager.CursorState.PlayerMenu ||
+            state == TurnStateManager.CursorState.CommandService ||
+            state == TurnStateManager.CursorState.CommandServiceExecuting;
+        if (!blocked)
+            return false;
+
+        if (showFeedback)
+        {
+            cursorController?.PlayErrorSfx();
+            PanelDialogController.TrySetTransientText($"Save/Load bloqueado em {state}: volte ao Neutral.", 2.4f);
+        }
+
+        if (showFeedback)
+            Debug.LogWarning($"[SaveGame] Save/Load bloqueado: estado atual {state}; volte ao Neutral.");
         return true;
     }
 
@@ -2126,8 +2172,6 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
-
-
 
 
 

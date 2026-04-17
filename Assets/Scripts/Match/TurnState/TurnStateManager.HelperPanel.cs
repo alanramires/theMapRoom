@@ -792,7 +792,7 @@ public partial class TurnStateManager
         if (cursorState == CursorState.InspectingUnit ||
             cursorState == CursorState.InspectingBuilding ||
             cursorState == CursorState.InspectingHotZone)
-            SetCursorState(CursorState.Neutral, "ExitInspectStateToNeutral", rollback: true);
+            Retreat("ExitInspectStateToNeutral");
     }
 
     private void ApplyInspectedThreatOverlay(UnitManager unit)
@@ -891,7 +891,7 @@ public partial class TurnStateManager
         if (hadActiveSelection)
             scannerPromptStep = ScannerPromptStep.AwaitingAction;
         if (cursorState == CursorState.InspectingHotZone)
-            SetCursorState(CursorState.Neutral, "TryCloseThreatLayerHotzone", rollback: true);
+            Retreat("TryCloseThreatLayerHotzone");
         return true;
     }
 

@@ -80,7 +80,7 @@ public partial class TurnStateManager
 
         cursorController?.PlayConfirmSfx();
         cursorStateBeforeFundindo = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        SetCursorState(CursorState.Fundindo, "EnterMergeStateFromSensors");
+        Advance(CursorState.Fundindo, "EnterMergeStateFromSensors");
         ClearCommittedPathVisual();
         mergeQueuedUnits.Clear();
         RebuildMergeQueuePreviewTracks();
@@ -323,8 +323,8 @@ public partial class TurnStateManager
         if (cursorState != CursorState.Fundindo)
             return;
 
-        CursorState targetMovementState = cursorStateBeforeFundindo == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        SetCursorState(targetMovementState, "ExitMergeStateToMovement", rollback: true);
+        Retreat("ExitMergeStateToMovement");
+        CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
         if (cursorController != null && selectedUnit != null)
@@ -1932,5 +1932,3 @@ public partial class TurnStateManager
         return supplyStepsByType.Count;
     }
 }
-
-
