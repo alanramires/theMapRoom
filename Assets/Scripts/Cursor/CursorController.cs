@@ -838,6 +838,11 @@ public class CursorController : MonoBehaviour
             return;
         }
 
+        if (turnStateManager != null &&
+            (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Saving ||
+             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Loading))
+            return;
+
         if (WasAdvanceTurnPressedThisFrame())
         {
             turnStateManager?.TryCloseThreatLayerHotzone();
@@ -845,8 +850,17 @@ public class CursorController : MonoBehaviour
             if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
                 return;
 
+            if (turnStateManager != null && !turnStateManager.TryOpenEndingTurnConfirmation(out string endTurnMessage))
+            {
+                if (!string.IsNullOrWhiteSpace(endTurnMessage))
+                    PanelDialogController.TrySetTransientText(endTurnMessage, 2.4f);
+                PlayErrorSfx();
+                return;
+            }
+
             pendingEndTurnConfirmation = true;
-            PanelDialogController.TrySetExternalText("End Turn :: Confirm");
+            if (turnStateManager == null)
+                PanelDialogController.TrySetExternalText("End Turn :: Confirm");
             PlayBeepSfx();
             return;
         }
@@ -894,9 +908,46 @@ public class CursorController : MonoBehaviour
         return true;
     }
 
+    public bool TryExecuteEndTurnFromMenu()
+    {
+        TryAutoAssignMatchController();
+        if (turnStateManager != null)
+        {
+            if (!turnStateManager.TryExecuteEndingTurnFromMenu(out string message))
+            {
+                if (!string.IsNullOrWhiteSpace(message))
+                    PanelDialogController.TrySetTransientText(message, 2.4f);
+                return false;
+            }
+
+            pendingEndTurnConfirmation = false;
+            return true;
+        }
+
+        if (matchController == null)
+            return false;
+
+        PanelDialogController.ClearExternalText();
+        matchController.AdvanceTurnWithTransition();
+        return true;
+    }
+
     private void ConfirmPendingEndTurn()
     {
         TryAutoAssignMatchController();
+        if (turnStateManager != null)
+        {
+            if (!turnStateManager.TryExecuteEndingTurnFromConfirmation(out string message))
+            {
+                if (!string.IsNullOrWhiteSpace(message))
+                    PanelDialogController.TrySetTransientText(message, 2.4f);
+                PlayActionFeedback(TurnStateManager.ActionSfx.Error);
+            }
+
+            pendingEndTurnConfirmation = false;
+            return;
+        }
+
         if (matchController == null)
         {
             ClearPendingEndTurnConfirmation();
@@ -909,6 +960,7 @@ public class CursorController : MonoBehaviour
 
     private void CancelPendingEndTurn()
     {
+        turnStateManager?.TryCancelEndingTurnConfirmation();
         ClearPendingEndTurnConfirmation();
         PlayActionFeedback(TurnStateManager.ActionSfx.Cancel);
     }

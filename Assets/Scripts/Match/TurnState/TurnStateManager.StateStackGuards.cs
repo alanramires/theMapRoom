@@ -36,7 +36,8 @@ public partial class TurnStateManager
         return state == CursorState.AircraftFuelDepletionQueue ||
                state == CursorState.TurnStartRallyQueue ||
                state == CursorState.CommandServiceExecuting ||
-               state == CursorState.RemovingUnitExecuting;
+               state == CursorState.RemovingUnitExecuting ||
+               state == CursorState.EndingTurnExecuting;
     }
 
     private void ValidateStateStack(string reason)
@@ -82,11 +83,32 @@ public partial class TurnStateManager
                     WarnStateStackIssue(reason, $"RemovingUnitExecuting requer pai RemovingUnit, pai atual={parent}");
             }
 
+            if (current == CursorState.EndingTurn)
+            {
+                CursorState parent = i + 1 < states.Length ? states[i + 1] : CursorState.Neutral;
+                if (parent != CursorState.Neutral)
+                    WarnStateStackIssue(reason, $"EndingTurn requer pai Neutral, pai atual={parent}");
+            }
+
+            if (current == CursorState.EndingTurnExecuting)
+            {
+                CursorState parent = i + 1 < states.Length ? states[i + 1] : CursorState.Neutral;
+                if (parent != CursorState.EndingTurn && parent != CursorState.PlayerMenu)
+                    WarnStateStackIssue(reason, $"EndingTurnExecuting requer pai EndingTurn/PlayerMenu, pai atual={parent}");
+            }
+
+            if (current == CursorState.Saving || current == CursorState.Loading)
+            {
+                CursorState parent = i + 1 < states.Length ? states[i + 1] : CursorState.Neutral;
+                if (parent != CursorState.Neutral && parent != CursorState.PlayerMenu)
+                    WarnStateStackIssue(reason, $"{current} requer pai Neutral/PlayerMenu, pai atual={parent}");
+            }
+
             if (current == CursorState.PlayerMenu && !isTop)
             {
                 CursorState child = i - 1 >= 0 ? states[i - 1] : CursorState.Neutral;
-                if (child != CursorState.CommandService && child != CursorState.RemovingUnit)
-                    WarnStateStackIssue(reason, $"PlayerMenu so deve manter CommandService/RemovingUnit acima, filho atual={child}");
+                if (child != CursorState.CommandService && child != CursorState.RemovingUnit && child != CursorState.EndingTurnExecuting && child != CursorState.Saving && child != CursorState.Loading)
+                    WarnStateStackIssue(reason, $"PlayerMenu so deve manter CommandService/RemovingUnit/EndingTurnExecuting/Saving/Loading acima, filho atual={child}");
             }
 
             if (IsResetOnlyState(current) && !isTop)

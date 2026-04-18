@@ -674,12 +674,12 @@ public partial class TurnStateManager
         return 0f;
     }
 
-    private static IEnumerator AnimateFuelRecoverFill(UnitManager target, int fromFuel, int toFuel)
+    private static IEnumerator AnimateFuelRecoverFill(UnitManager target, int fromFuel, int toFuel, bool emitLogs = true)
     {
         if (target == null)
             yield break;
 
-        EnsureFuelHudReadyForAnimation(target);
+        EnsureFuelHudReadyForAnimation(target, emitLogs);
         RefreshUnitHudImmediate(target);
 
         int start = Mathf.Clamp(fromFuel, 0, target.MaxFuel);
@@ -688,7 +688,8 @@ public partial class TurnStateManager
             yield break;
 
         int gain = end - start;
-        Debug.Log($"[FuelAnim] Inicio {target.name}: {start}->{end} (+{gain})");
+        if (emitLogs)
+            Debug.Log($"[FuelAnim] Inicio {target.name}: {start}->{end} (+{gain})");
 
         // Evita animacao "instantanea" em ganhos pequenos (+1/+2), que parecia aleatoria.
         float duration = Mathf.Clamp(gain * 0.035f, 0.25f, 1.20f);
@@ -724,15 +725,16 @@ public partial class TurnStateManager
 
         // Segura um frame extra no estado final antes de passar para o proximo alvo.
         yield return null;
-        Debug.Log($"[FuelAnim] Fim {target.name}: {target.CurrentFuel}/{target.MaxFuel}");
+        if (emitLogs)
+            Debug.Log($"[FuelAnim] Fim {target.name}: {target.CurrentFuel}/{target.MaxFuel}");
     }
 
-    private static IEnumerator AnimateHpRecoverFill(UnitManager target, int fromHp, int toHp)
+    private static IEnumerator AnimateHpRecoverFill(UnitManager target, int fromHp, int toHp, bool emitLogs = true)
     {
         if (target == null)
             yield break;
 
-        EnsureFuelHudReadyForAnimation(target);
+        EnsureFuelHudReadyForAnimation(target, emitLogs);
 
         int start = Mathf.Clamp(fromHp, 0, target.GetMaxHP());
         int end = Mathf.Clamp(toHp, 0, target.GetMaxHP());
@@ -795,7 +797,7 @@ public partial class TurnStateManager
             showDetectedIndicator: ResolveDetectedIndicatorForHud(unit));
     }
 
-    private static void EnsureFuelHudReadyForAnimation(UnitManager unit)
+    private static void EnsureFuelHudReadyForAnimation(UnitManager unit, bool emitLogs = true)
     {
         if (unit == null)
             return;
@@ -856,7 +858,7 @@ public partial class TurnStateManager
 
         bool structuralActivation = reactivatedHud || reactivatedFuelContainer;
         bool visualReenable = reenabledCanvas || reenabledImages || reenabledTexts;
-        if (structuralActivation || (unit.IsEmbarked && visualReenable))
+        if (emitLogs && (structuralActivation || (unit.IsEmbarked && visualReenable)))
             Debug.Log($"[FuelAnim] Reativado HUD para animacao: unidade={unit.name} | hud={(reactivatedHud ? "on" : "ok")} | fuel_container={(reactivatedFuelContainer ? "on" : "ok")} | canvas={(reenabledCanvas ? "on" : "ok")} | img={(reenabledImages ? "on" : "ok")} | txt={(reenabledTexts ? "on" : "ok")}");
     }
 
@@ -2058,5 +2060,3 @@ public partial class TurnStateManager
         return null;
     }
 }
-
-

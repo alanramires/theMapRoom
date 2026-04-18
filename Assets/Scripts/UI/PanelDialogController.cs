@@ -186,7 +186,11 @@ public class PanelDialogController : MonoBehaviour
             (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandService ||
              turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandServiceExecuting ||
              turnStateManager.CurrentCursorState == TurnStateManager.CursorState.RemovingUnit ||
-             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.RemovingUnitExecuting))
+             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.RemovingUnitExecuting ||
+             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.EndingTurn ||
+             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.EndingTurnExecuting ||
+             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Saving ||
+             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Loading))
         {
             nextText = turnStateManager.CurrentCursorStateStackDebugText;
         }

@@ -72,6 +72,16 @@ public partial class TurnStateManager
         !IsCommandServiceExecutionRunning &&
         commandServiceQueuedOrders.Count > 0;
 
+    private static bool ShouldLogCommandServiceRuntime => SensorLogGate.IsServicoDoComandoEnabled();
+
+    private static void CommandServiceLog(string message)
+    {
+        if (!ShouldLogCommandServiceRuntime || string.IsNullOrWhiteSpace(message))
+            return;
+
+        Debug.Log(message);
+    }
+
     private void EnterCommandServiceState(string reason)
     {
         if (CurrentCursorState != CursorState.CommandService)
@@ -149,7 +159,7 @@ public partial class TurnStateManager
         ClearPendingCommandServiceConfirmation();
         message = $"Servico do Comando (\"X\"): iniciando ordem com {commandServiceQueuedOrders.Count} unidade(s).";
         if (emitLogs)
-            Debug.Log(message);
+            CommandServiceLog(message);
         PushPanelUnitMessage(
             PanelDialogController.ResolveDialogMessage(
                 "command_service.executing",
@@ -186,7 +196,7 @@ public partial class TurnStateManager
                 "Servico do Comando :: Confirmar"));
         message = $"Servico do Comando (\"X\"): confirmacao pendente para {estimate.servedTargets} alvo(s) | custo previsto=${Mathf.Max(0, estimate.totalCost)}.";
         if (emitLogs)
-            Debug.Log(message);
+            CommandServiceLog(message);
         cursorController?.PlayConfirmSfx();
         return true;
     }
@@ -207,7 +217,7 @@ public partial class TurnStateManager
         {
             message = "Servico do Comando indisponivel durante outra execucao.";
             if (emitLogs)
-                Debug.Log(message);
+                CommandServiceLog(message);
             ClearPendingCommandServiceConfirmation();
             PushPanelUnitMessage(PanelDialogController.ResolveDialogMessage(
                 "command_service.unavailable",
@@ -221,7 +231,7 @@ public partial class TurnStateManager
         {
             message = $"Servico do Comando (\"X\") exige cursor em Neutral/PlayerMenu/CommandService (atual: {cursorState}).";
             if (emitLogs)
-                Debug.Log(message);
+                CommandServiceLog(message);
             ClearPendingCommandServiceConfirmation();
             PushPanelUnitMessage(PanelDialogController.ResolveDialogMessage(
                 "command_service.neutral_only",
@@ -235,7 +245,7 @@ public partial class TurnStateManager
         {
             message = "Servico do Comando (\"X\"): sem time ativo valido.";
             if (emitLogs)
-                Debug.Log(message);
+                CommandServiceLog(message);
             ClearPendingCommandServiceConfirmation();
             PushPanelUnitMessage(PanelDialogController.ResolveDialogMessage(
                 "command_service.invalid_team",
@@ -297,7 +307,7 @@ public partial class TurnStateManager
             string suffix = commandServiceInvalidOrders.Count > 0 ? $" | invalidos={commandServiceInvalidOrders.Count}" : string.Empty;
             message = $"Servico do Comando (\"X\"): {reason}{suffix}";
             if (emitLogs)
-                Debug.Log(message);
+                CommandServiceLog(message);
             ClearPendingCommandServiceConfirmation();
             PushPanelUnitMessage(
                 PanelDialogController.ResolveDialogMessage(
@@ -324,7 +334,7 @@ public partial class TurnStateManager
         try
         {
             NormalizeCommandServiceQueueForEmbarkedFamilies(commandServiceQueuedOrders);
-            Debug.Log($"[ServicoComando][Fila] Inicio da execucao: {commandServiceQueuedOrders.Count} ordem(ns).");
+            CommandServiceLog($"[ServicoComando][Fila] Inicio da execucao: {commandServiceQueuedOrders.Count} ordem(ns).");
             for (int q = 0; q < commandServiceQueuedOrders.Count; q++)
             {
                 ServicoDoComandoOption queued = commandServiceQueuedOrders[q];
@@ -333,7 +343,7 @@ public partial class TurnStateManager
                 string sourceName = queued != null && queued.sourceConstruction != null
                     ? $"construcao={queued.sourceConstruction.name}"
                     : (queued != null && queued.sourceSupplierUnit != null ? $"fornecedor={queued.sourceSupplierUnit.name}" : "fonte=(null)");
-                Debug.Log($"[ServicoComando][Fila] {q + 1}/{commandServiceQueuedOrders.Count} alvo={targetName} | {sourceName}");
+                CommandServiceLog($"[ServicoComando][Fila] {q + 1}/{commandServiceQueuedOrders.Count} alvo={targetName} | {sourceName}");
             }
 
         int servedTargets = 0;
@@ -368,7 +378,7 @@ public partial class TurnStateManager
             string sourceLabel = fromConstruction
                 ? $"construcao={sourceConstruction.name}"
                 : $"fornecedor={sourceSupplierUnit.name}";
-            Debug.Log($"[ServicoComando][Fila] {i + 1}/{commandServiceQueuedOrders.Count} alvo={target.name} | {sourceLabel}");
+            CommandServiceLog($"[ServicoComando][Fila] {i + 1}/{commandServiceQueuedOrders.Count} alvo={target.name} | {sourceLabel}");
 
             if (fromConstruction && (int)target.TeamId != (int)sourceConstruction.TeamId)
                 continue;
@@ -388,10 +398,10 @@ public partial class TurnStateManager
             Vector3Int targetCell;
             if (isEmbarkedPassenger)
             {
-                Debug.Log($"detectado, embarcado em {sourceSupplierUnit.name}");
+                CommandServiceLog($"detectado, embarcado em {sourceSupplierUnit.name}");
                 if (!TryPrepareEmbarkedSupplyTarget(target, sourceSupplierUnit, hiddenEmbarkedSuppliers, out targetCell))
                     continue;
-                Debug.Log($"ocultando HUD do {sourceSupplierUnit.name}");
+                CommandServiceLog($"ocultando HUD do {sourceSupplierUnit.name}");
             }
             else if (!TryPrepareIndividualSupplyTarget(target, target.TeamId, out targetCell))
             {
@@ -410,7 +420,7 @@ public partial class TurnStateManager
                 {
                     if (!CanUseLayerModeAtCurrentCell(target, boardMap, terrainDatabase, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
                     {
-                        Debug.Log($"[ServicoComando] {target.name} ignorado: camada planejada {order.plannedServiceDomain}/{order.plannedServiceHeight} invalida ({plannedLayerReason}).");
+                        CommandServiceLog($"[ServicoComando] {target.name} ignorado: camada planejada {order.plannedServiceDomain}/{order.plannedServiceHeight} invalida ({plannedLayerReason}).");
                         continue;
                     }
 
@@ -422,7 +432,7 @@ public partial class TurnStateManager
                     PodeEmergirReport emergirReport = PodeEmergirSensor.Evaluate(target, boardMap, terrainDatabase);
                     if (!emergirReport.status)
                     {
-                        Debug.Log($"[ServicoComando] {target.name} ignorado: nao pode emergir para Naval/Surface ({emergirReport.explicacao}).");
+                        CommandServiceLog($"[ServicoComando] {target.name} ignorado: nao pode emergir para Naval/Surface ({emergirReport.explicacao}).");
                         continue;
                     }
 
@@ -487,7 +497,7 @@ public partial class TurnStateManager
                         commandServiceQueuedOrders.Clear();
                         commandServiceInvalidOrders.Clear();
                         cursorController?.PlayErrorSfx();
-                        Debug.Log($"[ServicoComando] Interrompido: saldo insuficiente para continuar no alvo {target.name} (saldo atual=${Mathf.Max(0, availableMoney)}).");
+                        CommandServiceLog($"[ServicoComando] Interrompido: saldo insuficiente para continuar no alvo {target.name} (saldo atual=${Mathf.Max(0, availableMoney)}).");
                         break;
                     }
                 }
@@ -543,7 +553,7 @@ public partial class TurnStateManager
                             "ServicoComando",
                             out int serviceMoneySpent))
                     {
-                        Debug.Log($"[ServicoComando] Servico ignorado por saldo insuficiente: {ResolveServiceLabel(service)}.");
+                        CommandServiceLog($"[ServicoComando] Servico ignorado por saldo insuficiente: {ResolveServiceLabel(service)}.");
                         continue;
                     }
                     totalMoneySpent += Mathf.Max(0, serviceMoneySpent);
@@ -578,9 +588,9 @@ public partial class TurnStateManager
                     if (actualHpGain > 0)
                     {
                         int desiredHp = Mathf.Clamp(hpBeforeApply + actualHpGain, 0, target.GetMaxHP());
-                        Debug.Log($"[ServicoComando][HpAnim] {target.name}: {hpBeforeApply} -> {desiredHp} (+{actualHpGain})");
+                        CommandServiceLog($"[ServicoComando][HpAnim] {target.name}: {hpBeforeApply} -> {desiredHp} (+{actualHpGain})");
                         target.SetCurrentHP(hpBeforeApply);
-                        yield return AnimateHpRecoverFill(target, hpBeforeApply, desiredHp);
+                        yield return AnimateHpRecoverFill(target, hpBeforeApply, desiredHp, ShouldLogCommandServiceRuntime);
                     }
 
                     int fuelAfterApply = Mathf.Clamp(target.CurrentFuel, 0, target.MaxFuel);
@@ -588,13 +598,13 @@ public partial class TurnStateManager
                     if (actualFuelGain > 0)
                     {
                         int desiredFuel = Mathf.Clamp(fuelBeforeApply + actualFuelGain, 0, target.MaxFuel);
-                        Debug.Log($"[ServicoComando][FuelAnim] {target.name}: {fuelBeforeApply} -> {desiredFuel} (+{actualFuelGain})");
+                        CommandServiceLog($"[ServicoComando][FuelAnim] {target.name}: {fuelBeforeApply} -> {desiredFuel} (+{actualFuelGain})");
                         target.SetCurrentFuel(fuelBeforeApply);
-                        yield return AnimateFuelRecoverFill(target, fuelBeforeApply, desiredFuel);
+                        yield return AnimateFuelRecoverFill(target, fuelBeforeApply, desiredFuel, ShouldLogCommandServiceRuntime);
                     }
                     else if (fuelStep > 0)
                     {
-                        Debug.Log($"[ServicoComando][FuelAnim] {target.name}: fuelStep={fuelStep}, mas ganho real=0 (antes={fuelBeforeApply}, depois={fuelAfterApply}, max={target.MaxFuel}).");
+                        CommandServiceLog($"[ServicoComando][FuelAnim] {target.name}: fuelStep={fuelStep}, mas ganho real=0 (antes={fuelBeforeApply}, depois={fuelAfterApply}, max={target.MaxFuel}).");
                     }
                     else
                     {
@@ -603,7 +613,7 @@ public partial class TurnStateManager
                                 ? "alvo com autonomia cheia"
                                 : "servico aplicado sem ganho de autonomia")
                             : "servico sem recuperaAutonomia";
-                        Debug.Log($"[ServicoComando][FuelAnim] {target.name}: sem animacao de fuel ({fuelReason}) | fuel={fuelBeforeApply}/{target.MaxFuel} | service={ResolveServiceLabel(service)}");
+                        CommandServiceLog($"[ServicoComando][FuelAnim] {target.name}: sem animacao de fuel ({fuelReason}) | fuel={fuelBeforeApply}/{target.MaxFuel} | service={ResolveServiceLabel(service)}");
                     }
 
                     List<int> ammoAfterApply = SnapshotUnitAmmoByWeapon(target);
@@ -635,11 +645,11 @@ public partial class TurnStateManager
 
                 if (hpGain <= 0 && fuelGain <= 0 && ammoGain <= 0)
                 {
-                    Debug.Log($"[ServicoComando][Fila] {target.name}: sem ganhos aplicados (HP/AUT/MUN).");
+                    CommandServiceLog($"[ServicoComando][Fila] {target.name}: sem ganhos aplicados (HP/AUT/MUN).");
                     continue;
                 }
                 if (fuelGain <= 0)
-                    Debug.Log($"[ServicoComando][Fila] {target.name}: sem ganho de AUT no alvo (HP +{hpGain} | AUT +{fuelGain} | MUN +{ammoGain}).");
+                    CommandServiceLog($"[ServicoComando][Fila] {target.name}: sem ganho de AUT no alvo (HP +{hpGain} | AUT +{fuelGain} | MUN +{ammoGain}).");
 
                 NotifyUnitSupplied(sourceSupplierUnit, target);
                 MarkUnitServedByCommandThisTurn(target);
@@ -687,7 +697,7 @@ public partial class TurnStateManager
 
         if (servedTargets <= 0)
         {
-            Debug.Log("[ServicoComando] Nenhum alvo recebeu servico (necessidade/estoque).");
+            CommandServiceLog("[ServicoComando] Nenhum alvo recebeu servico (necessidade/estoque).");
             if (stopByEconomy)
             {
                 PushPanelUnitMessage(
@@ -709,7 +719,7 @@ public partial class TurnStateManager
             yield break;
         }
 
-        Debug.Log($"[ServicoComando] alvos atendidos={servedTargets} | HP +{recoveredHp} | autonomia +{recoveredFuel} | municao +{recoveredAmmo} | custo ${Mathf.Max(0, totalMoneySpent)}");
+        CommandServiceLog($"[ServicoComando] alvos atendidos={servedTargets} | HP +{recoveredHp} | autonomia +{recoveredFuel} | municao +{recoveredAmmo} | custo ${Mathf.Max(0, totalMoneySpent)}");
         ShowCommandServiceHelperSummary(
             servedTargets,
             recoveredHp,
@@ -739,7 +749,7 @@ public partial class TurnStateManager
                     }),
                 3.2f);
         }
-            Debug.Log(BuildCommandServiceDetailedReportLog(detailedReport));
+            CommandServiceLog(BuildCommandServiceDetailedReportLog(detailedReport));
             cursorController?.PlayLoadSfx();
             ExecuteAndReset("ExecuteCommandServiceOrderSequence: completed");
         }
@@ -771,7 +781,7 @@ public partial class TurnStateManager
         }
 
         string message = $"Servico do Comando (\"X\"): iniciando ordem com {commandServiceQueuedOrders.Count} unidade(s).";
-        Debug.Log(message);
+        CommandServiceLog(message);
         ClearCommandServicePreviewDimmedUnits();
         PanelDialogController.ClearExternalText();
         ClearCommandServiceHelper();
@@ -1698,7 +1708,7 @@ public partial class TurnStateManager
         int missing = Mathf.Max(0, target.GetMaxHP() - target.CurrentHP);
         if (missing <= 0)
         {
-            Debug.Log($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (HP cheio: {target.CurrentHP}/{target.GetMaxHP()})");
+            CommandServiceLog($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (HP cheio: {target.CurrentHP}/{target.GetMaxHP()})");
             return 0;
         }
 
@@ -1707,20 +1717,20 @@ public partial class TurnStateManager
             : missing;
         if (cap <= 0)
         {
-            Debug.Log($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (cap=0, limite por turno={service.serviceLimitPerUnitPerTurn})");
+            CommandServiceLog($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (cap=0, limite por turno={service.serviceLimitPerUnitPerTurn})");
             return 0;
         }
 
         int pointsPerSupply = ResolvePointsPerSupply(service, ResolveArmorClass(target));
         if (pointsPerSupply <= 0)
         {
-            Debug.Log($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (eficiencia HP <= 0 para classe)");
+            CommandServiceLog($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (eficiencia HP <= 0 para classe)");
             return 0;
         }
 
         if (!TryResolveSupplyForService(sourceConstruction, service, out SupplyData supply, out int stock))
         {
-            Debug.Log($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (sem estoque de suprimento para o servico)");
+            CommandServiceLog($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (sem estoque de suprimento para o servico)");
             return 0;
         }
 
@@ -1728,14 +1738,14 @@ public partial class TurnStateManager
         int recovered = Mathf.Min(cap, maxByStock);
         if (recovered <= 0)
         {
-            Debug.Log($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (recuperacao calculada=0; stock={stock}, pontosPorSup={pointsPerSupply}, maxByStock={maxByStock})");
+            CommandServiceLog($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (recuperacao calculada=0; stock={stock}, pontosPorSup={pointsPerSupply}, maxByStock={maxByStock})");
             return 0;
         }
 
         int supplies = Mathf.CeilToInt(recovered / (float)pointsPerSupply);
         if (!TryConsumeSupplyFromConstruction(sourceConstruction, supply, supplies))
         {
-            Debug.Log($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (falha ao consumir suprimento; qtdNec={supplies})");
+            CommandServiceLog($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem reparo (falha ao consumir suprimento; qtdNec={supplies})");
             return 0;
         }
 
@@ -1743,7 +1753,7 @@ public partial class TurnStateManager
         target.SetCurrentHP(target.CurrentHP + recovered);
         int afterHp = target.CurrentHP;
         int actualGain = Mathf.Max(0, afterHp - beforeHp);
-        Debug.Log($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | {beforeHp}->{afterHp} (+{actualGain})");
+        CommandServiceLog($"[HpRepair] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | {beforeHp}->{afterHp} (+{actualGain})");
         return recovered;
     }
 
@@ -1850,7 +1860,7 @@ public partial class TurnStateManager
             if (actualGain > 0)
             {
                 string weaponLabel = ResolveWeaponLabel(baseline.weapon);
-                Debug.Log($"[AmmoGain] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | arma={weaponLabel} | {beforeAmmo}->{afterAmmo} (+{actualGain})");
+                CommandServiceLog($"[AmmoGain] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | arma={weaponLabel} | {beforeAmmo}->{afterAmmo} (+{actualGain})");
             }
             recoveredTotal += recovered;
             serviceBudget -= recovered;
@@ -1867,7 +1877,7 @@ public partial class TurnStateManager
                         : consumeFailed
                             ? "falha ao consumir suprimento de municao"
                             : "sem ganho calculado por limites/cap";
-            Debug.Log($"[AmmoGain] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem rearm ({reason})");
+            CommandServiceLog($"[AmmoGain] modo=ServicoComando | alvo={targetName} | construcao={sourceName} | servico={serviceLabel} | sem rearm ({reason})");
         }
 
         return recoveredTotal;

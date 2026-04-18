@@ -29,13 +29,14 @@ public class BattleMapMenuRootController : MonoBehaviour
         VoltarMenu = 4,
         Minimapa = 5,
         Config = 6,
-        SaveLoad = 7,
-        Gerenciar = 8,
-        VoltarOptions = 9,
-        Destruir = 10,
-        Render = 11,
-        Sair = 12,
-        VoltarGerenciar = 13
+        Save = 7,
+        Load = 8,
+        Gerenciar = 9,
+        VoltarOptions = 10,
+        Destruir = 11,
+        Render = 12,
+        Sair = 13,
+        VoltarGerenciar = 14
     }
 
     [Header("Scene")]
@@ -60,7 +61,8 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     [SerializeField] private Button btnMinimapa;
     [SerializeField] private Button btnConfig;
-    [SerializeField] private Button btnSaveLoad;
+    [SerializeField] private Button btnSave;
+    [SerializeField] private Button btnLoad;
     [SerializeField] private Button btnGerenciar;
     [SerializeField] private Button btnVoltarOptions;
 
@@ -91,7 +93,6 @@ public class BattleMapMenuRootController : MonoBehaviour
     private int currentIndex;
     private bool menuInitialized;
     private bool menuOpen;
-    private bool saveLoadPromptOpen;
     private bool exitConfirmOpen;
     private bool pendingOpenOnNextNeutral;
     private bool eventSystemNavStateCaptured;
@@ -99,10 +100,12 @@ public class BattleMapMenuRootController : MonoBehaviour
     private int lastConfirmSfxFrame = -1;
     private Vector3Int savedCursorCell;
     private Coroutine restoreSelectionRoutine;
+    private int restoredFromStateStackFrame = -1;
+    private static int suppressMenuOpenFrame = -1;
 
     public bool IsMenuOpen => menuOpen;
 
-    public static bool TryRestoreMenuFromStateStack()
+    public static bool TryRestoreMenuFromStateStack(TurnStateManager.CursorState exitedState = TurnStateManager.CursorState.Neutral)
     {
         bool restored = false;
         BattleMapMenuRootController[] controllers = FindObjectsByType<BattleMapMenuRootController>(
@@ -111,18 +114,25 @@ public class BattleMapMenuRootController : MonoBehaviour
         for (int i = 0; i < controllers.Length; i++)
         {
             BattleMapMenuRootController controller = controllers[i];
-            if (controller != null && controller.RestoreMenuFromStateStack())
+            if (controller != null && controller.RestoreMenuFromStateStack(exitedState))
                 restored = true;
         }
 
         return restored;
     }
 
+    public static void SuppressMenuOpenForCurrentFrame()
+    {
+        suppressMenuOpenFrame = Time.frameCount;
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void EnsureSceneInstance()
     {
-        BattleMapMenuRootController existing = FindAnyObjectByType<BattleMapMenuRootController>();
-        if (existing != null)
+        BattleMapMenuRootController[] existing = FindObjectsByType<BattleMapMenuRootController>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        if (existing != null && existing.Length > 0)
             return;
 
         GameObject go = new GameObject("BattleMapMenuRootController");
@@ -166,6 +176,9 @@ public class BattleMapMenuRootController : MonoBehaviour
             if (!WasEscapePressedThisFrame())
                 return false;
 
+            if (suppressMenuOpenFrame == Time.frameCount)
+                return true;
+
             if (IsAnyTextInputFocusedInUi())
                 return false;
 
@@ -195,34 +208,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         UiInputBlocker.SuppressGameplayInputForFrames(1);
         RefreshDockByCursorProximity();
 
-        if (saveLoadPromptOpen)
-        {
-            if (WasEscapePressedThisFrame())
-            {
-                saveLoadPromptOpen = false;
-                PlayCancelSfx();
-                RestoreDefaultDialogForCurrentPanel();
-                return true;
-            }
-
-            if (WasLetterPressedThisFrame('I'))
-            {
-                saveLoadPromptOpen = false;
-                CloseMenu(restoreCursor: true);
-                saveGameManager?.OpenSaveSlotPromptFromMenu();
-                return true;
-            }
-
-            if (WasLetterPressedThisFrame('O'))
-            {
-                saveLoadPromptOpen = false;
-                CloseMenu(restoreCursor: true);
-                saveGameManager?.OpenLoadSlotPromptFromMenu();
-                return true;
-            }
-
+        if (restoredFromStateStackFrame == Time.frameCount)
             return true;
-        }
 
         if (exitConfirmOpen)
         {
@@ -286,7 +273,6 @@ public class BattleMapMenuRootController : MonoBehaviour
         menuRoot.SetActive(true);
         menuOpen = true;
         pendingOpenOnNextNeutral = false;
-        saveLoadPromptOpen = false;
         exitConfirmOpen = false;
         RestoreUndockedLayout();
         hasLastUndockedScreenRect = false;
@@ -297,7 +283,7 @@ public class BattleMapMenuRootController : MonoBehaviour
         PanelDialogController.ClearExternalText();
     }
 
-    private bool RestoreMenuFromStateStack()
+    private bool RestoreMenuFromStateStack(TurnStateManager.CursorState exitedState)
     {
         TryAutoAssignReferences();
         EnsureButtonsCache();
@@ -313,7 +299,6 @@ public class BattleMapMenuRootController : MonoBehaviour
         menuRoot.SetActive(true);
         menuOpen = true;
         pendingOpenOnNextNeutral = false;
-        saveLoadPromptOpen = false;
         exitConfirmOpen = false;
         RestoreUndockedLayout();
         hasLastUndockedScreenRect = false;
@@ -321,10 +306,35 @@ public class BattleMapMenuRootController : MonoBehaviour
         CaptureAndDisableEventSystemNavigation();
         RefreshButtonInteractability();
         SetPanel(activePanel, resetIndex: false);
+        RestoreSelectionForExitedState(exitedState);
         SelectCurrentButton();
         ScheduleRestoreSelectionNextFrame();
         PanelDialogController.ClearExternalText();
+        restoredFromStateStackFrame = Time.frameCount;
         return true;
+    }
+
+    private void RestoreSelectionForExitedState(TurnStateManager.CursorState exitedState)
+    {
+        switch (exitedState)
+        {
+            case TurnStateManager.CursorState.CommandService:
+                SetPanel(MenuPanel.Menu, resetIndex: false);
+                SetPanelSelectionByButton(btnComando);
+                break;
+            case TurnStateManager.CursorState.RemovingUnit:
+                SetPanel(MenuPanel.Gerenciar, resetIndex: false);
+                SetPanelSelectionByButton(btnDestruir);
+                break;
+            case TurnStateManager.CursorState.Saving:
+                SetPanel(MenuPanel.Options, resetIndex: false);
+                SetPanelSelectionByButton(btnSave);
+                break;
+            case TurnStateManager.CursorState.Loading:
+                SetPanel(MenuPanel.Options, resetIndex: false);
+                SetPanelSelectionByButton(btnLoad);
+                break;
+        }
     }
 
     private void RefreshButtonInteractability()
@@ -355,10 +365,11 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         menuOpen = false;
         pendingOpenOnNextNeutral = false;
-        saveLoadPromptOpen = false;
         exitConfirmOpen = false;
         if (exitPlayerMenuState)
+        {
             turnStateManager?.TryExitPlayerMenuStateToNeutral();
+        }
         RestoreUndockedLayout();
         hasLastUndockedScreenRect = false;
         cursorNearUndockedDockRegion = false;
@@ -376,7 +387,6 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         menuOpen = false;
         pendingOpenOnNextNeutral = false;
-        saveLoadPromptOpen = false;
         exitConfirmOpen = false;
     }
 
@@ -508,7 +518,8 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         BindButton(btnMinimapa, MenuAction.Minimapa);
         BindButton(btnConfig, MenuAction.Config);
-        BindButton(btnSaveLoad, MenuAction.SaveLoad);
+        BindButton(btnSave, MenuAction.Save);
+        BindButton(btnLoad, MenuAction.Load);
         BindButton(btnGerenciar, MenuAction.Gerenciar);
         BindButton(btnVoltarOptions, MenuAction.VoltarOptions);
 
@@ -518,9 +529,9 @@ public class BattleMapMenuRootController : MonoBehaviour
         BindButton(btnVoltarGerenciar, MenuAction.VoltarGerenciar);
 
         panelButtons.Clear();
-        panelButtons[MenuPanel.Menu] = BuildPanelButtons(btnStatus, btnComando, btnRodada, btnOpcoes, btnVoltarMenu);
-        panelButtons[MenuPanel.Options] = BuildPanelButtons(btnMinimapa, btnConfig, btnSaveLoad, btnGerenciar, btnVoltarOptions);
-        panelButtons[MenuPanel.Gerenciar] = BuildPanelButtons(btnDestruir, btnRender, btnSair, btnVoltarGerenciar);
+        panelButtons[MenuPanel.Menu] = BuildPanelButtonsFromLayout(panelMenu, btnStatus, btnComando, btnRodada, btnOpcoes, btnVoltarMenu);
+        panelButtons[MenuPanel.Options] = BuildPanelButtonsFromLayout(panelOptions, btnMinimapa, btnConfig, btnSave, btnLoad, btnGerenciar, btnVoltarOptions);
+        panelButtons[MenuPanel.Gerenciar] = BuildPanelButtonsFromLayout(panelGerenciar, btnDestruir, btnRender, btnSair, btnVoltarGerenciar);
 
     }
 
@@ -530,11 +541,144 @@ public class BattleMapMenuRootController : MonoBehaviour
         for (int i = 0; i < source.Length; i++)
         {
             Button button = source[i];
-            if (button != null)
+            if (button != null && !list.Contains(button))
                 list.Add(button);
         }
 
         return list;
+    }
+
+    private List<Button> BuildPanelButtonsFromLayout(GameObject panel, params Button[] fallbackButtons)
+    {
+        List<Button> list = new List<Button>();
+
+        if (panel != null)
+        {
+            Button[] panelCandidates = panel.GetComponentsInChildren<Button>(true);
+            for (int i = 0; i < panelCandidates.Length; i++)
+            {
+                Button button = panelCandidates[i];
+                if (IsNavigablePanelButton(panel, button) && !list.Contains(button))
+                    list.Add(button);
+            }
+
+            list.Sort(CompareButtonsByVisualOrder);
+        }
+
+        for (int i = 0; i < fallbackButtons.Length; i++)
+        {
+            Button button = fallbackButtons[i];
+            if (IsNavigablePanelButton(panel, button) && !list.Contains(button))
+                list.Add(button);
+        }
+
+        return list;
+    }
+
+    private static bool IsNavigablePanelButton(GameObject panel, Button button)
+    {
+        if (panel == null || button == null)
+            return false;
+        if (!IsInsidePanelWithoutCrossingNestedPanel(panel.transform, button.transform))
+            return false;
+        if (!button.gameObject.activeSelf)
+            return false;
+
+        RectTransform rect = GetButtonVisualRectTransform(button);
+        if (rect != null && (rect.rect.width <= 1f || rect.rect.height <= 1f))
+            return false;
+
+        return true;
+    }
+
+    private static bool IsInsidePanelWithoutCrossingNestedPanel(Transform panel, Transform child)
+    {
+        if (panel == null || child == null)
+            return false;
+
+        Transform current = child;
+        while (current != null)
+        {
+            if (current == panel)
+                return true;
+
+            current = current.parent;
+            if (current != null && current != panel && IsMenuPanelTransform(current))
+                return false;
+        }
+
+        return false;
+    }
+
+    private static bool IsMenuPanelTransform(Transform transform)
+    {
+        if (transform == null)
+            return false;
+
+        string name = transform.name;
+        return string.Equals(name, "panel_menu", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(name, "panel_options", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(name, "panel_opcoes", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(name, "panel_opções", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(name, "panel_gerenciar", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int CompareButtonsByVisualOrder(Button a, Button b)
+    {
+        Vector3 aCenter = GetButtonWorldCenter(a);
+        Vector3 bCenter = GetButtonWorldCenter(b);
+
+        float yDelta = bCenter.y - aCenter.y;
+        if (Mathf.Abs(yDelta) > 0.01f)
+            return yDelta > 0f ? 1 : -1;
+
+        float xDelta = aCenter.x - bCenter.x;
+        if (Mathf.Abs(xDelta) > 0.01f)
+            return xDelta > 0f ? 1 : -1;
+
+        int siblingA = a != null ? a.transform.GetSiblingIndex() : 0;
+        int siblingB = b != null ? b.transform.GetSiblingIndex() : 0;
+        return siblingA.CompareTo(siblingB);
+    }
+
+    private static Vector3 GetButtonWorldCenter(Button button)
+    {
+        if (button == null)
+            return Vector3.zero;
+
+        RectTransform rect = GetButtonVisualRectTransform(button);
+        if (rect == null)
+            return button.transform.position;
+
+        return rect.TransformPoint(rect.rect.center);
+    }
+
+    private static RectTransform GetButtonVisualRectTransform(Button button)
+    {
+        if (button == null)
+            return null;
+
+        RectTransform rect = button.GetComponent<RectTransform>();
+        if (HasUsableRect(rect))
+            return rect;
+
+        if (button.targetGraphic != null && HasUsableRect(button.targetGraphic.rectTransform))
+            return button.targetGraphic.rectTransform;
+
+        Graphic[] graphics = button.GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            Graphic graphic = graphics[i];
+            if (graphic != null && HasUsableRect(graphic.rectTransform))
+                return graphic.rectTransform;
+        }
+
+        return rect;
+    }
+
+    private static bool HasUsableRect(RectTransform rect)
+    {
+        return rect != null && rect.rect.width > 1f && rect.rect.height > 1f;
     }
 
     private void BindButton(Button button, MenuAction action)
@@ -545,8 +689,47 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (buttonActions.TryGetValue(button, out MenuAction existing) && existing == action)
             return;
 
+        bool alreadyTracked = buttonActions.ContainsKey(button);
         buttonActions[button] = action;
+        if (alreadyTracked)
+            return;
+
         button.onClick.AddListener(() => OnButtonClicked(button));
+    }
+
+    private static bool TryInferActionFromButton(MenuPanel panel, Button button, out MenuAction action)
+    {
+        action = default;
+        if (button == null)
+            return false;
+
+        string name = button.name.ToLowerInvariant();
+        switch (panel)
+        {
+            case MenuPanel.Menu:
+                if (name.Contains("status")) { action = MenuAction.Status; return true; }
+                if (name.Contains("comando")) { action = MenuAction.Comando; return true; }
+                if (name.Contains("rodada")) { action = MenuAction.Rodada; return true; }
+                if (name.Contains("opcoes") || name.Contains("opções")) { action = MenuAction.Opcoes; return true; }
+                if (name.Contains("voltar")) { action = MenuAction.VoltarMenu; return true; }
+                break;
+            case MenuPanel.Options:
+                if (name.Contains("minimapa") || name.Contains("minimap")) { action = MenuAction.Minimapa; return true; }
+                if (name.Contains("config")) { action = MenuAction.Config; return true; }
+                if (name.Contains("save")) { action = MenuAction.Save; return true; }
+                if (name.Contains("load")) { action = MenuAction.Load; return true; }
+                if (name.Contains("gerenciar")) { action = MenuAction.Gerenciar; return true; }
+                if (name.Contains("voltar")) { action = MenuAction.VoltarOptions; return true; }
+                break;
+            case MenuPanel.Gerenciar:
+                if (name.Contains("destruir")) { action = MenuAction.Destruir; return true; }
+                if (name.Contains("render")) { action = MenuAction.Render; return true; }
+                if (name.Contains("sair")) { action = MenuAction.Sair; return true; }
+                if (name.Contains("voltar")) { action = MenuAction.VoltarGerenciar; return true; }
+                break;
+        }
+
+        return false;
     }
 
     private void OnButtonClicked(Button button)
@@ -554,7 +737,13 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (button == null || !buttonActions.TryGetValue(button, out MenuAction action))
             return;
 
-        if (action != MenuAction.Minimapa && action != MenuAction.Rodada)
+        SyncSelectionFromClickedButton(button);
+
+        if (action != MenuAction.Comando &&
+            action != MenuAction.Minimapa &&
+            action != MenuAction.Rodada &&
+            action != MenuAction.Save &&
+            action != MenuAction.Load)
             PlayConfirmSfxOncePerFrame();
 
         switch (action)
@@ -572,13 +761,14 @@ public class BattleMapMenuRootController : MonoBehaviour
                 }
                 break;
             case MenuAction.Rodada:
-                if (!TryCloseMenuForDispatchAndEnsureNeutral())
+                if (!TryCloseMenuForEndTurnDispatch())
                     break;
-                if (cursorController == null || !cursorController.TryOpenEndTurnConfirmationFromMenu())
+                if (cursorController == null || !cursorController.TryExecuteEndTurnFromMenu())
                     cursorController?.PlayErrorSfx();
                 break;
             case MenuAction.Opcoes:
                 SetPanel(MenuPanel.Options, resetIndex: true);
+                ScheduleRestoreSelectionNextFrame();
                 break;
             case MenuAction.VoltarMenu:
                 CloseMenu(restoreCursor: true);
@@ -591,18 +781,24 @@ public class BattleMapMenuRootController : MonoBehaviour
             case MenuAction.Config:
                 PanelDialogController.TrySetTransientText("Config de partida: em desenvolvimento.", 2.4f);
                 break;
-            case MenuAction.SaveLoad:
-                if (!CanOpenSaveLoadPromptFromMenu())
+            case MenuAction.Save:
+                if (!TryCloseMenuForSaveLoadDispatch())
                     break;
-                saveLoadPromptOpen = true;
-                PanelDialogController.TrySetExternalText("Save/Load :: I: salvar | O: carregar | ESC: voltar");
+                saveGameManager?.OpenSaveSlotPromptFromMenu();
+                break;
+            case MenuAction.Load:
+                if (!TryCloseMenuForSaveLoadDispatch())
+                    break;
+                saveGameManager?.OpenLoadSlotPromptFromMenu();
                 break;
             case MenuAction.Gerenciar:
                 SetPanel(MenuPanel.Gerenciar, resetIndex: true);
+                ScheduleRestoreSelectionNextFrame();
                 break;
             case MenuAction.VoltarOptions:
                 SetPanel(MenuPanel.Menu, resetIndex: false);
                 SetPanelSelectionByButton(btnOpcoes);
+                ScheduleRestoreSelectionNextFrame();
                 break;
             case MenuAction.Destruir:
                 if (!TryCloseMenuForRemoveUnitDispatch())
@@ -623,14 +819,15 @@ public class BattleMapMenuRootController : MonoBehaviour
             case MenuAction.VoltarGerenciar:
                 SetPanel(MenuPanel.Options, resetIndex: false);
                 SetPanelSelectionByButton(btnGerenciar);
+                ScheduleRestoreSelectionNextFrame();
                 break;
         }
     }
 
-    private void SetPanelSelectionByButton(Button target)
+    private bool SetPanelSelectionByButton(Button target)
     {
         if (target == null || !panelButtons.TryGetValue(activePanel, out List<Button> list) || list == null || list.Count <= 0)
-            return;
+            return false;
 
         for (int i = 0; i < list.Count; i++)
         {
@@ -639,6 +836,29 @@ public class BattleMapMenuRootController : MonoBehaviour
 
             currentIndex = i;
             SelectCurrentButton();
+            return true;
+        }
+
+        return false;
+    }
+
+    private void SyncSelectionFromClickedButton(Button clickedButton)
+    {
+        if (clickedButton == null)
+            return;
+
+        foreach (KeyValuePair<MenuPanel, List<Button>> pair in panelButtons)
+        {
+            List<Button> list = pair.Value;
+            if (list == null)
+                continue;
+
+            int index = list.IndexOf(clickedButton);
+            if (index < 0)
+                continue;
+
+            activePanel = pair.Key;
+            currentIndex = index;
             return;
         }
     }
@@ -658,7 +878,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (turnStateManager == null)
             return true;
 
-        if (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral)
+        if (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral ||
+            turnStateManager.CurrentCursorState == TurnStateManager.CursorState.PlayerMenu)
             return true;
 
         string message = $"Menu do jogador: estado nao normalizado para Neutral (atual: {turnStateManager.CurrentCursorState}).";
@@ -701,15 +922,37 @@ public class BattleMapMenuRootController : MonoBehaviour
         return false;
     }
 
-    private bool CanOpenSaveLoadPromptFromMenu()
+    private bool TryCloseMenuForEndTurnDispatch()
     {
+        CloseMenu(restoreCursor: true, exitPlayerMenuState: false);
         if (turnStateManager == null)
             return true;
 
-        if (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral)
+        TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
+        if (state == TurnStateManager.CursorState.PlayerMenu ||
+            state == TurnStateManager.CursorState.Neutral)
             return true;
 
-        PanelDialogController.TrySetTransientText($"Save/Load bloqueado em {turnStateManager.CurrentCursorState}: volte ao Neutral.", 2.4f);
+        string message = $"Menu do jogador: estado invalido para Passar a Vez (atual: {state}).";
+        PanelDialogController.TrySetTransientText(message, 2.8f);
+        cursorController?.PlayErrorSfx();
+        return false;
+    }
+
+    private bool TryCloseMenuForSaveLoadDispatch()
+    {
+        UiInputBlocker.SuppressGameplayInputForFrames(2);
+        CloseMenu(restoreCursor: true, exitPlayerMenuState: false);
+        if (turnStateManager == null)
+            return true;
+
+        TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
+        if (state == TurnStateManager.CursorState.PlayerMenu ||
+            state == TurnStateManager.CursorState.Neutral)
+            return true;
+
+        string message = $"Menu do jogador: estado invalido para Save/Load (atual: {state}).";
+        PanelDialogController.TrySetTransientText(message, 2.8f);
         cursorController?.PlayErrorSfx();
         return false;
     }
@@ -796,22 +1039,23 @@ public class BattleMapMenuRootController : MonoBehaviour
             menuRootRect = menuRoot.GetComponent<RectTransform>();
         CacheOriginalDockLayoutIfNeeded();
 
-        if (btnStatus == null) btnStatus = FindButton(panelMenu, "btn_status");
-        if (btnComando == null) btnComando = FindButton(panelMenu, "btn_comando");
-        if (btnRodada == null) btnRodada = FindButton(panelMenu, "btn_rodada");
-        if (btnOpcoes == null) btnOpcoes = FindButton(panelMenu, "btn_opcoes");
-        if (btnVoltarMenu == null) btnVoltarMenu = FindButton(panelMenu, "btn_voltar");
+        if (btnStatus == null) btnStatus = FindButtonByNames(panelMenu, "btn_status", "button_status");
+        if (btnComando == null) btnComando = FindButtonByNames(panelMenu, "btn_comando", "button_comando");
+        if (btnRodada == null) btnRodada = FindButtonByNames(panelMenu, "btn_rodada", "button_rodada");
+        if (btnOpcoes == null) btnOpcoes = FindButtonByNames(panelMenu, "btn_opcoes", "button_opcoes", "button_opções");
+        if (btnVoltarMenu == null) btnVoltarMenu = FindButtonByNames(panelMenu, "btn_voltar", "button_voltar");
 
-        if (btnMinimapa == null) btnMinimapa = FindButton(panelOptions, "btn_minimapa");
-        if (btnConfig == null) btnConfig = FindButton(panelOptions, "btn_config");
-        if (btnSaveLoad == null) btnSaveLoad = FindButton(panelOptions, "btn_saveLoad");
-        if (btnGerenciar == null) btnGerenciar = FindButton(panelOptions, "btn_gerenciar");
-        if (btnVoltarOptions == null) btnVoltarOptions = FindButton(panelOptions, "btn_voltar");
+        if (btnMinimapa == null) btnMinimapa = FindButtonByNames(panelOptions, "btn_minimapa", "button_minimapa", "button_miniMapa");
+        if (btnConfig == null) btnConfig = FindButtonByNames(panelOptions, "btn_config", "button_config");
+        if (btnSave == null) btnSave = FindButtonByNames(panelOptions, "button_save", "btn_save");
+        if (btnLoad == null) btnLoad = FindButtonByNames(panelOptions, "button_load", "btn_load");
+        if (btnGerenciar == null) btnGerenciar = FindButtonByNames(panelOptions, "btn_gerenciar", "button_gerenciar");
+        if (btnVoltarOptions == null) btnVoltarOptions = FindButtonByNames(panelOptions, "btn_voltar", "button_voltar");
 
-        if (btnDestruir == null) btnDestruir = FindButton(panelGerenciar, "btn_destruir");
-        if (btnRender == null) btnRender = FindButton(panelGerenciar, "btn_render");
-        if (btnSair == null) btnSair = FindButton(panelGerenciar, "btn_sair");
-        if (btnVoltarGerenciar == null) btnVoltarGerenciar = FindButton(panelGerenciar, "btn_voltar");
+        if (btnDestruir == null) btnDestruir = FindButtonByNames(panelGerenciar, "btn_destruir", "button_destruir");
+        if (btnRender == null) btnRender = FindButtonByNames(panelGerenciar, "btn_render", "button_render");
+        if (btnSair == null) btnSair = FindButtonByNames(panelGerenciar, "btn_sair", "button_sair");
+        if (btnVoltarGerenciar == null) btnVoltarGerenciar = FindButtonByNames(panelGerenciar, "btn_voltar", "button_voltar");
 
         if (cursorController == null) cursorController = FindInActiveScene<CursorController>();
         if (turnStateManager == null) turnStateManager = FindInActiveScene<TurnStateManager>();
@@ -967,6 +1211,21 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         Transform found = FindChildByName(panel.transform, buttonName);
         return found != null ? found.GetComponent<Button>() : null;
+    }
+
+    private static Button FindButtonByNames(GameObject panel, params string[] buttonNames)
+    {
+        if (panel == null || buttonNames == null)
+            return null;
+
+        for (int i = 0; i < buttonNames.Length; i++)
+        {
+            Button button = FindButton(panel, buttonNames[i]);
+            if (button != null)
+                return button;
+        }
+
+        return null;
     }
 
     private static Transform FindChildByName(Transform root, string name)

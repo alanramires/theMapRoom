@@ -130,6 +130,10 @@ public partial class TurnStateManager
             case CursorState.CommandServiceExecuting:
             case CursorState.RemovingUnit:
             case CursorState.RemovingUnitExecuting:
+            case CursorState.EndingTurn:
+            case CursorState.EndingTurnExecuting:
+            case CursorState.Saving:
+            case CursorState.Loading:
                 return true;
             default:
                 return false;

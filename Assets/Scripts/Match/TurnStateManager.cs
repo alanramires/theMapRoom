@@ -67,7 +67,11 @@ public partial class TurnStateManager : MonoBehaviour
         TurnStartRallyQueue = 20,
         Replay = 21,
         CommandServiceExecuting = 22,
-        RemovingUnitExecuting = 23
+        RemovingUnitExecuting = 23,
+        EndingTurn = 24,
+        EndingTurnExecuting = 25,
+        Saving = 26,
+        Loading = 27
     }
 
     [Header("References")]
@@ -412,6 +416,14 @@ public partial class TurnStateManager : MonoBehaviour
                 return "Removing Unit";
             case CursorState.RemovingUnitExecuting:
                 return "Removing Unit Executing";
+            case CursorState.EndingTurn:
+                return "Ending Turn";
+            case CursorState.EndingTurnExecuting:
+                return "Ending Turn Executing";
+            case CursorState.Saving:
+                return "Saving";
+            case CursorState.Loading:
+                return "Loading";
             case CursorState.PlayerMenu:
                 return "Player Menu";
             case CursorState.AircraftFuelDepletionQueue:

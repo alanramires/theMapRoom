@@ -51,6 +51,13 @@ public partial class TurnStateManager
                 return HandleConfirmWhileRemovingUnit();
             case CursorState.RemovingUnitExecuting:
                 return ActionSfx.None;
+            case CursorState.EndingTurn:
+                return HandleConfirmWhileEndingTurn();
+            case CursorState.EndingTurnExecuting:
+                return ActionSfx.None;
+            case CursorState.Saving:
+            case CursorState.Loading:
+                return ActionSfx.None;
             case CursorState.Planning:
                 return HandleConfirmWhilePlanning();
             case CursorState.PlayerMenu:
@@ -114,6 +121,13 @@ public partial class TurnStateManager
             case CursorState.RemovingUnit:
                 return HandleCancelWhileRemovingUnit();
             case CursorState.RemovingUnitExecuting:
+                return ActionSfx.None;
+            case CursorState.EndingTurn:
+                return HandleCancelWhileEndingTurn();
+            case CursorState.EndingTurnExecuting:
+                return ActionSfx.None;
+            case CursorState.Saving:
+            case CursorState.Loading:
                 return ActionSfx.None;
             case CursorState.Planning:
                 return HandleCancelWhilePlanning();
@@ -774,6 +788,22 @@ public partial class TurnStateManager
         return ActionSfx.Cancel;
     }
 
+    private ActionSfx HandleConfirmWhileEndingTurn()
+    {
+        LogStateStep("HandleConfirmWhileEndingTurn");
+        return TryExecuteEndingTurnFromConfirmation(out _)
+            ? ActionSfx.Confirm
+            : ActionSfx.Error;
+    }
+
+    private ActionSfx HandleCancelWhileEndingTurn()
+    {
+        LogStateStep("HandleCancelWhileEndingTurn", rollback: true);
+        return TryCancelEndingTurnConfirmation()
+            ? ActionSfx.Cancel
+            : ActionSfx.None;
+    }
+
     private ActionSfx HandleConfirmWhileSuprindo()
     {
         LogStateStep("HandleConfirmWhileSuprindo");
@@ -808,6 +838,115 @@ public partial class TurnStateManager
         LogStateStep("HandleCancelWhilePlanning", rollback: true);
         ExitPlanningStateToNeutral(rollback: true);
         return ActionSfx.Cancel;
+    }
+
+    public bool TryOpenEndingTurnConfirmation(out string message)
+    {
+        message = string.Empty;
+        if (cursorState != CursorState.Neutral)
+        {
+            message = $"Ending Turn exige cursor em Neutral (atual: {cursorState}).";
+            return false;
+        }
+
+        Advance(CursorState.EndingTurn, "TryOpenEndingTurnConfirmation");
+        PanelDialogController.TrySetExternalText("End Turn :: Confirm");
+        return true;
+    }
+
+    public bool TryCancelEndingTurnConfirmation()
+    {
+        if (cursorState != CursorState.EndingTurn)
+            return false;
+
+        PanelDialogController.ClearExternalText();
+        Retreat("TryCancelEndingTurnConfirmation");
+        return true;
+    }
+
+    public bool TryExecuteEndingTurnFromConfirmation(out string message)
+    {
+        message = string.Empty;
+        if (cursorState != CursorState.EndingTurn)
+        {
+            message = $"Ending Turn confirmation exige estado EndingTurn (atual: {cursorState}).";
+            return false;
+        }
+
+        return TryExecuteEndingTurn("TryExecuteEndingTurnFromConfirmation", out message);
+    }
+
+    public bool TryExecuteEndingTurnFromMenu(out string message)
+    {
+        message = string.Empty;
+        if (cursorState != CursorState.PlayerMenu && cursorState != CursorState.Neutral)
+        {
+            message = $"Passar a vez exige PlayerMenu/Neutral (atual: {cursorState}).";
+            return false;
+        }
+
+        return TryExecuteEndingTurn("TryExecuteEndingTurnFromMenu", out message);
+    }
+
+    private bool TryExecuteEndingTurn(string reason, out string message)
+    {
+        message = string.Empty;
+        if (matchController == null)
+        {
+            message = "MatchController ausente para passar a vez.";
+            PanelDialogController.ClearExternalText();
+            if (cursorState == CursorState.EndingTurn)
+                Retreat($"{reason}: missing MatchController");
+            return false;
+        }
+
+        if (cursorState != CursorState.EndingTurnExecuting)
+            Advance(CursorState.EndingTurnExecuting, reason);
+
+        PanelDialogController.ClearExternalText();
+        matchController.AdvanceTurnWithTransition();
+        ExecuteAndReset($"{reason}: dispatched");
+        return true;
+    }
+
+    public bool TryEnterSavingState(out string message)
+    {
+        message = string.Empty;
+        if (cursorState == CursorState.Saving)
+            return true;
+
+        if (cursorState != CursorState.Neutral && cursorState != CursorState.PlayerMenu)
+        {
+            message = $"Saving exige Neutral/PlayerMenu (atual: {cursorState}).";
+            return false;
+        }
+
+        Advance(CursorState.Saving, "TryEnterSavingState");
+        return true;
+    }
+
+    public bool TryEnterLoadingState(out string message)
+    {
+        message = string.Empty;
+        if (cursorState == CursorState.Loading)
+            return true;
+
+        if (cursorState != CursorState.Neutral && cursorState != CursorState.PlayerMenu)
+        {
+            message = $"Loading exige Neutral/PlayerMenu (atual: {cursorState}).";
+            return false;
+        }
+
+        Advance(CursorState.Loading, "TryEnterLoadingState");
+        return true;
+    }
+
+    public void TryExitPersistencePromptState()
+    {
+        if (cursorState != CursorState.Saving && cursorState != CursorState.Loading)
+            return;
+
+        Retreat("TryExitPersistencePromptState");
     }
 
     public bool TryEnterPlayerMenuState()

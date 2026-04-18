@@ -20,7 +20,8 @@ public class BattleMapMenuRootControllerEditor : Editor
     private SerializedProperty btnVoltarMenuProp;
     private SerializedProperty btnMinimapaProp;
     private SerializedProperty btnConfigProp;
-    private SerializedProperty btnSaveLoadProp;
+    private SerializedProperty btnSaveProp;
+    private SerializedProperty btnLoadProp;
     private SerializedProperty btnGerenciarProp;
     private SerializedProperty btnVoltarOptionsProp;
     private SerializedProperty btnDestruirProp;
@@ -49,7 +50,8 @@ public class BattleMapMenuRootControllerEditor : Editor
         btnVoltarMenuProp            = serializedObject.FindProperty("btnVoltarMenu");
         btnMinimapaProp              = serializedObject.FindProperty("btnMinimapa");
         btnConfigProp                = serializedObject.FindProperty("btnConfig");
-        btnSaveLoadProp              = serializedObject.FindProperty("btnSaveLoad");
+        btnSaveProp                  = serializedObject.FindProperty("btnSave");
+        btnLoadProp                  = serializedObject.FindProperty("btnLoad");
         btnGerenciarProp             = serializedObject.FindProperty("btnGerenciar");
         btnVoltarOptionsProp         = serializedObject.FindProperty("btnVoltarOptions");
         btnDestruirProp              = serializedObject.FindProperty("btnDestruir");
@@ -105,7 +107,8 @@ public class BattleMapMenuRootControllerEditor : Editor
         EditorGUILayout.PropertyField(btnVoltarMenuProp,   new GUIContent("Btn Voltar Menu"));
         EditorGUILayout.PropertyField(btnMinimapaProp,     new GUIContent("Btn Minimapa"));
         EditorGUILayout.PropertyField(btnConfigProp,       new GUIContent("Btn Config"));
-        EditorGUILayout.PropertyField(btnSaveLoadProp,     new GUIContent("Btn Save Load"));
+        EditorGUILayout.PropertyField(btnSaveProp,         new GUIContent("Btn Save"));
+        EditorGUILayout.PropertyField(btnLoadProp,         new GUIContent("Btn Load"));
         EditorGUILayout.PropertyField(btnGerenciarProp,    new GUIContent("Btn Gerenciar"));
         EditorGUILayout.PropertyField(btnVoltarOptionsProp,new GUIContent("Btn Voltar Options"));
         EditorGUILayout.PropertyField(btnDestruirProp,     new GUIContent("Btn Destruir"));
