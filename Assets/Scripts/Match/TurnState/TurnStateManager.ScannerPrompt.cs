@@ -432,9 +432,9 @@ public partial class TurnStateManager
             return false;
         }
 
-        if (cursorState != CursorState.Neutral)
+        if (cursorState != CursorState.Neutral && cursorState != CursorState.PlayerMenu)
         {
-            message = $"Destroy Unit exige cursor em Neutral (atual: {cursorState}).";
+            message = $"Destroy Unit exige cursor em Neutral/PlayerMenu (atual: {cursorState}).";
             return false;
         }
 
@@ -492,9 +492,21 @@ public partial class TurnStateManager
             return true;
         }
 
+        EnterRemovingUnitExecutingState("TryConfirmRemovingUnit");
         removeUnitExecutionInProgress = true;
         StartCoroutine(ExecuteRemoveUnitConfirmationFlow(target, actionCell, actionTurn, actionTeam));
         return true;
+    }
+
+    private void EnterRemovingUnitExecutingState(string reason)
+    {
+        if (CurrentCursorState == CursorState.RemovingUnitExecuting)
+            return;
+
+        if (CurrentCursorState != CursorState.RemovingUnit)
+            Advance(CursorState.RemovingUnit, $"{reason}: ensure RemovingUnit");
+
+        Advance(CursorState.RemovingUnitExecuting, reason);
     }
 
     private bool CanDestroyUnitTargetForActiveTeam(UnitManager target, TeamId activeTeam, out string reason)
@@ -567,7 +579,7 @@ public partial class TurnStateManager
         if (logCanceled)
             RuntimeLog("[Destroy Unit] Cancelado.");
         PanelDialogController.ClearExternalText();
-        if (logCanceled)
+        if (logCanceled && cursorState == CursorState.RemovingUnit)
             Retreat("ExitRemovingUnitStateToNeutral");
         else
             ExecuteAndReset("ExitRemovingUnitStateToNeutral");

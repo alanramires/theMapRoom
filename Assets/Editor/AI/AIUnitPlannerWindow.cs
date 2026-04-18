@@ -18,7 +18,6 @@ public class AIUnitPlannerWindow : EditorWindow
     // -----------------------------------------------------------------
     [SerializeField] private Tilemap         boardTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
-    private AIPlayerOrchestrator             _orchestrator;
     private MatchController                  _matchController;
 
     // -----------------------------------------------------------------
@@ -51,7 +50,6 @@ public class AIUnitPlannerWindow : EditorWindow
     private GUIStyle _cardNormal;
     private GUIStyle _chosenRow;
     private bool     _stylesReady;
-    private bool     _wasPaused;
 
     [MenuItem("Tools/AI/AI Unit Planner")]
     public static void OpenWindow() => GetWindow<AIUnitPlannerWindow>("AI Unit Planner");
@@ -69,13 +67,9 @@ public class AIUnitPlannerWindow : EditorWindow
 
     private void OnInspectorUpdate()
     {
-        bool isPaused = AIPlayerOrchestrator.IsDebugPaused;
 
         // Detecta transição para pausado: re-snapshot DEPOIS que o batch atual terminou
-        if (isPaused && !_wasPaused)
-            SnapshotQueue();
 
-        _wasPaused = isPaused;
 
         // Avança o cursor > para o próximo que ainda não agiu
         _currentIdx = _queue.Count;
@@ -124,8 +118,6 @@ public class AIUnitPlannerWindow : EditorWindow
 
     private void DrawTopBar()
     {
-        if (_orchestrator == null)
-            _orchestrator = Object.FindAnyObjectByType<AIPlayerOrchestrator>();
         if (_matchController == null)
             _matchController = Object.FindAnyObjectByType<MatchController>();
 
@@ -135,31 +127,15 @@ public class AIUnitPlannerWindow : EditorWindow
 
         EditorGUILayout.Space(2);
 
-        // Controles de pausa
         EditorGUILayout.BeginHorizontal();
-        bool isPaused = AIPlayerOrchestrator.IsDebugPaused;
-
-        EditorGUI.BeginDisabledGroup(_orchestrator == null || isPaused);
-        if (GUILayout.Button("⏸  AI Pause", GUILayout.Height(22)))
-            _orchestrator.SetDebugPaused(true);
-        EditorGUI.EndDisabledGroup();
-
-        EditorGUI.BeginDisabledGroup(_orchestrator == null || !isPaused);
-        if (GUILayout.Button("▶  AI Resume", GUILayout.Height(22)))
-            _orchestrator.SetDebugPaused(false);
-        EditorGUI.EndDisabledGroup();
-
-        if (GUILayout.Button("↺", GUILayout.Width(24), GUILayout.Height(22)))
+        if (GUILayout.Button("Capturar fila", GUILayout.Height(22)))
             SnapshotQueue();
-
         EditorGUILayout.EndHorizontal();
 
-        if (isPaused)
-            EditorGUILayout.HelpBox("IA pausada — cursor livre para inspeção.", MessageType.Warning);
+        EditorGUILayout.HelpBox("AI legacy removida da compilacao. Use Capturar fila para avaliar unidades com HexEvaluator.", MessageType.Info);
 
         EditorGUILayout.EndVertical();
     }
-
     private void DrawContextFields()
     {
         boardTilemap    = (Tilemap)EditorGUILayout.ObjectField("Tilemap",   boardTilemap,    typeof(Tilemap),          true);
@@ -451,8 +427,6 @@ public class AIUnitPlannerWindow : EditorWindow
 
     private void AutoDetectContext()
     {
-        if (_orchestrator == null)
-            _orchestrator = Object.FindAnyObjectByType<AIPlayerOrchestrator>();
         if (_matchController == null)
             _matchController = Object.FindAnyObjectByType<MatchController>();
 

@@ -29,6 +29,7 @@ public partial class TurnStateManager
         switch (exited)
         {
             case CursorState.CommandService:
+            case CursorState.RemovingUnit:
                 BattleMapMenuRootController.TryRestoreMenuFromStateStack();
                 break;
         }

@@ -128,6 +128,8 @@ public partial class TurnStateManager
             case CursorState.PlayerMenu:
             case CursorState.CommandService:
             case CursorState.CommandServiceExecuting:
+            case CursorState.RemovingUnit:
+            case CursorState.RemovingUnitExecuting:
                 return true;
             default:
                 return false;

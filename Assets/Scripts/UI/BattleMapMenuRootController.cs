@@ -605,10 +605,13 @@ public class BattleMapMenuRootController : MonoBehaviour
                 SetPanelSelectionByButton(btnOpcoes);
                 break;
             case MenuAction.Destruir:
-                if (!TryCloseMenuForDispatchAndEnsureNeutral())
+                if (!TryCloseMenuForRemoveUnitDispatch())
                     break;
                 if (turnStateManager != null && !turnStateManager.TryOpenDestroyUnitPromptFromMenu(out string destroyMessage))
+                {
+                    turnStateManager.TryExitPlayerMenuStateToNeutral();
                     PanelDialogController.TrySetTransientText(destroyMessage, 2.4f);
+                }
                 break;
             case MenuAction.Render:
                 PanelDialogController.TrySetTransientText("Render: em desenvolvimento.", 2.4f);
@@ -676,6 +679,23 @@ public class BattleMapMenuRootController : MonoBehaviour
             return true;
 
         string message = $"Menu do jogador: estado invalido para Servico do Comando (atual: {state}).";
+        PanelDialogController.TrySetTransientText(message, 2.8f);
+        cursorController?.PlayErrorSfx();
+        return false;
+    }
+
+    private bool TryCloseMenuForRemoveUnitDispatch()
+    {
+        CloseMenu(restoreCursor: true, exitPlayerMenuState: false);
+        if (turnStateManager == null)
+            return true;
+
+        TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
+        if (state == TurnStateManager.CursorState.PlayerMenu ||
+            state == TurnStateManager.CursorState.Neutral)
+            return true;
+
+        string message = $"Menu do jogador: estado invalido para Destroy Unit (atual: {state}).";
         PanelDialogController.TrySetTransientText(message, 2.8f);
         cursorController?.PlayErrorSfx();
         return false;

@@ -184,7 +184,9 @@ public class PanelDialogController : MonoBehaviour
         string nextText = BuildStateText(unitName, turnStateManager.CurrentCursorState);
         if (turnStateManager != null &&
             (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandService ||
-             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandServiceExecuting))
+             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandServiceExecuting ||
+             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.RemovingUnit ||
+             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.RemovingUnitExecuting))
         {
             nextText = turnStateManager.CurrentCursorStateStackDebugText;
         }

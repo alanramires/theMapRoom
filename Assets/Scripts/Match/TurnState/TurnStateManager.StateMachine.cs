@@ -49,6 +49,8 @@ public partial class TurnStateManager
                 return ActionSfx.None;
             case CursorState.RemovingUnit:
                 return HandleConfirmWhileRemovingUnit();
+            case CursorState.RemovingUnitExecuting:
+                return ActionSfx.None;
             case CursorState.Planning:
                 return HandleConfirmWhilePlanning();
             case CursorState.PlayerMenu:
@@ -111,6 +113,8 @@ public partial class TurnStateManager
                 return ActionSfx.None;
             case CursorState.RemovingUnit:
                 return HandleCancelWhileRemovingUnit();
+            case CursorState.RemovingUnitExecuting:
+                return ActionSfx.None;
             case CursorState.Planning:
                 return HandleCancelWhilePlanning();
             case CursorState.PlayerMenu:

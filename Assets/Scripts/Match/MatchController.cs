@@ -921,7 +921,6 @@ public class MatchController : MonoBehaviour
     // Bloqueio central de input humano durante o turno de um time controlado por IA.
     public bool IsPlayerInputLockedByActiveAI()
     {
-        if (AIPlayerOrchestrator.IsDebugPaused) return false;
         return Application.isPlaying && IsActiveTeamAI();
     }
 

@@ -15,7 +15,6 @@ public class DebugManager : MonoBehaviour
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private MatchController matchController;
     [SerializeField] private CursorController cursorController;
-    [SerializeField] private AIPlayerOrchestrator aiOrchestrator;
     [SerializeField] private Button sendButton;
     [Tooltip("Arraste o objeto do input (raiz ou filho).")]
     [SerializeField] private GameObject commandInputObject;
@@ -127,8 +126,6 @@ public class DebugManager : MonoBehaviour
             cursorController = FindAnyObjectByType<CursorController>();
         if (matchController == null)
             matchController = FindAnyObjectByType<MatchController>();
-        if (aiOrchestrator == null)
-            aiOrchestrator = FindAnyObjectByType<AIPlayerOrchestrator>();
 
         if (sendButton == null)
             sendButton = GetComponentInChildren<Button>();
@@ -395,33 +392,11 @@ public class DebugManager : MonoBehaviour
         }
         else if (command == "AI PAUSE" || command == "PAUSE AI")
         {
-            if (aiOrchestrator == null)
-            {
-                Debug.Log("[Debug Command] AIPlayerOrchestrator nao encontrado.");
-            }
-            else
-            {
-                aiOrchestrator.SetDebugPaused(true);
-                executed = true;
-                cursorController?.PlayBeepSfx();
-                PanelDialogController.TrySetTransientText("AI pausada — cursor livre", 2.4f);
-                Debug.Log("[Debug Command] AI pausada.");
-            }
+            Debug.Log("[Debug Command] AI legacy movida para AI_Legacy~; comando AI PAUSE indisponivel.");
         }
         else if (command == "AI RESUME" || command == "RESUME AI")
         {
-            if (aiOrchestrator == null)
-            {
-                Debug.Log("[Debug Command] AIPlayerOrchestrator nao encontrado.");
-            }
-            else
-            {
-                aiOrchestrator.SetDebugPaused(false);
-                executed = true;
-                cursorController?.PlayDoneSfx();
-                PanelDialogController.TrySetTransientText("AI retomada", 2.4f);
-                Debug.Log("[Debug Command] AI retomada.");
-            }
+            Debug.Log("[Debug Command] AI legacy movida para AI_Legacy~; comando AI RESUME indisponivel.");
         }
         else
         {

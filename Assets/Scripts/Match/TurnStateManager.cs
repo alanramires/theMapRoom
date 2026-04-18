@@ -66,7 +66,8 @@ public partial class TurnStateManager : MonoBehaviour
         AircraftFuelDepletionQueue = 19,
         TurnStartRallyQueue = 20,
         Replay = 21,
-        CommandServiceExecuting = 22
+        CommandServiceExecuting = 22,
+        RemovingUnitExecuting = 23
     }
 
     [Header("References")]
@@ -243,6 +244,7 @@ public partial class TurnStateManager : MonoBehaviour
         stateStack.Push(nextState);
         ApplyStateTransition(previous, nextState, reason, rollback: false);
         HandleStateAdvanced(previous, nextState, reason);
+        ValidateStateStack(reason);
         RefreshFsmDebugText();
     }
 
@@ -250,11 +252,13 @@ public partial class TurnStateManager : MonoBehaviour
     {
         EnsureStateStackInitialized();
         CursorState previous = CurrentCursorState;
+        ValidateRetreatSource(previous, reason);
         if (stateStack.Count > 1)
             stateStack.Pop();
         CursorState revealed = CurrentCursorState;
         ApplyStateTransition(previous, revealed, reason, rollback: true);
         HandleStateRevealedByRetreat(previous, revealed, reason);
+        ValidateStateStack(reason);
         RefreshFsmDebugText();
     }
 
@@ -265,6 +269,7 @@ public partial class TurnStateManager : MonoBehaviour
         stateStack.Push(CursorState.Neutral);
         ApplyStateTransition(previous, CursorState.Neutral, reason, rollback: false);
         HandleStateStackReset(previous, reason);
+        ValidateStateStack(reason);
         RefreshFsmDebugText();
     }
 
@@ -405,6 +410,8 @@ public partial class TurnStateManager : MonoBehaviour
                 return "Executing";
             case CursorState.RemovingUnit:
                 return "Removing Unit";
+            case CursorState.RemovingUnitExecuting:
+                return "Removing Unit Executing";
             case CursorState.PlayerMenu:
                 return "Player Menu";
             case CursorState.AircraftFuelDepletionQueue:

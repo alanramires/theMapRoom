@@ -736,7 +736,9 @@ public class SaveGameManager : MonoBehaviour
         bool blocked =
             state == TurnStateManager.CursorState.PlayerMenu ||
             state == TurnStateManager.CursorState.CommandService ||
-            state == TurnStateManager.CursorState.CommandServiceExecuting;
+            state == TurnStateManager.CursorState.CommandServiceExecuting ||
+            state == TurnStateManager.CursorState.RemovingUnit ||
+            state == TurnStateManager.CursorState.RemovingUnitExecuting;
         if (!blocked)
             return false;
 
@@ -2172,8 +2174,6 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
-
-
 
 
 
