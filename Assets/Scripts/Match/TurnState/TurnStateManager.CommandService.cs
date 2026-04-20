@@ -64,8 +64,8 @@ public partial class TurnStateManager
     /// </summary>
     public bool IsAutoCommandServiceBusy => autoCommandServiceRoutine != null || IsCommandServiceExecutionRunning;
 
-    private bool IsCommandServiceState => cursorState == CursorState.CommandService;
-    private bool IsCommandServiceExecutingState => cursorState == CursorState.CommandServiceExecuting;
+    private bool IsCommandServiceState => CurrentCursorState == CursorState.CommandService;
+    private bool IsCommandServiceExecutingState => CurrentCursorState == CursorState.CommandServiceExecuting;
     private bool IsCommandServiceExecutionRunning => commandServiceExecutionRoutine != null;
     private bool IsCommandServiceAwaitingConfirmation =>
         IsCommandServiceState &&
@@ -111,7 +111,7 @@ public partial class TurnStateManager
         if (!WasLetterPressedThisFrame('X'))
             return;
 
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
             return;
 
         TryCloseThreatLayerHotzone();
@@ -130,9 +130,9 @@ public partial class TurnStateManager
             return false;
         }
 
-        if (cursorState != CursorState.Neutral && cursorState != CursorState.PlayerMenu)
+        if (CurrentCursorState != CursorState.Neutral && CurrentCursorState != CursorState.PlayerMenu)
         {
-            message = $"Servico do Comando exige cursor em Neutral/PlayerMenu (atual: {cursorState}).";
+            message = $"Servico do Comando exige cursor em Neutral/PlayerMenu (atual: {CurrentCursorState}).";
             return false;
         }
 
@@ -225,11 +225,11 @@ public partial class TurnStateManager
             return false;
         }
 
-        if (cursorState != CursorState.Neutral &&
-            cursorState != CursorState.PlayerMenu &&
-            cursorState != CursorState.CommandService)
+        if (CurrentCursorState != CursorState.Neutral &&
+            CurrentCursorState != CursorState.PlayerMenu &&
+            CurrentCursorState != CursorState.CommandService)
         {
-            message = $"Servico do Comando (\"X\") exige cursor em Neutral/PlayerMenu/CommandService (atual: {cursorState}).";
+            message = $"Servico do Comando (\"X\") exige cursor em Neutral/PlayerMenu/CommandService (atual: {CurrentCursorState}).";
             if (emitLogs)
                 CommandServiceLog(message);
             ClearPendingCommandServiceConfirmation();
@@ -835,7 +835,7 @@ public partial class TurnStateManager
         commandServiceServedUnitInstanceIds.Clear();
         ClearPendingCommandServiceConfirmation();
         ClearCommandServicePreviewNavigation();
-        if (cursorState == CursorState.CommandService || cursorState == CursorState.CommandServiceExecuting)
+        if (CurrentCursorState == CursorState.CommandService || CurrentCursorState == CursorState.CommandServiceExecuting)
             ExecuteAndReset("ResetCommandServiceReplayTransientState");
     }
 
@@ -2249,7 +2249,7 @@ public partial class TurnStateManager
         // e cursor voltar ao Neutral.
         while (supplyExecutionInProgress ||
                IsCommandServiceExecutionRunning ||
-               cursorState != CursorState.Neutral)
+               CurrentCursorState != CursorState.Neutral)
         {
             yield return null;
         }

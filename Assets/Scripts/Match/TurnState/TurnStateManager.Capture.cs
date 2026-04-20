@@ -8,11 +8,11 @@ public partial class TurnStateManager
     {
         if (selectedUnit == null)
             return;
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return;
 
         bool canCapture = availableSensorActionCodes.Contains('C');
-        SensorMovementMode movementMode = cursorState == CursorState.MoveuAndando
+        SensorMovementMode movementMode = CurrentCursorState == CursorState.MoveuAndando
             ? SensorMovementMode.MoveuAndando
             : SensorMovementMode.MoveuParado;
         Tilemap boardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
@@ -37,125 +37,127 @@ public partial class TurnStateManager
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Capture, "CaptureActionRequested");
         Advance(CursorState.Capturando, "HandleCaptureActionRequested");
         ClearCommittedPathVisual();
-        StartCoroutine(ExecuteCaptureSequence(target));
+        StartCoroutine(ExecuteCaptureSequence(target, movementMode));
     }
 
-    private IEnumerator ExecuteCaptureSequence(ConstructionManager targetConstruction)
+    private IEnumerator ExecuteCaptureSequence(ConstructionManager targetConstruction, SensorMovementMode movementMode)
     {
         captureExecutionInProgress = true;
+        Advance(CursorState.CapturandoExecuting, "ExecuteCaptureSequence: begin");
 
-        UnitManager capturer = selectedUnit;
-        if (capturer == null || targetConstruction == null)
+        try
         {
-            captureExecutionInProgress = false;
-            yield break;
-        }
+            UnitManager capturer = selectedUnit;
+            if (capturer == null || targetConstruction == null)
+                yield break;
 
-        int captureDamage = Mathf.Max(0, capturer.CurrentHP);
-        float hp01 = Mathf.InverseLerp(1f, 10f, Mathf.Clamp(capturer.CurrentHP, 1, 10));
-        float capturePitch = Mathf.Lerp(1f, 2f, hp01);
-        float preSfxDelay = animationManager != null ? animationManager.CapturePreSfxDelay : 0.12f;
-        float postCapturingSfxDelay = animationManager != null ? animationManager.CapturePostCapturingSfxDelay : 0.12f;
-        float postDoneSfxDelay = animationManager != null ? animationManager.CapturePostDoneSfxDelay : 0.05f;
-        float postCapturedSfxDelay = animationManager != null ? animationManager.CapturePostCapturedSfxDelay : 0.10f;
+            int captureDamage = Mathf.Max(0, capturer.CurrentHP);
+            float hp01 = Mathf.InverseLerp(1f, 10f, Mathf.Clamp(capturer.CurrentHP, 1, 10));
+            float capturePitch = Mathf.Lerp(1f, 2f, hp01);
+            float preSfxDelay = animationManager != null ? animationManager.CapturePreSfxDelay : 0.12f;
+            float postCapturingSfxDelay = animationManager != null ? animationManager.CapturePostCapturingSfxDelay : 0.12f;
+            float postDoneSfxDelay = animationManager != null ? animationManager.CapturePostDoneSfxDelay : 0.05f;
+            float postCapturedSfxDelay = animationManager != null ? animationManager.CapturePostCapturedSfxDelay : 0.10f;
 
-        if (preSfxDelay > 0f)
-            yield return new WaitForSeconds(preSfxDelay);
-        cursorController?.PlayCapturingSfx(capturePitch, 1f);
-        if (postCapturingSfxDelay > 0f)
-            yield return new WaitForSeconds(postCapturingSfxDelay);
+            if (preSfxDelay > 0f)
+                yield return new WaitForSeconds(preSfxDelay);
+            cursorController?.PlayCapturingSfx(capturePitch, 1f);
+            if (postCapturingSfxDelay > 0f)
+                yield return new WaitForSeconds(postCapturingSfxDelay);
 
-        if (!PodeCapturarSensor.TryGetCaptureTarget(
-                capturer,
-                terrainTilemap != null ? terrainTilemap : capturer.BoardTilemap,
-                cursorState == CursorState.MoveuAndando ? SensorMovementMode.MoveuAndando : SensorMovementMode.MoveuParado,
-                out _,
-                out PodeCapturarSensor.CaptureOperationType operationType,
-                out string operationReason))
-        {
-            RuntimeLog(string.IsNullOrWhiteSpace(operationReason)
-                ? "[Captura] Operacao invalida no momento da execucao."
-                : $"[Captura] Operacao invalida: {operationReason}");
-            FinalizeCaptureAction(capturer);
-            captureExecutionInProgress = false;
-            yield break;
-        }
-
-        int before = Mathf.Max(0, targetConstruction.CurrentCapturePoints);
-        int safeMax = Mathf.Max(0, targetConstruction.CapturePointsMax);
-        int after;
-        bool concluded;
-        bool captureCompletedForReplay = false;
-        TeamId newOwnerForReplay = targetConstruction.TeamId;
-
-        if (operationType == PodeCapturarSensor.CaptureOperationType.RecoverAlly)
-        {
-            after = Mathf.Min(safeMax, before + captureDamage);
-            targetConstruction.SetCurrentCapturePoints(after);
-            concluded = after >= safeMax;
-            RuntimeLog(
-                $"[Captura] {capturer.name} recuperou {captureDamage} de captura em {targetConstruction.ConstructionDisplayName} " +
-                $"({before} -> {after}).");
-        }
-        else
-        {
-            after = Mathf.Max(0, before - captureDamage);
-            targetConstruction.SetCurrentCapturePoints(after);
-            concluded = after <= 0;
-            RuntimeLog(
-                $"[Captura] {capturer.name} causou {captureDamage} de captura em {targetConstruction.ConstructionDisplayName} " +
-                $"({before} -> {after}).");
-        }
-
-        if (concluded)
-        {
-            cursorController?.PlayCapturedSfx(1f, 1f);
-            if (postCapturedSfxDelay > 0f)
-                yield return new WaitForSeconds(postCapturedSfxDelay);
-
-            if (operationType == PodeCapturarSensor.CaptureOperationType.CaptureEnemy)
+            if (!PodeCapturarSensor.TryGetCaptureTarget(
+                    capturer,
+                    terrainTilemap != null ? terrainTilemap : capturer.BoardTilemap,
+                    movementMode,
+                    out _,
+                    out PodeCapturarSensor.CaptureOperationType operationType,
+                    out string operationReason))
             {
-                targetConstruction.SetTeamId(capturer.TeamId);
-                targetConstruction.SetCurrentCapturePoints(targetConstruction.CapturePointsMax);
-                captureCompletedForReplay = true;
-                newOwnerForReplay = capturer.TeamId;
+                RuntimeLog(string.IsNullOrWhiteSpace(operationReason)
+                    ? "[Captura] Operacao invalida no momento da execucao."
+                    : $"[Captura] Operacao invalida: {operationReason}");
+                FinalizeCaptureAction(capturer);
+                yield break;
+            }
+
+            int before = Mathf.Max(0, targetConstruction.CurrentCapturePoints);
+            int safeMax = Mathf.Max(0, targetConstruction.CapturePointsMax);
+            int after;
+            bool concluded;
+            bool captureCompletedForReplay = false;
+            TeamId newOwnerForReplay = targetConstruction.TeamId;
+
+            if (operationType == PodeCapturarSensor.CaptureOperationType.RecoverAlly)
+            {
+                after = Mathf.Min(safeMax, before + captureDamage);
+                targetConstruction.SetCurrentCapturePoints(after);
+                concluded = after >= safeMax;
                 RuntimeLog(
-                    $"[Captura] Construcao capturada por {TeamUtils.GetName(capturer.TeamId)}. " +
-                    $"Capture resetado para {targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}.");
+                    $"[Captura] {capturer.name} recuperou {captureDamage} de captura em {targetConstruction.ConstructionDisplayName} " +
+                    $"({before} -> {after}).");
             }
             else
             {
+                after = Mathf.Max(0, before - captureDamage);
+                targetConstruction.SetCurrentCapturePoints(after);
+                concluded = after <= 0;
                 RuntimeLog(
-                    $"[Captura] Construcao aliada recuperada para {targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}.");
+                    $"[Captura] {capturer.name} causou {captureDamage} de captura em {targetConstruction.ConstructionDisplayName} " +
+                    $"({before} -> {after}).");
             }
+
+            if (concluded)
+            {
+                cursorController?.PlayCapturedSfx(1f, 1f);
+                if (postCapturedSfxDelay > 0f)
+                    yield return new WaitForSeconds(postCapturedSfxDelay);
+
+                if (operationType == PodeCapturarSensor.CaptureOperationType.CaptureEnemy)
+                {
+                    targetConstruction.SetTeamId(capturer.TeamId);
+                    targetConstruction.SetCurrentCapturePoints(targetConstruction.CapturePointsMax);
+                    captureCompletedForReplay = true;
+                    newOwnerForReplay = capturer.TeamId;
+                    RuntimeLog(
+                        $"[Captura] Construcao capturada por {TeamUtils.GetName(capturer.TeamId)}. " +
+                        $"Capture resetado para {targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}.");
+                }
+                else
+                {
+                    RuntimeLog(
+                        $"[Captura] Construcao aliada recuperada para {targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}.");
+                }
+
+                RecordCaptureReplayCommand(
+                    capturer,
+                    targetConstruction,
+                    before,
+                    targetConstruction.CurrentCapturePoints,
+                    captureCompletedForReplay,
+                    newOwnerForReplay);
+
+                FinalizeCaptureAction(capturer);
+                yield break;
+            }
+
+            cursorController?.PlayDoneSfx();
+            if (postDoneSfxDelay > 0f)
+                yield return new WaitForSeconds(postDoneSfxDelay);
 
             RecordCaptureReplayCommand(
                 capturer,
                 targetConstruction,
                 before,
                 targetConstruction.CurrentCapturePoints,
-                captureCompletedForReplay,
-                newOwnerForReplay);
+                captureCompleted: false,
+                newOwner: targetConstruction.TeamId);
 
             FinalizeCaptureAction(capturer);
-            captureExecutionInProgress = false;
-            yield break;
         }
-
-        cursorController?.PlayDoneSfx();
-        if (postDoneSfxDelay > 0f)
-            yield return new WaitForSeconds(postDoneSfxDelay);
-
-        RecordCaptureReplayCommand(
-            capturer,
-            targetConstruction,
-            before,
-            targetConstruction.CurrentCapturePoints,
-            captureCompleted: false,
-            newOwner: targetConstruction.TeamId);
-
-        FinalizeCaptureAction(capturer);
-        captureExecutionInProgress = false;
+        finally
+        {
+            captureExecutionInProgress = false;
+        }
     }
 
     private void FinalizeCaptureAction(UnitManager capturer)

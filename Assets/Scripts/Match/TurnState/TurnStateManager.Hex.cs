@@ -21,52 +21,52 @@ public partial class TurnStateManager
             return true;
         }
 
-        if (cursorState == CursorState.ShoppingAndServices)
+        if (CurrentCursorState == CursorState.ShoppingAndServices)
         {
             TryResolveShoppingCursorMove(currentCell, inputDelta);
             resolvedCell = currentCell;
             return false;
         }
 
-        if (cursorState == CursorState.Capturando)
+        if (CurrentCursorState == CursorState.Capturando || CurrentCursorState == CursorState.CapturandoExecuting)
         {
             resolvedCell = currentCell;
             return false;
         }
 
-        if (cursorState == CursorState.AircraftFuelDepletionQueue || cursorState == CursorState.TurnStartRallyQueue)
+        if (CurrentCursorState == CursorState.AircraftFuelDepletionQueue || CurrentCursorState == CursorState.TurnStartRallyQueue)
         {
             resolvedCell = currentCell;
             return false;
         }
 
-        if (cursorState == CursorState.Mirando)
+        if (CurrentCursorState == CursorState.Mirando)
             return TryResolveMirandoCursorMove(inputDelta, out resolvedCell);
 
-        if (cursorState == CursorState.Desembarcando)
+        if (CurrentCursorState == CursorState.Desembarcando)
             return TryResolveDisembarkCursorMove(currentCell, inputDelta, out resolvedCell);
 
-        if (cursorState == CursorState.Fundindo)
+        if (CurrentCursorState == CursorState.Fundindo)
             return TryResolveMergeCursorMove(currentCell, inputDelta, out resolvedCell);
 
-        if (cursorState == CursorState.Suprindo)
+        if (CurrentCursorState == CursorState.Suprindo)
             return TryResolveSupplyCursorMove(currentCell, inputDelta, out resolvedCell);
 
-        if (cursorState == CursorState.Pousando)
+        if (CurrentCursorState == CursorState.Pousando)
         {
             if (IsLandingPromptActive())
                 return TryResolveLandingCursorMove(inputDelta, out resolvedCell);
             return false;
         }
 
-        if (cursorState == CursorState.Embarcando)
+        if (CurrentCursorState == CursorState.Embarcando)
         {
             if (IsEmbarkPromptActive())
                 return TryResolveEmbarkCursorMove(inputDelta, out resolvedCell);
             return false;
         }
 
-        if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
+        if (CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado)
         {
             if (IsTransferSelectionStepActive())
                 return TryResolveTransferCursorMove(currentCell, inputDelta, out resolvedCell);
@@ -96,7 +96,7 @@ public partial class TurnStateManager
             return false;
         }
 
-        if (cursorState != CursorState.UnitSelected)
+        if (CurrentCursorState != CursorState.UnitSelected)
             return true;
 
         if (paintedRangeLookup.Count == 0)
@@ -123,7 +123,7 @@ public partial class TurnStateManager
 
     private bool IsBoardCursorMovementLockedByCurrentState()
     {
-        switch (cursorState)
+        switch (CurrentCursorState)
         {
             case CursorState.PlayerMenu:
             case CursorState.CommandService:
@@ -134,6 +134,10 @@ public partial class TurnStateManager
             case CursorState.EndingTurnExecuting:
             case CursorState.Saving:
             case CursorState.Loading:
+            case CursorState.SuprindoExecuting:
+            case CursorState.FundindoExecuting:
+            case CursorState.DesembarcandoExecuting:
+            case CursorState.EmbarcandoExecuting:
                 return true;
             default:
                 return false;

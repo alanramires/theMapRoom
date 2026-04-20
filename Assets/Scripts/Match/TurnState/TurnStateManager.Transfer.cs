@@ -200,7 +200,7 @@ public partial class TurnStateManager
     {
         return (transferPromptSelectionPending || transferPromptConfirmationPending) &&
                transferPromptOptions.Count > 0 &&
-               (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado);
+               (CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado);
     }
 
     private bool IsTransferSelectionStepActive()
@@ -416,7 +416,7 @@ public partial class TurnStateManager
             return;
 
         transferPromptTemporarilyHidCommittedPath = false;
-        bool canRestoreInMovementSensors = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
+        bool canRestoreInMovementSensors = CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado;
         if (!canRestoreInMovementSensors)
             return;
         if (!hasCommittedMovement || committedMovementPath == null || committedMovementPath.Count < 2)

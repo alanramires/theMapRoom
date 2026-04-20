@@ -13,7 +13,7 @@ public partial class TurnStateManager
         if (TryConfirmPendingTransferPrompt())
             return ActionSfx.Confirm;
 
-        switch (cursorState)
+        switch (CurrentCursorState)
         {
             case CursorState.Neutral:
                 return HandleConfirmWhileNeutral();
@@ -83,7 +83,7 @@ public partial class TurnStateManager
         if (HandleScannerPromptCancel())
             return ActionSfx.Cancel;
 
-        switch (cursorState)
+        switch (CurrentCursorState)
         {
             case CursorState.Neutral:
                 return ActionSfx.None;
@@ -157,7 +157,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmFromNeutralLikeState()
     {
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
             ExecuteAndReset("HandleConfirmFromNeutralLikeState: normalize");
 
         if (cursorController == null)
@@ -577,7 +577,7 @@ public partial class TurnStateManager
     {
         LogStateStep("HandleCancelWhileMoveuAndando", rollback: true);
         RuntimeLog(
-            $"[Rollback] ESC em fluxo andado (state={cursorState}) | hasCommittedMovement={hasCommittedMovement} | " +
+            $"[Rollback] ESC em fluxo andado (state={CurrentCursorState}) | hasCommittedMovement={hasCommittedMovement} | " +
             $"pathCount={committedMovementPath.Count} | selected={(selectedUnit != null ? selectedUnit.name : "(none)")}");
 
         if (HandleScannerPromptCancel())
@@ -843,9 +843,9 @@ public partial class TurnStateManager
     public bool TryOpenEndingTurnConfirmation(out string message)
     {
         message = string.Empty;
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
         {
-            message = $"Ending Turn exige cursor em Neutral (atual: {cursorState}).";
+            message = $"Ending Turn exige cursor em Neutral (atual: {CurrentCursorState}).";
             return false;
         }
 
@@ -856,7 +856,7 @@ public partial class TurnStateManager
 
     public bool TryCancelEndingTurnConfirmation()
     {
-        if (cursorState != CursorState.EndingTurn)
+        if (CurrentCursorState != CursorState.EndingTurn)
             return false;
 
         PanelDialogController.ClearExternalText();
@@ -867,9 +867,9 @@ public partial class TurnStateManager
     public bool TryExecuteEndingTurnFromConfirmation(out string message)
     {
         message = string.Empty;
-        if (cursorState != CursorState.EndingTurn)
+        if (CurrentCursorState != CursorState.EndingTurn)
         {
-            message = $"Ending Turn confirmation exige estado EndingTurn (atual: {cursorState}).";
+            message = $"Ending Turn confirmation exige estado EndingTurn (atual: {CurrentCursorState}).";
             return false;
         }
 
@@ -879,9 +879,9 @@ public partial class TurnStateManager
     public bool TryExecuteEndingTurnFromMenu(out string message)
     {
         message = string.Empty;
-        if (cursorState != CursorState.PlayerMenu && cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.PlayerMenu && CurrentCursorState != CursorState.Neutral)
         {
-            message = $"Passar a vez exige PlayerMenu/Neutral (atual: {cursorState}).";
+            message = $"Passar a vez exige PlayerMenu/Neutral (atual: {CurrentCursorState}).";
             return false;
         }
 
@@ -895,12 +895,12 @@ public partial class TurnStateManager
         {
             message = "MatchController ausente para passar a vez.";
             PanelDialogController.ClearExternalText();
-            if (cursorState == CursorState.EndingTurn)
+            if (CurrentCursorState == CursorState.EndingTurn)
                 Retreat($"{reason}: missing MatchController");
             return false;
         }
 
-        if (cursorState != CursorState.EndingTurnExecuting)
+        if (CurrentCursorState != CursorState.EndingTurnExecuting)
             Advance(CursorState.EndingTurnExecuting, reason);
 
         PanelDialogController.ClearExternalText();
@@ -912,12 +912,12 @@ public partial class TurnStateManager
     public bool TryEnterSavingState(out string message)
     {
         message = string.Empty;
-        if (cursorState == CursorState.Saving)
+        if (CurrentCursorState == CursorState.Saving)
             return true;
 
-        if (cursorState != CursorState.Neutral && cursorState != CursorState.PlayerMenu)
+        if (CurrentCursorState != CursorState.Neutral && CurrentCursorState != CursorState.PlayerMenu)
         {
-            message = $"Saving exige Neutral/PlayerMenu (atual: {cursorState}).";
+            message = $"Saving exige Neutral/PlayerMenu (atual: {CurrentCursorState}).";
             return false;
         }
 
@@ -928,12 +928,12 @@ public partial class TurnStateManager
     public bool TryEnterLoadingState(out string message)
     {
         message = string.Empty;
-        if (cursorState == CursorState.Loading)
+        if (CurrentCursorState == CursorState.Loading)
             return true;
 
-        if (cursorState != CursorState.Neutral && cursorState != CursorState.PlayerMenu)
+        if (CurrentCursorState != CursorState.Neutral && CurrentCursorState != CursorState.PlayerMenu)
         {
-            message = $"Loading exige Neutral/PlayerMenu (atual: {cursorState}).";
+            message = $"Loading exige Neutral/PlayerMenu (atual: {CurrentCursorState}).";
             return false;
         }
 
@@ -943,7 +943,7 @@ public partial class TurnStateManager
 
     public void TryExitPersistencePromptState()
     {
-        if (cursorState != CursorState.Saving && cursorState != CursorState.Loading)
+        if (CurrentCursorState != CursorState.Saving && CurrentCursorState != CursorState.Loading)
             return;
 
         Retreat("TryExitPersistencePromptState");
@@ -951,7 +951,7 @@ public partial class TurnStateManager
 
     public bool TryEnterPlayerMenuState()
     {
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
             return false;
 
         Advance(CursorState.PlayerMenu, "TryEnterPlayerMenuState");
@@ -960,7 +960,7 @@ public partial class TurnStateManager
 
     public void TryExitPlayerMenuStateToNeutral()
     {
-        if (cursorState != CursorState.PlayerMenu)
+        if (CurrentCursorState != CursorState.PlayerMenu)
             return;
 
         Retreat("TryExitPlayerMenuStateToNeutral");
@@ -968,10 +968,10 @@ public partial class TurnStateManager
 
     public bool TryEnterReplayState()
     {
-        if (cursorState == CursorState.Replay)
+        if (CurrentCursorState == CursorState.Replay)
             return true;
 
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
             return false;
 
         Advance(CursorState.Replay, "TryEnterReplayState");
@@ -980,7 +980,7 @@ public partial class TurnStateManager
 
     public void TryExitReplayStateToNeutral()
     {
-        if (cursorState != CursorState.Replay)
+        if (CurrentCursorState != CursorState.Replay)
             return;
 
         Retreat("TryExitReplayStateToNeutral");

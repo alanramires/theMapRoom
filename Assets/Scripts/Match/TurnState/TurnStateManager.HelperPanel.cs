@@ -367,29 +367,29 @@ public partial class TurnStateManager
         if (scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
             return TryBuildSensorsHelperPanelData(data);
 
-        if (cursorState == CursorState.Neutral)
+        if (CurrentCursorState == CursorState.Neutral)
             return false;
 
-        if (cursorState == CursorState.ShoppingAndServices)
+        if (CurrentCursorState == CursorState.ShoppingAndServices)
             return TryBuildShoppingHelperPanelData(data);
 
-        if (cursorState == CursorState.Desembarcando)
+        if (CurrentCursorState == CursorState.Desembarcando)
             return TryBuildDisembarkHelperPanelData(data);
 
-        if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
+        if (CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado)
         {
             if (IsTransferPromptActive())
                 return TryBuildTransferHelperPanelData(data);
             return TryBuildSensorsHelperPanelData(data);
         }
 
-        if (cursorState == CursorState.Suprindo)
+        if (CurrentCursorState == CursorState.Suprindo)
             return TryBuildSupplyHelperPanelData(data);
 
-        if (cursorState == CursorState.Embarcando)
+        if (CurrentCursorState == CursorState.Embarcando)
             return TryBuildEmbarkHelperPanelData(data);
 
-        if (cursorState == CursorState.Fundindo)
+        if (CurrentCursorState == CursorState.Fundindo)
             return TryBuildMergeHelperPanelData(data);
 
         return false;
@@ -467,11 +467,11 @@ public partial class TurnStateManager
             return false;
 
         UnitManager unit = null;
-        if (cursorState == CursorState.UnitSelected && selectedUnit != null)
+        if (CurrentCursorState == CursorState.UnitSelected && selectedUnit != null)
         {
             unit = selectedUnit;
         }
-        else if ((cursorState == CursorState.Neutral || IsInspectingState()) && IsInspectedHelperActive())
+        else if ((CurrentCursorState == CursorState.Neutral || IsInspectingState()) && IsInspectedHelperActive())
         {
             unit = inspectedHelperUnit;
         }
@@ -640,8 +640,8 @@ public partial class TurnStateManager
     private bool TryBuildConstructionStatsHelperPanelData(HelperPanelData data)
     {
         bool canRenderInspectConstruction =
-            cursorState == CursorState.Neutral ||
-            cursorState == CursorState.InspectingBuilding;
+            CurrentCursorState == CursorState.Neutral ||
+            CurrentCursorState == CursorState.InspectingBuilding;
         if (data == null || !canRenderInspectConstruction || !IsInspectedHelperActive() || inspectedHelperConstruction == null)
             return false;
 
@@ -789,9 +789,9 @@ public partial class TurnStateManager
     private void ExitInspectStateToNeutral()
     {
         ClearInspectedHelper();
-        if (cursorState == CursorState.InspectingUnit ||
-            cursorState == CursorState.InspectingBuilding ||
-            cursorState == CursorState.InspectingHotZone)
+        if (CurrentCursorState == CursorState.InspectingUnit ||
+            CurrentCursorState == CursorState.InspectingBuilding ||
+            CurrentCursorState == CursorState.InspectingHotZone)
             Retreat("ExitInspectStateToNeutral");
     }
 
@@ -890,7 +890,7 @@ public partial class TurnStateManager
         ClearEnemyThreatLayersOverlay();
         if (hadActiveSelection)
             scannerPromptStep = ScannerPromptStep.AwaitingAction;
-        if (cursorState == CursorState.InspectingHotZone)
+        if (CurrentCursorState == CursorState.InspectingHotZone)
             Retreat("TryCloseThreatLayerHotzone");
         return true;
     }
@@ -1541,7 +1541,7 @@ public partial class TurnStateManager
 
     private void UpdateHoverInspection()
     {
-        if (cursorController == null || cursorState != CursorState.Neutral)
+        if (cursorController == null || CurrentCursorState != CursorState.Neutral)
         {
             lastHoveredCell = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
             hoveredCellStartTime = -1f;
@@ -1914,7 +1914,7 @@ public partial class TurnStateManager
         if (data == null)
             return false;
 
-        bool isMovementSensorState = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
+        bool isMovementSensorState = CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado;
         bool isThreatLayerSelectionStep = scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect;
         if (!isMovementSensorState && !isThreatLayerSelectionStep)
             return false;
@@ -2013,7 +2013,7 @@ public partial class TurnStateManager
     private bool TryBuildMergeHelperPanelData(HelperPanelData data)
     {
         bool isMergeAnimating = animationManager != null && animationManager.IsAnimatingMovement;
-        if (data == null || cursorState != CursorState.Fundindo || mergeExecutionInProgress || isMergeAnimating)
+        if (data == null || CurrentCursorState != CursorState.Fundindo || mergeExecutionInProgress || isMergeAnimating)
             return false;
 
         data.Kind = HelperPanelKind.Merge;
@@ -2078,7 +2078,7 @@ public partial class TurnStateManager
 
     private bool TryBuildEmbarkHelperPanelData(HelperPanelData data)
     {
-        if (data == null || cursorState != CursorState.Embarcando)
+        if (data == null || CurrentCursorState != CursorState.Embarcando)
             return false;
 
         data.Kind = HelperPanelKind.Embark;
@@ -2113,7 +2113,7 @@ public partial class TurnStateManager
 
     private bool TryBuildSupplyHelperPanelData(HelperPanelData data)
     {
-        if (data == null || cursorState != CursorState.Suprindo || selectedUnit == null || supplyExecutionInProgress)
+        if (data == null || CurrentCursorState != CursorState.Suprindo || selectedUnit == null || supplyExecutionInProgress)
             return false;
         if (scannerPromptStep != ScannerPromptStep.MergeParticipantSelect && scannerPromptStep != ScannerPromptStep.MergeConfirm)
             return false;

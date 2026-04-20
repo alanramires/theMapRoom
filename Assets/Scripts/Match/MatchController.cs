@@ -419,6 +419,15 @@ public class MatchController : MonoBehaviour
         return Mathf.Max(0, players[playerIndex].actualMoney);
     }
 
+    public int GetStartMoney(TeamId team)
+    {
+        int playerIndex = FindPlayerEconomyIndex(team);
+        if (playerIndex < 0)
+            return 0;
+
+        return Mathf.Max(0, players[playerIndex].startMoney);
+    }
+
     public int GetIncomePerTurn(TeamId team)
     {
         int playerIndex = FindPlayerEconomyIndex(team);
@@ -726,6 +735,7 @@ public class MatchController : MonoBehaviour
             FindAnyObjectByType<ReplayManager>()?.CleanupReplayArtifactsForMatchStart();
             if (autoFlipXFromHqPositions)
                 AutoComputeFlipXFromHqPositions();
+            ResetUnfundedStartMoneyFlagsForFreshMatch();
             ApplyActiveTeamIfChanged(force: true);
             TryAutoAssignTurnTransitionReferences();
             matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);
@@ -1521,6 +1531,24 @@ public class MatchController : MonoBehaviour
             entry.actualMoney = Mathf.Max(0, entry.actualMoney);
             entry.incomePerTurn = Mathf.Max(0, entry.incomePerTurn);
             entry.defeated = entry.defeated && entry.teamId != TeamId.Neutral;
+            players[i] = entry;
+        }
+    }
+
+    private void ResetUnfundedStartMoneyFlagsForFreshMatch()
+    {
+        if (!Application.isPlaying || currentTurn > 1 || players == null)
+            return;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            PlayerEntry entry = players[i];
+            if (!entry.startMoneyApplied)
+                continue;
+            if (entry.startMoney <= 0 || entry.actualMoney > 0)
+                continue;
+
+            entry.startMoneyApplied = false;
             players[i] = entry;
         }
     }

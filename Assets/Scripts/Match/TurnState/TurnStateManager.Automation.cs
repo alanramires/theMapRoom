@@ -48,18 +48,18 @@ public partial class TurnStateManager
 
     public bool HandleAutomatedMoveOnlyActionRequested()
     {
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return false;
 
         HandleMoveOnlyActionRequested();
-        return cursorState == CursorState.Neutral;
+        return CurrentCursorState == CursorState.Neutral;
     }
 
     public bool TryAutomatedSelectUnitAndEnterMoveuParado(UnitManager unit)
     {
         if (unit == null || cursorController == null)
             return false;
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
             return false;
 
         Vector3Int unitCell = unit.CurrentCellPosition;
@@ -74,7 +74,7 @@ public partial class TurnStateManager
         // Confirm #2 no mesmo hex: entra em MoveuParado (sensores habilitados).
         cursorController.SetCell(unitCell, playMoveSfx: false);
         HandleConfirm();
-        return cursorState == CursorState.MoveuParado || cursorState == CursorState.MoveuAndando;
+        return CurrentCursorState == CursorState.MoveuParado || CurrentCursorState == CursorState.MoveuAndando;
     }
 
     // Seleciona a unidade e mantem em UnitSelected (sem confirmar "moveu parado").
@@ -83,7 +83,7 @@ public partial class TurnStateManager
     {
         if (unit == null || cursorController == null)
             return false;
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
             return false;
 
         Vector3Int unitCell = unit.CurrentCellPosition;
@@ -91,7 +91,7 @@ public partial class TurnStateManager
         cursorController.SetCell(unitCell, playMoveSfx: false);
 
         HandleConfirm();
-        return selectedUnit == unit && cursorState == CursorState.UnitSelected;
+        return selectedUnit == unit && CurrentCursorState == CursorState.UnitSelected;
     }
 
     public bool TryExecuteAutomatedAttackFirstTarget()
@@ -101,7 +101,7 @@ public partial class TurnStateManager
 
     public bool TryExecuteAutomatedAttackBestTarget(UnitManager preferredTarget = null)
     {
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return false;
         if (selectedUnit == null || selectedUnit.HasActed)
             return false;
@@ -285,7 +285,7 @@ public partial class TurnStateManager
 
     public bool TryExecuteAutomatedAttackPreferredTarget(UnitManager preferredTarget)
     {
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return false;
         if (selectedUnit == null || selectedUnit.HasActed)
             return false;
@@ -394,7 +394,7 @@ public partial class TurnStateManager
 
     public bool TryExecuteAutomatedMergePreferredTarget(UnitManager preferredTarget)
     {
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return false;
         if (!HandleAutomatedSensorActionRequested(SensorActionType.Merge))
             return false;
@@ -417,7 +417,7 @@ public partial class TurnStateManager
 
     public bool HasAutomatedMoveAvailable()
     {
-        return cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
+        return CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado;
     }
 
     public float GetAutomatedPhaseDelay()
@@ -451,7 +451,7 @@ public partial class TurnStateManager
     {
         if (construction == null || cursorController == null)
             return false;
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
             return false;
 
         Vector3Int constructionCell = construction.CurrentCellPosition;
@@ -465,7 +465,7 @@ public partial class TurnStateManager
         // Mantem a semantica audiovisual do "Confirm" usada no fluxo normal/replay.
         cursorController.PlayConfirmSfx();
 
-        return cursorState == CursorState.ShoppingAndServices;
+        return CurrentCursorState == CursorState.ShoppingAndServices;
     }
 
     // Intel da IA (Fase 0): verifica via PodeMirarSensor (MoveuParado) se a unidade
@@ -543,7 +543,7 @@ public partial class TurnStateManager
 
     public bool TryExecuteAutomatedSupplyPreferredTarget(UnitManager preferredTarget)
     {
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return false;
         if (!HandleAutomatedSensorActionRequested(SensorActionType.Supply))
             return false;
@@ -566,7 +566,7 @@ public partial class TurnStateManager
 
     public bool TryExecuteAutomatedSupplyPreferredTargets(List<UnitManager> preferredTargets)
     {
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return false;
         if (preferredTargets == null || preferredTargets.Count <= 0)
             return false;
@@ -603,7 +603,7 @@ public partial class TurnStateManager
         ConstructionManager preferredConstruction = null,
         UnitManager preferredUnit = null)
     {
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return false;
         if (!HandleAutomatedSensorActionRequested(SensorActionType.Transfer))
             return false;
@@ -691,7 +691,7 @@ public partial class TurnStateManager
     }
     public bool TryExecuteAutomatedCaptureIfAvailable()
     {
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return false;
         if (availableSensorActionCodes == null || !availableSensorActionCodes.Contains('C'))
             return false;
@@ -706,11 +706,11 @@ public partial class TurnStateManager
         float elapsed = 0f;
         while (elapsed < timeout)
         {
-            if (cursorState == CursorState.Neutral && !IsScannerActionExecutionInProgress && !IsMovementAnimationRunning())
+            if (CurrentCursorState == CursorState.Neutral && !IsScannerActionExecutionInProgress && !IsMovementAnimationRunning())
                 yield break;
 
             // PlayerMenu/Replay pausam a simulacao automatica sem consumir timeout.
-            if (cursorState == CursorState.PlayerMenu || cursorState == CursorState.Replay)
+            if (CurrentCursorState == CursorState.PlayerMenu || CurrentCursorState == CursorState.Replay)
             {
                 yield return null;
                 continue;
@@ -757,7 +757,7 @@ public partial class TurnStateManager
         path = null;
         if (cursorController == null)
             return false;
-        if (cursorState != CursorState.UnitSelected || selectedUnit == null)
+        if (CurrentCursorState != CursorState.UnitSelected || selectedUnit == null)
             return false;
         if (movementPathsByCell == null || movementPathsByCell.Count == 0)
             return false;
@@ -1243,7 +1243,7 @@ public partial class TurnStateManager
         while (Time.time < endTime)
         {
             if (!IsMovementAnimationRunning() &&
-                (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado))
+                (CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado))
                 yield break;
             yield return null;
         }
@@ -1261,7 +1261,7 @@ public partial class TurnStateManager
 
     public bool HandleAutomatedCommandServiceRequested()
     {
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
             return false;
 
         TryCloseThreatLayerHotzone();
@@ -1274,7 +1274,7 @@ public partial class TurnStateManager
 
     public bool HandleAutomatedRemoveUnitRequested()
     {
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
             return false;
 
         if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out _))

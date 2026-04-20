@@ -102,7 +102,7 @@ public partial class TurnStateManager
     {
         if (selectedUnit == null)
             return;
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return;
 
         if (cachedPodeDesembarcarTargets.Count == 0)
@@ -114,7 +114,7 @@ public partial class TurnStateManager
 
         cursorController?.PlayConfirmSfx();
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Disembark, "DisembarkActionRequested");
-        cursorStateBeforeDesembarcando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+        cursorStateBeforeDesembarcando = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
         Advance(CursorState.Desembarcando, "HandleDisembarkActionRequested");
         ClearCommittedPathVisual();
         disembarkQueuedOrders.Clear();
@@ -123,7 +123,7 @@ public partial class TurnStateManager
 
     private void ProcessDisembarkPromptInput()
     {
-        if (cursorState != CursorState.Desembarcando)
+        if (CurrentCursorState != CursorState.Desembarcando)
             return;
 
         if (scannerPromptStep == ScannerPromptStep.DisembarkPassengerSelect)
@@ -172,7 +172,7 @@ public partial class TurnStateManager
 
     private bool TryConfirmScannerDisembark()
     {
-        if (cursorState != CursorState.Desembarcando)
+        if (CurrentCursorState != CursorState.Desembarcando)
             return false;
 
         if (scannerPromptStep == ScannerPromptStep.DisembarkPassengerSelect)
@@ -377,7 +377,7 @@ public partial class TurnStateManager
 
     private void ExitDisembarkStateToMovement()
     {
-        if (cursorState != CursorState.Desembarcando)
+        if (CurrentCursorState != CursorState.Desembarcando)
             return;
 
         Retreat("ExitDisembarkStateToMovement");
@@ -436,6 +436,11 @@ public partial class TurnStateManager
             transporterSortingRaised = true;
         }
 
+        Advance(CursorState.DesembarcandoExecuting, "ExecuteQueuedDisembarkOrdersSequence: begin");
+
+        try
+        {
+
         // Mesmo comportamento do embarque: transportador aereo pousa antes do desembarque.
         if (transporter != null && transporter.GetDomain() == Domain.Air)
         {
@@ -451,7 +456,7 @@ public partial class TurnStateManager
                     : $"[Desembarque] {landingDecision.reason}");
                 if (transporterSortingRaised && transporter != null)
                     transporter.ClearTemporarySortingOrder();
-                disembarkExecutionInProgress = false;
+                Retreat("DesembarcandoExecuting: air landing abort");
                 ExitDisembarkStateToMovement();
                 yield break;
             }
@@ -478,7 +483,7 @@ public partial class TurnStateManager
                 RuntimeLog("[Desembarque] Falha ao concluir pouso do transportador (Land/Surface).");
                 if (transporterSortingRaised && transporter != null)
                     transporter.ClearTemporarySortingOrder();
-                disembarkExecutionInProgress = false;
+                Retreat("DesembarcandoExecuting: layer mode abort");
                 ExitDisembarkStateToMovement();
                 yield break;
             }
@@ -517,6 +522,7 @@ public partial class TurnStateManager
             if (passenger == null)
                 continue;
 
+            passenger.SetFogOfWarVisibility(true);
             // Passageiro nasce exatamente na coordenada atual do transportador.
             passenger.SetCurrentCellPosition(transporterCellForSpawn, enforceFinalOccupancyRule: false);
             if (passenger.TryGetUnitData(out UnitData passengerDataAtSpawn) && passengerDataAtSpawn != null && passengerDataAtSpawn.IsAircraft())
@@ -663,7 +669,12 @@ public partial class TurnStateManager
         ResetDisembarkRuntimeState();
         if (transporterSortingRaised && transporter != null)
             transporter.ClearTemporarySortingOrder();
-        disembarkExecutionInProgress = false;
+
+        } // try
+        finally
+        {
+            disembarkExecutionInProgress = false;
+        }
     }
 
     private void ResetDisembarkRuntimeState()
@@ -743,9 +754,30 @@ public partial class TurnStateManager
         }
 
         if (skippedByQueuedReservation > 0)
-        {
             RuntimeLog($"[Desembarque] {skippedByQueuedReservation} hex(es) filtrado(s) para {ResolveUnitRuntimeName(passengerEntry.passenger)} por reserva em ordens ja definidas.");
-        }
+
+        SortDisembarkLandingOptionsClockwise();
+    }
+
+    private void SortDisembarkLandingOptionsClockwise()
+    {
+        if (disembarkLandingOptions.Count <= 1 || terrainTilemap == null || selectedUnit == null)
+            return;
+
+        Vector3Int transporterCell = selectedUnit.CurrentCellPosition;
+        transporterCell.z = 0;
+        Vector3 center = HexCoordinates.GetCellCenterWorld(terrainTilemap, transporterCell);
+
+        disembarkLandingOptions.Sort((a, b) =>
+        {
+            Vector3 posA = HexCoordinates.GetCellCenterWorld(terrainTilemap, new Vector3Int(a.disembarkCell.x, a.disembarkCell.y, 0));
+            Vector3 posB = HexCoordinates.GetCellCenterWorld(terrainTilemap, new Vector3Int(b.disembarkCell.x, b.disembarkCell.y, 0));
+            float angleA = Mathf.Atan2(posA.x - center.x, posA.y - center.y);
+            float angleB = Mathf.Atan2(posB.x - center.x, posB.y - center.y);
+            if (angleA < 0) angleA += 2 * Mathf.PI;
+            if (angleB < 0) angleB += 2 * Mathf.PI;
+            return angleA.CompareTo(angleB);
+        });
     }
 
     private void PaintDisembarkLandingOptions()
@@ -783,69 +815,42 @@ public partial class TurnStateManager
     private bool TryResolveDisembarkCursorMove(Vector3Int currentCell, Vector3Int inputDelta, out Vector3Int resolvedCell)
     {
         resolvedCell = currentCell;
-        if (cursorState != CursorState.Desembarcando)
+        if (CurrentCursorState != CursorState.Desembarcando)
             return false;
         if (scannerPromptStep != ScannerPromptStep.DisembarkLandingSelect)
             return false;
-        if (paintedRangeLookup.Count == 0)
+        if (disembarkLandingOptions.Count == 0)
             return false;
 
-        Vector3Int desired = currentCell + inputDelta;
-        desired.z = 0;
-        if (paintedRangeLookup.Contains(desired))
-        {
-            resolvedCell = desired;
-            SetDisembarkSelectedLandingCell(desired, moveCursor: false);
-            return true;
-        }
+        int step = GetMirandoStepFromInput(inputDelta);
+        if (step == 0)
+            return false;
 
-        if (HexPathResolver.TryResolveDirectionalFallback(
-                terrainTilemap,
-                paintedRangeLookup,
-                currentCell,
-                desired,
-                out resolvedCell))
+        int currentIndex = 0;
+        for (int i = 0; i < disembarkLandingOptions.Count; i++)
         {
-            SetDisembarkSelectedLandingCell(resolvedCell, moveCursor: false);
-            return true;
-        }
-
-        // Fallback robusto: cicla entre opcoes validas (mesmo padrao dos outros prompts).
-        if (disembarkLandingOptions.Count > 1)
-        {
-            int step = GetMirandoStepFromInput(inputDelta);
-            if (step != 0)
+            PodeDesembarcarOption item = disembarkLandingOptions[i];
+            if (item == null)
+                continue;
+            Vector3Int cell = item.disembarkCell;
+            cell.z = 0;
+            if (cell == disembarkSelectedLandingCell)
             {
-                int currentIndex = 0;
-                for (int i = 0; i < disembarkLandingOptions.Count; i++)
-                {
-                    PodeDesembarcarOption item = disembarkLandingOptions[i];
-                    if (item == null)
-                        continue;
-
-                    Vector3Int cell = item.disembarkCell;
-                    cell.z = 0;
-                    if (cell == disembarkSelectedLandingCell)
-                    {
-                        currentIndex = i;
-                        break;
-                    }
-                }
-
-                int nextIndex = (currentIndex + step + disembarkLandingOptions.Count) % disembarkLandingOptions.Count;
-                PodeDesembarcarOption next = disembarkLandingOptions[nextIndex];
-                if (next != null)
-                {
-                    Vector3Int nextCell = next.disembarkCell;
-                    nextCell.z = 0;
-                    resolvedCell = nextCell;
-                    SetDisembarkSelectedLandingCell(nextCell, moveCursor: false);
-                    return true;
-                }
+                currentIndex = i;
+                break;
             }
         }
 
-        return false;
+        int nextIndex = (currentIndex + step + disembarkLandingOptions.Count) % disembarkLandingOptions.Count;
+        PodeDesembarcarOption next = disembarkLandingOptions[nextIndex];
+        if (next == null)
+            return false;
+
+        Vector3Int nextCell = next.disembarkCell;
+        nextCell.z = 0;
+        resolvedCell = nextCell;
+        SetDisembarkSelectedLandingCell(nextCell, moveCursor: false);
+        return true;
     }
 
     private void SetDisembarkSelectedLandingCell(Vector3Int cell, bool moveCursor)
@@ -1126,7 +1131,7 @@ public partial class TurnStateManager
     }
     public bool TryQueueAutomatedDisembarkReplayOrder(string passengerInstanceId, Vector3Int targetCell)
     {
-        if (cursorState != CursorState.Desembarcando || selectedUnit == null)
+        if (CurrentCursorState != CursorState.Desembarcando || selectedUnit == null)
             return false;
 
         RebuildDisembarkPassengerEntries();
@@ -1169,7 +1174,7 @@ public partial class TurnStateManager
 
     public bool TryStartAutomatedDisembarkReplayExecution()
     {
-        if (cursorState != CursorState.Desembarcando || disembarkExecutionInProgress)
+        if (CurrentCursorState != CursorState.Desembarcando || disembarkExecutionInProgress)
             return false;
         if (disembarkQueuedOrders.Count <= 0)
             return false;

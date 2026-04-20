@@ -56,7 +56,7 @@ public partial class TurnStateManager
         string selectedLabel = selectedUnit != null
             ? ResolveUnitRuntimeName(selectedUnit)
             : "(null)";
-        Debug.Log($"[FusaoDBG] state={cursorState} step={scannerPromptStep} selected={selectedLabel} | {message}");
+        Debug.Log($"[FusaoDBG] state={CurrentCursorState} step={scannerPromptStep} selected={selectedLabel} | {message}");
     }
 
     private string DescribeMergeCandidate(MergeCandidateEntry entry)
@@ -72,14 +72,14 @@ public partial class TurnStateManager
     {
         if (selectedUnit == null)
             return;
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return;
 
         LogMergeDebug($"EnterMergeStateFromSensors selected={ResolveUnitRuntimeName(selectedUnit)} cursorBefore={cursorStateBeforeFundindo}");
         EnsureMergeSensorSnapshot();
 
         cursorController?.PlayConfirmSfx();
-        cursorStateBeforeFundindo = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+        cursorStateBeforeFundindo = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
         Advance(CursorState.Fundindo, "EnterMergeStateFromSensors");
         ClearCommittedPathVisual();
         mergeQueuedUnits.Clear();
@@ -89,7 +89,7 @@ public partial class TurnStateManager
 
     private void ProcessMergePromptInput()
     {
-        if (cursorState != CursorState.Fundindo)
+        if (CurrentCursorState != CursorState.Fundindo)
             return;
 
         if (scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
@@ -150,7 +150,7 @@ public partial class TurnStateManager
 
     private bool TryConfirmScannerMerge()
     {
-        if (cursorState != CursorState.Fundindo)
+        if (CurrentCursorState != CursorState.Fundindo)
             return false;
         LogMergeDebug("TryConfirmScannerMerge");
         EnsureMergeSensorSnapshot();
@@ -320,7 +320,7 @@ public partial class TurnStateManager
 
     private void ExitMergeStateToMovement()
     {
-        if (cursorState != CursorState.Fundindo)
+        if (CurrentCursorState != CursorState.Fundindo)
             return;
 
         Retreat("ExitMergeStateToMovement");
@@ -405,6 +405,11 @@ public partial class TurnStateManager
             ExitMergeStateToMovement();
             yield break;
         }
+
+        Advance(CursorState.FundindoExecuting, "ExecuteQueuedMergeOrdersSequence: begin");
+
+        try
+        {
 
         List<UnitManager> mergeMembers = BuildMergeMembersForLayerPlan(receiver, participants);
         MergeLayerPlan layerPlan = ResolveMergeLayerPlanForExecution(mergeMembers, boardMap);
@@ -551,8 +556,13 @@ public partial class TurnStateManager
             receiver.SetRemainingMovementPoints(0);
 
         ResetMergeRuntimeState();
-        mergeExecutionInProgress = false;
         LogMergeDebug("ExecuteQueuedMergeOrdersSequence end");
+
+        } // try
+        finally
+        {
+            mergeExecutionInProgress = false;
+        }
     }
 
     private MergeLayerPlan ResolveMergeLayerPlanForExecution(List<UnitManager> members, Tilemap boardMap)
@@ -936,7 +946,7 @@ public partial class TurnStateManager
     private bool TryResolveMergeCursorMove(Vector3Int currentCell, Vector3Int inputDelta, out Vector3Int resolvedCell)
     {
         resolvedCell = currentCell;
-        if (cursorState != CursorState.Fundindo)
+        if (CurrentCursorState != CursorState.Fundindo)
             return false;
         if (scannerPromptStep != ScannerPromptStep.MergeParticipantSelect)
             return false;
@@ -1346,7 +1356,7 @@ public partial class TurnStateManager
 
     private void UpdateMergeQueuePreviewAnimation()
     {
-        bool shouldShow = cursorState == CursorState.Fundindo &&
+        bool shouldShow = CurrentCursorState == CursorState.Fundindo &&
                           (mergeQueuedUnits.Count > 0 ||
                            scannerPromptStep == ScannerPromptStep.MergeConfirm ||
                            scannerPromptStep == ScannerPromptStep.MergeParticipantSelect);
@@ -1487,7 +1497,7 @@ public partial class TurnStateManager
         bool hasSelectedCandidate = TryGetSelectedMergeCandidate(out selected);
         bool isMergeSelectionStep = scannerPromptStep == ScannerPromptStep.MergeParticipantSelect || scannerPromptStep == ScannerPromptStep.MergeConfirm;
         bool showConfirmPreview =
-            cursorState == CursorState.Fundindo &&
+            CurrentCursorState == CursorState.Fundindo &&
             isMergeSelectionStep &&
             hasSelectedCandidate &&
             selected != null &&
@@ -1677,7 +1687,7 @@ public partial class TurnStateManager
 
     public int FindMergeTargetIndexForReplay(string targetInstanceId)
     {
-        if (cursorState != CursorState.Fundindo) return -1;
+        if (CurrentCursorState != CursorState.Fundindo) return -1;
         EnsureMergeSensorSnapshot();
         RebuildMergeCandidateEntries();
         for (int i = 0; i < mergeCandidateEntries.Count; i++)
@@ -1695,7 +1705,7 @@ public partial class TurnStateManager
     /// </summary>
     public bool StepMergeForReplay()
     {
-        if (cursorState != CursorState.Fundindo) return false;
+        if (CurrentCursorState != CursorState.Fundindo) return false;
         if (scannerPromptStep != ScannerPromptStep.MergeParticipantSelect) return false;
         EnsureMergeSensorSnapshot();
         RebuildMergeCandidateEntries();
@@ -1718,7 +1728,7 @@ public partial class TurnStateManager
 
     public bool TryQueueAutomatedMergeReplayOrder(string targetInstanceId)
     {
-        if (cursorState != CursorState.Fundindo || selectedUnit == null)
+        if (CurrentCursorState != CursorState.Fundindo || selectedUnit == null)
             return false;
 
         EnsureMergeSensorSnapshot();
@@ -1772,7 +1782,7 @@ public partial class TurnStateManager
     {
         if (mergeExecutionInProgress)
             return true;
-        if (cursorState != CursorState.Fundindo)
+        if (CurrentCursorState != CursorState.Fundindo)
             return CurrentCursorState == CursorState.Neutral || IsScannerActionExecutionInProgress;
         if (mergeQueuedUnits.Count <= 0)
             return IsScannerActionExecutionInProgress;

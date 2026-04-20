@@ -46,7 +46,10 @@ public class UnitVisionException
     [Tooltip("Dominio alvo para esta excecao de visao.")]
     public Domain domain = Domain.Land;
 
-    [Tooltip("Altura alvo para esta excecao de visao.")]
+    [Tooltip("Se ativo, esta excecao se aplica a qualquer altura do dominio (heightLevel ignorado).")]
+    public bool allHeights = false;
+
+    [Tooltip("Altura alvo para esta excecao de visao (ignorado quando allHeights estiver ativo).")]
     public HeightLevel heightLevel = HeightLevel.Surface;
 
     [Min(0)]
@@ -608,13 +611,13 @@ public class UnitData : ScriptableObject
             for (int i = 0; i < visionSpecializations.Count; i++)
             {
                 UnitVisionException entry = visionSpecializations[i];
-                if (entry == null)
+                if (entry == null || entry.domain != targetDomain)
                     continue;
-                if (entry.domain != targetDomain || entry.heightLevel != targetHeightLevel)
-                    continue;
-
-                match = entry;
-                return true;
+                if (entry.allHeights || entry.heightLevel == targetHeightLevel)
+                {
+                    match = entry;
+                    return true;
+                }
             }
         }
 

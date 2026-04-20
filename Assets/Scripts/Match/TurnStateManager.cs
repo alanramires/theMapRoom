@@ -71,7 +71,12 @@ public partial class TurnStateManager : MonoBehaviour
         EndingTurn = 24,
         EndingTurnExecuting = 25,
         Saving = 26,
-        Loading = 27
+        Loading = 27,
+        CapturandoExecuting = 28,
+        SuprindoExecuting = 29,
+        FundindoExecuting = 30,
+        DesembarcandoExecuting = 31,
+        EmbarcandoExecuting = 32
     }
 
     [Header("References")]
@@ -152,7 +157,6 @@ public partial class TurnStateManager : MonoBehaviour
 
     public CursorState CurrentCursorState => stateStack.Count > 0 ? stateStack.Peek() : CursorState.Neutral;
     public string CurrentCursorStateStackDebugText => BuildFsmDebugText(horizontal: true);
-    private CursorState cursorState => CurrentCursorState;
     public UnitManager SelectedUnit => selectedUnit;
     public TerrainDatabase TerrainDatabaseRef => terrainDatabase;
     public WeaponPriorityData WeaponPriorityDataRef => weaponPriorityData;
@@ -203,7 +207,7 @@ public partial class TurnStateManager : MonoBehaviour
         if (string.IsNullOrWhiteSpace(text))
             return;
 
-        if (cursorState == CursorState.Suprindo && supplyExecutionInProgress)
+        if (CurrentCursorState == CursorState.Suprindo && supplyExecutionInProgress)
             return;
         string normalized = text.Replace('\n', ' ').Replace('\r', ' ').Trim();
         const int maxLen = 64;
@@ -453,7 +457,7 @@ public partial class TurnStateManager : MonoBehaviour
 
     private bool IsInspectingState()
     {
-        return IsInspectingState(cursorState);
+        return IsInspectingState(CurrentCursorState);
     }
 
     public bool TryFinalizeSelectedUnitActionFromDebug()
@@ -493,7 +497,7 @@ public partial class TurnStateManager : MonoBehaviour
             return false;
         }
 
-        if (selectedUnit != null || cursorState != CursorState.Neutral)
+        if (selectedUnit != null || CurrentCursorState != CursorState.Neutral)
             ClearSelectionAndReturnToNeutral();
 
         string targetName = ResolveDebugUnitName(target);
@@ -1109,7 +1113,7 @@ public partial class TurnStateManager : MonoBehaviour
 
     public void ForceNeutral()
     {
-        if (cursorState == CursorState.Planning)
+        if (CurrentCursorState == CursorState.Planning)
             planningManager?.ExitPlanningMode();
         ClearSelectionAndReturnToNeutral();
     }
@@ -1558,7 +1562,7 @@ public partial class TurnStateManager : MonoBehaviour
 
     private void EnterTurnStartFuelDepletionCursorState()
     {
-        if (cursorState == CursorState.AircraftFuelDepletionQueue)
+        if (CurrentCursorState == CursorState.AircraftFuelDepletionQueue)
             return;
 
         Advance(CursorState.AircraftFuelDepletionQueue, "TurnStartFuelDepletionQueue: begin");
@@ -1566,7 +1570,7 @@ public partial class TurnStateManager : MonoBehaviour
 
     private void ExitTurnStartFuelDepletionCursorState()
     {
-        if (cursorState != CursorState.AircraftFuelDepletionQueue)
+        if (CurrentCursorState != CursorState.AircraftFuelDepletionQueue)
             return;
 
         ExecuteAndReset("TurnStartFuelDepletionQueue: completed");

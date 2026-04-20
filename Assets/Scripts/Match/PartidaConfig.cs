@@ -55,9 +55,9 @@ public static class PartidaConfig
             teamIds.Add((int)team);
             flipXs.Add((FlipX != null && i < FlipX.Length) ? FlipX[i] : DefaultFlipX(team));
             isAIs.Add((IsAI != null && i < IsAI.Length) && IsAI[i]);
-            startMoneys.Add(0);
-            actualMoneys.Add(0);
-            incomePerTurns.Add(0);
+            startMoneys.Add(mc.GetStartMoney(team));
+            actualMoneys.Add(mc.GetActualMoney(team));
+            incomePerTurns.Add(mc.GetIncomePerTurn(team));
             startMoneyAppliedFlags.Add(false);
         }
 

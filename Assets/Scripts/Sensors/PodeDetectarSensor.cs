@@ -688,6 +688,13 @@ public static class PodeDetectarSensor
             if (domain == resolvedTargetDomain && height == resolvedTargetHeight)
                 continue;
 
+            // Só permite cruzar tipos de terreno dentro da família aquática (Naval ↔ Submarine).
+            // Impede que visão sub/submerged revele hexes de terra ou ar.
+            bool specIsAquatic = domain == Domain.Submarine || domain == Domain.Naval;
+            bool terrainIsAquatic = resolvedTargetDomain == Domain.Submarine || resolvedTargetDomain == Domain.Naval;
+            if (specIsAquatic != terrainIsAquatic)
+                continue;
+
             if (CanObserveCellWithLayer(
                     observer,
                     observerData,
@@ -774,7 +781,7 @@ public static class PodeDetectarSensor
             UnitVisionException entry = observerData.visionSpecializations[i];
             if (entry == null)
                 continue;
-            if (entry.domain == targetDomain && entry.heightLevel == targetHeight)
+            if (entry.domain == targetDomain && (entry.allHeights || entry.heightLevel == targetHeight))
                 return true;
         }
 

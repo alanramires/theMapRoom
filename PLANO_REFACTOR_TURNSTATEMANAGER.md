@@ -50,16 +50,16 @@ public void ExecuteAndReset() { ... }
 ## Fluxo da pilha em tempo de execuÃ§Ã£o
 
 ```
-Neutral                       â† base da pilha (sempre presente)
+Neutral                       â† base da pilha (sempre presente)
   Advance(UnitSelected)
   UnitSelected
     Advance(MoveuAndando)
     MoveuAndando
       Advance(Mirando)
       Mirando
-        Retreat()             â† volta para MoveuAndando automaticamente
-      Retreat()               â† volta para UnitSelected
-    Retreat()                 â† volta para Neutral (ou ExecuteAndReset se confirmou)
+        Retreat()             â† volta para MoveuAndando automaticamente
+      Retreat()               â† volta para UnitSelected
+    Retreat()                 â† volta para Neutral (ou ExecuteAndReset se confirmou)
 ```
 
 ---
@@ -465,3 +465,281 @@ ApÃ³s todos os call sites migrados:
 5. Passo 3 (simplificar cancel handlers)
 6. Passo 4 (atualizar logs)
 7. Passo 5 (remover adaptador, testar)
+
+------------------
+ANDAMENTO DA MIGRAÇÃO
+----------------
+Estamos indo na direção certa, principalmente por uma coisa: os fluxos estão deixando de ser “efeitos colaterais de UI” e virando rotas explícitas de estado.
+
+Hoje a FSM já está mais preparada para AI/replay do que antes por causa destes pontos:
+
+1. **Rotas com origem preservada**
+
+Antes vários fluxos faziam algo como:
+
+```text
+menu fecha
+estado muda
+ESC tenta adivinhar para onde voltar
+```
+
+Agora a stack resolve isso:
+
+```text
+Neutral > CommandService > Neutral
+Neutral > PlayerMenu > CommandService > PlayerMenu > Neutral
+```
+
+E o mesmo padrão foi estendido para:
+
+```text
+RemovingUnit
+Saving
+Loading
+EndingTurn
+```
+
+Isso é bom para replay e AI porque o estado anterior não precisa ser inferido por botão, painel, variável temporária ou “quem chamou”. Ele está na pilha.
+
+2. **Separação entre preview e execução**
+
+`CommandService` e `RemovingUnit` já apontam para um modelo saudável:
+
+```text
+CommandService          // preview / confirmação
+CommandServiceExecuting // execução irreversível
+```
+
+```text
+RemovingUnit
+RemovingUnitExecuting
+```
+
+Isso é exatamente o que replay e AI precisam. O replay consegue gravar a decisão e executar sem depender de input humano. A AI consegue pedir uma ação, validar, confirmar e aguardar o estado executivo terminar.
+
+3. **Estados bloqueiam input indevido**
+
+Adicionar estados como `Saving`, `Loading`, `EndingTurn`, `EndingTurnExecuting`, `RemovingUnitExecuting` na FSM reduz vazamento de input. Isso é importante porque AI/replay falham quando um input humano ou UI ainda consegue interferir durante execução automática.
+
+O caminho ideal é:
+
+```text
+estado de decisão
+estado de confirmação/preview
+estado de execução
+retorno por Retreat ou ExecuteAndReset
+```
+
+4. **UI está virando cliente da FSM**
+
+O menu não deveria “ser dono” da lógica de jogo. Ele deve pedir:
+
+```csharp
+TryOpenCommandServiceFromMenu()
+TryOpenDestroyUnitPromptFromMenu()
+TryEnterSavingState()
+TryEnterLoadingState()
+TryExecuteEndingTurnFromMenu()
+```
+
+Esse é o modelo certo. A UI dispara intenção; a FSM decide se pode, empilha estado e controla retorno.
+
+Para AI/replay, isso é essencial porque eles podem chamar os mesmos métodos sem depender de botão.
+
+5. **Replay precisa de comandos determinísticos**
+
+Para replay manager, o ponto mais importante é: cada ação gravada precisa ter uma entrada clara e uma finalização clara.
+
+Exemplo bom:
+
+```text
+Replay action: CommandService
+FSM: Neutral > CommandService > CommandServiceExecuting > Neutral
+```
+
+O replay pode aguardar:
+
+```text
+CurrentCursorState == Neutral
+```
+
+ou evento:
+
+```text
+OnCursorReturnedToNeutral
+```
+
+Isso é muito melhor do que esperar “alguma coroutine terminar” sem saber qual estado estava ativo.
+
+**O que ainda falta melhorar**
+
+Ainda tem partes que parecem meio híbridas:
+
+- `SaveGameManager` ainda tem lógica própria de estado e cena, fora da FSM.
+- `BattleMapMenuRootController` ainda carrega bastante responsabilidade de navegação, seleção e dispatch.
+- Alguns fluxos ainda parecem depender de `CursorController` para confirmar/cancelar coisas que conceitualmente pertencem à FSM.
+- A FSM ainda mistura estados de UI/player menu com estados de ação de jogo.
+
+Mas isso não é necessariamente errado agora. Só significa que estamos no meio da migração.
+
+**A direção que eu seguiria**
+
+Eu manteria o padrão atual e consolidaria:
+
+```text
+1. Toda ação tática tem TryOpenX(...)
+2. Toda ação com preview tem X + XExecuting
+3. Cancelamento de preview usa Retreat()
+4. Execução final usa ExecuteAndReset()
+5. Menu nunca decide retorno; retorno vem da stack
+6. Replay/AI chamam a mesma API que o jogador chama
+```
+
+Para uma futura AI, o ideal seria algo assim:
+
+```csharp
+if (turnStateManager.TryOpenCommandServiceFromAutomation(out reason))
+{
+    turnStateManager.TryConfirmPendingCommandServiceOrder();
+}
+```
+
+Para replay:
+
+```csharp
+yield return ExecuteRecordedCommandServiceBatch(action);
+yield return WaitUntilNeutral();
+```
+
+Ou seja: AI e replay não deveriam simular tecla, botão ou painel. Eles devem conversar direto com a FSM.
+
+**Resumo**
+
+Estamos preparando a base correta: a FSM está começando a virar a fonte de verdade dos fluxos, e o menu está virando só uma interface de entrada. Isso é exatamente o que AI e replay precisam.
+
+O próximo salto de qualidade seria padronizar todos os sensores/ações nesse contrato:
+
+```text
+CanPreview
+OpenPreview
+ConfirmExecution
+CancelPreview
+ExecuteAndReset
+```
+
+Aí AI, replay e jogador passam a usar a mesma estrada, com entradas diferentes.
+
+Eu não começaria um jogo novo do zero agora.
+
+O que você tem hoje já tem valor demais para jogar fora: sensores, FoW, replay parcial, economia, logística, unidades, terreno, UI, saves, cenas, AI em andamento. O problema não é “o projeto é irrecuperável”. O problema é que a arquitetura cresceu com muita regra acoplada em `TurnStateManager`, `CursorController`, menu e managers laterais. Isso dá dor porque cada correção pequena vira investigação grande.
+
+Minha recomendação pragmática é: **continuar este jogo, mas parar de adicionar feature por um tempo e fazer uma estabilização arquitetural curta e objetiva.**
+
+Não um refactor infinito. Um ciclo fechado.
+
+Algo como:
+
+```text
+Objetivo: preparar FSM para replay/AI sem reescrever o jogo.
+Escopo: 1 a 2 semanas de trabalho focado.
+Regra: nenhuma feature nova, só padronização de fluxo.
+```
+
+Eu faria assim:
+
+1. **Congelar os fluxos que já funcionam**
+
+Declare que estes são referência:
+
+```text
+CommandService
+RemovingUnit
+Saving
+Loading
+EndingTurn
+```
+
+E documente o contrato:
+
+```text
+Neutral > X > Neutral
+Neutral > PlayerMenu > X > PlayerMenu > Neutral
+X > XExecuting > Neutral
+```
+
+2. **Transformar isso em padrão de código**
+
+Criar helpers pequenos na FSM, não um framework enorme:
+
+```csharp
+TryEnterPreviewState(...)
+RetreatPreviewState(...)
+EnterExecutingState(...)
+ExecuteAndReset(...)
+```
+
+Ou mesmo só nomes e organização consistentes primeiro.
+
+3. **Parar de deixar UI decidir retorno**
+
+Menu pode chamar ação, mas não deve guardar breadcrumb. Breadcrumb tem que ser stack.
+
+4. **Separar ação tática de input**
+
+Para cada ação importante:
+
+```text
+Input humano chama TryOpenXFromHotkey()
+Menu chama TryOpenXFromMenu()
+AI chama TryOpenXFromAutomation()
+Replay chama TryReplayX()
+```
+
+Mas todos entram no mesmo núcleo:
+
+```text
+TryOpenXCore(origin)
+ConfirmX()
+CancelX()
+```
+
+5. **Criar testes manuais/checklist antes de mexer**
+
+Porque sem teste, cada ajuste consome crédito em regressão. Um checklist simples já ajuda:
+
+```text
+X hotkey > ESC > Neutral
+X menu > ESC > Menu
+X menu > Confirm > Executing > Neutral
+Save hotkey > ESC > Neutral
+Load cross-scene > troca cena > carrega
+Minimap > scroll > toggle > volta zoom anterior
+```
+
+Sobre começar outro jogo do zero: parece tentador porque você levaria as lições aprendidas. Mas geralmente o segundo projeto começa limpo por 20% do tempo e depois volta a ficar complexo. Você gastaria meses reconstruindo sistemas que já existem e ainda teria que resolver os mesmos problemas de FSM, replay, AI, save, UI e cenas.
+
+Eu só começaria do zero se uma destas fosse verdade:
+
+```text
+O core gameplay mudou completamente.
+As cenas/prefabs/dados estão inutilizáveis.
+O código não compila por dias.
+Você não quer mais manter compatibilidade com saves/mapas atuais.
+Você quer transformar isso em outro produto, não evoluir este.
+```
+
+Pelo que vejo, não é esse o caso.
+
+Minha sugestão honesta: **não recomeça. Faz uma “v2.1 arquitetura” dentro do projeto atual.** Pequena, agressiva e com critério de fim.
+
+O foco não deve ser “deixar bonito”. Deve ser reduzir o custo de cada bug futuro:
+
+```text
+menos inferência
+menos estado escondido
+menos UI mandando em gameplay
+mais rotas explícitas
+mais APIs reutilizáveis por jogador/AI/replay
+```
+
+Isso é menos glamouroso que começar do zero, mas tem muito mais chance de entregar o jogo.

@@ -321,23 +321,23 @@ public partial class TurnStateManager
         if (!Application.isPlaying || !enableTurnStateRuntimeLogs)
             return;
 
-        bool stateChanged = lastLoggedCursorState != cursorState;
+        bool stateChanged = lastLoggedCursorState != CurrentCursorState;
         bool substepChanged = lastLoggedScannerPromptStep != scannerPromptStep;
         bool selectedChanged = lastLoggedSelectedUnit != selectedUnit;
         if (!stateChanged && !selectedChanged && !substepChanged)
             return;
 
         ScannerPromptStep previousSubstep = lastLoggedScannerPromptStep;
-        lastLoggedCursorState = cursorState;
+        lastLoggedCursorState = CurrentCursorState;
         lastLoggedScannerPromptStep = scannerPromptStep;
         lastLoggedSelectedUnit = selectedUnit;
         string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
-        //RuntimeLog($"[TurnState] state={cursorState} | selected={selectedName}");
+        //RuntimeLog($"[TurnState] state={CurrentCursorState} | selected={selectedName}");
         if (substepChanged)
         {
             bool rollback = previousSubstep != (ScannerPromptStep)(-1) && (int)scannerPromptStep < (int)previousSubstep;
             string rollbackTag = rollback ? " [roll back]" : string.Empty;
-            RuntimeLog($"[TurnState]{rollbackTag} substep={previousSubstep} -> {scannerPromptStep} | state={cursorState}");
+            RuntimeLog($"[TurnState]{rollbackTag} substep={previousSubstep} -> {scannerPromptStep} | state={CurrentCursorState}");
         }
 
     }
@@ -392,7 +392,7 @@ public partial class TurnStateManager
         if (UiInputBlocker.IsTextInputFocused())
             return;
 
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
             return;
 
         if (IsMovementAnimationRunning())
@@ -432,9 +432,9 @@ public partial class TurnStateManager
             return false;
         }
 
-        if (cursorState != CursorState.Neutral && cursorState != CursorState.PlayerMenu)
+        if (CurrentCursorState != CursorState.Neutral && CurrentCursorState != CursorState.PlayerMenu)
         {
-            message = $"Destroy Unit exige cursor em Neutral/PlayerMenu (atual: {cursorState}).";
+            message = $"Destroy Unit exige cursor em Neutral/PlayerMenu (atual: {CurrentCursorState}).";
             return false;
         }
 
@@ -467,7 +467,7 @@ public partial class TurnStateManager
 
     private bool TryConfirmRemovingUnit()
     {
-        if (cursorState != CursorState.RemovingUnit)
+        if (CurrentCursorState != CursorState.RemovingUnit)
             return false;
         if (removeUnitExecutionInProgress)
             return true;
@@ -579,7 +579,7 @@ public partial class TurnStateManager
         if (logCanceled)
             RuntimeLog("[Destroy Unit] Cancelado.");
         PanelDialogController.ClearExternalText();
-        if (logCanceled && cursorState == CursorState.RemovingUnit)
+        if (logCanceled && CurrentCursorState == CursorState.RemovingUnit)
             Retreat("ExitRemovingUnitStateToNeutral");
         else
             ExecuteAndReset("ExitRemovingUnitStateToNeutral");
@@ -592,7 +592,7 @@ public partial class TurnStateManager
 
         DiscardPendingCombatCinematicTrack();
 
-        if (cursorState == CursorState.Mirando && scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget)
+        if (CurrentCursorState == CursorState.Mirando && scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget)
         {
             if (GetMirandoEntryCount() <= 1)
             {
@@ -605,7 +605,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        if (cursorState == CursorState.Embarcando &&
+        if (CurrentCursorState == CursorState.Embarcando &&
             scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget)
         {
             scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
@@ -613,14 +613,14 @@ public partial class TurnStateManager
             return true;
         }
 
-        if (cursorState == CursorState.Embarcando &&
+        if (CurrentCursorState == CursorState.Embarcando &&
             scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget)
         {
             ExitEmbarkStateToMovement();
             return true;
         }
 
-        if (cursorState == CursorState.Pousando &&
+        if (CurrentCursorState == CursorState.Pousando &&
             scannerPromptStep == ScannerPromptStep.LandingConfirmOption)
         {
             if (cachedLandingOptions.Count <= 1)
@@ -634,21 +634,21 @@ public partial class TurnStateManager
             return true;
         }
 
-        if (cursorState == CursorState.Pousando &&
+        if (CurrentCursorState == CursorState.Pousando &&
             scannerPromptStep == ScannerPromptStep.LandingCycleOption)
         {
             ExitLandingStateToMovement();
             return true;
         }
 
-        if (cursorState == CursorState.Desembarcando &&
+        if (CurrentCursorState == CursorState.Desembarcando &&
             scannerPromptStep == ScannerPromptStep.DisembarkConfirm)
         {
             ReturnToDisembarkLandingSelect();
             return true;
         }
 
-        if (cursorState == CursorState.Desembarcando &&
+        if (CurrentCursorState == CursorState.Desembarcando &&
             scannerPromptStep == ScannerPromptStep.DisembarkLandingSelect)
         {
             if (disembarkLandingAutoEntered)
@@ -661,7 +661,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        if (cursorState == CursorState.Desembarcando &&
+        if (CurrentCursorState == CursorState.Desembarcando &&
             scannerPromptStep == ScannerPromptStep.DisembarkPassengerSelect)
         {
             if (TryUndoLastQueuedDisembarkOrderAndReturnToLanding())
@@ -671,7 +671,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        if (cursorState == CursorState.Fundindo &&
+        if (CurrentCursorState == CursorState.Fundindo &&
             scannerPromptStep == ScannerPromptStep.MergeConfirm)
         {
             if (mergeTargetAutoEntered)
@@ -684,7 +684,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        if (cursorState == CursorState.Fundindo &&
+        if (CurrentCursorState == CursorState.Fundindo &&
             scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
         {
             if (TryUndoLastQueuedMergeOrderAndReturnToTarget())
@@ -694,7 +694,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        if (cursorState == CursorState.Suprindo &&
+        if (CurrentCursorState == CursorState.Suprindo &&
             scannerPromptStep == ScannerPromptStep.MergeConfirm)
         {
             if (supplyTargetAutoEntered)
@@ -707,7 +707,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        if (cursorState == CursorState.Suprindo &&
+        if (CurrentCursorState == CursorState.Suprindo &&
             scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
         {
             if (TryUndoLastQueuedSupplyOrderAndReturnToTarget())
@@ -721,7 +721,7 @@ public partial class TurnStateManager
         {
             ClearEnemyThreatLayersOverlay();
             scannerPromptStep = ScannerPromptStep.AwaitingAction;
-            if (cursorState == CursorState.InspectingHotZone)
+            if (CurrentCursorState == CursorState.InspectingHotZone)
                 Retreat("HandleScannerPromptCancel: threat hot zone close");
             return true;
         }
@@ -734,18 +734,18 @@ public partial class TurnStateManager
         if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress || combatExecutionInProgress || captureExecutionInProgress || mergeExecutionInProgress || supplyExecutionInProgress || transferExecutionInProgress)
             return;
 
-        if (cursorState == CursorState.Mirando)
+        if (CurrentCursorState == CursorState.Mirando)
             return;
 
-        if (cursorState != CursorState.Neutral &&
-            cursorState != CursorState.InspectingHotZone &&
+        if (CurrentCursorState != CursorState.Neutral &&
+            CurrentCursorState != CursorState.InspectingHotZone &&
             scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
         {
             ClearEnemyThreatLayersOverlay();
             scannerPromptStep = ScannerPromptStep.AwaitingAction;
         }
 
-        bool isNeutralLikeInspectState = cursorState == CursorState.Neutral || cursorState == CursorState.InspectingHotZone;
+        bool isNeutralLikeInspectState = CurrentCursorState == CursorState.Neutral || CurrentCursorState == CursorState.InspectingHotZone;
         if (isNeutralLikeInspectState)
         {
             if (scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
@@ -755,7 +755,7 @@ public partial class TurnStateManager
                 {
                     handledThreatLayerInput = true;
                     TryCloseThreatLayerHotzone();
-                    if (cursorState == CursorState.InspectingHotZone)
+                    if (CurrentCursorState == CursorState.InspectingHotZone)
                         Retreat("ProcessScannerPromptInput: hot zone closed by Z");
                     return;
                 }
@@ -787,10 +787,10 @@ public partial class TurnStateManager
                     }
                 }
 
-                if (cursorState == CursorState.InspectingHotZone && !handledThreatLayerInput && WasAnyInputPressedThisFrame())
+                if (CurrentCursorState == CursorState.InspectingHotZone && !handledThreatLayerInput && WasAnyInputPressedThisFrame())
                 {
                     TryCloseThreatLayerHotzone();
-                    if (cursorState != CursorState.Neutral)
+                    if (CurrentCursorState != CursorState.Neutral)
                         Retreat("ProcessScannerPromptInput: hot zone auto-dismiss by input");
                 }
                 return;
@@ -804,12 +804,12 @@ public partial class TurnStateManager
             return;
         }
 
-        bool isMovementScannerState = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
-        bool isLandingScannerState = cursorState == CursorState.Pousando;
-        bool isEmbarkScannerState = cursorState == CursorState.Embarcando;
-        bool isDisembarkScannerState = cursorState == CursorState.Desembarcando;
-        bool isMergeScannerState = cursorState == CursorState.Fundindo;
-        bool isSupplyScannerState = cursorState == CursorState.Suprindo;
+        bool isMovementScannerState = CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado;
+        bool isLandingScannerState = CurrentCursorState == CursorState.Pousando;
+        bool isEmbarkScannerState = CurrentCursorState == CursorState.Embarcando;
+        bool isDisembarkScannerState = CurrentCursorState == CursorState.Desembarcando;
+        bool isMergeScannerState = CurrentCursorState == CursorState.Fundindo;
+        bool isSupplyScannerState = CurrentCursorState == CursorState.Suprindo;
         if (isDisembarkScannerState)
         {
             ProcessDisembarkPromptInput();
@@ -893,7 +893,7 @@ public partial class TurnStateManager
             return;
         }
 
-        if (cursorState == CursorState.Embarcando &&
+        if (CurrentCursorState == CursorState.Embarcando &&
             (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget || scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget))
         {
             if (TryReadPressedNumber(out int number))
@@ -914,7 +914,7 @@ public partial class TurnStateManager
             }
         }
 
-        if (cursorState == CursorState.Pousando &&
+        if (CurrentCursorState == CursorState.Pousando &&
             scannerPromptStep == ScannerPromptStep.LandingCycleOption)
         {
             if (TryReadPressedNumber(out int number))
@@ -997,7 +997,7 @@ public partial class TurnStateManager
     {
         if (selectedUnit == null)
             return;
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return;
 
         BuildLandingOptionsFromCurrentState();
@@ -1012,7 +1012,7 @@ public partial class TurnStateManager
             return;
         }
 
-        cursorStateBeforePousando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+        cursorStateBeforePousando = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Land, "LandActionRequested");
         Advance(CursorState.Pousando, "HandleLandingSensorRequested");
         ClearCommittedPathVisual();
@@ -1039,7 +1039,7 @@ public partial class TurnStateManager
             return;
         }
 
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
         {
             RuntimeLog("Layers de Ameaca (\"Z\"): so disponivel em cursor neutro.");
             return;
@@ -1066,9 +1066,9 @@ public partial class TurnStateManager
         message = string.Empty;
         if (selectedUnit == null)
         {
-            if (cursorState != CursorState.Neutral)
+            if (CurrentCursorState != CursorState.Neutral)
             {
-                message = $"Nenhuma unidade selecionada e estado atual nao permite auto-selecao ({cursorState}).";
+                message = $"Nenhuma unidade selecionada e estado atual nao permite auto-selecao ({CurrentCursorState}).";
                 return false;
             }
 
@@ -1080,12 +1080,12 @@ public partial class TurnStateManager
             message = $"Unidade auto-selecionada no cursor {FormatMapCellWithZ(cursorCell)}.";
         }
 
-        bool isMovementScannerState = cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado;
-        bool isLandingScannerState = cursorState == CursorState.Pousando;
-        bool isSelectionScannerState = cursorState == CursorState.UnitSelected;
+        bool isMovementScannerState = CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado;
+        bool isLandingScannerState = CurrentCursorState == CursorState.Pousando;
+        bool isSelectionScannerState = CurrentCursorState == CursorState.UnitSelected;
         if (!isMovementScannerState && !isLandingScannerState && !isSelectionScannerState)
         {
-            message = $"Estado atual nao permite mudanca de camada por comando ({cursorState}).";
+            message = $"Estado atual nao permite mudanca de camada por comando ({CurrentCursorState}).";
             return false;
         }
 
@@ -1115,9 +1115,9 @@ public partial class TurnStateManager
             return false;
         }
 
-        if (cursorState != CursorState.Pousando)
+        if (CurrentCursorState != CursorState.Pousando)
         {
-            cursorStateBeforePousando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+            cursorStateBeforePousando = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
             Advance(CursorState.Pousando, "TryChangeAltitudeFromDebug");
             ClearCommittedPathVisual();
         }
@@ -1134,7 +1134,7 @@ public partial class TurnStateManager
 
     private void HandleEmbarkActionRequested()
     {
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return;
 
         bool hasValid = cachedPodeEmbarcarTargets.Count > 0;
@@ -1148,7 +1148,7 @@ public partial class TurnStateManager
         cursorController?.PlayConfirmSfx();
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Embark, "EmbarkActionRequested");
         // Mesma regra do Mirando: ao entrar em um submenu de sensor, oculta o preview de movimento.
-        cursorStateBeforeEmbarcando = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+        cursorStateBeforeEmbarcando = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
         Advance(CursorState.Embarcando, "HandleEmbarkActionRequested");
         ClearCommittedPathVisual();
         scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
@@ -1250,7 +1250,7 @@ public partial class TurnStateManager
 
     private bool TryConfirmScannerLanding()
     {
-        if (cursorState != CursorState.Pousando)
+        if (CurrentCursorState != CursorState.Pousando)
             return false;
 
         if (scannerPromptStep == ScannerPromptStep.LandingCycleOption)
@@ -1467,7 +1467,7 @@ public partial class TurnStateManager
                 }
             }
 
-            if (cursorState == CursorState.Pousando)
+            if (CurrentCursorState == CursorState.Pousando)
             {
                 BuildLandingOptionsFromCurrentState();
                 scannerPromptStep = ScannerPromptStep.LandingCycleOption;
@@ -2017,7 +2017,7 @@ public partial class TurnStateManager
 
     private bool TryConfirmScannerEmbark()
     {
-        if (cursorState != CursorState.Embarcando)
+        if (CurrentCursorState != CursorState.Embarcando)
             return false;
 
         if (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget)
@@ -2052,7 +2052,7 @@ public partial class TurnStateManager
 
     public bool TryExecuteAutomatedEmbarkReplayTarget(string transporterInstanceId, Vector3Int targetCell)
     {
-        if (cursorState != CursorState.Embarcando)
+        if (CurrentCursorState != CursorState.Embarcando)
             return false;
         if (cachedPodeEmbarcarTargets == null || cachedPodeEmbarcarTargets.Count <= 0)
             return false;
@@ -2135,6 +2135,8 @@ public partial class TurnStateManager
             passengerSortingRaised = true;
         }
 
+        Advance(CursorState.EmbarcandoExecuting, "ExecuteEmbarkSequence: begin");
+
         try
         {
             if (transporter != null)
@@ -2155,8 +2157,8 @@ public partial class TurnStateManager
                     RuntimeLog(string.IsNullOrWhiteSpace(landingDecision.reason)
                         ? "[Embarque] Transportador aereo sem pouso valido."
                         : $"[Embarque] {landingDecision.reason}");
-                    embarkExecutionInProgress = false;
                     scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+                    Retreat("EmbarcandoExecuting: air landing abort");
                     ExitEmbarkStateToMovement();
                     RefreshSensorsForCurrentState();
                     yield break;
@@ -2184,8 +2186,8 @@ public partial class TurnStateManager
                 if (!transporter.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface))
                 {
                     RuntimeLog("[Embarque] Falha ao concluir pouso do transportador (Land/Surface).");
-                    embarkExecutionInProgress = false;
                     scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+                    Retreat("EmbarcandoExecuting: layer mode abort");
                     ExitEmbarkStateToMovement();
                     RefreshSensorsForCurrentState();
                     yield break;
@@ -2313,8 +2315,8 @@ public partial class TurnStateManager
                 if (passenger != null && passenger.CurrentFuel != fuelBeforeEmbark)
                     passenger.SetCurrentFuel(fuelBeforeEmbark);
                 RuntimeLog($"Pode Embarcar (\"E\"): {resultMessage}");
-                embarkExecutionInProgress = false;
                 scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+                Retreat("EmbarcandoExecuting: embark failed");
                 ExitEmbarkStateToMovement();
                 RefreshSensorsForCurrentState();
                 yield break;
@@ -2322,11 +2324,11 @@ public partial class TurnStateManager
 
             cursorController?.PlayLoadSfx();
             RuntimeLog(resultMessage);
-            embarkExecutionInProgress = false;
             ResetScannerPromptState();
         }
         finally
         {
+            embarkExecutionInProgress = false;
             if (passengerSortingRaised && passenger != null)
                 passenger.ClearTemporarySortingOrder();
             if (transporterSortingRaised && transporter != null)
@@ -2701,7 +2703,7 @@ public partial class TurnStateManager
 
     private bool TryConfirmScannerAttack()
     {
-        if (cursorState != CursorState.Mirando)
+        if (CurrentCursorState != CursorState.Mirando)
             return false;
         if (combatExecutionInProgress)
             return true;
@@ -2788,7 +2790,7 @@ public partial class TurnStateManager
 
     public bool TryExecuteAutomatedAttackReplayTarget(string targetInstanceId, Vector3Int targetCell)
     {
-        if (cursorState != CursorState.Mirando)
+        if (CurrentCursorState != CursorState.Mirando)
             return false;
         if (GetMirandoEntryCount() <= 0)
             return false;
@@ -2843,7 +2845,7 @@ public partial class TurnStateManager
     public bool StepMirandoForReplay()
     {
         int count = GetMirandoEntryCount();
-        if (cursorState != CursorState.Mirando || count == 0) return false;
+        if (CurrentCursorState != CursorState.Mirando || count == 0) return false;
         scannerSelectedTargetIndex = (scannerSelectedTargetIndex + 1 + count) % count;
         FocusCurrentMirandoTarget(logDetails: false, moveCursor: true);
         cursorController?.PlayCursorMoveSfx();
@@ -2885,7 +2887,7 @@ public partial class TurnStateManager
     /// </summary>
     public bool SelectAutomatedAttackTarget(string targetInstanceId, Vector3Int targetCell)
     {
-        if (cursorState != CursorState.Mirando)
+        if (CurrentCursorState != CursorState.Mirando)
             return false;
         if (GetMirandoEntryCount() <= 0)
             return false;
@@ -3541,8 +3543,8 @@ public partial class TurnStateManager
         scannerPromptStep = ScannerPromptStep.MirandoConfirmTarget;
         MirandoSelectionEntry picked = cachedMirandoSelectionEntries[scannerSelectedTargetIndex];
         RebuildMirandoPreviewPath(picked);
-        SetMirandoPreviewVisible(cursorState == CursorState.Mirando);
-        SetMirandoSpotterPreviewsVisible(cursorState == CursorState.Mirando && picked.isValid);
+        SetMirandoPreviewVisible(CurrentCursorState == CursorState.Mirando);
+        SetMirandoSpotterPreviewsVisible(CurrentCursorState == CursorState.Mirando && picked.isValid);
         LogAttackConfirmationPrompt(picked, scannerSelectedTargetIndex + 1);
     }
 
@@ -3564,8 +3566,8 @@ public partial class TurnStateManager
         if (moveCursor)
             MoveCursorToTarget(option.TargetUnit);
         RebuildMirandoPreviewPath(option);
-        SetMirandoPreviewVisible(cursorState == CursorState.Mirando);
-        SetMirandoSpotterPreviewsVisible(cursorState == CursorState.Mirando && option.isValid);
+        SetMirandoPreviewVisible(CurrentCursorState == CursorState.Mirando);
+        SetMirandoSpotterPreviewsVisible(CurrentCursorState == CursorState.Mirando && option.isValid);
         if (logDetails)
             LogCurrentMirandoTarget(option, scannerSelectedTargetIndex + 1, GetMirandoEntryCount());
     }
@@ -3740,7 +3742,7 @@ public partial class TurnStateManager
     private bool TryResolveMirandoCursorMove(Vector3Int inputDelta, out Vector3Int resolvedCell)
     {
         resolvedCell = cursorController != null ? cursorController.CurrentCell : Vector3Int.zero;
-        if (cursorState != CursorState.Mirando || GetMirandoEntryCount() == 0)
+        if (CurrentCursorState != CursorState.Mirando || GetMirandoEntryCount() == 0)
             return false;
         if (scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget)
             return false;
@@ -3773,7 +3775,7 @@ public partial class TurnStateManager
     private bool TryResolveEmbarkCursorMove(Vector3Int inputDelta, out Vector3Int resolvedCell)
     {
         resolvedCell = cursorController != null ? cursorController.CurrentCell : Vector3Int.zero;
-        if (cursorState != CursorState.Embarcando)
+        if (CurrentCursorState != CursorState.Embarcando)
             return false;
         if (scannerPromptStep != ScannerPromptStep.EmbarkCycleTarget)
             return false;
@@ -3806,7 +3808,7 @@ public partial class TurnStateManager
     private bool TryResolveLandingCursorMove(Vector3Int inputDelta, out Vector3Int resolvedCell)
     {
         resolvedCell = cursorController != null ? cursorController.CurrentCell : Vector3Int.zero;
-        if (cursorState != CursorState.Pousando)
+        if (CurrentCursorState != CursorState.Pousando)
             return false;
         if (scannerPromptStep != ScannerPromptStep.LandingCycleOption)
             return false;
@@ -3825,14 +3827,14 @@ public partial class TurnStateManager
 
     private bool IsEmbarkPromptActive()
     {
-        return cursorState == CursorState.Embarcando &&
+        return CurrentCursorState == CursorState.Embarcando &&
                (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget ||
                 scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget);
     }
 
     private bool IsLandingPromptActive()
     {
-        return cursorState == CursorState.Pousando &&
+        return CurrentCursorState == CursorState.Pousando &&
                (scannerPromptStep == ScannerPromptStep.LandingCycleOption ||
                 scannerPromptStep == ScannerPromptStep.LandingConfirmOption);
     }
@@ -3847,7 +3849,7 @@ public partial class TurnStateManager
 
     private void ExitLandingStateToMovement()
     {
-        if (cursorState != CursorState.Pousando)
+        if (CurrentCursorState != CursorState.Pousando)
             return;
 
         Retreat("ExitLandingStateToMovement");
@@ -3869,7 +3871,7 @@ public partial class TurnStateManager
 
     private void ExitEmbarkStateToMovement()
     {
-        if (cursorState != CursorState.Embarcando)
+        if (CurrentCursorState != CursorState.Embarcando)
             return;
 
         Retreat("ExitEmbarkStateToMovement");
@@ -3891,7 +3893,7 @@ public partial class TurnStateManager
 
     private void ExitMirandoStateToMovement()
     {
-        if (cursorState != CursorState.Mirando)
+        if (CurrentCursorState != CursorState.Mirando)
             return;
 
         Retreat("ExitMirandoStateToMovement");
@@ -3911,11 +3913,11 @@ public partial class TurnStateManager
     private void UpdateMirandoPreviewAnimation()
     {
         bool isMirandoCycle =
-            cursorState == CursorState.Mirando &&
+            CurrentCursorState == CursorState.Mirando &&
             scannerPromptStep == ScannerPromptStep.MirandoCycleTarget;
 
         bool isMirandoConfirm =
-            cursorState == CursorState.Mirando &&
+            CurrentCursorState == CursorState.Mirando &&
             scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget;
 
         bool canRenderMirandoPreview =
@@ -4281,7 +4283,7 @@ public partial class TurnStateManager
         }
 
         if (mirandoSpotterPreviewTracks.Count > 0)
-            SetMirandoSpotterPreviewsVisible(cursorState == CursorState.Mirando);
+            SetMirandoSpotterPreviewsVisible(CurrentCursorState == CursorState.Mirando);
     }
 
     private void UpdateMirandoSpotterPreviewAnimation()
@@ -4544,7 +4546,7 @@ public partial class TurnStateManager
     private void UpdateEmbarkPreviewAnimation()
     {
         bool shouldShow =
-            (cursorState == CursorState.Embarcando &&
+            (CurrentCursorState == CursorState.Embarcando &&
              (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget || scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget)) &&
             embarkPreviewPathLength > 0.0001f &&
             embarkPreviewPathPoints.Count >= 2;

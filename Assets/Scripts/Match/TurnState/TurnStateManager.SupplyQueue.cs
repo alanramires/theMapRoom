@@ -62,11 +62,11 @@ public partial class TurnStateManager
     {
         if (selectedUnit == null)
             return;
-        if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return;
 
         cursorController?.PlayConfirmSfx();
-        cursorStateBeforeSuprindo = cursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
+        cursorStateBeforeSuprindo = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
         Advance(CursorState.Suprindo, "EnterSupplyStateFromSensors");
         ClearCommittedPathVisual();
         supplyQueuedOrders.Clear();
@@ -76,7 +76,7 @@ public partial class TurnStateManager
 
     private void ProcessSupplyPromptInput()
     {
-        if (cursorState != CursorState.Suprindo || scannerPromptStep != ScannerPromptStep.MergeParticipantSelect)
+        if (CurrentCursorState != CursorState.Suprindo || scannerPromptStep != ScannerPromptStep.MergeParticipantSelect)
             return;
 
         if (!TryReadPressedDigitIncludingZero(out int number))
@@ -123,7 +123,7 @@ public partial class TurnStateManager
 
     private bool TryConfirmScannerSupply()
     {
-        if (cursorState != CursorState.Suprindo)
+        if (CurrentCursorState != CursorState.Suprindo)
             return false;
 
         if (scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
@@ -283,7 +283,7 @@ public partial class TurnStateManager
 
     private void ExitSupplyStateToMovement()
     {
-        if (cursorState != CursorState.Suprindo)
+        if (CurrentCursorState != CursorState.Suprindo)
             return;
 
         Retreat("ExitSupplyStateToMovement");
@@ -376,6 +376,11 @@ public partial class TurnStateManager
             yield break;
         }
 
+        Advance(CursorState.SuprindoExecuting, "ExecuteQueuedSupplyOrdersSequence: begin");
+
+        try
+        {
+
         SupplyServiceLayerPlan layerPlan = ResolveSupplyServiceLayerPlanForExecution(supplier, supplyQueuedOrders);
         if (TryGetSupplyLayerFromPlan(layerPlan, out Domain serviceDomain, out HeightLevel serviceHeight))
         {
@@ -384,7 +389,7 @@ public partial class TurnStateManager
             if (!CanUseLayerModeAtCurrentCell(supplier, terrainTilemap != null ? terrainTilemap : supplier.BoardTilemap, terrainDatabase, supplierCell, serviceDomain, serviceHeight, out string supplierLayerReason))
             {
                 Debug.Log($"[Suprimento] Supplier nao pode operar em {serviceDomain}/{serviceHeight} no hex atual ({supplierLayerReason}).");
-                supplyExecutionInProgress = false;
+                Retreat("SuprindoExecuting: retry layer");
                 EnterSupplyCandidateSelectStep();
                 yield break;
             }
@@ -584,7 +589,7 @@ public partial class TurnStateManager
         if (servedTargets <= 0)
         {
             Debug.Log("[Suprimento] Nenhum alvo recebeu servico (necessidade/estoque).");
-            supplyExecutionInProgress = false;
+            Retreat("SuprindoExecuting: retry no targets");
             EnterSupplyCandidateSelectStep();
             yield break;
         }
@@ -612,7 +617,12 @@ public partial class TurnStateManager
         cursorController?.PlayDoneSfx();
 
         ResetSupplyRuntimeState();
-        supplyExecutionInProgress = false;
+
+        } // try
+        finally
+        {
+            supplyExecutionInProgress = false;
+        }
     }
 
     private static bool UnitNeedsServiceForSupplyExecution(UnitManager target, ServiceData service)
@@ -1012,7 +1022,7 @@ public partial class TurnStateManager
     private bool TryResolveSupplyCursorMove(Vector3Int currentCell, Vector3Int inputDelta, out Vector3Int resolvedCell)
     {
         resolvedCell = currentCell;
-        if (cursorState != CursorState.Suprindo || scannerPromptStep != ScannerPromptStep.MergeParticipantSelect || supplyCandidateEntries.Count <= 0)
+        if (CurrentCursorState != CursorState.Suprindo || scannerPromptStep != ScannerPromptStep.MergeParticipantSelect || supplyCandidateEntries.Count <= 0)
             return false;
 
         int step = GetMirandoStepFromInput(inputDelta);
@@ -1086,7 +1096,7 @@ public partial class TurnStateManager
 
     private void UpdateSupplyPreviewFromCurrentContext()
     {
-        if (cursorState != CursorState.Suprindo || selectedUnit == null)
+        if (CurrentCursorState != CursorState.Suprindo || selectedUnit == null)
         {
             supplyPreviewLastTarget = null;
             supplyPreviewPathPoints.Clear();
@@ -1144,7 +1154,7 @@ public partial class TurnStateManager
         UpdateSupplyPreviewFromCurrentContext();
 
         bool shouldShow =
-            cursorState == CursorState.Suprindo &&
+            CurrentCursorState == CursorState.Suprindo &&
             (supplyQueuedOrders.Count > 0 || scannerPromptStep == ScannerPromptStep.MergeConfirm);
         if (!shouldShow)
         {
@@ -1650,7 +1660,7 @@ public partial class TurnStateManager
 
     public bool TryQueueAutomatedSupplyReplayOrder(string targetInstanceId)
     {
-        if (cursorState != CursorState.Suprindo || selectedUnit == null)
+        if (CurrentCursorState != CursorState.Suprindo || selectedUnit == null)
             return false;
 
         RebuildSupplyCandidateEntries();
@@ -1697,7 +1707,7 @@ public partial class TurnStateManager
 
     public bool TryStartAutomatedSupplyReplayExecution()
     {
-        if (cursorState != CursorState.Suprindo || supplyExecutionInProgress)
+        if (CurrentCursorState != CursorState.Suprindo || supplyExecutionInProgress)
             return false;
         if (supplyQueuedOrders.Count <= 0)
             return false;
@@ -1717,7 +1727,7 @@ public partial class TurnStateManager
     private void RefreshSupplyEmbarkedSelectionVisuals(bool queuedOnly)
     {
         UnitManager supplier = selectedUnit;
-        if (cursorState != CursorState.Suprindo || supplier == null)
+        if (CurrentCursorState != CursorState.Suprindo || supplier == null)
         {
             RestoreSupplyEmbarkedSelectionVisuals();
             return;

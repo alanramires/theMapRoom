@@ -57,7 +57,7 @@ public partial class TurnStateManager
 
     private void ProcessConstructionShoppingInput()
     {
-        if (cursorState != CursorState.ShoppingAndServices)
+        if (CurrentCursorState != CursorState.ShoppingAndServices)
             return;
 
         if (shoppingConstruction == null || shoppingUnitsForSale.Count == 0)
@@ -85,7 +85,7 @@ public partial class TurnStateManager
 
     private bool TryConfirmSelectedShoppingOption()
     {
-        if (cursorState != CursorState.ShoppingAndServices)
+        if (CurrentCursorState != CursorState.ShoppingAndServices)
             return false;
         if (shoppingConstruction == null || shoppingUnitsForSale.Count <= 0)
             return false;
@@ -261,7 +261,7 @@ public partial class TurnStateManager
     // Retorna false se nao estiver no estado ShoppingAndServices ou se a unidade nao for encontrada.
     public bool TryAISetShoppingSelectedUnit(string unitId)
     {
-        if (cursorState != CursorState.ShoppingAndServices)
+        if (CurrentCursorState != CursorState.ShoppingAndServices)
             return false;
         if (shoppingUnitsForSale == null || shoppingUnitsForSale.Count == 0)
             return false;
@@ -336,7 +336,7 @@ public partial class TurnStateManager
     }
     private bool TryResolveShoppingCursorMove(Vector3Int currentCell, Vector3Int inputDelta)
     {
-        if (cursorState != CursorState.ShoppingAndServices || shoppingUnitsForSale == null || shoppingUnitsForSale.Count <= 0)
+        if (CurrentCursorState != CursorState.ShoppingAndServices || shoppingUnitsForSale == null || shoppingUnitsForSale.Count <= 0)
             return false;
 
         int step = GetMirandoStepFromInput(inputDelta);
@@ -360,7 +360,7 @@ public partial class TurnStateManager
 
     private void UpdateShoppingPreviewPersistence()
     {
-        if (cursorState != CursorState.ShoppingAndServices)
+        if (CurrentCursorState != CursorState.ShoppingAndServices)
             return;
 
         if (shoppingConstruction == null || shoppingUnitsForSale.Count == 0)
@@ -622,7 +622,7 @@ public partial class TurnStateManager
     {
         if (!enableTurnStateRuntimeLogs)
             return;
-        if (cursorState != CursorState.ShoppingAndServices || shoppingConstruction == null)
+        if (CurrentCursorState != CursorState.ShoppingAndServices || shoppingConstruction == null)
             return;
 
         StringBuilder sb = new StringBuilder();

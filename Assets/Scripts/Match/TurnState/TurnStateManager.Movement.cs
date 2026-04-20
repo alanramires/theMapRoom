@@ -157,7 +157,7 @@ public partial class TurnStateManager
         else
             Advance(onCompleteState, $"HandleMovementAnimationCompleted(target={onCompleteState})");
 
-        if (cursorState == CursorState.UnitSelected)
+        if (CurrentCursorState == CursorState.UnitSelected)
         {
             ClearSensorResults();
             PaintSelectedUnitMovementRange();

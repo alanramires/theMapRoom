@@ -181,7 +181,7 @@ public partial class TurnStateManager
             ResetScannerPromptState();
             LogScannerPanel();
 
-            if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
+            if (CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado)
                 NotifySensorsReady();
         }
         finally
@@ -316,19 +316,19 @@ public partial class TurnStateManager
 
     private bool TryResolveSensorMovementModeForCurrentState(out SensorMovementMode mode)
     {
-        if (cursorState == CursorState.MoveuAndando)
+        if (CurrentCursorState == CursorState.MoveuAndando)
         {
             mode = SensorMovementMode.MoveuAndando;
             return true;
         }
 
-        if (cursorState == CursorState.MoveuParado)
+        if (CurrentCursorState == CursorState.MoveuParado)
         {
             mode = SensorMovementMode.MoveuParado;
             return true;
         }
 
-        if (cursorState == CursorState.Pousando)
+        if (CurrentCursorState == CursorState.Pousando)
         {
             mode = cursorStateBeforePousando == CursorState.MoveuAndando
                 ? SensorMovementMode.MoveuAndando
@@ -336,7 +336,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        if (cursorState == CursorState.Embarcando)
+        if (CurrentCursorState == CursorState.Embarcando)
         {
             mode = cursorStateBeforeEmbarcando == CursorState.MoveuAndando
                 ? SensorMovementMode.MoveuAndando
@@ -344,7 +344,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        if (cursorState == CursorState.Desembarcando)
+        if (CurrentCursorState == CursorState.Desembarcando)
         {
             mode = SensorMovementMode.MoveuParado;
             return true;
@@ -369,7 +369,7 @@ public partial class TurnStateManager
         bool podeTransferir = availableSensorActionCodes.Contains('T');
 
         Debug.Log(
-            $"[Sensors] state={cursorState} | A={(podeMirar ? "sim" : "nao")} ({cachedPodeMirarTargets.Count}) | " +
+            $"[Sensors] state={CurrentCursorState} | A={(podeMirar ? "sim" : "nao")} ({cachedPodeMirarTargets.Count}) | " +
             $"E={(podeEmbarcar ? "sim" : "nao")} ({cachedPodeEmbarcarTargets.Count}) | " +
             $"D={(podeDesembarcar ? "sim" : "nao")} ({cachedPodeDesembarcarTargets.Count}) | " +
             $"C={(podeCapturar ? "sim" : "nao")} | " +

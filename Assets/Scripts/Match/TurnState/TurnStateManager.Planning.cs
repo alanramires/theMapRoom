@@ -13,13 +13,13 @@ public partial class TurnStateManager
         if (planningManager == null)
             return false;
 
-        if (cursorState == CursorState.Planning)
+        if (CurrentCursorState == CursorState.Planning)
         {
             ExitPlanningStateToNeutral(rollback: true);
             return true;
         }
 
-        if (cursorState != CursorState.Neutral)
+        if (CurrentCursorState != CursorState.Neutral)
             return false;
 
         if (!planningManager.TryEnterPlanningMode(out string reason))
@@ -89,7 +89,7 @@ public partial class TurnStateManager
 
     private void EnterTurnStartRallyCursorState()
     {
-        if (cursorState == CursorState.TurnStartRallyQueue)
+        if (CurrentCursorState == CursorState.TurnStartRallyQueue)
             return;
 
         Advance(CursorState.TurnStartRallyQueue, "TurnStartRallyQueue: begin");
@@ -97,7 +97,7 @@ public partial class TurnStateManager
 
     private void ExitTurnStartRallyCursorState()
     {
-        if (cursorState != CursorState.TurnStartRallyQueue)
+        if (CurrentCursorState != CursorState.TurnStartRallyQueue)
             return;
 
         ExecuteAndReset("TurnStartRallyQueue: completed");
@@ -116,7 +116,7 @@ public partial class TurnStateManager
         {
             if (unit == null || path == null || path.Count < 2)
                 yield break;
-            if (cursorState != CursorState.TurnStartRallyQueue && cursorState != CursorState.AircraftFuelDepletionQueue)
+            if (CurrentCursorState != CursorState.TurnStartRallyQueue && CurrentCursorState != CursorState.AircraftFuelDepletionQueue)
                 yield break;
             if (IsMovementAnimationRunning())
                 yield break;
@@ -145,12 +145,12 @@ public partial class TurnStateManager
             int guard = 0;
             while (guard++ < 120)
             {
-                if (cursorState == CursorState.MoveuAndando || cursorState == CursorState.MoveuParado)
+                if (CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado)
                     break;
                 yield return null;
             }
 
-            if (cursorState != CursorState.MoveuAndando && cursorState != CursorState.MoveuParado)
+            if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
                 yield break;
 
             HandleMoveOnlyActionRequested();
@@ -158,7 +158,7 @@ public partial class TurnStateManager
             guard = 0;
             while (guard++ < 180)
             {
-                if (cursorState == CursorState.Neutral)
+                if (CurrentCursorState == CursorState.Neutral)
                     break;
                 yield return null;
             }
@@ -166,11 +166,11 @@ public partial class TurnStateManager
             Vector3Int postCell = unit.CurrentCellPosition;
             postCell.z = 0;
             movedHexes = Mathf.Max(0, path.Count - 1);
-            success = postCell == destinationCell && cursorState == CursorState.Neutral;
+            success = postCell == destinationCell && CurrentCursorState == CursorState.Neutral;
             if (!success)
             {
                 replayManager?.DiscardCurrentBuffer("Planning move failed");
-                if (cursorState != CursorState.Neutral)
+                if (CurrentCursorState != CursorState.Neutral)
                     ClearSelectionAndReturnToNeutral(keepPreparedFuelCost: false);
             }
         }

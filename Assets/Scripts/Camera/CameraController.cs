@@ -50,6 +50,7 @@ public class CameraController : MonoBehaviour
     private bool _dragging;
     private float _quickZoomNearSize;
     private bool _hasQuickZoomNearSize;
+    private bool _quickZoomFarActive;
     private bool _warnedNoBoundsContext;
 
     void Awake()
@@ -103,20 +104,21 @@ public class CameraController : MonoBehaviour
         float clampedFar = GetQuickZoomFarOrthoSize();
 
         float current = _cam.orthographicSize;
-        bool nearFar = Mathf.Abs(current - clampedFar) <= 0.01f;
-        if (nearFar)
+        if (_quickZoomFarActive)
         {
             float nearSize = ResolveQuickZoomNearSize(effectiveMax);
             _cam.orthographicSize = nearSize;
+            _quickZoomFarActive = false;
         }
         else
         {
             _quickZoomNearSize = Mathf.Clamp(current, minOrthoSize, effectiveMax);
             _hasQuickZoomNearSize = true;
             _cam.orthographicSize = clampedFar;
+            _quickZoomFarActive = true;
         }
 
-        if (nearFar)
+        if (!_quickZoomFarActive)
         {
             if (hasCursorAnchor)
                 FocusOn(cursorWorldBefore, instant: true);
