@@ -4,5 +4,6 @@
     UnitAction,
     Shopping,
     CommandService,
-    RemoveUnit
+    RemoveUnit,
+    EndTurn
 }

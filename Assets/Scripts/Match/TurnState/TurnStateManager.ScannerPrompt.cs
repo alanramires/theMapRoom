@@ -2937,6 +2937,11 @@ public partial class TurnStateManager
         CombatResolutionResult combat)
     {
         combatExecutionInProgress = true;
+        Advance(CursorState.AttackingExecuting, "ExecuteConfirmedAttackSequence: begin");
+
+        try
+        {
+
         // Esconde a linha de mira antes de iniciar audio/projeteis do combate.
         SetMirandoPreviewVisible(false);
         SetMirandoSpotterPreviewsVisible(false);
@@ -2973,7 +2978,6 @@ public partial class TurnStateManager
             embarkedHpBeforeById);
         yield return ExecuteDeathResolutionIfNeeded(combat);
 
-        combatExecutionInProgress = false;
         cursorController?.PlayDoneSfx();
         OnAttackResolved?.Invoke(attacker, defender);
         bool finalized = TryFinalizeSelectedUnitActionFromDebug();
@@ -2988,6 +2992,12 @@ public partial class TurnStateManager
             }
         }
         ResetScannerPromptState();
+
+        } // try
+        finally
+        {
+            combatExecutionInProgress = false;
+        }
     }
 
     private IEnumerator ExecuteCombatProjectileExchange(
@@ -3657,6 +3667,9 @@ public partial class TurnStateManager
             cachedMirandoSelectionEntries.Add(new MirandoSelectionEntry(invalid));
         }
 
+        SortClockwiseAroundUnit(cachedMirandoSelectionEntries,
+            e => e.TargetUnit != null ? e.TargetUnit.CurrentCellPosition : Vector3Int.zero,
+            selectedUnit);
         ApplyMirandoInvalidUnitTint();
     }
 

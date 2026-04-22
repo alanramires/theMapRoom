@@ -21,28 +21,28 @@ MonoBehaviour:
     exposta e dependente de posicionamento. Pode ser neutralizado por detec\xE7\xE3o
     naval especializada."
   spriteDefault: {fileID: 21300000, guid: 2345ab0360bab724090a920cb6b3bdb9, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 12
   armorClass: 1
   movement: 4
-  visao: 5
+  visao: 3
   visionSpecializations:
   - domain: 2
+    allHeights: 0
     heightLevel: 2
     vision: 7
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
     losPolicy: 2
   - domain: 3
+    allHeights: 0
     heightLevel: 4
     vision: 1
     detectUnitsWithFollowingSkills: []
     losPolicy: 0
   - domain: 3
+    allHeights: 0
     heightLevel: 5
     vision: 1
     detectUnitsWithFollowingSkills: []
@@ -51,12 +51,21 @@ MonoBehaviour:
   militaryForce: 2
   unitClass: 7
   combatClassification: 2
-  aiUnitProfile: {fileID: 11400000, guid: ac91d7b2d6b1747438b7f2210c28d5b2, type: 2}
+  roles: 
+  aiInitiative: 2
   aiTargetPreferenceByClass:
   - targetClass: 8
     priority: 2
   - targetClass: 7
     priority: 1
+  aiSensorPriority: 0000000002000000
+  prioritizeDpqAtBattle: 0
+  repairTriggerHpBelow: 0
+  repairTriggerAutonomyPct: 0
+  repairTriggerAmmoEnabled: 0
+  repairTriggerAmmoPct: 0
+  repairRecoverHpAbove: 8
+  fuseWhileInRepair: 0
   eliteLevel: 0
   combatModifiers: []
   domain: 2
@@ -65,10 +74,7 @@ MonoBehaviour:
   - domain: 1
     heightLevel: 3
     spriteDefault: {fileID: 21300000, guid: 99d5c0f1e3808ee4bb1f798ca9319930, type: 3}
-    spriteGreen: {fileID: 0}
-    spriteRed: {fileID: 0}
-    spriteBlue: {fileID: 0}
-    spriteYellow: {fileID: 0}
+    teamVariantSprites: []
   useExplicitPreferredAirHeight: 0
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 1

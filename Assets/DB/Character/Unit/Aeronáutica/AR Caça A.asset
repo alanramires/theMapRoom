@@ -26,18 +26,27 @@ MonoBehaviour:
   defense: 15
   armorClass: 2
   movement: 9
-  visao: 3
+  visao: 4
   visionSpecializations: []
   movementCategory: 3
   militaryForce: 1
   unitClass: 4
   combatClassification: 0
   roles: 02000000
+  aiInitiative: 2
   aiTargetPreferenceByClass:
   - targetClass: 6
     priority: 2
   - targetClass: 4
     priority: 1
+  aiSensorPriority: 0000000002000000
+  prioritizeDpqAtBattle: 0
+  repairTriggerHpBelow: 0
+  repairTriggerAutonomyPct: 0
+  repairTriggerAmmoEnabled: 0
+  repairTriggerAmmoPct: 0
+  repairRecoverHpAbove: 8
+  fuseWhileInRepair: 0
   eliteLevel: 1
   combatModifiers:
   - {fileID: 11400000, guid: 25b8791e695efc94a8c2d5a329cd5602, type: 2}

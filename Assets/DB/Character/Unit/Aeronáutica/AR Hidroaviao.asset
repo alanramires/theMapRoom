@@ -20,22 +20,28 @@ MonoBehaviour:
     de infantaria e pousa em praias ou estradas. Ideal para movimentos improvisados
     e situa\xE7\xF5es espec\xEDficas, mas n\xE3o substitui transportes dedicados."
   spriteDefault: {fileID: 21300000, guid: 45ca2a03cea85fe4f895f32d1843c233, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 8
   armorClass: 0
   movement: 3
-  visao: 3
+  visao: 4
   visionSpecializations: []
   movementCategory: 1
   militaryForce: 1
   unitClass: 6
   combatClassification: 3
-  aiUnitProfile: {fileID: 11400000, guid: 626e71f53bedacc409de7c3bae53de83, type: 2}
+  roles: 
+  aiInitiative: 2
   aiTargetPreferenceByClass: []
+  aiSensorPriority: 0000000002000000
+  prioritizeDpqAtBattle: 0
+  repairTriggerHpBelow: 0
+  repairTriggerAutonomyPct: 0
+  repairTriggerAmmoEnabled: 0
+  repairTriggerAmmoPct: 0
+  repairRecoverHpAbove: 8
+  fuseWhileInRepair: 0
   eliteLevel: 0
   combatModifiers: []
   domain: 3
@@ -44,17 +50,11 @@ MonoBehaviour:
   - domain: 0
     heightLevel: 3
     spriteDefault: {fileID: 21300000, guid: 56007c1733ab269419a7ba6ea154e0cc, type: 3}
-    spriteGreen: {fileID: 0}
-    spriteRed: {fileID: 0}
-    spriteBlue: {fileID: 0}
-    spriteYellow: {fileID: 0}
+    teamVariantSprites: []
   - domain: 1
     heightLevel: 3
     spriteDefault: {fileID: 21300000, guid: 36f879b018467e749808fcfb0c1d8aa8, type: 3}
-    spriteGreen: {fileID: 0}
-    spriteRed: {fileID: 0}
-    spriteBlue: {fileID: 0}
-    spriteYellow: {fileID: 0}
+    teamVariantSprites: []
   useExplicitPreferredAirHeight: 1
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0

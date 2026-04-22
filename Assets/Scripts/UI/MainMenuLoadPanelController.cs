@@ -749,6 +749,7 @@ public class MainMenuLoadPanelController : MonoBehaviour
             return;
 
         panelLoadRoot.SetActive(!hidden);
+        panelMenu?.SetCompassCursorVisible(hidden);
     }
 
     private static Transform FindTransformByName(string name)

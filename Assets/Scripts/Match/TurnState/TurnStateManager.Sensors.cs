@@ -85,6 +85,9 @@ public partial class TurnStateManager
                 cachedPodeDesembarcarTargets,
                 cachedPodeDesembarcarInvalidTargets);
             CollapseMirarTargetsByTargetUnit(cachedPodeMirarTargets);
+            SortClockwiseAroundUnit(cachedPodeEmbarcarTargets,
+                o => o?.transporterUnit != null ? o.transporterUnit.CurrentCellPosition : Vector3Int.zero,
+                selectedUnit);
 
         // Normaliza os codigos de acao com base nos resultados efetivos dos sensores.
         availableSensorActionCodes.Remove('A');

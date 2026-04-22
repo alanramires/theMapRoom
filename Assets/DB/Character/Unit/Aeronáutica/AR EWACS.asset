@@ -21,10 +21,7 @@ MonoBehaviour:
     unidades terrestres ou submarinos. Deve operar protegida, pois sua perda reduz
     severamente a consci\xEAncia do campo de batalha."
   spriteDefault: {fileID: 21300000, guid: c0b17bc8f689a46478caca98f7d5183b, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 12
   armorClass: 1
@@ -32,16 +29,13 @@ MonoBehaviour:
   visao: 3
   visionSpecializations:
   - domain: 3
-    heightLevel: 4
-    vision: 5
-    detectUnitsWithFollowingSkills: []
-    losPolicy: 0
-  - domain: 3
+    allHeights: 1
     heightLevel: 5
     vision: 7
     detectUnitsWithFollowingSkills: []
     losPolicy: 0
   - domain: 2
+    allHeights: 0
     heightLevel: 2
     vision: 0
     detectUnitsWithFollowingSkills: []
@@ -50,8 +44,17 @@ MonoBehaviour:
   militaryForce: 1
   unitClass: 6
   combatClassification: 3
-  aiUnitProfile: {fileID: 11400000, guid: 626e71f53bedacc409de7c3bae53de83, type: 2}
+  roles: 
+  aiInitiative: 2
   aiTargetPreferenceByClass: []
+  aiSensorPriority: 0000000002000000
+  prioritizeDpqAtBattle: 0
+  repairTriggerHpBelow: 0
+  repairTriggerAutonomyPct: 0
+  repairTriggerAmmoEnabled: 0
+  repairTriggerAmmoPct: 0
+  repairRecoverHpAbove: 8
+  fuseWhileInRepair: 0
   eliteLevel: 0
   combatModifiers: []
   domain: 3
@@ -60,17 +63,11 @@ MonoBehaviour:
   - domain: 0
     heightLevel: 3
     spriteDefault: {fileID: 21300000, guid: 06cbc9a30dd101f4395d6b36b942a822, type: 3}
-    spriteGreen: {fileID: 0}
-    spriteRed: {fileID: 0}
-    spriteBlue: {fileID: 0}
-    spriteYellow: {fileID: 0}
+    teamVariantSprites: []
   - domain: 3
     heightLevel: 4
     spriteDefault: {fileID: 21300000, guid: 2c55b7950037b9e43a76edfdeb8b2780, type: 3}
-    spriteGreen: {fileID: 0}
-    spriteRed: {fileID: 0}
-    spriteBlue: {fileID: 0}
-    spriteYellow: {fileID: 0}
+    teamVariantSprites: []
   useExplicitPreferredAirHeight: 0
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0

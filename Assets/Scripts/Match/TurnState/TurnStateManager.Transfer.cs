@@ -63,6 +63,7 @@ public partial class TurnStateManager
             return;
         }
 
+        SortClockwiseAroundUnit(transferPromptOptions, o => o.targetCell, selectedUnit);
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Transfer, "TransferActionRequested");
         EnterTransferSelectionStep();
         cursorController?.PlayConfirmSfx();

@@ -32,6 +32,11 @@ public class PanelMenu : MonoBehaviour
     [SerializeField] private GameObject panelTutorialRoot;
     [SerializeField] private GameObject panelConfigRoot;
 
+    [Header("Compass Cursor")]
+    [SerializeField] private RectTransform compassCursor;
+    [SerializeField] private float compassOffsetX = -80f;
+    [SerializeField] private float compassOffsetY = 0f;
+
     [Header("References")]
     [SerializeField] private CursorController cursorController;
     [SerializeField] private MainMenuLoadPanelController loadPanelController;
@@ -266,6 +271,7 @@ public class PanelMenu : MonoBehaviour
     {
         currentIndex = index;
         ClampCurrentIndex();
+        RefreshCompassCursor();
     }
 
     private void SelectCurrentButton(bool playSfx)
@@ -282,8 +288,51 @@ public class PanelMenu : MonoBehaviour
         if (EventSystem.current != null)
             EventSystem.current.SetSelectedGameObject(button.gameObject);
 
+        UpdateCompassCursor(button);
+
         if (playSfx)
             cursorController?.PlayCursorMoveSfx();
+    }
+
+    private void UpdateCompassCursor(Button button)
+    {
+        if (compassCursor == null || button == null)
+            return;
+
+        RectTransform buttonRect = button.GetComponent<RectTransform>();
+        if (buttonRect == null)
+            return;
+
+        RectTransform parentRect = compassCursor.parent as RectTransform;
+        if (parentRect == null)
+            return;
+
+        Canvas.ForceUpdateCanvases();
+        RectTransform layoutRoot = buttonRect.parent as RectTransform;
+        if (layoutRoot != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(layoutRoot);
+
+        Vector3[] corners = new Vector3[4];
+        buttonRect.GetWorldCorners(corners);
+        Vector3 worldCenter = (corners[0] + corners[2]) * 0.5f;
+        Vector2 localCenter = parentRect.InverseTransformPoint(worldCenter);
+
+        compassCursor.anchoredPosition = new Vector2(
+            localCenter.x + compassOffsetX,
+            localCenter.y + compassOffsetY);
+    }
+
+    private void RefreshCompassCursor()
+    {
+        Button button = GetCurrentButton();
+        if (button != null)
+            UpdateCompassCursor(button);
+    }
+
+    public void SetCompassCursorVisible(bool visible)
+    {
+        if (compassCursor != null)
+            compassCursor.gameObject.SetActive(visible);
     }
 
     private Button GetCurrentButton()
@@ -326,13 +375,19 @@ public class PanelMenu : MonoBehaviour
     private List<Button> GetRootButtons()
     {
         List<Button> list = new List<Button>(6);
-        if (buttonNew != null) list.Add(buttonNew);
-        if (buttonLoad != null) list.Add(buttonLoad);
-        if (buttonTutorial != null) list.Add(buttonTutorial);
-        if (buttonConfig != null) list.Add(buttonConfig);
-        if (buttonCinematic != null) list.Add(buttonCinematic);
-        if (buttonSair != null) list.Add(buttonSair);
+        AddIfActive(list, buttonNew);
+        AddIfActive(list, buttonLoad);
+        AddIfActive(list, buttonTutorial);
+        AddIfActive(list, buttonConfig);
+        AddIfActive(list, buttonCinematic);
+        AddIfActive(list, buttonSair);
         return list;
+    }
+
+    private static void AddIfActive(List<Button> list, Button button)
+    {
+        if (button != null && button.gameObject.activeInHierarchy)
+            list.Add(button);
     }
 
     private void ResolveMenuButtonsIfNeeded()
@@ -524,13 +579,16 @@ public class PanelMenu : MonoBehaviour
             SyncCurrentIndexWithButton(buttonNew);
 
         PlayConfirmSfxOncePerFrame();
-        if (stateController != null)
-        {
-            stateController.RequestState(MainMenuState.NewGame);
-            return;
-        }
 
-        OpenPanelAndHideMenu(panelNewGameRoot, "Panel_NewGame");
+        TeamId[] teams  = { TeamId.Green, TeamId.Red };
+        bool[]   isAI   = { false, false };
+        bool[]   flipX  = { false, true };
+        const MatchController.GameSetupPreset preset = MatchController.GameSetupPreset.FogOfWarTotal;
+        const string target = "Battle Map";
+
+        SaveGameManager.SetupForNewGame(string.Empty);
+        PartidaConfig.Set(2, teams, isAI, flipX, preset, false, target);
+        UnityEngine.SceneManagement.SceneManager.LoadScene(target);
     }
 
     private void OnLoadButtonClicked()
@@ -772,6 +830,7 @@ public class PanelMenu : MonoBehaviour
             if (buttons[i] == button)
             {
                 currentIndex = i;
+                RefreshCompassCursor();
                 return;
             }
         }

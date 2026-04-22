@@ -8,16 +8,16 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Tela de Entrada.unity
     guid: ec8aff1d73d71884caebcaf97919f2ed
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Mapas/Team Island.unity
     guid: d195c2d48f08e5f4f842d2b940b90f57
   - enabled: 1
     path: Assets/Scenes/Mapas/Battle Map.unity
     guid: 6f3c08b20d025f84baa7c6cf0eca3e72
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Mapas/Triple Trouble.unity
     guid: 61d3e0c5eac34134b837e8ffcb8920c1
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Mapas/AI Ground.unity
     guid: 3f127f32d3f14b844b2b9680a7f9fc6e
   m_configObjects:

@@ -76,7 +76,8 @@ public partial class TurnStateManager : MonoBehaviour
         SuprindoExecuting = 29,
         FundindoExecuting = 30,
         DesembarcandoExecuting = 31,
-        EmbarcandoExecuting = 32
+        EmbarcandoExecuting = 32,
+        AttackingExecuting = 33
     }
 
     [Header("References")]

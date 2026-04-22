@@ -9,6 +9,16 @@ using UnityEngine.InputSystem;
 
 public partial class TurnStateManager
 {
+    private bool shoppingSuppressDefaultConfirmSfxOnce;
+
+    private bool ConsumeShoppingSuppressDefaultConfirmSfxOnce()
+    {
+        if (!shoppingSuppressDefaultConfirmSfxOnce)
+            return false;
+        shoppingSuppressDefaultConfirmSfxOnce = false;
+        return true;
+    }
+
     private bool TryEnterConstructionShoppingState(ConstructionManager construction, int activeTeam)
     {
         if (construction == null || activeTeam < 0)
@@ -170,6 +180,7 @@ public partial class TurnStateManager
         if (matchController != null)
             PanelMoneyController.PushContextualUpdate(spawnTeam, remainingMoney, ResolveUnitName(unit), -unitCost);
 
+        shoppingSuppressDefaultConfirmSfxOnce = true;
         cursorController?.PlayDoneSfx();
         if (enableTurnStateRuntimeLogs)
             Debug.Log($"[Shopping] Compra concluida: {ResolveUnitName(unit)} por ${unitCost} em {ResolveConstructionName(shoppingConstruction)}.");

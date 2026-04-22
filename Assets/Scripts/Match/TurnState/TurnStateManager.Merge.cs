@@ -865,6 +865,10 @@ public partial class TurnStateManager
             mergeCandidateIndexByCell[cell] = mergeCandidateEntries.Count - 1;
             LogMergeDebug($"CandidateAdded INVALID {DescribeMergeCandidate(mergeCandidateEntries[mergeCandidateEntries.Count - 1])}");
         }
+
+        SortClockwiseAroundUnit(mergeCandidateEntries, e => e.cell, selectedUnit);
+        for (int i = 0; i < mergeCandidateEntries.Count; i++)
+            mergeCandidateIndexByCell[mergeCandidateEntries[i].cell] = i;
     }
 
     private void PaintMergeCandidateOptions()

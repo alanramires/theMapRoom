@@ -1627,13 +1627,25 @@ public class MatchController : MonoBehaviour
 
         TryAutoAssignTurnTransitionReferences();
         if (matchMusicAudioManager != null)
-        {
-            matchMusicAudioManager.StopForTurnTransition();
-            matchMusicAudioManager.EndTurnTransition();
-        }
+            matchMusicAudioManager.StopPlaybackPermanently();
 
-        string winnerUpper = (winnerLabel ?? string.Empty).ToUpperInvariant();
-        PanelDialogController.TrySetTransientText($"VENCEDOR: TEAM {winnerUpper}", 4.2f);
+        CursorController cursor = FindAnyObjectByType<CursorController>();
+        cursor?.PlayVictorySfx();
+
+        string reason = goal > 0 ? "CAPTURA DO QG" : "EXÉRCITO OPONENTE ELIMINADO";
+        foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
+        {
+            if (go.name == "Panel_vitoria" && go.scene.IsValid())
+            {
+                go.SetActive(true);
+                foreach (TMPro.TMP_Text t in go.GetComponentsInChildren<TMPro.TMP_Text>(includeInactive: true))
+                {
+                    if (t.name == "text_descricao")
+                        t.text = $"TIME {(winnerLabel ?? string.Empty).ToUpperInvariant()} — {reason}";
+                }
+                break;
+            }
+        }
     }
 
     private void SyncActivePlayerIndexFromActiveTeam()
@@ -1931,7 +1943,7 @@ public class MatchController : MonoBehaviour
                     int consumed = Mathf.Max(0, beforeFuel - afterFuel);
                     unit.SetCurrentFuel(afterFuel);
                     bool markedForFuelDepletionDeath = false;
-                    if (beforeFuel > 0 && afterFuel <= 0)
+                    if (afterFuel <= 0)
                     {
                         bool isAirUnitInFlight =
                             unit.GetAircraftType() != AircraftType.None &&

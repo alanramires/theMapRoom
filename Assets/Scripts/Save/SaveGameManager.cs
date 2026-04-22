@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -113,10 +114,30 @@ public class SaveGameManager : MonoBehaviour
     private readonly Dictionary<string, ServiceData> cachedServicesById = new Dictionary<string, ServiceData>(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SupplyData> cachedSuppliesById = new Dictionary<string, SupplyData>(StringComparer.OrdinalIgnoreCase);
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+    [DllImport("__Internal")] private static extern void SyncFilesToIndexedDB();
+    [DllImport("__Internal")] private static extern void LoadFilesFromIndexedDB(string objectName, string callbackMethod);
+#endif
+
     private void Awake()
     {
         EnsureDefaultSaveDirectoryConfigured();
         TryAutoAssignReferences();
+#if UNITY_WEBGL && !UNITY_EDITOR
+        LoadFilesFromIndexedDB(gameObject.name, nameof(OnWebGLInitSyncComplete));
+#endif
+    }
+
+    private void OnWebGLInitSyncComplete()
+    {
+        Debug.Log("[SaveGame] WebGL: IndexedDB sincronizado e pronto.");
+    }
+
+    private static void WebGLSyncAfterWrite()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        SyncFilesToIndexedDB();
+#endif
     }
 
     private void Start()
@@ -552,6 +573,7 @@ public class SaveGameManager : MonoBehaviour
             File.WriteAllBytes(path, compressedBytes);
             WriteSlotMetadataFile(path, data);
             WriteOrDeleteReplaySidecar(path);
+            WebGLSyncAfterWrite();
             LogSaveDiagnostics(normalizedSlot, json, compressedBytes);
             cursorController?.PlayLoadSfx();
             string savedText = ResolveDialog(
@@ -1701,7 +1723,16 @@ public class SaveGameManager : MonoBehaviour
         if (!Path.IsPathRooted(basePath))
             basePath = Path.Combine(Application.persistentDataPath, basePath);
 
-        return basePath;
+        try
+        {
+            Directory.CreateDirectory(basePath);
+            return basePath;
+        }
+        catch
+        {
+            Debug.LogWarning($"[SaveGame] Diretorio customizado inacessivel: '{basePath}'. Usando persistentDataPath.");
+            return Application.persistentDataPath;
+        }
     }
 
     private void EnsureDefaultSaveDirectoryConfigured()

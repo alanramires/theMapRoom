@@ -993,6 +993,10 @@ public partial class TurnStateManager
             });
             supplyCandidateIndexByCell[cell] = supplyCandidateEntries.Count - 1;
         }
+
+        SortClockwiseAroundUnit(supplyCandidateEntries, e => e.cell, selectedUnit);
+        for (int i = 0; i < supplyCandidateEntries.Count; i++)
+            supplyCandidateIndexByCell[supplyCandidateEntries[i].cell] = i;
     }
 
     private void PaintSupplyCandidateOptions()

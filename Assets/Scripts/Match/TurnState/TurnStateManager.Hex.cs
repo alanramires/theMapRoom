@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -138,6 +139,7 @@ public partial class TurnStateManager
             case CursorState.FundindoExecuting:
             case CursorState.DesembarcandoExecuting:
             case CursorState.EmbarcandoExecuting:
+            case CursorState.AttackingExecuting:
                 return true;
             default:
                 return false;
@@ -167,6 +169,27 @@ public partial class TurnStateManager
             return null;
 
         return ConstructionOccupancyRules.GetConstructionAtCell(referenceTilemap, cell);
+    }
+
+    private void SortClockwiseAroundUnit<T>(List<T> list, System.Func<T, Vector3Int> getCell, UnitManager unit)
+    {
+        if (list.Count <= 1 || terrainTilemap == null || unit == null)
+            return;
+        Vector3Int centerCell = unit.CurrentCellPosition;
+        centerCell.z = 0;
+        Vector3 worldCenter = HexCoordinates.GetCellCenterWorld(terrainTilemap, centerCell);
+        list.Sort((a, b) =>
+        {
+            Vector3Int ca = getCell(a); ca.z = 0;
+            Vector3Int cb = getCell(b); cb.z = 0;
+            Vector3 wa = HexCoordinates.GetCellCenterWorld(terrainTilemap, ca);
+            Vector3 wb = HexCoordinates.GetCellCenterWorld(terrainTilemap, cb);
+            float fa = Mathf.Atan2(wa.x - worldCenter.x, wa.y - worldCenter.y);
+            float fb = Mathf.Atan2(wb.x - worldCenter.x, wb.y - worldCenter.y);
+            if (fa < 0) fa += 2 * Mathf.PI;
+            if (fb < 0) fb += 2 * Mathf.PI;
+            return fa.CompareTo(fb);
+        });
     }
 }
 

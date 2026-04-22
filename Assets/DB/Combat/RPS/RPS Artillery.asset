@@ -75,6 +75,21 @@ MonoBehaviour:
         +3
   - ataque:
       unitClass: 2
+      weaponCategory: 1
+      targetClass: 8
+      attackBonus: 0
+      notes: 
+      rpsAttackText: Artillery com AntiTanque ataca Ship com RPS Ataque +0
+    defesa:
+      targetClass: 8
+      unitClass: 2
+      weaponCategory: 1
+      defenseBonus: 0
+      notes: 
+      rpsDefenseText: Ship se defende de Artillery com AntiTanque com RPS Defesa
+        +0
+  - ataque:
+      unitClass: 2
       weaponCategory: 2
       targetClass: 5
       attackBonus: 0

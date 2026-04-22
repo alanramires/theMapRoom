@@ -45,6 +45,8 @@ public class ReplayManager : MonoBehaviour
     [SerializeField, Range(0f, 2f)] private float replayConfirmVisualDelay = 0.25f;
     [SerializeField, Range(0.5f, 8f), Tooltip("Tempo minimo de exibicao das mensagens de transicao do replay (segundos).") ] private float replayTransitionMinDisplaySeconds = 3f;
     [SerializeField, Range(0.01f, 1f), Tooltip("Delay between shopping menu items during replay automation (seconds).") ] private float shoppingNavDelay = 0.15f;
+    [SerializeField, Range(0f, 1f), Tooltip("Pausa após o menu de compras abrir, antes de navegar ou confirmar a seleção (seconds).") ] private float shoppingMenuOpenDelay = 0.25f;
+    [SerializeField, Range(0f, 1f), Tooltip("Pausa entre cada passo de navegação no menu do jogador (abre ESC, navega ate Reabastecer, etc.) durante execução da IA (seconds).") ] private float playerMenuStepDelay = 0.2f;
     [SerializeField, Tooltip("Quando ligado, remove delays artificiais do replay e usa teleporte do cursor entre cells.")] private bool fastReplayMode = false;
     [Header("Telemetry")]
     [SerializeField] private bool snapshotTelemetryEnabled = true;
@@ -78,6 +80,7 @@ public class ReplayManager : MonoBehaviour
 
     private readonly Dictionary<string, ServiceData> cachedServicesById = new Dictionary<string, ServiceData>(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SupplyData> cachedSuppliesById = new Dictionary<string, SupplyData>(StringComparer.OrdinalIgnoreCase);
+    private BattleMapMenuRootController cachedBattleMapMenu;
 
     public bool IsRecording => isRecording;
     public bool IsReplaying => isReplaying;
@@ -385,6 +388,7 @@ public class ReplayManager : MonoBehaviour
             case PlayerActionType.CommandService:
             case PlayerActionType.RemoveUnit:
             case PlayerActionType.Shopping:
+            case PlayerActionType.EndTurn:
                 return true;
 
             default:
@@ -424,8 +428,10 @@ public class ReplayManager : MonoBehaviour
             case PlayerActionType.Shopping:
                 yield return ExecuteRecordedShoppingBatch(action, preActionSnapshot);
                 break;
+            case PlayerActionType.EndTurn:
+                yield return ExecuteRecordedEndTurnBatch(action, preActionSnapshot);
+                break;
             default:
-                // Shopping and unknown actions are finalized by restoring post-action snapshot.
                 break;
         }
 
@@ -1016,6 +1022,11 @@ public class ReplayManager : MonoBehaviour
             yield break;
         }
 
+        // Pausa após abrir o menu — mostra o cursor pousando na seleção antes de navegar/confirmar.
+        float menuOpenHold = GetEffectiveShoppingMenuOpenDelay();
+        if (menuOpenHold > 0f)
+            yield return new WaitForSecondsRealtime(menuOpenHold);
+
         int targetIndex = Mathf.Max(0, action != null ? action.ShoppingSelectedIndex : 0);
         int guard = 0;
         const int maxGuard = 256;
@@ -1069,28 +1080,84 @@ public class ReplayManager : MonoBehaviour
     }
     private IEnumerator ExecuteRecordedCommandServiceBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
     {
-        if (cursorController != null && TryResolveRecordedCursorCell(action, preActionSnapshot, out Vector3Int cursorCell))
+        Debug.Log("[Replay][CommandService] ExecuteRecordedCommandServiceBatch iniciado.");
+
+        // Passo 1: "ESC" — abre o menu do jogador
+        BattleMapMenuRootController menu = GetBattleMapMenu();
+        Debug.Log($"[Replay][CommandService] BattleMapMenuRootController encontrado: {menu != null}");
+        if (menu == null || !menu.TryOpenMenuFromAI())
         {
-            yield return MoveCursorToCellWithTravel(NormalizeCell(cursorCell));
+            ReplayLogWarning("[Replay][CommandService] Menu do jogador indisponível — abortando.");
+            yield break;
         }
 
-        if (!turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.CommandService))
+        float stepDelay = GetEffectivePlayerMenuStepDelay();
+
+        if (stepDelay > 0f) yield return new WaitForSecondsRealtime(stepDelay);
+
+        // Passo 2: "Cursor Down" — navega até o botão Reabastecer (Comando)
+        int guard = 0;
+        while (!menu.IsComandoButtonSelected && guard++ < 10)
         {
-            turnStateManager.ForceNeutral();
-            yield return null;
-            if (!turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.CommandService))
-            {
-                AbortReplayBatchDueToError(
-                    "dialog.replay.error",
-                    "replay <erro>",
-                    "CommandService replay nao conseguiu entrar em estado de confirmacao",
-                    3.2f);
-                yield break;
-            }
+            menu.NavigateMenuStepForAI(+1);
+            if (stepDelay > 0f) yield return new WaitForSecondsRealtime(stepDelay);
+        }
+
+        if (!menu.IsComandoButtonSelected)
+        {
+            ReplayLogWarning("[Replay][CommandService] Botão Comando não encontrado no menu — abortando.");
+            menu.CloseMenuFromAI();
+            yield break;
+        }
+
+        if (stepDelay > 0f) yield return new WaitForSecondsRealtime(stepDelay);
+
+        // Passo 3: "Enter" — aciona o Serviço do Comando (fecha menu, abre preview)
+        if (!menu.TryTriggerComandoForAI())
+        {
+            // Sem candidatos — encerra silenciosamente (sem error dialog)
+            yield break;
         }
 
         yield return null;
+
+        // Passo 4: "Enter" — confirma a execução do serviço
         ExecuteReplayConfirmInput();
+        yield return null;
+    }
+
+    private IEnumerator ExecuteRecordedEndTurnBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
+    {
+        Debug.Log("[Replay][EndTurn] ExecuteRecordedEndTurnBatch iniciado.");
+
+        BattleMapMenuRootController menu = GetBattleMapMenu();
+        if (menu == null || !menu.TryOpenMenuFromAI())
+        {
+            ReplayLogWarning("[Replay][EndTurn] Menu do jogador indisponível — abortando.");
+            yield break;
+        }
+
+        float stepDelay = GetEffectivePlayerMenuStepDelay();
+        if (stepDelay > 0f) yield return new WaitForSecondsRealtime(stepDelay);
+
+        // Navega até btnRodada: ESC abriu no índice 0 (Status), 2× DOWN chega em Rodada
+        int guard = 0;
+        while (!menu.IsRodadaButtonSelected && guard++ < 10)
+        {
+            menu.NavigateMenuStepForAI(+1);
+            if (stepDelay > 0f) yield return new WaitForSecondsRealtime(stepDelay);
+        }
+
+        if (!menu.IsRodadaButtonSelected)
+        {
+            ReplayLogWarning("[Replay][EndTurn] Botão Rodada não encontrado — abortando.");
+            menu.CloseMenuFromAI();
+            yield break;
+        }
+
+        if (stepDelay > 0f) yield return new WaitForSecondsRealtime(stepDelay);
+
+        menu.TryTriggerRodadaForAI();
         yield return null;
     }
 
@@ -2336,6 +2403,28 @@ public class ReplayManager : MonoBehaviour
     private float GetEffectiveShoppingNavDelay()
     {
         return fastReplayMode ? 0f : Mathf.Max(0f, shoppingNavDelay);
+    }
+
+    private float GetEffectiveShoppingMenuOpenDelay()
+    {
+        return fastReplayMode ? 0f : Mathf.Max(0f, shoppingMenuOpenDelay);
+    }
+
+    private float GetEffectivePlayerMenuStepDelay()
+    {
+        return fastReplayMode ? 0f : Mathf.Max(0f, playerMenuStepDelay);
+    }
+
+    private BattleMapMenuRootController GetBattleMapMenu()
+    {
+        if (cachedBattleMapMenu != null) return cachedBattleMapMenu;
+        BattleMapMenuRootController[] all = FindObjectsByType<BattleMapMenuRootController>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < all.Length; i++)
+        {
+            if (all[i] != null) { cachedBattleMapMenu = all[i]; break; }
+        }
+        return cachedBattleMapMenu;
     }
     private float GetEffectiveSensorSubstepDelay()
     {

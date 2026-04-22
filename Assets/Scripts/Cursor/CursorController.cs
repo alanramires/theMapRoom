@@ -190,6 +190,9 @@ public class CursorController : MonoBehaviour
         if (UiInputBlocker.IsTextInputFocused())
             return true;
 
+        if (matchController != null && matchController.HasVictoryWinner)
+            return true;
+
         if (matchController != null && matchController.IsPlayerInputLockedByActiveAI())
             return true;
 

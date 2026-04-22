@@ -260,6 +260,121 @@ public class BattleMapMenuRootController : MonoBehaviour
         return true;
     }
 
+    // -------------------------------------------------------------------------
+    // AI API — métodos públicos para o AIController emular o menu sem bloqueios
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Abre o menu in-game como a IA (sem desabilitar botões pelo turno da IA).
+    /// </summary>
+    public bool TryOpenMenuFromAI()
+    {
+        TryAutoAssignReferences();
+        EnsureButtonsCache();
+        if (menuRoot == null)
+        {
+            Debug.Log("[AI][Menu] TryOpenMenuFromAI → false (menuRoot == null)");
+            return false;
+        }
+        if (menuOpen)
+        {
+            Debug.Log("[AI][Menu] TryOpenMenuFromAI → true (já estava aberto)");
+            return true;
+        }
+        if (turnStateManager == null || !turnStateManager.TryEnterPlayerMenuState())
+        {
+            Debug.Log($"[AI][Menu] TryOpenMenuFromAI → false (TryEnterPlayerMenuState falhou | turnStateManager={turnStateManager != null} | cursorState={turnStateManager?.CurrentCursorState})");
+            return false;
+        }
+
+        if (cursorController != null) savedCursorCell = cursorController.CurrentCell;
+        menuRoot.SetActive(true);
+        menuOpen = true;
+        pendingOpenOnNextNeutral = false;
+        exitConfirmOpen = false;
+        RestoreUndockedLayout();
+        hasLastUndockedScreenRect = false;
+        cursorNearUndockedDockRegion = false;
+        CaptureAndDisableEventSystemNavigation();
+        // Intencionalmente omite RefreshButtonInteractability: a IA pode selecionar qualquer botão.
+        SetPanel(MenuPanel.Menu, resetIndex: true);
+        PanelDialogController.ClearExternalText();
+        PlayConfirmSfxOncePerFrame();
+        Debug.Log("[AI][Menu] TryOpenMenuFromAI → true (menu aberto com sucesso)");
+        return true;
+    }
+
+    /// <summary>
+    /// Navega um passo na lista (ignora interatividade — a IA não é bloqueada por isso).
+    /// </summary>
+    public void NavigateMenuStepForAI(int delta)
+    {
+        if (!panelButtons.TryGetValue(activePanel, out List<Button> list) || list.Count <= 0) return;
+        int count = list.Count;
+        currentIndex = ((currentIndex + delta) % count + count) % count;
+        SelectCurrentButton();
+        cursorController?.PlayCursorMoveSfx();
+    }
+
+    /// <summary>True se o botão atualmente selecionado é o "Comando" (Reabastecer).</summary>
+    public bool IsComandoButtonSelected
+    {
+        get
+        {
+            if (btnComando == null) return false;
+            if (!panelButtons.TryGetValue(activePanel, out List<Button> list)) return false;
+            return currentIndex >= 0 && currentIndex < list.Count && list[currentIndex] == btnComando;
+        }
+    }
+
+    /// <summary>True se o botão atualmente selecionado é o "Rodada" (Passar a Vez).</summary>
+    public bool IsRodadaButtonSelected
+    {
+        get
+        {
+            if (btnRodada == null) return false;
+            if (!panelButtons.TryGetValue(activePanel, out List<Button> list)) return false;
+            return currentIndex >= 0 && currentIndex < list.Count && list[currentIndex] == btnRodada;
+        }
+    }
+
+    /// <summary>
+    /// Fecha o menu e aciona Passar a Vez sem checar interatividade do botão.
+    /// </summary>
+    public bool TryTriggerRodadaForAI()
+    {
+        if (!TryCloseMenuForEndTurnDispatch()) return false;
+        if (cursorController == null) return false;
+        return cursorController.TryExecuteEndTurnFromMenu();
+    }
+
+    /// <summary>
+    /// Fecha o menu e aciona o Serviço do Comando sem checar interatividade do botão.
+    /// Retorna false se não há alvos ou se o estado é inválido.
+    /// </summary>
+    public bool TryTriggerComandoForAI()
+    {
+        if (!TryCloseMenuForCommandServiceDispatch()) return false;
+        if (turnStateManager == null) return false;
+        if (!turnStateManager.TryOpenCommandServiceFromMenu(out string message))
+        {
+            turnStateManager.TryExitPlayerMenuStateToNeutral();
+            PanelDialogController.TrySetTransientText(message, 2.4f);
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Fecha o menu sem passar a vez (para uso da IA quando precisa cancelar a abertura).
+    /// </summary>
+    public void CloseMenuFromAI()
+    {
+        CloseMenu(restoreCursor: true);
+    }
+
+    // -------------------------------------------------------------------------
+
     private void OpenMenu()
     {
         if (menuRoot == null)
