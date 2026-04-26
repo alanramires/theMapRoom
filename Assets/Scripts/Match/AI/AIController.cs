@@ -7,13 +7,17 @@ using UnityEngine.Tilemaps;
 /// Cérebro da IA V2. Orquestra as 4 fases do turno via coroutine,
 /// usando HexEvaluator para posicionamento e ExecuteLiveAIBatch para execução.
 /// </summary>
-public class AIController : MonoBehaviour
+public partial class AIController : MonoBehaviour
 {
     [SerializeField] private MatchController matchController;
     [SerializeField] private ReplayManager replayManager;
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private Tilemap boardTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
+
+    [Header("AI HUD")]
+    [SerializeField] private bool showAIUnitHUD;
+
 
     private bool isActive;
     private Coroutine aiCoroutine;
@@ -97,6 +101,8 @@ public class AIController : MonoBehaviour
                   $"| {snapshot.MyUnits.Count} unidades | {snapshot.EnemyUnits.Count} inimigos " +
                   $"| R$ {snapshot.Budget}");
 
+        BuildObjectivePlan(snapshot);
+
         yield return Phase1_CommandService(snapshot);
         yield return Phase2_UnitActions(snapshot);
         yield return Phase3_Shopping(snapshot);
@@ -168,7 +174,9 @@ public class AIController : MonoBehaviour
 
     private IEnumerator Phase2_UnitActions(AIWorldSnapshot snapshot)
     {
-        List<UnitManager> initial = GetAvailableUnits(snapshot.AITeam);
+        TeamId aiTeam = snapshot.AITeam;
+
+        List<UnitManager> initial = GetAvailableUnits(aiTeam);
         if (initial.Count == 0)
         {
             Debug.Log("[AI] Fase 2 — sem unidades em campo, pulando.");
@@ -179,11 +187,14 @@ public class AIController : MonoBehaviour
 
         while (isActive)
         {
-            List<UnitManager> available = GetAvailableUnits(snapshot.AITeam);
+            List<UnitManager> available = GetAvailableUnits(aiTeam);
             if (available.Count == 0) break;
 
+            // Reconstrói a foto do mundo após cada batch — hexes ocupados mudam
+            AIWorldSnapshot current = AIWorldSnapshot.Build(aiTeam, matchController);
+
             UnitManager unit = available[0];
-            PlayerAction action = DecideUnitAction(unit, snapshot);
+            PlayerAction action = DecideUnitAction(unit, current);
 
             if (action == null)
             {
@@ -194,6 +205,10 @@ public class AIController : MonoBehaviour
 
             replayManager.ExecuteLiveAIBatch(action);
             yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
+
+            // Recalcula FoW após cada ação para que a próxima unidade veja inimigos
+            // revelados pelo movimento desta (cache de visibilidade fica stale senão).
+            matchController?.RefreshFogOfWarForActiveTeam();
 
             float delay = GetBatchDelay();
             if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
@@ -269,6 +284,13 @@ public class AIController : MonoBehaviour
 
     private PlayerAction DecideUnitAction(UnitManager unit, AIWorldSnapshot snapshot)
     {
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        if (plan != null)
+        {
+            PlayerAction objectiveAction = TryDecideCapturerAction(unit, snapshot, plan);
+            if (objectiveAction != null) return objectiveAction;
+        }
+
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
 
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
@@ -298,6 +320,18 @@ public class AIController : MonoBehaviour
             if (e.isChosen) { chosen = e; foundChosen = true; break; }
         }
 
+        if (showAIUnitHUD)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"[AI][Think] Unidade {unit.InstanceId} ({unit.UnitDisplayName}) | role={resolvedRole} target={resolvedTarget}");
+            foreach (HexEvaluation e in evaluations)
+                sb.AppendLine($"  {(e.isChosen ? "★" : " ")} {e.cell} | total={e.total:F2}" +
+                              $"  cap={e.captureProximity:F2} cbt={e.combatValue:F2} dpq={e.positionQuality:F2}" +
+                              $"  coh={e.cohesion:F2} dev={e.deviation:F2} saf={e.safety:F2}" +
+                              $"  → {e.actionSummary}");
+            Debug.Log(sb.ToString());
+        }
+
         if (!foundChosen)
         {
             Debug.LogWarning($"[AI] {unit.InstanceId}: HexEvaluator sem vencedor — aguardando no lugar.");
@@ -313,7 +347,7 @@ public class AIController : MonoBehaviour
         if (isCaptureContext)
         {
             Debug.Log($"[AI] {unit.InstanceId} → captura @ {destCell}");
-            return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, destCell);
+            return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, destCell, paths);
         }
 
         // 2. Ataque: posição escolhida tem valor de combate
@@ -327,13 +361,13 @@ public class AIController : MonoBehaviour
                 Debug.Log($"[AI] {unit.InstanceId} → ataca {target.targetUnit.InstanceId} de {destCell}");
                 return BuildAttackBatch(
                     unit, snapshot.AITeam, fromCell, destCell,
-                    target.targetUnit.InstanceId.ToString(), targetCell);
+                    target.targetUnit.InstanceId.ToString(), targetCell, paths);
             }
         }
 
         // 3. Movimento simples
         Debug.Log($"[AI] {unit.InstanceId} → move para {destCell}");
-        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, destCell);
+        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, destCell, paths);
     }
 
     private PodeMirarTargetOption FindBestAttackTarget(UnitManager unit, Vector3Int fromCell, bool hasMoved)
@@ -352,12 +386,22 @@ public class AIController : MonoBehaviour
         int bestScore = int.MinValue;
 
         unit.TryGetUnitData(out UnitData attackerData);
+        bool isCapturador = attackerData != null && attackerData.roles != null
+            && attackerData.roles.Contains(UnitRole.Capturador);
 
         foreach (PodeMirarTargetOption opt in targets)
         {
             if (opt?.targetUnit == null || opt.targetUnit.IsDead) continue;
 
             int score = 0;
+
+            // Capturadores priorizam inimigos sobre construções
+            if (isCapturador)
+            {
+                Vector3Int ec = opt.targetUnit.CurrentCellPosition; ec.z = 0;
+                if (ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, ec) != null)
+                    score += 10000;
+            }
 
             // Preferir inimigos com HP baixo (mais fáceis de eliminar)
             score += (10 - opt.targetUnit.CurrentHP) * 200;
@@ -393,11 +437,20 @@ public class AIController : MonoBehaviour
             list.Add(u);
         }
 
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
+
         list.Sort((a, b) =>
         {
+            // Unidades mais próximas do objetivo agem primeiro — evita bloqueio de rotas
+            float da = GetDistanceToAssignedTarget(a, aiTeam, plan);
+            float db = GetDistanceToAssignedTarget(b, aiTeam, plan);
+            int cmp = da.CompareTo(db);
+            if (cmp != 0) return cmp;
+
+            // Desempate: aiInitiative menor age primeiro, depois HP maior
             int ia = a.TryGetUnitData(out UnitData ua) ? (int)ua.aiInitiative : (int)AiInitiative.Medium;
             int ib = b.TryGetUnitData(out UnitData ub) ? (int)ub.aiInitiative : (int)AiInitiative.Medium;
-            int cmp = ia.CompareTo(ib);
+            cmp = ia.CompareTo(ib);
             return cmp != 0 ? cmp : b.CurrentHP.CompareTo(a.CurrentHP);
         });
 
@@ -427,8 +480,11 @@ public class AIController : MonoBehaviour
     // Construtores de PlayerAction
     // -------------------------------------------------------------------------
 
-    private PlayerAction BuildMoveBatch(UnitManager unit, TeamId team, Vector3Int from, Vector3Int to)
+    private PlayerAction BuildMoveBatch(UnitManager unit, TeamId team, Vector3Int from, Vector3Int to,
+        Dictionary<Vector3Int, List<Vector3Int>> paths = null)
     {
+        List<Vector3Int> movementPath = null;
+        paths?.TryGetValue(to, out movementPath);
         return new PlayerAction
         {
             IsAIGenerated  = true,
@@ -440,12 +496,16 @@ public class AIController : MonoBehaviour
             MoveFrom       = from, HasMoveFrom = true,
             MoveTo         = to,   HasMoveTo   = true,
             SensorAction   = SensorActionType.None,
+            MovementPath   = movementPath,
             DebugLabel     = $"AI Move {unit.InstanceId} → {to}",
         };
     }
 
-    private PlayerAction BuildCaptureBatch(UnitManager unit, TeamId team, Vector3Int from, Vector3Int to)
+    private PlayerAction BuildCaptureBatch(UnitManager unit, TeamId team, Vector3Int from, Vector3Int to,
+        Dictionary<Vector3Int, List<Vector3Int>> paths = null)
     {
+        List<Vector3Int> movementPath = null;
+        paths?.TryGetValue(to, out movementPath);
         return new PlayerAction
         {
             IsAIGenerated  = true,
@@ -457,13 +517,17 @@ public class AIController : MonoBehaviour
             MoveFrom       = from, HasMoveFrom = true,
             MoveTo         = to,   HasMoveTo   = true,
             SensorAction   = SensorActionType.Capture,
+            MovementPath   = movementPath,
             DebugLabel     = $"AI Capture {unit.InstanceId} @ {to}",
         };
     }
 
     private PlayerAction BuildAttackBatch(UnitManager unit, TeamId team,
-        Vector3Int from, Vector3Int to, string targetId, Vector3Int targetCell)
+        Vector3Int from, Vector3Int to, string targetId, Vector3Int targetCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths = null)
     {
+        List<Vector3Int> movementPath = null;
+        paths?.TryGetValue(to, out movementPath);
         return new PlayerAction
         {
             IsAIGenerated   = true,
@@ -475,6 +539,7 @@ public class AIController : MonoBehaviour
             MoveFrom        = from, HasMoveFrom = true,
             MoveTo          = to,   HasMoveTo   = true,
             SensorAction    = SensorActionType.Attack,
+            MovementPath    = movementPath,
             TargetInstanceId = targetId,
             TargetHex       = targetCell, HasTargetHex = true,
             DebugLabel      = $"AI Attack {unit.InstanceId} → {targetId} @ {targetCell}",

@@ -123,6 +123,10 @@ public class UnitData : ScriptableObject
     public List<AISensorPriority> aiSensorPriority = new List<AISensorPriority> { AISensorPriority.Attack, AISensorPriority.Reposition };
     [Tooltip("Ao se posicionar para combate (inimigo engajado), prioriza celulas DPQ favoraveis (construcoes, estruturas) em vez de avancar em linha reta.")]
     public bool prioritizeDpqAtBattle = false;
+    [Tooltip("Quando ativo, o capturador evita hexes com ameaca proxima e da passos mais curtos mas seguros. Quando inativo (padrao), o capturador avanca direto para o objetivo ignorando ameacas.")]
+    public bool playConservative = false;
+    [Tooltip("Ao se mover (fora de combate), prefere rotas com melhor DPQ em vez da rota mais curta. Util para unidades de suporte que devem permanecer em posicoes defensivas.")]
+    public bool preferMoveOnBestDPQ = false;
 
     [Header("Repair Decision")]
     // Decision data lives here (UnitData). Runtime state lives in UnitManager.isUnderRepair.

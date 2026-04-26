@@ -1,6 +1,42 @@
 using UnityEditor;
 using UnityEngine;
 
+[CustomPropertyDrawer(typeof(SectorManager.SectorHQDistance))]
+public class SectorHQDistanceDrawer : PropertyDrawer
+{
+    public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+    {
+        SerializedProperty teamProp = property.FindPropertyRelative("Team");
+        if (teamProp != null)
+        {
+            int idx = Mathf.Clamp(teamProp.enumValueIndex, 0, teamProp.enumDisplayNames.Length - 1);
+            label.text = teamProp.enumDisplayNames[idx];
+        }
+        EditorGUI.PropertyField(position, property, label, includeChildren: true);
+    }
+
+    public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
+        => EditorGUI.GetPropertyHeight(property, label, includeChildren: true);
+}
+
+[CustomPropertyDrawer(typeof(SectorManager.SectorRiskEntry))]
+public class SectorRiskEntryDrawer : PropertyDrawer
+{
+    public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+    {
+        SerializedProperty teamProp = property.FindPropertyRelative("Team");
+        if (teamProp != null)
+        {
+            int idx = Mathf.Clamp(teamProp.enumValueIndex, 0, teamProp.enumDisplayNames.Length - 1);
+            label.text = teamProp.enumDisplayNames[idx];
+        }
+        EditorGUI.PropertyField(position, property, label, includeChildren: true);
+    }
+
+    public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
+        => EditorGUI.GetPropertyHeight(property, label, includeChildren: true);
+}
+
 [CustomEditor(typeof(SectorManager))]
 public class SectorManagerEditor : Editor
 {

@@ -84,6 +84,8 @@ public class UnitDataEditor : Editor
             "aiTargetPreferenceByClass",
             "aiSensorPriority",
             "prioritizeDpqAtBattle",
+            "playConservative",
+            "preferMoveOnBestDPQ",
             "repairTriggerHpBelow",
             "repairTriggerAutonomyPct",
             "repairTriggerAmmoEnabled",
@@ -137,8 +139,6 @@ public class UnitDataEditor : Editor
         SerializedProperty aiInitiativeProp      = serializedObject.FindProperty("aiInitiative");
         SerializedProperty aiTargetPrefProp      = serializedObject.FindProperty("aiTargetPreferenceByClass");
         SerializedProperty sensorPriorityProp    = serializedObject.FindProperty("aiSensorPriority");
-        SerializedProperty dpqAtBattleProp       = serializedObject.FindProperty("prioritizeDpqAtBattle");
-
         if (aiInitiativeProp != null)
             EditorGUILayout.PropertyField(aiInitiativeProp, new GUIContent("Ai Initiative"));
         if (aiTargetPrefProp != null)
@@ -148,8 +148,16 @@ public class UnitDataEditor : Editor
         EditorGUILayout.LabelField("Combat Behavior", EditorStyles.boldLabel);
         if (sensorPriorityProp != null)
             EditorGUILayout.PropertyField(sensorPriorityProp, new GUIContent("Ai Sensor Priority"), includeChildren: true);
-        if (dpqAtBattleProp != null)
-            EditorGUILayout.PropertyField(dpqAtBattleProp, new GUIContent("Prioritize Dpq At Battle"));
+
+        SerializedProperty dpqProp           = serializedObject.FindProperty("prioritizeDpqAtBattle");
+        SerializedProperty conservativeProp  = serializedObject.FindProperty("playConservative");
+        SerializedProperty preferDpqMoveProp = serializedObject.FindProperty("preferMoveOnBestDPQ");
+        if (dpqProp != null)
+            EditorGUILayout.PropertyField(dpqProp,           new GUIContent("Prioritize DPQ At Battle"));
+        if (conservativeProp != null)
+            EditorGUILayout.PropertyField(conservativeProp,  new GUIContent("Play Conservative"));
+        if (preferDpqMoveProp != null)
+            EditorGUILayout.PropertyField(preferDpqMoveProp, new GUIContent("Prefer Move On Best DPQ"));
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Repair Decision", EditorStyles.boldLabel);
@@ -400,10 +408,9 @@ public class UnitDataEditor : Editor
         SerializedProperty militaryForceProperty = serializedObject.FindProperty("militaryForce");
         SerializedProperty unitClassProperty = serializedObject.FindProperty("unitClass");
         SerializedProperty combatClassificationProperty = serializedObject.FindProperty("combatClassification");
+        SerializedProperty rolesProperty = serializedObject.FindProperty("roles");
         SerializedProperty spriteDefaultProperty = serializedObject.FindProperty("spriteDefault");
         SerializedProperty teamVariantSpritesProperty = serializedObject.FindProperty("teamVariantSprites");
-        SerializedProperty rolesProperty = serializedObject.FindProperty("roles");
-
         if (idProperty != null)
             EditorGUILayout.PropertyField(idProperty);
         if (displayNameProperty != null)
@@ -416,10 +423,10 @@ public class UnitDataEditor : Editor
             EditorGUILayout.PropertyField(militaryForceProperty);
         if (unitClassProperty != null)
             EditorGUILayout.PropertyField(unitClassProperty);
-        if (rolesProperty != null)
-            EditorGUILayout.PropertyField(rolesProperty, includeChildren: true);
         if (combatClassificationProperty != null)
             EditorGUILayout.PropertyField(combatClassificationProperty);
+        if (rolesProperty != null)
+            EditorGUILayout.PropertyField(rolesProperty, new GUIContent("Roles"), includeChildren: true);
 
         EditorGUILayout.Space(2f);
         EditorGUILayout.LabelField("Visuals", EditorStyles.boldLabel);

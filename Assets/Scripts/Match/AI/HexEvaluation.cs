@@ -16,6 +16,7 @@ public struct HexEvaluation
     public CandidateType type;
     public float        captureProximity;
     public float        combatValue;
+    public float        positionQuality;
     public float        cohesion;
     public float        deviation;
     public float        safety;

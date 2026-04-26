@@ -29,16 +29,19 @@ MonoBehaviour:
   visao: 3
   visionSpecializations:
   - domain: 3
+    allHeights: 0
     heightLevel: 4
     vision: 5
     detectUnitsWithFollowingSkills: []
     losPolicy: 0
   - domain: 3
+    allHeights: 0
     heightLevel: 5
     vision: 6
     detectUnitsWithFollowingSkills: []
     losPolicy: 0
   - domain: 2
+    allHeights: 0
     heightLevel: 2
     vision: 0
     detectUnitsWithFollowingSkills: []
@@ -47,8 +50,17 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 1
   combatClassification: 3
-  roles: 04000000
+  roles: 06000000
+  aiInitiative: 2
   aiTargetPreferenceByClass: []
+  aiSensorPriority: 0000000002000000
+  prioritizeDpqAtBattle: 0
+  repairTriggerHpBelow: 0
+  repairTriggerAutonomyPct: 0
+  repairTriggerAmmoEnabled: 0
+  repairTriggerAmmoPct: 0
+  repairRecoverHpAbove: 8
+  fuseWhileInRepair: 0
   eliteLevel: 0
   combatModifiers: []
   domain: 0

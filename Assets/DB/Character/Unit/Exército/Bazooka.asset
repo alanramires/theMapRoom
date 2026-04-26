@@ -31,7 +31,7 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 0
   combatClassification: 0
-  roles: 01000000
+  roles: 0200000001000000
   aiInitiative: 3
   aiTargetPreferenceByClass:
   - targetClass: 1
@@ -42,6 +42,12 @@ MonoBehaviour:
     priority: 1
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 1
+  repairTriggerHpBelow: 0
+  repairTriggerAutonomyPct: 0
+  repairTriggerAmmoEnabled: 0
+  repairTriggerAmmoPct: 0
+  repairRecoverHpAbove: 8
+  fuseWhileInRepair: 0
   eliteLevel: 0
   combatModifiers:
   - {fileID: 11400000, guid: 03730181a775d5f48b3f1751d4d68f07, type: 2}

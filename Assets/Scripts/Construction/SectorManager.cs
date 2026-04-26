@@ -6,6 +6,7 @@ using UnityEngine.SceneManagement;
 using UnityEditor;
 #endif
 
+
 [ExecuteAlways]
 [DefaultExecutionOrder(-320)]
 public sealed class SectorManager : MonoBehaviour
@@ -42,6 +43,30 @@ public sealed class SectorManager : MonoBehaviour
     }
 
     [System.Serializable]
+    public struct SectorHQDistance
+    {
+        [SerializeField] public TeamId Team;
+        [SerializeField] public float  Distance;
+    }
+
+    [System.Serializable]
+    public struct SectorRiskEntry
+    {
+        [SerializeField] public TeamId          Team;
+        [SerializeField] public float           RiskRatio;
+        [SerializeField] public SectorRiskLevel RiskLevel;
+    }
+
+    public enum SectorRiskLevel
+    {
+        Safe,     // ratio < 0.25  — território próprio, fácil de defender
+        Low,      // ratio < 0.40  — levemente avançado
+        Medium,   // ratio < 0.60  — zona de conflito equidistante
+        High,     // ratio < 0.75  — território adversário
+        DeepRaid  // ratio >= 0.75 — deep raid, precisa de suporte pesado
+    }
+
+    [System.Serializable]
     public sealed class SectorInfo
     {
         [SerializeField] private ConstructionSector sector;
@@ -57,6 +82,8 @@ public sealed class SectorManager : MonoBehaviour
         [SerializeField] private TeamId controllingTeam = TeamId.Neutral;
         [SerializeField] private string statusText;
         [SerializeField] private List<SectorConstructionInfo> constructions = new List<SectorConstructionInfo>();
+        [SerializeField] private List<SectorHQDistance> hqDistances = new List<SectorHQDistance>();
+        [SerializeField] private List<SectorRiskEntry>  riskEntries  = new List<SectorRiskEntry>();
 
         public ConstructionSector Sector => sector;
         public ConstructionManager RepresentativeConstruction => representativeConstruction;
@@ -71,6 +98,85 @@ public sealed class SectorManager : MonoBehaviour
         public TeamId ControllingTeam => controllingTeam;
         public string StatusText => statusText;
         public IReadOnlyList<SectorConstructionInfo> Constructions => constructions;
+        public IReadOnlyList<SectorHQDistance> HQDistances => hqDistances;
+        public IReadOnlyList<SectorRiskEntry>  RiskEntries  => riskEntries;
+
+        public float GetDistanceToHQ(TeamId team)
+        {
+            for (int i = 0; i < hqDistances.Count; i++)
+                if (hqDistances[i].Team == team) return hqDistances[i].Distance;
+            return float.MaxValue;
+        }
+
+        public TeamId NearestTeam()
+        {
+            TeamId best = TeamId.Neutral;
+            float  min  = float.MaxValue;
+            for (int i = 0; i < hqDistances.Count; i++)
+            {
+                if (hqDistances[i].Distance < min)
+                {
+                    min  = hqDistances[i].Distance;
+                    best = hqDistances[i].Team;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Risco relativo do setor para o time informado: 0 = seguro, 1 = deep raid.
+        /// Fórmula: minhaDist / (minhaDist + menorDistInimiga)
+        /// </summary>
+        public float GetRiskRatioFor(TeamId team)
+        {
+            float myDist      = GetDistanceToHQ(team);
+            float enemyMinDist = float.MaxValue;
+
+            for (int i = 0; i < hqDistances.Count; i++)
+            {
+                if (hqDistances[i].Team == team) continue;
+                if (hqDistances[i].Distance < enemyMinDist)
+                    enemyMinDist = hqDistances[i].Distance;
+            }
+
+            if (myDist == float.MaxValue)   return 0.5f;
+            if (enemyMinDist == float.MaxValue) return 0f;
+
+            float total = myDist + enemyMinDist;
+            return total < 0.01f ? 0.5f : myDist / total;
+        }
+
+        /// <summary>Classificação categórica do risco para uso em decisões da IA.</summary>
+        public SectorRiskLevel GetRiskLevelFor(TeamId team)
+        {
+            float r = GetRiskRatioFor(team);
+            if (r < 0.25f) return SectorRiskLevel.Safe;
+            if (r < 0.40f) return SectorRiskLevel.Low;
+            if (r < 0.60f) return SectorRiskLevel.Medium;
+            if (r < 0.75f) return SectorRiskLevel.High;
+            return SectorRiskLevel.DeepRaid;
+        }
+
+        internal void ApplyHQDistances(List<SectorHQDistance> distances)
+        {
+            hqDistances.Clear();
+            riskEntries.Clear();
+            if (distances == null) return;
+
+            hqDistances.AddRange(distances);
+
+            for (int i = 0; i < distances.Count; i++)
+            {
+                TeamId team  = distances[i].Team;
+                float  ratio = GetRiskRatioFor(team);
+                riskEntries.Add(new SectorRiskEntry
+                {
+                    Team      = team,
+                    RiskRatio = Mathf.Round(ratio * 100f) / 100f,
+                    RiskLevel = GetRiskLevelFor(team),
+                });
+            }
+        }
 
         internal void Apply(
             ConstructionSector valueSector,
@@ -301,8 +407,19 @@ public sealed class SectorManager : MonoBehaviour
         baseInfos.Clear();
         baseInfoBySector.Clear();
 
+        // Coleta HQs de cada time antes de processar setores
+        var hqByTeam = new Dictionary<TeamId, Vector3Int>();
+        IReadOnlyList<ConstructionManager> allConstructions = GetTrackedConstructions();
+        for (int i = 0; i < allConstructions.Count; i++)
+        {
+            ConstructionManager c = allConstructions[i];
+            if (c == null || !c.IsPlayerHeadQuarter) continue;
+            if (!hqByTeam.ContainsKey(c.TeamId))
+                hqByTeam[c.TeamId] = c.CurrentCellPosition;
+        }
+
         var grouped = new Dictionary<ConstructionSector, List<ConstructionManager>>();
-        IReadOnlyList<ConstructionManager> constructions = GetTrackedConstructions();
+        IReadOnlyList<ConstructionManager> constructions = allConstructions;
         for (int i = 0; i < constructions.Count; i++)
         {
             ConstructionManager construction = constructions[i];
@@ -370,6 +487,20 @@ public sealed class SectorManager : MonoBehaviour
                 controllingTeam,
                 statusText,
                 entries);
+
+            // Distâncias de cada HQ ao centroide do setor (em coordenadas de célula)
+            var distances = new List<SectorHQDistance>(hqByTeam.Count);
+            Vector2 sectorCenter = new Vector2(representativeCell.x, representativeCell.y);
+            foreach (KeyValuePair<TeamId, Vector3Int> kv in hqByTeam)
+            {
+                Vector2 hqCenter = new Vector2(kv.Value.x, kv.Value.y);
+                distances.Add(new SectorHQDistance
+                {
+                    Team     = kv.Key,
+                    Distance = Vector2.Distance(sectorCenter, hqCenter),
+                });
+            }
+            info.ApplyHQDistances(distances);
 
             if (ConstructionSectorHelper.IsBase(sector))
             {

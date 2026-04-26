@@ -32,6 +32,8 @@ public static class HexEvaluator
     private const float CohesionRadius            = 3.5f;
     /// <summary>Raio de safety: inimigos dentro deste raio penalizam o hex.</summary>
     private const float SafetyThreatRadius        = 2.5f;
+    /// <summary>Contribuição por ponto de DPQ quando prioritizeDpqAtBattle=true. Unique(4)=+0.60.</summary>
+    private const float DpqPositionWeight         = 0.15f;
 
     // -----------------------------------------------------------------
     // Tabela de desvio por papel (subtrai do total — fixo, não geométrico)
@@ -192,12 +194,12 @@ public static class HexEvaluator
         }
 
         // ----------------------------------------------------------
-        // Classifica prédios capturáveis
+        // Classifica prédios capturáveis — score = peso estratégico / distância
         // ----------------------------------------------------------
         ConstructionManager bestFree          = null;
-        float               bestFreeDist      = float.MaxValue;
+        float               bestFreeScore     = float.MinValue;
         ConstructionManager bestContested     = null;
-        float               bestContestedDist = float.MaxValue;
+        float               bestContestedScore = float.MinValue;
 
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
@@ -207,19 +209,20 @@ public static class HexEvaluator
             if (c.TeamId == myTeam && c.CurrentCapturePoints >= c.CapturePointsMax) continue;
 
             Vector3Int cCell = c.CurrentCellPosition; cCell.z = 0;
-            float dist = WorldDist(boardTilemap, fromCell, cCell);
+            float dist  = Mathf.Max(0.01f, WorldDist(boardTilemap, fromCell, cCell));
+            float score = GetSectorStrategicWeight(c, myTeam) / dist;
 
             bool hasEnemy = enemyPos.Contains(cCell);
             bool hasAlly  = alliedPos.Contains(cCell);
-            if (hasAlly) continue; // aliado em cima → ignora completamente
+            if (hasAlly) continue;
 
             if (hasEnemy)
             {
-                if (dist < bestContestedDist) { bestContestedDist = dist; bestContested = c; }
+                if (score > bestContestedScore) { bestContestedScore = score; bestContested = c; }
             }
             else
             {
-                if (dist < bestFreeDist) { bestFreeDist = dist; bestFree = c; }
+                if (score > bestFreeScore) { bestFreeScore = score; bestFree = c; }
             }
         }
 
@@ -383,13 +386,6 @@ public static class HexEvaluator
 
                 rawValue += targetWeight;
             }
-            // Bônus de DPQ: normalizado para [0, 0.3] e somado ao combatValue
-            if (useDpq && turnStateManager != null)
-            {
-                int dpq = turnStateManager.GetCellDpqPoints(cell, unit);
-                rawValue += dpq * 0.03f; // cada ponto DPQ vale 0.03 (10 pts ≈ +0.3)
-            }
-
             eval.combatValue = Mathf.Min(rawValue, 1.0f);
 
             // Popula combatSummary com os alvos encontrados
@@ -406,6 +402,18 @@ public static class HexEvaluator
         else
         {
             eval.combatSummary = "—";
+        }
+
+        // ----------------------------------------------------------
+        // positionQuality — bônus de DPQ independente de combate
+        //   Ativo apenas quando unitData.prioritizeDpqAtBattle = true.
+        //   Aplicado fora do bloco de alvos para que células sem alcance
+        //   de tiro também recebam o bônus de posição.
+        // ----------------------------------------------------------
+        if (useDpq && turnStateManager != null)
+        {
+            int dpq = turnStateManager.GetCellDpqPoints(cell, unit);
+            eval.positionQuality = dpq * DpqPositionWeight;
         }
 
         // ----------------------------------------------------------
@@ -431,9 +439,13 @@ public static class HexEvaluator
         // ----------------------------------------------------------
         // safety — penalidade por exposição a inimigos
         //   Suprimida se combatValue > 0 e o alvo é ocupante de prédio contestado:
-        //   exposição é aceitável quando a ação resolve o objetivo
+        //   exposição é aceitável quando a ação resolve o objetivo.
+        //   Também suprimida quando prioritizeDpqAtBattle=true e a célula tem
+        //   DPQ positivo com alvo de ataque: doutrina pede combate de posição
+        //   privilegiada — aceita exposição.
         // ----------------------------------------------------------
-        if (attackingContestedOccupant && eval.combatValue > 0f)
+        bool suppressedByDpqCombat = useDpq && eval.positionQuality > 0f && eval.combatValue > 0f;
+        if ((attackingContestedOccupant || suppressedByDpqCombat) && eval.combatValue > 0f)
         {
             eval.safety = 0f;
         }
@@ -456,6 +468,7 @@ public static class HexEvaluator
         // ----------------------------------------------------------
         eval.total = eval.captureProximity
                    + eval.combatValue
+                   + eval.positionQuality
                    + eval.cohesion
                    - eval.deviation
                    + eval.safety;
@@ -572,5 +585,35 @@ public static class HexEvaluator
         Vector3 wa = map.GetCellCenterWorld(a);
         Vector3 wb = map.GetCellCenterWorld(b);
         return Vector2.Distance(wa, wb);
+    }
+
+    // -----------------------------------------------------------------
+    // Peso estratégico do setor de um prédio para a IA
+    //   2.0 — setor em disputa       → urgência máxima
+    //   1.5 — setor mais perto do inimigo → território avançado
+    //   1.0 — setor neutro / default
+    //   0.5 — setor já totalmente aliado → baixa prioridade
+    // -----------------------------------------------------------------
+    private static float GetSectorStrategicWeight(ConstructionManager building, TeamId myTeam)
+    {
+        if (building == null) return 1f;
+
+        SectorManager.SectorInfo info = null;
+        if (!SectorManager.TryGetSectorInfo(building.Sector, out info))
+            SectorManager.TryGetBaseInfo(building.Sector, out info);
+
+        if (info == null) return 1f;
+
+        if (info.IsDisputed)
+            return 2.0f;
+
+        TeamId nearest = info.NearestTeam();
+        if (nearest != TeamId.Neutral && nearest != myTeam)
+            return 1.5f;
+
+        if (info.IsFullyControlled && info.ControllingTeam == myTeam)
+            return 0.5f;
+
+        return 1.0f;
     }
 }
