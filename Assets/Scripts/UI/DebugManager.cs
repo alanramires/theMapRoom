@@ -392,11 +392,33 @@ public class DebugManager : MonoBehaviour
         }
         else if (command == "AI PAUSE" || command == "PAUSE AI")
         {
-            Debug.Log("[Debug Command] AI legacy movida para AI_Legacy~; comando AI PAUSE indisponivel.");
+            AIController aiController = FindAnyObjectByType<AIController>();
+            if (aiController == null)
+            {
+                Debug.Log("[Debug Command] AIController nao encontrado.");
+            }
+            else
+            {
+                aiController.SetDebugPaused(true);
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log("[Debug Command] AI PAUSE.");
+            }
         }
         else if (command == "AI RESUME" || command == "RESUME AI")
         {
-            Debug.Log("[Debug Command] AI legacy movida para AI_Legacy~; comando AI RESUME indisponivel.");
+            AIController aiController = FindAnyObjectByType<AIController>();
+            if (aiController == null)
+            {
+                Debug.Log("[Debug Command] AIController nao encontrado.");
+            }
+            else
+            {
+                aiController.SetDebugPaused(false);
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log("[Debug Command] AI RESUME.");
+            }
         }
         else
         {

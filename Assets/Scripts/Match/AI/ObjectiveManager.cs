@@ -3,12 +3,13 @@ using UnityEngine;
 
 public enum ObjectiveStatus
 {
-    Pending,    // setor escolhido, nenhuma unidade alocada ainda
-    Pursuing,   // unidade(s) a caminho
-    Capturing,  // capturador está no prédio
-    Defending,  // setor controlado, mantendo guarda
-    Complete,   // totalmente controlado, sem pressão
-    Abandoned,  // descartado por realocação ou pressão insuportável
+    Pending,               // setor escolhido, nenhuma unidade alocada ainda
+    Pursuing,              // unidade(s) a caminho
+    Capturing,             // capturador está no prédio
+    PartialReadyForHandoff,// captura parcial; slot transferido para substituto mais saudável
+    Defending,             // setor controlado, mantendo guarda
+    Complete,              // totalmente controlado, sem pressão
+    Abandoned,             // descartado por realocação ou pressão insuportável
 }
 
 // UnitRole está em Assets/Scripts/Units/UnitRole.cs
@@ -36,6 +37,10 @@ public class SectorObjective
 
     [Header("Orçamento reservado")]
     public int BudgetReserved;
+
+    [Header("Handoff")]
+    public bool HandoffEligible;
+    public int  PreferredHandoffFromUnitId = -1;
 
     public bool HasOpenSlot(UnitRole role)
     {

@@ -128,13 +128,14 @@ public static class HexEvaluator
 
         unit.TryGetUnitData(out UnitData unitDataForDpq);
         bool useDpq = unitDataForDpq != null && unitDataForDpq.prioritizeDpqAtBattle;
+        bool suppressSafety = unitDataForDpq != null && !unitDataForDpq.playConservative;
 
         foreach (Vector3Int cell in allCells)
         {
             HexEvaluation eval = ScoreHex(
                 unit, myTeam, cell, fromCell, ctx,
                 boardTilemap, terrainDatabase, targetBuffer,
-                useDpq, turnStateManager);
+                useDpq, turnStateManager, suppressSafety);
             results.Add(eval);
         }
 
@@ -305,7 +306,8 @@ public static class HexEvaluator
         TerrainDatabase terrainDatabase,
         List<PodeMirarTargetOption> buffer,
         bool useDpq = false,
-        TurnStateManager turnStateManager = null)
+        TurnStateManager turnStateManager = null,
+        bool suppressSafety = false)
     {
         bool isStaying = cell == fromCell;
 
@@ -445,7 +447,8 @@ public static class HexEvaluator
         //   privilegiada — aceita exposição.
         // ----------------------------------------------------------
         bool suppressedByDpqCombat = useDpq && eval.positionQuality > 0f && eval.combatValue > 0f;
-        if ((attackingContestedOccupant || suppressedByDpqCombat) && eval.combatValue > 0f)
+        if (suppressSafety
+            || (attackingContestedOccupant || suppressedByDpqCombat) && eval.combatValue > 0f)
         {
             eval.safety = 0f;
         }

@@ -25,7 +25,8 @@ public partial class AIController
             foreach (SlotNeed slot in obj.Slots)
             {
                 if (!slot.Filled) continue;
-                if (FindActiveUnit(slot.AssignedUnitId, aiTeam) == null)
+                UnitManager slotUnit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                if (slotUnit == null || slotUnit.IsUnderRepair)
                 {
                     slot.Filled = false;
                     slot.AssignedUnitId = -1;
@@ -66,6 +67,10 @@ public partial class AIController
         for (int i = 0; i < plan.Objectives.Count; i++)
             plan.Objectives[i].Priority = i + 1;
 
+        // Passo 3b: handoff — capturador mais saudável herda objetivo parcial;
+        //           capturador original fica livre para o backtracking reatribuir
+        EvaluateCaptureHandoffs(plan, aiTeam);
+
         // Passo 4: coleta IDs já atribuídos (sticky — não serão remexidos)
         var assignedIds = new HashSet<int>();
         foreach (SectorObjective obj in plan.Objectives)
@@ -95,27 +100,84 @@ public partial class AIController
         }
         foreach (UnitManager u in immediateList) freeCapturers.Remove(u);
 
-        // 5b: atribuição ótima por backtracking (minimiza distância total)
-        // Para N ≤ 8 capturadores e ≤ 8 objetivos abertos, o espaço de busca é trivial
-        // (ex: 3 unidades × 7 objetivos = P(7,3) = 210 combinações).
+        // 5b: atribuição ótima por backtracking (minimiza passos reais de caminho)
+        // Para N ≤ 8 capturadores e ≤ 8 objetivos abertos o espaço é trivial.
+        // Setores já alocados (sticky) cobrem seus vizinhos por cascata.
+        const float CascadeRange = 4f;
+        var cascadeCovered = new HashSet<ConstructionSector>();
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            foreach (SlotNeed s in obj.Slots)
+                if (s.Filled && s.Role == UnitRole.Capturador)
+                    { MarkCascadeCoverage(obj.Sector, cascadeCovered, CascadeRange); break; }
+        }
+
+        // Constrói alvos em ordem de prioridade marcando cascade a cada adição:
+        // Golf adicionado → Eco marcada → Eco pulada → Foxtrot entra no lugar.
         var assignableObjs = new List<(SectorObjective obj, Vector3Int cell)>();
         foreach (SectorObjective obj in plan.Objectives)
         {
             if (!obj.HasOpenSlot(UnitRole.Capturador)) continue;
+            if (cascadeCovered.Contains(obj.Sector)) continue;
             ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
             if (tgt == null) continue;
             Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
             assignableObjs.Add((obj, tc));
+            MarkCascadeCoverage(obj.Sector, cascadeCovered, CascadeRange);
         }
 
         int nu = Mathf.Min(freeCapturers.Count, assignableObjs.Count);
         if (nu > 0)
         {
+            int nObj = assignableObjs.Count;
+
+            // Pré-seleciona os N candidatos mais próximos (Euclidiana como filtro rápido).
+            if (freeCapturers.Count > nu)
+            {
+                freeCapturers.Sort((a, b) =>
+                {
+                    float minA = float.MaxValue, minB = float.MaxValue;
+                    Vector3Int ca = a.CurrentCellPosition; ca.z = 0;
+                    Vector3Int cb = b.CurrentCellPosition; cb.z = 0;
+                    foreach ((_, Vector3Int tc) in assignableObjs)
+                    {
+                        float da = Vector3Int.Distance(ca, tc);
+                        float db = Vector3Int.Distance(cb, tc);
+                        if (da < minA) minA = da;
+                        if (db < minB) minB = db;
+                    }
+                    return minA.CompareTo(minB);
+                });
+            }
+
+            // Pré-computa matriz de distâncias reais (passos de caminho).
+            // Orçamento = 30 pts de movimento ≈ 6-10 turnos para a maioria das unidades.
+            // Fallback para Euclidiana×2 quando o alvo está fora do alcance do orçamento.
+            const int PlanBudget = 30;
+            var distMatrix = new float[nu, nObj];
+            for (int ui = 0; ui < nu; ui++)
+            {
+                UnitManager u   = freeCapturers[ui];
+                Vector3Int  uc  = u.CurrentCellPosition; uc.z = 0;
+                var planPaths   = UnitMovementPathRules.CalcularCaminhosValidos(
+                    boardTilemap, u, PlanBudget, terrainDatabase);
+                for (int oj = 0; oj < nObj; oj++)
+                {
+                    Vector3Int tc = assignableObjs[oj].cell;
+                    if (planPaths != null
+                        && planPaths.TryGetValue(tc, out List<Vector3Int> path)
+                        && path.Count > 0)
+                        distMatrix[ui, oj] = path.Count;
+                    else
+                        distMatrix[ui, oj] = Vector3Int.Distance(uc, tc) * 2f;
+                }
+            }
+
             int[] bestAssign = new int[nu];
             float bestCost   = float.MaxValue;
             SolveAssignment(freeCapturers, assignableObjs,
-                new bool[assignableObjs.Count], new int[nu],
-                0, nu, 0f, ref bestCost, ref bestAssign);
+                new bool[nObj], new int[nu],
+                0, nu, 0f, distMatrix, ref bestCost, ref bestAssign);
 
             for (int i = 0; i < nu; i++)
             {
@@ -242,6 +304,120 @@ public partial class AIController
         return float.MaxValue;
     }
 
+    // -------------------------------------------------------------------------
+    // Handoff: capturador mais saudável herda objetivo parcial
+    // -------------------------------------------------------------------------
+
+    private void EvaluateCaptureHandoffs(TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        // IDs já atribuídos (snapshot local antes das modificações)
+        var assignedIds = new HashSet<int>();
+        foreach (SectorObjective obj in plan.Objectives)
+            foreach (SlotNeed slot in obj.Slots)
+                if (slot.Filled) assignedIds.Add(slot.AssignedUnitId);
+
+        // Capturadores livres: não atribuídos, não em reparo
+        List<UnitManager> allCapturers = GetAvailableCapturers(aiTeam);
+        var freeCapturers = new List<UnitManager>();
+        foreach (UnitManager u in allCapturers)
+            if (!assignedIds.Contains(u.InstanceId)) freeCapturers.Add(u);
+
+        if (freeCapturers.Count == 0) return;
+
+        for (int i = 0; i < plan.Objectives.Count; i++)
+        {
+            SectorObjective obj = plan.Objectives[i];
+
+            // Precisa de slot preenchido por capturador
+            SlotNeed filledSlot = null;
+            foreach (SlotNeed s in obj.Slots)
+                if (s.Filled && s.Role == UnitRole.Capturador) { filledSlot = s; break; }
+            if (filledSlot == null) continue;
+
+            UnitManager assignedUnit = FindActiveUnit(filledSlot.AssignedUnitId, aiTeam);
+            if (assignedUnit == null || assignedUnit.IsUnderRepair) continue;
+
+            // Construção precisa estar parcialmente capturada
+            ConstructionManager target = FindCapturableInSector(obj.Sector, aiTeam);
+            if (target == null) continue;
+            int pts = target.CurrentCapturePoints;
+            int max = target.CapturePointsMax;
+            if (pts <= 0 || pts >= max) continue;
+
+            // Só vale handoff se existe algum outro objetivo aberto para mandar a unidade original
+            if (!HasOpenObjectiveOtherThan(plan, obj)) continue;
+
+            // Inimigo visível perto do alvo → não abandonar
+            Vector3Int targetCell = target.CurrentCellPosition; targetCell.z = 0;
+            if (HasEnemyNearCell(targetCell, aiTeam)) continue;
+
+            // Procura o melhor substituto entre capturadores livres:
+            // qualquer um que alcance o alvo este turno serve; preferência por completar a captura
+            UnitManager substitute   = null;
+            float       bestSubScore = float.MinValue;
+
+            foreach (UnitManager candidate in freeCapturers)
+            {
+                if (!SimulateCaptureSensor(candidate, targetCell, out _)) continue;
+
+                Dictionary<Vector3Int, List<Vector3Int>> candidatePaths =
+                    UnitMovementPathRules.CalcularCaminhosValidos(
+                        boardTilemap, candidate,
+                        Mathf.Max(0, candidate.RemainingMovementPoints), terrainDatabase);
+                if (candidatePaths == null || !candidatePaths.ContainsKey(targetCell)) continue;
+
+                bool completesCapture = pts + candidate.CurrentHP >= max;
+                Vector3Int cc = candidate.CurrentCellPosition; cc.z = 0;
+                float dist  = Vector3Int.Distance(cc, targetCell);
+                float score = candidate.CurrentHP * 100f - dist * 20f;
+                if (completesCapture) score += 500f;
+
+                if (score > bestSubScore) { bestSubScore = score; substitute = candidate; }
+            }
+
+            if (substitute == null)
+            {
+                Debug.Log($"[AI][Handoff][Skip] sem substituto para {obj.Sector} ({pts}/{max})");
+                continue;
+            }
+
+            bool subCompletes = pts + substitute.CurrentHP >= max;
+            Debug.Log($"[AI][Handoff] Unit{assignedUnit.InstanceId} hp={assignedUnit.CurrentHP} avança; " +
+                      $"Unit{substitute.InstanceId} hp={substitute.CurrentHP} herda {obj.Sector} " +
+                      $"({pts}/{max}){(subCompletes ? " → completa" : "")}");
+
+            // Libera slot do capturador original → será reatribuído pelo backtracking (Passo 5)
+            filledSlot.Filled         = false;
+            filledSlot.AssignedUnitId = -1;
+            assignedUnit.ClearAIAssignedPlan();
+
+            // Atribui substituto ao objetivo parcial
+            obj.TryFillSlot(UnitRole.Capturador, substitute.InstanceId);
+            obj.Status                     = ObjectiveStatus.PartialReadyForHandoff;
+            obj.HandoffEligible            = true;
+            obj.PreferredHandoffFromUnitId = assignedUnit.InstanceId;
+            ApplyPlanHUD(substitute, obj);
+
+            // Substituto sai do pool livre; capturador original re-entra via Passo 4/5
+            freeCapturers.Remove(substitute);
+            assignedIds.Add(substitute.InstanceId);
+        }
+    }
+
+    private static void MarkCascadeCoverage(ConstructionSector sector, HashSet<ConstructionSector> covered, float range)
+    {
+        if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return;
+        if (info.ClosestNeighbor1Distance <= range) covered.Add(info.ClosestNeighbor1);
+        if (info.ClosestNeighbor2Distance <= range) covered.Add(info.ClosestNeighbor2);
+    }
+
+    private static bool HasOpenObjectiveOtherThan(TeamObjectivePlan plan, SectorObjective exclude)
+    {
+        foreach (SectorObjective obj in plan.Objectives)
+            if (obj != exclude && obj.HasOpenSlot(UnitRole.Capturador)) return true;
+        return false;
+    }
+
     private static MatchController cachedMatchController;
     private static MatchController GetMatchController()
     {
@@ -250,7 +426,7 @@ public partial class AIController
         return cachedMatchController;
     }
 
-    // Backtracking ótimo: minimiza a soma das distâncias euclidiana unit→objetivo.
+    // Backtracking ótimo: minimiza a soma de passos reais de caminho unit→objetivo.
     // Para N ≤ 8 e M ≤ 8 objetivos abertos, P(M,N) ≤ 40 320 iterações — trivial.
     private static void SolveAssignment(
         List<UnitManager> units,
@@ -260,6 +436,7 @@ public partial class AIController
         int depth,
         int maxDepth,
         float cost,
+        float[,] distMatrix,
         ref float bestCost,
         ref int[] bestAssign)
     {
@@ -273,15 +450,14 @@ public partial class AIController
             return;
         }
 
-        Vector3Int uc = units[depth].CurrentCellPosition; uc.z = 0;
         for (int j = 0; j < objs.Count; j++)
         {
             if (usedObj[j]) continue;
-            float newCost = cost + Vector3Int.Distance(uc, objs[j].cell);
+            float newCost = cost + distMatrix[depth, j];
             if (newCost >= bestCost) continue;
             current[depth] = j;
             usedObj[j] = true;
-            SolveAssignment(units, objs, usedObj, current, depth + 1, maxDepth, newCost, ref bestCost, ref bestAssign);
+            SolveAssignment(units, objs, usedObj, current, depth + 1, maxDepth, newCost, distMatrix, ref bestCost, ref bestAssign);
             usedObj[j] = false;
         }
     }

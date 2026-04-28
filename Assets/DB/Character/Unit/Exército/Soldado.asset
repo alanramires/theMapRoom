@@ -39,7 +39,9 @@ MonoBehaviour:
     priority: 2
   aiSensorPriority: 010000000000000002000000
   prioritizeDpqAtBattle: 1
-  repairTriggerHpBelow: 3
+  playConservative: 0
+  preferMoveOnBestDPQ: 0
+  repairTriggerHpBelow: 5
   repairTriggerAutonomyPct: 25
   repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0

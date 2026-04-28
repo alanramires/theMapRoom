@@ -931,7 +931,7 @@ public class MatchController : MonoBehaviour
     // Bloqueio central de input humano durante o turno de um time controlado por IA.
     public bool IsPlayerInputLockedByActiveAI()
     {
-        return Application.isPlaying && IsActiveTeamAI();
+        return Application.isPlaying && IsActiveTeamAI() && !AIController.IsDebugPaused;
     }
 
     public bool IsTeamDefeated(TeamId team)
@@ -2349,7 +2349,7 @@ public class MatchController : MonoBehaviour
         return null;
     }
 
-    public void RefreshFogOfWarForActiveTeam()
+    public void RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode mode = FogOfWarRefreshMode.FullVisual)
     {
         PodeDetectarSensor.ClearRefreshScopedTerrainCache();
         if (SuppressFogOfWarRefresh)
@@ -2379,7 +2379,7 @@ public class MatchController : MonoBehaviour
         }
 
         ResetFogOfWarRuntime(clearTilemap: false);
-        InitializeFogOverlay(boardMap);
+        InitializeFogRuntimeData(boardMap);
         if (!fogOverlayInitialized)
             return;
 
@@ -2437,7 +2437,8 @@ public class MatchController : MonoBehaviour
                 boardMap,
                 out double collectMs,
                 out int visibleCellsCollected,
-                out bool collectExecuted);
+                out bool collectExecuted,
+                updateVisual: false);
             if (collectExecuted)
             {
                 collectTotalMs += collectMs;
@@ -2452,13 +2453,17 @@ public class MatchController : MonoBehaviour
             Debug.Log($"[FoW][Unit][Summary] total={units.Length} included={unitsIncluded}");
 
         double constructionVisionStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
-        int constructionsIncluded = ApplyFriendlyConstructionVision(boardMap);
+        int constructionsIncluded = ApplyFriendlyConstructionVision(boardMap, updateVisual: false);
         double constructionVisionMs = enableFogStepPerfLogs
             ? (Time.realtimeSinceStartupAsDouble - constructionVisionStartMs) * 1000d
             : 0d;
         RefreshRuntimeUnitFogVisibility();
-        if (Application.isPlaying)
-            OnFogOfWarUpdated?.Invoke();
+        if (mode == FogOfWarRefreshMode.FullVisual)
+        {
+            RenderFogOverlayFromRuntimeCache(boardMap);
+            if (Application.isPlaying)
+                OnFogOfWarUpdated?.Invoke();
+        }
 
         if (enableFogStepPerfLogs)
         {
@@ -3610,12 +3615,46 @@ public class MatchController : MonoBehaviour
         fogOverlayInitialized = true;
     }
 
+    // Coleta células do board e marca overlay como inicializado, sem escrever no tilemap.
+    // Usado em DataOnly e como fase de dados do FullVisual.
+    private void InitializeFogRuntimeData(Tilemap boardMap)
+    {
+        fogBoardCellsBuffer.Clear();
+        CollectBoardCells(boardMap, fogBoardCellsBuffer);
+        if (fogBoardCellsBuffer.Count <= 0)
+        {
+            fogOverlayInitialized = false;
+            return;
+        }
+        fogCachedTeamId = activeTeamId;
+        fogOverlayInitialized = true;
+    }
+
+    // Desenha o overlay de névoa a partir do cache já calculado (fogVisibleContributorsByCell).
+    // Deve ser chamado apenas após todos os UpdateFogVisibilityForUnit do turno terem rodado.
+    private void RenderFogOverlayFromRuntimeCache(Tilemap boardMap)
+    {
+        fogOfWarTilemap.ClearAllTiles();
+        Color fogColor = new Color(0f, 0f, 0f, Mathf.Clamp01(fogOfWarAlpha));
+        for (int i = 0; i < fogBoardCellsBuffer.Count; i++)
+        {
+            Vector3Int cell = fogBoardCellsBuffer[i];
+            if (fogVisibleContributorsByCell.ContainsKey(cell)) continue;
+            TileBase tile = ResolveFogTileForCell(boardMap, cell);
+            if (tile == null) continue;
+            fogOfWarTilemap.SetTile(cell, tile);
+            fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
+            fogOfWarTilemap.SetColor(cell, fogColor);
+        }
+    }
+
     private void UpdateFogVisibilityForUnit(
         UnitManager unit,
         Tilemap boardMap,
         out double collectMs,
         out int visibleCellsCollected,
-        out bool collectExecuted)
+        out bool collectExecuted,
+        bool updateVisual = true)
     {
         collectMs = 0d;
         visibleCellsCollected = 0;
@@ -3642,7 +3681,7 @@ public class MatchController : MonoBehaviour
         if (cacheEntry.visibleCells.Count > 0)
         {
             foreach (Vector3Int cell in cacheEntry.visibleCells)
-                ApplyFogContribution(cell, -1, boardMap);
+                ApplyFogContribution(cell, -1, boardMap, updateVisual);
             cacheEntry.visibleCells.Clear();
         }
 
@@ -3669,7 +3708,7 @@ public class MatchController : MonoBehaviour
         foreach (Vector3Int cell in fogUnitVisibleScratchBuffer)
         {
             cacheEntry.visibleCells.Add(cell);
-            ApplyFogContribution(cell, +1, boardMap);
+            ApplyFogContribution(cell, +1, boardMap, updateVisual);
         }
 
         cacheEntry.key = nextKey;
@@ -3704,7 +3743,7 @@ public class MatchController : MonoBehaviour
         OnFogOfWarUpdated?.Invoke();
     }
 
-    private void ApplyFogContribution(Vector3Int cell, int delta, Tilemap boardMap)
+    private void ApplyFogContribution(Vector3Int cell, int delta, Tilemap boardMap, bool updateVisual = true)
     {
         if (delta == 0)
             return;
@@ -3720,6 +3759,9 @@ public class MatchController : MonoBehaviour
             fogVisibleContributorsByCell.Remove(cell);
         else
             fogVisibleContributorsByCell[cell] = next;
+
+        if (!updateVisual)
+            return;
 
         if (current <= 0 && next > 0)
         {
@@ -3748,7 +3790,7 @@ public class MatchController : MonoBehaviour
         return boardMap.GetTile(cell);
     }
 
-    private int ApplyFriendlyConstructionVision(Tilemap boardMap)
+    private int ApplyFriendlyConstructionVision(Tilemap boardMap, bool updateVisual = true)
     {
         if (boardMap == null || activeTeamId < 0)
             return 0;
@@ -3812,7 +3854,7 @@ public class MatchController : MonoBehaviour
             constructionsIncluded++;
             if (ShouldLogPodeEnxergarRuntime)
                 Debug.Log($"[FoW][Construction][Use] {construction.name} cell={cell.x},{cell.y}");
-            ApplyFogContribution(cell, +1, boardMap);
+            ApplyFogContribution(cell, +1, boardMap, updateVisual);
         }
 
         if (ShouldLogPodeEnxergarRuntime)

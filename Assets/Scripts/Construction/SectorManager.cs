@@ -43,10 +43,48 @@ public sealed class SectorManager : MonoBehaviour
     }
 
     [System.Serializable]
-    public struct SectorHQDistance
+    public struct SectorDistanceEntry
     {
-        [SerializeField] public TeamId Team;
+        [SerializeField] public string ConstructionName;
+        [SerializeField] public int    InstanceId;
         [SerializeField] public float  Distance;
+        [SerializeField] public bool   IsHQ;
+    }
+
+    [System.Serializable]
+    public class SectorTeamDistances
+    {
+        [SerializeField] public TeamId                    Team;
+        [SerializeField] public List<SectorDistanceEntry> Entries = new List<SectorDistanceEntry>();
+
+        public float GetHQDistance()
+        {
+            for (int i = 0; i < Entries.Count; i++)
+                if (Entries[i].IsHQ) return Entries[i].Distance;
+            return float.MaxValue;
+        }
+
+        public float GetNearestFactoryDistance()
+        {
+            float best = float.MaxValue;
+            for (int i = 0; i < Entries.Count; i++)
+                if (!Entries[i].IsHQ && Entries[i].Distance < best) best = Entries[i].Distance;
+            return best;
+        }
+
+        public bool TryGetNearestFactory(out SectorDistanceEntry factory)
+        {
+            factory = default;
+            bool  found = false;
+            float best  = float.MaxValue;
+            for (int i = 0; i < Entries.Count; i++)
+            {
+                SectorDistanceEntry e = Entries[i];
+                if (e.IsHQ || e.Distance >= best) continue;
+                best = e.Distance; factory = e; found = true;
+            }
+            return found;
+        }
     }
 
     [System.Serializable]
@@ -81,9 +119,13 @@ public sealed class SectorManager : MonoBehaviour
         [SerializeField] private bool hasPartialCapture;
         [SerializeField] private TeamId controllingTeam = TeamId.Neutral;
         [SerializeField] private string statusText;
-        [SerializeField] private List<SectorConstructionInfo> constructions = new List<SectorConstructionInfo>();
-        [SerializeField] private List<SectorHQDistance> hqDistances = new List<SectorHQDistance>();
-        [SerializeField] private List<SectorRiskEntry>  riskEntries  = new List<SectorRiskEntry>();
+        [SerializeField] private List<SectorConstructionInfo> constructions    = new List<SectorConstructionInfo>();
+        [SerializeField] private List<SectorRiskEntry>        riskEntries      = new List<SectorRiskEntry>();
+        [SerializeField] private List<SectorTeamDistances>    sectorDistances  = new List<SectorTeamDistances>();
+        [HideInInspector][SerializeField] private ConstructionSector closestNeighbor1;
+        [HideInInspector][SerializeField] private float              closestNeighbor1Distance = float.MaxValue;
+        [HideInInspector][SerializeField] private ConstructionSector closestNeighbor2;
+        [HideInInspector][SerializeField] private float              closestNeighbor2Distance = float.MaxValue;
 
         public ConstructionSector Sector => sector;
         public ConstructionManager RepresentativeConstruction => representativeConstruction;
@@ -97,56 +139,64 @@ public sealed class SectorManager : MonoBehaviour
         public bool HasPartialCapture => hasPartialCapture;
         public TeamId ControllingTeam => controllingTeam;
         public string StatusText => statusText;
-        public IReadOnlyList<SectorConstructionInfo> Constructions => constructions;
-        public IReadOnlyList<SectorHQDistance> HQDistances => hqDistances;
-        public IReadOnlyList<SectorRiskEntry>  RiskEntries  => riskEntries;
+        public IReadOnlyList<SectorConstructionInfo> Constructions    => constructions;
+        public IReadOnlyList<SectorRiskEntry>        RiskEntries      => riskEntries;
+        public IReadOnlyList<SectorTeamDistances>    SectorDistances  => sectorDistances;
+        public ConstructionSector ClosestNeighbor1         => closestNeighbor1;
+        public float              ClosestNeighbor1Distance => closestNeighbor1Distance;
+        public ConstructionSector ClosestNeighbor2         => closestNeighbor2;
+        public float              ClosestNeighbor2Distance => closestNeighbor2Distance;
 
         public float GetDistanceToHQ(TeamId team)
         {
-            for (int i = 0; i < hqDistances.Count; i++)
-                if (hqDistances[i].Team == team) return hqDistances[i].Distance;
+            for (int i = 0; i < sectorDistances.Count; i++)
+                if (sectorDistances[i].Team == team) return sectorDistances[i].GetHQDistance();
             return float.MaxValue;
+        }
+
+        public float GetNearestFactoryDistance(TeamId team)
+        {
+            for (int i = 0; i < sectorDistances.Count; i++)
+                if (sectorDistances[i].Team == team) return sectorDistances[i].GetNearestFactoryDistance();
+            return float.MaxValue;
+        }
+
+        public bool TryGetNearestFactory(TeamId team, out SectorDistanceEntry factory)
+        {
+            for (int i = 0; i < sectorDistances.Count; i++)
+                if (sectorDistances[i].Team == team) return sectorDistances[i].TryGetNearestFactory(out factory);
+            factory = default;
+            return false;
         }
 
         public TeamId NearestTeam()
         {
             TeamId best = TeamId.Neutral;
             float  min  = float.MaxValue;
-            for (int i = 0; i < hqDistances.Count; i++)
+            for (int i = 0; i < sectorDistances.Count; i++)
             {
-                if (hqDistances[i].Distance < min)
-                {
-                    min  = hqDistances[i].Distance;
-                    best = hqDistances[i].Team;
-                }
+                float d = sectorDistances[i].GetHQDistance();
+                if (d < min) { min = d; best = sectorDistances[i].Team; }
             }
             return best;
         }
 
-        /// <summary>
-        /// Risco relativo do setor para o time informado: 0 = seguro, 1 = deep raid.
-        /// Fórmula: minhaDist / (minhaDist + menorDistInimiga)
-        /// </summary>
         public float GetRiskRatioFor(TeamId team)
         {
-            float myDist      = GetDistanceToHQ(team);
+            float myDist       = GetDistanceToHQ(team);
             float enemyMinDist = float.MaxValue;
-
-            for (int i = 0; i < hqDistances.Count; i++)
+            for (int i = 0; i < sectorDistances.Count; i++)
             {
-                if (hqDistances[i].Team == team) continue;
-                if (hqDistances[i].Distance < enemyMinDist)
-                    enemyMinDist = hqDistances[i].Distance;
+                if (sectorDistances[i].Team == team) continue;
+                float d = sectorDistances[i].GetHQDistance();
+                if (d < enemyMinDist) enemyMinDist = d;
             }
-
-            if (myDist == float.MaxValue)   return 0.5f;
+            if (myDist == float.MaxValue)      return 0.5f;
             if (enemyMinDist == float.MaxValue) return 0f;
-
             float total = myDist + enemyMinDist;
             return total < 0.01f ? 0.5f : myDist / total;
         }
 
-        /// <summary>Classificação categórica do risco para uso em decisões da IA.</summary>
         public SectorRiskLevel GetRiskLevelFor(TeamId team)
         {
             float r = GetRiskRatioFor(team);
@@ -157,13 +207,21 @@ public sealed class SectorManager : MonoBehaviour
             return SectorRiskLevel.DeepRaid;
         }
 
-        internal void ApplyHQDistances(List<SectorHQDistance> distances)
+        internal void ApplyNeighbors(ConstructionSector s1, float d1, ConstructionSector s2, float d2)
         {
-            hqDistances.Clear();
+            closestNeighbor1         = s1;
+            closestNeighbor1Distance = d1;
+            closestNeighbor2         = s2;
+            closestNeighbor2Distance = d2;
+        }
+
+        internal void ApplySectorDistances(List<SectorTeamDistances> distances)
+        {
+            sectorDistances.Clear();
             riskEntries.Clear();
             if (distances == null) return;
 
-            hqDistances.AddRange(distances);
+            sectorDistances.AddRange(distances);
 
             for (int i = 0; i < distances.Count; i++)
             {
@@ -400,6 +458,16 @@ public sealed class SectorManager : MonoBehaviour
         RebuildFromActiveConstructions(reason);
     }
 
+    // Distância em passos de hex (pointy-top, even-r offset — Unity m_CellLayout=1, cellSize.x≈0.866).
+    private static float ComputeHexDistance(Vector3Int a, Vector3Int b)
+    {
+        int aq  = a.x - (a.y - (a.y & 1)) / 2;
+        int bq  = b.x - (b.y - (b.y & 1)) / 2;
+        int as_ = -aq - a.y;
+        int bs  = -bq - b.y;
+        return (Mathf.Abs(aq - bq) + Mathf.Abs(a.y - b.y) + Mathf.Abs(as_ - bs)) / 2f;
+    }
+
     private void RebuildFromActiveConstructions(string reason)
     {
         sectorInfos.Clear();
@@ -407,15 +475,19 @@ public sealed class SectorManager : MonoBehaviour
         baseInfos.Clear();
         baseInfoBySector.Clear();
 
-        // Coleta HQs de cada time antes de processar setores
-        var hqByTeam = new Dictionary<TeamId, Vector3Int>();
         IReadOnlyList<ConstructionManager> allConstructions = GetTrackedConstructions();
+
+        // Coleta HQs e fábricas antes de processar setores
+        var hqByTeam  = new Dictionary<TeamId, (string name, Vector3Int cell)>();
+        var factories = new List<ConstructionManager>();
         for (int i = 0; i < allConstructions.Count; i++)
         {
             ConstructionManager c = allConstructions[i];
-            if (c == null || !c.IsPlayerHeadQuarter) continue;
-            if (!hqByTeam.ContainsKey(c.TeamId))
-                hqByTeam[c.TeamId] = c.CurrentCellPosition;
+            if (c == null) continue;
+            if (c.IsPlayerHeadQuarter && !hqByTeam.ContainsKey(c.TeamId))
+                hqByTeam[c.TeamId] = (c.ConstructionDisplayName, c.CurrentCellPosition);
+            if (c.CanProduceUnits && !c.IsPlayerHeadQuarter)
+                factories.Add(c);
         }
 
         var grouped = new Dictionary<ConstructionSector, List<ConstructionManager>>();
@@ -488,19 +560,42 @@ public sealed class SectorManager : MonoBehaviour
                 statusText,
                 entries);
 
-            // Distâncias de cada HQ ao centroide do setor (em coordenadas de célula)
-            var distances = new List<SectorHQDistance>(hqByTeam.Count);
-            Vector2 sectorCenter = new Vector2(representativeCell.x, representativeCell.y);
-            foreach (KeyValuePair<TeamId, Vector3Int> kv in hqByTeam)
+            // Distâncias hex unificadas por time (HQ + fábricas)
+            var teamDistMap = new Dictionary<TeamId, SectorTeamDistances>();
+
+            foreach (KeyValuePair<TeamId, (string name, Vector3Int cell)> kv in hqByTeam)
             {
-                Vector2 hqCenter = new Vector2(kv.Value.x, kv.Value.y);
-                distances.Add(new SectorHQDistance
+                if (!teamDistMap.TryGetValue(kv.Key, out SectorTeamDistances td))
                 {
-                    Team     = kv.Key,
-                    Distance = Vector2.Distance(sectorCenter, hqCenter),
+                    td = new SectorTeamDistances { Team = kv.Key };
+                    teamDistMap[kv.Key] = td;
+                }
+                td.Entries.Add(new SectorDistanceEntry
+                {
+                    ConstructionName = kv.Value.name,
+                    InstanceId       = 0,
+                    Distance         = ComputeHexDistance(representativeCell, kv.Value.cell),
+                    IsHQ             = true,
                 });
             }
-            info.ApplyHQDistances(distances);
+
+            foreach (ConstructionManager f in factories)
+            {
+                if (!teamDistMap.TryGetValue(f.TeamId, out SectorTeamDistances td))
+                {
+                    td = new SectorTeamDistances { Team = f.TeamId };
+                    teamDistMap[f.TeamId] = td;
+                }
+                td.Entries.Add(new SectorDistanceEntry
+                {
+                    ConstructionName = f.ConstructionDisplayName,
+                    InstanceId       = f.InstanceId,
+                    Distance         = ComputeHexDistance(representativeCell, f.CurrentCellPosition),
+                    IsHQ             = false,
+                });
+            }
+
+            info.ApplySectorDistances(new List<SectorTeamDistances>(teamDistMap.Values));
 
             if (ConstructionSectorHelper.IsBase(sector))
             {
@@ -512,6 +607,34 @@ public sealed class SectorManager : MonoBehaviour
                 sectorInfos.Add(info);
                 sectorInfoBySector[sector] = info;
             }
+        }
+
+        // Segundo passo: 2 vizinhos capturáveis mais próximos por setor (células representativas)
+        for (int i = 0; i < sectorInfos.Count; i++)
+        {
+            SectorInfo  infoA  = sectorInfos[i];
+            Vector3Int  cellA  = infoA.RepresentativeCell;
+
+            ConstructionSector best1 = default; float dist1 = float.MaxValue;
+            ConstructionSector best2 = default; float dist2 = float.MaxValue;
+
+            for (int j = 0; j < sectorInfos.Count; j++)
+            {
+                if (i == j) continue;
+                SectorInfo other = sectorInfos[j];
+                float d = ComputeHexDistance(cellA, other.RepresentativeCell);
+                if (d < dist1)
+                {
+                    dist2 = dist1; best2 = best1;
+                    dist1 = d;     best1 = other.Sector;
+                }
+                else if (d < dist2)
+                {
+                    dist2 = d; best2 = other.Sector;
+                }
+            }
+
+            infoA.ApplyNeighbors(best1, dist1, best2, dist2);
         }
 
         if (sectorLog)

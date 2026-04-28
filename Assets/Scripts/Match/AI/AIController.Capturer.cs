@@ -21,6 +21,9 @@ public partial class AIController
 
     private PlayerAction TryDecideCapturerAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
+        PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
+        if (repairAction != null) return repairAction;
+
         SectorObjective assigned = ResolveAssignedObjective(unit, plan);
 
         if (assigned == null)
@@ -64,6 +67,16 @@ public partial class AIController
                 UnitMovementPathRules.CalcularCaminhosValidos(
                     boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
             HashSet<Vector3Int> engageOccupied = BuildOccupied(unit);
+
+            // Captura oportunista tem prioridade sobre o combate: prédio disponível é mais
+            // valioso do que eliminar um inimigo que não bloqueia o caminho.
+            if (TryFindOpportunisticCapture(unit, engagePaths, engageOccupied, target, out Vector3Int engageOpCell))
+            {
+                Debug.Log($"[AI][Rogue] {unit.InstanceId} captura oportunista (inimigos no raio) @ {engageOpCell}");
+                return BuildCaptureBatch(unit, snapshot.AITeam, from, engageOpCell, engagePaths);
+            }
+
+            // Sem captura disponível → abre caminho por combate
             var engageBuffer = new List<PodeMirarTargetOption>();
             foreach (Vector3Int cell in engagePaths.Keys)
             {
@@ -80,7 +93,8 @@ public partial class AIController
                         candidate.InstanceId.ToString(), btCell, engagePaths);
                 }
             }
-            return null; // inimigos próximos mas sem alcance de tiro → HexEvaluator
+
+            return null; // inimigos próximos, sem captura nem ataque → HexEvaluator
         }
 
         Dictionary<Vector3Int, List<Vector3Int>> paths =
@@ -321,8 +335,9 @@ public partial class AIController
             SensorMovementMode.MoveuParado, targets) && targets.Count > 0;
     }
 
-    // Escolhe o melhor alvo para o rogue: prioriza HP mais baixo (mais fácil de eliminar).
-    private static UnitManager PickBestRogueTarget(List<PodeMirarTargetOption> options, TeamId aiTeam)
+    // Escolhe o melhor alvo para o rogue: capturadores ativos em prédios têm prioridade máxima,
+    // desempate por HP mais baixo (mais fácil de eliminar).
+    private UnitManager PickBestRogueTarget(List<PodeMirarTargetOption> options, TeamId aiTeam)
     {
         UnitManager best = null;
         float bestPriority = float.MinValue;
@@ -330,6 +345,14 @@ public partial class AIController
         {
             if (opt?.targetUnit == null || opt.targetUnit.TeamId == aiTeam) continue;
             float priority = 10f - opt.targetUnit.CurrentHP;
+
+            // Inimigo em prédio capturável → ameaça direta ao objetivo, prioridade máxima
+            Vector3Int ec = opt.targetUnit.CurrentCellPosition; ec.z = 0;
+            ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, ec);
+            if (bldg != null && bldg.IsCapturable
+                && !(bldg.TeamId == aiTeam && bldg.CurrentCapturePoints >= bldg.CapturePointsMax))
+                priority += 1000f;
+
             if (priority > bestPriority) { bestPriority = priority; best = opt.targetUnit; }
         }
         return best;
@@ -539,7 +562,7 @@ public partial class AIController
         var list = new List<UnitManager>();
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked) continue;
+            if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
             if (!u.TryGetUnitData(out UnitData data)) continue;
             if (data.roles != null && data.roles.Contains(UnitRole.Capturador))
                 list.Add(u);

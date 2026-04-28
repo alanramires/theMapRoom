@@ -49,7 +49,14 @@ public class AIShoppingPlanner : MonoBehaviour
         var occupied  = new HashSet<Vector3Int>(snapshot.OccupiedCells);
         int remaining = snapshot.Budget;
 
-        foreach (ConstructionManager building in snapshot.MyBuildings)
+        // Ordena fábricas: as mais próximas de slots abertos compram primeiro
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        var sortedBuildings = new List<ConstructionManager>(snapshot.MyBuildings);
+        sortedBuildings.Sort((a, b) =>
+            GetMinDistanceToOpenObjective(a, plan, snapshot.AITeam)
+            .CompareTo(GetMinDistanceToOpenObjective(b, plan, snapshot.AITeam)));
+
+        foreach (ConstructionManager building in sortedBuildings)
         {
             if (!building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
 
@@ -74,6 +81,32 @@ public class AIShoppingPlanner : MonoBehaviour
         }
 
         return orders;
+    }
+
+    private static float GetMinDistanceToOpenObjective(ConstructionManager building, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (plan == null) return float.MaxValue;
+        float minDist = float.MaxValue;
+
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (!obj.HasOpenSlot(UnitRole.Capturador)) continue;
+            if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info)) continue;
+
+            foreach (SectorManager.SectorTeamDistances td in info.SectorDistances)
+            {
+                if (td.Team != aiTeam) continue;
+                foreach (SectorManager.SectorDistanceEntry e in td.Entries)
+                {
+                    bool match = building.IsPlayerHeadQuarter
+                        ? e.IsHQ
+                        : (!e.IsHQ && e.InstanceId == building.InstanceId);
+                    if (match && e.Distance < minDist) minDist = e.Distance;
+                }
+            }
+        }
+
+        return minDist;
     }
 
     private static UnitData PickUnit(ConstructionManager building, AIWorldSnapshot snapshot, int budget, bool onlyCapturers)

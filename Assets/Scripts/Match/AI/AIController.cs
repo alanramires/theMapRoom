@@ -20,7 +20,23 @@ public partial class AIController : MonoBehaviour
 
 
     private bool isActive;
+    private bool isDebugPaused;
     private Coroutine aiCoroutine;
+
+    public static bool IsDebugPaused { get; private set; }
+
+    /// <summary>
+    /// Pausa ou retoma o loop da IA sem cancelar o batch em andamento.
+    /// </summary>
+    public void SetDebugPaused(bool paused)
+    {
+        isDebugPaused = paused;
+        IsDebugPaused = paused;
+
+        Debug.Log(paused
+            ? "[AI] Pausa de debug solicitada. Aguardando ponto seguro."
+            : "[AI] Pausa de debug encerrada. Retomando IA.");
+    }
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -61,6 +77,7 @@ public partial class AIController : MonoBehaviour
     {
         MatchController.OnActiveTeamChanged -= HandleTeamChanged;
         if (aiCoroutine != null) StopCoroutine(aiCoroutine);
+        if (IsDebugPaused) IsDebugPaused = false;
     }
 
     // -------------------------------------------------------------------------
@@ -95,6 +112,7 @@ public partial class AIController : MonoBehaviour
     {
         Debug.Log($"[AI] RunAITurn iniciado para {aiTeam}.");
         yield return Phase0_WaitForTurnReady();
+        yield return WaitIfDebugPaused();
 
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
         Debug.Log($"[AI] Turno {snapshot.TurnNumber} | Stance: {snapshot.Stance} " +
@@ -104,8 +122,11 @@ public partial class AIController : MonoBehaviour
         BuildObjectivePlan(snapshot);
 
         yield return Phase1_CommandService(snapshot);
+        yield return WaitIfDebugPaused();
         yield return Phase2_UnitActions(snapshot);
+        yield return WaitIfDebugPaused();
         yield return Phase3_Shopping(snapshot);
+        yield return WaitIfDebugPaused();
         yield return Phase4_EndTurn();
 
         aiCoroutine = null;
@@ -137,6 +158,15 @@ public partial class AIController : MonoBehaviour
     // -------------------------------------------------------------------------
     // Fase 1: Serviço do Comando
     // -------------------------------------------------------------------------
+
+    private IEnumerator WaitIfDebugPaused()
+    {
+        if (!isDebugPaused) yield break;
+
+        Debug.Log("[AI] Pausa de debug ativa - aguardando 'AI RESUME'.");
+        yield return new WaitUntil(() => !isDebugPaused);
+        Debug.Log("[AI] Retomando execucao da IA.");
+    }
 
     private IEnumerator Phase1_CommandService(AIWorldSnapshot snapshot)
     {
@@ -187,6 +217,8 @@ public partial class AIController : MonoBehaviour
 
         while (isActive)
         {
+            yield return WaitIfDebugPaused();
+
             List<UnitManager> available = GetAvailableUnits(aiTeam);
             if (available.Count == 0) break;
 
@@ -205,10 +237,15 @@ public partial class AIController : MonoBehaviour
 
             replayManager.ExecuteLiveAIBatch(action);
             yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
+            yield return WaitIfDebugPaused();
 
-            // Recalcula FoW após cada ação para que a próxima unidade veja inimigos
-            // revelados pelo movimento desta (cache de visibilidade fica stale senão).
-            matchController?.RefreshFogOfWarForActiveTeam();
+            // Recalcula FoW apenas quando algo que altera visibilidade ocorreu:
+            // movimento (nova posição = novo cone de visão) ou ataque (inimigo pode
+            // ter morrido, liberando LOS para células antes bloqueadas).
+            bool unitMoved    = action.HasMoveTo && action.MoveTo != action.MoveFrom;
+            bool unitAttacked = !string.IsNullOrEmpty(action.TargetInstanceId);
+            if (unitMoved || unitAttacked)
+                matchController?.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.DataOnly);
 
             float delay = GetBatchDelay();
             if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
@@ -232,12 +269,14 @@ public partial class AIController : MonoBehaviour
         foreach (AIShoppingPlanner.ShoppingOrder order in orders)
         {
             if (!isActive) break;
+            yield return WaitIfDebugPaused();
 
             PlayerAction batch = BuildShoppingBatch(snapshot.AITeam, order);
             Debug.Log($"[AI][Shopping] {order.UnitToBuy.name} @ {order.Building.CurrentCellPosition}");
 
             replayManager.ExecuteLiveAIBatch(batch);
             yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
+            yield return WaitIfDebugPaused();
 
             // Segurança: fecha o menu de shopping se ficou aberto (compra falhou)
             if (turnStateManager != null &&
@@ -544,6 +583,37 @@ public partial class AIController : MonoBehaviour
             TargetHex       = targetCell, HasTargetHex = true,
             DebugLabel      = $"AI Attack {unit.InstanceId} → {targetId} @ {targetCell}",
         };
+    }
+
+    private PlayerAction BuildMergeBatch(UnitManager unit, TeamId team,
+        Vector3Int from, Vector3Int to, UnitManager target,
+        Dictionary<Vector3Int, List<Vector3Int>> paths = null)
+    {
+        List<Vector3Int> movementPath = null;
+        paths?.TryGetValue(to, out movementPath);
+        Vector3Int targetCell = target.CurrentCellPosition; targetCell.z = 0;
+        var action = new PlayerAction
+        {
+            IsAIGenerated    = true,
+            ActionType       = PlayerActionType.UnitAction,
+            ActingTeam       = team,
+            TurnNumber       = matchController != null ? matchController.CurrentTurn : 0,
+            CursorHex        = from, HasCursorHex = true,
+            UnitInstanceId   = unit.InstanceId.ToString(),
+            MoveFrom         = from, HasMoveFrom = true,
+            MoveTo           = to,   HasMoveTo   = true,
+            SensorAction     = SensorActionType.Merge,
+            MovementPath     = movementPath,
+            DebugLabel       = $"AI Merge {unit.InstanceId} → {target.InstanceId}",
+        };
+        action.SubSteps.Add(new PlayerActionSubStep
+        {
+            Label            = "AIFuse",
+            TargetInstanceId = target.InstanceId.ToString(),
+            TargetHex        = targetCell,
+            HasTargetHex     = true,
+        });
+        return action;
     }
 
     private PlayerAction BuildEndTurnBatch(TeamId team)
