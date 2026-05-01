@@ -71,6 +71,9 @@ public class TeamObjectivePlan
     public List<SectorObjective> Objectives   = new List<SectorObjective>();
     public List<int>             RogueUnitIds = new List<int>();
 
+    public List<int>                     HandoffVacaterIds      = new List<int>();
+    public HashSet<ConstructionSector>   VacaterForwardSectors  = new HashSet<ConstructionSector>();
+
     public int TotalReserved
     {
         get
@@ -151,6 +154,141 @@ public class ObjectiveManager : MonoBehaviour
             p.Objectives.Clear();
             p.RogueUnitIds.Clear();
             return;
+        }
+    }
+
+    public static List<AIObjectivePlanSaveData> BuildSaveData()
+    {
+        ObjectiveManager m = EnsureInstance();
+        var result = new List<AIObjectivePlanSaveData>();
+        foreach (TeamObjectivePlan plan in m.plans)
+        {
+            if (plan == null)
+                continue;
+
+            var savedPlan = new AIObjectivePlanSaveData
+            {
+                teamId = (int)plan.Team,
+                rogueUnitIds = plan.RogueUnitIds != null ? new List<int>(plan.RogueUnitIds) : new List<int>(),
+                handoffVacaterIds = plan.HandoffVacaterIds != null ? new List<int>(plan.HandoffVacaterIds) : new List<int>()
+            };
+
+            if (plan.VacaterForwardSectors != null)
+            {
+                foreach (ConstructionSector sector in plan.VacaterForwardSectors)
+                    savedPlan.vacaterForwardSectors.Add((int)sector);
+            }
+
+            if (plan.Objectives != null)
+            {
+                foreach (SectorObjective obj in plan.Objectives)
+                {
+                    if (obj == null)
+                        continue;
+
+                    var savedObj = new AIObjectiveSaveData
+                    {
+                        sector = (int)obj.Sector,
+                        assignedTeam = (int)obj.AssignedTeam,
+                        status = (int)obj.Status,
+                        priority = obj.Priority,
+                        budgetReserved = obj.BudgetReserved,
+                        handoffEligible = obj.HandoffEligible,
+                        preferredHandoffFromUnitId = obj.PreferredHandoffFromUnitId
+                    };
+
+                    if (obj.Slots != null)
+                    {
+                        foreach (SlotNeed slot in obj.Slots)
+                        {
+                            if (slot == null)
+                                continue;
+
+                            savedObj.slots.Add(new AISlotNeedSaveData
+                            {
+                                role = (int)slot.Role,
+                                filled = slot.Filled,
+                                assignedUnitId = slot.AssignedUnitId
+                            });
+                        }
+                    }
+
+                    savedPlan.objectives.Add(savedObj);
+                }
+            }
+
+            result.Add(savedPlan);
+        }
+
+        return result;
+    }
+
+    public static void RestoreSaveData(List<AIObjectivePlanSaveData> savedPlans)
+    {
+        ObjectiveManager m = EnsureInstance();
+        m.plans.Clear();
+        if (savedPlans == null)
+            return;
+
+        foreach (AIObjectivePlanSaveData savedPlan in savedPlans)
+        {
+            if (savedPlan == null)
+                continue;
+
+            var plan = new TeamObjectivePlan
+            {
+                Team = (TeamId)savedPlan.teamId
+            };
+
+            if (savedPlan.rogueUnitIds != null)
+                plan.RogueUnitIds.AddRange(savedPlan.rogueUnitIds);
+            if (savedPlan.handoffVacaterIds != null)
+                plan.HandoffVacaterIds.AddRange(savedPlan.handoffVacaterIds);
+            if (savedPlan.vacaterForwardSectors != null)
+            {
+                foreach (int sector in savedPlan.vacaterForwardSectors)
+                    plan.VacaterForwardSectors.Add((ConstructionSector)sector);
+            }
+
+            if (savedPlan.objectives != null)
+            {
+                foreach (AIObjectiveSaveData savedObj in savedPlan.objectives)
+                {
+                    if (savedObj == null)
+                        continue;
+
+                    var obj = new SectorObjective
+                    {
+                        Sector = (ConstructionSector)savedObj.sector,
+                        AssignedTeam = (TeamId)savedObj.assignedTeam,
+                        Status = (ObjectiveStatus)savedObj.status,
+                        Priority = savedObj.priority,
+                        BudgetReserved = savedObj.budgetReserved,
+                        HandoffEligible = savedObj.handoffEligible,
+                        PreferredHandoffFromUnitId = savedObj.preferredHandoffFromUnitId
+                    };
+
+                    if (savedObj.slots != null)
+                    {
+                        foreach (AISlotNeedSaveData savedSlot in savedObj.slots)
+                        {
+                            if (savedSlot == null)
+                                continue;
+
+                            obj.Slots.Add(new SlotNeed
+                            {
+                                Role = (UnitRole)savedSlot.role,
+                                Filled = savedSlot.filled,
+                                AssignedUnitId = savedSlot.assignedUnitId
+                            });
+                        }
+                    }
+
+                    plan.Objectives.Add(obj);
+                }
+            }
+
+            m.plans.Add(plan);
         }
     }
 }

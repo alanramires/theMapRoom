@@ -162,7 +162,7 @@ public static class SaveDataMapper
             aiAssignedPlanKey = unit.AIAssignedPlanKey,
             aiAssignedPlanName = unit.AIAssignedPlanName,
             aiAssignedPlanBadge = unit.AIAssignedPlanBadge,
-            aiAssignedPlanRole = 0, // (int)unit.AIAssignedPlanRole,
+            aiAssignedPlanRole = unit.AIAssignedPlanRole,
             aiAssignedPlanBadgeVisible = unit.AIAssignedPlanBadgeVisible
         };
 

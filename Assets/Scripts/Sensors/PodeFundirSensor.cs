@@ -331,8 +331,7 @@ public static class PodeFundirSensor
             return false;
         }
 
-        invalidReason = "Sem caminho valido ate o alvo (bloqueio no trajeto).";
-        return false;
+        return true;
     }
 
     private static bool TryResolveMergeEnterCost(

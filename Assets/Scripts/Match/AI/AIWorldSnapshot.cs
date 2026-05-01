@@ -41,7 +41,7 @@ public class AIWorldSnapshot
             snap.OccupiedCells.Add(p);
 
             if (u.TeamId == aiTeam) snap.MyUnits.Add(u);
-            else                    snap.EnemyUnits.Add(u);
+            else if (!u.IsHiddenByFogOfWar) snap.EnemyUnits.Add(u);
         }
 
         foreach (ConstructionManager c in ConstructionManager.AllActive)

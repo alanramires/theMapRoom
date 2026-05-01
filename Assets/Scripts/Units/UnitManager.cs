@@ -109,13 +109,19 @@ public class UnitManager : MonoBehaviour
     [SerializeField, HideInInspector] private int embarkedTransporterSlotIndex = -1;
     [Header("Stealth Runtime")]
     [SerializeField, HideInInspector] private List<int> currentlyObservedByTeamIds = new List<int>();
-    [Header("AI")]
+    [Header("AI Plan Runtime")]
+    [Tooltip("Plano/objetivo atribuido pela AI. Este e o estado visual/cache da unidade; o plano canonico fica no ObjectiveManager.")]
     [SerializeField] private bool aiHasAssignedPlan;
+    [Tooltip("Chave persistida do objetivo, normalmente o nome do setor.")]
     [SerializeField] private string aiAssignedPlanKey = string.Empty;
+    [Tooltip("Nome exibido do objetivo, normalmente Alpha/Bravo/etc.")]
     [SerializeField] private string aiAssignedPlanName = string.Empty;
+    [Tooltip("Badge curto mostrado no HUD da unidade, por exemplo A/B/C/D.")]
     [SerializeField] private string aiAssignedPlanBadge = string.Empty;
+    [Tooltip("Role da unidade dentro do plano. Usa os valores de UnitRole.")]
     [SerializeField] private int aiAssignedPlanRole = 0;
     [SerializeField] private bool aiAssignedPlanBadgeVisible;
+    [Header("AI Stance Runtime")]
     [SerializeField] private bool aiHasStance;
     [SerializeField] private int aiStance = 0;
     [SerializeField] private bool aiStanceVisible;
@@ -173,7 +179,7 @@ public class UnitManager : MonoBehaviour
     public string AIAssignedPlanKey => aiAssignedPlanKey ?? string.Empty;
     public string AIAssignedPlanName => aiAssignedPlanName ?? string.Empty;
     public string AIAssignedPlanBadge => aiAssignedPlanBadge ?? string.Empty;
-    // public AIPlanRole AIAssignedPlanRole => aiAssignedPlanRole;
+    public int AIAssignedPlanRole => aiAssignedPlanRole;
     public bool AIAssignedPlanBadgeVisible => aiAssignedPlanBadgeVisible;
     public UnitCombatClassification CombatClassification
         => TryGetUnitData(out UnitData data) && data != null

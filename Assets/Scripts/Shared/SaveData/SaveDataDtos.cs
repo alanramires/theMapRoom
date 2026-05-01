@@ -27,6 +27,11 @@ public class SaveGameData
     public List<FogCellContributorSaveData> fogVisibleContributorsByCell = new List<FogCellContributorSaveData>();
     public List<FogUnitVisibilitySaveData> fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>();
     public AIPlannerMultiTeamSaveData aiPlannerState;
+    public List<AIObjectivePlanSaveData> aiObjectivePlans = new List<AIObjectivePlanSaveData>();
+    public bool aiRuntimeActive;
+    public int aiRuntimeTeamId = (int)TeamId.Neutral;
+    public int aiRuntimeTurnNumber;
+    public int aiRuntimeStage;
 }
 
 [Serializable]
@@ -85,6 +90,37 @@ public class MatchVictoryStarSaveData
 {
     public int teamId;
     public int stars;
+}
+
+[Serializable]
+public class AIObjectivePlanSaveData
+{
+    public int teamId;
+    public List<AIObjectiveSaveData> objectives = new List<AIObjectiveSaveData>();
+    public List<int> rogueUnitIds = new List<int>();
+    public List<int> handoffVacaterIds = new List<int>();
+    public List<int> vacaterForwardSectors = new List<int>();
+}
+
+[Serializable]
+public class AIObjectiveSaveData
+{
+    public int sector;
+    public int assignedTeam;
+    public int status;
+    public int priority;
+    public int budgetReserved;
+    public bool handoffEligible;
+    public int preferredHandoffFromUnitId = -1;
+    public List<AISlotNeedSaveData> slots = new List<AISlotNeedSaveData>();
+}
+
+[Serializable]
+public class AISlotNeedSaveData
+{
+    public int role;
+    public bool filled;
+    public int assignedUnitId = -1;
 }
 
 [Serializable]

@@ -46,6 +46,8 @@ public class SaveGameManager : MonoBehaviour
     [SerializeField] private ReplayManager replayManager;
     
     [SerializeField] private PlanningManager planningManager;
+
+    [SerializeField] private AIController aiController;
     
     // [SerializeField] private AIPlayerController aiPlayerController;
 
@@ -1301,6 +1303,27 @@ public class SaveGameManager : MonoBehaviour
                 }
             }
             LogLoadPerf(loadedSlot, "restore_unit_flags.end", restoreUnitFlagsStartMs, PerfNowMs() - routineStartMs);
+
+            stage = "restore-ai-objective-plans";
+            if (data.aiObjectivePlans != null && data.aiObjectivePlans.Count > 0)
+            {
+                ObjectiveManager.RestoreSaveData(data.aiObjectivePlans);
+            }
+            else
+            {
+                ObjectiveManager.RestoreSaveData(null);
+                ClearLoadedAIAssignmentBadges(unitsById);
+            }
+
+            if (aiController != null)
+            {
+                aiController.RestoreAIRuntimeState(
+                    data.aiRuntimeActive,
+                    (TeamId)data.aiRuntimeTeamId,
+                    data.aiRuntimeTurnNumber,
+                    data.aiRuntimeStage);
+            }
+
             stage = "restore-ai-planner";
             double restoreAiPlannerStartMs = PerfNowMs();
             LogLoadPerf(loadedSlot, "restore_ai_planner.begin", restoreAiPlannerStartMs, restoreAiPlannerStartMs - routineStartMs);
@@ -1468,7 +1491,12 @@ public class SaveGameManager : MonoBehaviour
             victoryStars = matchState.victoryStars != null ? matchState.victoryStars : new List<MatchVictoryStarSaveData>(),
             fogCacheTeamId = int.MinValue,
             fogVisibleContributorsByCell = new List<FogCellContributorSaveData>(),
-            fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>()
+            fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>(),
+            aiObjectivePlans = ObjectiveManager.BuildSaveData(),
+            aiRuntimeActive = aiController != null && aiController.IsAIRuntimeActive,
+            aiRuntimeTeamId = aiController != null ? (int)aiController.CurrentAITeam : (int)TeamId.Neutral,
+            aiRuntimeTurnNumber = aiController != null ? aiController.CurrentAITurnNumber : 0,
+            aiRuntimeStage = aiController != null ? aiController.CurrentAIStage : 0
         };
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
@@ -1537,6 +1565,19 @@ public class SaveGameManager : MonoBehaviour
             victoryWinnerTeamId = data.victoryWinnerTeamId
         };
         SaveDataMapper.ApplyMatchStateSaveData(matchController, matchState);
+    }
+
+    private static void ClearLoadedAIAssignmentBadges(Dictionary<int, UnitManager> unitsById)
+    {
+        if (unitsById == null)
+            return;
+
+        foreach (KeyValuePair<int, UnitManager> pair in unitsById)
+        {
+            UnitManager unit = pair.Value;
+            if (unit != null)
+                unit.ClearAIAssignedPlan();
+        }
     }
 
     private void ClearCurrentRuntime()
@@ -2071,6 +2112,8 @@ public class SaveGameManager : MonoBehaviour
         
         if (planningManager == null)
             planningManager = FindInActiveScene<PlanningManager>();
+        if (aiController == null)
+            aiController = FindInActiveScene<AIController>();
         
         // if (aiPlayerController == null)
         //     aiPlayerController = FindInActiveScene<AIPlayerController>();
@@ -2262,13 +2305,6 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
-
-
-
-
-
-
-
 
 
 

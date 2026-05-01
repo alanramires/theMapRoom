@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Tilemaps;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -40,6 +41,15 @@ public sealed class SectorManager : MonoBehaviour
             currentCapturePoints = construction != null ? construction.CurrentCapturePoints : 0;
             capturePointsMax = construction != null ? construction.CapturePointsMax : 0;
         }
+    }
+
+    public sealed class SectorNeighborDistanceDebugEntry
+    {
+        public ConstructionSector Sector;
+        public bool UsedTerrainCost;
+        public bool Reachable;
+        public float Distance;
+        public List<Vector3Int> Path = new List<Vector3Int>();
     }
 
     [System.Serializable]
@@ -272,6 +282,11 @@ public sealed class SectorManager : MonoBehaviour
     private static SectorManager instance;
 
     [SerializeField] private bool sectorLog;
+    [Header("Neighbor Distance")]
+    [SerializeField] private bool useTerrainCostForNeighborDistances = true;
+    [SerializeField] private Tilemap neighborDistanceTilemap;
+    [SerializeField] private TerrainDatabase neighborDistanceTerrainDatabase;
+    [SerializeField] private UnitData neighborDistanceReferenceUnitData;
     [SerializeField] private List<SectorInfo> sectorInfos = new List<SectorInfo>();
     [SerializeField] private List<SectorInfo> baseInfos   = new List<SectorInfo>();
 
@@ -314,6 +329,56 @@ public sealed class SectorManager : MonoBehaviour
             manager.RebuildFromActiveConstructions("first-query");
 
         return manager.sectorInfoBySector.TryGetValue(sector, out info);
+    }
+
+    public static bool TryBuildNeighborDistanceDebug(ConstructionSector sector, List<SectorNeighborDistanceDebugEntry> entries)
+    {
+        if (entries == null)
+            return false;
+
+        entries.Clear();
+        SectorManager manager = EnsureInstance();
+        if (manager == null)
+            return false;
+
+        if (manager.sectorInfos.Count == 0)
+            manager.RebuildFromActiveConstructions("neighbor-debug");
+
+        if (!manager.sectorInfoBySector.TryGetValue(sector, out SectorInfo origin) || origin == null)
+            return false;
+
+        SectorNeighborDistanceContext context = manager.BuildNeighborDistanceContext();
+        for (int i = 0; i < manager.sectorInfos.Count; i++)
+        {
+            SectorInfo other = manager.sectorInfos[i];
+            if (other == null || other.Sector == sector)
+                continue;
+
+            var entry = new SectorNeighborDistanceDebugEntry
+            {
+                Sector = other.Sector,
+                Distance = ComputeHexDistance(origin.RepresentativeCell, other.RepresentativeCell),
+                Reachable = true,
+                UsedTerrainCost = false,
+            };
+
+            if (context.IsValid &&
+                TryComputeLandMovementDistance(origin.RepresentativeCell, other.RepresentativeCell, context, out int movementCost, entry.Path))
+            {
+                entry.Distance = movementCost;
+                entry.UsedTerrainCost = true;
+            }
+
+            entries.Add(entry);
+        }
+
+        entries.Sort((a, b) =>
+        {
+            int d = a.Distance.CompareTo(b.Distance);
+            return d != 0 ? d : ((int)a.Sector).CompareTo((int)b.Sector);
+        });
+
+        return true;
     }
 
     public static IReadOnlyList<SectorInfo> GetAllBaseInfos()
@@ -459,13 +524,40 @@ public sealed class SectorManager : MonoBehaviour
     }
 
     // Distância em passos de hex (pointy-top, even-r offset — Unity m_CellLayout=1, cellSize.x≈0.866).
-    private static float ComputeHexDistance(Vector3Int a, Vector3Int b)
+    // Público para uso pelo AI planner e outros sistemas que precisam de distância hex correta.
+    public static float HexDistance(Vector3Int a, Vector3Int b)
     {
         int aq  = a.x - (a.y - (a.y & 1)) / 2;
         int bq  = b.x - (b.y - (b.y & 1)) / 2;
         int as_ = -aq - a.y;
         int bs  = -bq - b.y;
         return (Mathf.Abs(aq - bq) + Mathf.Abs(a.y - b.y) + Mathf.Abs(as_ - bs)) / 2f;
+    }
+
+    private static float ComputeHexDistance(Vector3Int a, Vector3Int b) => HexDistance(a, b);
+
+    // Distância com custo de terreno usando o contexto já configurado no Inspector.
+    // Retorna false se o contexto não estiver disponível; nesse caso usa HexDistance como fallback.
+    public static bool TryGetLandMovementDistance(Vector3Int from, Vector3Int to, out int cost)
+    {
+        cost = 0;
+        SectorManager manager = EnsureInstance();
+        if (manager == null) return false;
+        SectorNeighborDistanceContext ctx = manager.BuildNeighborDistanceContext();
+        if (!ctx.IsValid) return false;
+        from.z = 0; to.z = 0;
+        return TryComputeLandMovementDistance(from, to, ctx, out cost, null);
+    }
+
+    public static bool TryGetLandMovementDistance(Vector3Int from, Vector3Int to, UnitData referenceUnitData, out int cost)
+    {
+        cost = 0;
+        SectorManager manager = EnsureInstance();
+        if (manager == null) return false;
+        SectorNeighborDistanceContext ctx = manager.BuildNeighborDistanceContext(referenceUnitData);
+        if (!ctx.IsValid) return false;
+        from.z = 0; to.z = 0;
+        return TryComputeLandMovementDistance(from, to, ctx, out cost, null);
     }
 
     private void RebuildFromActiveConstructions(string reason)
@@ -609,6 +701,8 @@ public sealed class SectorManager : MonoBehaviour
             }
         }
 
+        SectorNeighborDistanceContext neighborDistanceContext = BuildNeighborDistanceContext();
+
         // Segundo passo: 2 vizinhos capturáveis mais próximos por setor (células representativas)
         for (int i = 0; i < sectorInfos.Count; i++)
         {
@@ -622,7 +716,7 @@ public sealed class SectorManager : MonoBehaviour
             {
                 if (i == j) continue;
                 SectorInfo other = sectorInfos[j];
-                float d = ComputeHexDistance(cellA, other.RepresentativeCell);
+                float d = ComputeSectorNeighborDistance(cellA, other.RepresentativeCell, neighborDistanceContext);
                 if (d < dist1)
                 {
                     dist2 = dist1; best2 = best1;
@@ -639,6 +733,504 @@ public sealed class SectorManager : MonoBehaviour
 
         if (sectorLog)
             Debug.Log($"[SectorManager] rebuild reason={reason ?? "none"} sectors={sectorInfos.Count} bases={baseInfos.Count} constructions={constructions.Count}");
+    }
+
+    private SectorNeighborDistanceContext BuildNeighborDistanceContext(UnitData referenceUnitOverride = null)
+    {
+        if (!useTerrainCostForNeighborDistances)
+            return default;
+
+        Tilemap map = neighborDistanceTilemap != null ? neighborDistanceTilemap : ResolveNeighborDistanceTilemap();
+        TerrainDatabase terrainDb = neighborDistanceTerrainDatabase != null ? neighborDistanceTerrainDatabase : ResolveNeighborDistanceTerrainDatabase();
+        if (map == null || terrainDb == null)
+            return default;
+
+        var constructionsByCell = new Dictionary<Vector3Int, ConstructionManager>();
+        IReadOnlyList<ConstructionManager> constructions = GetTrackedConstructions();
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null)
+                continue;
+
+            Vector3Int cell = construction.BoardTilemap == map
+                ? construction.CurrentCellPosition
+                : HexCoordinates.WorldToCell(map, construction.transform.position);
+            cell.z = 0;
+            if (!constructionsByCell.ContainsKey(cell))
+                constructionsByCell[cell] = construction;
+        }
+
+        Tilemap[] gridMaps = map.layoutGrid != null
+            ? map.layoutGrid.GetComponentsInChildren<Tilemap>(includeInactive: true)
+            : System.Array.Empty<Tilemap>();
+
+        RoadNetworkManager[] roadNetworks = Object.FindObjectsByType<RoadNetworkManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        UnitData referenceUnitData = referenceUnitOverride != null
+            ? referenceUnitOverride
+            : neighborDistanceReferenceUnitData != null
+            ? neighborDistanceReferenceUnitData
+            : ResolveNeighborDistanceReferenceUnitData();
+
+        return new SectorNeighborDistanceContext
+        {
+            Tilemap = map,
+            TerrainDatabase = terrainDb,
+            GridTilemaps = gridMaps,
+            RoadNetworks = roadNetworks,
+            ConstructionsByCell = constructionsByCell,
+            ReferenceUnitData = referenceUnitData,
+            IsValid = true,
+        };
+    }
+
+    private static UnitData ResolveNeighborDistanceReferenceUnitData()
+    {
+        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null)
+                continue;
+            if (unit.TryGetUnitData(out UnitData data) && data != null && data.unitClass == GameUnitClass.Infantry)
+                return data;
+        }
+
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null && data.domain == Domain.Land)
+                return data;
+        }
+
+        return null;
+    }
+
+    private static Tilemap ResolveNeighborDistanceTilemap()
+    {
+        CursorController cursor = Object.FindAnyObjectByType<CursorController>();
+        if (cursor != null && cursor.BoardTilemap != null)
+            return cursor.BoardTilemap;
+
+        ConstructionManager construction = Object.FindAnyObjectByType<ConstructionManager>();
+        if (construction != null && construction.BoardTilemap != null)
+            return construction.BoardTilemap;
+
+        Tilemap[] maps = Object.FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < maps.Length; i++)
+            if (maps[i] != null && string.Equals(maps[i].name, "TileMap", System.StringComparison.OrdinalIgnoreCase))
+                return maps[i];
+
+        return maps != null && maps.Length > 0 ? maps[0] : null;
+    }
+
+    private static TerrainDatabase ResolveNeighborDistanceTerrainDatabase()
+    {
+        TurnStateManager turnState = Object.FindAnyObjectByType<TurnStateManager>();
+        if (turnState != null && turnState.TerrainDatabaseRef != null)
+            return turnState.TerrainDatabaseRef;
+
+        MatchController match = Object.FindAnyObjectByType<MatchController>();
+        if (match != null && match.TerrainDatabaseRef != null)
+            return match.TerrainDatabaseRef;
+
+#if UNITY_EDITOR
+        string[] guids = AssetDatabase.FindAssets("t:TerrainDatabase");
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            TerrainDatabase db = AssetDatabase.LoadAssetAtPath<TerrainDatabase>(path);
+            if (db != null)
+                return db;
+        }
+#endif
+
+        return null;
+    }
+
+    private static float ComputeSectorNeighborDistance(Vector3Int from, Vector3Int to, SectorNeighborDistanceContext context)
+    {
+        if (context.IsValid && TryComputeLandMovementDistance(from, to, context, out int movementCost, null))
+            return movementCost;
+
+        return ComputeHexDistance(from, to);
+    }
+
+    private static bool TryComputeLandMovementDistance(
+        Vector3Int from,
+        Vector3Int to,
+        SectorNeighborDistanceContext context,
+        out int movementCost,
+        List<Vector3Int> path)
+    {
+        movementCost = 0;
+        path?.Clear();
+        if (!context.IsValid || context.Tilemap == null)
+            return false;
+
+        from.z = 0;
+        to.z = 0;
+        if (from == to)
+        {
+            path?.Add(from);
+            return true;
+        }
+
+        var frontier = new List<Vector3Int> { from };
+        var costByCell = new Dictionary<Vector3Int, int> { [from] = 0 };
+        var cameFrom = new Dictionary<Vector3Int, Vector3Int> { [from] = from };
+        var neighbors = new List<Vector3Int>(6);
+        int expanded = 0;
+        int maxExpanded = Mathf.Max(512, context.Tilemap.cellBounds.size.x * context.Tilemap.cellBounds.size.y);
+
+        while (frontier.Count > 0 && expanded < maxExpanded)
+        {
+            int bestIndex = 0;
+            int bestCost = costByCell[frontier[0]];
+            for (int i = 1; i < frontier.Count; i++)
+            {
+                int candidateCost = costByCell[frontier[i]];
+                if (candidateCost >= bestCost)
+                    continue;
+
+                bestIndex = i;
+                bestCost = candidateCost;
+            }
+
+            Vector3Int current = frontier[bestIndex];
+            frontier.RemoveAt(bestIndex);
+            expanded++;
+
+            if (current == to)
+            {
+                movementCost = bestCost;
+                BuildSectorPath(from, to, cameFrom, path);
+                return true;
+            }
+
+            UnitMovementPathRules.GetImmediateHexNeighbors(context.Tilemap, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = neighbors[i];
+                next.z = 0;
+                if (!TryGetLandEnterCost(next, context, out int enterCost))
+                    continue;
+
+                int nextCost = bestCost + enterCost;
+                if (costByCell.TryGetValue(next, out int knownCost) && knownCost <= nextCost)
+                    continue;
+
+                costByCell[next] = nextCost;
+                cameFrom[next] = current;
+                if (!frontier.Contains(next))
+                    frontier.Add(next);
+            }
+        }
+
+        return false;
+    }
+
+    private static void BuildSectorPath(
+        Vector3Int from,
+        Vector3Int to,
+        Dictionary<Vector3Int, Vector3Int> cameFrom,
+        List<Vector3Int> path)
+    {
+        if (path == null)
+            return;
+
+        path.Clear();
+        if (cameFrom == null || !cameFrom.ContainsKey(to))
+            return;
+
+        Vector3Int current = to;
+        path.Add(current);
+        int guard = 0;
+        while (current != from && guard++ < 4096)
+        {
+            current = cameFrom[current];
+            path.Add(current);
+        }
+
+        path.Reverse();
+    }
+
+    private static bool TryGetLandEnterCost(Vector3Int cell, SectorNeighborDistanceContext context, out int cost)
+    {
+        cost = 1;
+        cell.z = 0;
+
+        if (!HasAnyPaintedTileAtCell(cell, context))
+            return false;
+
+        ConstructionManager construction = null;
+        if (context.ConstructionsByCell != null)
+            context.ConstructionsByCell.TryGetValue(cell, out construction);
+
+        if (construction != null)
+        {
+            if (context.ReferenceUnitData != null &&
+                !ConstructionSupportsUnitData(construction, context.ReferenceUnitData))
+                return false;
+            if (context.ReferenceUnitData == null && !construction.SupportsLayerMode(Domain.Land, HeightLevel.Surface))
+                return false;
+
+            cost = 1;
+            return true;
+        }
+
+        StructureData structure = ResolveStructureAtCell(cell, context);
+        TerrainTypeData terrain = ResolveTerrainAtCell(cell, context);
+
+        if (context.ReferenceUnitData != null)
+            return TryGetUnitDataEnterCost(context.ReferenceUnitData, null, structure, terrain, out cost);
+
+        if (structure != null)
+        {
+            if (!SupportsLayerMode(structure.domain, structure.heightLevel, structure.aditionalDomainsAllowed, Domain.Land, HeightLevel.Surface))
+                return false;
+
+            cost = Mathf.Max(1, structure.baseMovementCost);
+            return true;
+        }
+
+        if (terrain == null)
+            return false;
+
+        if (!SupportsLayerMode(terrain.domain, terrain.heightLevel, terrain.aditionalDomainsAllowed, Domain.Land, HeightLevel.Surface))
+            return false;
+
+        cost = Mathf.Max(1, terrain.basicAutonomyCost);
+        return true;
+    }
+
+    private static bool TryGetUnitDataEnterCost(
+        UnitData unitData,
+        ConstructionManager construction,
+        StructureData structure,
+        TerrainTypeData terrain,
+        out int cost)
+    {
+        cost = 1;
+        if (unitData == null)
+            return false;
+
+        if (construction != null)
+        {
+            if (!ConstructionSupportsUnitData(construction, unitData))
+                return false;
+
+            cost = 1;
+            return true;
+        }
+
+        if (structure != null)
+        {
+            if (!SupportsLayerMode(structure.domain, structure.heightLevel, structure.aditionalDomainsAllowed, unitData.domain, unitData.heightLevel))
+                return false;
+            if (!UnitDataPassesSkillRules(unitData, structure.GetRequiredSkillsToEnter(terrain), structure.GetBlockedSkillsToEnter(terrain)))
+                return false;
+
+            cost = GetCostWithUnitDataSkillOverrides(structure.baseMovementCost, structure.GetSkillCostOverrides(terrain), unitData);
+            cost = GetCostWithUnitDataSkillOverrides(cost, terrain != null ? terrain.skillCostOverrides : null, unitData);
+            cost = Mathf.Max(1, cost);
+            return true;
+        }
+
+        if (terrain == null)
+            return false;
+        if (!SupportsLayerMode(terrain.domain, terrain.heightLevel, terrain.aditionalDomainsAllowed, unitData.domain, unitData.heightLevel))
+            return false;
+        if (!UnitDataPassesSkillRules(unitData, terrain.requiredSkillsToEnter, terrain.blockedSkills))
+            return false;
+
+        cost = GetCostWithUnitDataSkillOverrides(terrain.basicAutonomyCost, terrain.skillCostOverrides, unitData);
+        cost = Mathf.Max(1, cost);
+        return true;
+    }
+
+    private static bool ConstructionSupportsUnitData(ConstructionManager construction, UnitData unitData)
+    {
+        if (construction == null || unitData == null)
+            return false;
+
+        if (!construction.SupportsLayerMode(unitData.domain, unitData.heightLevel))
+            return false;
+
+        return UnitDataPassesSkillRules(unitData, construction.GetRequiredSkillsToEnter(), construction.GetBlockedSkillsToEnter());
+    }
+
+    private static int GetCostWithUnitDataSkillOverrides(
+        int baseCost,
+        IReadOnlyList<TerrainSkillCostOverride> overrides,
+        UnitData unitData)
+    {
+        int safeBase = Mathf.Max(1, baseCost);
+        if (unitData == null || overrides == null)
+            return safeBase;
+
+        for (int i = 0; i < overrides.Count; i++)
+        {
+            TerrainSkillCostOverride entry = overrides[i];
+            if (entry == null || entry.skill == null)
+                continue;
+
+            if (UnitDataHasSkill(unitData, entry.skill))
+                return Mathf.Max(1, entry.autonomyCost);
+        }
+
+        return safeBase;
+    }
+
+    private static bool UnitDataPassesSkillRules(
+        UnitData unitData,
+        IReadOnlyList<SkillData> requiredSkills,
+        IReadOnlyList<SkillData> blockedSkills)
+    {
+        if (unitData == null)
+            return false;
+
+        if (blockedSkills != null)
+        {
+            for (int i = 0; i < blockedSkills.Count; i++)
+                if (blockedSkills[i] != null && UnitDataHasSkill(unitData, blockedSkills[i]))
+                    return false;
+        }
+
+        if (requiredSkills == null || requiredSkills.Count == 0)
+            return true;
+
+        for (int i = 0; i < requiredSkills.Count; i++)
+            if (requiredSkills[i] != null && UnitDataHasSkill(unitData, requiredSkills[i]))
+                return true;
+
+        return false;
+    }
+
+    private static bool UnitDataHasSkill(UnitData unitData, SkillData skill)
+    {
+        if (unitData == null || skill == null || unitData.skills == null)
+            return false;
+
+        if (unitData.skills.Contains(skill))
+            return true;
+
+        string skillId = !string.IsNullOrWhiteSpace(skill.id) ? skill.id : skill.name;
+        for (int i = 0; i < unitData.skills.Count; i++)
+        {
+            SkillData owned = unitData.skills[i];
+            if (owned == null)
+                continue;
+            if (owned == skill)
+                return true;
+            if (!string.IsNullOrWhiteSpace(skillId) &&
+                (string.Equals(owned.id, skillId, System.StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(owned.name, skillId, System.StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(owned.displayName, skillId, System.StringComparison.OrdinalIgnoreCase)))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static StructureData ResolveStructureAtCell(Vector3Int cell, SectorNeighborDistanceContext context)
+    {
+        if (context.RoadNetworks == null)
+            return null;
+
+        for (int i = 0; i < context.RoadNetworks.Length; i++)
+        {
+            RoadNetworkManager road = context.RoadNetworks[i];
+            if (road == null)
+                continue;
+
+            Tilemap roadMap = road.BoardTilemap;
+            if (context.Tilemap != null && roadMap != null && roadMap != context.Tilemap && roadMap.layoutGrid != context.Tilemap.layoutGrid)
+                continue;
+
+            if (road.TryGetStructureAtCell(cell, out StructureData structure) && structure != null)
+                return structure;
+        }
+
+        return null;
+    }
+
+    private static TerrainTypeData ResolveTerrainAtCell(Vector3Int cell, SectorNeighborDistanceContext context)
+    {
+        if (context.TerrainDatabase == null)
+            return null;
+
+        TileBase tile = context.Tilemap != null ? context.Tilemap.GetTile(cell) : null;
+        if (tile != null && context.TerrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData terrain) && terrain != null)
+            return terrain;
+
+        if (context.GridTilemaps == null)
+            return null;
+
+        for (int i = 0; i < context.GridTilemaps.Length; i++)
+        {
+            Tilemap map = context.GridTilemaps[i];
+            if (map == null)
+                continue;
+
+            TileBase other = map.GetTile(cell);
+            if (other != null && context.TerrainDatabase.TryGetByPaletteTile(other, out TerrainTypeData byGridTile) && byGridTile != null)
+                return byGridTile;
+        }
+
+        return null;
+    }
+
+    private static bool HasAnyPaintedTileAtCell(Vector3Int cell, SectorNeighborDistanceContext context)
+    {
+        if (context.Tilemap != null && context.Tilemap.GetTile(cell) != null)
+            return true;
+
+        if (context.GridTilemaps == null)
+            return false;
+
+        for (int i = 0; i < context.GridTilemaps.Length; i++)
+        {
+            Tilemap map = context.GridTilemaps[i];
+            if (map != null && map.GetTile(cell) != null)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool SupportsLayerMode(
+        Domain nativeDomain,
+        HeightLevel nativeHeight,
+        IReadOnlyList<TerrainLayerMode> additionalModes,
+        Domain targetDomain,
+        HeightLevel targetHeight)
+    {
+        if (nativeDomain == targetDomain && nativeHeight == targetHeight)
+            return true;
+
+        if (additionalModes == null)
+            return false;
+
+        for (int i = 0; i < additionalModes.Count; i++)
+        {
+            TerrainLayerMode mode = additionalModes[i];
+            if (mode.domain == targetDomain && mode.heightLevel == targetHeight)
+                return true;
+        }
+
+        return false;
+    }
+
+    private struct SectorNeighborDistanceContext
+    {
+        public bool IsValid;
+        public Tilemap Tilemap;
+        public TerrainDatabase TerrainDatabase;
+        public Tilemap[] GridTilemaps;
+        public RoadNetworkManager[] RoadNetworks;
+        public Dictionary<Vector3Int, ConstructionManager> ConstructionsByCell;
+        public UnitData ReferenceUnitData;
     }
 
     private static IReadOnlyList<ConstructionManager> GetTrackedConstructions()

@@ -31,19 +31,20 @@ public partial class AIController
                         {
                             slot.Filled = false;
                             slot.AssignedUnitId = -1;
-                            unit.ClearAIAssignedPlan();
                             break;
                         }
                 plan.RogueUnitIds.Remove(unit.InstanceId);
             }
-            Debug.Log($"[AI][Repair] {unit.InstanceId} entra em reparo " +
+            unit.SetAIMaintenanceActive(true);
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} entra em reparo " +
                       $"hp={unit.CurrentHP} fuel={unit.CurrentFuel}/{unit.GetMaxFuel()} " +
                       $"ammo={unit.CurrentAmmo}/{unit.GetMaxAmmo()}");
         }
         else if (unit.IsUnderRepair && !anyTrigger && unit.CurrentHP >= data.repairRecoverHpAbove)
         {
             unit.SetIsUnderRepair(false);
-            Debug.Log($"[AI][Repair] {unit.InstanceId} saiu do reparo hp={unit.CurrentHP}");
+            unit.SetAIMaintenanceActive(false);
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} saiu do reparo hp={unit.CurrentHP}");
         }
     }
 
@@ -81,7 +82,7 @@ public partial class AIController
             Vector3Int exitCell = FindRepairExitCell(paths, occupied, fromCell, aiTeam);
             if (exitCell != fromCell)
             {
-                Debug.Log($"[AI][Repair] {unit.InstanceId} sai de captura incompleta em {fromCell} → {exitCell}");
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} sai de captura incompleta em {fromCell} → {exitCell}");
                 return BuildMoveBatch(unit, aiTeam, fromCell, exitCell, paths);
             }
         }
@@ -89,23 +90,43 @@ public partial class AIController
         // Fusão oportunista: se fuseWhileInRepair e HP < 10, funde com aliado no caminho
         if (unit.TryGetUnitData(out UnitData fuseData) && fuseData.fuseWhileInRepair && unit.CurrentHP < 10)
         {
+            int totalMovement = Mathf.Max(0, unit.RemainingMovementPoints);
             var fuseOptions = new List<PodeFundirOption>();
             foreach (Vector3Int cell in paths.Keys)
             {
                 if (occupied.Contains(cell)) continue;
+
+                // Calcula movimento restante APÓS chegar em 'cell'.
+                // A fusão exige pontos suficientes para "entrar" no hex do candidato a partir de 'cell':
+                // sem esse cálculo, o sensor recebe movimento demais e valida fusões inalcançáveis.
+                List<Vector3Int> pathToCell = paths[cell];
+                int costToCell = pathToCell != null && pathToCell.Count > 0
+                    ? Mathf.Max(0, UnitMovementPathRules.CalculateAutonomyCostForPath(
+                        boardTilemap, unit, pathToCell, terrainDatabase,
+                        applyOperationalAutonomyModifier: false))
+                    : 0;
+                int remainingAfterMove = Mathf.Max(0, totalMovement - costToCell);
+
                 fuseOptions.Clear();
-                if (!PodeFundirSensor.CollectOptions(unit, boardTilemap, terrainDatabase,
-                    Mathf.Max(0, unit.RemainingMovementPoints), fuseOptions, out _,
-                    fromCell: cell))
-                    continue;
+                bool canFuse = PodeFundirSensor.CollectOptions(unit, boardTilemap, terrainDatabase,
+                    remainingAfterMove, fuseOptions, out _,
+                    fromCell: cell);
+                Debug.Log($"[Repair] fusão de {cell} mov={remainingAfterMove} canFuse={canFuse} opts={fuseOptions.Count}");
+                if (!canFuse) continue;
                 foreach (PodeFundirOption opt in fuseOptions)
                 {
                     if (opt?.candidateUnit == null) continue;
-                    if (opt.candidateUnit.CurrentHP + unit.CurrentHP > 10) continue;
-                    Vector3Int candidateCell = opt.candidateCell; candidateCell.z = 0;
-                    Debug.Log($"[AI][Repair] {unit.InstanceId} fusão oportunista com " +
-                              $"{opt.candidateUnit.InstanceId} hp={unit.CurrentHP}+{opt.candidateUnit.CurrentHP}");
-                    return BuildMergeBatch(unit, aiTeam, fromCell, candidateCell, opt.candidateUnit, paths);
+                    if (opt.candidateUnit.CurrentHP + unit.CurrentHP > 10)
+                    {
+                        Debug.Log($"[Repair] skip fusão {opt.candidateUnit.InstanceId} hp={unit.CurrentHP}+{opt.candidateUnit.CurrentHP}>10");
+                        continue;
+                    }
+                    // Receptor move para 'cell' (vizinho livre do candidato).
+                    // candidateCell é o hex do candidato (já ocupado) — não é o destino de movimento.
+                    Debug.Log($"{TL("Repair")} {unit.InstanceId} fusão oportunista com " +
+                              $"{opt.candidateUnit.InstanceId} hp={unit.CurrentHP}+{opt.candidateUnit.CurrentHP}" +
+                              $" via {cell} (mov restante={remainingAfterMove})");
+                    return BuildMergeBatch(unit, aiTeam, fromCell, cell, opt.candidateUnit, paths);
                 }
             }
         }
@@ -114,7 +135,7 @@ public partial class AIController
         ConstructionManager repairDest = FindRepairConstruction(fromCell, aiTeam, occupied);
         if (repairDest == null)
         {
-            Debug.Log($"[AI][Repair] {unit.InstanceId} sem destino de reparo — conservador");
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} sem destino de reparo — conservador");
             return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
         }
 
@@ -122,7 +143,7 @@ public partial class AIController
 
         if (fromCell == destCell)
         {
-            Debug.Log($"[AI][Repair] {unit.InstanceId} aguarda reparo em {fromCell}");
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} aguarda reparo em {fromCell}");
             return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
         }
 
@@ -138,7 +159,7 @@ public partial class AIController
             if (score > bestScore) { bestScore = score; bestStep = cell; }
         }
 
-        Debug.Log($"[AI][Repair] {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
+        Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
         return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, paths);
     }
 
@@ -169,12 +190,29 @@ public partial class AIController
         float bestDist = float.MaxValue;
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
-            if (c.TeamId != aiTeam) continue;
-            if (c.CurrentCapturePoints < c.CapturePointsMax) continue; // não totalmente controlado
             Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
-            if (occupied.Contains(cc)) continue;
             float dist = Vector3Int.Distance(fromCell, cc);
+            if (c.TeamId != aiTeam)
+            {
+                Debug.Log($"[Repair] skip {cc} team={c.TeamId} (need {aiTeam}) dist={dist:F1}");
+                continue;
+            }
+            if (c.CurrentCapturePoints < c.CapturePointsMax)
+            {
+                Debug.Log($"[Repair] skip {cc} cap={c.CurrentCapturePoints}/{c.CapturePointsMax} (incompleto) dist={dist:F1}");
+                continue;
+            }
+            if (occupied.Contains(cc))
+            {
+                Debug.Log($"[Repair] skip {cc} ocupado dist={dist:F1}");
+                continue;
+            }
             if (dist < bestDist) { bestDist = dist; best = c; }
+        }
+        if (best != null)
+        {
+            Vector3Int bc = best.CurrentCellPosition; bc.z = 0;
+            Debug.Log($"[Repair] destino selecionado {bc} dist={bestDist:F1}");
         }
         return best;
     }

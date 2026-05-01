@@ -19,11 +19,44 @@ public partial class AIController : MonoBehaviour
     [SerializeField] private bool showAIUnitHUD;
 
 
-    private bool isActive;
-    private bool isDebugPaused;
+    private bool   isActive;
+    private bool   isDebugPaused;
+    private bool   isDebugShoppingPaused;
     private Coroutine aiCoroutine;
+    private int    aiTurnNumber;
+    private string aiTeamTag;
+    [SerializeField, Range(0, 4)] private int currentAIStage;
+    [SerializeField] private TeamId currentAITeam = TeamId.Neutral;
+    private enum DebugStepRequest
+    {
+        None,
+        Prepare,
+        Execute
+    }
+
+    private DebugStepRequest debugStepRequest;
+    private PlayerAction debugStepPendingAction;
+
+    private string TL(string category = "")
+        => string.IsNullOrEmpty(category)
+            ? $"[AI {aiTeamTag}][T{aiTurnNumber}]"
+            : $"[AI {aiTeamTag}][T{aiTurnNumber}][{category}]";
 
     public static bool IsDebugPaused { get; private set; }
+    public static bool IsDebugShoppingPaused { get; private set; }
+    public bool IsAIRuntimeActive => isActive;
+    public int CurrentAIStage => currentAIStage;
+    public TeamId CurrentAITeam => currentAITeam;
+    public int CurrentAITurnNumber => aiTurnNumber;
+
+    public void RestoreAIRuntimeState(bool active, TeamId team, int turnNumber, int stage)
+    {
+        isActive = active;
+        currentAITeam = team;
+        aiTurnNumber = turnNumber;
+        currentAIStage = Mathf.Clamp(stage, 0, 4);
+        aiTeamTag = team == TeamId.Neutral ? string.Empty : TeamUtils.GetName(team).ToUpper();
+    }
 
     /// <summary>
     /// Pausa ou retoma o loop da IA sem cancelar o batch em andamento.
@@ -33,9 +66,101 @@ public partial class AIController : MonoBehaviour
         isDebugPaused = paused;
         IsDebugPaused = paused;
 
+        if (!paused)
+        {
+            debugStepRequest = DebugStepRequest.None;
+            ClearDebugStepPreview();
+            PanelDialogController.TrySetTransientText("AI RESUME", 1.8f);
+        }
+
         Debug.Log(paused
             ? "[AI] Pausa de debug solicitada. Aguardando ponto seguro."
             : "[AI] Pausa de debug encerrada. Retomando IA.");
+
+        if (paused)
+            PanelDialogController.TrySetExternalText("AI PAUSE\nAguardando AI RESUME ou AI STEP");
+    }
+
+    public void RequestDebugStep()
+    {
+        if (!isDebugPaused)
+        {
+            Debug.Log("[AI Step] Ignorado: acione AI Pause antes de usar AI Step.");
+            PanelDialogController.TrySetTransientText("AI STEP ignorado: use AI PAUSE primeiro", 2.0f);
+            return;
+        }
+
+        debugStepRequest = debugStepPendingAction != null
+            ? DebugStepRequest.Execute
+            : DebugStepRequest.Prepare;
+
+        Debug.Log(debugStepRequest == DebugStepRequest.Prepare
+            ? "[AI Step] Preparando proximo batch."
+            : "[AI Step] Executando batch preparado.");
+
+        PanelDialogController.TrySetTransientText(
+            debugStepRequest == DebugStepRequest.Prepare
+                ? "AI STEP: preparando batch"
+                : "AI STEP: executando batch",
+            1.6f);
+    }
+
+    public void SetDebugShoppingPaused(bool paused)
+    {
+        isDebugShoppingPaused = paused;
+        IsDebugShoppingPaused = paused;
+
+        Debug.Log(paused
+            ? "[AI Shopping] Fase 3 pausada. A IA vai parar antes das compras."
+            : "[AI Shopping] Fase 3 liberada. A IA pode entrar nas compras.");
+
+        if (paused)
+            PanelDialogController.TrySetTransientText("AI SHOPPING PAUSE", 2.0f);
+        else
+            PanelDialogController.TrySetTransientText("AI SHOPPING RESUME", 1.8f);
+    }
+
+    public bool TryStartDebugStage(int stage)
+    {
+        if (stage < 1 || stage > 3)
+        {
+            Debug.Log($"[AI Stage] Stage invalido: {stage}. Use 1, 2 ou 3.");
+            PanelDialogController.TrySetTransientText("AI STAGE invalido: use 1, 2 ou 3", 2.2f);
+            return false;
+        }
+
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+        if (replayManager == null)
+            replayManager = FindAnyObjectByType<ReplayManager>();
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+
+        if (matchController == null)
+        {
+            Debug.Log("[AI Stage] MatchController nao encontrado.");
+            PanelDialogController.TrySetTransientText("AI STAGE: MatchController nao encontrado", 2.2f);
+            return false;
+        }
+
+        TeamId aiTeam = matchController.ActiveTeam;
+        if (!matchController.IsPlayerAI(aiTeam))
+        {
+            Debug.Log($"[AI Stage] Time ativo {aiTeam} nao e IA.");
+            PanelDialogController.TrySetTransientText($"AI STAGE: time ativo {aiTeam} nao e IA", 2.2f);
+            return false;
+        }
+
+        if (aiCoroutine != null)
+            StopCoroutine(aiCoroutine);
+
+        isActive = true;
+        debugStepRequest = DebugStepRequest.None;
+        ClearDebugStepPreview();
+        aiCoroutine = StartCoroutine(RunAIDebugStage(aiTeam, stage));
+        Debug.Log($"[AI Stage] Reiniciando IA no stage {stage} para {aiTeam}.");
+        PanelDialogController.TrySetTransientText($"AI STAGE {stage}", 2.0f);
+        return true;
     }
 
     // -------------------------------------------------------------------------
@@ -78,6 +203,7 @@ public partial class AIController : MonoBehaviour
         MatchController.OnActiveTeamChanged -= HandleTeamChanged;
         if (aiCoroutine != null) StopCoroutine(aiCoroutine);
         if (IsDebugPaused) IsDebugPaused = false;
+        if (IsDebugShoppingPaused) IsDebugShoppingPaused = false;
     }
 
     // -------------------------------------------------------------------------
@@ -101,6 +227,8 @@ public partial class AIController : MonoBehaviour
         else
         {
             isActive = false;
+            currentAIStage = 0;
+            currentAITeam = TeamId.Neutral;
         }
     }
 
@@ -111,24 +239,84 @@ public partial class AIController : MonoBehaviour
     private IEnumerator RunAITurn(TeamId aiTeam)
     {
         Debug.Log($"[AI] RunAITurn iniciado para {aiTeam}.");
+        currentAITeam = aiTeam;
+        currentAIStage = 0;
         yield return Phase0_WaitForTurnReady();
         yield return WaitIfDebugPaused();
 
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
-        Debug.Log($"[AI] Turno {snapshot.TurnNumber} | Stance: {snapshot.Stance} " +
-                  $"| {snapshot.MyUnits.Count} unidades | {snapshot.EnemyUnits.Count} inimigos " +
+        aiTurnNumber = snapshot.TurnNumber;
+        aiTeamTag    = TeamUtils.GetName(aiTeam).ToUpper();
+        Debug.Log($"{TL()} Turno {snapshot.TurnNumber} | Stance: {snapshot.Stance} " +
+                  $"| {snapshot.MyUnits.Count} unidades | {snapshot.EnemyUnits.Count} inimigos visíveis " +
                   $"| R$ {snapshot.Budget}");
 
+        currentAIStage = 1;
         BuildObjectivePlan(snapshot);
 
         yield return Phase1_CommandService(snapshot);
         yield return WaitIfDebugPaused();
+        currentAIStage = 2;
         yield return Phase2_UnitActions(snapshot);
         yield return WaitIfDebugPaused();
+        yield return WaitIfDebugShoppingPaused();
+        yield return WaitIfDebugPaused();
+        currentAIStage = 3;
         yield return Phase3_Shopping(snapshot);
         yield return WaitIfDebugPaused();
+        currentAIStage = 4;
         yield return Phase4_EndTurn();
 
+        currentAIStage = 0;
+        currentAITeam = TeamId.Neutral;
+        aiCoroutine = null;
+    }
+
+    private IEnumerator RunAIDebugStage(TeamId aiTeam, int stage)
+    {
+        currentAITeam = aiTeam;
+        currentAIStage = Mathf.Clamp(stage, 1, 3);
+        yield return WaitIfDebugPaused();
+        yield return new WaitUntil(() => replayManager == null || !replayManager.IsStepExecutionBusy);
+        yield return new WaitUntil(() =>
+            turnStateManager == null ||
+            turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral);
+
+        AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
+        aiTurnNumber = snapshot.TurnNumber;
+        aiTeamTag    = TeamUtils.GetName(aiTeam).ToUpper();
+        Debug.Log($"{TL("Stage")} Inicio debug stage {stage} | Stance: {snapshot.Stance} " +
+                  $"| {snapshot.MyUnits.Count} unidades | {snapshot.EnemyUnits.Count} inimigos visiveis " +
+                  $"| R$ {snapshot.Budget}");
+
+        currentAIStage = 1;
+        BuildObjectivePlan(snapshot);
+
+        if (stage <= 1)
+        {
+            currentAIStage = 1;
+            yield return Phase1_CommandService(snapshot);
+            yield return WaitIfDebugPaused();
+        }
+
+        if (stage <= 2)
+        {
+            currentAIStage = 2;
+            yield return Phase2_UnitActions(snapshot);
+            yield return WaitIfDebugPaused();
+        }
+
+        currentAIStage = 2;
+        yield return WaitIfDebugShoppingPaused();
+        yield return WaitIfDebugPaused();
+        currentAIStage = 3;
+        yield return Phase3_Shopping(snapshot);
+        yield return WaitIfDebugPaused();
+        currentAIStage = 4;
+        yield return Phase4_EndTurn();
+
+        currentAIStage = 0;
+        currentAITeam = TeamId.Neutral;
         aiCoroutine = null;
     }
 
@@ -152,7 +340,7 @@ public partial class AIController : MonoBehaviour
         float batchDelay = GetBatchDelay();
         if (batchDelay > 0f) yield return new WaitForSeconds(batchDelay);
 
-        Debug.Log("[AI] Fase 0 concluída.");
+        Debug.Log($"{TL()} Fase0 concluída.");
     }
 
     // -------------------------------------------------------------------------
@@ -163,31 +351,42 @@ public partial class AIController : MonoBehaviour
     {
         if (!isDebugPaused) yield break;
 
-        Debug.Log("[AI] Pausa de debug ativa - aguardando 'AI RESUME'.");
-        yield return new WaitUntil(() => !isDebugPaused);
-        Debug.Log("[AI] Retomando execucao da IA.");
+        Debug.Log("[AI] Pausa de debug ativa - aguardando 'AI RESUME' ou 'AI STEP'.");
+        yield return new WaitUntil(() => !isDebugPaused || debugStepRequest != DebugStepRequest.None);
+        if (!isDebugPaused)
+            Debug.Log("[AI] Retomando execucao da IA.");
+    }
+
+    private IEnumerator WaitIfDebugShoppingPaused()
+    {
+        if (!isDebugShoppingPaused) yield break;
+
+        Debug.Log($"{TL("Shopping")} Pausado antes da Fase 3 - aguardando 'AI SHOPPING RESUME'.");
+        PanelDialogController.TrySetExternalText("AI Shopping pausado\nAI SHOPPING RESUME para liberar compras");
+        yield return new WaitUntil(() => !isDebugShoppingPaused);
+        PanelDialogController.ClearExternalText();
+        Debug.Log($"{TL("Shopping")} Resume recebido - entrando na Fase 3.");
     }
 
     private IEnumerator Phase1_CommandService(AIWorldSnapshot snapshot)
     {
-        Debug.Log($"[AI] Fase 1 — iniciando. replayManager={replayManager != null} turnStateManager={turnStateManager != null}");
+        Debug.Log($"{TL()} Fase1 — iniciando. replayManager={replayManager != null} turnStateManager={turnStateManager != null}");
 
         if (replayManager == null)
         {
-            Debug.LogWarning("[AI] Fase 1 — replayManager é null, abortando.");
+            Debug.LogWarning($"{TL()} Fase1 — replayManager é null, abortando.");
             yield break;
         }
 
         if (matchController == null || !matchController.IsPlayerCommandServiceAutomatic(snapshot.AITeam))
         {
-            Debug.Log("[AI] Fase 1 — commandServiceAutomatic=false, pulando.");
+            Debug.Log($"{TL()} Fase1 — commandServiceAutomatic=false, pulando.");
             yield break;
         }
 
-        Debug.Log("[AI] Fase 1 — enviando batch CommandService.");
-        replayManager.ExecuteLiveAIBatch(BuildCommandServiceBatch(snapshot.AITeam));
-        yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
-        Debug.Log("[AI] Fase 1 — batch concluído. Aguardando IsAutoCommandServiceBusy...");
+        Debug.Log($"{TL()} Fase1 — enviando batch CommandService.");
+        yield return ExecuteAIBatchWithDebugStep(BuildCommandServiceBatch(snapshot.AITeam));
+        Debug.Log($"{TL()} Fase1 — batch concluído. Aguardando IsAutoCommandServiceBusy...");
 
         if (turnStateManager != null)
             yield return new WaitUntil(() => !turnStateManager.IsAutoCommandServiceBusy);
@@ -195,7 +394,7 @@ public partial class AIController : MonoBehaviour
         float delay = GetBatchDelay();
         if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
 
-        Debug.Log("[AI] Fase 1 — Serviço do Comando concluído.");
+        Debug.Log($"{TL()} Fase1 — Serviço do Comando concluído.");
     }
 
     // -------------------------------------------------------------------------
@@ -209,11 +408,11 @@ public partial class AIController : MonoBehaviour
         List<UnitManager> initial = GetAvailableUnits(aiTeam);
         if (initial.Count == 0)
         {
-            Debug.Log("[AI] Fase 2 — sem unidades em campo, pulando.");
+            Debug.Log($"{TL()} Fase 2 — sem unidades em campo, pulando.");
             yield break;
         }
 
-        Debug.Log("[AI] Fase 2 — iniciando ações.");
+        Debug.Log($"{TL()} Fase2 — iniciando ações.");
 
         while (isActive)
         {
@@ -225,6 +424,49 @@ public partial class AIController : MonoBehaviour
             // Reconstrói a foto do mundo após cada batch — hexes ocupados mudam
             AIWorldSnapshot current = AIWorldSnapshot.Build(aiTeam, matchController);
 
+            // Ordena iniciativa por grupo (menor = age primeiro):
+            // 0 = vacater handoff  1 = reparo sobre capturável (libera prédio imediatamente)
+            // 2 = objetivo normal  3 = rogue/sem objetivo
+            // 4 = reparo em campo (age por último — base pode estar vazia antes das compras)
+            TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+            available.Sort((a, b) =>
+            {
+                int groupA = GetInitiativeGroup(a, activePlan, aiTeam);
+                int groupB = GetInitiativeGroup(b, activePlan, aiTeam);
+
+                // Blocker cross-group: B fisicamente no target de A → B age primeiro para desocupar
+                if (activePlan != null)
+                {
+                    Vector3Int? aTarget = GetAssignedTargetCell(a, activePlan);
+                    if (aTarget.HasValue)
+                    {
+                        Vector3Int bCell = b.CurrentCellPosition; bCell.z = 0;
+                        if (bCell == aTarget.Value) return 1;
+                    }
+                    Vector3Int? bTarget = GetAssignedTargetCell(b, activePlan);
+                    if (bTarget.HasValue)
+                    {
+                        Vector3Int aCell = a.CurrentCellPosition; aCell.z = 0;
+                        if (aCell == bTarget.Value) return -1;
+                    }
+                }
+
+                if (groupA != groupB) return groupA.CompareTo(groupB);
+
+                // Dentro do grupo 2: prioridade do objetivo (pri=1 = age primeiro)
+                if (groupA == 2 && activePlan != null)
+                {
+                    SectorObjective objA = ResolveAssignedObjective(a, activePlan);
+                    SectorObjective objB = ResolveAssignedObjective(b, activePlan);
+                    if (objA == null && objB == null) return 0;
+                    if (objA == null) return 1;
+                    if (objB == null) return -1;
+                    return objA.Priority.CompareTo(objB.Priority);
+                }
+
+                return 0;
+            });
+
             UnitManager unit = available[0];
             PlayerAction action = DecideUnitAction(unit, current);
 
@@ -235,15 +477,14 @@ public partial class AIController : MonoBehaviour
                 continue;
             }
 
-            replayManager.ExecuteLiveAIBatch(action);
-            yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
-            yield return WaitIfDebugPaused();
-
             // Recalcula FoW apenas quando algo que altera visibilidade ocorreu:
             // movimento (nova posição = novo cone de visão) ou ataque (inimigo pode
             // ter morrido, liberando LOS para células antes bloqueadas).
             bool unitMoved    = action.HasMoveTo && action.MoveTo != action.MoveFrom;
             bool unitAttacked = !string.IsNullOrEmpty(action.TargetInstanceId);
+            yield return ExecuteAIBatchWithDebugStep(action);
+            yield return WaitIfDebugPaused();
+
             if (unitMoved || unitAttacked)
                 matchController?.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.DataOnly);
 
@@ -251,7 +492,7 @@ public partial class AIController : MonoBehaviour
             if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
         }
 
-        Debug.Log("[AI] Fase 2 concluída.");
+        Debug.Log($"{TL()} Fase2 concluída.");
     }
 
     // -------------------------------------------------------------------------
@@ -260,7 +501,7 @@ public partial class AIController : MonoBehaviour
 
     private IEnumerator Phase3_Shopping(AIWorldSnapshot snapshot)
     {
-        Debug.Log("[AI] Fase 3 — compras.");
+        Debug.Log($"{TL()} Fase3 — compras.");
 
         // Reconstrói snapshot para refletir o saldo atual pós-ações
         AIWorldSnapshot freshSnap = AIWorldSnapshot.Build(snapshot.AITeam, matchController);
@@ -270,19 +511,20 @@ public partial class AIController : MonoBehaviour
         {
             if (!isActive) break;
             yield return WaitIfDebugPaused();
+            yield return WaitIfDebugShoppingPaused();
+            yield return WaitIfDebugPaused();
 
             PlayerAction batch = BuildShoppingBatch(snapshot.AITeam, order);
-            Debug.Log($"[AI][Shopping] {order.UnitToBuy.name} @ {order.Building.CurrentCellPosition}");
+            Debug.Log($"{TL("Shopping")} {order.UnitToBuy.name} @ {order.Building.CurrentCellPosition}");
 
-            replayManager.ExecuteLiveAIBatch(batch);
-            yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
+            yield return ExecuteAIBatchWithDebugStep(batch);
             yield return WaitIfDebugPaused();
 
             // Segurança: fecha o menu de shopping se ficou aberto (compra falhou)
             if (turnStateManager != null &&
                 turnStateManager.CurrentCursorState == TurnStateManager.CursorState.ShoppingAndServices)
             {
-                Debug.LogWarning("[AI][Shopping] Menu ficou aberto — fechando.");
+                Debug.LogWarning($"{TL("Shopping")} Menu ficou aberto — fechando.");
                 turnStateManager.HandleCancel();
             }
 
@@ -290,7 +532,7 @@ public partial class AIController : MonoBehaviour
             if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
         }
 
-        Debug.Log("[AI] Fase 3 concluída.");
+        Debug.Log($"{TL()} Fase3 concluída.");
     }
 
     // -------------------------------------------------------------------------
@@ -299,7 +541,7 @@ public partial class AIController : MonoBehaviour
 
     private IEnumerator Phase4_EndTurn()
     {
-        Debug.Log("[AI] Fase 4 — passando a vez.");
+        Debug.Log($"{TL()} Fase4 — passando a vez.");
         isActive = false;
 
         yield return new WaitUntil(() =>
@@ -309,7 +551,7 @@ public partial class AIController : MonoBehaviour
         if (replayManager != null)
         {
             TeamId aiTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
-            replayManager.ExecuteLiveAIBatch(BuildEndTurnBatch(aiTeam));
+            yield return ExecuteAIBatchWithDebugStep(BuildEndTurnBatch(aiTeam));
         }
         else
         {
@@ -362,7 +604,7 @@ public partial class AIController : MonoBehaviour
         if (showAIUnitHUD)
         {
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"[AI][Think] Unidade {unit.InstanceId} ({unit.UnitDisplayName}) | role={resolvedRole} target={resolvedTarget}");
+            sb.AppendLine($"{TL("Think")} Unidade {unit.InstanceId} ({unit.UnitDisplayName}) | role={resolvedRole} target={resolvedTarget}");
             foreach (HexEvaluation e in evaluations)
                 sb.AppendLine($"  {(e.isChosen ? "★" : " ")} {e.cell} | total={e.total:F2}" +
                               $"  cap={e.captureProximity:F2} cbt={e.combatValue:F2} dpq={e.positionQuality:F2}" +
@@ -496,6 +738,34 @@ public partial class AIController : MonoBehaviour
         return list;
     }
 
+    private static Vector3Int? GetAssignedTargetCell(UnitManager unit, TeamObjectivePlan plan)
+    {
+        SectorObjective obj = ResolveAssignedObjective(unit, plan);
+        if (obj == null) return null;
+        ConstructionManager tgt = FindCapturableInSector(obj.Sector, unit.TeamId);
+        if (tgt == null) return null;
+        Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
+        return tc;
+    }
+
+    // Grupo de iniciativa (menor = age primeiro):
+    // 0 = vacater handoff, 1 = reparo sobre capturável não-completo (libera prédio),
+    // 2 = objetivo normal, 3 = rogue/sem objetivo, 4 = reparo em campo (age por último).
+    private int GetInitiativeGroup(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (plan != null && plan.HandoffVacaterIds.Contains(unit.InstanceId)) return 0;
+        if (unit.IsUnderRepair)
+        {
+            Vector3Int cell = unit.CurrentCellPosition; cell.z = 0;
+            ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+            bool onCapturable = bldg != null && bldg.IsCapturable
+                && !(bldg.TeamId == aiTeam && bldg.CurrentCapturePoints >= bldg.CapturePointsMax);
+            return onCapturable ? 1 : 4;
+        }
+        bool hasObjective = plan != null && ResolveAssignedObjective(unit, plan) != null;
+        return hasObjective ? 2 : 3;
+    }
+
     private HashSet<Vector3Int> BuildOccupied(UnitManager excludeUnit)
     {
         var set = new HashSet<Vector3Int>();
@@ -513,6 +783,112 @@ public partial class AIController : MonoBehaviour
         if (replayManager != null)
             return Mathf.Max(0f, replayManager.GetEffectiveTimeBetweenBatchesForAutoplay());
         return 0.5f;
+    }
+
+    private IEnumerator ExecuteAIBatchWithDebugStep(PlayerAction action)
+    {
+        if (action == null)
+            yield break;
+
+        if (isDebugPaused)
+        {
+            debugStepPendingAction = action;
+            debugStepRequest = DebugStepRequest.None;
+            ShowDebugStepPreview(action);
+
+            yield return new WaitUntil(() => !isDebugPaused || debugStepRequest == DebugStepRequest.Execute);
+            debugStepRequest = DebugStepRequest.None;
+            ClearDebugStepPreview();
+        }
+
+        if (replayManager == null)
+            yield break;
+
+        replayManager.ExecuteLiveAIBatch(action);
+        yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
+        debugStepPendingAction = null;
+    }
+
+    private void ShowDebugStepPreview(PlayerAction action)
+    {
+        string description = BuildDebugStepDescription(action);
+        string previewMessage = string.Empty;
+        bool previewShown = turnStateManager != null &&
+            turnStateManager.TryShowAIDebugStepPreview(action, out previewMessage);
+
+        Debug.Log($"[AI Step] {description}");
+        if (!string.IsNullOrWhiteSpace(previewMessage))
+            Debug.Log($"[AI Step] {previewMessage}");
+
+        PanelDialogController.TrySetExternalText(
+            $"AI Step\n{description}\nF11: executar | F9: resume");
+
+        if (!previewShown)
+            Debug.Log("[AI Step] Preview visual indisponivel para este batch.");
+    }
+
+    private void ClearDebugStepPreview()
+    {
+        debugStepPendingAction = null;
+        turnStateManager?.ClearAIDebugStepPreview();
+        PanelDialogController.ClearExternalText();
+    }
+
+    private string BuildDebugStepDescription(PlayerAction action)
+    {
+        if (action == null)
+            return "batch vazio.";
+
+        string unitLabel = ResolveUnitLabel(action.UnitInstanceId);
+        string from = action.HasMoveFrom ? FormatCell(action.MoveFrom) : "origem indefinida";
+        string to = action.HasMoveTo ? FormatCell(action.MoveTo) : "destino indefinido";
+
+        switch (action.ActionType)
+        {
+            case PlayerActionType.CommandService:
+                return "servico do comando automatico sera executado.";
+            case PlayerActionType.Shopping:
+                return $"compra {action.ShoppingUnitTypeId} no hex {FormatCell(action.TargetHex)}.";
+            case PlayerActionType.EndTurn:
+                return "a IA vai passar a vez.";
+            case PlayerActionType.UnitAction:
+                switch (action.SensorAction)
+                {
+                    case SensorActionType.Attack:
+                        return $"{unitLabel} vai de {from} ate {to} e vai atacar {action.TargetInstanceId} no hex {FormatCell(action.TargetHex)}.";
+                    case SensorActionType.Capture:
+                        return $"{unitLabel} vai de {from} ate {to} e vai capturar.";
+                    case SensorActionType.Merge:
+                        return $"{unitLabel} vai de {from} ate {to} e vai fundir.";
+                    case SensorActionType.Supply:
+                        return $"{unitLabel} vai de {from} ate {to} e vai suprir.";
+                    default:
+                        return $"{unitLabel} vai de {from} ate {to}.";
+                }
+            default:
+                return !string.IsNullOrWhiteSpace(action.DebugLabel) ? action.DebugLabel : action.ActionType.ToString();
+        }
+    }
+
+    private static string FormatCell(Vector3Int cell)
+    {
+        return $"({cell.x},{cell.y})";
+    }
+
+    private static string ResolveUnitLabel(string instanceId)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId))
+            return "a unidade";
+
+        foreach (UnitManager unit in UnitManager.AllActive)
+        {
+            if (unit == null)
+                continue;
+            if (unit.InstanceId.ToString() == instanceId)
+                return $"{unit.UnitDisplayName} #{unit.InstanceId}";
+        }
+
+        return $"unidade #{instanceId}";
     }
 
     // -------------------------------------------------------------------------

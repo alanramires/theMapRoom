@@ -526,12 +526,17 @@ public partial class TurnStateManager : MonoBehaviour
             return false;
         }
 
-        if (!target.HasActed)
+        bool wasMissingFromAllActive = !UnitManager.AllActive.Contains(target);
+        bool hadMerged = target.HasMerged;
+        if (!target.HasActed && !hadMerged && !wasMissingFromAllActive)
         {
             message = $"{ResolveDebugUnitName(target)} ja esta pronta para agir.";
             return false;
         }
 
+        EnsureDebugUnitRegisteredInAllActive(target, "wake unit");
+        if (hadMerged)
+            target.ClearMergeAudit();
         target.ResetActed();
         message = $"Unidade reativada: {ResolveDebugUnitName(target)} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
@@ -551,6 +556,8 @@ public partial class TurnStateManager : MonoBehaviour
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         int totalTeamUnits = 0;
         int wokeUnits = 0;
+        int restoredActiveUnits = 0;
+        int clearedMergeUnits = 0;
 
         for (int i = 0; i < units.Length; i++)
         {
@@ -559,14 +566,28 @@ public partial class TurnStateManager : MonoBehaviour
                 continue;
 
             totalTeamUnits++;
-            if (!unit.HasActed)
+            bool wasMissingFromAllActive = !UnitManager.AllActive.Contains(unit);
+            bool hadMerged = unit.HasMerged;
+            if (!unit.HasActed && !hadMerged && !wasMissingFromAllActive)
                 continue;
 
+            if (EnsureDebugUnitRegisteredInAllActive(unit, "wake all units"))
+                restoredActiveUnits++;
+            if (hadMerged)
+            {
+                unit.ClearMergeAudit();
+                clearedMergeUnits++;
+            }
             unit.ResetActed();
             wokeUnits++;
         }
 
-        message = $"Wake all units: time ativo {TeamUtils.GetName(activeTeam)} | reativadas {wokeUnits}/{totalTeamUnits}.";
+        message = $"Wake all units: time ativo {TeamUtils.GetName(activeTeam)} | reativadas {wokeUnits}/{totalTeamUnits}";
+        if (clearedMergeUnits > 0)
+            message += $" | fusao liberada {clearedMergeUnits}";
+        if (restoredActiveUnits > 0)
+            message += $" | AllActive restaurado {restoredActiveUnits}";
+        message += ".";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -986,6 +1007,7 @@ public partial class TurnStateManager : MonoBehaviour
             return false;
         }
 
+        EnsureDebugSpawnRegisteredInAllActive(spawned);
         RefreshFogOfWarAfterSpawn();
         message = $"Spawnado: {ResolveDebugUnitDataName(unitData)} em {FormatMapCellWithZ(cursorCell)} para team {TeamUtils.GetName(teamId)}.";
         Debug.Log($"[Debug Command] {message}");
@@ -1020,8 +1042,31 @@ public partial class TurnStateManager : MonoBehaviour
             return false;
         }
 
+        EnsureDebugSpawnRegisteredInAllActive(spawned);
         RefreshFogOfWarAfterSpawn();
         message = $"Spawnado: {unitToken} em {cell} para team {TeamUtils.GetName(resolvedTeam)}.";
+        return true;
+    }
+
+    private static void EnsureDebugSpawnRegisteredInAllActive(GameObject spawned)
+    {
+        if (spawned == null)
+            return;
+
+        UnitManager unit = spawned.GetComponent<UnitManager>();
+        if (unit == null)
+            return;
+
+        EnsureDebugUnitRegisteredInAllActive(unit, "spawn debug");
+    }
+
+    private static bool EnsureDebugUnitRegisteredInAllActive(UnitManager unit, string source)
+    {
+        if (unit == null || UnitManager.AllActive.Contains(unit))
+            return false;
+
+        UnitManager.AllActive.Add(unit);
+        Debug.Log($"[Debug Command] UnitManager.AllActive atualizado por {source}: {unit.InstanceId}.");
         return true;
     }
 

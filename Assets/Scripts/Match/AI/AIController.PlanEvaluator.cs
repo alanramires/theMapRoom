@@ -34,7 +34,8 @@ public partial class AIController
             }
         }
 
-        // Passo 2: adiciona objetivos para setores ainda não cobertos
+        // Passo 2: adiciona objetivos para setores ainda não cobertos.
+        // Em Defensive: não abre novos objetivos em setores Medium ou piores (já ocupados persistem).
         IReadOnlyList<SectorManager.SectorInfo> allSectors = SectorManager.GetAllSectorInfos();
         foreach (SectorManager.SectorInfo info in allSectors)
         {
@@ -45,12 +46,16 @@ public partial class AIController
             if (!hasCapturable) continue;
             if (plan.GetObjectiveForSector(info.Sector) != null) continue;
 
+            if (snapshot.Stance == AIStance.Defensive
+                && info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.Medium)
+                continue;
+
             SectorObjective obj = new SectorObjective
             {
                 Sector       = info.Sector,
                 AssignedTeam = aiTeam,
                 Status       = ObjectiveStatus.Pending,
-                Priority     = CalculateSectorPriority(info, aiTeam),
+                Priority     = CalculateSectorPriority(info, aiTeam, snapshot.Stance),
             };
             int slots = info.GetRiskLevelFor(aiTeam) == SectorManager.SectorRiskLevel.High ? 2 : 1;
             for (int s = 0; s < slots; s++)
@@ -58,14 +63,47 @@ public partial class AIController
             plan.Objectives.Add(obj);
         }
 
+        // Edge case defensivo: se não sobrou nenhum objetivo, adiciona o setor capturável mais próximo do HQ
+        if (snapshot.Stance == AIStance.Defensive && plan.Objectives.Count == 0)
+        {
+            SectorManager.SectorInfo closest = null;
+            float closestDist = float.MaxValue;
+            foreach (SectorManager.SectorInfo info in allSectors)
+            {
+                if (info.IsFullyControlled && info.ControllingTeam == aiTeam) continue;
+                bool hasCapturable = false;
+                foreach (SectorManager.SectorConstructionInfo c in info.Constructions)
+                    if (c.OwnerTeam != aiTeam) { hasCapturable = true; break; }
+                if (!hasCapturable) continue;
+                float d = info.GetDistanceToHQ(aiTeam);
+                if (d < closestDist) { closestDist = d; closest = info; }
+            }
+            if (closest != null && plan.GetObjectiveForSector(closest.Sector) == null)
+            {
+                SectorObjective fallback = new SectorObjective
+                {
+                    Sector       = closest.Sector,
+                    AssignedTeam = aiTeam,
+                    Status       = ObjectiveStatus.Pending,
+                    Priority     = CalculateSectorPriority(closest, aiTeam, snapshot.Stance),
+                };
+                fallback.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
+                plan.Objectives.Add(fallback);
+                Debug.Log($"{TL("Plan")} Defensive sem objetivos seguros — fallback para {closest.Sector} ({closestDist:F1}h do HQ)");
+            }
+        }
+
         // Passo 3: recalcula prioridades, ordena e renumera
         foreach (SectorObjective obj in plan.Objectives)
             if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo inf))
-                obj.Priority = CalculateSectorPriority(inf, aiTeam);
+                obj.Priority = CalculateSectorPriority(inf, aiTeam, snapshot.Stance);
 
         plan.Objectives.Sort((a, b) => b.Priority.CompareTo(a.Priority));
         for (int i = 0; i < plan.Objectives.Count; i++)
             plan.Objectives[i].Priority = i + 1;
+
+        plan.HandoffVacaterIds.Clear();
+        plan.VacaterForwardSectors.Clear();
 
         // Passo 3b: handoff — capturador mais saudável herda objetivo parcial;
         //           capturador original fica livre para o backtracking reatribuir
@@ -96,34 +134,27 @@ public partial class AIController
             obj.Status = ObjectiveStatus.Pursuing;
             ApplyPlanHUD(u, obj);
             immediateList.Add(u);
-            Debug.Log($"[AI][Plan] {u.InstanceId} já está em {bldg.Sector} → captura imediata");
+            Debug.Log($"{TL("Plan")} {u.InstanceId} já está em {bldg.Sector} → captura imediata");
         }
         foreach (UnitManager u in immediateList) freeCapturers.Remove(u);
 
-        // 5b: atribuição ótima por backtracking (minimiza passos reais de caminho)
-        // Para N ≤ 8 capturadores e ≤ 8 objetivos abertos o espaço é trivial.
-        // Setores já alocados (sticky) cobrem seus vizinhos por cascata.
-        const float CascadeRange = 4f;
+        // 5b: atribuição ótima por backtracking (minimiza passos reais de caminho).
+        // Cascata DINÂMICA: setores com slot aberto são processados em ordem de prioridade;
+        // cada setor selecionado suprime apenas seu neighbor1 (vizinho mais próximo).
+        // Setores já preenchidos (sticky) NÃO geram cascata — só setores abertos participam.
+        // Isso garante que: (a) setores com substituto handoff não bloqueiam o vacater,
+        //                   (b) a cascata só reflete quem está disputando slot neste turno.
         var cascadeCovered = new HashSet<ConstructionSector>();
-        foreach (SectorObjective obj in plan.Objectives)
-        {
-            foreach (SlotNeed s in obj.Slots)
-                if (s.Filled && s.Role == UnitRole.Capturador)
-                    { MarkCascadeCoverage(obj.Sector, cascadeCovered, CascadeRange); break; }
-        }
-
-        // Constrói alvos em ordem de prioridade marcando cascade a cada adição:
-        // Golf adicionado → Eco marcada → Eco pulada → Foxtrot entra no lugar.
         var assignableObjs = new List<(SectorObjective obj, Vector3Int cell)>();
-        foreach (SectorObjective obj in plan.Objectives)
+        foreach (SectorObjective obj in plan.Objectives) // pri=1 primeiro (mais prioritário)
         {
             if (!obj.HasOpenSlot(UnitRole.Capturador)) continue;
-            if (cascadeCovered.Contains(obj.Sector)) continue;
+            if (cascadeCovered.Contains(obj.Sector))   continue;
             ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
             if (tgt == null) continue;
             Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
             assignableObjs.Add((obj, tc));
-            MarkCascadeCoverage(obj.Sector, cascadeCovered, CascadeRange);
+            MarkCascadeNeighbor1(obj.Sector, cascadeCovered, aiTeam, plan.VacaterForwardSectors);
         }
 
         int nu = Mathf.Min(freeCapturers.Count, assignableObjs.Count);
@@ -169,7 +200,10 @@ public partial class AIController
                         && path.Count > 0)
                         distMatrix[ui, oj] = path.Count;
                     else
-                        distMatrix[ui, oj] = Vector3Int.Distance(uc, tc) * 2f;
+                        if (SectorManager.TryGetLandMovementDistance(uc, tc, out int terrainCost))
+                            distMatrix[ui, oj] = terrainCost;
+                        else
+                            distMatrix[ui, oj] = SectorManager.HexDistance(uc, tc);
                 }
             }
 
@@ -191,7 +225,10 @@ public partial class AIController
         }
 
         foreach (UnitManager u in freeCapturers)
+        {
+            u.ClearAIAssignedPlan();
             plan.RogueUnitIds.Add(u.InstanceId);
+        }
 
         // Passo 6: reaplica HUD para atribuições anteriores
         foreach (SectorObjective obj in plan.Objectives)
@@ -204,7 +241,7 @@ public partial class AIController
 
         int totalAssigned = 0;
         var planLog = new System.Text.StringBuilder();
-        planLog.AppendLine($"[AI][Plan] {aiTeam} — {plan.Objectives.Count} objetivos:");
+        planLog.AppendLine($"{TL("Plan")} {aiTeam} — {plan.Objectives.Count} objetivos:");
         foreach (SectorObjective obj in plan.Objectives)
         {
             foreach (SlotNeed slot in obj.Slots)
@@ -259,13 +296,15 @@ public partial class AIController
         return null;
     }
 
-    private static int CalculateSectorPriority(SectorManager.SectorInfo info, TeamId aiTeam)
+    private static int CalculateSectorPriority(SectorManager.SectorInfo info, TeamId aiTeam, AIStance stance = AIStance.Tactical)
     {
         float distToAI = info.GetDistanceToHQ(aiTeam);
         if (distToAI == float.MaxValue) return 0;
 
+        SectorManager.SectorRiskLevel risk = info.GetRiskLevelFor(aiTeam);
+
         int riskBonus;
-        switch (info.GetRiskLevelFor(aiTeam))
+        switch (risk)
         {
             case SectorManager.SectorRiskLevel.Safe:   riskBonus = 40; break;
             case SectorManager.SectorRiskLevel.Low:    riskBonus = 30; break;
@@ -277,7 +316,42 @@ public partial class AIController
         int distPenalty   = Mathf.RoundToInt(distToAI);
         int disputedBonus = info.IsDisputed ? 15 : 0;
 
-        return riskBonus - distPenalty + disputedBonus;
+        // Bônus por tipo de construção no setor (HQ inimigo, fábrica, prédio com renda)
+        int buildingValueBonus = 0;
+        foreach (SectorManager.SectorConstructionInfo c in info.Constructions)
+        {
+            if (c.Source == null || c.OwnerTeam == aiTeam) continue;
+            if (c.Source.IsPlayerHeadQuarter)
+            {
+                int hqVal = stance == AIStance.Defensive
+                    ? Mathf.RoundToInt(100 * 0.2f)   // modera rush irresponsável em defensive
+                    : 100;
+                buildingValueBonus += hqVal;
+            }
+            else if (c.Source.CanProduceUnits)
+                buildingValueBonus += 30;
+            else if (c.Source.CapturedIncoming > 0)
+                buildingValueBonus += 15;
+        }
+        buildingValueBonus = Mathf.Clamp(buildingValueBonus, 0, 80);
+
+        int stanceBonus = 0;
+        switch (stance)
+        {
+            case AIStance.Defensive:
+                stanceBonus += Mathf.RoundToInt(1f / (distToAI + 1f) * 30f);
+                if (risk >= SectorManager.SectorRiskLevel.High)
+                    stanceBonus -= 30;
+                break;
+            case AIStance.Offensive:
+                if (risk >= SectorManager.SectorRiskLevel.High)
+                    stanceBonus += 20;
+                else if (risk <= SectorManager.SectorRiskLevel.Low)
+                    stanceBonus -= 10;
+                break;
+        }
+
+        return riskBonus - distPenalty + disputedBonus + buildingValueBonus + stanceBonus;
     }
 
     // Retorna distância até o alvo atribuído. Rogues e sem plano = float.MaxValue (agem por último).
@@ -298,7 +372,7 @@ public partial class AIController
 
             Vector3Int uCell = unit.CurrentCellPosition; uCell.z = 0;
             Vector3Int tCell = target.CurrentCellPosition; tCell.z = 0;
-            return Vector3Int.Distance(uCell, tCell);
+            return SectorManager.HexDistance(uCell, tCell);
         }
 
         return float.MaxValue;
@@ -368,7 +442,7 @@ public partial class AIController
 
                 bool completesCapture = pts + candidate.CurrentHP >= max;
                 Vector3Int cc = candidate.CurrentCellPosition; cc.z = 0;
-                float dist  = Vector3Int.Distance(cc, targetCell);
+                float dist  = SectorManager.HexDistance(cc, targetCell);
                 float score = candidate.CurrentHP * 100f - dist * 20f;
                 if (completesCapture) score += 500f;
 
@@ -377,12 +451,12 @@ public partial class AIController
 
             if (substitute == null)
             {
-                Debug.Log($"[AI][Handoff][Skip] sem substituto para {obj.Sector} ({pts}/{max})");
+                Debug.Log($"{TL("Handoff")}[Skip] sem substituto para {obj.Sector} ({pts}/{max})");
                 continue;
             }
 
             bool subCompletes = pts + substitute.CurrentHP >= max;
-            Debug.Log($"[AI][Handoff] Unit{assignedUnit.InstanceId} hp={assignedUnit.CurrentHP} avança; " +
+            Debug.Log($"{TL("Handoff")} Unit{assignedUnit.InstanceId} hp={assignedUnit.CurrentHP} avança; " +
                       $"Unit{substitute.InstanceId} hp={substitute.CurrentHP} herda {obj.Sector} " +
                       $"({pts}/{max}){(subCompletes ? " → completa" : "")}");
 
@@ -390,6 +464,9 @@ public partial class AIController
             filledSlot.Filled         = false;
             filledSlot.AssignedUnitId = -1;
             assignedUnit.ClearAIAssignedPlan();
+            plan.HandoffVacaterIds.Add(assignedUnit.InstanceId);
+            ConstructionSector fwdSector = ComputeForwardNeighborSector(obj.Sector, aiTeam);
+            if (fwdSector != default) plan.VacaterForwardSectors.Add(fwdSector);
 
             // Atribui substituto ao objetivo parcial
             obj.TryFillSlot(UnitRole.Capturador, substitute.InstanceId);
@@ -404,11 +481,46 @@ public partial class AIController
         }
     }
 
-    private static void MarkCascadeCoverage(ConstructionSector sector, HashSet<ConstructionSector> covered, float range)
+    private void MarkCascadeNeighbor1(ConstructionSector sector, HashSet<ConstructionSector> covered, TeamId aiTeam, HashSet<ConstructionSector> vacaterProtected = null)
     {
         if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return;
-        if (info.ClosestNeighbor1Distance <= range) covered.Add(info.ClosestNeighbor1);
-        if (info.ClosestNeighbor2Distance <= range) covered.Add(info.ClosestNeighbor2);
+
+        // Prefere neighbor1 (mais próximo).
+        // Se já for totalmente controlado pelo time AI (atrás do front), usa neighbor2 (direção de avanço).
+        ConstructionSector candidate = info.ClosestNeighbor1;
+        float              candidateDist = info.ClosestNeighbor1Distance;
+
+        if (candidate != default
+            && SectorManager.TryGetSectorInfo(candidate, out SectorManager.SectorInfo n1)
+            && n1.IsFullyControlled && n1.ControllingTeam == aiTeam)
+        {
+            candidate     = info.ClosestNeighbor2;
+            candidateDist = info.ClosestNeighbor2Distance;
+        }
+
+        if (candidate == default) return;
+
+        // Setor forward de um vacater: não suprimir — o vacater vai naturalmente para lá
+        if (vacaterProtected != null && vacaterProtected.Contains(candidate))
+        {
+            Debug.Log($"{TL("Plan")} cascata: {sector} → {candidate} protegido por vacater, supressão ignorada");
+            return;
+        }
+
+        covered.Add(candidate);
+        Debug.Log($"{TL("Plan")} cascata: {sector} → {candidate} ({candidateDist:F1}h)");
+    }
+
+    // Mesmo cálculo de direção que MarkCascadeNeighbor1: retorna o setor forward sem suprimir nada.
+    private static ConstructionSector ComputeForwardNeighborSector(ConstructionSector sector, TeamId aiTeam)
+    {
+        if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return default;
+        ConstructionSector candidate = info.ClosestNeighbor1;
+        if (candidate != default
+            && SectorManager.TryGetSectorInfo(candidate, out SectorManager.SectorInfo n1)
+            && n1.IsFullyControlled && n1.ControllingTeam == aiTeam)
+            candidate = info.ClosestNeighbor2;
+        return candidate;
     }
 
     private static bool HasOpenObjectiveOtherThan(TeamObjectivePlan plan, SectorObjective exclude)

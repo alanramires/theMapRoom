@@ -591,30 +591,27 @@ public static class HexEvaluator
     }
 
     // -----------------------------------------------------------------
-    // Peso estratégico do setor de um prédio para a IA
-    //   2.0 — setor em disputa       → urgência máxima
-    //   1.5 — setor mais perto do inimigo → território avançado
-    //   1.0 — setor neutro / default
-    //   0.5 — setor já totalmente aliado → baixa prioridade
+    // Peso estratégico do prédio para a IA (por tipo de construção)
+    //   3.0 — HQ inimigo          → alvo de vitória
+    //   2.0 — Fábrica             → produção de unidades
+    //   1.5 — Prédio com renda    → geração de fundos
+    //   0.5 — Prédio aliado completo → baixa prioridade
+    //   1.0 — default
     // -----------------------------------------------------------------
     private static float GetSectorStrategicWeight(ConstructionManager building, TeamId myTeam)
     {
         if (building == null) return 1f;
 
-        SectorManager.SectorInfo info = null;
-        if (!SectorManager.TryGetSectorInfo(building.Sector, out info))
-            SectorManager.TryGetBaseInfo(building.Sector, out info);
+        if (building.IsPlayerHeadQuarter && building.TeamId != myTeam)
+            return 3.0f;
 
-        if (info == null) return 1f;
-
-        if (info.IsDisputed)
+        if (building.CanProduceUnits)
             return 2.0f;
 
-        TeamId nearest = info.NearestTeam();
-        if (nearest != TeamId.Neutral && nearest != myTeam)
+        if (building.CapturedIncoming > 0)
             return 1.5f;
 
-        if (info.IsFullyControlled && info.ControllingTeam == myTeam)
+        if (building.TeamId == myTeam && building.CurrentCapturePoints >= building.CapturePointsMax)
             return 0.5f;
 
         return 1.0f;

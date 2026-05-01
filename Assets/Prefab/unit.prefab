@@ -482,7 +482,7 @@ MonoBehaviour:
   embarkedResourcesRuntime: []
   embarkedServicesRuntime: []
   appliedHasActed: 0
-  appliedActiveTeamId: 3
+  appliedActiveTeamId: 0
   isEmbarked: 0
   embarkedAtUnit: 
   embarkedVisualPreviewDepth: 0

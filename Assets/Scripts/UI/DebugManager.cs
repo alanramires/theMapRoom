@@ -19,6 +19,10 @@ public class DebugManager : MonoBehaviour
     [Tooltip("Arraste o objeto do input (raiz ou filho).")]
     [SerializeField] private GameObject commandInputObject;
 
+    [Header("AI Debug Shortcuts")]
+    [Tooltip("F9 = AI Resume  |  F10 = AI Pause  |  F11 = AI Step")]
+    [SerializeField] private bool aiDebugShortcutsEnabled;
+
     private Component resolvedCommandInputField;
     private PropertyInfo cachedTextProperty;
     private InputField resolvedLegacyInputField;
@@ -98,6 +102,9 @@ public class DebugManager : MonoBehaviour
 
     private void Update()
     {
+        if (aiDebugShortcutsEnabled)
+            HandleAIDebugShortcuts();
+
         bool commandInputFocused = IsCommandInputFocused();
         if (!commandInputFocused)
         {
@@ -420,6 +427,50 @@ public class DebugManager : MonoBehaviour
                 Debug.Log("[Debug Command] AI RESUME.");
             }
         }
+        else if (command == "AI SHOPPING PAUSE" || command == "PAUSE AI SHOPPING")
+        {
+            AIController aiController = FindAnyObjectByType<AIController>();
+            if (aiController == null)
+            {
+                Debug.Log("[Debug Command] AIController nao encontrado.");
+            }
+            else
+            {
+                aiController.SetDebugShoppingPaused(true);
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log("[Debug Command] AI SHOPPING PAUSE.");
+            }
+        }
+        else if (command == "AI SHOPPING RESUME" || command == "RESUME AI SHOPPING")
+        {
+            AIController aiController = FindAnyObjectByType<AIController>();
+            if (aiController == null)
+            {
+                Debug.Log("[Debug Command] AIController nao encontrado.");
+            }
+            else
+            {
+                aiController.SetDebugShoppingPaused(false);
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log("[Debug Command] AI SHOPPING RESUME.");
+            }
+        }
+        else if (TryParseAIStageCommand(command, out int aiStage))
+        {
+            AIController aiController = FindAnyObjectByType<AIController>();
+            if (aiController == null)
+            {
+                Debug.Log("[Debug Command] AIController nao encontrado.");
+            }
+            else if (aiController.TryStartDebugStage(aiStage))
+            {
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log($"[Debug Command] AI STAGE {aiStage}.");
+            }
+        }
         else
         {
             Debug.Log($"[Debug Command] Comando desconhecido: \"{rawCommand}\"");
@@ -487,6 +538,42 @@ public class DebugManager : MonoBehaviour
 
         lastSubmitFrame = Time.frameCount;
         HandleSendClicked();
+    }
+
+    private void HandleAIDebugShortcuts()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current == null) return;
+        bool f9  = Keyboard.current.f9Key.wasPressedThisFrame;
+        bool f10 = Keyboard.current.f10Key.wasPressedThisFrame;
+        bool f11 = Keyboard.current.f11Key.wasPressedThisFrame;
+#else
+        bool f9  = Input.GetKeyDown(KeyCode.F9);
+        bool f10 = Input.GetKeyDown(KeyCode.F10);
+        bool f11 = Input.GetKeyDown(KeyCode.F11);
+#endif
+        if (!f9 && !f10 && !f11) return;
+
+        AIController ai = FindAnyObjectByType<AIController>();
+
+        if (f9)
+        {
+            if (ai != null) ai.SetDebugPaused(false);
+            else Debug.Log("[AI Shortcuts] AIController não encontrado.");
+            Debug.Log("[AI Shortcuts] F9 — AI Resume");
+        }
+        if (f10)
+        {
+            if (ai != null) ai.SetDebugPaused(true);
+            else Debug.Log("[AI Shortcuts] AIController não encontrado.");
+            Debug.Log("[AI Shortcuts] F10 — AI Pause");
+        }
+        if (f11)
+        {
+            if (ai != null) ai.RequestDebugStep();
+            else Debug.Log("[AI Shortcuts] AIController nao encontrado.");
+            Debug.Log("[AI Shortcuts] F11 — AI Step");
+        }
     }
 
     private System.Collections.IEnumerator FocusCommandInputNextFrame()
@@ -784,7 +871,7 @@ public class DebugManager : MonoBehaviour
             "set owner <x> (alias, -1 neutro, 0 verde, 1 azul, 2 vermelho, 3 amarelo)\n" +
             "set active team <x> (troca time ativo sem avancar turno)\n" +
             "set capture points <v>\n" +
-            "spawn <unit>\n" +
+            "spawn <unit> | ai spawn <unit>\n" +
             "spawn:<team> <unit>\n" +
             "set money <v> | set money:<team> <v>\n" +
             "set economy on|off\n" +
@@ -794,7 +881,30 @@ public class DebugManager : MonoBehaviour
             "fow on|off\n" +
             "ai pause | pause ai\n" +
             "ai resume | resume ai\n" +
+            "ai shopping pause | pause ai shopping\n" +
+            "ai shopping resume | resume ai shopping\n" +
+            "ai stage <1-3> (reinicia a IA no bloco escolhido)\n" +
             "help";
+    }
+
+    private static bool TryParseAIStageCommand(string normalizedCommand, out int stage)
+    {
+        stage = 0;
+        if (string.IsNullOrWhiteSpace(normalizedCommand))
+            return false;
+
+        const string prefix = "AI STAGE ";
+        if (!normalizedCommand.StartsWith(prefix))
+            return false;
+
+        string valueToken = normalizedCommand.Substring(prefix.Length).Trim();
+        if (!int.TryParse(valueToken, out stage))
+            return true;
+
+        if (stage < 1 || stage > 3)
+            return true;
+
+        return true;
     }
 
     private static bool TryParseSetCapturePointsCommand(string normalizedCommand, out int capturePointsValue)
@@ -844,6 +954,13 @@ public class DebugManager : MonoBehaviour
         }
 
         const string prefix = "spawn ";
+        const string aiPrefix = "ai spawn ";
+        if (trimmed.StartsWith(aiPrefix, System.StringComparison.OrdinalIgnoreCase))
+        {
+            unitToken = trimmed.Substring(aiPrefix.Length).Trim();
+            return !string.IsNullOrWhiteSpace(unitToken);
+        }
+
         if (!trimmed.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
             return false;
 

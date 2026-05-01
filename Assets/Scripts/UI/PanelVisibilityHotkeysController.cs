@@ -45,7 +45,6 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
     [SerializeField] [Range(1f, 30f)] private float retractLerpSpeed = 14f;
     [Header("Display")]
     [SerializeField] private KeyCode tutorialToggleKey = KeyCode.F6;
-    [SerializeField] private KeyCode fullscreenToggleKey = KeyCode.F11;
     [SerializeField] private bool preferExclusiveFullscreen = true;
 
     private GameObject panelDebug;
@@ -99,9 +98,6 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
 
         if (!textInputFocused && WasHotkeysTogglePressedThisFrame())
             TogglePanelHotkeys();
-
-        if (!textInputFocused && WasFullscreenTogglePressedThisFrame())
-            ToggleFullscreenMode();
 
         if (!textInputFocused && WasTutorialTogglePressedThisFrame())
             OnF6Pressed?.Invoke();
@@ -462,8 +458,7 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
             "Enter: Confirm\n" +
             "Esc: Cancel\n" +
             "Tab: Cycle Units\n" +
-            "Shift+Tab: Reverse Cycle Units\n" +
-            "F11: Toggle Fullscreen");
+            "Shift+Tab: Reverse Cycle Units");
     }
 
     private static TMP_Text FindNamedTmpText(Transform root, string name)
@@ -604,21 +599,6 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
 #endif
 #else
         return Input.GetKeyDown(KeyCode.H);
-#endif
-    }
-
-    private bool WasFullscreenTogglePressedThisFrame()
-    {
-#if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current != null && WasFunctionKeyPressedThisFrame(fullscreenToggleKey))
-            return true;
-#if ENABLE_LEGACY_INPUT_MANAGER
-        return Input.GetKeyDown(fullscreenToggleKey);
-#else
-        return false;
-#endif
-#else
-        return Input.GetKeyDown(fullscreenToggleKey);
 #endif
     }
 

@@ -142,6 +142,8 @@ public partial class TurnStateManager
     private float mirandoPreviewHeadDistance;
     private bool mirandoPreviewUseInvalidColor;
     private bool mirandoPreviewSignatureValid;
+    private bool aiDebugStepPreviewActive;
+    private readonly Color aiDebugStepPreviewColor = new Color(0.1f, 0.45f, 1f, 0.95f);
     private Vector3 mirandoPreviewLastFrom;
     private Vector3 mirandoPreviewLastTo;
     private WeaponTrajectoryType mirandoPreviewLastTrajectory;
@@ -3925,6 +3927,7 @@ public partial class TurnStateManager
 
     private void UpdateMirandoPreviewAnimation()
     {
+        bool isAIDebugStepPreview = aiDebugStepPreviewActive;
         bool isMirandoCycle =
             CurrentCursorState == CursorState.Mirando &&
             scannerPromptStep == ScannerPromptStep.MirandoCycleTarget;
@@ -3934,10 +3937,11 @@ public partial class TurnStateManager
             scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget;
 
         bool canRenderMirandoPreview =
-            !combatExecutionInProgress &&
-            (isMirandoCycle || isMirandoConfirm);
+            isAIDebugStepPreview ||
+            (!combatExecutionInProgress &&
+            (isMirandoCycle || isMirandoConfirm));
 
-        if (canRenderMirandoPreview)
+        if (canRenderMirandoPreview && !isAIDebugStepPreview)
             TryRefreshMirandoPreviewPathIfNeeded();
 
         bool shouldShow =
@@ -3948,7 +3952,8 @@ public partial class TurnStateManager
         if (!shouldShow)
         {
             SetMirandoPreviewVisible(false);
-            SetMirandoSpotterPreviewsVisible(false);
+            if (!isAIDebugStepPreview)
+                SetMirandoSpotterPreviewsVisible(false);
             return;
         }
 
@@ -4022,7 +4027,10 @@ public partial class TurnStateManager
             renderer.enabled = true;
         }
 
-        UpdateMirandoSpotterPreviewAnimation();
+        if (isAIDebugStepPreview)
+            SetMirandoSpotterPreviewsVisible(false);
+        else
+            UpdateMirandoSpotterPreviewAnimation();
     }
 
     private void RebuildMirandoPreviewPath(MirandoSelectionEntry entry)
@@ -4759,6 +4767,126 @@ public partial class TurnStateManager
         RestoreMirandoInvalidUnitTint();
     }
 
+    public bool TryShowAIDebugStepPreview(PlayerAction action, out string message)
+    {
+        message = string.Empty;
+        ClearAIDebugStepPreview();
+
+        if (action == null)
+        {
+            message = "Batch vazio.";
+            return false;
+        }
+
+        if (cursorController != null && TryResolveAIDebugStepCursorCell(action, out Vector3Int cursorCell))
+            cursorController.SetCell(cursorCell, playMoveSfx: false, adjustCamera: true);
+
+        if (!TryResolveAIDebugStepLineCells(action, out Vector3Int fromCell, out Vector3Int toCell))
+        {
+            message = "Batch sem origem/destino visual para linha azul.";
+            return false;
+        }
+
+        Tilemap map = terrainTilemap != null ? terrainTilemap : (cursorController != null ? cursorController.BoardTilemap : null);
+        Vector3 from = HexCoordinates.GetCellCenterWorld(map, fromCell);
+        Vector3 to = HexCoordinates.GetCellCenterWorld(map, toCell);
+        from.z = to.z;
+
+        mirandoPreviewPathPoints.Clear();
+        mirandoPreviewSegmentPoints.Clear();
+        mirandoPreviewPathPoints.Add(from);
+        mirandoPreviewPathPoints.Add(to);
+        mirandoPreviewPathLength = ComputePathLength(mirandoPreviewPathPoints);
+        mirandoPreviewHeadDistance = 0f;
+        mirandoPreviewUseInvalidColor = false;
+        mirandoPreviewSignatureValid = false;
+        aiDebugStepPreviewActive = mirandoPreviewPathLength > 0.0001f;
+
+        SetMirandoPreviewVisible(aiDebugStepPreviewActive);
+        SetMirandoSpotterPreviewsVisible(false);
+
+        message = aiDebugStepPreviewActive
+            ? $"Linha azul: {FormatMapCellWithZ(fromCell)} -> {FormatMapCellWithZ(toCell)}."
+            : "Origem e destino iguais; linha azul nao foi exibida.";
+        return aiDebugStepPreviewActive;
+    }
+
+    public void ClearAIDebugStepPreview()
+    {
+        aiDebugStepPreviewActive = false;
+        ClearMirandoPreview();
+    }
+
+    private static bool TryResolveAIDebugStepCursorCell(PlayerAction action, out Vector3Int cell)
+    {
+        cell = default;
+        if (action == null)
+            return false;
+
+        if (action.HasCursorHex)
+        {
+            cell = action.CursorHex;
+            cell.z = 0;
+            return true;
+        }
+
+        if (action.HasMoveFrom)
+        {
+            cell = action.MoveFrom;
+            cell.z = 0;
+            return true;
+        }
+
+        if (action.HasTargetHex)
+        {
+            cell = action.TargetHex;
+            cell.z = 0;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveAIDebugStepLineCells(PlayerAction action, out Vector3Int fromCell, out Vector3Int toCell)
+    {
+        fromCell = default;
+        toCell = default;
+        if (action == null)
+            return false;
+
+        if (action.ActionType == PlayerActionType.UnitAction &&
+            action.SensorAction == SensorActionType.Attack &&
+            action.HasMoveTo &&
+            action.HasTargetHex)
+        {
+            fromCell = action.MoveTo;
+            toCell = action.TargetHex;
+            fromCell.z = 0;
+            toCell.z = 0;
+            return true;
+        }
+
+        if (action.HasMoveFrom && action.HasMoveTo)
+        {
+            fromCell = action.MoveFrom;
+            toCell = action.MoveTo;
+            fromCell.z = 0;
+            toCell.z = 0;
+            return true;
+        }
+
+        if (action.HasCursorHex && action.HasTargetHex)
+        {
+            fromCell = action.CursorHex;
+            toCell = action.TargetHex;
+            fromCell.z = 0;
+            toCell.z = 0;
+            return true;
+        }
+
+        return false;
+    }
+
     private void UpdateMirandoTargetHighlight(UnitManager target)
     {
         if (highlightedMirandoTarget == target)
@@ -4800,6 +4928,9 @@ public partial class TurnStateManager
 
     private Color GetCurrentMirandoPreviewColor()
     {
+        if (aiDebugStepPreviewActive)
+            return aiDebugStepPreviewColor;
+
         if (mirandoPreviewUseInvalidColor)
             return new Color(0.18f, 0.18f, 0.18f, 0.95f);
 
@@ -5069,10 +5200,6 @@ public partial class TurnStateManager
 #endif
     }
 }
-
-
-
-
 
 
 
