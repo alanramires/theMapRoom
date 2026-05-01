@@ -4859,10 +4859,20 @@ public partial class TurnStateManager
             action.HasMoveTo &&
             action.HasTargetHex)
         {
-            fromCell = action.MoveTo;
-            toCell = action.TargetHex;
+            // Se a unidade vai se mover antes de atacar → mostra o movimento (MoveFrom → MoveTo).
+            // Se fica parada → mostra a linha de ataque (posição atual → inimigo).
+            if (action.HasMoveFrom && action.MoveFrom != action.MoveTo)
+            {
+                fromCell = action.MoveFrom;
+                toCell   = action.MoveTo;
+            }
+            else
+            {
+                fromCell = action.MoveTo;
+                toCell   = action.TargetHex;
+            }
             fromCell.z = 0;
-            toCell.z = 0;
+            toCell.z   = 0;
             return true;
         }
 

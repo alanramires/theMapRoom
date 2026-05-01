@@ -34,6 +34,7 @@ public static class SaveDataMapper
                 teamId = teamIds[i],
                 flipX = i < flipXs.Count && flipXs[i],
                 isAI = i < isAIs.Count && isAIs[i],
+                commandServiceAutomatic = matchController.IsPlayerCommandServiceAutomatic((TeamId)teamIds[i]),
                 startMoney = i < startMoneys.Count ? Mathf.Max(0, startMoneys[i]) : 0,
                 actualMoney = i < actualMoneys.Count ? Mathf.Max(0, actualMoneys[i]) : 0,
                 incomePerTurn = i < incomePerTurns.Count ? Mathf.Max(0, incomePerTurns[i]) : 0,
@@ -106,6 +107,13 @@ public static class SaveDataMapper
             incomePerTurns,
             startMoneyAppliedFlags,
             data.includeNeutralTeam);
+
+        for (int i = 0; i < data.players.Count; i++)
+        {
+            MatchPlayerSaveData p = data.players[i];
+            if (p != null)
+                matchController.SetPlayerCommandServiceAutomatic((TeamId)p.teamId, p.commandServiceAutomatic);
+        }
 
         List<int> victoryTeamIds = new List<int>();
         List<int> victoryStars = new List<int>();

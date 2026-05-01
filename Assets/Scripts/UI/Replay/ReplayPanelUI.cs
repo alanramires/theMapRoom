@@ -31,7 +31,7 @@ public class ReplayPanelUI : MonoBehaviour
     [SerializeField] private Toggle fastReplayModeToggle;
 
     [Header("Input")]
-    [SerializeField] private KeyCode togglePanelKey = KeyCode.F9;
+    [SerializeField] private KeyCode togglePanelKey = KeyCode.None; // F9 reservado para AI Debug Shortcuts
 
     [SerializeField] private bool isOpen;
     [SerializeField] private bool replaySessionArmed;
@@ -158,7 +158,7 @@ public class ReplayPanelUI : MonoBehaviour
         switch (key)
         {
             case KeyCode.F9:
-                return Keyboard.current.f9Key.wasPressedThisFrame;
+                return false; // reservado para AI Debug Shortcuts
             case KeyCode.RightBracket:
                 return Keyboard.current.rightBracketKey.wasPressedThisFrame;
             case KeyCode.LeftBracket:

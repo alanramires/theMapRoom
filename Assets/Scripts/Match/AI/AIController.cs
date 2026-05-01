@@ -18,6 +18,11 @@ public partial class AIController : MonoBehaviour
     [Header("AI HUD")]
     [SerializeField] private bool showAIUnitHUD;
 
+    [Header("Captura")]
+    [Tooltip("Impacto do risco na tomada de decisão (0 = ignora risco, 2 = risco pesa muito)")]
+    [SerializeField, Range(0f, 2f)] private float riskDecisionImpact = 0.5f;
+    public float RiskDecisionImpact => riskDecisionImpact;
+
 
     private bool   isActive;
     private bool   isDebugPaused;
@@ -120,7 +125,7 @@ public partial class AIController : MonoBehaviour
             PanelDialogController.TrySetTransientText("AI SHOPPING RESUME", 1.8f);
     }
 
-    public bool TryStartDebugStage(int stage)
+    public bool TryStartDebugStage(int stage, bool resetPlan = false)
     {
         if (stage < 1 || stage > 3)
         {
@@ -157,9 +162,10 @@ public partial class AIController : MonoBehaviour
         isActive = true;
         debugStepRequest = DebugStepRequest.None;
         ClearDebugStepPreview();
-        aiCoroutine = StartCoroutine(RunAIDebugStage(aiTeam, stage));
-        Debug.Log($"[AI Stage] Reiniciando IA no stage {stage} para {aiTeam}.");
-        PanelDialogController.TrySetTransientText($"AI STAGE {stage}", 2.0f);
+        aiCoroutine = StartCoroutine(RunAIDebugStage(aiTeam, stage, resetPlan));
+        string resetTag = resetPlan ? " (RESET PLANO)" : "";
+        Debug.Log($"[AI Stage] Reiniciando IA no stage {stage} para {aiTeam}{resetTag}.");
+        PanelDialogController.TrySetTransientText($"AI STAGE {stage}{resetTag}", 2.0f);
         return true;
     }
 
@@ -272,7 +278,7 @@ public partial class AIController : MonoBehaviour
         aiCoroutine = null;
     }
 
-    private IEnumerator RunAIDebugStage(TeamId aiTeam, int stage)
+    private IEnumerator RunAIDebugStage(TeamId aiTeam, int stage, bool resetPlan = false)
     {
         currentAITeam = aiTeam;
         currentAIStage = Mathf.Clamp(stage, 1, 3);
@@ -288,6 +294,15 @@ public partial class AIController : MonoBehaviour
         Debug.Log($"{TL("Stage")} Inicio debug stage {stage} | Stance: {snapshot.Stance} " +
                   $"| {snapshot.MyUnits.Count} unidades | {snapshot.EnemyUnits.Count} inimigos visiveis " +
                   $"| R$ {snapshot.Budget}");
+
+        if (resetPlan)
+        {
+            TeamObjectivePlan existing = ObjectiveManager.GetOrCreatePlanForTeam(aiTeam);
+            foreach (SectorObjective obj in existing.Objectives)
+                ClearObjectiveHUD(obj);
+            ObjectiveManager.ClearPlanForTeam(aiTeam);
+            Debug.Log($"{TL("Stage")} Plano resetado antes do BuildObjectivePlan.");
+        }
 
         currentAIStage = 1;
         BuildObjectivePlan(snapshot);
@@ -749,11 +764,15 @@ public partial class AIController : MonoBehaviour
     }
 
     // Grupo de iniciativa (menor = age primeiro):
-    // 0 = vacater handoff, 1 = reparo sobre capturável não-completo (libera prédio),
+    // 0 = vacater handoff ou blocker com inimigos adjacentes (libera o hex para o capturador),
+    // 1 = reparo sobre capturável não-completo (libera prédio),
     // 2 = objetivo normal, 3 = rogue/sem objetivo, 4 = reparo em campo (age por último).
     private int GetInitiativeGroup(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
     {
         if (plan != null && plan.HandoffVacaterIds.Contains(unit.InstanceId)) return 0;
+        // Blocker com ameaça: unidade está sobre o alvo de outro capturador E tem inimigo adjacente.
+        // Age primeiro para engajar o inimigo e liberar o hex antes do capturador designado agir.
+        if (plan != null && IsBlockingCaptureTargetWithEnemies(unit, plan, aiTeam)) return 0;
         if (unit.IsUnderRepair)
         {
             Vector3Int cell = unit.CurrentCellPosition; cell.z = 0;
@@ -764,6 +783,25 @@ public partial class AIController : MonoBehaviour
         }
         bool hasObjective = plan != null && ResolveAssignedObjective(unit, plan) != null;
         return hasObjective ? 2 : 3;
+    }
+
+    private bool IsBlockingCaptureTargetWithEnemies(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
+        => IsBlockingCaptureTarget(unit, plan, aiTeam) && HasEnemyNearCell(unit.CurrentCellPosition, aiTeam);
+
+    // Retorna true se a unidade está fisicamente sobre o alvo de captura de outro capturador designado.
+    private bool IsBlockingCaptureTarget(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        Vector3Int cell = unit.CurrentCellPosition; cell.z = 0;
+        foreach (SectorObjective obj in plan.Objectives)
+            foreach (SlotNeed slot in obj.Slots)
+            {
+                if (!slot.Filled || slot.AssignedUnitId == unit.InstanceId) continue;
+                ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
+                if (tgt == null) continue;
+                Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
+                if (tc == cell) return true;
+            }
+        return false;
     }
 
     private HashSet<Vector3Int> BuildOccupied(UnitManager excludeUnit)

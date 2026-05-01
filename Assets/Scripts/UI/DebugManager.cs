@@ -22,6 +22,8 @@ public class DebugManager : MonoBehaviour
     [Header("AI Debug Shortcuts")]
     [Tooltip("F9 = AI Resume  |  F10 = AI Pause  |  F11 = AI Step")]
     [SerializeField] private bool aiDebugShortcutsEnabled;
+    [Tooltip("Quando ativo, 'AI Stage 1' limpa o plano antes de rodar (força nova atribuição A+B).")]
+    [SerializeField] private bool resetPlanOnDebugStage;
 
     private Component resolvedCommandInputField;
     private PropertyInfo cachedTextProperty;
@@ -464,7 +466,7 @@ public class DebugManager : MonoBehaviour
             {
                 Debug.Log("[Debug Command] AIController nao encontrado.");
             }
-            else if (aiController.TryStartDebugStage(aiStage))
+            else if (aiController.TryStartDebugStage(aiStage, resetPlanOnDebugStage))
             {
                 executed = true;
                 cursorController?.PlayDoneSfx();

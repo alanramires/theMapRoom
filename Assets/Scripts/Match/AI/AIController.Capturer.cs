@@ -220,12 +220,31 @@ public partial class AIController
             {
                 if (opt?.targetUnit == null) continue;
                 Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
-                // Prioriza defensor que está no hex do objetivo (ameaça direta)
-                float priority = (tc == targetCell) ? 2f : 1f;
+                float priority = AttackTargetPriority(tc, targetCell);
                 if (priority > bestPriority) { bestPriority = priority; bestStayTarget = opt.targetUnit; }
             }
             if (bestStayTarget != null)
             {
+                // Reposicionamento antes de atacar se:
+                // (a) prioritizeDpqAtBattle — prefere terreno elevado; ou
+                // (b) está fisicamente sobre o alvo de outro capturador designado — deve liberar o hex.
+                TeamObjectivePlan activePlanDef = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+                bool mustVacate = activePlanDef != null && IsBlockingCaptureTarget(unit, activePlanDef, snapshot.AITeam);
+                bool dpqPref    = unit.TryGetUnitData(out UnitData udDef) && udDef.prioritizeDpqAtBattle;
+
+                if (mustVacate || dpqPref)
+                {
+                    Vector3Int ec = bestStayTarget.CurrentCellPosition; ec.z = 0;
+                    if (TryFindBestLoSCell(unit, paths, occupied, ec, out Vector3Int combatCell)
+                        && combatCell != fromCell)
+                    {
+                        string reason = mustVacate && dpqPref ? "vacate+DPQ" : mustVacate ? "vacate" : "DPQ";
+                        Debug.Log($"{TL("Obj")} {unit.InstanceId} [{reason}] reposiciona @ {combatCell} — ataca {bestStayTarget.UnitDisplayName}#{bestStayTarget.InstanceId} @ {ec}");
+                        return BuildAttackBatch(unit, snapshot.AITeam, fromCell, combatCell,
+                            bestStayTarget.InstanceId.ToString(), ec);
+                    }
+                }
+
                 Vector3Int stCell = bestStayTarget.CurrentCellPosition; stCell.z = 0;
                 Debug.Log($"{TL("Obj")} {unit.InstanceId} defende {assigned.Sector} — ataca {bestStayTarget.UnitDisplayName}#{bestStayTarget.InstanceId} @ {stCell}");
                 return BuildAttackBatch(unit, snapshot.AITeam, fromCell, fromCell,
@@ -236,10 +255,41 @@ public partial class AIController
 
         // (B) Captura oportunista: prédio capturável no caminho ao objetivo atribuído
         // excludeCurrentCell=true: após handoff, unit ainda está no setor anterior — não voltar a capturá-lo
+        // Não captura oportunisticamente se outro capturador já foi designado para aquele setor —
+        // evita roubar o alvo de uma unidade que age depois por ter objetivo de menor prioridade.
         if (TryFindOpportunisticCapture(unit, paths, occupied, targetCell, out Vector3Int opCell, excludeCurrentCell: true))
         {
-            Debug.Log($"{TL("Obj")} {unit.InstanceId} captura oportunista @ {opCell} → {assigned.Sector}");
-            return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, opCell, paths);
+            bool hasDesignated = false;
+            ConstructionManager opBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, opCell);
+            TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+            if (opBldg != null && activePlan != null)
+            {
+                SectorObjective opObj = activePlan.GetObjectiveForSector(opBldg.Sector);
+                if (opObj != null)
+                    foreach (SlotNeed slot in opObj.Slots)
+                    {
+                        if (!slot.Filled || slot.AssignedUnitId == unit.InstanceId) continue;
+                        UnitManager designated = null;
+                        foreach (UnitManager u in UnitManager.AllActive)
+                            if (u.InstanceId == slot.AssignedUnitId) { designated = u; break; }
+                        if (designated != null)
+                        {
+                            Dictionary<Vector3Int, List<Vector3Int>> dPaths =
+                                UnitMovementPathRules.CalcularCaminhosValidos(
+                                    boardTilemap, designated,
+                                    Mathf.Max(0, designated.RemainingMovementPoints),
+                                    terrainDatabase);
+                            if (dPaths != null && dPaths.ContainsKey(opCell))
+                                hasDesignated = true;
+                        }
+                        break;
+                    }
+            }
+            if (!hasDesignated)
+            {
+                Debug.Log($"{TL("Obj")} {unit.InstanceId} captura oportunista @ {opCell} → {assigned.Sector}");
+                return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, opCell, paths);
+            }
         }
 
         // (D) FoW passinho: ocupante invisível no alvo → sobe no DPQ mais elevado adjacente
@@ -270,15 +320,17 @@ public partial class AIController
             && defender.TeamId != snapshot.AITeam
             && (mcDef == null || mcDef.IsUnitVisibleForTeam(defender, snapshot.AITeam));
 
-        Vector3Int bestMove   = fromCell;
-        float      bestScore  = float.MinValue;
-        float      bestTie    = float.MinValue;
-        bool       canAdvance = false;
+        Vector3Int bestMove       = fromCell;
+        float      bestScore     = float.MinValue;
+        float      bestSectorTie = float.MinValue;
+        float      bestHqTie     = float.MinValue;
+        bool       canAdvance    = false;
 
-        Vector3Int attackMove   = fromCell;
-        float      attackScore  = float.MinValue;
-        float      attackTie    = float.MinValue;
-        bool       hasAttackHex = false;
+        Vector3Int attackMove       = fromCell;
+        float      attackScore     = float.MinValue;
+        float      attackSectorTie = float.MinValue;
+        float      attackHqTie     = float.MinValue;
+        bool       hasAttackHex    = false;
 
         bool preferDpqMove     = unit.TryGetUnitData(out UnitData moveUd) && moveUd.preferMoveOnBestDPQ;
         bool preferDpqAtBattle = unit.TryGetUnitData(out UnitData dpqUd)  && dpqUd.prioritizeDpqAtBattle;
@@ -300,18 +352,20 @@ public partial class AIController
             // Desempata células equidistantes do alvo: prefere a que está na direção direta.
             float moveCost  = paths[cell].Count;
             float score     = prox - moveCost + dpq - threat * ThreatWeight;
+            float sectorTie = -dist; // desempate 1: prefere célula mais próxima do setor
             float hqDist    = CalculateEnemyHqDistance(cell, snapshot, unit);
-            float tie       = CalculateEnemyHqTieBreak(hqDist);
+            float hqTie     = CalculateEnemyHqTieBreak(hqDist); // desempate 2: prefere mais próximo ao HQ
 
             string hqDistText = hqDist < float.MaxValue ? hqDist.ToString("F1") : "?";
-            scoringLog?.AppendLine($"  {cell} dist={dist:F1} prox={prox:F0} mv={moveCost:F0} dpq={dpq:F0} thr={threat:F0} hq={hqDistText} hqTie={tie:F1} -> {score:F0}");
+            scoringLog?.AppendLine($"  {cell} dist={dist:F1} prox={prox:F0} mv={moveCost:F0} dpq={dpq:F0} thr={threat:F0} secTie={sectorTie:F1} hq={hqDistText} hqTie={hqTie:F1} -> {score:F0}");
 
-            if (IsBetterScore(score, tie, bestScore, bestTie))
+            if (IsBetterScore(score, sectorTie, hqTie, bestScore, bestSectorTie, bestHqTie))
             {
-                bestScore = score;
-                bestTie = tie;
-                bestMove = cell;
-                canAdvance = true;
+                bestScore     = score;
+                bestSectorTie = sectorTie;
+                bestHqTie     = hqTie;
+                bestMove      = cell;
+                canAdvance    = true;
             }
 
             if (defenderVisible && score >= SafetyThresholdFactor
@@ -323,12 +377,13 @@ public partial class AIController
                     ? GetTerrainDpqPontos(cell) * DpqWeight
                     : 0f;
                 float aScore = score + AttackHexBonus + attackDpq;
-                if (IsBetterScore(aScore, tie, attackScore, attackTie))
+                if (IsBetterScore(aScore, sectorTie, hqTie, attackScore, attackSectorTie, attackHqTie))
                 {
-                    attackScore = aScore;
-                    attackTie = tie;
-                    attackMove = cell;
-                    hasAttackHex = true;
+                    attackScore      = aScore;
+                    attackSectorTie  = sectorTie;
+                    attackHqTie      = hqTie;
+                    attackMove       = cell;
+                    hasAttackHex     = true;
                 }
             }
         }
@@ -371,7 +426,7 @@ public partial class AIController
             {
                 if (opt?.targetUnit == null) continue;
                 Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
-                float priority = (tc == targetCell) ? 2f : 1f; // defensor do prédio tem prioridade
+                float priority = AttackTargetPriority(tc, targetCell);
                 if (priority > bestPriority) { bestPriority = priority; bestTarget = opt.targetUnit; }
             }
             if (bestTarget != null)
@@ -387,13 +442,21 @@ public partial class AIController
         assigned.Status = ObjectiveStatus.Pursuing;
         float bestHqDist = CalculateEnemyHqDistance(bestMove, snapshot, unit);
         string bestHqText = bestHqDist < float.MaxValue ? bestHqDist.ToString("F1") : "?";
-        Debug.Log($"{TL("Obj")} {unit.InstanceId} avança para {assigned.Sector} via {bestMove} (score={bestScore:F0}, hq={bestHqText}, hqTie={bestTie:F1})");
+        Debug.Log($"{TL("Obj")} {unit.InstanceId} avança para {assigned.Sector} via {bestMove} (score={bestScore:F0}, secTie={bestSectorTie:F1}, hq={bestHqText}, hqTie={bestHqTie:F1})");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestMove, paths);
     }
 
     // -------------------------------------------------------------------------
     // Helpers de combate
     // -------------------------------------------------------------------------
+
+    // 3 = defensor do prédio objetivo  2 = inimigo em qualquer construção  1 = terreno aberto
+    private float AttackTargetPriority(Vector3Int targetUnitCell, Vector3Int captureTargetCell)
+    {
+        if (targetUnitCell == captureTargetCell) return 3f;
+        ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, targetUnitCell);
+        return bldg != null ? 2f : 1f;
+    }
 
     private bool HasAttackTargetAtCurrentPos(UnitManager unit)
     {
@@ -583,14 +646,17 @@ public partial class AIController
         return 0f;
     }
 
-    private static bool IsBetterScore(float score, float tie, float bestScore, float bestTie)
+    private static bool IsBetterScore(float score, float sectorTie, float hqTie,
+                                       float bestScore, float bestSectorTie, float bestHqTie)
     {
         const float epsilon = 0.001f;
-        if (score > bestScore + epsilon)
-            return true;
-        if (Mathf.Abs(score - bestScore) > epsilon)
-            return false;
-        return tie > bestTie + epsilon;
+        if (score > bestScore + epsilon) return true;
+        if (Mathf.Abs(score - bestScore) > epsilon) return false;
+        // desempate 1: setor atribuído (menor distância ao alvo do setor)
+        if (sectorTie > bestSectorTie + epsilon) return true;
+        if (Mathf.Abs(sectorTie - bestSectorTie) > epsilon) return false;
+        // desempate 2: HQ inimigo
+        return hqTie > bestHqTie + epsilon;
     }
 
     private static float CalculateEnemyHqDistance(Vector3Int cell, AIWorldSnapshot snapshot, UnitManager unit)

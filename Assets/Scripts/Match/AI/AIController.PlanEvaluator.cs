@@ -50,6 +50,33 @@ public partial class AIController
                 && info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.Medium)
                 continue;
 
+            // Gating de co-chegada: setor arriscado só abre se pelo menos 2 capturadores
+            // chegarem com gap ≤ MaxArrivalGap hexes entre si (evita capturador solo em zona inimiga).
+            if (info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
+            {
+                ConstructionManager riskTgt = FindCapturableInSector(info.Sector, aiTeam);
+                if (riskTgt != null)
+                {
+                    const float MaxArrivalGap = 5f;
+                    Vector3Int rtc = riskTgt.CurrentCellPosition; rtc.z = 0;
+                    float near1 = float.MaxValue, near2 = float.MaxValue;
+                    foreach (UnitManager cap in GetAvailableCapturers(aiTeam))
+                    {
+                        Vector3Int cc = cap.CurrentCellPosition; cc.z = 0;
+                        float d = SectorManager.TryGetLandMovementDistance(cc, rtc, out int td)
+                            ? td : SectorManager.HexDistance(cc, rtc);
+                        if (d < near1) { near2 = near1; near1 = d; }
+                        else if (d < near2) near2 = d;
+                    }
+                    float gap = near2 - near1;
+                    if (near2 == float.MaxValue || gap > MaxArrivalGap)
+                    {
+                        Debug.Log($"{TL("Plan")} Setor {info.Sector} ignorado: risco alto, escolta muito distante (gap={(near2 == float.MaxValue ? "?" : gap.ToString("F0"))}h)");
+                        continue;
+                    }
+                }
+            }
+
             SectorObjective obj = new SectorObjective
             {
                 Sector       = info.Sector,
@@ -139,11 +166,13 @@ public partial class AIController
         foreach (UnitManager u in immediateList) freeCapturers.Remove(u);
 
         // 5b: atribuição ótima por backtracking (minimiza passos reais de caminho).
-        // Cascata DINÂMICA: setores com slot aberto são processados em ordem de prioridade;
-        // cada setor selecionado suprime apenas seu neighbor1 (vizinho mais próximo).
-        // Setores já preenchidos (sticky) NÃO geram cascata — só setores abertos participam.
-        // Isso garante que: (a) setores com substituto handoff não bloqueiam o vacater,
-        //                   (b) a cascata só reflete quem está disputando slot neste turno.
+        // Cascata apenas na distribuição inicial (nenhum objetivo ainda em Pursuing):
+        // cada setor selecionado suprime seu vizinho forward (direção de avanço),
+        // para que as unidades se espalhem em vez de se aglomerar no mesmo front.
+        // Após T1, quando unidades já estão em rota, a cascata é desativada para que
+        // cada setor possa receber cobertura independente.
+        bool isInitialDistribution = !plan.Objectives.Exists(o => o.Status == ObjectiveStatus.Pursuing);
+        const float MaxCoArrivalGap = 5f;
         var cascadeCovered = new HashSet<ConstructionSector>();
         var assignableObjs = new List<(SectorObjective obj, Vector3Int cell)>();
         foreach (SectorObjective obj in plan.Objectives) // pri=1 primeiro (mais prioritário)
@@ -153,8 +182,42 @@ public partial class AIController
             ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
             if (tgt == null) continue;
             Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
+
+            // 2º slot de setor de alto risco: só abre se houver capturador livre que possa
+            // chegar junto com o 1º (co-chegada). Evita mandar unidade recém-comprada a 10h.
+            if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo slotInfo)
+                && slotInfo.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
+            {
+                SlotNeed filledSlot = obj.Slots.Find(s => s.Role == UnitRole.Capturador && s.Filled);
+                if (filledSlot != null)
+                {
+                    UnitManager assigned = FindActiveUnit(filledSlot.AssignedUnitId, aiTeam);
+                    Vector3Int  aPos     = assigned != null ? assigned.CurrentCellPosition : tc; aPos.z = 0;
+                    float assignedDist   = SectorManager.TryGetLandMovementDistance(aPos, tc, out int adCost)
+                        ? adCost : SectorManager.HexDistance(aPos, tc);
+
+                    float nearestFree = float.MaxValue;
+                    foreach (UnitManager cap in freeCapturers)
+                    {
+                        Vector3Int cc = cap.CurrentCellPosition; cc.z = 0;
+                        float d = SectorManager.TryGetLandMovementDistance(cc, tc, out int td)
+                            ? td : SectorManager.HexDistance(cc, tc);
+                        if (d < nearestFree) nearestFree = d;
+                    }
+
+                    if (nearestFree == float.MaxValue || nearestFree > assignedDist + MaxCoArrivalGap)
+                    {
+                        Debug.Log($"{TL("Plan")} {obj.Sector} 2º slot bloqueado: livre mais próximo " +
+                                  $"({(nearestFree == float.MaxValue ? "?" : nearestFree.ToString("F0"))}h) " +
+                                  $"fora de alcance do 1º ({assignedDist:F0}h)");
+                        continue;
+                    }
+                }
+            }
+
             assignableObjs.Add((obj, tc));
-            MarkCascadeNeighbor1(obj.Sector, cascadeCovered, aiTeam, plan.VacaterForwardSectors);
+            if (isInitialDistribution)
+                MarkCascadeNeighbor1(obj.Sector, cascadeCovered, aiTeam, plan.VacaterForwardSectors);
         }
 
         int nu = Mathf.Min(freeCapturers.Count, assignableObjs.Count);
@@ -184,7 +247,19 @@ public partial class AIController
             // Pré-computa matriz de distâncias reais (passos de caminho).
             // Orçamento = 30 pts de movimento ≈ 6-10 turnos para a maioria das unidades.
             // Fallback para Euclidiana×2 quando o alvo está fora do alcance do orçamento.
-            const int PlanBudget = 30;
+            const int   PlanBudget     = 30;
+            float RiskCostWeight = riskDecisionImpact;
+
+            // Multiplicador de risco: setores de alto risco encarecem atribuição (incentiva co-chegada).
+            var riskMultipliers = new float[nObj];
+            for (int oj = 0; oj < nObj; oj++)
+            {
+                riskMultipliers[oj] = 1f;
+                if (SectorManager.TryGetSectorInfo(assignableObjs[oj].obj.Sector,
+                        out SectorManager.SectorInfo sInfo))
+                    riskMultipliers[oj] = 1f + sInfo.GetRiskRatioFor(aiTeam) * RiskCostWeight;
+            }
+
             var distMatrix = new float[nu, nObj];
             for (int ui = 0; ui < nu; ui++)
             {
@@ -195,15 +270,16 @@ public partial class AIController
                 for (int oj = 0; oj < nObj; oj++)
                 {
                     Vector3Int tc = assignableObjs[oj].cell;
+                    float rawDist;
                     if (planPaths != null
                         && planPaths.TryGetValue(tc, out List<Vector3Int> path)
                         && path.Count > 0)
-                        distMatrix[ui, oj] = path.Count;
+                        rawDist = path.Count;
+                    else if (SectorManager.TryGetLandMovementDistance(uc, tc, out int terrainCost))
+                        rawDist = terrainCost;
                     else
-                        if (SectorManager.TryGetLandMovementDistance(uc, tc, out int terrainCost))
-                            distMatrix[ui, oj] = terrainCost;
-                        else
-                            distMatrix[ui, oj] = SectorManager.HexDistance(uc, tc);
+                        rawDist = SectorManager.HexDistance(uc, tc);
+                    distMatrix[ui, oj] = rawDist * riskMultipliers[oj];
                 }
             }
 
@@ -259,7 +335,10 @@ public partial class AIController
                 {
                     Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
                     Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
-                    distStr = $"{Vector3Int.Distance(uc, tc):F1}h";
+                    float d = SectorManager.TryGetLandMovementDistance(uc, tc, out int td)
+                        ? td
+                        : SectorManager.HexDistance(uc, tc);
+                    distStr = $"{d:F0}h";
                 }
                 planLog.AppendLine($"  pri={obj.Priority} {obj.Sector}: Unit{slot.AssignedUnitId} @ {distStr}");
             }
@@ -451,7 +530,79 @@ public partial class AIController
 
             if (substitute == null)
             {
-                Debug.Log($"{TL("Handoff")}[Skip] sem substituto para {obj.Sector} ({pts}/{max})");
+                // Swap: sem capturador livre — avalia se uma unidade sticky de outro objetivo
+                // já está aqui e vale redirecionar. Duas condições obrigatórias:
+                //   1. A unidade original está longe o suficiente (swap compensa a troca)
+                //   2. O candidato vem de objetivo de prioridade igual ou menor (não deserta missão importante)
+                const float SwapMinAssignedDist = 4f;
+
+                Vector3Int assignedPos = assignedUnit.CurrentCellPosition; assignedPos.z = 0;
+                float assignedDist = SectorManager.TryGetLandMovementDistance(assignedPos, targetCell, out int adSwap)
+                    ? adSwap : SectorManager.HexDistance(assignedPos, targetCell);
+
+                UnitManager     swapCandidate = null;
+                SectorObjective swapFromObj   = null;
+                SlotNeed        swapFromSlot  = null;
+
+                if (assignedDist >= SwapMinAssignedDist)
+                {
+                    foreach (SectorObjective otherObj in plan.Objectives)
+                    {
+                        if (otherObj == obj) continue;
+                        if (otherObj.Priority < obj.Priority) continue; // não deserta missão mais importante
+
+                        foreach (SlotNeed otherSlot in otherObj.Slots)
+                        {
+                            if (!otherSlot.Filled || otherSlot.Role != UnitRole.Capturador) continue;
+                            UnitManager cand = FindActiveUnit(otherSlot.AssignedUnitId, aiTeam);
+                            if (cand == null || cand.IsUnderRepair) continue;
+                            if (!SimulateCaptureSensor(cand, targetCell, out _)) continue;
+
+                            var swapPaths = UnitMovementPathRules.CalcularCaminhosValidos(
+                                boardTilemap, cand,
+                                Mathf.Max(0, cand.RemainingMovementPoints), terrainDatabase);
+                            if (swapPaths == null || !swapPaths.ContainsKey(targetCell)) continue;
+
+                            swapCandidate = cand;
+                            swapFromObj   = otherObj;
+                            swapFromSlot  = otherSlot;
+                            break;
+                        }
+                        if (swapCandidate != null) break;
+                    }
+                }
+
+                if (swapCandidate == null)
+                {
+                    Debug.Log($"{TL("Handoff")}[Skip] sem substituto para {obj.Sector} ({pts}/{max})" +
+                              $" assignedDist={assignedDist:F0}h");
+                    continue;
+                }
+
+                // Libera a unidade original deste obj → passo 5 a reatribui
+                filledSlot.Filled         = false;
+                filledSlot.AssignedUnitId = -1;
+                assignedUnit.ClearAIAssignedPlan();
+                plan.HandoffVacaterIds.Add(assignedUnit.InstanceId);
+                ConstructionSector fwdSec = ComputeForwardNeighborSector(obj.Sector, aiTeam);
+                if (fwdSec != default) plan.VacaterForwardSectors.Add(fwdSec);
+
+                // Libera o slot original do swap candidate → passo 5 pode preenchê-lo de novo
+                swapFromSlot.Filled         = false;
+                swapFromSlot.AssignedUnitId = -1;
+
+                // Atribui swap candidate a este objetivo
+                obj.TryFillSlot(UnitRole.Capturador, swapCandidate.InstanceId);
+                obj.Status                     = ObjectiveStatus.PartialReadyForHandoff;
+                obj.HandoffEligible            = true;
+                obj.PreferredHandoffFromUnitId = assignedUnit.InstanceId;
+                ApplyPlanHUD(swapCandidate, obj);
+
+                bool swapCompletes = pts + swapCandidate.CurrentHP >= max;
+                Debug.Log($"{TL("Handoff")}[Swap] Unit{swapCandidate.InstanceId} " +
+                          $"({swapFromObj.Sector} pri={swapFromObj.Priority}→{obj.Sector} pri={obj.Priority}) " +
+                          $"já no prédio; Unit{assignedUnit.InstanceId} livre (era {assignedDist:F0}h)" +
+                          $"{(swapCompletes ? " completa captura" : "")}");
                 continue;
             }
 
@@ -485,14 +636,23 @@ public partial class AIController
     {
         if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return;
 
-        // Prefere neighbor1 (mais próximo).
-        // Se já for totalmente controlado pelo time AI (atrás do front), usa neighbor2 (direção de avanço).
-        ConstructionSector candidate = info.ClosestNeighbor1;
-        float              candidateDist = info.ClosestNeighbor1Distance;
+        // Cascateia apenas para o vizinho que está À FRENTE: mais longe do HQ amigo do que o setor atual.
+        // Isso garante que a cascata vai na direção de avanço independente do time.
+        float myHQDist = info.GetDistanceToHQ(aiTeam);
 
-        if (candidate != default
-            && SectorManager.TryGetSectorInfo(candidate, out SectorManager.SectorInfo n1)
-            && n1.IsFullyControlled && n1.ControllingTeam == aiTeam)
+        ConstructionSector candidate     = default;
+        float              candidateDist = float.MaxValue;
+
+        if (info.ClosestNeighbor1 != default
+            && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1)
+            && n1.GetDistanceToHQ(aiTeam) > myHQDist)
+        {
+            candidate     = info.ClosestNeighbor1;
+            candidateDist = info.ClosestNeighbor1Distance;
+        }
+        else if (info.ClosestNeighbor2 != default
+            && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2)
+            && n2.GetDistanceToHQ(aiTeam) > myHQDist)
         {
             candidate     = info.ClosestNeighbor2;
             candidateDist = info.ClosestNeighbor2Distance;
@@ -515,12 +675,16 @@ public partial class AIController
     private static ConstructionSector ComputeForwardNeighborSector(ConstructionSector sector, TeamId aiTeam)
     {
         if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return default;
-        ConstructionSector candidate = info.ClosestNeighbor1;
-        if (candidate != default
-            && SectorManager.TryGetSectorInfo(candidate, out SectorManager.SectorInfo n1)
-            && n1.IsFullyControlled && n1.ControllingTeam == aiTeam)
-            candidate = info.ClosestNeighbor2;
-        return candidate;
+        float myHQDist = info.GetDistanceToHQ(aiTeam);
+        if (info.ClosestNeighbor1 != default
+            && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1)
+            && n1.GetDistanceToHQ(aiTeam) > myHQDist)
+            return info.ClosestNeighbor1;
+        if (info.ClosestNeighbor2 != default
+            && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2)
+            && n2.GetDistanceToHQ(aiTeam) > myHQDist)
+            return info.ClosestNeighbor2;
+        return default;
     }
 
     private static bool HasOpenObjectiveOtherThan(TeamObjectivePlan plan, SectorObjective exclude)
