@@ -164,12 +164,196 @@ public partial class AIController
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
         ConstructionManager target = FindCapturableInSector(assigned.Sector, snapshot.AITeam, fromCell);
 
-        // (C) Setor já conquistado: defende se houver inimigos, aguarda caso contrário
+        // (C) Setor já conquistado — modo Defensor
         if (target == null)
         {
             assigned.Status = ObjectiveStatus.Complete;
-            if (HasEnemyInEngageRadius(unit, fromCell, snapshot.AITeam)) return null; // HexEvaluator defende
-            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);         // aguarda reatribuição
+
+            SectorManager.TryGetSectorInfo(assigned.Sector, out SectorManager.SectorInfo secInfo);
+            Vector3Int repCell = secInfo != null ? secInfo.RepresentativeCell : fromCell; repCell.z = 0;
+
+            // Captura oportunista mesmo em defesa: setor vazio é sempre preenchido
+            Dictionary<Vector3Int, List<Vector3Int>> defPaths =
+                UnitMovementPathRules.CalcularCaminhosValidos(
+                    boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+            HashSet<Vector3Int> defOcc = BuildOccupied(unit);
+            if (defPaths != null && TryFindOpportunisticCapture(unit, defPaths, defOcc, repCell, out Vector3Int defOpCell))
+            {
+                Debug.Log($"{TL("Oportunista")} {unit.InstanceId} captura oportunista @ {defOpCell} (defende {assigned.Sector})");
+                return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, defOpCell, defPaths);
+            }
+
+            // Unidade no repCell → defende ativamente
+            if (fromCell == repCell)
+            {
+                if (HasAttackTargetAtCurrentPos(unit))
+                {
+                    var defTargets = new List<PodeMirarTargetOption>();
+                    PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                        SensorMovementMode.MoveuParado, defTargets);
+                    UnitManager defBest = null; float defPri = float.MinValue;
+                    foreach (PodeMirarTargetOption opt in defTargets)
+                    {
+                        if (opt?.targetUnit == null) continue;
+                        Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
+                        float p = AttackTargetPriority(tc, repCell);
+                        if (p > defPri) { defPri = p; defBest = opt.targetUnit; }
+                    }
+                    if (defBest != null)
+                    {
+                        Vector3Int dtCell = defBest.CurrentCellPosition; dtCell.z = 0;
+                        Debug.Log($"{TL("Defensor")} {unit.InstanceId} defende {assigned.Sector} — ataca {defBest.UnitDisplayName}#{defBest.InstanceId} @ {dtCell}");
+                        return BuildAttackBatch(unit, snapshot.AITeam, fromCell, fromCell,
+                            defBest.InstanceId.ToString(), dtCell);
+                    }
+                }
+                Debug.Log($"{TL("Defensor")} {unit.InstanceId} segura {assigned.Sector} — mantém posição");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+            }
+
+            if (defPaths == null) return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+
+            // Unidade fora do repCell → cobre ou combate na zona
+            if (defPaths.ContainsKey(repCell) && !defOcc.Contains(repCell))
+            {
+                var coverBuffer = new List<PodeMirarTargetOption>();
+                if (PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                        SensorMovementMode.MoveuAndando, coverBuffer, fromCell: repCell) && coverBuffer.Count > 0)
+                {
+                    UnitManager coverTarget = null; float coverPri = float.MinValue;
+                    foreach (PodeMirarTargetOption opt in coverBuffer)
+                    {
+                        if (opt?.targetUnit == null) continue;
+                        Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
+                        if (SectorManager.HexDistance(tc, repCell) > DefenseEnemyRange) continue;
+                        float p = AttackTargetPriority(tc, repCell);
+                        if (p > coverPri) { coverPri = p; coverTarget = opt.targetUnit; }
+                    }
+                    if (coverTarget != null)
+                    {
+                        Vector3Int ctCell = coverTarget.CurrentCellPosition; ctCell.z = 0;
+                        Debug.Log($"{TL("Defensor")} {unit.InstanceId} cobre + ataca {assigned.Sector} via {repCell} → {coverTarget.UnitDisplayName}#{coverTarget.InstanceId}");
+                        return BuildAttackBatch(unit, snapshot.AITeam, fromCell, repCell,
+                            coverTarget.InstanceId.ToString(), ctCell, defPaths);
+                    }
+                }
+                Debug.Log($"{TL("Defensor")} {unit.InstanceId} reforça {assigned.Sector} → {repCell}");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, repCell, defPaths);
+            }
+
+            // repCell ocupada ou fora de alcance — combate na zona
+            bool inDefenseZone = SectorManager.HexDistance(fromCell, repCell) <= DefenseEnemyRange;
+            var zoneEnemies = new List<UnitManager>();
+            {
+                MatchController mcZone = GetMatchController();
+                foreach (UnitManager enemy in UnitManager.AllActive)
+                {
+                    if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
+                    if (mcZone != null && !mcZone.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
+                    Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+                    if (SectorManager.HexDistance(ec, repCell) <= DefenseEnemyRange) zoneEnemies.Add(enemy);
+                }
+            }
+
+            if (!inDefenseZone)
+            {
+                Vector3Int bestAttCell = fromCell; UnitManager bestAttEnemy = null; float bestAttPri = float.MinValue;
+                foreach (Vector3Int cell in defPaths.Keys)
+                {
+                    if (defOcc.Contains(cell)) continue;
+                    var buf = new List<PodeMirarTargetOption>();
+                    if (!PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                            SensorMovementMode.MoveuAndando, buf, fromCell: cell)) continue;
+                    foreach (PodeMirarTargetOption opt in buf)
+                    {
+                        if (opt?.targetUnit == null || !zoneEnemies.Contains(opt.targetUnit)) continue;
+                        Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
+                        float p = AttackTargetPriority(tc, repCell);
+                        if (p > bestAttPri) { bestAttPri = p; bestAttEnemy = opt.targetUnit; bestAttCell = cell; }
+                    }
+                }
+                if (bestAttEnemy != null)
+                {
+                    bool dpqPrefAdv = unit.TryGetUnitData(out UnitData udAdv) && udAdv.prioritizeDpqAtBattle;
+                    if (dpqPrefAdv) { Vector3Int ec2 = bestAttEnemy.CurrentCellPosition; ec2.z = 0;
+                        if (TryFindBestLoSCell(unit, defPaths, defOcc, ec2, out Vector3Int dpqAdv)) bestAttCell = dpqAdv; }
+                    Vector3Int enemyCell = bestAttEnemy.CurrentCellPosition; enemyCell.z = 0;
+                    Debug.Log($"{TL("Defensor")} {unit.InstanceId} avança + ataca zona de {assigned.Sector} via {bestAttCell} → {bestAttEnemy.UnitDisplayName}#{bestAttEnemy.InstanceId}");
+                    return BuildAttackBatch(unit, snapshot.AITeam, fromCell, bestAttCell,
+                        bestAttEnemy.InstanceId.ToString(), enemyCell, defPaths);
+                }
+                Vector3Int advTarget = repCell;
+                if (zoneEnemies.Count > 0)
+                {
+                    float closestD = float.MaxValue;
+                    foreach (UnitManager ze in zoneEnemies)
+                    {
+                        Vector3Int ec = ze.CurrentCellPosition; ec.z = 0;
+                        float d = SectorManager.HexDistance(fromCell, ec);
+                        if (d < closestD) { closestD = d; advTarget = ec; }
+                    }
+                }
+                Vector3Int adv = fromCell; float advDist = SectorManager.HexDistance(fromCell, advTarget);
+                foreach (Vector3Int cell in defPaths.Keys)
+                {
+                    if (defOcc.Contains(cell)) continue;
+                    float d = SectorManager.HexDistance(cell, advTarget);
+                    if (d < advDist) { advDist = d; adv = cell; }
+                }
+                Debug.Log($"{TL("Defensor")} {unit.InstanceId} marcha para zona de {assigned.Sector} via {adv}");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, adv, defPaths);
+            }
+
+            // Na zona: ataca inimigos da zona
+            Vector3Int bestAttackMove = fromCell; UnitManager bestAttackTarget = null; float bestAttackPri = float.MinValue;
+            var stayBuf = new List<PodeMirarTargetOption>();
+            if (PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                    SensorMovementMode.MoveuParado, stayBuf) && stayBuf.Count > 0)
+                foreach (PodeMirarTargetOption opt in stayBuf)
+                {
+                    if (opt?.targetUnit == null || !zoneEnemies.Contains(opt.targetUnit)) continue;
+                    Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
+                    float p = AttackTargetPriority(tc, repCell);
+                    if (p > bestAttackPri) { bestAttackPri = p; bestAttackTarget = opt.targetUnit; bestAttackMove = fromCell; }
+                }
+            foreach (Vector3Int cell in defPaths.Keys)
+            {
+                if (defOcc.Contains(cell)) continue;
+                var moveBuf = new List<PodeMirarTargetOption>();
+                if (!PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                        SensorMovementMode.MoveuAndando, moveBuf, fromCell: cell)) continue;
+                foreach (PodeMirarTargetOption opt in moveBuf)
+                {
+                    if (opt?.targetUnit == null || !zoneEnemies.Contains(opt.targetUnit)) continue;
+                    Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
+                    float p = AttackTargetPriority(tc, repCell);
+                    if (p > bestAttackPri) { bestAttackPri = p; bestAttackTarget = opt.targetUnit; bestAttackMove = cell; }
+                }
+            }
+            if (bestAttackTarget != null)
+            {
+                Vector3Int atCell = bestAttackTarget.CurrentCellPosition; atCell.z = 0;
+                bool dpqPref = unit.TryGetUnitData(out UnitData udDef2) && udDef2.prioritizeDpqAtBattle;
+                if (dpqPref && TryFindBestLoSCell(unit, defPaths, defOcc, atCell, out Vector3Int dpqCell2))
+                    bestAttackMove = dpqCell2;
+                Debug.Log($"{TL("Defensor")} {unit.InstanceId} defende {assigned.Sector} — ataca via {bestAttackMove} → {bestAttackTarget.UnitDisplayName}#{bestAttackTarget.InstanceId}");
+                return BuildAttackBatch(unit, snapshot.AITeam, fromCell, bestAttackMove,
+                    bestAttackTarget.InstanceId.ToString(), atCell, defPaths);
+            }
+
+            Vector3Int bestPos = fromCell; float bestPosDist = SectorManager.HexDistance(fromCell, repCell);
+            foreach (Vector3Int cell in defPaths.Keys)
+            {
+                if (defOcc.Contains(cell)) continue;
+                float d = SectorManager.HexDistance(cell, repCell);
+                if (d < bestPosDist) { bestPosDist = d; bestPos = cell; }
+            }
+            if (bestPos != fromCell)
+            {
+                Debug.Log($"{TL("Defensor")} {unit.InstanceId} aguarda posição em {assigned.Sector} via {bestPos}");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestPos, defPaths);
+            }
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
         }
 
         Vector3Int targetCell = target.CurrentCellPosition; targetCell.z = 0;
@@ -188,7 +372,7 @@ public partial class AIController
             if (SimulateCaptureSensor(unit, targetCell, out _))
             {
                 assigned.Status = ObjectiveStatus.Capturing;
-                Debug.Log($"{TL("Obj")} {unit.InstanceId} captura {assigned.Sector} @ {targetCell}");
+                Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} captura {assigned.Sector} @ {targetCell}");
                 return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, targetCell);
             }
             assigned.Status = ObjectiveStatus.Complete;
@@ -201,14 +385,13 @@ public partial class AIController
             if (SimulateCaptureSensor(unit, targetCell, out _))
             {
                 assigned.Status = ObjectiveStatus.Capturing;
-                Debug.Log($"{TL("Obj")} {unit.InstanceId} alcança e captura {assigned.Sector} @ {targetCell}");
+                Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} alcança e captura {assigned.Sector} @ {targetCell}");
                 return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, targetCell, paths);
             }
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, targetCell, paths);
         }
 
-        // Auto-defesa: inimigo em alcance de tiro direto → ataca sem delegar ao HexEvaluator.
-        // HexEvaluator tem viés de avanço para o próximo objetivo e ignora ameaças ao setor atual.
+        // Perseguidor: inimigos próximos ao objetivo — elimina antes de avançar
         if (HasAttackTargetAtCurrentPos(unit))
         {
             var stayTargets = new List<PodeMirarTargetOption>();
@@ -220,14 +403,12 @@ public partial class AIController
             {
                 if (opt?.targetUnit == null) continue;
                 Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
-                float priority = AttackTargetPriority(tc, targetCell);
+                if (SectorManager.HexDistance(tc, targetCell) > DefenseEnemyRange) continue;
+                float priority = AttackTargetPriorityPursuer(tc, targetCell);
                 if (priority > bestPriority) { bestPriority = priority; bestStayTarget = opt.targetUnit; }
             }
             if (bestStayTarget != null)
             {
-                // Reposicionamento antes de atacar se:
-                // (a) prioritizeDpqAtBattle — prefere terreno elevado; ou
-                // (b) está fisicamente sobre o alvo de outro capturador designado — deve liberar o hex.
                 TeamObjectivePlan activePlanDef = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
                 bool mustVacate = activePlanDef != null && IsBlockingCaptureTarget(unit, activePlanDef, snapshot.AITeam);
                 bool dpqPref    = unit.TryGetUnitData(out UnitData udDef) && udDef.prioritizeDpqAtBattle;
@@ -239,60 +420,27 @@ public partial class AIController
                         && combatCell != fromCell)
                     {
                         string reason = mustVacate && dpqPref ? "vacate+DPQ" : mustVacate ? "vacate" : "DPQ";
-                        Debug.Log($"{TL("Obj")} {unit.InstanceId} [{reason}] reposiciona @ {combatCell} — ataca {bestStayTarget.UnitDisplayName}#{bestStayTarget.InstanceId} @ {ec}");
+                        Debug.Log($"{TL("Perseguidor")} {unit.InstanceId} [{reason}] reposiciona @ {combatCell} — ataca {bestStayTarget.UnitDisplayName}#{bestStayTarget.InstanceId} @ {ec}");
                         return BuildAttackBatch(unit, snapshot.AITeam, fromCell, combatCell,
                             bestStayTarget.InstanceId.ToString(), ec);
                     }
                 }
 
                 Vector3Int stCell = bestStayTarget.CurrentCellPosition; stCell.z = 0;
-                Debug.Log($"{TL("Obj")} {unit.InstanceId} defende {assigned.Sector} — ataca {bestStayTarget.UnitDisplayName}#{bestStayTarget.InstanceId} @ {stCell}");
+                Debug.Log($"{TL("Perseguidor")} {unit.InstanceId} elimina bloqueador de {assigned.Sector} — ataca {bestStayTarget.UnitDisplayName}#{bestStayTarget.InstanceId} @ {stCell}");
                 return BuildAttackBatch(unit, snapshot.AITeam, fromCell, fromCell,
                     bestStayTarget.InstanceId.ToString(), stCell);
             }
-            return null; // sensor retornou true mas CollectTargets não encontrou alvo válido
         }
 
-        // (B) Captura oportunista: prédio capturável no caminho ao objetivo atribuído
-        // excludeCurrentCell=true: após handoff, unit ainda está no setor anterior — não voltar a capturá-lo
-        // Não captura oportunisticamente se outro capturador já foi designado para aquele setor —
-        // evita roubar o alvo de uma unidade que age depois por ter objetivo de menor prioridade.
+        // Oportunista: captura oportunista no caminho ao objetivo atribuído
         if (TryFindOpportunisticCapture(unit, paths, occupied, targetCell, out Vector3Int opCell, excludeCurrentCell: true))
         {
-            bool hasDesignated = false;
-            ConstructionManager opBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, opCell);
-            TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
-            if (opBldg != null && activePlan != null)
-            {
-                SectorObjective opObj = activePlan.GetObjectiveForSector(opBldg.Sector);
-                if (opObj != null)
-                    foreach (SlotNeed slot in opObj.Slots)
-                    {
-                        if (!slot.Filled || slot.AssignedUnitId == unit.InstanceId) continue;
-                        UnitManager designated = null;
-                        foreach (UnitManager u in UnitManager.AllActive)
-                            if (u.InstanceId == slot.AssignedUnitId) { designated = u; break; }
-                        if (designated != null)
-                        {
-                            Dictionary<Vector3Int, List<Vector3Int>> dPaths =
-                                UnitMovementPathRules.CalcularCaminhosValidos(
-                                    boardTilemap, designated,
-                                    Mathf.Max(0, designated.RemainingMovementPoints),
-                                    terrainDatabase);
-                            if (dPaths != null && dPaths.ContainsKey(opCell))
-                                hasDesignated = true;
-                        }
-                        break;
-                    }
-            }
-            if (!hasDesignated)
-            {
-                Debug.Log($"{TL("Obj")} {unit.InstanceId} captura oportunista @ {opCell} → {assigned.Sector}");
-                return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, opCell, paths);
-            }
+            Debug.Log($"{TL("Oportunista")} {unit.InstanceId} captura oportunista @ {opCell} → {assigned.Sector}");
+            return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, opCell, paths);
         }
 
-        // (D) FoW passinho: ocupante invisível no alvo → sobe no DPQ mais elevado adjacente
+        // Explorador: ocupante invisível no alvo → DPQ mais elevado + ataque lateral oportunista
         {
             UnitManager occupant = HexOccupancyQuery.FindUnitAtCell(targetCell);
             if (occupant != null && occupant.TeamId != snapshot.AITeam)
@@ -303,15 +451,40 @@ public partial class AIController
                     if (TryFindBestLoSCell(unit, paths, occupied, targetCell, out Vector3Int dpqCell))
                     {
                         assigned.Status = ObjectiveStatus.Pursuing;
-                        Debug.Log($"{TL("FoW")} {unit.InstanceId} DPQ para revelar {assigned.Sector} via {dpqCell} (ev={GetTerrainEv(dpqCell):F0})");
+
+                        SensorMovementMode dpqMode = dpqCell != fromCell
+                            ? SensorMovementMode.MoveuAndando
+                            : SensorMovementMode.MoveuParado;
+                        var dpqTargets = new List<PodeMirarTargetOption>();
+                        if (PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                                dpqMode, dpqTargets, fromCell: dpqCell) && dpqTargets.Count > 0)
+                        {
+                            UnitManager lateralTarget = null; float lateralPri = float.MinValue;
+                            foreach (PodeMirarTargetOption opt in dpqTargets)
+                            {
+                                if (opt?.targetUnit == null) continue;
+                                Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
+                                if (SectorManager.HexDistance(tc, targetCell) > DefenseEnemyRange + 1) continue;
+                                float p = AttackTargetPriorityPursuer(tc, targetCell);
+                                if (p > lateralPri) { lateralPri = p; lateralTarget = opt.targetUnit; }
+                            }
+                            if (lateralTarget != null)
+                            {
+                                Vector3Int ltCell = lateralTarget.CurrentCellPosition; ltCell.z = 0;
+                                Debug.Log($"{TL("Explorador")} {unit.InstanceId} DPQ {assigned.Sector} via {dpqCell} + ataque lateral → {lateralTarget.UnitDisplayName}#{lateralTarget.InstanceId}");
+                                return BuildAttackBatch(unit, snapshot.AITeam, fromCell, dpqCell,
+                                    lateralTarget.InstanceId.ToString(), ltCell, paths);
+                            }
+                        }
+
+                        Debug.Log($"{TL("Explorador")} {unit.InstanceId} DPQ para revelar {assigned.Sector} via {dpqCell} (ev={GetTerrainEv(dpqCell):F0})");
                         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, dpqCell, paths);
                     }
                 }
             }
         }
 
-        // Scoring: escolhe o melhor hex de avanço por captureProximity + DPQ - ameaça.
-        // Fase 3: se defensor visível ocupa o alvo, prioriza hex de onde é possível atacá-lo.
+        // Scoring: avança pelo melhor hex (PontaLanca) — ataca defensor visível (Perseguidor)
         float fromDist = SectorManager.HexDistance(fromCell, targetCell);
 
         UnitManager defender    = HexOccupancyQuery.FindUnitAtCell(targetCell);
@@ -342,19 +515,17 @@ public partial class AIController
         foreach (Vector3Int cell in paths.Keys)
         {
             if (occupied.Contains(cell)) continue;
-            if (SectorManager.HexDistance(cell, targetCell) >= fromDist) continue; // só avanço
+            if (SectorManager.HexDistance(cell, targetCell) >= fromDist) continue;
 
             float threat    = conservative ? CalculateThreatLevel(cell, snapshot.AITeam) : 0f;
             float dist      = SectorManager.HexDistance(cell, targetCell);
             float prox      = (1f / (dist + 1f)) * CaptureProximityBase;
             float dpq       = preferDpqMove ? GetTerrainDpqPontos(cell) * DpqWeight : 0f;
-            // moveCost: custo de movimento da unidade até este candidato.
-            // Desempata células equidistantes do alvo: prefere a que está na direção direta.
             float moveCost  = paths[cell].Count;
             float score     = prox - moveCost + dpq - threat * ThreatWeight;
-            float sectorTie = -dist; // desempate 1: prefere célula mais próxima do setor
+            float sectorTie = -dist;
             float hqDist    = CalculateEnemyHqDistance(cell, snapshot, unit);
-            float hqTie     = CalculateEnemyHqTieBreak(hqDist); // desempate 2: prefere mais próximo ao HQ
+            float hqTie     = CalculateEnemyHqTieBreak(hqDist);
 
             string hqDistText = hqDist < float.MaxValue ? hqDist.ToString("F1") : "?";
             scoringLog?.AppendLine($"  {cell} dist={dist:F1} prox={prox:F0} mv={moveCost:F0} dpq={dpq:F0} thr={threat:F0} secTie={sectorTie:F1} hq={hqDistText} hqTie={hqTie:F1} -> {score:F0}");
@@ -371,8 +542,6 @@ public partial class AIController
             if (defenderVisible && score >= SafetyThresholdFactor
                 && CanAttackTargetFrom(fromCell, cell, unit, defender))
             {
-                // prioritizeDpqAtBattle: favorece hex de ataque com DPQ mais alto.
-                // Evita double-count quando preferDpqMove já incluiu DPQ no score base.
                 float attackDpq = (preferDpqAtBattle && !preferDpqMove)
                     ? GetTerrainDpqPontos(cell) * DpqWeight
                     : 0f;
@@ -392,7 +561,7 @@ public partial class AIController
         {
             assigned.Status = ObjectiveStatus.Pursuing;
             Vector3Int defCell = defender.CurrentCellPosition; defCell.z = 0;
-            Debug.Log($"{TL("Obj")} {unit.InstanceId} move+ataca defensor de {assigned.Sector} via {attackMove}");
+            Debug.Log($"{TL("Perseguidor")} {unit.InstanceId} move+ataca defensor de {assigned.Sector} via {attackMove}");
             return BuildAttackBatch(unit, snapshot.AITeam, fromCell, attackMove,
                 defender.InstanceId.ToString(), defCell, paths);
         }
@@ -400,18 +569,15 @@ public partial class AIController
         if (scoringLog != null) Debug.Log(scoringLog.ToString());
         if (!canAdvance)
         {
-            // Alvo ocupado por aliado: aguarda adjacente em vez de ceder ao HexEvaluator
             UnitManager occupant = HexOccupancyQuery.FindUnitAtCell(targetCell);
             if (occupant != null && occupant.TeamId == snapshot.AITeam)
             {
-                Debug.Log($"{TL("Obj")} {unit.InstanceId} aguarda {assigned.Sector} — aliado {occupant.InstanceId} ocupa o alvo");
+                Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} aguarda {assigned.Sector} — aliado {occupant.InstanceId} ocupa o alvo");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
             }
             return null;
         }
 
-        // Após escolher bestMove, tenta atacar qualquer inimigo alcançável a partir dele.
-        // Prioriza defensor do prédio alvo; aceita qualquer alvo no caminho.
         SensorMovementMode advanceMode = bestMove != fromCell
             ? SensorMovementMode.MoveuAndando
             : SensorMovementMode.MoveuParado;
@@ -426,14 +592,15 @@ public partial class AIController
             {
                 if (opt?.targetUnit == null) continue;
                 Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
-                float priority = AttackTargetPriority(tc, targetCell);
+                if (SectorManager.HexDistance(tc, targetCell) > DefenseEnemyRange) continue;
+                float priority = AttackTargetPriorityPursuer(tc, targetCell);
                 if (priority > bestPriority) { bestPriority = priority; bestTarget = opt.targetUnit; }
             }
             if (bestTarget != null)
             {
                 assigned.Status = ObjectiveStatus.Pursuing;
                 Vector3Int btCell = bestTarget.CurrentCellPosition; btCell.z = 0;
-                Debug.Log($"{TL("Obj")} {unit.InstanceId} move+ataca inimigo via {bestMove} → {bestTarget.UnitDisplayName}#{bestTarget.InstanceId}");
+                Debug.Log($"{TL("Perseguidor")} {unit.InstanceId} move+ataca inimigo via {bestMove} → {bestTarget.UnitDisplayName}#{bestTarget.InstanceId}");
                 return BuildAttackBatch(unit, snapshot.AITeam, fromCell, bestMove,
                     bestTarget.InstanceId.ToString(), btCell, paths);
             }
@@ -442,7 +609,7 @@ public partial class AIController
         assigned.Status = ObjectiveStatus.Pursuing;
         float bestHqDist = CalculateEnemyHqDistance(bestMove, snapshot, unit);
         string bestHqText = bestHqDist < float.MaxValue ? bestHqDist.ToString("F1") : "?";
-        Debug.Log($"{TL("Obj")} {unit.InstanceId} avança para {assigned.Sector} via {bestMove} (score={bestScore:F0}, secTie={bestSectorTie:F1}, hq={bestHqText}, hqTie={bestHqTie:F1})");
+        Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} avança para {assigned.Sector} via {bestMove} (score={bestScore:F0}, secTie={bestSectorTie:F1}, hq={bestHqText}, hqTie={bestHqTie:F1})");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestMove, paths);
     }
 
@@ -456,6 +623,16 @@ public partial class AIController
         if (targetUnitCell == captureTargetCell) return 3f;
         ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, targetUnitCell);
         return bldg != null ? 2f : 1f;
+    }
+
+    // Perseguidor: prioriza inimigos mais próximos ao objetivo a capturar
+    private float AttackTargetPriorityPursuer(Vector3Int targetUnitCell, Vector3Int captureTargetCell)
+    {
+        if (targetUnitCell == captureTargetCell) return 3f;
+        float dist = SectorManager.HexDistance(targetUnitCell, captureTargetCell);
+        ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, targetUnitCell);
+        float bldgBonus = bldg != null ? 0.5f : 0f;
+        return 2f - dist * 0.1f + bldgBonus;
     }
 
     private bool HasAttackTargetAtCurrentPos(UnitManager unit)

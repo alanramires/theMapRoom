@@ -129,6 +129,33 @@ public partial class AIController
         for (int i = 0; i < plan.Objectives.Count; i++)
             plan.Objectives[i].Priority = i + 1;
 
+        // Passo 3c: objetivos defensivos — setores conquistados com inimigo visível a ≤3h.
+        // Adicionados APÓS a renumeração ofensiva → sempre prioridade mais baixa.
+        // Rogues livres após o solver ofensivo são alocados aqui antes de virarem permanentemente rogues.
+        {
+            int DefenseEnemyRange = defenseEnemyRange;
+            int defPriority = plan.Objectives.Count + 1;
+            foreach (SectorManager.SectorInfo info in allSectors)
+            {
+                if (!info.IsFullyControlled || info.ControllingTeam != aiTeam) continue;
+                if (plan.GetObjectiveForSector(info.Sector) != null) continue;
+                Vector3Int rc = info.RepresentativeCell; rc.z = 0;
+                if (!HasNearbyVisibleEnemy(rc, aiTeam, DefenseEnemyRange)) continue;
+
+                var defObj = new SectorObjective
+                {
+                    Sector = info.Sector, AssignedTeam = aiTeam,
+                    Status = ObjectiveStatus.Defending, Priority = defPriority++,
+                };
+                // 2º slot se inimigo já está recapturando — precisa de reforço urgente
+                int defSlots = info.HasPartialCapture ? 2 : 1;
+                for (int s = 0; s < defSlots; s++)
+                    defObj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
+                plan.Objectives.Add(defObj);
+                Debug.Log($"{TL("Plan")} Objetivo defensivo: {info.Sector} (pri {defPriority - 1}, inimigo ≤{DefenseEnemyRange}h)");
+            }
+        }
+
         plan.HandoffVacaterIds.Clear();
         plan.VacaterForwardSectors.Clear();
 
@@ -158,7 +185,7 @@ public partial class AIController
             SectorObjective obj = plan.GetObjectiveForSector(bldg.Sector);
             if (obj == null || !obj.HasOpenSlot(UnitRole.Capturador)) continue;
             obj.TryFillSlot(UnitRole.Capturador, u.InstanceId);
-            obj.Status = ObjectiveStatus.Pursuing;
+            if (obj.Status != ObjectiveStatus.Defending) obj.Status = ObjectiveStatus.Pursuing;
             ApplyPlanHUD(u, obj);
             immediateList.Add(u);
             Debug.Log($"{TL("Plan")} {u.InstanceId} já está em {bldg.Sector} → captura imediata");
@@ -178,10 +205,22 @@ public partial class AIController
         foreach (SectorObjective obj in plan.Objectives) // pri=1 primeiro (mais prioritário)
         {
             if (!obj.HasOpenSlot(UnitRole.Capturador)) continue;
-            if (cascadeCovered.Contains(obj.Sector))   continue;
+            // Objetivos defensivos nunca são bloqueados pelo cascade (território já conquistado).
+            bool isDefensive = false;
             ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
-            if (tgt == null) continue;
-            Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
+            Vector3Int tc;
+            if (tgt != null)
+            {
+                tc = tgt.CurrentCellPosition; tc.z = 0;
+            }
+            else if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)
+                && defInfo.IsFullyControlled && defInfo.ControllingTeam == aiTeam)
+            {
+                isDefensive = true;
+                tc = defInfo.RepresentativeCell; tc.z = 0;
+            }
+            else continue;
+            if (!isDefensive && cascadeCovered.Contains(obj.Sector)) continue;
 
             // 2º slot de setor de alto risco: só abre se houver capturador livre que possa
             // chegar junto com o 1º (co-chegada). Evita mandar unidade recém-comprada a 10h.
@@ -216,7 +255,7 @@ public partial class AIController
             }
 
             assignableObjs.Add((obj, tc));
-            if (isInitialDistribution)
+            if (isInitialDistribution && !isDefensive)
                 MarkCascadeNeighbor1(obj.Sector, cascadeCovered, aiTeam, plan.VacaterForwardSectors);
         }
 
@@ -294,10 +333,92 @@ public partial class AIController
                 UnitManager u       = freeCapturers[i];
                 SectorObjective obj = assignableObjs[bestAssign[i]].obj;
                 obj.TryFillSlot(UnitRole.Capturador, u.InstanceId);
-                obj.Status = ObjectiveStatus.Pursuing;
+                if (obj.Status != ObjectiveStatus.Defending) obj.Status = ObjectiveStatus.Pursuing;
                 ApplyPlanHUD(u, obj);
             }
             freeCapturers.RemoveRange(0, nu);
+        }
+
+        // Passo 5c: rogues próximos reforçam objetivos defensivos (sem slot fixo — escala com disponíveis)
+        {
+            int maxDefenders   = 3;
+            int defReachRange  = DefenseEnemyRange * defenseCallRange;
+            var rogueAssigned  = new List<UnitManager>();
+            foreach (SectorObjective obj in plan.Objectives)
+            {
+                if (obj.Status != ObjectiveStatus.Defending) continue;
+                if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
+                int defenders = 0; foreach (SlotNeed s in obj.Slots) if (s.Filled) defenders++;
+                Vector3Int rc = defInfo.RepresentativeCell; rc.z = 0;
+                foreach (UnitManager u in freeCapturers)
+                {
+                    if (rogueAssigned.Contains(u)) continue;
+                    if (defenders >= maxDefenders) break;
+                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                    if (SectorManager.HexDistance(uc, rc) > defReachRange) continue;
+                    obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador, Filled = true, AssignedUnitId = u.InstanceId });
+                    ApplyPlanHUD(u, obj);
+                    rogueAssigned.Add(u);
+                    defenders++;
+                    Debug.Log($"{TL("Plan")} Rogue {u.InstanceId} → defesa de {obj.Sector} (dist={SectorManager.HexDistance(uc, rc)})");
+                }
+            }
+            foreach (UnitManager u in rogueAssigned) freeCapturers.Remove(u);
+        }
+
+        // Passo 5d: rogues próximos reforçam captura em severa desvantagem
+        {
+            const int MaxCaptureReinforcements = 2;
+            float     SosRatio                 = alliesAgainstEnemiesHpRatio;
+            int       sosReachRange            = alliesCallRange;
+            var         captureReinforced        = new List<UnitManager>();
+
+            foreach (SectorObjective obj in plan.Objectives)
+            {
+                if (obj.Status != ObjectiveStatus.Pursuing && obj.Status != ObjectiveStatus.Capturing) continue;
+
+                ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
+                if (tgt == null) continue;
+                Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
+
+                // HP inimigo visível dentro de alliesEnemyRange do alvo
+                int enemyHp = 0;
+                MatchController mc = GetMatchController();
+                foreach (UnitManager enemy in UnitManager.AllActive)
+                {
+                    if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+                    if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+                    Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+                    if (SectorManager.HexDistance(ec, tc) <= alliesEnemyRange) enemyHp += enemy.CurrentHP;
+                }
+                if (enemyHp == 0) continue;
+
+                // HP aliado já atribuído ao objetivo
+                int allyHp = 0;
+                foreach (SlotNeed s in obj.Slots)
+                {
+                    if (!s.Filled) continue;
+                    UnitManager ally = FindActiveUnit(s.AssignedUnitId, aiTeam);
+                    if (ally != null) allyHp += ally.CurrentHP;
+                }
+
+                if (enemyHp < allyHp * SosRatio) continue;
+
+                int reinforcers = 0;
+                foreach (UnitManager u in freeCapturers)
+                {
+                    if (captureReinforced.Contains(u)) continue;
+                    if (reinforcers >= MaxCaptureReinforcements) break;
+                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                    if (SectorManager.HexDistance(uc, tc) > sosReachRange) continue;
+                    obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador, Filled = true, AssignedUnitId = u.InstanceId });
+                    ApplyPlanHUD(u, obj);
+                    captureReinforced.Add(u);
+                    reinforcers++;
+                    Debug.Log($"{TL("Plan")} SOS {u.InstanceId} → reforço de captura {obj.Sector} (inimigo={enemyHp}HP aliado={allyHp}HP ratio={enemyHp / (float)allyHp:F1}×)");
+                }
+            }
+            foreach (UnitManager u in captureReinforced) freeCapturers.Remove(u);
         }
 
         foreach (UnitManager u in freeCapturers)
@@ -373,6 +494,19 @@ public partial class AIController
         foreach (UnitManager u in UnitManager.AllActive)
             if (u.InstanceId == instanceId && u.TeamId == team && !u.IsDead) return u;
         return null;
+    }
+
+    private bool HasNearbyVisibleEnemy(Vector3Int cell, TeamId aiTeam, int range)
+    {
+        MatchController mc = GetMatchController();
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+            if (SectorManager.HexDistance(ec, cell) <= range) return true;
+        }
+        return false;
     }
 
     private static int CalculateSectorPriority(SectorManager.SectorInfo info, TeamId aiTeam, AIStance stance = AIStance.Tactical)

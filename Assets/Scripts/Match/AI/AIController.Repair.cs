@@ -74,31 +74,79 @@ public partial class AIController
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
 
-        // Se está sobre captura incompleta → sair e liberar o prédio para outros capturadores
+        // 1. Prédio conquistado: verifica segurança e presença de substituto
         ConstructionManager currentBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
         if (currentBldg != null && currentBldg.IsCapturable
-            && !(currentBldg.TeamId == aiTeam && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax))
+            && currentBldg.TeamId == aiTeam && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax)
         {
-            Vector3Int exitCell = FindRepairExitCell(paths, occupied, fromCell, aiTeam);
-            if (exitCell != fromCell)
+            bool safe = !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);
+            if (safe)
             {
-                Debug.Log($"{TL("Repair")} {unit.InstanceId} sai de captura incompleta em {fromCell} → {exitCell}");
-                return BuildMoveBatch(unit, aiTeam, fromCell, exitCell, paths);
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} aguarda reparo em {fromCell} (conquistado, setor seguro)");
+                return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
+            }
+
+            // Com ameaça: só sai se houver aliado saudável próximo que pode substituir
+            bool hasReplacement = false;
+            foreach (UnitManager ally in UnitManager.AllActive)
+            {
+                if (ally == unit || ally.TeamId != aiTeam || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair) continue;
+                Vector3Int ac = ally.CurrentCellPosition; ac.z = 0;
+                if (SectorManager.HexDistance(ac, fromCell) <= DefenseEnemyRange) { hasReplacement = true; break; }
+            }
+            if (!hasReplacement)
+            {
+                // Sem substituto: defende o prédio enquanto aguarda reparo
+                if (HasAttackTargetAtCurrentPos(unit))
+                {
+                    var defBuf = new List<PodeMirarTargetOption>();
+                    PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                        SensorMovementMode.MoveuParado, defBuf);
+                    UnitManager defTarget = null; float defPri = float.MinValue;
+                    foreach (PodeMirarTargetOption opt in defBuf)
+                    {
+                        if (opt?.targetUnit == null) continue;
+                        Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
+                        float p = AttackTargetPriority(tc, fromCell);
+                        if (p > defPri) { defPri = p; defTarget = opt.targetUnit; }
+                    }
+                    if (defTarget != null)
+                    {
+                        Vector3Int dtc = defTarget.CurrentCellPosition; dtc.z = 0;
+                        Debug.Log($"{TL("Repair")} {unit.InstanceId} segura {fromCell} sem substituto — ataca {defTarget.UnitDisplayName}#{defTarget.InstanceId}");
+                        return BuildAttackBatch(unit, aiTeam, fromCell, fromCell, defTarget.InstanceId.ToString(), dtc);
+                    }
+                }
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} segura {fromCell} sem substituto");
+                return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
             }
         }
 
-        // Fusão oportunista: se fuseWhileInRepair e HP < 10, funde com aliado no caminho
-        if (unit.TryGetUnitData(out UnitData fuseData) && fuseData.fuseWhileInRepair && unit.CurrentHP < 10)
+        // 2. Fusão: libera o hex e recupera a unidade ao mesmo tempo
+        // Scoring: candidato em repCell defensivo (+20) > em prédio (+10) > campo (0); desempate por HP combinado
+        if (unit.TryGetUnitData(out UnitData fuseData) && fuseData.fuseWhileInRepair)
         {
+            var defensiveRepCells = new HashSet<Vector3Int>();
+            TeamObjectivePlan fusePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+            if (fusePlan != null)
+                foreach (SectorObjective obj in fusePlan.Objectives)
+                {
+                    if (obj.Status != ObjectiveStatus.Defending) continue;
+                    if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo di)) continue;
+                    Vector3Int rc = di.RepresentativeCell; rc.z = 0;
+                    defensiveRepCells.Add(rc);
+                }
+
             int totalMovement = Mathf.Max(0, unit.RemainingMovementPoints);
             var fuseOptions = new List<PodeFundirOption>();
+            Vector3Int bestFuseCell = Vector3Int.zero;
+            PodeFundirOption bestFuseOpt = null;
+            float bestFuseScore = float.MinValue;
+
             foreach (Vector3Int cell in paths.Keys)
             {
                 if (occupied.Contains(cell)) continue;
 
-                // Calcula movimento restante APÓS chegar em 'cell'.
-                // A fusão exige pontos suficientes para "entrar" no hex do candidato a partir de 'cell':
-                // sem esse cálculo, o sensor recebe movimento demais e valida fusões inalcançáveis.
                 List<Vector3Int> pathToCell = paths[cell];
                 int costToCell = pathToCell != null && pathToCell.Count > 0
                     ? Mathf.Max(0, UnitMovementPathRules.CalculateAutonomyCostForPath(
@@ -109,10 +157,10 @@ public partial class AIController
 
                 fuseOptions.Clear();
                 bool canFuse = PodeFundirSensor.CollectOptions(unit, boardTilemap, terrainDatabase,
-                    remainingAfterMove, fuseOptions, out _,
-                    fromCell: cell);
+                    remainingAfterMove, fuseOptions, out _, fromCell: cell);
                 Debug.Log($"[Repair] fusão de {cell} mov={remainingAfterMove} canFuse={canFuse} opts={fuseOptions.Count}");
                 if (!canFuse) continue;
+
                 foreach (PodeFundirOption opt in fuseOptions)
                 {
                     if (opt?.candidateUnit == null) continue;
@@ -121,18 +169,43 @@ public partial class AIController
                         Debug.Log($"[Repair] skip fusão {opt.candidateUnit.InstanceId} hp={unit.CurrentHP}+{opt.candidateUnit.CurrentHP}>10");
                         continue;
                     }
-                    // Receptor move para 'cell' (vizinho livre do candidato).
-                    // candidateCell é o hex do candidato (já ocupado) — não é o destino de movimento.
-                    Debug.Log($"{TL("Repair")} {unit.InstanceId} fusão oportunista com " +
-                              $"{opt.candidateUnit.InstanceId} hp={unit.CurrentHP}+{opt.candidateUnit.CurrentHP}" +
-                              $" via {cell} (mov restante={remainingAfterMove})");
-                    return BuildMergeBatch(unit, aiTeam, fromCell, cell, opt.candidateUnit, paths);
+                    Vector3Int cc = opt.candidateUnit.CurrentCellPosition; cc.z = 0;
+                    float score = 0f;
+                    if (defensiveRepCells.Contains(cc)) score += 20f;
+                    else
+                    {
+                        ConstructionManager candBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cc);
+                        if (candBldg != null && candBldg.IsCapturable) score += 10f;
+                    }
+                    score += opt.candidateUnit.CurrentHP + unit.CurrentHP;
+
+                    if (score > bestFuseScore) { bestFuseScore = score; bestFuseOpt = opt; bestFuseCell = cell; }
                 }
+            }
+
+            if (bestFuseOpt != null)
+            {
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} fusão oportunista com " +
+                          $"{bestFuseOpt.candidateUnit.InstanceId} hp={unit.CurrentHP}+{bestFuseOpt.candidateUnit.CurrentHP}" +
+                          $" via {bestFuseCell} (score={bestFuseScore:F0})");
+                return BuildMergeBatch(unit, aiTeam, fromCell, bestFuseCell, bestFuseOpt.candidateUnit, paths);
             }
         }
 
-        // Navega para a construção aliada mais próxima desocupada
-        ConstructionManager repairDest = FindRepairConstruction(fromCell, aiTeam, occupied);
+        // 3. Marcha para a construção aliada mais próxima desocupada (não defensiva)
+        // Exclui: célula atual + repCells de objetivos defensivos ativos
+        var occupiedForRepair = new HashSet<Vector3Int>(occupied) { fromCell };
+        TeamObjectivePlan repPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        if (repPlan != null)
+            foreach (SectorObjective obj in repPlan.Objectives)
+            {
+                if (obj.Status != ObjectiveStatus.Defending) continue;
+                if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
+                Vector3Int rc = defInfo.RepresentativeCell; rc.z = 0;
+                occupiedForRepair.Add(rc);
+            }
+
+        ConstructionManager repairDest = FindRepairConstruction(fromCell, aiTeam, occupiedForRepair);
         if (repairDest == null)
         {
             Debug.Log($"{TL("Repair")} {unit.InstanceId} sem destino de reparo — conservador");
@@ -153,35 +226,14 @@ public partial class AIController
         foreach (Vector3Int cell in paths.Keys)
         {
             if (occupied.Contains(cell)) continue;
-            float dist  = Vector3Int.Distance(cell, destCell);
+            float dist   = Vector3Int.Distance(cell, destCell);
             float threat = CalculateThreatLevel(cell, aiTeam);
-            float score = -dist * 10f - threat * ThreatWeight;
+            float score  = -dist * 10f - threat * ThreatWeight;
             if (score > bestScore) { bestScore = score; bestStep = cell; }
         }
 
         Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
         return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, paths);
-    }
-
-    private Vector3Int FindRepairExitCell(
-        Dictionary<Vector3Int, List<Vector3Int>> paths,
-        HashSet<Vector3Int> occupied,
-        Vector3Int fromCell,
-        TeamId aiTeam)
-    {
-        Vector3Int best = fromCell;
-        float bestScore = float.MinValue;
-        foreach (Vector3Int cell in paths.Keys)
-        {
-            if (cell == fromCell || occupied.Contains(cell)) continue;
-            // Não sair para outro prédio inimigo/neutro capturável (evita captura acidental)
-            ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-            if (bldg != null && bldg.IsCapturable && bldg.TeamId != aiTeam) continue;
-            float threat = CalculateThreatLevel(cell, aiTeam);
-            float score  = -threat;
-            if (score > bestScore) { bestScore = score; best = cell; }
-        }
-        return best;
     }
 
     private static ConstructionManager FindRepairConstruction(Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied)

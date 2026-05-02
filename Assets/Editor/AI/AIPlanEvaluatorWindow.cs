@@ -20,6 +20,7 @@ public class AIPlanEvaluatorWindow : EditorWindow
     [SerializeField] private UnitData        referenceUnitData;
     [SerializeField] private TeamId          selectedTeam      = TeamId.Neutral;
     [SerializeField] private float           riskDecisionImpact = 0.5f;
+    [SerializeField] private int             defenseEnemyRange  = 2;
 
     // ------------------------------------------------------------------
     // Estado do plano
@@ -128,6 +129,9 @@ public class AIPlanEvaluatorWindow : EditorWindow
         riskDecisionImpact = EditorGUILayout.Slider(
             new GUIContent("Impacto do risco na tomada de decisão", "0 = ignora risco  |  2 = risco pesa muito"),
             riskDecisionImpact, 0f, 2f);
+        defenseEnemyRange = EditorGUILayout.IntSlider(
+            new GUIContent("Raio de defesa (hexes)", "Distância máxima do inimigo para criar objetivo defensivo"),
+            defenseEnemyRange, 1, 5);
 
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Auto Detect"))   AutoDetectContext();
@@ -544,6 +548,28 @@ public class AIPlanEvaluatorWindow : EditorWindow
         plan.Objectives.Sort((a, b) => b.Priority.CompareTo(a.Priority));
         for (int i = 0; i < plan.Objectives.Count; i++) plan.Objectives[i].Priority = i + 1;
 
+        // Passo 3c: objetivos defensivos — setores conquistados com inimigo visível a ≤3h
+        {
+            int DefenseEnemyRange = defenseEnemyRange;
+            int defPriority = plan.Objectives.Count + 1;
+            foreach (SectorManager.SectorInfo info in allSectors)
+            {
+                if (!info.IsFullyControlled || info.ControllingTeam != selectedTeam) continue;
+                if (plan.GetObjectiveForSector(info.Sector) != null) continue;
+                Vector3Int rc = info.RepresentativeCell; rc.z = 0;
+                if (!SimHasNearbyEnemy(rc, DefenseEnemyRange)) continue;
+                var defObj = new SectorObjective
+                {
+                    Sector = info.Sector, AssignedTeam = selectedTeam,
+                    Status = ObjectiveStatus.Pending, Priority = defPriority++,
+                };
+                int defSlots = info.HasPartialCapture ? 2 : 1;
+                for (int s = 0; s < defSlots; s++)
+                    defObj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
+                plan.Objectives.Add(defObj);
+            }
+        }
+
         // Passo 5: capturadores livres
         var freeCapturers = new List<UnitManager>();
         foreach (UnitManager u in UnitManager.AllActive)
@@ -588,9 +614,21 @@ public class AIPlanEvaluatorWindow : EditorWindow
                 if (!trace.CascadeBlocked.Contains(obj.Sector)) trace.CascadeBlocked.Add(obj.Sector);
                 continue;
             }
+            bool isDefensive = false;
             ConstructionManager tgt = FindCapturableInSector(obj.Sector, selectedTeam);
-            if (tgt == null) continue;
-            Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
+            Vector3Int tc;
+            if (tgt != null)
+            {
+                tc = tgt.CurrentCellPosition; tc.z = 0;
+            }
+            else if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)
+                && defInfo.IsFullyControlled && defInfo.ControllingTeam == selectedTeam)
+            {
+                isDefensive = true;
+                tc = defInfo.RepresentativeCell; tc.z = 0;
+            }
+            else continue;
+            if (!isDefensive && cascadeCovered.Contains(obj.Sector)) continue;
 
             // 2º slot co-chegada
             if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo slotInfo)
@@ -619,7 +657,7 @@ public class AIPlanEvaluatorWindow : EditorWindow
             }
 
             assignable.Add((obj, tc));
-            if (isInitDist) SimMarkCascadeNeighbor(obj.Sector, cascadeCovered);
+            if (isInitDist && !isDefensive) SimMarkCascadeNeighbor(obj.Sector, cascadeCovered);
         }
 
         int nu   = Mathf.Min(freeCapturers.Count, assignable.Count);
@@ -718,6 +756,18 @@ public class AIPlanEvaluatorWindow : EditorWindow
 
     // ------------------------------------------------------------------
     // Helpers internos
+    private bool SimHasNearbyEnemy(Vector3Int cell, int maxDistance)
+    {
+        TeamId enemyCheck = selectedTeam;
+        foreach (UnitManager u in UnitManager.AllActive)
+        {
+            if (u == null || u.IsDead || u.IsEmbarked || u.TeamId == enemyCheck) continue;
+            Vector3Int ec = u.CurrentCellPosition; ec.z = 0;
+            if (SectorManager.HexDistance(ec, cell) <= maxDistance) return true;
+        }
+        return false;
+    }
+
     // ------------------------------------------------------------------
     private void SimMarkCascadeNeighbor(ConstructionSector sector, HashSet<ConstructionSector> covered)
     {
@@ -949,6 +999,7 @@ public class AIPlanEvaluatorWindow : EditorWindow
             {
                 if (selectedTeam == TeamId.Neutral) selectedTeam = ai.CurrentAITeam;
                 riskDecisionImpact = ai.RiskDecisionImpact;
+                defenseEnemyRange  = ai.DefenseEnemyRange;
             }
             else if (selectedTeam == TeamId.Neutral)
             {

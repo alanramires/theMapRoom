@@ -23,6 +23,28 @@ public partial class AIController : MonoBehaviour
     [SerializeField, Range(0f, 2f)] private float riskDecisionImpact = 0.5f;
     public float RiskDecisionImpact => riskDecisionImpact;
 
+    [Tooltip("Raio em hexes para criar objetivo defensivo num setor conquistado quando inimigo está próximo")]
+    [SerializeField, Range(1, 8)] private int defenseEnemyRange = 2;
+    public int DefenseEnemyRange => defenseEnemyRange;
+
+    [Tooltip("Multiplicador de recrutamento: rogues dentro de defenseEnemyRange × defenseCallRange hexes são convocados para defesa")]
+    [SerializeField, Range(1, 8)] private int defenseCallRange = 4;
+    public int DefenseCallRange => defenseCallRange;
+
+    [Tooltip("Raio em hexes para detectar inimigos próximos ao alvo de captura e acionar reforço SOS")]
+    [SerializeField, Range(1, 8)] private int alliesEnemyRange = 2;
+    public int AlliesEnemyRange => alliesEnemyRange;
+
+    [Tooltip("Raio em hexes para recrutar rogues como reforço SOS em captura com desvantagem")]
+    [SerializeField, Range(1, 16)] private int alliesCallRange = 8;
+    public int AlliesCallRange => alliesCallRange;
+
+    [Tooltip("Ratio inimigo HP / aliado HP para acionar reforço SOS numa captura (ex: 2 = inimigo tem o dobro do HP)")]
+    [SerializeField, Range(1f, 5f)] private float alliesAgainstEnemiesHpRatio = 2f;
+    public float AlliesAgainstEnemiesHpRatio => alliesAgainstEnemiesHpRatio;
+
+
+    private readonly HashSet<Vector3Int> plannedDestinations = new HashSet<Vector3Int>();
 
     private bool   isActive;
     private bool   isDebugPaused;
@@ -428,6 +450,7 @@ public partial class AIController : MonoBehaviour
         }
 
         Debug.Log($"{TL()} Fase2 — iniciando ações.");
+        plannedDestinations.Clear();
 
         while (isActive)
         {
@@ -444,6 +467,11 @@ public partial class AIController : MonoBehaviour
             // 2 = objetivo normal  3 = rogue/sem objetivo
             // 4 = reparo em campo (age por último — base pode estar vazia antes das compras)
             TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+
+            // Pre-pass: atualiza estado de reparo antes do sort para que IsUnderRepair
+            // esteja correto quando GetInitiativeGroup classificar cada unidade.
+            foreach (UnitManager u in available) UpdateRepairState(u, activePlan);
+
             available.Sort((a, b) =>
             {
                 int groupA = GetInitiativeGroup(a, activePlan, aiTeam);
@@ -490,6 +518,13 @@ public partial class AIController : MonoBehaviour
                 Debug.LogWarning($"[AI] Sem decisão para {unit.InstanceId} — marcando como agida.");
                 unit.MarkAsActed();
                 continue;
+            }
+
+            // Registra destino para que unidades subsequentes não colidam
+            if (action.HasMoveTo && action.MoveTo != action.MoveFrom)
+            {
+                Vector3Int dest = action.MoveTo; dest.z = 0;
+                plannedDestinations.Add(dest);
             }
 
             // Recalcula FoW apenas quando algo que altera visibilidade ocorreu:
@@ -777,9 +812,10 @@ public partial class AIController : MonoBehaviour
         {
             Vector3Int cell = unit.CurrentCellPosition; cell.z = 0;
             ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-            bool onCapturable = bldg != null && bldg.IsCapturable
-                && !(bldg.TeamId == aiTeam && bldg.CurrentCapturePoints >= bldg.CapturePointsMax);
-            return onCapturable ? 1 : 4;
+            // Qualquer construção capturável (incompleta ou posição defensiva conquistada):
+            // age cedo (grupo 1) para vacatar e tentar fundir com aliados antes que se dispersem.
+            bool onAnyBuilding = bldg != null && bldg.IsCapturable;
+            return onAnyBuilding ? 1 : 4;
         }
         bool hasObjective = plan != null && ResolveAssignedObjective(unit, plan) != null;
         return hasObjective ? 2 : 3;
@@ -813,6 +849,8 @@ public partial class AIController : MonoBehaviour
             Vector3Int p = u.CurrentCellPosition; p.z = 0;
             set.Add(p);
         }
+        // inclui destinos já reservados por unidades que agiram antes neste turno
+        foreach (Vector3Int planned in plannedDestinations) set.Add(planned);
         return set;
     }
 
