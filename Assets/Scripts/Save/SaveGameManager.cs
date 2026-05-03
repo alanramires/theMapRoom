@@ -1045,6 +1045,7 @@ public class SaveGameManager : MonoBehaviour
         if (turnStateManager != null)
         {
             turnStateManager.StopAllCoroutines();
+            turnStateManager.ResetCommandServiceReplayTransientState();
             turnStateManager.ForceNeutral();
         }
 
