@@ -335,7 +335,7 @@ public class SaveGameManager : MonoBehaviour
             (WasKeyPressedThisFrame(KeyCode.Return) || WasKeyPressedThisFrame(KeyCode.KeypadEnter)))
         {
             SaveSlot(overwritePendingSlot);
-            CancelPrompt(clearDialogOverride: false);
+            CompletePromptAfterConfirmedPersistence();
             return;
         }
 
@@ -376,7 +376,7 @@ public class SaveGameManager : MonoBehaviour
             }
 
             LoadSlot(normalizedSlot);
-            CancelPrompt(clearDialogOverride: false);
+            CompletePromptAfterConfirmedPersistence();
             return;
         }
 
@@ -391,7 +391,17 @@ public class SaveGameManager : MonoBehaviour
         }
 
         SaveSlot(normalizedSlot);
-        CancelPrompt(clearDialogOverride: false);
+        CompletePromptAfterConfirmedPersistence();
+    }
+
+    private void CompletePromptAfterConfirmedPersistence()
+    {
+        promptState = SlotPromptState.None;
+        promptOpenedFrame = -1;
+        overwritePendingSlot = 0;
+        PanelHelperController.ClearExternalText();
+        ExitPersistenceStateToNeutralAfterConfirmedPersistence();
+        BattleMapMenuRootController.SuppressMenuOpenForCurrentFrame();
     }
 
     private void CancelPrompt(bool clearDialogOverride)
@@ -857,6 +867,15 @@ public class SaveGameManager : MonoBehaviour
 
         promptUsingPersistenceState = false;
         turnStateManager?.TryExitPersistencePromptState();
+    }
+
+    private void ExitPersistenceStateToNeutralAfterConfirmedPersistence()
+    {
+        if (!promptUsingPersistenceState)
+            return;
+
+        promptUsingPersistenceState = false;
+        turnStateManager?.ForceNeutral();
     }
 
     private IEnumerator LoadSlotAsync(string path, int normalizedSlot)
@@ -2305,7 +2324,6 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
-
 
 
 

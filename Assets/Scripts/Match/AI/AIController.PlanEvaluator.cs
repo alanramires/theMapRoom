@@ -18,6 +18,30 @@ public partial class AIController
             SectorObjective obj = plan.Objectives[i];
             if (FindCapturableInSector(obj.Sector, aiTeam) == null)
             {
+                // Setor já conquistado: transita para Defending e preserva enquanto a ameaça persistir.
+                // Captura tanto a transição ofensivo→defensivo (1º turno pós-conquista)
+                // quanto turnos subsequentes (já Defending), evitando redistribuição dos defensores.
+                if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInf)
+                    && defInf.IsFullyControlled && defInf.ControllingTeam == aiTeam
+                    && HasNearbyVisibleEnemy(defInf.RepresentativeCell, aiTeam, defenseEnemyRange))
+                {
+                    obj.Status = ObjectiveStatus.Defending;
+                    // Remove slots vazios de rodadas anteriores; valida slots preenchidos.
+                    for (int s = obj.Slots.Count - 1; s >= 0; s--)
+                    {
+                        SlotNeed slot = obj.Slots[s];
+                        if (!slot.Filled) { obj.Slots.RemoveAt(s); continue; }
+                        UnitManager slotUnit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                        if (slotUnit == null || slotUnit.IsUnderRepair)
+                        {
+                            slotUnit?.ClearAIAssignedPlan();
+                            obj.Slots.RemoveAt(s);
+                        }
+                    }
+                    if (obj.Slots.Count == 0)
+                        obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
+                    continue;
+                }
                 ClearObjectiveHUD(obj);
                 plan.Objectives.RemoveAt(i);
                 continue;
@@ -120,12 +144,22 @@ public partial class AIController
             }
         }
 
-        // Passo 3: recalcula prioridades, ordena e renumera
+        // Passo 3: recalcula prioridades, ordena e renumera.
+        // Objetivos defensivos (preservados do turno anterior) ficam sempre após os ofensivos.
         foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj.Status == ObjectiveStatus.Defending) continue;
             if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo inf))
                 obj.Priority = CalculateSectorPriority(inf, aiTeam, snapshot.Stance);
+        }
 
-        plan.Objectives.Sort((a, b) => b.Priority.CompareTo(a.Priority));
+        plan.Objectives.Sort((a, b) =>
+        {
+            bool aDefending = a.Status == ObjectiveStatus.Defending;
+            bool bDefending = b.Status == ObjectiveStatus.Defending;
+            if (aDefending != bDefending) return aDefending ? 1 : -1;
+            return b.Priority.CompareTo(a.Priority);
+        });
         for (int i = 0; i < plan.Objectives.Count; i++)
             plan.Objectives[i].Priority = i + 1;
 
@@ -340,17 +374,33 @@ public partial class AIController
         }
 
         // Passo 5c: rogues próximos reforçam objetivos defensivos (sem slot fixo — escala com disponíveis)
+        // Candidatos ordenados por distância ao HQ aliado (ascendente): recém-comprados no HQ
+        // são preferidos sobre unidades já posicionadas no front, preservando a cobertura avançada.
         {
-            int maxDefenders   = 3;
-            int defReachRange  = DefenseEnemyRange * defenseCallRange;
-            var rogueAssigned  = new List<UnitManager>();
+            int maxDefenders  = 3;
+            int defReachRange = DefenseEnemyRange * defenseCallRange;
+            var rogueAssigned = new List<UnitManager>();
+
+            var defCandidates = new List<UnitManager>(freeCapturers);
+            if (snapshot.MyHQ != null)
+            {
+                Vector3Int hqCell = snapshot.MyHQ.CurrentCellPosition; hqCell.z = 0;
+                defCandidates.Sort((a, b) =>
+                {
+                    Vector3Int ca = a.CurrentCellPosition; ca.z = 0;
+                    Vector3Int cb = b.CurrentCellPosition; cb.z = 0;
+                    return SectorManager.HexDistance(ca, hqCell)
+                        .CompareTo(SectorManager.HexDistance(cb, hqCell));
+                });
+            }
+
             foreach (SectorObjective obj in plan.Objectives)
             {
                 if (obj.Status != ObjectiveStatus.Defending) continue;
                 if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
                 int defenders = 0; foreach (SlotNeed s in obj.Slots) if (s.Filled) defenders++;
                 Vector3Int rc = defInfo.RepresentativeCell; rc.z = 0;
-                foreach (UnitManager u in freeCapturers)
+                foreach (UnitManager u in defCandidates)
                 {
                     if (rogueAssigned.Contains(u)) continue;
                     if (defenders >= maxDefenders) break;
@@ -614,6 +664,9 @@ public partial class AIController
         for (int i = 0; i < plan.Objectives.Count; i++)
         {
             SectorObjective obj = plan.Objectives[i];
+
+            // Handoff só se aplica a objetivos ofensivos — defensores não são substituídos
+            if (obj.Status == ObjectiveStatus.Defending) continue;
 
             // Precisa de slot preenchido por capturador
             SlotNeed filledSlot = null;

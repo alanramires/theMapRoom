@@ -83,11 +83,24 @@ public partial class AIController
         // Scoring: avança pelo melhor hex (PontaLanca) — ataca defensor visível (Perseguidor)
         float fromDist = SectorManager.HexDistance(fromCell, targetCell);
 
-        UnitManager defender    = HexOccupancyQuery.FindUnitAtCell(targetCell);
-        MatchController mcDef   = GetMatchController();
-        bool defenderVisible    = defender != null
-            && defender.TeamId != snapshot.AITeam
-            && (mcDef == null || mcDef.IsUnitVisibleForTeam(defender, snapshot.AITeam));
+        // Coleta todos os inimigos visíveis dentro de fromDist do objetivo (fonte: AllActive + FoW)
+        MatchController mcDef = GetMatchController();
+        var nearbyEnemies = new List<UnitManager>();
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (mcDef != null && !mcDef.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
+            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+            if (SectorManager.HexDistance(ec, targetCell) > fromDist) continue;
+            nearbyEnemies.Add(enemy);
+        }
+        nearbyEnemies.Sort((a, b) =>
+        {
+            Vector3Int ca = a.CurrentCellPosition; ca.z = 0;
+            Vector3Int cb = b.CurrentCellPosition; cb.z = 0;
+            return SectorManager.HexDistance(ca, targetCell)
+                .CompareTo(SectorManager.HexDistance(cb, targetCell));
+        });
 
         Vector3Int bestMove       = fromCell;
         float      bestScore     = float.MinValue;
@@ -96,6 +109,7 @@ public partial class AIController
         bool       canAdvance    = false;
 
         Vector3Int attackMove       = fromCell;
+        UnitManager attackTarget    = null;
         float      attackScore     = float.MinValue;
         float      attackSectorTie = float.MinValue;
         float      attackHqTie     = float.MinValue;
@@ -111,10 +125,14 @@ public partial class AIController
         foreach (Vector3Int cell in paths.Keys)
         {
             if (occupied.Contains(cell)) continue;
-            if (SectorManager.HexDistance(cell, targetCell) >= fromDist) continue;
+            float dist     = SectorManager.HexDistance(cell, targetCell);
+            bool  advances = dist < fromDist;
+            // preferDpqAtBattle: considera também células a mesma distância do objetivo —
+            // permite se posicionar em terreno DPQ lateral sem precisar avançar primeiro.
+            bool  eligibleForAttack = advances || (preferDpqAtBattle && dist == fromDist);
+            if (!advances && !eligibleForAttack) continue;
 
             float threat    = conservative ? CalculateThreatLevel(cell, snapshot.AITeam) : 0f;
-            float dist      = SectorManager.HexDistance(cell, targetCell);
             float prox      = (1f / (dist + 1f)) * CaptureProximityBase;
             float dpq       = preferDpqMove ? GetTerrainDpqPontos(cell) * DpqWeight : 0f;
             float moveCost  = paths[cell].Count;
@@ -126,7 +144,8 @@ public partial class AIController
             string hqDistText = hqDist < float.MaxValue ? hqDist.ToString("F1") : "?";
             scoringLog?.AppendLine($"  {cell} dist={dist:F1} prox={prox:F0} mv={moveCost:F0} dpq={dpq:F0} thr={threat:F0} secTie={sectorTie:F1} hq={hqDistText} hqTie={hqTie:F1} -> {score:F0}");
 
-            if (IsBetterScore(score, sectorTie, hqTie, bestScore, bestSectorTie, bestHqTie))
+            // bestMove: só células que avançam em direção ao objetivo
+            if (advances && IsBetterScore(score, sectorTie, hqTie, bestScore, bestSectorTie, bestHqTie))
             {
                 bestScore     = score;
                 bestSectorTie = sectorTie;
@@ -135,34 +154,41 @@ public partial class AIController
                 canAdvance    = true;
             }
 
-            if (defenderVisible && score >= SafetyThresholdFactor
-                && CanAttackTargetFrom(fromCell, cell, unit, defender))
+            if (eligibleForAttack && score >= SafetyThresholdFactor && nearbyEnemies.Count > 0)
             {
-                float attackDpq = (preferDpqAtBattle && !preferDpqMove)
-                    ? GetTerrainDpqPontos(cell) * DpqWeight
-                    : 0f;
-                float aScore = score + AttackHexBonus + attackDpq;
-                if (IsBetterScore(aScore, sectorTie, hqTie, attackScore, attackSectorTie, attackHqTie))
+                foreach (UnitManager nearbyEnemy in nearbyEnemies)
                 {
-                    attackScore      = aScore;
-                    attackSectorTie  = sectorTie;
-                    attackHqTie      = hqTie;
-                    attackMove       = cell;
-                    hasAttackHex     = true;
+                    if (!CanAttackTargetFrom(fromCell, cell, unit, nearbyEnemy)) continue;
+                    Vector3Int enemyCell = nearbyEnemy.CurrentCellPosition; enemyCell.z = 0;
+                    float targetPriority = AttackTargetPriorityPursuer(enemyCell, targetCell);
+                    float objectiveBonus = enemyCell == targetCell ? 100000f : 0f;
+                    // DPQ sempre reforça o bonus de combate quando a flag está ativa,
+                    // independentemente de preferMoveOnBestDPQ
+                    float attackDpq = preferDpqAtBattle ? GetTerrainDpqPontos(cell) * DpqWeight : 0f;
+                    float aScore    = objectiveBonus + targetPriority * 1000f + score + AttackHexBonus + attackDpq;
+                    if (IsBetterScore(aScore, sectorTie, hqTie, attackScore, attackSectorTie, attackHqTie))
+                    {
+                        attackScore      = aScore;
+                        attackSectorTie  = sectorTie;
+                        attackHqTie      = hqTie;
+                        attackMove       = cell;
+                        attackTarget     = nearbyEnemy;
+                        hasAttackHex     = true;
+                    }
                 }
             }
         }
 
-        if (hasAttackHex)
+        if (scoringLog != null) Debug.Log(scoringLog.ToString());
+        if (hasAttackHex && attackTarget != null)
         {
             assigned.Status = ObjectiveStatus.Pursuing;
-            Vector3Int defCell = defender.CurrentCellPosition; defCell.z = 0;
-            Debug.Log($"{TL("Perseguidor")} {unit.InstanceId} move+ataca defensor de {assigned.Sector} via {attackMove}");
+            Vector3Int atCell = attackTarget.CurrentCellPosition; atCell.z = 0;
+            string targetRole = atCell == targetCell ? "defensor do objetivo" : "inimigo";
+            Debug.Log($"{TL("Perseguidor")} {unit.InstanceId} move+ataca {targetRole} via {attackMove} → {attackTarget.UnitDisplayName}#{attackTarget.InstanceId}");
             return BuildAttackBatch(unit, snapshot.AITeam, fromCell, attackMove,
-                defender.InstanceId.ToString(), defCell, paths);
+                attackTarget.InstanceId.ToString(), atCell, paths);
         }
-
-        if (scoringLog != null) Debug.Log(scoringLog.ToString());
         if (!canAdvance)
         {
             UnitManager occupant = HexOccupancyQuery.FindUnitAtCell(targetCell);
@@ -188,8 +214,7 @@ public partial class AIController
             {
                 if (opt?.targetUnit == null) continue;
                 Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
-                if (SectorManager.HexDistance(tc, targetCell) > DefenseEnemyRange &&
-                    SectorManager.HexDistance(tc, bestMove) > DefenseEnemyRange) continue;
+                if (SectorManager.HexDistance(tc, targetCell) > fromDist) continue;
                 float priority = AttackTargetPriorityPursuer(tc, targetCell);
                 if (priority > bestPriority) { bestPriority = priority; bestTarget = opt.targetUnit; }
             }

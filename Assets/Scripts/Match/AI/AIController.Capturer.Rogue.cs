@@ -104,6 +104,37 @@ public partial class AIController
             }
         }
 
+        // Move+ataca: inimigo visível (AllActive + FoW) alcançável de célula que avança ao HQ
+        {
+            float fromDistHQ = SectorManager.HexDistance(from, target);
+            MatchController mcAdv = GetMatchController();
+            UnitManager advAttackTarget = null;
+            Vector3Int  advAttackCell   = from;
+            float       advAttackPri    = float.MinValue;
+            foreach (UnitManager enemy in UnitManager.AllActive)
+            {
+                if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
+                if (mcAdv != null && !mcAdv.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
+                foreach (Vector3Int cell in paths.Keys)
+                {
+                    if (occupied.Contains(cell)) continue;
+                    if (SectorManager.HexDistance(cell, target) >= fromDistHQ) continue;
+                    if (!CanAttackTargetFrom(from, cell, unit, enemy)) continue;
+                    Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+                    float pri = -SectorManager.HexDistance(ec, target); // prefere inimigo mais perto do HQ
+                    if (pri > advAttackPri) { advAttackPri = pri; advAttackTarget = enemy; advAttackCell = cell; }
+                    break;
+                }
+            }
+            if (advAttackTarget != null)
+            {
+                Vector3Int atCell = advAttackTarget.CurrentCellPosition; atCell.z = 0;
+                Debug.Log($"{TL("Rogue")} {unit.InstanceId} move+ataca {advAttackTarget.UnitDisplayName}#{advAttackTarget.InstanceId} via {advAttackCell} (no avanço ao HQ)");
+                return BuildAttackBatch(unit, snapshot.AITeam, from, advAttackCell,
+                    advAttackTarget.InstanceId.ToString(), atCell, paths);
+            }
+        }
+
         // Avança para o hex mais próximo do HQ
         Vector3Int best     = from;
         float      bestDist = SectorManager.HexDistance(from, target);
