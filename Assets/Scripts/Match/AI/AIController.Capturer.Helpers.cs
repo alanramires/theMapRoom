@@ -153,7 +153,7 @@ public partial class AIController
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
             if (candidate == opportunist || candidate.TeamId != aiTeam) continue;
-            if (candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.HasMerged || candidate.IsUnderRepair) continue;
+            if (candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair) continue;
             if (!SimulateCaptureSensor(candidate, captureCell, out _)) continue;
 
             Dictionary<Vector3Int, List<Vector3Int>> candidatePaths =
@@ -266,10 +266,68 @@ public partial class AIController
     {
         if (boardTilemap == null || terrainDatabase == null) return 0f;
         cell.z = 0;
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+        if (construction != null
+            && construction.TryResolveConstructionData(out ConstructionData constructionData)
+            && constructionData != null
+            && constructionData.dpqData != null)
+        {
+            return constructionData.dpqData.Pontos;
+        }
+
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardTilemap, cell);
+        if (structure != null && structure.dpqData != null)
+            return structure.dpqData.Pontos;
+
         TileBase tile = boardTilemap.GetTile(cell);
         if (tile != null && terrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData data) && data?.dpqData != null)
             return data.dpqData.Pontos;
+
+        GridLayout grid = boardTilemap.layoutGrid;
+        if (grid != null)
+        {
+            Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
+            for (int i = 0; i < maps.Length; i++)
+            {
+                Tilemap map = maps[i];
+                if (map == null || map == boardTilemap)
+                    continue;
+
+                TileBase other = map.GetTile(cell);
+                if (other != null && terrainDatabase.TryGetByPaletteTile(other, out TerrainTypeData otherData) && otherData?.dpqData != null)
+                    return otherData.dpqData.Pontos;
+            }
+        }
+
         return 0f;
+    }
+
+    private static bool IsBetterAttackCandidate(
+        bool preferDpqAtBattle,
+        float targetPriority,
+        float attackDpq,
+        float score,
+        float sectorTie,
+        float hqTie,
+        float bestTargetPriority,
+        float bestAttackDpq,
+        float bestScore,
+        float bestSectorTie,
+        float bestHqTie)
+    {
+        const float epsilon = 0.001f;
+
+        if (preferDpqAtBattle)
+        {
+            if (targetPriority > bestTargetPriority + epsilon) return true;
+            if (Mathf.Abs(targetPriority - bestTargetPriority) > epsilon) return false;
+
+            if (attackDpq > bestAttackDpq + epsilon) return true;
+            if (Mathf.Abs(attackDpq - bestAttackDpq) > epsilon) return false;
+        }
+
+        return IsBetterScore(score, sectorTie, hqTie, bestScore, bestSectorTie, bestHqTie);
     }
 
     private static bool IsBetterScore(float score, float sectorTie, float hqTie,

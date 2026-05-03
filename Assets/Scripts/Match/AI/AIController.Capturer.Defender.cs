@@ -135,13 +135,23 @@ public partial class AIController
                     if (d < closestD) { closestD = d; advTarget = ec; }
                 }
             }
-            Vector3Int adv = fromCell; float advDist = SectorManager.HexDistance(fromCell, advTarget);
+            Vector3Int adv     = fromCell;
+            float      advDist = SectorManager.HexDistance(fromCell, advTarget);
+            float      advHqTie = CalculateEnemyHqTieBreak(CalculateEnemyHqDistance(fromCell, snapshot, unit));
+            var defMarchLog = showAIUnitHUD ? new System.Text.StringBuilder() : null;
+            defMarchLog?.AppendLine($"{TL("Defensor")} Unit{unit.InstanceId} marcha → {assigned.Sector} advTarget={advTarget}");
             foreach (Vector3Int cell in defPaths.Keys)
             {
                 if (defOcc.Contains(cell)) continue;
                 float d = SectorManager.HexDistance(cell, advTarget);
-                if (d < advDist) { advDist = d; adv = cell; }
+                if (d > advDist) continue;
+                float hqDist = CalculateEnemyHqDistance(cell, snapshot, unit);
+                float hqTie  = CalculateEnemyHqTieBreak(hqDist);
+                string marker = (d < advDist || hqTie > advHqTie) ? "★" : " ";
+                defMarchLog?.AppendLine($"  {marker} {cell} dist={d:F1} hq={( hqDist < float.MaxValue ? hqDist.ToString("F1") : "?")} hqTie={hqTie:F1}");
+                if (d < advDist || hqTie > advHqTie) { advDist = d; advHqTie = hqTie; adv = cell; }
             }
+            if (defMarchLog != null) Debug.Log(defMarchLog.ToString());
             Debug.Log($"{TL("Defensor")} {unit.InstanceId} marcha para zona de {assigned.Sector} via {adv}");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, adv, defPaths);
         }
@@ -183,6 +193,15 @@ public partial class AIController
                 bestAttackTarget.InstanceId.ToString(), atCell, defPaths);
         }
 
+        if (fromCell != repCell
+            && TryFindDefensiveInterceptCell(unit, snapshot, fromCell, repCell, defPaths, defOcc,
+                out Vector3Int interceptCell, out UnitManager interceptEnemy))
+        {
+            Vector3Int enemyCell = interceptEnemy.CurrentCellPosition; enemyCell.z = 0;
+            Debug.Log($"{TL("Defensor")} {unit.InstanceId} intercepta ameaça de {assigned.Sector} via {interceptCell} → {interceptEnemy.UnitDisplayName}#{interceptEnemy.InstanceId} @ {enemyCell}");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, interceptCell, defPaths);
+        }
+
         Vector3Int bestPos = fromCell; float bestPosDist = SectorManager.HexDistance(fromCell, repCell);
         foreach (Vector3Int cell in defPaths.Keys)
         {
@@ -196,5 +215,78 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestPos, defPaths);
         }
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+    }
+
+    private bool TryFindDefensiveInterceptCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int repCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestCell,
+        out UnitManager bestEnemy)
+    {
+        bestCell = fromCell;
+        bestEnemy = null;
+        if (unit == null || snapshot == null || paths == null)
+            return false;
+
+        int interceptRange = DefenseEnemyRange + 1;
+        var threats = new List<UnitManager>();
+        MatchController mc = GetMatchController();
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
+
+            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+            if (SectorManager.HexDistance(ec, repCell) <= interceptRange)
+                threats.Add(enemy);
+        }
+
+        if (threats.Count == 0)
+            return false;
+
+        bool preferDpq = unit.TryGetUnitData(out UnitData data) && data.prioritizeDpqAtBattle;
+        float bestScore = float.MinValue;
+        float fromBestThreatDist = float.MaxValue;
+
+        foreach (UnitManager enemy in threats)
+        {
+            Vector3Int enemyCell = enemy.CurrentCellPosition; enemyCell.z = 0;
+            float fromEnemyDist = SectorManager.HexDistance(fromCell, enemyCell);
+            if (fromEnemyDist < fromBestThreatDist)
+                fromBestThreatDist = fromEnemyDist;
+
+            foreach (Vector3Int cell in paths.Keys)
+            {
+                if (cell != fromCell && occupied.Contains(cell)) continue;
+
+                float enemyDist = SectorManager.HexDistance(cell, enemyCell);
+                if (enemyDist >= fromEnemyDist) continue;
+
+                float repDist = SectorManager.HexDistance(cell, repCell);
+                if (repDist > interceptRange) continue;
+
+                float dpq = preferDpq ? GetTerrainDpqPontos(cell) : GetTerrainEv(cell);
+                float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+                float score =
+                    (fromEnemyDist - enemyDist) * 1000f
+                    - repDist * 120f
+                    + dpq * 80f
+                    - threat * ThreatWeight
+                    - GetPathStepCount(paths, cell);
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestCell = cell;
+                    bestEnemy = enemy;
+                }
+            }
+        }
+
+        return bestEnemy != null && bestCell != fromCell;
     }
 }

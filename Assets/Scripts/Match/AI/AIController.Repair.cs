@@ -208,7 +208,10 @@ public partial class AIController
         ConstructionManager repairDest = FindRepairConstruction(fromCell, aiTeam, occupiedForRepair);
         if (repairDest == null)
         {
-            Debug.Log($"{TL("Repair")} {unit.InstanceId} sem destino de reparo — conservador");
+            if (TryDecideRepairFallbackToHQ(unit, snapshot, fromCell, paths, occupied, out PlayerAction hqFallback))
+                return hqFallback;
+
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} sem destino de reparo e sem HQ válido — conservador");
             return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
         }
 
@@ -234,6 +237,54 @@ public partial class AIController
 
         Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
         return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, paths);
+    }
+
+    private bool TryDecideRepairFallbackToHQ(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out PlayerAction action)
+    {
+        action = null;
+        if (snapshot == null || snapshot.MyHQ == null || paths == null || paths.Count == 0)
+            return false;
+
+        TeamId aiTeam = snapshot.AITeam;
+        Vector3Int hqCell = snapshot.MyHQ.CurrentCellPosition;
+        hqCell.z = 0;
+
+        bool safeNearHQ = SectorManager.HexDistance(fromCell, hqCell) <= DefenseEnemyRange
+            && !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange)
+            && !HasNearbyVisibleEnemy(hqCell, aiTeam, DefenseEnemyRange);
+        if (safeNearHQ)
+        {
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} aguarda nos arredores do HQ {hqCell} (sem ameaça)");
+            action = BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
+            return true;
+        }
+
+        Vector3Int bestStep = fromCell;
+        float bestScore = float.MinValue;
+        foreach (Vector3Int cell in paths.Keys)
+        {
+            if (cell != fromCell && occupied.Contains(cell)) continue;
+
+            float dist = SectorManager.HexDistance(cell, hqCell);
+            float threat = CalculateThreatLevel(cell, aiTeam);
+            float hqAdjacencyBonus = SectorManager.HexDistance(cell, hqCell) <= DefenseEnemyRange ? 25f : 0f;
+            float score = -dist * 100f - threat * ThreatWeight + hqAdjacencyBonus;
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestStep = cell;
+            }
+        }
+
+        Debug.Log($"{TL("Repair")} {unit.InstanceId} sem destino de reparo — retorna ao HQ {hqCell} via {bestStep}");
+        action = BuildMoveBatch(unit, aiTeam, fromCell, bestStep, paths);
+        return true;
     }
 
     private static ConstructionManager FindRepairConstruction(Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied)

@@ -492,7 +492,7 @@ public partial class TurnStateManager
         for (int i = 0; i < units.Count; i++)
         {
             UnitManager unit = units[i];
-            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked || unit.IsDead)
                 continue;
             if (occupancyMap != null && (unit.BoardTilemap == null || unit.BoardTilemap != occupancyMap))
                 continue;

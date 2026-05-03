@@ -863,7 +863,7 @@ public static class UnitMovementPathRules
             for (int i = 0; i < units.Length; i++)
             {
                 UnitManager unit = units[i];
-                if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked || unit.IsDead)
                     continue;
                 if (!IsUnitOnReferenceMap(unit, referenceTilemap))
                     continue;
@@ -1090,7 +1090,7 @@ public static class UnitMovementPathRules
                 for (int i = 0; i < occupants.Count; i++)
                 {
                     UnitManager unit = occupants[i];
-                    if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit)
+                    if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsDead)
                         continue;
 
                     if (unit.TeamId == exceptUnit.TeamId)
@@ -1112,7 +1112,7 @@ public static class UnitMovementPathRules
             for (int i = 0; i < occupants.Count; i++)
             {
                 UnitManager unit = occupants[i];
-                if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit)
+                if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsDead)
                     continue;
 
                 Vector3Int occupiedCell = unit.CurrentCellPosition;

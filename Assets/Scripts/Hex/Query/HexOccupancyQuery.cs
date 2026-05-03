@@ -9,7 +9,7 @@ public static class HexOccupancyQuery
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
-            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked || unit.IsDead)
                 continue;
 
             Vector3Int occupiedCell = unit.CurrentCellPosition;

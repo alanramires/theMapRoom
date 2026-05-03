@@ -111,6 +111,8 @@ public partial class AIController
         Vector3Int attackMove       = fromCell;
         UnitManager attackTarget    = null;
         float      attackScore     = float.MinValue;
+        float      attackPriority  = float.MinValue;
+        float      attackDpqTie    = float.MinValue;
         float      attackSectorTie = float.MinValue;
         float      attackHqTie     = float.MinValue;
         bool       hasAttackHex    = false;
@@ -124,7 +126,12 @@ public partial class AIController
 
         foreach (Vector3Int cell in paths.Keys)
         {
-            if (occupied.Contains(cell)) continue;
+            float dpqPontos = GetTerrainDpqPontos(cell);
+            if (occupied.Contains(cell))
+            {
+                scoringLog?.AppendLine($"  {cell} SKIP occupied dpqPts={dpqPontos:F1}");
+                continue;
+            }
             float dist     = SectorManager.HexDistance(cell, targetCell);
             bool  advances = dist < fromDist;
             // preferDpqAtBattle: considera também células a mesma distância do objetivo —
@@ -134,7 +141,7 @@ public partial class AIController
 
             float threat    = conservative ? CalculateThreatLevel(cell, snapshot.AITeam) : 0f;
             float prox      = (1f / (dist + 1f)) * CaptureProximityBase;
-            float dpq       = preferDpqMove ? GetTerrainDpqPontos(cell) * DpqWeight : 0f;
+            float dpq       = preferDpqMove ? dpqPontos * DpqWeight : 0f;
             float moveCost  = paths[cell].Count;
             float score     = prox - moveCost + dpq - threat * ThreatWeight;
             float sectorTie = -dist;
@@ -142,7 +149,8 @@ public partial class AIController
             float hqTie     = CalculateEnemyHqTieBreak(hqDist);
 
             string hqDistText = hqDist < float.MaxValue ? hqDist.ToString("F1") : "?";
-            scoringLog?.AppendLine($"  {cell} dist={dist:F1} prox={prox:F0} mv={moveCost:F0} dpq={dpq:F0} thr={threat:F0} secTie={sectorTie:F1} hq={hqDistText} hqTie={hqTie:F1} -> {score:F0}");
+            // dpqPontos sempre exibido (independente de preferDpqMove) para diagnóstico
+            scoringLog?.AppendLine($"  {cell} dist={dist:F1} prox={prox:F0} mv={moveCost:F0} dpqPts={dpqPontos:F1} dpq={dpq:F0} thr={threat:F0} secTie={sectorTie:F1} hq={hqDistText} hqTie={hqTie:F1} -> {score:F0}");
 
             // bestMove: só células que avançam em direção ao objetivo
             if (advances && IsBetterScore(score, sectorTie, hqTie, bestScore, bestSectorTie, bestHqTie))
@@ -162,13 +170,26 @@ public partial class AIController
                     Vector3Int enemyCell = nearbyEnemy.CurrentCellPosition; enemyCell.z = 0;
                     float targetPriority = AttackTargetPriorityPursuer(enemyCell, targetCell);
                     float objectiveBonus = enemyCell == targetCell ? 100000f : 0f;
-                    // DPQ sempre reforça o bonus de combate quando a flag está ativa,
-                    // independentemente de preferMoveOnBestDPQ
-                    float attackDpq = preferDpqAtBattle ? GetTerrainDpqPontos(cell) * DpqWeight : 0f;
-                    float aScore    = objectiveBonus + targetPriority * 1000f + score + AttackHexBonus + attackDpq;
-                    if (IsBetterScore(aScore, sectorTie, hqTie, attackScore, attackSectorTie, attackHqTie))
+                    float attackDpq = preferDpqAtBattle ? dpqPontos : 0f;
+                    float aScore    = objectiveBonus + targetPriority * 1000f + score + AttackHexBonus;
+                    bool  isNewBest = IsBetterAttackCandidate(
+                        preferDpqAtBattle,
+                        targetPriority,
+                        attackDpq,
+                        aScore,
+                        sectorTie,
+                        hqTie,
+                        attackPriority,
+                        attackDpqTie,
+                        attackScore,
+                        attackSectorTie,
+                        attackHqTie);
+                    scoringLog?.AppendLine($"    ↳ ATK {nearbyEnemy.UnitDisplayName}#{nearbyEnemy.InstanceId} pri={targetPriority:F1} objBonus={objectiveBonus:F0} atkDpqPts={attackDpq:F1} aScore={aScore:F0}{(isNewBest ? " ★" : "")}");
+                    if (isNewBest)
                     {
                         attackScore      = aScore;
+                        attackPriority   = targetPriority;
+                        attackDpqTie     = attackDpq;
                         attackSectorTie  = sectorTie;
                         attackHqTie      = hqTie;
                         attackMove       = cell;

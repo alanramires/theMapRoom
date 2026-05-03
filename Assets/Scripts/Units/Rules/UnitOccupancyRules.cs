@@ -53,7 +53,7 @@ public static class UnitOccupancyRules
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
-            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked || unit.IsDead)
                 continue;
             if (!IsUnitOnReferenceMap(unit, referenceTilemap))
                 continue;
@@ -79,7 +79,7 @@ public static class UnitOccupancyRules
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
-            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked || unit.IsDead)
                 continue;
             if (unit.TeamId != teamId)
                 continue;
@@ -110,7 +110,7 @@ public static class UnitOccupancyRules
             for (int i = 0; i < totalWarUnits.Length; i++)
             {
                 UnitManager unit = totalWarUnits[i];
-                if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
+                if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked || unit.IsDead)
                     continue;
                 if (!IsUnitOnReferenceMap(unit, referenceTilemap))
                     continue;
@@ -140,7 +140,7 @@ public static class UnitOccupancyRules
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
-            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked || unit.IsDead)
                 continue;
             if (!IsUnitOnReferenceMap(unit, referenceTilemap))
                 continue;
