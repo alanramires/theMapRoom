@@ -188,7 +188,8 @@ public partial class AIController
             {
                 if (opt?.targetUnit == null) continue;
                 Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
-                if (SectorManager.HexDistance(tc, targetCell) > DefenseEnemyRange) continue;
+                if (SectorManager.HexDistance(tc, targetCell) > DefenseEnemyRange &&
+                    SectorManager.HexDistance(tc, bestMove) > DefenseEnemyRange) continue;
                 float priority = AttackTargetPriorityPursuer(tc, targetCell);
                 if (priority > bestPriority) { bestPriority = priority; bestTarget = opt.targetUnit; }
             }
@@ -205,7 +206,14 @@ public partial class AIController
         assigned.Status = ObjectiveStatus.Pursuing;
         float bestHqDist = CalculateEnemyHqDistance(bestMove, snapshot, unit);
         string bestHqText = bestHqDist < float.MaxValue ? bestHqDist.ToString("F1") : "?";
-        Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} avança para {assigned.Sector} via {bestMove} (score={bestScore:F0}, secTie={bestSectorTie:F1}, hq={bestHqText}, hqTie={bestHqTie:F1})");
+        UnitManager advOccupant = HexOccupancyQuery.FindUnitAtCell(targetCell);
+        MatchController mcAdv   = GetMatchController();
+        bool hiddenOccupant = advOccupant != null
+            && advOccupant.TeamId != snapshot.AITeam
+            && (mcAdv == null || !mcAdv.IsUnitVisibleForTeam(advOccupant, snapshot.AITeam));
+        bool sectorInContest = HasNearbyVisibleEnemy(targetCell, snapshot.AITeam, DefenseEnemyRange);
+        string advTag = hiddenOccupant ? "Explorador" : sectorInContest ? "Perseguidor" : "PontaLanca";
+        Debug.Log($"{TL(advTag)} {unit.InstanceId} avança para {assigned.Sector} via {bestMove} (score={bestScore:F0}, secTie={bestSectorTie:F1}, hq={bestHqText}, hqTie={bestHqTie:F1})");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestMove, paths);
     }
 }

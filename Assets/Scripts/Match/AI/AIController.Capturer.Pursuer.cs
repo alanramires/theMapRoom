@@ -22,7 +22,8 @@ public partial class AIController
             {
                 if (opt?.targetUnit == null) continue;
                 Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
-                if (SectorManager.HexDistance(tc, targetCell) > DefenseEnemyRange) continue;
+                if (SectorManager.HexDistance(tc, targetCell) > DefenseEnemyRange &&
+                    SectorManager.HexDistance(tc, fromCell) > DefenseEnemyRange) continue;
                 float priority = AttackTargetPriorityPursuer(tc, targetCell);
                 if (priority > bestPriority) { bestPriority = priority; bestStayTarget = opt.targetUnit; }
             }
