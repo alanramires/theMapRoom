@@ -95,7 +95,7 @@ public partial class AIController
                     float gap = near2 - near1;
                     if (near2 == float.MaxValue || gap > MaxArrivalGap)
                     {
-                        Debug.Log($"{TL("Plan")} Setor {info.Sector} ignorado: risco alto, escolta muito distante (gap={(near2 == float.MaxValue ? "?" : gap.ToString("F0"))}h)");
+                        Debug.Log($"{TL("Plan")} Setor {info.Sector} ignorado: risco alto, batedor muito distante (gap={(near2 == float.MaxValue ? "?" : gap.ToString("F0"))}h)");
                         continue;
                     }
                 }
@@ -108,9 +108,11 @@ public partial class AIController
                 Status       = ObjectiveStatus.Pending,
                 Priority     = CalculateSectorPriority(info, aiTeam, snapshot.Stance),
             };
-            int slots = info.GetRiskLevelFor(aiTeam) == SectorManager.SectorRiskLevel.High ? 2 : 1;
+            int slots = info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High ? 2 : 1;
             for (int s = 0; s < slots; s++)
                 obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
+            if (info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
+                obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
             plan.Objectives.Add(obj);
         }
 
@@ -373,7 +375,188 @@ public partial class AIController
             freeCapturers.RemoveRange(0, nu);
         }
 
-        // Passo 5c: rogues próximos reforçam objetivos defensivos (sem slot fixo — escala com disponíveis)
+        // Passo 5c: assaltos primários preenchem slots de batedor.
+        {
+            var assignedAfterCapturers = new HashSet<int>();
+            foreach (SectorObjective obj in plan.Objectives)
+                foreach (SlotNeed slot in obj.Slots)
+                    if (slot.Filled) assignedAfterCapturers.Add(slot.AssignedUnitId);
+
+            List<UnitManager> freeAssaults = GetAvailablePrimaryAssaults(aiTeam);
+            for (int i = freeAssaults.Count - 1; i >= 0; i--)
+                if (assignedAfterCapturers.Contains(freeAssaults[i].InstanceId))
+                    freeAssaults.RemoveAt(i);
+
+            foreach (SectorObjective obj in plan.Objectives)
+            {
+                if (freeAssaults.Count == 0) break;
+                if (obj.Status != ObjectiveStatus.Defending) continue;
+                if (HasAnySlot(obj, UnitRole.Assalto)) continue;
+                if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
+                Vector3Int targetCell = defInfo.RepresentativeCell; targetCell.z = 0;
+                if (!IsObjectiveInCombatDisadvantage(obj, aiTeam, targetCell,
+                        defenseEnemyRange, alliesAgainstEnemiesHpRatio, out int enemyHp, out int allyHp))
+                    continue;
+
+                UnitManager best = null;
+                float bestDist = float.MaxValue;
+                foreach (UnitManager u in freeAssaults)
+                {
+                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                    float d = SectorManager.TryGetLandMovementDistance(uc, targetCell, out int td)
+                        ? td : SectorManager.HexDistance(uc, targetCell);
+                    if (d < bestDist) { bestDist = d; best = u; }
+                }
+
+                if (best == null) continue;
+
+                obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
+                obj.TryFillSlot(UnitRole.Assalto, best.InstanceId);
+                ApplyPlanHUD(best, obj, UnitRole.Assalto);
+                freeAssaults.Remove(best);
+                Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} → defesa crítica de {obj.Sector} " +
+                          $"(inimigo={enemyHp}HP aliado={allyHp}HP ratio={enemyHp / (float)allyHp:F1}× dist={bestDist:F0}h)");
+            }
+
+            foreach (SectorObjective obj in plan.Objectives)
+            {
+                if (freeAssaults.Count == 0) break;
+                if (obj.Status != ObjectiveStatus.Pursuing && obj.Status != ObjectiveStatus.Capturing) continue;
+                if (HasAnySlot(obj, UnitRole.Assalto)) continue;
+
+                ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
+                if (tgt == null) continue;
+                Vector3Int targetCell = tgt.CurrentCellPosition; targetCell.z = 0;
+
+                if (!IsObjectiveInCombatDisadvantage(obj, aiTeam, targetCell,
+                        alliesEnemyRange, alliesAgainstEnemiesHpRatio, out int enemyHp, out int allyHp))
+                    continue;
+
+                UnitManager best = null;
+                float bestDist = float.MaxValue;
+                foreach (UnitManager u in freeAssaults)
+                {
+                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                    float d = SectorManager.TryGetLandMovementDistance(uc, targetCell, out int td)
+                        ? td : SectorManager.HexDistance(uc, targetCell);
+                    if (d < bestDist) { bestDist = d; best = u; }
+                }
+
+                if (best == null) continue;
+
+                obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
+                obj.TryFillSlot(UnitRole.Assalto, best.InstanceId);
+                ApplyPlanHUD(best, obj, UnitRole.Assalto);
+                freeAssaults.Remove(best);
+                Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} → SOS ofensivo {obj.Sector} " +
+                          $"(inimigo={enemyHp}HP aliado={allyHp}HP ratio={enemyHp / (float)allyHp:F1}× dist={bestDist:F0}h)");
+            }
+
+            foreach (SectorObjective obj in plan.Objectives)
+            {
+                if (freeAssaults.Count == 0) break;
+                if (obj.Status != ObjectiveStatus.Defending) continue;
+                if (HasAnySlot(obj, UnitRole.Assalto)) continue;
+                if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
+                Vector3Int targetCell = defInfo.RepresentativeCell; targetCell.z = 0;
+
+                UnitManager best = null;
+                float bestDist = float.MaxValue;
+                foreach (UnitManager u in freeAssaults)
+                {
+                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                    float d = SectorManager.TryGetLandMovementDistance(uc, targetCell, out int td)
+                        ? td : SectorManager.HexDistance(uc, targetCell);
+                    if (d < bestDist) { bestDist = d; best = u; }
+                }
+
+                if (best == null) continue;
+
+                obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
+                obj.TryFillSlot(UnitRole.Assalto, best.InstanceId);
+                ApplyPlanHUD(best, obj, UnitRole.Assalto);
+                freeAssaults.Remove(best);
+                Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} → defesa estável de {obj.Sector} (dist={bestDist:F0}h)");
+            }
+
+            foreach (SectorObjective obj in plan.Objectives)
+            {
+                if (!obj.HasOpenSlot(UnitRole.Assalto)) continue;
+                if (!HasFilledSlot(obj, UnitRole.Capturador)) continue;
+                if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
+                Vector3Int targetCell = escortInfo.RepresentativeCell; targetCell.z = 0;
+
+                UnitManager best = null;
+                float bestDist = float.MaxValue;
+                foreach (UnitManager u in freeAssaults)
+                {
+                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                    float d = SectorManager.TryGetLandMovementDistance(uc, targetCell, out int td)
+                        ? td : SectorManager.HexDistance(uc, targetCell);
+                    if (d < bestDist) { bestDist = d; best = u; }
+                }
+
+                if (best == null) continue;
+
+                obj.TryFillSlot(UnitRole.Assalto, best.InstanceId);
+                if (obj.Status != ObjectiveStatus.Defending) obj.Status = ObjectiveStatus.Pursuing;
+                ApplyPlanHUD(best, obj, UnitRole.Assalto);
+                freeAssaults.Remove(best);
+                Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} → batedor de {obj.Sector} (dist={bestDist:F0}h)");
+            }
+
+            if (freeAssaults.Count > 0)
+            {
+                var lowRiskFallbacks = new List<SectorObjective>();
+                foreach (SectorObjective obj in plan.Objectives)
+                {
+                    if (!HasFilledSlot(obj, UnitRole.Capturador)) continue;
+                    if (HasAnySlot(obj, UnitRole.Assalto)) continue;
+                    if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
+                    if (escortInfo.GetRiskLevelFor(aiTeam) != SectorManager.SectorRiskLevel.Low) continue;
+                    lowRiskFallbacks.Add(obj);
+                }
+
+                lowRiskFallbacks.Sort((a, b) =>
+                {
+                    float ar = SectorManager.TryGetSectorInfo(a.Sector, out SectorManager.SectorInfo ai)
+                        ? ai.GetRiskRatioFor(aiTeam) : 0f;
+                    float br = SectorManager.TryGetSectorInfo(b.Sector, out SectorManager.SectorInfo bi)
+                        ? bi.GetRiskRatioFor(aiTeam) : 0f;
+                    int riskCompare = br.CompareTo(ar);
+                    return riskCompare != 0 ? riskCompare : a.Priority.CompareTo(b.Priority);
+                });
+
+                foreach (SectorObjective obj in lowRiskFallbacks)
+                {
+                    if (freeAssaults.Count == 0) break;
+                    if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
+                    Vector3Int targetCell = escortInfo.RepresentativeCell; targetCell.z = 0;
+
+                    UnitManager best = null;
+                    float bestDist = float.MaxValue;
+                    foreach (UnitManager u in freeAssaults)
+                    {
+                        Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                        float d = SectorManager.TryGetLandMovementDistance(uc, targetCell, out int td)
+                            ? td : SectorManager.HexDistance(uc, targetCell);
+                        if (d < bestDist) { bestDist = d; best = u; }
+                    }
+
+                    if (best == null) continue;
+
+                    obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
+                    obj.TryFillSlot(UnitRole.Assalto, best.InstanceId);
+                    if (obj.Status != ObjectiveStatus.Defending) obj.Status = ObjectiveStatus.Pursuing;
+                    ApplyPlanHUD(best, obj, UnitRole.Assalto);
+                    freeAssaults.Remove(best);
+                    Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} → batedor fallback Low de {obj.Sector} " +
+                              $"(risco={escortInfo.GetRiskRatioFor(aiTeam):F2}, dist={bestDist:F0}h)");
+                }
+            }
+        }
+
+        // Passo 5d: rogues próximos reforçam objetivos defensivos (sem slot fixo — escala com disponíveis)
         // Candidatos ordenados por distância ao HQ aliado (ascendente): recém-comprados no HQ
         // são preferidos sobre unidades já posicionadas no front, preservando a cobertura avançada.
         {
@@ -416,7 +599,7 @@ public partial class AIController
             foreach (UnitManager u in rogueAssigned) freeCapturers.Remove(u);
         }
 
-        // Passo 5d: rogues próximos reforçam captura em severa desvantagem
+        // Passo 5e: rogues próximos reforçam captura em severa desvantagem
         {
             const int MaxCaptureReinforcements = 2;
             float     SosRatio                 = alliesAgainstEnemiesHpRatio;
@@ -483,7 +666,7 @@ public partial class AIController
                 if (slot.Filled && !freeCapturers.Exists(u => u.InstanceId == slot.AssignedUnitId))
                 {
                     UnitManager u = FindActiveUnit(slot.AssignedUnitId, aiTeam);
-                    if (u != null) ApplyPlanHUD(u, obj);
+                    if (u != null) ApplyPlanHUD(u, obj, slot.Role);
                 }
 
         int totalAssigned = 0;
@@ -502,10 +685,22 @@ public partial class AIController
                 UnitManager u = FindActiveUnit(slot.AssignedUnitId, aiTeam);
                 ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
                 string distStr = "?";
-                if (u != null && tgt != null)
+                Vector3Int tc = Vector3Int.zero;
+                bool hasTargetCell = false;
+                if (tgt != null)
+                {
+                    tc = tgt.CurrentCellPosition; tc.z = 0;
+                    hasTargetCell = true;
+                }
+                else if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo objInfo))
+                {
+                    tc = objInfo.RepresentativeCell; tc.z = 0;
+                    hasTargetCell = true;
+                }
+
+                if (u != null && hasTargetCell)
                 {
                     Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
-                    Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
                     float d = SectorManager.TryGetLandMovementDistance(uc, tc, out int td)
                         ? td
                         : SectorManager.HexDistance(uc, tc);
@@ -532,11 +727,11 @@ public partial class AIController
         }
     }
 
-    private void ApplyPlanHUD(UnitManager unit, SectorObjective obj)
+    private void ApplyPlanHUD(UnitManager unit, SectorObjective obj, UnitRole role = UnitRole.Capturador)
     {
         string sectorName = obj.Sector.ToString();
         string badge = sectorName.Length > 0 ? sectorName[0].ToString().ToUpper() : "?";
-        unit.SetAIAssignedPlan(sectorName, sectorName, badge, (int)UnitRole.Capturador, showAIUnitHUD);
+        unit.SetAIAssignedPlan(sectorName, sectorName, badge, (int)role, showAIUnitHUD);
     }
 
     private static UnitManager FindActiveUnit(int instanceId, TeamId team)
@@ -544,6 +739,72 @@ public partial class AIController
         foreach (UnitManager u in UnitManager.AllActive)
             if (u.InstanceId == instanceId && u.TeamId == team && !u.IsDead) return u;
         return null;
+    }
+
+    private static bool HasFilledSlot(SectorObjective obj, UnitRole role)
+    {
+        if (obj == null || obj.Slots == null) return false;
+        foreach (SlotNeed slot in obj.Slots)
+            if (slot.Role == role && slot.Filled) return true;
+        return false;
+    }
+
+    private static bool HasAnySlot(SectorObjective obj, UnitRole role)
+    {
+        if (obj == null || obj.Slots == null) return false;
+        foreach (SlotNeed slot in obj.Slots)
+            if (slot.Role == role) return true;
+        return false;
+    }
+
+    private bool IsObjectiveInCombatDisadvantage(
+        SectorObjective obj,
+        TeamId aiTeam,
+        Vector3Int targetCell,
+        int enemyRange,
+        float disadvantageRatio,
+        out int enemyHp,
+        out int allyHp)
+    {
+        enemyHp = 0;
+        allyHp = 0;
+        if (obj == null)
+            return false;
+
+        MatchController mc = GetMatchController();
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+            if (SectorManager.HexDistance(ec, targetCell) <= enemyRange)
+                enemyHp += Mathf.Max(1, enemy.CurrentHP);
+        }
+        if (enemyHp == 0)
+            return false;
+
+        foreach (SlotNeed slot in obj.Slots)
+        {
+            if (!slot.Filled) continue;
+            UnitManager ally = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            if (ally != null)
+                allyHp += Mathf.Max(1, ally.CurrentHP);
+        }
+
+        return allyHp > 0 && enemyHp >= allyHp * disadvantageRatio;
+    }
+
+    private static List<UnitManager> GetAvailablePrimaryAssaults(TeamId aiTeam)
+    {
+        var list = new List<UnitManager>();
+        foreach (UnitManager u in UnitManager.AllActive)
+        {
+            if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
+            if (!u.TryGetUnitData(out UnitData data)) continue;
+            if (data.roles != null && data.roles.Count > 0 && data.roles[0] == UnitRole.Assalto)
+                list.Add(u);
+        }
+        return list;
     }
 
     private bool HasNearbyVisibleEnemy(Vector3Int cell, TeamId aiTeam, int range)

@@ -1,0 +1,390 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+public partial class AIController
+{
+    private const int AssaultScoutZoneRadius = 2;
+
+    // -------------------------------------------------------------------------
+    // Assalto Batedor - protege e varre a zona do objetivo de captura atribuido.
+    // -------------------------------------------------------------------------
+
+    private PlayerAction TryDecideAssaultAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
+    {
+        if (unit == null || snapshot == null || plan == null)
+            return null;
+        if (!unit.TryGetUnitData(out UnitData data) || data == null
+            || data.roles == null || data.roles.Count == 0
+            || data.roles[0] != UnitRole.Assalto)
+            return null;
+
+        SectorObjective assigned = ResolveAssignedAssaultObjective(unit, plan);
+        if (assigned == null)
+            return DecideRogueAssaultBreakerAction(unit, snapshot);
+
+        return DecideAssignedAssaultEscortAction(unit, snapshot, assigned);
+    }
+
+    private PlayerAction DecideRogueAssaultBreakerAction(UnitManager unit, AIWorldSnapshot snapshot)
+    {
+        Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+
+        if (paths == null || paths.Count == 0)
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+
+        List<UnitManager> enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
+        if (TryFindAssaultBreakerAttack(unit, snapshot, fromCell, paths, occupied, enemies,
+                out Vector3Int attackCell, out UnitManager attackTarget, out string attackReason))
+        {
+            Vector3Int targetCell = attackTarget.CurrentCellPosition; targetCell.z = 0;
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} breaker — ataca via {attackCell} → {attackTarget.UnitDisplayName}#{attackTarget.InstanceId} ({attackReason})");
+            return BuildAttackBatch(unit, snapshot.AITeam, fromCell, attackCell,
+                attackTarget.InstanceId.ToString(), targetCell, paths);
+        }
+
+        Vector3Int pressureTarget = ResolveAssaultPressureTarget(snapshot, enemies, fromCell);
+        Vector3Int bestMove = FindAssaultPressureMove(unit, snapshot, fromCell, pressureTarget, paths, occupied);
+        if (bestMove != fromCell)
+        {
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} breaker — pressiona via {bestMove} alvo={pressureTarget}");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestMove, paths);
+        }
+
+        Debug.Log($"{TL("Assalto")} {unit.InstanceId} breaker — mantém posição");
+        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+    }
+
+    private PlayerAction DecideAssignedAssaultEscortAction(UnitManager unit, AIWorldSnapshot snapshot, SectorObjective assigned)
+    {
+        Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
+        Vector3Int scoutAnchorCell = ResolveAssaultEscortCell(assigned, snapshot.AITeam, fromCell);
+        int scoutZoneRadius = ResolveAssaultScoutZoneRadius(unit, assigned);
+
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+
+        if (paths == null || paths.Count == 0)
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+
+        // Se o escort está no corredor de avanço do capturador, exclui a célula atual
+        // do patrol para forçar movimento real e liberar o caminho.
+        TeamObjectivePlan escortPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        bool inCorridor = escortPlan != null && IsAssaultEscortInCapturerCorridor(unit, fromCell, escortPlan, snapshot.AITeam);
+        if (inCorridor)
+        {
+            occupied.Add(fromCell);
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — cede corredor, força movimento");
+        }
+
+        List<UnitManager> threats = CollectAssaultEscortThreats(snapshot.AITeam, scoutAnchorCell, scoutZoneRadius);
+        AddAssaultEscortTravelThreats(snapshot.AITeam, fromCell, paths, threats);
+        bool defensiveContext = assigned.Status == ObjectiveStatus.Defending;
+        if (TryFindAssaultEscortAttack(unit, snapshot, fromCell, scoutAnchorCell, scoutZoneRadius, defensiveContext, paths, occupied, threats,
+                out Vector3Int attackCell, out UnitManager attackTarget, out string attackReason))
+        {
+            Vector3Int targetCell = attackTarget.CurrentCellPosition; targetCell.z = 0;
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — ataca via {attackCell} → {attackTarget.UnitDisplayName}#{attackTarget.InstanceId} ({attackReason})");
+            return BuildAttackBatch(unit, snapshot.AITeam, fromCell, attackCell,
+                attackTarget.InstanceId.ToString(), targetCell, paths);
+        }
+
+        List<UnitManager> hiddenThreats = CollectHiddenAssaultEscortThreats(snapshot.AITeam, scoutAnchorCell, scoutZoneRadius);
+        if (TryFindAssaultScoutRevealMove(unit, snapshot, fromCell, scoutAnchorCell, scoutZoneRadius, paths, occupied, hiddenThreats,
+                out Vector3Int revealCell, out UnitManager hiddenTarget, out string revealReason))
+        {
+            Vector3Int hiddenCell = hiddenTarget.CurrentCellPosition; hiddenCell.z = 0;
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — varre FoW via {revealCell} → suspeita @ {hiddenCell} ({revealReason})");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, revealCell, paths);
+        }
+
+        Vector3Int coverCell = FindAssaultEscortCoverCell(unit, snapshot, fromCell, scoutAnchorCell, scoutZoneRadius, paths, occupied, threats, out string coverEvaluationLog);
+        if (!string.IsNullOrEmpty(coverEvaluationLog))
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — HexEvaluator.Batedor target={scoutAnchorCell} zona={scoutZoneRadius}h\n{coverEvaluationLog}");
+        if (coverCell != fromCell)
+        {
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — patrulha via {coverCell}");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, coverCell, paths);
+        }
+
+        Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — mantém patrulha");
+        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+    }
+
+    private List<UnitManager> CollectVisibleAssaultEnemies(TeamId aiTeam)
+    {
+        var enemies = new List<UnitManager>();
+        MatchController mc = GetMatchController();
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            enemies.Add(enemy);
+        }
+        return enemies;
+    }
+
+    private bool TryFindAssaultBreakerAttack(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        List<UnitManager> enemies,
+        out Vector3Int bestCell,
+        out UnitManager bestTarget,
+        out string reason)
+    {
+        bestCell = fromCell;
+        bestTarget = null;
+        reason = "";
+        if (enemies == null || enemies.Count == 0)
+            return false;
+
+        Vector3Int enemyHqCell = snapshot.EnemyHQ != null
+            ? snapshot.EnemyHQ.CurrentCellPosition
+            : fromCell;
+        enemyHqCell.z = 0;
+
+        float bestScore = float.MinValue;
+        foreach (Vector3Int cell in paths.Keys)
+        {
+            if (cell != fromCell && occupied.Contains(cell)) continue;
+
+            foreach (UnitManager enemy in enemies)
+            {
+                if (!CanAttackTargetFrom(fromCell, cell, unit, enemy)) continue;
+                if (!PassesAttackDecision(unit, enemy, cell, false, out string attackDecisionReason))
+                    continue;
+
+                Vector3Int enemyCell = enemy.CurrentCellPosition; enemyCell.z = 0;
+                bool inConstruction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell) != null;
+                float enemyHqDist = SectorManager.HexDistance(enemyCell, enemyHqCell);
+                float cellHqDist = SectorManager.HexDistance(cell, enemyHqCell);
+                float dpq = GetTerrainDpqPontos(cell);
+                BazookaTargetPriority targetPreference = ResolveAssaultTargetPreference(unit, enemy);
+                float targetPreferenceScore = GetAssaultTargetPreferenceScore(targetPreference);
+                float score =
+                    targetPreferenceScore
+                    + Mathf.Max(0, 20 - enemy.CurrentHP) * 900f
+                    + (inConstruction ? 5000f : 0f)
+                    - enemyHqDist * 120f
+                    - cellHqDist * 30f
+                    + dpq * 40f
+                    - GetPathStepCount(paths, cell) * 5f
+                    - enemy.InstanceId * 0.001f;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestCell = cell;
+                    bestTarget = enemy;
+                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} bldg={inConstruction} enemyHqDist={enemyHqDist:F1} dpq={dpq:F1} {attackDecisionReason}";
+                }
+            }
+        }
+
+        return bestTarget != null;
+    }
+
+    private static BazookaTargetPriority ResolveAssaultTargetPreference(UnitManager attacker, UnitManager target)
+    {
+        if (attacker == null || target == null)
+            return BazookaTargetPriority.Tertiary;
+        if (!attacker.TryGetUnitData(out UnitData attackerData) || attackerData == null)
+            return BazookaTargetPriority.Tertiary;
+        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
+            return BazookaTargetPriority.Tertiary;
+
+        return attackerData.ResolveAiTargetPriorityForTargetClass(targetData.unitClass);
+    }
+
+    private static float GetAssaultTargetPreferenceScore(BazookaTargetPriority priority)
+    {
+        switch (priority)
+        {
+            case BazookaTargetPriority.Primary:
+                return 30000f;
+            case BazookaTargetPriority.Secondary:
+                return 15000f;
+            default:
+                return 0f;
+        }
+    }
+
+    private Vector3Int ResolveAssaultPressureTarget(AIWorldSnapshot snapshot, List<UnitManager> enemies, Vector3Int fromCell)
+    {
+        if (snapshot.EnemyHQ != null)
+        {
+            Vector3Int hq = snapshot.EnemyHQ.CurrentCellPosition; hq.z = 0;
+            return hq;
+        }
+
+        if (snapshot.EnemyBuildings != null && snapshot.EnemyBuildings.Count > 0)
+        {
+            ConstructionManager closest = null;
+            float bestD = float.MaxValue;
+            foreach (ConstructionManager eb in snapshot.EnemyBuildings)
+            {
+                Vector3Int ec = eb.CurrentCellPosition; ec.z = 0;
+                float d = SectorManager.HexDistance(fromCell, ec);
+                if (d < bestD) { bestD = d; closest = eb; }
+            }
+            if (closest != null)
+            {
+                Vector3Int ec = closest.CurrentCellPosition; ec.z = 0;
+                return ec;
+            }
+        }
+
+        if (enemies != null && enemies.Count > 0)
+        {
+            UnitManager best = null;
+            float bestDist = float.MaxValue;
+            foreach (UnitManager enemy in enemies)
+            {
+                Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+                float d = SectorManager.HexDistance(fromCell, ec);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    best = enemy;
+                }
+            }
+            if (best != null)
+            {
+                Vector3Int bc = best.CurrentCellPosition; bc.z = 0;
+                return bc;
+            }
+        }
+
+        if (snapshot.EnemyHQ != null)
+        {
+            Vector3Int hq = snapshot.EnemyHQ.CurrentCellPosition; hq.z = 0;
+            return hq;
+        }
+
+        // Fallback: edifício inimigo mais próximo (sem filtro FoW)
+        if (snapshot.EnemyBuildings != null && snapshot.EnemyBuildings.Count > 0)
+        {
+            ConstructionManager closest = null;
+            float bestD = float.MaxValue;
+            foreach (ConstructionManager eb in snapshot.EnemyBuildings)
+            {
+                Vector3Int ec = eb.CurrentCellPosition; ec.z = 0;
+                float d = SectorManager.HexDistance(fromCell, ec);
+                if (d < bestD) { bestD = d; closest = eb; }
+            }
+            if (closest != null)
+            {
+                Vector3Int ec = closest.CurrentCellPosition; ec.z = 0;
+                return ec;
+            }
+        }
+
+        return fromCell;
+    }
+
+    private Vector3Int FindAssaultPressureMove(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int pressureTarget,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied)
+    {
+        float fromDist = SectorManager.HexDistance(fromCell, pressureTarget);
+        Vector3Int bestCell = fromCell;
+        Vector3Int bestFallbackCell = fromCell;
+        float bestProgress = float.MinValue;
+        float bestLine = float.MinValue;
+        int bestPathCost = int.MinValue;
+        float bestThreat = float.MaxValue;
+        float bestFallbackProgress = float.MinValue;
+        float bestFallbackLine = float.MinValue;
+        int bestFallbackPathCost = int.MinValue;
+        float bestFallbackThreat = float.MaxValue;
+        bool foundMove = false;
+
+        foreach (Vector3Int cell in paths.Keys)
+        {
+            if (cell == fromCell) continue;
+            if (cell != fromCell && occupied.Contains(cell)) continue;
+
+            float dist = SectorManager.HexDistance(cell, pressureTarget);
+            float dpq = GetTerrainDpqPontos(cell);
+            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+            // Bonus forte para células que avançam; penalidade leve para as que regridem
+            float progress = fromDist - dist;
+            float line = CalculateLineProgressTieBreak(fromCell, pressureTarget, cell);
+            int pathCost = GetPathStepCount(paths, cell);
+
+            if (IsBetterAssaultPressureMove(progress, line, pathCost, threat, dpq,
+                    bestFallbackProgress, bestFallbackLine, bestFallbackPathCost, bestFallbackThreat, GetTerrainDpqPontos(bestFallbackCell)))
+            {
+                bestFallbackProgress = progress;
+                bestFallbackLine = line;
+                bestFallbackPathCost = pathCost;
+                bestFallbackThreat = threat;
+                bestFallbackCell = cell;
+            }
+
+            if (dist > fromDist) continue;
+
+            if (IsBetterAssaultPressureMove(progress, line, pathCost, threat, dpq,
+                    bestProgress, bestLine, bestPathCost, bestThreat, GetTerrainDpqPontos(bestCell)))
+            {
+                bestProgress = progress;
+                bestLine = line;
+                bestPathCost = pathCost;
+                bestThreat = threat;
+                bestCell = cell;
+                foundMove = true;
+            }
+        }
+
+        return foundMove ? bestCell : bestFallbackCell;
+    }
+
+    private static bool IsBetterAssaultPressureMove(
+        float candidateProgress,
+        float candidateLine,
+        int candidatePathCost,
+        float candidateThreat,
+        float candidateDpq,
+        float bestProgress,
+        float bestLine,
+        int bestPathCost,
+        float bestThreat,
+        float bestDpq)
+    {
+        const float epsilon = 0.001f;
+        if (candidateProgress > bestProgress + epsilon) return true;
+        if (candidateProgress < bestProgress - epsilon) return false;
+
+        if (candidateLine > bestLine + epsilon) return true;
+        if (candidateLine < bestLine - epsilon) return false;
+
+        if (candidatePathCost > bestPathCost) return true;
+        if (candidatePathCost < bestPathCost) return false;
+
+        if (candidateThreat < bestThreat - epsilon) return true;
+        if (candidateThreat > bestThreat + epsilon) return false;
+
+        return candidateDpq > bestDpq + epsilon;
+    }
+
+    private static SectorObjective ResolveAssignedAssaultObjective(UnitManager unit, TeamObjectivePlan plan)
+    {
+        foreach (SectorObjective obj in plan.Objectives)
+            foreach (SlotNeed slot in obj.Slots)
+                if (slot.Role == UnitRole.Assalto && slot.Filled && slot.AssignedUnitId == unit.InstanceId)
+                    return obj;
+        return null;
+    }
+}

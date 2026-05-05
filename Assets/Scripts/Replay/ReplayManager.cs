@@ -2717,8 +2717,8 @@ public class ReplayManager : MonoBehaviour
             }
         }
 
-        unitSpawner.EnsureNextIdAbove(maxUnitId);
-        constructionSpawner.EnsureNextIdAbove(maxConstructionId);
+        unitSpawner.SetNextIdAfterMax(maxUnitId);
+        constructionSpawner.SetNextIdAfterMax(maxConstructionId);
 
         MatchStateSaveData matchState = snapshot.MatchState ?? new MatchStateSaveData();
         SaveDataMapper.ApplyMatchStateSaveData(matchController, matchState);

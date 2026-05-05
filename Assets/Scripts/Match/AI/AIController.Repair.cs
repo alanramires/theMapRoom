@@ -55,9 +55,22 @@ public partial class AIController
         if (data.repairTriggerAutonomyPct > 0 &&
             unit.CurrentFuel * 100f / unit.GetMaxFuel() <= data.repairTriggerAutonomyPct)
             return true;
-        if (data.repairTriggerAmmoEnabled &&
-            unit.CurrentAmmo * 100f / unit.GetMaxAmmo() <= data.repairTriggerAmmoPct)
-            return true;
+        if (data.repairTriggerAmmoEnabled)
+        {
+            System.Collections.Generic.IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+            for (int i = 0; i < weapons.Count; i++)
+            {
+                UnitEmbarkedWeapon rw = weapons[i];
+                if (rw == null) continue;
+                int baseAmmo = (data.embarkedWeapons != null && i < data.embarkedWeapons.Count
+                                && data.embarkedWeapons[i] != null)
+                    ? data.embarkedWeapons[i].squadAmmunition : 0;
+                if (baseAmmo <= 0) continue; // arma sem ammo base não é rastreada
+                float ammoPct = rw.squadAmmunition * 100f / baseAmmo;
+                if (ammoPct <= data.repairTriggerAmmoPct)
+                    return true;
+            }
+        }
         return false;
     }
 
@@ -106,6 +119,7 @@ public partial class AIController
                     foreach (PodeMirarTargetOption opt in defBuf)
                     {
                         if (opt?.targetUnit == null) continue;
+                        if (!PassesAttackDecision(unit, opt.targetUnit, fromCell, true, out _)) continue;
                         Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
                         float p = AttackTargetPriority(tc, fromCell);
                         if (p > defPri) { defPri = p; defTarget = opt.targetUnit; }

@@ -160,6 +160,9 @@ public partial class TurnStateManager : MonoBehaviour
     public string CurrentCursorStateStackDebugText => BuildFsmDebugText(horizontal: true);
     public UnitManager SelectedUnit => selectedUnit;
     public TerrainDatabase TerrainDatabaseRef => terrainDatabase;
+    public Tilemap MovementTilemapRef => terrainTilemap != null
+        ? terrainTilemap
+        : cursorController != null ? cursorController.BoardTilemap : null;
     public WeaponPriorityData WeaponPriorityDataRef => weaponPriorityData;
     public DPQMatchupDatabase DpqMatchupDatabaseRef => dpqMatchupDatabase;
     public RPSDatabase RpsDatabaseRef => rpsDatabase;

@@ -38,11 +38,29 @@ public partial class AIController
     // desempate por HP mais baixo (mais fácil de eliminar).
     private UnitManager PickBestRogueTarget(List<PodeMirarTargetOption> options, TeamId aiTeam)
     {
+        return PickBestRogueTarget(options, aiTeam, null, default, false, out _);
+    }
+
+    private UnitManager PickBestRogueTarget(
+        List<PodeMirarTargetOption> options,
+        TeamId aiTeam,
+        UnitManager attacker,
+        Vector3Int attackCell,
+        bool defensiveContext,
+        out string attackDecisionReason)
+    {
+        attackDecisionReason = "";
         UnitManager best = null;
         float bestPriority = float.MinValue;
         foreach (PodeMirarTargetOption opt in options)
         {
             if (opt?.targetUnit == null || opt.targetUnit.TeamId == aiTeam) continue;
+            string decisionReason = "";
+            if (attacker != null
+                && !PassesAttackDecision(attacker, opt.targetUnit, attackCell, defensiveContext, out decisionReason))
+            {
+                continue;
+            }
             float priority = 10f - opt.targetUnit.CurrentHP;
 
             // Inimigo em prédio capturável → ameaça direta ao objetivo, prioridade máxima
@@ -52,7 +70,12 @@ public partial class AIController
                 && !(bldg.TeamId == aiTeam && bldg.CurrentCapturePoints >= bldg.CapturePointsMax))
                 priority += 1000f;
 
-            if (priority > bestPriority) { bestPriority = priority; best = opt.targetUnit; }
+            if (priority > bestPriority)
+            {
+                bestPriority = priority;
+                best = opt.targetUnit;
+                attackDecisionReason = attacker != null ? decisionReason : "";
+            }
         }
         return best;
     }
@@ -252,6 +275,159 @@ public partial class AIController
         return false;
     }
 
+    private void AppendMissingDpqReachabilityDiagnostics(
+        System.Text.StringBuilder log,
+        UnitManager unit,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        Vector3Int targetCell)
+    {
+        if (log == null || unit == null || boardTilemap == null)
+            return;
+
+        var cells = new List<Vector3Int>();
+        UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, targetCell, cells);
+
+        foreach (Vector3Int rawCell in cells)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (paths != null && paths.ContainsKey(cell))
+                continue;
+
+            float dpq = GetTerrainDpqPontos(cell);
+            if (dpq <= 0f)
+                continue;
+
+            bool canEnter = UnitMovementPathRules.TryGetEnterCellCost(
+                boardTilemap,
+                unit,
+                cell,
+                terrainDatabase,
+                applyOperationalAutonomyModifier: true,
+                out int enterCost);
+
+            string occupant = DescribeAnyUnitAtCellForDiagnostics(cell);
+            string route = DescribeReachabilityFromKnownPaths(unit, paths, cell, enterCost, canEnter);
+            log.AppendLine($"  {cell} MISS notReachable dpqPts={dpq:F1} enter={(canEnter ? enterCost.ToString() : "no")} {route} occ={occupant}");
+        }
+    }
+
+    private void AppendSpecificReachabilityDiagnostics(
+        System.Text.StringBuilder log,
+        UnitManager unit,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        params Vector3Int[] cells)
+    {
+        if (log == null || unit == null || cells == null)
+            return;
+
+        for (int i = 0; i < cells.Length; i++)
+        {
+            Vector3Int cell = cells[i];
+            cell.z = 0;
+            if (paths != null && paths.ContainsKey(cell))
+                continue;
+
+            bool canEnter = UnitMovementPathRules.TryGetEnterCellCost(
+                boardTilemap,
+                unit,
+                cell,
+                terrainDatabase,
+                applyOperationalAutonomyModifier: true,
+                out int enterCost);
+
+            string occupant = DescribeAnyUnitAtCellForDiagnostics(cell);
+            string route = DescribeReachabilityFromKnownPaths(unit, paths, cell, enterCost, canEnter);
+            log.AppendLine($"  {cell} MISS probe dpqPts={GetTerrainDpqPontos(cell):F1} enter={(canEnter ? enterCost.ToString() : "no")} {route} occ={occupant}");
+        }
+    }
+
+    private string DescribeReachabilityFromKnownPaths(
+        UnitManager unit,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        Vector3Int blockedCell,
+        int enterCost,
+        bool canEnter)
+    {
+        if (unit == null || paths == null || boardTilemap == null)
+            return "route=?";
+
+        Vector3Int origin = unit.CurrentCellPosition;
+        origin.z = 0;
+        int maxMove = Mathf.Max(0, unit.RemainingMovementPoints);
+        int maxFuel = Mathf.Max(0, unit.CurrentFuel);
+
+        var neighbors = new List<Vector3Int>();
+        UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, blockedCell, neighbors);
+
+        Vector3Int bestNeighbor = Vector3Int.zero;
+        int bestSteps = int.MaxValue;
+        int bestPathLen = int.MaxValue;
+        string bestOcc = "-";
+
+        for (int i = 0; i < neighbors.Count; i++)
+        {
+            Vector3Int neighbor = neighbors[i];
+            neighbor.z = 0;
+            if (paths.TryGetValue(neighbor, out List<Vector3Int> path) && path != null)
+            {
+                int steps = Mathf.Max(0, path.Count - 1);
+                if (steps < bestSteps)
+                {
+                    bestSteps = steps;
+                    bestPathLen = path.Count;
+                    bestNeighbor = neighbor;
+                }
+            }
+            else if (bestOcc == "-")
+            {
+                string occ = DescribeAnyUnitAtCellForDiagnostics(neighbor);
+                if (occ != "-")
+                    bestOcc = $"{neighbor}:{occ}";
+            }
+        }
+
+        if (bestSteps == int.MaxValue)
+            return $"route=noReachableNeighbor maxMove={maxMove} fuel={maxFuel} nearOcc={bestOcc}";
+
+        int estimatedTotal = canEnter ? bestSteps + Mathf.Max(1, enterCost) : int.MaxValue;
+        string totalText = canEnter ? estimatedTotal.ToString() : "?";
+        return $"route=via {bestNeighbor} pathLen={bestPathLen} stepApprox={bestSteps}+{(canEnter ? enterCost.ToString() : "?")}={totalText} maxMove={maxMove} fuel={maxFuel}";
+    }
+
+    private string DescribeAnyUnitAtCellForDiagnostics(Vector3Int cell)
+    {
+        cell.z = 0;
+        UnitManager found = null;
+        foreach (UnitManager unit in UnitManager.AllActive)
+        {
+            if (unit == null || !unit.gameObject.activeInHierarchy)
+                continue;
+
+            Vector3Int uc = unit.CurrentCellPosition;
+            uc.z = 0;
+            if (uc != cell)
+                continue;
+
+            found = unit;
+            break;
+        }
+
+        if (found == null)
+            return "-";
+
+        Tilemap map = found.BoardTilemap != null ? found.BoardTilemap : boardTilemap;
+        Vector3Int worldCell = map != null
+            ? HexCoordinates.WorldToCell(map, found.transform.position)
+            : found.CurrentCellPosition;
+        worldCell.z = 0;
+        Vector3Int stateCell = found.CurrentCellPosition;
+        stateCell.z = 0;
+        bool stale = worldCell != stateCell;
+
+        return $"{found.UnitDisplayName}#{found.InstanceId}/team={found.TeamId}/dead={found.IsDead}/emb={found.IsEmbarked}/acted={found.HasActed}/state={stateCell}/world={worldCell}/stale={stale}";
+    }
+
     private float GetTerrainEv(Vector3Int cell)
     {
         if (boardTilemap == null || terrainDatabase == null) return 0f;
@@ -409,7 +585,7 @@ public partial class AIController
     {
         foreach (SectorObjective obj in plan.Objectives)
             foreach (SlotNeed slot in obj.Slots)
-                if (slot.Filled && slot.AssignedUnitId == unit.InstanceId) return obj;
+                if (slot.Role == UnitRole.Capturador && slot.Filled && slot.AssignedUnitId == unit.InstanceId) return obj;
         return null;
     }
 

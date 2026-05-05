@@ -127,6 +127,19 @@ public class UnitData : ScriptableObject
     public bool playConservative = false;
     [Tooltip("Ao se mover (fora de combate), prefere rotas com melhor DPQ em vez da rota mais curta. Util para unidades de suporte que devem permanecer em posicoes defensivas.")]
     public bool preferMoveOnBestDPQ = false;
+    [Header("Attack Decision")]
+    [Tooltip("Se ativo, a IA usa simulacao da Matriz de HP para decidir se esta unidade deve aceitar um combate.")]
+    public bool useAttackDecision = true;
+    [Tooltip("Perda maxima de HP que a unidade aceita sofrer ao iniciar combate. Ex.: 50 permite perder ate metade do HP atual.")]
+    [Range(0, 100)] public int attackAcceptHpLossPercent = 50;
+    [Tooltip("Dano minimo exigido no alvo, em percentual do HP maximo do alvo, para aceitar o combate mesmo quando nao houver kill.")]
+    [Range(0, 100)] public int attackEliminationMinPercent = 10;
+    [Tooltip("Se ativo, a unidade rejeita ataques em que a simulacao indica que ela morre no contra-ataque.")]
+    public bool attackMustSurvive = true;
+    [Tooltip("Se ativo, ignora o gate de Attack Decision quando a unidade estiver alocada em um plano defensivo.")]
+    public bool ignoreAttackDecisionWhenDefending = false;
+    [Tooltip("Tolerancia extra de perda de HP quando a unidade estiver defendendo um setor/base. Ex.: 20 transforma limite 50 em 70.")]
+    [Range(0, 100)] public int defensiveAttackExtraHpLossPercent = 20;
 
     [Header("Repair Decision")]
     // Decision data lives here (UnitData). Runtime state lives in UnitManager.isUnderRepair.
@@ -288,6 +301,9 @@ public class UnitData : ScriptableObject
             passengersCanDisembarkAndGoesToConstructions = new List<ConstructionData>();
         eliteLevel = Mathf.Max(0, eliteLevel);
         visao = Mathf.Max(1, visao);
+        attackAcceptHpLossPercent = Mathf.Clamp(attackAcceptHpLossPercent, 0, 100);
+        attackEliminationMinPercent = Mathf.Clamp(attackEliminationMinPercent, 0, 100);
+        defensiveAttackExtraHpLossPercent = Mathf.Clamp(defensiveAttackExtraHpLossPercent, 0, 100);
         for (int i = 0; i < visionSpecializations.Count; i++)
         {
             UnitVisionException entry = visionSpecializations[i];
@@ -679,7 +695,5 @@ public class UnitData : ScriptableObject
         armorClass = ArmorClass.Light;
     }
 }
-
-
 
 

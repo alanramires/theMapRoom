@@ -38,12 +38,26 @@ MonoBehaviour:
     priority: 2
   - targetClass: 1
     priority: 2
-  - targetClass: 0
-    priority: 1
   - targetClass: 3
+    priority: 1
+  - targetClass: 0
     priority: 1
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 1
+  playConservative: 0
+  preferMoveOnBestDPQ: 0
+  useAttackDecision: 1
+  attackAcceptHpLossPercent: 60
+  attackEliminationMinPercent: 10
+  attackMustSurvive: 1
+  ignoreAttackDecisionWhenDefending: 1
+  defensiveAttackExtraHpLossPercent: 20
+  repairTriggerHpBelow: 3
+  repairTriggerAutonomyPct: 25
+  repairTriggerAmmoEnabled: 1
+  repairTriggerAmmoPct: 0
+  repairRecoverHpAbove: 8
+  fuseWhileInRepair: 1
   eliteLevel: 1
   combatModifiers:
   - {fileID: 11400000, guid: 42fcc72060965254e91dc5cb0e43f35c, type: 2}

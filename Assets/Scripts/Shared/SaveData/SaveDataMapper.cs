@@ -156,6 +156,12 @@ public static class SaveDataMapper
             worldY = unit.transform.position.y,
             currentHP = unit.CurrentHP,
             isDead = unit.IsDead,
+            deadWhenTurn = unit.DeadWhenTurn,
+            deadByReason = unit.DeadByReason,
+            diedByUnit = unit.DiedByUnit,
+            hasMerged = unit.HasMerged,
+            mergedWhenTurn = unit.MergedWhenTurn,
+            mergedWithUnit = unit.MergedWithUnit,
             currentAmmo = unit.CurrentAmmo,
             currentFuel = unit.CurrentFuel,
             remainingMovementPoints = unit.RemainingMovementPoints,
@@ -212,7 +218,14 @@ public static class SaveDataMapper
         unit.AssignSpawnInstanceId(saved.instanceId);
         unit.SetCurrentCellPosition(new Vector3Int(saved.cellX, saved.cellY, 0), enforceFinalOccupancyRule: false);
         unit.SetCurrentHP(saved.currentHP);
-        unit.SetIsDead(saved.isDead);
+        unit.RestoreLifecycleAudit(
+            saved.isDead,
+            saved.deadWhenTurn,
+            saved.deadByReason,
+            saved.diedByUnit,
+            saved.hasMerged,
+            saved.mergedWhenTurn,
+            saved.mergedWithUnit);
         unit.SetCurrentAmmo(saved.currentAmmo);
         unit.SetCurrentFuel(saved.currentFuel);
         unit.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);

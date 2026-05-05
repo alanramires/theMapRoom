@@ -26,14 +26,14 @@ public partial class AIController
 
         if (turnStateManager == null) turnStateManager = FindAnyObjectByType<TurnStateManager>();
 
-        if (boardTilemap == null)
-
+        if (turnStateManager != null && turnStateManager.MovementTilemapRef != null)
         {
-
+            boardTilemap = turnStateManager.MovementTilemapRef;
+        }
+        else if (boardTilemap == null)
+        {
             CursorController cursor = FindAnyObjectByType<CursorController>();
-
             if (cursor != null) boardTilemap = cursor.BoardTilemap;
-
         }
 
         if (terrainDatabase == null)

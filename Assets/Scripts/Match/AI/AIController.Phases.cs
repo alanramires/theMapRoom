@@ -170,6 +170,7 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase2 — iniciando ações.");
         plannedDestinations.Clear();
+        var deferredUnitIds = new HashSet<int>();
 
         while (isActive)
         {
@@ -177,6 +178,16 @@ public partial class AIController
 
             List<UnitManager> available = GetAvailableUnits(aiTeam);
             if (available.Count == 0) break;
+            if (deferredUnitIds.Count > 0)
+            {
+                available.RemoveAll(u => u != null && deferredUnitIds.Contains(u.InstanceId));
+                if (available.Count == 0)
+                {
+                    deferredUnitIds.Clear();
+                    available = GetAvailableUnits(aiTeam);
+                    if (available.Count == 0) break;
+                }
+            }
 
             // Reconstrói a foto do mundo após cada batch — hexes ocupados mudam
             AIWorldSnapshot current = AIWorldSnapshot.Build(aiTeam, matchController);
@@ -194,46 +205,56 @@ public partial class AIController
             // esteja correto quando GetInitiativeGroup classificar cada unidade.
             foreach (UnitManager u in available) UpdateRepairState(u, activePlan);
 
+            // LOG: ordem de iniciativa antes de agir
+            {
+                var initLog = new System.Text.StringBuilder();
+                initLog.AppendLine($"{TL()} Fase2 iniciativa ({available.Count} unidades):");
+                foreach (UnitManager u in available)
+                {
+                    int g  = GetInitiativeGroup(u, activePlan, aiTeam);
+                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                    Vector3Int? tgt = GetAssignedTargetCell(u, activePlan);
+                    string tgtStr = tgt.HasValue ? tgt.Value.ToString() : "null";
+                    initLog.AppendLine($"  [grp={g}] Unit{u.InstanceId} @ {uc} target={tgtStr}");
+                }
+                Debug.Log(initLog.ToString());
+            }
+
             available.Sort((a, b) =>
             {
                 int groupA = GetInitiativeGroup(a, activePlan, aiTeam);
                 int groupB = GetInitiativeGroup(b, activePlan, aiTeam);
-
-                // Blocker cross-group: B fisicamente no target de A → B age primeiro para desocupar
-                if (activePlan != null)
-                {
-                    Vector3Int? aTarget = GetAssignedTargetCell(a, activePlan);
-                    if (aTarget.HasValue)
-                    {
-                        Vector3Int bCell = b.CurrentCellPosition; bCell.z = 0;
-                        if (bCell == aTarget.Value) return 1;
-                    }
-                    Vector3Int? bTarget = GetAssignedTargetCell(b, activePlan);
-                    if (bTarget.HasValue)
-                    {
-                        Vector3Int aCell = a.CurrentCellPosition; aCell.z = 0;
-                        if (aCell == bTarget.Value) return -1;
-                    }
-                }
 
                 if (groupA != groupB) return groupA.CompareTo(groupB);
 
                 // Dentro do grupo 2: prioridade do objetivo (pri=1 = age primeiro)
                 if (groupA == 2 && activePlan != null)
                 {
-                    SectorObjective objA = ResolveAssignedObjective(a, activePlan);
-                    SectorObjective objB = ResolveAssignedObjective(b, activePlan);
-                    if (objA == null && objB == null) return 0;
+                    SectorObjective objA = ResolveAnyAssignedObjective(a, activePlan);
+                    SectorObjective objB = ResolveAnyAssignedObjective(b, activePlan);
+                    if (objA == null && objB == null) return b.CurrentHP.CompareTo(a.CurrentHP);
                     if (objA == null) return 1;
                     if (objB == null) return -1;
-                    return objA.Priority.CompareTo(objB.Priority);
+
+                    int cmp = objA.Priority.CompareTo(objB.Priority);
+                    if (cmp != 0) return cmp;
+
+                    return b.CurrentHP.CompareTo(a.CurrentHP);
                 }
 
-                return 0;
+                return b.CurrentHP.CompareTo(a.CurrentHP);
             });
 
             UnitManager unit = available[0];
             PlayerAction action = DecideUnitAction(unit, current);
+
+            if (IsNoOpUnitAction(action) && ShouldDeferIdleAssaultForSectorCapturer(unit, activePlan, aiTeam))
+            {
+                SectorObjective obj = ResolveAssignedAssaultObjective(unit, activePlan);
+                deferredUnitIds.Add(unit.InstanceId);
+                Debug.Log($"{TL()} Fase2 — batedor {unit.InstanceId} cede vez para capturador de {obj.Sector}");
+                continue;
+            }
 
             if (action == null)
             {
@@ -265,6 +286,40 @@ public partial class AIController
         }
 
         Debug.Log($"{TL()} Fase2 concluída.");
+    }
+
+    private static bool IsNoOpUnitAction(PlayerAction action)
+    {
+        if (action == null) return false;
+        if (!string.IsNullOrEmpty(action.TargetInstanceId)) return false;
+        if (!string.IsNullOrEmpty(action.TargetConstructionId)) return false;
+        if (!action.HasMoveTo || !action.HasMoveFrom) return false;
+
+        Vector3Int from = action.MoveFrom; from.z = 0;
+        Vector3Int to = action.MoveTo; to.z = 0;
+        return from == to;
+    }
+
+    private bool ShouldDeferIdleAssaultForSectorCapturer(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (unit == null || plan == null) return false;
+        if (!unit.TryGetUnitData(out UnitData data) || data == null
+            || data.roles == null || data.roles.Count == 0
+            || data.roles[0] != UnitRole.Assalto)
+            return false;
+
+        SectorObjective assaultObjective = ResolveAssignedAssaultObjective(unit, plan);
+        if (assaultObjective == null) return false;
+
+        foreach (SlotNeed slot in assaultObjective.Slots)
+        {
+            if (!slot.Filled || slot.Role != UnitRole.Capturador) continue;
+            UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            if (capturer != null && !capturer.HasActed)
+                return true;
+        }
+
+        return false;
     }
 
     // -------------------------------------------------------------------------

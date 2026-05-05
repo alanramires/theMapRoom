@@ -503,6 +503,25 @@ public class UnitManager : MonoBehaviour
         UpdateDynamicName();
     }
 
+    public void RestoreLifecycleAudit(
+        bool savedIsDead,
+        int savedDeadWhenTurn,
+        string savedDeadByReason,
+        string savedDiedByUnit,
+        bool savedHasMerged,
+        int savedMergedWhenTurn,
+        string savedMergedWithUnit)
+    {
+        isDead = savedIsDead;
+        deadWhenTurn = savedIsDead ? savedDeadWhenTurn : -1;
+        deadByReason = savedIsDead ? (savedDeadByReason ?? string.Empty) : string.Empty;
+        diedByUnit = savedIsDead ? (savedDiedByUnit ?? string.Empty) : string.Empty;
+        hasMerged = savedHasMerged;
+        mergedWhenTurn = savedHasMerged ? savedMergedWhenTurn : -1;
+        mergedWithUnit = savedHasMerged ? (savedMergedWithUnit ?? string.Empty) : string.Empty;
+        UpdateDynamicName();
+    }
+
     public void MarkAsDonorMergedInto(UnitManager receiver)
     {
         hasMerged = true;

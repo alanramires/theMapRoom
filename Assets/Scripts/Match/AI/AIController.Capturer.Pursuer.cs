@@ -46,6 +46,7 @@ public partial class AIController
         foreach (PodeMirarTargetOption opt in stayTargets)
         {
             if (opt?.targetUnit == null) continue;
+            if (!PassesAttackDecision(unit, opt.targetUnit, fromCell, assigned.Status == ObjectiveStatus.Defending, out _)) continue;
             Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
             if (SectorManager.HexDistance(tc, targetCell) > fromDist &&
                 SectorManager.HexDistance(tc, fromCell) > DefenseEnemyRange) continue;

@@ -296,6 +296,11 @@ public class ConstructionSpawner : MonoBehaviour
             currentId = usedId + 1;
     }
 
+    public void SetNextIdAfterMax(int maxUsedId)
+    {
+        currentId = Mathf.Max(1, maxUsedId + 1);
+    }
+
     private int GetTargetSortingLayerId()
     {
         if (constructionPrefab == null)

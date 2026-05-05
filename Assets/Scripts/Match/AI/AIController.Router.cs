@@ -24,6 +24,10 @@ public partial class AIController
 
             if (objectiveAction != null) return objectiveAction;
 
+            PlayerAction assaultAction = TryDecideAssaultAction(unit, snapshot, plan);
+
+            if (assaultAction != null) return assaultAction;
+
         }
 
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
@@ -191,6 +195,7 @@ public partial class AIController
         {
 
             if (opt?.targetUnit == null || opt.targetUnit.IsDead) continue;
+            if (!PassesAttackDecision(unit, opt.targetUnit, fromCell, false, out _)) continue;
 
             int score = 0;
 

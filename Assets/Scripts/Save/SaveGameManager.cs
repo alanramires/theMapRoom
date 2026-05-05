@@ -1288,8 +1288,8 @@ public class SaveGameManager : MonoBehaviour
             stage = "sync-ids";
             double syncIdsStartMs = PerfNowMs();
             LogLoadPerf(loadedSlot, "sync_ids.begin", syncIdsStartMs, syncIdsStartMs - routineStartMs);
-            unitSpawner.EnsureNextIdAbove(maxUnitId);
-            constructionSpawner.EnsureNextIdAbove(maxConstructionId);
+            unitSpawner.SetNextIdAfterMax(maxUnitId);
+            constructionSpawner.SetNextIdAfterMax(maxConstructionId);
             LogLoadPerf(loadedSlot, "sync_ids.end", syncIdsStartMs, PerfNowMs() - routineStartMs);
 
             stage = "restore-match";
@@ -1323,6 +1323,9 @@ public class SaveGameManager : MonoBehaviour
                 }
             }
             LogLoadPerf(loadedSlot, "restore_unit_flags.end", restoreUnitFlagsStartMs, PerfNowMs() - routineStartMs);
+
+            stage = "restore-unit-active-states";
+            RestoreSavedUnitActiveStates(data, unitsById);
 
             stage = "restore-ai-objective-plans";
             if (data.aiObjectivePlans != null && data.aiObjectivePlans.Count > 0)
@@ -1519,11 +1522,11 @@ public class SaveGameManager : MonoBehaviour
             aiRuntimeStage = aiController != null ? aiController.CurrentAIStage : 0
         };
 
-        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
-            if (unit == null || !unit.gameObject.activeInHierarchy)
+            if (unit == null)
                 continue;
             if (unit.gameObject.scene != activeScene)
                 continue;
@@ -1533,11 +1536,11 @@ public class SaveGameManager : MonoBehaviour
                 data.units.Add(item);
         }
 
-        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         for (int i = 0; i < constructions.Length; i++)
         {
             ConstructionManager construction = constructions[i];
-            if (construction == null || !construction.gameObject.activeInHierarchy)
+            if (construction == null)
                 continue;
             if (construction.gameObject.scene != activeScene)
                 continue;
@@ -1600,17 +1603,33 @@ public class SaveGameManager : MonoBehaviour
         }
     }
 
+    private static void RestoreSavedUnitActiveStates(SaveGameData data, Dictionary<int, UnitManager> unitsById)
+    {
+        if (data?.units == null || unitsById == null)
+            return;
+
+        for (int i = 0; i < data.units.Count; i++)
+        {
+            UnitSaveData saved = data.units[i];
+            if (saved == null || !unitsById.TryGetValue(saved.instanceId, out UnitManager unit) || unit == null)
+                continue;
+
+            if (unit.gameObject.activeSelf != saved.isActiveInHierarchy)
+                unit.gameObject.SetActive(saved.isActiveInHierarchy);
+        }
+    }
+
     private void ClearCurrentRuntime()
     {
         Scene activeScene = SceneManager.GetActiveScene();
-        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
         {
             if (units[i] != null && units[i].gameObject.scene == activeScene)
                 Destroy(units[i].gameObject);
         }
 
-        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         for (int i = 0; i < constructions.Length; i++)
         {
             if (constructions[i] != null && constructions[i].gameObject.scene == activeScene)
@@ -2325,9 +2344,5 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
-
-
-
-
 
 

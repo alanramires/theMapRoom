@@ -18,7 +18,7 @@ public partial class AIController
             var stayTargets = new List<PodeMirarTargetOption>();
             PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
                 SensorMovementMode.MoveuParado, stayTargets);
-            UnitManager stayBest = PickBestRogueTarget(stayTargets, snapshot.AITeam);
+            UnitManager stayBest = PickBestRogueTarget(stayTargets, snapshot.AITeam, unit, from, false, out _);
             if (stayBest != null)
             {
                 Vector3Int stCell = stayBest.CurrentCellPosition; stCell.z = 0;
@@ -51,7 +51,7 @@ public partial class AIController
                 engageBuffer.Clear();
                 PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
                     SensorMovementMode.MoveuAndando, engageBuffer, fromCell: cell);
-                UnitManager candidate = PickBestRogueTarget(engageBuffer, snapshot.AITeam);
+                UnitManager candidate = PickBestRogueTarget(engageBuffer, snapshot.AITeam, unit, cell, false, out _);
                 if (candidate != null)
                 {
                     Vector3Int btCell = candidate.CurrentCellPosition; btCell.z = 0;
@@ -120,6 +120,7 @@ public partial class AIController
                     if (occupied.Contains(cell)) continue;
                     if (SectorManager.HexDistance(cell, target) >= fromDistHQ) continue;
                     if (!CanAttackTargetFrom(from, cell, unit, enemy)) continue;
+                    if (!PassesAttackDecision(unit, enemy, cell, false, out _)) continue;
                     Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
                     float pri = -SectorManager.HexDistance(ec, target); // prefere inimigo mais perto do HQ
                     if (pri > advAttackPri) { advAttackPri = pri; advAttackTarget = enemy; advAttackCell = cell; }

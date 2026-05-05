@@ -1137,7 +1137,7 @@ public static class UnitMovementPathRules
             for (int i = 0; i < occupants.Count; i++)
             {
                 UnitManager unit = occupants[i];
-                if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit)
+                if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsDead || unit.IsEmbarked)
                     continue;
 
                 Vector3Int occupiedCell = unit.CurrentCellPosition;

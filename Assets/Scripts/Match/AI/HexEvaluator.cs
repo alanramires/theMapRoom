@@ -32,7 +32,7 @@ public static class HexEvaluator
     private const float CohesionRadius            = 3.5f;
     /// <summary>Raio de safety: inimigos dentro deste raio penalizam o hex.</summary>
     private const float SafetyThreatRadius        = 2.5f;
-    /// <summary>Contribuição por ponto de DPQ quando prioritizeDpqAtBattle=true. Unique(4)=+0.60.</summary>
+    /// <summary>Contribuicao por ponto de DPQ quando a doutrina da unidade permite DPQ. Unique(4)=+0.60.</summary>
     private const float DpqPositionWeight         = 0.15f;
 
     // -----------------------------------------------------------------
@@ -127,7 +127,8 @@ public static class HexEvaluator
         var results      = new List<HexEvaluation>(allCells.Count);
 
         unit.TryGetUnitData(out UnitData unitDataForDpq);
-        bool useDpq = unitDataForDpq != null && unitDataForDpq.prioritizeDpqAtBattle;
+        bool preferMoveOnBestDpq = unitDataForDpq != null && unitDataForDpq.preferMoveOnBestDPQ;
+        bool prioritizeDpqAtBattle = unitDataForDpq != null && unitDataForDpq.prioritizeDpqAtBattle;
         bool suppressSafety = unitDataForDpq != null && !unitDataForDpq.playConservative;
 
         foreach (Vector3Int cell in allCells)
@@ -135,18 +136,16 @@ public static class HexEvaluator
             HexEvaluation eval = ScoreHex(
                 unit, myTeam, cell, fromCell, ctx,
                 boardTilemap, terrainDatabase, targetBuffer,
-                useDpq, turnStateManager, suppressSafety);
+                preferMoveOnBestDpq, prioritizeDpqAtBattle, turnStateManager, suppressSafety);
             results.Add(eval);
         }
 
         // Marca o vencedor
-        float bestTotal = float.NegativeInfinity;
         int   bestIdx   = 0;
         for (int i = 0; i < results.Count; i++)
         {
-            if (results[i].total > bestTotal)
+            if (IsBetterEvaluation(results[i], results[bestIdx], ctx))
             {
-                bestTotal = results[i].total;
                 bestIdx   = i;
             }
         }
@@ -305,7 +304,8 @@ public static class HexEvaluator
         Tilemap boardTilemap,
         TerrainDatabase terrainDatabase,
         List<PodeMirarTargetOption> buffer,
-        bool useDpq = false,
+        bool preferMoveOnBestDpq = false,
+        bool prioritizeDpqAtBattle = false,
         TurnStateManager turnStateManager = null,
         bool suppressSafety = false)
     {
@@ -407,12 +407,13 @@ public static class HexEvaluator
         }
 
         // ----------------------------------------------------------
-        // positionQuality — bônus de DPQ independente de combate
-        //   Ativo apenas quando unitData.prioritizeDpqAtBattle = true.
-        //   Aplicado fora do bloco de alvos para que células sem alcance
-        //   de tiro também recebam o bônus de posição.
+        // positionQuality: DPQ de movimento depende de preferMoveOnBestDPQ.
+        // DPQ de batalha depende de prioritizeDpqAtBattle e so entra quando
+        // a celula realmente oferece alvo de ataque.
         // ----------------------------------------------------------
-        if (useDpq && turnStateManager != null)
+        bool allowDpqPosition = preferMoveOnBestDpq
+            || (prioritizeDpqAtBattle && eval.combatValue > 0f);
+        if (allowDpqPosition && turnStateManager != null)
         {
             int dpq = turnStateManager.GetCellDpqPoints(cell, unit);
             eval.positionQuality = dpq * DpqPositionWeight;
@@ -446,7 +447,7 @@ public static class HexEvaluator
         //   DPQ positivo com alvo de ataque: doutrina pede combate de posição
         //   privilegiada — aceita exposição.
         // ----------------------------------------------------------
-        bool suppressedByDpqCombat = useDpq && eval.positionQuality > 0f && eval.combatValue > 0f;
+        bool suppressedByDpqCombat = prioritizeDpqAtBattle && eval.positionQuality > 0f && eval.combatValue > 0f;
         if (suppressSafety
             || (attackingContestedOccupant || suppressedByDpqCombat) && eval.combatValue > 0f)
         {
@@ -588,6 +589,32 @@ public static class HexEvaluator
         Vector3 wa = map.GetCellCenterWorld(a);
         Vector3 wb = map.GetCellCenterWorld(b);
         return Vector2.Distance(wa, wb);
+    }
+
+    private static bool IsBetterEvaluation(HexEvaluation candidate, HexEvaluation current, CaptureContext ctx)
+    {
+        if (ctx.role == CandidateType.CaptureAdvance && ctx.hasTarget)
+        {
+            bool candidateHasCombat = candidate.combatValue > 0f;
+            bool currentHasCombat = current.combatValue > 0f;
+            if (candidateHasCombat != currentHasCombat)
+                return candidateHasCombat;
+
+            if (!candidateHasCombat)
+            {
+                const float ProgressEpsilon = 0.0001f;
+                bool candidateAdvances = candidate.captureProximity > 0f;
+                bool currentAdvances = current.captureProximity > 0f;
+                if (candidateAdvances != currentAdvances)
+                    return candidateAdvances;
+
+                if (candidateAdvances && currentAdvances
+                    && Mathf.Abs(candidate.captureProximity - current.captureProximity) > ProgressEpsilon)
+                    return candidate.captureProximity > current.captureProximity;
+            }
+        }
+
+        return candidate.total > current.total;
     }
 
     // -----------------------------------------------------------------

@@ -33,6 +33,7 @@ public partial class AIController
                             foreach (PodeMirarTargetOption opt in dpqTargets)
                             {
                                 if (opt?.targetUnit == null) continue;
+                                if (!PassesAttackDecision(unit, opt.targetUnit, dpqCell, assigned.Status == ObjectiveStatus.Defending, out _)) continue;
                                 Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
                                 if (SectorManager.HexDistance(tc, targetCell) > DefenseEnemyRange + 1) continue;
                                 float p = AttackTargetPriorityPursuer(tc, targetCell);

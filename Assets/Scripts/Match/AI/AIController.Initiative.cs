@@ -64,7 +64,7 @@ public partial class AIController
 
     {
 
-        SectorObjective obj = ResolveAssignedObjective(unit, plan);
+        SectorObjective obj = ResolveAnyAssignedObjective(unit, plan);
 
         if (obj == null) return null;
 
@@ -92,11 +92,9 @@ public partial class AIController
 
         if (plan != null && plan.HandoffVacaterIds.Contains(unit.InstanceId)) return 0;
 
-        // Blocker com ameaça: unidade está sobre o alvo de outro capturador E tem inimigo adjacente.
-
-        // Age primeiro para engajar o inimigo e liberar o hex antes do capturador designado agir.
-
-        if (plan != null && IsBlockingCaptureTargetWithEnemies(unit, plan, aiTeam)) return 0;
+        // Blocker: unidade está sobre o objetivo de captura de outro capturador designado.
+        // Age primeiro (grupo 0) para liberar o hex — com ou sem inimigos adjacentes.
+        if (plan != null && IsBlockingCaptureTarget(unit, plan, aiTeam)) return 0;
 
         if (unit.IsUnderRepair)
 
@@ -118,10 +116,91 @@ public partial class AIController
 
         }
 
-        bool hasObjective = plan != null && ResolveAssignedObjective(unit, plan) != null;
+        // Capturador no corredor de outro setor (mais perto do objetivo alheio que o capturador
+        // designado a ele) → age antes (grupo 1) para liberar o caminho.
+        if (!unit.IsUnderRepair && plan != null)
+        {
+            Vector3Int unitCell = unit.CurrentCellPosition; unitCell.z = 0;
+            if (IsCapturerInOtherCapturerCorridor(unit, unitCell, plan, aiTeam)) return 1;
+        }
+
+        // Assault escort mais perto do objetivo que o capturador designado ao mesmo setor
+        // → age antes (grupo 1) para liberar o corredor de avanço.
+        if (!unit.IsUnderRepair && plan != null)
+        {
+            Vector3Int escortCell = unit.CurrentCellPosition; escortCell.z = 0;
+            if (IsAssaultEscortInCapturerCorridor(unit, escortCell, plan, aiTeam)) return 1;
+        }
+
+        bool hasObjective = plan != null && ResolveAnyAssignedObjective(unit, plan) != null;
 
         return hasObjective ? 2 : 3;
 
+    }
+
+    // Retorna true se um capturador está mais perto do objetivo de OUTRO setor do que
+    // o capturador designado a ele — passa pelo corredor alheio e deve agir primeiro.
+    private bool IsCapturerInOtherCapturerCorridor(UnitManager unit, Vector3Int unitCell, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (!unit.TryGetUnitData(out UnitData data) || data == null
+            || data.roles == null || data.roles.Count == 0
+            || data.roles[0] != UnitRole.Capturador) return false;
+
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj.Status == ObjectiveStatus.Defending) continue;
+
+            bool isOwnSector = false;
+            foreach (SlotNeed slot in obj.Slots)
+                if (slot.Filled && slot.AssignedUnitId == unit.InstanceId) { isOwnSector = true; break; }
+            if (isOwnSector) continue;
+
+            ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
+            if (tgt == null) continue;
+
+            Vector3Int objCell = tgt.CurrentCellPosition; objCell.z = 0;
+            float myDist = SectorManager.HexDistance(unitCell, objCell);
+
+            foreach (SlotNeed slot in obj.Slots)
+            {
+                if (!slot.Filled || slot.Role != UnitRole.Capturador) continue;
+                UnitManager assigned = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                if (assigned == null) continue;
+                Vector3Int assignedCell = assigned.CurrentCellPosition; assignedCell.z = 0;
+                if (myDist < SectorManager.HexDistance(assignedCell, objCell))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    // Retorna true se o assault escort está mais perto do objetivo do seu setor do que
+    // o capturador designado a ele — ou seja, está no corredor de avanço e pode bloquear.
+    private bool IsAssaultEscortInCapturerCorridor(UnitManager escort, Vector3Int escortCell, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (!escort.TryGetUnitData(out UnitData data) || data == null
+            || data.roles == null || data.roles.Count == 0
+            || data.roles[0] != UnitRole.Assalto) return false;
+
+        SectorObjective obj = ResolveAssignedAssaultObjective(escort, plan);
+        if (obj == null || obj.Status == ObjectiveStatus.Defending) return false;
+
+        ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
+        if (tgt == null) return false;
+
+        Vector3Int objCell = tgt.CurrentCellPosition; objCell.z = 0;
+        float escortDist = SectorManager.HexDistance(escortCell, objCell);
+
+        foreach (SlotNeed slot in obj.Slots)
+        {
+            if (!slot.Filled || slot.Role != UnitRole.Capturador) continue;
+            UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            if (capturer == null) continue;
+            Vector3Int capCell = capturer.CurrentCellPosition; capCell.z = 0;
+            if (escortDist < SectorManager.HexDistance(capCell, objCell))
+                return true;
+        }
+        return false;
     }
 
     // Retorna true se a unidade de reparo está mais perto de algum objetivo ativo do que
@@ -207,6 +286,25 @@ public partial class AIController
 
         return false;
 
+    }
+
+    private static SectorObjective ResolveAnyAssignedObjective(UnitManager unit, TeamObjectivePlan plan)
+    {
+        SectorObjective capturerObjective = ResolveAssignedObjective(unit, plan);
+        if (capturerObjective != null) return capturerObjective;
+        return ResolveAssignedAssaultObjective(unit, plan);
+    }
+
+    private static int CompareUnitInitiative(UnitManager a, UnitManager b)
+    {
+        int ia = a != null && a.TryGetUnitData(out UnitData ua)
+            ? (int)ua.aiInitiative
+            : (int)AiInitiative.Medium;
+        int ib = b != null && b.TryGetUnitData(out UnitData ub)
+            ? (int)ub.aiInitiative
+            : (int)AiInitiative.Medium;
+
+        return ia.CompareTo(ib);
     }
 
     private HashSet<Vector3Int> BuildOccupied(UnitManager excludeUnit)

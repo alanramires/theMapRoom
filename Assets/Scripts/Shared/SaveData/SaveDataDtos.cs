@@ -137,6 +137,12 @@ public class UnitSaveData
     public float worldY;
     public int currentHP;
     public bool isDead;
+    public int deadWhenTurn = -1;
+    public string deadByReason;
+    public string diedByUnit;
+    public bool hasMerged;
+    public int mergedWhenTurn = -1;
+    public string mergedWithUnit;
     public int currentAmmo;
     public int currentFuel;
     public int remainingMovementPoints;

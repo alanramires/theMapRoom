@@ -56,6 +56,16 @@ public partial class AIController
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
 
+        // Se está sobre o objetivo de captura de outro setor com capturador ativo,
+        // marca o próprio hex como ocupado para forçar saída no scoring.
+        TeamObjectivePlan selfPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        bool onOtherTarget = selfPlan != null && IsOtherAssignedCapturerTarget(fromCell, unit, assigned, selfPlan, snapshot.AITeam);
+        if (onOtherTarget)
+        {
+            occupied.Add(fromCell);
+            Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} — sobre objetivo alheio {fromCell}, cedendo hex");
+        }
+
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
@@ -123,6 +133,7 @@ public partial class AIController
 
         var scoringLog = showAIUnitHUD ? new System.Text.StringBuilder() : null;
         scoringLog?.AppendLine($"{TL("Score")} Unit{unit.InstanceId} → {assigned.Sector} (fromDist={fromDist:F1} dpqMove={preferDpqMove} dpqBattle={preferDpqAtBattle} conservative={conservative})");
+        AppendMissingDpqReachabilityDiagnostics(scoringLog, unit, paths, targetCell);
 
         foreach (Vector3Int cell in paths.Keys)
         {
@@ -134,10 +145,9 @@ public partial class AIController
             }
             float dist     = SectorManager.HexDistance(cell, targetCell);
             bool  advances = dist < fromDist;
-            // preferDpqAtBattle: considera também células a mesma distância do objetivo —
-            // permite se posicionar em terreno DPQ lateral sem precisar avançar primeiro.
-            bool  eligibleForAttack = advances || (preferDpqAtBattle && dist == fromDist);
-            if (!advances && !eligibleForAttack) continue;
+            // prioritizeDpqAtBattle: considera qualquer célula alcançável como
+            // origem de tiro; ela só vence se realmente conseguir atacar.
+            bool  eligibleForAttack = advances || preferDpqAtBattle;
 
             float threat    = conservative ? CalculateThreatLevel(cell, snapshot.AITeam) : 0f;
             float prox      = (1f / (dist + 1f)) * CaptureProximityBase;
@@ -155,18 +165,32 @@ public partial class AIController
             // bestMove: só células que avançam em direção ao objetivo
             if (advances && IsBetterScore(score, sectorTie, hqTie, bestScore, bestSectorTie, bestHqTie))
             {
-                bestScore     = score;
-                bestSectorTie = sectorTie;
-                bestHqTie     = hqTie;
-                bestMove      = cell;
-                canAdvance    = true;
+                TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+                if (IsOtherAssignedCapturerTarget(cell, unit, assigned, capPlan, snapshot.AITeam))
+                    scoringLog?.AppendLine($"    ↳ SKIP bestMove: hex de captura de outro setor");
+                else
+                {
+                    bestScore     = score;
+                    bestSectorTie = sectorTie;
+                    bestHqTie     = hqTie;
+                    bestMove      = cell;
+                    canAdvance    = true;
+                }
             }
+
+            if (!advances && !eligibleForAttack) continue;
 
             if (eligibleForAttack && score >= SafetyThresholdFactor && nearbyEnemies.Count > 0)
             {
                 foreach (UnitManager nearbyEnemy in nearbyEnemies)
                 {
                     if (!CanAttackTargetFrom(fromCell, cell, unit, nearbyEnemy)) continue;
+                    bool attackAllowed = PassesAttackDecision(unit, nearbyEnemy, cell, assigned.Status == ObjectiveStatus.Defending, out string attackDecisionReason);
+                    if (!attackAllowed)
+                    {
+                        scoringLog?.AppendLine($"    ↳ ATK {nearbyEnemy.UnitDisplayName}#{nearbyEnemy.InstanceId} BLOCK {attackDecisionReason}");
+                        continue;
+                    }
                     Vector3Int enemyCell = nearbyEnemy.CurrentCellPosition; enemyCell.z = 0;
                     float targetPriority = AttackTargetPriorityPursuer(enemyCell, targetCell);
                     float objectiveBonus = enemyCell == targetCell ? 100000f : 0f;
@@ -184,7 +208,7 @@ public partial class AIController
                         attackScore,
                         attackSectorTie,
                         attackHqTie);
-                    scoringLog?.AppendLine($"    ↳ ATK {nearbyEnemy.UnitDisplayName}#{nearbyEnemy.InstanceId} pri={targetPriority:F1} objBonus={objectiveBonus:F0} atkDpqPts={attackDpq:F1} aScore={aScore:F0}{(isNewBest ? " ★" : "")}");
+                    scoringLog?.AppendLine($"    ↳ ATK {nearbyEnemy.UnitDisplayName}#{nearbyEnemy.InstanceId} pri={targetPriority:F1} objBonus={objectiveBonus:F0} atkDpqPts={attackDpq:F1} aScore={aScore:F0} {attackDecisionReason}{(isNewBest ? " ★" : "")}");
                     if (isNewBest)
                     {
                         attackScore      = aScore;
@@ -212,6 +236,16 @@ public partial class AIController
         }
         if (!canAdvance)
         {
+            // Está bloqueado mas sobre o objetivo de outro capturador — tenta ceder qualquer hex livre
+            if (onOtherTarget)
+            {
+                foreach (Vector3Int cell in paths.Keys)
+                {
+                    if (cell == fromCell || occupied.Contains(cell)) continue;
+                    Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} cede objetivo alheio {fromCell} → {cell}");
+                    return BuildMoveBatch(unit, snapshot.AITeam, fromCell, cell, paths);
+                }
+            }
             UnitManager occupant = HexOccupancyQuery.FindUnitAtCell(targetCell);
             if (occupant != null && occupant.TeamId == snapshot.AITeam)
             {
@@ -261,5 +295,28 @@ public partial class AIController
         string advTag = hiddenOccupant ? "Explorador" : sectorInContest ? "Perseguidor" : "PontaLanca";
         Debug.Log($"{TL(advTag)} {unit.InstanceId} avança para {assigned.Sector} via {bestMove} (score={bestScore:F0}, secTie={bestSectorTie:F1}, hq={bestHqText}, hqTie={bestHqTie:F1})");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestMove, paths);
+    }
+
+    // Retorna true se `cell` é o alvo de captura de OUTRO setor com capturador ativo designado.
+    // Usado para evitar que um capturador avance para o objetivo alheio e bloqueie seu designado.
+    private bool IsOtherAssignedCapturerTarget(Vector3Int cell, UnitManager unit, SectorObjective ownObjective, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (plan == null) return false;
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj == ownObjective) continue;
+            if (obj.Status == ObjectiveStatus.Defending) continue;
+            ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
+            if (tgt == null) continue;
+            Vector3Int tgtCell = tgt.CurrentCellPosition; tgtCell.z = 0;
+            if (tgtCell != cell) continue;
+            foreach (SlotNeed slot in obj.Slots)
+            {
+                if (!slot.Filled || slot.Role != UnitRole.Capturador) continue;
+                UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                if (capturer != null) return true;
+            }
+        }
+        return false;
     }
 }

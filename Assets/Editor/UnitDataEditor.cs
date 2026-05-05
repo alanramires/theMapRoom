@@ -86,6 +86,12 @@ public class UnitDataEditor : Editor
             "prioritizeDpqAtBattle",
             "playConservative",
             "preferMoveOnBestDPQ",
+            "useAttackDecision",
+            "attackAcceptHpLossPercent",
+            "attackEliminationMinPercent",
+            "attackMustSurvive",
+            "ignoreAttackDecisionWhenDefending",
+            "defensiveAttackExtraHpLossPercent",
             "repairTriggerHpBelow",
             "repairTriggerAutonomyPct",
             "repairTriggerAmmoEnabled",
@@ -158,6 +164,36 @@ public class UnitDataEditor : Editor
             EditorGUILayout.PropertyField(conservativeProp,  new GUIContent("Play Conservative"));
         if (preferDpqMoveProp != null)
             EditorGUILayout.PropertyField(preferDpqMoveProp, new GUIContent("Prefer Move On Best DPQ"));
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Attack Decision", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Campos de decisao para a IA antes de aceitar combate. A aplicacao no score/gate de ataque sera feita no AIController.",
+            MessageType.None);
+
+        SerializedProperty useAttackDecisionProp = serializedObject.FindProperty("useAttackDecision");
+        SerializedProperty acceptHpLossProp = serializedObject.FindProperty("attackAcceptHpLossPercent");
+        SerializedProperty eliminationMinProp = serializedObject.FindProperty("attackEliminationMinPercent");
+        SerializedProperty mustSurviveProp = serializedObject.FindProperty("attackMustSurvive");
+        SerializedProperty ignoreWhenDefendingProp = serializedObject.FindProperty("ignoreAttackDecisionWhenDefending");
+        SerializedProperty defensiveExtraProp = serializedObject.FindProperty("defensiveAttackExtraHpLossPercent");
+
+        if (useAttackDecisionProp != null)
+            EditorGUILayout.PropertyField(useAttackDecisionProp, new GUIContent("Use Attack Decision"));
+
+        using (new EditorGUI.DisabledScope(useAttackDecisionProp != null && !useAttackDecisionProp.boolValue))
+        {
+            if (acceptHpLossProp != null)
+                EditorGUILayout.PropertyField(acceptHpLossProp, new GUIContent("Accept HP Loss %", "Perda maxima de HP aceita ao iniciar combate."));
+            if (eliminationMinProp != null)
+                EditorGUILayout.PropertyField(eliminationMinProp, new GUIContent("Elimination Min %", "Dano minimo no alvo, em % do HP maximo dele, para aceitar o combate."));
+            if (mustSurviveProp != null)
+                EditorGUILayout.PropertyField(mustSurviveProp, new GUIContent("Must Survive", "Rejeita ataques em que a simulacao mata esta unidade."));
+            if (ignoreWhenDefendingProp != null)
+                EditorGUILayout.PropertyField(ignoreWhenDefendingProp, new GUIContent("Ignore When Defending", "Ignora o gate quando esta unidade estiver em plano defensivo."));
+            if (defensiveExtraProp != null)
+                EditorGUILayout.PropertyField(defensiveExtraProp, new GUIContent("Defensive Extra HP Loss %", "Tolerancia extra quando estiver defendendo setor/base."));
+        }
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Repair Decision", EditorStyles.boldLabel);
