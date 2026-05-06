@@ -196,6 +196,70 @@ public partial class AIController
 
     }
 
+    private PlayerAction BuildEmbarcarBatch(
+        UnitManager passenger,
+        TeamId team,
+        Vector3Int from,
+        UnitManager transporter,
+        int slotIndex,
+        Dictionary<Vector3Int, List<Vector3Int>> paths = null)
+    {
+        Vector3Int transporterCell = transporter.CurrentCellPosition; transporterCell.z = 0;
+        List<Vector3Int> movementPath = null;
+        paths?.TryGetValue(transporterCell, out movementPath);
+        return new PlayerAction
+        {
+            IsAIGenerated    = true,
+            ActionType       = PlayerActionType.UnitAction,
+            ActingTeam       = team,
+            TurnNumber       = matchController != null ? matchController.CurrentTurn : 0,
+            CursorHex        = from, HasCursorHex = true,
+            UnitInstanceId   = passenger.InstanceId.ToString(),
+            MoveFrom         = from, HasMoveFrom = true,
+            MoveTo           = transporterCell, HasMoveTo = true,
+            SensorAction     = SensorActionType.Embark,
+            TargetInstanceId = transporter.InstanceId.ToString(),
+            TargetHex        = transporterCell, HasTargetHex = true,
+            MovementPath     = movementPath,
+            DebugLabel       = $"AI Embark {passenger.InstanceId} → {transporter.InstanceId} (slot {slotIndex})",
+        };
+    }
+
+    // O transportador não se move ao desembarcar: o sensor é avaliado da posição atual
+    // e os SubSteps distribuem cada passageiro para um hex adjacente livre.
+    private PlayerAction BuildDesembarcarBatch(
+        UnitManager transporter,
+        TeamId team,
+        Vector3Int from,
+        List<PodeDesembarcarOption> disembarkOrders)
+    {
+        var action = new PlayerAction
+        {
+            IsAIGenerated  = true,
+            ActionType     = PlayerActionType.UnitAction,
+            ActingTeam     = team,
+            TurnNumber     = matchController != null ? matchController.CurrentTurn : 0,
+            CursorHex      = from, HasCursorHex = true,
+            UnitInstanceId = transporter.InstanceId.ToString(),
+            MoveFrom       = from, HasMoveFrom = true,
+            MoveTo         = from, HasMoveTo   = true,
+            SensorAction   = SensorActionType.Disembark,
+            DebugLabel     = $"AI Disembark ← {transporter.InstanceId} ({disembarkOrders.Count} passageiro(s))",
+        };
+        foreach (PodeDesembarcarOption order in disembarkOrders)
+        {
+            Vector3Int targetCell = order.disembarkCell; targetCell.z = 0;
+            action.SubSteps.Add(new PlayerActionSubStep
+            {
+                Label            = "AIDisembark",
+                TargetInstanceId = order.passengerUnit.InstanceId.ToString(),
+                TargetHex        = targetCell,
+                HasTargetHex     = true,
+            });
+        }
+        return action;
+    }
+
     private PlayerAction BuildEndTurnBatch(TeamId team)
 
     {

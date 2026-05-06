@@ -86,6 +86,7 @@ public class UnitDataEditor : Editor
             "prioritizeDpqAtBattle",
             "playConservative",
             "preferMoveOnBestDPQ",
+            "preferMaxDisplacement",
             "useAttackDecision",
             "attackAcceptHpLossPercent",
             "attackEliminationMinPercent",
@@ -155,15 +156,18 @@ public class UnitDataEditor : Editor
         if (sensorPriorityProp != null)
             EditorGUILayout.PropertyField(sensorPriorityProp, new GUIContent("Ai Sensor Priority"), includeChildren: true);
 
-        SerializedProperty dpqProp           = serializedObject.FindProperty("prioritizeDpqAtBattle");
-        SerializedProperty conservativeProp  = serializedObject.FindProperty("playConservative");
-        SerializedProperty preferDpqMoveProp = serializedObject.FindProperty("preferMoveOnBestDPQ");
+        SerializedProperty dpqProp              = serializedObject.FindProperty("prioritizeDpqAtBattle");
+        SerializedProperty conservativeProp     = serializedObject.FindProperty("playConservative");
+        SerializedProperty preferDpqMoveProp    = serializedObject.FindProperty("preferMoveOnBestDPQ");
+        SerializedProperty preferMaxDispProp    = serializedObject.FindProperty("preferMaxDisplacement");
         if (dpqProp != null)
             EditorGUILayout.PropertyField(dpqProp,           new GUIContent("Prioritize DPQ At Battle"));
         if (conservativeProp != null)
             EditorGUILayout.PropertyField(conservativeProp,  new GUIContent("Play Conservative"));
         if (preferDpqMoveProp != null)
             EditorGUILayout.PropertyField(preferDpqMoveProp, new GUIContent("Prefer Move On Best DPQ"));
+        if (preferMaxDispProp != null)
+            EditorGUILayout.PropertyField(preferMaxDispProp, new GUIContent("Prefer Max Displacement"));
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Attack Decision", EditorStyles.boldLabel);

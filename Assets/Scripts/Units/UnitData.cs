@@ -127,6 +127,8 @@ public class UnitData : ScriptableObject
     public bool playConservative = false;
     [Tooltip("Ao se mover (fora de combate), prefere rotas com melhor DPQ em vez da rota mais curta. Util para unidades de suporte que devem permanecer em posicoes defensivas.")]
     public bool preferMoveOnBestDPQ = false;
+    [Tooltip("Ao se mover rumo a um destino, prioriza atingir o hex mais distante possivel dentro do alcance de movimento. Favorece rotas de estrada naturalmente pois permitem chegar mais longe por turno. Usado por transportadores para cobrir distancias maximas por turno.")]
+    public bool preferMaxDisplacement = false;
     [Header("Attack Decision")]
     [Tooltip("Se ativo, a IA usa simulacao da Matriz de HP para decidir se esta unidade deve aceitar um combate.")]
     public bool useAttackDecision = true;

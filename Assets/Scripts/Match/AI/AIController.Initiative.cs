@@ -132,10 +132,41 @@ public partial class AIController
             if (IsAssaultEscortInCapturerCorridor(unit, escortCell, plan, aiTeam)) return 1;
         }
 
+        // Transportador rogue vazio com candidato de pickup no alcance →
+        // age antes dos capturadores (grupo 1) para se posicionar adjacente.
+        if (!unit.IsUnderRepair && IsTransporterWithValidPickupCandidate(unit, plan, aiTeam)) return 1;
+
         bool hasObjective = plan != null && ResolveAnyAssignedObjective(unit, plan) != null;
 
         return hasObjective ? 2 : 3;
 
+    }
+
+    // Retorna true se o transportador está vazio e tem pelo menos um candidato de pickup
+    // dentro do alcance de movimento (+1 para adjacência). Checagem barata: só hex distance.
+    private bool IsTransporterWithValidPickupCandidate(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (!unit.TryGetUnitData(out UnitData data) || data == null
+            || data.roles == null || data.roles.Count == 0
+            || data.roles[0] != UnitRole.Transportador) return false;
+
+        if (HasTransportCargo(unit)) return false;
+
+        Vector3Int transporterCell = unit.CurrentCellPosition; transporterCell.z = 0;
+        float reach = Mathf.Max(0, unit.RemainingMovementPoints) + 1f;
+
+        foreach (UnitManager candidate in UnitManager.AllActive)
+        {
+            if (candidate == unit) continue;
+            if (candidate.TeamId != aiTeam || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
+            if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
+            Vector3Int cc = candidate.CurrentCellPosition; cc.z = 0;
+            if (SectorManager.HexDistance(transporterCell, cc) > reach) continue;
+            if (FindFittingSlotIndex(unit, data, candidateData) < 0) continue;
+            return true;
+        }
+
+        return false;
     }
 
     // Retorna true se um capturador está mais perto do objetivo de OUTRO setor do que

@@ -30,6 +30,10 @@ public partial class AIController
 
         }
 
+        PlayerAction transportAction = TryDecideTransportadorAction(unit, snapshot, plan);
+
+        if (transportAction != null) return transportAction;
+
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
 
         HashSet<Vector3Int> occupied = BuildOccupied(unit);

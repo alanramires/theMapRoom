@@ -19,7 +19,9 @@
       "Bash(python3)",
       "Bash(python)",
       "Bash(grep -n \"SetPlayerIsAI\" \"d:/Unity Projects/The Map Room/Assets/Scripts/\"*.cs)",
-      "Bash(grep -v \"//.*isAI\\\\|IsPlayerAI\\\\|IsActiveTeamAI\\\\|IsAI\\\\b\")"
+      "Bash(grep -v \"//.*isAI\\\\|IsPlayerAI\\\\|IsActiveTeamAI\\\\|IsAI\\\\b\")",
+      "Bash(Get-ChildItem -Path \"d:\\\\Unity Projects\\\\The Map Room\\\\Assets\\\\Scripts\\\\Match\\\\AI\" -Filter \"*.cs\")",
+      "Bash(Select-Object -ExpandProperty Name)"
     ]
   }
 }

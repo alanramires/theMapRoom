@@ -23,6 +23,9 @@ public partial class AIController
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
 
+        PlayerAction embarkAction = TryDecideCapturerEmbarkAction(unit, snapshot, plan);
+        if (embarkAction != null) return embarkAction;
+
         SectorObjective assigned = ResolveAssignedObjective(unit, plan);
 
         if (assigned == null)
@@ -75,16 +78,25 @@ public partial class AIController
         if (TryDecideCapturerPursuerCurrent(unit, snapshot, assigned, fromCell, targetCell, paths, occupied, out PlayerAction pursuerAction))
             return pursuerAction;
 
-        if (TryFindOpportunisticCapture(unit, paths, occupied, targetCell, out Vector3Int opCell, excludeCurrentCell: true))
+        HashSet<Vector3Int> reservedOpportunisticCells = null;
+        while (TryFindOpportunisticCapture(
+            unit,
+            paths,
+            occupied,
+            targetCell,
+            out Vector3Int opCell,
+            excludeCurrentCell: true,
+            skippedCaptureCells: reservedOpportunisticCells))
         {
             if (ShouldReserveOpportunisticCaptureForCloserUnit(unit, snapshot.AITeam, opCell, paths, out UnitManager reservedFor))
             {
                 Debug.Log($"{TL("Oportunista")} {unit.InstanceId} cede captura oportunista @ {opCell} para {reservedFor.InstanceId}");
+                reservedOpportunisticCells ??= new HashSet<Vector3Int>();
+                reservedOpportunisticCells.Add(opCell);
+                continue;
             }
-            else
-            {
-                return DecideCapturerOpportunistAction(unit, snapshot, assigned, fromCell, opCell, paths);
-            }
+
+            return DecideCapturerOpportunistAction(unit, snapshot, assigned, fromCell, opCell, paths);
         }
 
         if (TryDecideCapturerExplorer(unit, snapshot, assigned, fromCell, targetCell, paths, occupied, out PlayerAction explorerAction))

@@ -216,6 +216,8 @@ public partial class AIController
                 if (obj.Status != ObjectiveStatus.Defending) continue;
                 if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
                 Vector3Int rc = defInfo.RepresentativeCell; rc.z = 0;
+                ConstructionManager reservedConstruction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, rc);
+                if (IsRepairHomeConstruction(reservedConstruction, aiTeam)) continue;
                 occupiedForRepair.Add(rc);
             }
 
@@ -303,12 +305,22 @@ public partial class AIController
 
     private static ConstructionManager FindRepairConstruction(Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied)
     {
+        ConstructionManager homeDest = FindRepairConstruction(fromCell, aiTeam, occupied, homeOnly: true);
+        return homeDest != null
+            ? homeDest
+            : FindRepairConstruction(fromCell, aiTeam, occupied, homeOnly: false);
+    }
+
+    private static ConstructionManager FindRepairConstruction(Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied, bool homeOnly)
+    {
         ConstructionManager best = null;
         float bestDist = float.MaxValue;
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
             Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
             float dist = Vector3Int.Distance(fromCell, cc);
+            bool isHomeRepair = IsRepairHomeConstruction(c, aiTeam);
+            if (homeOnly && !isHomeRepair) continue;
             if (c.TeamId != aiTeam)
             {
                 Debug.Log($"[Repair] skip {cc} team={c.TeamId} (need {aiTeam}) dist={dist:F1}");
@@ -329,8 +341,16 @@ public partial class AIController
         if (best != null)
         {
             Vector3Int bc = best.CurrentCellPosition; bc.z = 0;
-            Debug.Log($"[Repair] destino selecionado {bc} dist={bestDist:F1}");
+            string home = IsRepairHomeConstruction(best, aiTeam) ? " home" : string.Empty;
+            Debug.Log($"[Repair] destino{home} selecionado {bc} dist={bestDist:F1}");
         }
         return best;
+    }
+
+    private static bool IsRepairHomeConstruction(ConstructionManager construction, TeamId aiTeam)
+    {
+        return construction != null
+            && construction.TeamId == aiTeam
+            && (construction.IsPlayerHeadQuarter || ConstructionSectorHelper.IsBase(construction.Sector));
     }
 }

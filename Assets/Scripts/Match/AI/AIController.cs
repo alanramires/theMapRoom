@@ -43,6 +43,14 @@ public partial class AIController : MonoBehaviour
     [SerializeField, Range(1f, 5f)] private float alliesAgainstEnemiesHpRatio = 2f;
     public float AlliesAgainstEnemiesHpRatio => alliesAgainstEnemiesHpRatio;
 
+    [Header("Transporte")]
+    [Tooltip("Distância mínima em hexes do HQ para que um setor gere slot de transportador no plano e no shopping")]
+    [SerializeField, Range(1, 30)] private int minDistanceForTransportSlot = 7;
+    public int MinDistanceForTransportSlot => minDistanceForTransportSlot;
+
+
+    private static AIController _instance;
+    public static AIController Instance => _instance;
 
     private readonly HashSet<Vector3Int> plannedDestinations = new HashSet<Vector3Int>();
 

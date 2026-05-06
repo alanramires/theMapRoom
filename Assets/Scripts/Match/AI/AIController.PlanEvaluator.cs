@@ -113,6 +113,8 @@ public partial class AIController
                 obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
             if (info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
                 obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
+            if (info.GetDistanceToHQ(aiTeam) >= MinDistanceForTransportSlot)
+                obj.Slots.Add(new SlotNeed { Role = UnitRole.Transportador });
             plan.Objectives.Add(obj);
         }
 
@@ -658,6 +660,34 @@ public partial class AIController
         {
             u.ClearAIAssignedPlan();
             plan.RogueUnitIds.Add(u.InstanceId);
+        }
+
+        // Passo 5f: atribui transportadores livres a slots de Transportador abertos (por proximidade)
+        {
+            List<UnitManager> freeTransporters = GetAvailableTransporters(aiTeam);
+            foreach (UnitManager u in freeTransporters)
+            {
+                if (assignedIds.Contains(u.InstanceId)) continue;
+
+                SectorObjective bestObj = null;
+                float bestDist = float.MaxValue;
+                foreach (SectorObjective obj in plan.Objectives)
+                {
+                    if (!obj.HasOpenSlot(UnitRole.Transportador)) continue;
+                    ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
+                    if (tgt == null) continue;
+                    Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
+                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                    float d = SectorManager.HexDistance(uc, tc);
+                    if (d < bestDist) { bestDist = d; bestObj = obj; }
+                }
+
+                if (bestObj == null) continue;
+                bestObj.TryFillSlot(UnitRole.Transportador, u.InstanceId);
+                assignedIds.Add(u.InstanceId);
+                ApplyPlanHUD(u, bestObj, UnitRole.Transportador);
+                Debug.Log($"{TL("Plan")} Transportador {u.InstanceId} → {bestObj.Sector} (dist={bestDist:F0}h)");
+            }
         }
 
         // Passo 6: reaplica HUD para atribuições anteriores

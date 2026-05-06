@@ -12,6 +12,7 @@ public partial class AIController
 
     {
 
+        _instance = this;
         MatchController.OnActiveTeamChanged += HandleTeamChanged;
 
     }

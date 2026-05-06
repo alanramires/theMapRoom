@@ -142,13 +142,15 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         Vector3Int excludeCell,
         out Vector3Int captureCell,
-        bool excludeCurrentCell = false)
+        bool excludeCurrentCell = false,
+        HashSet<Vector3Int> skippedCaptureCells = null)
     {
         captureCell = Vector3Int.zero;
         Vector3Int currentCell = unit.CurrentCellPosition; currentCell.z = 0;
         foreach (Vector3Int cell in paths.Keys)
         {
             if (occupied.Contains(cell) || cell == excludeCell) continue;
+            if (skippedCaptureCells != null && skippedCaptureCells.Contains(cell)) continue;
             if (excludeCurrentCell && cell == currentCell) continue;
             if (!SimulateCaptureSensor(unit, cell, out _)) continue;
             captureCell = cell;
@@ -173,6 +175,18 @@ public partial class AIController
         int opportunistCost = GetPathStepCount(opportunistPaths, captureCell);
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
 
+        if (TryFindAssignedCapturerForCaptureTarget(
+                opportunist,
+                plan,
+                captureTarget,
+                aiTeam,
+                captureCell,
+                out UnitManager assignedCapturer))
+        {
+            reservedFor = assignedCapturer;
+            return true;
+        }
+
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
             if (candidate == opportunist || candidate.TeamId != aiTeam) continue;
@@ -190,6 +204,48 @@ public partial class AIController
             if (candidateCost < opportunistCost || (candidateOwnsTarget && candidateCost <= opportunistCost))
             {
                 reservedFor = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryFindAssignedCapturerForCaptureTarget(
+        UnitManager opportunist,
+        TeamObjectivePlan plan,
+        ConstructionManager captureTarget,
+        TeamId aiTeam,
+        Vector3Int captureCell,
+        out UnitManager assignedCapturer)
+    {
+        assignedCapturer = null;
+        if (plan == null || captureTarget == null) return false;
+
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj.Status == ObjectiveStatus.Defending) continue;
+            if (obj.Sector != captureTarget.Sector) continue;
+
+            ConstructionManager assignedTarget = FindCapturableInSector(obj.Sector, aiTeam);
+            if (assignedTarget != captureTarget) continue;
+
+            foreach (SlotNeed slot in obj.Slots)
+            {
+                if (!slot.Filled || slot.Role != UnitRole.Capturador) continue;
+
+                UnitManager candidate = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                if (candidate == null || candidate == opportunist) continue;
+                if (candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair) continue;
+                if (!SimulateCaptureSensor(candidate, captureCell, out _)) continue;
+
+                Dictionary<Vector3Int, List<Vector3Int>> candidatePaths =
+                    UnitMovementPathRules.CalcularCaminhosValidos(
+                        boardTilemap, candidate, Mathf.Max(0, candidate.RemainingMovementPoints), terrainDatabase);
+
+                if (candidatePaths == null || !candidatePaths.ContainsKey(captureCell)) continue;
+
+                assignedCapturer = candidate;
                 return true;
             }
         }
@@ -606,7 +662,7 @@ public partial class AIController
         return true;
     }
 
-    private static ConstructionManager FindCapturableInSector(ConstructionSector sector, TeamId aiTeam, Vector3Int? unitPos = null)
+    public static ConstructionManager FindCapturableInSector(ConstructionSector sector, TeamId aiTeam, Vector3Int? unitPos = null)
     {
         ConstructionManager best = null;
         float bestDist = float.MaxValue;
