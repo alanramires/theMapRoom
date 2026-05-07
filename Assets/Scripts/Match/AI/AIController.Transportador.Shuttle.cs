@@ -32,14 +32,14 @@ public partial class AIController
             }
 
             Vector3Int candidateObjective = ResolveUnitObjectiveCell(bestCandidate, plan, snapshot);
-            Vector3Int moveTarget = FindTransportShuttleMove(fromCell, candidateCell, paths, occupied, snapshot.AITeam, candidateObjective);
+            Vector3Int moveTarget = FindTransportShuttleMove(unit, fromCell, candidateCell, paths, occupied, snapshot.AITeam, candidateObjective);
             Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — candidato {bestCandidate.InstanceId}@{candidateCell} via {moveTarget}");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
         }
 
         // No pickup candidate: head toward nearest friendly factory/HQ
         Vector3Int waitTarget = FindTransportWaitTarget(snapshot.AITeam, fromCell);
-        Vector3Int waitMove = FindTransportMove(fromCell, waitTarget, paths, occupied, snapshot.AITeam);
+        Vector3Int waitMove = FindTransportMove(unit, fromCell, waitTarget, paths, occupied, snapshot.AITeam);
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — sem candidato, aguarda em {waitMove}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, waitMove, paths);
     }
@@ -117,6 +117,7 @@ public partial class AIController
     private const int ShuttlePickupRange = 2;
 
     private Vector3Int FindTransportShuttleMove(
+        UnitManager unit,
         Vector3Int fromCell,
         Vector3Int candidateCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
@@ -212,7 +213,7 @@ public partial class AIController
 
         if (foundAdj) return bestAdj;
         if (SectorManager.HexDistance(fromCell, candidateCell) < 1.5f) return fromCell;
-        return FindTransportMove(fromCell, candidateCell, paths, occupied, aiTeam);
+        return FindTransportMove(unit, fromCell, candidateCell, paths, occupied, aiTeam);
     }
 
     private bool IsTeamProductionBuilding(Vector3Int cell, TeamId aiTeam)

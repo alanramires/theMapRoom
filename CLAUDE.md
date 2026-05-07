@@ -79,19 +79,34 @@ A `PlayerAction` is a batch of sub-steps executed atomically. Key builders:
 - `BuildAttackBatch(unit, team, from, to, targetId, targetCell, paths)` — move + attack
 - `BuildCaptureBatch(unit, team, from, to, paths)` — move + capture
 - `BuildEmbarcarBatch(unit, team, from, transporter, slotIndex, paths)` — embark (passenger action)
-- `BuildDesembarcarBatch(unit, team, from, passengers)` — disembark (transporter stays; no move+disembark)
+- `BuildDesembarcarBatch(unit, team, from, passengers)` — disembark in place
+- `BuildDesembarcarBatch(unit, team, from, passengers, moveTo, movementPath)` — move **then** disembark (supported by engine)
 - `BuildShoppingBatch(team, order)` — buy unit
+
+**Move + disembark in one batch is fully supported.** `ReplayManager.ExecuteRecordedUnitActionBatch` moves the APC to `action.MoveTo` first, waits for sensors to refresh from the new position, then executes the disembark sub-steps. Setting `MoveTo ≠ MoveFrom` with `SensorAction = Disembark` is the correct way to combine both.
 
 ### Transport system (`AIController.Transportador*.cs`)
 
 Split into four files:
 
 - `AIController.Transportador.cs` — entry point `TryDecideTransportadorAction`, shared helpers, constants (`MinDistanceForTransportSlot = 7`, `TransportDropOffRange = 3`)
-- `AIController.Transportador.Shuttle.cs` — empty APC scanning for pickup candidates
+- `AIController.Transportador.Shuttle.cs` — empty APC scanning for pickup candidates; `ShuttlePickupRange = 2`
 - `AIController.Transportador.Courier.cs` — APC with embarked passengers, delivers toward objectives
 - `AIController.Transportador.Assigned.cs` — APC with an explicit plan-assigned slot
 
 Capturers can intercept to embark via `TryDecideCapturerEmbarkAction` in `AIController.Capturer.Embark.cs` (called near the top of `TryDecideCapturerAction`).
+
+**Courier decision priority** (`DecideTransportadorCourierAction`):
+1. Move + disembark — if moving gains >1h toward target AND simulated drop-off lands within `TransportDropOffRange`
+2. Disembark in place — if moving gains ≤1h and current position already qualifies for drop-off
+3. Opportunistic attack — near-dead enemies (HP ≤ 2), ≤2h route deviation
+4. Move toward target
+
+**Simulating sensors from a hypothetical position**: use `SimulateDisembarkFromCell(unit, cell)` — temporarily calls `unit.SetCurrentCellPosition(cell, false)`, runs the sensor, then restores. Safe because it is synchronous and finishes before any other unit's decision runs. Do not replicate sensor logic directly.
+
+**Unit-aware routing**: `FindTransportMove` uses `UnitMovementPathRules.CalculateMovementCostMap(tilemap, unit, target, budget, terrainDb)` (reverse BFS from target) for real MP costs. This correctly prefers roads over forest for ground APCs. `SectorManager.HexDistance` is unit-agnostic and should not be used as a movement cost proxy for routing decisions.
+
+**Extended embark (pass-2)**: `movePaths` computed with `remainingMP - 1` may include friendly-occupied hexes (passable for pathfinding) but the capturer cannot stop there. Always filter with `BuildOccupied(unit)` before treating a hex as a valid intermediate stop.
 
 ### Shopping (`AIShoppingPlanner.cs`)
 
@@ -99,7 +114,8 @@ Capturers can intercept to embark via `TryDecideCapturerEmbarkAction` in `AICont
 
 ### Hex utilities
 
-- `SectorManager.HexDistance(a, b)` — hex grid distance
+- `SectorManager.HexDistance(a, b)` — hex grid distance (unit-agnostic; do not use as movement cost proxy)
+- `UnitMovementPathRules.CalculateMovementCostMap(tilemap, unit, startCell, budget, terrainDb)` → `Dictionary<Vector3Int, int>` — real MP cost from `startCell` to every reachable cell within `budget` steps, unit and terrain aware
 - `CalculateThreatLevel(cell, team)` — threat score for a cell
 - `ConstructionOccupancyRules.GetConstructionAtCell(tilemap, cell)` — building at hex
 - All cell positions: zero out `z` before comparisons (`cell.z = 0`)

@@ -18,6 +18,21 @@ public partial class AIController
             Mathf.Max(0, unit.RemainingMovementPoints), options);
 
         SectorObjective assigned = plan != null ? ResolveAssignedObjective(unit, plan) : null;
+
+        // Não embarca se já está dentro do alcance de caminhada até o objetivo.
+        // O capturador chega a pé; o transporte seria desperdício de turno.
+        if (assigned != null)
+        {
+            ConstructionManager objBuilding = FindCapturableInSector(assigned.Sector, unit.TeamId);
+            if (objBuilding != null)
+            {
+                Vector3Int objCell = objBuilding.CurrentCellPosition; objCell.z = 0;
+                Vector3Int myCell = unit.CurrentCellPosition; myCell.z = 0;
+                if (SectorManager.HexDistance(myCell, objCell) <= TransportDropOffRange)
+                    return null;
+            }
+        }
+
         PodeEmbarcarOption best = null;
 
         if (options.Count > 0)
@@ -51,6 +66,8 @@ public partial class AIController
 
         if (best != null)
         {
+            if (ShouldYieldEmbarkToNeedierCapturer(unit, best.transporterUnit, assigned, plan))
+                return null;
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca → {best.transporterUnit.InstanceId} slot {best.transporterSlotIndex}");
             return BuildEmbarcarBatch(unit, snapshot.AITeam, fromCell, best.transporterUnit, best.transporterSlotIndex, paths);
         }
@@ -93,10 +110,13 @@ public partial class AIController
         // 2) Hexes alcançáveis com MP reservado — simula sensor de cada um
         if (movePaths == null) return null;
 
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+
         foreach (var kvp in movePaths)
         {
             Vector3Int hex = kvp.Key;
             if (hex == fromCell) continue;
+            if (occupied.Contains(hex)) continue; // unidade não pode parar num hex ocupado
 
             UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, hex, neighborBuf);
             foreach (Vector3Int tCell in neighborBuf)
@@ -109,6 +129,44 @@ public partial class AIController
         }
 
         return null;
+    }
+
+    // Retorna true se outro capturer do mesmo setor está mais longe do objetivo e
+    // ainda dentro do pickup range do APC — este capturer deve ceder a vaga.
+    private bool ShouldYieldEmbarkToNeedierCapturer(
+        UnitManager unit, UnitManager transporter, SectorObjective assigned, TeamObjectivePlan plan)
+    {
+        if (assigned == null || plan == null) return false;
+
+        ConstructionManager objBuilding = FindCapturableInSector(assigned.Sector, unit.TeamId);
+        if (objBuilding == null) return false;
+        Vector3Int objCell = objBuilding.CurrentCellPosition; objCell.z = 0;
+
+        Vector3Int myCell = unit.CurrentCellPosition; myCell.z = 0;
+        float myDist = SectorManager.HexDistance(myCell, objCell);
+
+        Vector3Int apcCell = transporter.CurrentCellPosition; apcCell.z = 0;
+
+        foreach (SlotNeed slot in assigned.Slots)
+        {
+            if (!slot.Filled || slot.Role != UnitRole.Capturador) continue;
+            if (slot.AssignedUnitId == unit.InstanceId) continue;
+
+            UnitManager other = FindActiveUnit(slot.AssignedUnitId, unit.TeamId);
+            if (other == null || other.HasActed || other.IsEmbarked || other.IsDead) continue;
+
+            Vector3Int otherCell = other.CurrentCellPosition; otherCell.z = 0;
+            float otherDist = SectorManager.HexDistance(otherCell, objCell);
+            if (otherDist <= myDist) continue; // não está mais longe
+
+            float otherDistToAPC = SectorManager.HexDistance(otherCell, apcCell);
+            if (otherDistToAPC > ShuttlePickupRange + 0.5f) continue; // fora do alcance do APC
+
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} cede embarque para {other.InstanceId} ({otherDist:F0}h > {myDist:F0}h ao objetivo)");
+            return true;
+        }
+
+        return false;
     }
 
     // Verifica se há um transporter válido em tCell acessível a partir de fromHex,
@@ -143,6 +201,9 @@ public partial class AIController
 
         int slotIdx = FindFittingSlotIndex(transporter, tData, unitData);
         if (slotIdx < 0) return false;
+
+        if (ShouldYieldEmbarkToNeedierCapturer(unit, transporter, assigned, plan))
+            return false;
 
         tCell.z = 0;
         var pathsForBatch = pathToHex != null

@@ -26,11 +26,21 @@ public partial class AIController
                     && HasNearbyVisibleEnemy(defInf.RepresentativeCell, aiTeam, defenseEnemyRange))
                 {
                     obj.Status = ObjectiveStatus.Defending;
-                    // Remove slots vazios de rodadas anteriores; valida slots preenchidos.
+                    // Remove slots vazios e slots de Transportador (transporte é fase ofensiva).
+                    // Valida e preserva apenas Capturador/Assalto preenchidos para defesa.
                     for (int s = obj.Slots.Count - 1; s >= 0; s--)
                     {
                         SlotNeed slot = obj.Slots[s];
-                        if (!slot.Filled) { obj.Slots.RemoveAt(s); continue; }
+                        if (!slot.Filled || slot.Role == UnitRole.Transportador)
+                        {
+                            if (slot.Filled)
+                            {
+                                UnitManager transUnit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                                transUnit?.ClearAIAssignedPlan();
+                            }
+                            obj.Slots.RemoveAt(s);
+                            continue;
+                        }
                         UnitManager slotUnit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
                         if (slotUnit == null || slotUnit.IsUnderRepair)
                         {

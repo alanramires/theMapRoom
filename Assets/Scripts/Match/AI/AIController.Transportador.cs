@@ -59,17 +59,26 @@ public partial class AIController
         return bldg != null && bldg.TeamId != aiTeam;
     }
 
-    // Max-displacement move: minimises remaining distance to target,
+    // Max-displacement move: minimises real MP cost to target (unit-aware terrain costs),
     // prefers cells without non-team constructions, uses threat as tiebreaker.
     private Vector3Int FindTransportMove(
+        UnitManager unit,
         Vector3Int fromCell,
         Vector3Int pressureTarget,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
         TeamId aiTeam)
     {
+        // Reverse cost map: how many MP does this unit need to go from pressureTarget to each cell?
+        // Budget 50 covers any realistic map (25 all-forest hexes).
+        Dictionary<Vector3Int, int> costFromTarget =
+            UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, pressureTarget, 50, terrainDatabase);
+
+        float GetCost(Vector3Int c) =>
+            costFromTarget.TryGetValue(c, out int v) ? (float)v : float.MaxValue;
+
         Vector3Int bestCell = fromCell;
-        float bestDist = SectorManager.HexDistance(fromCell, pressureTarget);
+        float bestDist = GetCost(fromCell);
         bool bestIsNonTeamBldg = false;
         float bestThreat = float.MaxValue;
 
@@ -80,7 +89,7 @@ public partial class AIController
             if (cell == fromCell) continue;
             if (occupied.Contains(cell)) continue;
 
-            float dist = SectorManager.HexDistance(cell, pressureTarget);
+            float dist = GetCost(cell);
             bool isNonTeamBldg = IsNonTeamConstruction(cell, aiTeam);
             float threat = CalculateThreatLevel(cell, aiTeam);
 

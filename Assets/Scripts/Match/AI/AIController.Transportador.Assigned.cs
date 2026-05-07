@@ -29,8 +29,21 @@ public partial class AIController
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
-        // Find the capturer unit this transport is supposed to ferry
+        // Find the capturer unit this transport is supposed to ferry.
+        // Discard the passenger if they're already close enough to walk — same threshold as
+        // TryDecideCapturerEmbarkAction, so both sides agree on when transport is no longer needed.
         UnitManager targetPassenger = ResolveAssignedPassengerUnit(assigned, snapshot.AITeam);
+        if (targetPassenger != null)
+        {
+            ConstructionManager objCheck = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
+            if (objCheck != null)
+            {
+                Vector3Int objCheckCell = objCheck.CurrentCellPosition; objCheckCell.z = 0;
+                Vector3Int passCell = targetPassenger.CurrentCellPosition; passCell.z = 0;
+                if (SectorManager.HexDistance(passCell, objCheckCell) <= TransportDropOffRange)
+                    targetPassenger = null;
+            }
+        }
 
         if (targetPassenger == null)
         {
@@ -40,7 +53,17 @@ public partial class AIController
             if (sectorTarget != null) { sectorCell = sectorTarget.CurrentCellPosition; sectorCell.z = 0; }
 
             Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — sem passageiro, pressiona {sectorCell}");
-            Vector3Int sectorMove = FindTransportMove(fromCell, sectorCell, paths, occupied, snapshot.AITeam);
+            Vector3Int sectorMove = FindTransportMove(unit, fromCell, sectorCell, paths, occupied, snapshot.AITeam);
+
+            if (TryFindTransportBreakerAttack(unit, snapshot, fromCell, paths, occupied, sectorCell,
+                    out Vector3Int attackCell, out UnitManager attackTarget))
+            {
+                Vector3Int targetCell = attackTarget.CurrentCellPosition; targetCell.z = 0;
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — ataca {attackTarget.InstanceId} via {attackCell}");
+                return BuildAttackBatch(unit, snapshot.AITeam, fromCell, attackCell,
+                    attackTarget.InstanceId.ToString(), targetCell, paths);
+            }
+
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, sectorMove, paths);
         }
 
@@ -49,8 +72,18 @@ public partial class AIController
         Vector3Int passengerCell = targetPassenger.CurrentCellPosition; passengerCell.z = 0;
         ConstructionManager sectorTgt = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
         Vector3Int objCell = sectorTgt != null ? sectorTgt.CurrentCellPosition : Vector3Int.zero; objCell.z = 0;
-        Vector3Int moveTarget = FindTransportShuttleMove(fromCell, passengerCell, paths, occupied, snapshot.AITeam, objCell);
+        Vector3Int moveTarget = FindTransportShuttleMove(unit, fromCell, passengerCell, paths, occupied, snapshot.AITeam, objCell);
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — pickup {targetPassenger.InstanceId}@{passengerCell} via {moveTarget}");
+
+        if (TryFindTransportBreakerAttack(unit, snapshot, fromCell, paths, occupied, passengerCell,
+                out Vector3Int pickupAttackCell, out UnitManager pickupAttackTarget))
+        {
+            Vector3Int pickupTargetCell = pickupAttackTarget.CurrentCellPosition; pickupTargetCell.z = 0;
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — ataca {pickupAttackTarget.InstanceId} via {pickupAttackCell}");
+            return BuildAttackBatch(unit, snapshot.AITeam, fromCell, pickupAttackCell,
+                pickupAttackTarget.InstanceId.ToString(), pickupTargetCell, paths);
+        }
+
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
     }
 

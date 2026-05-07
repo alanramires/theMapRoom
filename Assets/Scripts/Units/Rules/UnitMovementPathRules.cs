@@ -282,6 +282,58 @@ public static class UnitMovementPathRules
         return TryGetEnterCellCost(terrainTilemap, unit, cell, terrainDatabase, applyOperationalAutonomyModifier: true, out cost);
     }
 
+    // Returns the real MP cost (using this unit's movement rules) from startCell to every
+    // reachable cell within maxSteps. Used by AI to compare candidates by true travel cost
+    // instead of unit-agnostic hex distance.
+    public static Dictionary<Vector3Int, int> CalculateMovementCostMap(
+        Tilemap terrainTilemap,
+        UnitManager unit,
+        Vector3Int startCell,
+        int maxSteps,
+        TerrainDatabase terrainDatabase = null)
+    {
+        var costByCell = new Dictionary<Vector3Int, int>();
+        if (terrainTilemap == null || unit == null || maxSteps < 0)
+            return costByCell;
+
+        unit.SyncLayerStateFromData(forceNativeDefault: false);
+        Vector3Int origin = startCell; origin.z = 0;
+        costByCell[origin] = 0;
+
+        MovementQueryCache cache = new MovementQueryCache(terrainTilemap, terrainDatabase);
+        var frontier = new Queue<(Vector3Int cell, int steps)>();
+        frontier.Enqueue((origin, 0));
+        var neighbors = new List<Vector3Int>(6);
+
+        while (frontier.Count > 0)
+        {
+            var (current, currentSteps) = frontier.Dequeue();
+            if (costByCell.TryGetValue(current, out int recorded) && recorded < currentSteps) continue;
+
+            GetImmediateHexNeighbors(terrainTilemap, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = neighbors[i];
+                ConstructionManager construction = cache.GetConstructionAtCell(next);
+                StructureData structure = cache.GetStructureAtCell(next);
+                TerrainTypeData terrainData = cache.ResolveTerrainAtCell(next);
+                bool hasAnyTile = cache.HasAnyPaintedTileAtCell(next);
+                if (!CanTraverseCell(next, cache, construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit))
+                    continue;
+
+                int moveCost = Mathf.Max(1, GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier: false));
+                int nextSteps = currentSteps + moveCost;
+                if (nextSteps > maxSteps) continue;
+
+                if (costByCell.TryGetValue(next, out int knownCost) && knownCost <= nextSteps) continue;
+                costByCell[next] = nextSteps;
+                frontier.Enqueue((next, nextSteps));
+            }
+        }
+
+        return costByCell;
+    }
+
     private static bool CanUseRoadFullMoveBonus(UnitManager unit, int baseMove)
     {
         if (unit == null)

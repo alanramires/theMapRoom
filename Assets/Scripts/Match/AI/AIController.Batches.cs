@@ -274,6 +274,42 @@ public partial class AIController
         return action;
     }
 
+    private PlayerAction BuildDesembarcarBatch(
+        UnitManager transporter,
+        TeamId team,
+        Vector3Int from,
+        List<PodeDesembarcarOption> disembarkOrders,
+        Vector3Int moveTo,
+        List<Vector3Int> movementPath)
+    {
+        var action = new PlayerAction
+        {
+            IsAIGenerated  = true,
+            ActionType     = PlayerActionType.UnitAction,
+            ActingTeam     = team,
+            TurnNumber     = matchController != null ? matchController.CurrentTurn : 0,
+            CursorHex      = from, HasCursorHex = true,
+            UnitInstanceId = transporter.InstanceId.ToString(),
+            MoveFrom       = from, HasMoveFrom = true,
+            MoveTo         = moveTo, HasMoveTo  = true,
+            SensorAction   = SensorActionType.Disembark,
+            MovementPath   = movementPath,
+            DebugLabel     = $"AI Disembark ← {transporter.InstanceId} ({disembarkOrders.Count} passageiro(s)) via {moveTo}",
+        };
+        foreach (PodeDesembarcarOption order in disembarkOrders)
+        {
+            Vector3Int targetCell = order.disembarkCell; targetCell.z = 0;
+            action.SubSteps.Add(new PlayerActionSubStep
+            {
+                Label            = "AIDisembark",
+                TargetInstanceId = order.passengerUnit.InstanceId.ToString(),
+                TargetHex        = targetCell,
+                HasTargetHex     = true,
+            });
+        }
+        return action;
+    }
+
     private PlayerAction BuildEndTurnBatch(TeamId team)
 
     {
