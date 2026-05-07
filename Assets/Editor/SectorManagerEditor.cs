@@ -190,6 +190,34 @@ public class SectorManagerEditor : Editor
                 ? sectorProp.enumDisplayNames[Mathf.Clamp(sectorProp.enumValueIndex, 0, sectorProp.enumDisplayNames.Length - 1)]
                 : $"Setor {i}";
 
+            // Append HQ distances to the foldout label so they're visible without expanding
+            SerializedProperty distancesProp = element.FindPropertyRelative("sectorDistances");
+            if (distancesProp != null && distancesProp.arraySize > 0)
+            {
+                var parts = new System.Collections.Generic.List<string>();
+                for (int d = 0; d < distancesProp.arraySize; d++)
+                {
+                    SerializedProperty td       = distancesProp.GetArrayElementAtIndex(d);
+                    SerializedProperty tdTeam   = td.FindPropertyRelative("Team");
+                    SerializedProperty tdEntries= td.FindPropertyRelative("Entries");
+                    if (tdTeam == null || tdEntries == null) continue;
+                    string teamName = tdTeam.enumDisplayNames[Mathf.Clamp(tdTeam.enumValueIndex, 0, tdTeam.enumDisplayNames.Length - 1)];
+                    for (int e = 0; e < tdEntries.arraySize; e++)
+                    {
+                        SerializedProperty entry = tdEntries.GetArrayElementAtIndex(e);
+                        SerializedProperty isHQ  = entry.FindPropertyRelative("IsHQ");
+                        SerializedProperty dist  = entry.FindPropertyRelative("Distance");
+                        if (isHQ != null && isHQ.boolValue && dist != null && dist.floatValue < float.MaxValue * 0.5f)
+                        {
+                            parts.Add($"{teamName}: {dist.floatValue:F0}h");
+                            break;
+                        }
+                    }
+                }
+                if (parts.Count > 0)
+                    sectorLabel += $"  [{string.Join(" | ", parts)}]";
+            }
+
             EditorGUILayout.PropertyField(element, new GUIContent(sectorLabel), includeChildren: true);
 
             if (element.isExpanded)

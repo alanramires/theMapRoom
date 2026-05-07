@@ -207,6 +207,20 @@ public partial class AIController
         Vector3Int transporterCell = transporter.CurrentCellPosition; transporterCell.z = 0;
         List<Vector3Int> movementPath = null;
         paths?.TryGetValue(transporterCell, out movementPath);
+
+        // MoveTo = hex onde a unidade PARA para embarcar (adjacente ao transporter, nunca sobre ele).
+        // Percorre o path de trás pra frente e usa o último cell que não é o transporterCell.
+        // Caso sem path (adjacente, ficar parado): from.
+        Vector3Int moveTo = from;
+        if (movementPath != null)
+        {
+            for (int i = movementPath.Count - 1; i >= 0; i--)
+            {
+                Vector3Int c = movementPath[i]; c.z = 0;
+                if (c != transporterCell) { moveTo = c; break; }
+            }
+        }
+
         return new PlayerAction
         {
             IsAIGenerated    = true,
@@ -216,7 +230,7 @@ public partial class AIController
             CursorHex        = from, HasCursorHex = true,
             UnitInstanceId   = passenger.InstanceId.ToString(),
             MoveFrom         = from, HasMoveFrom = true,
-            MoveTo           = transporterCell, HasMoveTo = true,
+            MoveTo           = moveTo, HasMoveTo = true,
             SensorAction     = SensorActionType.Embark,
             TargetInstanceId = transporter.InstanceId.ToString(),
             TargetHex        = transporterCell, HasTargetHex = true,

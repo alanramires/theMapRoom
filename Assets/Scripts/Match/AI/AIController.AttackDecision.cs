@@ -39,6 +39,8 @@ public partial class AIController
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
         int distance = Mathf.Max(1, Mathf.RoundToInt(SectorManager.HexDistance(attackCell, targetCell)));
+        PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(attackCell);
+        PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(targetCell);
         AICombatHpSimulator.AICombatHpResult sim = AICombatHpSimulator.Simulate(
             attackerData,
             targetData,
@@ -47,7 +49,11 @@ public partial class AIController
             distance,
             turnStateManager.RpsDatabaseRef,
             turnStateManager.DpqMatchupDatabaseRef,
-            turnStateManager.WeaponPriorityDataRef);
+            turnStateManager.WeaponPriorityDataRef,
+            attackerDpq.points,
+            defenderDpq.points,
+            attackerDpq.defenseBonus,
+            defenderDpq.defenseBonus);
 
         if (!sim.isValid)
         {
@@ -69,7 +75,7 @@ public partial class AIController
             + (defensiveContext ? attackerData.defensiveAttackExtraHpLossPercent : 0), 0, 100);
         int eliminationMin = Mathf.Clamp(attackerData.attackEliminationMinPercent, 0, 100);
 
-        string summary = $"atkDecision hp={attackerHpBefore}->{sim.attackerHpAfter} loss={attackerLossPct}%/{hpLossLimit}% dmg={targetDamagePct}%/{eliminationMin}% target={targetHpBefore}->{sim.defenderHpAfter} kill={sim.killGuaranteed} survive={sim.attackerSurvives}";
+        string summary = $"atkDecision hp={attackerHpBefore}->{sim.attackerHpAfter} loss={attackerLossPct}%/{hpLossLimit}% dmg={targetDamagePct}%/{eliminationMin}% target={targetHpBefore}->{sim.defenderHpAfter} dpq={attackerDpq.points}/{defenderDpq.points} def={attackerDpq.defenseBonus}/{defenderDpq.defenseBonus} kill={sim.killGuaranteed} survive={sim.attackerSurvives}";
 
         if (attackerData.attackMustSurvive && !sim.attackerSurvives)
         {

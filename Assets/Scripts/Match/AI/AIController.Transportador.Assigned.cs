@@ -44,9 +44,12 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, sectorMove, paths);
         }
 
-        // Move to be adjacent to the assigned passenger
+        // Park on the path to the objective: within ShuttlePickupRange of the passenger,
+        // as close to the objective as possible so the journey starts immediately after boarding.
         Vector3Int passengerCell = targetPassenger.CurrentCellPosition; passengerCell.z = 0;
-        Vector3Int moveTarget = FindTransportShuttleMove(fromCell, passengerCell, paths, occupied, snapshot.AITeam);
+        ConstructionManager sectorTgt = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
+        Vector3Int objCell = sectorTgt != null ? sectorTgt.CurrentCellPosition : Vector3Int.zero; objCell.z = 0;
+        Vector3Int moveTarget = FindTransportShuttleMove(fromCell, passengerCell, paths, occupied, snapshot.AITeam, objCell);
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — pickup {targetPassenger.InstanceId}@{passengerCell} via {moveTarget}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
     }

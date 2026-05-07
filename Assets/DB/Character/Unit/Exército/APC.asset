@@ -43,12 +43,21 @@ MonoBehaviour:
     priority: 1
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 1
-  repairTriggerHpBelow: 0
-  repairTriggerAutonomyPct: 0
-  repairTriggerAmmoEnabled: 0
+  playConservative: 0
+  preferMoveOnBestDPQ: 0
+  preferMaxDisplacement: 1
+  useAttackDecision: 1
+  attackAcceptHpLossPercent: 50
+  attackEliminationMinPercent: 10
+  attackMustSurvive: 1
+  ignoreAttackDecisionWhenDefending: 0
+  defensiveAttackExtraHpLossPercent: 20
+  repairTriggerHpBelow: 5
+  repairTriggerAutonomyPct: 30
+  repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
-  fuseWhileInRepair: 0
+  fuseWhileInRepair: 1
   eliteLevel: 0
   combatModifiers: []
   domain: 0

@@ -499,22 +499,33 @@ public partial class AIController
         if (boardTilemap == null || terrainDatabase == null) return 0f;
         cell.z = 0;
 
+        PositionDpqForAttackDecision dpq = ResolveDpqForAttackDecision(cell);
+        return dpq.points;
+    }
+
+    private PositionDpqForAttackDecision ResolveDpqForAttackDecision(Vector3Int cell)
+    {
+        cell.z = 0;
+
+        if (boardTilemap == null || terrainDatabase == null)
+            return PositionDpqForAttackDecision.None;
+
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
         if (construction != null
             && construction.TryResolveConstructionData(out ConstructionData constructionData)
             && constructionData != null
             && constructionData.dpqData != null)
         {
-            return constructionData.dpqData.Pontos;
+            return new PositionDpqForAttackDecision(constructionData.dpqData.Pontos, constructionData.dpqData.DefesaBonus);
         }
 
         StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardTilemap, cell);
         if (structure != null && structure.dpqData != null)
-            return structure.dpqData.Pontos;
+            return new PositionDpqForAttackDecision(structure.dpqData.Pontos, structure.dpqData.DefesaBonus);
 
         TileBase tile = boardTilemap.GetTile(cell);
         if (tile != null && terrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData data) && data?.dpqData != null)
-            return data.dpqData.Pontos;
+            return new PositionDpqForAttackDecision(data.dpqData.Pontos, data.dpqData.DefesaBonus);
 
         GridLayout grid = boardTilemap.layoutGrid;
         if (grid != null)
@@ -528,11 +539,25 @@ public partial class AIController
 
                 TileBase other = map.GetTile(cell);
                 if (other != null && terrainDatabase.TryGetByPaletteTile(other, out TerrainTypeData otherData) && otherData?.dpqData != null)
-                    return otherData.dpqData.Pontos;
+                    return new PositionDpqForAttackDecision(otherData.dpqData.Pontos, otherData.dpqData.DefesaBonus);
             }
         }
 
-        return 0f;
+        return PositionDpqForAttackDecision.None;
+    }
+
+    private readonly struct PositionDpqForAttackDecision
+    {
+        public static PositionDpqForAttackDecision None => new PositionDpqForAttackDecision(0, 0);
+
+        public readonly int points;
+        public readonly int defenseBonus;
+
+        public PositionDpqForAttackDecision(int points, int defenseBonus)
+        {
+            this.points = Mathf.Max(0, points);
+            this.defenseBonus = defenseBonus;
+        }
     }
 
     private static bool IsBetterAttackCandidate(

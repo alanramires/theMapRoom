@@ -282,6 +282,7 @@ public partial class AIController
                 if (opt?.targetUnit == null) continue;
                 Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
                 if (SectorManager.HexDistance(tc, targetCell) > fromDist) continue;
+                if (!PassesAttackDecision(unit, opt.targetUnit, bestMove, assigned.Status == ObjectiveStatus.Defending, out _)) continue;
                 float priority = AttackTargetPriorityPursuer(tc, targetCell);
                 if (priority > bestPriority) { bestPriority = priority; bestTarget = opt.targetUnit; }
             }

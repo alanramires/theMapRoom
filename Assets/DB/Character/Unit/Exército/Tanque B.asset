@@ -44,6 +44,7 @@ MonoBehaviour:
   prioritizeDpqAtBattle: 1
   playConservative: 0
   preferMoveOnBestDPQ: 0
+  preferMaxDisplacement: 0
   useAttackDecision: 1
   attackAcceptHpLossPercent: 60
   attackEliminationMinPercent: 10
@@ -51,7 +52,7 @@ MonoBehaviour:
   ignoreAttackDecisionWhenDefending: 0
   defensiveAttackExtraHpLossPercent: 20
   repairTriggerHpBelow: 3
-  repairTriggerAutonomyPct: 25
+  repairTriggerAutonomyPct: 50
   repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8

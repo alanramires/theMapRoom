@@ -662,7 +662,9 @@ public partial class AIController
             plan.RogueUnitIds.Add(u.InstanceId);
         }
 
-        // Passo 5f: atribui transportadores livres a slots de Transportador abertos (por proximidade)
+        // Passo 5f: atribui transportadores livres a slots de Transportador abertos.
+        // Critério primário: capturer mais longe do seu objetivo (precisa mais de carona).
+        // Critério secundário: APC mais perto do objetivo (chega antes).
         {
             List<UnitManager> freeTransporters = GetAvailableTransporters(aiTeam);
             foreach (UnitManager u in freeTransporters)
@@ -670,7 +672,9 @@ public partial class AIController
                 if (assignedIds.Contains(u.InstanceId)) continue;
 
                 SectorObjective bestObj = null;
-                float bestDist = float.MaxValue;
+                float bestCapturerDist = -1f;
+                float bestRisk = float.MaxValue;
+                float bestApcDist = float.MaxValue;
                 foreach (SectorObjective obj in plan.Objectives)
                 {
                     if (!obj.HasOpenSlot(UnitRole.Transportador)) continue;
@@ -678,15 +682,42 @@ public partial class AIController
                     if (tgt == null) continue;
                     Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
                     Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
-                    float d = SectorManager.HexDistance(uc, tc);
-                    if (d < bestDist) { bestDist = d; bestObj = obj; }
+
+                    // Distância do capturer alocado ao objetivo (quem mais precisa de carona).
+                    // Fallback: distância do setor ao HQ — mesmo critério que criou o slot de transporte.
+                    float sectorRisk = 0f;
+                    float capturerDistToObj = SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo sInfo)
+                        ? sInfo.GetDistanceToHQ(aiTeam) : 0f;
+                    if (sInfo != null) sectorRisk = sInfo.GetRiskRatioFor(aiTeam);
+                    foreach (SlotNeed slot in obj.Slots)
+                    {
+                        if (slot.Role != UnitRole.Capturador || !slot.Filled) continue;
+                        UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                        if (capturer == null || capturer.IsEmbarked) continue;
+                        Vector3Int cc = capturer.CurrentCellPosition; cc.z = 0;
+                        capturerDistToObj = SectorManager.HexDistance(cc, tc);
+                        break;
+                    }
+
+                    float apcDistToObj = SectorManager.HexDistance(uc, tc);
+                    const float eps = 0.5f;
+                    bool isBetter = capturerDistToObj > bestCapturerDist + eps
+                        || (capturerDistToObj >= bestCapturerDist - eps && sectorRisk < bestRisk - 0.01f)
+                        || (capturerDistToObj >= bestCapturerDist - eps && sectorRisk < bestRisk + 0.01f && apcDistToObj < bestApcDist);
+                    if (isBetter)
+                    {
+                        bestCapturerDist = capturerDistToObj;
+                        bestRisk = sectorRisk;
+                        bestApcDist = apcDistToObj;
+                        bestObj = obj;
+                    }
                 }
 
                 if (bestObj == null) continue;
                 bestObj.TryFillSlot(UnitRole.Transportador, u.InstanceId);
                 assignedIds.Add(u.InstanceId);
                 ApplyPlanHUD(u, bestObj, UnitRole.Transportador);
-                Debug.Log($"{TL("Plan")} Transportador {u.InstanceId} → {bestObj.Sector} (dist={bestDist:F0}h)");
+                Debug.Log($"{TL("Plan")} Transportador {u.InstanceId} → {bestObj.Sector} (capturerDist={bestCapturerDist:F0}h risk={bestRisk:F2} apcDist={bestApcDist:F0}h)");
             }
         }
 

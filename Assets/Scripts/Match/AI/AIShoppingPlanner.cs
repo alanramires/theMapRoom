@@ -327,8 +327,6 @@ public class AIShoppingPlanner : MonoBehaviour
             }
             if (openTransportSlots > 0 && isPrimaryTransporter)
                 score += 101000;
-            else if (openTransportSlots <= 0 && isPrimaryTransporter)
-                score -= 100000;
             if (openCapturerSlots > 0)
             {
                 if (isPrimaryCapturer)              score += 100000;

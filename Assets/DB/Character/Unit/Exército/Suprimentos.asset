@@ -32,13 +32,22 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 1
   combatClassification: 3
-  roles: 0400000007000000
+  roles: 040000000700000003000000
   aiInitiative: 2
   aiTargetPreferenceByClass: []
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
-  repairTriggerHpBelow: 0
-  repairTriggerAutonomyPct: 0
+  playConservative: 1
+  preferMoveOnBestDPQ: 1
+  preferMaxDisplacement: 0
+  useAttackDecision: 0
+  attackAcceptHpLossPercent: 50
+  attackEliminationMinPercent: 10
+  attackMustSurvive: 1
+  ignoreAttackDecisionWhenDefending: 0
+  defensiveAttackExtraHpLossPercent: 20
+  repairTriggerHpBelow: 5
+  repairTriggerAutonomyPct: 25
   repairTriggerAmmoEnabled: 0
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8

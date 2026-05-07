@@ -4,7 +4,7 @@ using UnityEngine;
 /// Simulador de combate para uso exclusivo da IA.
 /// Estima o resultado de um duelo (HP restante de cada lado) usando a mesma formula
 /// da Matriz de HP, sem aplicar dano real ao jogo.
-/// DPQ fixo em padrao (1x1) - serve como norteador para tomada de decisao.
+/// Pode receber DPQ real das posicoes para aproximar a decisao do combate resolvido.
 /// </summary>
 public static class AICombatHpSimulator
 {
@@ -110,7 +110,45 @@ public static class AICombatHpSimulator
             attacker, defender,
             attackPick, counterPick,
             attackerCurrentHp, defenderCurrentHp,
-            rpsDatabase, dpqMatchupDatabase);
+            rpsDatabase, dpqMatchupDatabase,
+            attackerDpqPoints: 1,
+            defenderDpqPoints: 1,
+            attackerDpqDefenseBonus: 0,
+            defenderDpqDefenseBonus: 0);
+    }
+
+    public static AICombatHpResult Simulate(
+        UnitData attacker,
+        UnitData defender,
+        int attackerCurrentHp,
+        int defenderCurrentHp,
+        int distance,
+        RPSDatabase rpsDatabase,
+        DPQMatchupDatabase dpqMatchupDatabase,
+        WeaponPriorityData weaponPriorityData,
+        int attackerDpqPoints,
+        int defenderDpqPoints,
+        int attackerDpqDefenseBonus,
+        int defenderDpqDefenseBonus)
+    {
+        if (attacker == null || defender == null || distance <= 0)
+            return AICombatHpResult.Invalid;
+
+        WeaponPick attackPick = PickBestAttackWeapon(attacker, defender, distance, weaponPriorityData);
+        if (!attackPick.isValid)
+            return AICombatHpResult.Invalid;
+
+        WeaponPick counterPick = PickBestCounterWeapon(defender, attacker, distance, weaponPriorityData);
+
+        return SimulateCore(
+            attacker, defender,
+            attackPick, counterPick,
+            attackerCurrentHp, defenderCurrentHp,
+            rpsDatabase, dpqMatchupDatabase,
+            attackerDpqPoints,
+            defenderDpqPoints,
+            attackerDpqDefenseBonus,
+            defenderDpqDefenseBonus);
     }
 
     // ---- Nucleo da simulacao ----
@@ -123,7 +161,11 @@ public static class AICombatHpSimulator
         int attackerHpBefore,
         int defenderHpBefore,
         RPSDatabase rpsDatabase,
-        DPQMatchupDatabase dpqMatchupDatabase)
+        DPQMatchupDatabase dpqMatchupDatabase,
+        int attackerDpqPoints,
+        int defenderDpqPoints,
+        int attackerDpqDefenseBonus,
+        int defenderDpqDefenseBonus)
     {
         WeaponData attackerWeapon = attackPick.weapon;
         WeaponData defenderWeapon = counterPick.isValid ? counterPick.weapon : null;
@@ -132,7 +174,11 @@ public static class AICombatHpSimulator
         DPQCombatOutcome attackerOutcome = DPQCombatOutcome.Neutro;
         DPQCombatOutcome defenderOutcome = DPQCombatOutcome.Neutro;
         if (dpqMatchupDatabase != null)
-            dpqMatchupDatabase.Resolve(1, 1, out attackerOutcome, out defenderOutcome);
+            dpqMatchupDatabase.Resolve(
+                Mathf.Max(0, attackerDpqPoints),
+                Mathf.Max(0, defenderDpqPoints),
+                out attackerOutcome,
+                out defenderOutcome);
 
         int attackerWeaponPower = attackerWeapon != null ? Mathf.Max(0, attackerWeapon.basicAttack) : 0;
         int defenderWeaponPower = counterExecuted && defenderWeapon != null ? Mathf.Max(0, defenderWeapon.basicAttack) : 0;
@@ -164,8 +210,8 @@ public static class AICombatHpSimulator
         int attackerWoundedPenalty = ResolveWoundedDefensePenalty(attackerHpBefore, attacker.maxHP);
         int defenderWoundedPenalty = ResolveWoundedDefensePenalty(defenderHpBefore, defender.maxHP);
 
-        int attackerEffectiveDefense = attacker.defense + attackerDefenseRps + attackerDefenseSkillTotal + attackerWoundedPenalty;
-        int defenderEffectiveDefense = defender.defense + defenderDefenseRps + defenderDefenseSkillTotal + defenderWoundedPenalty;
+        int attackerEffectiveDefense = attacker.defense + attackerDpqDefenseBonus + attackerDefenseRps + attackerDefenseSkillTotal + attackerWoundedPenalty;
+        int defenderEffectiveDefense = defender.defense + defenderDpqDefenseBonus + defenderDefenseRps + defenderDefenseSkillTotal + defenderWoundedPenalty;
 
         int roundedOnDefender = DPQCombatMath.DivideAndRound(
             attackerAttackEffective, Mathf.Max(1, defenderEffectiveDefense), attackerOutcome);
