@@ -19,11 +19,12 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
         UnitManager bestCandidate = FindBestShuttleCandidate(unit, snapshot, plan, fromCell, out Vector3Int candidateCell);
+        bool preferNoMove = unit.TryGetUnitData(out UnitData shuttleData) && shuttleData.prioritizeDpqAtBattle;
 
         if (bestCandidate != null)
         {
             if (TryFindTransportBreakerAttack(unit, snapshot, fromCell, paths, occupied, candidateCell,
-                    out Vector3Int attackCell, out UnitManager attackTarget))
+                    out Vector3Int attackCell, out UnitManager attackTarget, preferNoMove))
             {
                 Vector3Int targetCell = attackTarget.CurrentCellPosition; targetCell.z = 0;
                 Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — ataca oportunista {attackTarget.InstanceId} via {attackCell}");
@@ -253,13 +254,27 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         Vector3Int candidateCell,
         out Vector3Int bestCell,
-        out UnitManager bestTarget)
+        out UnitManager bestTarget,
+        bool preferNoMove = false)
     {
         bestCell = fromCell;
         bestTarget = null;
 
         List<UnitManager> enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
         if (enemies == null || enemies.Count == 0) return false;
+
+        // When prioritizeDpqAtBattle: try attacking from current position first (no movement).
+        if (preferNoMove)
+        {
+            foreach (UnitManager enemy in enemies)
+            {
+                if (!CanAttackTargetFrom(fromCell, fromCell, unit, enemy)) continue;
+                if (!PassesAttackDecision(unit, enemy, fromCell, false, out _)) continue;
+                bestCell = fromCell;
+                bestTarget = enemy;
+                return true;
+            }
+        }
 
         float fromDistToCandidate = SectorManager.HexDistance(fromCell, candidateCell);
         float bestScore = float.MinValue;

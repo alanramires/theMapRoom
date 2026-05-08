@@ -15,7 +15,7 @@ public partial class AIController
         }
 
         if (assigned != null
-            && SectorManager.TryGetSectorInfo(assigned.Sector, out SectorManager.SectorInfo info))
+            && TryGetAnySectorInfo(assigned.Sector, out SectorManager.SectorInfo info))
         {
             Vector3Int rc = info.RepresentativeCell; rc.z = 0;
             return rc;
@@ -154,11 +154,16 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
         List<UnitManager> threats,
+        int bestCapturerDist,
         out string evaluationLog)
     {
+        // Real MP cost from every cell to escortCell (road/terrain aware, budget=50).
+        Dictionary<Vector3Int, int> realCostToEscort =
+            UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, escortCell, 50, terrainDatabase);
+
         Vector3Int bestCell = fromCell;
         var evaluations = new List<AssaultEscortCoverEvaluation>();
-        AssaultEscortCoverEvaluation stayEval = ScoreAssaultEscortCover(unit, snapshot, fromCell, fromCell, escortCell, scoutZoneRadius, threats, paths);
+        AssaultEscortCoverEvaluation stayEval = ScoreAssaultEscortCover(unit, snapshot, fromCell, fromCell, escortCell, scoutZoneRadius, threats, paths, realCostToEscort, bestCapturerDist, occupied);
         evaluations.Add(stayEval);
         float bestScore = stayEval.score;
 
@@ -168,7 +173,7 @@ public partial class AIController
             if (cell != fromCell && occupied.Contains(cell)) continue;
             if (cell == escortCell && IsReservedAssaultEscortCaptureCell(cell, snapshot.AITeam)) continue;
 
-            AssaultEscortCoverEvaluation eval = ScoreAssaultEscortCover(unit, snapshot, fromCell, cell, escortCell, scoutZoneRadius, threats, paths);
+            AssaultEscortCoverEvaluation eval = ScoreAssaultEscortCover(unit, snapshot, fromCell, cell, escortCell, scoutZoneRadius, threats, paths, realCostToEscort, bestCapturerDist, occupied);
             evaluations.Add(eval);
             float score = eval.score;
             if (score > bestScore)
@@ -226,33 +231,57 @@ public partial class AIController
         Vector3Int escortCell,
         int scoutZoneRadius,
         List<UnitManager> threats,
-        Dictionary<Vector3Int, List<Vector3Int>> paths)
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        Dictionary<Vector3Int, int> realCostToEscort = null,
+        int bestCapturerDist = -1,
+        HashSet<Vector3Int> occupied = null)
     {
+        // Advance mode: um capturador já está próximo do objetivo — o escort prioriza
+        // avançar até lá em vez de patrulhar o anel de zona (que ainda está longe).
+        bool advanceMode = bestCapturerDist >= 0 && bestCapturerDist <= AdvancedCapturerThreshold;
+
         float escortDist = SectorManager.HexDistance(cell, escortCell);
         float fromEscortDist = SectorManager.HexDistance(fromCell, escortCell);
-        float routeDist = CalculateAssaultRouteDistance(unit, cell, escortCell);
-        float fromRouteDist = CalculateAssaultRouteDistance(unit, fromCell, escortCell);
+        // Use real terrain/road-aware MP cost when available; fall back to precomputed table.
+        float routeDist = realCostToEscort != null && realCostToEscort.TryGetValue(cell, out int rc)
+            ? rc : CalculateAssaultRouteDistance(unit, cell, escortCell);
+        float fromRouteDist = realCostToEscort != null && realCostToEscort.TryGetValue(fromCell, out int frc)
+            ? frc : CalculateAssaultRouteDistance(unit, fromCell, escortCell);
         float routeProgress = fromRouteDist - routeDist;
         float hexProgress = fromEscortDist - escortDist;
         float dpq = GetTerrainDpqPontos(cell);
         float threatPenalty = CalculateThreatLevel(cell, snapshot.AITeam);
         float pathCost = cell == fromCell ? 0f : GetPathStepCount(paths, cell);
-        float scoutRingBonus = CalculateAssaultScoutRingBonus(escortDist, scoutZoneRadius);
+        // Em advance mode, suprime o bônus negativo de anel: o escort está longe do objetivo
+        // por congestionamento, não por escolha — penalizá-lo faria ele ficar parado ou recuar.
+        float scoutRingBonus = advanceMode
+            ? 0f
+            : CalculateAssaultScoutRingBonus(escortDist, scoutZoneRadius);
         float zonePressureBonus = CalculateAssaultScoutZonePressure(unit, fromCell, cell, threats, out bool canCoverZoneEnemy);
+        // Assault escorts are durable — use 40 % of the capturer ThreatWeight so they
+        // don't shy away from positions that are dangerous but tactically sound.
+        const float AssaultEscortThreatMult = 0.4f;
+        float routeProgressWeight = advanceMode ? 900f : 450f;
+        float routeDistWeight = advanceMode ? 280f : 180f;
         float score =
-            routeProgress * 450f
-            - routeDist * 180f
+            routeProgress * routeProgressWeight
+            - routeDist * routeDistWeight
             + hexProgress * 80f
             + dpq * 45f
             + scoutRingBonus
             + zonePressureBonus
-            - threatPenalty * ThreatWeight
+            - threatPenalty * ThreatWeight * AssaultEscortThreatMult
             - pathCost * 8f;
 
         if (escortDist <= 1f) score += 250f;
         if (escortDist <= scoutZoneRadius) score += 100f;
-        if (routeProgress > 0f) score += 350f;
-        else if (routeProgress < 0f) score -= 600f;
+        float routeProgressBonus = advanceMode ? 700f : 350f;
+        float routeProgressPenalty = advanceMode ? 1200f : 600f;
+        if (routeProgress > 0f) score += routeProgressBonus;
+        else if (routeProgress < 0f) score -= routeProgressPenalty;
+        // When route distance is flat (all cells same rota), still prefer cells that
+        // don't retreat geometrically — avoids seemingly-random lateral/backward moves.
+        else if (hexProgress < 0f) score -= 300f;
 
         bool reservedCapture = IsReservedAssaultEscortCaptureCell(cell, snapshot.AITeam);
         if (reservedCapture)
@@ -267,8 +296,15 @@ public partial class AIController
                 float d = SectorManager.HexDistance(cell, ec);
                 if (d < bestEnemyDist) bestEnemyDist = d;
             }
-            score -= bestEnemyDist * 120f;
+            // Higher weight than capturer (120) so the escort actively positions
+            // toward visible threats rather than staying put.
+            score -= bestEnemyDist * 300f;
         }
+
+        // Congestionamento à frente: vizinhos com custo de rota menor (= próximo passo rumo ao
+        // destino) que estão bloqueados por aliados. Ratio 0..1 penaliza células em beco.
+        float congestion = ComputeForwardCongestion(cell, realCostToEscort, occupied);
+        score -= congestion * ForwardCongestionWeight;
 
         return new AssaultEscortCoverEvaluation
         {
@@ -284,7 +320,36 @@ public partial class AIController
             nearestThreatDistance = bestEnemyDist,
             canCoverZoneEnemy = canCoverZoneEnemy,
             reservedCapture = reservedCapture,
+            advanceMode = advanceMode,
+            congestion = congestion,
         };
+    }
+
+    // Ratio de vizinhos "à frente" (custo de rota menor = mais perto do destino) bloqueados
+    // por aliados. 0.0 = caminho livre; 1.0 = todos os próximos passos obstruídos.
+    private float ComputeForwardCongestion(
+        Vector3Int cell,
+        Dictionary<Vector3Int, int> costFromDest,
+        HashSet<Vector3Int> occupied)
+    {
+        if (costFromDest == null || occupied == null) return 0f;
+        if (!costFromDest.TryGetValue(cell, out int cellCost) || cellCost <= 0) return 0f;
+
+        var neighbors = new List<Vector3Int>();
+        UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, cell, neighbors);
+
+        int forwardCount = 0;
+        int blockedCount = 0;
+        foreach (Vector3Int n in neighbors)
+        {
+            Vector3Int nc = n; nc.z = 0;
+            if (!costFromDest.TryGetValue(nc, out int neighborCost)) continue;
+            if (neighborCost >= cellCost) continue; // mesmo custo ou mais longe = não é frente
+            forwardCount++;
+            if (occupied.Contains(nc)) blockedCount++;
+        }
+
+        return forwardCount > 0 ? (float)blockedCount / forwardCount : 0f;
     }
 
     private static float CalculateAssaultScoutRingBonus(float anchorDistance, int scoutZoneRadius)
@@ -362,14 +427,21 @@ public partial class AIController
             return "";
 
         var sb = new System.Text.StringBuilder();
+        bool shownAdvanceHeader = false;
         for (int i = 0; i < evaluations.Count; i++)
         {
             AssaultEscortCoverEvaluation e = evaluations[i];
+            if (e.advanceMode && !shownAdvanceHeader)
+            {
+                sb.AppendLine("  [ADVANCE MODE: anel suprimido, progRota amplificado]");
+                shownAdvanceHeader = true;
+            }
             string mark = e.isChosen ? "*" : " ";
             string threatDist = e.nearestThreatDistance < float.MaxValue ? e.nearestThreatDistance.ToString("F1") : "-";
             string reserved = e.reservedCapture ? " reservadaCaptura" : "";
             string cover = e.canCoverZoneEnemy ? " cobreInimigoZona" : "";
-            sb.AppendLine($"  {mark} {e.cell} total={e.score:F0} rota={e.routeDistance:F1} progRota={e.routeProgress:+0.0;-0.0;0.0} zona={e.hexDistance:F1} progHex={e.hexProgress:+0.0;-0.0;0.0} dpq={e.dpq:F1} ameaca={e.threat:F1} mov={e.pathCost:F0} inimigo={threatDist}{cover}{reserved}");
+            string cong = e.congestion > 0f ? $" cong={e.congestion:F2}" : "";
+            sb.AppendLine($"  {mark} {e.cell} total={e.score:F0} rota={e.routeDistance:F1} progRota={e.routeProgress:+0.0;-0.0;0.0} zona={e.hexDistance:F1} progHex={e.hexProgress:+0.0;-0.0;0.0} dpq={e.dpq:F1} ameaca={e.threat:F1} mov={e.pathCost:F0} inimigo={threatDist}{cong}{cover}{reserved}");
         }
         return sb.ToString();
     }
@@ -386,8 +458,10 @@ public partial class AIController
         public float threat;
         public float pathCost;
         public float nearestThreatDistance;
+        public float congestion;
         public bool canCoverZoneEnemy;
         public bool reservedCapture;
         public bool isChosen;
+        public bool advanceMode;
     }
 }

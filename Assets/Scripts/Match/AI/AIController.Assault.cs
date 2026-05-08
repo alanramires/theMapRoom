@@ -4,6 +4,12 @@ using UnityEngine;
 public partial class AIController
 {
     private const int AssaultScoutZoneRadius = 2;
+    // Se qualquer slot de Capturador no objetivo tiver DistanceToObjective ≤ esse limiar,
+    // o escort entra em "advance mode": prioriza avançar ao objetivo em vez de patrulhar.
+    private const int AdvancedCapturerThreshold = 6;
+    // Penalidade por congestionamento à frente: vizinhos com custo menor (próximo passo de rota)
+    // que estão bloqueados por aliados. Ratio 0..1 × esse peso é subtraído do score.
+    private const float ForwardCongestionWeight = 700f;
 
     // -------------------------------------------------------------------------
     // Assalto Batedor - protege e varre a zona do objetivo de captura atribuido.
@@ -22,6 +28,13 @@ public partial class AIController
         if (assigned == null)
             return DecideRogueAssaultBreakerAction(unit, snapshot);
 
+        if (!IsCriticalHomeDefenseObjective(assigned, snapshot.AITeam)
+            && TryFindCriticalHomeDefenseObjectiveForUnit(plan, snapshot.AITeam, unit, unit.CurrentCellPosition, "Assalto", out SectorObjective criticalHome))
+        {
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} redireciona {assigned.Sector} -> {criticalHome.Sector}: Base/HQ sob ameaca");
+            assigned = criticalHome;
+        }
+
         return DecideAssignedAssaultEscortAction(unit, snapshot, assigned);
     }
 
@@ -35,6 +48,9 @@ public partial class AIController
 
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+
+        if (TryFindHomeProductionVacateCombatAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction vacateAction))
+            return vacateAction;
 
         List<UnitManager> enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
         if (TryFindAssaultBreakerAttack(unit, snapshot, fromCell, paths, occupied, enemies,
@@ -74,6 +90,9 @@ public partial class AIController
 
         // Se o escort está no corredor de avanço do capturador, exclui a célula atual
         // do patrol para forçar movimento real e liberar o caminho.
+        if (TryFindHomeProductionVacateCombatAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction assignedVacateAction))
+            return assignedVacateAction;
+
         TeamObjectivePlan escortPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
         bool inCorridor = escortPlan != null && IsAssaultEscortInCapturerCorridor(unit, fromCell, escortPlan, snapshot.AITeam);
         if (inCorridor)
@@ -94,18 +113,22 @@ public partial class AIController
                 attackTarget.InstanceId.ToString(), targetCell, paths);
         }
 
-        List<UnitManager> hiddenThreats = CollectHiddenAssaultEscortThreats(snapshot.AITeam, scoutAnchorCell, scoutZoneRadius);
-        if (TryFindAssaultScoutRevealMove(unit, snapshot, fromCell, scoutAnchorCell, scoutZoneRadius, paths, occupied, hiddenThreats,
-                out Vector3Int revealCell, out UnitManager hiddenTarget, out string revealReason))
+        List<Vector3Int> suspectCells = CollectSweepSuspectCells(snapshot.AITeam, scoutAnchorCell, scoutZoneRadius);
+        if (TryFindAssaultScoutRevealMove(unit, snapshot, fromCell, scoutAnchorCell, scoutZoneRadius, paths, occupied, suspectCells,
+                out Vector3Int revealCell, out string revealReason))
         {
-            Vector3Int hiddenCell = hiddenTarget.CurrentCellPosition; hiddenCell.z = 0;
-            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — varre FoW via {revealCell} → suspeita @ {hiddenCell} ({revealReason})");
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — abre FoW via {revealCell} ({revealReason})");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, revealCell, paths);
         }
 
-        Vector3Int coverCell = FindAssaultEscortCoverCell(unit, snapshot, fromCell, scoutAnchorCell, scoutZoneRadius, paths, occupied, threats, out string coverEvaluationLog);
+        int bestCapturerDist = GetBestCapturerDistanceToObjective(assigned);
+        bool escortAdvanceMode = bestCapturerDist >= 0 && bestCapturerDist <= AdvancedCapturerThreshold;
+        if (escortAdvanceMode)
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — ADVANCE MODE: capturador mais próximo a {bestCapturerDist}PM de {assigned.Sector}");
+
+        Vector3Int coverCell = FindAssaultEscortCoverCell(unit, snapshot, fromCell, scoutAnchorCell, scoutZoneRadius, paths, occupied, threats, bestCapturerDist, out string coverEvaluationLog);
         if (!string.IsNullOrEmpty(coverEvaluationLog))
-            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — HexEvaluator.Batedor target={scoutAnchorCell} zona={scoutZoneRadius}h\n{coverEvaluationLog}");
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — HexEvaluator.Batedor target={scoutAnchorCell} zona={scoutZoneRadius}h advanceMode={escortAdvanceMode} melhorCapt={bestCapturerDist}PM\n{coverEvaluationLog}");
         if (coverCell != fromCell)
         {
             Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — patrulha via {coverCell}");
@@ -386,5 +409,18 @@ public partial class AIController
                 if (slot.Role == UnitRole.Assalto && slot.Filled && slot.AssignedUnitId == unit.InstanceId)
                     return obj;
         return null;
+    }
+
+    // Retorna o menor DistanceToObjective entre os slots de Capturador preenchidos no objetivo.
+    // Retorna -1 se nenhum capturador tiver distância conhecida.
+    private static int GetBestCapturerDistanceToObjective(SectorObjective obj)
+    {
+        int best = int.MaxValue;
+        foreach (SlotNeed slot in obj.Slots)
+        {
+            if (slot.Role != UnitRole.Capturador || !slot.Filled || slot.DistanceToObjective < 0) continue;
+            if (slot.DistanceToObjective < best) best = slot.DistanceToObjective;
+        }
+        return best == int.MaxValue ? -1 : best;
     }
 }

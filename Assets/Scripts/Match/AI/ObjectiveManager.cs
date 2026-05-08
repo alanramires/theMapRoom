@@ -21,6 +21,9 @@ public class SlotNeed
     public UnitRole Role;
     public bool     Filled;
     public int      AssignedUnitId = -1;
+    // PM reais (terreno) da unidade até o objetivo; -1 = desconhecido.
+    // Unidades embarcadas propagam a posição do transportador.
+    public int      DistanceToObjective = -1;
 }
 
 [System.Serializable]

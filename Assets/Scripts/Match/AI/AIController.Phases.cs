@@ -194,11 +194,9 @@ public partial class AIController
 
             // Ordena iniciativa por grupo (menor = age primeiro):
             // 0 = vacater handoff / blocker com inimigo adjacente
-            // 1 = IsUnderRepair sobre construção capturável  OU  no corredor de avanço
-            //     (mais perto do objetivo do que o capturador designado) — libera o hex antes
-            //     do capturador avaliar suas opções de ataque/avanço.
+            // 1 = unidade ativa liberando corredor/posicionamento
             // 2 = objetivo normal  3 = rogue/sem objetivo
-            // 4 = IsUnderRepair fora de corredor (ex: floresta no meio do nada) — age por último
+            // 4 = IsUnderRepair / manutencao - age por ultimo
             TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
 
             // Pre-pass: atualiza estado de reparo antes do sort para que IsUnderRepair
@@ -279,7 +277,15 @@ public partial class AIController
             yield return WaitIfDebugPaused();
 
             if (unitMoved || unitAttacked)
+            {
                 matchController?.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.DataOnly);
+                if (activePlan != null)
+                {
+                    ClearResolvedCriticalHomeDefenseObjectives(activePlan, aiTeam);
+                    EnsureCriticalHomeDefenseObjectives(activePlan, aiTeam, SectorManager.GetAllBaseInfos());
+                    EnsureCriticalHomeDefenseObjectivesFromConstructions(activePlan, aiTeam);
+                }
+            }
 
             float delay = GetBatchDelay();
             if (delay > 0f) yield return new WaitForSecondsRealtime(delay);

@@ -36,6 +36,159 @@ public partial class AIController
 
     // Escolhe o melhor alvo para o rogue: capturadores ativos em prédios têm prioridade máxima,
     // desempate por HP mais baixo (mais fácil de eliminar).
+    private bool TryFindHomeProductionVacateCombatAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null || paths == null || paths.Count == 0)
+            return false;
+        TeamId aiTeam = snapshot.AITeam;
+        if (!IsActiveUnitBlockingThreatenedHomeProduction(unit, aiTeam, fromCell))
+            return false;
+
+        if (TryFindHomeProductionVacateAttack(unit, snapshot, fromCell, paths, occupied,
+                out Vector3Int attackCell, out UnitManager target, out string reason))
+        {
+            Vector3Int targetCell = target.CurrentCellPosition;
+            targetCell.z = 0;
+            Debug.Log($"{TL("Base")} {unit.InstanceId} libera producao sob ameaca - ataca via {attackCell} -> {target.UnitDisplayName}#{target.InstanceId} ({reason})");
+            action = BuildAttackBatch(unit, aiTeam, fromCell, attackCell,
+                target.InstanceId.ToString(), targetCell, paths);
+            return true;
+        }
+
+        if (TryFindHomeProductionVacateMove(unit, aiTeam, fromCell, paths, occupied, out Vector3Int moveCell))
+        {
+            Debug.Log($"{TL("Base")} {unit.InstanceId} libera producao sob ameaca - reposiciona via {moveCell}");
+            action = BuildMoveBatch(unit, aiTeam, fromCell, moveCell, paths);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool IsActiveUnitBlockingThreatenedHomeProduction(UnitManager unit, TeamId aiTeam, Vector3Int fromCell)
+    {
+        if (unit == null || unit.IsUnderRepair)
+            return false;
+
+        fromCell.z = 0;
+        ConstructionManager current = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
+        return current != null
+            && current.CanProduceUnitsForTeam(aiTeam)
+            && IsCriticalHomeDefenseSector(current.Sector, aiTeam)
+            && IsHomeDefenseThreatened(current.Sector, aiTeam, HomeDefenseThreatRange);
+    }
+
+    private bool TryFindHomeProductionVacateAttack(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestCell,
+        out UnitManager bestTarget,
+        out string bestReason)
+    {
+        bestCell = fromCell;
+        bestTarget = null;
+        bestReason = "";
+        float bestScore = float.MinValue;
+
+        foreach (Vector3Int cell in paths.Keys)
+        {
+            if (cell == fromCell) continue;
+            if (occupied != null && occupied.Contains(cell)) continue;
+
+            var targets = new List<PodeMirarTargetOption>();
+            if (!PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                    SensorMovementMode.MoveuAndando, targets, fromCell: cell))
+                continue;
+
+            foreach (PodeMirarTargetOption opt in targets)
+            {
+                if (opt?.targetUnit == null) continue;
+                if (!PassesAttackDecision(unit, opt.targetUnit, cell, true, out string decisionReason))
+                    continue;
+
+                Vector3Int targetCell = opt.targetUnit.CurrentCellPosition;
+                targetCell.z = 0;
+                float score =
+                    AttackTargetPriority(targetCell, fromCell) * 10000f
+                    + Mathf.Max(0, 20 - opt.targetUnit.CurrentHP) * 100f
+                    + GetTerrainDpqPontos(cell) * 25f
+                    - SectorManager.HexDistance(cell, targetCell) * 20f
+                    - GetPathStepCount(paths, cell) * 5f;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestCell = cell;
+                    bestTarget = opt.targetUnit;
+                    bestReason = $"score={score:F0} hp={opt.targetUnit.CurrentHP} dpq={GetTerrainDpqPontos(cell):F1} {decisionReason}";
+                }
+            }
+        }
+
+        return bestTarget != null;
+    }
+
+    private bool TryFindHomeProductionVacateMove(
+        UnitManager unit,
+        TeamId aiTeam,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestCell)
+    {
+        bestCell = fromCell;
+        float bestScore = float.MinValue;
+        foreach (Vector3Int cell in paths.Keys)
+        {
+            if (cell == fromCell) continue;
+            if (occupied != null && occupied.Contains(cell)) continue;
+
+            ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+            bool blocksProduction = bldg != null && bldg.CanProduceUnitsForTeam(aiTeam);
+            float enemyDist = DistanceToNearestVisibleEnemy(cell, aiTeam);
+            float score =
+                (blocksProduction ? -10000f : 0f)
+                - enemyDist * 50f
+                + GetTerrainDpqPontos(cell) * 20f
+                - GetPathStepCount(paths, cell) * 2f;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCell = cell;
+            }
+        }
+
+        return bestCell != fromCell;
+    }
+
+    private static float DistanceToNearestVisibleEnemy(Vector3Int cell, TeamId aiTeam)
+    {
+        float best = float.MaxValue;
+        MatchController mc = GetMatchController();
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+
+            Vector3Int enemyCell = enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            best = Mathf.Min(best, SectorManager.HexDistance(cell, enemyCell));
+        }
+
+        return best < float.MaxValue ? best : 99f;
+    }
+
     private UnitManager PickBestRogueTarget(List<PodeMirarTargetOption> options, TeamId aiTeam)
     {
         return PickBestRogueTarget(options, aiTeam, null, default, false, out _);

@@ -82,9 +82,9 @@ public partial class AIController
 
     // 0 = vacater handoff ou blocker com inimigos adjacentes (libera o hex para o capturador),
 
-    // 1 = reparo sobre capturável não-completo (libera prédio),
+    // 1 = unidade ativa liberando corredor/posicionamento,
 
-    // 2 = objetivo normal, 3 = rogue/sem objetivo, 4 = reparo em campo (age por último).
+    // 2 = objetivo normal, 3 = rogue/sem objetivo, 4 = reparo/manutencao (age por ultimo).
 
     private int GetInitiativeGroup(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
 
@@ -96,25 +96,9 @@ public partial class AIController
         // Age primeiro (grupo 0) para liberar o hex — com ou sem inimigos adjacentes.
         if (plan != null && IsBlockingCaptureTarget(unit, plan, aiTeam)) return 0;
 
-        if (unit.IsUnderRepair)
-
-        {
-
-            Vector3Int cell = unit.CurrentCellPosition; cell.z = 0;
-
-            if (ShouldDelayRepairInitiative(unit, cell, aiTeam)) return 4;
-
-            ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-
-            if (bldg != null && bldg.IsCapturable) return 1;
-
-            // Unidade no corredor de avanço de algum objetivo ativo: age antes dos capturadores
-            // (grupo 1) para liberar o hex. Caso contrário age por último (grupo 4).
-            if (plan != null && IsRepairUnitInActiveCorridor(unit, cell, plan, aiTeam)) return 1;
-
-            return 4;
-
-        }
+        // Manutencao nao preempta a fila. Se estiver em cima de alvo de captura,
+        // IsBlockingCaptureTarget ja colocou no grupo 0 acima.
+        if (unit.IsUnderRepair) return 4;
 
         // Capturador no corredor de outro setor (mais perto do objetivo alheio que o capturador
         // designado a ele) → age antes (grupo 1) para liberar o caminho.
@@ -231,57 +215,6 @@ public partial class AIController
             if (escortDist < SectorManager.HexDistance(capCell, objCell))
                 return true;
         }
-        return false;
-    }
-
-    // Retorna true se a unidade de reparo está mais perto de algum objetivo ativo do que
-    // o capturador designado a ele — ou seja, está no corredor de avanço e pode bloquear.
-    private bool IsRepairUnitInActiveCorridor(UnitManager unit, Vector3Int repairCell, TeamObjectivePlan plan, TeamId aiTeam)
-    {
-        foreach (SectorObjective obj in plan.Objectives)
-        {
-            if (obj.Status == ObjectiveStatus.Defending) continue;
-            ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
-            if (tgt == null) continue;
-            Vector3Int objCell = tgt.CurrentCellPosition; objCell.z = 0;
-            float repairDist = SectorManager.HexDistance(repairCell, objCell);
-            foreach (SlotNeed slot in obj.Slots)
-            {
-                if (!slot.Filled) continue;
-                UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
-                if (capturer == null) continue;
-                Vector3Int capCell = capturer.CurrentCellPosition; capCell.z = 0;
-                if (repairDist < SectorManager.HexDistance(capCell, objCell))
-                    return true;
-            }
-        }
-        return false;
-    }
-
-    private bool ShouldDelayRepairInitiative(UnitManager unit, Vector3Int repairCell, TeamId aiTeam)
-    {
-        if (!HasNearbyVisibleEnemy(repairCell, aiTeam, AlliesEnemyRange))
-            return true;
-
-        if (!TryFindTeamHQCell(aiTeam, out Vector3Int hqCell))
-            return false;
-
-        return SectorManager.HexDistance(repairCell, hqCell) <= DefenseEnemyRange;
-    }
-
-    private static bool TryFindTeamHQCell(TeamId team, out Vector3Int hqCell)
-    {
-        hqCell = Vector3Int.zero;
-        foreach (ConstructionManager construction in ConstructionManager.AllActive)
-        {
-            if (construction == null || construction.TeamId != team || !construction.IsPlayerHeadQuarter)
-                continue;
-
-            hqCell = construction.CurrentCellPosition;
-            hqCell.z = 0;
-            return true;
-        }
-
         return false;
     }
 

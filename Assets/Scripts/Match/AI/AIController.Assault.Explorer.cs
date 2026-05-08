@@ -3,31 +3,30 @@ using UnityEngine;
 
 public partial class AIController
 {
-    private List<UnitManager> CollectHiddenAssaultEscortThreats(TeamId aiTeam, Vector3Int escortCell, int scoutZoneRadius)
+    // Returns cells of capturable buildings near the scout zone that are not fully
+    // owned by the AI — used as sweep targets without hidden-unit omniscience.
+    private List<Vector3Int> CollectSweepSuspectCells(TeamId aiTeam, Vector3Int escortCell, int scoutZoneRadius)
     {
-        var threats = new List<UnitManager>();
-        MatchController mc = GetMatchController();
-        if (mc == null) return threats;
+        var suspects = new List<Vector3Int>();
+        // Fixed sweep radius — escort stays close to the capturador regardless of unit speed.
+        // scoutZoneRadius (dynamic, = movement) is intentionally NOT used here.
+        int searchRadius = AssaultScoutZoneRadius + 1;
 
-        foreach (UnitManager enemy in UnitManager.AllActive)
+        foreach (ConstructionManager bldg in ConstructionManager.AllActive)
         {
-            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            if (bldg == null || !bldg.IsCapturable || bldg.CapturePointsMax <= 0) continue;
+            if (bldg.TeamId == aiTeam && bldg.CurrentCapturePoints >= bldg.CapturePointsMax) continue;
 
-            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
-            if (SectorManager.HexDistance(ec, escortCell) <= scoutZoneRadius)
-                threats.Add(enemy);
+            Vector3Int bc = bldg.CurrentCellPosition; bc.z = 0;
+            if (SectorManager.HexDistance(bc, escortCell) > searchRadius) continue;
+
+            suspects.Add(bc);
         }
 
-        threats.Sort((a, b) =>
-        {
-            Vector3Int ac = a.CurrentCellPosition; ac.z = 0;
-            Vector3Int bc = b.CurrentCellPosition; bc.z = 0;
-            int distCmp = SectorManager.HexDistance(ac, escortCell).CompareTo(SectorManager.HexDistance(bc, escortCell));
-            if (distCmp != 0) return distCmp;
-            return a.CurrentHP.CompareTo(b.CurrentHP);
-        });
-        return threats;
+        suspects.Sort((a, b) =>
+            SectorManager.HexDistance(a, escortCell).CompareTo(SectorManager.HexDistance(b, escortCell)));
+
+        return suspects;
     }
 
     private bool TryFindAssaultScoutRevealMove(
@@ -38,27 +37,21 @@ public partial class AIController
         int scoutZoneRadius,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
-        List<UnitManager> hiddenThreats,
+        List<Vector3Int> suspectCells,
         out Vector3Int bestCell,
-        out UnitManager bestTarget,
         out string reason)
     {
         bestCell = fromCell;
-        bestTarget = null;
         reason = "";
-        if (hiddenThreats == null || hiddenThreats.Count == 0)
-            return false;
+        if (suspectCells == null || suspectCells.Count == 0) return false;
 
         bool preferDpq = unit.TryGetUnitData(out UnitData ud) && ud.prioritizeDpqAtBattle;
         float bestScore = float.MinValue;
 
-        foreach (UnitManager hidden in hiddenThreats)
+        foreach (Vector3Int suspectCell in suspectCells)
         {
-            if (hidden == null || hidden.IsDead || hidden.IsEmbarked) continue;
-            Vector3Int hiddenCell = hidden.CurrentCellPosition; hiddenCell.z = 0;
-
             var revealCells = new List<Vector3Int>();
-            UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, hiddenCell, revealCells);
+            UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, suspectCell, revealCells);
             foreach (Vector3Int rawCell in revealCells)
             {
                 Vector3Int cell = rawCell; cell.z = 0;
@@ -69,26 +62,24 @@ public partial class AIController
                 if (IsReservedAssaultEscortCaptureCell(cell, snapshot.AITeam)) continue;
 
                 float anchorDist = SectorManager.HexDistance(cell, escortCell);
-                float hiddenDist = SectorManager.HexDistance(hiddenCell, escortCell);
+                float suspectDist = SectorManager.HexDistance(suspectCell, escortCell);
                 float terrain = preferDpq ? GetTerrainDpqPontos(cell) : GetTerrainEv(cell);
                 float pathCost = GetPathStepCount(paths, cell);
                 float score =
-                    Mathf.Max(0, scoutZoneRadius + 1 - hiddenDist) * 1000f
+                    Mathf.Max(0, scoutZoneRadius + 1 - suspectDist) * 1000f
                     - anchorDist * 120f
                     + terrain * 60f
-                    - pathCost * 10f
-                    - hidden.CurrentHP * 2f;
+                    - pathCost * 10f;
 
                 if (score > bestScore)
                 {
                     bestScore = score;
                     bestCell = cell;
-                    bestTarget = hidden;
-                    reason = $"score={score:F0} hiddenDist={hiddenDist:F1} zona={anchorDist:F1} terrain={terrain:F1} mov={pathCost:F0}";
+                    reason = $"score={score:F0} suspectDist={suspectDist:F1} zona={anchorDist:F1} terrain={terrain:F1} mov={pathCost:F0}";
                 }
             }
         }
 
-        return bestTarget != null && bestCell != fromCell;
+        return bestCell != fromCell;
     }
 }

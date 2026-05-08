@@ -24,7 +24,7 @@ public partial class AIController : MonoBehaviour
     public float RiskDecisionImpact => riskDecisionImpact;
 
     [Tooltip("Raio em hexes para criar objetivo defensivo num setor conquistado quando inimigo está próximo")]
-    [SerializeField, Range(1, 8)] private int defenseEnemyRange = 2;
+    [SerializeField, Range(1, 8)] private int defenseEnemyRange = 3;
     public int DefenseEnemyRange => defenseEnemyRange;
 
     [Tooltip("Multiplicador de recrutamento: rogues dentro de defenseEnemyRange × defenseCallRange hexes são convocados para defesa")]

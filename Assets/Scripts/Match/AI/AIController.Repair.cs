@@ -208,6 +208,9 @@ public partial class AIController
 
         // 3. Marcha para a construção aliada mais próxima desocupada (não defensiva)
         // Exclui: célula atual + repCells de objetivos defensivos ativos
+        if (TryDecideRepairHoldHomeDefense(unit, snapshot, aiTeam, fromCell, out PlayerAction homeDefenseAction))
+            return homeDefenseAction;
+
         var occupiedForRepair = new HashSet<Vector3Int>(occupied) { fromCell };
         TeamObjectivePlan repPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
         if (repPlan != null)
@@ -239,13 +242,13 @@ public partial class AIController
             return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
         }
 
-        // Avança para o destino: mínima distância + mínima ameaça
+        // Avança para o destino: mínima distância hex + mínima ameaça
         Vector3Int bestStep = fromCell;
         float bestScore = float.MinValue;
         foreach (Vector3Int cell in paths.Keys)
         {
             if (occupied.Contains(cell)) continue;
-            float dist   = Vector3Int.Distance(cell, destCell);
+            float dist   = SectorManager.HexDistance(cell, destCell);
             float threat = CalculateThreatLevel(cell, aiTeam);
             float score  = -dist * 10f - threat * ThreatWeight;
             if (score > bestScore) { bestScore = score; bestStep = cell; }
@@ -253,6 +256,78 @@ public partial class AIController
 
         Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
         return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, paths);
+    }
+
+    private bool TryDecideRepairHoldHomeDefense(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        TeamId aiTeam,
+        Vector3Int fromCell,
+        out PlayerAction action)
+    {
+        action = null;
+        if (!IsRepairUnitInThreatenedOwnHqArea(snapshot, fromCell, aiTeam))
+            return false;
+
+        if (HasAttackTargetAtCurrentPos(unit))
+        {
+            var targets = new List<PodeMirarTargetOption>();
+            PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                SensorMovementMode.MoveuParado, targets);
+
+            UnitManager bestTarget = null;
+            float bestPriority = float.MinValue;
+            foreach (PodeMirarTargetOption opt in targets)
+            {
+                if (opt?.targetUnit == null) continue;
+                if (!PassesAttackDecision(unit, opt.targetUnit, fromCell, true, out _)) continue;
+
+                Vector3Int targetCell = opt.targetUnit.CurrentCellPosition;
+                targetCell.z = 0;
+                float priority = AttackTargetPriority(targetCell, fromCell);
+                if (priority > bestPriority)
+                {
+                    bestPriority = priority;
+                    bestTarget = opt.targetUnit;
+                }
+            }
+
+            if (bestTarget != null)
+            {
+                Vector3Int targetCell = bestTarget.CurrentCellPosition;
+                targetCell.z = 0;
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} segura base/HQ em {fromCell} sob ameaca - ataca {bestTarget.UnitDisplayName}#{bestTarget.InstanceId}");
+                action = BuildAttackBatch(unit, aiTeam, fromCell, fromCell, bestTarget.InstanceId.ToString(), targetCell);
+                return true;
+            }
+        }
+
+        Debug.Log($"{TL("Repair")} {unit.InstanceId} segura base/HQ em {fromCell} sob ameaca");
+        action = BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
+        return true;
+    }
+
+    private bool IsRepairUnitInThreatenedOwnHqArea(AIWorldSnapshot snapshot, Vector3Int fromCell, TeamId aiTeam)
+    {
+        if (snapshot == null || snapshot.MyHQ == null)
+            return false;
+
+        fromCell.z = 0;
+        Vector3Int hqCell = snapshot.MyHQ.CurrentCellPosition;
+        hqCell.z = 0;
+        ConstructionSector hqSector = snapshot.MyHQ.Sector;
+
+        ConstructionManager current = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
+        if (current != null
+            && current.Sector == hqSector
+            && IsHomeDefenseThreatened(hqSector, aiTeam, HomeDefenseThreatRange))
+            return true;
+
+        if (SectorManager.HexDistance(fromCell, hqCell) <= HomeDefenseThreatRange
+            && IsHomeDefenseThreatened(hqSector, aiTeam, HomeDefenseThreatRange))
+            return true;
+
+        return false;
     }
 
     private bool TryDecideRepairFallbackToHQ(
@@ -318,7 +393,7 @@ public partial class AIController
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
             Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
-            float dist = Vector3Int.Distance(fromCell, cc);
+            float dist = SectorManager.HexDistance(fromCell, cc);
             bool isHomeRepair = IsRepairHomeConstruction(c, aiTeam);
             if (homeOnly && !isHomeRepair) continue;
             if (c.TeamId != aiTeam)

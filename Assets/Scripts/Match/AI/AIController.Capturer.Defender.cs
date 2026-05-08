@@ -9,9 +9,18 @@ public partial class AIController
 
     private PlayerAction DecideCapturerDefenderAction(UnitManager unit, AIWorldSnapshot snapshot, SectorObjective assigned, Vector3Int fromCell)
     {
-        assigned.Status = ObjectiveStatus.Complete;
+        TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        if (!IsCriticalHomeDefenseObjective(assigned, snapshot.AITeam)
+            && TryFindCriticalHomeDefenseObjectiveForUnit(activePlan, snapshot.AITeam, unit, fromCell, "Defensor", out SectorObjective criticalHome))
+        {
+            Debug.Log($"{TL("Defensor")} {unit.InstanceId} redireciona {assigned.Sector} -> {criticalHome.Sector}: Base/HQ sob ameaca");
+            assigned = criticalHome;
+        }
 
-        SectorManager.TryGetSectorInfo(assigned.Sector, out SectorManager.SectorInfo secInfo);
+        bool activeCriticalHomeDefense = IsCriticalHomeDefenseObjective(assigned, snapshot.AITeam);
+        assigned.Status = activeCriticalHomeDefense ? ObjectiveStatus.Defending : ObjectiveStatus.Complete;
+
+        TryGetAnySectorInfo(assigned.Sector, out SectorManager.SectorInfo secInfo);
         Vector3Int repCell = secInfo != null ? secInfo.RepresentativeCell : fromCell; repCell.z = 0;
 
         // Captura oportunista mesmo em defesa: setor vazio é sempre preenchido
@@ -26,6 +35,10 @@ public partial class AIController
         }
 
         // Unidade no repCell → defende ativamente
+        if (defPaths != null
+            && TryFindHomeProductionVacateCombatAction(unit, snapshot, fromCell, defPaths, defOcc, out PlayerAction vacateAction))
+            return vacateAction;
+
         if (fromCell == repCell)
         {
             if (HasAttackTargetAtCurrentPos(unit))

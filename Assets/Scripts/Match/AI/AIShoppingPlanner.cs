@@ -342,8 +342,13 @@ public class AIShoppingPlanner : MonoBehaviour
                 else if (openCapturerSlots <= 0 && !isPrimaryTransporter) score -= 90000;
             }
 
+            // Penalise slow units in non-defensive stance — only decisive in the fallback
+            // case (no open slots), where the base score is just u.cost.
+            if (!defensiveStance && u.movement < 3)
+                score -= (3 - u.movement) * 1500;
+
             string roleStr = isPrimaryTransporter ? "TRANS" : isPrimaryCapturer ? "CAP" : isPrimaryAssault ? $"ASS(hybrid={isHybridCapturer})" : "other";
-            Debug.Log($"[AI PickUnit] {u.displayName} ${u.cost} role={roleStr} score={score} | trans={openTransportSlots} cap={openCapturerSlots} ass={openAssaultSlots} defThreat={defensiveBaseThreat}");
+            Debug.Log($"[AI PickUnit] {u.displayName} ${u.cost} role={roleStr} score={score} mov={u.movement} | trans={openTransportSlots} cap={openCapturerSlots} ass={openAssaultSlots} defThreat={defensiveBaseThreat}");
             if (score > bestScore) { bestScore = score; best = u; }
         }
 

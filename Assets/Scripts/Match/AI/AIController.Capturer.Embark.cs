@@ -10,7 +10,12 @@ public partial class AIController
     private PlayerAction TryDecideCapturerEmbarkAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
         if (!unit.TryGetUnitData(out UnitData data) || data?.roles == null || data.roles.Count == 0
-            || data.roles[0] != UnitRole.Capturador) return null;
+            || !data.roles.Contains(UnitRole.Capturador)) return null;
+
+        // Primary capturer: strict sector alignment (don't board a wrong-direction APC).
+        // Secondary capturer (e.g. Assalto+Capturador): can board any APC that has no formal
+        // passenger — it is acting as shuttle and will reorient to the passenger's objective.
+        bool isPrimaryCapturador = data.roles[0] == UnitRole.Capturador;
 
         // Pass 1: sensor padrão — encontra transporters adjacentes (1h)
         var options = new List<PodeEmbarcarOption>();
@@ -39,12 +44,14 @@ public partial class AIController
         {
             if (assigned != null && plan != null)
             {
-                // Capturador designado: só embarca no transporter formalmente do mesmo setor.
-                // Não cai em qualquer APC oportunista — o APC rogue não tem destino correto.
                 foreach (PodeEmbarcarOption opt in options)
                 {
                     SectorObjective tObj = ResolveAssignedTransportObjective(opt.transporterUnit, plan);
-                    if (tObj != null && tObj.Sector == assigned.Sector) { best = opt; break; }
+                    bool sectorMatch = tObj != null && tObj.Sector == assigned.Sector;
+                    // Secondary capturer: also accepts APC with no formal passenger (shuttle mode)
+                    bool freeTransport = !isPrimaryCapturador
+                        && (tObj == null || ResolveAssignedPassengerUnit(tObj, snapshot.AITeam) == null);
+                    if (sectorMatch || freeTransport) { best = opt; break; }
                 }
             }
             else
@@ -184,9 +191,15 @@ public partial class AIController
         if (transporter.IsDead || transporter.IsEmbarked) return false;
         if (!transporter.TryGetUnitData(out UnitData tData) || !tData.isTransporter) return false;
 
-        // Só embarca se o transporter está designado ao mesmo setor
+        // Primary capturer: APC must be assigned to the same sector.
+        // Secondary capturer: also accepts an APC with no formal passenger (shuttle mode).
         SectorObjective tObj = ResolveAssignedTransportObjective(transporter, plan);
-        if (tObj == null || tObj.Sector != assigned.Sector) return false;
+        bool isPrimary = unitData.roles != null && unitData.roles.Count > 0
+            && unitData.roles[0] == UnitRole.Capturador;
+        bool sameSector = tObj != null && tObj.Sector == assigned.Sector;
+        bool shuttleFree = !isPrimary
+            && (tObj == null || ResolveAssignedPassengerUnit(tObj, unit.TeamId) == null);
+        if (!sameSector && !shuttleFree) return false;
 
         // Transporter deve estar dentro do pickup range da posição original
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;

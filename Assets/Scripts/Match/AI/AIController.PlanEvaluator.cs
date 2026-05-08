@@ -21,9 +21,11 @@ public partial class AIController
                 // Setor já conquistado: transita para Defending e preserva enquanto a ameaça persistir.
                 // Captura tanto a transição ofensivo→defensivo (1º turno pós-conquista)
                 // quanto turnos subsequentes (já Defending), evitando redistribuição dos defensores.
-                if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInf)
+                if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo defInf)
                     && defInf.IsFullyControlled && defInf.ControllingTeam == aiTeam
-                    && HasNearbyVisibleEnemy(defInf.RepresentativeCell, aiTeam, defenseEnemyRange))
+                    && (HasNearbyVisibleEnemy(defInf.RepresentativeCell, aiTeam, defenseEnemyRange)
+                        || (IsCriticalHomeDefenseSector(defInf, aiTeam)
+                            && IsHomeDefenseThreatened(defInf, aiTeam, HomeDefenseThreatRange))))
                 {
                     obj.Status = ObjectiveStatus.Defending;
                     // Remove slots vazios e slots de Transportador (transporte é fase ofensiva).
@@ -62,6 +64,7 @@ public partial class AIController
                 UnitManager slotUnit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
                 if (slotUnit == null || slotUnit.IsUnderRepair)
                 {
+                    slotUnit?.ClearAIAssignedPlan();
                     slot.Filled = false;
                     slot.AssignedUnitId = -1;
                 }
@@ -71,18 +74,35 @@ public partial class AIController
         // Passo 2: adiciona objetivos para setores ainda não cobertos.
         // Em Defensive: não abre novos objetivos em setores Medium ou piores (já ocupados persistem).
         IReadOnlyList<SectorManager.SectorInfo> allSectors = SectorManager.GetAllSectorInfos();
+        IReadOnlyList<SectorManager.SectorInfo> allBases = SectorManager.GetAllBaseInfos();
         foreach (SectorManager.SectorInfo info in allSectors)
         {
             if (info.IsFullyControlled && info.ControllingTeam == aiTeam) continue;
             bool hasCapturable = false;
             foreach (SectorManager.SectorConstructionInfo c in info.Constructions)
+            {
+                // Not owned by us, or owned but capture not yet finished (mirrors FindCapturableInSector)
                 if (c.OwnerTeam != aiTeam) { hasCapturable = true; break; }
-            if (!hasCapturable) continue;
-            if (plan.GetObjectiveForSector(info.Sector) != null) continue;
+                if (c.CapturePointsMax > 0 && c.CurrentCapturePoints < c.CapturePointsMax) { hasCapturable = true; break; }
+            }
+            if (!hasCapturable) { Debug.Log($"{TL("Plan")} skip {info.Sector}: sem capturável"); continue; }
+            if (plan.GetObjectiveForSector(info.Sector) != null) { Debug.Log($"{TL("Plan")} skip {info.Sector}: já tem objetivo"); continue; }
+
+            // Defensive stance blocks Medium+ risk sectors — EXCEPT buildings we already started
+            // capturing (partial own capture). Abandoning a 11/20 capture mid-way is wasteful.
+            bool hasPartialOwnCapture = false;
+            foreach (SectorManager.SectorConstructionInfo c in info.Constructions)
+                if (c.OwnerTeam == aiTeam && c.CapturePointsMax > 0
+                    && c.CurrentCapturePoints > 0 && c.CurrentCapturePoints < c.CapturePointsMax)
+                { hasPartialOwnCapture = true; break; }
 
             if (snapshot.Stance == AIStance.Defensive
-                && info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.Medium)
+                && info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.Medium
+                && !hasPartialOwnCapture)
+            {
+                Debug.Log($"{TL("Plan")} skip {info.Sector}: Defensive + risco={info.GetRiskLevelFor(aiTeam)} (>= Medium)");
                 continue;
+            }
 
             // Gating de co-chegada: setor arriscado só abre se pelo menos 2 capturadores
             // chegarem com gap ≤ MaxArrivalGap hexes entre si (evita capturador solo em zona inimiga).
@@ -128,6 +148,10 @@ public partial class AIController
             plan.Objectives.Add(obj);
         }
 
+        ClearResolvedCriticalHomeDefenseObjectives(plan, aiTeam);
+        EnsureCriticalHomeDefenseObjectives(plan, aiTeam, allBases);
+        EnsureCriticalHomeDefenseObjectivesFromConstructions(plan, aiTeam);
+
         // Edge case defensivo: se não sobrou nenhum objetivo, adiciona o setor capturável mais próximo do HQ
         if (snapshot.Stance == AIStance.Defensive && plan.Objectives.Count == 0)
         {
@@ -138,7 +162,10 @@ public partial class AIController
                 if (info.IsFullyControlled && info.ControllingTeam == aiTeam) continue;
                 bool hasCapturable = false;
                 foreach (SectorManager.SectorConstructionInfo c in info.Constructions)
+                {
                     if (c.OwnerTeam != aiTeam) { hasCapturable = true; break; }
+                    if (c.CapturePointsMax > 0 && c.CurrentCapturePoints < c.CapturePointsMax) { hasCapturable = true; break; }
+                }
                 if (!hasCapturable) continue;
                 float d = info.GetDistanceToHQ(aiTeam);
                 if (d < closestDist) { closestDist = d; closest = info; }
@@ -163,19 +190,11 @@ public partial class AIController
         foreach (SectorObjective obj in plan.Objectives)
         {
             if (obj.Status == ObjectiveStatus.Defending) continue;
-            if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo inf))
+            if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo inf))
                 obj.Priority = CalculateSectorPriority(inf, aiTeam, snapshot.Stance);
         }
 
-        plan.Objectives.Sort((a, b) =>
-        {
-            bool aDefending = a.Status == ObjectiveStatus.Defending;
-            bool bDefending = b.Status == ObjectiveStatus.Defending;
-            if (aDefending != bDefending) return aDefending ? 1 : -1;
-            return b.Priority.CompareTo(a.Priority);
-        });
-        for (int i = 0; i < plan.Objectives.Count; i++)
-            plan.Objectives[i].Priority = i + 1;
+        SortPlanObjectivesByStrategicPriority(plan, aiTeam, priorityNumberAscending: false);
 
         // Passo 3c: objetivos defensivos — setores conquistados com inimigo visível a ≤3h.
         // Adicionados APÓS a renumeração ofensiva → sempre prioridade mais baixa.
@@ -188,7 +207,9 @@ public partial class AIController
                 if (!info.IsFullyControlled || info.ControllingTeam != aiTeam) continue;
                 if (plan.GetObjectiveForSector(info.Sector) != null) continue;
                 Vector3Int rc = info.RepresentativeCell; rc.z = 0;
-                if (!HasNearbyVisibleEnemy(rc, aiTeam, DefenseEnemyRange)) continue;
+                bool criticalHomeThreat = IsCriticalHomeDefenseSector(info, aiTeam)
+                    && IsHomeDefenseThreatened(info, aiTeam, HomeDefenseThreatRange);
+                if (!criticalHomeThreat && !HasNearbyVisibleEnemy(rc, aiTeam, DefenseEnemyRange)) continue;
 
                 var defObj = new SectorObjective
                 {
@@ -196,13 +217,15 @@ public partial class AIController
                     Status = ObjectiveStatus.Defending, Priority = defPriority++,
                 };
                 // 2º slot se inimigo já está recapturando — precisa de reforço urgente
-                int defSlots = info.HasPartialCapture ? 2 : 1;
+                int defSlots = info.HasPartialCapture || criticalHomeThreat ? 2 : 1;
                 for (int s = 0; s < defSlots; s++)
                     defObj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
                 plan.Objectives.Add(defObj);
                 Debug.Log($"{TL("Plan")} Objetivo defensivo: {info.Sector} (pri {defPriority - 1}, inimigo ≤{DefenseEnemyRange}h)");
             }
         }
+
+        SortPlanObjectivesByStrategicPriority(plan, aiTeam, priorityNumberAscending: true);
 
         plan.HandoffVacaterIds.Clear();
         plan.VacaterForwardSectors.Clear();
@@ -261,7 +284,7 @@ public partial class AIController
             {
                 tc = tgt.CurrentCellPosition; tc.z = 0;
             }
-            else if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)
+            else if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)
                 && defInfo.IsFullyControlled && defInfo.ControllingTeam == aiTeam)
             {
                 isDefensive = true;
@@ -272,7 +295,7 @@ public partial class AIController
 
             // 2º slot de setor de alto risco: só abre se houver capturador livre que possa
             // chegar junto com o 1º (co-chegada). Evita mandar unidade recém-comprada a 10h.
-            if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo slotInfo)
+            if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo slotInfo)
                 && slotInfo.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
             {
                 SlotNeed filledSlot = obj.Slots.Find(s => s.Role == UnitRole.Capturador && s.Filled);
@@ -338,13 +361,26 @@ public partial class AIController
             float RiskCostWeight = riskDecisionImpact;
 
             // Multiplicador de risco: setores de alto risco encarecem atribuição (incentiva co-chegada).
+            // Exceção: setor com captura própria parcial tem risco efetivo reduzido à metade —
+            // já temos presença lá, o risco real é menor que num setor virgem de mesmo risco nominal.
             var riskMultipliers = new float[nObj];
             for (int oj = 0; oj < nObj; oj++)
             {
                 riskMultipliers[oj] = 1f;
                 if (SectorManager.TryGetSectorInfo(assignableObjs[oj].obj.Sector,
                         out SectorManager.SectorInfo sInfo))
+                {
                     riskMultipliers[oj] = 1f + sInfo.GetRiskRatioFor(aiTeam) * RiskCostWeight;
+                    foreach (SectorManager.SectorConstructionInfo c in sInfo.Constructions)
+                    {
+                        if (c.OwnerTeam == aiTeam && c.CapturePointsMax > 0
+                            && c.CurrentCapturePoints > 0 && c.CurrentCapturePoints < c.CapturePointsMax)
+                        {
+                            riskMultipliers[oj] = Mathf.Max(1f, riskMultipliers[oj] * 0.5f);
+                            break;
+                        }
+                    }
+                }
             }
 
             var distMatrix = new float[nu, nObj];
@@ -404,7 +440,7 @@ public partial class AIController
                 if (freeAssaults.Count == 0) break;
                 if (obj.Status != ObjectiveStatus.Defending) continue;
                 if (HasAnySlot(obj, UnitRole.Assalto)) continue;
-                if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
+                if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
                 Vector3Int targetCell = defInfo.RepresentativeCell; targetCell.z = 0;
                 if (!IsObjectiveInCombatDisadvantage(obj, aiTeam, targetCell,
                         defenseEnemyRange, alliesAgainstEnemiesHpRatio, out int enemyHp, out int allyHp))
@@ -464,12 +500,16 @@ public partial class AIController
                           $"(inimigo={enemyHp}HP aliado={allyHp}HP ratio={enemyHp / (float)allyHp:F1}× dist={bestDist:F0}h)");
             }
 
+            // Raio máximo para atribuir um batedor a defesa estável (sem emergência).
+            // Unidades além desse raio ficam como rogues e pressionam o front inimigo em vez
+            // de voltar à base — assegurar Base a 11 PM não vale mandar o batedor de volta.
+            const float DefenseEscortMaxPM = 8f;
             foreach (SectorObjective obj in plan.Objectives)
             {
                 if (freeAssaults.Count == 0) break;
                 if (obj.Status != ObjectiveStatus.Defending) continue;
                 if (HasAnySlot(obj, UnitRole.Assalto)) continue;
-                if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
+                if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
                 Vector3Int targetCell = defInfo.RepresentativeCell; targetCell.z = 0;
 
                 UnitManager best = null;
@@ -479,6 +519,7 @@ public partial class AIController
                     Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
                     float d = SectorManager.TryGetLandMovementDistance(uc, targetCell, out int td)
                         ? td : SectorManager.HexDistance(uc, targetCell);
+                    if (d > DefenseEscortMaxPM) continue;
                     if (d < bestDist) { bestDist = d; best = u; }
                 }
 
@@ -495,7 +536,7 @@ public partial class AIController
             {
                 if (!obj.HasOpenSlot(UnitRole.Assalto)) continue;
                 if (!HasFilledSlot(obj, UnitRole.Capturador)) continue;
-                if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
+                if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
                 Vector3Int targetCell = escortInfo.RepresentativeCell; targetCell.z = 0;
 
                 UnitManager best = null;
@@ -524,7 +565,7 @@ public partial class AIController
                 {
                     if (!HasFilledSlot(obj, UnitRole.Capturador)) continue;
                     if (HasAnySlot(obj, UnitRole.Assalto)) continue;
-                    if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
+                    if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
                     if (escortInfo.GetRiskLevelFor(aiTeam) != SectorManager.SectorRiskLevel.Low) continue;
                     lowRiskFallbacks.Add(obj);
                 }
@@ -542,7 +583,7 @@ public partial class AIController
                 foreach (SectorObjective obj in lowRiskFallbacks)
                 {
                     if (freeAssaults.Count == 0) break;
-                    if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
+                    if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
                     Vector3Int targetCell = escortInfo.RepresentativeCell; targetCell.z = 0;
 
                     UnitManager best = null;
@@ -592,7 +633,7 @@ public partial class AIController
             foreach (SectorObjective obj in plan.Objectives)
             {
                 if (obj.Status != ObjectiveStatus.Defending) continue;
-                if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
+                if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
                 int defenders = 0; foreach (SlotNeed s in obj.Slots) if (s.Filled) defenders++;
                 Vector3Int rc = defInfo.RepresentativeCell; rc.z = 0;
                 foreach (UnitManager u in defCandidates)
@@ -673,7 +714,10 @@ public partial class AIController
         }
 
         // Passo 5f: atribui transportadores livres a slots de Transportador abertos.
-        // Critério primário: capturer mais longe do seu objetivo (precisa mais de carona).
+        // Critério primário: capturer de campo (não em prédio de produção) mais longe do objetivo.
+        //   Capturadores recém-comprados ainda na fábrica são ignorados no scoring — eles embarcam
+        //   naturalmente no APC que já está lá; o que importa é o capturer já desdobrado no campo.
+        //   Usamos o máximo entre todos os capturadores de campo para não depender da ordem dos slots.
         // Critério secundário: APC mais perto do objetivo (chega antes).
         {
             List<UnitManager> freeTransporters = GetAvailableTransporters(aiTeam);
@@ -693,11 +737,14 @@ public partial class AIController
                     Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
                     Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
 
-                    // Distância do capturer alocado ao objetivo (quem mais precisa de carona).
-                    // Fallback: distância do setor ao HQ — mesmo critério que criou o slot de transporte.
+                    // Scoring: maior distância entre capturadores de CAMPO (não em prédio de produção).
+                    // Capturadores recém-comprados na fábrica não distorcem o score quando há
+                    // capturadores de campo disponíveis — eles não precisam que o APC viaje até eles.
+                    // Fallback: se o setor tem APENAS recém-comprados (time destruído, por exemplo),
+                    // usa a distância deles mesmo — precisam de carona e não há opção melhor.
                     float sectorRisk = 0f;
-                    float capturerDistToObj = SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo sInfo)
-                        ? sInfo.GetDistanceToHQ(aiTeam) : 0f;
+                    float capturerDistToObj = -1f;
+                    TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo sInfo);
                     if (sInfo != null) sectorRisk = sInfo.GetRiskRatioFor(aiTeam);
                     foreach (SlotNeed slot in obj.Slots)
                     {
@@ -705,9 +752,23 @@ public partial class AIController
                         UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
                         if (capturer == null || capturer.IsEmbarked) continue;
                         Vector3Int cc = capturer.CurrentCellPosition; cc.z = 0;
-                        capturerDistToObj = SectorManager.HexDistance(cc, tc);
-                        break;
+                        if (IsTeamProductionBuilding(cc, aiTeam)) continue; // prefere campo
+                        float dist = SectorManager.HexDistance(cc, tc);
+                        if (dist > capturerDistToObj) capturerDistToObj = dist;
                     }
+                    if (capturerDistToObj < 0f) // nenhum de campo — fallback para recém-comprados
+                    {
+                        foreach (SlotNeed slot in obj.Slots)
+                        {
+                            if (slot.Role != UnitRole.Capturador || !slot.Filled) continue;
+                            UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                            if (capturer == null || capturer.IsEmbarked) continue;
+                            Vector3Int cc = capturer.CurrentCellPosition; cc.z = 0;
+                            float dist = SectorManager.HexDistance(cc, tc);
+                            if (dist > capturerDistToObj) capturerDistToObj = dist;
+                        }
+                    }
+                    if (capturerDistToObj < 0f) continue; // sem nenhum capturer alocado — pula
 
                     float apcDistToObj = SectorManager.HexDistance(uc, tc);
                     const float eps = 0.5f;
@@ -740,6 +801,20 @@ public partial class AIController
                     if (u != null) ApplyPlanHUD(u, obj, slot.Role);
                 }
 
+        // Passo 7: limpa badge de unidades que não estão em nenhum slot ativo do plano
+        var slottedIds = new HashSet<int>();
+        foreach (SectorObjective obj in plan.Objectives)
+            foreach (SlotNeed slot in obj.Slots)
+                if (slot.Filled) slottedIds.Add(slot.AssignedUnitId);
+        foreach (UnitManager u in UnitManager.AllActive)
+        {
+            if (u.TeamId != aiTeam || u.IsDead) continue;
+            if (!slottedIds.Contains(u.InstanceId)) u.ClearAIAssignedPlan();
+        }
+
+        // Passo 8: atualiza distância real de cada slot até seu objetivo (propaga pelo transporter se embarcado)
+        RefreshSlotDistances(plan, aiTeam);
+
         int totalAssigned = 0;
         var planLog = new System.Text.StringBuilder();
         planLog.AppendLine($"{TL("Plan")} {aiTeam} — {plan.Objectives.Count} objetivos:");
@@ -754,34 +829,56 @@ public partial class AIController
                 }
                 totalAssigned++;
                 UnitManager u = FindActiveUnit(slot.AssignedUnitId, aiTeam);
-                ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
-                string distStr = "?";
-                Vector3Int tc = Vector3Int.zero;
-                bool hasTargetCell = false;
-                if (tgt != null)
-                {
-                    tc = tgt.CurrentCellPosition; tc.z = 0;
-                    hasTargetCell = true;
-                }
-                else if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo objInfo))
-                {
-                    tc = objInfo.RepresentativeCell; tc.z = 0;
-                    hasTargetCell = true;
-                }
-
-                if (u != null && hasTargetCell)
-                {
-                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
-                    float d = SectorManager.TryGetLandMovementDistance(uc, tc, out int td)
-                        ? td
-                        : SectorManager.HexDistance(uc, tc);
-                    distStr = $"{d:F0}h";
-                }
-                planLog.AppendLine($"  pri={obj.Priority} {obj.Sector}: Unit{slot.AssignedUnitId} @ {distStr}");
+                string distStr = slot.DistanceToObjective >= 0 ? $"{slot.DistanceToObjective}h" : "?";
+                string embarkedTag = (u != null && u.IsEmbarked) ? " [APC]" : "";
+                planLog.AppendLine($"  pri={obj.Priority} {obj.Sector}: {slot.Role} Unit{slot.AssignedUnitId}{embarkedTag} @ {distStr}");
             }
         }
         planLog.Append($"  → {totalAssigned} atribuídos | {plan.RogueUnitIds.Count} rogues");
         Debug.Log(planLog.ToString());
+    }
+
+    private void RefreshSlotDistances(TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            Vector3Int targetCell = Vector3Int.zero;
+            bool hasTarget = false;
+            ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
+            if (tgt != null)
+            {
+                targetCell = tgt.CurrentCellPosition; targetCell.z = 0;
+                hasTarget = true;
+            }
+            else if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo info))
+            {
+                targetCell = info.RepresentativeCell; targetCell.z = 0;
+                hasTarget = true;
+            }
+
+            foreach (SlotNeed slot in obj.Slots)
+            {
+                slot.DistanceToObjective = -1;
+                if (!slot.Filled || !hasTarget) continue;
+
+                UnitManager unit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                if (unit == null) continue;
+
+                // Unidade embarcada: usa posição do transportador como ponto de partida
+                Vector3Int fromCell = (unit.IsEmbarked && unit.EmbarkedTransporter != null)
+                    ? unit.EmbarkedTransporter.CurrentCellPosition
+                    : unit.CurrentCellPosition;
+                fromCell.z = 0;
+
+                if (unit.TryGetUnitData(out UnitData unitData) && unitData != null
+                    && SectorManager.TryGetLandMovementDistance(fromCell, targetCell, unitData, out int d1))
+                    slot.DistanceToObjective = d1;
+                else if (SectorManager.TryGetLandMovementDistance(fromCell, targetCell, out int d2))
+                    slot.DistanceToObjective = d2;
+                else
+                    slot.DistanceToObjective = (int)SectorManager.HexDistance(fromCell, targetCell);
+            }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -801,8 +898,26 @@ public partial class AIController
     private void ApplyPlanHUD(UnitManager unit, SectorObjective obj, UnitRole role = UnitRole.Capturador)
     {
         string sectorName = obj.Sector.ToString();
-        string badge = sectorName.Length > 0 ? sectorName[0].ToString().ToUpper() : "?";
+        string badge;
+        if (ConstructionSectorHelper.IsBase(obj.Sector))
+        {
+            // Identifica o dono do HQ nesse setor para saber se é base própria ou inimiga.
+            TeamId hqTeam = FindHQTeamInSector(obj.Sector);
+            badge = hqTeam == obj.AssignedTeam ? "!" : ">>";
+        }
+        else
+        {
+            badge = sectorName.Length > 0 ? sectorName[0].ToString().ToUpper() : "?";
+        }
         unit.SetAIAssignedPlan(sectorName, sectorName, badge, (int)role, showAIUnitHUD);
+    }
+
+    private static TeamId FindHQTeamInSector(ConstructionSector sector)
+    {
+        foreach (ConstructionManager c in ConstructionManager.AllActive)
+            if (c.Sector == sector && c.IsPlayerHeadQuarter)
+                return c.TeamId;
+        return TeamId.Neutral;
     }
 
     private static UnitManager FindActiveUnit(int instanceId, TeamId team)
@@ -888,6 +1003,472 @@ public partial class AIController
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(ec, cell) <= range) return true;
         }
+        return false;
+    }
+
+    private void SortPlanObjectivesByStrategicPriority(
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        bool priorityNumberAscending)
+    {
+        if (plan == null) return;
+
+        plan.Objectives.Sort((a, b) =>
+        {
+            bool aCritical = IsCriticalHomeDefenseObjective(a, aiTeam);
+            bool bCritical = IsCriticalHomeDefenseObjective(b, aiTeam);
+            if (aCritical != bCritical) return aCritical ? -1 : 1;
+
+            bool aDefending = a.Status == ObjectiveStatus.Defending;
+            bool bDefending = b.Status == ObjectiveStatus.Defending;
+            if (aDefending != bDefending) return aDefending ? 1 : -1;
+
+            return priorityNumberAscending
+                ? a.Priority.CompareTo(b.Priority)
+                : b.Priority.CompareTo(a.Priority);
+        });
+
+        for (int i = 0; i < plan.Objectives.Count; i++)
+            plan.Objectives[i].Priority = i + 1;
+    }
+
+    private int HomeDefenseThreatRange => Mathf.Max(3, defenseEnemyRange);
+
+    private static bool TryGetAnySectorInfo(ConstructionSector sector, out SectorManager.SectorInfo info)
+    {
+        if (SectorManager.TryGetSectorInfo(sector, out info))
+            return true;
+        return SectorManager.TryGetBaseInfo(sector, out info);
+    }
+
+    private bool IsCriticalHomeDefenseObjective(SectorObjective obj, TeamId aiTeam)
+    {
+        if (obj == null || obj.Status != ObjectiveStatus.Defending)
+            return false;
+        if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo info))
+            return IsCriticalHomeDefenseSector(info, aiTeam)
+                && IsHomeDefenseThreatened(info, aiTeam, HomeDefenseThreatRange);
+
+        return IsCriticalHomeDefenseSector(obj.Sector, aiTeam)
+            && IsHomeDefenseThreatened(obj.Sector, aiTeam, HomeDefenseThreatRange);
+    }
+
+    private bool TryFindCriticalHomeDefenseObjective(
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        out SectorObjective best)
+    {
+        best = null;
+        if (plan == null)
+            return false;
+
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (!IsCriticalHomeDefenseObjective(obj, aiTeam))
+                continue;
+            if (best == null || obj.Priority < best.Priority)
+                best = obj;
+        }
+
+        return best != null;
+    }
+
+    private bool TryFindCriticalHomeDefenseObjectiveForUnit(
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        UnitManager unit,
+        Vector3Int fromCell,
+        string callerLabel,
+        out SectorObjective best)
+    {
+        best = null;
+        if (plan == null || unit == null)
+            return false;
+
+        int responseRange = Mathf.Max(HomeDefenseThreatRange, defenseEnemyRange * defenseCallRange);
+        float bestDistance = float.MaxValue;
+        bool foundCritical = false;
+        fromCell.z = 0;
+
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (!IsCriticalHomeDefenseObjective(obj, aiTeam))
+                continue;
+            foundCritical = true;
+            Vector3Int targetCell = ResolveCriticalHomeDefenseTargetCell(obj, aiTeam, fromCell);
+            float distance = CalculateUnitResponseDistance(unit, fromCell, targetCell);
+            if (distance > responseRange)
+            {
+                Debug.Log($"{TL("Plan")} {callerLabel} {unit.InstanceId} nao redireciona para {obj.Sector}: dist={distance:F0}h > chamada={responseRange}h");
+                continue;
+            }
+            if (best == null
+                || obj.Priority < best.Priority
+                || (obj.Priority == best.Priority && distance < bestDistance))
+            {
+                best = obj;
+                bestDistance = distance;
+            }
+        }
+
+        if (!foundCritical)
+            Debug.Log($"{TL("Plan")} {callerLabel} {unit.InstanceId} nao achou SOS Base/HQ ativo no plano");
+
+        return best != null;
+    }
+
+    private Vector3Int ResolveCriticalHomeDefenseTargetCell(
+        SectorObjective obj,
+        TeamId aiTeam,
+        Vector3Int fallback)
+    {
+        ConstructionManager target = obj != null
+            ? FindCapturableInSector(obj.Sector, aiTeam, fallback)
+            : null;
+        if (target != null)
+        {
+            Vector3Int tc = target.CurrentCellPosition; tc.z = 0;
+            return tc;
+        }
+
+        if (obj != null && TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo info))
+        {
+            Vector3Int rc = info.RepresentativeCell; rc.z = 0;
+            return rc;
+        }
+
+        if (obj != null && TryFindHomeDefenseLiveAnchor(obj.Sector, aiTeam, fallback, out Vector3Int liveAnchor))
+            return liveAnchor;
+
+        fallback.z = 0;
+        return fallback;
+    }
+
+    private static float CalculateUnitResponseDistance(UnitManager unit, Vector3Int fromCell, Vector3Int targetCell)
+    {
+        fromCell.z = 0;
+        targetCell.z = 0;
+        if (unit != null
+            && unit.TryGetUnitData(out UnitData data)
+            && data != null
+            && SectorManager.TryGetLandMovementDistance(fromCell, targetCell, data, out int unitCost))
+            return unitCost;
+        if (SectorManager.TryGetLandMovementDistance(fromCell, targetCell, out int terrainCost))
+            return terrainCost;
+        return SectorManager.HexDistance(fromCell, targetCell);
+    }
+
+    private void EnsureCriticalHomeDefenseObjectives(
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        IReadOnlyList<SectorManager.SectorInfo> allSectors)
+    {
+        if (plan == null || allSectors == null)
+            return;
+
+        foreach (SectorManager.SectorInfo info in allSectors)
+        {
+            if (!IsCriticalHomeDefenseSector(info, aiTeam))
+                continue;
+            if (!IsHomeDefenseThreatened(info, aiTeam, HomeDefenseThreatRange))
+                continue;
+
+            SectorObjective obj = plan.GetObjectiveForSector(info.Sector);
+            if (obj == null)
+            {
+                obj = new SectorObjective
+                {
+                    Sector = info.Sector,
+                    AssignedTeam = aiTeam,
+                    Status = ObjectiveStatus.Defending,
+                    Priority = int.MaxValue,
+                };
+                plan.Objectives.Add(obj);
+            }
+            else
+            {
+                obj.Status = ObjectiveStatus.Defending;
+                obj.AssignedTeam = aiTeam;
+                obj.Priority = int.MaxValue;
+            }
+
+            RemoveTransportSlotsFromDefense(obj, aiTeam);
+            EnsureOpenSlots(obj, UnitRole.Capturador, 2);
+
+            Debug.Log($"{TL("Plan")} SOS Base/HQ: {info.Sector} sob captura/ameaca critica");
+        }
+    }
+
+    private void ClearResolvedCriticalHomeDefenseObjectives(TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (plan == null || plan.Objectives == null)
+            return;
+
+        for (int i = plan.Objectives.Count - 1; i >= 0; i--)
+        {
+            SectorObjective obj = plan.Objectives[i];
+            if (obj == null || obj.Status != ObjectiveStatus.Defending)
+                continue;
+            if (!IsCriticalHomeDefenseSector(obj.Sector, aiTeam))
+                continue;
+            if (IsHomeDefenseThreatened(obj.Sector, aiTeam, HomeDefenseThreatRange))
+                continue;
+            if (FindCapturableInSector(obj.Sector, aiTeam) != null)
+                continue;
+
+            if (obj.Slots != null)
+            {
+                foreach (SlotNeed slot in obj.Slots)
+                {
+                    if (slot == null || !slot.Filled)
+                        continue;
+                    UnitManager unit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                    unit?.ClearAIAssignedPlan();
+                }
+            }
+
+            ClearObjectiveHUD(obj);
+            plan.Objectives.RemoveAt(i);
+            Debug.Log($"{TL("Plan")} SOS Base/HQ resolvido: {obj.Sector} seguro - objetivo defensivo removido");
+        }
+    }
+
+    private void EnsureCriticalHomeDefenseObjectivesFromConstructions(TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (plan == null)
+            return;
+
+        var sectors = new HashSet<ConstructionSector>();
+        foreach (ConstructionManager construction in ConstructionManager.AllActive)
+        {
+            if (construction == null)
+                continue;
+            if (!IsCriticalHomeDefenseSector(construction.Sector, aiTeam))
+                continue;
+            if (!IsHomeDefenseThreatened(construction.Sector, aiTeam, HomeDefenseThreatRange))
+                continue;
+            sectors.Add(construction.Sector);
+        }
+
+        foreach (ConstructionSector sector in sectors)
+        {
+            SectorObjective obj = plan.GetObjectiveForSector(sector);
+            if (obj == null)
+            {
+                obj = new SectorObjective
+                {
+                    Sector = sector,
+                    AssignedTeam = aiTeam,
+                    Status = ObjectiveStatus.Defending,
+                    Priority = int.MaxValue,
+                };
+                plan.Objectives.Add(obj);
+            }
+            else
+            {
+                obj.Status = ObjectiveStatus.Defending;
+                obj.AssignedTeam = aiTeam;
+                obj.Priority = int.MaxValue;
+            }
+
+            RemoveTransportSlotsFromDefense(obj, aiTeam);
+            EnsureOpenSlots(obj, UnitRole.Capturador, 2);
+
+            Debug.Log($"{TL("Plan")} SOS Base/HQ live: {sector} sob captura/ameaca no conjunto da base");
+        }
+    }
+
+    private void RemoveTransportSlotsFromDefense(SectorObjective obj, TeamId aiTeam)
+    {
+        if (obj == null || obj.Slots == null)
+            return;
+
+        for (int i = obj.Slots.Count - 1; i >= 0; i--)
+        {
+            SlotNeed slot = obj.Slots[i];
+            if (slot.Role != UnitRole.Transportador)
+                continue;
+            if (slot.Filled)
+            {
+                UnitManager unit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                unit?.ClearAIAssignedPlan();
+            }
+            obj.Slots.RemoveAt(i);
+        }
+    }
+
+    private static void EnsureOpenSlots(SectorObjective obj, UnitRole role, int desiredTotal)
+    {
+        if (obj == null || obj.Slots == null)
+            return;
+
+        int total = 0;
+        foreach (SlotNeed slot in obj.Slots)
+            if (slot.Role == role)
+                total++;
+
+        while (total < desiredTotal)
+        {
+            obj.Slots.Add(new SlotNeed { Role = role });
+            total++;
+        }
+    }
+
+    private static bool IsCriticalHomeDefenseSector(SectorManager.SectorInfo info, TeamId aiTeam)
+    {
+        if (info == null)
+            return false;
+        if (IsCriticalHomeDefenseSector(info.Sector, aiTeam))
+            return true;
+
+        foreach (SectorManager.SectorConstructionInfo construction in info.Constructions)
+        {
+            if (construction?.Source == null) continue;
+            if (construction.Source.IsPlayerHeadQuarter && construction.OwnerTeam == aiTeam)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsCriticalHomeDefenseSector(ConstructionSector sector, TeamId aiTeam)
+    {
+        if (ConstructionSectorHelper.IsBase(sector))
+            return true;
+
+        foreach (ConstructionManager construction in ConstructionManager.AllActive)
+        {
+            if (construction == null || construction.Sector != sector)
+                continue;
+            if (construction.TeamId == aiTeam && construction.IsPlayerHeadQuarter)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsHomeDefenseThreatened(SectorManager.SectorInfo info, TeamId aiTeam, int range)
+    {
+        if (info == null)
+            return false;
+        if (IsHomeDefenseThreatened(info.Sector, aiTeam, range))
+            return true;
+
+        Vector3Int rep = info.RepresentativeCell; rep.z = 0;
+        if (HasNearbyVisibleEnemy(rep, aiTeam, range))
+            return true;
+
+        foreach (SectorManager.SectorConstructionInfo construction in info.Constructions)
+        {
+            Vector3Int cell = construction.Cell; cell.z = 0;
+            if (HasNearbyVisibleEnemy(cell, aiTeam, range))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsHomeDefenseThreatened(ConstructionSector sector, TeamId aiTeam, int range)
+    {
+        MatchController mc = GetMatchController();
+        foreach (ConstructionManager construction in ConstructionManager.AllActive)
+        {
+            if (construction == null || construction.Sector != sector)
+                continue;
+
+            if (construction.IsCapturable
+                && construction.CapturePointsMax > 0
+                && (construction.TeamId == aiTeam || construction.TeamId == TeamId.Neutral)
+                && construction.CurrentCapturePoints < construction.CapturePointsMax)
+                return true;
+
+            Vector3Int cc = construction.CurrentCellPosition; cc.z = 0;
+            foreach (UnitManager enemy in UnitManager.AllActive)
+            {
+                if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked)
+                    continue;
+                if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
+                    continue;
+                Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+                if (SectorManager.HexDistance(ec, cc) <= range)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryFindHomeDefenseLiveAnchor(
+        ConstructionSector sector,
+        TeamId aiTeam,
+        Vector3Int fromCell,
+        out Vector3Int anchor)
+    {
+        anchor = fromCell;
+        ConstructionManager best = null;
+        float bestScore = float.MinValue;
+        MatchController mc = GetMatchController();
+        fromCell.z = 0;
+
+        foreach (ConstructionManager construction in ConstructionManager.AllActive)
+        {
+            if (construction == null || construction.Sector != sector)
+                continue;
+
+            Vector3Int cc = construction.CurrentCellPosition; cc.z = 0;
+            bool underCapture = construction.IsCapturable
+                && construction.CapturePointsMax > 0
+                && construction.TeamId == aiTeam
+                && construction.CurrentCapturePoints < construction.CapturePointsMax;
+            bool hasNearbyEnemy = false;
+            foreach (UnitManager enemy in UnitManager.AllActive)
+            {
+                if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked)
+                    continue;
+                if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
+                    continue;
+                Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+                if (SectorManager.HexDistance(ec, cc) <= HomeDefenseThreatRange)
+                {
+                    hasNearbyEnemy = true;
+                    break;
+                }
+            }
+
+            if (!underCapture && !hasNearbyEnemy && !construction.IsPlayerHeadQuarter)
+                continue;
+
+            float score = 0f;
+            if (underCapture) score += 100000f;
+            if (hasNearbyEnemy) score += 50000f;
+            if (construction.IsPlayerHeadQuarter) score += 1000f;
+            score -= SectorManager.HexDistance(fromCell, cc);
+
+            if (best == null || score > bestScore)
+            {
+                best = construction;
+                bestScore = score;
+                anchor = cc;
+            }
+        }
+
+        return best != null;
+    }
+
+    private static bool HasHomeConstructionUnderCapture(ConstructionSector sector, TeamId aiTeam)
+    {
+        foreach (ConstructionManager construction in ConstructionManager.AllActive)
+        {
+            if (construction == null || construction.Sector != sector)
+                continue;
+            if (!construction.IsCapturable || construction.CapturePointsMax <= 0)
+                continue;
+            if (construction.TeamId != aiTeam)
+                continue;
+            if (construction.CurrentCapturePoints < construction.CapturePointsMax)
+                return true;
+        }
+
         return false;
     }
 
