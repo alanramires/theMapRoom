@@ -21,7 +21,11 @@
       "Bash(grep -n \"SetPlayerIsAI\" \"d:/Unity Projects/The Map Room/Assets/Scripts/\"*.cs)",
       "Bash(grep -v \"//.*isAI\\\\|IsPlayerAI\\\\|IsActiveTeamAI\\\\|IsAI\\\\b\")",
       "Bash(Get-ChildItem -Path \"d:\\\\Unity Projects\\\\The Map Room\\\\Assets\\\\Scripts\\\\Match\\\\AI\" -Filter \"*.cs\")",
-      "Bash(Select-Object -ExpandProperty Name)"
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git tag *)",
+      "Bash(git push *)"
     ]
   }
 }

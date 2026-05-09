@@ -24,9 +24,23 @@ public partial class AIController
 
             if (objectiveAction != null) return objectiveAction;
 
+            bool preferFireSupportFirst = PreferFireSupportBeforeAssault(unit);
+
+            if (preferFireSupportFirst)
+            {
+                PlayerAction earlyFireSupportAction = TryDecideFireSupportAction(unit, snapshot, plan);
+                if (earlyFireSupportAction != null) return earlyFireSupportAction;
+            }
+
             PlayerAction assaultAction = TryDecideAssaultAction(unit, snapshot, plan);
 
             if (assaultAction != null) return assaultAction;
+
+            if (!preferFireSupportFirst)
+            {
+                PlayerAction fireSupportAction = TryDecideFireSupportAction(unit, snapshot, plan);
+                if (fireSupportAction != null) return fireSupportAction;
+            }
 
         }
 
@@ -164,6 +178,15 @@ public partial class AIController
 
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, destCell, paths);
 
+    }
+
+    private static bool PreferFireSupportBeforeAssault(UnitManager unit)
+    {
+        if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
+            return false;
+        return data.preferArtilleryModeBeforeCombatant
+            && data.roles != null
+            && data.roles.Contains(UnitRole.FogoIndireto);
     }
 
     private PodeMirarTargetOption FindBestAttackTarget(UnitManager unit, Vector3Int fromCell, bool hasMoved)

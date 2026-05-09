@@ -19,6 +19,7 @@ public partial class AIController
 
         bool activeCriticalHomeDefense = IsCriticalHomeDefenseObjective(assigned, snapshot.AITeam);
         assigned.Status = activeCriticalHomeDefense ? ObjectiveStatus.Defending : ObjectiveStatus.Complete;
+        ApplyPlanHUD(unit, assigned, UnitRole.Capturador);
 
         TryGetAnySectorInfo(assigned.Sector, out SectorManager.SectorInfo secInfo);
         Vector3Int repCell = secInfo != null ? secInfo.RepresentativeCell : fromCell; repCell.z = 0;
@@ -67,7 +68,8 @@ public partial class AIController
                         defBest.InstanceId.ToString(), dtCell);
                 }
             }
-            Debug.Log($"{TL("Defensor")} {unit.InstanceId} segura {assigned.Sector} — mantém posição");
+            string holdKind = activeCriticalHomeDefense ? "SOS" : "guarda";
+            Debug.Log($"{TL("Defensor")} {unit.InstanceId} segura {assigned.Sector} ({holdKind}) — mantém posição");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
         }
 

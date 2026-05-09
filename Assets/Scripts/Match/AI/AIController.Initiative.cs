@@ -96,9 +96,15 @@ public partial class AIController
         // Age primeiro (grupo 0) para liberar o hex — com ou sem inimigos adjacentes.
         if (plan != null && IsBlockingCaptureTarget(unit, plan, aiTeam)) return 0;
 
+        // Transportador com passageiro formal ainda nao agido precisa se posicionar
+        // antes do capturador, para que o embarque seja avaliado no turno do passageiro.
+        if (plan != null && IsAssignedTransporterWithUnactedPassenger(unit, plan, aiTeam)) return 0;
+
         // Manutencao nao preempta a fila. Se estiver em cima de alvo de captura,
         // IsBlockingCaptureTarget ja colocou no grupo 0 acima.
         if (unit.IsUnderRepair) return 4;
+
+        if (HasFireSupportAttackInCurrentPosition(unit, aiTeam)) return 1;
 
         // Capturador no corredor de outro setor (mais perto do objetivo alheio que o capturador
         // designado a ele) → age antes (grupo 1) para liberar o caminho.
@@ -128,6 +134,37 @@ public partial class AIController
 
     // Retorna true se o transportador está vazio e tem pelo menos um candidato de pickup
     // dentro do alcance de movimento (+1 para adjacência). Checagem barata: só hex distance.
+    private bool HasFireSupportAttackInCurrentPosition(UnitManager unit, TeamId aiTeam)
+    {
+        if (!IsFireSupportUnit(unit))
+            return false;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+
+        var targets = new List<PodeMirarTargetOption>();
+        WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
+        if (!PodeMirarSensor.CollectTargets(
+                unit,
+                boardTilemap,
+                terrainDatabase,
+                SensorMovementMode.MoveuParado,
+                targets,
+                weaponPriorityData: weaponPriorityData,
+                fromCell: fromCell))
+            return false;
+
+        foreach (PodeMirarTargetOption opt in targets)
+        {
+            if (opt == null || opt.targetUnit == null) continue;
+            if (opt.targetUnit.TeamId == aiTeam || opt.targetUnit.IsDead) continue;
+            if (PassesAttackDecision(unit, opt.targetUnit, fromCell, defensiveContext: false, out _))
+                return true;
+        }
+
+        return false;
+    }
+
     private bool IsTransporterWithValidPickupCandidate(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
     {
         if (!unit.TryGetUnitData(out UnitData data) || data == null
@@ -155,6 +192,21 @@ public partial class AIController
 
     // Retorna true se um capturador está mais perto do objetivo de OUTRO setor do que
     // o capturador designado a ele — passa pelo corredor alheio e deve agir primeiro.
+    private bool IsAssignedTransporterWithUnactedPassenger(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (!unit.TryGetUnitData(out UnitData data) || data == null
+            || data.roles == null || data.roles.Count == 0
+            || data.roles[0] != UnitRole.Transportador) return false;
+
+        if (HasTransportCargo(unit)) return false;
+
+        SectorObjective assigned = ResolveAssignedTransportObjective(unit, plan);
+        if (assigned == null) return false;
+
+        UnitManager passenger = ResolveAssignedPassengerUnit(assigned, aiTeam);
+        return passenger != null && !passenger.HasActed;
+    }
+
     private bool IsCapturerInOtherCapturerCorridor(UnitManager unit, Vector3Int unitCell, TeamObjectivePlan plan, TeamId aiTeam)
     {
         if (!unit.TryGetUnitData(out UnitData data) || data == null
@@ -256,7 +308,9 @@ public partial class AIController
     {
         SectorObjective capturerObjective = ResolveAssignedObjective(unit, plan);
         if (capturerObjective != null) return capturerObjective;
-        return ResolveAssignedAssaultObjective(unit, plan);
+        SectorObjective assaultObjective = ResolveAssignedAssaultObjective(unit, plan);
+        if (assaultObjective != null) return assaultObjective;
+        return ResolveAssignedFireSupportObjective(unit, plan);
     }
 
     private static int CompareUnitInitiative(UnitManager a, UnitManager b)

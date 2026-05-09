@@ -70,9 +70,10 @@ public partial class AIController
         TeamId aiTeam)
     {
         // Reverse cost map: how many MP does this unit need to go from pressureTarget to each cell?
-        // Budget 50 covers any realistic map (25 all-forest hexes).
+        // Keep this horizon generous: transport objectives can require long detours around
+        // terrain chokepoints, and a short horizon looks like a false blockade.
         Dictionary<Vector3Int, int> costFromTarget =
-            UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, pressureTarget, 50, terrainDatabase);
+            UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, pressureTarget, 120, terrainDatabase);
 
         float GetCost(Vector3Int c) =>
             costFromTarget.TryGetValue(c, out int v) ? (float)v : float.MaxValue;
@@ -81,6 +82,8 @@ public partial class AIController
         float bestDist = GetCost(fromCell);
         bool bestIsNonTeamBldg = false;
         float bestThreat = float.MaxValue;
+        bool foundReachableRoute = bestDist < float.MaxValue;
+        bool foundImprovingMove = false;
 
         const float eps = 0.01f;
 
@@ -92,6 +95,8 @@ public partial class AIController
             float dist = GetCost(cell);
             bool isNonTeamBldg = IsNonTeamConstruction(cell, aiTeam);
             float threat = CalculateThreatLevel(cell, aiTeam);
+            if (dist < float.MaxValue)
+                foundReachableRoute = true;
 
             bool isBetter;
             if (dist < bestDist - eps)
@@ -108,6 +113,52 @@ public partial class AIController
                 bestDist = dist;
                 bestIsNonTeamBldg = isNonTeamBldg;
                 bestThreat = threat;
+                if (dist < GetCost(fromCell) - eps)
+                    foundImprovingMove = true;
+            }
+        }
+
+        if (foundReachableRoute && (bestCell != fromCell || foundImprovingMove))
+            return bestCell;
+
+        return FindTransportExplorationMove(fromCell, pressureTarget, paths, occupied, aiTeam);
+    }
+
+    private Vector3Int FindTransportExplorationMove(
+        Vector3Int fromCell,
+        Vector3Int pressureTarget,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        TeamId aiTeam)
+    {
+        Vector3Int bestCell = fromCell;
+        float bestScore = float.MinValue;
+        float fromHexDist = SectorManager.HexDistance(fromCell, pressureTarget);
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell) continue;
+            if (occupied != null && occupied.Contains(cell)) continue;
+
+            float hexDist = SectorManager.HexDistance(cell, pressureTarget);
+            float progress = fromHexDist - hexDist;
+            int pathSteps = GetPathStepCount(paths, cell);
+            float threat = CalculateThreatLevel(cell, aiTeam);
+            bool isNonTeamBldg = IsNonTeamConstruction(cell, aiTeam);
+
+            float score =
+                Mathf.Min(pathSteps, 8) * 55f
+                + Mathf.Max(0f, progress) * 35f
+                - Mathf.Max(0f, -progress) * 18f
+                - threat * 8f
+                - (isNonTeamBldg ? 300f : 0f);
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCell = cell;
             }
         }
 

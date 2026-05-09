@@ -243,19 +243,63 @@ public partial class AIController
         }
 
         // Avança para o destino: mínima distância hex + mínima ameaça
-        Vector3Int bestStep = fromCell;
-        float bestScore = float.MinValue;
-        foreach (Vector3Int cell in paths.Keys)
-        {
-            if (occupied.Contains(cell)) continue;
-            float dist   = SectorManager.HexDistance(cell, destCell);
-            float threat = CalculateThreatLevel(cell, aiTeam);
-            float score  = -dist * 10f - threat * ThreatWeight;
-            if (score > bestScore) { bestScore = score; bestStep = cell; }
-        }
+        Vector3Int bestStep = FindRepairApproachStep(
+            aiTeam, fromCell, destCell, repairDest, paths, occupied);
 
         Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
         return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, paths);
+    }
+
+    private Vector3Int FindRepairApproachStep(
+        TeamId aiTeam,
+        Vector3Int fromCell,
+        Vector3Int destCell,
+        ConstructionManager repairDest,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied)
+    {
+        if (paths == null || paths.Count == 0)
+            return fromCell;
+
+        bool homeRepair = IsRepairHomeConstruction(repairDest, aiTeam);
+        bool destOccupied = occupied != null && occupied.Contains(destCell) && destCell != fromCell;
+        if (!destOccupied && paths.ContainsKey(destCell))
+            return destCell;
+
+        float fromDist = SectorManager.HexDistance(fromCell, destCell);
+        Vector3Int bestStep = fromCell;
+        float bestScore = float.MinValue;
+
+        foreach (Vector3Int cell in paths.Keys)
+        {
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+
+            float dist = SectorManager.HexDistance(cell, destCell);
+            float progress = fromDist - dist;
+            float threat = CalculateThreatLevel(cell, aiTeam);
+            float pathCost = cell == fromCell ? 0f : GetPathStepCount(paths, cell);
+
+            float threatMult = homeRepair ? 0.15f : 0.35f;
+            float score =
+                progress * 1200f
+                - dist * 180f
+                - pathCost * 4f
+                - threat * ThreatWeight * threatMult;
+
+            if (homeRepair && progress > 0f)
+                score += 350f;
+            if (cell == destCell)
+                score += 10000f;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestStep = cell;
+            }
+        }
+
+        return bestStep;
     }
 
     private bool TryDecideRepairHoldHomeDefense(
@@ -378,24 +422,15 @@ public partial class AIController
         return true;
     }
 
-    private static ConstructionManager FindRepairConstruction(Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied)
-    {
-        ConstructionManager homeDest = FindRepairConstruction(fromCell, aiTeam, occupied, homeOnly: true);
-        return homeDest != null
-            ? homeDest
-            : FindRepairConstruction(fromCell, aiTeam, occupied, homeOnly: false);
-    }
-
-    private static ConstructionManager FindRepairConstruction(Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied, bool homeOnly)
+    private ConstructionManager FindRepairConstruction(Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied)
     {
         ConstructionManager best = null;
-        float bestDist = float.MaxValue;
+        float bestScore = float.MinValue;
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
             Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
             float dist = SectorManager.HexDistance(fromCell, cc);
             bool isHomeRepair = IsRepairHomeConstruction(c, aiTeam);
-            if (homeOnly && !isHomeRepair) continue;
             if (c.TeamId != aiTeam)
             {
                 Debug.Log($"[Repair] skip {cc} team={c.TeamId} (need {aiTeam}) dist={dist:F1}");
@@ -406,18 +441,33 @@ public partial class AIController
                 Debug.Log($"[Repair] skip {cc} cap={c.CurrentCapturePoints}/{c.CapturePointsMax} (incompleto) dist={dist:F1}");
                 continue;
             }
-            if (occupied.Contains(cc))
+            bool occupiedCell = occupied.Contains(cc);
+            if (occupiedCell && !isHomeRepair)
             {
                 Debug.Log($"[Repair] skip {cc} ocupado dist={dist:F1}");
                 continue;
             }
-            if (dist < bestDist) { bestDist = dist; best = c; }
+            if (occupiedCell && isHomeRepair)
+                Debug.Log($"[Repair] home {cc} ocupado, mantendo como fallback de reparo dist={dist:F1}");
+
+            bool safe = !HasNearbyVisibleEnemy(cc, aiTeam, DefenseEnemyRange);
+            float score = -dist * 100f;
+            if (safe) score += 500f;
+            if (isHomeRepair) score += 25f;
+            if (occupiedCell && isHomeRepair) score -= 10000f;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = c;
+            }
         }
         if (best != null)
         {
             Vector3Int bc = best.CurrentCellPosition; bc.z = 0;
             string home = IsRepairHomeConstruction(best, aiTeam) ? " home" : string.Empty;
-            Debug.Log($"[Repair] destino{home} selecionado {bc} dist={bestDist:F1}");
+            string safe = !HasNearbyVisibleEnemy(bc, aiTeam, DefenseEnemyRange) ? " safe" : string.Empty;
+            Debug.Log($"[Repair] destino{home}{safe} selecionado {bc} dist={SectorManager.HexDistance(fromCell, bc):F1} score={bestScore:F0}");
         }
         return best;
     }

@@ -18,6 +18,13 @@ public partial class AIController : MonoBehaviour
     [Header("AI HUD")]
     [SerializeField] private bool showAIUnitHUD;
 
+    [Header("AI Stage Emulation")]
+    [SerializeField] private bool emulateStage0 = true;
+    [SerializeField] private bool emulateStage1 = true;
+    [SerializeField] private bool emulateStage2 = true;
+    [SerializeField] private bool emulateStage3 = true;
+    [SerializeField] private bool emulateStage4 = true;
+
     [Header("Captura")]
     [Tooltip("Impacto do risco na tomada de decisão (0 = ignora risco, 2 = risco pesa muito)")]
     [SerializeField, Range(0f, 2f)] private float riskDecisionImpact = 0.5f;

@@ -76,7 +76,7 @@ public partial class AIController
 
             Vector3Int candidateCell = candidate.CurrentCellPosition; candidateCell.z = 0;
             float objectiveDist = SectorManager.HexDistance(candidateCell, objectiveCell);
-            if (objectiveDist <= MinDistanceForTransportSlot) continue;
+            if (objectiveDist < MinDistanceForTransportSlot) continue;
 
             float transportDist = SectorManager.HexDistance(transporterCell, candidateCell);
             int rolePriority = candidateData.roles != null && candidateData.roles.Count > 0

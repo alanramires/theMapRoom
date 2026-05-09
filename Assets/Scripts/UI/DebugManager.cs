@@ -325,7 +325,49 @@ public class DebugManager : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
-        else if (TryParseSetMoneyCommand(rawCommand, out int? moneyTeamOverride, out int moneyValue))
+        else if (TryParseAdjustMoneyCommand(rawCommand, out int? moneyTeamOverride, out int moneyDelta))
+        {
+            if (matchController == null)
+            {
+                Debug.Log("[Debug Command] MatchController nao encontrado.");
+            }
+            else if (moneyTeamOverride.HasValue)
+            {
+                TeamId team = (TeamId)Mathf.Clamp(moneyTeamOverride.Value, 0, 3);
+                int currentMoney = matchController.GetActualMoney(team);
+                int adjustedMoney = ClampMoneyDelta(currentMoney, moneyDelta);
+                executed = matchController.TrySetActualMoney(team, adjustedMoney);
+                if (executed)
+                {
+                    cursorController?.PlayDoneSfx();
+                    Debug.Log($"[Debug Command] Actual money do team {(int)team} ajustado em {moneyDelta:+#;-#;0}: ${currentMoney} -> ${adjustedMoney}.");
+                }
+                else
+                {
+                    Debug.Log($"[Debug Command] Team {(int)team} nao encontrado na lista de players.");
+                }
+            }
+            else
+            {
+                TeamId resolvedTeam = matchController.ActiveTeam;
+                if (resolvedTeam == TeamId.Neutral)
+                    resolvedTeam = TeamId.Green;
+
+                int currentMoney = matchController.GetActualMoney(resolvedTeam);
+                int adjustedMoney = ClampMoneyDelta(currentMoney, moneyDelta);
+                executed = matchController.TrySetActualMoney(resolvedTeam, adjustedMoney);
+                if (executed)
+                {
+                    cursorController?.PlayDoneSfx();
+                    Debug.Log($"[Debug Command] Actual money do team ativo ({(int)resolvedTeam}) ajustado em {moneyDelta:+#;-#;0}: ${currentMoney} -> ${adjustedMoney}.");
+                }
+                else
+                {
+                    Debug.Log($"[Debug Command] Team ativo ({(int)resolvedTeam}) nao encontrado na lista de players.");
+                }
+            }
+        }
+        else if (TryParseSetMoneyCommand(rawCommand, out moneyTeamOverride, out int moneyValue))
         {
             if (matchController == null)
             {
@@ -875,7 +917,7 @@ public class DebugManager : MonoBehaviour
             "set capture points <v>\n" +
             "spawn <unit> | ai spawn <unit>\n" +
             "spawn:<team> <unit>\n" +
-            "set money <v> | set money:<team> <v>\n" +
+            "set money <v> | set money +<v> | set money:<team> <v>\n" +
             "set economy on|off\n" +
             "change altitude <dominio>/<altura>\n" +
             "land unit\n" +
@@ -1005,6 +1047,64 @@ public class DebugManager : MonoBehaviour
 
         string valueOnly = trimmed.Substring(prefixNoTeam.Length).Trim();
         return int.TryParse(valueOnly, out moneyValue);
+    }
+
+    private static bool TryParseAdjustMoneyCommand(string rawCommand, out int? teamOverride, out int moneyDelta)
+    {
+        teamOverride = null;
+        moneyDelta = 0;
+        if (string.IsNullOrWhiteSpace(rawCommand))
+            return false;
+
+        string trimmed = rawCommand.Trim();
+        const string prefixWithTeam = "set money:";
+        if (trimmed.StartsWith(prefixWithTeam, System.StringComparison.OrdinalIgnoreCase))
+        {
+            string remainder = trimmed.Substring(prefixWithTeam.Length).Trim();
+            int firstSpace = remainder.IndexOf(' ');
+            if (firstSpace <= 0)
+                return false;
+
+            string teamToken = remainder.Substring(0, firstSpace).Trim();
+            string valueToken = remainder.Substring(firstSpace + 1).Trim();
+            if (!IsSignedDeltaToken(valueToken))
+                return false;
+            if (!int.TryParse(teamToken, out int parsedTeam))
+                return false;
+            if (parsedTeam < 0 || parsedTeam > 3)
+                return false;
+            if (!int.TryParse(valueToken, out moneyDelta))
+                return false;
+
+            teamOverride = parsedTeam;
+            return true;
+        }
+
+        const string prefixNoTeam = "set money ";
+        if (!trimmed.StartsWith(prefixNoTeam, System.StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string valueOnly = trimmed.Substring(prefixNoTeam.Length).Trim();
+        return IsSignedDeltaToken(valueOnly) && int.TryParse(valueOnly, out moneyDelta);
+    }
+
+    private static bool IsSignedDeltaToken(string valueToken)
+    {
+        if (string.IsNullOrWhiteSpace(valueToken))
+            return false;
+
+        char first = valueToken.TrimStart()[0];
+        return first == '+' || first == '-';
+    }
+
+    private static int ClampMoneyDelta(int currentMoney, int moneyDelta)
+    {
+        long adjusted = (long)Mathf.Max(0, currentMoney) + moneyDelta;
+        if (adjusted <= 0)
+            return 0;
+        if (adjusted >= int.MaxValue)
+            return int.MaxValue;
+        return (int)adjusted;
     }
 
     private static bool TryParseSetEconomyCommand(string rawCommand, out bool economyEnabled)

@@ -330,6 +330,7 @@ public partial class TurnStateManager
         RestoreSupplyEmbarkedSelectionVisuals();
         HashSet<UnitManager> hiddenEmbarkedSuppliers = new HashSet<UnitManager>();
         HashSet<UnitManager> touchedSupplierUnits = new HashSet<UnitManager>();
+        HashSet<UnitManager> touchedTargetUnits = new HashSet<UnitManager>();
 
         try
         {
@@ -582,6 +583,7 @@ public partial class TurnStateManager
                     tempSingleService.Clear();
                     if (!changed)
                         continue;
+                    touchedTargetUnits.Add(target);
 
                     int hpAfterApply = Mathf.Clamp(target.CurrentHP, 0, target.GetMaxHP());
                     int actualHpGain = Mathf.Max(0, hpAfterApply - hpBeforeApply);
@@ -617,6 +619,9 @@ public partial class TurnStateManager
                     }
 
                     List<int> ammoAfterApply = SnapshotUnitAmmoByWeapon(target);
+                    if (ammoStep > 0)
+                        RefreshUnitHudImmediate(target);
+
                     RecordSupplyReplayCommand(
                         supplier: sourceSupplierUnit,
                         sourceConstruction: sourceConstruction,
@@ -758,6 +763,7 @@ public partial class TurnStateManager
             if (hiddenEmbarkedSuppliers.Count > 0)
                 RestoreTransporterHudVisibility(hiddenEmbarkedSuppliers);
             RefreshTransporterHudAfterCommandService(touchedSupplierUnits);
+            RefreshCommandServiceTargetHuds(touchedTargetUnits);
 
             commandServiceQueuedOrders.Clear();
             commandServiceInvalidOrders.Clear();
@@ -765,6 +771,22 @@ public partial class TurnStateManager
             RestoreSupplyEmbarkedSelectionVisuals();
             commandServiceExecutionRoutine = null;
             ExecuteAndReset("ExecuteCommandServiceOrderSequence: cleanup");
+        }
+    }
+
+    private static void RefreshCommandServiceTargetHuds(HashSet<UnitManager> touchedTargetUnits)
+    {
+        if (touchedTargetUnits == null || touchedTargetUnits.Count <= 0)
+            return;
+
+        foreach (UnitManager target in touchedTargetUnits)
+        {
+            if (target == null)
+                continue;
+            if (!target.gameObject.activeInHierarchy && !(target.IsEmbarked && target.IsEmbarkedVisualPreviewActive))
+                continue;
+
+            RefreshUnitHudImmediate(target);
         }
     }
 

@@ -491,6 +491,12 @@ public class UnitManager : MonoBehaviour
         deadByReason = string.IsNullOrWhiteSpace(reason) ? "(unknown)" : reason.Trim();
         diedByUnit = ResolveKillerAuditId(killer);
         UpdateDynamicName();
+        if (Application.isPlaying)
+        {
+            Vector3Int cell = currentCellPosition;
+            cell.z = 0;
+            UnitOccupancyRules.NotifyUnitOccupancyChanged(this, cell, cell);
+        }
     }
 
     public void ClearDeathAudit()

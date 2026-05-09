@@ -52,7 +52,7 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private bool continuousEditorVisualRefresh = false;
     [System.NonSerialized] private int cachedOccupantInstanceId = int.MinValue;
     [System.NonSerialized] private bool cachedOccupantVisible;
-    [System.NonSerialized] private bool cachedOccupantReadySameTeam;
+    [System.NonSerialized] private bool cachedOccupantShouldDarken;
     [System.NonSerialized] private bool cachedShowFlagThreatOutline;
 #if UNITY_EDITOR
     [System.NonSerialized] private bool editorTickRegistered;
@@ -861,8 +861,7 @@ public class ConstructionManager : MonoBehaviour
         Color baseColor = TeamUtils.GetColor(teamId);
         Color targetColor = baseColor;
 
-        bool sameTeam = occupant != null && IsOccupantVisibleForHud(occupant) && occupant.TeamId == teamId;
-        if (sameTeam && !occupant.HasActed)
+        if (ShouldDarkenForOccupant(occupant))
         {
             float darken = Mathf.Clamp01(occupiedByReadyUnitDarkenFactor);
             targetColor = new Color(baseColor.r * darken, baseColor.g * darken, baseColor.b * darken, baseColor.a);
@@ -870,6 +869,14 @@ public class ConstructionManager : MonoBehaviour
 
         if (spriteRenderer.color != targetColor)
             spriteRenderer.color = targetColor;
+    }
+
+    private bool ShouldDarkenForOccupant(UnitManager occupant)
+    {
+        if (occupant == null || !IsOccupantVisibleForHud(occupant))
+            return false;
+        bool isActiveTeam = matchController != null && (int)occupant.TeamId == matchController.ActiveTeamId;
+        return !isActiveTeam || !occupant.HasActed;
     }
 
     private void RefreshHud(UnitManager occupant)
@@ -902,7 +909,7 @@ public class ConstructionManager : MonoBehaviour
         UnitManager occupant = TryGetOccupantOnTop();
         int occupantId = occupant != null ? occupant.GetInstanceID() : 0;
         bool occupantVisible = IsOccupantVisibleForHud(occupant);
-        bool sameTeamReady = occupant != null && occupantVisible && occupant.TeamId == teamId && !occupant.HasActed;
+        bool shouldDarken = ShouldDarkenForOccupant(occupant);
         bool showFlagThreatOutline = occupant != null
             && occupantVisible
             && occupant.TeamId != teamId
@@ -911,7 +918,7 @@ public class ConstructionManager : MonoBehaviour
         if (!force
             && cachedOccupantInstanceId == occupantId
             && cachedOccupantVisible == occupantVisible
-            && cachedOccupantReadySameTeam == sameTeamReady
+            && cachedOccupantShouldDarken == shouldDarken
             && cachedShowFlagThreatOutline == showFlagThreatOutline)
         {
             return;
@@ -919,7 +926,7 @@ public class ConstructionManager : MonoBehaviour
 
         cachedOccupantInstanceId = occupantId;
         cachedOccupantVisible = occupantVisible;
-        cachedOccupantReadySameTeam = sameTeamReady;
+        cachedOccupantShouldDarken = shouldDarken;
         cachedShowFlagThreatOutline = showFlagThreatOutline;
         RefreshOccupancyVisualTint(occupant);
         RefreshHud(occupant);
@@ -932,7 +939,7 @@ public class ConstructionManager : MonoBehaviour
         if (!Application.isPlaying)
             return true;
 
-        return !occupant.IsHiddenByFogOfWar;
+        return !occupant.IsDead && !occupant.IsHiddenByFogOfWar;
     }
 
     private void RefreshVictoryBuildingOverlayVisual()
@@ -1028,8 +1035,7 @@ public class ConstructionManager : MonoBehaviour
     private void HandleActiveTeamChanged(int _)
     {
         double startMs = Time.realtimeSinceStartupAsDouble * 1000d;
-        // Active-team switch should leverage cached occupant/flags most of the time.
-        RefreshRuntimeVisualState(force: false);
+        RefreshRuntimeVisualState(force: true);
         activeTeamChangedHandlerCount++;
         activeTeamChangedHandlerTotalMs += (Time.realtimeSinceStartupAsDouble * 1000d) - startMs;
     }

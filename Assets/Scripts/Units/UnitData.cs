@@ -129,6 +129,16 @@ public class UnitData : ScriptableObject
     public bool preferMoveOnBestDPQ = false;
     [Tooltip("Ao se mover rumo a um destino, prioriza atingir o hex mais distante possivel dentro do alcance de movimento. Favorece rotas de estrada naturalmente pois permitem chegar mais longe por turno. Usado por transportadores para cobrir distancias maximas por turno.")]
     public bool preferMaxDisplacement = false;
+
+    [Header("Long Range Decision")]
+    [Tooltip("Se ativo, a IA nao reposiciona esta unidade apos compra/spawn. Outros casos especiais podem mover a unidade em regras futuras.")]
+    public bool longRangeStationary = false;
+    [Tooltip("Se ativo, a IA prefere reposicionar para manter o alvo no alcance maximo da arma em vez de se aproximar do alvo.")]
+    [FormerlySerializedAs("preferRepositionToMaxRange")]
+    public bool preferRepositionAtWeaponMaxRange = false;
+    [Tooltip("Se ativo, unidades hibridas tentam agir primeiro como artilheiro/fogo indireto; se nao houver acao valida, caem para comportamento combatente.")]
+    public bool preferArtilleryModeBeforeCombatant = false;
+
     [Header("Attack Decision")]
     [Tooltip("Se ativo, a IA usa simulacao da Matriz de HP para decidir se esta unidade deve aceitar um combate.")]
     public bool useAttackDecision = true;
@@ -697,5 +707,3 @@ public class UnitData : ScriptableObject
         armorClass = ArmorClass.Light;
     }
 }
-
-

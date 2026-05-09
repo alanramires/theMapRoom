@@ -60,9 +60,11 @@ public partial class AIController
             UnitManager nearbyCandidate = FindBestShuttleCandidate(unit, snapshot, plan, fromCell, out Vector3Int nearbyCell);
             if (nearbyCandidate != null)
             {
-                Vector3Int objCell2 = sectorCell;
+                Vector3Int objCell2 = ResolveUnitObjectiveCell(nearbyCandidate, plan, snapshot);
+                if (objCell2 == Vector3Int.zero)
+                    objCell2 = sectorCell;
                 Vector3Int shuttleMove = FindTransportShuttleMove(unit, fromCell, nearbyCell, paths, occupied, snapshot.AITeam, objCell2);
-                Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — sem passageiro formal, aguarda candidato {nearbyCandidate.InstanceId}@{nearbyCell} via {shuttleMove}");
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — sem passageiro formal, aguarda candidato {nearbyCandidate.InstanceId}@{nearbyCell} obj={objCell2} via {shuttleMove}");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, shuttleMove, paths);
             }
 
@@ -88,15 +90,6 @@ public partial class AIController
         Vector3Int objCell = sectorTgt != null ? sectorTgt.CurrentCellPosition : Vector3Int.zero; objCell.z = 0;
         Vector3Int moveTarget = FindTransportShuttleMove(unit, fromCell, passengerCell, paths, occupied, snapshot.AITeam, objCell);
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — pickup {targetPassenger.InstanceId}@{passengerCell} via {moveTarget}");
-
-        if (TryFindTransportBreakerAttack(unit, snapshot, fromCell, paths, occupied, passengerCell,
-                out Vector3Int pickupAttackCell, out UnitManager pickupAttackTarget, preferNoMove))
-        {
-            Vector3Int pickupTargetCell = pickupAttackTarget.CurrentCellPosition; pickupTargetCell.z = 0;
-            Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — ataca {pickupAttackTarget.InstanceId} via {pickupAttackCell}");
-            return BuildAttackBatch(unit, snapshot.AITeam, fromCell, pickupAttackCell,
-                pickupAttackTarget.InstanceId.ToString(), pickupTargetCell, paths);
-        }
 
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
     }

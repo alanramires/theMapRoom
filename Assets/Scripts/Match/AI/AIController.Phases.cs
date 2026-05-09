@@ -12,9 +12,16 @@ public partial class AIController
     {
         Debug.Log($"[AI] RunAITurn iniciado para {aiTeam}.");
         currentAITeam = aiTeam;
-        currentAIStage = 0;
-        yield return Phase0_WaitForTurnReady();
-        yield return WaitIfDebugPaused();
+        if (emulateStage0)
+        {
+            currentAIStage = 0;
+            yield return Phase0_WaitForTurnReady();
+            yield return WaitIfDebugPaused();
+        }
+        else
+        {
+            Debug.Log("[AI Stage] Stage 0 desativado por emulação.");
+        }
 
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
         aiTurnNumber = snapshot.TurnNumber;
@@ -23,21 +30,57 @@ public partial class AIController
                   $"| {snapshot.MyUnits.Count} unidades | {snapshot.EnemyUnits.Count} inimigos visíveis " +
                   $"| R$ {snapshot.Budget}");
 
-        currentAIStage = 1;
-        BuildObjectivePlan(snapshot);
+        if (emulateStage1 || emulateStage2 || emulateStage3)
+        {
+            currentAIStage = 1;
+            BuildObjectivePlan(snapshot);
+        }
 
-        yield return Phase1_CommandService(snapshot);
-        yield return WaitIfDebugPaused();
-        currentAIStage = 2;
-        yield return Phase2_UnitActions(snapshot);
-        yield return WaitIfDebugPaused();
-        yield return WaitIfDebugShoppingPaused();
-        yield return WaitIfDebugPaused();
-        currentAIStage = 3;
-        yield return Phase3_Shopping(snapshot);
-        yield return WaitIfDebugPaused();
-        currentAIStage = 4;
-        yield return Phase4_EndTurn();
+        if (emulateStage1)
+        {
+            currentAIStage = 1;
+            yield return Phase1_CommandService(snapshot);
+            yield return WaitIfDebugPaused();
+        }
+        else
+        {
+            Debug.Log($"{TL("Stage")} Stage 1 desativado por emulação.");
+        }
+
+        if (emulateStage2)
+        {
+            currentAIStage = 2;
+            yield return Phase2_UnitActions(snapshot);
+            yield return WaitIfDebugPaused();
+        }
+        else
+        {
+            Debug.Log($"{TL("Stage")} Stage 2 desativado por emulação.");
+        }
+
+        if (emulateStage3)
+        {
+            yield return WaitIfDebugShoppingPaused();
+            yield return WaitIfDebugPaused();
+            currentAIStage = 3;
+            yield return Phase3_Shopping(snapshot);
+            yield return WaitIfDebugPaused();
+        }
+        else
+        {
+            Debug.Log($"{TL("Stage")} Stage 3 desativado por emulação.");
+        }
+
+        if (emulateStage4)
+        {
+            currentAIStage = 4;
+            yield return Phase4_EndTurn();
+        }
+        else
+        {
+            Debug.Log($"{TL("Stage")} Stage 4 desativado por emulação. Controle liberado sem passar o turno.");
+            isActive = false;
+        }
 
         currentAIStage = 0;
         currentAITeam = TeamId.Neutral;
@@ -70,31 +113,58 @@ public partial class AIController
             Debug.Log($"{TL("Stage")} Plano resetado antes do BuildObjectivePlan.");
         }
 
-        currentAIStage = 1;
-        BuildObjectivePlan(snapshot);
+        if (stage <= 3 && (emulateStage1 || emulateStage2 || emulateStage3))
+        {
+            currentAIStage = 1;
+            BuildObjectivePlan(snapshot);
+        }
 
-        if (stage <= 1)
+        if (stage <= 1 && emulateStage1)
         {
             currentAIStage = 1;
             yield return Phase1_CommandService(snapshot);
             yield return WaitIfDebugPaused();
         }
+        else if (stage <= 1)
+        {
+            Debug.Log($"{TL("Stage")} Stage 1 desativado por emulação.");
+        }
 
-        if (stage <= 2)
+        if (stage <= 2 && emulateStage2)
         {
             currentAIStage = 2;
             yield return Phase2_UnitActions(snapshot);
             yield return WaitIfDebugPaused();
         }
+        else if (stage <= 2)
+        {
+            Debug.Log($"{TL("Stage")} Stage 2 desativado por emulação.");
+        }
 
-        currentAIStage = 2;
-        yield return WaitIfDebugShoppingPaused();
-        yield return WaitIfDebugPaused();
-        currentAIStage = 3;
-        yield return Phase3_Shopping(snapshot);
-        yield return WaitIfDebugPaused();
-        currentAIStage = 4;
-        yield return Phase4_EndTurn();
+        if (stage <= 3 && emulateStage3)
+        {
+            currentAIStage = 2;
+            yield return WaitIfDebugShoppingPaused();
+            yield return WaitIfDebugPaused();
+            currentAIStage = 3;
+            yield return Phase3_Shopping(snapshot);
+            yield return WaitIfDebugPaused();
+        }
+        else if (stage <= 3)
+        {
+            Debug.Log($"{TL("Stage")} Stage 3 desativado por emulação.");
+        }
+
+        if (emulateStage4)
+        {
+            currentAIStage = 4;
+            yield return Phase4_EndTurn();
+        }
+        else
+        {
+            Debug.Log($"{TL("Stage")} Stage 4 desativado por emulação. Controle liberado sem passar o turno.");
+            isActive = false;
+        }
 
         currentAIStage = 0;
         currentAITeam = TeamId.Neutral;
@@ -279,12 +349,6 @@ public partial class AIController
             if (unitMoved || unitAttacked)
             {
                 matchController?.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.DataOnly);
-                if (activePlan != null)
-                {
-                    ClearResolvedCriticalHomeDefenseObjectives(activePlan, aiTeam);
-                    EnsureCriticalHomeDefenseObjectives(activePlan, aiTeam, SectorManager.GetAllBaseInfos());
-                    EnsureCriticalHomeDefenseObjectivesFromConstructions(activePlan, aiTeam);
-                }
             }
 
             float delay = GetBatchDelay();

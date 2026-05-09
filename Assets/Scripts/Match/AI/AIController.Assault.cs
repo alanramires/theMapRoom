@@ -113,6 +113,21 @@ public partial class AIController
                 attackTarget.InstanceId.ToString(), targetCell, paths);
         }
 
+        int bestCapturerDist = GetBestCapturerDistanceToObjective(assigned);
+        bool escortAdvanceMode = bestCapturerDist >= 0 && bestCapturerDist <= AdvancedCapturerThreshold;
+        if (escortAdvanceMode)
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — ADVANCE MODE: capturador mais próximo a {bestCapturerDist}PM de {assigned.Sector}");
+
+        if (escortAdvanceMode
+            && TryFindAssaultAdvanceRouteAttack(unit, snapshot, fromCell, scoutAnchorCell, defensiveContext, paths, occupied,
+                out Vector3Int routeAttackCell, out UnitManager routeAttackTarget, out string routeAttackReason))
+        {
+            Vector3Int targetCell = routeAttackTarget.CurrentCellPosition; targetCell.z = 0;
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — intercepta via {routeAttackCell} → {routeAttackTarget.UnitDisplayName}#{routeAttackTarget.InstanceId} ({routeAttackReason})");
+            return BuildAttackBatch(unit, snapshot.AITeam, fromCell, routeAttackCell,
+                routeAttackTarget.InstanceId.ToString(), targetCell, paths);
+        }
+
         List<Vector3Int> suspectCells = CollectSweepSuspectCells(snapshot.AITeam, scoutAnchorCell, scoutZoneRadius);
         if (TryFindAssaultScoutRevealMove(unit, snapshot, fromCell, scoutAnchorCell, scoutZoneRadius, paths, occupied, suspectCells,
                 out Vector3Int revealCell, out string revealReason))
@@ -120,11 +135,6 @@ public partial class AIController
             Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — abre FoW via {revealCell} ({revealReason})");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, revealCell, paths);
         }
-
-        int bestCapturerDist = GetBestCapturerDistanceToObjective(assigned);
-        bool escortAdvanceMode = bestCapturerDist >= 0 && bestCapturerDist <= AdvancedCapturerThreshold;
-        if (escortAdvanceMode)
-            Debug.Log($"{TL("Assalto")} {unit.InstanceId} batedor {assigned.Sector} — ADVANCE MODE: capturador mais próximo a {bestCapturerDist}PM de {assigned.Sector}");
 
         Vector3Int coverCell = FindAssaultEscortCoverCell(unit, snapshot, fromCell, scoutAnchorCell, scoutZoneRadius, paths, occupied, threats, bestCapturerDist, out string coverEvaluationLog);
         if (!string.IsNullOrEmpty(coverEvaluationLog))

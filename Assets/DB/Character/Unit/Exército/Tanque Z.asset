@@ -46,6 +46,10 @@ MonoBehaviour:
   prioritizeDpqAtBattle: 1
   playConservative: 0
   preferMoveOnBestDPQ: 0
+  preferMaxDisplacement: 0
+  longRangeStationary: 0
+  preferRepositionAtWeaponMaxRange: 1
+  preferArtilleryModeBeforeCombatant: 1
   useAttackDecision: 1
   attackAcceptHpLossPercent: 70
   attackEliminationMinPercent: 10

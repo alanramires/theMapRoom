@@ -145,6 +145,86 @@ public partial class AIController
         return bestTarget != null;
     }
 
+    private bool TryFindAssaultAdvanceRouteAttack(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int escortCell,
+        bool defensiveContext,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestCell,
+        out UnitManager bestTarget,
+        out string reason)
+    {
+        bestCell = fromCell;
+        bestTarget = null;
+        reason = "";
+        if (unit == null || snapshot == null || paths == null || paths.Count == 0)
+            return false;
+
+        List<UnitManager> enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
+        if (enemies == null || enemies.Count == 0)
+            return false;
+
+        Dictionary<Vector3Int, int> realCostToEscort =
+            UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, escortCell, 50, terrainDatabase);
+        float fromRouteDist = realCostToEscort != null && realCostToEscort.TryGetValue(fromCell, out int frc)
+            ? frc : CalculateAssaultRouteDistance(unit, fromCell, escortCell);
+        float fromHexDist = SectorManager.HexDistance(fromCell, escortCell);
+
+        float bestScore = float.MinValue;
+        foreach (Vector3Int cell in paths.Keys)
+        {
+            if (IsReservedAssaultEscortCaptureCell(cell, snapshot.AITeam)) continue;
+            if (cell != fromCell && occupied.Contains(cell)) continue;
+
+            float routeDist = realCostToEscort != null && realCostToEscort.TryGetValue(cell, out int rc)
+                ? rc : CalculateAssaultRouteDistance(unit, cell, escortCell);
+            float routeProgress = fromRouteDist - routeDist;
+            float hexProgress = fromHexDist - SectorManager.HexDistance(cell, escortCell);
+            if (cell != fromCell && routeProgress <= 0f && hexProgress <= 0f)
+                continue;
+
+            foreach (UnitManager enemy in enemies)
+            {
+                if (!CanAttackTargetFrom(fromCell, cell, unit, enemy)) continue;
+                if (!PassesAttackDecision(unit, enemy, cell, defensiveContext, out string attackDecisionReason))
+                    continue;
+
+                Vector3Int enemyCell = enemy.CurrentCellPosition; enemyCell.z = 0;
+                float enemyDist = SectorManager.HexDistance(cell, enemyCell);
+                float targetDist = SectorManager.HexDistance(enemyCell, escortCell);
+                float line = CalculateLineProgressTieBreak(fromCell, escortCell, cell);
+                float dpq = GetTerrainDpqPontos(cell);
+                BazookaTargetPriority targetPreference = ResolveAssaultTargetPreference(unit, enemy);
+                float targetPreferenceScore = GetAssaultTargetPreferenceScore(targetPreference);
+                float score =
+                    targetPreferenceScore
+                    + Mathf.Max(0, 20 - enemy.CurrentHP) * 1000f
+                    + routeProgress * 1200f
+                    + hexProgress * 250f
+                    + line * 180f
+                    + dpq * 50f
+                    - routeDist * 120f
+                    - targetDist * 90f
+                    - enemyDist * 60f
+                    - GetPathStepCount(paths, cell) * 8f
+                    - enemy.InstanceId * 0.001f;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestCell = cell;
+                    bestTarget = enemy;
+                    reason = $"advanceRoute score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} progRota={routeProgress:+0.0;-0.0;0.0} rota={routeDist:F1} alvoZona={targetDist:F1} tiroDist={enemyDist:F1} dpq={dpq:F1} {attackDecisionReason}";
+                }
+            }
+        }
+
+        return bestTarget != null;
+    }
+
     private Vector3Int FindAssaultEscortCoverCell(
         UnitManager unit,
         AIWorldSnapshot snapshot,

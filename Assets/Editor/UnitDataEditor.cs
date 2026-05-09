@@ -87,6 +87,9 @@ public class UnitDataEditor : Editor
             "playConservative",
             "preferMoveOnBestDPQ",
             "preferMaxDisplacement",
+            "longRangeStationary",
+            "preferRepositionAtWeaponMaxRange",
+            "preferArtilleryModeBeforeCombatant",
             "useAttackDecision",
             "attackAcceptHpLossPercent",
             "attackEliminationMinPercent",
@@ -168,6 +171,20 @@ public class UnitDataEditor : Editor
             EditorGUILayout.PropertyField(preferDpqMoveProp, new GUIContent("Prefer Move On Best DPQ"));
         if (preferMaxDispProp != null)
             EditorGUILayout.PropertyField(preferMaxDispProp, new GUIContent("Prefer Max Displacement"));
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Long Range Decision", EditorStyles.boldLabel);
+
+        SerializedProperty stationaryProp = serializedObject.FindProperty("longRangeStationary");
+        SerializedProperty maxRangeProp = serializedObject.FindProperty("preferRepositionAtWeaponMaxRange");
+        SerializedProperty artilleryFirstProp = serializedObject.FindProperty("preferArtilleryModeBeforeCombatant");
+
+        if (stationaryProp != null)
+            EditorGUILayout.PropertyField(stationaryProp, new GUIContent("Stationary", "A IA nao reposiciona esta unidade apos compra/spawn. Outros casos especiais podem mover a unidade em regras futuras."));
+        if (maxRangeProp != null)
+            EditorGUILayout.PropertyField(maxRangeProp, new GUIContent("Prefer Reposition At Weapon Max Range", "Prefere reposicionar para manter o alvo no alcance maximo da arma em vez de se aproximar do alvo."));
+        if (artilleryFirstProp != null)
+            EditorGUILayout.PropertyField(artilleryFirstProp, new GUIContent("Prefer Artillery Mode Before Combatant", "Unidades hibridas tentam agir primeiro como artilheiro/fogo indireto; se nao houver acao valida, caem para comportamento combatente."));
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Attack Decision", EditorStyles.boldLabel);

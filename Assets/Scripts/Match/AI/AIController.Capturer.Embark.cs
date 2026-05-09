@@ -24,19 +24,9 @@ public partial class AIController
 
         SectorObjective assigned = plan != null ? ResolveAssignedObjective(unit, plan) : null;
 
-        // Não embarca se já está dentro do alcance de caminhada até o objetivo.
-        // O capturador chega a pé; o transporte seria desperdício de turno.
-        if (assigned != null)
-        {
-            ConstructionManager objBuilding = FindCapturableInSector(assigned.Sector, unit.TeamId);
-            if (objBuilding != null)
-            {
-                Vector3Int objCell = objBuilding.CurrentCellPosition; objCell.z = 0;
-                Vector3Int myCell = unit.CurrentCellPosition; myCell.z = 0;
-                if (SectorManager.HexDistance(myCell, objCell) <= TransportDropOffRange)
-                    return null;
-            }
-        }
+        Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
+        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromCell, "origem"))
+            return null;
 
         PodeEmbarcarOption best = null;
 
@@ -66,7 +56,6 @@ public partial class AIController
             }
         }
 
-        Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
         Dictionary<Vector3Int, List<Vector3Int>> paths =
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
@@ -200,6 +189,8 @@ public partial class AIController
         bool shuttleFree = !isPrimary
             && (tObj == null || ResolveAssignedPassengerUnit(tObj, unit.TeamId) == null);
         if (!sameSector && !shuttleFree) return false;
+        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromHex, "hex embarque"))
+            return false;
 
         // Transporter deve estar dentro do pickup range da posição original
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
@@ -225,6 +216,29 @@ public partial class AIController
 
         Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca (ext {(int)SectorManager.HexDistance(fromCell, tCell)}h) → {transporter.InstanceId} slot {slotIdx} via {fromHex}");
         action = BuildEmbarcarBatch(unit, snapshot.AITeam, fromCell, transporter, slotIdx, pathsForBatch);
+        return true;
+    }
+
+    private bool ShouldSkipCapturerEmbarkForShortWalk(
+        UnitManager unit,
+        SectorObjective assigned,
+        Vector3Int candidateCell,
+        string context)
+    {
+        if (unit == null || assigned == null)
+            return false;
+
+        ConstructionManager objBuilding = FindCapturableInSector(assigned.Sector, unit.TeamId);
+        if (objBuilding == null)
+            return false;
+
+        Vector3Int objCell = objBuilding.CurrentCellPosition; objCell.z = 0;
+        candidateCell.z = 0;
+        float objectiveDist = SectorManager.HexDistance(candidateCell, objCell);
+        if (objectiveDist >= MinDistanceForTransportSlot)
+            return false;
+
+        Debug.Log($"{TL("Capturador")} {unit.InstanceId} ignora embarque ({context} {objectiveDist:F0}h<{MinDistanceForTransportSlot}h de {assigned.Sector})");
         return true;
     }
 }
