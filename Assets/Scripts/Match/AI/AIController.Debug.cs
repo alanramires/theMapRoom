@@ -116,21 +116,29 @@ public partial class AIController
 
     private IEnumerator WaitIfDebugPaused()
     {
+        if (ShouldStopAIForMatchEnd("debug_pause_start"))
+            yield break;
         if (!isDebugPaused) yield break;
 
         Debug.Log("[AI] Pausa de debug ativa - aguardando 'AI RESUME' ou 'AI STEP'.");
         yield return new WaitUntil(() => !isDebugPaused || debugStepRequest != DebugStepRequest.None);
+        if (ShouldStopAIForMatchEnd("debug_pause_end"))
+            yield break;
         if (!isDebugPaused)
             Debug.Log("[AI] Retomando execucao da IA.");
     }
 
     private IEnumerator WaitIfDebugShoppingPaused()
     {
+        if (ShouldStopAIForMatchEnd("debug_shopping_pause_start"))
+            yield break;
         if (!isDebugShoppingPaused) yield break;
 
         Debug.Log($"{TL("Shopping")} Pausado antes da Fase 3 - aguardando 'AI SHOPPING RESUME'.");
         PanelDialogController.TrySetExternalText("AI Shopping pausado\nAI SHOPPING RESUME para liberar compras");
         yield return new WaitUntil(() => !isDebugShoppingPaused);
+        if (ShouldStopAIForMatchEnd("debug_shopping_pause_end"))
+            yield break;
         PanelDialogController.ClearExternalText();
         Debug.Log($"{TL("Shopping")} Resume recebido - entrando na Fase 3.");
     }
@@ -144,6 +152,8 @@ public partial class AIController
 
     private IEnumerator ExecuteAIBatchWithDebugStep(PlayerAction action)
     {
+        if (ShouldStopAIForMatchEnd("batch_start"))
+            yield break;
         if (action == null)
             yield break;
 
@@ -154,6 +164,8 @@ public partial class AIController
             ShowDebugStepPreview(action);
 
             yield return new WaitUntil(() => !isDebugPaused || debugStepRequest == DebugStepRequest.Execute);
+            if (ShouldStopAIForMatchEnd("batch_debug_wait"))
+                yield break;
             debugStepRequest = DebugStepRequest.None;
             ClearDebugStepPreview();
         }
@@ -163,6 +175,8 @@ public partial class AIController
 
         replayManager.ExecuteLiveAIBatch(action);
         yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
+        if (ShouldStopAIForMatchEnd("batch_end"))
+            yield break;
         debugStepPendingAction = null;
     }
 

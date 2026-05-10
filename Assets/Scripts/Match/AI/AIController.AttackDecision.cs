@@ -2,6 +2,99 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private readonly struct AIAttackSimulationSummary
+    {
+        public readonly AICombatHpSimulator.AICombatHpResult result;
+        public readonly int attackerHpBefore;
+        public readonly int targetHpBefore;
+        public readonly int attackerLoss;
+        public readonly int targetDamage;
+        public readonly int attackerLossPct;
+        public readonly int targetDamagePct;
+
+        public AIAttackSimulationSummary(
+            AICombatHpSimulator.AICombatHpResult result,
+            int attackerHpBefore,
+            int targetHpBefore,
+            int attackerLoss,
+            int targetDamage,
+            int attackerLossPct,
+            int targetDamagePct)
+        {
+            this.result = result;
+            this.attackerHpBefore = attackerHpBefore;
+            this.targetHpBefore = targetHpBefore;
+            this.attackerLoss = attackerLoss;
+            this.targetDamage = targetDamage;
+            this.attackerLossPct = attackerLossPct;
+            this.targetDamagePct = targetDamagePct;
+        }
+    }
+
+    private bool TrySimulateAttackForAI(
+        UnitManager attacker,
+        UnitManager target,
+        Vector3Int attackCell,
+        out AIAttackSimulationSummary summary)
+    {
+        summary = default;
+        if (attacker == null || target == null)
+            return false;
+
+        if (!attacker.TryGetUnitData(out UnitData attackerData) || attackerData == null)
+            return false;
+        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
+            return false;
+        if (turnStateManager == null
+            || turnStateManager.RpsDatabaseRef == null
+            || turnStateManager.DpqMatchupDatabaseRef == null
+            || turnStateManager.WeaponPriorityDataRef == null)
+            return false;
+
+        Vector3Int targetCell = target.CurrentCellPosition;
+        targetCell.z = 0;
+        int distance = Mathf.Max(1, Mathf.RoundToInt(SectorManager.HexDistance(attackCell, targetCell)));
+        PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(attackCell);
+        PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(targetCell);
+        AICombatHpSimulator.AICombatHpResult sim = AICombatHpSimulator.Simulate(
+            attackerData,
+            targetData,
+            Mathf.Max(0, attacker.CurrentHP),
+            Mathf.Max(0, target.CurrentHP),
+            distance,
+            turnStateManager.RpsDatabaseRef,
+            turnStateManager.DpqMatchupDatabaseRef,
+            turnStateManager.WeaponPriorityDataRef,
+            attackerDpq.points,
+            defenderDpq.points,
+            attackerDpq.defenseBonus,
+            defenderDpq.defenseBonus);
+
+        if (!sim.isValid)
+            return false;
+
+        int attackerHpBefore = Mathf.Max(0, attacker.CurrentHP);
+        int targetHpBefore = Mathf.Max(0, target.CurrentHP);
+        int attackerLoss = Mathf.Max(0, attackerHpBefore - sim.attackerHpAfter);
+        int targetDamage = Mathf.Max(0, targetHpBefore - sim.defenderHpAfter);
+        int attackerLossPct = attackerHpBefore > 0
+            ? Mathf.RoundToInt(attackerLoss * 100f / attackerHpBefore)
+            : 0;
+        int targetDamagePct = Mathf.Max(1, targetData.maxHP) > 0
+            ? Mathf.RoundToInt(targetDamage * 100f / Mathf.Max(1, targetData.maxHP))
+            : 0;
+
+        summary = new AIAttackSimulationSummary(
+            sim,
+            attackerHpBefore,
+            targetHpBefore,
+            attackerLoss,
+            targetDamage,
+            attackerLossPct,
+            targetDamagePct);
+        return true;
+    }
+
     private bool PassesAttackDecision(
         UnitManager attacker,
         UnitManager target,
@@ -36,41 +129,22 @@ public partial class AIController
             return true;
         }
 
+        PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(attackCell);
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
-        int distance = Mathf.Max(1, Mathf.RoundToInt(SectorManager.HexDistance(attackCell, targetCell)));
-        PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(attackCell);
         PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(targetCell);
-        AICombatHpSimulator.AICombatHpResult sim = AICombatHpSimulator.Simulate(
-            attackerData,
-            targetData,
-            Mathf.Max(0, attacker.CurrentHP),
-            Mathf.Max(0, target.CurrentHP),
-            distance,
-            turnStateManager.RpsDatabaseRef,
-            turnStateManager.DpqMatchupDatabaseRef,
-            turnStateManager.WeaponPriorityDataRef,
-            attackerDpq.points,
-            defenderDpq.points,
-            attackerDpq.defenseBonus,
-            defenderDpq.defenseBonus);
-
-        if (!sim.isValid)
+        if (!TrySimulateAttackForAI(attacker, target, attackCell, out AIAttackSimulationSummary simSummary))
         {
             reason = "atkDecision=simInvalid";
             return true;
         }
 
-        int attackerHpBefore = Mathf.Max(0, attacker.CurrentHP);
-        int targetHpBefore = Mathf.Max(0, target.CurrentHP);
-        int attackerLoss = Mathf.Max(0, attackerHpBefore - sim.attackerHpAfter);
-        int targetDamage = Mathf.Max(0, targetHpBefore - sim.defenderHpAfter);
-        int attackerLossPct = attackerHpBefore > 0
-            ? Mathf.RoundToInt(attackerLoss * 100f / attackerHpBefore)
-            : 0;
-        int targetDamagePct = Mathf.Max(1, targetData.maxHP) > 0
-            ? Mathf.RoundToInt(targetDamage * 100f / Mathf.Max(1, targetData.maxHP))
-            : 0;
+        AICombatHpSimulator.AICombatHpResult sim = simSummary.result;
+        int attackerHpBefore = simSummary.attackerHpBefore;
+        int targetHpBefore = simSummary.targetHpBefore;
+        int attackerLossPct = simSummary.attackerLossPct;
+        int targetDamage = simSummary.targetDamage;
+        int targetDamagePct = simSummary.targetDamagePct;
         int hpLossLimit = Mathf.Clamp(attackerData.attackAcceptHpLossPercent
             + (defensiveContext ? attackerData.defensiveAttackExtraHpLossPercent : 0), 0, 100);
         int eliminationMin = Mathf.Clamp(attackerData.attackEliminationMinPercent, 0, 100);

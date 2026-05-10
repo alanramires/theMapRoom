@@ -104,6 +104,7 @@ public partial class AIController
 
         // Scoring: avança pelo melhor hex (PontaLanca) — ataca defensor visível (Perseguidor)
         float fromDist = SectorManager.HexDistance(fromCell, targetCell);
+        bool fromRouteFound = TryCalculateRouteDistance(unit, fromCell, targetCell, out float fromRouteDist);
 
         // Coleta todos os inimigos visíveis dentro de fromDist do objetivo (fonte: AllActive + FoW)
         MatchController mcDef = GetMatchController();
@@ -156,23 +157,30 @@ public partial class AIController
                 continue;
             }
             float dist     = SectorManager.HexDistance(cell, targetCell);
-            bool  advances = dist < fromDist;
+            bool cellRouteFound = TryCalculateRouteDistance(unit, cell, targetCell, out float routeDist);
+            float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - routeDist : 0f;
+            bool recoversMissingRoute = !fromRouteFound && cellRouteFound;
+            bool advancesByRoute = recoversMissingRoute || routeProgress > 0f;
+            bool advancesByHex = !fromRouteFound && !cellRouteFound && dist < fromDist;
+            bool  advances = advancesByRoute || advancesByHex;
             // prioritizeDpqAtBattle: considera qualquer célula alcançável como
             // origem de tiro; ela só vence se realmente conseguir atacar.
             bool  eligibleForAttack = advances || preferDpqAtBattle;
 
             float threat    = conservative ? CalculateThreatLevel(cell, snapshot.AITeam) : 0f;
-            float prox      = (1f / (dist + 1f)) * CaptureProximityBase;
+            float effectiveDist = cellRouteFound ? routeDist : dist;
+            float prox      = (1f / (effectiveDist + 1f)) * CaptureProximityBase;
             float dpq       = preferDpqMove ? dpqPontos * DpqWeight : 0f;
             float moveCost  = paths[cell].Count;
             float score     = prox - moveCost + dpq - threat * ThreatWeight;
-            float sectorTie = -dist;
+            float sectorTie = -effectiveDist;
             float hqDist    = CalculateEnemyHqDistance(cell, snapshot, unit);
             float hqTie     = CalculateEnemyHqTieBreak(hqDist);
 
             string hqDistText = hqDist < float.MaxValue ? hqDist.ToString("F1") : "?";
+            string routeText = cellRouteFound ? routeDist.ToString("F1") : "?";
             // dpqPontos sempre exibido (independente de preferDpqMove) para diagnóstico
-            scoringLog?.AppendLine($"  {cell} dist={dist:F1} prox={prox:F0} mv={moveCost:F0} dpqPts={dpqPontos:F1} dpq={dpq:F0} thr={threat:F0} secTie={sectorTie:F1} hq={hqDistText} hqTie={hqTie:F1} -> {score:F0}");
+            scoringLog?.AppendLine($"  {cell} dist={dist:F1} rota={routeText} progRota={routeProgress:+0.0;-0.0;0.0} prox={prox:F0} mv={moveCost:F0} dpqPts={dpqPontos:F1} dpq={dpq:F0} thr={threat:F0} secTie={sectorTie:F1} hq={hqDistText} hqTie={hqTie:F1} -> {score:F0}");
 
             // bestMove: só células que avançam em direção ao objetivo
             if (advances && IsBetterScore(score, sectorTie, hqTie, bestScore, bestSectorTie, bestHqTie))

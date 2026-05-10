@@ -195,7 +195,7 @@ public partial class AIController
 
                 Vector3Int targetCell = opt.targetUnit.CurrentCellPosition;
                 targetCell.z = 0;
-                float targetPriority = ScoreFireSupportTarget(unit, opt, targetCell, anchor, weaponPriorityData);
+                float targetPriority = ScoreFireSupportTarget(unit, opt, cell, targetCell, anchor, weaponPriorityData, out string combatScoreDetails);
                 float rangeScore = PreferFireSupportWeaponMaxRange(unit) ? opt.distance * 30f : -opt.distance * 5f;
                 float movePenalty = cell == fromCell ? 0f : GetPathStepCount(paths, cell) * 40f;
                 float dpq = GetTerrainDpqPontos(cell) * 25f;
@@ -206,7 +206,7 @@ public partial class AIController
                     bestScore = score;
                     bestCell = cell;
                     bestTarget = opt.targetUnit;
-                    bestDecision = attackDecisionReason;
+                    bestDecision = $"{attackDecisionReason} {combatScoreDetails}";
                 }
             }
         }
@@ -246,10 +246,13 @@ public partial class AIController
     private float ScoreFireSupportTarget(
         UnitManager attacker,
         PodeMirarTargetOption option,
+        Vector3Int attackCell,
         Vector3Int targetCell,
         Vector3Int anchor,
-        WeaponPriorityData weaponPriorityData)
+        WeaponPriorityData weaponPriorityData,
+        out string details)
     {
+        details = "";
         UnitManager target = option != null ? option.targetUnit : null;
         if (target == null)
             return 0f;
@@ -257,15 +260,27 @@ public partial class AIController
         float score = 10000f;
         score -= SectorManager.HexDistance(targetCell, anchor) * 500f;
         score += Mathf.Max(0, 20 - target.CurrentHP) * 120f;
-        score += GetFireSupportTargetPreferenceScore(ResolveFireSupportTargetPreference(attacker, target));
+        BazookaTargetPriority targetPreference = ResolveFireSupportTargetPreference(attacker, target);
+        score += GetFireSupportTargetPreferenceScore(targetPreference);
         if (option.isPreferredTargetForWeapon)
             score += 6500f;
         score += GetFireSupportRangeFitScore(attacker, target, option.distance, option.weapon, weaponPriorityData);
+        string simDetails = "";
+        if (TrySimulateAttackForAI(attacker, target, attackCell, out AIAttackSimulationSummary sim))
+        {
+            float damageScore = sim.targetDamage * 3000f;
+            float damagePctScore = sim.targetDamagePct * 80f;
+            float killScore = sim.result.killGuaranteed ? 12000f : 0f;
+            float survivalPenalty = sim.result.attackerSurvives ? 0f : 4000f;
+            score += damageScore + damagePctScore + killScore - survivalPenalty;
+            simDetails = $" simDmg={sim.targetDamage} dmgPct={sim.targetDamagePct}% kill={sim.result.killGuaranteed} simScore={(damageScore + damagePctScore + killScore - survivalPenalty):F0}";
+        }
 
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, targetCell);
         if (construction != null)
             score += 1500f;
 
+        details = $"pref={targetPreference}{simDetails}";
         return score;
     }
 
@@ -318,9 +333,9 @@ public partial class AIController
         switch (priority)
         {
             case BazookaTargetPriority.Primary:
-                return 9000f;
+                return 18000f;
             case BazookaTargetPriority.Secondary:
-                return 4500f;
+                return 8500f;
             default:
                 return 0f;
         }
@@ -342,6 +357,9 @@ public partial class AIController
         if (weapons == null || weapons.Count == 0)
             return 0f;
 
+        BazookaTargetPriority targetPreference = ResolveFireSupportTargetPreference(attacker, target);
+        bool preferredByUnitData = targetPreference == BazookaTargetPriority.Primary
+            || targetPreference == BazookaTargetPriority.Secondary;
         float best = 0f;
         for (int i = 0; i < weapons.Count; i++)
         {
@@ -364,10 +382,11 @@ public partial class AIController
             float rangeError = distance < minRange
                 ? minRange - distance
                 : distance > maxRange ? distance - maxRange
-                : Mathf.Abs(distance - idealRange);
+                : preferredByUnitData ? 0f : Mathf.Abs(distance - idealRange);
             float inRangeBonus = inRange ? 3500f : 0f;
             float preferredBonus = preferredWeapon ? 6500f : 0f;
-            float score = preferredBonus + inRangeBonus + Mathf.Max(0f, 2600f - rangeError * 900f);
+            float unitPreferenceInRangeBonus = preferredByUnitData && inRange ? 2500f : 0f;
+            float score = preferredBonus + inRangeBonus + unitPreferenceInRangeBonus + Mathf.Max(0f, 2600f - rangeError * 900f);
             if (score > best)
                 best = score;
         }
@@ -399,6 +418,7 @@ public partial class AIController
         bool preferBestDpq = PreferFireSupportBestDpq(unit);
         int maxRange = GetFireSupportMaxWeaponRange(unit);
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
+        bool fromRouteFound = TryCalculateFireSupportRouteDistance(unit, fromCell, anchor, out float fromRouteDist);
         float fromScore = ScoreFireSupportRepositionCell(
             unit,
             snapshot,
@@ -413,6 +433,14 @@ public partial class AIController
             maxRange,
             weaponPriorityData,
             out _);
+        Vector3Int bestAdvanceCell = fromCell;
+        bool bestAdvanceRouteFound = false;
+        float bestAdvanceProgress = 0f;
+        float bestAdvanceHexProgress = 0f;
+        float bestAdvanceDpq = GetTerrainDpqPontos(fromCell);
+        float bestAdvanceThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
+        int bestAdvancePathCost = int.MaxValue;
+        bool foundAdvance = false;
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
@@ -424,6 +452,10 @@ public partial class AIController
             float progress = fromDist - SectorManager.HexDistance(cell, anchor);
             float dpq = GetTerrainDpqPontos(cell);
             int pathCost = GetPathStepCount(paths, cell);
+            bool cellRouteFound = TryCalculateFireSupportRouteDistance(unit, cell, anchor, out float cellRouteDist);
+            float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - cellRouteDist : 0f;
+            bool recoversMissingRoute = !fromRouteFound && cellRouteFound;
+            bool advancesByRoute = recoversMissingRoute || routeProgress > 0f;
             if (requireImmediateThreat && CalculateFireSupportTacticalPressureScore(unit, snapshot, cell, weaponPriorityData) <= 0f)
                 continue;
 
@@ -447,6 +479,37 @@ public partial class AIController
             if (preferBestDpq && dpq <= GetTerrainDpqPontos(fromCell) && pathCost <= 1)
                 score -= 250f;
 
+            if (!requireImmediateThreat && (progress > 0f || advancesByRoute))
+            {
+                float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+                float fallbackProgress = advancesByRoute
+                    ? recoversMissingRoute ? -cellRouteDist : routeProgress
+                    : progress;
+                if (!foundAdvance || IsBetterFireSupportAdvanceFallback(
+                    advancesByRoute,
+                    fallbackProgress,
+                    progress,
+                    dpq,
+                    threat,
+                    pathCost,
+                    bestAdvanceRouteFound,
+                    bestAdvanceProgress,
+                    bestAdvanceHexProgress,
+                    bestAdvanceDpq,
+                    bestAdvanceThreat,
+                    bestAdvancePathCost))
+                {
+                    bestAdvanceCell = cell;
+                    bestAdvanceRouteFound = advancesByRoute;
+                    bestAdvanceProgress = fallbackProgress;
+                    bestAdvanceHexProgress = progress;
+                    bestAdvanceDpq = dpq;
+                    bestAdvanceThreat = threat;
+                    bestAdvancePathCost = pathCost;
+                    foundAdvance = true;
+                }
+            }
+
             if (score > bestScore)
             {
                 bestScore = score;
@@ -456,8 +519,29 @@ public partial class AIController
         }
 
         const float moveMargin = 120f;
-        if (!found || bestCell == fromCell || bestScore < fromScore + moveMargin)
+        if (!found || bestCell == fromCell)
+        {
+            if (foundAdvance)
+            {
+                bestCell = bestAdvanceCell;
+                reason = $"advanceFallback route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
+                return true;
+            }
+
             return false;
+        }
+
+        if (bestScore < fromScore + moveMargin)
+        {
+            if (foundAdvance)
+            {
+                bestCell = bestAdvanceCell;
+                reason = $"advanceFallback score={bestScore:F0} hold={fromScore:F0} route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
+                return true;
+            }
+
+            return false;
+        }
 
         ScoreFireSupportRepositionCell(
             unit,
@@ -475,6 +559,63 @@ public partial class AIController
             out string scoreDetails);
         reason = $"score={bestScore:F0} hold={fromScore:F0} {scoreDetails}";
         return true;
+    }
+
+    private static bool IsBetterFireSupportAdvanceFallback(
+        bool candidateRouteFound,
+        float candidateProgress,
+        float candidateHexProgress,
+        float candidateDpq,
+        float candidateThreat,
+        int candidatePathCost,
+        bool currentRouteFound,
+        float currentProgress,
+        float currentHexProgress,
+        float currentDpq,
+        float currentThreat,
+        int currentPathCost)
+    {
+        const float Epsilon = 0.001f;
+        if (candidateRouteFound != currentRouteFound)
+            return candidateRouteFound;
+
+        if (Mathf.Abs(candidateProgress - currentProgress) > Epsilon)
+            return candidateProgress > currentProgress;
+
+        if (Mathf.Abs(candidateHexProgress - currentHexProgress) > Epsilon)
+            return candidateHexProgress > currentHexProgress;
+
+        if (Mathf.Abs(candidateDpq - currentDpq) > Epsilon)
+            return candidateDpq > currentDpq;
+
+        if (Mathf.Abs(candidateThreat - currentThreat) > Epsilon)
+            return candidateThreat < currentThreat;
+
+        return candidatePathCost < currentPathCost;
+    }
+
+    private static bool TryCalculateFireSupportRouteDistance(UnitManager unit, Vector3Int fromCell, Vector3Int targetCell, out float distance)
+    {
+        distance = 0f;
+        fromCell.z = 0;
+        targetCell.z = 0;
+
+        if (unit != null
+            && unit.TryGetUnitData(out UnitData unitData)
+            && unitData != null
+            && SectorManager.TryGetLandMovementDistance(fromCell, targetCell, unitData, out int unitCost))
+        {
+            distance = unitCost;
+            return true;
+        }
+
+        if (SectorManager.TryGetLandMovementDistance(fromCell, targetCell, out int fallbackCost))
+        {
+            distance = fallbackCost;
+            return true;
+        }
+
+        return false;
     }
 
     private float ScoreFireSupportRepositionCell(

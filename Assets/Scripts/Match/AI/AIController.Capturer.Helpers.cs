@@ -48,7 +48,7 @@ public partial class AIController
         if (unit == null || snapshot == null || paths == null || paths.Count == 0)
             return false;
         TeamId aiTeam = snapshot.AITeam;
-        if (!IsActiveUnitBlockingThreatenedHomeProduction(unit, aiTeam, fromCell))
+        if (!IsActiveUnitBlockingThreatenedHomeProduction(unit, snapshot, aiTeam, fromCell, out string threatReason))
             return false;
 
         if (TryFindHomeProductionVacateAttack(unit, snapshot, fromCell, paths, occupied,
@@ -56,7 +56,7 @@ public partial class AIController
         {
             Vector3Int targetCell = target.CurrentCellPosition;
             targetCell.z = 0;
-            Debug.Log($"{TL("Base")} {unit.InstanceId} libera producao sob ameaca - ataca via {attackCell} -> {target.UnitDisplayName}#{target.InstanceId} ({reason})");
+            Debug.Log($"{TL("Base")} {unit.InstanceId} libera producao ({threatReason}) - ataca via {attackCell} -> {target.UnitDisplayName}#{target.InstanceId} ({reason})");
             action = BuildAttackBatch(unit, aiTeam, fromCell, attackCell,
                 target.InstanceId.ToString(), targetCell, paths);
             return true;
@@ -64,7 +64,7 @@ public partial class AIController
 
         if (TryFindHomeProductionVacateMove(unit, aiTeam, fromCell, paths, occupied, out Vector3Int moveCell))
         {
-            Debug.Log($"{TL("Base")} {unit.InstanceId} libera producao sob ameaca - reposiciona via {moveCell}");
+            Debug.Log($"{TL("Base")} {unit.InstanceId} libera producao ({threatReason}) - reposiciona via {moveCell}");
             action = BuildMoveBatch(unit, aiTeam, fromCell, moveCell, paths);
             return true;
         }
@@ -72,17 +72,105 @@ public partial class AIController
         return false;
     }
 
-    private bool IsActiveUnitBlockingThreatenedHomeProduction(UnitManager unit, TeamId aiTeam, Vector3Int fromCell)
+    private bool IsActiveUnitBlockingThreatenedHomeProduction(UnitManager unit, AIWorldSnapshot snapshot, TeamId aiTeam, Vector3Int fromCell, out string reason)
     {
-        if (unit == null || unit.IsUnderRepair)
+        reason = "";
+        if (unit == null)
             return false;
 
         fromCell.z = 0;
         ConstructionManager current = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
-        return current != null
-            && current.CanProduceUnitsForTeam(aiTeam)
+        if (current == null || !current.CanProduceUnitsForTeam(aiTeam))
+            return false;
+
+        if (!unit.IsUnderRepair
             && IsCriticalHomeDefenseSector(current.Sector, aiTeam)
-            && IsHomeDefenseThreatened(current.Sector, aiTeam, HomeDefenseThreatRange);
+            && IsHomeDefenseThreatened(current.Sector, aiTeam, HomeDefenseThreatRange))
+        {
+            reason = "ameaca_base";
+            return true;
+        }
+
+        if (IsEmergencyProductionDefenseUnblockNeeded(snapshot, current, out UnitData emergencyUnit, out int contestedOwned))
+        {
+            string unitName = emergencyUnit != null && !string.IsNullOrWhiteSpace(emergencyUnit.displayName)
+                ? emergencyUnit.displayName
+                : emergencyUnit != null ? emergencyUnit.name : "defesa";
+            reason = $"emergencia_fabrica cash={snapshot.Budget} comprar={unitName} construcoes_contestadas={contestedOwned}";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsEmergencyProductionDefenseUnblockNeeded(
+        AIWorldSnapshot snapshot,
+        ConstructionManager blockedProduction,
+        out UnitData emergencyUnit,
+        out int contestedOwned)
+    {
+        emergencyUnit = null;
+        contestedOwned = CountOwnedConstructionsUnderCapture(snapshot);
+        if (snapshot == null || blockedProduction == null)
+            return false;
+        if (snapshot.MyUnits == null || snapshot.MyUnits.Count != 1)
+            return false;
+        if (contestedOwned <= 0)
+            return false;
+
+        emergencyUnit = FindBestAffordableEmergencyDefensePurchase(blockedProduction, snapshot.Budget);
+        return emergencyUnit != null;
+    }
+
+    private static int CountOwnedConstructionsUnderCapture(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null)
+            return 0;
+
+        int count = 0;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.IsCapturable || building.CapturePointsMax <= 0)
+                continue;
+            if (building.CurrentCapturePoints < building.CapturePointsMax)
+                count++;
+        }
+
+        return count;
+    }
+
+    private static UnitData FindBestAffordableEmergencyDefensePurchase(ConstructionManager building, int budget)
+    {
+        if (building == null || building.OfferedUnits == null)
+            return null;
+
+        UnitData best = null;
+        int bestScore = int.MinValue;
+        foreach (UnitData unit in building.OfferedUnits)
+        {
+            if (unit == null || unit.cost > budget || unit.domain != Domain.Land)
+                continue;
+
+            bool fireSupport = unit.roles != null && unit.roles.Contains(UnitRole.FogoIndireto);
+            bool assaultArmor = unit.unitClass == GameUnitClass.Armored
+                && unit.roles != null && unit.roles.Count > 0 && unit.roles[0] == UnitRole.Assalto;
+            if (!fireSupport && !assaultArmor)
+                continue;
+
+            int score = unit.cost + Mathf.Max(0, unit.eliteLevel) * 10000;
+            if (fireSupport) score += 100000;
+            if (unit.longRangeStationary) score += 25000;
+            if (unit.preferRepositionAtWeaponMaxRange) score += 15000;
+            if (assaultArmor) score += 50000;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = unit;
+            }
+        }
+
+        return best;
     }
 
     private bool TryFindHomeProductionVacateAttack(
@@ -774,6 +862,37 @@ public partial class AIController
             return fallbackCost;
 
         return SectorManager.HexDistance(cell, hq);
+    }
+
+    private static bool TryCalculateRouteDistance(UnitManager unit, Vector3Int fromCell, Vector3Int targetCell, out float distance)
+    {
+        distance = 0f;
+        fromCell.z = 0;
+        targetCell.z = 0;
+
+        if (unit != null
+            && unit.TryGetUnitData(out UnitData unitData)
+            && unitData != null
+            && SectorManager.TryGetLandMovementDistance(fromCell, targetCell, unitData, out int unitCost))
+        {
+            distance = unitCost;
+            return true;
+        }
+
+        if (SectorManager.TryGetLandMovementDistance(fromCell, targetCell, out int fallbackCost))
+        {
+            distance = fallbackCost;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static float CalculateRouteDistanceOrHex(UnitManager unit, Vector3Int fromCell, Vector3Int targetCell)
+    {
+        return TryCalculateRouteDistance(unit, fromCell, targetCell, out float routeDistance)
+            ? routeDistance
+            : SectorManager.HexDistance(fromCell, targetCell);
     }
 
     private static float CalculateEnemyHqTieBreak(float hqDistance)

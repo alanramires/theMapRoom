@@ -332,6 +332,7 @@ public partial class AIController
         HashSet<Vector3Int> occupied)
     {
         float fromDist = SectorManager.HexDistance(fromCell, pressureTarget);
+        bool fromRouteFound = TryCalculateRouteDistance(unit, fromCell, pressureTarget, out float fromRouteDist);
         Vector3Int bestCell = fromCell;
         Vector3Int bestFallbackCell = fromCell;
         float bestProgress = float.MinValue;
@@ -350,10 +351,15 @@ public partial class AIController
             if (cell != fromCell && occupied.Contains(cell)) continue;
 
             float dist = SectorManager.HexDistance(cell, pressureTarget);
+            bool cellRouteFound = TryCalculateRouteDistance(unit, cell, pressureTarget, out float routeDist);
             float dpq = GetTerrainDpqPontos(cell);
             float threat = CalculateThreatLevel(cell, snapshot.AITeam);
             // Bonus forte para células que avançam; penalidade leve para as que regridem
-            float progress = fromDist - dist;
+            float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - routeDist : 0f;
+            bool recoversMissingRoute = !fromRouteFound && cellRouteFound;
+            float progress = recoversMissingRoute
+                ? -routeDist
+                : (fromRouteFound && cellRouteFound) ? routeProgress : fromDist - dist;
             float line = CalculateLineProgressTieBreak(fromCell, pressureTarget, cell);
             int pathCost = GetPathStepCount(paths, cell);
 
@@ -367,7 +373,10 @@ public partial class AIController
                 bestFallbackCell = cell;
             }
 
-            if (dist > fromDist) continue;
+            bool movesCloser = recoversMissingRoute
+                || routeProgress > 0f
+                || (!fromRouteFound && !cellRouteFound && dist <= fromDist);
+            if (!movesCloser) continue;
 
             if (IsBetterAssaultPressureMove(progress, line, pathCost, threat, dpq,
                     bestProgress, bestLine, bestPathCost, bestThreat, GetTerrainDpqPontos(bestCell)))

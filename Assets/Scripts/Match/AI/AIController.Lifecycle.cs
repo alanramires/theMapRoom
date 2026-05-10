@@ -2,6 +2,34 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private bool IsMatchEnded()
+    {
+        return matchController != null && matchController.HasVictoryWinner;
+    }
+
+    private bool ShouldStopAIForMatchEnd(string context)
+    {
+        if (!IsMatchEnded())
+            return false;
+
+        StopAIForMatchEnd(context);
+        return true;
+    }
+
+    private void StopAIForMatchEnd(string context)
+    {
+        isActive = false;
+        currentAIStage = 0;
+        currentAITeam = TeamId.Neutral;
+        aiCoroutine = null;
+        debugStepPendingAction = null;
+        debugStepRequest = DebugStepRequest.None;
+        if (IsDebugPaused) IsDebugPaused = false;
+        if (IsDebugShoppingPaused) IsDebugShoppingPaused = false;
+        PanelDialogController.ClearExternalText();
+        Debug.Log($"[AI] Partida encerrada ({context}); IA interrompida.");
+    }
+
     // -------------------------------------------------------------------------
 
     // Lifecycle
@@ -90,6 +118,11 @@ public partial class AIController
         Debug.Log($"[AI] HandleTeamChanged — teamIndex={teamIndex} newTeam={newTeam} matchController={matchController != null} isAI={aiCheck}");
 
         if (matchController == null) return;
+        if (matchController.HasVictoryWinner)
+        {
+            StopAIForMatchEnd("team_changed");
+            return;
+        }
 
         if (aiCheck)
 

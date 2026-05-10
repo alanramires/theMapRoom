@@ -11,6 +11,16 @@ public partial class AIController
     {
         if (!IsFireSupportUnit(unit)) return null;
 
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        Dictionary<Vector3Int, List<Vector3Int>> vacatePaths = BuildFireSupportPaths(unit);
+        if (vacatePaths != null && vacatePaths.Count > 0)
+        {
+            HashSet<Vector3Int> vacateOccupied = BuildOccupied(unit);
+            if (TryFindHomeProductionVacateCombatAction(unit, snapshot, fromCell, vacatePaths, vacateOccupied, out PlayerAction vacateAction))
+                return vacateAction;
+        }
+
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
 

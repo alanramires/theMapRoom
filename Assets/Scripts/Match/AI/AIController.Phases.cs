@@ -11,12 +11,19 @@ public partial class AIController
     private IEnumerator RunAITurn(TeamId aiTeam)
     {
         Debug.Log($"[AI] RunAITurn iniciado para {aiTeam}.");
+        if (ShouldStopAIForMatchEnd("turn_start"))
+            yield break;
+
         currentAITeam = aiTeam;
         if (emulateStage0)
         {
             currentAIStage = 0;
             yield return Phase0_WaitForTurnReady();
+            if (ShouldStopAIForMatchEnd("apos_stage0"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("apos_pause_stage0"))
+                yield break;
         }
         else
         {
@@ -40,7 +47,11 @@ public partial class AIController
         {
             currentAIStage = 1;
             yield return Phase1_CommandService(snapshot);
+            if (ShouldStopAIForMatchEnd("apos_stage1"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("apos_pause_stage1"))
+                yield break;
         }
         else
         {
@@ -51,7 +62,11 @@ public partial class AIController
         {
             currentAIStage = 2;
             yield return Phase2_UnitActions(snapshot);
+            if (ShouldStopAIForMatchEnd("apos_stage2"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("apos_pause_stage2"))
+                yield break;
         }
         else
         {
@@ -61,10 +76,18 @@ public partial class AIController
         if (emulateStage3)
         {
             yield return WaitIfDebugShoppingPaused();
+            if (ShouldStopAIForMatchEnd("apos_pause_compras"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("apos_pause_stage3_pre"))
+                yield break;
             currentAIStage = 3;
             yield return Phase3_Shopping(snapshot);
+            if (ShouldStopAIForMatchEnd("apos_stage3"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("apos_pause_stage3"))
+                yield break;
         }
         else
         {
@@ -73,6 +96,8 @@ public partial class AIController
 
         if (emulateStage4)
         {
+            if (ShouldStopAIForMatchEnd("antes_stage4"))
+                yield break;
             currentAIStage = 4;
             yield return Phase4_EndTurn();
         }
@@ -89,13 +114,22 @@ public partial class AIController
 
     private IEnumerator RunAIDebugStage(TeamId aiTeam, int stage, bool resetPlan = false)
     {
+        if (ShouldStopAIForMatchEnd("debug_stage_start"))
+            yield break;
+
         currentAITeam = aiTeam;
         currentAIStage = Mathf.Clamp(stage, 1, 3);
         yield return WaitIfDebugPaused();
+        if (ShouldStopAIForMatchEnd("debug_apos_pause_inicial"))
+            yield break;
         yield return new WaitUntil(() => replayManager == null || !replayManager.IsStepExecutionBusy);
+        if (ShouldStopAIForMatchEnd("debug_apos_replay_busy"))
+            yield break;
         yield return new WaitUntil(() =>
             turnStateManager == null ||
             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral);
+        if (ShouldStopAIForMatchEnd("debug_apos_neutral"))
+            yield break;
 
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
         aiTurnNumber = snapshot.TurnNumber;
@@ -123,7 +157,11 @@ public partial class AIController
         {
             currentAIStage = 1;
             yield return Phase1_CommandService(snapshot);
+            if (ShouldStopAIForMatchEnd("debug_apos_stage1"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("debug_apos_pause_stage1"))
+                yield break;
         }
         else if (stage <= 1)
         {
@@ -134,7 +172,11 @@ public partial class AIController
         {
             currentAIStage = 2;
             yield return Phase2_UnitActions(snapshot);
+            if (ShouldStopAIForMatchEnd("debug_apos_stage2"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("debug_apos_pause_stage2"))
+                yield break;
         }
         else if (stage <= 2)
         {
@@ -145,10 +187,18 @@ public partial class AIController
         {
             currentAIStage = 2;
             yield return WaitIfDebugShoppingPaused();
+            if (ShouldStopAIForMatchEnd("debug_apos_pause_compras"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("debug_apos_pause_stage3_pre"))
+                yield break;
             currentAIStage = 3;
             yield return Phase3_Shopping(snapshot);
+            if (ShouldStopAIForMatchEnd("debug_apos_stage3"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("debug_apos_pause_stage3"))
+                yield break;
         }
         else if (stage <= 3)
         {
@@ -157,6 +207,8 @@ public partial class AIController
 
         if (emulateStage4)
         {
+            if (ShouldStopAIForMatchEnd("debug_antes_stage4"))
+                yield break;
             currentAIStage = 4;
             yield return Phase4_EndTurn();
         }
@@ -177,6 +229,9 @@ public partial class AIController
 
     private IEnumerator Phase0_WaitForTurnReady()
     {
+        if (ShouldStopAIForMatchEnd("phase0_start"))
+            yield break;
+
         // Um frame para que os handlers de OnActiveTeamChanged das outras systems
         // (supply queue, auto command service) registrem suas coroutines primeiro.
         yield return null;
@@ -184,8 +239,12 @@ public partial class AIController
         if (turnStateManager != null)
         {
             yield return new WaitUntil(() => !turnStateManager.IsAutoCommandServiceBusy);
+            if (ShouldStopAIForMatchEnd("phase0_apos_command_service"))
+                yield break;
             yield return new WaitUntil(() =>
                 turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral);
+            if (ShouldStopAIForMatchEnd("phase0_apos_neutral"))
+                yield break;
         }
 
         float batchDelay = GetBatchDelay();
@@ -196,6 +255,9 @@ public partial class AIController
 
     private IEnumerator Phase1_CommandService(AIWorldSnapshot snapshot)
     {
+        if (ShouldStopAIForMatchEnd("phase1_start"))
+            yield break;
+
         Debug.Log($"{TL()} Fase1 — iniciando. replayManager={replayManager != null} turnStateManager={turnStateManager != null}");
 
         if (replayManager == null)
@@ -212,10 +274,14 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase1 — enviando batch CommandService.");
         yield return ExecuteAIBatchWithDebugStep(BuildCommandServiceBatch(snapshot.AITeam));
+        if (ShouldStopAIForMatchEnd("phase1_apos_batch"))
+            yield break;
         Debug.Log($"{TL()} Fase1 — batch concluído. Aguardando IsAutoCommandServiceBusy...");
 
         if (turnStateManager != null)
             yield return new WaitUntil(() => !turnStateManager.IsAutoCommandServiceBusy);
+        if (ShouldStopAIForMatchEnd("phase1_apos_command_service"))
+            yield break;
 
         float delay = GetBatchDelay();
         if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
@@ -229,6 +295,9 @@ public partial class AIController
 
     private IEnumerator Phase2_UnitActions(AIWorldSnapshot snapshot)
     {
+        if (ShouldStopAIForMatchEnd("phase2_start"))
+            yield break;
+
         TeamId aiTeam = snapshot.AITeam;
 
         List<UnitManager> initial = GetAvailableUnits(aiTeam);
@@ -242,9 +311,11 @@ public partial class AIController
         plannedDestinations.Clear();
         var deferredUnitIds = new HashSet<int>();
 
-        while (isActive)
+        while (isActive && !IsMatchEnded())
         {
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("phase2_loop_apos_pause"))
+                yield break;
 
             List<UnitManager> available = GetAvailableUnits(aiTeam);
             if (available.Count == 0) break;
@@ -344,7 +415,11 @@ public partial class AIController
             bool unitMoved    = action.HasMoveTo && action.MoveTo != action.MoveFrom;
             bool unitAttacked = !string.IsNullOrEmpty(action.TargetInstanceId);
             yield return ExecuteAIBatchWithDebugStep(action);
+            if (ShouldStopAIForMatchEnd("phase2_apos_batch"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("phase2_apos_pause_batch"))
+                yield break;
 
             if (unitMoved || unitAttacked)
             {
@@ -398,24 +473,39 @@ public partial class AIController
 
     private IEnumerator Phase3_Shopping(AIWorldSnapshot snapshot)
     {
+        if (ShouldStopAIForMatchEnd("phase3_start"))
+            yield break;
+
         Debug.Log($"{TL()} Fase3 — compras.");
 
         // Reconstrói snapshot para refletir o saldo atual pós-ações
         AIWorldSnapshot freshSnap = AIWorldSnapshot.Build(snapshot.AITeam, matchController);
+        if (ShouldStopAIForMatchEnd("phase3_apos_snapshot"))
+            yield break;
         List<AIShoppingPlanner.ShoppingOrder> orders = AIShoppingPlanner.Decide(freshSnap);
 
         foreach (AIShoppingPlanner.ShoppingOrder order in orders)
         {
-            if (!isActive) break;
+            if (!isActive || ShouldStopAIForMatchEnd("phase3_loop")) break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("phase3_apos_pause_loop"))
+                yield break;
             yield return WaitIfDebugShoppingPaused();
+            if (ShouldStopAIForMatchEnd("phase3_apos_pause_shop"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("phase3_apos_pause_pre_batch"))
+                yield break;
 
             PlayerAction batch = BuildShoppingBatch(snapshot.AITeam, order);
             Debug.Log($"{TL("Shopping")} {order.UnitToBuy.name} @ {order.Building.CurrentCellPosition}");
 
             yield return ExecuteAIBatchWithDebugStep(batch);
+            if (ShouldStopAIForMatchEnd("phase3_apos_batch"))
+                yield break;
             yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("phase3_apos_pause_batch"))
+                yield break;
 
             // Segurança: fecha o menu de shopping se ficou aberto (compra falhou)
             if (turnStateManager != null &&
@@ -440,10 +530,14 @@ public partial class AIController
     {
         Debug.Log($"{TL()} Fase4 — passando a vez.");
         isActive = false;
+        if (ShouldStopAIForMatchEnd("phase4_start"))
+            yield break;
 
         yield return new WaitUntil(() =>
             turnStateManager == null ||
             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral);
+        if (ShouldStopAIForMatchEnd("phase4_apos_neutral"))
+            yield break;
 
         if (replayManager != null)
         {

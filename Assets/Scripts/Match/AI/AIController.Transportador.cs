@@ -121,10 +121,11 @@ public partial class AIController
         if (foundReachableRoute && (bestCell != fromCell || foundImprovingMove))
             return bestCell;
 
-        return FindTransportExplorationMove(fromCell, pressureTarget, paths, occupied, aiTeam);
+        return FindTransportExplorationMove(unit, fromCell, pressureTarget, paths, occupied, aiTeam);
     }
 
     private Vector3Int FindTransportExplorationMove(
+        UnitManager unit,
         Vector3Int fromCell,
         Vector3Int pressureTarget,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
@@ -134,6 +135,7 @@ public partial class AIController
         Vector3Int bestCell = fromCell;
         float bestScore = float.MinValue;
         float fromHexDist = SectorManager.HexDistance(fromCell, pressureTarget);
+        bool fromRouteFound = TryCalculateRouteDistance(unit, fromCell, pressureTarget, out float fromRouteDist);
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
@@ -143,7 +145,12 @@ public partial class AIController
             if (occupied != null && occupied.Contains(cell)) continue;
 
             float hexDist = SectorManager.HexDistance(cell, pressureTarget);
-            float progress = fromHexDist - hexDist;
+            bool cellRouteFound = TryCalculateRouteDistance(unit, cell, pressureTarget, out float routeDist);
+            float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - routeDist : 0f;
+            bool recoversMissingRoute = !fromRouteFound && cellRouteFound;
+            float progress = recoversMissingRoute
+                ? -routeDist
+                : (fromRouteFound && cellRouteFound) ? routeProgress : fromHexDist - hexDist;
             int pathSteps = GetPathStepCount(paths, cell);
             float threat = CalculateThreatLevel(cell, aiTeam);
             bool isNonTeamBldg = IsNonTeamConstruction(cell, aiTeam);

@@ -15,6 +15,7 @@ public partial class AIController
         // Verifica se o scoring loop (hasAttackHex) terá algum inimigo visível atacável
         // a partir de uma célula que avance (ou, para dpqPref, que fique à mesma distância).
         float fromDist = SectorManager.HexDistance(fromCell, targetCell);
+        bool fromRouteFound = TryCalculateRouteDistance(unit, fromCell, targetCell, out float fromRouteDist);
         bool dpqPref = unit.TryGetUnitData(out UnitData udPursuer) && udPursuer.prioritizeDpqAtBattle;
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
@@ -27,9 +28,23 @@ public partial class AIController
             {
                 if (occupied.Contains(cell)) continue;
                 float cellDist = SectorManager.HexDistance(cell, targetCell);
+                bool cellRouteFound = TryCalculateRouteDistance(unit, cell, targetCell, out float cellRouteDist);
+                float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - cellRouteDist : 0f;
+                bool advancesByRoute = (!fromRouteFound && cellRouteFound) || routeProgress > 0f;
+                bool sameRoute = fromRouteFound && cellRouteFound && Mathf.Abs(routeProgress) <= 0.001f;
                 // célula elegível se avança, ou se dpqPref e está à mesma distância (posição DPQ lateral)
-                if (cellDist > fromDist) continue;
-                if (cellDist == fromDist && !dpqPref) continue;
+                if (!advancesByRoute)
+                {
+                    if (fromRouteFound && cellRouteFound)
+                    {
+                        if (!sameRoute || !dpqPref) continue;
+                    }
+                    else
+                    {
+                        if (cellDist > fromDist) continue;
+                        if (cellDist == fromDist && !dpqPref) continue;
+                    }
+                }
                 if (CanAttackTargetFrom(fromCell, cell, unit, enemy))
                     return false; // scoring loop tem move+attack disponível — ele decide
             }

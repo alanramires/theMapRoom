@@ -107,6 +107,7 @@ public partial class AIController
         // Move+ataca: inimigo visível (AllActive + FoW) alcançável de célula que avança ao HQ
         {
             float fromDistHQ = SectorManager.HexDistance(from, target);
+            bool fromRouteFound = TryCalculateRouteDistance(unit, from, target, out float fromRouteDist);
             MatchController mcAdv = GetMatchController();
             UnitManager advAttackTarget = null;
             Vector3Int  advAttackCell   = from;
@@ -118,7 +119,13 @@ public partial class AIController
                 foreach (Vector3Int cell in paths.Keys)
                 {
                     if (occupied.Contains(cell)) continue;
-                    if (SectorManager.HexDistance(cell, target) >= fromDistHQ) continue;
+                    float cellDist = SectorManager.HexDistance(cell, target);
+                    bool cellRouteFound = TryCalculateRouteDistance(unit, cell, target, out float cellRouteDist);
+                    float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - cellRouteDist : 0f;
+                    bool advances = (!fromRouteFound && cellRouteFound)
+                        || routeProgress > 0f
+                        || (!fromRouteFound && !cellRouteFound && cellDist < fromDistHQ);
+                    if (!advances) continue;
                     if (!CanAttackTargetFrom(from, cell, unit, enemy)) continue;
                     if (!PassesAttackDecision(unit, enemy, cell, false, out _)) continue;
                     Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
@@ -138,11 +145,11 @@ public partial class AIController
 
         // Avança para o hex mais próximo do HQ
         Vector3Int best     = from;
-        float      bestDist = SectorManager.HexDistance(from, target);
+        float      bestDist = CalculateRouteDistanceOrHex(unit, from, target);
         foreach (Vector3Int cell in paths.Keys)
         {
             if (occupied.Contains(cell)) continue;
-            float dist = SectorManager.HexDistance(cell, target);
+            float dist = CalculateRouteDistanceOrHex(unit, cell, target);
             if (IsBetterRogueAdvance(from, target, cell, dist, best, bestDist))
             {
                 bestDist = dist;

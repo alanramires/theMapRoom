@@ -52,8 +52,8 @@ public partial class AIController
             if (bestAdj != Vector3Int.zero) moveTarget = bestAdj;
         }
 
-        float moveImprovement = SectorManager.HexDistance(fromCell, primaryTarget)
-                              - SectorManager.HexDistance(moveTarget, primaryTarget);
+        float moveImprovement = CalculateRouteDistanceOrHex(unit, fromCell, primaryTarget)
+                              - CalculateRouteDistanceOrHex(unit, moveTarget, primaryTarget);
 
         // Priority 1: move + disembark when moving brings the APC meaningfully closer
         // AND the simulated drop-off from moveTarget is within delivery range.

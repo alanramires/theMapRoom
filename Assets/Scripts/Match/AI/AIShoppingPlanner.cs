@@ -115,6 +115,16 @@ public class AIShoppingPlanner : MonoBehaviour
             && activeFireSupportCount < 2;
         int reserveForEliteFireSupport = 0;
         bool eliteFireSupportBought = false;
+        bool emergencyProductionDefense = TryFindEmergencyProductionDefensePurchase(snapshot, remaining, out UnitData emergencyDefenseTarget, out int emergencyContestedOwned);
+        if (emergencyProductionDefense)
+        {
+            eliteFireSupportTarget = emergencyDefenseTarget;
+            openFireSupportSlots = Mathf.Max(openFireSupportSlots, 1);
+            preferDefensiveFireSupport = true;
+            wantsEliteFireSupport = true;
+            eliteFireSupportNowAffordable = true;
+            Debug.Log($"[AI Shopping] emergencia fabrica: construcoes_contestadas={emergencyContestedOwned} cash={remaining} compra_prioritaria={emergencyDefenseTarget.displayName} custo={emergencyDefenseTarget.cost}");
+        }
         if (wantsEliteFireSupport)
         {
             if (remaining >= eliteFireSupportTarget.cost)
@@ -248,7 +258,8 @@ public class AIShoppingPlanner : MonoBehaviour
             }
 
             bool defensiveBaseThreat = HasVisibleEnemyNearBase(building, snapshot, DefensiveBaseThreatRange)
-                || defensiveArmorThreat;
+                || defensiveArmorThreat
+                || emergencyProductionDefense;
             bool allowDefensiveEliteAssault = defensiveBaseThreat
                 && wantsEliteAssault
                 && !eliteAssaultBought
@@ -764,6 +775,110 @@ public class AIShoppingPlanner : MonoBehaviour
         return myCount > 0
             && myCount <= DefensiveLowTroopCountThreshold
             && visibleEnemyCount > myCount;
+    }
+
+    private static bool TryFindEmergencyProductionDefensePurchase(
+        AIWorldSnapshot snapshot,
+        int budget,
+        out UnitData bestUnit,
+        out int contestedOwned)
+    {
+        bestUnit = null;
+        contestedOwned = CountOwnedConstructionsUnderCapture(snapshot);
+        if (snapshot == null || snapshot.MyUnits == null || snapshot.MyBuildings == null)
+            return false;
+        if (snapshot.MyUnits.Count != 1)
+            return false;
+        if (contestedOwned <= 0)
+            return false;
+
+        int bestScore = int.MinValue;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            UnitData unit = FindBestAffordableEmergencyDefensePurchase(building, budget);
+            if (unit == null) continue;
+
+            int score = ScoreEmergencyDefensePurchase(unit);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestUnit = unit;
+            }
+        }
+
+        return bestUnit != null;
+    }
+
+    private static int CountOwnedConstructionsUnderCapture(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null)
+            return 0;
+
+        int count = 0;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.IsCapturable || building.CapturePointsMax <= 0)
+                continue;
+            if (building.CurrentCapturePoints < building.CapturePointsMax)
+                count++;
+        }
+
+        return count;
+    }
+
+    private static UnitData FindBestAffordableEmergencyDefensePurchase(ConstructionManager building, int budget)
+    {
+        if (building == null || building.OfferedUnits == null)
+            return null;
+
+        UnitData best = null;
+        int bestScore = int.MinValue;
+        foreach (UnitData unit in building.OfferedUnits)
+        {
+            if (unit == null || unit.cost > budget || unit.domain != Domain.Land)
+                continue;
+            if (!IsEmergencyDefensePurchase(unit))
+                continue;
+
+            int score = ScoreEmergencyDefensePurchase(unit);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = unit;
+            }
+        }
+
+        return best;
+    }
+
+    private static bool IsEmergencyDefensePurchase(UnitData unit)
+    {
+        if (unit == null || unit.roles == null)
+            return false;
+
+        bool fireSupport = unit.roles.Contains(UnitRole.FogoIndireto);
+        bool assaultArmor = unit.unitClass == GameUnitClass.Armored
+            && unit.roles.Count > 0
+            && unit.roles[0] == UnitRole.Assalto;
+        return fireSupport || assaultArmor;
+    }
+
+    private static int ScoreEmergencyDefensePurchase(UnitData unit)
+    {
+        if (unit == null)
+            return int.MinValue;
+
+        bool fireSupport = unit.roles != null && unit.roles.Contains(UnitRole.FogoIndireto);
+        bool assaultArmor = unit.unitClass == GameUnitClass.Armored
+            && unit.roles != null && unit.roles.Count > 0 && unit.roles[0] == UnitRole.Assalto;
+
+        int score = unit.cost + Mathf.Max(0, unit.eliteLevel) * 10000;
+        if (fireSupport) score += 100000;
+        if (unit.longRangeStationary) score += 25000;
+        if (unit.preferRepositionAtWeaponMaxRange) score += 15000;
+        if (assaultArmor) score += 50000;
+        return score;
     }
 
     private static int FindCheapestDefensiveBaseThreatPurchaseCost(AIWorldSnapshot snapshot)
