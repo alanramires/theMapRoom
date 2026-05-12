@@ -45,7 +45,7 @@ MonoBehaviour:
   preferMaxDisplacement: 0
   longRangeStationary: 0
   preferRepositionAtWeaponMaxRange: 0
-  preferArtilleryModeBeforeCombatant: 0
+  preferArtilleryModeBeforeCombatant: 1
   useAttackDecision: 1
   attackAcceptHpLossPercent: 50
   attackEliminationMinPercent: 10

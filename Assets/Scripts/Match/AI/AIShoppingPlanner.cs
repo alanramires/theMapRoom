@@ -18,6 +18,7 @@ public class AIShoppingPlanner : MonoBehaviour
     public bool onlyCapturers;
     public bool onlyAssault;
     public bool onlyTransporter;
+    public bool onlyLogistics;
     public bool onlyFireSupport;
 
     [Header("Economia")]
@@ -27,6 +28,8 @@ public class AIShoppingPlanner : MonoBehaviour
     [Range(1, 12)]   public int   MinTurnForFireSupport     = 3;
     [Range(0, 8)]    public int   MinActiveCapturersForFireSupport = 2;
     [Range(0, 5)]    public int   MinActiveAssaultForFireSupport   = 1;
+    [Range(2, 8)]    public int   CapturersPerPreventiveTransport = 4;
+    [Range(1, 4)]    public int   ProgressiveCapturerBatchSize = 2;
 
     private static AIShoppingPlanner instance;
     public static AIShoppingPlanner Instance => EnsureInstance();
@@ -59,6 +62,7 @@ public class AIShoppingPlanner : MonoBehaviour
         bool onlyCapturers    = Instance != null && Instance.onlyCapturers;
         bool onlyAssault      = Instance != null && Instance.onlyAssault;
         bool onlyTransporter  = Instance != null && Instance.onlyTransporter;
+        bool onlyLogistics    = Instance != null && Instance.onlyLogistics;
         bool onlyFireSupport  = Instance != null && Instance.onlyFireSupport;
 
         var orders = new List<ShoppingOrder>();
@@ -70,14 +74,14 @@ public class AIShoppingPlanner : MonoBehaviour
         int openAssaultSlots    = CountOpenSlots(snapshot.AITeam, UnitRole.Assalto);
         int openTransportSlots = ComputeTransportDemand(snapshot, out bool urgentTransportDemand);
         int openFireSupportSlots = ComputeFireSupportDemand(snapshot, openCapturerSlots, openAssaultSlots, out bool preferDefensiveFireSupport);
+        int openLogisticsSlots = ComputeLogisticsDemand(snapshot, out int repairDemandCount, out int activeLogisticsCount);
         if (openAssaultSlots <= 0
             && !HasActivePrimaryRole(snapshot, UnitRole.Assalto)
             && CanAffordPurePrimaryRole(snapshot, UnitRole.Assalto, remaining))
         {
             openAssaultSlots = 1;
         }
-        if (openAssaultSlots > 0 && openCapturerSlots > 2)
-            openCapturerSlots = 2;
+        openCapturerSlots = LimitCapturerDemandForProgression(snapshot, openCapturerSlots, openAssaultSlots, openTransportSlots, openLogisticsSlots, openFireSupportSlots);
 
         UnitData eliteAssaultTarget = FindEliteAssaultReserveTarget(snapshot);
 
@@ -141,9 +145,25 @@ public class AIShoppingPlanner : MonoBehaviour
 
         int cheapestTransportCost = openTransportSlots > 0 ? FindCheapestAvailableTransportCost(snapshot) : 0;
 
-        Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cheapest_transport={cheapestTransportCost} onlyCap={onlyCapturers} onlyAss={onlyAssault} onlyTrans={onlyTransporter} onlyFire={onlyFireSupport}");
+        Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cheapest_transport={cheapestTransportCost} onlyCap={onlyCapturers} onlyAss={onlyAssault} onlyTrans={onlyTransporter} onlyLog={onlyLogistics} onlyFire={onlyFireSupport}");
 
-        bool wantsEliteAssault = eliteAssaultTarget != null && openAssaultSlots > 0;
+        bool strategicEliteAssaultReserve = eliteAssaultTarget != null
+            && openCapturerSlots <= 0
+            && openAssaultSlots <= 0
+            && openTransportSlots <= 0
+            && openLogisticsSlots <= 0
+            && openFireSupportSlots <= 0
+            && IsEliteAssaultReserveReady(snapshot);
+        bool nextTurnEliteAssaultReserve = eliteAssaultTarget != null
+            && remaining < eliteAssaultTarget.cost
+            && remaining + Mathf.Max(0, snapshot.IncomePerTurn) >= eliteAssaultTarget.cost
+            && IsEliteAssaultReserveReady(snapshot);
+        bool wantsEliteAssault = eliteAssaultTarget != null
+            && (openAssaultSlots > 0 || strategicEliteAssaultReserve || nextTurnEliteAssaultReserve);
+        if (strategicEliteAssaultReserve)
+            Debug.Log($"[AI Shopping] reserva estrategica elite assalto: composicao completa alvo={eliteAssaultTarget.displayName} custo={eliteAssaultTarget.cost}");
+        else if (nextTurnEliteAssaultReserve)
+            Debug.Log($"[AI Shopping] reserva proximo turno elite assalto: alvo={eliteAssaultTarget.displayName} custo={eliteAssaultTarget.cost} cash={remaining} income={snapshot.IncomePerTurn}");
         bool eliteAssaultBought = false;
         bool defensiveBaseTankBought = false;
         int defensiveBaseResponseReserveCost = FindCheapestDefensiveBaseThreatPurchaseCost(snapshot);
@@ -152,6 +172,17 @@ public class AIShoppingPlanner : MonoBehaviour
         bool defensiveArmorThreat = defensiveArmorThreatCount > 0;
         if (defensiveArmorThreat)
             Debug.Log($"[AI Shopping] defesa blindada: {defensiveArmorThreatCount} armored visivel <= {DefensiveArmorThreatRange}h da base/HQ");
+        UnitData eliteDefensiveTankTarget = defensiveArmorThreat ? FindEliteDefensiveTankReserveTarget(snapshot) : null;
+        int reserveForEliteDefensiveTank = 0;
+        if (eliteDefensiveTankTarget != null && remaining < eliteDefensiveTankTarget.cost)
+        {
+            int nextTurnCash = remaining + Mathf.Max(0, snapshot.IncomePerTurn);
+            if (nextTurnCash >= eliteDefensiveTankTarget.cost)
+            {
+                reserveForEliteDefensiveTank = Mathf.Min(remaining, Mathf.Max(0, eliteDefensiveTankTarget.cost - Mathf.Max(0, snapshot.IncomePerTurn)));
+                Debug.Log($"[AI Shopping] reserva tank elite {eliteDefensiveTankTarget.displayName} custo={eliteDefensiveTankTarget.cost} cash={remaining} income={snapshot.IncomePerTurn} reserva={reserveForEliteDefensiveTank} gastoLivre={Mathf.Max(0, remaining - reserveForEliteDefensiveTank)}");
+            }
+        }
         UnitData supremeFireSupport = null;
         if (defensiveArmorThreat)
         {
@@ -168,6 +199,7 @@ public class AIShoppingPlanner : MonoBehaviour
         }
         bool needsAffordableArmorFallback = defensiveArmorThreat
             && supremeFireSupport == null
+            && reserveForEliteDefensiveTank <= 0
             && !CanAffordEliteDefensiveTank(snapshot, remaining);
         if (needsAffordableArmorFallback)
         {
@@ -235,6 +267,10 @@ public class AIShoppingPlanner : MonoBehaviour
                 && CanOfferPrimaryRoleUnit(b, UnitRole.Transportador) ? 0 : 1;
             if (transA != transB) return transA.CompareTo(transB);
 
+            int logA = openLogisticsSlots > 0 && CanOfferPrimaryRoleUnit(a, UnitRole.Logistica) ? 0 : 1;
+            int logB = openLogisticsSlots > 0 && CanOfferPrimaryRoleUnit(b, UnitRole.Logistica) ? 0 : 1;
+            if (logA != logB) return logA.CompareTo(logB);
+
             int fireA = openFireSupportSlots > 0 && CanOfferFireSupportUnit(a) ? 0 : 1;
             int fireB = openFireSupportSlots > 0 && CanOfferFireSupportUnit(b) ? 0 : 1;
             if (fireA != fireB) return fireA.CompareTo(fireB);
@@ -270,6 +306,12 @@ public class AIShoppingPlanner : MonoBehaviour
             int defensiveTankReserveCost = defensiveArmorThreat ? 0 : defensiveBaseResponseReserveCost;
             int defensiveMassReserveCost = defensiveArmorThreat ? 0 : defensiveBaseBasicMassCost;
             int spendBudget = remaining;
+            if (defensiveArmorThreat
+                && reserveForEliteDefensiveTank > 0
+                && (eliteDefensiveTankTarget == null || remaining < eliteDefensiveTankTarget.cost))
+            {
+                spendBudget = Mathf.Max(0, remaining - reserveForEliteDefensiveTank);
+            }
             if (!defensiveBaseThreat && wantsEliteAssault && !eliteAssaultBought)
             {
                 if (remaining >= eliteAssaultTarget.cost)
@@ -295,11 +337,12 @@ public class AIShoppingPlanner : MonoBehaviour
                 Debug.Log(offerLog.ToString());
             }
 
-            UnitData unit = PickUnit(building, snapshot, spendBudget, onlyCapturers, onlyAssault, onlyTransporter, onlyFireSupport,
-                openCapturerSlots, openAssaultSlots, openTransportSlots, urgentTransportDemand, openFireSupportSlots, preferDefensiveFireSupport,
+            UnitData unit = PickUnit(building, snapshot, spendBudget, onlyCapturers, onlyAssault, onlyTransporter, onlyLogistics, onlyFireSupport,
+                openCapturerSlots, openAssaultSlots, openTransportSlots, urgentTransportDemand, openLogisticsSlots, openFireSupportSlots, preferDefensiveFireSupport,
                 eliteAssaultTarget, eliteFireSupportTarget, defensiveBaseThreat,
                 allowDefensiveEliteAssault, defensiveTankReserveCost,
-                defensiveBaseManpowerShortage, defensiveMassReserveCost, defensiveBaseTankBought);
+                defensiveBaseManpowerShortage, defensiveMassReserveCost, defensiveBaseTankBought,
+                defensiveArmorThreat);
             if (unit == null)
             {
                 Debug.Log($"[AI Shopping] {building.ConstructionDisplayName} @ {cell} — nenhuma unidade selecionada (sem fit ou sem budget)");
@@ -332,6 +375,8 @@ public class AIShoppingPlanner : MonoBehaviour
                 openAssaultSlots--;
             else if (IsPrimaryRole(unit, UnitRole.Transportador) && openTransportSlots > 0)
                 openTransportSlots--;
+            else if (IsPrimaryRole(unit, UnitRole.Logistica) && openLogisticsSlots > 0)
+                openLogisticsSlots--;
             else if (IsFireSupportPurchase(unit) && openFireSupportSlots > 0)
                 openFireSupportSlots--;
             if (unit == eliteAssaultTarget)
@@ -380,11 +425,13 @@ public class AIShoppingPlanner : MonoBehaviour
         bool onlyCapturers,
         bool onlyAssault,
         bool onlyTransporter,
+        bool onlyLogistics,
         bool onlyFireSupport,
         int openCapturerSlots,
         int openAssaultSlots,
         int openTransportSlots = 0,
         bool urgentTransportDemand = false,
+        int openLogisticsSlots = 0,
         int openFireSupportSlots = 0,
         bool preferDefensiveFireSupport = false,
         UnitData eliteAssaultTarget = null,
@@ -394,7 +441,8 @@ public class AIShoppingPlanner : MonoBehaviour
         int defensiveBaseResponseReserveCost = 0,
         bool defensiveBaseManpowerShortage = false,
         int defensiveBaseBasicMassCost = 0,
-        bool defensiveBaseTankBought = false)
+        bool defensiveBaseTankBought = false,
+        bool defensiveArmorThreat = false)
     {
         if (building.OfferedUnits == null || building.OfferedUnits.Count == 0) return null;
 
@@ -408,15 +456,33 @@ public class AIShoppingPlanner : MonoBehaviour
         {
             if (u == null || u.cost > budget) { if (u != null) Debug.Log($"[AI PickUnit] SKIP {u.displayName} ${u.cost} — custo>{budget}"); continue; }
             if (u.domain != Domain.Land) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — domain={u.domain} (não Land)"); continue; }
+            if (IsAntiAirOnlyUnit(u) && !HasAnyAirThreat())
+            {
+                Debug.Log($"[AI PickUnit] SKIP {u.displayName} — anti-aerea sem ameaca aerea em campo");
+                continue;
+            }
 
             bool isPrimaryCapturer   = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Capturador;
             bool isPrimaryAssault    = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Assalto;
             bool isPrimaryTransporter = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Transportador;
+            bool isPrimaryLogistics = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Logistica;
             bool isPrimaryFireSupport = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.FogoIndireto;
             bool isFireSupportCapable = u.roles != null && u.roles.Contains(UnitRole.FogoIndireto);
             bool isHybridCapturer    = isPrimaryAssault && u.roles.Contains(UnitRole.Capturador);
             bool isSecondary       = !isPrimaryCapturer && u.roles != null && u.roles.Contains(UnitRole.Capturador);
             bool fireSupportAllowedNow = openFireSupportSlots > 0 || IsFireSupportAllowedByTiming(snapshot);
+
+            if (isPrimaryCapturer && openCapturerSlots <= 0 && !onlyCapturers)
+            {
+                Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda capturador");
+                continue;
+            }
+
+            if (isPrimaryLogistics && openLogisticsSlots <= 0)
+            {
+                Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda logistics");
+                continue;
+            }
 
             if (isFireSupportCapable && !isPrimaryAssault && openFireSupportSlots <= 0)
             {
@@ -434,20 +500,24 @@ public class AIShoppingPlanner : MonoBehaviour
             bool isAllowedDefensiveFireSupport = openFireSupportSlots > 0
                 && ((preferDefensiveFireSupport && IsDefensiveFireSupportPurchase(u))
                     || (defensiveBaseThreat && isFireSupportCapable));
-            bool canAffordDefensiveTank = IsDefensiveBaseAssaultTankPurchase(u)
-                && budget >= u.cost + Mathf.Max(0, defensiveBaseResponseReserveCost);
+            bool canAffordDefensiveTank = CanAffordDefensiveBaseTankPurchase(u, budget, defensiveBaseResponseReserveCost);
             bool canBuyBasicMass = defensiveBaseManpowerShortage
                 && defensiveBaseTankBought
                 && IsDefensiveBaseBasicMassPurchase(u);
-            if (defensiveBaseThreat
+            bool canBuyLogistics = openLogisticsSlots > 0 && isPrimaryLogistics;
+            if (defensiveBaseThreat && canBuyLogistics)
+            {
+                // Logistics demand remains valid during defense, but scores below direct combat buys.
+            }
+            else if (defensiveBaseThreat
                 && !IsDefensiveBaseThreatPurchase(u)
                 && !isAllowedDefensiveElite
                 && !isAllowedDefensiveFireSupport
                 && !canAffordDefensiveTank
                 && !canBuyBasicMass) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — defThreat filter (notThreat={!IsDefensiveBaseThreatPurchase(u)} notElite={!isAllowedDefensiveElite} notTank={!canAffordDefensiveTank} notMass={!canBuyBasicMass})"); continue; }
             if (!defensiveBaseThreat && isHybridCapturer && !hasOpenDefensiveSlot) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — hybrid sem slot defensivo"); continue; }
-            if ((onlyCapturers || onlyAssault || onlyTransporter || onlyFireSupport)
-                && !((onlyCapturers && isPrimaryCapturer) || (onlyAssault && isPrimaryAssault) || (onlyTransporter && isPrimaryTransporter) || (onlyFireSupport && isPrimaryFireSupport))) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — onlyFilter (cap={isPrimaryCapturer} ass={isPrimaryAssault} trans={isPrimaryTransporter} fire={isPrimaryFireSupport})"); continue; }
+            if ((onlyCapturers || onlyAssault || onlyTransporter || onlyLogistics || onlyFireSupport)
+                && !((onlyCapturers && isPrimaryCapturer) || (onlyAssault && isPrimaryAssault) || (onlyTransporter && isPrimaryTransporter) || (onlyLogistics && isPrimaryLogistics) || (onlyFireSupport && isPrimaryFireSupport))) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — onlyFilter (cap={isPrimaryCapturer} ass={isPrimaryAssault} trans={isPrimaryTransporter} log={isPrimaryLogistics} fire={isPrimaryFireSupport})"); continue; }
 
             int score = u.cost;
             if (defensiveBaseThreat && defensiveBaseManpowerShortage)
@@ -455,11 +525,21 @@ public class AIShoppingPlanner : MonoBehaviour
                 int basicReserve = Mathf.Max(0, defensiveBaseBasicMassCost) * 2;
                 if (IsDefensiveBaseAssaultTankPurchase(u) && budget >= u.cost + basicReserve)
                     score += 180000;
+                else if (IsDefensiveBaseThreatPurchase(u))
+                    score += 90000;
                 else if (IsDefensiveBaseBasicMassPurchase(u))
                     score += 70000;
             }
+            if (defensiveArmorThreat && IsDefensiveBaseThreatPurchase(u))
+                score += 80000;
             if (openTransportSlots > 0 && isPrimaryTransporter)
-                score += urgentTransportDemand ? 132000 : 88000;
+                score += urgentTransportDemand ? 144000 : 108000;
+            if (openLogisticsSlots > 0 && isPrimaryLogistics)
+            {
+                score += openLogisticsSlots >= 2 ? 128000 : 108000;
+                if (defensiveBaseThreat)
+                    score -= 25000;
+            }
             if (openFireSupportSlots > 0 && isFireSupportCapable)
             {
                 bool preferredProfile = preferDefensiveFireSupport
@@ -487,7 +567,7 @@ public class AIShoppingPlanner : MonoBehaviour
             {
                 if (isPrimaryCapturer)              score += 100000;
                 else if (isSecondary && defensiveStance) score +=  10000;
-                else if (openAssaultSlots <= 0)     score -= 100000;
+                else if (openAssaultSlots <= 0 && !(openTransportSlots > 0 && isPrimaryTransporter)) score -= 100000;
             }
             if (openAssaultSlots > 0)
             {
@@ -503,8 +583,8 @@ public class AIShoppingPlanner : MonoBehaviour
             if (!defensiveStance && u.movement < 3)
                 score -= (3 - u.movement) * 1500;
 
-            string roleStr = isFireSupportCapable && !isPrimaryFireSupport ? "ASS/FIRE" : isPrimaryFireSupport ? "FIRE" : isPrimaryTransporter ? "TRANS" : isPrimaryCapturer ? "CAP" : isPrimaryAssault ? $"ASS(hybrid={isHybridCapturer})" : "other";
-            Debug.Log($"[AI PickUnit] {u.displayName} ${u.cost} role={roleStr} score={score} mov={u.movement} | trans={openTransportSlots} transUrg={urgentTransportDemand} cap={openCapturerSlots} ass={openAssaultSlots} fire={openFireSupportSlots} fireDef={preferDefensiveFireSupport} defThreat={defensiveBaseThreat}");
+            string roleStr = isFireSupportCapable && !isPrimaryFireSupport ? "ASS/FIRE" : isPrimaryFireSupport ? "FIRE" : isPrimaryLogistics ? "LOG" : isPrimaryTransporter ? "TRANS" : isPrimaryCapturer ? "CAP" : isPrimaryAssault ? $"ASS(hybrid={isHybridCapturer})" : "other";
+            Debug.Log($"[AI PickUnit] {u.displayName} ${u.cost} role={roleStr} score={score} mov={u.movement} | trans={openTransportSlots} transUrg={urgentTransportDemand} log={openLogisticsSlots} cap={openCapturerSlots} ass={openAssaultSlots} fire={openFireSupportSlots} fireDef={preferDefensiveFireSupport} defThreat={defensiveBaseThreat}");
             if (score > bestScore) { bestScore = score; best = u; }
         }
 
@@ -665,6 +745,11 @@ public class AIShoppingPlanner : MonoBehaviour
         return capFill >= fillThreshold && filledAss >= minAssault;
     }
 
+    private static bool IsEliteAssaultReserveReady(AIWorldSnapshot snapshot)
+    {
+        return IsEliteFireSupportReserveReady(snapshot);
+    }
+
     private static int CountOpenSlots(TeamId aiTeam, UnitRole role)
     {
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
@@ -675,6 +760,36 @@ public class AIShoppingPlanner : MonoBehaviour
             foreach (SlotNeed slot in obj.Slots)
                 if (slot.Role == role && !slot.Filled) open++;
         return open;
+    }
+
+    private static int LimitCapturerDemandForProgression(
+        AIWorldSnapshot snapshot,
+        int openCapturerSlots,
+        int openAssaultSlots,
+        int openTransportSlots,
+        int openLogisticsSlots,
+        int openFireSupportSlots)
+    {
+        if (openCapturerSlots <= 0 || snapshot == null)
+            return 0;
+
+        int batchSize = Instance != null ? Instance.ProgressiveCapturerBatchSize : 2;
+        int capped = Mathf.Min(openCapturerSlots, Mathf.Max(1, batchSize));
+        int supportDemand = openAssaultSlots + openTransportSlots + openLogisticsSlots + openFireSupportSlots;
+
+        int activeCapturers = CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: false);
+        int activeAssault = CountActiveUnitsWithRole(snapshot, UnitRole.Assalto, requirePrimary: true);
+        int supportPauseThreshold = Instance != null ? Instance.CapturersPerPreventiveTransport : 4;
+
+        if (supportDemand > 0 && activeCapturers >= supportPauseThreshold && activeAssault >= 1)
+            capped = 0;
+
+        if (capped != openCapturerSlots)
+        {
+            Debug.Log($"[AI Shopping] capturer_progression: raw={openCapturerSlots} capped={capped} activeCap={activeCapturers} activeAss={activeAssault} supportDemand={supportDemand} batch={batchSize} pauseAt={supportPauseThreshold}");
+        }
+
+        return capped;
     }
 
     private static void CountSlots(TeamId aiTeam, UnitRole role, out int total, out int filled)
@@ -820,6 +935,8 @@ public class AIShoppingPlanner : MonoBehaviour
         {
             if (building == null || !building.IsCapturable || building.CapturePointsMax <= 0)
                 continue;
+            if (!IsCriticalHomeConstruction(building, snapshot.AITeam))
+                continue;
             if (building.CurrentCapturePoints < building.CapturePointsMax)
                 count++;
         }
@@ -925,6 +1042,8 @@ public class AIShoppingPlanner : MonoBehaviour
     {
         if (building == null || snapshot == null || snapshot.EnemyUnits == null)
             return false;
+        if (!IsCriticalHomeConstruction(building, snapshot.AITeam))
+            return false;
 
         Vector3Int baseCell = building.CurrentCellPosition;
         baseCell.z = 0;
@@ -960,7 +1079,7 @@ public class AIShoppingPlanner : MonoBehaviour
             foreach (ConstructionManager building in snapshot.MyBuildings)
             {
                 if (building == null) continue;
-                if (!building.IsPlayerHeadQuarter && !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+                if (!IsCriticalHomeConstruction(building, snapshot.AITeam)) continue;
 
                 Vector3Int baseCell = building.CurrentCellPosition;
                 baseCell.z = 0;
@@ -972,6 +1091,13 @@ public class AIShoppingPlanner : MonoBehaviour
         }
 
         return count;
+    }
+
+    private static bool IsCriticalHomeConstruction(ConstructionManager building, TeamId aiTeam)
+    {
+        if (building == null || building.TeamId != aiTeam)
+            return false;
+        return building.IsPlayerHeadQuarter || ConstructionSectorHelper.IsBase(building.Sector);
     }
 
     private static bool CanOfferUnit(ConstructionManager building, UnitData target)
@@ -994,14 +1120,21 @@ public class AIShoppingPlanner : MonoBehaviour
     {
         if (building == null || building.OfferedUnits == null) return false;
 
-        int safeReserve = Mathf.Max(0, reserve);
         foreach (UnitData unit in building.OfferedUnits)
         {
-            if (!IsDefensiveBaseAssaultTankPurchase(unit)) continue;
-            if (budget >= unit.cost + safeReserve) return true;
+            if (CanAffordDefensiveBaseTankPurchase(unit, budget, reserve)) return true;
         }
 
         return false;
+    }
+
+    private static bool CanAffordDefensiveBaseTankPurchase(UnitData unit, int budget, int reserve)
+    {
+        if (!IsDefensiveBaseAssaultTankPurchase(unit))
+            return false;
+
+        int safeReserve = unit.eliteLevel >= 1 ? 0 : Mathf.Max(0, reserve);
+        return budget >= unit.cost + safeReserve;
     }
 
     private static bool CanAffordEliteDefensiveTank(AIWorldSnapshot snapshot, int budget)
@@ -1022,6 +1155,31 @@ public class AIShoppingPlanner : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static UnitData FindEliteDefensiveTankReserveTarget(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null) return null;
+
+        UnitData best = null;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building.OfferedUnits == null) continue;
+
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (!IsDefensiveBaseAssaultTankPurchase(unit)) continue;
+                if (unit.eliteLevel < 1) continue;
+
+                if (best == null
+                    || unit.eliteLevel > best.eliteLevel
+                    || (unit.eliteLevel == best.eliteLevel && unit.cost < best.cost))
+                    best = unit;
+            }
+        }
+
+        return best;
     }
 
     private static bool HasActivePrimaryRole(AIWorldSnapshot snapshot, UnitRole role)
@@ -1071,7 +1229,15 @@ public class AIShoppingPlanner : MonoBehaviour
 
         int activeCapturers = CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: false);
         int activeAssault = CountActiveUnitsWithRole(snapshot, UnitRole.Assalto, requirePrimary: true);
-        int activeFireSupport = CountActiveUnitsWithRole(snapshot, UnitRole.FogoIndireto, requirePrimary: false);
+        // Exclude units under repair — they are not combat-ready and must not block buying replacements.
+        int activeFireSupport = 0;
+        if (snapshot.MyUnits != null)
+            foreach (UnitManager fsUnit in snapshot.MyUnits)
+            {
+                if (fsUnit == null || fsUnit.IsDead || fsUnit.IsEmbarked || fsUnit.IsUnderRepair) continue;
+                if (!fsUnit.TryGetUnitData(out UnitData fsData) || fsData?.roles == null) continue;
+                if (fsData.roles.Contains(UnitRole.FogoIndireto)) activeFireSupport++;
+            }
 
         int minCapturers = Instance != null ? Instance.MinActiveCapturersForFireSupport : 2;
         int minAssault = Instance != null ? Instance.MinActiveAssaultForFireSupport : 1;
@@ -1120,13 +1286,52 @@ public class AIShoppingPlanner : MonoBehaviour
         return count;
     }
 
+    private static int ComputeLogisticsDemand(AIWorldSnapshot snapshot, out int repairDemandCount, out int activeLogisticsCount)
+    {
+        repairDemandCount = CountUnitsUnderRepair(snapshot);
+        activeLogisticsCount = CountActiveUnitsWithRole(snapshot, UnitRole.Logistica, requirePrimary: false);
+
+        if (snapshot != null && snapshot.TurnNumber <= 1)
+        {
+            Debug.Log($"[AI Shopping] logistics_demand: 0 turn={snapshot.TurnNumber}<=1");
+            return 0;
+        }
+
+        int desiredLogistics = 0;
+        if (repairDemandCount >= 1)
+            desiredLogistics = 1;
+        if (repairDemandCount >= 4)
+            desiredLogistics = 2;
+
+        int demand = Mathf.Max(0, desiredLogistics - activeLogisticsCount);
+        Debug.Log($"[AI Shopping] logistics_demand: demand={demand} repairs={repairDemandCount} activeLog={activeLogisticsCount} desired={desiredLogistics}");
+        return demand;
+    }
+
+    private static int CountUnitsUnderRepair(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+            if (unit.IsUnderRepair)
+                count++;
+        }
+
+        return count;
+    }
+
     private static bool HasAnyVisibleEnemyNearOwnedBase(AIWorldSnapshot snapshot, int range)
     {
         if (snapshot == null || snapshot.MyBuildings == null) return false;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
             if (building == null) continue;
-            if (!building.IsPlayerHeadQuarter && !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (!IsCriticalHomeConstruction(building, snapshot.AITeam)) continue;
             if (HasVisibleEnemyNearBase(building, snapshot, range)) return true;
         }
         return false;
@@ -1178,7 +1383,7 @@ public class AIShoppingPlanner : MonoBehaviour
         if (plan == null) return 0;
 
         int minDist = AIController.Instance != null
-            ? AIController.Instance.MinDistanceForTransportSlot : 7;
+            ? AIController.Instance.GetEffectiveTransportThreshold(aiTeam) : 7;
 
         // Count transporters already in the field. Preventive demand only needs
         // existing APC coverage; urgent assigned demand needs an APC with no cargo.
@@ -1247,13 +1452,18 @@ public class AIShoppingPlanner : MonoBehaviour
             if (dist >= minDist) assignedNeeded++;
         }
 
+        int capturersPerTransport = Instance != null ? Instance.CapturersPerPreventiveTransport : 4;
+        int massNeeded = 0;
+        if (activeCapturers >= capturersPerTransport && activeAssault >= 1)
+            massNeeded = activeCapturers / Mathf.Max(1, capturersPerTransport);
+
         int assignedDeficit = Mathf.Max(0, assignedNeeded - freeAPCs);
-        int preventiveDeficit = Mathf.Max(0, preventiveNeeded - activeTransporters);
+        int preventiveDeficit = Mathf.Max(0, Mathf.Max(preventiveNeeded, massNeeded) - activeTransporters);
         urgentTransportDemand = assignedDeficit > 0;
-        int needed = Mathf.Max(assignedNeeded, preventiveNeeded);
+        int needed = Mathf.Max(assignedNeeded, Mathf.Max(preventiveNeeded, massNeeded));
         int deficit = urgentTransportDemand ? assignedDeficit : preventiveDeficit;
         int demand  = Mathf.Min(deficit, 1); // cap: max 1 APC per shopping round
-        Debug.Log($"[AI Shopping] transport_demand: needed={needed} assigned={assignedNeeded} preventive={preventiveNeeded} activeCap={activeCapturers} activeAss={activeAssault} activeAPCs={activeTransporters} freeAPCs={freeAPCs} assignedDef={assignedDeficit} preventiveDef={preventiveDeficit} urgent={urgentTransportDemand} demand={demand} minDist={minDist}");
+        Debug.Log($"[AI Shopping] transport_demand: needed={needed} assigned={assignedNeeded} preventive={preventiveNeeded} mass={massNeeded} activeCap={activeCapturers} activeAss={activeAssault} activeAPCs={activeTransporters} freeAPCs={freeAPCs} assignedDef={assignedDeficit} preventiveDef={preventiveDeficit} urgent={urgentTransportDemand} demand={demand} minDist={minDist}");
         return demand;
     }
 
@@ -1294,5 +1504,33 @@ public class AIShoppingPlanner : MonoBehaviour
         for (int i = 0; i < list.Count; i++)
             if (list[i] == target) return i;
         return 0;
+    }
+
+    // Returns true when all of the unit's weapons target only air (AntiAerea).
+    // Units with at least one non-AA weapon retain some general-purpose value.
+    private static bool IsAntiAirOnlyUnit(UnitData unit)
+    {
+        if (unit == null || unit.embarkedWeapons == null || unit.embarkedWeapons.Count == 0)
+            return false;
+        foreach (UnitEmbarkedWeapon ew in unit.embarkedWeapons)
+        {
+            if (ew?.weapon == null) continue;
+            if (ew.weapon.WeaponCategory != WeaponCategory.AntiAerea)
+                return false;
+        }
+        return true;
+    }
+
+    // Returns true when at least one active unit on the map has a native Air domain.
+    // This covers both flying and grounded aircraft.
+    private static bool HasAnyAirThreat()
+    {
+        foreach (UnitManager u in UnitManager.AllActive)
+        {
+            if (u == null || u.IsDead) continue;
+            if (!u.TryGetUnitData(out UnitData data) || data == null) continue;
+            if (data.domain == Domain.Air) return true;
+        }
+        return false;
     }
 }

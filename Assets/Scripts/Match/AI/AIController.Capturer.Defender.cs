@@ -24,6 +24,25 @@ public partial class AIController
         TryGetAnySectorInfo(assigned.Sector, out SectorManager.SectorInfo secInfo);
         Vector3Int repCell = secInfo != null ? secInfo.RepresentativeCell : fromCell; repCell.z = 0;
 
+        // No active SOS: release to HexEvaluator if no enemy is near the defended sector.
+        // The snapshot is rebuilt each iteration, so a tank destroyed earlier this turn
+        // will already be absent from EnemyUnits here.
+        if (!activeCriticalHomeDefense)
+        {
+            bool enemyNearby = false;
+            foreach (UnitManager e in snapshot.EnemyUnits)
+            {
+                if (e.IsDead || e.IsEmbarked) continue;
+                Vector3Int ec = e.CurrentCellPosition; ec.z = 0;
+                if (SectorManager.HexDistance(ec, repCell) <= DefenseEnemyRange) { enemyNearby = true; break; }
+            }
+            if (!enemyNearby)
+            {
+                Debug.Log($"{TL("Defensor")} {unit.InstanceId} libera {assigned.Sector}: setor seguro, sem inimigos");
+                return null;
+            }
+        }
+
         // Captura oportunista mesmo em defesa: setor vazio é sempre preenchido
         Dictionary<Vector3Int, List<Vector3Int>> defPaths =
             UnitMovementPathRules.CalcularCaminhosValidos(
@@ -121,19 +140,17 @@ public partial class AIController
                 if (SectorManager.HexDistance(ec, repCell) <= DefenseEnemyRange) zoneEnemies.Add(enemy);
             }
         }
-        if (inDefenseZone)
+        int engageRadius = Mathf.Max(0, unit.RemainingMovementPoints) + 1;
+        MatchController mcLocal = GetMatchController();
+        foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            MatchController mcLocal = GetMatchController();
-            foreach (UnitManager enemy in UnitManager.AllActive)
-            {
-                if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
-                if (mcLocal != null && !mcLocal.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
-                if (zoneEnemies.Contains(enemy)) continue;
+            if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (mcLocal != null && !mcLocal.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
+            if (zoneEnemies.Contains(enemy)) continue;
 
-                Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
-                if (SectorManager.HexDistance(ec, fromCell) <= 1f)
-                    zoneEnemies.Add(enemy);
-            }
+            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+            if (SectorManager.HexDistance(ec, fromCell) <= engageRadius)
+                zoneEnemies.Add(enemy);
         }
 
         if (!inDefenseZone)

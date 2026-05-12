@@ -172,6 +172,21 @@ public partial class AIController
         return bestCell;
     }
 
+    // Returns the effective transport slot threshold for the current map.
+    // If the farthest capturable sector is closer than MinDistanceForTransportSlot,
+    // the threshold adapts so transport slots are still created and shuttle candidates still qualify.
+    public int GetEffectiveTransportThreshold(TeamId aiTeam)
+    {
+        int maxDist = 0;
+        foreach (SectorManager.SectorInfo info in SectorManager.GetAllSectorInfos())
+        {
+            if (info.IsFullyControlled && info.ControllingTeam == aiTeam) continue;
+            int d = Mathf.RoundToInt(info.GetDistanceToHQ(aiTeam));
+            if (d > maxDist) maxDist = d;
+        }
+        return Mathf.Min(MinDistanceForTransportSlot, Mathf.Max(3, maxDist));
+    }
+
     private static List<UnitManager> GetAvailableTransporters(TeamId aiTeam)
     {
         var list = new List<UnitManager>();

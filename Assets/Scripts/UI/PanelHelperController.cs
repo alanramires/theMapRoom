@@ -1851,9 +1851,7 @@ public class PanelHelperController : MonoBehaviour
 
     private static string FormatMapCell(Vector3Int cell)
     {
-        int linha = -cell.y;
-        int coluna = cell.x;
-        return $"L{linha},C{coluna}";
+        return $"C{cell.x},L{cell.y}";
     }
 
     private void EnsureCoordinateOverlayStyles()

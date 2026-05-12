@@ -44,6 +44,10 @@ public partial class AIController
 
         }
 
+        PlayerAction logisticsAction = TryDecideLogisticsAction(unit, snapshot, plan);
+
+        if (logisticsAction != null) return logisticsAction;
+
         PlayerAction transportAction = TryDecideTransportadorAction(unit, snapshot, plan);
 
         if (transportAction != null) return transportAction;
@@ -222,7 +226,6 @@ public partial class AIController
         {
 
             if (opt?.targetUnit == null || opt.targetUnit.IsDead) continue;
-            if (!PassesAttackDecision(unit, opt.targetUnit, fromCell, false, out _)) continue;
 
             int score = 0;
 

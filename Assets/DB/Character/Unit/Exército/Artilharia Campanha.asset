@@ -41,7 +41,7 @@ MonoBehaviour:
   - targetClass: 2
     priority: 1
   aiSensorPriority: 0000000002000000
-  prioritizeDpqAtBattle: 0
+  prioritizeDpqAtBattle: 1
   playConservative: 0
   preferMoveOnBestDPQ: 0
   preferMaxDisplacement: 0
@@ -60,6 +60,12 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  aiPreventiveMaintenanceEnabled: 1
+  aiPreventiveSupplyCanRunWithUnderRepair: 0
+  aiConservativeSupplyAvoidEnemyRange: 2
+  aiPreventiveSupplyHpBelowPct: 70
+  aiPreventiveSupplyAutonomyBelowPct: 60
+  aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
   eliteLevel: 2
   combatModifiers:
   - {fileID: 11400000, guid: 8f009e4781fd97c4384dbdc6c19ce234, type: 2}

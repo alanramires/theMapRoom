@@ -1820,10 +1820,7 @@ public partial class TurnStateManager : MonoBehaviour
 
     protected static string FormatMapCell(Vector3Int cell)
     {
-        cell.z = 0;
-        int linha = -cell.y;
-        int coluna = cell.x;
-        return $"L{linha},C{coluna}";
+        return $"C{cell.x},L{cell.y}";
     }
 
     protected static string FormatMapCellWithZ(Vector3Int cell)

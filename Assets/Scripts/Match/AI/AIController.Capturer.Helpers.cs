@@ -83,6 +83,40 @@ public partial class AIController
         if (current == null || !current.CanProduceUnitsForTeam(aiTeam))
             return false;
 
+        if (unit.TryGetUnitData(out UnitData unitData) && unitData != null)
+        {
+            if (unitData.longRangeStationary)
+                return false;
+            if (unitData.roles != null && unitData.roles.Contains(UnitRole.FogoIndireto))
+            {
+                // Fire support stays if any non-fire-support unit can vacate instead.
+                if (HasNonFireSupportUnitOnProductionBuilding(unit, aiTeam, snapshot))
+                    return false;
+                // All production slots occupied by fire support — only the least preferred
+                // defender vacates: elite=0 first, then artillery-mode (can operate at range).
+                if (!IsLeastPreferredFireSupportDefender(unit, unitData, aiTeam, snapshot))
+                    return false;
+            }
+        }
+
+        bool hasOtherFreeFactory = false;
+        if (snapshot != null && snapshot.MyBuildings != null)
+        {
+            foreach (ConstructionManager bldg in snapshot.MyBuildings)
+            {
+                if (bldg == current || bldg == null || !bldg.CanProduceUnitsForTeam(aiTeam)) continue;
+                Vector3Int cell = bldg.CurrentCellPosition; cell.z = 0;
+                if (UnitOccupancyRules.GetUnitAtCell(boardTilemap, cell, null) == null)
+                {
+                    hasOtherFreeFactory = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasOtherFreeFactory)
+            return false;
+
         if (!unit.IsUnderRepair
             && IsCriticalHomeDefenseSector(current.Sector, aiTeam)
             && IsHomeDefenseThreatened(current.Sector, aiTeam, HomeDefenseThreatRange))
@@ -101,6 +135,51 @@ public partial class AIController
         }
 
         return false;
+    }
+
+    private bool HasNonFireSupportUnitOnProductionBuilding(UnitManager fireSupportUnit, TeamId aiTeam, AIWorldSnapshot snapshot)
+    {
+        if (snapshot?.MyUnits == null) return false;
+        foreach (UnitManager other in snapshot.MyUnits)
+        {
+            if (other == null || other == fireSupportUnit) continue;
+            if (other.IsDead || other.IsEmbarked || other.HasActed) continue;
+            if (!other.TryGetUnitData(out UnitData otherData) || otherData == null) continue;
+            if (otherData.longRangeStationary) continue;
+            if (otherData.roles != null && otherData.roles.Contains(UnitRole.FogoIndireto)) continue;
+            Vector3Int otherCell = other.CurrentCellPosition; otherCell.z = 0;
+            ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, otherCell);
+            if (bldg != null && bldg.CanProduceUnitsForTeam(aiTeam))
+                return true;
+        }
+        return false;
+    }
+
+    // Returns true if this fire support unit is the most appropriate one to vacate.
+    // Vacate order: lowest eliteLevel first; tiebreak: preferArtilleryModeBeforeCombatant first
+    // (artillery-mode units can operate effectively outside the production tile).
+    private bool IsLeastPreferredFireSupportDefender(UnitManager unit, UnitData unitData, TeamId aiTeam, AIWorldSnapshot snapshot)
+    {
+        if (snapshot?.MyUnits == null) return true;
+        int myElite = unitData != null ? unitData.eliteLevel : 0;
+        bool myArtilleryMode = unitData != null && unitData.preferArtilleryModeBeforeCombatant;
+        foreach (UnitManager other in snapshot.MyUnits)
+        {
+            if (other == null || other == unit) continue;
+            if (other.IsDead || other.IsEmbarked || other.HasActed) continue;
+            if (!other.TryGetUnitData(out UnitData otherData) || otherData == null) continue;
+            if (otherData.longRangeStationary) continue;
+            if (otherData.roles == null || !otherData.roles.Contains(UnitRole.FogoIndireto)) continue;
+            Vector3Int otherCell = other.CurrentCellPosition; otherCell.z = 0;
+            ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, otherCell);
+            if (bldg == null || !bldg.CanProduceUnitsForTeam(aiTeam)) continue;
+            // If 'other' is a worse defender, this unit should not vacate.
+            if (otherData.eliteLevel < myElite) return false;
+            if (otherData.eliteLevel > myElite) continue;
+            // Same elite: artillery-mode is a worse defender (can operate at range).
+            if (otherData.preferArtilleryModeBeforeCombatant && !myArtilleryMode) return false;
+        }
+        return true;
     }
 
     private static bool IsEmergencyProductionDefenseUnblockNeeded(

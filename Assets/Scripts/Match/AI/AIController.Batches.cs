@@ -196,6 +196,102 @@ public partial class AIController
 
     }
 
+    private PlayerAction BuildSupplyBatch(
+        UnitManager supplier,
+        TeamId team,
+        Vector3Int from,
+        Vector3Int to,
+        List<UnitManager> targets,
+        Dictionary<Vector3Int, List<Vector3Int>> paths = null)
+    {
+        List<Vector3Int> movementPath = null;
+        paths?.TryGetValue(to, out movementPath);
+
+        var action = new PlayerAction
+        {
+            IsAIGenerated = true,
+            ActionType = PlayerActionType.UnitAction,
+            ActingTeam = team,
+            TurnNumber = matchController != null ? matchController.CurrentTurn : 0,
+            CursorHex = from,
+            HasCursorHex = true,
+            UnitInstanceId = supplier.InstanceId.ToString(),
+            MoveFrom = from,
+            HasMoveFrom = true,
+            MoveTo = to,
+            HasMoveTo = true,
+            SensorAction = SensorActionType.Supply,
+            MovementPath = movementPath,
+            DebugLabel = $"AI Supply {supplier.InstanceId} ({(targets != null ? targets.Count : 0)} alvo(s)) via {to}",
+        };
+
+        if (targets != null)
+        {
+            for (int i = 0; i < targets.Count; i++)
+            {
+                UnitManager target = targets[i];
+                if (target == null)
+                    continue;
+
+                Vector3Int targetCell = target.CurrentCellPosition;
+                targetCell.z = 0;
+                action.SubSteps.Add(new PlayerActionSubStep
+                {
+                    Label = "SupplyQueueConfirm",
+                    TargetInstanceId = target.InstanceId.ToString(),
+                    TargetHex = targetCell,
+                    HasTargetHex = true,
+                });
+            }
+        }
+
+        return action;
+    }
+
+    private PlayerAction BuildTransferReceiveBatch(
+        UnitManager receiver,
+        TeamId team,
+        Vector3Int from,
+        Vector3Int to,
+        PodeTransferirOption option,
+        Dictionary<Vector3Int, List<Vector3Int>> paths = null)
+    {
+        List<Vector3Int> movementPath = null;
+        paths?.TryGetValue(to, out movementPath);
+
+        Vector3Int targetCell = option != null ? option.targetCell : to;
+        targetCell.z = 0;
+
+        var action = new PlayerAction
+        {
+            IsAIGenerated = true,
+            ActionType = PlayerActionType.UnitAction,
+            ActingTeam = team,
+            TurnNumber = matchController != null ? matchController.CurrentTurn : 0,
+            CursorHex = from,
+            HasCursorHex = true,
+            UnitInstanceId = receiver.InstanceId.ToString(),
+            MoveFrom = from,
+            HasMoveFrom = true,
+            MoveTo = to,
+            HasMoveTo = true,
+            SensorAction = SensorActionType.Transfer,
+            MovementPath = movementPath,
+            DebugLabel = $"AI TransferReceive {receiver.InstanceId} via {to}",
+        };
+
+        action.SubSteps.Add(new PlayerActionSubStep
+        {
+            Label = "TransferTargetConfirm",
+            TargetInstanceId = option != null && option.targetUnit != null ? option.targetUnit.InstanceId.ToString() : null,
+            TargetConstructionId = option != null && option.targetConstruction != null ? option.targetConstruction.InstanceId.ToString() : null,
+            TargetHex = targetCell,
+            HasTargetHex = true,
+        });
+
+        return action;
+    }
+
     private PlayerAction BuildEmbarcarBatch(
         UnitManager passenger,
         TeamId team,

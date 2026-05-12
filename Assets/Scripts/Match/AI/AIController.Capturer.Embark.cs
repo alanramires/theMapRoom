@@ -156,7 +156,7 @@ public partial class AIController
             if (otherDist <= myDist) continue; // não está mais longe
 
             float otherDistToAPC = SectorManager.HexDistance(otherCell, apcCell);
-            if (otherDistToAPC > ShuttlePickupRange + 0.5f) continue; // fora do alcance do APC
+            if (otherDistToAPC > ShuttlePickupRange + 1 + 0.5f) continue; // fora do alcance do APC
 
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} cede embarque para {other.InstanceId} ({otherDist:F0}h > {myDist:F0}h ao objetivo)");
             return true;
@@ -194,7 +194,7 @@ public partial class AIController
 
         // Transporter deve estar dentro do pickup range da posição original
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
-        if (SectorManager.HexDistance(fromCell, tCell) > ShuttlePickupRange + 0.5f) return false;
+        if (SectorManager.HexDistance(fromCell, tCell) > ShuttlePickupRange + 1 + 0.5f) return false;
 
         // Verifica custo de embarque vs MP restante no hex intermediário
         if (!UnitMovementPathRules.TryGetEnterCellCost(
@@ -203,7 +203,7 @@ public partial class AIController
         embarkCost = Mathf.Max(1, embarkCost);
         if (remainingMPAtHex < embarkCost) return false;
 
-        int slotIdx = FindFittingSlotIndex(transporter, tData, unitData);
+        int slotIdx = FindFittingSlotIndex(transporter, tData, unit, unitData);
         if (slotIdx < 0) return false;
 
         if (ShouldYieldEmbarkToNeedierCapturer(unit, transporter, assigned, plan))
@@ -225,20 +225,41 @@ public partial class AIController
         Vector3Int candidateCell,
         string context)
     {
-        if (unit == null || assigned == null)
+        if (unit == null)
             return false;
 
-        ConstructionManager objBuilding = FindCapturableInSector(assigned.Sector, unit.TeamId);
+        candidateCell.z = 0;
+
+        ConstructionManager objBuilding = assigned != null
+            ? FindCapturableInSector(assigned.Sector, unit.TeamId)
+            : FindNearestCapturableForUnit(unit, candidateCell);
+
         if (objBuilding == null)
             return false;
 
         Vector3Int objCell = objBuilding.CurrentCellPosition; objCell.z = 0;
-        candidateCell.z = 0;
         float objectiveDist = SectorManager.HexDistance(candidateCell, objCell);
-        if (objectiveDist >= MinDistanceForTransportSlot)
+        int effectiveThreshold = GetEffectiveTransportThreshold(unit.TeamId);
+        if (objectiveDist >= effectiveThreshold)
             return false;
 
-        Debug.Log($"{TL("Capturador")} {unit.InstanceId} ignora embarque ({context} {objectiveDist:F0}h<{MinDistanceForTransportSlot}h de {assigned.Sector})");
+        string sectorLabel = assigned != null ? assigned.Sector.ToString() : objBuilding.Sector.ToString();
+        Debug.Log($"{TL("Capturador")} {unit.InstanceId} ignora embarque ({context} {objectiveDist:F0}h<{effectiveThreshold}h de {sectorLabel})");
         return true;
+    }
+
+    private ConstructionManager FindNearestCapturableForUnit(UnitManager unit, Vector3Int fromCell)
+    {
+        ConstructionManager best = null;
+        float bestDist = float.MaxValue;
+        foreach (ConstructionManager c in ConstructionManager.AllActive)
+        {
+            if (!c.IsCapturable || c.CapturePointsMax <= 0) continue;
+            if (c.TeamId == unit.TeamId && c.CurrentCapturePoints >= c.CapturePointsMax) continue;
+            Vector3Int tc = c.CurrentCellPosition; tc.z = 0;
+            float dist = SectorManager.HexDistance(fromCell, tc);
+            if (dist < bestDist) { bestDist = dist; best = c; }
+        }
+        return best;
     }
 }

@@ -23,7 +23,33 @@ public partial class AIController
         return unit != null
             && unit.TryGetUnitData(out UnitData data)
             && data != null
-            && data.preferRepositionAtWeaponMaxRange;
+            && (data.preferRepositionAtWeaponMaxRange || data.preferArtilleryModeBeforeCombatant);
+    }
+
+    private static bool IsArtilleryModeOnly(UnitManager unit)
+    {
+        return unit != null
+            && unit.TryGetUnitData(out UnitData data)
+            && data != null
+            && data.preferArtilleryModeBeforeCombatant;
+    }
+
+    // Returns the smallest minRange among all indirect weapons (minRange >= 2) the unit has with ammo.
+    // Returns -1 if the unit has no indirect weapon (filter should not apply).
+    private static int GetUnitIndirectWeaponMinRange(UnitManager unit)
+    {
+        if (unit == null) return -1;
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+        if (weapons == null) return -1;
+        int best = -1;
+        foreach (UnitEmbarkedWeapon embarked in weapons)
+        {
+            if (embarked?.weapon == null || embarked.squadAmmunition <= 0) continue;
+            int minR = embarked.GetRangeMin();
+            if (minR < 2) continue;
+            if (best < 0 || minR < best) best = minR;
+        }
+        return best;
     }
 
     private static bool IsFireSupportConservative(UnitManager unit)
@@ -114,6 +140,15 @@ public partial class AIController
 
     private Vector3Int ResolveRogueFireSupportAnchor(AIWorldSnapshot snapshot, Vector3Int fallback)
     {
+        // Rogue fire support always marches toward the enemy HQ when no attack is available.
+        if (snapshot != null && snapshot.EnemyHQ != null)
+        {
+            Vector3Int hq = snapshot.EnemyHQ.CurrentCellPosition;
+            hq.z = 0;
+            return hq;
+        }
+
+        // Fallback: nearest visible enemy unit.
         if (snapshot != null && snapshot.EnemyUnits != null && snapshot.EnemyUnits.Count > 0)
         {
             UnitManager best = null;
@@ -139,13 +174,6 @@ public partial class AIController
             }
         }
 
-        if (snapshot != null && snapshot.EnemyHQ != null)
-        {
-            Vector3Int hq = snapshot.EnemyHQ.CurrentCellPosition;
-            hq.z = 0;
-            return hq;
-        }
-
         return fallback;
     }
 
@@ -158,7 +186,8 @@ public partial class AIController
         Vector3Int anchor,
         bool defensiveContext,
         out PlayerAction action,
-        out string reason)
+        out string reason,
+        bool indirectOnly = false)
     {
         action = null;
         reason = "";
@@ -171,6 +200,10 @@ public partial class AIController
         UnitManager bestTarget = null;
         float bestScore = float.MinValue;
         string bestDecision = "";
+
+        // Artillery-mode filter: only allow attacks at the unit's max weapon range.
+        // preferArtilleryModeBeforeCombatant means "fire from distance, not close combat."
+        int artilleryMaxRange = indirectOnly ? GetFireSupportMaxWeaponRange(unit) : 0;
 
         foreach (Vector3Int rawCell in EnumerateFireSupportCandidateCells(fromCell, paths, stationary))
         {
@@ -190,6 +223,7 @@ public partial class AIController
             foreach (PodeMirarTargetOption opt in targets)
             {
                 if (opt?.targetUnit == null || opt.targetUnit.TeamId == snapshot.AITeam || opt.targetUnit.IsDead) continue;
+                if (artilleryMaxRange > 0 && opt.distance < artilleryMaxRange) continue;
                 if (!PassesAttackDecision(unit, opt.targetUnit, cell, defensiveContext, out string attackDecisionReason))
                     continue;
 
@@ -265,6 +299,15 @@ public partial class AIController
         if (option.isPreferredTargetForWeapon)
             score += 6500f;
         score += GetFireSupportRangeFitScore(attacker, target, option.distance, option.weapon, weaponPriorityData);
+
+        // Economic value: expensive/elite targets are strategically more valuable to destroy.
+        float targetValueScore = 0f;
+        if (target.TryGetUnitData(out UnitData targetUnitData) && targetUnitData != null)
+        {
+            targetValueScore = targetUnitData.cost * 1.5f + targetUnitData.eliteLevel * 5000f;
+            score += targetValueScore;
+        }
+
         string simDetails = "";
         if (TrySimulateAttackForAI(attacker, target, attackCell, out AIAttackSimulationSummary sim))
         {
@@ -277,10 +320,32 @@ public partial class AIController
         }
 
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, targetCell);
-        if (construction != null)
-            score += 1500f;
+        float constructionThreatScore = ScoreFireSupportConstructionThreat(target, construction, attacker != null ? attacker.TeamId : TeamId.Neutral);
+        score += constructionThreatScore;
 
-        details = $"pref={targetPreference}{simDetails}";
+        details = $"pref={targetPreference} value={targetValueScore:F0}{simDetails} bldgThreat={constructionThreatScore:F0}";
+        return score;
+    }
+
+    private float ScoreFireSupportConstructionThreat(UnitManager target, ConstructionManager construction, TeamId aiTeam)
+    {
+        if (target == null || construction == null || !construction.IsCapturable)
+            return 0f;
+
+        bool ownedOrContested = construction.TeamId == aiTeam
+            || (construction.TeamId == aiTeam && construction.CurrentCapturePoints < construction.CapturePointsMax);
+        bool enemyHeld = construction.TeamId != aiTeam;
+        float score = ownedOrContested ? 26000f : enemyHeld ? 12000f : 0f;
+
+        if (target.TryGetUnitData(out UnitData targetData)
+            && targetData != null
+            && targetData.roles != null
+            && targetData.roles.Contains(UnitRole.Capturador))
+        {
+            score += 9000f;
+        }
+
+        score += Mathf.Max(0, target.CurrentHP) * 350f;
         return score;
     }
 
@@ -403,7 +468,8 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         out Vector3Int bestCell,
         out string reason,
-        bool requireImmediateThreat = false)
+        bool requireImmediateThreat = false,
+        float moveMarginOverride = -1f)
     {
         bestCell = fromCell;
         reason = "";
@@ -419,6 +485,7 @@ public partial class AIController
         int maxRange = GetFireSupportMaxWeaponRange(unit);
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
         bool fromRouteFound = TryCalculateFireSupportRouteDistance(unit, fromCell, anchor, out float fromRouteDist);
+        float fromThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
         float fromScore = ScoreFireSupportRepositionCell(
             unit,
             snapshot,
@@ -448,6 +515,9 @@ public partial class AIController
             cell.z = 0;
             if (cell == fromCell) continue;
             if (occupied != null && occupied.Contains(cell)) continue;
+            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+            if (conservative && threat > fromThreat + 0.1f)
+                continue;
 
             float progress = fromDist - SectorManager.HexDistance(cell, anchor);
             float dpq = GetTerrainDpqPontos(cell);
@@ -481,7 +551,6 @@ public partial class AIController
 
             if (!requireImmediateThreat && (progress > 0f || advancesByRoute))
             {
-                float threat = CalculateThreatLevel(cell, snapshot.AITeam);
                 float fallbackProgress = advancesByRoute
                     ? recoversMissingRoute ? -cellRouteDist : routeProgress
                     : progress;
@@ -518,10 +587,10 @@ public partial class AIController
             }
         }
 
-        const float moveMargin = 120f;
+        float moveMargin = moveMarginOverride >= 0f ? moveMarginOverride : 120f;
         if (!found || bestCell == fromCell)
         {
-            if (foundAdvance)
+            if (foundAdvance && fromDist > maxRange)
             {
                 bestCell = bestAdvanceCell;
                 reason = $"advanceFallback route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
@@ -533,7 +602,7 @@ public partial class AIController
 
         if (bestScore < fromScore + moveMargin)
         {
-            if (foundAdvance)
+            if (foundAdvance && fromDist > maxRange)
             {
                 bestCell = bestAdvanceCell;
                 reason = $"advanceFallback score={bestScore:F0} hold={fromScore:F0} route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
@@ -640,9 +709,11 @@ public partial class AIController
         float cohesion = conservative ? CalculateFireSupportCohesionScore(unit, snapshot, cell) : 0f;
         float rearLine = conservative ? CalculateFireSupportRearLineScore(unit, snapshot, cell, anchor) : 0f;
         float tacticalPressure = CalculateFireSupportTacticalPressureScore(unit, snapshot, cell, weaponPriorityData);
+        if (conservative)
+            tacticalPressure = Mathf.Min(tacticalPressure, 3200f);
 
         float dpqWeight = preferBestDpq ? 95f : 35f;
-        float threatWeight = conservative && tacticalPressure <= 0f ? 85f : conservative ? 45f : 15f;
+        float threatWeight = conservative ? 145f : 15f;
         float movementWeight = preferBestDpq ? 18f : 4f;
         float postureScore;
 
@@ -673,6 +744,8 @@ public partial class AIController
 
         if (cell != fromCell && tacticalPressure <= 0f)
             score -= conservative ? 80f : 25f;
+        if (conservative && threat > 0f && cell != fromCell)
+            score -= threat * 90f;
 
         details = $"dist={dist:F1} range={maxRange} dpq={dpq:F1} prog={progress:F1} coh={cohesion:F0} rear={rearLine:F0} threat={threat:F1} pressure={tacticalPressure:F0}";
         return score;

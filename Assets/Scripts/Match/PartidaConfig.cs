@@ -14,7 +14,7 @@ public static class PartidaConfig
     public static bool[] IsAI { get; private set; }
     public static bool[] FlipX { get; private set; }
     public static MatchController.GameSetupPreset Preset { get; private set; }
-    public static bool CommandServiceAutomatic { get; private set; }
+    public static bool[] CommandServiceAutomatic { get; private set; }
     public static string TargetScene { get; private set; }
 
     public static void Set(
@@ -23,7 +23,7 @@ public static class PartidaConfig
         bool[] isAI,
         bool[] flipX,
         MatchController.GameSetupPreset preset,
-        bool commandServiceAutomatic,
+        bool[] commandServiceAutomatic,
         string targetScene)
     {
         PlayerCount = Mathf.Clamp(playerCount, 2, 4);
@@ -63,7 +63,12 @@ public static class PartidaConfig
 
         mc.ImportPlayersState(teamIds, flipXs, isAIs, startMoneys, actualMoneys, incomePerTurns, startMoneyAppliedFlags, false);
         mc.SetGameSetupPreset(Preset);
-        mc.CommandServiceAutomatic = CommandServiceAutomatic;
+        for (int i = 0; i < PlayerCount; i++)
+        {
+            TeamId team = (Teams != null && i < Teams.Length) ? Teams[i] : TeamId.Green;
+            bool cmdAuto = (CommandServiceAutomatic != null && i < CommandServiceAutomatic.Length) ? CommandServiceAutomatic[i] : false;
+            mc.SetPlayerCommandServiceAutomatic(team, cmdAuto);
+        }
     }
 
     public static void Clear()

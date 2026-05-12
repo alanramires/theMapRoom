@@ -143,7 +143,7 @@ public partial class AIController
                 obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
             if (info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
                 obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
-            if (info.GetDistanceToHQ(aiTeam) >= MinDistanceForTransportSlot)
+            if (info.GetDistanceToHQ(aiTeam) >= GetEffectiveTransportThreshold(aiTeam))
                 obj.Slots.Add(new SlotNeed { Role = UnitRole.Transportador });
             plan.Objectives.Add(obj);
         }
@@ -216,12 +216,15 @@ public partial class AIController
                     Sector = info.Sector, AssignedTeam = aiTeam,
                     Status = ObjectiveStatus.Defending, Priority = defPriority++,
                 };
-                // 2º slot se inimigo já está recapturando — precisa de reforço urgente
+                // 2º capturer se inimigo já está recapturando — reforço urgente
                 int defSlots = info.HasPartialCapture || criticalHomeThreat ? 2 : 1;
                 for (int s = 0; s < defSlots; s++)
                     defObj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
+                // Setor não-base com captura ativa: pede assault para expulsar o inimigo
+                if (info.HasPartialCapture && !criticalHomeThreat)
+                    defObj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
                 plan.Objectives.Add(defObj);
-                Debug.Log($"{TL("Plan")} Objetivo defensivo: {info.Sector} (pri {defPriority - 1}, inimigo ≤{DefenseEnemyRange}h)");
+                Debug.Log($"{TL("Plan")} Objetivo defensivo: {info.Sector} (pri {defPriority - 1}, inimigo ≤{DefenseEnemyRange}h, partialCapture={info.HasPartialCapture})");
             }
         }
 
@@ -867,7 +870,7 @@ public partial class AIController
                     float apcDistToObj = SectorManager.HexDistance(uc, tc);
                     float pickupReach = Mathf.Max(0, u.RemainingMovementPoints) + ShuttlePickupRange;
                     bool canCreateOpportunisticSlot = !hasOpenTransportSlot
-                        && capturerDistToObj >= MinDistanceForTransportSlot
+                        && capturerDistToObj >= GetEffectiveTransportThreshold(aiTeam)
                         && pickupDist <= pickupReach + 0.5f;
                     if (!hasOpenTransportSlot && !canCreateOpportunisticSlot) continue;
 
@@ -1463,7 +1466,8 @@ public partial class AIController
 
                 Vector3Int transporterCell = transporter.CurrentCellPosition; transporterCell.z = 0;
                 float apcDist = SectorManager.HexDistance(transporterCell, targetCell);
-                if (apcDist >= MinDistanceForTransportSlot)
+                int effectiveThreshold = GetEffectiveTransportThreshold(aiTeam);
+                if (apcDist >= effectiveThreshold)
                     continue;
 
                 bool supportNeeded = IsObjectiveInCombatDisadvantage(obj, aiTeam, targetCell,
@@ -1471,14 +1475,14 @@ public partial class AIController
                 if (supportNeeded)
                 {
                     Debug.Log($"{TL("Plan")} Transportador {transporter.InstanceId} mantém apoio em {obj.Sector} " +
-                              $"({apcDist:F0}h<{MinDistanceForTransportSlot}h, combate inimigo={enemyHp}HP aliado={allyHp}HP)");
+                              $"({apcDist:F0}h<{effectiveThreshold}h, combate inimigo={enemyHp}HP aliado={allyHp}HP)");
                     continue;
                 }
 
                 transporter.ClearAIAssignedPlan();
                 obj.Slots.RemoveAt(i);
                 Debug.Log($"{TL("Plan")} Transportador {transporter.InstanceId} libera {obj.Sector}: " +
-                          $"vazio e perto ({apcDist:F0}h<{MinDistanceForTransportSlot}h), volta a shuttle/HQ");
+                          $"vazio e perto ({apcDist:F0}h<{effectiveThreshold}h), volta a shuttle/HQ");
             }
         }
     }

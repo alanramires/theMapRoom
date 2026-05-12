@@ -85,12 +85,23 @@ public partial class AIController
 
         // Park on the path to the objective: within ShuttlePickupRange of the passenger,
         // as close to the objective as possible so the journey starts immediately after boarding.
+        // Use ResolveUnitObjectiveCell so the objective falls back to enemy HQ when the
+        // sector capturable is gone (e.g. already taken by another AI unit this turn).
         Vector3Int passengerCell = targetPassenger.CurrentCellPosition; passengerCell.z = 0;
-        ConstructionManager sectorTgt = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
-        Vector3Int objCell = sectorTgt != null ? sectorTgt.CurrentCellPosition : Vector3Int.zero; objCell.z = 0;
+        Vector3Int objCell = ResolveUnitObjectiveCell(targetPassenger, plan, snapshot);
         Vector3Int moveTarget = FindTransportShuttleMove(unit, fromCell, passengerCell, paths, occupied, snapshot.AITeam, objCell);
-        Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — pickup {targetPassenger.InstanceId}@{passengerCell} via {moveTarget}");
 
+        // Opportunistic attack from the pickup position: move there first, then fire.
+        UnitManager pickupAtk = TryFindAttackFromCell(unit, snapshot, fromCell, moveTarget);
+        if (pickupAtk != null)
+        {
+            Vector3Int pickupAtkCell = pickupAtk.CurrentCellPosition; pickupAtkCell.z = 0;
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — pickup+ataque {pickupAtk.InstanceId} via {moveTarget}");
+            return BuildAttackBatch(unit, snapshot.AITeam, fromCell, moveTarget,
+                pickupAtk.InstanceId.ToString(), pickupAtkCell, paths);
+        }
+
+        Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — pickup {targetPassenger.InstanceId}@{passengerCell} via {moveTarget}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
     }
 

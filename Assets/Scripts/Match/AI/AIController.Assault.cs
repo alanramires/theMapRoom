@@ -179,6 +179,9 @@ public partial class AIController
         if (enemies == null || enemies.Count == 0)
             return false;
 
+        bool preferDpq = unit.TryGetUnitData(out UnitData attackerUd) && attackerUd != null && attackerUd.prioritizeDpqAtBattle;
+        float dpqWeight = preferDpq ? 2000f : 40f;
+
         Vector3Int enemyHqCell = snapshot.EnemyHQ != null
             ? snapshot.EnemyHQ.CurrentCellPosition
             : fromCell;
@@ -196,19 +199,25 @@ public partial class AIController
                     continue;
 
                 Vector3Int enemyCell = enemy.CurrentCellPosition; enemyCell.z = 0;
-                bool inConstruction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell) != null;
+                ConstructionManager enemyBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell);
+                bool inOwnConstruction = enemyBldg != null && enemyBldg.TeamId == snapshot.AITeam;
+                bool inConstruction = enemyBldg != null;
+                // Enemy on OUR building (capturing it) is far more urgent than any other position.
+                float constructionBonus = inOwnConstruction ? 20000f : inConstruction ? 5000f : 0f;
                 float enemyHqDist = SectorManager.HexDistance(enemyCell, enemyHqCell);
                 float cellHqDist = SectorManager.HexDistance(cell, enemyHqCell);
                 float dpq = GetTerrainDpqPontos(cell);
                 BazookaTargetPriority targetPreference = ResolveAssaultTargetPreference(unit, enemy);
                 float targetPreferenceScore = GetAssaultTargetPreferenceScore(targetPreference);
+                // enemyHqDist penalises enemies far from their HQ (advancing enemies).
+                // If they are on OUR building, distance to their HQ is irrelevant — skip the penalty.
                 float score =
                     targetPreferenceScore
                     + Mathf.Max(0, 20 - enemy.CurrentHP) * 900f
-                    + (inConstruction ? 5000f : 0f)
-                    - enemyHqDist * 120f
+                    + constructionBonus
+                    - (inOwnConstruction ? 0f : enemyHqDist * 120f)
                     - cellHqDist * 30f
-                    + dpq * 40f
+                    + dpq * dpqWeight
                     - GetPathStepCount(paths, cell) * 5f
                     - enemy.InstanceId * 0.001f;
 
@@ -217,7 +226,7 @@ public partial class AIController
                     bestScore = score;
                     bestCell = cell;
                     bestTarget = enemy;
-                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} bldg={inConstruction} enemyHqDist={enemyHqDist:F1} dpq={dpq:F1} {attackDecisionReason}";
+                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} bldg={inConstruction} ownBldg={inOwnConstruction} enemyHqDist={enemyHqDist:F1} dpq={dpq:F1} dpqW={dpqWeight:F0} preferDpq={preferDpq} {attackDecisionReason}";
                 }
             }
         }

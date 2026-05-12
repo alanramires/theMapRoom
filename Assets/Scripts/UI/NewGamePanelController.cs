@@ -438,7 +438,13 @@ public class NewGamePanelController : MonoBehaviour
             : string.Empty;
         SaveGameManager.SetupForNewGame(saveDir);
 
-        PartidaConfig.Set(teams.Count, teams.ToArray(), isAI.ToArray(), flipX.ToArray(), preset, cmdAuto, target);
+        bool[] cmdAutoArray = new bool[teams.Count];
+        for (int i = 0; i < teams.Count; i++)
+        {
+            cmdAutoArray[i] = cmdAuto;
+        }
+
+        PartidaConfig.Set(teams.Count, teams.ToArray(), isAI.ToArray(), flipX.ToArray(), preset, cmdAutoArray, target);
         SceneManager.LoadScene(target);
     }
 

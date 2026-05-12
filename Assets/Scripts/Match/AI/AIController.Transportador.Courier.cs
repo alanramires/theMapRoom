@@ -153,7 +153,8 @@ public partial class AIController
         return best;
     }
 
-    // For each passenger, picks the disembark option closest to their objective.
+    // For each passenger, picks the best delivery cell, preferring immediate capture chances
+    // that do not pull the courier away from its current delivery route.
     private List<PodeDesembarcarOption> SelectBestDisembarkPerPassenger(
         List<PodeDesembarcarOption> options,
         List<UnitManager> passengers,
@@ -176,14 +177,41 @@ public partial class AIController
                     ? SectorManager.HexDistance(dc, target)
                     : 0f;
                 float threat = CalculateThreatLevel(dc, snapshot.AITeam);
-                bool isBetter = dist < bestDist - 0.1f
-                    || (dist < bestDist + 0.1f && threat < bestThreat - 0.001f);
+                float score = ScoreCourierDisembarkOption(passenger, dc, target, snapshot.AITeam, dist, threat);
+                float bestScore = best != null
+                    ? ScoreCourierDisembarkOption(passenger, best.disembarkCell, target, snapshot.AITeam, bestDist, bestThreat)
+                    : float.MinValue;
+                bool isBetter = score > bestScore + 0.1f
+                    || (score > bestScore - 0.1f && dist < bestDist - 0.1f)
+                    || (score > bestScore - 0.1f && dist < bestDist + 0.1f && threat < bestThreat - 0.001f);
                 if (isBetter) { bestDist = dist; bestThreat = threat; best = opt; }
             }
 
             if (best != null) selected.Add(best);
         }
         return selected;
+    }
+
+    private float ScoreCourierDisembarkOption(
+        UnitManager passenger,
+        Vector3Int disembarkCell,
+        Vector3Int assignedTarget,
+        TeamId aiTeam,
+        float distToAssignedTarget,
+        float threat)
+    {
+        disembarkCell.z = 0;
+        float score = -distToAssignedTarget * 20f - threat * 8f;
+
+        if (SimulateCaptureSensor(passenger, disembarkCell, out ConstructionManager captureTarget))
+        {
+            Vector3Int captureCell = captureTarget.CurrentCellPosition; captureCell.z = 0;
+            bool isAssignedTarget = assignedTarget != Vector3Int.zero && captureCell == assignedTarget;
+            bool isNeutralOrEnemy = captureTarget.TeamId != aiTeam;
+            score += isAssignedTarget ? 3000f : isNeutralOrEnemy ? 1800f : 900f;
+        }
+
+        return score;
     }
 
     // -------------------------------------------------------------------------

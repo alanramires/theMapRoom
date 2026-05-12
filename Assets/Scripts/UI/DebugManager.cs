@@ -221,9 +221,7 @@ public class DebugManager : MonoBehaviour
         else if (command == "HELP")
         {
             string helpText = BuildDebugHelpSummary();
-            bool shownOnHelper = PanelHelperController.TrySetTransientText("DEBUG COMMANDS", helpText, 35f);
-            if (!shownOnHelper)
-                PanelDialogController.TrySetTransientText("Debug help enviado ao console", 2.4f);
+            ShowDynamicHelpPanel(helpText);
 
             Debug.Log($"[Debug Command] HELP\n{helpText}");
             cursorController?.PlayBeepSfx();
@@ -1432,6 +1430,39 @@ public class DebugManager : MonoBehaviour
             return true;
 
         return false;
+    }
+
+    private string currentDynamicHelpText = null;
+    private Vector2 dynamicHelpScrollPos = Vector2.zero;
+    private Rect dynamicHelpWindowRect = new Rect(20, 20, 300, 400);
+
+    private void ShowDynamicHelpPanel(string text)
+    {
+        currentDynamicHelpText = text;
+        dynamicHelpWindowRect = new Rect(20, 40, 300, Screen.height * 0.7f);
+        dynamicHelpScrollPos = Vector2.zero;
+    }
+
+    private void OnGUI()
+    {
+        if (!string.IsNullOrEmpty(currentDynamicHelpText))
+        {
+            dynamicHelpWindowRect = GUI.Window(8888, dynamicHelpWindowRect, DrawDynamicHelpWindow, "DEBUG COMMANDS");
+        }
+    }
+
+    private void DrawDynamicHelpWindow(int windowID)
+    {
+        if (GUI.Button(new Rect(dynamicHelpWindowRect.width - 25, 2, 20, 16), "X"))
+        {
+            currentDynamicHelpText = null;
+        }
+
+        dynamicHelpScrollPos = GUILayout.BeginScrollView(dynamicHelpScrollPos);
+        GUILayout.Label(currentDynamicHelpText);
+        GUILayout.EndScrollView();
+
+        GUI.DragWindow();
     }
 }
 

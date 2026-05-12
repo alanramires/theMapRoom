@@ -581,13 +581,14 @@ public class PanelMenu : MonoBehaviour
         PlayConfirmSfxOncePerFrame();
 
         TeamId[] teams  = { TeamId.Green, TeamId.Red };
-        bool[]   isAI   = { false, false };
+        bool[]   isAI   = { false, true };
         bool[]   flipX  = { false, true };
+        bool[]   cmdAuto= { false, true };
         const MatchController.GameSetupPreset preset = MatchController.GameSetupPreset.FogOfWarTotal;
         const string target = "Battle Map";
 
         SaveGameManager.SetupForNewGame(string.Empty);
-        PartidaConfig.Set(2, teams, isAI, flipX, preset, false, target);
+        PartidaConfig.Set(2, teams, isAI, flipX, preset, cmdAuto, target);
         UnityEngine.SceneManagement.SceneManager.LoadScene(target);
     }
 

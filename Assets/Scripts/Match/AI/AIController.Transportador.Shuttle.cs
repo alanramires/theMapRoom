@@ -38,11 +38,9 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
         }
 
-        // No pickup candidate: head toward nearest friendly factory/HQ
-        Vector3Int waitTarget = FindTransportWaitTarget(snapshot.AITeam, fromCell);
-        Vector3Int waitMove = FindTransportMove(unit, fromCell, waitTarget, paths, occupied, snapshot.AITeam);
-        Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — sem candidato, aguarda em {waitMove}");
-        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, waitMove, paths);
+        // No pickup candidate: release to HexEvaluator so the APC fights/positions generically.
+        Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — sem candidato, libera para HexEvaluator");
+        return null;
     }
 
     // -------------------------------------------------------------------------
@@ -69,14 +67,14 @@ public partial class AIController
             if (candidate.TeamId != snapshot.AITeam || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
 
-            if (FindFittingSlotIndex(transporter, transporterData, candidateData) < 0) continue;
+            if (FindFittingSlotIndex(transporter, transporterData, candidate, candidateData) < 0) continue;
 
             Vector3Int objectiveCell = ResolveUnitObjectiveCell(candidate, plan, snapshot);
             if (objectiveCell == Vector3Int.zero) continue;
 
             Vector3Int candidateCell = candidate.CurrentCellPosition; candidateCell.z = 0;
             float objectiveDist = SectorManager.HexDistance(candidateCell, objectiveCell);
-            if (objectiveDist < MinDistanceForTransportSlot) continue;
+            if (objectiveDist < GetEffectiveTransportThreshold(snapshot.AITeam)) continue;
 
             float transportDist = SectorManager.HexDistance(transporterCell, candidateCell);
             int rolePriority = candidateData.roles != null && candidateData.roles.Count > 0
@@ -94,15 +92,14 @@ public partial class AIController
         return best;
     }
 
-    private static int FindFittingSlotIndex(UnitManager transporter, UnitData transporterData, UnitData candidateData)
+    private static int FindFittingSlotIndex(UnitManager transporter, UnitData transporterData, UnitManager candidate, UnitData candidateData)
     {
         if (transporterData.transportSlots == null) return -1;
         for (int i = 0; i < transporterData.transportSlots.Count; i++)
         {
             UnitTransportSlotRule slot = transporterData.transportSlots[i];
             if (slot == null) continue;
-            if (slot.allowedClasses != null && slot.allowedClasses.Count > 0
-                && !slot.allowedClasses.Contains(candidateData.unitClass)) continue;
+            if (!PodeEmbarcarSensor.CanUseSlot(candidate, candidateData, slot, out _)) continue;
             int occupancy = transporter.GetOccupiedTransportSeatCountForSlot(i);
             if (occupancy >= Mathf.Max(1, slot.capacity)) continue;
             return i;
@@ -131,53 +128,57 @@ public partial class AIController
         const float eps = 0.1f;
 
         // When we know the destination, park on the path: find the reachable cell
-        // within ShuttlePickupRange of the passenger that is closest to the objective.
+        // within pickup range of the passenger that is closest to the objective.
+        // Try preferred range (2h) first; expand to extended range (3h) if nothing found.
         // "Stay" counts as a candidate if already in range and not blocking production.
         if (hasObjective)
         {
-            Vector3Int best = fromCell;
-            float bestDistToObj = float.MaxValue;
-            bool bestIsProductionBldg = true;
-            float bestThreat = float.MaxValue;
-            bool found = false;
-
-            if (SectorManager.HexDistance(fromCell, candidateCell) <= ShuttlePickupRange && !fromIsProductionBldg)
+            for (int pickupRange = ShuttlePickupRange; pickupRange <= ShuttlePickupRange + 1; pickupRange++)
             {
-                best = fromCell;
-                bestDistToObj = SectorManager.HexDistance(fromCell, objectiveCell);
-                bestIsProductionBldg = false;
-                bestThreat = CalculateThreatLevel(fromCell, aiTeam);
-                found = true;
-            }
+                Vector3Int best = fromCell;
+                float bestDistToObj = float.MaxValue;
+                bool bestIsProductionBldg = true;
+                float bestThreat = float.MaxValue;
+                bool found = false;
 
-            foreach (Vector3Int cell in paths.Keys)
-            {
-                if (cell == fromCell) continue;
-                if (occupied.Contains(cell)) continue;
-                if (IsNonTeamConstruction(cell, aiTeam)) continue;
-                if (SectorManager.HexDistance(cell, candidateCell) > ShuttlePickupRange) continue;
-
-                float distToObj = SectorManager.HexDistance(cell, objectiveCell);
-                bool isProductionBldg = IsTeamProductionBuilding(cell, aiTeam);
-                float threat = CalculateThreatLevel(cell, aiTeam);
-
-                bool isBetter = !found
-                    || distToObj < bestDistToObj - eps
-                    || (distToObj < bestDistToObj + eps && !isProductionBldg && bestIsProductionBldg)
-                    || (distToObj < bestDistToObj + eps && isProductionBldg == bestIsProductionBldg && threat < bestThreat - 0.001f);
-
-                if (isBetter)
+                if (SectorManager.HexDistance(fromCell, candidateCell) <= pickupRange && !fromIsProductionBldg)
                 {
-                    best = cell;
-                    bestDistToObj = distToObj;
-                    bestIsProductionBldg = isProductionBldg;
-                    bestThreat = threat;
+                    best = fromCell;
+                    bestDistToObj = SectorManager.HexDistance(fromCell, objectiveCell);
+                    bestIsProductionBldg = false;
+                    bestThreat = CalculateThreatLevel(fromCell, aiTeam);
                     found = true;
                 }
-            }
 
-            if (found) return best;
-            // No cell within pickup range reachable — fall through to adjacent/displacement
+                foreach (Vector3Int cell in paths.Keys)
+                {
+                    if (cell == fromCell) continue;
+                    if (occupied.Contains(cell)) continue;
+                    if (IsNonTeamConstruction(cell, aiTeam)) continue;
+                    if (SectorManager.HexDistance(cell, candidateCell) > pickupRange) continue;
+
+                    float distToObj = SectorManager.HexDistance(cell, objectiveCell);
+                    bool isProductionBldg = IsTeamProductionBuilding(cell, aiTeam);
+                    float threat = CalculateThreatLevel(cell, aiTeam);
+
+                    bool isBetter = !found
+                        || distToObj < bestDistToObj - eps
+                        || (distToObj < bestDistToObj + eps && !isProductionBldg && bestIsProductionBldg)
+                        || (distToObj < bestDistToObj + eps && isProductionBldg == bestIsProductionBldg && threat < bestThreat - 0.001f);
+
+                    if (isBetter)
+                    {
+                        best = cell;
+                        bestDistToObj = distToObj;
+                        bestIsProductionBldg = isProductionBldg;
+                        bestThreat = threat;
+                        found = true;
+                    }
+                }
+
+                if (found) return best;
+            }
+            // No cell within extended pickup range reachable — fall through to rendezvous move
         }
 
         // Fallback: original adjacent-first behavior
@@ -214,6 +215,23 @@ public partial class AIController
 
         if (foundAdj) return bestAdj;
         if (SectorManager.HexDistance(fromCell, candidateCell) < 1.5f) return fromCell;
+
+        // When we know the objective, head toward the rendezvous: the cell ~2h from the
+        // capturer along the capturer→objective direction. This keeps the APC on the
+        // delivery route so both sides converge; falling back to the capturer directly
+        // forces a needless detour away from the objective.
+        if (hasObjective)
+        {
+            float cToObj = SectorManager.HexDistance(candidateCell, objectiveCell);
+            Vector3Int rendezvous = cToObj > ShuttlePickupRange + 0.5f
+                ? new Vector3Int(
+                      Mathf.RoundToInt(Mathf.Lerp(candidateCell.x, objectiveCell.x, ShuttlePickupRange / cToObj)),
+                      Mathf.RoundToInt(Mathf.Lerp(candidateCell.y, objectiveCell.y, ShuttlePickupRange / cToObj)),
+                      0)
+                : candidateCell;
+            return FindTransportMove(unit, fromCell, rendezvous, paths, occupied, aiTeam);
+        }
+
         return FindTransportMove(unit, fromCell, candidateCell, paths, occupied, aiTeam);
     }
 
@@ -224,6 +242,27 @@ public partial class AIController
     }
 
     // Returns the nearest friendly factory or HQ to wait at between deliveries.
+    // Returns the best enemy to attack from attackCell (moving from fromCell), or null if none qualify.
+    private UnitManager TryFindAttackFromCell(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int fromCell, Vector3Int attackCell)
+    {
+        SensorMovementMode mode = attackCell != fromCell ? SensorMovementMode.MoveuAndando : SensorMovementMode.MoveuParado;
+        var targets = new List<PodeMirarTargetOption>();
+        WeaponPriorityData wpData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
+        if (!PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase, mode, targets, weaponPriorityData: wpData, fromCell: attackCell))
+            return null;
+
+        UnitManager best = null;
+        float bestScore = float.MinValue;
+        foreach (PodeMirarTargetOption opt in targets)
+        {
+            if (opt?.targetUnit == null || opt.targetUnit.TeamId == snapshot.AITeam || opt.targetUnit.IsDead) continue;
+            if (!PassesAttackDecision(unit, opt.targetUnit, attackCell, false, out _)) continue;
+            float score = (20f - opt.targetUnit.CurrentHP) * 100f - opt.targetUnit.InstanceId * 0.001f;
+            if (score > bestScore) { bestScore = score; best = opt.targetUnit; }
+        }
+        return best;
+    }
+
     private static Vector3Int FindTransportWaitTarget(TeamId aiTeam, Vector3Int fromCell)
     {
         ConstructionManager best = null;

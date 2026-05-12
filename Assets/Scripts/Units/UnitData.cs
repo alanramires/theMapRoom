@@ -169,6 +169,19 @@ public class UnitData : ScriptableObject
     [Range(1, 10)] public int repairRecoverHpAbove = 8;
     [Tooltip("BEHAVIOR — While under repair, attempt to fuse with a damaged allied unit of the same type nearby instead of waiting passively.")]
     public bool fuseWhileInRepair = false;
+    [Header("Logistics AI")]
+    [Tooltip("Se ativo, a IA usa este supridor em manutencao preventiva.")]
+    public bool aiPreventiveMaintenanceEnabled = true;
+    [Tooltip("Se ativo, a manutencao preventiva tambem pode ser atendida mesmo quando houver aliados em UnderRepair. Se desativo, UnderRepair bloqueia preventivos.")]
+    public bool aiPreventiveSupplyCanRunWithUnderRepair = false;
+    [Tooltip("Para supridores com Play Conservative: evita hex de atendimento com inimigo visivel neste raio. 0 desativa. Use 2 para tolerar inimigo a 3 hexes.")]
+    [Range(0, 6)] public int aiConservativeSupplyAvoidEnemyRange = 2;
+    [Tooltip("Manutencao preventiva: suprir aliados com HP abaixo deste percentual. 0 desativa este criterio.")]
+    [Range(0, 100)] public int aiPreventiveSupplyHpBelowPct = 70;
+    [Tooltip("Manutencao preventiva: suprir aliados com autonomia abaixo deste percentual. 0 desativa este criterio.")]
+    [Range(0, 100)] public int aiPreventiveSupplyAutonomyBelowPct = 60;
+    [Tooltip("Manutencao preventiva: suprir aliados com alguma arma embarcada com munição nesse valor ou abaixo. 0 desativa este criterio.")]
+    [Range(0, 10)] public int aiPreventiveSupplyWeaponAmmoAtOrBelow = 1;
 
     [Header("Elite")]
     [Tooltip("Nivel de elite da unidade (padrao: 0).")]
@@ -333,6 +346,10 @@ public class UnitData : ScriptableObject
             preferredAirHeight = HeightLevel.AirLow;
         if (preferredNavalHeight != HeightLevel.Surface && preferredNavalHeight != HeightLevel.Submerged)
             preferredNavalHeight = HeightLevel.Submerged;
+        aiPreventiveSupplyHpBelowPct = Mathf.Clamp(aiPreventiveSupplyHpBelowPct, 0, 100);
+        aiPreventiveSupplyAutonomyBelowPct = Mathf.Clamp(aiPreventiveSupplyAutonomyBelowPct, 0, 100);
+        aiPreventiveSupplyWeaponAmmoAtOrBelow = Mathf.Max(0, aiPreventiveSupplyWeaponAmmoAtOrBelow);
+        aiConservativeSupplyAvoidEnemyRange = Mathf.Max(0, aiConservativeSupplyAvoidEnemyRange);
 
         for (int i = 0; i < embarkedWeapons.Count; i++)
         {

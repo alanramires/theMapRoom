@@ -3,6 +3,8 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private static readonly Dictionary<TeamId, int> repairActivationsThisSessionByTeam = new Dictionary<TeamId, int>();
+
     // -------------------------------------------------------------------------
     // Modo de reparo
     // -------------------------------------------------------------------------
@@ -22,6 +24,7 @@ public partial class AIController
         if (!unit.IsUnderRepair && anyTrigger)
         {
             unit.SetIsUnderRepair(true);
+            int sessionCount = IncrementRepairActivationCount(unit.TeamId);
             // Libera o slot do objetivo para reatribuição imediata
             if (plan != null)
             {
@@ -38,7 +41,7 @@ public partial class AIController
             unit.SetAIMaintenanceActive(true);
             Debug.Log($"{TL("Repair")} {unit.InstanceId} entra em reparo " +
                       $"hp={unit.CurrentHP} fuel={unit.CurrentFuel}/{unit.GetMaxFuel()} " +
-                      $"ammo={unit.CurrentAmmo}/{unit.GetMaxAmmo()}");
+                      $"ammo={unit.CurrentAmmo}/{unit.GetMaxAmmo()} sessao={sessionCount}");
         }
         else if (unit.IsUnderRepair && !anyTrigger && unit.CurrentHP >= data.repairRecoverHpAbove)
         {
@@ -46,6 +49,20 @@ public partial class AIController
             unit.SetAIMaintenanceActive(false);
             Debug.Log($"{TL("Repair")} {unit.InstanceId} saiu do reparo hp={unit.CurrentHP}");
         }
+    }
+
+    private static int IncrementRepairActivationCount(TeamId team)
+    {
+        repairActivationsThisSessionByTeam.TryGetValue(team, out int count);
+        count++;
+        repairActivationsThisSessionByTeam[team] = count;
+        return count;
+    }
+
+    public static int GetRepairActivationCountThisSession(TeamId team)
+    {
+        repairActivationsThisSessionByTeam.TryGetValue(team, out int count);
+        return count;
     }
 
     private static bool EvaluateRepairTriggers(UnitManager unit, UnitData data)
@@ -211,13 +228,68 @@ public partial class AIController
             }
         }
 
-        // 3. Marcha para a construção aliada mais próxima desocupada (não defensiva)
+        // 3. Área home (base/HQ): reparo pode marchar no setor mas DEVE lutar — sem filtro de sobrevivência.
+        // Se prioritizeDpqAtBattle, tenta se mover para célula de maior DPQ antes de atacar.
+        if (IsRepairUnitInOwnHomeArea(snapshot, fromCell, aiTeam))
+        {
+            bool repairPreferDpq = unit.TryGetUnitData(out UnitData repairUd)
+                && repairUd != null && repairUd.prioritizeDpqAtBattle;
+
+            UnitManager homeTarget = null;
+            Vector3Int homeAttackCell = fromCell;
+            float homeBestScore = float.MinValue;
+            var homeCandidateBuf = new List<PodeMirarTargetOption>();
+
+            // When preferDpq, evaluate all reachable home-area cells; otherwise only current cell.
+            System.Collections.Generic.IEnumerable<Vector3Int> homeCells = repairPreferDpq && paths != null
+                ? (System.Collections.Generic.IEnumerable<Vector3Int>)paths.Keys
+                : new[] { fromCell };
+
+            foreach (Vector3Int rawAttackFrom in homeCells)
+            {
+                Vector3Int attackFrom = rawAttackFrom; attackFrom.z = 0;
+                bool staysInPlace = attackFrom == fromCell;
+                if (!staysInPlace && occupied.Contains(attackFrom)) continue;
+                if (repairPreferDpq && !staysInPlace
+                    && !IsRepairUnitInOwnHomeArea(snapshot, attackFrom, aiTeam)) continue;
+
+                SensorMovementMode homeMode = staysInPlace
+                    ? SensorMovementMode.MoveuParado
+                    : SensorMovementMode.MoveuAndando;
+                homeCandidateBuf.Clear();
+                if (!PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                        homeMode, homeCandidateBuf, fromCell: attackFrom))
+                    continue;
+
+                float dpqBonus = repairPreferDpq ? GetTerrainDpqPontos(attackFrom) * 500f : 0f;
+                float movPenalty = staysInPlace ? 0f : GetPathStepCount(paths, attackFrom) * 10f;
+
+                foreach (PodeMirarTargetOption opt in homeCandidateBuf)
+                {
+                    if (opt?.targetUnit == null) continue;
+                    Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
+                    float p = AttackTargetPriority(tc, attackFrom) + dpqBonus - movPenalty;
+                    if (p > homeBestScore)
+                    {
+                        homeBestScore = p;
+                        homeTarget = opt.targetUnit;
+                        homeAttackCell = attackFrom;
+                    }
+                }
+            }
+
+            if (homeTarget != null)
+            {
+                Vector3Int dtc = homeTarget.CurrentCellPosition; dtc.z = 0;
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} area home — DEVE lutar: ataca {homeTarget.UnitDisplayName}#{homeTarget.InstanceId} de {homeAttackCell} (preferDpq={repairPreferDpq}) antes de reparar");
+                return BuildAttackBatch(unit, aiTeam, fromCell, homeAttackCell, homeTarget.InstanceId.ToString(), dtc, paths);
+            }
+        }
+
+        // 4. Marcha para a construção aliada mais próxima desocupada (não defensiva)
         // Exclui: célula atual + repCells de objetivos defensivos ativos
         if (TryBuildRepairLastStandAttack(unit, aiTeam, fromCell, currentBldg, paths, occupied, out PlayerAction lastStandAction))
             return lastStandAction;
-
-        if (TryDecideRepairHoldHomeDefense(unit, snapshot, aiTeam, fromCell, out PlayerAction homeDefenseAction))
-            return homeDefenseAction;
 
         var occupiedForRepair = new HashSet<Vector3Int>(occupied) { fromCell };
         TeamObjectivePlan repPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
@@ -225,6 +297,10 @@ public partial class AIController
             foreach (SectorObjective obj in repPlan.Objectives)
             {
                 if (obj.Status != ObjectiveStatus.Defending) continue;
+                // Base and HQ sectors must never be blocked for repair — skip at sector level
+                // so units can always route back to them, regardless of cell lookup results.
+                if (ConstructionSectorHelper.IsBase(obj.Sector)) continue;
+                if (snapshot.MyHQ != null && snapshot.MyHQ.Sector == obj.Sector) continue;
                 if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
                 Vector3Int rc = defInfo.RepresentativeCell; rc.z = 0;
                 ConstructionManager reservedConstruction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, rc);
@@ -380,7 +456,7 @@ public partial class AIController
             float threat = CalculateThreatLevel(cell, aiTeam);
             float pathCost = cell == fromCell ? 0f : GetPathStepCount(paths, cell);
 
-            float threatMult = homeRepair ? 0.15f : 0.35f;
+            float threatMult = homeRepair ? 0f : 0.35f;
             float score =
                 progress * 1200f
                 - effectiveDist * 180f
@@ -474,6 +550,25 @@ public partial class AIController
         return false;
     }
 
+    private bool IsRepairUnitInOwnHomeArea(AIWorldSnapshot snapshot, Vector3Int fromCell, TeamId aiTeam)
+    {
+        fromCell.z = 0;
+
+        ConstructionManager current = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
+        if (current != null && current.TeamId == aiTeam
+            && (current.IsPlayerHeadQuarter || ConstructionSectorHelper.IsBase(current.Sector)))
+            return true;
+
+        if (snapshot?.MyHQ != null)
+        {
+            Vector3Int hqCell = snapshot.MyHQ.CurrentCellPosition; hqCell.z = 0;
+            if (SectorManager.HexDistance(fromCell, hqCell) <= HomeDefenseThreatRange)
+                return true;
+        }
+
+        return false;
+    }
+
     private bool TryDecideRepairFallbackToHQ(
         UnitManager unit,
         AIWorldSnapshot snapshot,
@@ -551,6 +646,11 @@ public partial class AIController
                 Debug.Log($"[Repair] home {cc} ocupado, mantendo como fallback de reparo dist={dist:F1}");
 
             bool safe = !HasNearbyVisibleEnemy(cc, aiTeam, DefenseEnemyRange);
+            if (!safe && !isHomeRepair)
+            {
+                Debug.Log($"[Repair] skip {cc} unsafe (não-home) dist={dist:F1}");
+                continue;
+            }
             float score = -dist * 100f;
             if (safe) score += 500f;
             if (isHomeRepair) score += 25f;

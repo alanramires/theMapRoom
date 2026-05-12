@@ -100,6 +100,10 @@ public partial class AIController
         // antes do capturador, para que o embarque seja avaliado no turno do passageiro.
         if (plan != null && IsAssignedTransporterWithUnactedPassenger(unit, plan, aiTeam)) return 0;
 
+        // Se um capturador inimigo esta entocado em construcao nossa, fogo de suporte
+        // com tiro possivel deve agir antes da infantaria defensora se reposicionar.
+        if (!unit.IsUnderRepair && HasFireSupportShotAtOwnedConstructionCapturer(unit, aiTeam)) return 0;
+
         // Manutencao nao preempta a fila. Se estiver em cima de alvo de captura,
         // IsBlockingCaptureTarget ja colocou no grupo 0 acima.
         if (unit.IsUnderRepair) return 4;
@@ -165,6 +169,73 @@ public partial class AIController
         return false;
     }
 
+    private bool HasFireSupportShotAtOwnedConstructionCapturer(UnitManager unit, TeamId aiTeam)
+    {
+        if (!IsFireSupportUnit(unit))
+            return false;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+
+        Dictionary<Vector3Int, List<Vector3Int>> paths = BuildFireSupportPaths(unit);
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        bool stationary = IsLongRangeStationary(unit);
+        WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
+
+        foreach (Vector3Int rawCell in EnumerateFireSupportCandidateCells(fromCell, paths, stationary))
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+
+            SensorMovementMode mode = cell != fromCell
+                ? SensorMovementMode.MoveuAndando
+                : SensorMovementMode.MoveuParado;
+
+            var targets = new List<PodeMirarTargetOption>();
+            if (!PodeMirarSensor.CollectTargets(
+                    unit,
+                    boardTilemap,
+                    terrainDatabase,
+                    mode,
+                    targets,
+                    weaponPriorityData: weaponPriorityData,
+                    fromCell: cell))
+                continue;
+
+            for (int i = 0; i < targets.Count; i++)
+            {
+                UnitManager target = targets[i] != null ? targets[i].targetUnit : null;
+                if (!IsEnemyCapturerOnOwnedConstruction(target, aiTeam))
+                    continue;
+                if (PassesAttackDecision(unit, target, cell, defensiveContext: true, out _))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsEnemyCapturerOnOwnedConstruction(UnitManager target, TeamId aiTeam)
+    {
+        if (target == null || target.TeamId == aiTeam || target.IsDead || target.IsEmbarked)
+            return false;
+        if (!target.TryGetUnitData(out UnitData targetData)
+            || targetData == null
+            || targetData.roles == null
+            || !targetData.roles.Contains(UnitRole.Capturador))
+            return false;
+
+        Vector3Int targetCell = target.CurrentCellPosition;
+        targetCell.z = 0;
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, targetCell);
+        return construction != null
+            && construction.IsCapturable
+            && construction.TeamId == aiTeam
+            && construction.CurrentCapturePoints < construction.CapturePointsMax;
+    }
+
     private bool IsTransporterWithValidPickupCandidate(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
     {
         if (!unit.TryGetUnitData(out UnitData data) || data == null
@@ -183,7 +254,7 @@ public partial class AIController
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
             Vector3Int cc = candidate.CurrentCellPosition; cc.z = 0;
             if (SectorManager.HexDistance(transporterCell, cc) > reach) continue;
-            if (FindFittingSlotIndex(unit, data, candidateData) < 0) continue;
+            if (FindFittingSlotIndex(unit, data, candidate, candidateData) < 0) continue;
             return true;
         }
 

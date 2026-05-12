@@ -49,12 +49,6 @@ public partial class AIController
             return attackAction;
         }
 
-        if (IsLongRangeStationary(unit) && IsFireSupportCloseEnoughToHold(unit, fromCell, anchor))
-        {
-            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} estacionario em {fromCell} - sem alvo");
-            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
-        }
-
         if (TryFindFireSupportRepositionCell(unit, snapshot, fromCell, anchor, paths, occupied, out Vector3Int moveCell, out string moveReason))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reposiciona para apoiar {assigned.Sector} via {moveCell} ({moveReason})");

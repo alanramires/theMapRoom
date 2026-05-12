@@ -273,7 +273,7 @@ public static class PodeEmbarcarSensor
         return true;
     }
 
-    private static bool CanUseSlot(UnitManager sourceUnit, UnitData sourceData, UnitTransportSlotRule slot, out string reason)
+    public static bool CanUseSlot(UnitManager sourceUnit, UnitData sourceData, UnitTransportSlotRule slot, out string reason)
     {
         reason = string.Empty;
         if (sourceUnit == null || sourceData == null || slot == null)

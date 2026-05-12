@@ -40,6 +40,9 @@ MonoBehaviour:
   playConservative: 1
   preferMoveOnBestDPQ: 1
   preferMaxDisplacement: 0
+  longRangeStationary: 0
+  preferRepositionAtWeaponMaxRange: 0
+  preferArtilleryModeBeforeCombatant: 0
   useAttackDecision: 0
   attackAcceptHpLossPercent: 50
   attackEliminationMinPercent: 10
@@ -52,6 +55,12 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 0
+  aiPreventiveMaintenanceEnabled: 1
+  aiPreventiveSupplyCanRunWithUnderRepair: 1
+  aiConservativeSupplyAvoidEnemyRange: 1
+  aiPreventiveSupplyHpBelowPct: 70
+  aiPreventiveSupplyAutonomyBelowPct: 60
+  aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
   eliteLevel: 0
   combatModifiers: []
   domain: 0

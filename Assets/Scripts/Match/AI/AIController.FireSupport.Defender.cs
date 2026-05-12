@@ -22,7 +22,7 @@ public partial class AIController
             return attackAction;
         }
 
-        if (IsLongRangeStationary(unit))
+        if (IsLongRangeStationary(unit) && IsFireSupportCloseEnoughToHold(unit, fromCell, anchor))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} defesa estacionaria {assigned.Sector} @ {fromCell}");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
