@@ -70,6 +70,12 @@ public partial class AIController
 
             if (FindFittingSlotIndex(transporter, transporterData, candidate, candidateData) < 0) continue;
 
+            // Skip candidates that are already the formal passenger of another transporter.
+            // A candidate is "taken" when both conditions hold in the same SectorObjective:
+            //   1. they occupy a filled Capturador slot, AND
+            //   2. a different transporter occupies a filled Transportador slot.
+            if (IsAlreadyFormalPassenger(candidate, transporter, plan)) continue;
+
             // When the transporter has a formal sector assignment, only consider candidates
             // heading to that same sector — cross-plan passengers will ignore the embark offer.
             if (assignedSector != null && plan != null)
@@ -83,7 +89,10 @@ public partial class AIController
 
             Vector3Int candidateCell = candidate.CurrentCellPosition; candidateCell.z = 0;
             float objectiveDist = SectorManager.HexDistance(candidateCell, objectiveCell);
-            if (objectiveDist < GetEffectiveTransportThreshold(snapshot.AITeam)) continue;
+            int candidateThreshold = GetEffectiveTransportThreshold(snapshot.AITeam);
+            int candidateMP = candidate.MaxMovementPoints;
+            if (candidateMP < 3) candidateThreshold += (3 - candidateMP) * 2;
+            if (objectiveDist < candidateThreshold) continue;
 
             float transportDist = SectorManager.HexDistance(transporterCell, candidateCell);
             int rolePriority = candidateData.roles != null && candidateData.roles.Count > 0
@@ -99,6 +108,25 @@ public partial class AIController
         }
 
         return best;
+    }
+
+    private static bool IsAlreadyFormalPassenger(UnitManager candidate, UnitManager thisTransporter, TeamObjectivePlan plan)
+    {
+        if (plan == null) return false;
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            bool candidateIsPassenger = false;
+            bool otherTransporterAssigned = false;
+            foreach (SlotNeed slot in obj.Slots)
+            {
+                if (slot.Role == UnitRole.Capturador && slot.Filled && slot.AssignedUnitId == candidate.InstanceId)
+                    candidateIsPassenger = true;
+                if (slot.Role == UnitRole.Transportador && slot.Filled && slot.AssignedUnitId != thisTransporter.InstanceId)
+                    otherTransporterAssigned = true;
+            }
+            if (candidateIsPassenger && otherTransporterAssigned) return true;
+        }
+        return false;
     }
 
     private static int FindFittingSlotIndex(UnitManager transporter, UnitData transporterData, UnitManager candidate, UnitData candidateData)

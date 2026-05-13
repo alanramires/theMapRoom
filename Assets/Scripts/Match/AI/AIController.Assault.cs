@@ -26,7 +26,11 @@ public partial class AIController
 
         SectorObjective assigned = ResolveAssignedAssaultObjective(unit, plan);
         if (assigned == null)
+        {
+            PlayerAction embarkAction = TryDecideAssaultEmbarkAction(unit, snapshot, plan);
+            if (embarkAction != null) return embarkAction;
             return DecideRogueAssaultBreakerAction(unit, snapshot);
+        }
 
         if (!IsCriticalHomeDefenseObjective(assigned, snapshot.AITeam)
             && TryFindCriticalHomeDefenseObjectiveForUnit(plan, snapshot.AITeam, unit, unit.CurrentCellPosition, "Assalto", out SectorObjective criticalHome))

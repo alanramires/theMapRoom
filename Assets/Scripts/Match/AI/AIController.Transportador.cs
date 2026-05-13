@@ -4,6 +4,9 @@ using UnityEngine;
 public partial class AIController
 {
     private const int TransportDropOffRange = 3;
+    // Fire support units have long range — drop them off farther from the sector target
+    // so they land with friendly troops rather than alone in enemy territory.
+    private const int FireSupportDropOffRange = 10;
 
     // -------------------------------------------------------------------------
     // Entry point
@@ -29,7 +32,10 @@ public partial class AIController
             return DecideAssignedTransportAction(unit, snapshot, plan, assigned, hasCargo);
         if (hasCargo)
             return DecideTransportadorCourierAction(unit, snapshot);
-        return DecideRogueShuttleAction(unit, snapshot, plan);
+
+        PlayerAction rogueAction = DecideRogueShuttleAction(unit, snapshot, plan);
+        if (rogueAction != null) return rogueAction;
+        return TryDecideTowShuttleAction(unit, snapshot, plan);
     }
 
     // -------------------------------------------------------------------------

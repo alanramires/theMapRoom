@@ -16,8 +16,14 @@ public partial class AIController
     {
         if (hasCargo)
         {
-            // Deliver the cargo; courier decides based on passenger targets
-            return DecideTransportadorCourierAction(unit, snapshot);
+            // Deliver the cargo toward the assigned sector.
+            // Pass the sector building as an override so the courier doesn't fall back to
+            // enemy HQ when the passenger was picked up informally (no plan slot).
+            ConstructionManager assignedBldg = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
+            Vector3Int assignedTarget = assignedBldg != null
+                ? (Vector3Int)(assignedBldg.CurrentCellPosition) : Vector3Int.zero;
+            if (assignedTarget != Vector3Int.zero) assignedTarget.z = 0;
+            return DecideTransportadorCourierAction(unit, snapshot, assignedTarget);
         }
 
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;

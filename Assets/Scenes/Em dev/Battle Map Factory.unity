@@ -388,6 +388,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -571,6 +572,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -2088,6 +2090,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -2360,6 +2363,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -3987,7 +3991,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 12000 / turn
+  m_text: 6000 / turn
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -5840,6 +5844,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -6125,7 +6130,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 12000
+    incomePerTurn: 6000
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
@@ -6134,7 +6139,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 12000
+    incomePerTurn: 9000
     startMoneyApplied: 1
   includeNeutralTeam: 0
   economyEnabled: 1
@@ -6179,7 +6184,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 2145970039
+  cachedConstructionIncomeSignature: -1554605513
   cachedConstructionIncomeCount: 24
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -9638,6 +9643,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -9880,6 +9886,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -10261,12 +10268,13 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
     - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
     - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-    - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+    - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
@@ -11203,6 +11211,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -12358,6 +12367,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -14977,6 +14987,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -17293,12 +17304,13 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
     - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
     - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-    - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+    - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
@@ -17846,6 +17858,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -20291,6 +20304,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
     - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
@@ -28698,68 +28712,8 @@ MonoBehaviour:
   neighborDistanceReferenceUnitData: {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
   sectorInfos:
   - sector: 0
-    representativeConstruction: {fileID: 1490324605}
-    representativeCell: {x: -2, y: 4, z: 0}
-    representativeLabel: Cidade
-    totalCapturePointsMax: 20
-    totalCurrentCapturePoints: 20
-    constructionCount: 1
-    isFullyControlled: 1
-    isDisputed: 0
-    hasPartialCapture: 0
-    controllingTeam: -1
-    statusText: Controlado por neutro
-    constructions:
-    - instanceId: 34
-      displayName: Cidade
-      cell: {x: -2, y: 4, z: 0}
-      ownerTeam: -1
-      currentCapturePoints: 20
-      capturePointsMax: 20
-      source: {fileID: 1490324605}
-    riskEntries:
-    - Team: 0
-      RiskRatio: 0.15
-      RiskLevel: 0
-    - Team: 1
-      RiskRatio: 0.85
-      RiskLevel: 4
-    sectorDistances:
-    - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 2
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 3
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 2
-        IsHQ: 0
-    - Team: 1
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 11
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 12
-        IsHQ: 0
-    closestNeighbor1: 1
-    closestNeighbor1Distance: 4
-    closestNeighbor2: 2
-    closestNeighbor2Distance: 5
-  - sector: 1
     representativeConstruction: {fileID: 389740650}
-    representativeCell: {x: -3, y: 0, z: 0}
+    representativeCell: {x: -8, y: -1, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -28772,33 +28726,19 @@ MonoBehaviour:
     constructions:
     - instanceId: 10
       displayName: Cidade
-      cell: {x: -3, y: 0, z: 0}
+      cell: {x: -8, y: -1, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 389740650}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.33
-      RiskLevel: 1
     - Team: 1
-      RiskRatio: 0.67
-      RiskLevel: 3
-    sectorDistances:
+      RiskRatio: 0.53
+      RiskLevel: 2
     - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 5
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 6
-        IsHQ: 0
+      RiskRatio: 0.47
+      RiskLevel: 2
+    sectorDistances:
     - Team: 1
       Entries:
       - ConstructionName: HQ
@@ -28806,20 +28746,158 @@ MonoBehaviour:
         Distance: 10
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 98
+        Distance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 7
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 9
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 6
+        IsHQ: 0
+    closestNeighbor1: 1
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 2
+    closestNeighbor2Distance: 3
+  - sector: 1
+    representativeConstruction: {fileID: 1490324605}
+    representativeCell: {x: -6, y: 0, z: 0}
+    representativeLabel: Cidade
+    totalCapturePointsMax: 20
+    totalCurrentCapturePoints: 20
+    constructionCount: 1
+    isFullyControlled: 1
+    isDisputed: 0
+    hasPartialCapture: 0
+    controllingTeam: -1
+    statusText: Controlado por neutro
+    constructions:
+    - instanceId: 34
+      displayName: Cidade
+      cell: {x: -6, y: 0, z: 0}
+      ownerTeam: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 1490324605}
+    riskEntries:
+    - Team: 1
+      RiskRatio: 0.56
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.44
+      RiskLevel: 2
+    sectorDistances:
+    - Team: 1
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 9
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
         Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 99
+        Distance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
         Distance: 11
         IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 6
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 7
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 5
+        IsHQ: 0
     closestNeighbor1: 0
-    closestNeighbor1Distance: 4
-    closestNeighbor2: 5
-    closestNeighbor2Distance: 5
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 2
+    closestNeighbor2Distance: 2
   - sector: 2
     representativeConstruction: {fileID: 979752351}
-    representativeCell: {x: 2, y: 3, z: 0}
+    representativeCell: {x: -5, y: -1, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -28832,114 +28910,86 @@ MonoBehaviour:
     constructions:
     - instanceId: 28
       displayName: Cidade
-      cell: {x: 2, y: 3, z: 0}
+      cell: {x: -5, y: -1, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 979752351}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.47
-      RiskLevel: 2
     - Team: 1
-      RiskRatio: 0.53
+      RiskRatio: 0.54
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.46
       RiskLevel: 2
     sectorDistances:
-    - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 7
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 7
-        IsHQ: 0
     - Team: 1
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 8
+        Distance: 7
         IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 6
+        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 98
         Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 124
+        Distance: 5
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 6
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
         Distance: 8
         IsHQ: 0
-    closestNeighbor1: 3
-    closestNeighbor1Distance: 3
-    closestNeighbor2: 0
-    closestNeighbor2Distance: 5
-  - sector: 3
-    representativeConstruction: {fileID: 893666202}
-    representativeCell: {x: 4, y: 0, z: 0}
-    representativeLabel: Cidade
-    totalCapturePointsMax: 20
-    totalCurrentCapturePoints: 20
-    constructionCount: 1
-    isFullyControlled: 1
-    isDisputed: 0
-    hasPartialCapture: 0
-    controllingTeam: -1
-    statusText: Controlado por neutro
-    constructions:
-    - instanceId: 8
-      displayName: Cidade
-      cell: {x: 4, y: 0, z: 0}
-      ownerTeam: -1
-      currentCapturePoints: 20
-      capturePointsMax: 20
-      source: {fileID: 893666202}
-    riskEntries:
-    - Team: 0
-      RiskRatio: 0.67
-      RiskLevel: 3
-    - Team: 1
-      RiskRatio: 0.33
-      RiskLevel: 1
-    sectorDistances:
-    - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 10
-        IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 10
-        IsHQ: 0
-    - Team: 1
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 5
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 116
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 5
+        InstanceId: 117
+        Distance: 7
         IsHQ: 0
-    closestNeighbor1: 2
-    closestNeighbor1Distance: 3
-    closestNeighbor2: 4
-    closestNeighbor2Distance: 4
-  - sector: 4
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 6
+        IsHQ: 0
+    closestNeighbor1: 1
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 3
+    closestNeighbor2Distance: 2
+  - sector: 3
     representativeConstruction: {fileID: 1408437812}
-    representativeCell: {x: 1, y: -1, z: 0}
+    representativeCell: {x: -3, y: 0, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -28952,33 +29002,111 @@ MonoBehaviour:
     constructions:
     - instanceId: 9
       displayName: Cidade
-      cell: {x: 1, y: -1, z: 0}
+      cell: {x: -3, y: 0, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 1408437812}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.62
-      RiskLevel: 3
     - Team: 1
-      RiskRatio: 0.38
-      RiskLevel: 1
+      RiskRatio: 0.55
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.45
+      RiskLevel: 2
     sectorDistances:
+    - Team: 1
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 6
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 6
+        IsHQ: 0
     - Team: 0
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 8
+        Distance: 5
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 9
+        InstanceId: 119
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 7
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 95
-        Distance: 8
+        Distance: 5
         IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 5
+        IsHQ: 0
+    closestNeighbor1: 2
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 4
+    closestNeighbor2Distance: 2
+  - sector: 4
+    representativeConstruction: {fileID: 893666202}
+    representativeCell: {x: -2, y: -1, z: 0}
+    representativeLabel: Cidade
+    totalCapturePointsMax: 20
+    totalCurrentCapturePoints: 20
+    constructionCount: 1
+    isFullyControlled: 1
+    isDisputed: 0
+    hasPartialCapture: 0
+    controllingTeam: -1
+    statusText: Controlado por neutro
+    constructions:
+    - instanceId: 8
+      displayName: Cidade
+      cell: {x: -2, y: -1, z: 0}
+      ownerTeam: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 893666202}
+    riskEntries:
+    - Team: 1
+      RiskRatio: 0.45
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.55
+      RiskLevel: 2
+    sectorDistances:
     - Team: 1
       Entries:
       - ConstructionName: HQ
@@ -28986,20 +29114,66 @@ MonoBehaviour:
         Distance: 5
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 121
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 99
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
         Distance: 6
         IsHQ: 0
-    closestNeighbor1: 6
-    closestNeighbor1Distance: 3
-    closestNeighbor2: 3
-    closestNeighbor2Distance: 4
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 5
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 6
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 6
+        IsHQ: 0
+    closestNeighbor1: 3
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 5
+    closestNeighbor2Distance: 2
   - sector: 5
     representativeConstruction: {fileID: 294939977}
-    representativeCell: {x: -2, y: -5, z: 0}
+    representativeCell: {x: 0, y: 0, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -29012,54 +29186,86 @@ MonoBehaviour:
     constructions:
     - instanceId: 11
       displayName: Cidade
-      cell: {x: -2, y: -5, z: 0}
+      cell: {x: 0, y: 0, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 294939977}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.62
-      RiskLevel: 3
     - Team: 1
-      RiskRatio: 0.38
-      RiskLevel: 1
-    sectorDistances:
+      RiskRatio: 0.55
+      RiskLevel: 2
     - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 10
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 10
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 11
-        IsHQ: 0
+      RiskRatio: 0.45
+      RiskLevel: 2
+    sectorDistances:
     - Team: 1
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
         Distance: 6
         IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 6
+        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 98
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 124
+        Distance: 6
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 5
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
         Distance: 7
         IsHQ: 0
-    closestNeighbor1: 1
-    closestNeighbor1Distance: 5
-    closestNeighbor2: 4
-    closestNeighbor2Distance: 5
+    closestNeighbor1: 4
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 6
+    closestNeighbor2Distance: 2
   - sector: 6
     representativeConstruction: {fileID: 1231452011}
-    representativeCell: {x: 3, y: -4, z: 0}
+    representativeCell: {x: 1, y: -1, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -29072,59 +29278,367 @@ MonoBehaviour:
     constructions:
     - instanceId: 33
       displayName: Cidade
-      cell: {x: 3, y: -4, z: 0}
+      cell: {x: 1, y: -1, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 1231452011}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.85
-      RiskLevel: 4
     - Team: 1
-      RiskRatio: 0.15
-      RiskLevel: 0
+      RiskRatio: 0.45
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.55
+      RiskLevel: 2
     sectorDistances:
+    - Team: 1
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 5
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 7
+        IsHQ: 0
     - Team: 0
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 11
+        Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 94
-        Distance: 12
+        Distance: 9
+        IsHQ: 0
+    closestNeighbor1: 5
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 7
+    closestNeighbor2Distance: 2
+  - sector: 7
+    representativeConstruction: {fileID: 1510675138}
+    representativeCell: {x: 3, y: 0, z: 0}
+    representativeLabel: Cidade
+    totalCapturePointsMax: 20
+    totalCurrentCapturePoints: 20
+    constructionCount: 1
+    isFullyControlled: 1
+    isDisputed: 0
+    hasPartialCapture: 0
+    controllingTeam: -1
+    statusText: Controlado por neutro
+    constructions:
+    - instanceId: 125
+      displayName: Cidade
+      cell: {x: 3, y: 0, z: 0}
+      ownerTeam: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 1510675138}
+    riskEntries:
+    - Team: 1
+      RiskRatio: 0.46
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.54
+      RiskLevel: 2
+    sectorDistances:
+    - Team: 1
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 6
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 9
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 7
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 10
+        IsHQ: 0
+    closestNeighbor1: 6
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 8
+    closestNeighbor2Distance: 2
+  - sector: 8
+    representativeConstruction: {fileID: 1683438219}
+    representativeCell: {x: 4, y: -1, z: 0}
+    representativeLabel: Cidade
+    totalCapturePointsMax: 20
+    totalCurrentCapturePoints: 20
+    constructionCount: 1
+    isFullyControlled: 1
+    isDisputed: 0
+    hasPartialCapture: 0
+    controllingTeam: -1
+    statusText: Controlado por neutro
+    constructions:
+    - instanceId: 126
+      displayName: Cidade
+      cell: {x: 4, y: -1, z: 0}
+      ownerTeam: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 1683438219}
+    riskEntries:
+    - Team: 1
+      RiskRatio: 0.44
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.56
+      RiskLevel: 2
+    sectorDistances:
+    - Team: 1
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 7
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 10
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 9
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 95
         Distance: 11
         IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 12
+        IsHQ: 0
+    closestNeighbor1: 7
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 9
+    closestNeighbor2Distance: 2
+  - sector: 9
+    representativeConstruction: {fileID: 570950481}
+    representativeCell: {x: 6, y: 0, z: 0}
+    representativeLabel: Cidade
+    totalCapturePointsMax: 20
+    totalCurrentCapturePoints: 20
+    constructionCount: 1
+    isFullyControlled: 1
+    isDisputed: 0
+    hasPartialCapture: 0
+    controllingTeam: -1
+    statusText: Controlado por neutro
+    constructions:
+    - instanceId: 127
+      displayName: Cidade
+      cell: {x: 6, y: 0, z: 0}
+      ownerTeam: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 570950481}
+    riskEntries:
+    - Team: 1
+      RiskRatio: 0.47
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.53
+      RiskLevel: 2
+    sectorDistances:
     - Team: 1
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 2
+        Distance: 9
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 2
+        InstanceId: 121
+        Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 99
-        Distance: 3
+        Distance: 6
         IsHQ: 0
-    closestNeighbor1: 4
-    closestNeighbor1Distance: 3
-    closestNeighbor2: 3
-    closestNeighbor2Distance: 4
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 12
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 10
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 13
+        IsHQ: 0
+    closestNeighbor1: 8
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 7
+    closestNeighbor2Distance: 3
   baseInfos:
   - sector: 100
     representativeConstruction: {fileID: 659395221}
-    representativeCell: {x: -4, y: 5, z: 0}
+    representativeCell: {x: -2, y: 5, z: 0}
     representativeLabel: HQ
-    totalCapturePointsMax: 100
-    totalCurrentCapturePoints: 100
-    constructionCount: 3
+    totalCapturePointsMax: 220
+    totalCurrentCapturePoints: 220
+    constructionCount: 7
     isFullyControlled: 1
     isDisputed: 0
     hasPartialCapture: 0
@@ -29138,28 +29652,86 @@ MonoBehaviour:
       currentCapturePoints: 30
       capturePointsMax: 30
       source: {fileID: 21506763}
-    - instanceId: 1
-      displayName: HQ
-      cell: {x: -4, y: 5, z: 0}
-      ownerTeam: 0
-      currentCapturePoints: 40
-      capturePointsMax: 40
-      source: {fileID: 659395221}
     - instanceId: 95
       displayName: "F\xE1brica"
-      cell: {x: -3, y: 6, z: 0}
+      cell: {x: -4, y: 5, z: 0}
       ownerTeam: 0
       currentCapturePoints: 30
       capturePointsMax: 30
       source: {fileID: 1009361498}
+    - instanceId: 116
+      displayName: "F\xE1brica"
+      cell: {x: -3, y: 5, z: 0}
+      ownerTeam: 0
+      currentCapturePoints: 30
+      capturePointsMax: 30
+      source: {fileID: 587369099}
+    - instanceId: 1
+      displayName: HQ
+      cell: {x: -2, y: 5, z: 0}
+      ownerTeam: 0
+      currentCapturePoints: 40
+      capturePointsMax: 40
+      source: {fileID: 659395221}
+    - instanceId: 117
+      displayName: "F\xE1brica"
+      cell: {x: -1, y: 5, z: 0}
+      ownerTeam: 0
+      currentCapturePoints: 30
+      capturePointsMax: 30
+      source: {fileID: 1215639721}
+    - instanceId: 119
+      displayName: "F\xE1brica"
+      cell: {x: 0, y: 5, z: 0}
+      ownerTeam: 0
+      currentCapturePoints: 30
+      capturePointsMax: 30
+      source: {fileID: 321670183}
+    - instanceId: 120
+      displayName: "F\xE1brica"
+      cell: {x: 1, y: 5, z: 0}
+      ownerTeam: 0
+      currentCapturePoints: 30
+      capturePointsMax: 30
+      source: {fileID: 129024786}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0
-      RiskLevel: 0
     - Team: 1
       RiskRatio: 1
       RiskLevel: 4
+    - Team: 0
+      RiskRatio: 0
+      RiskLevel: 0
     sectorDistances:
+    - Team: 1
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 11
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 11
+        IsHQ: 0
     - Team: 0
       Entries:
       - ConstructionName: HQ
@@ -29167,26 +29739,28 @@ MonoBehaviour:
         Distance: 0
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 94
+        InstanceId: 119
+        Distance: 2
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
         Distance: 1
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 1
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 3
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 95
-        Distance: 1
-        IsHQ: 0
-    - Team: 1
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 13
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 13
+        Distance: 2
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 14
+        InstanceId: 94
+        Distance: 3
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -29194,60 +29768,74 @@ MonoBehaviour:
     closestNeighbor2Distance: 3.4028235e+38
   - sector: 101
     representativeConstruction: {fileID: 1237704132}
-    representativeCell: {x: 4, y: -5, z: 0}
+    representativeCell: {x: 0, y: -6, z: 0}
     representativeLabel: HQ
-    totalCapturePointsMax: 100
-    totalCurrentCapturePoints: 100
-    constructionCount: 3
+    totalCapturePointsMax: 220
+    totalCurrentCapturePoints: 220
+    constructionCount: 7
     isFullyControlled: 1
     isDisputed: 0
     hasPartialCapture: 0
     controllingTeam: 1
     statusText: Controlado por vermelho
     constructions:
-    - instanceId: 98
+    - instanceId: 124
       displayName: "F\xE1brica"
-      cell: {x: 4, y: -6, z: 0}
+      cell: {x: -3, y: -6, z: 0}
       ownerTeam: 1
       currentCapturePoints: 30
       capturePointsMax: 30
-      source: {fileID: 1476047396}
+      source: {fileID: 37449265}
+    - instanceId: 123
+      displayName: "F\xE1brica"
+      cell: {x: -2, y: -6, z: 0}
+      ownerTeam: 1
+      currentCapturePoints: 30
+      capturePointsMax: 30
+      source: {fileID: 823859569}
+    - instanceId: 122
+      displayName: "F\xE1brica"
+      cell: {x: -1, y: -6, z: 0}
+      ownerTeam: 1
+      currentCapturePoints: 30
+      capturePointsMax: 30
+      source: {fileID: 583208569}
     - instanceId: 13
       displayName: HQ
-      cell: {x: 4, y: -5, z: 0}
+      cell: {x: 0, y: -6, z: 0}
       ownerTeam: 1
       currentCapturePoints: 40
       capturePointsMax: 40
       source: {fileID: 1237704132}
+    - instanceId: 121
+      displayName: "F\xE1brica"
+      cell: {x: 1, y: -6, z: 0}
+      ownerTeam: 1
+      currentCapturePoints: 30
+      capturePointsMax: 30
+      source: {fileID: 580153160}
+    - instanceId: 98
+      displayName: "F\xE1brica"
+      cell: {x: 2, y: -6, z: 0}
+      ownerTeam: 1
+      currentCapturePoints: 30
+      capturePointsMax: 30
+      source: {fileID: 1476047396}
     - instanceId: 99
       displayName: "F\xE1brica"
-      cell: {x: 5, y: -5, z: 0}
+      cell: {x: 3, y: -6, z: 0}
       ownerTeam: 1
       currentCapturePoints: 30
       capturePointsMax: 30
       source: {fileID: 116751744}
     riskEntries:
-    - Team: 0
-      RiskRatio: 1
-      RiskLevel: 4
     - Team: 1
       RiskRatio: 0
       RiskLevel: 0
-    sectorDistances:
     - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 13
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 14
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 13
-        IsHQ: 0
+      RiskRatio: 1
+      RiskLevel: 4
+    sectorDistances:
     - Team: 1
       Entries:
       - ConstructionName: HQ
@@ -29255,12 +29843,58 @@ MonoBehaviour:
         Distance: 0
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 121
         Distance: 1
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 99
+        Distance: 3
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 2
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
         Distance: 1
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 2
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 3
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 11
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 11
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38

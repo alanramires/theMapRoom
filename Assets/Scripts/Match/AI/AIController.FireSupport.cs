@@ -26,15 +26,19 @@ public partial class AIController
 
         SectorObjective assigned = ResolveAssignedFireSupportObjective(unit, plan);
         if (assigned == null)
+        {
+            PlayerAction embarkAction = TryDecideAssaultEmbarkAction(unit, snapshot, plan);
+            if (embarkAction != null) return embarkAction;
             return DecideRogueFireSupportAction(unit, snapshot);
+        }
 
         if (assigned.Status == ObjectiveStatus.Defending)
             return DecideFireSupportDefenderAction(unit, snapshot, assigned);
 
-        return DecideAssignedFireSupportAction(unit, snapshot, assigned);
+        return DecideAssignedFireSupportAction(unit, snapshot, plan, assigned);
     }
 
-    private PlayerAction DecideAssignedFireSupportAction(UnitManager unit, AIWorldSnapshot snapshot, SectorObjective assigned)
+    private PlayerAction DecideAssignedFireSupportAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan, SectorObjective assigned)
     {
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
@@ -48,6 +52,10 @@ public partial class AIController
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} apoia {assigned.Sector} - {attackReason}");
             return attackAction;
         }
+
+        // Adjacent supply truck takes priority over walking — faster delivery to objective.
+        PlayerAction embarkAction = TryDecideAssaultEmbarkAction(unit, snapshot, plan);
+        if (embarkAction != null) return embarkAction;
 
         if (TryFindFireSupportRepositionCell(unit, snapshot, fromCell, anchor, paths, occupied, out Vector3Int moveCell, out string moveReason))
         {

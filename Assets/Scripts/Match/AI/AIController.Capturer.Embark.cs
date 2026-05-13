@@ -23,6 +23,10 @@ public partial class AIController
             Mathf.Max(0, unit.RemainingMovementPoints), options);
 
         SectorObjective assigned = plan != null ? ResolveAssignedObjective(unit, plan) : null;
+        // Multi-role units (e.g. Assalto+Capturador) may have no Capturer slot but still have
+        // a plan assignment in another role — use that to avoid falling back to nearest capturable.
+        if (assigned == null && plan != null)
+            assigned = ResolveAnyAssignedObjective(unit, plan);
 
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
         if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromCell, "origem"))
@@ -241,6 +245,9 @@ public partial class AIController
         Vector3Int objCell = objBuilding.CurrentCellPosition; objCell.z = 0;
         float objectiveDist = SectorManager.HexDistance(candidateCell, objCell);
         int effectiveThreshold = GetEffectiveTransportThreshold(unit.TeamId);
+        // Slow units benefit from transport from farther away (+2h per MP below 3).
+        int baseMP = unit.MaxMovementPoints;
+        if (baseMP < 3) effectiveThreshold += (3 - baseMP) * 2;
         if (objectiveDist >= effectiveThreshold)
             return false;
 

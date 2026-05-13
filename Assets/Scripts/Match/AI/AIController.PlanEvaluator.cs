@@ -943,9 +943,32 @@ public partial class AIController
                     }
                     if (capturerDistToObj < 0f) continue; // sem nenhum capturer alocado — pula
 
+                    // Build list of active non-embarked capturers for compatibility check.
+                    List<UnitManager> activeCapturers = new List<UnitManager>();
+                    foreach (SlotNeed ts in obj.Slots)
+                    {
+                        if (ts.Role != UnitRole.Capturador || !ts.Filled) continue;
+                        UnitManager cap = FindActiveUnit(ts.AssignedUnitId, aiTeam);
+                        if (cap != null && !cap.IsEmbarked) activeCapturers.Add(cap);
+                    }
+                    // Skip if this transporter cannot carry any capturer in this objective (wrong slot type).
+                    if (GetCompatibleSlotCapacity(u, activeCapturers) == 0) continue;
+
                     float apcDistToObj = SectorManager.HexDistance(uc, tc);
                     float pickupReach = Mathf.Max(0, u.RemainingMovementPoints) + ShuttlePickupRange;
+
+                    // Compare compatible transport capacity against active capturers — supports multi-slot transports (e.g. helicopter).
+                    int totalTransportCapacity = 0;
+                    foreach (SlotNeed ts in obj.Slots)
+                    {
+                        if (ts.Role != UnitRole.Transportador || !ts.Filled) continue;
+                        UnitManager transporter = FindActiveUnit(ts.AssignedUnitId, aiTeam);
+                        if (transporter == null) continue;
+                        totalTransportCapacity += GetCompatibleSlotCapacity(transporter, activeCapturers);
+                    }
+                    bool transportCapacityMet = totalTransportCapacity >= activeCapturers.Count;
                     bool canCreateOpportunisticSlot = !hasOpenTransportSlot
+                        && !transportCapacityMet
                         && capturerDistToObj >= GetEffectiveTransportThreshold(aiTeam)
                         && pickupDist <= pickupReach + 0.5f;
                     if (!hasOpenTransportSlot && !canCreateOpportunisticSlot) continue;
@@ -1139,6 +1162,29 @@ public partial class AIController
         foreach (SlotNeed slot in obj.Slots)
             if (slot.Role == role) return true;
         return false;
+    }
+
+    // Returns total slot capacity of a transporter that can physically carry at least one unit in the list.
+    // Uses PodeEmbarcarSensor.CanUseSlot as source of truth (class, skills, domain/height).
+    private static int GetCompatibleSlotCapacity(UnitManager transporter, List<UnitManager> capturers)
+    {
+        if (transporter == null || capturers == null || capturers.Count == 0) return 0;
+        if (!transporter.TryGetUnitData(out UnitData tData) || tData == null
+            || tData.transportSlots == null || tData.transportSlots.Count == 0) return 0;
+        int total = 0;
+        foreach (UnitTransportSlotRule tSlot in tData.transportSlots)
+        {
+            foreach (UnitManager cap in capturers)
+            {
+                if (!cap.TryGetUnitData(out UnitData cData) || cData == null) continue;
+                if (PodeEmbarcarSensor.CanUseSlot(cap, cData, tSlot, out _))
+                {
+                    total += Mathf.Max(1, tSlot.capacity);
+                    break;
+                }
+            }
+        }
+        return total;
     }
 
     private bool IsObjectiveInCombatDisadvantage(

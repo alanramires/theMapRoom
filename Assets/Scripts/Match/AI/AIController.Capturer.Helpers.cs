@@ -1021,6 +1021,7 @@ public partial class AIController
         return null;
     }
 
+
     // Replica PodeCapturarSensor em um hex simulado sem mover a unidade.
     private bool SimulateCaptureSensor(UnitManager unit, Vector3Int simulatedCell,
         out ConstructionManager targetConstruction)

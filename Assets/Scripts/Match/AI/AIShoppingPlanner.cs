@@ -4,7 +4,7 @@ using UnityEngine;
 public class AIShoppingPlanner : MonoBehaviour
 {
     private const int DefensiveBaseThreatRange = 3;
-    private const int DefensiveArmorThreatRange = 5;
+    private const int DefensiveArmorThreatRange = 3;
     private const int DefensiveLowTroopCountThreshold = 7;
 
     public struct ShoppingOrder
@@ -1096,6 +1096,10 @@ public class AIShoppingPlanner : MonoBehaviour
             if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
             if (!enemy.TryGetUnitData(out UnitData enemyData) || enemyData == null) continue;
             if (enemyData.unitClass != GameUnitClass.Armored) continue;
+            // APCs are logistics, not assault armor — don't treat them as armor threats.
+            if (enemyData.roles != null && enemyData.roles.Count > 0 && enemyData.roles[0] == UnitRole.Transportador) continue;
+            // Only elite tanks (level >= 1) justify emergency defense spending.
+            if (enemyData.eliteLevel < 1) continue;
 
             Vector3Int enemyCell = enemy.CurrentCellPosition;
             enemyCell.z = 0;

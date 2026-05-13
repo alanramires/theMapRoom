@@ -102,6 +102,26 @@ public partial class AIController
         if (threats == null || threats.Count == 0)
             return false;
 
+        bool preferDpq = unit.TryGetUnitData(out UnitData escortUd) && escortUd != null && escortUd.prioritizeDpqAtBattle;
+        float dpqWeight = preferDpq ? 2000f : 50f;
+
+        // When prioritizeDpqAtBattle: try attacking from current position first (no movement).
+        if (preferDpq)
+        {
+            foreach (UnitManager enemy in threats)
+            {
+                if (!CanAttackTargetFrom(fromCell, fromCell, unit, enemy)) continue;
+                if (!PassesAttackDecision(unit, enemy, fromCell, defensiveContext, out string atkReason))
+                    continue;
+                Vector3Int enemyCell0 = enemy.CurrentCellPosition; enemyCell0.z = 0;
+                float dpq0 = GetTerrainDpqPontos(fromCell);
+                reason = $"score=parado pref={ResolveAssaultTargetPreference(unit, enemy)} hp={enemy.CurrentHP} threatDist={SectorManager.HexDistance(enemyCell0, escortCell):F1} coverDist=0 dpq={dpq0:F1} {atkReason}";
+                bestCell = fromCell;
+                bestTarget = enemy;
+                return true;
+            }
+        }
+
         float bestScore = float.MinValue;
         foreach (Vector3Int cell in paths.Keys)
         {
@@ -125,7 +145,7 @@ public partial class AIController
                     + Mathf.Max(0, 20 - enemy.CurrentHP) * 1000f
                     + Mathf.Max(0, scoutZoneRadius + 1 - targetDist) * 500f
                     - coverDist * 80f
-                    + dpq * 50f
+                    + dpq * dpqWeight
                     - GetPathStepCount(paths, cell) * 5f
                     - enemy.InstanceId * 0.001f;
 
@@ -137,7 +157,7 @@ public partial class AIController
                     bestScore = score;
                     bestCell = cell;
                     bestTarget = enemy;
-                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} threatDist={targetDist:F1} coverDist={coverDist:F1} dpq={dpq:F1} {attackDecisionReason}";
+                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} threatDist={targetDist:F1} coverDist={coverDist:F1} dpq={dpq:F1} dpqW={dpqWeight:F0} {attackDecisionReason}";
                 }
             }
         }

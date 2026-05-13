@@ -307,7 +307,9 @@ public static class PodeDesembarcarSensor
             return false;
         }
 
-        if (terrainDatabase != null &&
+        ConstructionManager targetConstruction = ConstructionOccupancyRules.GetConstructionAtCell(map, targetCell);
+        if (targetConstruction == null &&
+            terrainDatabase != null &&
             TryResolveTerrainAtCell(map, terrainDatabase, targetCell, out TerrainTypeData targetTerrain) &&
             targetTerrain != null &&
             !targetTerrain.allowDisembark)

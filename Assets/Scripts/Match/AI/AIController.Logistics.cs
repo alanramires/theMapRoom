@@ -8,6 +8,10 @@ public partial class AIController
         if (!IsPrimaryLogisticsUnit(unit))
             return null;
 
+        // Tow delivery takes priority — drop off passengers before doing logistics work.
+        if (HasTransportCargo(unit))
+            return DecideTransportadorCourierAction(unit, snapshot);
+
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null)
             return repairAction;
