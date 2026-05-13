@@ -148,6 +148,75 @@ public partial class AIController
             plan.Objectives.Add(obj);
         }
 
+        // Passo 2b: base inimiga — entra no plano ofensivo quando setores regulares estão cobertos.
+        // Capturadores proporcionais ao número de construções (1 por 2 prédios, mín 2).
+        foreach (SectorManager.SectorInfo baseInfo in allBases)
+        {
+            // Usa HQ como referência canônica de dono da base — ControllingTeam pode estar errado
+            // se prédios capturáveis tiverem slotIndex errado e aparecerem como Green no snapshot.
+            if (FindHQTeamInSector(baseInfo.Sector) == aiTeam) continue;
+            if (plan.GetObjectiveForSector(baseInfo.Sector) != null) continue;
+
+            bool hasCapturable = false;
+            foreach (SectorManager.SectorConstructionInfo c in baseInfo.Constructions)
+            {
+                if (c.OwnerTeam != aiTeam) { hasCapturable = true; break; }
+                if (c.CapturePointsMax > 0 && c.CurrentCapturePoints < c.CapturePointsMax) { hasCapturable = true; break; }
+            }
+            if (!hasCapturable) continue;
+
+            bool hasPartialOwnCapture = false;
+            foreach (SectorManager.SectorConstructionInfo c in baseInfo.Constructions)
+                if (c.OwnerTeam == aiTeam && c.CapturePointsMax > 0
+                    && c.CurrentCapturePoints > 0 && c.CurrentCapturePoints < c.CapturePointsMax)
+                { hasPartialOwnCapture = true; break; }
+
+            if (snapshot.Stance == AIStance.Defensive && !hasPartialOwnCapture)
+            {
+                Debug.Log($"{TL("Plan")} skip base inimiga {baseInfo.Sector}: Defensive sem captura parcial");
+                continue;
+            }
+
+            // Co-chegada: base inimiga sempre requer pelo menos 2 capturadores próximos
+            ConstructionManager baseTgt = FindCapturableInSector(baseInfo.Sector, aiTeam);
+            if (baseTgt != null)
+            {
+                const float MaxArrivalGap = 5f;
+                Vector3Int rtc = baseTgt.CurrentCellPosition; rtc.z = 0;
+                float near1 = float.MaxValue, near2 = float.MaxValue;
+                foreach (UnitManager cap in GetAvailableCapturers(aiTeam))
+                {
+                    Vector3Int cc = cap.CurrentCellPosition; cc.z = 0;
+                    float d = SectorManager.TryGetLandMovementDistance(cc, rtc, out int td)
+                        ? td : SectorManager.HexDistance(cc, rtc);
+                    if (d < near1) { near2 = near1; near1 = d; }
+                    else if (d < near2) near2 = d;
+                }
+                float gap = near2 - near1;
+                if (near2 == float.MaxValue || gap > MaxArrivalGap)
+                {
+                    Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector} aguarda co-chegada (gap={(near2 == float.MaxValue ? "?" : gap.ToString("F0"))}h)");
+                    continue;
+                }
+            }
+
+            int capturerSlots = Mathf.Max(2, Mathf.CeilToInt(baseInfo.ConstructionCount / 2f));
+            var baseObj = new SectorObjective
+            {
+                Sector       = baseInfo.Sector,
+                AssignedTeam = aiTeam,
+                Status       = ObjectiveStatus.Pending,
+                Priority     = CalculateSectorPriority(baseInfo, aiTeam, snapshot.Stance),
+            };
+            for (int s = 0; s < capturerSlots; s++)
+                baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
+            baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
+            if (baseInfo.GetDistanceToHQ(aiTeam) >= GetEffectiveTransportThreshold(aiTeam))
+                baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Transportador });
+            plan.Objectives.Add(baseObj);
+            Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector}: {capturerSlots}xCap + Assalto construcoes={baseInfo.ConstructionCount} dist={baseInfo.GetDistanceToHQ(aiTeam):F0}h");
+        }
+
         ClearResolvedCriticalHomeDefenseObjectives(plan, aiTeam);
         EnsureCriticalHomeDefenseObjectives(plan, aiTeam, allBases);
         EnsureCriticalHomeDefenseObjectivesFromConstructions(plan, aiTeam);
@@ -773,7 +842,14 @@ public partial class AIController
                 bestObj.TryFillSlot(UnitRole.FogoIndireto, u.InstanceId);
                 assignedIds.Add(u.InstanceId);
                 ApplyPlanHUD(u, bestObj, UnitRole.FogoIndireto);
-                Debug.Log($"{TL("Plan")} FireSupport {u.InstanceId} -> apoio de {bestObj.Sector} (dist={bestDist:F0}h score={bestScore:F0})");
+                bool fsIsEnemySector;
+                if (ConstructionSectorHelper.IsBase(bestObj.Sector))
+                    fsIsEnemySector = FindHQTeamInSector(bestObj.Sector) != aiTeam;
+                else
+                    fsIsEnemySector = TryGetAnySectorInfo(bestObj.Sector, out SectorManager.SectorInfo fsSecInfo)
+                        && fsSecInfo.ControllingTeam != aiTeam;
+                string fsActionLabel = fsIsEnemySector ? "apoio a captura de" : "apoio de";
+                Debug.Log($"{TL("Plan")} FireSupport {u.InstanceId} -> {fsActionLabel} {bestObj.Sector} (dist={bestDist:F0}h score={bestScore:F0})");
             }
         }
 
@@ -1462,6 +1538,14 @@ public partial class AIController
                 }
 
                 if (HasTransportCargo(transporter))
+                    continue;
+
+                // APC vazio perto de base inimiga deve FICAR — está em território adversário,
+                // não num destino seguro onde o capturador pode caminhar sozinho.
+                // Usa HQ como referência — ControllingTeam pode estar incorreto se prédios
+                // capturáveis tiverem slotIndex apontando pro time errado no snapshot.
+                if (ConstructionSectorHelper.IsBase(obj.Sector)
+                    && FindHQTeamInSector(obj.Sector) != aiTeam)
                     continue;
 
                 Vector3Int transporterCell = transporter.CurrentCellPosition; transporterCell.z = 0;

@@ -83,7 +83,14 @@ public class AIShoppingPlanner : MonoBehaviour
         }
         openCapturerSlots = LimitCapturerDemandForProgression(snapshot, openCapturerSlots, openAssaultSlots, openTransportSlots, openLogisticsSlots, openFireSupportSlots);
 
-        UnitData eliteAssaultTarget = FindEliteAssaultReserveTarget(snapshot);
+        // Escalada: se já tem N tanks elite em campo, mira o nível acima na próxima compra.
+        // Usa contagem de unidades em campo, não slots do plano (plano fica vazio em modo rogue).
+        int activeEliteAssaultCount = CountActiveEliteAssaultUnits(snapshot);
+        const int DreamTeamEliteAssaultThreshold = 2;
+        int eliteAssaultTargetLevel = activeEliteAssaultCount >= DreamTeamEliteAssaultThreshold ? 2 : 1;
+        UnitData eliteAssaultTarget = FindEliteAssaultReserveTarget(snapshot, eliteAssaultTargetLevel);
+        if (eliteAssaultTarget == null && eliteAssaultTargetLevel > 1)
+            eliteAssaultTarget = FindEliteAssaultReserveTarget(snapshot, 1); // fallback se nível 2 indisponível
 
         // Reserva elite apenas quando a composição mínima do exército já foi atingida:
         // proporção dos slots de capturador preenchidos >= EliteCapturerFillRatio
@@ -111,12 +118,26 @@ public class AIShoppingPlanner : MonoBehaviour
 
         UnitData eliteFireSupportTarget = FindEliteFireSupportReserveTarget(snapshot, preferDefensiveFireSupport, remaining);
         int activeFireSupportCount = CountActiveUnitsWithRole(snapshot, UnitRole.FogoIndireto, requirePrimary: false);
+
+        // Dream team pivot: once the AI has N+ elite assault units in the field, stop
+        // adding more elite tanks and invest in elite defensive fire support instead.
+        // Uses field unit count, not plan slots — plan slots are empty in rogue mode.
+        int activeEliteFireSupportCount = CountActiveEliteFireSupportUnits(snapshot);
+        int desiredEliteFireSupport = activeEliteAssaultCount / DreamTeamEliteAssaultThreshold;
+        bool dreamTeamPivot = activeEliteAssaultCount >= DreamTeamEliteAssaultThreshold
+            && activeEliteFireSupportCount < desiredEliteFireSupport;
+        if (dreamTeamPivot)
+        {
+            preferDefensiveFireSupport = true;
+            eliteFireSupportTarget = FindEliteFireSupportReserveTarget(snapshot, preferDefensiveFireSupport: true, remaining);
+            Debug.Log($"[AI Shopping] dream_team_pivot: {activeEliteAssaultCount} elite assault em campo → target={eliteFireSupportTarget?.displayName ?? "nenhum"} custo={eliteFireSupportTarget?.cost ?? 0}");
+        }
+
         bool eliteFireSupportReserveReady = IsEliteFireSupportReserveReady(snapshot);
         bool eliteFireSupportNowAffordable = eliteFireSupportTarget != null && remaining >= eliteFireSupportTarget.cost;
         bool wantsEliteFireSupport = eliteFireSupportTarget != null
             && (eliteFireSupportReserveReady || eliteFireSupportNowAffordable)
-            && activeFireSupportCount > 0
-            && activeFireSupportCount < 2;
+            && (dreamTeamPivot || (activeFireSupportCount > 0 && activeFireSupportCount < 2));
         int reserveForEliteFireSupport = 0;
         bool eliteFireSupportBought = false;
         bool emergencyProductionDefense = TryFindEmergencyProductionDefensePurchase(snapshot, remaining, out UnitData emergencyDefenseTarget, out int emergencyContestedOwned);
@@ -148,6 +169,7 @@ public class AIShoppingPlanner : MonoBehaviour
         Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cheapest_transport={cheapestTransportCost} onlyCap={onlyCapturers} onlyAss={onlyAssault} onlyTrans={onlyTransporter} onlyLog={onlyLogistics} onlyFire={onlyFireSupport}");
 
         bool strategicEliteAssaultReserve = eliteAssaultTarget != null
+            && !dreamTeamPivot
             && openCapturerSlots <= 0
             && openAssaultSlots <= 0
             && openTransportSlots <= 0
@@ -155,6 +177,7 @@ public class AIShoppingPlanner : MonoBehaviour
             && openFireSupportSlots <= 0
             && IsEliteAssaultReserveReady(snapshot);
         bool nextTurnEliteAssaultReserve = eliteAssaultTarget != null
+            && !dreamTeamPivot
             && remaining < eliteAssaultTarget.cost
             && remaining + Mathf.Max(0, snapshot.IncomePerTurn) >= eliteAssaultTarget.cost
             && IsEliteAssaultReserveReady(snapshot);
@@ -591,7 +614,7 @@ public class AIShoppingPlanner : MonoBehaviour
         return best;
     }
 
-    private static UnitData FindEliteAssaultReserveTarget(AIWorldSnapshot snapshot)
+    private static UnitData FindEliteAssaultReserveTarget(AIWorldSnapshot snapshot, int minEliteLevel = 1)
     {
         if (snapshot == null || snapshot.MyBuildings == null) return null;
 
@@ -605,7 +628,7 @@ public class AIShoppingPlanner : MonoBehaviour
             {
                 if (unit == null || unit.domain != Domain.Land) continue;
                 if (!IsPurePrimaryAssault(unit)) continue;
-                if (unit.eliteLevel < 1) continue;
+                if (unit.eliteLevel < minEliteLevel) continue;
 
                 if (best == null
                     || unit.eliteLevel < best.eliteLevel
@@ -1263,6 +1286,34 @@ public class AIShoppingPlanner : MonoBehaviour
         int demand = (defensiveNeed || offensiveNeed || snapshot.Stance == AIStance.Tactical) ? 1 : 0;
         Debug.Log($"[AI Shopping] fire_support_demand: demand={demand} activeFire={activeFireSupport} stance={snapshot.Stance} defensive={defensiveNeed} offensive={offensiveNeed} preferDef={preferDefensiveFireSupport}");
         return demand;
+    }
+
+    private static int CountActiveEliteFireSupportUnits(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyUnits == null) return 0;
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked) continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null) continue;
+            if (data.roles == null || !data.roles.Contains(UnitRole.FogoIndireto)) continue;
+            if (data.eliteLevel >= 1) count++;
+        }
+        return count;
+    }
+
+    private static int CountActiveEliteAssaultUnits(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyUnits == null) return 0;
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked) continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null) continue;
+            if (!IsPurePrimaryAssault(data) || data.eliteLevel < 1) continue;
+            count++;
+        }
+        return count;
     }
 
     private static int CountActiveUnitsWithRole(AIWorldSnapshot snapshot, UnitRole role, bool requirePrimary)

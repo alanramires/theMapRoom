@@ -40,7 +40,7 @@ public partial class AIController
             {
                 Vector3Int objCheckCell = objCheck.CurrentCellPosition; objCheckCell.z = 0;
                 Vector3Int passCell = targetPassenger.CurrentCellPosition; passCell.z = 0;
-                if (SectorManager.HexDistance(passCell, objCheckCell) <= TransportDropOffRange)
+                if (SectorManager.HexDistance(passCell, objCheckCell) < GetEffectiveTransportThreshold(snapshot.AITeam))
                     targetPassenger = null;
             }
         }
@@ -57,7 +57,7 @@ public partial class AIController
             Vector3Int sectorCell = fromCell;
             if (sectorTarget != null) { sectorCell = sectorTarget.CurrentCellPosition; sectorCell.z = 0; }
 
-            UnitManager nearbyCandidate = FindBestShuttleCandidate(unit, snapshot, plan, fromCell, out Vector3Int nearbyCell);
+            UnitManager nearbyCandidate = FindBestShuttleCandidate(unit, snapshot, plan, fromCell, out Vector3Int nearbyCell, assigned);
             if (nearbyCandidate != null)
             {
                 Vector3Int objCell2 = ResolveUnitObjectiveCell(nearbyCandidate, plan, snapshot);
@@ -90,16 +90,6 @@ public partial class AIController
         Vector3Int passengerCell = targetPassenger.CurrentCellPosition; passengerCell.z = 0;
         Vector3Int objCell = ResolveUnitObjectiveCell(targetPassenger, plan, snapshot);
         Vector3Int moveTarget = FindTransportShuttleMove(unit, fromCell, passengerCell, paths, occupied, snapshot.AITeam, objCell);
-
-        // Opportunistic attack from the pickup position: move there first, then fire.
-        UnitManager pickupAtk = TryFindAttackFromCell(unit, snapshot, fromCell, moveTarget);
-        if (pickupAtk != null)
-        {
-            Vector3Int pickupAtkCell = pickupAtk.CurrentCellPosition; pickupAtkCell.z = 0;
-            Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — pickup+ataque {pickupAtk.InstanceId} via {moveTarget}");
-            return BuildAttackBatch(unit, snapshot.AITeam, fromCell, moveTarget,
-                pickupAtk.InstanceId.ToString(), pickupAtkCell, paths);
-        }
 
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — pickup {targetPassenger.InstanceId}@{passengerCell} via {moveTarget}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);

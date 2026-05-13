@@ -184,6 +184,14 @@ public partial class AIController
             int d = Mathf.RoundToInt(info.GetDistanceToHQ(aiTeam));
             if (d > maxDist) maxDist = d;
         }
+        // Include enemy base sectors so threshold stays at MinDistanceForTransportSlot in late
+        // game when all regular sectors are captured (maxDist would otherwise collapse to 0).
+        foreach (SectorManager.SectorInfo baseInfo in SectorManager.GetAllBaseInfos())
+        {
+            if (FindHQTeamInSector(baseInfo.Sector) == aiTeam) continue;
+            int d = Mathf.RoundToInt(baseInfo.GetDistanceToHQ(aiTeam));
+            if (d > maxDist) maxDist = d;
+        }
         return Mathf.Min(MinDistanceForTransportSlot, Mathf.Max(3, maxDist));
     }
 

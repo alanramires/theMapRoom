@@ -82,9 +82,6 @@ public partial class AIController
         SectorObjective assigned, Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths)
     {
-        // Embark estendido só se o transporter tem plano no mesmo setor deste capturador.
-        if (assigned == null || plan == null) return null;
-
         // movePaths: hexes alcançáveis reservando 1 MP para o custo de embarque.
         // fromCell (ficar parado) é verificado separadamente com MP completo.
         int mpForMove = Mathf.Max(0, unit.RemainingMovementPoints - 1);
@@ -182,19 +179,23 @@ public partial class AIController
 
         // Primary capturer: APC must be assigned to the same sector.
         // Secondary capturer: also accepts an APC with no formal passenger (shuttle mode).
+        // Rogue capturer (no assigned sector): accepts any APC with no formal passenger.
         SectorObjective tObj = ResolveAssignedTransportObjective(transporter, plan);
         bool isPrimary = unitData.roles != null && unitData.roles.Count > 0
             && unitData.roles[0] == UnitRole.Capturador;
-        bool sameSector = tObj != null && tObj.Sector == assigned.Sector;
+        bool sameSector = assigned != null && tObj != null && tObj.Sector == assigned.Sector;
         bool shuttleFree = !isPrimary
             && (tObj == null || ResolveAssignedPassengerUnit(tObj, unit.TeamId) == null);
-        if (!sameSector && !shuttleFree) return false;
+        bool rogueEmbark = assigned == null
+            && (tObj == null || ResolveAssignedPassengerUnit(tObj, unit.TeamId) == null);
+        if (!sameSector && !shuttleFree && !rogueEmbark) return false;
         if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromHex, "hex embarque"))
             return false;
 
-        // Transporter deve estar dentro do pickup range da posição original
+        // Pickup range: usa fromHex (posição após movimento) para não bloquear embarque estendido.
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
-        if (SectorManager.HexDistance(fromCell, tCell) > ShuttlePickupRange + 1 + 0.5f) return false;
+        Vector3Int pickupRef = fromHex; pickupRef.z = 0;
+        if (SectorManager.HexDistance(pickupRef, tCell) > ShuttlePickupRange + 1 + 0.5f) return false;
 
         // Verifica custo de embarque vs MP restante no hex intermediário
         if (!UnitMovementPathRules.TryGetEnterCellCost(

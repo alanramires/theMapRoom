@@ -190,11 +190,17 @@ public class SectorManagerEditor : Editor
                 ? sectorProp.enumDisplayNames[Mathf.Clamp(sectorProp.enumValueIndex, 0, sectorProp.enumDisplayNames.Length - 1)]
                 : $"Setor {i}";
 
-            // Append HQ distances to the foldout label so they're visible without expanding
+            // Append controlling team + HQ distances to the foldout label.
+            // controllingTeam shown first; distances sorted ascending (0h = home base first).
+            SerializedProperty ctProp = element.FindPropertyRelative("controllingTeam");
+            string ctName = ctProp != null
+                ? ctProp.enumDisplayNames[Mathf.Clamp(ctProp.enumValueIndex, 0, ctProp.enumDisplayNames.Length - 1)]
+                : null;
+
             SerializedProperty distancesProp = element.FindPropertyRelative("sectorDistances");
-            if (distancesProp != null && distancesProp.arraySize > 0)
+            var distParts = new System.Collections.Generic.List<(float dist, string text)>();
+            if (distancesProp != null)
             {
-                var parts = new System.Collections.Generic.List<string>();
                 for (int d = 0; d < distancesProp.arraySize; d++)
                 {
                     SerializedProperty td       = distancesProp.GetArrayElementAtIndex(d);
@@ -209,13 +215,20 @@ public class SectorManagerEditor : Editor
                         SerializedProperty dist  = entry.FindPropertyRelative("Distance");
                         if (isHQ != null && isHQ.boolValue && dist != null && dist.floatValue < float.MaxValue * 0.5f)
                         {
-                            parts.Add($"{teamName}: {dist.floatValue:F0}h");
+                            distParts.Add((dist.floatValue, $"{teamName}: {dist.floatValue:F0}h"));
                             break;
                         }
                     }
                 }
-                if (parts.Count > 0)
-                    sectorLabel += $"  [{string.Join(" | ", parts)}]";
+                distParts.Sort((a, b) => a.dist.CompareTo(b.dist));
+            }
+
+            {
+                var tagParts = new System.Collections.Generic.List<string>();
+                if (!string.IsNullOrEmpty(ctName)) tagParts.Add(ctName);
+                foreach (var dp in distParts) tagParts.Add(dp.text);
+                if (tagParts.Count > 0)
+                    sectorLabel += $"  [{string.Join(" | ", tagParts)}]";
             }
 
             EditorGUILayout.PropertyField(element, new GUIContent(sectorLabel), includeChildren: true);

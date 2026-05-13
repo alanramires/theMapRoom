@@ -52,7 +52,8 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         TeamObjectivePlan plan,
         Vector3Int transporterCell,
-        out Vector3Int bestCandidateCell)
+        out Vector3Int bestCandidateCell,
+        SectorObjective assignedSector = null)
     {
         bestCandidateCell = transporterCell;
         if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null)
@@ -68,6 +69,14 @@ public partial class AIController
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
 
             if (FindFittingSlotIndex(transporter, transporterData, candidate, candidateData) < 0) continue;
+
+            // When the transporter has a formal sector assignment, only consider candidates
+            // heading to that same sector — cross-plan passengers will ignore the embark offer.
+            if (assignedSector != null && plan != null)
+            {
+                SectorObjective candidateAssigned = ResolveAssignedObjective(candidate, plan);
+                if (candidateAssigned == null || candidateAssigned.Sector != assignedSector.Sector) continue;
+            }
 
             Vector3Int objectiveCell = ResolveUnitObjectiveCell(candidate, plan, snapshot);
             if (objectiveCell == Vector3Int.zero) continue;
