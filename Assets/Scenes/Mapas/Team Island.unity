@@ -147605,7 +147605,7 @@ MonoBehaviour:
   stepForwardButton: {fileID: 252746611}
   stopButton: {fileID: 676808773}
   fastReplayModeToggle: {fileID: 674394143}
-  togglePanelKey: 290
+  togglePanelKey: 0
   isOpen: 0
   replaySessionArmed: 0
   replayStartMode: 2

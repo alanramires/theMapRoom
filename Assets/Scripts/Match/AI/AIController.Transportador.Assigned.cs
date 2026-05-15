@@ -97,6 +97,15 @@ public partial class AIController
         Vector3Int objCell = ResolveUnitObjectiveCell(targetPassenger, plan, snapshot);
         Vector3Int moveTarget = FindTransportShuttleMove(unit, fromCell, passengerCell, paths, occupied, snapshot.AITeam, objCell);
 
+        if (TryFindTransportBreakerAttack(unit, snapshot, fromCell, paths, occupied, passengerCell,
+                out Vector3Int pickupAttackCell, out UnitManager pickupAttackTarget, preferNoMove))
+        {
+            Vector3Int pickupTargetCell = pickupAttackTarget.CurrentCellPosition; pickupTargetCell.z = 0;
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — ataca {pickupAttackTarget.InstanceId} via {pickupAttackCell} (en route pickup {targetPassenger.InstanceId})");
+            return BuildAttackBatch(unit, snapshot.AITeam, fromCell, pickupAttackCell,
+                pickupAttackTarget.InstanceId.ToString(), pickupTargetCell, paths);
+        }
+
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — pickup {targetPassenger.InstanceId}@{passengerCell} via {moveTarget}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
     }

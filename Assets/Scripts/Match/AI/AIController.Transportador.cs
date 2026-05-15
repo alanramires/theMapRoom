@@ -4,9 +4,9 @@ using UnityEngine;
 public partial class AIController
 {
     private const int TransportDropOffRange = 3;
-    // Fire support units have long range — drop them off farther from the sector target
-    // so they land with friendly troops rather than alone in enemy territory.
-    private const int FireSupportDropOffRange = 10;
+    // Delivery range, not weapon range: artillery should be carried to the sector front
+    // before DPQ decides the exact landing hex.
+    private const int FireSupportDropOffRange = 3;
 
     // -------------------------------------------------------------------------
     // Entry point
@@ -224,11 +224,11 @@ public partial class AIController
                     if (slot.Filled && slot.AssignedUnitId == unit.InstanceId)
                     {
                         ConstructionManager tgt = FindCapturableInSector(obj.Sector, snapshot.AITeam);
-                        if (tgt != null)
-                        {
-                            Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
-                            return tc;
-                        }
+                        if (tgt != null) { Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0; return tc; }
+                        // No capturable (e.g. FireSupport assigned to a support sector already controlled):
+                        // use the sector's representative cell so navigation still targets the right area.
+                        if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo si))
+                        { Vector3Int rc = si.RepresentativeCell; rc.z = 0; return rc; }
                     }
         }
 

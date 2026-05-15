@@ -9,8 +9,14 @@ public partial class AIController
             return null;
 
         // Tow delivery takes priority — drop off passengers before doing logistics work.
+        // Resolve the delivery target for tow cargo: the passenger may have no formal plan slot
+        // (picked up by tow shuttle), so re-derive the target via FindTowDeliveryTarget.
         if (HasTransportCargo(unit))
+        {
+            // Pass assignedSectorTarget=zero — TryResolveCourierPassengerTarget re-derives the
+            // target from the passenger's plan slot, handling cell (0,0,0) correctly.
             return DecideTransportadorCourierAction(unit, snapshot);
+        }
 
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null)

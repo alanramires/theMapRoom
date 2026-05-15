@@ -70,8 +70,7 @@ public partial class AIController
             if (FindFittingSlotIndex(transporter, transporterData, candidate, candidateData) < 0) continue;
 
             Vector3Int candidateCell = candidate.CurrentCellPosition; candidateCell.z = 0;
-            Vector3Int deliveryCell = FindTowDeliveryTarget(candidate, candidateCell, snapshot, plan);
-            if (deliveryCell == Vector3Int.zero) continue;
+            if (!TryFindTowDeliveryTarget(candidate, candidateCell, snapshot, plan, out Vector3Int deliveryCell)) continue;
 
             float distToTarget = SectorManager.HexDistance(candidateCell, deliveryCell);
             if (distToTarget < TowDeliveryThreshold) continue; // already close enough, no tow needed
@@ -94,21 +93,47 @@ public partial class AIController
     // Delivery target — shared with TryDecideAssaultEmbarkAction
     // -------------------------------------------------------------------------
 
-    // Finds where to deliver a towed unit.
-    // Primary: the unit's own plan-assigned objective (the planner already decided).
-    // Fallback (rogue unit): highest-risk offensive sector with a capturer, then enemy HQ.
-    internal Vector3Int FindTowDeliveryTarget(
+    // Returns true if a delivery target was found (including cell (0,0,0) which is valid).
+    // Returns false only when no target could be determined at all.
+    internal bool TryFindTowDeliveryTarget(
         UnitManager candidate,
         Vector3Int candidateCell,
         AIWorldSnapshot snapshot,
-        TeamObjectivePlan plan)
+        TeamObjectivePlan plan,
+        out Vector3Int deliveryTarget)
     {
-        // Use the unit's own plan assignment as the authoritative delivery target.
-        Vector3Int assigned = ResolveUnitObjectiveCell(candidate, plan, snapshot);
-        if (assigned != Vector3Int.zero) return assigned;
+        deliveryTarget = Vector3Int.zero;
 
-        // Rogue unit — no plan slot. Pick the most contested offensive sector.
-        Vector3Int best = Vector3Int.zero;
+        // Use the unit's own plan slot as the authoritative delivery target.
+        // Do NOT call ResolveUnitObjectiveCell here — its HQ fallback returns a non-zero value
+        // even when no slot exists, causing the fallback logic below to be skipped.
+        if (plan != null)
+        {
+            foreach (SectorObjective obj in plan.Objectives)
+                foreach (SlotNeed slot in obj.Slots)
+                    if (slot.Filled && slot.AssignedUnitId == candidate.InstanceId)
+                    {
+                        ConstructionManager tgt = FindCapturableInSector(obj.Sector, snapshot.AITeam);
+                        if (tgt != null)
+                        {
+                            Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
+                            Debug.Log($"{TL("TowTarget")} #{candidate.InstanceId} setor={obj.Sector} capturable={tc}");
+                            deliveryTarget = tc; return true;
+                        }
+                        if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo si))
+                        {
+                            Vector3Int rc = si.RepresentativeCell; rc.z = 0;
+                            Debug.Log($"{TL("TowTarget")} #{candidate.InstanceId} setor={obj.Sector} repCell={rc} (sem capturable)");
+                            deliveryTarget = rc; return true;
+                        }
+                        Debug.LogWarning($"{TL("TowTarget")} #{candidate.InstanceId} setor={obj.Sector} sem sectorInfo");
+                        return false;
+                    }
+        }
+
+        // Rogue unit — no plan slot. Pick the nearest sector with capturers that is
+        // not under active threat (artillery stays behind the front line).
+        bool found = false;
         float bestScore = float.MinValue;
 
         if (plan != null)
@@ -118,25 +143,41 @@ public partial class AIController
                 if (!HasFilledSlot(obj, UnitRole.Capturador)) continue;
 
                 Vector3Int objCell;
-                ConstructionManager tgt = FindCapturableInSector(obj.Sector, snapshot.AITeam);
+                ConstructionManager tgt = FindCapturableInSector(obj.Sector, snapshot.AITeam, candidateCell);
                 if (tgt != null) { objCell = tgt.CurrentCellPosition; objCell.z = 0; }
                 else if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo si))
                 { objCell = si.RepresentativeCell; objCell.z = 0; }
                 else continue;
 
-                TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo sInfo);
-                float risk = sInfo != null ? sInfo.GetRiskRatioFor(snapshot.AITeam) : 0f;
+                // Never drop artillery into active combat — skip sectors where enemies
+                // are within close range of the target building.
+                if (HasNearbyVisibleEnemy(objCell, snapshot.AITeam, 2)) continue;
+
                 float dist = SectorManager.HexDistance(candidateCell, objCell);
-                float score = dist * 40f + risk * 200f;
-                if (score > bestScore) { bestScore = score; best = objCell; }
+                float score = -dist * 40f; // prefer nearest safe sector
+                if (score > bestScore) { bestScore = score; deliveryTarget = objCell; found = true; }
             }
         }
 
-        if (best != Vector3Int.zero) return best;
+        if (found) return true;
 
         if (snapshot.EnemyHQ != null)
-        { Vector3Int hq = snapshot.EnemyHQ.CurrentCellPosition; hq.z = 0; return hq; }
+        {
+            Vector3Int hq = snapshot.EnemyHQ.CurrentCellPosition; hq.z = 0;
+            deliveryTarget = hq; return true;
+        }
 
-        return Vector3Int.zero;
+        return false;
+    }
+
+    // Backward-compat wrapper for callers that can't be null (keep Vector3Int.zero meaning "not found").
+    internal Vector3Int FindTowDeliveryTarget(
+        UnitManager candidate,
+        Vector3Int candidateCell,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan)
+    {
+        TryFindTowDeliveryTarget(candidate, candidateCell, snapshot, plan, out Vector3Int result);
+        return result;
     }
 }

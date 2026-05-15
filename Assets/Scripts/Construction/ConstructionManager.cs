@@ -900,6 +900,8 @@ public class ConstructionManager : MonoBehaviour
             teamId,
             hasUnitOnTop,
             showFlagThreatOutline);
+
+        hudController.ApplySectorBadge(AIController.ShowAIHUD, hasUnitOnTop, sector);
     }
 
     private void RefreshRuntimeVisualState(bool force)

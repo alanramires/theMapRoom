@@ -34,6 +34,7 @@ MonoBehaviour:
   combatClassification: 1
   roles: 
   aiInitiative: 2
+  aiPurchaseMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 8
     priority: 2
@@ -45,13 +46,32 @@ MonoBehaviour:
     priority: 1
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
+  playConservative: 0
+  preferMoveOnBestDPQ: 0
+  preferMaxDisplacement: 0
+  longRangeStationary: 0
+  preferRepositionAtWeaponMaxRange: 0
+  preferArtilleryModeBeforeCombatant: 0
+  useAttackDecision: 1
+  attackAcceptHpLossPercent: 50
+  attackEliminationMinPercent: 10
+  attackMustSurvive: 1
+  ignoreAttackDecisionWhenDefending: 0
+  defensiveAttackExtraHpLossPercent: 20
   repairTriggerHpBelow: 0
   repairTriggerAutonomyPct: 0
   repairTriggerAmmoEnabled: 0
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 0
+  aiPreventiveMaintenanceEnabled: 1
+  aiPreventiveSupplyCanRunWithUnderRepair: 0
+  aiConservativeSupplyAvoidEnemyRange: 2
+  aiPreventiveSupplyHpBelowPct: 70
+  aiPreventiveSupplyAutonomyBelowPct: 60
+  aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
   eliteLevel: 0
+  eliteFrom: {fileID: 0}
   combatModifiers: []
   domain: 1
   heightLevel: 3

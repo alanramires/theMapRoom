@@ -151,14 +151,15 @@ public class ReplayPanelUI : MonoBehaviour
 
     private static bool WasKeyPressedThisFrame(KeyCode key)
     {
+        if (key == KeyCode.F9)
+            return false;
+
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current == null)
             return false;
 
         switch (key)
         {
-            case KeyCode.F9:
-                return false; // reservado para AI Debug Shortcuts
             case KeyCode.RightBracket:
                 return Keyboard.current.rightBracketKey.wasPressedThisFrame;
             case KeyCode.LeftBracket:

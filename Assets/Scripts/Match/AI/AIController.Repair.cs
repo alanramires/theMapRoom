@@ -229,8 +229,11 @@ public partial class AIController
         }
 
         // 3. Área home (base/HQ): reparo pode marchar no setor mas DEVE lutar — sem filtro de sobrevivência.
+        // Fire support units skip this when in open field — they must reach a construction first.
         // Se prioritizeDpqAtBattle, tenta se mover para célula de maior DPQ antes de atacar.
-        if (IsRepairUnitInOwnHomeArea(snapshot, fromCell, aiTeam))
+        bool fireSupportInOpenField = IsFireSupportUnit(unit)
+            && (currentBldg == null || currentBldg.TeamId != aiTeam);
+        if (!fireSupportInOpenField && IsRepairUnitInOwnHomeArea(snapshot, fromCell, aiTeam))
         {
             bool repairPreferDpq = unit.TryGetUnitData(out UnitData repairUd)
                 && repairUd != null && repairUd.prioritizeDpqAtBattle;
@@ -288,6 +291,43 @@ public partial class AIController
 
         // 4. Marcha para a construção aliada mais próxima desocupada (não defensiva)
         // Exclui: célula atual + repCells de objetivos defensivos ativos
+        // Mordiscada en route: HP above trigger level (fuel-only repair) — stationary shot, no deviation.
+        if (!fireSupportInOpenField && !IsRepairUnitInOwnHomeArea(snapshot, fromCell, aiTeam)
+            && unit.TryGetUnitData(out UnitData routeData) && routeData != null)
+        {
+            bool hpOkForAttack = routeData.repairTriggerHpBelow <= 0 || unit.CurrentHP > routeData.repairTriggerHpBelow;
+            bool hasAmmo = false;
+            {
+                var ws = unit.GetEmbarkedWeapons();
+                for (int wi = 0; wi < ws.Count; wi++)
+                    if (ws[wi] != null && ws[wi].squadAmmunition > 0) { hasAmmo = true; break; }
+            }
+            if (hpOkForAttack && hasAmmo && HasAttackTargetAtCurrentPos(unit))
+            {
+                var routeBuf = new List<PodeMirarTargetOption>();
+                PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                    SensorMovementMode.MoveuParado, routeBuf);
+                UnitManager routeTarget = null;
+                float routeBestScore = float.MinValue;
+                foreach (PodeMirarTargetOption opt in routeBuf)
+                {
+                    if (opt?.targetUnit == null) continue;
+                    if (!PassesAttackDecision(unit, opt.targetUnit, fromCell, false, out _)) continue;
+                    Vector3Int tc = opt.targetUnit.CurrentCellPosition; tc.z = 0;
+                    float p = AttackTargetPriority(tc, fromCell)
+                        + Mathf.Max(0, 20 - opt.targetUnit.CurrentHP) * 25f
+                        - opt.distance * 5f;
+                    if (p > routeBestScore) { routeBestScore = p; routeTarget = opt.targetUnit; }
+                }
+                if (routeTarget != null)
+                {
+                    Vector3Int dtc = routeTarget.CurrentCellPosition; dtc.z = 0;
+                    Debug.Log($"{TL("Repair")} {unit.InstanceId} mordiscada en route — ataca {routeTarget.UnitDisplayName}#{routeTarget.InstanceId} de {fromCell} hp={unit.CurrentHP}>{routeData.repairTriggerHpBelow}");
+                    return BuildAttackBatch(unit, aiTeam, fromCell, fromCell, routeTarget.InstanceId.ToString(), dtc);
+                }
+            }
+        }
+
         if (TryBuildRepairLastStandAttack(unit, aiTeam, fromCell, currentBldg, paths, occupied, out PlayerAction lastStandAction))
             return lastStandAction;
 

@@ -35,6 +35,7 @@ MonoBehaviour:
   combatClassification: 3
   roles: 0700000003000000
   aiInitiative: 2
+  aiPurchaseMode: 0
   aiTargetPreferenceByClass: []
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
@@ -56,7 +57,14 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  aiPreventiveMaintenanceEnabled: 1
+  aiPreventiveSupplyCanRunWithUnderRepair: 0
+  aiConservativeSupplyAvoidEnemyRange: 2
+  aiPreventiveSupplyHpBelowPct: 70
+  aiPreventiveSupplyAutonomyBelowPct: 60
+  aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
   eliteLevel: 0
+  eliteFrom: {fileID: 0}
   combatModifiers: []
   domain: 0
   heightLevel: 3

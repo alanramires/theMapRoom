@@ -58,6 +58,7 @@ public partial class AIController : MonoBehaviour
 
     private static AIController _instance;
     public static AIController Instance => _instance;
+    public static bool ShowAIHUD => _instance != null && _instance.showAIUnitHUD;
 
     private readonly HashSet<Vector3Int> plannedDestinations = new HashSet<Vector3Int>();
 

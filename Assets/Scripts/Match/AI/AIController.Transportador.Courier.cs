@@ -21,16 +21,10 @@ public partial class AIController
         }
 
         UnitManager primaryPassenger = ResolvePrimaryPassenger(passengers);
-        Vector3Int primaryTarget = ResolveUnitObjectiveCell(primaryPassenger, plan, snapshot);
-        // If the passenger has no plan slot (rogue pickup), fall back to the transporter's
-        // assigned sector target so an assigned APC still delivers to the right place.
-        bool passengerTargetIsHQFallback = snapshot.EnemyHQ != null
-            && primaryTarget == snapshot.EnemyHQ.CurrentCellPosition;
-        if ((primaryTarget == Vector3Int.zero || passengerTargetIsHQFallback)
-            && assignedSectorTarget != Vector3Int.zero)
-            primaryTarget = assignedSectorTarget;
-        if (primaryTarget == Vector3Int.zero) primaryTarget = fromCell;
+        bool primaryTargetFound = TryResolveCourierPassengerTarget(primaryPassenger, plan, snapshot, assignedSectorTarget, fromCell, out Vector3Int primaryTarget);
+        if (!primaryTargetFound) primaryTarget = fromCell;
         int dropOffRange = IsFireSupportUnit(primaryPassenger) ? FireSupportDropOffRange : TransportDropOffRange;
+        Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — passageiro #{primaryPassenger.InstanceId} alvo={primaryTarget} range={dropOffRange} distAtual={SectorManager.HexDistance(fromCell, primaryTarget):F0}h");
 
         Dictionary<Vector3Int, List<Vector3Int>> paths =
             UnitMovementPathRules.CalcularCaminhosValidos(
@@ -64,68 +58,69 @@ public partial class AIController
         float moveImprovement = CalculateRouteDistanceOrHex(unit, fromCell, primaryTarget)
                               - CalculateRouteDistanceOrHex(unit, moveTarget, primaryTarget);
 
-        // Priority 1a — FireSupport passenger: scan ALL reachable cells via PodeDesembarcarSensor
-        // and pick the (moveCell, disembarkCell) pair with the best DPQ score.
-        // This avoids committing to a single move direction before knowing where the artillery lands.
+        // Priority 1a — FireSupport passenger: first drive as far as this turn can toward
+        // the assigned target, then choose the best legal landing cell from there.
         if (IsFireSupportUnit(primaryPassenger))
         {
-            Vector3Int bestMoveCell = Vector3Int.zero;
-            List<PodeDesembarcarOption> bestSelected = null;
-            float bestScore = float.MinValue;
+            SectorObjective fsObj = ResolveAssignedFireSupportObjective(primaryPassenger, plan);
+            string fsSector = fsObj != null ? fsObj.Sector.ToString() : "?";
+            float distToTarget = SectorManager.HexDistance(fromCell, primaryTarget);
 
-            // Evaluate disembark from current position (no move).
-            var currentOpts = new List<PodeDesembarcarOption>();
-            if (PodeDesembarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, currentOpts) && currentOpts.Count > 0)
+            // Only skip the forward move if it would send the truck BACKWARD (redirect case:
+            // truck is already on the objective cell, redirect moved it away → moveImprovement < 0).
+            bool hasForwardMove = moveTarget != fromCell && moveImprovement >= 0f;
+
+            if (hasForwardMove)
             {
-                List<PodeDesembarcarOption> sel = SelectBestDisembarkPerPassenger(currentOpts, passengers, plan, snapshot);
-                PodeDesembarcarOption opt = sel.Find(o => o.passengerUnit == primaryPassenger);
-                if (opt != null)
+                List<PodeDesembarcarOption> opts = SimulateDisembarkFromCell(unit, moveTarget);
+                if (opts != null && opts.Count > 0)
                 {
-                    Vector3Int dc = opt.disembarkCell; dc.z = 0;
-                    float dcDist = SectorManager.HexDistance(dc, primaryTarget);
-                    if (dcDist <= FireSupportDropOffRange)
+                    List<PodeDesembarcarOption> selected = SelectBestDisembarkPerPassenger(opts, passengers, plan, snapshot);
+                    PodeDesembarcarOption primaryOpt = selected.Find(o => o.passengerUnit == primaryPassenger);
+                    if (primaryOpt != null)
                     {
-                        float s = ScoreCourierDisembarkOption(primaryPassenger, dc, primaryTarget, snapshot.AITeam,
-                            dcDist, CalculateThreatLevel(dc, snapshot.AITeam));
-                        if (s > bestScore) { bestScore = s; bestMoveCell = fromCell; bestSelected = sel; }
+                        Vector3Int dc = primaryOpt.disembarkCell; dc.z = 0;
+                        float dcDist = SectorManager.HexDistance(dc, primaryTarget);
+                        // Drop if the artillery lands near the target OR if the truck itself
+                        // is already close enough (artillery can walk the remaining distance).
+                        float truckDistAfterMove = SectorManager.HexDistance(moveTarget, primaryTarget);
+                        if (dcDist <= FireSupportDropOffRange || truckDistAfterMove <= FireSupportDropOffRange)
+                        {
+                            float score = ScoreCourierDisembarkOption(primaryPassenger, dc, primaryTarget, snapshot.AITeam,
+                                dcDist, CalculateThreatLevel(dc, snapshot.AITeam));
+                            paths.TryGetValue(moveTarget, out List<Vector3Int> fsMoved);
+                            Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — FireSupport #{primaryPassenger.InstanceId} setor={fsSector} avança+desembarca via {moveTarget} destDist={dcDist:F0}h truckDist={truckDistAfterMove:F0}h dpq={score:F0} → {primaryTarget}");
+                            return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selected, moveTarget, fsMoved);
+                        }
                     }
                 }
             }
-
-            // Evaluate disembark from every reachable non-occupied forward cell.
-            // Only consider disembark cells within FireSupportDropOffRange of the target so the
-            // truck keeps moving until it is actually close enough to drop off the artillery.
-            // Also skip cells that are further from the target than the current position (no reversing).
-            float fromDistToTarget = SectorManager.HexDistance(fromCell, primaryTarget);
-            foreach (Vector3Int candidate in paths.Keys)
+            else
             {
-                if (candidate == fromCell || occupied.Contains(candidate)) continue;
-                if (SectorManager.HexDistance(candidate, primaryTarget) > fromDistToTarget + 1f) continue;
-                List<PodeDesembarcarOption> opts = SimulateDisembarkFromCell(unit, candidate);
-                if (opts == null || opts.Count == 0) continue;
-                List<PodeDesembarcarOption> sel = SelectBestDisembarkPerPassenger(opts, passengers, plan, snapshot);
-                PodeDesembarcarOption opt = sel.Find(o => o.passengerUnit == primaryPassenger);
-                if (opt == null) continue;
-                Vector3Int dc = opt.disembarkCell; dc.z = 0;
-                float dcDist = SectorManager.HexDistance(dc, primaryTarget);
-                if (dcDist > FireSupportDropOffRange) continue;
-                float s = ScoreCourierDisembarkOption(primaryPassenger, dc, primaryTarget, snapshot.AITeam,
-                    dcDist, CalculateThreatLevel(dc, snapshot.AITeam));
-                if (s > bestScore) { bestScore = s; bestMoveCell = candidate; bestSelected = sel; }
-            }
-
-            if (bestSelected != null)
-            {
-                if (bestMoveCell == fromCell)
+                // If the truck cannot improve this turn, keep the artillery aboard unless
+                // the landing cell is already close to the assigned sector.
+                var currentOpts = new List<PodeDesembarcarOption>();
+                if (PodeDesembarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, currentOpts) && currentOpts.Count > 0)
                 {
-                    Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — FireSupport desembarca no lugar dpq={bestScore:F0}");
-                    return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, bestSelected);
+                    List<PodeDesembarcarOption> selected = SelectBestDisembarkPerPassenger(currentOpts, passengers, plan, snapshot);
+                    PodeDesembarcarOption primaryOpt = selected.Find(o => o.passengerUnit == primaryPassenger);
+                    if (primaryOpt != null)
+                    {
+                        Vector3Int dc = primaryOpt.disembarkCell; dc.z = 0;
+                        float dcDist = SectorManager.HexDistance(dc, primaryTarget);
+                        // Also drop in place when the truck itself is within drop range.
+                        if (dcDist <= FireSupportDropOffRange || distToTarget <= FireSupportDropOffRange)
+                        {
+                            float score = ScoreCourierDisembarkOption(primaryPassenger, dc, primaryTarget, snapshot.AITeam,
+                                dcDist, CalculateThreatLevel(dc, snapshot.AITeam));
+                            Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — FireSupport #{primaryPassenger.InstanceId} setor={fsSector} desembarca no lugar destDist={dcDist:F0}h truckDist={distToTarget:F0}h dpq={score:F0} → {primaryTarget}");
+                            return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selected);
+                        }
+                    }
                 }
-                paths.TryGetValue(bestMoveCell, out List<Vector3Int> fsMoved);
-                Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — FireSupport move+desembarca via {bestMoveCell} dpq={bestScore:F0} → {primaryTarget}");
-                return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, bestSelected, bestMoveCell, fsMoved);
             }
             // No disembark option available yet — fall through to Priority 3 (keep moving).
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — FireSupport #{primaryPassenger.InstanceId} setor={fsSector} sem opção de desembarque ainda dist={distToTarget:F0}h → {primaryTarget}");
         }
         else
         {
@@ -184,7 +179,8 @@ public partial class AIController
         // No combat with passengers aboard — delivering is the only priority.
 
         // Priority 3: move toward target
-        Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — move para {moveTarget} alvo={primaryTarget}");
+        float distRemaining = SectorManager.HexDistance(moveTarget, primaryTarget);
+        Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — move para {moveTarget} alvo={primaryTarget} dist={distRemaining:F0}h passageiro=#{primaryPassenger.InstanceId}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
     }
 
@@ -240,7 +236,7 @@ public partial class AIController
         var selected = new List<PodeDesembarcarOption>();
         foreach (UnitManager passenger in passengers)
         {
-            Vector3Int target = ResolveUnitObjectiveCell(passenger, plan, snapshot);
+            bool targetFound = TryResolveCourierPassengerTarget(passenger, plan, snapshot, Vector3Int.zero, passenger.CurrentCellPosition, out Vector3Int target);
             PodeDesembarcarOption best = null;
             float bestDist = float.MaxValue;
             float bestThreat = float.MaxValue;
@@ -249,7 +245,7 @@ public partial class AIController
             {
                 if (opt.passengerUnit != passenger) continue;
                 Vector3Int dc = opt.disembarkCell; dc.z = 0;
-                float dist = target != Vector3Int.zero
+                float dist = targetFound
                     ? SectorManager.HexDistance(dc, target)
                     : 0f;
                 float threat = CalculateThreatLevel(dc, snapshot.AITeam);
@@ -292,6 +288,111 @@ public partial class AIController
         }
 
         return score;
+    }
+
+    // Returns true if a real target was resolved (including cell (0,0,0) which is a valid hex).
+    // Returns false only when no target could be determined at all.
+    private bool TryResolveCourierPassengerTarget(
+        UnitManager passenger,
+        TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot,
+        Vector3Int assignedSectorTarget,
+        Vector3Int fallbackCell,
+        out Vector3Int resolvedTarget)
+    {
+        resolvedTarget = Vector3Int.zero;
+        if (passenger == null) return false;
+        if (assignedSectorTarget != Vector3Int.zero) assignedSectorTarget.z = 0;
+        fallbackCell.z = 0;
+
+        if (IsFireSupportUnit(passenger))
+        {
+            SectorObjective assignedFireSupport = ResolveAssignedFireSupportObjective(passenger, plan);
+            if (assignedFireSupport != null)
+            {
+                // Do NOT use fallbackCell (truck position) as last resort — when the assigned
+                // sector has no capturable building (already AI-controlled), passing the truck's
+                // cell as fallback makes the truck believe it has already arrived, so it never drives.
+                ConstructionManager tgt = FindCapturableInSector(assignedFireSupport.Sector, snapshot.AITeam);
+                if (tgt != null)
+                {
+                    Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
+                    Debug.Log($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} setor={assignedFireSupport.Sector} capturable={tc}");
+                    resolvedTarget = tc; return true;
+                }
+                if (TryGetAnySectorInfo(assignedFireSupport.Sector, out SectorManager.SectorInfo si))
+                {
+                    Vector3Int rc = si.RepresentativeCell; rc.z = 0;
+                    Debug.Log($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} setor={assignedFireSupport.Sector} repCell={rc} (sem capturable)");
+                    resolvedTarget = rc; return true;
+                }
+                Debug.LogWarning($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} setor={assignedFireSupport.Sector} sem sectorInfo");
+            }
+
+            if (assignedSectorTarget != Vector3Int.zero)
+            { resolvedTarget = assignedSectorTarget; return true; }
+
+            Vector3Int passengerCell = passenger.CurrentCellPosition;
+            passengerCell.z = 0;
+            if (TryFindTowDeliveryTarget(passenger, passengerCell, snapshot, plan, out Vector3Int towTarget))
+            { resolvedTarget = towTarget; return true; }
+
+            return false;
+        }
+
+        // Look up capturable in the passenger's assigned sector; do NOT fall back to
+        // the sector RepresentativeCell — for already-captured sectors it equals the
+        // truck's own starting position, causing a distance-0 disembark without moving.
+        Vector3Int target = Vector3Int.zero;
+        if (plan != null)
+        {
+            bool slotFound = false;
+            foreach (SectorObjective obj in plan.Objectives)
+            {
+                if (slotFound) break;
+                foreach (SlotNeed slot in obj.Slots)
+                {
+                    if (!slot.Filled || slot.AssignedUnitId != passenger.InstanceId) continue;
+                    ConstructionManager tgt = FindCapturableInSector(obj.Sector, snapshot.AITeam, fallbackCell);
+                    if (tgt != null) { target = tgt.CurrentCellPosition; target.z = 0; }
+                    Debug.Log($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} setor={obj.Sector} capturable={target} (fallback={fallbackCell})");
+                    slotFound = true; break;
+                }
+            }
+        }
+        // Rogue capturer — no plan slot. Head to the HQ sector and drop at the nearest
+        // capturable building within it (could be a factory before the HQ itself).
+        if (target == Vector3Int.zero && snapshot.EnemyHQ != null)
+        {
+            ConstructionManager tgt = FindCapturableInSector(snapshot.EnemyHQ.Sector, snapshot.AITeam, fallbackCell);
+            if (tgt != null)
+            {
+                target = tgt.CurrentCellPosition; target.z = 0;
+                Debug.Log($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} rogue → setor HQ capturable={target}");
+            }
+        }
+
+        bool targetIsHQFallback = snapshot.EnemyHQ != null
+            && target == snapshot.EnemyHQ.CurrentCellPosition;
+        if ((target == Vector3Int.zero || targetIsHQFallback)
+            && assignedSectorTarget != Vector3Int.zero)
+            target = assignedSectorTarget;
+        if (target == Vector3Int.zero && snapshot.EnemyHQ != null)
+        { target = snapshot.EnemyHQ.CurrentCellPosition; target.z = 0; }
+        if (target == Vector3Int.zero && snapshot.EnemyBuildings != null)
+        {
+            Vector3Int pCell = passenger.CurrentCellPosition; pCell.z = 0;
+            float nearestDist = float.MaxValue;
+            foreach (ConstructionManager eb in snapshot.EnemyBuildings)
+            {
+                if (eb == null) continue;
+                Vector3Int ec = eb.CurrentCellPosition; ec.z = 0;
+                float d = SectorManager.HexDistance(pCell, ec);
+                if (d < nearestDist) { nearestDist = d; target = ec; }
+            }
+        }
+        if (target != Vector3Int.zero) { resolvedTarget = target; return true; }
+        return false;
     }
 
     // -------------------------------------------------------------------------

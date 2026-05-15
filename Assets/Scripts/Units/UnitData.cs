@@ -24,6 +24,14 @@ public class TransportStructureTerrainRule
 }
 
 [System.Serializable]
+public enum AIPurchaseMode
+{
+    Either    = 0,  // Comprado em qualquer contexto (padrão)
+    Offensive = 1,  // Apenas modo ofensivo/normal; ignorado quando defensiveBaseThreat
+    Defensive = 2,  // Apenas quando há ameaça defensiva; nunca em modo ofensivo
+}
+
+[System.Serializable]
 public enum LosPolicy
 {
     InheritGlobal = 0,
@@ -115,6 +123,8 @@ public class UnitData : ScriptableObject
     [Header("AI")]
     [Tooltip("Ordem de iniciativa na fila de ação da IA. Priority age primeiro, Retreat age por último. Desempate: mais HP age antes.")]
     public AiInitiative aiInitiative = AiInitiative.Medium;
+    [Tooltip("Contexto de compra pela IA. Defensive = só comprada quando há ameaça à base; Offensive = nunca em modo defensivo; Either = sem restrição.")]
+    public AIPurchaseMode aiPurchaseMode = AIPurchaseMode.Either;
     [Tooltip("Preferencia de alvo por classe (usada pelo gate de Target Preference no AI Unit Profile).")]
     public List<AITargetPreferenceByClassRule> aiTargetPreferenceByClass = new List<AITargetPreferenceByClassRule>();
 
@@ -186,6 +196,8 @@ public class UnitData : ScriptableObject
     [Header("Elite")]
     [Tooltip("Nivel de elite da unidade (padrao: 0).")]
     [Min(0)] public int eliteLevel = 0;
+    [Tooltip("Unidade base da qual esta é um upgrade direto. Define a cadeia de evolução usada pela IA para o próximo upgrade (ex.: Tanque A → Tanque Z).")]
+    public UnitData eliteFrom;
     [Tooltip("Modificadores de RPS de combate aplicados por esta unidade.")]
     public List<CombatModifierData> combatModifiers = new List<CombatModifierData>();
     [Header("Native Domain")]

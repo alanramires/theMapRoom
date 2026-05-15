@@ -33,6 +33,7 @@ MonoBehaviour:
   combatClassification: 1
   roles: 05000000
   aiInitiative: 0
+  aiPurchaseMode: 2
   aiTargetPreferenceByClass:
   - targetClass: 6
     priority: 2
@@ -58,7 +59,14 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  aiPreventiveMaintenanceEnabled: 1
+  aiPreventiveSupplyCanRunWithUnderRepair: 0
+  aiConservativeSupplyAvoidEnemyRange: 2
+  aiPreventiveSupplyHpBelowPct: 70
+  aiPreventiveSupplyAutonomyBelowPct: 60
+  aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
   eliteLevel: 1
+  eliteFrom: {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
   combatModifiers:
   - {fileID: 11400000, guid: cae64e256d2ce3b459cbc9e546b4402c, type: 2}
   - {fileID: 11400000, guid: 156fa08900203414093f59ab53a77cc5, type: 2}

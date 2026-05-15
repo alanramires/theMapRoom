@@ -33,6 +33,7 @@ MonoBehaviour:
   combatClassification: 1
   roles: 05000000
   aiInitiative: 0
+  aiPurchaseMode: 2
   aiTargetPreferenceByClass:
   - targetClass: 3
     priority: 2
@@ -67,6 +68,7 @@ MonoBehaviour:
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
   eliteLevel: 2
+  eliteFrom: {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
   combatModifiers:
   - {fileID: 11400000, guid: 8f009e4781fd97c4384dbdc6c19ce234, type: 2}
   - {fileID: 11400000, guid: a85d4249a06a33349ab391872875ed9a, type: 2}

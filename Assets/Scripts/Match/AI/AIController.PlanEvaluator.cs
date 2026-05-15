@@ -642,27 +642,39 @@ public partial class AIController
 
             if (freeAssaults.Count > 0)
             {
-                var lowRiskFallbacks = new List<SectorObjective>();
+                // Fallback escort: Medium sectors first, then Low sectors with risk >= threshold.
+                // Low sectors below MinLowRiskForEscort (safe backyard near own HQ) are excluded.
+                const float MinLowRiskForEscort = 0.45f;
+                var escortFallbacks = new List<SectorObjective>();
                 foreach (SectorObjective obj in plan.Objectives)
                 {
                     if (!HasFilledSlot(obj, UnitRole.Capturador)) continue;
                     if (HasAnySlot(obj, UnitRole.Assalto)) continue;
                     if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
-                    if (escortInfo.GetRiskLevelFor(aiTeam) != SectorManager.SectorRiskLevel.Low) continue;
-                    lowRiskFallbacks.Add(obj);
+                    var riskLevel = escortInfo.GetRiskLevelFor(aiTeam);
+                    bool isMedium = riskLevel == SectorManager.SectorRiskLevel.Medium;
+                    bool isLow = riskLevel == SectorManager.SectorRiskLevel.Low
+                        && escortInfo.GetRiskRatioFor(aiTeam) >= MinLowRiskForEscort;
+                    if (!isMedium && !isLow) continue;
+                    escortFallbacks.Add(obj);
                 }
 
-                lowRiskFallbacks.Sort((a, b) =>
+                escortFallbacks.Sort((a, b) =>
                 {
-                    float ar = SectorManager.TryGetSectorInfo(a.Sector, out SectorManager.SectorInfo ai)
-                        ? ai.GetRiskRatioFor(aiTeam) : 0f;
-                    float br = SectorManager.TryGetSectorInfo(b.Sector, out SectorManager.SectorInfo bi)
-                        ? bi.GetRiskRatioFor(aiTeam) : 0f;
+                    bool aIsMed = TryGetAnySectorInfo(a.Sector, out SectorManager.SectorInfo ai)
+                        && ai.GetRiskLevelFor(aiTeam) == SectorManager.SectorRiskLevel.Medium;
+                    bool bIsMed = TryGetAnySectorInfo(b.Sector, out SectorManager.SectorInfo bi)
+                        && bi.GetRiskLevelFor(aiTeam) == SectorManager.SectorRiskLevel.Medium;
+                    if (aIsMed != bIsMed) return aIsMed ? -1 : 1; // Medium first
+                    float ar = SectorManager.TryGetSectorInfo(a.Sector, out SectorManager.SectorInfo aInfo)
+                        ? aInfo.GetRiskRatioFor(aiTeam) : 0f;
+                    float br = SectorManager.TryGetSectorInfo(b.Sector, out SectorManager.SectorInfo bInfo)
+                        ? bInfo.GetRiskRatioFor(aiTeam) : 0f;
                     int riskCompare = br.CompareTo(ar);
                     return riskCompare != 0 ? riskCompare : a.Priority.CompareTo(b.Priority);
                 });
 
-                foreach (SectorObjective obj in lowRiskFallbacks)
+                foreach (SectorObjective obj in escortFallbacks)
                 {
                     if (freeAssaults.Count == 0) break;
                     if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
@@ -685,7 +697,7 @@ public partial class AIController
                     if (obj.Status != ObjectiveStatus.Defending) obj.Status = ObjectiveStatus.Pursuing;
                     ApplyPlanHUD(best, obj, UnitRole.Assalto);
                     freeAssaults.Remove(best);
-                    Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} → batedor fallback Low de {obj.Sector} " +
+                    Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} → batedor fallback {escortInfo.GetRiskLevelFor(aiTeam)} de {obj.Sector} " +
                               $"(risco={escortInfo.GetRiskRatioFor(aiTeam):F2}, dist={bestDist:F0}h)");
                 }
             }
@@ -866,6 +878,7 @@ public partial class AIController
             foreach (UnitManager u in freeTransporters)
             {
                 if (assignedIds.Contains(u.InstanceId)) continue;
+                if (!u.TryGetUnitData(out UnitData uData) || uData == null) continue;
 
                 SectorObjective bestObj = null;
                 UnitManager bestPassenger = null;
@@ -910,6 +923,7 @@ public partial class AIController
                         if (slot.Role != UnitRole.Capturador || !slot.Filled) continue;
                         UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
                         if (capturer == null || capturer.IsEmbarked) continue;
+                        if (!capturer.TryGetUnitData(out UnitData capData) || FindFittingSlotIndex(u, uData, capturer, capData) < 0) continue;
                         Vector3Int cc = capturer.CurrentCellPosition; cc.z = 0;
                         if (IsTeamProductionBuilding(cc, aiTeam)) continue; // prefere campo
                         float dist = SectorManager.HexDistance(cc, tc);
@@ -929,6 +943,7 @@ public partial class AIController
                             if (slot.Role != UnitRole.Capturador || !slot.Filled) continue;
                             UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
                             if (capturer == null || capturer.IsEmbarked) continue;
+                            if (!capturer.TryGetUnitData(out UnitData capData) || FindFittingSlotIndex(u, uData, capturer, capData) < 0) continue;
                             Vector3Int cc = capturer.CurrentCellPosition; cc.z = 0;
                             float dist = SectorManager.HexDistance(cc, tc);
                             float apcToPassenger = SectorManager.HexDistance(uc, cc);

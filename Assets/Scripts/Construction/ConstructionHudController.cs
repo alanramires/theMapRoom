@@ -30,6 +30,9 @@ public class ConstructionHudController : MonoBehaviour
     [SerializeField] [Range(0.5f, 3f)] private float flagThreatPulseMaxDuration = 1.2f;
     [SerializeField] private Vector2 flagThreatOutlineDistance = new Vector2(1f, -1f);
 
+    [Header("Sector Badge")]
+    [SerializeField] private TMP_Text sectorBadge;
+
     [Header("Sorting")]
     [SerializeField] private bool applyHudSorting = true;
     [SerializeField] private string hudSortingLayerName = "SFX";
@@ -145,6 +148,22 @@ public class ConstructionHudController : MonoBehaviour
         }
     }
 
+    public void ApplySectorBadge(bool showAIHUD, bool isOccupied, ConstructionSector sector)
+    {
+        if (sectorBadge == null)
+            return;
+
+        bool show = showAIHUD && !isOccupied && !ConstructionSectorHelper.IsBase(sector);
+        if (sectorBadge.gameObject.activeSelf != show)
+            sectorBadge.gameObject.SetActive(show);
+
+        if (show)
+        {
+            string name = sector.ToString();
+            sectorBadge.text = name.Length > 0 ? name[0].ToString().ToUpper() : string.Empty;
+        }
+    }
+
     private void OnDisable()
     {
         StopFlagThreatPulseRoutine();
@@ -230,6 +249,13 @@ public class ConstructionHudController : MonoBehaviour
             Transform flagTextTransform = FindChildRecursive(transform, "flag_text");
             if (flagTextTransform != null)
                 flagText = flagTextTransform.GetComponent<TMP_Text>();
+        }
+
+        if (!IsChildOfThisHud(sectorBadge != null ? sectorBadge.transform : null))
+        {
+            Transform badgeTransform = FindChildRecursive(transform, "text_badge");
+            if (badgeTransform != null)
+                sectorBadge = badgeTransform.GetComponent<TMP_Text>();
         }
     }
 

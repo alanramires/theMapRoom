@@ -142,9 +142,18 @@ public partial class AIController
 
         {
 
+            bool isTransportador = unit.TryGetUnitData(out UnitData hexUnitData)
+                && hexUnitData.roles != null && hexUnitData.roles.Count > 0
+                && hexUnitData.roles[0] == UnitRole.Transportador;
+
+            if (!isTransportador)
+            {
+
             Debug.Log($"[AI] {unit.InstanceId} → captura @ {destCell}");
 
             return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, destCell, paths);
+
+            }
 
         }
 
@@ -156,21 +165,35 @@ public partial class AIController
 
             bool hasMoved = destCell != fromCell;
 
-            PodeMirarTargetOption target = FindBestAttackTarget(unit, destCell, hasMoved);
+            var attackCandidates = FindAttackTargetsSorted(unit, destCell, hasMoved);
 
-            if (target?.targetUnit != null)
+            if (attackCandidates != null)
 
             {
 
-                Vector3Int targetCell = target.targetUnit.CurrentCellPosition; targetCell.z = 0;
+                foreach (var (target, _) in attackCandidates)
 
-                Debug.Log($"[AI] {unit.InstanceId} → ataca {target.targetUnit.InstanceId} de {destCell}");
+                {
 
-                return BuildAttackBatch(
+                    if (target?.targetUnit == null) continue;
 
-                    unit, snapshot.AITeam, fromCell, destCell,
+                    if (!PassesAttackDecision(unit, target.targetUnit, destCell, false, out string atkReason))
+                    {
+                        Debug.Log($"[AI] {unit.InstanceId} → ataque bloqueado por AttackDecision ({target.targetUnit.InstanceId}): {atkReason}");
+                        continue;
+                    }
 
-                    target.targetUnit.InstanceId.ToString(), targetCell, paths);
+                    Vector3Int targetCell = target.targetUnit.CurrentCellPosition; targetCell.z = 0;
+
+                    Debug.Log($"[AI] {unit.InstanceId} → ataca {target.targetUnit.InstanceId} de {destCell}");
+
+                    return BuildAttackBatch(
+
+                        unit, snapshot.AITeam, fromCell, destCell,
+
+                        target.targetUnit.InstanceId.ToString(), targetCell, paths);
+
+                }
 
             }
 
@@ -193,7 +216,7 @@ public partial class AIController
             && data.roles.Contains(UnitRole.FogoIndireto);
     }
 
-    private PodeMirarTargetOption FindBestAttackTarget(UnitManager unit, Vector3Int fromCell, bool hasMoved)
+    private List<(PodeMirarTargetOption opt, int score)> FindAttackTargetsSorted(UnitManager unit, Vector3Int fromCell, bool hasMoved)
 
     {
 
@@ -211,15 +234,13 @@ public partial class AIController
 
         if (!hasAny || targets.Count == 0) return null;
 
-        PodeMirarTargetOption best = null;
-
-        int bestScore = int.MinValue;
-
         unit.TryGetUnitData(out UnitData attackerData);
 
         bool isCapturador = attackerData != null && attackerData.roles != null
 
             && attackerData.roles.Contains(UnitRole.Capturador);
+
+        var scored = new List<(PodeMirarTargetOption opt, int score)>();
 
         foreach (PodeMirarTargetOption opt in targets)
 
@@ -247,29 +268,23 @@ public partial class AIController
 
             score += (10 - opt.targetUnit.CurrentHP) * 200;
 
-            // Bônus por matar (HP <= dano esperado)
+            // Heurística simples: alvo com ≤ 2 HP provavelmente morre
 
-            if (attackerData != null && opt.targetUnit.TryGetUnitData(out UnitData defData))
+            if (opt.targetUnit.CurrentHP <= 2)
 
-            {
-
-                // Heurística simples: alvo com ≤ 2 HP provavelmente morre
-
-                if (opt.targetUnit.CurrentHP <= 2)
-
-                    score += 5000;
-
-            }
+                score += 5000;
 
             // Penalidade por distância
 
             score -= opt.distance * 50;
 
-            if (score > bestScore) { bestScore = score; best = opt; }
+            scored.Add((opt, score));
 
         }
 
-        return best;
+        scored.Sort((a, b) => b.score.CompareTo(a.score));
+
+        return scored;
 
     }
 }

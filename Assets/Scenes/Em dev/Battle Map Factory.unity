@@ -2185,6 +2185,134 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!1 &117626048
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 117626049}
+  - component: {fileID: 117626051}
+  - component: {fileID: 117626050}
+  m_Layer: 0
+  m_Name: Construction HUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &117626049
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 117626048}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1533042746}
+  m_Father: {fileID: 226372600}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &117626050
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 117626048}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e9100ad8f547f745b56485cad9b28b6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionHudController
+  capturedContainer: {fileID: 1773580549}
+  capturedBarImage: {fileID: 1773580550}
+  capturedBarRenderer: {fileID: 0}
+  capturedFillImage: {fileID: 462739134}
+  capturedFillRenderer: {fileID: 0}
+  capturedText: {fileID: 1160367171}
+  hideWhenFull: 0
+  capturedTintWithTeamColor: 0
+  capturedDefaultColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  captured50PercentColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  captured25PercentColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  flagIcon: {fileID: 1832708431}
+  flagText: {fileID: 1727822702}
+  flagThreatOutlineColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  flagThreatOutlineAlphaMin: 0.12
+  flagThreatOutlineAlphaMax: 0.42
+  flagThreatPulseMinDuration: 0.8
+  flagThreatPulseMaxDuration: 1.2
+  flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
+  applyHudSorting: 1
+  hudSortingLayerName: SFX
+  hudSortingOrder: 60
+--- !u!212 &117626051
+SpriteRenderer:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 117626048}
+  m_Enabled: 0
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: -994085901
+  m_SortingLayer: 3
+  m_SortingOrder: 5
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 21300000, guid: bce959b8c385ce944acee4b18898b47d, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 0.8652344, y: 1}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
 --- !u!1 &124014184
 GameObject:
   m_ObjectHideFlags: 0
@@ -3456,6 +3584,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -3856,6 +3985,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -3991,7 +4121,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 6000 / turn
+  m_text: 1500 / turn
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -4136,6 +4266,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -4732,6 +4863,163 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 226028857}
   m_CullTransparentMesh: 1
+--- !u!1 &226372599
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 226372600}
+  - component: {fileID: 226372602}
+  - component: {fileID: 226372601}
+  m_Layer: 0
+  m_Name: Cidade_T-1_C131
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &226372600
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 226372599}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 5.1958594, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 117626049}
+  m_Father: {fileID: 1888992690}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &226372601
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 226372599}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1abcbdaf8b20e164f9bb22694db65716, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionManager
+  spriteRenderer: {fileID: 226372602}
+  constructionDatabase: {fileID: 11400000, guid: c98d78d227439ec4997c0fe3200b3bda, type: 2}
+  boardTilemap: {fileID: 1566606925}
+  snapToCellCenter: 1
+  autoSnapWhenMovedInEditor: 1
+  currentCellPosition: {x: 6, y: 0, z: 0}
+  teamId: -1
+  slotIndex: -1
+  sector: 13
+  constructionId: cidade
+  instanceId: 131
+  currentPosition: {x: 5.1958594, y: 0, z: 0}
+  constructionDisplayName: Cidade
+  autoApplyOnStart: 1
+  siteRuntime:
+    isPlayerHeadQuarter: 0
+    isVictoryBuilding: 0
+    isCapturable: 1
+    capturePointsMax: 20
+    capturedIncoming: 1000
+    sellingRule: 3
+    legacyCanProduceAndSellUnits: 
+    offeredUnits: []
+    canProvideSupplies: 1
+    offeredSupplies:
+    - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+      quantity: 40
+    - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+      quantity: 20
+    - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+      quantity: 30
+    offeredServices:
+    - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+    - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+    - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  hasSiteRuntimeOverride: 1
+  currentCapturePoints: 20
+  hasInfiniteSuppliesOverride: 1
+  originalOwnerTeamId: -1
+  originalOwnerInitialized: 1
+  firstOwnerTeamId: -1
+  firstOwnerInitialized: 0
+  occupiedByReadyUnitDarkenFactor: 0.4
+  hudController: {fileID: 117626050}
+  matchController: {fileID: 327617512}
+  victoryBuildingOverlayRenderer: {fileID: 0}
+  victoryBuildingOverlaySprite: {fileID: 0}
+  victoryBuildingOverlayColor: {r: 1, g: 0.84, b: 0.22, a: 1}
+  victoryBuildingOverlayLocalPosition: {x: 0, y: 0, z: -0.01}
+  victoryBuildingOverlayLocalScale: {x: 1, y: 1, z: 1}
+  victoryBuildingOverlaySortingOrderOffset: 6
+  continuousEditorVisualRefresh: 0
+--- !u!212 &226372602
+SpriteRenderer:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 226372599}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: -994085901
+  m_SortingLayer: 3
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 21300000, guid: 5ca4a449521141e49a72d100a0c798b4, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 1, y: 1}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
 --- !u!1 &235715786
 GameObject:
   m_ObjectHideFlags: 0
@@ -5038,6 +5326,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -5401,7 +5690,7 @@ Transform:
   m_GameObject: {fileID: 294939975}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -5.1958594, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -5425,13 +5714,13 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: 0, y: 0, z: 0}
+  currentCellPosition: {x: -6, y: 0, z: 0}
   teamId: -1
   slotIndex: -1
   sector: 5
   constructionId: cidade
   instanceId: 11
-  currentPosition: {x: 0, y: 0, z: 0}
+  currentPosition: {x: -5.1958594, y: 0, z: 0}
   constructionDisplayName: Cidade
   autoApplyOnStart: 1
   siteRuntime:
@@ -5669,6 +5958,134 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 304560804}
   m_CullTransparentMesh: 1
+--- !u!1 &305367078
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 305367079}
+  - component: {fileID: 305367081}
+  - component: {fileID: 305367080}
+  m_Layer: 0
+  m_Name: Construction HUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &305367079
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 305367078}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1203140639}
+  m_Father: {fileID: 1195268524}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &305367080
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 305367078}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e9100ad8f547f745b56485cad9b28b6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionHudController
+  capturedContainer: {fileID: 1293092983}
+  capturedBarImage: {fileID: 1293092984}
+  capturedBarRenderer: {fileID: 0}
+  capturedFillImage: {fileID: 1925373450}
+  capturedFillRenderer: {fileID: 0}
+  capturedText: {fileID: 366935001}
+  hideWhenFull: 0
+  capturedTintWithTeamColor: 0
+  capturedDefaultColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  captured50PercentColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  captured25PercentColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  flagIcon: {fileID: 1090685761}
+  flagText: {fileID: 601932022}
+  flagThreatOutlineColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  flagThreatOutlineAlphaMin: 0.12
+  flagThreatOutlineAlphaMax: 0.42
+  flagThreatPulseMinDuration: 0.8
+  flagThreatPulseMaxDuration: 1.2
+  flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
+  applyHudSorting: 1
+  hudSortingLayerName: SFX
+  hudSortingOrder: 60
+--- !u!212 &305367081
+SpriteRenderer:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 305367078}
+  m_Enabled: 0
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: -994085901
+  m_SortingLayer: 3
+  m_SortingOrder: 5
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 21300000, guid: bce959b8c385ce944acee4b18898b47d, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 0.8652344, y: 1}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
 --- !u!1 &315826520
 GameObject:
   m_ObjectHideFlags: 0
@@ -6130,7 +6547,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 6000
+    incomePerTurn: 1500
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
@@ -6139,7 +6556,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 9000
+    incomePerTurn: 1500
     startMoneyApplied: 1
   includeNeutralTeam: 0
   economyEnabled: 1
@@ -6184,8 +6601,8 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -1554605513
-  cachedConstructionIncomeCount: 24
+  cachedConstructionIncomeSignature: 1010482409
+  cachedConstructionIncomeCount: 28
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
   enableFogSourceDebugLogs: 0
@@ -6589,6 +7006,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -6651,6 +7069,218 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!1 &366934999
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 366935000}
+  - component: {fileID: 366935002}
+  - component: {fileID: 366935001}
+  m_Layer: 0
+  m_Name: capture_text
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &366935000
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 366934999}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1293092983}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 3.1000001, y: 3.9000015}
+  m_SizeDelta: {x: 50, y: 15}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &366935001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 366934999}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: 20/20
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 12
+  m_fontSizeBase: 12
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 1
+  m_HorizontalAlignment: 4
+  m_VerticalAlignment: 1024
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_characterHorizontalScale: 1
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_TextWrappingMode: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 0
+  m_ActiveFontFeatures: 6e72656b
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_EmojiFallbackSupport: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &366935002
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 366934999}
+  m_CullTransparentMesh: 1
+--- !u!1 &377369601
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 377369602}
+  - component: {fileID: 377369604}
+  - component: {fileID: 377369603}
+  m_Layer: 0
+  m_Name: capture
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &377369602
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 377369601}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 411233361}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 58, y: 4}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &377369603
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 377369601}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 38af98aab419de84eaf68ce3ca6a1087, type: 3}
+  m_Type: 3
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 0
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &377369604
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 377369601}
+  m_CullTransparentMesh: 1
 --- !u!1 &385849870
 GameObject:
   m_ObjectHideFlags: 0
@@ -6755,7 +7385,7 @@ Transform:
   m_GameObject: {fileID: 389740648}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -6.4948244, y: -0.75, z: 0}
+  m_LocalPosition: {x: -5.628848, y: 2.25, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -6779,13 +7409,13 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: -8, y: -1, z: 0}
+  currentCellPosition: {x: -7, y: 3, z: 0}
   teamId: -1
   slotIndex: -1
   sector: 0
   constructionId: cidade
   instanceId: 10
-  currentPosition: {x: -6.4948244, y: -0.75, z: 0}
+  currentPosition: {x: -5.628848, y: 2.25, z: 0}
   constructionDisplayName: Cidade
   autoApplyOnStart: 1
   siteRuntime:
@@ -6886,6 +7516,83 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!1 &411233360
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 411233361}
+  - component: {fileID: 411233363}
+  - component: {fileID: 411233362}
+  m_Layer: 0
+  m_Name: capture_bar
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &411233361
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 411233360}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 377369602}
+  - {fileID: 1652348633}
+  m_Father: {fileID: 1320362881}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0.20000002, y: -31.699995}
+  m_SizeDelta: {x: 60, y: 5}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &411233362
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 411233360}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 38af98aab419de84eaf68ce3ca6a1087, type: 3}
+  m_Type: 3
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 0
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &411233363
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 411233360}
+  m_CullTransparentMesh: 1
 --- !u!1 &443914745
 GameObject:
   m_ObjectHideFlags: 0
@@ -7097,6 +7804,81 @@ CanvasRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 457256195}
+  m_CullTransparentMesh: 1
+--- !u!1 &462739132
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 462739133}
+  - component: {fileID: 462739135}
+  - component: {fileID: 462739134}
+  m_Layer: 0
+  m_Name: capture
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &462739133
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 462739132}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1773580549}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 58, y: 4}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &462739134
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 462739132}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 38af98aab419de84eaf68ce3ca6a1087, type: 3}
+  m_Type: 3
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 0
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &462739135
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 462739132}
   m_CullTransparentMesh: 1
 --- !u!1 &470716131
 GameObject:
@@ -7576,6 +8358,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -8745,9 +9528,9 @@ Tilemap:
   - first: {x: -7, y: 6, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 2
-      m_TileSpriteIndex: 2
-      m_TileMatrixIndex: 1
+      m_TileIndex: 3
+      m_TileSpriteIndex: 3
+      m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
       dummyAlignment: 0
@@ -8891,10 +9674,10 @@ Tilemap:
     m_RefCount: 12
     m_Data: {fileID: 11400000, guid: 5ce90b8ffcede3e4d8ae80ea2cc80d86, type: 2}
   - serializedVersion: 2
-    m_RefCount: 25
+    m_RefCount: 24
     m_Data: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
   - serializedVersion: 2
-    m_RefCount: 13
+    m_RefCount: 14
     m_Data: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
   m_TileSpriteArray:
   - serializedVersion: 2
@@ -8904,14 +9687,14 @@ Tilemap:
     m_RefCount: 12
     m_Data: {fileID: 21300000, guid: 86606810d10263b4f843b0e916cb3a10, type: 3}
   - serializedVersion: 2
-    m_RefCount: 25
+    m_RefCount: 24
     m_Data: {fileID: 21300000, guid: 512d241c3ffefc340a1f5d2b15875c37, type: 3}
   - serializedVersion: 2
-    m_RefCount: 13
+    m_RefCount: 14
     m_Data: {fileID: 21300000, guid: cffa89daff7f85c4cb3446a4fc7d2fbb, type: 3}
   m_TileMatrixArray:
   - serializedVersion: 2
-    m_RefCount: 6
+    m_RefCount: 7
     m_Data:
       e00: -0.5000001
       e01: 0.8660254
@@ -8930,7 +9713,7 @@ Tilemap:
       e32: 0
       e33: 1
   - serializedVersion: 2
-    m_RefCount: 13
+    m_RefCount: 12
     m_Data:
       e00: -1.0000001
       e01: -0.00000015885017
@@ -9212,7 +9995,7 @@ Transform:
   m_GameObject: {fileID: 570950479}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 5.1958594, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -9236,13 +10019,13 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: 6, y: 0, z: 0}
+  currentCellPosition: {x: 0, y: 0, z: 0}
   teamId: -1
   slotIndex: -1
   sector: 9
   constructionId: cidade
   instanceId: 127
-  currentPosition: {x: 5.1958594, y: 0, z: 0}
+  currentPosition: {x: 0, y: 0, z: 0}
   constructionDisplayName: Cidade
   autoApplyOnStart: 1
   siteRuntime:
@@ -10817,6 +11600,143 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 601559980}
   m_CullTransparentMesh: 1
+--- !u!1 &601932020
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 601932021}
+  - component: {fileID: 601932023}
+  - component: {fileID: 601932022}
+  m_Layer: 0
+  m_Name: flag_text
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &601932021
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 601932020}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1203140639}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 30.5}
+  m_SizeDelta: {x: 50, y: 15}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &601932022
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 601932020}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: 20
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 12
+  m_fontSizeBase: 12
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 1
+  m_HorizontalAlignment: 1
+  m_VerticalAlignment: 1024
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_characterHorizontalScale: 1
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_TextWrappingMode: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 0
+  m_ActiveFontFeatures: 6e72656b
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_EmojiFallbackSupport: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &601932023
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 601932020}
+  m_CullTransparentMesh: 1
 --- !u!1 &615868272
 GameObject:
   m_ObjectHideFlags: 0
@@ -11023,6 +11943,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -11493,6 +12414,143 @@ MonoBehaviour:
   includeInvisibleTargets: 1
   lastDump: 
   snapshot: []
+--- !u!1 &688575644
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 688575645}
+  - component: {fileID: 688575647}
+  - component: {fileID: 688575646}
+  m_Layer: 0
+  m_Name: flag_text
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &688575645
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 688575644}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1320362881}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 30.5}
+  m_SizeDelta: {x: 50, y: 15}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &688575646
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 688575644}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: 20
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 12
+  m_fontSizeBase: 12
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 1
+  m_HorizontalAlignment: 1
+  m_VerticalAlignment: 1024
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_characterHorizontalScale: 1
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_TextWrappingMode: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 0
+  m_ActiveFontFeatures: 6e72656b
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_EmojiFallbackSupport: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &688575647
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 688575644}
+  m_CullTransparentMesh: 1
 --- !u!1 &701748288
 GameObject:
   m_ObjectHideFlags: 0
@@ -11558,6 +12616,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -11909,6 +12968,97 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 757943971}
   m_CullTransparentMesh: 1
+--- !u!1 &767827434
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 767827435}
+  - component: {fileID: 767827438}
+  - component: {fileID: 767827437}
+  - component: {fileID: 767827436}
+  m_Layer: 0
+  m_Name: flag_icon
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &767827435
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 767827434}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1320362881}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -30.6, y: 26.9}
+  m_SizeDelta: {x: 12, y: 12}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &767827436
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 767827434}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.5}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
+--- !u!114 &767827437
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 767827434}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: d3df5f58844a5ed4ba49288f1f14251f, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &767827438
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 767827434}
+  m_CullTransparentMesh: 1
 --- !u!1 &797368547
 GameObject:
   m_ObjectHideFlags: 0
@@ -12232,6 +13382,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -12527,6 +13678,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -13167,6 +14319,280 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 847676527}
   m_CullTransparentMesh: 1
+--- !u!1 &857941081
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 857941082}
+  - component: {fileID: 857941084}
+  - component: {fileID: 857941083}
+  m_Layer: 0
+  m_Name: flag_text
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &857941082
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 857941081}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1224904900}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 30.5}
+  m_SizeDelta: {x: 50, y: 15}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &857941083
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 857941081}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: 20
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 12
+  m_fontSizeBase: 12
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 1
+  m_HorizontalAlignment: 1
+  m_VerticalAlignment: 1024
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_characterHorizontalScale: 1
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_TextWrappingMode: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 0
+  m_ActiveFontFeatures: 6e72656b
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_EmojiFallbackSupport: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &857941084
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 857941081}
+  m_CullTransparentMesh: 1
+--- !u!1 &866868177
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 866868178}
+  - component: {fileID: 866868180}
+  - component: {fileID: 866868179}
+  m_Layer: 0
+  m_Name: capture_text
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &866868178
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 866868177}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1083757570}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 3.1000001, y: 3.9000015}
+  m_SizeDelta: {x: 50, y: 15}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &866868179
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 866868177}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: 20/20
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 12
+  m_fontSizeBase: 12
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 1
+  m_HorizontalAlignment: 4
+  m_VerticalAlignment: 1024
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_characterHorizontalScale: 1
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_TextWrappingMode: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 0
+  m_ActiveFontFeatures: 6e72656b
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_EmojiFallbackSupport: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &866868180
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 866868177}
+  m_CullTransparentMesh: 1
 --- !u!1 &893666200
 GameObject:
   m_ObjectHideFlags: 0
@@ -13194,7 +14620,7 @@ Transform:
   m_GameObject: {fileID: 893666200}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -1.2989649, y: -0.75, z: 0}
+  m_LocalPosition: {x: -6.4948244, y: -0.75, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -13218,13 +14644,13 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: -2, y: -1, z: 0}
+  currentCellPosition: {x: -8, y: -1, z: 0}
   teamId: -1
   slotIndex: -1
   sector: 4
   constructionId: cidade
   instanceId: 8
-  currentPosition: {x: -1.2989649, y: -0.75, z: 0}
+  currentPosition: {x: -6.4948244, y: -0.75, z: 0}
   constructionDisplayName: Cidade
   autoApplyOnStart: 1
   siteRuntime:
@@ -13648,6 +15074,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -13928,6 +15355,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -14672,7 +16100,7 @@ Transform:
   m_GameObject: {fileID: 979752349}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -3.8968945, y: -0.75, z: 0}
+  m_LocalPosition: {x: -5.628848, y: -3.75, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -14696,13 +16124,13 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: -5, y: -1, z: 0}
+  currentCellPosition: {x: -7, y: -5, z: 0}
   teamId: -1
   slotIndex: -1
   sector: 2
   constructionId: cidade
   instanceId: 28
-  currentPosition: {x: -3.8968945, y: -0.75, z: 0}
+  currentPosition: {x: -5.628848, y: -3.75, z: 0}
   constructionDisplayName: Cidade
   autoApplyOnStart: 1
   siteRuntime:
@@ -14868,6 +16296,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -15713,6 +17142,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -16145,6 +17575,174 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1080020200}
   m_CullTransparentMesh: 1
+--- !u!1 &1083757569
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1083757570}
+  - component: {fileID: 1083757572}
+  - component: {fileID: 1083757571}
+  m_Layer: 0
+  m_Name: capture_bar
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1083757570
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1083757569}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1683210504}
+  - {fileID: 866868178}
+  m_Father: {fileID: 1224904900}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0.20000002, y: -31.699995}
+  m_SizeDelta: {x: 60, y: 5}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1083757571
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1083757569}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 38af98aab419de84eaf68ce3ca6a1087, type: 3}
+  m_Type: 3
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 0
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1083757572
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1083757569}
+  m_CullTransparentMesh: 1
+--- !u!1 &1090685760
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1090685761}
+  - component: {fileID: 1090685764}
+  - component: {fileID: 1090685763}
+  - component: {fileID: 1090685762}
+  m_Layer: 0
+  m_Name: flag_icon
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &1090685761
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1090685760}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1203140639}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -30.6, y: 26.9}
+  m_SizeDelta: {x: 12, y: 12}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1090685762
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1090685760}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.5}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
+--- !u!114 &1090685763
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1090685760}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: d3df5f58844a5ed4ba49288f1f14251f, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1090685764
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1090685760}
+  m_CullTransparentMesh: 1
 --- !u!1 &1092931802
 GameObject:
   m_ObjectHideFlags: 0
@@ -16220,6 +17818,134 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1092931802}
   m_CullTransparentMesh: 1
+--- !u!1 &1096595050
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1096595051}
+  - component: {fileID: 1096595053}
+  - component: {fileID: 1096595052}
+  m_Layer: 0
+  m_Name: Construction HUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1096595051
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1096595050}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1320362881}
+  m_Father: {fileID: 1291503847}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1096595052
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1096595050}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e9100ad8f547f745b56485cad9b28b6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionHudController
+  capturedContainer: {fileID: 411233361}
+  capturedBarImage: {fileID: 411233362}
+  capturedBarRenderer: {fileID: 0}
+  capturedFillImage: {fileID: 377369603}
+  capturedFillRenderer: {fileID: 0}
+  capturedText: {fileID: 1652348634}
+  hideWhenFull: 0
+  capturedTintWithTeamColor: 0
+  capturedDefaultColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  captured50PercentColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  captured25PercentColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  flagIcon: {fileID: 767827435}
+  flagText: {fileID: 688575646}
+  flagThreatOutlineColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  flagThreatOutlineAlphaMin: 0.12
+  flagThreatOutlineAlphaMax: 0.42
+  flagThreatPulseMinDuration: 0.8
+  flagThreatPulseMaxDuration: 1.2
+  flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
+  applyHudSorting: 1
+  hudSortingLayerName: SFX
+  hudSortingOrder: 60
+--- !u!212 &1096595053
+SpriteRenderer:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1096595050}
+  m_Enabled: 0
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: -994085901
+  m_SortingLayer: 3
+  m_SortingOrder: 5
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 21300000, guid: bce959b8c385ce944acee4b18898b47d, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 0.8652344, y: 1}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
 --- !u!1 &1108241368
 GameObject:
   m_ObjectHideFlags: 0
@@ -16285,6 +18011,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -16589,6 +18316,143 @@ Canvas:
   m_SortingLayerID: 519888321
   m_SortingOrder: 60
   m_TargetDisplay: 0
+--- !u!1 &1160367169
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1160367170}
+  - component: {fileID: 1160367172}
+  - component: {fileID: 1160367171}
+  m_Layer: 0
+  m_Name: capture_text
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1160367170
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1160367169}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1773580549}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 3.1000001, y: 3.9000015}
+  m_SizeDelta: {x: 50, y: 15}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1160367171
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1160367169}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: 20/20
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 12
+  m_fontSizeBase: 12
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 1
+  m_HorizontalAlignment: 4
+  m_VerticalAlignment: 1024
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_characterHorizontalScale: 1
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_TextWrappingMode: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 0
+  m_ActiveFontFeatures: 6e72656b
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_EmojiFallbackSupport: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &1160367172
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1160367169}
+  m_CullTransparentMesh: 1
 --- !u!1 &1161699800
 GameObject:
   m_ObjectHideFlags: 0
@@ -16863,6 +18727,163 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1193159449}
   m_CullTransparentMesh: 1
+--- !u!1 &1195268523
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1195268524}
+  - component: {fileID: 1195268526}
+  - component: {fileID: 1195268525}
+  m_Layer: 0
+  m_Name: Cidade_T-1_C130
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1195268524
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1195268523}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 3.8968945, y: -0.75, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 305367079}
+  m_Father: {fileID: 1888992690}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1195268525
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1195268523}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1abcbdaf8b20e164f9bb22694db65716, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionManager
+  spriteRenderer: {fileID: 1195268526}
+  constructionDatabase: {fileID: 11400000, guid: c98d78d227439ec4997c0fe3200b3bda, type: 2}
+  boardTilemap: {fileID: 1566606925}
+  snapToCellCenter: 1
+  autoSnapWhenMovedInEditor: 1
+  currentCellPosition: {x: 4, y: -1, z: 0}
+  teamId: -1
+  slotIndex: -1
+  sector: 12
+  constructionId: cidade
+  instanceId: 130
+  currentPosition: {x: 3.8968945, y: -0.75, z: 0}
+  constructionDisplayName: Cidade
+  autoApplyOnStart: 1
+  siteRuntime:
+    isPlayerHeadQuarter: 0
+    isVictoryBuilding: 0
+    isCapturable: 1
+    capturePointsMax: 20
+    capturedIncoming: 1000
+    sellingRule: 3
+    legacyCanProduceAndSellUnits: 
+    offeredUnits: []
+    canProvideSupplies: 1
+    offeredSupplies:
+    - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+      quantity: 40
+    - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+      quantity: 20
+    - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+      quantity: 30
+    offeredServices:
+    - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+    - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+    - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  hasSiteRuntimeOverride: 1
+  currentCapturePoints: 20
+  hasInfiniteSuppliesOverride: 1
+  originalOwnerTeamId: -1
+  originalOwnerInitialized: 1
+  firstOwnerTeamId: -1
+  firstOwnerInitialized: 0
+  occupiedByReadyUnitDarkenFactor: 0.4
+  hudController: {fileID: 305367080}
+  matchController: {fileID: 327617512}
+  victoryBuildingOverlayRenderer: {fileID: 0}
+  victoryBuildingOverlaySprite: {fileID: 0}
+  victoryBuildingOverlayColor: {r: 1, g: 0.84, b: 0.22, a: 1}
+  victoryBuildingOverlayLocalPosition: {x: 0, y: 0, z: -0.01}
+  victoryBuildingOverlayLocalScale: {x: 1, y: 1, z: 1}
+  victoryBuildingOverlaySortingOrderOffset: 6
+  continuousEditorVisualRefresh: 0
+--- !u!212 &1195268526
+SpriteRenderer:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1195268523}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: -994085901
+  m_SortingLayer: 3
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 21300000, guid: 5ca4a449521141e49a72d100a0c798b4, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 1, y: 1}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
 --- !u!1 &1197292748
 GameObject:
   m_ObjectHideFlags: 0
@@ -17019,6 +19040,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -17081,6 +19103,111 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!1 &1203140638
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1203140639}
+  - component: {fileID: 1203140642}
+  - component: {fileID: 1203140641}
+  - component: {fileID: 1203140640}
+  m_Layer: 0
+  m_Name: Canvas
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1203140639
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1203140638}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.01, y: 0.01, z: 0.01}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 601932021}
+  - {fileID: 1090685761}
+  - {fileID: 1293092983}
+  m_Father: {fileID: 305367079}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1203140640
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1203140638}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &1203140641
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1203140638}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
+  m_UiScaleMode: 0
+  m_ReferencePixelsPerUnit: 100
+  m_ScaleFactor: 1
+  m_ReferenceResolution: {x: 800, y: 600}
+  m_ScreenMatchMode: 0
+  m_MatchWidthOrHeight: 0
+  m_PhysicalUnit: 3
+  m_FallbackScreenDPI: 96
+  m_DefaultSpriteDPI: 96
+  m_DynamicPixelsPerUnit: 1
+  m_PresetInfoIsWorld: 1
+--- !u!223 &1203140642
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1203140638}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 2
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 1
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 0
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
+  m_AdditionalShaderChannelsFlag: 25
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 519888321
+  m_SortingOrder: 60
+  m_TargetDisplay: 0
 --- !u!1 &1212644953
 GameObject:
   m_ObjectHideFlags: 0
@@ -17536,6 +19663,111 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1216962788}
   m_CullTransparentMesh: 1
+--- !u!1 &1224904899
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1224904900}
+  - component: {fileID: 1224904903}
+  - component: {fileID: 1224904902}
+  - component: {fileID: 1224904901}
+  m_Layer: 0
+  m_Name: Canvas
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1224904900
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1224904899}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.01, y: 0.01, z: 0.01}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 857941082}
+  - {fileID: 1522501901}
+  - {fileID: 1083757570}
+  m_Father: {fileID: 1329360191}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1224904901
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1224904899}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &1224904902
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1224904899}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
+  m_UiScaleMode: 0
+  m_ReferencePixelsPerUnit: 100
+  m_ScaleFactor: 1
+  m_ReferenceResolution: {x: 800, y: 600}
+  m_ScreenMatchMode: 0
+  m_MatchWidthOrHeight: 0
+  m_PhysicalUnit: 3
+  m_FallbackScreenDPI: 96
+  m_DefaultSpriteDPI: 96
+  m_DynamicPixelsPerUnit: 1
+  m_PresetInfoIsWorld: 1
+--- !u!223 &1224904903
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1224904899}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 2
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 1
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 0
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
+  m_AdditionalShaderChannelsFlag: 25
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 519888321
+  m_SortingOrder: 60
+  m_TargetDisplay: 0
 --- !u!1 &1231452009
 GameObject:
   m_ObjectHideFlags: 0
@@ -17563,7 +19795,7 @@ Transform:
   m_GameObject: {fileID: 1231452009}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.2989649, y: -0.75, z: 0}
+  m_LocalPosition: {x: -3.8968945, y: -0.75, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -17587,13 +19819,13 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: 1, y: -1, z: 0}
+  currentCellPosition: {x: -5, y: -1, z: 0}
   teamId: -1
   slotIndex: -1
   sector: 6
   constructionId: cidade
   instanceId: 33
-  currentPosition: {x: 1.2989649, y: -0.75, z: 0}
+  currentPosition: {x: -3.8968945, y: -0.75, z: 0}
   constructionDisplayName: Cidade
   autoApplyOnStart: 1
   siteRuntime:
@@ -18305,6 +20537,163 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1284435476}
   m_CullTransparentMesh: 1
+--- !u!1 &1291503846
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1291503847}
+  - component: {fileID: 1291503849}
+  - component: {fileID: 1291503848}
+  m_Layer: 0
+  m_Name: Cidade_T-1_C129
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1291503847
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1291503846}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 2.5979297, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1096595051}
+  m_Father: {fileID: 1888992690}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1291503848
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1291503846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1abcbdaf8b20e164f9bb22694db65716, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionManager
+  spriteRenderer: {fileID: 1291503849}
+  constructionDatabase: {fileID: 11400000, guid: c98d78d227439ec4997c0fe3200b3bda, type: 2}
+  boardTilemap: {fileID: 1566606925}
+  snapToCellCenter: 1
+  autoSnapWhenMovedInEditor: 1
+  currentCellPosition: {x: 3, y: 0, z: 0}
+  teamId: -1
+  slotIndex: -1
+  sector: 11
+  constructionId: cidade
+  instanceId: 129
+  currentPosition: {x: 2.5979297, y: 0, z: 0}
+  constructionDisplayName: Cidade
+  autoApplyOnStart: 1
+  siteRuntime:
+    isPlayerHeadQuarter: 0
+    isVictoryBuilding: 0
+    isCapturable: 1
+    capturePointsMax: 20
+    capturedIncoming: 1000
+    sellingRule: 3
+    legacyCanProduceAndSellUnits: 
+    offeredUnits: []
+    canProvideSupplies: 1
+    offeredSupplies:
+    - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+      quantity: 40
+    - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+      quantity: 20
+    - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+      quantity: 30
+    offeredServices:
+    - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+    - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+    - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  hasSiteRuntimeOverride: 1
+  currentCapturePoints: 20
+  hasInfiniteSuppliesOverride: 1
+  originalOwnerTeamId: -1
+  originalOwnerInitialized: 1
+  firstOwnerTeamId: -1
+  firstOwnerInitialized: 0
+  occupiedByReadyUnitDarkenFactor: 0.4
+  hudController: {fileID: 1096595052}
+  matchController: {fileID: 327617512}
+  victoryBuildingOverlayRenderer: {fileID: 0}
+  victoryBuildingOverlaySprite: {fileID: 0}
+  victoryBuildingOverlayColor: {r: 1, g: 0.84, b: 0.22, a: 1}
+  victoryBuildingOverlayLocalPosition: {x: 0, y: 0, z: -0.01}
+  victoryBuildingOverlayLocalScale: {x: 1, y: 1, z: 1}
+  victoryBuildingOverlaySortingOrderOffset: 6
+  continuousEditorVisualRefresh: 0
+--- !u!212 &1291503849
+SpriteRenderer:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1291503846}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: -994085901
+  m_SortingLayer: 3
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 21300000, guid: 5ca4a449521141e49a72d100a0c798b4, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 1, y: 1}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
 --- !u!1 &1291847258
 GameObject:
   m_ObjectHideFlags: 0
@@ -18500,6 +20889,83 @@ CanvasRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1293020470}
+  m_CullTransparentMesh: 1
+--- !u!1 &1293092982
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1293092983}
+  - component: {fileID: 1293092985}
+  - component: {fileID: 1293092984}
+  m_Layer: 0
+  m_Name: capture_bar
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1293092983
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1293092982}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1925373449}
+  - {fileID: 366935000}
+  m_Father: {fileID: 1203140639}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0.20000002, y: -31.699995}
+  m_SizeDelta: {x: 60, y: 5}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1293092984
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1293092982}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 38af98aab419de84eaf68ce3ca6a1087, type: 3}
+  m_Type: 3
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 0
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1293092985
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1293092982}
   m_CullTransparentMesh: 1
 --- !u!1 &1306345021
 GameObject:
@@ -18748,6 +21214,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -18901,6 +21368,111 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1318152279}
   m_CullTransparentMesh: 1
+--- !u!1 &1320362880
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1320362881}
+  - component: {fileID: 1320362884}
+  - component: {fileID: 1320362883}
+  - component: {fileID: 1320362882}
+  m_Layer: 0
+  m_Name: Canvas
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1320362881
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1320362880}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.01, y: 0.01, z: 0.01}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 688575645}
+  - {fileID: 767827435}
+  - {fileID: 411233361}
+  m_Father: {fileID: 1096595051}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1320362882
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1320362880}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &1320362883
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1320362880}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
+  m_UiScaleMode: 0
+  m_ReferencePixelsPerUnit: 100
+  m_ScaleFactor: 1
+  m_ReferenceResolution: {x: 800, y: 600}
+  m_ScreenMatchMode: 0
+  m_MatchWidthOrHeight: 0
+  m_PhysicalUnit: 3
+  m_FallbackScreenDPI: 96
+  m_DefaultSpriteDPI: 96
+  m_DynamicPixelsPerUnit: 1
+  m_PresetInfoIsWorld: 1
+--- !u!223 &1320362884
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1320362880}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 2
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 1
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 0
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
+  m_AdditionalShaderChannelsFlag: 25
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 519888321
+  m_SortingOrder: 60
+  m_TargetDisplay: 0
 --- !u!1 &1327819159
 GameObject:
   m_ObjectHideFlags: 0
@@ -19038,6 +21610,134 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1327819159}
   m_CullTransparentMesh: 1
+--- !u!1 &1329360190
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1329360191}
+  - component: {fileID: 1329360193}
+  - component: {fileID: 1329360192}
+  m_Layer: 0
+  m_Name: Construction HUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1329360191
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1329360190}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1224904900}
+  m_Father: {fileID: 1768778301}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1329360192
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1329360190}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e9100ad8f547f745b56485cad9b28b6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionHudController
+  capturedContainer: {fileID: 1083757570}
+  capturedBarImage: {fileID: 1083757571}
+  capturedBarRenderer: {fileID: 0}
+  capturedFillImage: {fileID: 1683210505}
+  capturedFillRenderer: {fileID: 0}
+  capturedText: {fileID: 866868179}
+  hideWhenFull: 0
+  capturedTintWithTeamColor: 0
+  capturedDefaultColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  captured50PercentColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  captured25PercentColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  flagIcon: {fileID: 1522501901}
+  flagText: {fileID: 857941083}
+  flagThreatOutlineColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  flagThreatOutlineAlphaMin: 0.12
+  flagThreatOutlineAlphaMax: 0.42
+  flagThreatPulseMinDuration: 0.8
+  flagThreatPulseMaxDuration: 1.2
+  flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
+  applyHudSorting: 1
+  hudSortingLayerName: SFX
+  hudSortingOrder: 60
+--- !u!212 &1329360193
+SpriteRenderer:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1329360190}
+  m_Enabled: 0
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: -994085901
+  m_SortingLayer: 3
+  m_SortingOrder: 5
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 21300000, guid: bce959b8c385ce944acee4b18898b47d, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 0.8652344, y: 1}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
 --- !u!1 &1330822901
 GameObject:
   m_ObjectHideFlags: 0
@@ -19526,7 +22226,7 @@ Transform:
   m_GameObject: {fileID: 1408437810}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -2.5979295, y: 0, z: 0}
+  m_LocalPosition: {x: 4.3298826, y: -3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -19550,13 +22250,13 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: -3, y: 0, z: 0}
+  currentCellPosition: {x: 5, y: -4, z: 0}
   teamId: -1
   slotIndex: -1
   sector: 3
   constructionId: cidade
   instanceId: 9
-  currentPosition: {x: -2.5979295, y: 0, z: 0}
+  currentPosition: {x: 4.3298826, y: -3, z: 0}
   constructionDisplayName: Cidade
   autoApplyOnStart: 1
   siteRuntime:
@@ -19859,6 +22559,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -20597,7 +23298,7 @@ Transform:
   m_GameObject: {fileID: 1490324603}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -5.1958594, y: 0, z: 0}
+  m_LocalPosition: {x: 4.3298826, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -20621,13 +23322,13 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: -6, y: 0, z: 0}
+  currentCellPosition: {x: 5, y: 4, z: 0}
   teamId: -1
   slotIndex: -1
   sector: 1
   constructionId: cidade
   instanceId: 34
-  currentPosition: {x: -5.1958594, y: 0, z: 0}
+  currentPosition: {x: 4.3298826, y: 3, z: 0}
   constructionDisplayName: Cidade
   autoApplyOnStart: 1
   siteRuntime:
@@ -20925,7 +23626,7 @@ Transform:
   m_GameObject: {fileID: 1510675136}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 2.5979297, y: 0, z: 0}
+  m_LocalPosition: {x: -2.5979295, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -20949,13 +23650,13 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: 3, y: 0, z: 0}
+  currentCellPosition: {x: -3, y: 0, z: 0}
   teamId: -1
   slotIndex: -1
   sector: 7
   constructionId: cidade
   instanceId: 125
-  currentPosition: {x: 2.5979297, y: 0, z: 0}
+  currentPosition: {x: -2.5979295, y: 0, z: 0}
   constructionDisplayName: Cidade
   autoApplyOnStart: 1
   siteRuntime:
@@ -21055,6 +23756,97 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!1 &1522501900
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1522501901}
+  - component: {fileID: 1522501904}
+  - component: {fileID: 1522501903}
+  - component: {fileID: 1522501902}
+  m_Layer: 0
+  m_Name: flag_icon
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &1522501901
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1522501900}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1224904900}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -30.6, y: 26.9}
+  m_SizeDelta: {x: 12, y: 12}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1522501902
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1522501900}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.5}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
+--- !u!114 &1522501903
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1522501900}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: d3df5f58844a5ed4ba49288f1f14251f, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1522501904
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1522501900}
+  m_CullTransparentMesh: 1
 --- !u!1 &1523410034
 GameObject:
   m_ObjectHideFlags: 0
@@ -21237,6 +24029,111 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1531363283}
   m_CullTransparentMesh: 1
+--- !u!1 &1533042745
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1533042746}
+  - component: {fileID: 1533042749}
+  - component: {fileID: 1533042748}
+  - component: {fileID: 1533042747}
+  m_Layer: 0
+  m_Name: Canvas
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1533042746
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1533042745}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.01, y: 0.01, z: 0.01}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1727822701}
+  - {fileID: 1832708431}
+  - {fileID: 1773580549}
+  m_Father: {fileID: 117626049}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1533042747
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1533042745}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &1533042748
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1533042745}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
+  m_UiScaleMode: 0
+  m_ReferencePixelsPerUnit: 100
+  m_ScaleFactor: 1
+  m_ReferenceResolution: {x: 800, y: 600}
+  m_ScreenMatchMode: 0
+  m_MatchWidthOrHeight: 0
+  m_PhysicalUnit: 3
+  m_FallbackScreenDPI: 96
+  m_DefaultSpriteDPI: 96
+  m_DynamicPixelsPerUnit: 1
+  m_PresetInfoIsWorld: 1
+--- !u!223 &1533042749
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1533042745}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 2
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 1
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 0
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
+  m_AdditionalShaderChannelsFlag: 25
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 519888321
+  m_SortingOrder: 60
+  m_TargetDisplay: 0
 --- !u!1 &1538635561
 GameObject:
   m_ObjectHideFlags: 0
@@ -21482,6 +24379,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -25440,6 +28338,143 @@ MonoBehaviour:
   - category: 9
     enabled: 0
     maxLevel: 2
+--- !u!1 &1652348632
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1652348633}
+  - component: {fileID: 1652348635}
+  - component: {fileID: 1652348634}
+  m_Layer: 0
+  m_Name: capture_text
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1652348633
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1652348632}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 411233361}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 3.1000001, y: 3.9000015}
+  m_SizeDelta: {x: 50, y: 15}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1652348634
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1652348632}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: 20/20
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 12
+  m_fontSizeBase: 12
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 1
+  m_HorizontalAlignment: 4
+  m_VerticalAlignment: 1024
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_characterHorizontalScale: 1
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_TextWrappingMode: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 0
+  m_ActiveFontFeatures: 6e72656b
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_EmojiFallbackSupport: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &1652348635
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1652348632}
+  m_CullTransparentMesh: 1
 --- !u!1 &1668952888
 GameObject:
   m_ObjectHideFlags: 0
@@ -25735,6 +28770,81 @@ MonoBehaviour:
   snapshotTelemetryVerboseContext: 0
   enableReplayRuntimeLogs: 1
   enableReplayRuntimeWarnings: 1
+--- !u!1 &1683210503
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1683210504}
+  - component: {fileID: 1683210506}
+  - component: {fileID: 1683210505}
+  m_Layer: 0
+  m_Name: capture
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1683210504
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1683210503}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1083757570}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 58, y: 4}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1683210505
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1683210503}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 38af98aab419de84eaf68ce3ca6a1087, type: 3}
+  m_Type: 3
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 0
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1683210506
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1683210503}
+  m_CullTransparentMesh: 1
 --- !u!1 &1683438217
 GameObject:
   m_ObjectHideFlags: 0
@@ -25762,7 +28872,7 @@ Transform:
   m_GameObject: {fileID: 1683438217}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 3.8968945, y: -0.75, z: 0}
+  m_LocalPosition: {x: -1.2989649, y: -0.75, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -25786,13 +28896,13 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: 4, y: -1, z: 0}
+  currentCellPosition: {x: -2, y: -1, z: 0}
   teamId: -1
   slotIndex: -1
   sector: 8
   constructionId: cidade
   instanceId: 126
-  currentPosition: {x: 3.8968945, y: -0.75, z: 0}
+  currentPosition: {x: -1.2989649, y: -0.75, z: 0}
   constructionDisplayName: Cidade
   autoApplyOnStart: 1
   siteRuntime:
@@ -26498,6 +29608,143 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1724058154}
   m_CullTransparentMesh: 1
+--- !u!1 &1727822700
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1727822701}
+  - component: {fileID: 1727822703}
+  - component: {fileID: 1727822702}
+  m_Layer: 0
+  m_Name: flag_text
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &1727822701
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1727822700}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1533042746}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 30.5}
+  m_SizeDelta: {x: 50, y: 15}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1727822702
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1727822700}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: 20
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 12
+  m_fontSizeBase: 12
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 1
+  m_HorizontalAlignment: 1
+  m_VerticalAlignment: 1024
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_characterHorizontalScale: 1
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_TextWrappingMode: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 0
+  m_ActiveFontFeatures: 6e72656b
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_EmojiFallbackSupport: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &1727822703
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1727822700}
+  m_CullTransparentMesh: 1
 --- !u!1 &1735959158
 GameObject:
   m_ObjectHideFlags: 0
@@ -27026,6 +30273,240 @@ CanvasRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1748163839}
+  m_CullTransparentMesh: 1
+--- !u!1 &1768778300
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1768778301}
+  - component: {fileID: 1768778303}
+  - component: {fileID: 1768778302}
+  m_Layer: 0
+  m_Name: Cidade_T-1_C128
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1768778301
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1768778300}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 1.2989649, y: -0.75, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1329360191}
+  m_Father: {fileID: 1888992690}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1768778302
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1768778300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1abcbdaf8b20e164f9bb22694db65716, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionManager
+  spriteRenderer: {fileID: 1768778303}
+  constructionDatabase: {fileID: 11400000, guid: c98d78d227439ec4997c0fe3200b3bda, type: 2}
+  boardTilemap: {fileID: 1566606925}
+  snapToCellCenter: 1
+  autoSnapWhenMovedInEditor: 1
+  currentCellPosition: {x: 1, y: -1, z: 0}
+  teamId: -1
+  slotIndex: -1
+  sector: 10
+  constructionId: cidade
+  instanceId: 128
+  currentPosition: {x: 1.2989649, y: -0.75, z: 0}
+  constructionDisplayName: Cidade
+  autoApplyOnStart: 1
+  siteRuntime:
+    isPlayerHeadQuarter: 0
+    isVictoryBuilding: 0
+    isCapturable: 1
+    capturePointsMax: 20
+    capturedIncoming: 1000
+    sellingRule: 3
+    legacyCanProduceAndSellUnits: 
+    offeredUnits: []
+    canProvideSupplies: 1
+    offeredSupplies:
+    - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+      quantity: 40
+    - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+      quantity: 20
+    - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+      quantity: 30
+    offeredServices:
+    - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+    - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+    - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  hasSiteRuntimeOverride: 1
+  currentCapturePoints: 20
+  hasInfiniteSuppliesOverride: 1
+  originalOwnerTeamId: -1
+  originalOwnerInitialized: 1
+  firstOwnerTeamId: -1
+  firstOwnerInitialized: 0
+  occupiedByReadyUnitDarkenFactor: 0.4
+  hudController: {fileID: 1329360192}
+  matchController: {fileID: 327617512}
+  victoryBuildingOverlayRenderer: {fileID: 0}
+  victoryBuildingOverlaySprite: {fileID: 0}
+  victoryBuildingOverlayColor: {r: 1, g: 0.84, b: 0.22, a: 1}
+  victoryBuildingOverlayLocalPosition: {x: 0, y: 0, z: -0.01}
+  victoryBuildingOverlayLocalScale: {x: 1, y: 1, z: 1}
+  victoryBuildingOverlaySortingOrderOffset: 6
+  continuousEditorVisualRefresh: 0
+--- !u!212 &1768778303
+SpriteRenderer:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1768778300}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: -994085901
+  m_SortingLayer: 3
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 21300000, guid: 5ca4a449521141e49a72d100a0c798b4, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 1, y: 1}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
+--- !u!1 &1773580548
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1773580549}
+  - component: {fileID: 1773580551}
+  - component: {fileID: 1773580550}
+  m_Layer: 0
+  m_Name: capture_bar
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1773580549
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1773580548}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 462739133}
+  - {fileID: 1160367170}
+  m_Father: {fileID: 1533042746}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0.20000002, y: -31.699995}
+  m_SizeDelta: {x: 60, y: 5}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1773580550
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1773580548}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 38af98aab419de84eaf68ce3ca6a1087, type: 3}
+  m_Type: 3
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 0
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1773580551
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1773580548}
   m_CullTransparentMesh: 1
 --- !u!1 &1776775224
 GameObject:
@@ -27640,6 +31121,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -27915,6 +31397,97 @@ CanvasRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1832337722}
+  m_CullTransparentMesh: 1
+--- !u!1 &1832708430
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1832708431}
+  - component: {fileID: 1832708434}
+  - component: {fileID: 1832708433}
+  - component: {fileID: 1832708432}
+  m_Layer: 0
+  m_Name: flag_icon
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &1832708431
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1832708430}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 10}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1533042746}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -30.6, y: 26.9}
+  m_SizeDelta: {x: 12, y: 12}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1832708432
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1832708430}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.5}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
+--- !u!114 &1832708433
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1832708430}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: d3df5f58844a5ed4ba49288f1f14251f, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1832708434
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1832708430}
   m_CullTransparentMesh: 1
 --- !u!1 &1845686530
 GameObject:
@@ -28659,6 +32232,10 @@ Transform:
   - {fileID: 1510675137}
   - {fileID: 1683438218}
   - {fileID: 570950480}
+  - {fileID: 1768778301}
+  - {fileID: 1291503847}
+  - {fileID: 1195268524}
+  - {fileID: 226372600}
   m_Father: {fileID: 1336167666}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1899427097
@@ -28713,7 +32290,7 @@ MonoBehaviour:
   sectorInfos:
   - sector: 0
     representativeConstruction: {fileID: 389740650}
-    representativeCell: {x: -8, y: -1, z: 0}
+    representativeCell: {x: -7, y: 3, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -28726,86 +32303,86 @@ MonoBehaviour:
     constructions:
     - instanceId: 10
       displayName: Cidade
-      cell: {x: -8, y: -1, z: 0}
+      cell: {x: -7, y: 3, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 389740650}
     riskEntries:
     - Team: 1
-      RiskRatio: 0.53
-      RiskLevel: 2
+      RiskRatio: 0.65
+      RiskLevel: 3
     - Team: 0
-      RiskRatio: 0.47
-      RiskLevel: 2
+      RiskRatio: 0.35
+      RiskLevel: 1
     sectorDistances:
     - Team: 1
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 10
+        Distance: 11
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 121
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 123
-        Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 122
+        InstanceId: 124
         Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 121
         Distance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 7
+        InstanceId: 123
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 14
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 13
         IsHQ: 0
     - Team: 0
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 9
+        Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 116
-        Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 117
-        Distance: 10
+        Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 120
-        Distance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 7
+        Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 94
-        Distance: 6
+        Distance: 3
         IsHQ: 0
-    closestNeighbor1: 1
-    closestNeighbor1Distance: 2
-    closestNeighbor2: 2
-    closestNeighbor2Distance: 3
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 4
+        IsHQ: 0
+    closestNeighbor1: 5
+    closestNeighbor1Distance: 3
+    closestNeighbor2: 4
+    closestNeighbor2Distance: 4
   - sector: 1
     representativeConstruction: {fileID: 1490324605}
-    representativeCell: {x: -6, y: 0, z: 0}
+    representativeCell: {x: 5, y: 4, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -28818,48 +32395,48 @@ MonoBehaviour:
     constructions:
     - instanceId: 34
       displayName: Cidade
-      cell: {x: -6, y: 0, z: 0}
+      cell: {x: 5, y: 4, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 1490324605}
     riskEntries:
     - Team: 1
-      RiskRatio: 0.56
+      RiskRatio: 0.59
       RiskLevel: 2
     - Team: 0
-      RiskRatio: 0.44
+      RiskRatio: 0.41
       RiskLevel: 2
     sectorDistances:
     - Team: 1
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 9
+        Distance: 10
         IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 13
+        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 121
         Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 123
         Distance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 123
-        Distance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 122
-        Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 98
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 6
+        InstanceId: 99
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 10
         IsHQ: 0
     - Team: 0
       Entries:
@@ -28868,36 +32445,36 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 116
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 117
         Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 120
-        Distance: 10
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 5
+        Distance: 4
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 94
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
         Distance: 5
         IsHQ: 0
-    closestNeighbor1: 0
-    closestNeighbor1Distance: 2
-    closestNeighbor2: 2
-    closestNeighbor2Distance: 2
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 9
+        IsHQ: 0
+    closestNeighbor1: 11
+    closestNeighbor1Distance: 4
+    closestNeighbor2: 13
+    closestNeighbor2Distance: 4
   - sector: 2
     representativeConstruction: {fileID: 979752351}
-    representativeCell: {x: -5, y: -1, z: 0}
+    representativeCell: {x: -7, y: -5, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -28910,17 +32487,17 @@ MonoBehaviour:
     constructions:
     - instanceId: 28
       displayName: Cidade
-      cell: {x: -5, y: -1, z: 0}
+      cell: {x: -7, y: -5, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 979752351}
     riskEntries:
     - Team: 1
-      RiskRatio: 0.54
+      RiskRatio: 0.41
       RiskLevel: 2
     - Team: 0
-      RiskRatio: 0.46
+      RiskRatio: 0.59
       RiskLevel: 2
     sectorDistances:
     - Team: 1
@@ -28930,12 +32507,12 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 121
-        Distance: 8
+        InstanceId: 124
+        Distance: 4
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 10
+        InstanceId: 121
+        Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 123
@@ -28946,50 +32523,50 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 9
+        InstanceId: 99
+        Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 5
+        InstanceId: 98
+        Distance: 9
         IsHQ: 0
     - Team: 0
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 6
+        Distance: 10
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 116
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 117
-        Distance: 7
+        Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 120
-        Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 6
+        Distance: 13
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 94
-        Distance: 6
+        Distance: 10
         IsHQ: 0
-    closestNeighbor1: 1
-    closestNeighbor1Distance: 2
-    closestNeighbor2: 3
-    closestNeighbor2Distance: 2
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 10
+        IsHQ: 0
+    closestNeighbor1: 4
+    closestNeighbor1Distance: 4
+    closestNeighbor2: 6
+    closestNeighbor2Distance: 4
   - sector: 3
     representativeConstruction: {fileID: 1408437812}
-    representativeCell: {x: -3, y: 0, z: 0}
+    representativeCell: {x: 5, y: -4, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -29002,18 +32579,18 @@ MonoBehaviour:
     constructions:
     - instanceId: 9
       displayName: Cidade
-      cell: {x: -3, y: 0, z: 0}
+      cell: {x: 5, y: -4, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 1408437812}
     riskEntries:
     - Team: 1
-      RiskRatio: 0.55
-      RiskLevel: 2
+      RiskRatio: 0.35
+      RiskLevel: 1
     - Team: 0
-      RiskRatio: 0.45
-      RiskLevel: 2
+      RiskRatio: 0.65
+      RiskLevel: 3
     sectorDistances:
     - Team: 1
       Entries:
@@ -29022,66 +32599,66 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 121
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
         Distance: 7
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 99
-        Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 123
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 122
-        Distance: 6
+        Distance: 3
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 98
-        Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 6
+        Distance: 4
         IsHQ: 0
     - Team: 0
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 5
+        Distance: 11
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 116
-        Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 117
-        Distance: 5
+        Distance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 120
-        Distance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 5
+        Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 94
-        Distance: 5
+        Distance: 14
         IsHQ: 0
-    closestNeighbor1: 2
-    closestNeighbor1Distance: 2
-    closestNeighbor2: 4
-    closestNeighbor2Distance: 2
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 13
+        IsHQ: 0
+    closestNeighbor1: 12
+    closestNeighbor1Distance: 3
+    closestNeighbor2: 11
+    closestNeighbor2Distance: 4
   - sector: 4
     representativeConstruction: {fileID: 893666202}
-    representativeCell: {x: -2, y: -1, z: 0}
+    representativeCell: {x: -8, y: -1, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -29094,86 +32671,86 @@ MonoBehaviour:
     constructions:
     - instanceId: 8
       displayName: Cidade
-      cell: {x: -2, y: -1, z: 0}
+      cell: {x: -8, y: -1, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 893666202}
     riskEntries:
     - Team: 1
-      RiskRatio: 0.45
+      RiskRatio: 0.53
       RiskLevel: 2
     - Team: 0
-      RiskRatio: 0.55
+      RiskRatio: 0.47
       RiskLevel: 2
     sectorDistances:
     - Team: 1
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 5
+        Distance: 10
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 121
-        Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 124
         Distance: 7
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 123
-        Distance: 5
+        Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 122
-        Distance: 5
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 13
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 98
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 5
+        Distance: 12
         IsHQ: 0
     - Team: 0
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 6
+        Distance: 9
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 116
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 117
-        Distance: 6
+        Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 120
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 6
+        Distance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 94
         Distance: 6
         IsHQ: 0
-    closestNeighbor1: 3
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 7
+        IsHQ: 0
+    closestNeighbor1: 5
     closestNeighbor1Distance: 2
-    closestNeighbor2: 5
-    closestNeighbor2Distance: 2
+    closestNeighbor2: 6
+    closestNeighbor2Distance: 3
   - sector: 5
     representativeConstruction: {fileID: 294939977}
-    representativeCell: {x: 0, y: 0, z: 0}
+    representativeCell: {x: -6, y: 0, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -29186,78 +32763,78 @@ MonoBehaviour:
     constructions:
     - instanceId: 11
       displayName: Cidade
-      cell: {x: 0, y: 0, z: 0}
+      cell: {x: -6, y: 0, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 294939977}
     riskEntries:
     - Team: 1
-      RiskRatio: 0.55
+      RiskRatio: 0.56
       RiskLevel: 2
     - Team: 0
-      RiskRatio: 0.45
+      RiskRatio: 0.44
       RiskLevel: 2
     sectorDistances:
     - Team: 1
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 6
+        Distance: 9
         IsHQ: 1
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 121
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 123
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 122
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 6
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 124
         Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 11
         IsHQ: 0
     - Team: 0
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 5
+        Distance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 5
+        InstanceId: 116
+        Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 116
+        InstanceId: 120
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 117
-        Distance: 5
+        Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 5
+        InstanceId: 119
+        Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 95
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 7
+        Distance: 5
         IsHQ: 0
     closestNeighbor1: 4
     closestNeighbor1Distance: 2
@@ -29265,7 +32842,7 @@ MonoBehaviour:
     closestNeighbor2Distance: 2
   - sector: 6
     representativeConstruction: {fileID: 1231452011}
-    representativeCell: {x: 1, y: -1, z: 0}
+    representativeCell: {x: -5, y: -1, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
     totalCurrentCapturePoints: 20
@@ -29278,11 +32855,195 @@ MonoBehaviour:
     constructions:
     - instanceId: 33
       displayName: Cidade
-      cell: {x: 1, y: -1, z: 0}
+      cell: {x: -5, y: -1, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 1231452011}
+    riskEntries:
+    - Team: 1
+      RiskRatio: 0.54
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.46
+      RiskLevel: 2
+    sectorDistances:
+    - Team: 1
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 7
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 9
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 6
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 6
+        IsHQ: 0
+    closestNeighbor1: 5
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 7
+    closestNeighbor2Distance: 2
+  - sector: 7
+    representativeConstruction: {fileID: 1510675138}
+    representativeCell: {x: -3, y: 0, z: 0}
+    representativeLabel: Cidade
+    totalCapturePointsMax: 20
+    totalCurrentCapturePoints: 20
+    constructionCount: 1
+    isFullyControlled: 1
+    isDisputed: 0
+    hasPartialCapture: 0
+    controllingTeam: -1
+    statusText: Controlado por neutro
+    constructions:
+    - instanceId: 125
+      displayName: Cidade
+      cell: {x: -3, y: 0, z: 0}
+      ownerTeam: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 1510675138}
+    riskEntries:
+    - Team: 1
+      RiskRatio: 0.55
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.45
+      RiskLevel: 2
+    sectorDistances:
+    - Team: 1
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 6
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 8
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 5
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 5
+        IsHQ: 0
+    closestNeighbor1: 6
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 8
+    closestNeighbor2Distance: 2
+  - sector: 8
+    representativeConstruction: {fileID: 1683438219}
+    representativeCell: {x: -2, y: -1, z: 0}
+    representativeLabel: Cidade
+    totalCapturePointsMax: 20
+    totalCurrentCapturePoints: 20
+    constructionCount: 1
+    isFullyControlled: 1
+    isDisputed: 0
+    hasPartialCapture: 0
+    controllingTeam: -1
+    statusText: Controlado por neutro
+    constructions:
+    - instanceId: 126
+      displayName: Cidade
+      cell: {x: -2, y: -1, z: 0}
+      ownerTeam: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 1683438219}
     riskEntries:
     - Team: 1
       RiskRatio: 0.45
@@ -29298,11 +33059,195 @@ MonoBehaviour:
         Distance: 5
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 121
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 99
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 6
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 6
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 6
+        IsHQ: 0
+    closestNeighbor1: 7
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 9
+    closestNeighbor2Distance: 2
+  - sector: 9
+    representativeConstruction: {fileID: 570950481}
+    representativeCell: {x: 0, y: 0, z: 0}
+    representativeLabel: Cidade
+    totalCapturePointsMax: 20
+    totalCurrentCapturePoints: 20
+    constructionCount: 1
+    isFullyControlled: 1
+    isDisputed: 0
+    hasPartialCapture: 0
+    controllingTeam: -1
+    statusText: Controlado por neutro
+    constructions:
+    - instanceId: 127
+      displayName: Cidade
+      cell: {x: 0, y: 0, z: 0}
+      ownerTeam: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 570950481}
+    riskEntries:
+    - Team: 1
+      RiskRatio: 0.55
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.45
+      RiskLevel: 2
+    sectorDistances:
+    - Team: 1
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 6
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 123
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 122
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 99
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 98
+        Distance: 6
+        IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 5
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 6
+        IsHQ: 0
+    closestNeighbor1: 8
+    closestNeighbor1Distance: 2
+    closestNeighbor2: 10
+    closestNeighbor2Distance: 2
+  - sector: 10
+    representativeConstruction: {fileID: 1768778302}
+    representativeCell: {x: 1, y: -1, z: 0}
+    representativeLabel: Cidade
+    totalCapturePointsMax: 20
+    totalCurrentCapturePoints: 20
+    constructionCount: 1
+    isFullyControlled: 1
+    isDisputed: 0
+    hasPartialCapture: 0
+    controllingTeam: -1
+    statusText: Controlado por neutro
+    constructions:
+    - instanceId: 128
+      displayName: Cidade
+      cell: {x: 1, y: -1, z: 0}
+      ownerTeam: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 1768778302}
+    riskEntries:
+    - Team: 1
+      RiskRatio: 0.45
+      RiskLevel: 2
+    - Team: 0
+      RiskRatio: 0.55
+      RiskLevel: 2
+    sectorDistances:
+    - Team: 1
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 5
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 121
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -29314,12 +33259,12 @@ MonoBehaviour:
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 99
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 7
+        InstanceId: 98
+        Distance: 5
         IsHQ: 0
     - Team: 0
       Entries:
@@ -29328,35 +33273,35 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 117
-        Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 120
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 94
         Distance: 9
         IsHQ: 0
-    closestNeighbor1: 5
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 8
+        IsHQ: 0
+    closestNeighbor1: 9
     closestNeighbor1Distance: 2
-    closestNeighbor2: 7
+    closestNeighbor2: 11
     closestNeighbor2Distance: 2
-  - sector: 7
-    representativeConstruction: {fileID: 1510675138}
+  - sector: 11
+    representativeConstruction: {fileID: 1291503848}
     representativeCell: {x: 3, y: 0, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
@@ -29368,13 +33313,13 @@ MonoBehaviour:
     controllingTeam: -1
     statusText: Controlado por neutro
     constructions:
-    - instanceId: 125
+    - instanceId: 129
       displayName: Cidade
       cell: {x: 3, y: 0, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
-      source: {fileID: 1510675138}
+      source: {fileID: 1291503848}
     riskEntries:
     - Team: 1
       RiskRatio: 0.46
@@ -29390,11 +33335,11 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 121
-        Distance: 6
+        InstanceId: 124
+        Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 121
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -29406,12 +33351,12 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 99
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 9
+        InstanceId: 98
+        Distance: 6
         IsHQ: 0
     - Team: 0
       Entries:
@@ -29420,35 +33365,35 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 117
-        Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 120
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 94
         Distance: 10
         IsHQ: 0
-    closestNeighbor1: 6
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 9
+        IsHQ: 0
+    closestNeighbor1: 10
     closestNeighbor1Distance: 2
-    closestNeighbor2: 8
+    closestNeighbor2: 12
     closestNeighbor2Distance: 2
-  - sector: 8
-    representativeConstruction: {fileID: 1683438219}
+  - sector: 12
+    representativeConstruction: {fileID: 1195268525}
     representativeCell: {x: 4, y: -1, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
@@ -29460,13 +33405,13 @@ MonoBehaviour:
     controllingTeam: -1
     statusText: Controlado por neutro
     constructions:
-    - instanceId: 126
+    - instanceId: 130
       displayName: Cidade
       cell: {x: 4, y: -1, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
-      source: {fileID: 1683438219}
+      source: {fileID: 1195268525}
     riskEntries:
     - Team: 1
       RiskRatio: 0.44
@@ -29482,12 +33427,12 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 121
-        Distance: 6
+        InstanceId: 124
+        Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 5
+        InstanceId: 121
+        Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 123
@@ -29498,12 +33443,12 @@ MonoBehaviour:
         Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 99
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 10
+        InstanceId: 98
+        Distance: 5
         IsHQ: 0
     - Team: 0
       Entries:
@@ -29512,35 +33457,35 @@ MonoBehaviour:
         Distance: 9
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 10
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 117
-        Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 120
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 94
         Distance: 12
         IsHQ: 0
-    closestNeighbor1: 7
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 11
+        IsHQ: 0
+    closestNeighbor1: 11
     closestNeighbor1Distance: 2
-    closestNeighbor2: 9
+    closestNeighbor2: 13
     closestNeighbor2Distance: 2
-  - sector: 9
-    representativeConstruction: {fileID: 570950481}
+  - sector: 13
+    representativeConstruction: {fileID: 226372601}
     representativeCell: {x: 6, y: 0, z: 0}
     representativeLabel: Cidade
     totalCapturePointsMax: 20
@@ -29552,13 +33497,13 @@ MonoBehaviour:
     controllingTeam: -1
     statusText: Controlado por neutro
     constructions:
-    - instanceId: 127
+    - instanceId: 131
       displayName: Cidade
       cell: {x: 6, y: 0, z: 0}
       ownerTeam: -1
       currentCapturePoints: 20
       capturePointsMax: 20
-      source: {fileID: 570950481}
+      source: {fileID: 226372601}
     riskEntries:
     - Team: 1
       RiskRatio: 0.47
@@ -29574,12 +33519,12 @@ MonoBehaviour:
         Distance: 9
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 121
-        Distance: 8
+        InstanceId: 124
+        Distance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 6
+        InstanceId: 121
+        Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 123
@@ -29590,12 +33535,12 @@ MonoBehaviour:
         Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 7
+        InstanceId: 99
+        Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 12
+        InstanceId: 98
+        Distance: 7
         IsHQ: 0
     - Team: 0
       Entries:
@@ -29604,32 +33549,32 @@ MonoBehaviour:
         Distance: 10
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 117
-        Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 120
         Distance: 7
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 94
         Distance: 13
         IsHQ: 0
-    closestNeighbor1: 8
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 12
+        IsHQ: 0
+    closestNeighbor1: 12
     closestNeighbor1Distance: 2
-    closestNeighbor2: 7
+    closestNeighbor2: 11
     closestNeighbor2Distance: 3
   baseInfos:
   - sector: 100
@@ -29709,11 +33654,11 @@ MonoBehaviour:
         Distance: 11
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 121
+        InstanceId: 124
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 121
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -29725,11 +33670,11 @@ MonoBehaviour:
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 99
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
+        InstanceId: 98
         Distance: 11
         IsHQ: 0
     - Team: 0
@@ -29739,15 +33684,7 @@ MonoBehaviour:
         Distance: 0
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 2
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 116
-        Distance: 1
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 117
         Distance: 1
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -29755,12 +33692,20 @@ MonoBehaviour:
         Distance: 3
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
+        InstanceId: 94
+        Distance: 3
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 1
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
         Distance: 2
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 3
+        InstanceId: 95
+        Distance: 2
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -29843,12 +33788,12 @@ MonoBehaviour:
         Distance: 0
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 121
-        Distance: 1
+        InstanceId: 124
+        Distance: 3
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 3
+        InstanceId: 121
+        Distance: 1
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 123
@@ -29859,12 +33804,12 @@ MonoBehaviour:
         Distance: 1
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 2
+        InstanceId: 99
+        Distance: 3
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 3
+        InstanceId: 98
+        Distance: 2
         IsHQ: 0
     - Team: 0
       Entries:
@@ -29873,15 +33818,7 @@ MonoBehaviour:
         Distance: 11
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 116
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 117
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -29889,11 +33826,19 @@ MonoBehaviour:
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
+        InstanceId: 94
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 94
+        InstanceId: 117
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 95
         Distance: 11
         IsHQ: 0
     closestNeighbor1: 0
@@ -30311,6 +34256,81 @@ MonoBehaviour:
   manualCellPosition: {x: 9, y: -6, z: 0}
   spawnMapListOnStart: 0
   mapSpawnEntries: []
+--- !u!1 &1925373448
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1925373449}
+  - component: {fileID: 1925373451}
+  - component: {fileID: 1925373450}
+  m_Layer: 0
+  m_Name: capture
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1925373449
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1925373448}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1293092983}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 58, y: 4}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1925373450
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1925373448}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 38af98aab419de84eaf68ce3ca6a1087, type: 3}
+  m_Type: 3
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 0
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1925373451
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1925373448}
+  m_CullTransparentMesh: 1
 --- !u!1 &1929172199
 GameObject:
   m_ObjectHideFlags: 0
@@ -30467,6 +34487,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -30576,7 +34597,7 @@ MonoBehaviour:
   constructionDatabase: {fileID: 11400000, guid: c98d78d227439ec4997c0fe3200b3bda, type: 2}
   constructionFieldDatabase: {fileID: 0}
   matchController: {fileID: 327617512}
-  currentId: 128
+  currentId: 132
   constructionPrefab: {fileID: 6576751892175530090, guid: 13117a41645b28b4fba41de10ae420eb, type: 3}
   boardTilemap: {fileID: 1566606925}
   spawnParent: {fileID: 1888992690}
@@ -30728,6 +34749,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -31083,6 +35105,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -31855,6 +35878,7 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60

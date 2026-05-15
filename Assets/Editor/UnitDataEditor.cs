@@ -59,6 +59,7 @@ public class UnitDataEditor : Editor
             "visao",
             "visionSpecializations",
             "eliteLevel",
+            "eliteFrom",
             "combatModifiers",
             "skills",
             "domain",
@@ -81,6 +82,7 @@ public class UnitDataEditor : Editor
             "bazookaTargetPriority",
             "aiUnitProfile",
             "aiInitiative",
+            "aiPurchaseMode",
             "aiTargetPreferenceByClass",
             "aiSensorPriority",
             "prioritizeDpqAtBattle",
@@ -147,10 +149,13 @@ public class UnitDataEditor : Editor
         EditorGUILayout.LabelField("AI", EditorStyles.boldLabel);
 
         SerializedProperty aiInitiativeProp      = serializedObject.FindProperty("aiInitiative");
+        SerializedProperty aiPurchaseModeProp    = serializedObject.FindProperty("aiPurchaseMode");
         SerializedProperty aiTargetPrefProp      = serializedObject.FindProperty("aiTargetPreferenceByClass");
         SerializedProperty sensorPriorityProp    = serializedObject.FindProperty("aiSensorPriority");
         if (aiInitiativeProp != null)
             EditorGUILayout.PropertyField(aiInitiativeProp, new GUIContent("Ai Initiative"));
+        if (aiPurchaseModeProp != null)
+            EditorGUILayout.PropertyField(aiPurchaseModeProp, new GUIContent("Purchase Mode"));
         if (aiTargetPrefProp != null)
             DrawAiTargetPreferenceByClassSection(aiTargetPrefProp);
 
@@ -672,11 +677,15 @@ public class UnitDataEditor : Editor
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Training & Abilities", EditorStyles.boldLabel);
 
-        SerializedProperty eliteLevelProperty = serializedObject.FindProperty("eliteLevel");
-        SerializedProperty skillsProperty = serializedObject.FindProperty("skills");
+        SerializedProperty eliteLevelProperty    = serializedObject.FindProperty("eliteLevel");
+        SerializedProperty eliteFromProperty     = serializedObject.FindProperty("eliteFrom");
+        SerializedProperty skillsProperty        = serializedObject.FindProperty("skills");
         SerializedProperty combatModifiersProperty = serializedObject.FindProperty("combatModifiers");
 
-        if (eliteLevelProperty != null) EditorGUILayout.PropertyField(eliteLevelProperty);
+        EditorGUILayout.LabelField("Elite", EditorStyles.boldLabel);
+        if (eliteLevelProperty != null) EditorGUILayout.PropertyField(eliteLevelProperty, new GUIContent("Elite Level"));
+        if (eliteFromProperty  != null) EditorGUILayout.PropertyField(eliteFromProperty,  new GUIContent("Elite From"));
+        EditorGUILayout.Space(2f);
         if (skillsProperty != null) EditorGUILayout.PropertyField(skillsProperty, includeChildren: true);
         if (combatModifiersProperty != null) EditorGUILayout.PropertyField(combatModifiersProperty, includeChildren: true);
     }

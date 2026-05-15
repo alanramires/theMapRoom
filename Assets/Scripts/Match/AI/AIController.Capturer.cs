@@ -145,7 +145,8 @@ public partial class AIController
         bool conservative      = unit.TryGetUnitData(out UnitData consUd)  && consUd.playConservative;
 
         var scoringLog = showAIUnitHUD ? new System.Text.StringBuilder() : null;
-        scoringLog?.AppendLine($"{TL("Score")} Unit{unit.InstanceId} → {assigned.Sector} (fromDist={fromDist:F1} dpqMove={preferDpqMove} dpqBattle={preferDpqAtBattle} conservative={conservative})");
+        bool defCtx = assigned.Status == ObjectiveStatus.Defending;
+        scoringLog?.AppendLine($"{TL("Score")} Unit{unit.InstanceId} → {assigned.Sector} status={assigned.Status} defCtx={defCtx} (fromDist={fromDist:F1} dpqMove={preferDpqMove} dpqBattle={preferDpqAtBattle} conservative={conservative})");
         AppendMissingDpqReachabilityDiagnostics(scoringLog, unit, paths, targetCell);
 
         foreach (Vector3Int cell in paths.Keys)
@@ -205,7 +206,7 @@ public partial class AIController
                 foreach (UnitManager nearbyEnemy in nearbyEnemies)
                 {
                     if (!CanAttackTargetFrom(fromCell, cell, unit, nearbyEnemy)) continue;
-                    bool attackAllowed = PassesAttackDecision(unit, nearbyEnemy, cell, assigned.Status == ObjectiveStatus.Defending, out string attackDecisionReason);
+                    bool attackAllowed = PassesAttackDecision(unit, nearbyEnemy, cell, defCtx, out string attackDecisionReason);
                     if (!attackAllowed)
                     {
                         scoringLog?.AppendLine($"    ↳ ATK {nearbyEnemy.UnitDisplayName}#{nearbyEnemy.InstanceId} BLOCK {attackDecisionReason}");
@@ -228,7 +229,7 @@ public partial class AIController
                         attackScore,
                         attackSectorTie,
                         attackHqTie);
-                    scoringLog?.AppendLine($"    ↳ ATK {nearbyEnemy.UnitDisplayName}#{nearbyEnemy.InstanceId} pri={targetPriority:F1} objBonus={objectiveBonus:F0} atkDpqPts={attackDpq:F1} aScore={aScore:F0} {attackDecisionReason}{(isNewBest ? " ★" : "")}");
+                    scoringLog?.AppendLine($"    ↳ ATK {nearbyEnemy.UnitDisplayName}#{nearbyEnemy.InstanceId} pri={targetPriority:F1} objBonus={objectiveBonus:F0} atkDpqPts={attackDpq:F1} aScore={aScore:F0} defCtx={defCtx} {attackDecisionReason}{(isNewBest ? " ★" : "")}");
                     if (isNewBest)
                     {
                         attackScore      = aScore;

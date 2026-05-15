@@ -19,6 +19,18 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
         UnitManager bestCandidate = FindBestShuttleCandidate(unit, snapshot, plan, fromCell, out Vector3Int candidateCell);
+
+        // Second pass with reduced threshold — catches units slightly below the formal cutoff
+        // that would still benefit from a ride rather than leaving the APC idle.
+        if (bestCandidate == null)
+        {
+            int relaxed = Mathf.Max(2, GetEffectiveTransportThreshold(snapshot.AITeam) / 2);
+            bestCandidate = FindBestShuttleCandidate(unit, snapshot, plan, fromCell, out candidateCell,
+                thresholdReduction: relaxed);
+            if (bestCandidate != null)
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — candidato relaxado {bestCandidate.InstanceId}@{candidateCell} (threshold -{relaxed})");
+        }
+
         bool preferNoMove = unit.TryGetUnitData(out UnitData shuttleData) && shuttleData.prioritizeDpqAtBattle;
 
         if (bestCandidate != null)
@@ -38,8 +50,9 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
         }
 
-        // No pickup candidate: release to HexEvaluator so the APC fights/positions generically.
-        Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — sem candidato, libera para HexEvaluator");
+        // No pickup candidate: release to HexEvaluator for opportunistic combat/positioning.
+        // Capture actions are suppressed for Transportador units in the Router.
+        Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — sem candidato, libera para suporte de combate");
         return null;
     }
 
@@ -53,7 +66,8 @@ public partial class AIController
         TeamObjectivePlan plan,
         Vector3Int transporterCell,
         out Vector3Int bestCandidateCell,
-        SectorObjective assignedSector = null)
+        SectorObjective assignedSector = null,
+        int thresholdReduction = 0)
     {
         bestCandidateCell = transporterCell;
         if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null)
@@ -76,11 +90,21 @@ public partial class AIController
             //   2. a different transporter occupies a filled Transportador slot.
             if (IsAlreadyFormalPassenger(candidate, transporter, plan)) continue;
 
-            // When the transporter has a formal sector assignment, only consider candidates
-            // heading to that same sector — cross-plan passengers will ignore the embark offer.
-            if (assignedSector != null && plan != null)
+            // Embark compatibility: only pick candidates that will actually accept the ride.
+            // Primary capturers with a plan assignment will refuse a rogue shuttle (no sector
+            // assignment) because the embark check requires sameSector. Skip them here to avoid
+            // the APC wasting movement toward a capturer that will refuse on their own turn.
+            SectorObjective candidateAssigned = plan != null ? ResolveAssignedObjective(candidate, plan) : null;
+            bool candidateIsPrimary = candidateData.roles != null && candidateData.roles.Count > 0
+                && candidateData.roles[0] == UnitRole.Capturador;
+            if (assignedSector == null)
             {
-                SectorObjective candidateAssigned = ResolveAssignedObjective(candidate, plan);
+                // Rogue shuttle: primary capturer with a plan assignment will refuse.
+                if (candidateIsPrimary && candidateAssigned != null) continue;
+            }
+            else if (plan != null)
+            {
+                // Assigned shuttle: only candidates heading to the same sector will accept.
                 if (candidateAssigned == null || candidateAssigned.Sector != assignedSector.Sector) continue;
             }
 
@@ -92,6 +116,7 @@ public partial class AIController
             int candidateThreshold = GetEffectiveTransportThreshold(snapshot.AITeam);
             int candidateMP = candidate.MaxMovementPoints;
             if (candidateMP < 3) candidateThreshold += (3 - candidateMP) * 2;
+            candidateThreshold = Mathf.Max(2, candidateThreshold - thresholdReduction);
             if (objectiveDist < candidateThreshold) continue;
 
             float transportDist = SectorManager.HexDistance(transporterCell, candidateCell);

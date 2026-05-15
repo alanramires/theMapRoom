@@ -30,6 +30,7 @@ public class AIShoppingPlanner : MonoBehaviour
     [Range(0, 5)]    public int   MinActiveAssaultForFireSupport   = 1;
     [Range(2, 8)]    public int   CapturersPerPreventiveTransport = 4;
     [Range(1, 4)]    public int   ProgressiveCapturerBatchSize = 2;
+    [Range(1, 4)]    public int   AssaultPerFireSupportRatio = 2;
 
     private static AIShoppingPlanner instance;
     public static AIShoppingPlanner Instance => EnsureInstance();
@@ -83,22 +84,26 @@ public class AIShoppingPlanner : MonoBehaviour
         }
         openCapturerSlots = LimitCapturerDemandForProgression(snapshot, openCapturerSlots, openAssaultSlots, openTransportSlots, openLogisticsSlots, openFireSupportSlots);
 
-        // Escalada: se já tem N tanks elite em campo, mira o nível acima na próxima compra.
-        // Usa contagem de unidades em campo, não slots do plano (plano fica vazio em modo rogue).
+        // Escalada via cadeia eliteFrom: level 2 só fica disponível quando level 1 já está em campo
+        // (chain gate em FindEliteAssaultReserveTarget). Não há mais necessidade de branch por contagem.
         int activeEliteAssaultCount = CountActiveEliteAssaultUnits(snapshot);
-        const int DreamTeamEliteAssaultThreshold = 2;
-        int eliteAssaultTargetLevel = activeEliteAssaultCount >= DreamTeamEliteAssaultThreshold ? 2 : 1;
-        UnitData eliteAssaultTarget = FindEliteAssaultReserveTarget(snapshot, eliteAssaultTargetLevel);
-        if (eliteAssaultTarget == null && eliteAssaultTargetLevel > 1)
-            eliteAssaultTarget = FindEliteAssaultReserveTarget(snapshot, 1); // fallback se nível 2 indisponível
+        const int DreamTeamEliteAssaultThreshold = 2;  // 2 elites → pivot para fire support
+        UnitData eliteLevel2Candidate = FindEliteAssaultReserveTarget(snapshot, 2);
+        UnitData eliteLevel1Candidate = FindEliteAssaultReserveTarget(snapshot, 1);
+        UnitData eliteAssaultTarget = eliteLevel2Candidate ?? eliteLevel1Candidate;
 
-        // Reserva elite apenas quando a composição mínima do exército já foi atingida:
+        // Save the target for reserve purposes BEFORE the composition check may null it.
+        // Reserve (saving money) applies even when composition isn't ready yet;
+        // only the actual purchase is gated by composition.
+        UnitData eliteAssaultTargetForReserve = eliteAssaultTarget;
+
+        // Compra elite apenas quando a composição mínima do exército já foi atingida:
         // proporção dos slots de capturador preenchidos >= EliteCapturerFillRatio
         // E pelo menos MinFilledAssaultSlots slots de assault preenchidos.
+        CountSlots(snapshot.AITeam, UnitRole.Capturador, out int totalCap, out int filledCap);
         if (eliteAssaultTarget != null)
         {
-            CountSlots(snapshot.AITeam, UnitRole.Capturador, out int totalCap, out int filledCap);
-            CountSlots(snapshot.AITeam, UnitRole.Assalto,    out int totalAss, out int filledAss);
+            CountSlots(snapshot.AITeam, UnitRole.Assalto, out int totalAss, out int filledAss);
             float capFill       = totalCap > 0 ? filledCap / (float)totalCap : 0f;
             float fillThreshold = Instance != null ? Instance.EliteCapturerFillRatio : 0.6f;
             int   minAssault    = Instance != null ? Instance.MinFilledAssaultSlots   : 1;
@@ -107,7 +112,7 @@ public class AIShoppingPlanner : MonoBehaviour
             string status       = (capOk && assOk) ? "ELITE LIBERADO" : $"bloqueado ({(!capOk ? $"cap {filledCap}/{totalCap} {capFill:P0}<{fillThreshold:P0}" : "cap OK")} | {(!assOk ? $"ass {filledAss}<{minAssault}" : "ass OK")})";
             Debug.Log($"[AI Shopping] composição: cap={filledCap}/{totalCap} ({capFill:P0}) ass={filledAss}/{totalAss} — {status}");
             if (!capOk || !assOk)
-                eliteAssaultTarget = null;
+                eliteAssaultTarget = null; // blocks purchase; eliteAssaultTargetForReserve still set
         }
 
         if (eliteAssaultTarget != null && openAssaultSlots <= 0 && remaining >= eliteAssaultTarget.cost)
@@ -129,15 +134,17 @@ public class AIShoppingPlanner : MonoBehaviour
         if (dreamTeamPivot)
         {
             preferDefensiveFireSupport = true;
-            eliteFireSupportTarget = FindEliteFireSupportReserveTarget(snapshot, preferDefensiveFireSupport: true, remaining);
+            eliteFireSupportTarget = FindEliteFireSupportReserveTarget(snapshot, preferDefensiveFireSupport: true, remaining, requireChain: false);
             Debug.Log($"[AI Shopping] dream_team_pivot: {activeEliteAssaultCount} elite assault em campo → target={eliteFireSupportTarget?.displayName ?? "nenhum"} custo={eliteFireSupportTarget?.cost ?? 0}");
         }
 
         bool eliteFireSupportReserveReady = IsEliteFireSupportReserveReady(snapshot);
         bool eliteFireSupportNowAffordable = eliteFireSupportTarget != null && remaining >= eliteFireSupportTarget.cost;
+        float eliteFireCapFill = totalCap > 0 ? filledCap / (float)totalCap : 0f;
+        float eliteFireFillThreshold = Instance != null ? Instance.EliteCapturerFillRatio : 0.6f;
         bool wantsEliteFireSupport = eliteFireSupportTarget != null
             && (eliteFireSupportReserveReady || eliteFireSupportNowAffordable)
-            && (dreamTeamPivot || (activeFireSupportCount > 0 && activeFireSupportCount < 2));
+            && (dreamTeamPivot || (activeFireSupportCount > 0 && activeFireSupportCount < 2 && eliteFireCapFill >= eliteFireFillThreshold));
         int reserveForEliteFireSupport = 0;
         bool eliteFireSupportBought = false;
         bool emergencyProductionDefense = TryFindEmergencyProductionDefensePurchase(snapshot, remaining, out UnitData emergencyDefenseTarget, out int emergencyContestedOwned);
@@ -176,17 +183,19 @@ public class AIShoppingPlanner : MonoBehaviour
             && openLogisticsSlots <= 0
             && openFireSupportSlots <= 0
             && IsEliteAssaultReserveReady(snapshot);
-        bool nextTurnEliteAssaultReserve = eliteAssaultTarget != null
+        float reserveCapFill = totalCap > 0 ? filledCap / (float)totalCap : 0f;
+        float reserveCapThreshold = (Instance != null ? Instance.EliteCapturerFillRatio : 0.6f) * 0.85f;
+        bool nextTurnEliteAssaultReserve = eliteAssaultTargetForReserve != null
             && !dreamTeamPivot
-            && remaining < eliteAssaultTarget.cost
-            && remaining + Mathf.Max(0, snapshot.IncomePerTurn) >= eliteAssaultTarget.cost
-            && IsEliteAssaultReserveReady(snapshot);
+            && remaining < eliteAssaultTargetForReserve.cost
+            && remaining + Mathf.Max(0, snapshot.IncomePerTurn) >= eliteAssaultTargetForReserve.cost
+            && reserveCapFill >= reserveCapThreshold;
         bool wantsEliteAssault = eliteAssaultTarget != null
             && (openAssaultSlots > 0 || strategicEliteAssaultReserve || nextTurnEliteAssaultReserve);
         if (strategicEliteAssaultReserve)
             Debug.Log($"[AI Shopping] reserva estrategica elite assalto: composicao completa alvo={eliteAssaultTarget.displayName} custo={eliteAssaultTarget.cost}");
         else if (nextTurnEliteAssaultReserve)
-            Debug.Log($"[AI Shopping] reserva proximo turno elite assalto: alvo={eliteAssaultTarget.displayName} custo={eliteAssaultTarget.cost} cash={remaining} income={snapshot.IncomePerTurn}");
+            Debug.Log($"[AI Shopping] reserva proximo turno elite assalto: alvo={eliteAssaultTargetForReserve.displayName} custo={eliteAssaultTargetForReserve.cost} cash={remaining} income={snapshot.IncomePerTurn}");
         bool eliteAssaultBought = false;
         bool defensiveBaseTankBought = false;
         int defensiveBaseResponseReserveCost = FindCheapestDefensiveBaseThreatPurchaseCost(snapshot);
@@ -239,20 +248,16 @@ public class AIShoppingPlanner : MonoBehaviour
         }
         int reserveForEliteAssault = 0;
         int eliteAssaultSafetyBuffer = 0;
-        if (wantsEliteAssault && remaining < eliteAssaultTarget.cost)
+        if (nextTurnEliteAssaultReserve)
         {
-            int nextTurnCash = remaining + Mathf.Max(0, snapshot.IncomePerTurn);
-            if (nextTurnCash >= eliteAssaultTarget.cost)
-            {
-                int baseReserve = Mathf.Max(0, eliteAssaultTarget.cost - Mathf.Max(0, snapshot.IncomePerTurn));
-                eliteAssaultSafetyBuffer = CalculateEliteAssaultSafetyBuffer(eliteAssaultTarget);
-                reserveForEliteAssault = Mathf.Min(remaining, baseReserve + eliteAssaultSafetyBuffer);
-            }
+            int baseReserve = Mathf.Max(0, eliteAssaultTargetForReserve.cost - Mathf.Max(0, snapshot.IncomePerTurn));
+            eliteAssaultSafetyBuffer = CalculateEliteAssaultSafetyBuffer(eliteAssaultTargetForReserve);
+            reserveForEliteAssault = Mathf.Min(remaining, baseReserve + eliteAssaultSafetyBuffer);
         }
 
         if (reserveForEliteAssault > 0)
         {
-            Debug.Log($"[AI Shopping] reserva elite assalto {eliteAssaultTarget.displayName} elite={eliteAssaultTarget.eliteLevel} custo={eliteAssaultTarget.cost} cash={remaining} income={snapshot.IncomePerTurn} reserva={reserveForEliteAssault} colchao={eliteAssaultSafetyBuffer} gastoLivre={Mathf.Max(0, remaining - reserveForEliteAssault)}");
+            Debug.Log($"[AI Shopping] reserva elite assalto {eliteAssaultTargetForReserve.displayName} elite={eliteAssaultTargetForReserve.eliteLevel} custo={eliteAssaultTargetForReserve.cost} cash={remaining} income={snapshot.IncomePerTurn} reserva={reserveForEliteAssault} colchao={eliteAssaultSafetyBuffer} gastoLivre={Mathf.Max(0, remaining - reserveForEliteAssault)}");
         }
 
         // Ordena fábricas: as mais próximas de slots abertos compram primeiro
@@ -335,19 +340,38 @@ public class AIShoppingPlanner : MonoBehaviour
             {
                 spendBudget = Mathf.Max(0, remaining - reserveForEliteDefensiveTank);
             }
-            if (!defensiveBaseThreat && wantsEliteAssault && !eliteAssaultBought)
+            if (!eliteAssaultBought)
             {
-                if (remaining >= eliteAssaultTarget.cost)
+                bool canBuyEliteNow = wantsEliteAssault && !defensiveBaseThreat
+                    && eliteAssaultTarget != null && remaining >= eliteAssaultTarget.cost;
+                if (canBuyEliteNow)
+                {
+                    // Composition OK and can afford: restrict to buildings that offer the elite unit.
                     spendBudget = CanOfferUnit(building, eliteAssaultTarget) ? remaining : 0;
-                else if (reserveForEliteAssault > 0)
-                    spendBudget = Mathf.Max(0, remaining - reserveForEliteAssault);
+                }
+                else if (reserveForEliteAssault > 0
+                         && (!defensiveBaseThreat || (!defensiveArmorThreat && !emergencyProductionDefense)))
+                {
+                    // Saving for elite (composition not yet ready, or can't afford):
+                    // honour the reserve in non-emergency scenarios.
+                    spendBudget = Mathf.Min(spendBudget, Mathf.Max(0, remaining - reserveForEliteAssault));
+                }
             }
-            if (!defensiveBaseThreat && wantsEliteFireSupport && !eliteFireSupportBought)
+            if (wantsEliteFireSupport && !eliteFireSupportBought)
             {
-                if (remaining >= eliteFireSupportTarget.cost)
-                    spendBudget = CanOfferUnit(building, eliteFireSupportTarget) ? spendBudget : 0;
-                else if (reserveForEliteFireSupport > 0)
+                if (!defensiveBaseThreat)
+                {
+                    if (remaining >= eliteFireSupportTarget.cost)
+                        spendBudget = CanOfferUnit(building, eliteFireSupportTarget) ? spendBudget : 0;
+                    else if (reserveForEliteFireSupport > 0)
+                        spendBudget = Mathf.Min(spendBudget, Mathf.Max(0, remaining - reserveForEliteFireSupport));
+                }
+                else if (!defensiveArmorThreat && !emergencyProductionDefense
+                         && remaining < eliteFireSupportTarget.cost && reserveForEliteFireSupport > 0)
+                {
+                    // Proximity threat only: still honour the elite fire support reserve.
                     spendBudget = Mathf.Min(spendBudget, Mathf.Max(0, remaining - reserveForEliteFireSupport));
+                }
             }
 
             // Log das opções deste edifício
@@ -365,7 +389,7 @@ public class AIShoppingPlanner : MonoBehaviour
                 eliteAssaultTarget, eliteFireSupportTarget, defensiveBaseThreat,
                 allowDefensiveEliteAssault, defensiveTankReserveCost,
                 defensiveBaseManpowerShortage, defensiveMassReserveCost, defensiveBaseTankBought,
-                defensiveArmorThreat);
+                defensiveArmorThreat, wantsEliteFireSupport, activeFireSupportCount);
             if (unit == null)
             {
                 Debug.Log($"[AI Shopping] {building.ConstructionDisplayName} @ {cell} — nenhuma unidade selecionada (sem fit ou sem budget)");
@@ -465,7 +489,9 @@ public class AIShoppingPlanner : MonoBehaviour
         bool defensiveBaseManpowerShortage = false,
         int defensiveBaseBasicMassCost = 0,
         bool defensiveBaseTankBought = false,
-        bool defensiveArmorThreat = false)
+        bool defensiveArmorThreat = false,
+        bool wantsEliteFireSupport = false,
+        int activeFireSupportCount = 0)
     {
         if (building.OfferedUnits == null || building.OfferedUnits.Count == 0) return null;
 
@@ -494,6 +520,13 @@ public class AIShoppingPlanner : MonoBehaviour
             bool isHybridCapturer    = isPrimaryAssault && u.roles.Contains(UnitRole.Capturador);
             bool isSecondary       = !isPrimaryCapturer && u.roles != null && u.roles.Contains(UnitRole.Capturador);
             bool fireSupportAllowedNow = openFireSupportSlots > 0 || IsFireSupportAllowedByTiming(snapshot);
+            bool isDefensiveOnlyUnit = u.aiPurchaseMode == AIPurchaseMode.Defensive;
+            bool isOffensiveOnlyUnit = u.aiPurchaseMode == AIPurchaseMode.Offensive;
+
+            if (!defensiveBaseThreat && isDefensiveOnlyUnit)
+            { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — Defensive-only, sem ameaça"); continue; }
+            if (defensiveBaseThreat && isOffensiveOnlyUnit)
+            { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — Offensive-only, modo defensivo"); continue; }
 
             if (isPrimaryCapturer && openCapturerSlots <= 0 && !onlyCapturers)
             {
@@ -507,7 +540,8 @@ public class AIShoppingPlanner : MonoBehaviour
                 continue;
             }
 
-            if (isFireSupportCapable && !isPrimaryAssault && openFireSupportSlots <= 0)
+            bool defensiveFireSupportBypass = defensiveBaseThreat && isDefensiveOnlyUnit && isFireSupportCapable;
+            if (isFireSupportCapable && !isPrimaryAssault && openFireSupportSlots <= 0 && !defensiveFireSupportBypass)
             {
                 Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda fire_support");
                 continue;
@@ -533,6 +567,7 @@ public class AIShoppingPlanner : MonoBehaviour
                 // Logistics demand remains valid during defense, but scores below direct combat buys.
             }
             else if (defensiveBaseThreat
+                && !isDefensiveOnlyUnit
                 && !IsDefensiveBaseThreatPurchase(u)
                 && !isAllowedDefensiveElite
                 && !isAllowedDefensiveFireSupport
@@ -543,6 +578,8 @@ public class AIShoppingPlanner : MonoBehaviour
                 && !((onlyCapturers && isPrimaryCapturer) || (onlyAssault && isPrimaryAssault) || (onlyTransporter && isPrimaryTransporter) || (onlyLogistics && isPrimaryLogistics) || (onlyFireSupport && isPrimaryFireSupport))) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — onlyFilter (cap={isPrimaryCapturer} ass={isPrimaryAssault} trans={isPrimaryTransporter} log={isPrimaryLogistics} fire={isPrimaryFireSupport})"); continue; }
 
             int score = u.cost;
+            if (defensiveBaseThreat && isDefensiveOnlyUnit && isFireSupportCapable)
+                score += 55000; // below Bazooka (90k) and tanks (180k) but valid as cheap defensive fire support
             if (defensiveBaseThreat && defensiveBaseManpowerShortage)
             {
                 int basicReserve = Mathf.Max(0, defensiveBaseBasicMassCost) * 2;
@@ -576,7 +613,9 @@ public class AIShoppingPlanner : MonoBehaviour
                 if (!isPrimaryFireSupport)
                     score -= 18000;
                 score += Mathf.Max(0, u.eliteLevel) * 1500;
-                if (u == eliteFireSupportTarget) score += 200000;
+                if (activeFireSupportCount == 0 && u.eliteLevel >= 1)
+                    score -= 120000; // prefer non-elite on first fire support buy
+                if (wantsEliteFireSupport && u == eliteFireSupportTarget) score += 200000;
                 if (defensiveBaseThreat)
                 {
                     score += 150000;
@@ -618,6 +657,7 @@ public class AIShoppingPlanner : MonoBehaviour
     {
         if (snapshot == null || snapshot.MyBuildings == null) return null;
 
+        HashSet<UnitData> inField = BuildFieldUnitDataSet(snapshot);
         UnitData best = null;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
@@ -627,8 +667,13 @@ public class AIShoppingPlanner : MonoBehaviour
             foreach (UnitData unit in building.OfferedUnits)
             {
                 if (unit == null || unit.domain != Domain.Land) continue;
-                if (!IsPurePrimaryAssault(unit)) continue;
+                if (unit.unitClass != GameUnitClass.Armored) continue;
+                if (unit.roles == null || !unit.roles.Contains(UnitRole.Assalto)) continue;
+                if (unit.roles.Contains(UnitRole.Capturador)) continue;
+                if (unit.roles.Contains(UnitRole.Transportador)) continue;
                 if (unit.eliteLevel < minEliteLevel) continue;
+                // Chain gate: predecessor must be in field (if chain is configured)
+                if (unit.eliteFrom != null && !inField.Contains(unit.eliteFrom)) continue;
 
                 if (best == null
                     || unit.eliteLevel < best.eliteLevel
@@ -640,6 +685,19 @@ public class AIShoppingPlanner : MonoBehaviour
         return best;
     }
 
+    private static HashSet<UnitData> BuildFieldUnitDataSet(AIWorldSnapshot snapshot)
+    {
+        var set = new HashSet<UnitData>();
+        if (snapshot?.MyUnits == null) return set;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead) continue;
+            if (unit.TryGetUnitData(out UnitData data) && data != null)
+                set.Add(data);
+        }
+        return set;
+    }
+
     private static int CalculateEliteAssaultSafetyBuffer(UnitData eliteAssault)
     {
         if (eliteAssault == null) return 0;
@@ -648,10 +706,11 @@ public class AIShoppingPlanner : MonoBehaviour
         return Mathf.CeilToInt(Mathf.Max(0, eliteAssault.cost) * (percent / 100f));
     }
 
-    private static UnitData FindEliteFireSupportReserveTarget(AIWorldSnapshot snapshot, bool preferDefensiveFireSupport, int budget = int.MaxValue)
+    private static UnitData FindEliteFireSupportReserveTarget(AIWorldSnapshot snapshot, bool preferDefensiveFireSupport, int budget = int.MaxValue, bool requireChain = true)
     {
         if (snapshot == null || snapshot.MyBuildings == null) return null;
 
+        HashSet<UnitData> inField = requireChain ? BuildFieldUnitDataSet(snapshot) : null;
         UnitData bestPreferred = null;
         UnitData bestFallback = null;
         UnitData bestAffordable = null;
@@ -665,6 +724,9 @@ public class AIShoppingPlanner : MonoBehaviour
                 if (unit == null || unit.domain != Domain.Land) continue;
                 if (!IsFireSupportPurchase(unit)) continue;
                 if (unit.eliteLevel < 1) continue;
+                if (IsPrimaryRole(unit, UnitRole.Assalto)) continue; // assault-primary units go through elite assault path
+                // Chain gate: predecessor must be in field (bypassed for dreamTeamPivot)
+                if (requireChain && unit.eliteFrom != null && !inField.Contains(unit.eliteFrom)) continue;
 
                 bool preferredProfile = preferDefensiveFireSupport
                     ? IsDefensiveFireSupportPurchase(unit)
@@ -802,14 +864,27 @@ public class AIShoppingPlanner : MonoBehaviour
 
         int activeCapturers = CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: false);
         int activeAssault = CountActiveUnitsWithRole(snapshot, UnitRole.Assalto, requirePrimary: true);
-        int supportPauseThreshold = Instance != null ? Instance.CapturersPerPreventiveTransport : 4;
+
+        // Dynamic pause threshold: scales with total capturer slots so the same
+        // fill-ratio breakpoint applies on both small and large maps.
+        CountSlots(snapshot.AITeam, UnitRole.Capturador, out int totalCapSlots, out int _);
+        int supportPauseThreshold;
+        if (totalCapSlots > 0)
+        {
+            float pauseRatio = (Instance != null ? Instance.EliteCapturerFillRatio : 0.6f) * 0.85f;
+            supportPauseThreshold = Mathf.Max(1, Mathf.CeilToInt(totalCapSlots * pauseRatio));
+        }
+        else
+        {
+            supportPauseThreshold = Instance != null ? Instance.CapturersPerPreventiveTransport : 4;
+        }
 
         if (supportDemand > 0 && activeCapturers >= supportPauseThreshold && activeAssault >= 1)
             capped = 0;
 
         if (capped != openCapturerSlots)
         {
-            Debug.Log($"[AI Shopping] capturer_progression: raw={openCapturerSlots} capped={capped} activeCap={activeCapturers} activeAss={activeAssault} supportDemand={supportDemand} batch={batchSize} pauseAt={supportPauseThreshold}");
+            Debug.Log($"[AI Shopping] capturer_progression: raw={openCapturerSlots} capped={capped} activeCap={activeCapturers} activeAss={activeAssault} supportDemand={supportDemand} batch={batchSize} pauseAt={supportPauseThreshold} totalCapSlots={totalCapSlots}");
         }
 
         return capped;
@@ -1281,14 +1356,13 @@ public class AIShoppingPlanner : MonoBehaviour
         bool offensiveNeed = snapshot.Stance == AIStance.Offensive || HasAnyOffensiveObjective(snapshot.AITeam);
         preferDefensiveFireSupport = defensiveNeed && !offensiveNeed || snapshot.Stance == AIStance.Defensive;
 
-        if (activeFireSupport > 0)
-        {
-            Debug.Log($"[AI Shopping] fire_support_demand: 0 activeFire={activeFireSupport} preferDef={preferDefensiveFireSupport}");
-            return 0;
-        }
-
-        int demand = (defensiveNeed || offensiveNeed || snapshot.Stance == AIStance.Tactical) ? 1 : 0;
-        Debug.Log($"[AI Shopping] fire_support_demand: demand={demand} activeFire={activeFireSupport} stance={snapshot.Stance} defensive={defensiveNeed} offensive={offensiveNeed} preferDef={preferDefensiveFireSupport}");
+        bool hasNeed = defensiveNeed || offensiveNeed || snapshot.Stance == AIStance.Tactical;
+        int ratio = Instance != null ? Instance.AssaultPerFireSupportRatio : 2;
+        int desiredFireSupport = hasNeed
+            ? Mathf.Max(1, Mathf.CeilToInt(activeAssault / (float)ratio))
+            : 0;
+        int demand = Mathf.Max(0, desiredFireSupport - activeFireSupport);
+        Debug.Log($"[AI Shopping] fire_support_demand: demand={demand} desired={desiredFireSupport} activeFire={activeFireSupport} activeAss={activeAssault} ratio=1:{ratio} stance={snapshot.Stance} defensive={defensiveNeed} offensive={offensiveNeed} preferDef={preferDefensiveFireSupport}");
         return demand;
     }
 
@@ -1507,7 +1581,17 @@ public class AIShoppingPlanner : MonoBehaviour
             if (dist >= minDist) assignedNeeded++;
         }
 
-        int capturersPerTransport = Instance != null ? Instance.CapturersPerPreventiveTransport : 4;
+        CountSlots(snapshot.AITeam, UnitRole.Capturador, out int totalCapSlotsForMass, out int _);
+        int capturersPerTransport;
+        if (totalCapSlotsForMass > 0)
+        {
+            float massRatio = (Instance != null ? Instance.EliteCapturerFillRatio : 0.6f) * 0.85f;
+            capturersPerTransport = Mathf.Max(1, Mathf.CeilToInt(totalCapSlotsForMass * massRatio));
+        }
+        else
+        {
+            capturersPerTransport = Instance != null ? Instance.CapturersPerPreventiveTransport : 4;
+        }
         int massNeeded = 0;
         if (activeCapturers >= capturersPerTransport && activeAssault >= 1)
             massNeeded = activeCapturers / Mathf.Max(1, capturersPerTransport);
@@ -1518,7 +1602,7 @@ public class AIShoppingPlanner : MonoBehaviour
         int needed = Mathf.Max(assignedNeeded, Mathf.Max(preventiveNeeded, massNeeded));
         int deficit = urgentTransportDemand ? assignedDeficit : preventiveDeficit;
         int demand  = Mathf.Min(deficit, 1); // cap: max 1 APC per shopping round
-        Debug.Log($"[AI Shopping] transport_demand: needed={needed} assigned={assignedNeeded} preventive={preventiveNeeded} mass={massNeeded} activeCap={activeCapturers} activeAss={activeAssault} activeAPCs={activeTransporters} freeAPCs={freeAPCs} assignedDef={assignedDeficit} preventiveDef={preventiveDeficit} urgent={urgentTransportDemand} demand={demand} minDist={minDist}");
+        Debug.Log($"[AI Shopping] transport_demand: needed={needed} assigned={assignedNeeded} preventive={preventiveNeeded} mass={massNeeded} capPerTrans={capturersPerTransport} activeCap={activeCapturers} activeAss={activeAssault} activeAPCs={activeTransporters} freeAPCs={freeAPCs} assignedDef={assignedDeficit} preventiveDef={preventiveDeficit} urgent={urgentTransportDemand} demand={demand} minDist={minDist}");
         return demand;
     }
 
