@@ -559,17 +559,17 @@ public partial class AIController
         if (target == null)
             return 0f;
 
-        if (target.IsUnderRepair)
-            return 10000f + Mathf.Max(0, target.GetMaxHP() - target.CurrentHP) * 120f;
+        float valueBonus = target.TryGetUnitData(out UnitData vd) && vd != null ? vd.cost / 100f : 0f;
 
-        float score = 0f;
+        if (target.IsUnderRepair)
+            return 10000f + Mathf.Max(0, target.GetMaxHP() - target.CurrentHP) * 120f + valueBonus;
+
+        float score = valueBonus;
         int maxHp = Mathf.Max(1, target.GetMaxHP());
         int maxFuel = Mathf.Max(1, target.GetMaxFuel());
         score += Mathf.Max(0f, 100f - target.CurrentHP * 100f / maxHp) * 18f;
         score += Mathf.Max(0f, 100f - target.CurrentFuel * 100f / maxFuel) * 10f;
-        if (target.TryGetUnitData(out UnitData targetData)
-            && targetData != null
-            && HasAnyWeaponAmmoAtOrBelow(target, 1))
+        if (vd != null && HasAnyWeaponAmmoAtOrBelow(target, 1))
             score += 1400f;
         return score;
     }

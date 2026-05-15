@@ -20,7 +20,7 @@ public class DebugManager : MonoBehaviour
     [SerializeField] private GameObject commandInputObject;
 
     [Header("AI Debug Shortcuts")]
-    [Tooltip("F9 = AI Resume  |  F10 = AI Pause  |  F11 = AI Step")]
+    [Tooltip("F12 = AI Resume  |  F10 = AI Pause  |  F11 = AI Step")]
     [SerializeField] private bool aiDebugShortcutsEnabled;
     [Tooltip("Quando ativo, 'AI Stage 1' limpa o plano antes de rodar (força nova atribuição A+B).")]
     [SerializeField] private bool resetPlanOnDebugStage;
@@ -586,23 +586,23 @@ public class DebugManager : MonoBehaviour
     {
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current == null) return;
-        bool f9  = Keyboard.current.f9Key.wasPressedThisFrame;
+        bool f12 = Keyboard.current.f12Key.wasPressedThisFrame;
         bool f10 = Keyboard.current.f10Key.wasPressedThisFrame;
         bool f11 = Keyboard.current.f11Key.wasPressedThisFrame;
 #else
-        bool f9  = Input.GetKeyDown(KeyCode.F9);
+        bool f12 = Input.GetKeyDown(KeyCode.F12);
         bool f10 = Input.GetKeyDown(KeyCode.F10);
         bool f11 = Input.GetKeyDown(KeyCode.F11);
 #endif
-        if (!f9 && !f10 && !f11) return;
+        if (!f12 && !f10 && !f11) return;
 
         AIController ai = FindAnyObjectByType<AIController>();
 
-        if (f9)
+        if (f12)
         {
             if (ai != null) ai.SetDebugPaused(false);
             else Debug.Log("[AI Shortcuts] AIController não encontrado.");
-            Debug.Log("[AI Shortcuts] F9 — AI Resume");
+            Debug.Log("[AI Shortcuts] F12 — AI Resume");
         }
         if (f10)
         {

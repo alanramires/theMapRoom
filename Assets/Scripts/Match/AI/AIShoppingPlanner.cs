@@ -144,7 +144,7 @@ public class AIShoppingPlanner : MonoBehaviour
         float eliteFireFillThreshold = Instance != null ? Instance.EliteCapturerFillRatio : 0.6f;
         bool wantsEliteFireSupport = eliteFireSupportTarget != null
             && (eliteFireSupportReserveReady || eliteFireSupportNowAffordable)
-            && (dreamTeamPivot || (activeFireSupportCount > 0 && activeFireSupportCount < 2 && eliteFireCapFill >= eliteFireFillThreshold));
+            && (dreamTeamPivot || (activeFireSupportCount > 0 && eliteFireCapFill >= eliteFireFillThreshold));
         int reserveForEliteFireSupport = 0;
         bool eliteFireSupportBought = false;
         bool emergencyProductionDefense = TryFindEmergencyProductionDefensePurchase(snapshot, remaining, out UnitData emergencyDefenseTarget, out int emergencyContestedOwned);
@@ -1429,7 +1429,7 @@ public class AIShoppingPlanner : MonoBehaviour
         int desiredLogistics = 0;
         if (repairDemandCount >= 1)
             desiredLogistics = 1;
-        if (repairDemandCount >= 4)
+        if (repairDemandCount >= 3)
             desiredLogistics = 2;
 
         int demand = Mathf.Max(0, desiredLogistics - activeLogisticsCount);

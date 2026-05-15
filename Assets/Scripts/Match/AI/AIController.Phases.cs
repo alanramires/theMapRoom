@@ -366,6 +366,14 @@ public partial class AIController
 
                 if (groupA != groupB) return groupA.CompareTo(groupB);
 
+                // Dentro do grupo 0: blocker (IsBlockingCaptureTarget) age antes de vacater/outros
+                if (groupA == 0 && activePlan != null)
+                {
+                    bool blockerA = IsBlockingCaptureTarget(a, activePlan, aiTeam);
+                    bool blockerB = IsBlockingCaptureTarget(b, activePlan, aiTeam);
+                    if (blockerA != blockerB) return blockerA ? -1 : 1;
+                }
+
                 // Dentro do grupo 2: prioridade do objetivo (pri=1 = age primeiro)
                 if (groupA == 2 && activePlan != null)
                 {

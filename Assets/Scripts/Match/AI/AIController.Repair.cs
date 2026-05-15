@@ -102,6 +102,11 @@ public partial class AIController
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
         ConstructionManager currentBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
 
+        TeamObjectivePlan capBlockPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        bool isBlockingCapTarget = capBlockPlan != null && IsBlockingCaptureTarget(unit, capBlockPlan, aiTeam);
+        if (isBlockingCapTarget)
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} em {fromCell} bloqueia capturador designado — priorizando saida do predio");
+
         if (paths == null || paths.Count == 0)
         {
             if (TryBuildRepairLastStandAttack(unit, aiTeam, fromCell, currentBldg, paths, occupied, out PlayerAction noPathLastStand))
@@ -115,7 +120,7 @@ public partial class AIController
             && currentBldg.TeamId == aiTeam && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax)
         {
             bool safe = !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);
-            if (safe)
+            if (safe && !isBlockingCapTarget)
             {
                 Debug.Log($"{TL("Repair")} {unit.InstanceId} aguarda reparo em {fromCell} (conquistado, setor seguro)");
                 return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
@@ -129,7 +134,7 @@ public partial class AIController
                 Vector3Int ac = ally.CurrentCellPosition; ac.z = 0;
                 if (SectorManager.HexDistance(ac, fromCell) <= DefenseEnemyRange) { hasReplacement = true; break; }
             }
-            if (!hasReplacement)
+            if (!hasReplacement && !isBlockingCapTarget)
             {
                 // Sem substituto: defende o prédio enquanto aguarda reparo
                 if (HasAttackTargetAtCurrentPos(unit))

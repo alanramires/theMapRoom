@@ -1911,10 +1911,10 @@ public class PanelHelperController : MonoBehaviour
             case KeyCode.F6: return Keyboard.current.f6Key.wasPressedThisFrame;
             case KeyCode.F7: return Keyboard.current.f7Key.wasPressedThisFrame;
             case KeyCode.F8: return Keyboard.current.f8Key.wasPressedThisFrame;
-            case KeyCode.F9: return false; // disabled - próxima versão (era: Keyboard.current.f9Key.wasPressedThisFrame)
+            case KeyCode.F9: return Keyboard.current.f9Key.wasPressedThisFrame;
             case KeyCode.F10: return Keyboard.current.f10Key.wasPressedThisFrame;
             case KeyCode.F11: return Keyboard.current.f11Key.wasPressedThisFrame;
-            case KeyCode.F12: return Keyboard.current.f12Key.wasPressedThisFrame;
+            case KeyCode.F12: return false; // reserved — AI Resume (DebugManager)
             default: return false;
         }
     }

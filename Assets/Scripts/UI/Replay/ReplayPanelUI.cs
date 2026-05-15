@@ -151,7 +151,7 @@ public class ReplayPanelUI : MonoBehaviour
 
     private static bool WasKeyPressedThisFrame(KeyCode key)
     {
-        if (key == KeyCode.F9)
+        if (key == KeyCode.F12)
             return false;
 
 #if ENABLE_INPUT_SYSTEM

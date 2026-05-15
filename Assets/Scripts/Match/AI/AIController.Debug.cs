@@ -192,7 +192,7 @@ public partial class AIController
             Debug.Log($"[AI Step] {previewMessage}");
 
         PanelDialogController.TrySetExternalText(
-            $"AI Step\n{description}\nF11: executar | F9: resume");
+            $"AI Step\n{description}\nF11: executar | F12: resume");
 
         if (!previewShown)
             Debug.Log("[AI Step] Preview visual indisponivel para este batch.");

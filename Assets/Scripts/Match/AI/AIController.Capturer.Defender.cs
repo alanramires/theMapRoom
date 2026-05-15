@@ -87,9 +87,15 @@ public partial class AIController
                         defBest.InstanceId.ToString(), dtCell);
                 }
             }
-            string holdKind = activeCriticalHomeDefense ? "SOS" : "guarda";
-            Debug.Log($"{TL("Defensor")} {unit.InstanceId} segura {assigned.Sector} ({holdKind}) — mantém posição");
-            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+            bool isLongRangeStationary = unit.TryGetUnitData(out UnitData stationaryUd) && stationaryUd != null && stationaryUd.longRangeStationary;
+            if (!activeCriticalHomeDefense || isLongRangeStationary)
+            {
+                string holdKind = activeCriticalHomeDefense ? "SOS" : "guarda";
+                Debug.Log($"{TL("Defensor")} {unit.InstanceId} segura {assigned.Sector} ({holdKind}) — mantém posição");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+            }
+            // SOS crítico + móvel: cai na lógica de zona para avaliar mover+atacar
+            Debug.Log($"{TL("Defensor")} {unit.InstanceId} SOS {assigned.Sector} — busca mover+atacar na zona");
         }
 
         if (defPaths == null) return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);

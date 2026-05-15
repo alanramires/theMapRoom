@@ -42,9 +42,9 @@ public partial class AIController
                 {
                     SectorObjective tObj = ResolveAssignedTransportObjective(opt.transporterUnit, plan);
                     bool sectorMatch = tObj != null && tObj.Sector == assigned.Sector;
-                    // Secondary capturer: also accepts APC with no formal passenger (shuttle mode)
-                    bool freeTransport = !isPrimaryCapturador
-                        && (tObj == null || ResolveAssignedPassengerUnit(tObj, snapshot.AITeam) == null);
+                    // Any capturer may board an APC with no formal passenger — it is a free shuttle
+                    // and will reorient to this capturer's objective regardless of plan sector.
+                    bool freeTransport = tObj == null || ResolveAssignedPassengerUnit(tObj, snapshot.AITeam) == null;
                     if (sectorMatch || freeTransport) { best = opt; break; }
                 }
             }
@@ -188,28 +188,44 @@ public partial class AIController
         bool isPrimary = unitData.roles != null && unitData.roles.Count > 0
             && unitData.roles[0] == UnitRole.Capturador;
         bool sameSector = assigned != null && tObj != null && tObj.Sector == assigned.Sector;
-        bool shuttleFree = !isPrimary
-            && (tObj == null || ResolveAssignedPassengerUnit(tObj, unit.TeamId) == null);
-        bool rogueEmbark = assigned == null
-            && (tObj == null || ResolveAssignedPassengerUnit(tObj, unit.TeamId) == null);
-        if (!sameSector && !shuttleFree && !rogueEmbark) return false;
-        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromHex, "hex embarque"))
+        // Any capturer may board an APC with no formal passenger — free shuttle reorients to this objective.
+        bool shuttleFree = tObj == null || ResolveAssignedPassengerUnit(tObj, unit.TeamId) == null;
+        bool rogueEmbark = assigned == null && shuttleFree;
+        if (!sameSector && !shuttleFree)
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor: assigned={assigned?.Sector} tObj={tObj?.Sector} sameSector={sameSector} shuttleFree={shuttleFree} isPrimary={isPrimary} transporter={transporter.InstanceId}");
+            return false;
+        }
+        Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
+        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromCell, "hex embarque"))
             return false;
 
         // Pickup range: usa fromHex (posição após movimento) para não bloquear embarque estendido.
-        Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
         Vector3Int pickupRef = fromHex; pickupRef.z = 0;
-        if (SectorManager.HexDistance(pickupRef, tCell) > ShuttlePickupRange + 1 + 0.5f) return false;
+        float pickupDist = SectorManager.HexDistance(pickupRef, tCell);
+        if (pickupDist > ShuttlePickupRange + 1 + 0.5f)
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO pickup: pickupDist={pickupDist:F0}h > {ShuttlePickupRange + 1 + 0.5f} fromHex={fromHex} tCell={tCell}");
+            return false;
+        }
 
         // Verifica custo de embarque vs MP restante no hex intermediário
         if (!UnitMovementPathRules.TryGetEnterCellCost(
                 boardTilemap, unit, tCell, terrainDatabase, false, out int embarkCost))
             embarkCost = 1;
         embarkCost = Mathf.Max(1, embarkCost);
-        if (remainingMPAtHex < embarkCost) return false;
+        if (remainingMPAtHex < embarkCost)
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO MP: remainingMPAtHex={remainingMPAtHex} < embarkCost={embarkCost} tCell={tCell}");
+            return false;
+        }
 
         int slotIdx = FindFittingSlotIndex(transporter, tData, unit, unitData);
-        if (slotIdx < 0) return false;
+        if (slotIdx < 0)
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO slot: sem slot disponível em transporter={transporter.InstanceId}");
+            return false;
+        }
 
         if (ShouldYieldEmbarkToNeedierCapturer(unit, transporter, assigned, plan))
             return false;

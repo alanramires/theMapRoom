@@ -131,6 +131,8 @@ public partial class AIController
             List<PodeDesembarcarOption> optionsFromMove = SimulateDisembarkFromCell(unit, moveTarget);
             if (optionsFromMove != null && optionsFromMove.Count > 0)
             {
+                var optCells = string.Join(", ", optionsFromMove.ConvertAll(o => { var c = o.disembarkCell; c.z = 0; return $"{c}({SectorManager.HexDistance(c, primaryTarget):F0}h)"; }));
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} simDisembark from {moveTarget}: [{optCells}] → target={primaryTarget}");
                 List<PodeDesembarcarOption> selectedFromMove =
                     SelectBestDisembarkPerPassenger(optionsFromMove, passengers, plan, snapshot);
                 PodeDesembarcarOption primaryOpt = selectedFromMove.Count > 0
@@ -138,10 +140,12 @@ public partial class AIController
                 if (primaryOpt != null)
                 {
                     Vector3Int dc = primaryOpt.disembarkCell; dc.z = 0;
-                    if (SectorManager.HexDistance(dc, primaryTarget) <= dropOffRange)
+                    bool dcInRange = SectorManager.HexDistance(dc, primaryTarget) <= dropOffRange;
+                    bool truckInRange = SectorManager.HexDistance(moveTarget, primaryTarget) <= dropOffRange;
+                    if (dcInRange || truckInRange)
                     {
                         paths.TryGetValue(moveTarget, out List<Vector3Int> movePath);
-                        Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — move+desembarca {selectedFromMove.Count} passageiro(s) via {moveTarget} → {primaryTarget}");
+                        Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — move+desembarca {selectedFromMove.Count} passageiro(s) via {moveTarget} dc={dc} dcDist={SectorManager.HexDistance(dc, primaryTarget):F0}h truckDist={SectorManager.HexDistance(moveTarget, primaryTarget):F0}h → {primaryTarget}");
                         return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selectedFromMove, moveTarget, movePath);
                     }
                 }
@@ -164,7 +168,9 @@ public partial class AIController
                 if (primaryOption != null)
                 {
                     Vector3Int dc = primaryOption.disembarkCell; dc.z = 0;
-                    bool inRangeP2 = isStuck || SectorManager.HexDistance(dc, primaryTarget) <= dropOffRange;
+                    bool inRangeP2 = isStuck
+                        || SectorManager.HexDistance(dc, primaryTarget) <= dropOffRange
+                        || SectorManager.HexDistance(fromCell, primaryTarget) <= dropOffRange;
                     if (inRangeP2)
                     {
                         string reason = isStuck ? "bloqueado, libera carga" : $"desembarca para {primaryTarget}";
@@ -273,7 +279,7 @@ public partial class AIController
         float threat)
     {
         disembarkCell.z = 0;
-        float score = -distToAssignedTarget * 20f - threat * 8f;
+        float score = -distToAssignedTarget * 20f;
 
         // FireSupport units prioritize defensive position quality — they fight from where they land.
         if (IsFireSupportUnit(passenger))
@@ -355,6 +361,8 @@ public partial class AIController
                     if (!slot.Filled || slot.AssignedUnitId != passenger.InstanceId) continue;
                     ConstructionManager tgt = FindCapturableInSector(obj.Sector, snapshot.AITeam, fallbackCell);
                     if (tgt != null) { target = tgt.CurrentCellPosition; target.z = 0; }
+                    else if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo si))
+                    { target = si.RepresentativeCell; target.z = 0; }
                     Debug.Log($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} setor={obj.Sector} capturable={target} (fallback={fallbackCell})");
                     slotFound = true; break;
                 }
