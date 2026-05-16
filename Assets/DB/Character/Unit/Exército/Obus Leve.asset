@@ -33,7 +33,7 @@ MonoBehaviour:
   combatClassification: 2
   roles: 0500000002000000
   aiInitiative: 2
-  aiPurchaseMode: 0
+  aiPurchaseMode: 2
   aiTargetPreferenceByClass:
   - targetClass: 1
     priority: 2

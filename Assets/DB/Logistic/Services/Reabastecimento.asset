@@ -23,7 +23,7 @@ MonoBehaviour:
   recuperaAutonomia: 1
   recuperaMunicao: 0
   apenasEntreSupridores: 0
-  percentCost: 10
+  percentCost: 5
   suppliesUsed:
   - {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
   serviceEfficiency:
@@ -33,4 +33,5 @@ MonoBehaviour:
     value: 2
   - armorWeaponClass: 2
     value: 1
+  costWeight: []
   serviceLimitPerUnitPerTurn: 0

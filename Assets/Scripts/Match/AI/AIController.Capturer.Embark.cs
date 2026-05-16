@@ -22,14 +22,19 @@ public partial class AIController
         PodeEmbarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase,
             Mathf.Max(0, unit.RemainingMovementPoints), options);
 
-        SectorObjective assigned = plan != null ? ResolveAssignedObjective(unit, plan) : null;
-        // Multi-role units (e.g. Assalto+Capturador) may have no Capturer slot but still have
-        // a plan assignment in another role — use that to avoid falling back to nearest capturable.
+        // capturerAssigned: slot de capturador exclusivo — usado para o skip de embarque.
+        // Rogues (sem slot de capturador) recebem null e nunca pulam o embarque por
+        // "estar perto do objetivo", pois seu destino real é o HQ inimigo, não o setor.
+        SectorObjective capturerAssigned = plan != null ? ResolveAssignedObjective(unit, plan) : null;
+
+        // assigned: ampliado para multi-role (e.g. Assalto+Capturador) que não têm slot de
+        // capturador mas têm atribuição em outro role — usado para sector match do APC.
+        SectorObjective assigned = capturerAssigned;
         if (assigned == null && plan != null)
             assigned = ResolveAnyAssignedObjective(unit, plan);
 
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
-        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromCell, "origem"))
+        if (ShouldSkipCapturerEmbarkForShortWalk(unit, capturerAssigned, fromCell, "origem"))
             return null;
 
         PodeEmbarcarOption best = null;
@@ -40,6 +45,7 @@ public partial class AIController
             {
                 foreach (PodeEmbarcarOption opt in options)
                 {
+                    if (opt.transporterUnit == null || opt.transporterUnit.IsUnderRepair) continue;
                     SectorObjective tObj = ResolveAssignedTransportObjective(opt.transporterUnit, plan);
                     bool sectorMatch = tObj != null && tObj.Sector == assigned.Sector;
                     // Any capturer may board an APC with no formal passenger — it is a free shuttle
@@ -53,6 +59,7 @@ public partial class AIController
                 // Capturador rogue: embark oportunista em transporter rogue (sem plano).
                 foreach (PodeEmbarcarOption opt in options)
                 {
+                    if (opt.transporterUnit == null || opt.transporterUnit.IsUnderRepair) continue;
                     SectorObjective tObj = plan != null
                         ? ResolveAssignedTransportObjective(opt.transporterUnit, plan) : null;
                     if (tObj == null) { best = opt; break; }
@@ -178,7 +185,7 @@ public partial class AIController
 
         UnitManager transporter = UnitOccupancyRules.GetUnitAtCell(boardTilemap, tCell, unit);
         if (transporter == null || transporter.TeamId != unit.TeamId) return false;
-        if (transporter.IsDead || transporter.IsEmbarked) return false;
+        if (transporter.IsDead || transporter.IsEmbarked || transporter.IsUnderRepair) return false;
         if (!transporter.TryGetUnitData(out UnitData tData) || !tData.isTransporter) return false;
 
         // Primary capturer: APC must be assigned to the same sector.
@@ -249,11 +256,14 @@ public partial class AIController
         if (unit == null)
             return false;
 
+        // Rogues marcham ao HQ inimigo, não ao capturável mais próximo.
+        // A referência de distância seria inválida — sempre permite embarque.
+        if (assigned == null)
+            return false;
+
         candidateCell.z = 0;
 
-        ConstructionManager objBuilding = assigned != null
-            ? FindCapturableInSector(assigned.Sector, unit.TeamId)
-            : FindNearestCapturableForUnit(unit, candidateCell);
+        ConstructionManager objBuilding = FindCapturableInSector(assigned.Sector, unit.TeamId);
 
         if (objBuilding == null)
             return false;

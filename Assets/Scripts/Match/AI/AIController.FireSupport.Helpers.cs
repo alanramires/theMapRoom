@@ -588,9 +588,10 @@ public partial class AIController
         }
 
         float moveMargin = moveMarginOverride >= 0f ? moveMarginOverride : 120f;
+        bool enemyNearAnchor = HasNearbyVisibleEnemy(anchor, snapshot.AITeam, defenseEnemyRange + maxRange);
         if (!found || bestCell == fromCell)
         {
-            if (foundAdvance && fromDist > maxRange)
+            if (foundAdvance && fromDist > maxRange && enemyNearAnchor)
             {
                 bestCell = bestAdvanceCell;
                 reason = $"advanceFallback route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
@@ -602,7 +603,7 @@ public partial class AIController
 
         if (bestScore < fromScore + moveMargin)
         {
-            if (foundAdvance && fromDist > maxRange)
+            if (foundAdvance && fromDist > maxRange && enemyNearAnchor)
             {
                 bestCell = bestAdvanceCell;
                 reason = $"advanceFallback score={bestScore:F0} hold={fromScore:F0} route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";

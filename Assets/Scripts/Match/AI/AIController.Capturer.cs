@@ -267,12 +267,23 @@ public partial class AIController
                     return BuildMoveBatch(unit, snapshot.AITeam, fromCell, cell, paths);
                 }
             }
+            // Bloqueado sem avanço possível (aliado ocupa o alvo, fogo inimigo controla o setor, etc.).
+            // Tenta captura oportunista de emergência antes de esperar — inclui hex atual e ignora
+            // reservas, pois qualquer captura útil vale mais que ficar parado.
+            if (TryFindOpportunisticCapture(unit, paths, occupied, targetCell,
+                    out Vector3Int emergencyOpCell, excludeCurrentCell: false, skippedCaptureCells: null))
+            {
+                Debug.Log($"{TL("Oportunista")} {unit.InstanceId} captura oportunista de emergência @ {emergencyOpCell} (avanço bloqueado em {assigned.Sector})");
+                return DecideCapturerOpportunistAction(unit, snapshot, assigned, fromCell, emergencyOpCell, paths);
+            }
+
             UnitManager occupant = HexOccupancyQuery.FindUnitAtCell(targetCell);
             if (occupant != null && occupant.TeamId == snapshot.AITeam)
             {
                 Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} aguarda {assigned.Sector} — aliado {occupant.InstanceId} ocupa o alvo");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
             }
+
             return null;
         }
 

@@ -25,7 +25,8 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git tag *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\Unity Projects\\\\The Map Room\\\\Assets\\\\Scripts\\\\Match\\\\AI\\\\\" -Recurse -File | Select-Object -ExpandProperty FullName)"
     ]
   }
 }

@@ -111,7 +111,20 @@ public static class HexEvaluator
             return new List<HexEvaluation> { repairEntry };
         }
 
-        CaptureContext ctx = ResolveContext(unit, myTeam, fromCell, boardTilemap, unitData);
+        // Constrói listas de posição uma vez para toda a avaliação desta unidade.
+        // ResolveContext e ScoreHex reutilizam as mesmas listas em vez de reiterar AllActive
+        // para cada hex candidato (O(candidatos × unidades) → O(unidades) por unidade que age).
+        var alliedPos = new List<Vector3Int>();
+        var enemyPos  = new List<Vector3Int>();
+        foreach (UnitManager u in UnitManager.AllActive)
+        {
+            if (u == unit || u.IsEmbarked || u.IsDead) continue;
+            Vector3Int p = u.CurrentCellPosition; p.z = 0;
+            if (u.TeamId == myTeam) alliedPos.Add(p);
+            else                    enemyPos.Add(p);
+        }
+
+        CaptureContext ctx = ResolveContext(unit, myTeam, fromCell, boardTilemap, unitData, alliedPos, enemyPos);
 
         resolvedRole      = ctx.role;
         resolvedTarget    = ctx.hasTarget ? ctx.targetCell : fromCell;
@@ -136,6 +149,7 @@ public static class HexEvaluator
             HexEvaluation eval = ScoreHex(
                 unit, myTeam, cell, fromCell, ctx,
                 boardTilemap, terrainDatabase, targetBuffer,
+                alliedPos, enemyPos,
                 preferMoveOnBestDpq, prioritizeDpqAtBattle, turnStateManager, suppressSafety);
             results.Add(eval);
         }
@@ -165,20 +179,9 @@ public static class HexEvaluator
     // -----------------------------------------------------------------
 
     private static CaptureContext ResolveContext(
-        UnitManager unit, TeamId myTeam, Vector3Int fromCell, Tilemap boardTilemap, UnitData unitData)
+        UnitManager unit, TeamId myTeam, Vector3Int fromCell, Tilemap boardTilemap, UnitData unitData,
+        List<Vector3Int> alliedPos, List<Vector3Int> enemyPos)
     {
-        // Snapshot de posições de aliados e inimigos
-        var alliedPos = new List<Vector3Int>();
-        var enemyPos  = new List<Vector3Int>();
-
-        foreach (UnitManager u in UnitManager.AllActive)
-        {
-            if (u == unit || u.IsEmbarked || u.IsDead) continue;
-            Vector3Int p = u.CurrentCellPosition; p.z = 0;
-            if (u.TeamId == myTeam) alliedPos.Add(p);
-            else                    enemyPos.Add(p);
-        }
-
         // ----------------------------------------------------------
         // Prioridade 1: CaptureNow — já está em cima de prédio capturável
         // ----------------------------------------------------------
@@ -304,6 +307,8 @@ public static class HexEvaluator
         Tilemap boardTilemap,
         TerrainDatabase terrainDatabase,
         List<PodeMirarTargetOption> buffer,
+        List<Vector3Int> alliedPos,
+        List<Vector3Int> enemyPos,
         bool preferMoveOnBestDpq = false,
         bool prioritizeDpqAtBattle = false,
         TurnStateManager turnStateManager = null,
@@ -423,11 +428,9 @@ public static class HexEvaluator
         // cohesion — aliados dentro do raio contribuem positivamente
         // ----------------------------------------------------------
         float cohesionAccum = 0f;
-        foreach (UnitManager u in UnitManager.AllActive)
+        foreach (Vector3Int aPos in alliedPos)
         {
-            if (u == unit || u.IsEmbarked || u.IsDead || u.TeamId != myTeam) continue;
-            Vector3Int uCell = u.CurrentCellPosition; uCell.z = 0;
-            float dist = WorldDist(boardTilemap, cell, uCell);
+            float dist = WorldDist(boardTilemap, cell, aPos);
             if (dist <= CohesionRadius)
                 cohesionAccum += (CohesionRadius - dist) / CohesionRadius;
         }
@@ -456,11 +459,9 @@ public static class HexEvaluator
         else
         {
             float exposureAccum = 0f;
-            foreach (UnitManager u in UnitManager.AllActive)
+            foreach (Vector3Int ePos in enemyPos)
             {
-                if (u.IsEmbarked || u.IsDead || u.TeamId == myTeam) continue;
-                Vector3Int uCell = u.CurrentCellPosition; uCell.z = 0;
-                float dist = WorldDist(boardTilemap, cell, uCell);
+                float dist = WorldDist(boardTilemap, cell, ePos);
                 if (dist <= SafetyThreatRadius)
                     exposureAccum += (SafetyThreatRadius - dist) / SafetyThreatRadius;
             }

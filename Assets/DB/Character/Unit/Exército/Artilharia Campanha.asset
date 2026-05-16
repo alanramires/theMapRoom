@@ -89,7 +89,7 @@ MonoBehaviour:
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: 196d938a8ddb1e245ac7ab070d89f387, type: 2}
     squadAmmunition: 3
-    operationRangeMin: 2
+    operationRangeMin: 3
     operationRangeMax: 4
     selectedTrajectory: 1
     canBeFireOnlyAtDomainHeigh: []

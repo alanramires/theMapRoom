@@ -310,6 +310,7 @@ public partial class AIController
         Debug.Log($"{TL()} Fase2 — iniciando ações.");
         plannedDestinations.Clear();
         var deferredUnitIds = new HashSet<int>();
+        Dictionary<int, int> prevGroupCache = null;
 
         while (isActive && !IsMatchEnded())
         {
@@ -331,7 +332,9 @@ public partial class AIController
             }
 
             // Reconstrói a foto do mundo após cada batch — hexes ocupados mudam
-            AIWorldSnapshot current = AIWorldSnapshot.Build(aiTeam, matchController);
+            // BuildLight omite campos não usados pelos handlers (MyUnits, EnemyUnits,
+            // OccupiedCells, Stance), reduzindo custo de ~50 iterações por unidade.
+            AIWorldSnapshot current = AIWorldSnapshot.BuildLight(aiTeam, matchController);
 
             // Ordena iniciativa por grupo (menor = age primeiro):
             // 0 = vacater handoff / blocker com inimigo adjacente
@@ -339,10 +342,16 @@ public partial class AIController
             // 2 = objetivo normal  3 = rogue/sem objetivo
             // 4 = IsUnderRepair / manutencao - age por ultimo
             TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+            InvalidateStaleThreatObjectives(activePlan, aiTeam);
 
             // Pre-pass: atualiza estado de reparo antes do sort para que IsUnderRepair
             // esteja correto quando GetInitiativeGroup classificar cada unidade.
             foreach (UnitManager u in available) UpdateRepairState(u, activePlan);
+
+            // Pre-computa grupos uma vez por unidade (evita O(N log N) chamadas no comparador).
+            var groupCache = new Dictionary<int, int>(available.Count);
+            foreach (UnitManager u in available)
+                groupCache[u.InstanceId] = GetInitiativeGroup(u, activePlan, aiTeam);
 
             // LOG: ordem de iniciativa antes de agir
             {
@@ -350,7 +359,7 @@ public partial class AIController
                 initLog.AppendLine($"{TL()} Fase2 iniciativa ({available.Count} unidades):");
                 foreach (UnitManager u in available)
                 {
-                    int g  = GetInitiativeGroup(u, activePlan, aiTeam);
+                    int g  = groupCache[u.InstanceId];
                     Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
                     Vector3Int? tgt = GetAssignedTargetCell(u, activePlan);
                     string tgtStr = tgt.HasValue ? tgt.Value.ToString() : "null";
@@ -359,38 +368,58 @@ public partial class AIController
                 Debug.Log(initLog.ToString());
             }
 
-            available.Sort((a, b) =>
+            // Dirty flag: grupos podem mudar após cada ação (captura concluída, reparo, etc.).
+            // Só re-sort quando ao menos um grupo mudou em relação à iteração anterior.
+            bool needsSort = prevGroupCache == null;
+            if (!needsSort)
             {
-                int groupA = GetInitiativeGroup(a, activePlan, aiTeam);
-                int groupB = GetInitiativeGroup(b, activePlan, aiTeam);
-
-                if (groupA != groupB) return groupA.CompareTo(groupB);
-
-                // Dentro do grupo 0: blocker (IsBlockingCaptureTarget) age antes de vacater/outros
-                if (groupA == 0 && activePlan != null)
+                foreach (UnitManager u in available)
                 {
-                    bool blockerA = IsBlockingCaptureTarget(a, activePlan, aiTeam);
-                    bool blockerB = IsBlockingCaptureTarget(b, activePlan, aiTeam);
-                    if (blockerA != blockerB) return blockerA ? -1 : 1;
+                    if (!prevGroupCache.TryGetValue(u.InstanceId, out int prev) || prev != groupCache[u.InstanceId])
+                    {
+                        needsSort = true;
+                        break;
+                    }
                 }
+            }
 
-                // Dentro do grupo 2: prioridade do objetivo (pri=1 = age primeiro)
-                if (groupA == 2 && activePlan != null)
+            if (needsSort)
+            {
+                available.Sort((a, b) =>
                 {
-                    SectorObjective objA = ResolveAnyAssignedObjective(a, activePlan);
-                    SectorObjective objB = ResolveAnyAssignedObjective(b, activePlan);
-                    if (objA == null && objB == null) return b.CurrentHP.CompareTo(a.CurrentHP);
-                    if (objA == null) return 1;
-                    if (objB == null) return -1;
+                    int groupA = groupCache[a.InstanceId];
+                    int groupB = groupCache[b.InstanceId];
 
-                    int cmp = objA.Priority.CompareTo(objB.Priority);
-                    if (cmp != 0) return cmp;
+                    if (groupA != groupB) return groupA.CompareTo(groupB);
+
+                    // Dentro do grupo 0: blocker (IsBlockingCaptureTarget) age antes de vacater/outros
+                    if (groupA == 0 && activePlan != null)
+                    {
+                        bool blockerA = IsBlockingCaptureTarget(a, activePlan, aiTeam);
+                        bool blockerB = IsBlockingCaptureTarget(b, activePlan, aiTeam);
+                        if (blockerA != blockerB) return blockerA ? -1 : 1;
+                    }
+
+                    // Dentro do grupo 2: prioridade do objetivo (pri=1 = age primeiro)
+                    if (groupA == 2 && activePlan != null)
+                    {
+                        SectorObjective objA = ResolveAnyAssignedObjective(a, activePlan);
+                        SectorObjective objB = ResolveAnyAssignedObjective(b, activePlan);
+                        if (objA == null && objB == null) return b.CurrentHP.CompareTo(a.CurrentHP);
+                        if (objA == null) return 1;
+                        if (objB == null) return -1;
+
+                        int cmp = objA.Priority.CompareTo(objB.Priority);
+                        if (cmp != 0) return cmp;
+
+                        return b.CurrentHP.CompareTo(a.CurrentHP);
+                    }
 
                     return b.CurrentHP.CompareTo(a.CurrentHP);
-                }
+                });
+            }
 
-                return b.CurrentHP.CompareTo(a.CurrentHP);
-            });
+            prevGroupCache = groupCache;
 
             UnitManager unit = available[0];
             PlayerAction action = DecideUnitAction(unit, current);

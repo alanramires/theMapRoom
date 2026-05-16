@@ -66,6 +66,44 @@ public class AIWorldSnapshot
         return snap;
     }
 
+    /// <summary>
+    /// Versão leve para o loop por-unidade da Fase 2.
+    /// Preenche apenas os campos consumidos pelos handlers de role;
+    /// omite MyUnits, EnemyUnits, OccupiedCells, Stance e IncomePerTurn.
+    /// </summary>
+    public static AIWorldSnapshot BuildLight(TeamId aiTeam, MatchController match)
+    {
+        var snap = new AIWorldSnapshot();
+        snap.AITeam     = aiTeam;
+        snap.TurnNumber = match != null ? match.CurrentTurn : 0;
+        snap.Budget     = match != null ? match.GetActualMoney(aiTeam) : 0;
+
+        // MyUnits: necessário para o handler de Logistics (FindLogisticsServiceTarget,
+        // TryBuildLogisticsSupplyAction, CalculateLogisticsRearAreaScore, etc.).
+        // Omitimos OccupiedCells e EnemyUnits (com seu custo de fog-of-war) — nenhum
+        // handler de role lê essas listas do snapshot.
+        foreach (UnitManager u in UnitManager.AllActive)
+        {
+            if (u.IsDead || u.IsEmbarked) continue;
+            if (u.TeamId == aiTeam) snap.MyUnits.Add(u);
+        }
+
+        foreach (ConstructionManager c in ConstructionManager.AllActive)
+        {
+            if (c.TeamId == aiTeam)
+            {
+                if (c.IsPlayerHeadQuarter && snap.MyHQ == null) snap.MyHQ = c;
+            }
+            else if (c.TeamId != TeamId.Neutral)
+            {
+                snap.EnemyBuildings.Add(c);
+                if (c.IsPlayerHeadQuarter && snap.EnemyHQ == null) snap.EnemyHQ = c;
+            }
+        }
+
+        return snap;
+    }
+
     private static AIStance CalculateStance(AIWorldSnapshot snap)
     {
         // Defensiva: inimigo a ≤4 células do nosso QG

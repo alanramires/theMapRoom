@@ -23,7 +23,7 @@ MonoBehaviour:
   recuperaAutonomia: 0
   recuperaMunicao: 1
   apenasEntreSupridores: 0
-  percentCost: 25
+  percentCost: 10
   suppliesUsed:
   - {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
   serviceEfficiency:

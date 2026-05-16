@@ -1129,6 +1129,69 @@ public partial class AIController
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Mid-turn threat invalidation
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Removes Defending objectives whose threat was eliminated mid-turn.
+    /// Called at the top of every Phase 2 iteration after fog refresh so that
+    /// units freed from a stale defense plan can redirect immediately.
+    /// </summary>
+    internal void InvalidateStaleThreatObjectives(TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (plan == null) return;
+
+        for (int i = plan.Objectives.Count - 1; i >= 0; i--)
+        {
+            SectorObjective obj = plan.Objectives[i];
+            if (obj.Status != ObjectiveStatus.Defending) continue;
+
+            bool stillThreatened;
+            if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo info))
+            {
+                // Critical home sectors use the broader HomeDefenseThreatRange check
+                // (covers capture-in-progress and nearby enemies at construction level).
+                bool criticalHomeThreat = IsCriticalHomeDefenseSector(info, aiTeam)
+                    && IsHomeDefenseThreatened(info, aiTeam, HomeDefenseThreatRange);
+                if (criticalHomeThreat)
+                {
+                    stillThreatened = true;
+                }
+                else
+                {
+                    Vector3Int rc = info.RepresentativeCell; rc.z = 0;
+                    stillThreatened = HasNearbyVisibleEnemy(rc, aiTeam, defenseEnemyRange);
+                    // Base sectors are rectangles — also scan each construction cell
+                    // so enemies near corner buildings aren't missed by the representative cell.
+                    if (!stillThreatened && ConstructionSectorHelper.IsBase(obj.Sector))
+                    {
+                        foreach (SectorManager.SectorConstructionInfo c in info.Constructions)
+                        {
+                            Vector3Int cc = c.Cell; cc.z = 0;
+                            if (HasNearbyVisibleEnemy(cc, aiTeam, defenseEnemyRange))
+                            {
+                                stillThreatened = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                stillThreatened = true; // can't confirm — preserve
+            }
+
+            if (!stillThreatened)
+            {
+                Debug.Log($"{TL("Plan")} Objetivo defensivo {obj.Sector} invalidado mid-turn (ameaça eliminada)");
+                ClearObjectiveHUD(obj);
+                plan.Objectives.RemoveAt(i);
+            }
+        }
+    }
+
     private void ApplyPlanHUD(UnitManager unit, SectorObjective obj, UnitRole role = UnitRole.Capturador)
     {
         string sectorName = obj.Sector.ToString();
