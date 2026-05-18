@@ -44,22 +44,22 @@ MonoBehaviour:
   prioritizeDpqAtBattle: 0
   playConservative: 0
   preferMoveOnBestDPQ: 0
-  preferMaxDisplacement: 0
+  preferMaxDisplacement: 1
   longRangeStationary: 0
   preferRepositionAtWeaponMaxRange: 0
   preferArtilleryModeBeforeCombatant: 0
   useAttackDecision: 1
-  attackAcceptHpLossPercent: 50
+  attackAcceptHpLossPercent: 90
   attackEliminationMinPercent: 10
   attackMustSurvive: 1
   ignoreAttackDecisionWhenDefending: 0
   defensiveAttackExtraHpLossPercent: 20
-  repairTriggerHpBelow: 0
-  repairTriggerAutonomyPct: 0
-  repairTriggerAmmoEnabled: 0
+  repairTriggerHpBelow: 5
+  repairTriggerAutonomyPct: 30
+  repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
-  fuseWhileInRepair: 0
+  fuseWhileInRepair: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
   aiConservativeSupplyAvoidEnemyRange: 2

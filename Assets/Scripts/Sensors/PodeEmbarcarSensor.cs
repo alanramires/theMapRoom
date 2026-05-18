@@ -219,6 +219,54 @@ public static class PodeEmbarcarSensor
         return false;
     }
 
+    // Checks whether a given cell is a valid stopping position for a transporter to
+    // receive passengers, using only the asset's allowedEmbark* terrain/construction
+    // rules (no AircraftOperationRules check — assumed valid by the caller's path set).
+    public static bool IsTransporterCellValidForEmbark(
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        UnitData transporterData,
+        Vector3Int cell)
+    {
+        if (transporterData == null) return true;
+
+        bool hasConstructionFilter = transporterData.allowedEmbarkWhenTransporterAtConstructions != null
+            && transporterData.allowedEmbarkWhenTransporterAtConstructions.Count > 0;
+        bool hasStructureFilter = transporterData.allowedEmbarkWhenTransporterAtTerrainStructures != null
+            && transporterData.allowedEmbarkWhenTransporterAtTerrainStructures.Count > 0;
+        bool hasTerrainFilter = transporterData.allowedEmbarkWhenTransporterAtTerrains != null
+            && transporterData.allowedEmbarkWhenTransporterAtTerrains.Count > 0;
+
+        if (!hasConstructionFilter && !hasStructureFilter && !hasTerrainFilter)
+            return true;
+
+        cell.z = 0;
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(map, cell);
+        if (construction != null && construction.TryResolveConstructionData(out ConstructionData constructionData) && constructionData != null)
+        {
+            if (hasConstructionFilter)
+                return transporterData.allowedEmbarkWhenTransporterAtConstructions.Contains(constructionData);
+            return true; // construction present, no filter = allowed
+        }
+
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(map, cell);
+        if (structure != null)
+        {
+            if (!hasStructureFilter) return false;
+            if (!TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrainAtStructure) || terrainAtStructure == null) return false;
+            PairRuleMatchResult pairResult = EvaluateEmbarkStructureTerrainPair(
+                transporterData.allowedEmbarkWhenTransporterAtTerrainStructures, structure, terrainAtStructure);
+            return pairResult == PairRuleMatchResult.Allowed;
+        }
+
+        if (hasTerrainFilter
+            && TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain)
+            && terrain != null)
+            return transporterData.allowedEmbarkWhenTransporterAtTerrains.Contains(terrain);
+
+        return false;
+    }
+
     private static PairRuleMatchResult EvaluateEmbarkStructureTerrainPair(
         List<TransportStructureTerrainRule> rules,
         StructureData structure,

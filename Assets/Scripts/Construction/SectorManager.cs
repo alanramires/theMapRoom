@@ -57,7 +57,9 @@ public sealed class SectorManager : MonoBehaviour
     {
         [SerializeField] public string ConstructionName;
         [SerializeField] public int    InstanceId;
-        [SerializeField] public float  Distance;
+        [SerializeField] public float  Distance;        // foot reference
+        [SerializeField] public float  VehicleDistance; // vehicle reference (APC, includes road bonus)
+        [SerializeField] public float  AirDistance;     // air reference (hex distance — air ignores terrain)
         [SerializeField] public bool   IsHQ;
     }
 
@@ -71,6 +73,20 @@ public sealed class SectorManager : MonoBehaviour
         {
             for (int i = 0; i < Entries.Count; i++)
                 if (Entries[i].IsHQ) return Entries[i].Distance;
+            return float.MaxValue;
+        }
+
+        public float GetHQVehicleDistance()
+        {
+            for (int i = 0; i < Entries.Count; i++)
+                if (Entries[i].IsHQ) return Entries[i].VehicleDistance;
+            return float.MaxValue;
+        }
+
+        public float GetHQAirDistance()
+        {
+            for (int i = 0; i < Entries.Count; i++)
+                if (Entries[i].IsHQ) return Entries[i].AirDistance;
             return float.MaxValue;
         }
 
@@ -162,6 +178,38 @@ public sealed class SectorManager : MonoBehaviour
             for (int i = 0; i < sectorDistances.Count; i++)
                 if (sectorDistances[i].Team == team) return sectorDistances[i].GetHQDistance();
             return float.MaxValue;
+        }
+
+        public float GetVehicleDistanceToHQ(TeamId team)
+        {
+            for (int i = 0; i < sectorDistances.Count; i++)
+                if (sectorDistances[i].Team == team) return sectorDistances[i].GetHQVehicleDistance();
+            return float.MaxValue;
+        }
+
+        public float GetAirDistanceToHQ(TeamId team)
+        {
+            for (int i = 0; i < sectorDistances.Count; i++)
+                if (sectorDistances[i].Team == team) return sectorDistances[i].GetHQAirDistance();
+            return float.MaxValue;
+        }
+
+        public enum TransportPreference { Vehicle, Air, Either }
+
+        // Compara distância de veículo vs ar para o HQ do time.
+        // Air:     vehicle > air + tieZoneHex (montanhas — helicóptero claramente melhor)
+        // Vehicle: vehicle <= air             (estradas — APC claramente melhor)
+        // Either:  empate técnico             (usa demanda para decidir)
+        public TransportPreference GetTransportPreference(TeamId team, int tieZoneHex = 2)
+        {
+            float vehicle = GetVehicleDistanceToHQ(team);
+            float air     = GetAirDistanceToHQ(team);
+            if (vehicle >= float.MaxValue * 0.5f) return TransportPreference.Air;
+            if (air     >= float.MaxValue * 0.5f) return TransportPreference.Vehicle;
+            float diff = vehicle - air;
+            if (diff > tieZoneHex) return TransportPreference.Air;
+            if (diff <= 0)         return TransportPreference.Vehicle;
+            return TransportPreference.Either;
         }
 
         public float GetNearestFactoryDistance(TeamId team)
@@ -286,7 +334,8 @@ public sealed class SectorManager : MonoBehaviour
     [SerializeField] private bool useTerrainCostForNeighborDistances = true;
     [SerializeField] private Tilemap neighborDistanceTilemap;
     [SerializeField] private TerrainDatabase neighborDistanceTerrainDatabase;
-    [SerializeField] private UnitData neighborDistanceReferenceUnitData;
+    [SerializeField] private UnitData neighborDistanceReferenceUnitData;  // foot reference (soldier)
+    [SerializeField] private UnitData neighborDistanceVehicleUnitData;    // vehicle reference (APC)
     [SerializeField] private List<SectorInfo> sectorInfos = new List<SectorInfo>();
     [SerializeField] private List<SectorInfo> baseInfos   = new List<SectorInfo>();
 
@@ -602,6 +651,9 @@ public sealed class SectorManager : MonoBehaviour
         List<ConstructionSector> sectors = new List<ConstructionSector>(grouped.Keys);
         sectors.Sort((a, b) => ((int)a).CompareTo((int)b));
 
+        SectorNeighborDistanceContext neighborDistanceContext = BuildNeighborDistanceContext();
+        SectorNeighborDistanceContext vehicleDistanceContext = BuildNeighborDistanceContext(neighborDistanceVehicleUnitData);
+
         for (int i = 0; i < sectors.Count; i++)
         {
             ConstructionSector sector = sectors[i];
@@ -652,7 +704,7 @@ public sealed class SectorManager : MonoBehaviour
                 statusText,
                 entries);
 
-            // Distâncias hex unificadas por time (HQ + fábricas)
+            // Distâncias por time (HQ + fábricas) — foot/vehicle terrain-aware, air = hex puro
             var teamDistMap = new Dictionary<TeamId, SectorTeamDistances>();
 
             foreach (KeyValuePair<TeamId, (string name, Vector3Int cell)> kv in hqByTeam)
@@ -666,7 +718,9 @@ public sealed class SectorManager : MonoBehaviour
                 {
                     ConstructionName = kv.Value.name,
                     InstanceId       = 0,
-                    Distance         = ComputeHexDistance(representativeCell, kv.Value.cell),
+                    Distance         = ComputeSectorNeighborDistance(representativeCell, kv.Value.cell, neighborDistanceContext),
+                    VehicleDistance  = ComputeSectorNeighborDistance(representativeCell, kv.Value.cell, vehicleDistanceContext),
+                    AirDistance      = ComputeHexDistance(representativeCell, kv.Value.cell),
                     IsHQ             = true,
                 });
             }
@@ -682,7 +736,9 @@ public sealed class SectorManager : MonoBehaviour
                 {
                     ConstructionName = f.ConstructionDisplayName,
                     InstanceId       = f.InstanceId,
-                    Distance         = ComputeHexDistance(representativeCell, f.CurrentCellPosition),
+                    Distance         = ComputeSectorNeighborDistance(representativeCell, f.CurrentCellPosition, neighborDistanceContext),
+                    VehicleDistance  = ComputeSectorNeighborDistance(representativeCell, f.CurrentCellPosition, vehicleDistanceContext),
+                    AirDistance      = ComputeHexDistance(representativeCell, f.CurrentCellPosition),
                     IsHQ             = false,
                 });
             }
@@ -700,8 +756,6 @@ public sealed class SectorManager : MonoBehaviour
                 sectorInfoBySector[sector] = info;
             }
         }
-
-        SectorNeighborDistanceContext neighborDistanceContext = BuildNeighborDistanceContext();
 
         // Segundo passo: 2 vizinhos capturáveis mais próximos por setor (células representativas)
         for (int i = 0; i < sectorInfos.Count; i++)

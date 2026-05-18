@@ -50,6 +50,10 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
         }
 
+        // EVAC: no capturer to shuttle — check for frontline unit-under-repair before releasing.
+        PlayerAction evacAction = TryDecideEvacShuttleAction(unit, snapshot, plan, paths, occupied);
+        if (evacAction != null) return evacAction;
+
         // No pickup candidate: release to HexEvaluator for opportunistic combat/positioning.
         // Capture actions are suppressed for Transportador units in the Router.
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — sem candidato, libera para suporte de combate");

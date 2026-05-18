@@ -73,6 +73,20 @@ public partial class AIController
                 out string reason))
         {
             Debug.Log($"{TL("Logistics")} {unit.InstanceId} move retaguarda via {moveCell} {reason}");
+
+            // When forced to vacate a producer, opportunistically supply from the destination.
+            if (reason.StartsWith("desocupa_produtora") && moveCell != fromCell)
+            {
+                bool allowPreventive = IsPreventiveLogisticsAllowed(unit, snapshot, fromCell, paths, occupied);
+                int limit = GetLogisticsServiceLimit(unit);
+                List<UnitManager> vacateSupply = CollectLogisticsTargetsInServiceRange(unit, snapshot, moveCell, limit, allowPreventive);
+                if (vacateSupply.Count > 0 && IsLogisticsServiceCellAllowed(unit, snapshot, moveCell))
+                {
+                    Debug.Log($"{TL("Logistics")} {unit.InstanceId} desocupa_produtora + supre {vacateSupply.Count} unidade(s) via {moveCell}");
+                    return BuildSupplyBatch(unit, snapshot.AITeam, fromCell, moveCell, vacateSupply, paths);
+                }
+            }
+
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
         }
 

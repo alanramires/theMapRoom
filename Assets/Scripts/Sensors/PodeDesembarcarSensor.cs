@@ -246,12 +246,28 @@ public static class PodeDesembarcarSensor
             SensorMovementMode.MoveuParado);
 
         bool canLand = landingProbe.available && landingProbe.action == AircraftOperationAction.Land;
-        status.isValid = canLand;
-        status.explanation = canLand
-            ? "Pouso autorizado neste hex para o transportador."
-            : (string.IsNullOrWhiteSpace(landingProbe.reason)
+        if (!canLand)
+        {
+            status.isValid = false;
+            status.explanation = string.IsNullOrWhiteSpace(landingProbe.reason)
                 ? "Pouso nao autorizado neste hex para o transportador."
-                : landingProbe.reason);
+                : landingProbe.reason;
+            return status;
+        }
+
+        // Terrain/construction allow landing — but also check for blocking-layer units at
+        // this hex. A helicopter at height 4 can coexist with a ground unit at height 3
+        // (different HeightBands), but cannot physically LAND while a ground unit is present.
+        UnitManager blockingUnit = FindBlockingGroundUnitAtHex(transporter, map);
+        if (blockingUnit != null)
+        {
+            status.isValid = false;
+            status.explanation = $"Hex bloqueado por unidade em camada terrestre ({blockingUnit.name}). Pouso impossivel.";
+            return status;
+        }
+
+        status.isValid = true;
+        status.explanation = "Pouso autorizado neste hex para o transportador.";
         return status;
     }
 
@@ -598,6 +614,16 @@ public static class PodeDesembarcarSensor
             return false;
         }
 
+        // Terrain/construction allow landing — also verify no blocking-layer unit occupies
+        // this hex. Air units (height 4) can coexist with ground units (height 3) in flight,
+        // but landing requires the blocking layer to be free.
+        UnitManager blockingUnit = FindBlockingGroundUnitAtHex(transporter, map);
+        if (blockingUnit != null)
+        {
+            reason = $"Hex bloqueado por unidade em camada terrestre ({blockingUnit.name}). Pouso impossivel.";
+            return false;
+        }
+
         return IsContextAllowedByTransporterCurrentHexDisembarkRules(
             map,
             terrainDatabase,
@@ -767,6 +793,42 @@ public static class PodeDesembarcarSensor
         if (!string.IsNullOrWhiteSpace(terrain.id))
             return terrain.id;
         return terrain.name;
+    }
+
+    // Returns the first HeightBand.Blocking unit found at the transporter's cell (excluding
+    // the transporter itself, embarked, dead). Air units at height 4 can fly over ground
+    // units at height 3, but cannot land while a blocking-layer occupant is present.
+    private static UnitManager FindBlockingGroundUnitAtHex(UnitManager transporter, Tilemap map)
+    {
+        if (transporter == null || map == null)
+            return null;
+
+        Vector3Int cell = transporter.CurrentCellPosition;
+        cell.z = 0;
+
+        var all = UnitManager.AllActive;
+        for (int i = 0; i < all.Count; i++)
+        {
+            UnitManager other = all[i];
+            if (other == null || other == transporter || other.IsEmbarked || other.IsDead)
+                continue;
+            if (!other.gameObject.activeInHierarchy)
+                continue;
+            if (other.BoardTilemap == null || other.BoardTilemap != map)
+                continue;
+            if (other.gameObject.scene != map.gameObject.scene)
+                continue;
+
+            Vector3Int otherCell = other.CurrentCellPosition;
+            otherCell.z = 0;
+            if (otherCell != cell)
+                continue;
+
+            if (OccupancyResolver.GetHeightBand(other) == HeightBand.Blocking)
+                return other;
+        }
+
+        return null;
     }
 
     private enum PairRuleMatchResult

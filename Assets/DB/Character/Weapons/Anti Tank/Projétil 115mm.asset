@@ -21,7 +21,9 @@ MonoBehaviour:
   aditionalDomainsAllowed:
   - domain: 1
     heightLevel: 3
-  basicAttack: 8
+  forceOpponentToGoToDomainAfterHit: []
+  unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit: []
+  basicAttack: 7
   weaponCategory: 1
   weaponClass: 1
   operationRangeMin: 2

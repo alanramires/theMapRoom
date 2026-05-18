@@ -1907,7 +1907,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -3328,7 +3328,7 @@ MonoBehaviour:
   sector: 101
   constructionId: fabrica
   instanceId: 124
-  currentPosition: {x: -2.5979297, y: -4.5, z: 0}
+  currentPosition: {x: -2.5979295, y: -4.5, z: 0}
   constructionDisplayName: "F\xE1brica"
   autoApplyOnStart: 1
   siteRuntime:
@@ -13472,7 +13472,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -15036,7 +15036,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -16350,7 +16350,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -28538,7 +28538,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -30304,7 +30304,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -31296,7 +31296,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 1500
     startMoneyApplied: 1
   includeNeutralTeam: 0
   economyEnabled: 1
@@ -31341,7 +31341,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 842688763
+  cachedConstructionIncomeSignature: 653725601
   cachedConstructionIncomeCount: 28
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -32608,7 +32608,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -35436,7 +35436,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -38461,6 +38461,42 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 411233360}
   m_CullTransparentMesh: 1
+--- !u!21 &413109250
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Runtime_UnitActedGlow
+  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _GlowSize: 1.5
+    - _GlowStrength: 1.25
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &413835315
 GameObject:
   m_ObjectHideFlags: 0
@@ -43715,7 +43751,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -46393,7 +46429,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -46830,7 +46866,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -53634,6 +53670,7 @@ MonoBehaviour:
   CapturersPerPreventiveTransport: 4
   ProgressiveCapturerBatchSize: 2
   AssaultPerFireSupportRatio: 2
+  MaxProactiveDefensiveFireSupport: 1
 --- !u!1 &570950479
 GameObject:
   m_ObjectHideFlags: 0
@@ -69970,7 +70007,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -72726,7 +72763,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -73018,7 +73055,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -76689,7 +76726,7 @@ MonoBehaviour:
   sector: 101
   constructionId: fabrica
   instanceId: 123
-  currentPosition: {x: -1.7319531, y: -4.5, z: 0}
+  currentPosition: {x: -1.7319533, y: -4.5, z: 0}
   constructionDisplayName: "F\xE1brica"
   autoApplyOnStart: 1
   siteRuntime:
@@ -80072,7 +80109,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -83194,7 +83231,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -85545,7 +85582,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -89525,7 +89562,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -98054,7 +98091,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -104639,7 +104676,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -108109,7 +108146,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -132825,7 +132862,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -134351,7 +134388,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -138456,7 +138493,7 @@ MonoBehaviour:
   sector: 7
   constructionId: cidade
   instanceId: 125
-  currentPosition: {x: -2.5979297, y: 0, z: 0}
+  currentPosition: {x: -2.5979295, y: 0, z: 0}
   constructionDisplayName: Cidade
   autoApplyOnStart: 1
   siteRuntime:
@@ -152870,7 +152907,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -155302,7 +155339,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -155519,7 +155556,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -161484,7 +161521,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -164895,7 +164932,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -172335,42 +172372,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1828509793}
   m_CullTransparentMesh: 1
---- !u!21 &1828535392
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Runtime_UnitActedGlow
-  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _GlowSize: 1.5
-    - _GlowStrength: 1.25
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &1828778656
 GameObject:
   m_ObjectHideFlags: 0
@@ -180744,12 +180745,8 @@ MonoBehaviour:
         Distance: 11
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 14
+        InstanceId: 98
+        Distance: 13
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 121
@@ -180764,8 +180761,12 @@ MonoBehaviour:
         Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 13
+        InstanceId: 99
+        Distance: 14
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 9
         IsHQ: 0
     - Team: 0
       Entries:
@@ -180774,28 +180775,28 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 4
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
         Distance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 3
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 119
         Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 4
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 3
         IsHQ: 0
     closestNeighbor1: 5
     closestNeighbor1Distance: 3
@@ -180836,11 +180837,7 @@ MonoBehaviour:
         Distance: 10
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 98
         Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -180856,8 +180853,12 @@ MonoBehaviour:
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 99
         Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 13
         IsHQ: 0
     - Team: 0
       Entries:
@@ -180866,28 +180867,28 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 4
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
         Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 119
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 4
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 10
         IsHQ: 0
     closestNeighbor1: 11
     closestNeighbor1Distance: 4
@@ -180928,12 +180929,8 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 4
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 10
+        InstanceId: 98
+        Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 121
@@ -180948,8 +180945,12 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 9
+        InstanceId: 99
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 4
         IsHQ: 0
     - Team: 0
       Entries:
@@ -180958,7 +180959,19 @@ MonoBehaviour:
         Distance: 10
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 95
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
         Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -180966,19 +180979,7 @@ MonoBehaviour:
         Distance: 13
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 117
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 94
-        Distance: 10
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 116
         Distance: 10
         IsHQ: 0
     closestNeighbor1: 4
@@ -181020,12 +181021,8 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 3
+        InstanceId: 98
+        Distance: 4
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 121
@@ -181040,8 +181037,12 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 4
+        InstanceId: 99
+        Distance: 3
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 9
         IsHQ: 0
     - Team: 0
       Entries:
@@ -181050,28 +181051,28 @@ MonoBehaviour:
         Distance: 11
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
         Distance: 10
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 14
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 119
         Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 14
         IsHQ: 0
     closestNeighbor1: 12
     closestNeighbor1Distance: 3
@@ -181112,12 +181113,8 @@ MonoBehaviour:
         Distance: 10
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 13
+        InstanceId: 98
+        Distance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 121
@@ -181132,8 +181129,12 @@ MonoBehaviour:
         Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 12
+        InstanceId: 99
+        Distance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 7
         IsHQ: 0
     - Team: 0
       Entries:
@@ -181142,28 +181143,28 @@ MonoBehaviour:
         Distance: 9
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
         Distance: 10
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 119
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 6
         IsHQ: 0
     closestNeighbor1: 5
     closestNeighbor1Distance: 2
@@ -181204,12 +181205,8 @@ MonoBehaviour:
         Distance: 9
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 12
+        InstanceId: 98
+        Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 121
@@ -181224,8 +181221,12 @@ MonoBehaviour:
         Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 11
+        InstanceId: 99
+        Distance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 6
         IsHQ: 0
     - Team: 0
       Entries:
@@ -181234,28 +181235,28 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 10
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
         Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 119
         Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 5
         IsHQ: 0
     closestNeighbor1: 4
     closestNeighbor1Distance: 2
@@ -181296,12 +181297,8 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 10
+        InstanceId: 98
+        Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 121
@@ -181316,8 +181313,12 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 9
+        InstanceId: 99
+        Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 5
         IsHQ: 0
     - Team: 0
       Entries:
@@ -181326,7 +181327,19 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
+        InstanceId: 117
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 119
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 95
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 116
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -181334,19 +181347,7 @@ MonoBehaviour:
         Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 117
-        Distance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 94
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 119
-        Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 116
         Distance: 6
         IsHQ: 0
     closestNeighbor1: 5
@@ -181388,12 +181389,8 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 9
+        InstanceId: 98
+        Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 121
@@ -181408,8 +181405,12 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 8
+        InstanceId: 99
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 6
         IsHQ: 0
     - Team: 0
       Entries:
@@ -181418,19 +181419,7 @@ MonoBehaviour:
         Distance: 5
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
-        Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -181438,7 +181427,19 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
         Distance: 5
         IsHQ: 0
     closestNeighbor1: 6
@@ -181480,12 +181481,8 @@ MonoBehaviour:
         Distance: 5
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 7
+        InstanceId: 98
+        Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 121
@@ -181500,8 +181497,12 @@ MonoBehaviour:
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 6
+        InstanceId: 99
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 5
         IsHQ: 0
     - Team: 0
       Entries:
@@ -181510,19 +181511,7 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -181530,7 +181519,19 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
         Distance: 6
         IsHQ: 0
     closestNeighbor1: 7
@@ -181572,11 +181573,7 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 98
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -181592,7 +181589,11 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 99
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
         Distance: 6
         IsHQ: 0
     - Team: 0
@@ -181602,28 +181603,28 @@ MonoBehaviour:
         Distance: 5
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
         Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 7
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 119
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 7
         IsHQ: 0
     closestNeighbor1: 8
     closestNeighbor1Distance: 2
@@ -181664,11 +181665,7 @@ MonoBehaviour:
         Distance: 5
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 98
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -181684,8 +181681,12 @@ MonoBehaviour:
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 99
         Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 7
         IsHQ: 0
     - Team: 0
       Entries:
@@ -181694,28 +181695,28 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
         Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 119
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 9
         IsHQ: 0
     closestNeighbor1: 9
     closestNeighbor1Distance: 2
@@ -181756,11 +181757,7 @@ MonoBehaviour:
         Distance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 98
         Distance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -181776,8 +181773,12 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 99
         Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 9
         IsHQ: 0
     - Team: 0
       Entries:
@@ -181786,28 +181787,28 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
         Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 119
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 10
         IsHQ: 0
     closestNeighbor1: 10
     closestNeighbor1Distance: 2
@@ -181848,11 +181849,7 @@ MonoBehaviour:
         Distance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 10
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 98
         Distance: 5
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -181868,8 +181865,12 @@ MonoBehaviour:
         Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 99
         Distance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 10
         IsHQ: 0
     - Team: 0
       Entries:
@@ -181878,28 +181879,28 @@ MonoBehaviour:
         Distance: 9
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
         Distance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 119
         Distance: 7
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 12
         IsHQ: 0
     closestNeighbor1: 11
     closestNeighbor1Distance: 2
@@ -181940,12 +181941,8 @@ MonoBehaviour:
         Distance: 9
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 6
+        InstanceId: 98
+        Distance: 7
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 121
@@ -181960,8 +181957,12 @@ MonoBehaviour:
         Distance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 7
+        InstanceId: 99
+        Distance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 12
         IsHQ: 0
     - Team: 0
       Entries:
@@ -181970,28 +181971,28 @@ MonoBehaviour:
         Distance: 10
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
         Distance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 13
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 119
         Distance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 13
         IsHQ: 0
     closestNeighbor1: 12
     closestNeighbor1Distance: 2
@@ -182075,11 +182076,7 @@ MonoBehaviour:
         Distance: 11
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
+        InstanceId: 98
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -182095,7 +182092,11 @@ MonoBehaviour:
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 99
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
         Distance: 11
         IsHQ: 0
     - Team: 0
@@ -182105,28 +182106,28 @@ MonoBehaviour:
         Distance: 0
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 2
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 3
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
         Distance: 1
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
-        Distance: 3
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 119
         Distance: 2
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 2
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
         Distance: 1
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 3
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
+        Distance: 3
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -182209,12 +182210,8 @@ MonoBehaviour:
         Distance: 0
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 124
-        Distance: 3
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 99
-        Distance: 3
+        InstanceId: 98
+        Distance: 2
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 121
@@ -182229,8 +182226,12 @@ MonoBehaviour:
         Distance: 1
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
-        Distance: 2
+        InstanceId: 99
+        Distance: 3
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 124
+        Distance: 3
         IsHQ: 0
     - Team: 0
       Entries:
@@ -182239,19 +182240,7 @@ MonoBehaviour:
         Distance: 11
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 95
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 120
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 117
-        Distance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 94
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -182259,7 +182248,19 @@ MonoBehaviour:
         Distance: 11
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 95
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 116
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 120
+        Distance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 94
         Distance: 11
         IsHQ: 0
     closestNeighbor1: 0
@@ -182888,7 +182889,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -184266,7 +184267,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -186559,7 +186560,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -188914,7 +188915,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -192288,7 +192289,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -200820,7 +200821,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -205199,7 +205200,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -205783,7 +205784,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1828535392}
+  - {fileID: 413109250}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

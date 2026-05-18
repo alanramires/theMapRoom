@@ -3,7 +3,7 @@ using UnityEngine;
 
 public partial class AIController
 {
-    private const int TransportDropOffRange = 3;
+    private const int TransportDropOffRange = 4;
     // Delivery range, not weapon range: artillery should be carried to the sector front
     // before DPQ decides the exact landing hex.
     private const int FireSupportDropOffRange = 3;
@@ -21,6 +21,9 @@ public partial class AIController
 
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
+
+        if (data.domain == Domain.Air)
+            return TryDecideAirTransportAction(unit, snapshot, plan);
 
         // Courier does NOT scan for new pickups — it is delivering existing cargo.
         // The next rogue-shuttle turn (empty APC) handles new pickups.

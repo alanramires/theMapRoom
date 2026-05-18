@@ -20,7 +20,7 @@ public partial class AIController
             return DecideRogueShuttleAction(unit, snapshot, plan);
         }
 
-        UnitManager primaryPassenger = ResolvePrimaryPassenger(passengers);
+        UnitManager primaryPassenger = ResolvePrimaryPassenger(passengers, plan);
         bool primaryTargetFound = TryResolveCourierPassengerTarget(primaryPassenger, plan, snapshot, assignedSectorTarget, fromCell, out Vector3Int primaryTarget);
         if (!primaryTargetFound) primaryTarget = fromCell;
         int dropOffRange = IsFireSupportUnit(primaryPassenger) ? FireSupportDropOffRange : TransportDropOffRange;
@@ -33,6 +33,11 @@ public partial class AIController
 
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+
+        // EVAC mode: passenger is under repair → deliver to nearest safe repair location.
+        UnitManager evacuee = passengers.Find(p => p.IsUnderRepair);
+        if (evacuee != null)
+            return DecideEvacCourierAction(unit, evacuee, passengers, snapshot, fromCell, paths, occupied);
 
         Vector3Int moveTarget = FindTransportMove(unit, fromCell, primaryTarget, paths, occupied, snapshot.AITeam);
 
@@ -329,17 +334,33 @@ public partial class AIController
         return list;
     }
 
-    private static UnitManager ResolvePrimaryPassenger(List<UnitManager> passengers)
+    private static UnitManager ResolvePrimaryPassenger(List<UnitManager> passengers, TeamObjectivePlan plan = null)
     {
         UnitManager best = passengers[0];
         int bestPriority = int.MaxValue;
+        bool bestIsAssigned = false;
         foreach (UnitManager p in passengers)
         {
             if (!p.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
             int priority = (int)d.roles[0];
-            if (priority < bestPriority) { bestPriority = priority; best = p; }
+            bool isAssigned = plan != null && IsPassengerInPlanSlot(p, plan);
+            bool isBetter = priority < bestPriority
+                || (priority == bestPriority && isAssigned && !bestIsAssigned);
+            if (isBetter) { bestPriority = priority; bestIsAssigned = isAssigned; best = p; }
         }
         return best;
+    }
+
+    private static bool IsPassengerInPlanSlot(UnitManager passenger, TeamObjectivePlan plan)
+    {
+        if (plan == null || passenger == null || plan.Objectives == null) return false;
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj.Slots == null) continue;
+            foreach (SlotNeed slot in obj.Slots)
+                if (slot.Filled && slot.AssignedUnitId == passenger.InstanceId) return true;
+        }
+        return false;
     }
 
     // For each passenger, picks the best delivery cell, preferring immediate capture chances

@@ -123,9 +123,11 @@ public partial class AIController
                         else if (d < near2) near2 = d;
                     }
                     float gap = near2 - near1;
-                    if (near2 == float.MaxValue || gap > MaxArrivalGap)
+                    // Gate only applies when ≥2 capturers exist to compare; with 0 or 1 the plan
+                    // must still admit the sector so shopping can buy the needed capturers.
+                    if (near2 < float.MaxValue && gap > MaxArrivalGap)
                     {
-                        Debug.Log($"{TL("Plan")} Setor {info.Sector} ignorado: risco alto, batedor muito distante (gap={(near2 == float.MaxValue ? "?" : gap.ToString("F0"))}h)");
+                        Debug.Log($"{TL("Plan")} Setor {info.Sector} ignorado: risco alto, batedor muito distante (gap={gap:F0}h)");
                         continue;
                     }
                 }
@@ -138,13 +140,18 @@ public partial class AIController
                 Status       = ObjectiveStatus.Pending,
                 Priority     = CalculateSectorPriority(info, aiTeam, snapshot.Stance),
             };
-            int slots = info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High ? 2 : 1;
+            int slots = Mathf.Clamp(Mathf.CeilToInt(info.ConstructionCount / 2f), 1, 4);
+            bool highRisk = info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High;
+            if (highRisk) slots = Mathf.Max(slots, 2);
             for (int s = 0; s < slots; s++)
                 obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
-            if (info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
+            if (highRisk)
                 obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
-            if (info.GetDistanceToHQ(aiTeam) >= GetEffectiveTransportThreshold(aiTeam))
-                obj.Slots.Add(new SlotNeed { Role = UnitRole.Transportador });
+            float distHQ = info.GetDistanceToHQ(aiTeam);
+            int   transThreshold = GetEffectiveTransportThreshold(aiTeam);
+            bool  addTrans = distHQ >= transThreshold;
+            if (addTrans) obj.Slots.Add(new SlotNeed { Role = UnitRole.Transportador });
+            Debug.Log($"{TL("Plan")} {info.Sector}: {slots}xCap{(highRisk ? " +Ass" : "")}{(addTrans ? " +Trans" : "")} dist={distHQ:F0}h threshold={transThreshold}");
             plan.Objectives.Add(obj);
         }
 
@@ -193,14 +200,14 @@ public partial class AIController
                     else if (d < near2) near2 = d;
                 }
                 float gap = near2 - near1;
-                if (near2 == float.MaxValue || gap > MaxArrivalGap)
+                if (near2 < float.MaxValue && gap > MaxArrivalGap)
                 {
-                    Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector} aguarda co-chegada (gap={(near2 == float.MaxValue ? "?" : gap.ToString("F0"))}h)");
+                    Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector} aguarda co-chegada (gap={gap:F0}h)");
                     continue;
                 }
             }
 
-            int capturerSlots = Mathf.Max(2, Mathf.CeilToInt(baseInfo.ConstructionCount / 2f));
+            int capturerSlots = Mathf.Clamp(Mathf.CeilToInt(baseInfo.ConstructionCount / 2f), 2, 4);
             var baseObj = new SectorObjective
             {
                 Sector       = baseInfo.Sector,

@@ -115,6 +115,13 @@ public partial class AIController
             return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
         }
 
+        // EVAC: if in danger, try to board a nearby empty transporter before walking back alone.
+        if (HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange))
+        {
+            PlayerAction evacEmbark = TryEvacEmbarkAction(unit, aiTeam, fromCell, paths);
+            if (evacEmbark != null) return evacEmbark;
+        }
+
         // 1. Prédio conquistado: verifica segurança e presença de substituto
         if (currentBldg != null && currentBldg.IsCapturable
             && currentBldg.TeamId == aiTeam && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax)
@@ -122,6 +129,14 @@ public partial class AIController
             bool safe = !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);
             if (safe && !isBlockingCapTarget)
             {
+                // While waiting for repair, a logistics unit can still receive a factory transfer.
+                if (IsPrimaryLogisticsUnit(unit)
+                    && TryBuildLogisticsTransferReceiveAction(unit, snapshot, fromCell, paths, out PlayerAction transferAction, out string transferReason))
+                {
+                    Debug.Log($"{TL("Repair")} {unit.InstanceId} aguarda reparo + transferência logística {transferReason}");
+                    return transferAction;
+                }
+
                 Debug.Log($"{TL("Repair")} {unit.InstanceId} aguarda reparo em {fromCell} (conquistado, setor seguro)");
                 return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
             }
@@ -372,8 +387,16 @@ public partial class AIController
         }
 
         // Avança para o destino: mínima distância hex + mínima ameaça
+        // Pass HQ as secondary anchor — cells blocked relative to the primary target
+        // may still make positive progress toward HQ, breaking the deadlock.
+        Vector3Int? hqAlt = null;
+        if (snapshot.MyHQ != null)
+        {
+            Vector3Int hc = snapshot.MyHQ.CurrentCellPosition; hc.z = 0;
+            if (hc != destCell) hqAlt = hc;
+        }
         Vector3Int bestStep = FindRepairApproachStep(
-            unit, aiTeam, fromCell, destCell, repairDest, paths, occupied);
+            unit, aiTeam, fromCell, destCell, repairDest, paths, occupied, hqAlt);
 
         Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
         return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, paths);
@@ -470,7 +493,8 @@ public partial class AIController
         Vector3Int destCell,
         ConstructionManager repairDest,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
-        HashSet<Vector3Int> occupied)
+        HashSet<Vector3Int> occupied,
+        Vector3Int? altDestCell = null)
     {
         if (paths == null || paths.Count == 0)
             return fromCell;
@@ -480,8 +504,52 @@ public partial class AIController
         if (!destOccupied && paths.ContainsKey(destCell))
             return destCell;
 
-        float fromDist = SectorManager.HexDistance(fromCell, destCell);
-        bool fromRouteFound = TryCalculateRouteDistance(unit, fromCell, destCell, out float fromRouteDist);
+        Vector3Int bestStep = ScoreRepairApproach(unit, aiTeam, fromCell, destCell, paths, occupied, homeRepair);
+
+        // Secondary anchor: if still stuck in a hotzone, retry scoring toward HQ (or altDest).
+        // A cell that's -5 toward Mike can be +1 toward HQ — either direction breaks the deadlock.
+        if (bestStep == fromCell
+            && altDestCell.HasValue
+            && altDestCell.Value != destCell
+            && HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange))
+        {
+            Vector3Int altDest = altDestCell.Value; altDest.z = 0;
+            Vector3Int altStep = ScoreRepairApproach(unit, aiTeam, fromCell, altDest, paths, occupied, homeRepair: false);
+            if (altStep != fromCell)
+            {
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} redirecionado p/ âncora secundária {altDest} via {altStep} (destino primário {destCell} bloqueado)");
+                bestStep = altStep;
+            }
+        }
+
+        // Last-resort: if still stuck and in a hotzone, flee to the minimum-threat reachable cell.
+        if (bestStep == fromCell && HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange))
+        {
+            Vector3Int fleeCell = fromCell;
+            float lowestThreat = float.MaxValue;
+            foreach (Vector3Int cell in paths.Keys)
+            {
+                if (cell == fromCell) continue;
+                if (occupied != null && occupied.Contains(cell)) continue;
+                float t = CalculateThreatLevel(cell, aiTeam);
+                if (t < lowestThreat) { lowestThreat = t; fleeCell = cell; }
+            }
+            if (fleeCell != fromCell)
+            {
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} fuga de emergência — todas âncoras bloqueadas; foge p/ {fleeCell} (threat={lowestThreat:F0})");
+                bestStep = fleeCell;
+            }
+        }
+
+        return bestStep;
+    }
+
+    private Vector3Int ScoreRepairApproach(
+        UnitManager unit, TeamId aiTeam, Vector3Int fromCell, Vector3Int target,
+        Dictionary<Vector3Int, List<Vector3Int>> paths, HashSet<Vector3Int> occupied, bool homeRepair)
+    {
+        float fromDist = SectorManager.HexDistance(fromCell, target);
+        bool fromRouteFound = TryCalculateRouteDistance(unit, fromCell, target, out float fromRouteDist);
         Vector3Int bestStep = fromCell;
         float bestScore = float.MinValue;
 
@@ -490,13 +558,17 @@ public partial class AIController
             if (cell != fromCell && occupied != null && occupied.Contains(cell))
                 continue;
 
-            float dist = SectorManager.HexDistance(cell, destCell);
-            bool cellRouteFound = TryCalculateRouteDistance(unit, cell, destCell, out float routeDist);
+            float dist = SectorManager.HexDistance(cell, target);
+            bool cellRouteFound = TryCalculateRouteDistance(unit, cell, target, out float routeDist);
             float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - routeDist : 0f;
             bool recoversMissingRoute = !fromRouteFound && cellRouteFound;
+            // When recovering a missing route, credit progress as if we closed fromDist worth of gap
+            // (treating "no route" as effectively infinite distance). Without this, -routeDist produces
+            // a catastrophic score that always loses to staying put.
             float progress = recoversMissingRoute
-                ? -routeDist
+                ? fromDist
                 : (fromRouteFound && cellRouteFound) ? routeProgress : fromDist - dist;
+            float recoveryBonus = recoversMissingRoute ? 5000f : 0f;
             float effectiveDist = cellRouteFound ? routeDist : dist;
             float threat = CalculateThreatLevel(cell, aiTeam);
             float pathCost = cell == fromCell ? 0f : GetPathStepCount(paths, cell);
@@ -506,11 +578,12 @@ public partial class AIController
                 progress * 1200f
                 - effectiveDist * 180f
                 - pathCost * 4f
-                - threat * ThreatWeight * threatMult;
+                - threat * ThreatWeight * threatMult
+                + recoveryBonus;
 
             if (homeRepair && progress > 0f)
                 score += 350f;
-            if (cell == destCell)
+            if (cell == target)
                 score += 10000f;
 
             if (score > bestScore)

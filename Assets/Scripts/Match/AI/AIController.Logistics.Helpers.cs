@@ -144,6 +144,9 @@ public partial class AIController
             if (!critical && !preventive)
                 continue;
 
+            bool preventiveReachable = preventive && !critical
+                && IsReachableLogisticsServiceTarget(logistics, ally, fromCell, paths, occupied);
+
             Vector3Int cell = ally.CurrentCellPosition;
             cell.z = 0;
             float threat = CalculateThreatLevel(cell, snapshot.AITeam);
@@ -153,6 +156,8 @@ public partial class AIController
                 - ally.InstanceId * 0.001f;
             if (reachableCritical)
                 score += 5000f;
+            if (preventiveReachable)
+                score += 2500f;
 
             if (score > bestScore)
             {
@@ -288,8 +293,6 @@ public partial class AIController
                 continue;
 
             float threat = CalculateThreatLevel(cell, snapshot.AITeam);
-            if (!baseDefense && threat > 0f)
-                continue;
 
             float dpq = GetTerrainDpqPontos(cell);
             float pairBonus = targets.Count >= 2 ? 1500f : 0f;

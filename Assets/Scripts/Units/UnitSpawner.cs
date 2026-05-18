@@ -236,6 +236,7 @@ public class UnitSpawner : MonoBehaviour
             manager.AssignSpawnInstanceId(GetNextId());
             manager.SetBoardTilemap(boardTilemap);
             manager.SetTeamId(teamId);
+            manager.SetSlotIndex(ResolveSlotIndexForTeam(teamId));
             manager.Setup(unitDatabase, data.id);
             if (boardTilemap != null)
                 manager.SetCurrentCellPosition(
@@ -393,6 +394,18 @@ public class UnitSpawner : MonoBehaviour
     public void SetNextIdAfterMax(int maxUsedId)
     {
         currentId = Mathf.Max(1, maxUsedId + 1);
+    }
+
+    private int ResolveSlotIndexForTeam(TeamId teamId)
+    {
+        if (teamId == TeamId.Neutral)
+            return -1;
+
+        TryAutoAssignMatchController();
+        if (matchController != null)
+            return matchController.GetSlotIndexForTeam(teamId);
+
+        return -1;
     }
 
     private int GetTargetSortingLayerId()

@@ -81,13 +81,16 @@ public class SectorManagerEditor : Editor
     private SerializedProperty neighborDistanceTilemapProp;
     private SerializedProperty neighborDistanceTerrainDatabaseProp;
     private SerializedProperty neighborDistanceReferenceUnitDataProp;
+    private SerializedProperty neighborDistanceVehicleUnitDataProp;
     private SerializedProperty sectorInfosProp;
     private SerializedProperty baseInfosProp;
     private static readonly System.Collections.Generic.List<SectorEdgeLine> drawnLines = new System.Collections.Generic.List<SectorEdgeLine>();
+    private static readonly System.Collections.Generic.List<SectorEdgeLine> drawnRepLines = new System.Collections.Generic.List<SectorEdgeLine>();
     private static readonly System.Collections.Generic.List<SectorPathMarker> drawnPathMarkers = new System.Collections.Generic.List<SectorPathMarker>();
     private static readonly Color singleSectorLineColor = new Color(0.15f, 0.9f, 1f, 1f);
     private static readonly Color allSectorLineColor = new Color(1f, 0.82f, 0.2f, 1f);
     private static readonly Color pathMarkerColor = new Color(1f, 0.25f, 0.15f, 1f);
+    private static readonly Color repLineColor = new Color(0.2f, 1f, 0.35f, 1f);
 
     private struct SectorEdgeLine
     {
@@ -111,6 +114,7 @@ public class SectorManagerEditor : Editor
         neighborDistanceTilemapProp = serializedObject.FindProperty("neighborDistanceTilemap");
         neighborDistanceTerrainDatabaseProp = serializedObject.FindProperty("neighborDistanceTerrainDatabase");
         neighborDistanceReferenceUnitDataProp = serializedObject.FindProperty("neighborDistanceReferenceUnitData");
+        neighborDistanceVehicleUnitDataProp = serializedObject.FindProperty("neighborDistanceVehicleUnitData");
         sectorInfosProp = serializedObject.FindProperty("sectorInfos");
         baseInfosProp   = serializedObject.FindProperty("baseInfos");
         if (useTerrainCostForNeighborDistancesProp != null && !useTerrainCostForNeighborDistancesProp.boolValue)
@@ -140,7 +144,9 @@ public class SectorManagerEditor : Editor
         if (neighborDistanceTerrainDatabaseProp != null)
             EditorGUILayout.PropertyField(neighborDistanceTerrainDatabaseProp, new GUIContent("Neighbor Distance Terrain DB"));
         if (neighborDistanceReferenceUnitDataProp != null)
-            EditorGUILayout.PropertyField(neighborDistanceReferenceUnitDataProp, new GUIContent("Neighbor Distance Reference Unit Data"));
+            EditorGUILayout.PropertyField(neighborDistanceReferenceUnitDataProp, new GUIContent("Foot Reference (Soldier)"));
+        if (neighborDistanceVehicleUnitDataProp != null)
+            EditorGUILayout.PropertyField(neighborDistanceVehicleUnitDataProp, new GUIContent("Vehicle Reference (APC)"));
 
         EditorGUILayout.Space(4f);
 
@@ -163,16 +169,26 @@ public class SectorManagerEditor : Editor
         }
         EditorGUILayout.EndHorizontal();
 
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Desenhar linhas HQ → Rep (todos)"))
+            DrawAllRepToHQLines(manager);
+        using (new EditorGUI.DisabledScope(drawnRepLines.Count == 0))
+        {
+            if (GUILayout.Button("Limpar linhas HQ → Rep"))
+                ClearRepLines();
+        }
+        EditorGUILayout.EndHorizontal();
+
         EditorGUILayout.Space(6f);
 
-        DrawSectorList(sectorInfosProp, "Sector Infos", manager, enableDrawButtons: true);
+        DrawSectorList(sectorInfosProp, "Sector Infos", manager, enableDrawButtons: true, enableRepButtons: true);
         EditorGUILayout.Space(4f);
-        DrawSectorList(baseInfosProp, "Base Infos", manager, enableDrawButtons: false);
+        DrawSectorList(baseInfosProp, "Base Infos", manager, enableDrawButtons: false, enableRepButtons: true);
 
         serializedObject.ApplyModifiedProperties();
     }
 
-    private static void DrawSectorList(SerializedProperty prop, string label, SectorManager manager, bool enableDrawButtons)
+    private static void DrawSectorList(SerializedProperty prop, string label, SectorManager manager, bool enableDrawButtons, bool enableRepButtons = false)
     {
         if (prop == null)
             return;
@@ -210,14 +226,22 @@ public class SectorManagerEditor : Editor
                     string teamName = tdTeam.enumDisplayNames[Mathf.Clamp(tdTeam.enumValueIndex, 0, tdTeam.enumDisplayNames.Length - 1)];
                     for (int e = 0; e < tdEntries.arraySize; e++)
                     {
-                        SerializedProperty entry = tdEntries.GetArrayElementAtIndex(e);
-                        SerializedProperty isHQ  = entry.FindPropertyRelative("IsHQ");
-                        SerializedProperty dist  = entry.FindPropertyRelative("Distance");
-                        if (isHQ != null && isHQ.boolValue && dist != null && dist.floatValue < float.MaxValue * 0.5f)
-                        {
-                            distParts.Add((dist.floatValue, $"{teamName}: {dist.floatValue:F0}h"));
-                            break;
-                        }
+                        SerializedProperty entry   = tdEntries.GetArrayElementAtIndex(e);
+                        SerializedProperty isHQ    = entry.FindPropertyRelative("IsHQ");
+                        SerializedProperty dist    = entry.FindPropertyRelative("Distance");
+                        SerializedProperty vehDist = entry.FindPropertyRelative("VehicleDistance");
+                        SerializedProperty airDist = entry.FindPropertyRelative("AirDistance");
+                        if (isHQ == null || !isHQ.boolValue || dist == null) continue;
+                        if (dist.floatValue >= float.MaxValue * 0.5f) continue;
+
+                        var parts = new System.Collections.Generic.List<string>();
+                        parts.Add($"👣{dist.floatValue:F0}h");
+                        if (vehDist != null && vehDist.floatValue < float.MaxValue * 0.5f)
+                            parts.Add($"🚗{vehDist.floatValue:F0}h");
+                        if (airDist != null && airDist.floatValue < float.MaxValue * 0.5f)
+                            parts.Add($"✈{airDist.floatValue:F0}h");
+                        distParts.Add((dist.floatValue, $"{teamName}: {string.Join(" ", parts)}"));
+                        break;
                     }
                 }
                 distParts.Sort((a, b) => a.dist.CompareTo(b.dist));
@@ -250,11 +274,15 @@ public class SectorManagerEditor : Editor
 
                 EditorGUI.indentLevel++;
                 EditorGUILayout.LabelField("Neighbors", $"{FormatNeighbor(n1, d1)}  |  {FormatNeighbor(n2, d2)}");
+                EditorGUILayout.BeginHorizontal();
                 if (enableDrawButtons && GUILayout.Button("Desenhar linha"))
                 {
                     DrawLinesForSector(manager, ReadSector(sectorProp), singleSectorLineColor, replaceExisting: true);
                     LogAndDrawNeighborDistanceDebug(ReadSector(sectorProp));
                 }
+                if (enableRepButtons && GUILayout.Button("HQ → Rep"))
+                    DrawRepToHQLines(ReadSector(sectorProp), replaceExisting: true);
+                EditorGUILayout.EndHorizontal();
                 EditorGUI.indentLevel--;
             }
         }
@@ -345,6 +373,91 @@ public class SectorManagerEditor : Editor
         SceneView.RepaintAll();
     }
 
+    private static void ClearRepLines()
+    {
+        drawnRepLines.Clear();
+        SceneView.RepaintAll();
+    }
+
+    private static void DrawRepToHQLines(ConstructionSector sector, bool replaceExisting)
+    {
+        if (replaceExisting)
+            drawnRepLines.Clear();
+
+        SectorManager.SectorInfo info = null;
+        if (!SectorManager.TryGetSectorInfo(sector, out info) || info == null)
+            SectorManager.TryGetBaseInfo(sector, out info);
+        if (info == null) { SceneView.RepaintAll(); return; }
+
+        Vector3Int repCell = info.RepresentativeCell; repCell.z = 0;
+        ConstructionManager[] all = Object.FindObjectsByType<ConstructionManager>(FindObjectsSortMode.None);
+        foreach (ConstructionManager c in all)
+        {
+            if (c == null || !c.IsPlayerHeadQuarter) continue;
+            Vector3Int hqCell = c.CurrentCellPosition; hqCell.z = 0;
+            float dist = GetHQDistanceFromInfo(info, c.TeamId);
+            string distLabel = dist < float.MaxValue * 0.5f ? $" ({dist:F0}h)" : "";
+            drawnRepLines.Add(new SectorEdgeLine
+            {
+                FromCell = hqCell,
+                ToCell   = repCell,
+                Label    = $"HQ({c.TeamId}) → {sector}{distLabel}",
+                Color    = repLineColor,
+            });
+        }
+        SceneView.RepaintAll();
+    }
+
+    private static void DrawAllRepToHQLines(SectorManager manager)
+    {
+        drawnRepLines.Clear();
+        if (manager == null) { SceneView.RepaintAll(); return; }
+
+        ConstructionManager[] all = Object.FindObjectsByType<ConstructionManager>(FindObjectsSortMode.None);
+        var hqs = new System.Collections.Generic.List<ConstructionManager>();
+        foreach (ConstructionManager c in all)
+            if (c != null && c.IsPlayerHeadQuarter) hqs.Add(c);
+
+        foreach (SectorManager.SectorInfo info in manager.SectorInfos)
+            AddRepHQLines(info, hqs);
+        foreach (SectorManager.SectorInfo info in manager.BaseInfos)
+            AddRepHQLines(info, hqs);
+
+        SceneView.RepaintAll();
+    }
+
+    private static void AddRepHQLines(SectorManager.SectorInfo info, System.Collections.Generic.List<ConstructionManager> hqs)
+    {
+        if (info == null) return;
+        Vector3Int repCell = info.RepresentativeCell; repCell.z = 0;
+        foreach (ConstructionManager hq in hqs)
+        {
+            if (hq == null) continue;
+            Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
+            float dist = GetHQDistanceFromInfo(info, hq.TeamId);
+            string distLabel = dist < float.MaxValue * 0.5f ? $" ({dist:F0}h)" : "";
+            drawnRepLines.Add(new SectorEdgeLine
+            {
+                FromCell = hqCell,
+                ToCell   = repCell,
+                Label    = $"HQ({hq.TeamId}) → {info.Sector}{distLabel}",
+                Color    = repLineColor,
+            });
+        }
+    }
+
+    private static float GetHQDistanceFromInfo(SectorManager.SectorInfo info, TeamId team)
+    {
+        if (info == null) return float.MaxValue;
+        foreach (SectorManager.SectorTeamDistances td in info.SectorDistances)
+        {
+            if (td.Team != team) continue;
+            foreach (SectorManager.SectorDistanceEntry e in td.Entries)
+                if (e.IsHQ) return e.Distance;
+        }
+        return float.MaxValue;
+    }
+
     private static void LogAndDrawNeighborDistanceDebug(ConstructionSector sector)
     {
         var entries = new System.Collections.Generic.List<SectorManager.SectorNeighborDistanceDebugEntry>();
@@ -402,7 +515,7 @@ public class SectorManagerEditor : Editor
 
     private static void OnSceneGUI(SceneView sceneView)
     {
-        if (drawnLines.Count == 0)
+        if (drawnLines.Count == 0 && drawnRepLines.Count == 0 && drawnPathMarkers.Count == 0)
             return;
 
         Tilemap map = ResolveDrawTilemap();
@@ -422,6 +535,19 @@ public class SectorManagerEditor : Editor
             Handles.SphereHandleCap(0, from, Quaternion.identity, 0.12f, EventType.Repaint);
             Handles.SphereHandleCap(0, to, Quaternion.identity, 0.12f, EventType.Repaint);
             Handles.Label(mid + new Vector3(0.1f, 0.1f, 0f), line.Label);
+        }
+
+        for (int i = 0; i < drawnRepLines.Count; i++)
+        {
+            SectorEdgeLine line = drawnRepLines[i];
+            Vector3 from = map.GetCellCenterWorld(line.FromCell);
+            Vector3 to = map.GetCellCenterWorld(line.ToCell);
+            Vector3 mid = Vector3.Lerp(from, to, 0.5f);
+
+            Handles.color = line.Color;
+            Handles.DrawAAPolyLine(3f, from, to);
+            Handles.SphereHandleCap(0, to, Quaternion.identity, 0.15f, EventType.Repaint);
+            Handles.Label(mid + new Vector3(0.1f, 0.15f, 0f), line.Label);
         }
 
         for (int i = 0; i < drawnPathMarkers.Count; i++)

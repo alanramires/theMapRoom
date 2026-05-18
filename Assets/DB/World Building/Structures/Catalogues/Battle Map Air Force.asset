@@ -1,0 +1,109 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9fcc8d7ad515dcf47b0af1cea7729cfa, type: 3}
+  m_Name: Battle Map Air Force
+  m_EditorClassIdentifier: Assembly-CSharp::StructureDatabase
+  structures:
+  - {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
+  - {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}
+  roadRoutesByStructure:
+  - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
+    routes:
+    - routeName: Acesso 1
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -4, y: -9, z: 0}
+      - {x: -4, y: -8, z: 0}
+      - {x: -5, y: -7, z: 0}
+    - routeName: Acesso 2
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -2, y: -9, z: 0}
+      - {x: -1, y: -9, z: 0}
+      - {x: 0, y: -9, z: 0}
+      - {x: 1, y: -8, z: 0}
+    - routeName: Principal
+      ownerDatabase: {fileID: 11400000}
+      cells: []
+    - routeName: Route 4
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -3, y: -7, z: 0}
+      - {x: -4, y: -7, z: 0}
+      - {x: -5, y: -7, z: 0}
+      - {x: -6, y: -7, z: 0}
+      - {x: -6, y: -6, z: 0}
+      - {x: -7, y: -5, z: 0}
+      - {x: -6, y: -4, z: 0}
+      - {x: -7, y: -3, z: 0}
+      - {x: -7, y: -2, z: 0}
+      - {x: -7, y: -1, z: 0}
+      - {x: -6, y: 0, z: 0}
+      - {x: -7, y: 1, z: 0}
+      - {x: -6, y: 2, z: 0}
+      - {x: -7, y: 3, z: 0}
+      - {x: -6, y: 4, z: 0}
+      - {x: -7, y: 5, z: 0}
+      - {x: -6, y: 6, z: 0}
+      - {x: -6, y: 7, z: 0}
+      - {x: -5, y: 7, z: 0}
+      - {x: -4, y: 7, z: 0}
+      - {x: -3, y: 7, z: 0}
+      - {x: -2, y: 7, z: 0}
+      - {x: -1, y: 8, z: 0}
+      - {x: 0, y: 8, z: 0}
+      - {x: 1, y: 8, z: 0}
+      - {x: 1, y: 7, z: 0}
+      - {x: 2, y: 7, z: 0}
+      - {x: 3, y: 7, z: 0}
+      - {x: 4, y: 7, z: 0}
+      - {x: 5, y: 6, z: 0}
+      - {x: 6, y: 6, z: 0}
+      - {x: 6, y: 5, z: 0}
+      - {x: 7, y: 5, z: 0}
+      - {x: 8, y: 4, z: 0}
+      - {x: 9, y: 4, z: 0}
+      - {x: 9, y: 3, z: 0}
+      - {x: 10, y: 2, z: 0}
+      - {x: 9, y: 1, z: 0}
+      - {x: 9, y: 0, z: 0}
+      - {x: 8, y: 0, z: 0}
+      - {x: 7, y: -1, z: 0}
+      - {x: 8, y: -2, z: 0}
+      - {x: 8, y: -3, z: 0}
+      - {x: 9, y: -4, z: 0}
+      - {x: 8, y: -5, z: 0}
+      - {x: 7, y: -5, z: 0}
+      - {x: 7, y: -6, z: 0}
+      - {x: 6, y: -6, z: 0}
+      - {x: 5, y: -7, z: 0}
+      - {x: 4, y: -7, z: 0}
+      - {x: 4, y: -8, z: 0}
+      - {x: 3, y: -8, z: 0}
+      - {x: 2, y: -8, z: 0}
+      - {x: 1, y: -8, z: 0}
+      - {x: 0, y: -7, z: 0}
+      - {x: -1, y: -7, z: 0}
+  - structure: {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}
+    routes:
+    - routeName: Ponte 1
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -4, y: -9, z: 0}
+      - {x: -3, y: -9, z: 0}
+      - {x: -2, y: -9, z: 0}
+    - routeName: Ponte 2
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -3, y: -7, z: 0}
+      - {x: -2, y: -7, z: 0}
+      - {x: -1, y: -7, z: 0}

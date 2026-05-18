@@ -130,7 +130,12 @@ public class UnitManager : MonoBehaviour
 
     public TeamId TeamId => teamId;
     public int SlotIndex => slotIndex;
-    public void SetSlotIndex(int index) { slotIndex = index; ResolveTeamIdFromSlot(); }
+    public void SetSlotIndex(int index)
+    {
+        slotIndex = index;
+        ResolveTeamIdFromSlot();
+        UpdateDynamicName();
+    }
     public Tilemap BoardTilemap => boardTilemap;
     public Vector3Int CurrentCellPosition => currentCellPosition;
     public string UnitId => unitId;
