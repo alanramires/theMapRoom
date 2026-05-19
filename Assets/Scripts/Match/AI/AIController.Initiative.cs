@@ -82,9 +82,11 @@ public partial class AIController
 
     // 0 = vacater handoff ou blocker com inimigos adjacentes (libera o hex para o capturador),
 
-    // 1 = unidade ativa liberando corredor/posicionamento,
+    // 1 = helicoptero (posiciona antes da coluna terrestre),
 
-    // 2 = objetivo normal, 3 = rogue/sem objetivo, 4 = reparo/manutencao (age por ultimo).
+    // 2 = unidade ativa liberando corredor/posicionamento,
+
+    // 3 = objetivo normal, 4 = rogue/sem objetivo, 5 = reparo/manutencao (age por ultimo).
 
     private int GetInitiativeGroup(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
 
@@ -100,22 +102,28 @@ public partial class AIController
         // antes do capturador, para que o embarque seja avaliado no turno do passageiro.
         if (plan != null && IsAssignedTransporterWithUnactedPassenger(unit, plan, aiTeam)) return 0;
 
+        // Rogue parado na ponta/corredor de um capturador formal deve agir antes dele:
+        // sair do caminho, embarcar, ou continuar como oportunista sem bloquear o slot bom.
+        if (!unit.IsUnderRepair && plan != null && IsRogueBlockingAssignedCapturerCorridor(unit, plan, aiTeam)) return 0;
+
         // Se um capturador inimigo esta entocado em construcao nossa, fogo de suporte
         // com tiro possivel deve agir antes da infantaria defensora se reposicionar.
         if (!unit.IsUnderRepair && HasFireSupportShotAtOwnedConstructionCapturer(unit, aiTeam)) return 0;
 
         // Manutencao nao preempta a fila. Se estiver em cima de alvo de captura,
         // IsBlockingCaptureTarget ja colocou no grupo 0 acima.
-        if (unit.IsUnderRepair) return 4;
+        if (unit.IsUnderRepair) return 5;
 
-        if (HasFireSupportAttackInCurrentPosition(unit, aiTeam)) return 1;
+        if (IsHelicopterInitiativeUnit(unit)) return 1;
+
+        if (HasFireSupportAttackInCurrentPosition(unit, aiTeam)) return 2;
 
         // Capturador no corredor de outro setor (mais perto do objetivo alheio que o capturador
         // designado a ele) → age antes (grupo 1) para liberar o caminho.
         if (!unit.IsUnderRepair && plan != null)
         {
             Vector3Int unitCell = unit.CurrentCellPosition; unitCell.z = 0;
-            if (IsCapturerInOtherCapturerCorridor(unit, unitCell, plan, aiTeam)) return 1;
+            if (IsCapturerInOtherCapturerCorridor(unit, unitCell, plan, aiTeam)) return 2;
         }
 
         // Assault escort mais perto do objetivo que o capturador designado ao mesmo setor
@@ -123,17 +131,43 @@ public partial class AIController
         if (!unit.IsUnderRepair && plan != null)
         {
             Vector3Int escortCell = unit.CurrentCellPosition; escortCell.z = 0;
-            if (IsAssaultEscortInCapturerCorridor(unit, escortCell, plan, aiTeam)) return 1;
+            if (IsAssaultEscortInCapturerCorridor(unit, escortCell, plan, aiTeam)) return 2;
         }
 
         // Transportador rogue vazio com candidato de pickup no alcance →
         // age antes dos capturadores (grupo 1) para se posicionar adjacente.
-        if (!unit.IsUnderRepair && IsTransporterWithValidPickupCandidate(unit, plan, aiTeam)) return 1;
+        if (!unit.IsUnderRepair && IsTransporterWithValidPickupCandidate(unit, plan, aiTeam)) return 2;
+
+        // Capturador cujo objetivo tem um transportador designado vivo e vazio:
+        // o transportador age no grupo 0; o capturador age logo em seguida (grupo 1)
+        // para garantir embarque antes que outras unidades ocupem os hexes adjacentes.
+        if (!unit.IsUnderRepair && plan != null
+            && IsCapturerWithAvailableAssignedTransporter(unit, plan, aiTeam)) return 2;
 
         bool hasObjective = plan != null && ResolveAnyAssignedObjective(unit, plan) != null;
 
-        return hasObjective ? 2 : 3;
+        return hasObjective ? 3 : 4;
 
+    }
+
+    private static bool IsHelicopterInitiativeUnit(UnitManager unit)
+    {
+        if (unit == null)
+            return false;
+
+        return unit.GetAircraftType() == AircraftType.Helicopter;
+    }
+
+    private static string FormatInitiativeUnitName(UnitManager unit)
+    {
+        if (unit == null)
+            return "Unit?";
+
+        string displayName = !string.IsNullOrWhiteSpace(unit.UnitDisplayName)
+            ? unit.UnitDisplayName.Trim()
+            : "Unit";
+
+        return $"{displayName}#{unit.InstanceId}";
     }
 
     // Retorna true se o transportador está vazio e tem pelo menos um candidato de pickup
@@ -261,6 +295,28 @@ public partial class AIController
         return false;
     }
 
+    // Retorna true se este capturador tem um slot de transportador preenchido no seu objetivo
+    // e o transportador atribuído está vivo e vazio (pronto para embarque).
+    private bool IsCapturerWithAvailableAssignedTransporter(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (!unit.TryGetUnitData(out UnitData data) || data == null
+            || data.roles == null || data.roles.Count == 0
+            || data.roles[0] != UnitRole.Capturador) return false;
+
+        SectorObjective obj = ResolveAssignedObjective(unit, plan);
+        if (obj == null) return false;
+
+        foreach (SlotNeed slot in obj.Slots)
+        {
+            if (slot.Role != UnitRole.Transportador || !slot.Filled) continue;
+            UnitManager transporter = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            if (transporter == null || transporter.IsDead || transporter.IsEmbarked) continue;
+            if (HasTransportCargo(transporter)) continue;
+            return true;
+        }
+        return false;
+    }
+
     // Retorna true se um capturador está mais perto do objetivo de OUTRO setor do que
     // o capturador designado a ele — passa pelo corredor alheio e deve agir primeiro.
     private bool IsAssignedTransporterWithUnactedPassenger(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
@@ -276,6 +332,48 @@ public partial class AIController
 
         UnitManager passenger = ResolveAssignedPassengerUnit(assigned, aiTeam);
         return passenger != null && !passenger.HasActed;
+    }
+
+    private bool IsRogueBlockingAssignedCapturerCorridor(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (unit == null || plan == null || plan.RogueUnitIds == null || !plan.RogueUnitIds.Contains(unit.InstanceId))
+            return false;
+
+        if (!unit.TryGetUnitData(out UnitData data) || data == null
+            || data.roles == null || !data.roles.Contains(UnitRole.Capturador))
+            return false;
+
+        Vector3Int rogueCell = unit.CurrentCellPosition; rogueCell.z = 0;
+
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj == null || obj.Status == ObjectiveStatus.Defending) continue;
+            ConstructionManager target = FindCapturableInSector(obj.Sector, aiTeam);
+            if (target == null) continue;
+
+            Vector3Int targetCell = target.CurrentCellPosition; targetCell.z = 0;
+            float rogueDist = SectorManager.HexDistance(rogueCell, targetCell);
+            if (rogueDist > 6f) continue;
+
+            foreach (SlotNeed slot in obj.Slots)
+            {
+                if (slot == null || !slot.Filled || slot.Role != UnitRole.Capturador) continue;
+                UnitManager assigned = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                if (assigned == null || assigned == unit || assigned.HasActed || assigned.IsEmbarked || assigned.IsDead) continue;
+
+                Vector3Int assignedCell = assigned.CurrentCellPosition; assignedCell.z = 0;
+                float assignedDist = SectorManager.HexDistance(assignedCell, targetCell);
+                if (rogueDist > assignedDist - 0.5f) continue;
+
+                float lateralGap = SectorManager.HexDistance(rogueCell, assignedCell);
+                if (lateralGap > Mathf.Max(3f, assigned.RemainingMovementPoints + 1f)) continue;
+
+                Debug.Log($"{TL()} iniciativa: rogue {unit.InstanceId} libera corredor de {assigned.InstanceId}->{obj.Sector} (rogueDist={rogueDist:F0} capDist={assignedDist:F0})");
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private bool IsCapturerInOtherCapturerCorridor(UnitManager unit, Vector3Int unitCell, TeamObjectivePlan plan, TeamId aiTeam)

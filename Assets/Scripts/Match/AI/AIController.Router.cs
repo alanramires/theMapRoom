@@ -44,6 +44,10 @@ public partial class AIController
 
         }
 
+        PlayerAction airCombatAction = TryDecideAirCombatAction(unit, snapshot);
+
+        if (airCombatAction != null) return airCombatAction;
+
         PlayerAction logisticsAction = TryDecideLogisticsAction(unit, snapshot, plan);
 
         if (logisticsAction != null) return logisticsAction;
@@ -142,11 +146,11 @@ public partial class AIController
 
         {
 
-            bool isTransportador = unit.TryGetUnitData(out UnitData hexUnitData)
+            bool canCapture = unit.TryGetUnitData(out UnitData hexUnitData)
                 && hexUnitData.roles != null && hexUnitData.roles.Count > 0
-                && hexUnitData.roles[0] == UnitRole.Transportador;
+                && hexUnitData.roles.Contains(UnitRole.Capturador);
 
-            if (!isTransportador)
+            if (canCapture)
             {
 
             Debug.Log($"[AI] {unit.InstanceId} → captura @ {destCell}");

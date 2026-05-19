@@ -73,8 +73,21 @@ public partial class AIController
 
         // Passo 2: adiciona objetivos para setores ainda não cobertos.
         // Em Defensive: não abre novos objetivos em setores Medium ou piores (já ocupados persistem).
+        // Cap de objetivos ofensivos simultâneos para evitar demand excessiva de capturadores.
         IReadOnlyList<SectorManager.SectorInfo> allSectors = SectorManager.GetAllSectorInfos();
         IReadOnlyList<SectorManager.SectorInfo> allBases = SectorManager.GetAllBaseInfos();
+
+        int existingOffensive = 0;
+        foreach (SectorObjective existing in plan.Objectives)
+            if (existing.Status != ObjectiveStatus.Defending
+                && existing.Status != ObjectiveStatus.Complete
+                && existing.Status != ObjectiveStatus.Abandoned)
+                existingOffensive++;
+
+        int maxObj  = Instance != null ? Instance.MaxActiveObjectives : 4;
+        int newSlots = Mathf.Max(0, maxObj - existingOffensive);
+
+        var sectorCandidates = new List<SectorObjective>();
         foreach (SectorManager.SectorInfo info in allSectors)
         {
             if (info.IsFullyControlled && info.ControllingTeam == aiTeam) continue;
@@ -151,8 +164,25 @@ public partial class AIController
             int   transThreshold = GetEffectiveTransportThreshold(aiTeam);
             bool  addTrans = distHQ >= transThreshold;
             if (addTrans) obj.Slots.Add(new SlotNeed { Role = UnitRole.Transportador });
-            Debug.Log($"{TL("Plan")} {info.Sector}: {slots}xCap{(highRisk ? " +Ass" : "")}{(addTrans ? " +Trans" : "")} dist={distHQ:F0}h threshold={transThreshold}");
+            sectorCandidates.Add(obj);
+        }
+
+        // Adiciona apenas os N mais prioritários para não ultrapassar o cap.
+        sectorCandidates.Sort((a, b) => b.Priority.CompareTo(a.Priority));
+        int addedSectors = 0;
+        foreach (SectorObjective obj in sectorCandidates)
+        {
+            if (addedSectors >= newSlots)
+            {
+                Debug.Log($"{TL("Plan")} cap atingido ({maxObj}): {obj.Sector} descartado (pri={obj.Priority})");
+                continue;
+            }
+            int capSlots  = obj.Slots.FindAll(s => s.Role == UnitRole.Capturador).Count;
+            bool hasAss   = obj.Slots.Exists(s => s.Role == UnitRole.Assalto);
+            bool hasTrans = obj.Slots.Exists(s => s.Role == UnitRole.Transportador);
+            Debug.Log($"{TL("Plan")} {obj.Sector}: {capSlots}xCap{(hasAss ? " +Ass" : "")}{(hasTrans ? " +Trans" : "")} pri={obj.Priority}");
             plan.Objectives.Add(obj);
+            addedSectors++;
         }
 
         // Passo 2b: base inimiga — entra no plano ofensivo quando setores regulares estão cobertos.
@@ -207,6 +237,14 @@ public partial class AIController
                 }
             }
 
+            // Base inimiga também respeita o cap de objetivos ofensivos.
+            int currentOffensive = existingOffensive + addedSectors;
+            if (currentOffensive >= maxObj)
+            {
+                Debug.Log($"{TL("Plan")} cap atingido ({maxObj}): base inimiga {baseInfo.Sector} descartada");
+                continue;
+            }
+
             int capturerSlots = Mathf.Clamp(Mathf.CeilToInt(baseInfo.ConstructionCount / 2f), 2, 4);
             var baseObj = new SectorObjective
             {
@@ -221,6 +259,7 @@ public partial class AIController
             if (baseInfo.GetDistanceToHQ(aiTeam) >= GetEffectiveTransportThreshold(aiTeam))
                 baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Transportador });
             plan.Objectives.Add(baseObj);
+            addedSectors++;
             Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector}: {capturerSlots}xCap + Assalto construcoes={baseInfo.ConstructionCount} dist={baseInfo.GetDistanceToHQ(aiTeam):F0}h");
         }
 
@@ -895,6 +934,7 @@ public partial class AIController
                 float bestApcDist = float.MaxValue;
                 float bestPickupDist = float.MaxValue;
                 bool bestCreatedSlot = false;
+                int planThreshold = GetEffectiveTransportThreshold(aiTeam);
                 foreach (SectorObjective obj in plan.Objectives)
                 {
                     bool hasOpenTransportSlot = obj.HasOpenSlot(UnitRole.Transportador);
@@ -933,7 +973,7 @@ public partial class AIController
                         if (!capturer.TryGetUnitData(out UnitData capData) || FindFittingSlotIndex(u, uData, capturer, capData) < 0) continue;
                         Vector3Int cc = capturer.CurrentCellPosition; cc.z = 0;
                         if (IsTeamProductionBuilding(cc, aiTeam)) continue; // prefere campo
-                        float dist = SectorManager.HexDistance(cc, tc);
+                        float dist = TerrainCostToCell(capturer, cc, tc, planThreshold * 2);
                         float apcToPassenger = SectorManager.HexDistance(uc, cc);
                         if (dist > capturerDistToObj
                             || (Mathf.Abs(dist - capturerDistToObj) <= 0.5f && apcToPassenger < pickupDist))
@@ -952,7 +992,7 @@ public partial class AIController
                             if (capturer == null || capturer.IsEmbarked) continue;
                             if (!capturer.TryGetUnitData(out UnitData capData) || FindFittingSlotIndex(u, uData, capturer, capData) < 0) continue;
                             Vector3Int cc = capturer.CurrentCellPosition; cc.z = 0;
-                            float dist = SectorManager.HexDistance(cc, tc);
+                            float dist = TerrainCostToCell(capturer, cc, tc, planThreshold * 2);
                             float apcToPassenger = SectorManager.HexDistance(uc, cc);
                             if (dist > capturerDistToObj
                                 || (Mathf.Abs(dist - capturerDistToObj) <= 0.5f && apcToPassenger < pickupDist))

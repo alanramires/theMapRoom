@@ -110,6 +110,9 @@ public partial class AIController
 
                 List<PodeDesembarcarOption> selectedFromMove =
                     SelectBestDisembarkPerPassenger(optsFromMove, passengers, plan, snapshot);
+                // Partial disembark: drop only passengers whose target is within AirDropOffRange.
+                selectedFromMove = FilterDisembarkByTargetRange(selectedFromMove, plan, snapshot, AirDropOffRange);
+
                 PodeDesembarcarOption primaryOpt = selectedFromMove.Count > 0
                     ? selectedFromMove.Find(o => o.passengerUnit == primaryPassenger) : null;
                 if (primaryOpt == null) continue;
@@ -120,7 +123,8 @@ public partial class AIController
                 if (dcInRange || heliInRange)
                 {
                     paths.TryGetValue(candidate, out List<Vector3Int> movePath);
-                    Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier — move+desembarca via {candidate} dc={dc} dcDist={SectorManager.HexDistance(dc, primaryTarget):F0}h → {primaryTarget}");
+                    int dropping = selectedFromMove.Count, keeping = passengers.Count - dropping;
+                    Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier — move+desembarca via {candidate} dc={dc} dcDist={SectorManager.HexDistance(dc, primaryTarget):F0}h → {primaryTarget} (desembarca={dropping} fica={keeping})");
                     return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selectedFromMove, candidate, movePath);
                 }
             }
@@ -134,6 +138,8 @@ public partial class AIController
         {
             List<PodeDesembarcarOption> selected =
                 SelectBestDisembarkPerPassenger(disembarkOptions, passengers, plan, snapshot);
+            // Partial disembark — when stuck, release all; otherwise only passengers in range of their target.
+            selected = FilterDisembarkByTargetRange(selected, plan, snapshot, AirDropOffRange, allowStuck: isStuck);
             if (selected.Count > 0)
             {
                 PodeDesembarcarOption primaryOption = selected.Find(o => o.passengerUnit == primaryPassenger);
@@ -145,8 +151,9 @@ public partial class AIController
                         || SectorManager.HexDistance(fromCell, primaryTarget) <= AirDropOffRange;
                     if (inRange)
                     {
+                        int dropping = selected.Count, keeping = passengers.Count - dropping;
                         string reason = isStuck ? "bloqueado, libera carga" : $"desembarca para {primaryTarget}";
-                        Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier — {reason} ({selected.Count} passageiro(s))");
+                        Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier — {reason} (desembarca={dropping} fica={keeping})");
                         return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selected);
                     }
                 }
@@ -198,8 +205,9 @@ public partial class AIController
         {
             Vector3Int candidateObjective = ResolveUnitObjectiveCell(bestCandidate, plan, snapshot);
             var embarkablePaths = FilterPathsToEmbarkableCells(paths, unit, snapshot.AITeam);
+            HashSet<Vector3Int> passengerReachable = BuildPassengerReachableSet(bestCandidate);
             Vector3Int moveTarget = FindTransportShuttleMove(
-                unit, fromCell, candidateCell, embarkablePaths, occupied, snapshot.AITeam, candidateObjective);
+                unit, fromCell, candidateCell, embarkablePaths, occupied, snapshot.AITeam, candidateObjective, passengerReachable);
             Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} shuttle — candidato {bestCandidate.InstanceId}@{candidateCell} via {moveTarget}");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
         }
@@ -320,7 +328,9 @@ public partial class AIController
             {
                 Vector3Int objCheckCell = objCheck.CurrentCellPosition; objCheckCell.z = 0;
                 Vector3Int passCell = targetPassenger.CurrentCellPosition; passCell.z = 0;
-                if (SectorManager.HexDistance(passCell, objCheckCell) < GetEffectiveTransportThreshold(snapshot.AITeam))
+                int airThreshold = GetEffectiveTransportThreshold(snapshot.AITeam);
+                int passTerrainCost = TerrainCostToCell(targetPassenger, passCell, objCheckCell, airThreshold);
+                if (passTerrainCost < airThreshold)
                     targetPassenger = null;
             }
         }
@@ -338,8 +348,9 @@ public partial class AIController
                 Vector3Int objCell2 = ResolveUnitObjectiveCell(nearbyCandidate, plan, snapshot);
                 if (objCell2 == Vector3Int.zero) objCell2 = sectorCell;
                 var embarkablePaths2 = FilterPathsToEmbarkableCells(paths, unit, snapshot.AITeam);
+                HashSet<Vector3Int> passengerReachable2 = BuildPassengerReachableSet(nearbyCandidate);
                 Vector3Int shuttleMove = FindTransportShuttleMove(
-                    unit, fromCell, nearbyCell, embarkablePaths2, occupied, snapshot.AITeam, objCell2);
+                    unit, fromCell, nearbyCell, embarkablePaths2, occupied, snapshot.AITeam, objCell2, passengerReachable2);
                 Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} assigned {assigned.Sector} — sem passageiro formal, aguarda candidato {nearbyCandidate.InstanceId}@{nearbyCell} via {shuttleMove}");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, shuttleMove, paths);
             }
@@ -351,9 +362,16 @@ public partial class AIController
 
         Vector3Int passengerCell = targetPassenger.CurrentCellPosition; passengerCell.z = 0;
         Vector3Int objCell = ResolveUnitObjectiveCell(targetPassenger, plan, snapshot);
+        ConstructionManager assignedPickupTarget = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
+        if (assignedPickupTarget != null)
+        {
+            objCell = assignedPickupTarget.CurrentCellPosition;
+            objCell.z = 0;
+        }
         var embarkablePaths3 = FilterPathsToEmbarkableCells(paths, unit, snapshot.AITeam);
+        HashSet<Vector3Int> passengerReachable3 = BuildPassengerReachableSet(targetPassenger);
         Vector3Int moveTarget = FindTransportShuttleMove(
-            unit, fromCell, passengerCell, embarkablePaths3, occupied, snapshot.AITeam, objCell);
+            unit, fromCell, passengerCell, embarkablePaths3, occupied, snapshot.AITeam, objCell, passengerReachable3, plan, assigned);
 
         Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} assigned {assigned.Sector} — pickup {targetPassenger.InstanceId}@{passengerCell} via {moveTarget}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
@@ -464,6 +482,23 @@ public partial class AIController
             filtered[kv.Key] = kv.Value;
         }
         return filtered.Count > 0 ? filtered : paths;
+    }
+
+    // Computes the set of cells the passenger can reach within ShuttlePickupRange steps,
+    // using terrain-aware BFS. Used so FindTransportShuttleMove picks a valid landing spot
+    // even when the helicopter can fly over obstacles the passenger cannot cross.
+    private HashSet<Vector3Int> BuildPassengerReachableSet(UnitManager passenger)
+    {
+        if (passenger == null) return null;
+        int budget = Mathf.Min(Mathf.Max(0, passenger.RemainingMovementPoints), ShuttlePickupRange);
+        var passPaths = UnitMovementPathRules.CalcularCaminhosValidos(
+            boardTilemap, passenger, budget, terrainDatabase);
+        if (passPaths == null || passPaths.Count == 0)
+        {
+            Vector3Int passCell = passenger.CurrentCellPosition; passCell.z = 0;
+            return new HashSet<Vector3Int> { passCell };
+        }
+        return new HashSet<Vector3Int>(passPaths.Keys);
     }
 
     private bool HasBlockingGroundUnitAtCell(Vector3Int cell, TeamId aiTeam)

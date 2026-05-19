@@ -32,7 +32,7 @@ MonoBehaviour:
   militaryForce: 1
   unitClass: 6
   combatClassification: 0
-  roles: 02000000
+  roles: 09000000
   aiInitiative: 2
   aiPurchaseMode: 0
   aiTargetPreferenceByClass:
@@ -71,7 +71,7 @@ MonoBehaviour:
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
   eliteLevel: 1
-  eliteFrom: {fileID: 0}
+  eliteFrom: {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
   combatModifiers:
   - {fileID: 11400000, guid: 23ed629c09c8bb74d882635509ae0f57, type: 2}
   domain: 3

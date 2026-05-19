@@ -33,7 +33,7 @@ MonoBehaviour:
   unitClass: 5
   combatClassification: 0
   roles: 03000000
-  aiInitiative: 2
+  aiInitiative: 0
   aiPurchaseMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 0

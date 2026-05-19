@@ -402,6 +402,36 @@ public partial class AIController
         return selected;
     }
 
+    // Partial disembark: remove passengers whose best drop-off cell is outside dropOffRange
+    // of their own objective. They stay aboard for delivery on the next leg.
+    // When allowStuck is true (helicopter can't move), all passengers are released.
+    private List<PodeDesembarcarOption> FilterDisembarkByTargetRange(
+        List<PodeDesembarcarOption> options,
+        TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot,
+        int dropOffRange,
+        bool allowStuck = false)
+    {
+        if (allowStuck || options.Count <= 1) return options;
+        var filtered = new List<PodeDesembarcarOption>();
+        foreach (PodeDesembarcarOption opt in options)
+        {
+            bool targetFound = TryResolveCourierPassengerTarget(
+                opt.passengerUnit, plan, snapshot, Vector3Int.zero,
+                opt.passengerUnit.CurrentCellPosition, out Vector3Int target);
+            if (!targetFound) { filtered.Add(opt); continue; }
+            Vector3Int dc = opt.disembarkCell; dc.z = 0;
+            float dist = SectorManager.HexDistance(dc, target);
+            if (dist <= dropOffRange)
+                filtered.Add(opt);
+            else
+                Debug.Log($"{TL("Transporte")} partial_disembark: #{opt.passengerUnit.InstanceId} FICA — dc={dc} alvo={target} dist={dist:F0}h > {dropOffRange}h");
+        }
+        // Safety: never return empty — if every passenger is out of range keep all.
+        // This prevents the helicopter from carrying cargo forever when it gets stuck.
+        return filtered.Count > 0 ? filtered : options;
+    }
+
     private float ScoreCourierDisembarkOption(
         UnitManager passenger,
         Vector3Int disembarkCell,

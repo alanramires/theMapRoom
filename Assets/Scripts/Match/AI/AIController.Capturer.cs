@@ -23,6 +23,24 @@ public partial class AIController
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
 
+        // Opportunistic capture of current cell — takes priority over embark.
+        // If already standing on a capturable construction not claimed by another capturer, capture now.
+        {
+            Vector3Int currentCell = unit.CurrentCellPosition; currentCell.z = 0;
+            if (SimulateCaptureSensor(unit, currentCell, out _))
+            {
+                SectorObjective ownObjective = plan != null ? ResolveAssignedObjective(unit, plan) : null;
+                TeamObjectivePlan selfPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+                bool isOtherTarget = selfPlan != null
+                    && IsOtherAssignedCapturerTarget(currentCell, unit, ownObjective, selfPlan, snapshot.AITeam);
+                if (!isOtherTarget)
+                {
+                    Debug.Log($"{TL("Oportunista")} {unit.InstanceId} captura célula atual {currentCell} antes de embarcar");
+                    return BuildCaptureBatch(unit, snapshot.AITeam, currentCell, currentCell);
+                }
+            }
+        }
+
         PlayerAction embarkAction = TryDecideCapturerEmbarkAction(unit, snapshot, plan);
         if (embarkAction != null) return embarkAction;
 
@@ -85,7 +103,7 @@ public partial class AIController
             occupied,
             targetCell,
             out Vector3Int opCell,
-            excludeCurrentCell: true,
+            excludeCurrentCell: false,
             skippedCaptureCells: reservedOpportunisticCells))
         {
             if (ShouldReserveOpportunisticCaptureForCloserUnit(unit, snapshot.AITeam, opCell, paths, out UnitManager reservedFor))

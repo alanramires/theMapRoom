@@ -338,9 +338,10 @@ public partial class AIController
 
             // Ordena iniciativa por grupo (menor = age primeiro):
             // 0 = vacater handoff / blocker com inimigo adjacente
-            // 1 = unidade ativa liberando corredor/posicionamento
-            // 2 = objetivo normal  3 = rogue/sem objetivo
-            // 4 = IsUnderRepair / manutencao - age por ultimo
+            // 1 = helicoptero
+            // 2 = unidade ativa liberando corredor/posicionamento
+            // 3 = objetivo normal  4 = rogue/sem objetivo
+            // 5 = IsUnderRepair / manutencao - age por ultimo
             TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
             InvalidateStaleThreatObjectives(activePlan, aiTeam);
 
@@ -353,24 +354,9 @@ public partial class AIController
             foreach (UnitManager u in available)
                 groupCache[u.InstanceId] = GetInitiativeGroup(u, activePlan, aiTeam);
 
-            // LOG: ordem de iniciativa antes de agir
-            {
-                var initLog = new System.Text.StringBuilder();
-                initLog.AppendLine($"{TL()} Fase2 iniciativa ({available.Count} unidades):");
-                foreach (UnitManager u in available)
-                {
-                    int g  = groupCache[u.InstanceId];
-                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
-                    Vector3Int? tgt = GetAssignedTargetCell(u, activePlan);
-                    string tgtStr = tgt.HasValue ? tgt.Value.ToString() : "null";
-                    initLog.AppendLine($"  [grp={g}] Unit{u.InstanceId} @ {uc} target={tgtStr}");
-                }
-                Debug.Log(initLog.ToString());
-            }
-
             // Dirty flag: grupos podem mudar após cada ação (captura concluída, reparo, etc.).
             // Só re-sort quando ao menos um grupo mudou em relação à iteração anterior.
-            bool needsSort = prevGroupCache == null;
+            bool needsSort = true;
             if (!needsSort)
             {
                 foreach (UnitManager u in available)
@@ -400,8 +386,8 @@ public partial class AIController
                         if (blockerA != blockerB) return blockerA ? -1 : 1;
                     }
 
-                    // Dentro do grupo 2: prioridade do objetivo (pri=1 = age primeiro)
-                    if (groupA == 2 && activePlan != null)
+                    // Dentro do grupo 3: prioridade do objetivo (pri=1 = age primeiro)
+                    if (groupA == 3 && activePlan != null)
                     {
                         SectorObjective objA = ResolveAnyAssignedObjective(a, activePlan);
                         SectorObjective objB = ResolveAnyAssignedObjective(b, activePlan);
@@ -415,11 +401,27 @@ public partial class AIController
                         return b.CurrentHP.CompareTo(a.CurrentHP);
                     }
 
-                    return b.CurrentHP.CompareTo(a.CurrentHP);
+                    int initiativeCmp = CompareUnitInitiative(a, b);
+                    return initiativeCmp != 0 ? initiativeCmp : b.CurrentHP.CompareTo(a.CurrentHP);
                 });
             }
 
             prevGroupCache = groupCache;
+
+            // LOG: ordem de iniciativa apos o sort real.
+            {
+                var initLog = new System.Text.StringBuilder();
+                initLog.AppendLine($"{TL()} Fase2 iniciativa ({available.Count} unidades):");
+                foreach (UnitManager u in available)
+                {
+                    int g  = groupCache[u.InstanceId];
+                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                    Vector3Int? tgt = GetAssignedTargetCell(u, activePlan);
+                    string tgtStr = tgt.HasValue ? tgt.Value.ToString() : "null";
+                    initLog.AppendLine($"  [grp={g}] {FormatInitiativeUnitName(u)} @ {uc} target={tgtStr}");
+                }
+                Debug.Log(initLog.ToString());
+            }
 
             UnitManager unit = available[0];
             PlayerAction action = DecideUnitAction(unit, current);

@@ -37,32 +37,32 @@ public partial class AIController
         if (ShouldSkipCapturerEmbarkForShortWalk(unit, capturerAssigned, fromCell, "origem"))
             return null;
 
+        // Não embarcar em transporters ainda no aeroporto/fábrica — espera sair primeiro.
+        options.RemoveAll(opt =>
+        {
+            if (opt?.transporterUnit == null) return false;
+            Vector3Int tc = opt.transporterUnit.CurrentCellPosition; tc.z = 0;
+            return IsTeamProductionBuilding(tc, unit.TeamId);
+        });
+
         PodeEmbarcarOption best = null;
+        int bestPriority = int.MaxValue;
+        float bestDistance = float.MaxValue;
 
         if (options.Count > 0)
         {
-            if (assigned != null && plan != null)
+            foreach (PodeEmbarcarOption opt in options)
             {
-                foreach (PodeEmbarcarOption opt in options)
+                if (!TryGetCapturerEmbarkPreference(unit, assigned, opt, plan, snapshot.AITeam,
+                        out int priority, out float distance))
+                    continue;
+
+                if (priority < bestPriority
+                    || (priority == bestPriority && distance < bestDistance))
                 {
-                    if (opt.transporterUnit == null || opt.transporterUnit.IsUnderRepair) continue;
-                    SectorObjective tObj = ResolveAssignedTransportObjective(opt.transporterUnit, plan);
-                    bool sectorMatch = tObj != null && tObj.Sector == assigned.Sector;
-                    // Any capturer may board an APC with no formal passenger — it is a free shuttle
-                    // and will reorient to this capturer's objective regardless of plan sector.
-                    bool freeTransport = tObj == null || ResolveAssignedPassengerUnit(tObj, snapshot.AITeam) == null;
-                    if (sectorMatch || freeTransport) { best = opt; break; }
-                }
-            }
-            else
-            {
-                // Capturador rogue: embark oportunista em transporter rogue (sem plano).
-                foreach (PodeEmbarcarOption opt in options)
-                {
-                    if (opt.transporterUnit == null || opt.transporterUnit.IsUnderRepair) continue;
-                    SectorObjective tObj = plan != null
-                        ? ResolveAssignedTransportObjective(opt.transporterUnit, plan) : null;
-                    if (tObj == null) { best = opt; break; }
+                    best = opt;
+                    bestPriority = priority;
+                    bestDistance = distance;
                 }
             }
         }
@@ -71,7 +71,7 @@ public partial class AIController
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
 
-        if (best != null)
+        if (best != null && bestPriority == 0)
         {
             if (ShouldYieldEmbarkToNeedierCapturer(unit, best.transporterUnit, assigned, plan))
                 return null;
@@ -79,19 +79,134 @@ public partial class AIController
             return BuildEmbarcarBatch(unit, snapshot.AITeam, fromCell, best.transporterUnit, best.transporterSlotIndex, paths);
         }
 
-        // Pass 2: simula PodeEmbarcarSensor em cada hex candidato (ficar parado + hexes alcançáveis)
+        // Pass 2: simula PodeEmbarcarSensor em cada hex candidato (ficar parado + hexes alcançáveis).
+        // Pass 2a: exige transporter formalmente pareado com este passageiro.
+        // Pass 2b: exige transporter do mesmo setor do plano.
+        // Pass 2c: aceita transporter livre (sem passageiro formal).
+        // Pass 3: overflow — embarca em qualquer transporter com slot físico livre (último recurso).
         if (paths == null || paths.Count == 0) return null;
-        return TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths);
+        PlayerAction formalExtendedEmbark =
+            TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths, requireFormalPassenger: true);
+        if (formalExtendedEmbark != null) return formalExtendedEmbark;
+
+        if (best != null)
+        {
+            if (ShouldYieldEmbarkToNeedierCapturer(unit, best.transporterUnit, assigned, plan))
+                return null;
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca fallback p{bestPriority} â†’ {best.transporterUnit.InstanceId} slot {best.transporterSlotIndex}");
+            return BuildEmbarcarBatch(unit, snapshot.AITeam, fromCell, best.transporterUnit, best.transporterSlotIndex, paths);
+        }
+
+        PlayerAction extendedEmbark =
+            TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths, requireSectorMatch: true)
+            ?? TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths, requireSectorMatch: false)
+            ?? TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths, requireSectorMatch: false, allowOverflow: true);
+        if (extendedEmbark != null) return extendedEmbark;
+
+        // Rogue capturer: extended embark failed — move toward nearest rogue transporter so
+        // it enters embark range next turn. Only applies when there is no sector assignment
+        // (rogues march to enemy HQ; boarding any rogue transport accelerates the push).
+        if (assigned == null)
+        {
+            UnitManager rogueTransport = FindNearestRogueTransporter(unit, data, plan, snapshot);
+            if (rogueTransport != null)
+            {
+                Vector3Int tCell = rogueTransport.CurrentCellPosition; tCell.z = 0;
+                HashSet<Vector3Int> occ = BuildOccupied(unit);
+                Vector3Int moveTarget = FindTransportMove(unit, fromCell, tCell, paths, occ, snapshot.AITeam);
+                if (moveTarget != fromCell)
+                {
+                    Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue — avança para transporte rogue {rogueTransport.InstanceId}@{tCell} via {moveTarget}");
+                    return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
+                }
+            }
+        }
+        return null;
     }
 
     // -------------------------------------------------------------------------
     // Pass 2: simula o sensor em cada hex candidato para achar embarque válido
     // -------------------------------------------------------------------------
 
+    private bool TryGetCapturerEmbarkPreference(
+        UnitManager unit,
+        SectorObjective assigned,
+        PodeEmbarcarOption option,
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        out int priority,
+        out float distance)
+    {
+        priority = int.MaxValue;
+        distance = float.MaxValue;
+
+        UnitManager transporter = option != null ? option.transporterUnit : null;
+        if (unit == null || transporter == null || transporter.IsUnderRepair)
+            return false;
+
+        SectorObjective transporterObjective = plan != null
+            ? ResolveAssignedTransportObjective(transporter, plan)
+            : null;
+
+        Vector3Int unitCell = unit.CurrentCellPosition; unitCell.z = 0;
+        Vector3Int transporterCell = transporter.CurrentCellPosition; transporterCell.z = 0;
+        distance = SectorManager.HexDistance(unitCell, transporterCell);
+
+        if (assigned == null)
+        {
+            priority = transporterObjective == null ? 0 : 1;
+            return true;
+        }
+
+        bool sameSector = transporterObjective != null && transporterObjective.Sector == assigned.Sector;
+        bool compatibleSector = transporterObjective != null
+            && AreEmbarkSectorsCompatible(assigned.Sector, transporterObjective.Sector);
+        UnitManager formalPassenger = transporterObjective != null
+            ? ResolveAssignedPassengerUnit(transporterObjective, aiTeam)
+            : null;
+        bool formalMatch = sameSector && formalPassenger == unit;
+        bool freeTransport = transporterObjective == null;
+        bool compatibleFreeTransport = transporterObjective != null
+            && compatibleSector
+            && formalPassenger == null;
+
+        if (formalMatch)
+            priority = 0;
+        else if (sameSector)
+            priority = 1;
+        else if (compatibleFreeTransport)
+            priority = 2;
+        else if (freeTransport)
+            priority = 3;
+        else
+            return false;
+
+        return true;
+    }
+
+    private static bool AreEmbarkSectorsCompatible(ConstructionSector assignedSector, ConstructionSector transportSector)
+    {
+        if (assignedSector == transportSector)
+            return true;
+
+        if (SectorManager.TryGetSectorInfo(assignedSector, out SectorManager.SectorInfo assignedInfo)
+            && assignedInfo != null
+            && (assignedInfo.ClosestNeighbor1 == transportSector || assignedInfo.ClosestNeighbor2 == transportSector))
+            return true;
+
+        if (SectorManager.TryGetSectorInfo(transportSector, out SectorManager.SectorInfo transportInfo)
+            && transportInfo != null
+            && (transportInfo.ClosestNeighbor1 == assignedSector || transportInfo.ClosestNeighbor2 == assignedSector))
+            return true;
+
+        return false;
+    }
+
     private PlayerAction TryBuildExtendedEmbarkBatch(
         UnitManager unit, UnitData unitData, AIWorldSnapshot snapshot, TeamObjectivePlan plan,
         SectorObjective assigned, Vector3Int fromCell,
-        Dictionary<Vector3Int, List<Vector3Int>> paths)
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        bool requireSectorMatch = false, bool allowOverflow = false, bool requireFormalPassenger = false)
     {
         // movePaths: hexes alcançáveis reservando 1 MP para o custo de embarque.
         // fromCell (ficar parado) é verificado separadamente com MP completo.
@@ -107,7 +222,7 @@ public partial class AIController
         foreach (Vector3Int tCell in neighborBuf)
         {
             if (TryEmbarkFromHex(fromCell, null, unit.RemainingMovementPoints,
-                    tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction a))
+                    tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction a, requireSectorMatch, allowOverflow, requireFormalPassenger))
                 return a;
         }
 
@@ -127,7 +242,7 @@ public partial class AIController
             {
                 // remainingMPAtHex = ao menos 1 (garantido pelo budget de movePaths)
                 if (TryEmbarkFromHex(hex, kvp.Value, 1,
-                        tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction a))
+                        tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction a, requireSectorMatch, allowOverflow, requireFormalPassenger))
                     return a;
             }
         }
@@ -179,14 +294,32 @@ public partial class AIController
         Vector3Int fromHex, List<Vector3Int> pathToHex, int remainingMPAtHex,
         Vector3Int tCell, UnitManager unit, UnitData unitData,
         TeamObjectivePlan plan, SectorObjective assigned,
-        AIWorldSnapshot snapshot, out PlayerAction action)
+        AIWorldSnapshot snapshot, out PlayerAction action,
+        bool requireSectorMatch = false, bool allowOverflow = false, bool requireFormalPassenger = false)
     {
         action = null;
 
+        tCell.z = 0;
         UnitManager transporter = UnitOccupancyRules.GetUnitAtCell(boardTilemap, tCell, unit);
+        // GetUnitAtCell queries the tilemap occupancy grid, which may lag behind after a unit
+        // moves earlier in Phase 2 (grid update is async; CurrentCellPosition is immediate).
+        // A transporter that executed its shuttle move this phase won't appear at its new cell
+        // in the grid yet. Fall back to a direct position scan using CurrentCellPosition.
+        if (transporter == null)
+        {
+            foreach (UnitManager u in UnitManager.AllActive)
+            {
+                if (u == unit || u.IsDead || u.IsEmbarked) continue;
+                Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                if (uc == tCell) { transporter = u; break; }
+            }
+        }
         if (transporter == null || transporter.TeamId != unit.TeamId) return false;
         if (transporter.IsDead || transporter.IsEmbarked || transporter.IsUnderRepair) return false;
         if (!transporter.TryGetUnitData(out UnitData tData) || !tData.isTransporter) return false;
+        // Não embarcar em transporter ainda no aeroporto/fábrica — espera ele sair primeiro.
+        Vector3Int transporterCell = transporter.CurrentCellPosition; transporterCell.z = 0;
+        if (IsTeamProductionBuilding(transporterCell, unit.TeamId)) return false;
 
         // Primary capturer: APC must be assigned to the same sector.
         // Secondary capturer: also accepts an APC with no formal passenger (shuttle mode).
@@ -195,13 +328,29 @@ public partial class AIController
         bool isPrimary = unitData.roles != null && unitData.roles.Count > 0
             && unitData.roles[0] == UnitRole.Capturador;
         bool sameSector = assigned != null && tObj != null && tObj.Sector == assigned.Sector;
+        bool compatibleSector = assigned != null && tObj != null
+            && AreEmbarkSectorsCompatible(assigned.Sector, tObj.Sector);
+        UnitManager formalPassenger = tObj != null ? ResolveAssignedPassengerUnit(tObj, unit.TeamId) : null;
+        bool formalMatch = sameSector && formalPassenger == unit;
         // Any capturer may board an APC with no formal passenger — free shuttle reorients to this objective.
-        bool shuttleFree = tObj == null || ResolveAssignedPassengerUnit(tObj, unit.TeamId) == null;
+        bool shuttleFree = assigned == null || tObj == null || (compatibleSector && formalPassenger == null);
         bool rogueEmbark = assigned == null && shuttleFree;
+        if (requireFormalPassenger && !formalMatch) return false;
+        // requireSectorMatch: called from the first preference pass — only accept the plan-assigned transporter.
+        if (requireSectorMatch && !sameSector) return false;
+        if (assigned != null && tObj != null && !compatibleSector)
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor distante: assigned={assigned.Sector} tObj={tObj.Sector} transporter={transporter.InstanceId}");
+            return false;
+        }
         if (!sameSector && !shuttleFree)
         {
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor: assigned={assigned?.Sector} tObj={tObj?.Sector} sameSector={sameSector} shuttleFree={shuttleFree} isPrimary={isPrimary} transporter={transporter.InstanceId}");
-            return false;
+            if (!allowOverflow)
+            {
+                Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor: assigned={assigned?.Sector} tObj={tObj?.Sector} sameSector={sameSector} compatible={compatibleSector} shuttleFree={shuttleFree} isPrimary={isPrimary} transporter={transporter.InstanceId}");
+                return false;
+            }
+            // overflow: slot físico check abaixo confirma capacidade disponível
         }
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
         if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromCell, "hex embarque"))
@@ -242,7 +391,8 @@ public partial class AIController
             ? new Dictionary<Vector3Int, List<Vector3Int>> { [tCell] = pathToHex }
             : null;
 
-        Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca (ext {(int)SectorManager.HexDistance(fromCell, tCell)}h) → {transporter.InstanceId} slot {slotIdx} via {fromHex}");
+        string overflowTag = allowOverflow && !sameSector && !shuttleFree ? " [overflow→" + tObj?.Sector + "]" : "";
+        Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca{overflowTag} (ext {(int)SectorManager.HexDistance(fromCell, tCell)}h) → {transporter.InstanceId} slot {slotIdx} via {fromHex}");
         action = BuildEmbarcarBatch(unit, snapshot.AITeam, fromCell, transporter, slotIdx, pathsForBatch);
         return true;
     }
@@ -269,16 +419,16 @@ public partial class AIController
             return false;
 
         Vector3Int objCell = objBuilding.CurrentCellPosition; objCell.z = 0;
-        float objectiveDist = SectorManager.HexDistance(candidateCell, objCell);
         int effectiveThreshold = GetEffectiveTransportThreshold(unit.TeamId);
         // Slow units benefit from transport from farther away (+2h per MP below 3).
         int baseMP = unit.MaxMovementPoints;
         if (baseMP < 3) effectiveThreshold += (3 - baseMP) * 2;
-        if (objectiveDist >= effectiveThreshold)
+        int terrainCost = TerrainCostToCell(unit, candidateCell, objCell, effectiveThreshold);
+        if (terrainCost >= effectiveThreshold)
             return false;
 
         string sectorLabel = assigned != null ? assigned.Sector.ToString() : objBuilding.Sector.ToString();
-        Debug.Log($"{TL("Capturador")} {unit.InstanceId} ignora embarque ({context} {objectiveDist:F0}h<{effectiveThreshold}h de {sectorLabel})");
+        Debug.Log($"{TL("Capturador")} {unit.InstanceId} ignora embarque ({context} terreno={terrainCost}<{effectiveThreshold}h de {sectorLabel})");
         return true;
     }
 
@@ -294,6 +444,31 @@ public partial class AIController
             float dist = SectorManager.HexDistance(fromCell, tc);
             if (dist < bestDist) { bestDist = dist; best = c; }
         }
+        return best;
+    }
+
+    // Finds the nearest rogue transporter (no formal plan assignment) that has a fitting
+    // slot for this capturer. Used as a fallback move target when extended embark fails.
+    private UnitManager FindNearestRogueTransporter(UnitManager capturer, UnitData capturerData,
+        TeamObjectivePlan plan, AIWorldSnapshot snapshot)
+    {
+        UnitManager best = null;
+        float bestDist = float.MaxValue;
+        Vector3Int fromCell = capturer.CurrentCellPosition; fromCell.z = 0;
+
+        foreach (UnitManager t in UnitManager.AllActive)
+        {
+            if (t == capturer) continue;
+            if (t.TeamId != capturer.TeamId || t.IsDead || t.IsEmbarked) continue;
+            if (!t.TryGetUnitData(out UnitData tData) || !tData.isTransporter) continue;
+            SectorObjective tObj = plan != null ? ResolveAssignedTransportObjective(t, plan) : null;
+            if (tObj != null) continue;
+            if (FindFittingSlotIndex(t, tData, capturer, capturerData) < 0) continue;
+            Vector3Int tCell = t.CurrentCellPosition; tCell.z = 0;
+            float dist = SectorManager.HexDistance(fromCell, tCell);
+            if (dist < bestDist) { bestDist = dist; best = t; }
+        }
+
         return best;
     }
 }

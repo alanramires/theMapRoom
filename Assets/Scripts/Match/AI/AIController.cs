@@ -55,6 +55,11 @@ public partial class AIController : MonoBehaviour
     [SerializeField, Range(1, 30)] private int minDistanceForTransportSlot = 7;
     public int MinDistanceForTransportSlot => minDistanceForTransportSlot;
 
+    [Header("Plano de Objetivos")]
+    [Tooltip("Máximo de objetivos ofensivos simultâneos (Pending/Pursuing/Capturing). Limita demand de capturadores em mapas grandes.")]
+    [SerializeField, Range(1, 12)] private int maxActiveObjectives = 4;
+    public int MaxActiveObjectives => maxActiveObjectives;
+
 
     private static AIController _instance;
     public static AIController Instance => _instance;

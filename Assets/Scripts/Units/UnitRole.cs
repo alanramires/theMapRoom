@@ -7,5 +7,7 @@ public enum UnitRole
     Logistica = 4,
     FogoIndireto = 5,
     Intel = 6,
-    Suprimentos = 7
+    Suprimentos = 7,
+    Interceptador = 8,
+    AtaqueAereo = 9
 }

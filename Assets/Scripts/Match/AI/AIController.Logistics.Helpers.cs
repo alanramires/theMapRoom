@@ -701,6 +701,16 @@ public partial class AIController
         return best;
     }
 
+    // Returns terrain-aware movement cost for unit to walk from fromCell to toCell.
+    // Explores up to maxBudget MP; returns maxBudget + 1 when not reachable within that budget.
+    private int TerrainCostToCell(UnitManager unit, Vector3Int fromCell, Vector3Int toCell, int maxBudget)
+    {
+        if (maxBudget <= 0) return maxBudget + 1;
+        var costMap = UnitMovementPathRules.CalculateMovementCostMap(
+            boardTilemap, unit, fromCell, maxBudget, terrainDatabase);
+        return costMap != null && costMap.TryGetValue(toCell, out int cost) ? cost : maxBudget + 1;
+    }
+
     private static bool IsLogisticsReloadConstruction(ConstructionManager building)
     {
         if (building == null)
