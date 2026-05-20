@@ -42,7 +42,8 @@ public partial class AIController
         {
             if (opt?.transporterUnit == null) return false;
             Vector3Int tc = opt.transporterUnit.CurrentCellPosition; tc.z = 0;
-            return IsTeamProductionBuilding(tc, unit.TeamId);
+            return IsTeamProductionBuilding(tc, unit.TeamId)
+                && !IsAirTransporter(opt.transporterUnit);
         });
 
         PodeEmbarcarOption best = null;
@@ -84,7 +85,12 @@ public partial class AIController
         // Pass 2b: exige transporter do mesmo setor do plano.
         // Pass 2c: aceita transporter livre (sem passageiro formal).
         // Pass 3: overflow — embarca em qualquer transporter com slot físico livre (último recurso).
-        if (paths == null || paths.Count == 0) return null;
+        if (paths == null || paths.Count == 0)
+        {
+            Debug.Log(BuildCapturerEmbarkScanDebug(unit, data, assigned, plan, snapshot,
+                fromCell, options.Count, best, bestPriority, "sem paths"));
+            return null;
+        }
         PlayerAction formalExtendedEmbark =
             TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths, requireFormalPassenger: true);
         if (formalExtendedEmbark != null) return formalExtendedEmbark;
@@ -121,7 +127,54 @@ public partial class AIController
                 }
             }
         }
+        Debug.Log(BuildCapturerEmbarkScanDebug(unit, data, assigned, plan, snapshot,
+            fromCell, options.Count, best, bestPriority, "sem embarque valido"));
         return null;
+    }
+
+    private string BuildCapturerEmbarkScanDebug(
+        UnitManager unit,
+        UnitData unitData,
+        SectorObjective assigned,
+        TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        int adjacentOptions,
+        PodeEmbarcarOption best,
+        int bestPriority,
+        string reason)
+    {
+        var sb = new System.Text.StringBuilder();
+        string sector = assigned != null ? assigned.Sector.ToString() : "rogue";
+        sb.AppendLine($"{TL("Capturador")} {unit.InstanceId} embarque scan: assigned={sector} reason={reason} adjacentOptions={adjacentOptions} best={(best?.transporterUnit != null ? best.transporterUnit.InstanceId.ToString() : "-")} p={(bestPriority == int.MaxValue ? "-" : bestPriority.ToString())}");
+
+        int listed = 0;
+        foreach (UnitManager t in UnitManager.AllActive)
+        {
+            if (t == null || t == unit || t.TeamId != unit.TeamId || t.IsDead || t.IsEmbarked) continue;
+            if (!t.TryGetUnitData(out UnitData tData) || tData == null || !tData.isTransporter) continue;
+
+            Vector3Int tCell = t.CurrentCellPosition; tCell.z = 0;
+            float dist = SectorManager.HexDistance(fromCell, tCell);
+            if (dist > 8f) continue;
+
+            SectorObjective tObj = plan != null ? ResolveAssignedTransportObjective(t, plan) : null;
+            UnitManager formalPassenger = tObj != null ? ResolveAssignedPassengerUnit(tObj, unit.TeamId) : null;
+            bool sameSector = assigned != null && tObj != null && tObj.Sector == assigned.Sector;
+            bool compatibleSector = assigned != null && tObj != null
+                && AreEmbarkSectorsCompatible(assigned.Sector, tObj.Sector);
+            bool production = IsTeamProductionBuilding(tCell, unit.TeamId);
+            int slot = FindFittingSlotIndex(t, tData, unit, unitData);
+            string cargo = HasTransportCargo(t) ? "cargo" : "empty";
+
+            sb.AppendLine($"  heli/trans {t.InstanceId}@{tCell} dist={dist:F0} sector={(tObj != null ? tObj.Sector.ToString() : "free")} formal={(formalPassenger != null ? formalPassenger.InstanceId.ToString() : "-")} slot={slot} same={sameSector} compat={compatibleSector} prod={production} acted={t.HasActed} repair={t.IsUnderRepair} {cargo}");
+            listed++;
+        }
+
+        if (listed == 0)
+            sb.AppendLine("  nenhum transporte aliado <=8h");
+
+        return sb.ToString();
     }
 
     // -------------------------------------------------------------------------
@@ -154,6 +207,10 @@ public partial class AIController
 
         if (assigned == null)
         {
+            if (transporterObjective != null
+                && !CanRogueUseAssignedTransporter(unit, transporter, transporterObjective, aiTeam))
+                return false;
+
             priority = transporterObjective == null ? 0 : 1;
             return true;
         }
@@ -208,28 +265,33 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         bool requireSectorMatch = false, bool allowOverflow = false, bool requireFormalPassenger = false)
     {
-        // movePaths: hexes alcançáveis reservando 1 MP para o custo de embarque.
-        // fromCell (ficar parado) é verificado separadamente com MP completo.
-        int mpForMove = Mathf.Max(0, unit.RemainingMovementPoints - 1);
-        var movePaths = mpForMove > 0
-            ? UnitMovementPathRules.CalcularCaminhosValidos(boardTilemap, unit, mpForMove, terrainDatabase)
-            : null;
+        // Usa os paths completos e calcula a sobra real por caminho. Reservar 1 PM
+        // antecipadamente quebra casos em que o passageiro anda 2 casas e embarca na 3a.
+        var movePaths = paths;
 
         var neighborBuf = new List<Vector3Int>(6);
+        var pickupBuf = new List<Vector3Int>(12);
+        var seenPickupCells = new HashSet<Vector3Int>();
 
         // 1) Ficar parado em fromCell — MP completo disponível para embarque
-        UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, fromCell, neighborBuf);
-        foreach (Vector3Int tCell in neighborBuf)
+        CollectEmbarkTargetCells(fromCell, unit, neighborBuf, pickupBuf, seenPickupCells);
+        foreach (Vector3Int tCell in pickupBuf)
         {
             if (TryEmbarkFromHex(fromCell, null, unit.RemainingMovementPoints,
                     tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction a, requireSectorMatch, allowOverflow, requireFormalPassenger))
                 return a;
         }
 
-        // 2) Hexes alcançáveis com MP reservado — simula sensor de cada um
+        // 2) Hexes alcançáveis — simula sensor de cada um com a sobra real de PM
         if (movePaths == null) return null;
 
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
+
+        PlayerAction directTransporterEmbark = TryBuildDirectTransporterExtendedEmbarkBatch(
+            unit, unitData, snapshot, plan, assigned, fromCell, movePaths, occupied,
+            neighborBuf, requireSectorMatch, allowOverflow, requireFormalPassenger);
+        if (directTransporterEmbark != null)
+            return directTransporterEmbark;
 
         foreach (var kvp in movePaths)
         {
@@ -237,17 +299,234 @@ public partial class AIController
             if (hex == fromCell) continue;
             if (occupied.Contains(hex)) continue; // unidade não pode parar num hex ocupado
 
-            UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, hex, neighborBuf);
-            foreach (Vector3Int tCell in neighborBuf)
+            CollectEmbarkTargetCells(hex, unit, neighborBuf, pickupBuf, seenPickupCells);
+            foreach (Vector3Int tCell in pickupBuf)
             {
-                // remainingMPAtHex = ao menos 1 (garantido pelo budget de movePaths)
-                if (TryEmbarkFromHex(hex, kvp.Value, 1,
+                int remainingMPAtHex = CalculateRemainingMovementAfterPath(unit, kvp.Value);
+                if (remainingMPAtHex <= 0) continue;
+
+                if (TryEmbarkFromHex(hex, kvp.Value, remainingMPAtHex,
                         tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction a, requireSectorMatch, allowOverflow, requireFormalPassenger))
                     return a;
             }
         }
 
         return null;
+    }
+
+    private PlayerAction TryBuildDirectTransporterExtendedEmbarkBatch(
+        UnitManager unit,
+        UnitData unitData,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        SectorObjective assigned,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> movePaths,
+        HashSet<Vector3Int> occupied,
+        List<Vector3Int> neighborBuf,
+        bool requireSectorMatch,
+        bool allowOverflow,
+        bool requireFormalPassenger)
+    {
+        foreach (UnitManager transporter in UnitManager.AllActive)
+        {
+            if (transporter == null || transporter == unit || transporter.TeamId != unit.TeamId)
+                continue;
+            if (transporter.IsDead || transporter.IsEmbarked || transporter.IsUnderRepair)
+                continue;
+            if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null || !transporterData.isTransporter)
+                continue;
+            if (FindFittingSlotIndex(transporter, transporterData, unit, unitData) < 0)
+                continue;
+
+            Vector3Int tCell = transporter.CurrentCellPosition;
+            tCell.z = 0;
+            float distFromOrigin = SectorManager.HexDistance(fromCell, tCell);
+            if (distFromOrigin > unit.RemainingMovementPoints + 0.5f)
+                continue;
+
+            neighborBuf.Clear();
+            UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, tCell, neighborBuf);
+            foreach (Vector3Int rawStop in neighborBuf)
+            {
+                Vector3Int stopCell = rawStop;
+                stopCell.z = 0;
+
+                if (stopCell == fromCell)
+                {
+                    if (TryEmbarkFromHex(fromCell, null, unit.RemainingMovementPoints,
+                            tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction action,
+                            requireSectorMatch, allowOverflow, requireFormalPassenger, transporter))
+                        return action;
+                    continue;
+                }
+
+                if (!TryGetEmbarkStopPath(unit, fromCell, stopCell, movePaths, out List<Vector3Int> pathToStop))
+                    continue;
+
+                int remainingMPAtStop = CalculateRemainingMovementAfterPath(unit, pathToStop);
+                if (remainingMPAtStop <= 0)
+                    continue;
+
+                if (TryEmbarkFromHex(stopCell, pathToStop, remainingMPAtStop,
+                        tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction movedAction,
+                        requireSectorMatch, allowOverflow, requireFormalPassenger, transporter))
+                    return movedAction;
+            }
+        }
+
+        return null;
+    }
+
+    private bool TryGetEmbarkStopPath(
+        UnitManager unit,
+        Vector3Int fromCell,
+        Vector3Int stopCell,
+        Dictionary<Vector3Int, List<Vector3Int>> movePaths,
+        out List<Vector3Int> path)
+    {
+        path = null;
+        fromCell.z = 0;
+        stopCell.z = 0;
+
+        if (movePaths != null && movePaths.TryGetValue(stopCell, out path) && path != null && path.Count > 0)
+            return true;
+
+        // Pathfinding can miss an otherwise valid embark stop when the target hex is
+        // occupied by a non-blocking air layer unit or the occupancy grid is stale after
+        // another AI action. Rebuild a small local path using current unit positions.
+        return TryFindEmbarkStopPath(unit, fromCell, stopCell, Mathf.Max(0, unit.RemainingMovementPoints), out path);
+    }
+
+    private bool TryFindEmbarkStopPath(
+        UnitManager unit,
+        Vector3Int fromCell,
+        Vector3Int stopCell,
+        int maxMovement,
+        out List<Vector3Int> path)
+    {
+        path = null;
+        if (unit == null || maxMovement <= 0)
+            return false;
+
+        fromCell.z = 0;
+        stopCell.z = 0;
+
+        var frontier = new Queue<Vector3Int>();
+        var costByCell = new Dictionary<Vector3Int, int>();
+        var cameFrom = new Dictionary<Vector3Int, Vector3Int>();
+        var neighbors = new List<Vector3Int>(6);
+
+        frontier.Enqueue(fromCell);
+        costByCell[fromCell] = 0;
+        cameFrom[fromCell] = fromCell;
+
+        while (frontier.Count > 0)
+        {
+            Vector3Int current = frontier.Dequeue();
+            if (current == stopCell)
+                break;
+
+            UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, current, neighbors);
+            foreach (Vector3Int rawNext in neighbors)
+            {
+                Vector3Int next = rawNext;
+                next.z = 0;
+
+                if (!UnitMovementPathRules.TryGetEnterCellCost(
+                        boardTilemap, unit, next, terrainDatabase, false, out int enterCost))
+                    continue;
+
+                enterCost = Mathf.Max(1, enterCost);
+                int nextCost = costByCell[current] + enterCost;
+                if (nextCost > maxMovement)
+                    continue;
+
+                if (!CanUseCellForEmbarkApproach(unit, next, isDestination: next == stopCell))
+                    continue;
+
+                if (costByCell.TryGetValue(next, out int knownCost) && knownCost <= nextCost)
+                    continue;
+
+                costByCell[next] = nextCost;
+                cameFrom[next] = current;
+                frontier.Enqueue(next);
+            }
+        }
+
+        if (!cameFrom.ContainsKey(stopCell))
+            return false;
+
+        path = new List<Vector3Int>();
+        Vector3Int cursor = stopCell;
+        while (true)
+        {
+            path.Add(cursor);
+            if (cursor == fromCell)
+                break;
+            cursor = cameFrom[cursor];
+        }
+        path.Reverse();
+        return path.Count >= 2;
+    }
+
+    private bool CanUseCellForEmbarkApproach(UnitManager unit, Vector3Int cell, bool isDestination)
+    {
+        foreach (UnitManager occupant in UnitManager.AllActive)
+        {
+            if (occupant == null || occupant == unit || occupant.IsDead || occupant.IsEmbarked)
+                continue;
+
+            Vector3Int occCell = occupant.CurrentCellPosition;
+            occCell.z = 0;
+            if (occCell != cell)
+                continue;
+
+            if (!OccupancyResolver.CanPassThrough(unit, occupant, cell))
+                return false;
+
+            if (isDestination
+                && occupant.TeamId == unit.TeamId
+                && OccupancyResolver.GetHeightBand(occupant) == OccupancyResolver.GetHeightBand(unit))
+                return false;
+        }
+
+        return true;
+    }
+
+    private int CalculateRemainingMovementAfterPath(UnitManager unit, IReadOnlyList<Vector3Int> path)
+    {
+        if (unit == null)
+            return 0;
+        int used = UnitMovementPathRules.CalculateAutonomyCostForPath(
+            boardTilemap,
+            unit,
+            path,
+            terrainDatabase,
+            applyOperationalAutonomyModifier: false);
+        return Mathf.Max(0, unit.RemainingMovementPoints - used);
+    }
+
+    private void CollectEmbarkTargetCells(
+        Vector3Int passengerCell,
+        UnitManager passenger,
+        List<Vector3Int> neighborBuf,
+        List<Vector3Int> output,
+        HashSet<Vector3Int> seenCells)
+    {
+        output.Clear();
+        seenCells.Clear();
+        neighborBuf.Clear();
+
+        passengerCell.z = 0;
+        UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, passengerCell, neighborBuf);
+        foreach (Vector3Int n in neighborBuf)
+        {
+            Vector3Int cell = n;
+            cell.z = 0;
+            if (seenCells.Add(cell))
+                output.Add(cell);
+        }
     }
 
     // Retorna true se outro capturer do mesmo setor está mais longe do objetivo e
@@ -281,11 +560,43 @@ public partial class AIController
             float otherDistToAPC = SectorManager.HexDistance(otherCell, apcCell);
             if (otherDistToAPC > ShuttlePickupRange + 1 + 0.5f) continue; // fora do alcance do APC
 
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} cede embarque para {other.InstanceId} ({otherDist:F0}h > {myDist:F0}h ao objetivo)");
+            int openSeats = CountAvailableSeatsForPassenger(transporter, unit);
+            if (openSeats > 1)
+            {
+                Debug.Log($"{TL("Capturador")} {unit.InstanceId} mantem embarque com {other.InstanceId}: transporter={transporter.InstanceId}@{apcCell} openSeats={openSeats} ({otherDist:F0}h > {myDist:F0}h ao objetivo)");
+                return false;
+            }
+
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} cede embarque para {other.InstanceId}: transporter={transporter.InstanceId}@{apcCell} openSeats={openSeats} myCell={myCell} otherCell={otherCell} ({otherDist:F0}h > {myDist:F0}h ao objetivo)");
             return true;
         }
 
         return false;
+    }
+
+    private int CountAvailableSeatsForPassenger(UnitManager transporter, UnitManager passenger)
+    {
+        if (transporter == null || passenger == null)
+            return 0;
+        if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null
+            || transporterData.transportSlots == null)
+            return 0;
+        if (!passenger.TryGetUnitData(out UnitData passengerData) || passengerData == null)
+            return 0;
+
+        int total = 0;
+        for (int i = 0; i < transporterData.transportSlots.Count; i++)
+        {
+            UnitTransportSlotRule slot = transporterData.transportSlots[i];
+            if (slot == null) continue;
+            if (!PodeEmbarcarSensor.CanUseSlot(passenger, passengerData, slot, out _)) continue;
+
+            int capacity = Mathf.Max(1, slot.capacity);
+            int occupied = transporter.GetOccupiedTransportSeatCountForSlot(i);
+            total += Mathf.Max(0, capacity - occupied);
+        }
+
+        return total;
     }
 
     // Verifica se há um transporter válido em tCell acessível a partir de fromHex,
@@ -295,31 +606,20 @@ public partial class AIController
         Vector3Int tCell, UnitManager unit, UnitData unitData,
         TeamObjectivePlan plan, SectorObjective assigned,
         AIWorldSnapshot snapshot, out PlayerAction action,
-        bool requireSectorMatch = false, bool allowOverflow = false, bool requireFormalPassenger = false)
+        bool requireSectorMatch = false, bool allowOverflow = false, bool requireFormalPassenger = false,
+        UnitManager expectedTransporter = null)
     {
         action = null;
 
         tCell.z = 0;
-        UnitManager transporter = UnitOccupancyRules.GetUnitAtCell(boardTilemap, tCell, unit);
-        // GetUnitAtCell queries the tilemap occupancy grid, which may lag behind after a unit
-        // moves earlier in Phase 2 (grid update is async; CurrentCellPosition is immediate).
-        // A transporter that executed its shuttle move this phase won't appear at its new cell
-        // in the grid yet. Fall back to a direct position scan using CurrentCellPosition.
-        if (transporter == null)
-        {
-            foreach (UnitManager u in UnitManager.AllActive)
-            {
-                if (u == unit || u.IsDead || u.IsEmbarked) continue;
-                Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
-                if (uc == tCell) { transporter = u; break; }
-            }
-        }
+        UnitManager transporter = ResolveEmbarkTransporterAtCell(unit, tCell, expectedTransporter);
         if (transporter == null || transporter.TeamId != unit.TeamId) return false;
         if (transporter.IsDead || transporter.IsEmbarked || transporter.IsUnderRepair) return false;
         if (!transporter.TryGetUnitData(out UnitData tData) || !tData.isTransporter) return false;
         // Não embarcar em transporter ainda no aeroporto/fábrica — espera ele sair primeiro.
         Vector3Int transporterCell = transporter.CurrentCellPosition; transporterCell.z = 0;
-        if (IsTeamProductionBuilding(transporterCell, unit.TeamId)) return false;
+        if (IsTeamProductionBuilding(transporterCell, unit.TeamId)
+            && !IsAirTransporter(transporter)) return false;
 
         // Primary capturer: APC must be assigned to the same sector.
         // Secondary capturer: also accepts an APC with no formal passenger (shuttle mode).
@@ -333,7 +633,12 @@ public partial class AIController
         UnitManager formalPassenger = tObj != null ? ResolveAssignedPassengerUnit(tObj, unit.TeamId) : null;
         bool formalMatch = sameSector && formalPassenger == unit;
         // Any capturer may board an APC with no formal passenger — free shuttle reorients to this objective.
-        bool shuttleFree = assigned == null || tObj == null || (compatibleSector && formalPassenger == null);
+        bool assignedRogueExtra = assigned == null
+            && tObj != null
+            && CanRogueUseAssignedTransporter(unit, transporter, tObj, unit.TeamId);
+        bool shuttleFree = assigned == null
+            ? (tObj == null || assignedRogueExtra)
+            : (tObj == null || (compatibleSector && formalPassenger == null));
         bool rogueEmbark = assigned == null && shuttleFree;
         if (requireFormalPassenger && !formalMatch) return false;
         // requireSectorMatch: called from the first preference pass — only accept the plan-assigned transporter.
@@ -341,6 +646,11 @@ public partial class AIController
         if (assigned != null && tObj != null && !compatibleSector)
         {
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor distante: assigned={assigned.Sector} tObj={tObj.Sector} transporter={transporter.InstanceId}");
+            return false;
+        }
+        if (assigned == null && tObj != null && !shuttleFree)
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO reserva: rogue nao usa transporter={transporter.InstanceId} reservado para {tObj.Sector}");
             return false;
         }
         if (!sameSector && !shuttleFree)
@@ -353,7 +663,8 @@ public partial class AIController
             // overflow: slot físico check abaixo confirma capacidade disponível
         }
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
-        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromCell, "hex embarque"))
+        Vector3Int embarkDecisionCell = fromHex; embarkDecisionCell.z = 0;
+        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, embarkDecisionCell, "hex embarque"))
             return false;
 
         // Pickup range: usa fromHex (posição após movimento) para não bloquear embarque estendido.
@@ -395,6 +706,75 @@ public partial class AIController
         Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca{overflowTag} (ext {(int)SectorManager.HexDistance(fromCell, tCell)}h) → {transporter.InstanceId} slot {slotIdx} via {fromHex}");
         action = BuildEmbarcarBatch(unit, snapshot.AITeam, fromCell, transporter, slotIdx, pathsForBatch);
         return true;
+    }
+
+    private UnitManager ResolveEmbarkTransporterAtCell(
+        UnitManager passenger,
+        Vector3Int transporterCell,
+        UnitManager expectedTransporter = null)
+    {
+        transporterCell.z = 0;
+
+        if (IsUsableTransporterAtCell(expectedTransporter, passenger, transporterCell))
+            return expectedTransporter;
+
+        // CurrentCellPosition is the source of truth during AI Phase 2. Tile occupancy can
+        // temporarily lag after earlier batches, so prefer an explicit live scan for
+        // transporters over the generic "first unit at cell" lookup.
+        foreach (UnitManager candidate in UnitManager.AllActive)
+        {
+            if (IsUsableTransporterAtCell(candidate, passenger, transporterCell))
+                return candidate;
+        }
+
+        UnitManager occupied = UnitOccupancyRules.GetUnitAtCell(boardTilemap, transporterCell, passenger);
+        return IsUsableTransporterAtCell(occupied, passenger, transporterCell) ? occupied : null;
+    }
+
+    private static bool IsUsableTransporterAtCell(
+        UnitManager candidate,
+        UnitManager passenger,
+        Vector3Int transporterCell)
+    {
+        if (candidate == null || candidate == passenger || candidate.IsDead || candidate.IsEmbarked)
+            return false;
+
+        Vector3Int candidateCell = candidate.CurrentCellPosition;
+        candidateCell.z = 0;
+        if (candidateCell != transporterCell)
+            return false;
+
+        return candidate.TryGetUnitData(out UnitData data) && data != null && data.isTransporter;
+    }
+
+    private bool CanRogueUseAssignedTransporter(
+        UnitManager passenger,
+        UnitManager transporter,
+        SectorObjective transportObjective,
+        TeamId aiTeam)
+    {
+        if (passenger == null || transporter == null || transportObjective == null)
+            return false;
+
+        UnitManager formalPassenger = ResolveAssignedPassengerSlotUnit(transportObjective, aiTeam);
+        if (formalPassenger == null)
+            return false;
+        if (formalPassenger == passenger)
+            return true;
+
+        return IsPassengerAlreadyOnboard(transporter, formalPassenger);
+    }
+
+    private static bool IsPassengerAlreadyOnboard(UnitManager transporter, UnitManager passenger)
+    {
+        if (transporter == null || passenger == null || transporter.TransportedUnitSlots == null)
+            return false;
+
+        foreach (UnitTransportSeatRuntime seat in transporter.TransportedUnitSlots)
+            if (seat.embarkedUnit == passenger && passenger.IsEmbarked)
+                return true;
+
+        return false;
     }
 
     private bool ShouldSkipCapturerEmbarkForShortWalk(

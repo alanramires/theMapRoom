@@ -106,6 +106,10 @@ public partial class AIController
         // sair do caminho, embarcar, ou continuar como oportunista sem bloquear o slot bom.
         if (!unit.IsUnderRepair && plan != null && IsRogueBlockingAssignedCapturerCorridor(unit, plan, aiTeam)) return 0;
 
+        // Qualquer unidade (rogue ou assigned, capturador ou assalto) que ocupa hex adjacente
+        // ao transporter cujo passageiro formal ainda nao agiu → sai na frente para liberar o staging.
+        if (!unit.IsUnderRepair && plan != null && TryFindAssignedEmbarkStagingBlockedBy(unit, plan, aiTeam, out _, out _)) return 0;
+
         // Se um capturador inimigo esta entocado em construcao nossa, fogo de suporte
         // com tiro possivel deve agir antes da infantaria defensora se reposicionar.
         if (!unit.IsUnderRepair && HasFireSupportShotAtOwnedConstructionCapturer(unit, aiTeam)) return 0;
@@ -376,6 +380,120 @@ public partial class AIController
         return false;
     }
 
+    private bool IsRogueBlockingAssignedEmbarkStaging(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (unit == null || plan == null || plan.RogueUnitIds == null || !plan.RogueUnitIds.Contains(unit.InstanceId))
+            return false;
+
+        if (!unit.TryGetUnitData(out UnitData data) || data == null
+            || data.roles == null || !data.roles.Contains(UnitRole.Capturador))
+            return false;
+
+        return TryFindAssignedEmbarkStagingBlockedBy(unit, plan, aiTeam, out _, out _);
+    }
+
+    private bool ShouldDeferCapturerForRogueEmbarkBlocker(
+        UnitManager unit,
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        out UnitManager blocker,
+        out UnitManager transporter)
+    {
+        blocker = null;
+        transporter = null;
+
+        if (unit == null || plan == null || unit.HasActed || unit.IsEmbarked || unit.IsDead)
+            return false;
+
+        if (!unit.TryGetUnitData(out UnitData data) || data == null
+            || data.roles == null || data.roles.Count == 0
+            || data.roles[0] != UnitRole.Capturador)
+            return false;
+
+        SectorObjective assigned = ResolveAssignedObjective(unit, plan);
+        if (assigned == null) return false;
+
+        UnitManager formalPassenger = ResolveAssignedPassengerUnit(assigned, aiTeam);
+        if (formalPassenger != unit) return false;
+
+        UnitManager bestBlocker = null;
+        UnitManager bestTransporter = null;
+        float bestDist = float.MaxValue;
+
+        foreach (UnitManager candidate in UnitManager.AllActive)
+        {
+            if (candidate == null || candidate.TeamId != aiTeam) continue;
+            if (candidate == unit || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked) continue;
+            if (plan.RogueUnitIds == null || !plan.RogueUnitIds.Contains(candidate.InstanceId)) continue;
+
+            if (!TryFindAssignedEmbarkStagingBlockedBy(candidate, plan, aiTeam, out UnitManager t, out SectorObjective tObj))
+                continue;
+            if (tObj != assigned) continue;
+
+            Vector3Int uc = unit.CurrentCellPosition; uc.z = 0;
+            Vector3Int bc = candidate.CurrentCellPosition; bc.z = 0;
+            float dist = SectorManager.HexDistance(uc, bc);
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                bestBlocker = candidate;
+                bestTransporter = t;
+            }
+        }
+
+        blocker = bestBlocker;
+        transporter = bestTransporter;
+        return blocker != null && transporter != null;
+    }
+
+    private bool TryFindAssignedEmbarkStagingBlockedBy(
+        UnitManager blocker,
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        out UnitManager transporter,
+        out SectorObjective transportObjective)
+    {
+        transporter = null;
+        transportObjective = null;
+
+        if (blocker == null || plan == null) return false;
+        Vector3Int blockerCell = blocker.CurrentCellPosition; blockerCell.z = 0;
+
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj == null || obj.Status == ObjectiveStatus.Defending) continue;
+            UnitManager passenger = ResolveAssignedPassengerUnit(obj, aiTeam);
+            if (passenger == null || passenger.HasActed || passenger.IsEmbarked || passenger.IsDead) continue;
+
+            foreach (SlotNeed slot in obj.Slots)
+            {
+                if (slot == null || slot.Role != UnitRole.Transportador || !slot.Filled) continue;
+                UnitManager t = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                if (t == null || t.IsDead || t.IsEmbarked || HasTransportCargo(t)) continue;
+                if (!t.TryGetUnitData(out UnitData tData) || tData == null || !tData.isTransporter) continue;
+
+                if (!passenger.TryGetUnitData(out UnitData passengerData) || passengerData == null) continue;
+                if (FindFittingSlotIndex(t, tData, passenger, passengerData) < 0) continue;
+
+                Vector3Int tCell = t.CurrentCellPosition; tCell.z = 0;
+                if (SectorManager.HexDistance(passenger.CurrentCellPosition, tCell) > 8f) continue;
+
+                var neighbors = new List<Vector3Int>(6);
+                UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, tCell, neighbors);
+                foreach (Vector3Int nRaw in neighbors)
+                {
+                    Vector3Int n = nRaw; n.z = 0;
+                    if (n != blockerCell) continue;
+                    transporter = t;
+                    transportObjective = obj;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private bool IsCapturerInOtherCapturerCorridor(UnitManager unit, Vector3Int unitCell, TeamObjectivePlan plan, TeamId aiTeam)
     {
         if (!unit.TryGetUnitData(out UnitData data) || data == null
@@ -494,6 +612,31 @@ public partial class AIController
         return ia.CompareTo(ib);
     }
 
+    // Distância ao transporter mais próximo que tem slot compatível livre para esta unidade.
+    // Retorna float.MaxValue se não houver nenhum disponível.
+    private float GetDistanceToNearestAvailableTransporter(UnitManager unit, TeamId aiTeam)
+    {
+        if (unit == null) return float.MaxValue;
+        if (!unit.TryGetUnitData(out UnitData data) || data == null
+            || data.roles == null || !data.roles.Contains(UnitRole.Capturador))
+            return float.MaxValue;
+
+        Vector3Int unitCell = unit.CurrentCellPosition; unitCell.z = 0;
+        float best = float.MaxValue;
+
+        foreach (UnitManager t in UnitManager.AllActive)
+        {
+            if (t == null || t.TeamId != aiTeam || t.IsDead || t.IsEmbarked) continue;
+            if (!t.TryGetUnitData(out UnitData tData) || tData == null || !tData.isTransporter) continue;
+            if (FindFittingSlotIndex(t, tData, unit, data) < 0) continue;
+            Vector3Int tCell = t.CurrentCellPosition; tCell.z = 0;
+            float dist = SectorManager.HexDistance(unitCell, tCell);
+            if (dist < best) best = dist;
+        }
+
+        return best;
+    }
+
     private HashSet<Vector3Int> BuildOccupied(UnitManager excludeUnit)
 
     {
@@ -506,7 +649,7 @@ public partial class AIController
 
             if (u == excludeUnit || u.IsEmbarked || u.IsDead) continue;
 
-            Vector3Int p = u.CurrentCellPosition; p.z = 0;
+            Vector3Int p = GetLiveUnitCell(u, syncState: true);
 
             set.Add(p);
 

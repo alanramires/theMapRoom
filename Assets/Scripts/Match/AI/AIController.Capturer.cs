@@ -172,7 +172,7 @@ public partial class AIController
             float dpqPontos = GetTerrainDpqPontos(cell);
             if (occupied.Contains(cell))
             {
-                scoringLog?.AppendLine($"  {cell} SKIP occupied dpqPts={dpqPontos:F1}");
+                scoringLog?.AppendLine($"  {cell} SKIP occupied dpqPts={dpqPontos:F1} occ={DescribeAnyUnitAtCellForDiagnostics(cell)}");
                 continue;
             }
             float dist     = SectorManager.HexDistance(cell, targetCell);

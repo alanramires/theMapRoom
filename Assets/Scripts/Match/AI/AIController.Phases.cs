@@ -331,6 +331,8 @@ public partial class AIController
                 }
             }
 
+            SyncAIUnitCellsFromTransforms();
+
             // Reconstrói a foto do mundo após cada batch — hexes ocupados mudam
             // BuildLight omite campos não usados pelos handlers (MyUnits, EnemyUnits,
             // OccupiedCells, Stance), reduzindo custo de ~50 iterações por unidade.
@@ -401,6 +403,16 @@ public partial class AIController
                         return b.CurrentHP.CompareTo(a.CurrentHP);
                     }
 
+                    // Dentro do grupo 4 (rogues): capturadores mais próximos de um
+                    // transporter com slot livre agem primeiro — garante embarque antes do heli encher.
+                    if (groupA == 4)
+                    {
+                        float transA = GetDistanceToNearestAvailableTransporter(a, aiTeam);
+                        float transB = GetDistanceToNearestAvailableTransporter(b, aiTeam);
+                        if (Mathf.Abs(transA - transB) > 0.5f)
+                            return transA.CompareTo(transB); // mais perto age primeiro; distantes agem por último
+                    }
+
                     int initiativeCmp = CompareUnitInitiative(a, b);
                     return initiativeCmp != 0 ? initiativeCmp : b.CurrentHP.CompareTo(a.CurrentHP);
                 });
@@ -425,6 +437,14 @@ public partial class AIController
 
             UnitManager unit = available[0];
             PlayerAction action = DecideUnitAction(unit, current);
+
+            if (ShouldDeferCapturerForRogueEmbarkBlocker(unit, activePlan, aiTeam,
+                    out UnitManager embarkBlocker, out UnitManager blockedTransporter))
+            {
+                deferredUnitIds.Add(unit.InstanceId);
+                Debug.Log($"{TL()} Fase2 — capturador {unit.InstanceId} cede vez para rogue {embarkBlocker.InstanceId} liberar embarque no transporte {blockedTransporter.InstanceId}");
+                continue;
+            }
 
             if (IsNoOpUnitAction(action) && ShouldDeferIdleAssaultForSectorCapturer(unit, activePlan, aiTeam))
             {
@@ -454,6 +474,7 @@ public partial class AIController
             bool unitMoved    = action.HasMoveTo && action.MoveTo != action.MoveFrom;
             bool unitAttacked = !string.IsNullOrEmpty(action.TargetInstanceId);
             yield return ExecuteAIBatchWithDebugStep(action);
+            SyncAIUnitCellsFromTransforms();
             if (ShouldStopAIForMatchEnd("phase2_apos_batch"))
                 yield break;
             yield return WaitIfDebugPaused();
@@ -482,6 +503,37 @@ public partial class AIController
         Vector3Int from = action.MoveFrom; from.z = 0;
         Vector3Int to = action.MoveTo; to.z = 0;
         return from == to;
+    }
+
+    private void SyncAIUnitCellsFromTransforms()
+    {
+        foreach (UnitManager unit in UnitManager.AllActive)
+            GetLiveUnitCell(unit, syncState: true);
+    }
+
+    private Vector3Int GetLiveUnitCell(UnitManager unit, bool syncState = false)
+    {
+        if (unit == null)
+            return Vector3Int.zero;
+
+        Vector3Int stateCell = unit.CurrentCellPosition;
+        stateCell.z = 0;
+
+        if (unit.IsDead || unit.IsEmbarked || !unit.gameObject.activeInHierarchy || unit.BoardTilemap == null)
+            return stateCell;
+
+        Vector3Int worldCell = HexCoordinates.WorldToCell(unit.BoardTilemap, unit.transform.position);
+        worldCell.z = 0;
+        if (worldCell == stateCell)
+            return stateCell;
+
+        if (syncState)
+        {
+            unit.SetCurrentCellPosition(worldCell, enforceFinalOccupancyRule: false);
+            Debug.Log($"{TL()} sync cell {unit.InstanceId}: state={stateCell} world={worldCell}");
+        }
+
+        return worldCell;
     }
 
     private bool ShouldDeferIdleAssaultForSectorCapturer(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)

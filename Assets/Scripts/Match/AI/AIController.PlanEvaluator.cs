@@ -84,7 +84,13 @@ public partial class AIController
                 && existing.Status != ObjectiveStatus.Abandoned)
                 existingOffensive++;
 
-        int maxObj  = Instance != null ? Instance.MaxActiveObjectives : 4;
+        int configuredMaxObj = Instance != null ? Instance.MaxActiveObjectives : 4;
+        int sectorScaledMaxObj = allSectors != null && allSectors.Count > 0
+            ? Mathf.CeilToInt(allSectors.Count / 3f)
+            : configuredMaxObj;
+        int maxObj = Mathf.Max(configuredMaxObj, sectorScaledMaxObj);
+        if (maxObj != configuredMaxObj)
+            Debug.Log($"{TL("Plan")} cap objetivos escalado: config={configuredMaxObj} setores={allSectors.Count} -> {maxObj}");
         int newSlots = Mathf.Max(0, maxObj - existingOffensive);
 
         var sectorCandidates = new List<SectorObjective>();
@@ -336,7 +342,7 @@ public partial class AIController
                 for (int s = 0; s < defSlots; s++)
                     defObj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
                 // Setor não-base com captura ativa: pede assault para expulsar o inimigo
-                if (info.HasPartialCapture && !criticalHomeThreat)
+                if (!criticalHomeThreat)
                     defObj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
                 plan.Objectives.Add(defObj);
                 Debug.Log($"{TL("Plan")} Objetivo defensivo: {info.Sector} (pri {defPriority - 1}, inimigo ≤{DefenseEnemyRange}h, partialCapture={info.HasPartialCapture})");
@@ -453,7 +459,10 @@ public partial class AIController
                 }
             }
 
-            assignableObjs.Add((obj, tc));
+            int openCapturerSlots = CountOpenSlots(obj, UnitRole.Capturador);
+            for (int slotIndex = 0; slotIndex < openCapturerSlots; slotIndex++)
+                assignableObjs.Add((obj, tc));
+
             if (isInitialDistribution && !isDefensive)
                 MarkCascadeNeighbor1(obj.Sector, cascadeCovered, aiTeam, plan.VacaterForwardSectors);
         }
@@ -1815,6 +1824,19 @@ public partial class AIController
             obj.Slots.Add(new SlotNeed { Role = role });
             total++;
         }
+    }
+
+    private static int CountOpenSlots(SectorObjective obj, UnitRole role)
+    {
+        if (obj == null || obj.Slots == null)
+            return 0;
+
+        int count = 0;
+        foreach (SlotNeed slot in obj.Slots)
+            if (slot.Role == role && !slot.Filled)
+                count++;
+
+        return count;
     }
 
     private static bool IsCriticalHomeDefenseSector(SectorManager.SectorInfo info, TeamId aiTeam)

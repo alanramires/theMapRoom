@@ -194,6 +194,7 @@ public partial class AIController
     {
         bool fromIsProductionBldg = IsTeamProductionBuilding(fromCell, aiTeam);
         bool hasObjective = objectiveCell != default && objectiveCell != Vector3Int.zero;
+        bool preferGroupPickup = unit != null && unit.GetDomain() == Domain.Air;
         const float eps = 0.1f;
 
         // When we know the destination, park on the path: find the reachable cell
@@ -209,6 +210,7 @@ public partial class AIController
                 float bestScore = float.MinValue;
                 float bestDistToObj = float.MaxValue;
                 int bestSupport = -1;
+                float bestBalancePenalty = float.MaxValue;
                 bool bestIsProductionBldg = true;
                 bool bestIsConstruction = true;
                 float bestThreat = float.MaxValue;
@@ -221,9 +223,11 @@ public partial class AIController
                     bestIsProductionBldg = false;
                     bestIsConstruction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell) != null;
                     bestThreat = CalculateThreatLevel(fromCell, aiTeam);
-                    bestSupport = CountAirPickupSupport(fromCell, aiTeam, plan, transportObjective);
+                    (bestSupport, bestBalancePenalty) = GetAirPickupSupportStats(fromCell, aiTeam, plan, transportObjective);
+                    bestSupport = Mathf.Max(1, bestSupport);
                     float bestTravel = SectorManager.HexDistance(fromCell, fromCell);
-                    bestScore = ScoreAirPickupCell(bestDistToObj, bestTravel, bestSupport, bestIsProductionBldg, bestIsConstruction, bestThreat);
+                    bestScore = ScoreAirPickupCell(bestDistToObj, bestTravel, bestSupport, bestBalancePenalty,
+                        bestIsProductionBldg, bestIsConstruction, bestThreat, preferGroupPickup);
                     found = true;
                 }
 
@@ -239,16 +243,19 @@ public partial class AIController
                     bool isProductionBldg = IsTeamProductionBuilding(cell, aiTeam);
                     bool isConstruction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell) != null;
                     float threat = CalculateThreatLevel(cell, aiTeam);
-                    int support = CountAirPickupSupport(cell, aiTeam, plan, transportObjective);
-                    float score = ScoreAirPickupCell(distToObj, travelDist, support, isProductionBldg, isConstruction, threat);
+                    (int support, float balancePenalty) = GetAirPickupSupportStats(cell, aiTeam, plan, transportObjective);
+                    support = Mathf.Max(1, support);
+                    float score = ScoreAirPickupCell(distToObj, travelDist, support, balancePenalty,
+                        isProductionBldg, isConstruction, threat, preferGroupPickup);
 
                     bool isBetter = !found
                         || score > bestScore + eps
                         || (score > bestScore - eps && distToObj < bestDistToObj - eps)
                         || (score > bestScore - eps && distToObj < bestDistToObj + eps && support > bestSupport)
-                        || (score > bestScore - eps && distToObj < bestDistToObj + eps && support == bestSupport && !isProductionBldg && bestIsProductionBldg)
-                        || (score > bestScore - eps && distToObj < bestDistToObj + eps && support == bestSupport && isProductionBldg == bestIsProductionBldg && !isConstruction && bestIsConstruction)
-                        || (score > bestScore - eps && distToObj < bestDistToObj + eps && support == bestSupport && isProductionBldg == bestIsProductionBldg && isConstruction == bestIsConstruction && threat < bestThreat - 0.001f);
+                        || (score > bestScore - eps && distToObj < bestDistToObj + eps && support == bestSupport && balancePenalty < bestBalancePenalty - 0.001f)
+                        || (score > bestScore - eps && distToObj < bestDistToObj + eps && support == bestSupport && Mathf.Abs(balancePenalty - bestBalancePenalty) < 0.001f && !isProductionBldg && bestIsProductionBldg)
+                        || (score > bestScore - eps && distToObj < bestDistToObj + eps && support == bestSupport && Mathf.Abs(balancePenalty - bestBalancePenalty) < 0.001f && isProductionBldg == bestIsProductionBldg && !isConstruction && bestIsConstruction)
+                        || (score > bestScore - eps && distToObj < bestDistToObj + eps && support == bestSupport && Mathf.Abs(balancePenalty - bestBalancePenalty) < 0.001f && isProductionBldg == bestIsProductionBldg && isConstruction == bestIsConstruction && threat < bestThreat - 0.001f);
 
                     if (isBetter)
                     {
@@ -256,6 +263,7 @@ public partial class AIController
                         bestScore = score;
                         bestDistToObj = distToObj;
                         bestSupport = support;
+                        bestBalancePenalty = balancePenalty;
                         bestIsProductionBldg = isProductionBldg;
                         bestIsConstruction = isConstruction;
                         bestThreat = threat;
@@ -343,26 +351,31 @@ public partial class AIController
         float distToObjective,
         float travelDist,
         int supportCount,
+        float balancePenalty,
         bool isProductionBuilding,
         bool isConstruction,
-        float threat)
+        float threat,
+        bool preferGroupPickup)
     {
-        float score = -distToObjective * 80f - travelDist * 55f + supportCount * 90f - threat * 5f;
-        if (isProductionBuilding) score -= 60f;
+        float score = preferGroupPickup
+            ? -distToObjective * 80f - travelDist * 55f + supportCount * 260f - balancePenalty * 45f - threat * 5f
+            : -distToObjective * 80f - travelDist * 55f + supportCount * 90f - threat * 5f;
+        if (isProductionBuilding) score -= preferGroupPickup ? 320f : 60f;
         if (isConstruction) score -= 15f;
         return score;
     }
 
-    private int CountAirPickupSupport(
+    private (int count, float balancePenalty) GetAirPickupSupportStats(
         Vector3Int cell,
         TeamId aiTeam,
         TeamObjectivePlan plan,
         SectorObjective transportObjective)
     {
         if (plan == null || transportObjective == null)
-            return 0;
+            return (0, 0f);
 
         int count = 0;
+        float balancePenalty = 0f;
         cell.z = 0;
 
         foreach (UnitManager candidate in UnitManager.AllActive)
@@ -373,17 +386,27 @@ public partial class AIController
             if (!data.roles.Contains(UnitRole.Capturador)) continue;
 
             SectorObjective assigned = ResolveAssignedObjective(candidate, plan);
-            if (assigned != null
-                && assigned.Sector != transportObjective.Sector
+            if (assigned == null)
+                continue;
+            if (assigned.Sector != transportObjective.Sector
                 && !AreEmbarkSectorsCompatible(assigned.Sector, transportObjective.Sector))
+                continue;
+
+            Vector3Int candidateCell = candidate.CurrentCellPosition;
+            candidateCell.z = 0;
+            float pickupDist = SectorManager.HexDistance(candidateCell, cell);
+            if (pickupDist < 0.5f || pickupDist > ShuttlePickupRange + 0.5f)
                 continue;
 
             HashSet<Vector3Int> reachable = BuildPassengerReachableSet(candidate);
             if (reachable != null && reachable.Contains(cell))
+            {
                 count++;
+                balancePenalty += Mathf.Abs(pickupDist - 1.5f);
+            }
         }
 
-        return count;
+        return (count, balancePenalty);
     }
 
     // Returns true if the transporter cell is within the passenger's reach.

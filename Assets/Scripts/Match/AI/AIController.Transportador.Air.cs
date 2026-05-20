@@ -204,10 +204,12 @@ public partial class AIController
         if (bestCandidate != null)
         {
             Vector3Int candidateObjective = ResolveUnitObjectiveCell(bestCandidate, plan, snapshot);
+            SectorObjective candidateAssigned = plan != null ? ResolveAssignedObjective(bestCandidate, plan) : null;
             var embarkablePaths = FilterPathsToEmbarkableCells(paths, unit, snapshot.AITeam);
             HashSet<Vector3Int> passengerReachable = BuildPassengerReachableSet(bestCandidate);
             Vector3Int moveTarget = FindTransportShuttleMove(
-                unit, fromCell, candidateCell, embarkablePaths, occupied, snapshot.AITeam, candidateObjective, passengerReachable);
+                unit, fromCell, candidateCell, embarkablePaths, occupied, snapshot.AITeam,
+                candidateObjective, passengerReachable, plan, candidateAssigned);
             Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} shuttle — candidato {bestCandidate.InstanceId}@{candidateCell} via {moveTarget}");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
         }
@@ -224,7 +226,8 @@ public partial class AIController
         Vector3Int transporterCell,
         out Vector3Int bestCandidateCell,
         bool preferAirSectors = false,
-        int thresholdReduction = 0)
+        int thresholdReduction = 0,
+        SectorObjective assignedSector = null)
     {
         bestCandidateCell = transporterCell;
         if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null)
@@ -244,7 +247,17 @@ public partial class AIController
             SectorObjective candidateAssigned = plan != null ? ResolveAssignedObjective(candidate, plan) : null;
             bool candidateIsPrimary = candidateData.roles != null && candidateData.roles.Count > 0
                 && candidateData.roles[0] == UnitRole.Capturador;
-            if (candidateIsPrimary && candidateAssigned != null) continue;
+            if (assignedSector == null)
+            {
+                if (candidateIsPrimary && candidateAssigned != null) continue;
+            }
+            else
+            {
+                if (candidateAssigned == null) continue;
+                if (candidateAssigned.Sector != assignedSector.Sector
+                    && !AreEmbarkSectorsCompatible(candidateAssigned.Sector, assignedSector.Sector))
+                    continue;
+            }
 
             Vector3Int objectiveCell = ResolveUnitObjectiveCell(candidate, plan, snapshot);
             if (objectiveCell == Vector3Int.zero) continue;
@@ -342,7 +355,8 @@ public partial class AIController
             if (sectorTarget != null) { sectorCell = sectorTarget.CurrentCellPosition; sectorCell.z = 0; }
 
             UnitManager nearbyCandidate = FindBestAirShuttleCandidate(
-                unit, snapshot, plan, fromCell, out Vector3Int nearbyCell, preferAirSectors: false);
+                unit, snapshot, plan, fromCell, out Vector3Int nearbyCell,
+                preferAirSectors: false, assignedSector: assigned);
             if (nearbyCandidate != null)
             {
                 Vector3Int objCell2 = ResolveUnitObjectiveCell(nearbyCandidate, plan, snapshot);
@@ -350,7 +364,8 @@ public partial class AIController
                 var embarkablePaths2 = FilterPathsToEmbarkableCells(paths, unit, snapshot.AITeam);
                 HashSet<Vector3Int> passengerReachable2 = BuildPassengerReachableSet(nearbyCandidate);
                 Vector3Int shuttleMove = FindTransportShuttleMove(
-                    unit, fromCell, nearbyCell, embarkablePaths2, occupied, snapshot.AITeam, objCell2, passengerReachable2);
+                    unit, fromCell, nearbyCell, embarkablePaths2, occupied, snapshot.AITeam,
+                    objCell2, passengerReachable2, plan, assigned);
                 Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} assigned {assigned.Sector} — sem passageiro formal, aguarda candidato {nearbyCandidate.InstanceId}@{nearbyCell} via {shuttleMove}");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, shuttleMove, paths);
             }

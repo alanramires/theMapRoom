@@ -191,7 +191,6 @@ public partial class AIController
     {
         Vector3Int bestCell = fromCell;
         float bestDist = SectorManager.HexDistance(fromCell, targetCell);
-        int bestPathSteps = 0;
         float bestThreat = CalculateThreatLevel(fromCell, aiTeam);
         const float eps = 0.01f;
 
@@ -203,19 +202,16 @@ public partial class AIController
                 continue;
 
             float dist = SectorManager.HexDistance(cell, targetCell);
-            int pathSteps = GetPathStepCount(paths, cell);
             float threat = CalculateThreatLevel(cell, aiTeam);
 
             bool isBetter = dist < bestDist - eps
-                || (dist < bestDist + eps && pathSteps > bestPathSteps)
-                || (dist < bestDist + eps && pathSteps == bestPathSteps && threat < bestThreat - eps);
+                || (dist < bestDist + eps && threat < bestThreat - eps);
 
             if (!isBetter)
                 continue;
 
             bestCell = cell;
             bestDist = dist;
-            bestPathSteps = pathSteps;
             bestThreat = threat;
         }
 

@@ -484,7 +484,18 @@ public partial class AIController
         bool preferBestDpq = PreferFireSupportBestDpq(unit);
         int maxRange = GetFireSupportMaxWeaponRange(unit);
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
-        bool fromRouteFound = TryCalculateFireSupportRouteDistance(unit, fromCell, anchor, out float fromRouteDist);
+        Dictionary<Vector3Int, int> routeCostToAnchor =
+            UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, anchor, 160, terrainDatabase);
+
+        float GetAnchorRouteCost(Vector3Int c) =>
+            routeCostToAnchor != null && routeCostToAnchor.TryGetValue(c, out int v)
+                ? (float)v
+                : float.MaxValue;
+
+        float fromRouteDist = GetAnchorRouteCost(fromCell);
+        bool fromRouteFound = fromRouteDist < float.MaxValue
+            || TryCalculateFireSupportRouteDistance(unit, fromCell, anchor, out fromRouteDist);
+        float fromEffectiveDist = fromRouteFound ? fromRouteDist : fromDist;
         float fromThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
         float fromScore = ScoreFireSupportRepositionCell(
             unit,
@@ -522,7 +533,9 @@ public partial class AIController
             float progress = fromDist - SectorManager.HexDistance(cell, anchor);
             float dpq = GetTerrainDpqPontos(cell);
             int pathCost = GetPathStepCount(paths, cell);
-            bool cellRouteFound = TryCalculateFireSupportRouteDistance(unit, cell, anchor, out float cellRouteDist);
+            float cellRouteDist = GetAnchorRouteCost(cell);
+            bool cellRouteFound = cellRouteDist < float.MaxValue
+                || TryCalculateFireSupportRouteDistance(unit, cell, anchor, out cellRouteDist);
             float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - cellRouteDist : 0f;
             bool recoversMissingRoute = !fromRouteFound && cellRouteFound;
             bool advancesByRoute = recoversMissingRoute || routeProgress > 0f;
@@ -589,12 +602,23 @@ public partial class AIController
 
         float moveMargin = moveMarginOverride >= 0f ? moveMarginOverride : 120f;
         bool enemyNearAnchor = HasNearbyVisibleEnemy(anchor, snapshot.AITeam, defenseEnemyRange + maxRange);
+        bool shouldAdvanceToAssigned = fromEffectiveDist > Mathf.Max(1, maxRange + 1);
+        if (!requireImmediateThreat
+            && shouldAdvanceToAssigned
+            && foundAdvance
+            && bestAdvanceCell != fromCell)
+        {
+            bestCell = bestAdvanceCell;
+            reason = $"advanceRoute forced route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} fromRoute={(fromRouteFound ? fromRouteDist.ToString("F1") : "?")} maxRange={maxRange} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
+            return true;
+        }
+
         if (!found || bestCell == fromCell)
         {
-            if (foundAdvance && fromDist > maxRange && enemyNearAnchor)
+            if (foundAdvance && (shouldAdvanceToAssigned || enemyNearAnchor))
             {
                 bestCell = bestAdvanceCell;
-                reason = $"advanceFallback route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
+                reason = $"advanceRoute route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} fromRoute={(fromRouteFound ? fromRouteDist.ToString("F1") : "?")} maxRange={maxRange} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
                 return true;
             }
 
@@ -603,10 +627,10 @@ public partial class AIController
 
         if (bestScore < fromScore + moveMargin)
         {
-            if (foundAdvance && fromDist > maxRange && enemyNearAnchor)
+            if (foundAdvance && (shouldAdvanceToAssigned || enemyNearAnchor))
             {
                 bestCell = bestAdvanceCell;
-                reason = $"advanceFallback score={bestScore:F0} hold={fromScore:F0} route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
+                reason = $"advanceRoute score={bestScore:F0} hold={fromScore:F0} route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} fromRoute={(fromRouteFound ? fromRouteDist.ToString("F1") : "?")} maxRange={maxRange} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
                 return true;
             }
 

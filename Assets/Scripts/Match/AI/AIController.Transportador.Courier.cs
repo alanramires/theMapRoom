@@ -424,12 +424,50 @@ public partial class AIController
             float dist = SectorManager.HexDistance(dc, target);
             if (dist <= dropOffRange)
                 filtered.Add(opt);
+            else if (IsRogueCapturerPassenger(opt.passengerUnit, plan)
+                     && IsUsefulRogueDropCell(opt.passengerUnit, dc, snapshot, dropOffRange))
+            {
+                filtered.Add(opt);
+                Debug.Log($"{TL("Transporte")} partial_disembark: #{opt.passengerUnit.InstanceId} rogue DESCE oportunista dc={dc} alvoOriginal={target} dist={dist:F0}h");
+            }
             else
                 Debug.Log($"{TL("Transporte")} partial_disembark: #{opt.passengerUnit.InstanceId} FICA — dc={dc} alvo={target} dist={dist:F0}h > {dropOffRange}h");
         }
         // Safety: never return empty — if every passenger is out of range keep all.
         // This prevents the helicopter from carrying cargo forever when it gets stuck.
         return filtered.Count > 0 ? filtered : options;
+    }
+
+    private bool IsRogueCapturerPassenger(UnitManager passenger, TeamObjectivePlan plan)
+    {
+        if (passenger == null || plan == null) return false;
+        if (IsPassengerInPlanSlot(passenger, plan)) return false;
+        if (!passenger.TryGetUnitData(out UnitData data) || data?.roles == null) return false;
+        return data.roles.Contains(UnitRole.Capturador);
+    }
+
+    private bool IsUsefulRogueDropCell(UnitManager passenger, Vector3Int dropCell, AIWorldSnapshot snapshot, int range)
+    {
+        if (passenger == null || snapshot == null) return false;
+
+        dropCell.z = 0;
+        if (SimulateCaptureSensor(passenger, dropCell, out ConstructionManager immediate)
+            && immediate != null
+            && immediate.TeamId != snapshot.AITeam)
+            return true;
+
+        if (snapshot.EnemyBuildings != null)
+        {
+            foreach (ConstructionManager b in snapshot.EnemyBuildings)
+            {
+                if (b == null || !b.IsCapturable || b.TeamId == snapshot.AITeam) continue;
+                Vector3Int bc = b.CurrentCellPosition; bc.z = 0;
+                if (SectorManager.HexDistance(dropCell, bc) <= range)
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private float ScoreCourierDisembarkOption(
@@ -512,6 +550,7 @@ public partial class AIController
         // the sector RepresentativeCell — for already-captured sectors it equals the
         // truck's own starting position, causing a distance-0 disembark without moving.
         Vector3Int target = Vector3Int.zero;
+        bool passengerHasPlanSlot = false;
         if (plan != null)
         {
             bool slotFound = false;
@@ -521,6 +560,7 @@ public partial class AIController
                 foreach (SlotNeed slot in obj.Slots)
                 {
                     if (!slot.Filled || slot.AssignedUnitId != passenger.InstanceId) continue;
+                    passengerHasPlanSlot = true;
                     ConstructionManager tgt = FindCapturableInSector(obj.Sector, snapshot.AITeam, fallbackCell);
                     if (tgt != null) { target = tgt.CurrentCellPosition; target.z = 0; }
                     else if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo si))
@@ -530,6 +570,15 @@ public partial class AIController
                 }
             }
         }
+
+        // Passenger without a plan slot is extra cargo. On an assigned transporter,
+        // it follows the transporter's assigned sector instead of hijacking the route to HQ.
+        if (!passengerHasPlanSlot && assignedSectorTarget != Vector3Int.zero)
+        {
+            resolvedTarget = assignedSectorTarget;
+            return true;
+        }
+
         // Rogue capturer — no plan slot. Head to the HQ sector and drop at the nearest
         // capturable building within it (could be a factory before the HQ itself).
         if (target == Vector3Int.zero && snapshot.EnemyHQ != null)

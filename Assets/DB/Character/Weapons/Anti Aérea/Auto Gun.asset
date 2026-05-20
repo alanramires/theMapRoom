@@ -21,6 +21,8 @@ MonoBehaviour:
   aditionalDomainsAllowed:
   - domain: 3
     heightLevel: 5
+  forceOpponentToGoToDomainAfterHit: []
+  unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit: []
   basicAttack: 10
   weaponCategory: 2
   weaponClass: 2
@@ -31,5 +33,5 @@ MonoBehaviour:
   ammunitionSprite: {fileID: 21300000, guid: a993bf2ba4691474485ad2c3d951ab1b, type: 3}
   useExplicitProjectileScale: 0
   projectileScale: 1
-  fireSfx: {fileID: 8300000, guid: 8e17b039776e93c4c9f37379d2062744, type: 3}
+  fireSfx: {fileID: 8300000, guid: a4fb3efb372b299479861dc2a7fa93b5, type: 3}
   fireSfxVolume: 1

@@ -53,6 +53,13 @@ public partial class AIController
         return false;
     }
 
+    private static bool IsAirTransporter(UnitManager unit)
+    {
+        if (unit == null) return false;
+        if (!unit.TryGetUnitData(out UnitData data) || data == null) return false;
+        return data.isTransporter && data.domain == Domain.Air;
+    }
+
     private static SectorObjective ResolveAssignedTransportObjective(UnitManager unit, TeamObjectivePlan plan)
     {
         foreach (SectorObjective obj in plan.Objectives)

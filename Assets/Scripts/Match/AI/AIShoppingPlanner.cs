@@ -145,6 +145,9 @@ public class AIShoppingPlanner : MonoBehaviour
         }
         int aaaCoverageRange = Instance != null ? Instance.AntiAirCoverageRange : 5;
         int aaaCap = CountVisibleEnemyAircraftNearHQ(snapshot, aaaCoverageRange);
+        bool aaaThreat = aaaCap > 0;
+        if (forceBaseAAA)
+            aaaCap = Mathf.Max(aaaCap, Instance != null ? Instance.MinBaseAAA : 1);
         if (aaaCap > 0 && activeAAAs < aaaCap && openAssaultSlots <= 0)
         {
             openAssaultSlots = 1;
@@ -167,7 +170,9 @@ public class AIShoppingPlanner : MonoBehaviour
         {
             openAssaultSlots = 1;
         }
+        int rawOpenCapturerSlots = openCapturerSlots;
         openCapturerSlots = LimitCapturerDemandForProgression(snapshot, openCapturerSlots, openAssaultSlots, openTransportSlots, openLogisticsSlots, openFireSupportSlots);
+        openCapturerSlots = RestoreCapturerDemandForIdleAirlift(snapshot, rawOpenCapturerSlots, openCapturerSlots);
 
         // Cap assault demand to 1 per 2 active capturers (min 1). Prevents the plan from
         // creating 5+ assault slots in T1 when all sectors are high-risk and no units exist,
@@ -406,12 +411,12 @@ public class AIShoppingPlanner : MonoBehaviour
         if (airBuildings.Count > 0)
             Debug.Log($"[AI Shopping] aerodromos={airBuildings.Count} air_trans_slots={openAirTransportSlots} custo_heli={cheapestAirTransportCost}");
 
-        // T1: sem reserva de elite ou aeronáutica — gasta tudo em capturadores e suporte básico.
+        // T1: sem reserva de elite — gasta tudo em capturadores e suporte básico.
+        // reserveForAirTransport é mantida para que soldados não consumam o orçamento do chinook.
         if (snapshot.TurnNumber <= 1)
         {
             reserveForEliteAssault      = 0;
             reserveForEliteFireSupport  = 0;
-            reserveForAirTransport      = 0;
             reserveForAirCombat         = 0;
             wantsEliteAssault           = false;
             wantsEliteFireSupport       = false;
@@ -556,7 +561,7 @@ public class AIShoppingPlanner : MonoBehaviour
                 allowDefensiveEliteAssault, defensiveTankReserveCost,
                 defensiveBaseManpowerShortage, defensiveMassReserveCost, defensiveBaseTankBought,
                 defensiveArmorThreat, wantsEliteFireSupport, activeFireSupportCount,
-                proactiveDefFireSupport, proactiveAntiAir, activeSAMs, activeAAAs, aaaCap);
+                proactiveDefFireSupport, proactiveAntiAir, activeSAMs, activeAAAs, aaaCap, aaaThreat);
             if (unit == null)
             {
                 Debug.Log($"[AI Shopping] {building.ConstructionDisplayName} @ {cell} — nenhuma unidade selecionada (sem fit ou sem budget)");
@@ -601,6 +606,8 @@ public class AIShoppingPlanner : MonoBehaviour
                 defensiveBaseTankBought = true;
             if (IsAntiAirOnlyUnit(unit) && IsPrimaryRole(unit, UnitRole.FogoIndireto))
                 activeSAMs++;
+            if (IsAntiAirOnlyUnit(unit) && IsPrimaryRole(unit, UnitRole.Assalto))
+                activeAAAs++;
 
             if (remaining <= 0) break;
         }
@@ -927,7 +934,8 @@ public class AIShoppingPlanner : MonoBehaviour
         bool proactiveAntiAir = false,
         int activeSAMs = 0,
         int activeAAAs = 0,
-        int aaaCap = 0)
+        int aaaCap = 0,
+        bool aaaThreat = false)
     {
         if (building.OfferedUnits == null || building.OfferedUnits.Count == 0) return null;
 
@@ -974,7 +982,7 @@ public class AIShoppingPlanner : MonoBehaviour
             bool isOffensiveOnlyUnit = u.aiPurchaseMode == AIPurchaseMode.Offensive;
 
             bool proactiveAntiAirSAMBypass = proactiveAntiAir && isSAMType;
-            bool proactiveAntiAirAAABypass = proactiveAntiAir && isAAAType;
+            bool proactiveAntiAirAAABypass = proactiveAntiAir && isAAAType && (aaaCap == 0 || activeAAAs < aaaCap);
             bool proactiveDefBypass = (proactiveDefFireSupport || proactiveAntiAirSAMBypass) && isDefensiveOnlyUnit && isFireSupportCapable;
             if (!defensiveBaseThreat && isDefensiveOnlyUnit && !proactiveDefBypass && !proactiveAntiAirAAABypass)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — Defensive-only, sem ameaça"); continue; }
@@ -1027,7 +1035,7 @@ public class AIShoppingPlanner : MonoBehaviour
                 && defensiveBaseTankBought
                 && IsDefensiveBaseBasicMassPurchase(u);
             bool canBuyLogistics = openLogisticsSlots > 0 && isPrimaryLogistics;
-            bool isAAADefense = isAAAType && aaaCap > 0 && activeAAAs < aaaCap;
+            bool isAAADefense = isAAAType && aaaThreat && activeAAAs < aaaCap;
             if (defensiveBaseThreat && canBuyLogistics)
             {
                 // Logistics demand remains valid during defense, but scores below direct combat buys.
@@ -1327,11 +1335,17 @@ public class AIShoppingPlanner : MonoBehaviour
         if (openCapturerSlots <= 0 || snapshot == null)
             return 0;
 
+        int activeCapturers = CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: false);
+
+        // T1 / opener: no active capturers yet — buy the full demand as the plan specifies.
+        // The batch limit exists to slow down purchases once the army is running, not to cap T1.
+        if (activeCapturers == 0)
+            return openCapturerSlots;
+
         int batchSize = Instance != null ? Instance.ProgressiveCapturerBatchSize : 2;
         int capped = Mathf.Min(openCapturerSlots, Mathf.Max(1, batchSize));
         int supportDemand = openAssaultSlots + openTransportSlots + openLogisticsSlots + openFireSupportSlots;
 
-        int activeCapturers = CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: false);
         int activeAssault = CountActiveUnitsWithRole(snapshot, UnitRole.Assalto, requirePrimary: true);
 
         // Dynamic pause threshold: scales with total capturer slots so the same
@@ -1360,6 +1374,31 @@ public class AIShoppingPlanner : MonoBehaviour
         }
 
         return capped;
+    }
+
+    private static int RestoreCapturerDemandForIdleAirlift(AIWorldSnapshot snapshot, int rawOpenCapturerSlots, int cappedOpenCapturerSlots)
+    {
+        if (cappedOpenCapturerSlots > 0 || rawOpenCapturerSlots <= 0 || snapshot == null)
+            return cappedOpenCapturerSlots;
+        if (!MapNeedsAirTransport(snapshot, out int minDist))
+            return cappedOpenCapturerSlots;
+
+        int emptyAirTransporters = CountAirTransporters(snapshot, requireEmpty: true);
+        if (emptyAirTransporters <= 0)
+            return cappedOpenCapturerSlots;
+
+        const int HeliCapacity = 2;
+        int pickupCapturers = CountAirTransportPickupCapturers(snapshot);
+        int spareSeats = Mathf.Max(0, emptyAirTransporters * HeliCapacity - pickupCapturers);
+        if (spareSeats <= 0)
+            return cappedOpenCapturerSlots;
+
+        int batchSize = Instance != null ? Instance.ProgressiveCapturerBatchSize : 2;
+        int airliftSeats = Mathf.Max(1, spareSeats);
+        int restored = Mathf.Max(rawOpenCapturerSlots, airliftSeats);
+        restored = Mathf.Min(restored, spareSeats);
+        Debug.Log($"[AI Shopping] capturer_airlift_feed: raw={rawOpenCapturerSlots} capped={cappedOpenCapturerSlots}->{restored} emptyAir={emptyAirTransporters} pickupCap={pickupCapturers} spareSeats={spareSeats} batch={batchSize} airliftSeats={airliftSeats} minDist={minDist}");
+        return restored;
     }
 
     private static void CountSlots(TeamId aiTeam, UnitRole role, out int total, out int filled)
@@ -2237,60 +2276,169 @@ public class AIShoppingPlanner : MonoBehaviour
         return demand;
     }
 
-    private static int ComputeAirTransportDemand(AIWorldSnapshot snapshot, int openCapturerSlots)
+    private static int ComputeAirTransportDemand(AIWorldSnapshot snapshot, int openCapturerSlots = 0)
     {
         TeamId aiTeam = snapshot.AITeam;
 
         // Gate: map must have at least one uncaptured sector far enough to warrant air transport.
         // Mirrors the plan evaluator's transport-slot logic but reads SectorManager directly,
         // so helicopters can be bought pre-emptively in T1 before the plan is populated.
-        int minDist = AIController.Instance != null
-            ? AIController.Instance.GetEffectiveTransportThreshold(aiTeam) : 7;
-
-        bool mapNeedsAirTransport = false;
-        foreach (SectorManager.SectorInfo info in SectorManager.GetAllSectorInfos())
-        {
-            if (info.IsFullyControlled && info.ControllingTeam == aiTeam) continue;
-            if (info.GetDistanceToHQ(aiTeam) >= minDist) { mapNeedsAirTransport = true; break; }
-        }
-        if (!mapNeedsAirTransport)
-        {
-            foreach (SectorManager.SectorInfo baseInfo in SectorManager.GetAllBaseInfos())
-            {
-                // Own base is at distance ~0; only enemy base has large enough distance.
-                if (baseInfo.GetDistanceToHQ(aiTeam) >= minDist) { mapNeedsAirTransport = true; break; }
-            }
-        }
-        if (!mapNeedsAirTransport)
+        if (!MapNeedsAirTransport(snapshot, out int minDist))
         {
             Debug.Log($"[AI Shopping] air_transport_demand: mapa pequeno (threshold={minDist}) → demand=0");
             return 0;
         }
 
-        int activeAirTransporters = 0;
+        int activeAirTransporters = CountAirTransporters(snapshot, requireEmpty: false);
         int activeGroundCapturers = 0;
         foreach (UnitManager u in UnitManager.AllActive)
         {
             if (u == null || u.TeamId != aiTeam || u.IsDead || u.IsEmbarked) continue;
             if (!u.TryGetUnitData(out UnitData d)) continue;
             if (d.roles == null || d.roles.Count == 0) continue;
-            if (d.roles[0] == UnitRole.Transportador && d.domain == Domain.Air)
-                activeAirTransporters++;
-            else if (d.roles[0] == UnitRole.Capturador && d.domain == Domain.Land)
+            if (d.roles[0] == UnitRole.Capturador && d.domain == Domain.Land)
                 activeGroundCapturers++;
         }
 
         // Demand = ceil(troops needing transport / helicopter capacity).
-        // Uses active ground capturers + capturer slots being opened this turn as proxy
-        // for how many units will eventually need a ride.
+        // T1 (no active capturers yet): mirror LimitCapturerDemandForProgression — full opener will be bought.
+        // T2+: only capturers still near the home air pickup area + this turn's batch.
         const int HeliCapacity = 2;
-        int troopsNeedingTransport = activeGroundCapturers + openCapturerSlots;
+        int pickupCapturers = CountAirTransportPickupCapturers(snapshot);
+        int troopsNeedingTransport;
+        if (activeGroundCapturers == 0)
+        {
+            troopsNeedingTransport = openCapturerSlots;
+        }
+        else
+        {
+            int batchSize = Instance != null ? Instance.ProgressiveCapturerBatchSize : 2;
+            int incomingCapturers = openCapturerSlots > 0 ? batchSize : 0;
+            troopsNeedingTransport = pickupCapturers + incomingCapturers;
+        }
+        if (troopsNeedingTransport <= 0)
+        {
+            Debug.Log($"[AI Shopping] air_transport_demand: 0 sem passageiro pickup/base groundCap={activeGroundCapturers} pickupCap={pickupCapturers} openCapSlots={openCapturerSlots} activeAirTrans={activeAirTransporters} minDist={minDist}");
+            return 0;
+        }
         int helicoptersNeeded = Mathf.CeilToInt((float)troopsNeedingTransport / HeliCapacity);
 
         int maxFleet = Instance != null ? Instance.MaxAirTransporters : 3;
         int demand = Mathf.Max(0, Mathf.Min(helicoptersNeeded, maxFleet) - activeAirTransporters);
-        Debug.Log($"[AI Shopping] air_transport_demand: groundCap={activeGroundCapturers} openCapSlots={openCapturerSlots} troops={troopsNeedingTransport} heliCap={HeliCapacity} heliNeeded={helicoptersNeeded} activeAirTrans={activeAirTransporters} maxFleet={maxFleet} minDist={minDist} demand={demand}");
+        Debug.Log($"[AI Shopping] air_transport_demand: groundCap={activeGroundCapturers} pickupCap={pickupCapturers} openCapSlots={openCapturerSlots} troops={troopsNeedingTransport} heliCap={HeliCapacity} heliNeeded={helicoptersNeeded} activeAirTrans={activeAirTransporters} maxFleet={maxFleet} minDist={minDist} demand={demand}");
         return demand;
+    }
+
+    private static bool MapNeedsAirTransport(AIWorldSnapshot snapshot, out int minDist)
+    {
+        TeamId aiTeam = snapshot != null ? snapshot.AITeam : TeamId.Neutral;
+        minDist = AIController.Instance != null
+            ? AIController.Instance.GetEffectiveTransportThreshold(aiTeam) : 7;
+
+        foreach (SectorManager.SectorInfo info in SectorManager.GetAllSectorInfos())
+        {
+            if (info.IsFullyControlled && info.ControllingTeam == aiTeam) continue;
+            if (info.GetDistanceToHQ(aiTeam) >= minDist) return true;
+        }
+
+        foreach (SectorManager.SectorInfo baseInfo in SectorManager.GetAllBaseInfos())
+        {
+            // Own base is at distance ~0; only enemy base has large enough distance.
+            if (baseInfo.GetDistanceToHQ(aiTeam) >= minDist) return true;
+        }
+
+        return false;
+    }
+
+    private static int CountAirTransporters(AIWorldSnapshot snapshot, bool requireEmpty)
+    {
+        if (snapshot == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager unit in UnitManager.AllActive)
+        {
+            if (unit == null || unit.TeamId != snapshot.AITeam || unit.IsDead || unit.IsEmbarked)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null || data.domain != Domain.Air || !IsPrimaryRole(data, UnitRole.Transportador))
+                continue;
+            if (requireEmpty && HasTransportCargo(unit))
+                continue;
+            count++;
+        }
+
+        return count;
+    }
+
+    private static bool HasTransportCargo(UnitManager unit)
+    {
+        if (unit == null || unit.TransportedUnitSlots == null)
+            return false;
+        foreach (UnitTransportSeatRuntime seat in unit.TransportedUnitSlots)
+        {
+            if (seat != null && seat.embarkedUnit != null && seat.embarkedUnit.IsEmbarked)
+                return true;
+        }
+        return false;
+    }
+
+    private static int CountAirTransportPickupCapturers(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null)
+            return 0;
+
+        var pickupCells = new List<Vector3Int>();
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam))
+                continue;
+            if (!CanOfferAirTransporter(building))
+                continue;
+
+            Vector3Int cell = building.CurrentCellPosition;
+            cell.z = 0;
+            pickupCells.Add(cell);
+        }
+
+        if (pickupCells.Count == 0)
+            return 0;
+
+        const float PickupRadius = 3f;
+        int count = 0;
+        foreach (UnitManager unit in UnitManager.AllActive)
+        {
+            if (unit == null || unit.TeamId != snapshot.AITeam || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null || !IsPrimaryRole(data, UnitRole.Capturador) || data.domain != Domain.Land)
+                continue;
+
+            Vector3Int unitCell = unit.CurrentCellPosition;
+            unitCell.z = 0;
+            for (int i = 0; i < pickupCells.Count; i++)
+            {
+                if (SectorManager.HexDistance(unitCell, pickupCells[i]) <= PickupRadius)
+                {
+                    count++;
+                    break;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private static bool CanOfferAirTransporter(ConstructionManager building)
+    {
+        if (building == null || building.OfferedUnits == null)
+            return false;
+        foreach (UnitData unit in building.OfferedUnits)
+        {
+            if (unit == null || unit.domain != Domain.Air)
+                continue;
+            if (IsPrimaryRole(unit, UnitRole.Transportador))
+                return true;
+        }
+        return false;
     }
 
     private static bool ObjectiveHasOpenOrFilledCapturer(SectorObjective obj)

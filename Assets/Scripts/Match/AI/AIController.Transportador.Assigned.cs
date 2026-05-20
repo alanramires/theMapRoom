@@ -122,4 +122,17 @@ public partial class AIController
         }
         return null;
     }
+
+    private static UnitManager ResolveAssignedPassengerSlotUnit(SectorObjective assigned, TeamId aiTeam)
+    {
+        if (assigned == null || assigned.Slots == null) return null;
+        foreach (SlotNeed slot in assigned.Slots)
+        {
+            if (!slot.Filled || slot.Role != UnitRole.Capturador) continue;
+            UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            if (capturer != null && !capturer.IsDead)
+                return capturer;
+        }
+        return null;
+    }
 }
