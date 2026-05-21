@@ -214,9 +214,15 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
         }
 
-        // No candidate: release to HexEvaluator for opportunistic positioning.
-        Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} shuttle — sem candidato, libera para suporte");
-        return null;
+        // No candidate: return to HQ to pick up the next wave of capturers rather than
+        // releasing to HexEvaluator, which would leave the helicopter idle (it cannot
+        // meaningfully capture or attack and HexEvaluator picks its current cell).
+        Vector3Int hqTarget = FindTransportWaitTarget(snapshot.AITeam, fromCell);
+        Vector3Int hqMove = hqTarget != fromCell
+            ? FindAirTransportMove(fromCell, hqTarget, paths, occupied, snapshot.AITeam)
+            : fromCell;
+        Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} shuttle — sem candidato, retorna ao HQ {hqTarget} via {hqMove}");
+        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, hqMove, paths);
     }
 
     private UnitManager FindBestAirShuttleCandidate(
