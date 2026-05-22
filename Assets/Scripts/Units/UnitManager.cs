@@ -128,6 +128,10 @@ public class UnitManager : MonoBehaviour
     private Sprite aiStanceIcon;
     [SerializeField] private bool aiMaintenanceActive;
 
+    private Vector3 _cohabitationOffset = Vector3.zero;
+    private Vector3 _cohabitationPreScale;
+    private bool _hasCohabitationVisual;
+
     public TeamId TeamId => teamId;
     public int SlotIndex => slotIndex;
     public void SetSlotIndex(int index)
@@ -2085,8 +2089,29 @@ public class UnitManager : MonoBehaviour
         }
 
         Vector3 snapped = HexCoordinates.GetCellCenterWorld(boardTilemap, currentCellPosition);
+        snapped += _cohabitationOffset;
         transform.position = snapped;
         currentPosition = snapped;
+    }
+
+    internal void ApplyCohabitationVisual(Vector3 positionOffset, Vector3 scale)
+    {
+        if (!_hasCohabitationVisual)
+            _cohabitationPreScale = transform.localScale;
+        _hasCohabitationVisual = true;
+        _cohabitationOffset = positionOffset;
+        transform.localScale = scale;
+        SnapToCellCenter();
+    }
+
+    internal void ClearCohabitationVisual()
+    {
+        if (!_hasCohabitationVisual)
+            return;
+        _hasCohabitationVisual = false;
+        transform.localScale = _cohabitationPreScale;
+        _cohabitationOffset = Vector3.zero;
+        SnapToCellCenter();
     }
 
     public void PullCellFromTransform()

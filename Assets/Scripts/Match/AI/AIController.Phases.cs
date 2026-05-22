@@ -41,6 +41,7 @@ public partial class AIController
         {
             currentAIStage = 1;
             BuildObjectivePlan(snapshot);
+            AIOperationManager.Instance.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
         }
 
         if (emulateStage1)
@@ -151,6 +152,7 @@ public partial class AIController
         {
             currentAIStage = 1;
             BuildObjectivePlan(snapshot);
+            AIOperationManager.Instance.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
         }
 
         if (stage <= 1 && emulateStage1)

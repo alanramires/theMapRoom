@@ -949,6 +949,12 @@ public partial class AIController
         fromCell.z = 0;
         targetCell.z = 0;
 
+        if (unit != null && unit.GetDomain() == Domain.Air)
+        {
+            distance = SectorManager.HexDistance(fromCell, targetCell);
+            return true;
+        }
+
         if (unit != null
             && unit.TryGetUnitData(out UnitData unitData)
             && unitData != null

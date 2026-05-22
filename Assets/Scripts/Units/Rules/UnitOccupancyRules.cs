@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -152,6 +153,63 @@ public static class UnitOccupancyRules
         }
 
         return null;
+    }
+
+    public static List<UnitManager> GetUnitsAtCell(Tilemap referenceTilemap, Vector3Int cell, UnitManager exceptUnit = null)
+    {
+        List<UnitManager> result = new List<UnitManager>();
+        cell.z = 0;
+
+        UnitManager[] units = GetActiveUnitsSnapshot();
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked || unit.IsDead)
+                continue;
+            if (!IsUnitOnReferenceMap(unit, referenceTilemap))
+                continue;
+
+            Vector3Int occupiedCell = unit.CurrentCellPosition;
+            occupiedCell.z = 0;
+            if (occupiedCell == cell)
+                result.Add(unit);
+        }
+
+        return result;
+    }
+
+    public static bool CanEndLayerTransitionAtCell(
+        Tilemap referenceTilemap,
+        Vector3Int cell,
+        UnitManager unit,
+        Domain targetDomain,
+        HeightLevel targetHeight,
+        out UnitManager blocker)
+    {
+        blocker = null;
+        if (unit == null)
+            return false;
+        if (!OccupancyResolver.IsLayerAwareRulesActive)
+            return true;
+
+        List<UnitManager> occupants = GetUnitsAtCell(referenceTilemap, cell, unit);
+        if (OccupancyResolver.CanEndLayerTransition(unit, targetDomain, targetHeight, occupants))
+            return true;
+
+        HeightBand targetBand = OccupancyResolver.GetHeightBand(targetDomain, targetHeight);
+        for (int i = 0; i < occupants.Count; i++)
+        {
+            UnitManager occupant = occupants[i];
+            if (occupant == null)
+                continue;
+            if (OccupancyResolver.GetHeightBand(occupant) == targetBand)
+            {
+                blocker = occupant;
+                break;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsUnitOnReferenceMap(UnitManager unit, Tilemap referenceTilemap)

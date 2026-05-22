@@ -347,6 +347,14 @@ public partial class AIController
 
             neighborBuf.Clear();
             UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, tCell, neighborBuf);
+            neighborBuf.Sort((a, b) =>
+            {
+                Vector3Int ca = a; ca.z = 0;
+                Vector3Int cb = b; cb.z = 0;
+                int cmp = SectorManager.HexDistance(fromCell, ca).CompareTo(SectorManager.HexDistance(fromCell, cb));
+                if (cmp != 0) return cmp;
+                return ca.GetHashCode().CompareTo(cb.GetHashCode());
+            });
             foreach (Vector3Int rawStop in neighborBuf)
             {
                 Vector3Int stopCell = rawStop;
@@ -390,7 +398,14 @@ public partial class AIController
         stopCell.z = 0;
 
         if (movePaths != null && movePaths.TryGetValue(stopCell, out path) && path != null && path.Count > 0)
-            return true;
+        {
+            Vector3Int last = path[path.Count - 1];
+            last.z = 0;
+            if (last == stopCell && CanUseCellForEmbarkApproach(unit, stopCell, isDestination: true))
+                return true;
+
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} descarta path de embarque stale para {stopCell}: last={last} usable={CanUseCellForEmbarkApproach(unit, stopCell, isDestination: true)}");
+        }
 
         // Pathfinding can miss an otherwise valid embark stop when the target hex is
         // occupied by a non-blocking air layer unit or the occupancy grid is stale after
@@ -616,6 +631,12 @@ public partial class AIController
         if (transporter == null || transporter.TeamId != unit.TeamId) return false;
         if (transporter.IsDead || transporter.IsEmbarked || transporter.IsUnderRepair) return false;
         if (!transporter.TryGetUnitData(out UnitData tData) || !tData.isTransporter) return false;
+        if (!PodeEmbarcarSensor.CanEmbarkAtTransporterContext(
+                boardTilemap, terrainDatabase, transporter, tData, out string contextReason))
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO contexto: transporter={transporter.InstanceId}@{tCell} {contextReason}");
+            return false;
+        }
         // Não embarcar em transporter ainda no aeroporto/fábrica — espera ele sair primeiro.
         Vector3Int transporterCell = transporter.CurrentCellPosition; transporterCell.z = 0;
         if (IsTeamProductionBuilding(transporterCell, unit.TeamId)

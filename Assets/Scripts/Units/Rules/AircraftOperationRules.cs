@@ -71,7 +71,15 @@ public static class AircraftOperationRules
         AirOperationTileContext tileContext = AirOperationResolver.ResolveContext(referenceTilemap, terrainDatabase, cell);
 
         if (unit.GetDomain() == Domain.Air && !unit.IsAircraftGrounded)
+        {
+            if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(referenceTilemap, cell, unit, Domain.Land, HeightLevel.Surface, out UnitManager blocker))
+            {
+                string blockerName = blocker != null && !string.IsNullOrWhiteSpace(blocker.UnitDisplayName) ? blocker.UnitDisplayName : "aliado";
+                return Unavailable($"Pouso indisponivel: camada Surface ocupada por {blockerName}.");
+            }
+
             return EvaluateLanding(unit, movementMode, tileContext);
+        }
 
         return EvaluateTakeoff(unit, movementMode, tileContext);
     }
@@ -90,8 +98,14 @@ public static class AircraftOperationRules
         if (!unit.TryGetUnitData(out UnitData data) || data == null)
             return false;
 
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+
         if (decision.action == AircraftOperationAction.Land)
         {
+            if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(referenceTilemap, cell, unit, Domain.Land, HeightLevel.Surface, out _))
+                return false;
+
             unit.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface);
             unit.SetAircraftGrounded(true);
             unit.SetAircraftEmbarkedInCarrier(false);
@@ -99,8 +113,6 @@ public static class AircraftOperationRules
             return true;
         }
 
-        Vector3Int cell = unit.CurrentCellPosition;
-        cell.z = 0;
         AirOperationTileContext tileContext = AirOperationResolver.ResolveContext(referenceTilemap, terrainDatabase, cell);
         HeightLevel endHeight = ResolvePreferredAirHeight(data);
         if (AirOperationResolver.TryGetTakeoffPlan(unit, tileContext, movementMode, out AirTakeoffPlan takeoffPlan, out _))

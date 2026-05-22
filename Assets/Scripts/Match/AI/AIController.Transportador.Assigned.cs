@@ -46,7 +46,9 @@ public partial class AIController
             {
                 Vector3Int objCheckCell = objCheck.CurrentCellPosition; objCheckCell.z = 0;
                 Vector3Int passCell = targetPassenger.CurrentCellPosition; passCell.z = 0;
-                if (SectorManager.HexDistance(passCell, objCheckCell) < GetEffectiveTransportThreshold(snapshot.AITeam))
+                int transportThreshold = GetEffectiveTransportThreshold(snapshot.AITeam);
+                int passTerrainCost = TerrainCostToCell(targetPassenger, passCell, objCheckCell, transportThreshold);
+                if (passTerrainCost < transportThreshold)
                     targetPassenger = null;
             }
         }

@@ -107,7 +107,7 @@ public static class PodeEmbarcarSensor
         return hasAny;
     }
 
-    private static bool CanEmbarkAtTransporterContext(
+    public static bool CanEmbarkAtTransporterContext(
         Tilemap map,
         TerrainDatabase terrainDatabase,
         UnitManager transporter,

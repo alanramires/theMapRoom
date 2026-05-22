@@ -12,7 +12,25 @@ public partial class AIController
     private PlayerAction TryDecideRepairAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
         UpdateRepairState(unit, plan);
-        return unit.IsUnderRepair ? DecideUnderRepairAction(unit, snapshot) : null;
+        if (!unit.IsUnderRepair)
+            return null;
+
+        // Aircraft under repair still navigates as aircraft. If it is currently
+        // grounded, temporarily lift it for AI path planning so mountains/terrain
+        // do not turn the repair march into a ground route.
+        bool wasGrounded = unit.IsAircraftGrounded;
+        if (wasGrounded)
+            unit.SetAircraftGrounded(false);
+
+        try
+        {
+            return DecideUnderRepairAction(unit, snapshot);
+        }
+        finally
+        {
+            if (wasGrounded)
+                unit.SetAircraftGrounded(true);
+        }
     }
 
     private void UpdateRepairState(UnitManager unit, TeamObjectivePlan plan)
@@ -99,7 +117,9 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths =
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
-        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        bool aircraftRepair = unit.GetAircraftType() != AircraftType.None;
+        HashSet<Vector3Int> occupied = aircraftRepair ? BuildAirOccupied(unit) : BuildOccupied(unit);
+        HashSet<Vector3Int> repairDestinationOccupied = aircraftRepair ? BuildOccupied(unit) : occupied;
         ConstructionManager currentBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
 
         TeamObjectivePlan capBlockPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
@@ -126,7 +146,8 @@ public partial class AIController
         if (currentBldg != null && currentBldg.IsCapturable
             && currentBldg.TeamId == aiTeam && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax)
         {
-            bool safe = !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);
+            bool safe = IsRepairConstructionSectorSafe(currentBldg, aiTeam)
+                && !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);
             if (safe && !isBlockingCapTarget)
             {
                 // While waiting for repair, a logistics unit can still receive a factory transfer.
@@ -351,7 +372,7 @@ public partial class AIController
         if (TryBuildRepairLastStandAttack(unit, aiTeam, fromCell, currentBldg, paths, occupied, out PlayerAction lastStandAction))
             return lastStandAction;
 
-        var occupiedForRepair = new HashSet<Vector3Int>(occupied) { fromCell };
+        var occupiedForRepair = new HashSet<Vector3Int>(repairDestinationOccupied) { fromCell };
         TeamObjectivePlan repPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
         if (repPlan != null)
             foreach (SectorObjective obj in repPlan.Objectives)
@@ -368,7 +389,7 @@ public partial class AIController
                 occupiedForRepair.Add(rc);
             }
 
-        ConstructionManager repairDest = FindRepairConstruction(fromCell, aiTeam, occupiedForRepair);
+        ConstructionManager repairDest = FindRepairConstruction(unit, fromCell, aiTeam, occupiedForRepair);
         if (repairDest == null)
         {
             if (TryDecideRepairFallbackToHQ(unit, snapshot, fromCell, paths, occupied, out PlayerAction hqFallback))
@@ -735,15 +756,17 @@ public partial class AIController
         return true;
     }
 
-    private ConstructionManager FindRepairConstruction(Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied)
+    private ConstructionManager FindRepairConstruction(UnitManager unit, Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied)
     {
         ConstructionManager best = null;
         float bestScore = float.MinValue;
+        bool preferAircraftFacility = unit != null && unit.GetAircraftType() != AircraftType.None;
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
             Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
             float dist = SectorManager.HexDistance(fromCell, cc);
             bool isHomeRepair = IsRepairHomeConstruction(c, aiTeam);
+            bool isAircraftFacility = IsAircraftRepairConstruction(c);
             if (c.TeamId != aiTeam)
             {
                 Debug.Log($"[Repair] skip {cc} team={c.TeamId} (need {aiTeam}) dist={dist:F1}");
@@ -752,6 +775,11 @@ public partial class AIController
             if (c.CurrentCapturePoints < c.CapturePointsMax)
             {
                 Debug.Log($"[Repair] skip {cc} cap={c.CurrentCapturePoints}/{c.CapturePointsMax} (incompleto) dist={dist:F1}");
+                continue;
+            }
+            if (!isHomeRepair && !IsRepairConstructionSectorSafe(c, aiTeam))
+            {
+                Debug.Log($"[Repair] skip {cc} setor inseguro sector={c.Sector} dist={dist:F1}");
                 continue;
             }
             bool occupiedCell = occupied.Contains(cc);
@@ -772,6 +800,13 @@ public partial class AIController
             float score = -dist * 100f;
             if (safe) score += 500f;
             if (isHomeRepair) score += 25f;
+            float aircraftCohesion = 0f;
+            if (preferAircraftFacility)
+            {
+                aircraftCohesion = CalculateAircraftRepairCohesionScore(unit, cc, aiTeam);
+                if (isAircraftFacility) score += 20000f + aircraftCohesion;
+                else if (isHomeRepair) score -= 1000f;
+            }
             if (occupiedCell && isHomeRepair) score -= 10000f;
 
             if (score > bestScore)
@@ -784,10 +819,85 @@ public partial class AIController
         {
             Vector3Int bc = best.CurrentCellPosition; bc.z = 0;
             string home = IsRepairHomeConstruction(best, aiTeam) ? " home" : string.Empty;
+            string aircraft = IsAircraftRepairConstruction(best) ? " airport" : string.Empty;
             string safe = !HasNearbyVisibleEnemy(bc, aiTeam, DefenseEnemyRange) ? " safe" : string.Empty;
-            Debug.Log($"[Repair] destino{home}{safe} selecionado {bc} dist={SectorManager.HexDistance(fromCell, bc):F1} score={bestScore:F0}");
+            string cohesion = unit != null && unit.GetAircraftType() != AircraftType.None
+                ? $" coh={CalculateAircraftRepairCohesionScore(unit, bc, aiTeam):F0}"
+                : string.Empty;
+            Debug.Log($"[Repair] destino{home}{aircraft}{safe} selecionado {bc} dist={SectorManager.HexDistance(fromCell, bc):F1}{cohesion} score={bestScore:F0}");
         }
         return best;
+    }
+
+    private float CalculateAircraftRepairCohesionScore(UnitManager unit, Vector3Int cell, TeamId aiTeam)
+    {
+        cell.z = 0;
+
+        int closeAllies = 0;
+        int nearbyAllies = 0;
+        float nearest = float.MaxValue;
+        float weighted = 0f;
+
+        foreach (UnitManager ally in UnitManager.AllActive)
+        {
+            if (ally == null || ally == unit || ally.TeamId != aiTeam)
+                continue;
+            if (ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            float dist = SectorManager.HexDistance(cell, allyCell);
+            nearest = Mathf.Min(nearest, dist);
+
+            if (dist <= 4f)
+            {
+                closeAllies++;
+                weighted += (5f - dist) * 110f;
+            }
+            else if (dist <= 8f)
+            {
+                nearbyAllies++;
+                weighted += (9f - dist) * 30f;
+            }
+        }
+
+        if (nearest == float.MaxValue)
+            return -1800f;
+
+        float isolationPenalty = nearest > 8f ? -2200f
+            : nearest > 6f ? -1200f
+            : nearest > 4f ? -450f
+            : 0f;
+
+        float closeBonus = Mathf.Min(closeAllies, 5) * 260f;
+        float nearbyBonus = Mathf.Min(nearbyAllies, 6) * 80f;
+        return weighted + closeBonus + nearbyBonus + isolationPenalty;
+    }
+
+    private static bool IsAircraftRepairConstruction(ConstructionManager construction)
+    {
+        return construction != null
+            && construction.TryResolveConstructionData(out ConstructionData data)
+            && data != null
+            && data.allowAircraftTakeoffAndLanding;
+    }
+
+    private static bool IsRepairConstructionSectorSafe(ConstructionManager construction, TeamId aiTeam)
+    {
+        if (construction == null || construction.TeamId != aiTeam)
+            return false;
+
+        if (IsRepairHomeConstruction(construction, aiTeam))
+            return true;
+
+        if (!TryGetAnySectorInfo(construction.Sector, out SectorManager.SectorInfo info) || info == null)
+            return false;
+
+        return info.IsFullyControlled
+            && !info.IsDisputed
+            && !info.HasPartialCapture
+            && info.ControllingTeam == aiTeam;
     }
 
     private static bool IsRepairHomeConstruction(ConstructionManager construction, TeamId aiTeam)

@@ -116,7 +116,37 @@ public static class OccupancyResolver
         return CanEndMove(unit, cell, occupants);
     }
 
-    private static HeightBand GetHeightBand(Domain domain, HeightLevel height)
+    public static bool CanEndLayerTransition(UnitManager unit, Domain targetDomain, HeightLevel targetHeight, IEnumerable<UnitManager> occupants)
+    {
+        if (unit == null)
+            return false;
+
+        if (!IsLayerAwareRulesActive)
+            return true;
+
+        HeightBand targetBand = GetHeightBand(targetDomain, targetHeight);
+        if (targetBand != HeightBand.Blocking)
+            return true;
+
+        if (occupants == null)
+            return true;
+
+        foreach (UnitManager occupant in occupants)
+        {
+            if (occupant == null || occupant == unit)
+                continue;
+            if (GetHeightBand(occupant) != targetBand)
+                continue;
+
+            // Transicao para camada bloqueante e mais restrita que movimento:
+            // se qualquer unidade ja ocupa a camada final, nao pousa/troca para ela.
+            return false;
+        }
+
+        return true;
+    }
+
+    public static HeightBand GetHeightBand(Domain domain, HeightLevel height)
     {
         if (domain == Domain.Air || height == HeightLevel.AirLow || height == HeightLevel.AirHigh)
             return HeightBand.Air;

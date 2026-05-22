@@ -6,6 +6,9 @@ public static class HexOccupancyQuery
     {
         UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         UnitManager firstMatch = null;
+        UnitManager preferredReadyMatch = null;
+        UnitManager preferredActedMatch = null;
+
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
@@ -17,12 +20,29 @@ public static class HexOccupancyQuery
             if (occupiedCell == cell)
             {
                 if (preferredTeamId >= 0 && (int)unit.TeamId == preferredTeamId)
-                    return unit;
+                {
+                    if (!unit.HasActed)
+                    {
+                        if (preferredReadyMatch == null)
+                            preferredReadyMatch = unit;
+                    }
+                    else if (preferredActedMatch == null)
+                    {
+                        preferredActedMatch = unit;
+                    }
+
+                    continue;
+                }
 
                 if (firstMatch == null)
                     firstMatch = unit;
             }
         }
+
+        if (preferredReadyMatch != null)
+            return preferredReadyMatch;
+        if (preferredActedMatch != null)
+            return preferredActedMatch;
 
         return firstMatch;
     }

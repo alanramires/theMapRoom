@@ -190,7 +190,8 @@ public partial class AIController
         Vector3Int objectiveCell = default,
         HashSet<Vector3Int> passengerReachable = null,
         TeamObjectivePlan plan = null,
-        SectorObjective transportObjective = null)
+        SectorObjective transportObjective = null,
+        Dictionary<Vector3Int, List<Vector3Int>> movementPaths = null)
     {
         bool fromIsProductionBldg = IsTeamProductionBuilding(fromCell, aiTeam);
         bool hasObjective = objectiveCell != default && objectiveCell != Vector3Int.zero;
@@ -334,6 +335,15 @@ public partial class AIController
         // forces a needless detour away from the objective.
         if (hasObjective)
         {
+            if (unit != null && unit.GetDomain() == Domain.Air)
+            {
+                Dictionary<Vector3Int, List<Vector3Int>> airMovePaths = movementPaths ?? paths;
+                Vector3Int pickupReturnTarget = ResolveAirPickupReturnTarget(candidateCell, passengerReachable, aiTeam);
+                Vector3Int airPickupMove = FindAirTransportMove(fromCell, pickupReturnTarget, airMovePaths, occupied, aiTeam);
+                Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} pickup sem intersecao neste turno - retorna pickup/base alvo={pickupReturnTarget} passageiro={candidateCell} objetivo={objectiveCell} via {airPickupMove}");
+                return airPickupMove;
+            }
+
             float cToObj = SectorManager.HexDistance(candidateCell, objectiveCell);
             Vector3Int rendezvous = cToObj > ShuttlePickupRange + 0.5f
                 ? new Vector3Int(
@@ -347,6 +357,55 @@ public partial class AIController
         return FindTransportMove(unit, fromCell, candidateCell, paths, occupied, aiTeam);
     }
 
+    private Vector3Int ResolveAirPickupReturnTarget(
+        Vector3Int candidateCell,
+        HashSet<Vector3Int> passengerReachable,
+        TeamId aiTeam)
+    {
+        candidateCell.z = 0;
+        Vector3Int homeTarget = FindTransportWaitTarget(aiTeam, candidateCell);
+
+        Vector3Int best = candidateCell;
+        float bestHomeDist = SectorManager.HexDistance(candidateCell, homeTarget);
+        float bestCandidateDist = 0f;
+        float bestThreat = CalculateThreatLevel(candidateCell, aiTeam);
+        bool bestIsProduction = IsTeamProductionBuilding(candidateCell, aiTeam);
+        const float eps = 0.01f;
+
+        if (passengerReachable == null || passengerReachable.Count == 0)
+            return best;
+
+        foreach (Vector3Int rawCell in passengerReachable)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (IsNonTeamConstruction(cell, aiTeam)) continue;
+            if (HasBlockingGroundUnitAtCell(cell, aiTeam) && cell != candidateCell) continue;
+
+            float homeDist = SectorManager.HexDistance(cell, homeTarget);
+            float candidateDist = SectorManager.HexDistance(cell, candidateCell);
+            float threat = CalculateThreatLevel(cell, aiTeam);
+            bool isProduction = IsTeamProductionBuilding(cell, aiTeam);
+
+            bool isBetter =
+                homeDist < bestHomeDist - eps
+                || (homeDist < bestHomeDist + eps && isProduction && !bestIsProduction)
+                || (homeDist < bestHomeDist + eps && isProduction == bestIsProduction && candidateDist < bestCandidateDist - eps)
+                || (homeDist < bestHomeDist + eps && isProduction == bestIsProduction && candidateDist < bestCandidateDist + eps && threat < bestThreat - eps);
+
+            if (!isBetter)
+                continue;
+
+            best = cell;
+            bestHomeDist = homeDist;
+            bestCandidateDist = candidateDist;
+            bestThreat = threat;
+            bestIsProduction = isProduction;
+        }
+
+        return best;
+    }
+
     private float ScoreAirPickupCell(
         float distToObjective,
         float travelDist,
@@ -358,7 +417,7 @@ public partial class AIController
         bool preferGroupPickup)
     {
         float score = preferGroupPickup
-            ? -distToObjective * 80f - travelDist * 55f + supportCount * 260f - balancePenalty * 45f - threat * 5f
+            ? -distToObjective * 22f - travelDist * 70f + supportCount * 420f - balancePenalty * 120f - threat * 5f
             : -distToObjective * 80f - travelDist * 55f + supportCount * 90f - threat * 5f;
         if (isProductionBuilding) score -= preferGroupPickup ? 320f : 60f;
         if (isConstruction) score -= 15f;

@@ -410,6 +410,8 @@ public partial class AIController
         foreach (SectorObjective obj in plan.Objectives) // pri=1 primeiro (mais prioritário)
         {
             if (!obj.HasOpenSlot(UnitRole.Capturador)) continue;
+            if (obj.Status == ObjectiveStatus.Defending)
+                continue;
             // Objetivos defensivos nunca são bloqueados pelo cascade (território já conquistado).
             bool isDefensive = false;
             ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
@@ -763,7 +765,7 @@ public partial class AIController
         // são preferidos sobre unidades já posicionadas no front, preservando a cobertura avançada.
         {
             int maxDefenders  = 3;
-            int defReachRange = DefenseEnemyRange * defenseCallRange;
+            int defReachRange = Mathf.Max(HomeDefenseThreatRange, DefenseEnemyRange);
             var rogueAssigned = new List<UnitManager>();
 
             var defCandidates = new List<UnitManager>(freeCapturers);
@@ -784,14 +786,17 @@ public partial class AIController
                 if (obj.Status != ObjectiveStatus.Defending) continue;
                 if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo defInfo)) continue;
                 int defenders = 0; foreach (SlotNeed s in obj.Slots) if (s.Filled) defenders++;
-                Vector3Int rc = defInfo.RepresentativeCell; rc.z = 0;
+                Vector3Int rc = ResolveCriticalHomeDefenseTargetCell(obj, aiTeam, defInfo.RepresentativeCell);
+                rc.z = 0;
                 foreach (UnitManager u in defCandidates)
                 {
                     if (rogueAssigned.Contains(u)) continue;
                     if (defenders >= maxDefenders) break;
                     Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
-                    if (SectorManager.HexDistance(uc, rc) > defReachRange) continue;
-                    obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador, Filled = true, AssignedUnitId = u.InstanceId });
+                    float responseDist = CalculateUnitResponseDistance(u, uc, rc);
+                    if (responseDist > defReachRange) continue;
+                    if (!obj.TryFillSlot(UnitRole.Capturador, u.InstanceId))
+                        obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador, Filled = true, AssignedUnitId = u.InstanceId });
                     ApplyPlanHUD(u, obj);
                     rogueAssigned.Add(u);
                     defenders++;

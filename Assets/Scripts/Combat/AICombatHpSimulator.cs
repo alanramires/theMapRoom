@@ -151,6 +151,43 @@ public static class AICombatHpSimulator
             defenderDpqDefenseBonus);
     }
 
+    public static AICombatHpResult SimulateWithWeapons(
+        UnitData attacker,
+        UnitData defender,
+        WeaponData attackWeapon,
+        WeaponData counterWeapon,
+        int attackerCurrentHp,
+        int defenderCurrentHp,
+        RPSDatabase rpsDatabase,
+        DPQMatchupDatabase dpqMatchupDatabase,
+        int attackerDpqPoints,
+        int defenderDpqPoints,
+        int attackerDpqDefenseBonus,
+        int defenderDpqDefenseBonus,
+        bool attackerIsGroundedAircraft,
+        bool defenderIsGroundedAircraft)
+    {
+        if (attacker == null || defender == null || attackWeapon == null)
+            return AICombatHpResult.Invalid;
+
+        WeaponPick attackPick = new WeaponPick(attackWeapon, -1, true);
+        WeaponPick counterPick = counterWeapon != null
+            ? new WeaponPick(counterWeapon, -1, true)
+            : WeaponPick.None;
+
+        return SimulateCore(
+            attacker, defender,
+            attackPick, counterPick,
+            attackerCurrentHp, defenderCurrentHp,
+            rpsDatabase, dpqMatchupDatabase,
+            attackerDpqPoints,
+            defenderDpqPoints,
+            attackerDpqDefenseBonus,
+            defenderDpqDefenseBonus,
+            attackerIsGroundedAircraft,
+            defenderIsGroundedAircraft);
+    }
+
     // ---- Nucleo da simulacao ----
 
     private static AICombatHpResult SimulateCore(
@@ -165,7 +202,9 @@ public static class AICombatHpSimulator
         int attackerDpqPoints,
         int defenderDpqPoints,
         int attackerDpqDefenseBonus,
-        int defenderDpqDefenseBonus)
+        int defenderDpqDefenseBonus,
+        bool attackerIsGroundedAircraft = false,
+        bool defenderIsGroundedAircraft = false)
     {
         WeaponData attackerWeapon = attackPick.weapon;
         WeaponData defenderWeapon = counterPick.isValid ? counterPick.weapon : null;
@@ -189,6 +228,10 @@ public static class AICombatHpSimulator
 
         int attackerAttackRps = ResolveAttackRps(attacker.unitClass, attackerCategory, defender.unitClass, rpsDatabase);
         int defenderAttackRps = counterExecuted ? ResolveAttackRps(defender.unitClass, defenderCategory, attacker.unitClass, rpsDatabase) : 0;
+        if (defenderIsGroundedAircraft)
+            attackerAttackRps = Mathf.Max(0, attackerAttackRps);
+        if (counterExecuted && attackerIsGroundedAircraft)
+            defenderAttackRps = Mathf.Max(0, defenderAttackRps);
 
         SkillModifierSummary attackerSkill = ResolveSkillModifiers(attacker, defender, attackerCategory, defenderCategoryForSkill);
         SkillModifierSummary defenderSkill = ResolveSkillModifiers(defender, attacker, defenderCategoryForSkill, attackerCategory);

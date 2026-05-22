@@ -119,6 +119,7 @@ public class AIShoppingPlanner : MonoBehaviour
         int openLogisticsSlots = ComputeLogisticsDemand(snapshot, out int repairDemandCount, out int activeLogisticsCount);
         bool proactiveAntiAir = ComputeProactiveAntiAirNeeded(snapshot, out int activeSAMs, out int activeAAAs);
         int maxSAMCap = Instance != null ? Instance.MaxProactiveAntiAirSAM : 3;
+        bool forceSAMBypass = false;
         // SAM proactive: requires AAA in field (chain gate) and cap not reached.
         // AAA proactive: bypasses the IsAntiAirOnlyUnit gate via proactiveAntiAir flag — competes normally for open assault slots.
         bool proactiveSAM = proactiveAntiAir && activeAAAs >= 1 && activeSAMs < 1; // proactive: 1 SAM is enough; reactive path uses maxSAMCap
@@ -164,6 +165,114 @@ public class AIShoppingPlanner : MonoBehaviour
                 Debug.Log($"[AI Shopping] reactive_anti_air_wide: {totalVisibleAir} aeronave(s) inimiga(s) visivel (longe do HQ), sem AAA no campo → slot assault para AAA");
             }
         }
+        int urgentCapturerFloor = 0;
+        List<OperationDeficit> opDeficits = AIOperationManager.Instance?.GetDeficits(snapshot.AITeam);
+        if (opDeficits != null)
+        {
+            foreach (OperationDeficit deficit in opDeficits)
+            {
+                if (deficit.Count <= 0) continue;
+                bool elevated = false;
+                switch (deficit.Kind)
+                {
+                    case AINeedKind.Capturer:
+                        if (deficit.Operation != null && deficit.Operation.IsUrgent)
+                        {
+                            int before = urgentCapturerFloor;
+                            urgentCapturerFloor = Mathf.Max(urgentCapturerFloor, deficit.Count);
+                            elevated = urgentCapturerFloor != before;
+                        }
+                        else
+                        {
+                            int before = openCapturerSlots;
+                            openCapturerSlots = Mathf.Max(openCapturerSlots, deficit.Count);
+                            elevated = openCapturerSlots != before;
+                        }
+                        break;
+                    case AINeedKind.Assault:
+                        {
+                            int before = openAssaultSlots;
+                            openAssaultSlots = Mathf.Max(openAssaultSlots, deficit.Count);
+                            elevated = openAssaultSlots != before;
+                        }
+                        break;
+                    case AINeedKind.AAA:
+                        {
+                            proactiveAntiAir = true;
+                            int before = openAssaultSlots;
+                            openAssaultSlots = Mathf.Max(openAssaultSlots, deficit.Count);
+                            elevated = openAssaultSlots != before;
+                        }
+                        break;
+                    case AINeedKind.SAM:
+                        {
+                            proactiveAntiAir = true;
+                            forceSAMBypass = true;
+                            int before = openFireSupportSlots;
+                            openFireSupportSlots = Mathf.Max(openFireSupportSlots, deficit.Count);
+                            preferDefensiveFireSupport = true;
+                            elevated = openFireSupportSlots != before;
+                        }
+                        break;
+                    case AINeedKind.Artillery:
+                        {
+                            int before = openFireSupportSlots;
+                            openFireSupportSlots = Mathf.Max(openFireSupportSlots, deficit.Count);
+                            preferDefensiveFireSupport = true;
+                            proactiveDefFireSupport = true;
+                            elevated = openFireSupportSlots != before;
+                        }
+                        break;
+                    case AINeedKind.FireSupport:
+                        {
+                            int before = openFireSupportSlots;
+                            openFireSupportSlots = Mathf.Max(openFireSupportSlots, deficit.Count);
+                            elevated = openFireSupportSlots != before;
+                        }
+                        break;
+                    case AINeedKind.AirTransport:
+                        {
+                            int before = openAirTransportSlots;
+                            openAirTransportSlots = Mathf.Max(openAirTransportSlots, deficit.Count);
+                            elevated = openAirTransportSlots != before;
+                        }
+                        break;
+                    case AINeedKind.FighterB:
+                        {
+                            int before = openCacaBSlots;
+                            openCacaBSlots = Mathf.Max(openCacaBSlots, deficit.Count);
+                            elevated = openCacaBSlots != before;
+                        }
+                        break;
+                    case AINeedKind.FighterA:
+                        {
+                            int before = openCacaASlots;
+                            openCacaASlots = Mathf.Max(openCacaASlots, deficit.Count);
+                            elevated = openCacaASlots != before;
+                        }
+                        break;
+                    case AINeedKind.Apache:
+                        {
+                            int before = openApacheSlots;
+                            openApacheSlots = Mathf.Max(openApacheSlots, deficit.Count);
+                            elevated = openApacheSlots != before;
+                        }
+                        break;
+                }
+
+                if (elevated)
+                    Debug.Log($"[AI Shopping] op_deficit: {deficit.Operation?.Type}({deficit.Operation?.Sector}) {deficit.Kind}x{deficit.Count}");
+            }
+        }
+        bool previousProactiveSAM = proactiveSAM;
+        proactiveSAM = (proactiveAntiAir && activeAAAs >= 1 && activeSAMs < 1)
+            || (forceSAMBypass && activeSAMs < 1);
+        if (proactiveSAM && !previousProactiveSAM)
+        {
+            openFireSupportSlots = Mathf.Max(openFireSupportSlots, 1);
+            preferDefensiveFireSupport = true;
+            Debug.Log($"[AI Shopping] op_deficit: SAM bypass force={forceSAMBypass} activeAAAs={activeAAAs} activeSAMs={activeSAMs}/{maxSAMCap}");
+        }
         if (openAssaultSlots <= 0
             && !HasActivePrimaryRole(snapshot, UnitRole.Assalto)
             && CanAffordPurePrimaryRole(snapshot, UnitRole.Assalto, remaining))
@@ -173,6 +282,8 @@ public class AIShoppingPlanner : MonoBehaviour
         int rawOpenCapturerSlots = openCapturerSlots;
         openCapturerSlots = LimitCapturerDemandForProgression(snapshot, openCapturerSlots, openAssaultSlots, openTransportSlots, openLogisticsSlots, openFireSupportSlots);
         openCapturerSlots = RestoreCapturerDemandForIdleAirlift(snapshot, rawOpenCapturerSlots, openCapturerSlots);
+        if (urgentCapturerFloor > 0)
+            openCapturerSlots = Mathf.Max(openCapturerSlots, urgentCapturerFloor);
 
         // Cap assault demand to 1 per 2 active capturers (min 1). Prevents the plan from
         // creating 5+ assault slots in T1 when all sectors are high-risk and no units exist,

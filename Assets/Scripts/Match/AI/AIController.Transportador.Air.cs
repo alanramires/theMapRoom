@@ -165,6 +165,22 @@ public partial class AIController
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
     }
 
+    private PlayerAction BuildAirTransportReturnToWaitTarget(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        string reason)
+    {
+        Vector3Int waitTarget = FindTransportWaitTarget(snapshot.AITeam, fromCell);
+        Vector3Int moveTarget = waitTarget != fromCell
+            ? FindAirTransportMove(fromCell, waitTarget, paths, occupied, snapshot.AITeam)
+            : fromCell;
+        Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} {reason} - retorna espera/HQ {waitTarget} via {moveTarget}");
+        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
+    }
+
     // -------------------------------------------------------------------------
     // Air Shuttle — empty helicopter seeking pickup candidates.
     // First pass prefers candidates whose assigned sectors favour air transport.
@@ -209,7 +225,7 @@ public partial class AIController
             HashSet<Vector3Int> passengerReachable = BuildPassengerReachableSet(bestCandidate);
             Vector3Int moveTarget = FindTransportShuttleMove(
                 unit, fromCell, candidateCell, embarkablePaths, occupied, snapshot.AITeam,
-                candidateObjective, passengerReachable, plan, candidateAssigned);
+                candidateObjective, passengerReachable, plan, candidateAssigned, paths);
             Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} shuttle — candidato {bestCandidate.InstanceId}@{candidateCell} via {moveTarget}");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
         }
@@ -339,26 +355,26 @@ public partial class AIController
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
+        ConstructionManager assignedCaptureTarget = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
+        if (assignedCaptureTarget == null)
+            return BuildAirTransportReturnToWaitTarget(unit, snapshot, fromCell, paths, occupied,
+                $"assigned {assigned.Sector} concluido/sem alvo capturavel");
+
         UnitManager targetPassenger = ResolveAssignedPassengerUnit(assigned, snapshot.AITeam);
         if (targetPassenger != null)
         {
-            ConstructionManager objCheck = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
-            if (objCheck != null)
-            {
-                Vector3Int objCheckCell = objCheck.CurrentCellPosition; objCheckCell.z = 0;
-                Vector3Int passCell = targetPassenger.CurrentCellPosition; passCell.z = 0;
-                int airThreshold = GetEffectiveTransportThreshold(snapshot.AITeam);
-                int passTerrainCost = TerrainCostToCell(targetPassenger, passCell, objCheckCell, airThreshold);
-                if (passTerrainCost < airThreshold)
-                    targetPassenger = null;
-            }
+            Vector3Int objCheckCell = assignedCaptureTarget.CurrentCellPosition; objCheckCell.z = 0;
+            Vector3Int passCell = targetPassenger.CurrentCellPosition; passCell.z = 0;
+            int airThreshold = GetEffectiveTransportThreshold(snapshot.AITeam);
+            int passTerrainCost = TerrainCostToCell(targetPassenger, passCell, objCheckCell, airThreshold);
+            if (passTerrainCost < airThreshold)
+                targetPassenger = null;
         }
 
         if (targetPassenger == null)
         {
-            ConstructionManager sectorTarget = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
-            Vector3Int sectorCell = fromCell;
-            if (sectorTarget != null) { sectorCell = sectorTarget.CurrentCellPosition; sectorCell.z = 0; }
+            Vector3Int sectorCell = assignedCaptureTarget.CurrentCellPosition;
+            sectorCell.z = 0;
 
             UnitManager nearbyCandidate = FindBestAirShuttleCandidate(
                 unit, snapshot, plan, fromCell, out Vector3Int nearbyCell,
@@ -371,28 +387,25 @@ public partial class AIController
                 HashSet<Vector3Int> passengerReachable2 = BuildPassengerReachableSet(nearbyCandidate);
                 Vector3Int shuttleMove = FindTransportShuttleMove(
                     unit, fromCell, nearbyCell, embarkablePaths2, occupied, snapshot.AITeam,
-                    objCell2, passengerReachable2, plan, assigned);
+                    objCell2, passengerReachable2, plan, assigned, paths);
                 Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} assigned {assigned.Sector} — sem passageiro formal, aguarda candidato {nearbyCandidate.InstanceId}@{nearbyCell} via {shuttleMove}");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, shuttleMove, paths);
             }
 
-            Vector3Int sectorMove = FindAirTransportMove(fromCell, sectorCell, paths, occupied, snapshot.AITeam);
-            Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} assigned {assigned.Sector} — sem passageiro, pressiona {sectorCell}");
+            Vector3Int waitCell = FindTransportWaitTarget(snapshot.AITeam, fromCell);
+            Vector3Int sectorMove = FindAirTransportMove(fromCell, waitCell, paths, occupied, snapshot.AITeam);
+            Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} assigned {assigned.Sector} sem passageiro util - retorna espera/HQ {waitCell} via {sectorMove}");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, sectorMove, paths);
         }
 
         Vector3Int passengerCell = targetPassenger.CurrentCellPosition; passengerCell.z = 0;
         Vector3Int objCell = ResolveUnitObjectiveCell(targetPassenger, plan, snapshot);
-        ConstructionManager assignedPickupTarget = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
-        if (assignedPickupTarget != null)
-        {
-            objCell = assignedPickupTarget.CurrentCellPosition;
-            objCell.z = 0;
-        }
+        objCell = assignedCaptureTarget.CurrentCellPosition;
+        objCell.z = 0;
         var embarkablePaths3 = FilterPathsToEmbarkableCells(paths, unit, snapshot.AITeam);
         HashSet<Vector3Int> passengerReachable3 = BuildPassengerReachableSet(targetPassenger);
         Vector3Int moveTarget = FindTransportShuttleMove(
-            unit, fromCell, passengerCell, embarkablePaths3, occupied, snapshot.AITeam, objCell, passengerReachable3, plan, assigned);
+            unit, fromCell, passengerCell, embarkablePaths3, occupied, snapshot.AITeam, objCell, passengerReachable3, plan, assigned, paths);
 
         Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} assigned {assigned.Sector} — pickup {targetPassenger.InstanceId}@{passengerCell} via {moveTarget}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);

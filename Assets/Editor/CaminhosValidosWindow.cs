@@ -7,8 +7,10 @@ using UnityEngine.Tilemaps;
 public class CaminhosValidosWindow : EditorWindow
 {
     [SerializeField] private UnitData unitData;
+    [SerializeField] private UnitDatabase unitDatabase;
     [SerializeField] private Tilemap tilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
+    [SerializeField] private bool calculateAircraftAsAirborne = true;
 
     [SerializeField] private Vector3Int originHex;
     [SerializeField] private int movementPoints = 3;
@@ -22,6 +24,8 @@ public class CaminhosValidosWindow : EditorWindow
 
     private static readonly FieldInfo s_teamIdField =
         typeof(UnitManager).GetField("teamId", BindingFlags.NonPublic | BindingFlags.Instance);
+    private static readonly FieldInfo s_unitDatabaseField =
+        typeof(UnitManager).GetField("unitDatabase", BindingFlags.NonPublic | BindingFlags.Instance);
 
     private bool pickingOrigin;
     private bool pickingDestination;
@@ -98,6 +102,13 @@ public class CaminhosValidosWindow : EditorWindow
                 terrainDatabase = AssetDatabase.LoadAssetAtPath<TerrainDatabase>(
                     AssetDatabase.GUIDToAssetPath(guids[0]));
         }
+        if (unitDatabase == null)
+        {
+            string[] guids = AssetDatabase.FindAssets("t:UnitDatabase");
+            if (guids.Length > 0)
+                unitDatabase = AssetDatabase.LoadAssetAtPath<UnitDatabase>(
+                    AssetDatabase.GUIDToAssetPath(guids[0]));
+        }
     }
 
     private UnitData ActiveUnitData()
@@ -132,7 +143,7 @@ public class CaminhosValidosWindow : EditorWindow
             {
                 UnitData d = ActiveUnitData();
                 string info = d != null
-                    ? $"  {sceneUnit.name}  mov={d.movement}  PM restantes={sceneUnit.RemainingMovementPoints}  {sceneUnit.CurrentCellPosition}"
+                    ? $"  {sceneUnit.name}  mov={d.movement}  PM restantes={sceneUnit.RemainingMovementPoints}  {sceneUnit.CurrentCellPosition}  layer={sceneUnit.GetDomain()}/{sceneUnit.GetHeightLevel()}"
                     : $"  {sceneUnit.name}  (sem UnitData)";
                 EditorGUILayout.LabelField(info, EditorStyles.miniLabel);
 
@@ -166,7 +177,9 @@ public class CaminhosValidosWindow : EditorWindow
         }
 
         tilemap         = (Tilemap)EditorGUILayout.ObjectField("Tilemap", tilemap, typeof(Tilemap), true);
+        unitDatabase    = (UnitDatabase)EditorGUILayout.ObjectField("Unit Database", unitDatabase, typeof(UnitDatabase), false);
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
+        calculateAircraftAsAirborne = EditorGUILayout.Toggle("Aeronave calcula em voo", calculateAircraftAsAirborne);
 
         EditorGUILayout.Space(4f);
         if (GUILayout.Button("Limpar Resultados", GUILayout.Height(22)))
@@ -455,14 +468,70 @@ public class CaminhosValidosWindow : EditorWindow
         try
         {
             var unit = go.AddComponent<UnitManager>();
+            UnitDatabase db = ActiveUnitDatabase(data);
+            if (db != null)
+                s_unitDatabaseField?.SetValue(unit, db);
             unit.Apply(data);
             unit.SetAutonomia(9999, refillCurrentFuel: true);
             s_teamIdField?.SetValue(unit, ActiveTeam());
             unit.SetCurrentCellPosition(atCell, enforceFinalOccupancyRule: false);
+            PrepareTempUnitLayer(unit, data);
             action(unit);
         }
         catch (System.Exception e) { statusMessage = e.Message; }
         finally { DestroyImmediate(go); }
+    }
+
+    private UnitDatabase ActiveUnitDatabase(UnitData data)
+    {
+        if (useSceneUnit && sceneUnit != null)
+        {
+            UnitDatabase sceneDb = s_unitDatabaseField?.GetValue(sceneUnit) as UnitDatabase;
+            if (sceneDb != null)
+                return sceneDb;
+        }
+
+        if (unitDatabase != null)
+            return unitDatabase;
+
+        return FindUnitDatabaseFor(data);
+    }
+
+    private static UnitDatabase FindUnitDatabaseFor(UnitData data)
+    {
+        if (data == null || string.IsNullOrWhiteSpace(data.id))
+            return null;
+
+        string[] guids = AssetDatabase.FindAssets("t:UnitDatabase");
+        for (int i = 0; i < guids.Length; i++)
+        {
+            UnitDatabase db = AssetDatabase.LoadAssetAtPath<UnitDatabase>(AssetDatabase.GUIDToAssetPath(guids[i]));
+            if (db == null)
+                continue;
+
+            if (db.TryGetById(data.id, out UnitData resolved) && resolved == data)
+                return db;
+        }
+
+        return null;
+    }
+
+    private void PrepareTempUnitLayer(UnitManager unit, UnitData data)
+    {
+        if (unit == null || data == null)
+            return;
+
+        if (useSceneUnit && sceneUnit != null)
+            unit.ForceLayerStateForDebug(sceneUnit.GetDomain(), sceneUnit.GetHeightLevel());
+
+        if (!calculateAircraftAsAirborne || unit.GetAircraftType() == AircraftType.None)
+            return;
+
+        HeightLevel airHeight = unit.GetPreferredAirHeight();
+        if (unit.TrySetCurrentLayerMode(Domain.Air, airHeight))
+            unit.SetAircraftGrounded(false);
+        else
+            statusMessage = "Aeronave sem camada Air valida para calcular caminhos em voo.";
     }
 
     // ── Scene GUI ─────────────────────────────────────────────────────────────

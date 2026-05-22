@@ -56,19 +56,44 @@ public partial class AIController
         int distance = Mathf.Max(1, Mathf.RoundToInt(SectorManager.HexDistance(attackCell, targetCell)));
         PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(attackCell);
         PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(targetCell);
-        AICombatHpSimulator.AICombatHpResult sim = AICombatHpSimulator.Simulate(
-            attackerData,
-            targetData,
-            Mathf.Max(0, attacker.CurrentHP),
-            Mathf.Max(0, target.CurrentHP),
-            distance,
-            turnStateManager.RpsDatabaseRef,
-            turnStateManager.DpqMatchupDatabaseRef,
-            turnStateManager.WeaponPriorityDataRef,
-            attackerDpq.points,
-            defenderDpq.points,
-            attackerDpq.defenseBonus,
-            defenderDpq.defenseBonus);
+        AICombatHpSimulator.AICombatHpResult sim;
+        if (TryFindAttackDecisionOption(attacker, target, attackCell, out PodeMirarTargetOption option))
+        {
+            WeaponData counterWeapon = option.defenderCanCounterAttack
+                ? option.defenderCounterWeapon
+                : null;
+            sim = AICombatHpSimulator.SimulateWithWeapons(
+                attackerData,
+                targetData,
+                option.weapon,
+                counterWeapon,
+                Mathf.Max(0, attacker.CurrentHP),
+                Mathf.Max(0, target.CurrentHP),
+                turnStateManager.RpsDatabaseRef,
+                turnStateManager.DpqMatchupDatabaseRef,
+                attackerDpq.points,
+                defenderDpq.points,
+                attackerDpq.defenseBonus,
+                defenderDpq.defenseBonus,
+                attacker.IsAircraftGrounded,
+                target.IsAircraftGrounded);
+        }
+        else
+        {
+            sim = AICombatHpSimulator.Simulate(
+                attackerData,
+                targetData,
+                Mathf.Max(0, attacker.CurrentHP),
+                Mathf.Max(0, target.CurrentHP),
+                distance,
+                turnStateManager.RpsDatabaseRef,
+                turnStateManager.DpqMatchupDatabaseRef,
+                turnStateManager.WeaponPriorityDataRef,
+                attackerDpq.points,
+                defenderDpq.points,
+                attackerDpq.defenseBonus,
+                defenderDpq.defenseBonus);
+        }
 
         if (!sim.isValid)
             return false;
@@ -93,6 +118,50 @@ public partial class AIController
             attackerLossPct,
             targetDamagePct);
         return true;
+    }
+
+    private bool TryFindAttackDecisionOption(
+        UnitManager attacker,
+        UnitManager target,
+        Vector3Int attackCell,
+        out PodeMirarTargetOption option)
+    {
+        option = null;
+        if (attacker == null || target == null)
+            return false;
+
+        Vector3Int fromCell = attacker.CurrentCellPosition;
+        fromCell.z = 0;
+        attackCell.z = 0;
+        SensorMovementMode mode = attackCell != fromCell
+            ? SensorMovementMode.MoveuAndando
+            : SensorMovementMode.MoveuParado;
+
+        var targets = new System.Collections.Generic.List<PodeMirarTargetOption>();
+        bool hasAny = PodeMirarSensor.CollectTargets(
+            attacker,
+            boardTilemap,
+            terrainDatabase,
+            mode,
+            targets,
+            weaponPriorityData: turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null,
+            dpqAirHeightConfig: turnStateManager != null ? turnStateManager.DpqAirHeightConfigRef : null,
+            fromCell: attackCell);
+
+        if (!hasAny || targets.Count == 0)
+            return false;
+
+        for (int i = 0; i < targets.Count; i++)
+        {
+            PodeMirarTargetOption candidate = targets[i];
+            if (candidate == null || candidate.targetUnit != target)
+                continue;
+
+            option = candidate;
+            return option.weapon != null;
+        }
+
+        return false;
     }
 
     private bool PassesAttackDecision(

@@ -753,6 +753,8 @@ public static class PodeSuprirSensor
             reason = "contexto de mapa/unidade invalido";
             return false;
         }
+        if (!CanEndLayerTransitionAtCurrentCellForSupply(unit, boardMap, cell, targetDomain, targetHeight, out reason))
+            return false;
 
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cell);
         if (construction != null)
@@ -839,6 +841,23 @@ public static class PodeSuprirSensor
         }
 
         return true;
+    }
+
+    private static bool CanEndLayerTransitionAtCurrentCellForSupply(
+        UnitManager unit,
+        Tilemap boardMap,
+        Vector3Int cell,
+        Domain targetDomain,
+        HeightLevel targetHeight,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (UnitOccupancyRules.CanEndLayerTransitionAtCell(boardMap, cell, unit, targetDomain, targetHeight, out UnitManager blocker))
+            return true;
+
+        string blockerName = blocker != null && !string.IsNullOrWhiteSpace(blocker.UnitDisplayName) ? blocker.UnitDisplayName : "aliado";
+        reason = $"camada {targetDomain}/{targetHeight} ocupada por {blockerName}";
+        return false;
     }
 
     private static bool UnitPassesAnyRequiredSkill(UnitManager unit, IReadOnlyList<SkillData> requiredSkills)

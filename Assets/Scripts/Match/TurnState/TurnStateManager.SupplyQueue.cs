@@ -905,6 +905,15 @@ public partial class TurnStateManager
             yield break;
         if (!unit.SupportsLayerMode(domain, height))
             yield break;
+        Tilemap boardMap = unit.BoardTilemap != null ? unit.BoardTilemap : terrainTilemap;
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+        if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(boardMap, cell, unit, domain, height, out UnitManager blocker))
+        {
+            string blockerName = blocker != null && !string.IsNullOrWhiteSpace(blocker.UnitDisplayName) ? blocker.UnitDisplayName : "aliado";
+            Debug.Log($"[Supply] Transicao de camada cancelada para {unit.name}: {domain}/{height} ocupado por {blockerName} em {cell}.");
+            yield break;
+        }
 
         PlayMovementStartSfx(unit);
 

@@ -132,12 +132,26 @@ public partial class AIController
                     continue;
                 if (!PassesAttackDecision(unit, enemy, cell, false, out string attackDecisionReason))
                     continue;
+                float combatScore = 0f;
+                string combatScoreReason = "";
+                if (TrySimulateAttackForAI(unit, enemy, cell, out AIAttackSimulationSummary simSummary))
+                {
+                    combatScore =
+                        (simSummary.result.killGuaranteed ? 26000f : 0f)
+                        + simSummary.targetDamagePct * 420f
+                        + simSummary.targetDamage * 1100f
+                        - simSummary.attackerLossPct * 260f
+                        - simSummary.attackerLoss * 900f;
+                    combatScoreReason =
+                        $" combatScore={combatScore:F0} kill={simSummary.result.killGuaranteed} dmg={simSummary.targetDamage}/{simSummary.targetDamagePct}% loss={simSummary.attackerLoss}/{simSummary.attackerLossPct}%";
+                }
 
                 Vector3Int enemyCell = enemy.CurrentCellPosition;
                 enemyCell.z = 0;
                 BazookaTargetPriority targetPreference = ResolveAirCombatTargetPreference(unit, enemy);
                 float score =
                     GetAirCombatTargetPreferenceScore(targetPreference)
+                    + combatScore
                     + Mathf.Max(0, 20 - enemy.CurrentHP) * 700f
                     - SectorManager.HexDistance(enemyCell, anchor) * 350f
                     - SectorManager.HexDistance(cell, anchor) * 40f
@@ -149,7 +163,7 @@ public partial class AIController
                     bestScore = score;
                     bestCell = cell;
                     bestTarget = enemy;
-                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} {attackDecisionReason}";
+                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP}{combatScoreReason} {attackDecisionReason}";
                 }
             }
         }
