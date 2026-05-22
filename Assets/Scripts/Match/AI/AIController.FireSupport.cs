@@ -54,6 +54,12 @@ public partial class AIController
         }
 
         // Adjacent supply truck takes priority over walking — faster delivery to objective.
+        if (TryBuildFireSupportBlockedShotRepositionAction(unit, snapshot, fromCell, paths, occupied, assigned.Status == ObjectiveStatus.Defending, out PlayerAction blockedShotAction, out string blockedShotReason))
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reposiciona para linha de tiro {assigned.Sector} - {blockedShotReason}");
+            return blockedShotAction;
+        }
+
         PlayerAction embarkAction = TryDecideAssaultEmbarkAction(unit, snapshot, plan);
         if (embarkAction != null) return embarkAction;
 

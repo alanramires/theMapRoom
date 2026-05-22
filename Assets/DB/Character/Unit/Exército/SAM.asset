@@ -44,7 +44,7 @@ MonoBehaviour:
   playConservative: 1
   preferMoveOnBestDPQ: 0
   preferMaxDisplacement: 0
-  longRangeStationary: 1
+  longRangeStationary: 0
   preferRepositionAtWeaponMaxRange: 1
   preferArtilleryModeBeforeCombatant: 0
   useAttackDecision: 1

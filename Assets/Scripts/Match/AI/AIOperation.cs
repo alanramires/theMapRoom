@@ -14,6 +14,7 @@ public enum AINeedKind
     FighterB,
     FighterA,
     Apache,
+    AirTanker,
 }
 
 public enum AIOperationType
@@ -23,6 +24,7 @@ public enum AIOperationType
     GroundCapture,
     AirliftCapture,
     AirInterception,
+    AirRefuelSupport,
     PreventiveDefense,
     Reserve,
 }

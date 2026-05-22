@@ -108,6 +108,7 @@ public class AIShoppingPlanner : MonoBehaviour
         int openCacaASlots  = ComputeCacaADemand(snapshot);
         int openApacheSlots = ComputeApacheDemand(snapshot);
         int openBombaSlots  = ComputeBombaDemand(snapshot);
+        int openAirTankerSlots = 0;
         bool proactiveDefFireSupport = !preferDefensiveFireSupport
             && ComputeProactiveDefensiveFireSupportNeeded(snapshot);
         if (proactiveDefFireSupport)
@@ -256,6 +257,13 @@ public class AIShoppingPlanner : MonoBehaviour
                             int before = openApacheSlots;
                             openApacheSlots = Mathf.Max(openApacheSlots, deficit.Count);
                             elevated = openApacheSlots != before;
+                        }
+                        break;
+                    case AINeedKind.AirTanker:
+                        {
+                            int before = openAirTankerSlots;
+                            openAirTankerSlots = Mathf.Max(openAirTankerSlots, deficit.Count);
+                            elevated = openAirTankerSlots != before;
                         }
                         break;
                 }
@@ -413,7 +421,7 @@ public class AIShoppingPlanner : MonoBehaviour
             Debug.Log($"[AI Shopping] reserva_combate_ar: slots={anyAirCombatDemand} custo={cheapestAirCombatCost} reserva={reserveForAirCombat}");
         }
 
-        Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} air_trans_slots={openAirTransportSlots} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cacaB_slots={openCacaBSlots} cacaA_slots={openCacaASlots} apache_slots={openApacheSlots} bomba_slots={openBombaSlots} cheapest_transport={cheapestTransportCost} cheapest_air={cheapestAirTransportCost} reserva_ar={reserveForAirTransport} onlyCap={onlyCapturers} onlyAss={onlyAssault} onlyTrans={onlyTransporter} onlyLog={onlyLogistics} onlyFire={onlyFireSupport}");
+        Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} air_trans_slots={openAirTransportSlots} air_tanker_slots={openAirTankerSlots} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cacaB_slots={openCacaBSlots} cacaA_slots={openCacaASlots} apache_slots={openApacheSlots} bomba_slots={openBombaSlots} cheapest_transport={cheapestTransportCost} cheapest_air={cheapestAirTransportCost} reserva_ar={reserveForAirTransport} onlyCap={onlyCapturers} onlyAss={onlyAssault} onlyTrans={onlyTransporter} onlyLog={onlyLogistics} onlyFire={onlyFireSupport}");
 
         bool strategicEliteAssaultReserve = eliteAssaultTarget != null
             && !dreamTeamPivot
@@ -730,9 +738,10 @@ public class AIShoppingPlanner : MonoBehaviour
             bool wantsCacaA        = openCacaASlots  > 0;
             bool wantsApache       = openApacheSlots > 0;
             bool wantsBomba        = openBombaSlots  > 0;
-            bool anyAirDemand      = wantsAirTransport || wantsCacaB || wantsCacaA || wantsApache || wantsBomba;
+            bool wantsAirTanker    = openAirTankerSlots > 0;
+            bool anyAirDemand      = wantsAirTransport || wantsCacaB || wantsCacaA || wantsApache || wantsBomba || wantsAirTanker;
             bool noLandOnlyFilter  = !onlyCapturers && !onlyAssault && !onlyTransporter && !onlyLogistics && !onlyFireSupport;
-            bool airOnlyFilter     = onlyAirTransporter || onlyInterceptador || onlyAtaqueAereo;
+            bool airOnlyFilter     = onlyAirTransporter || onlyInterceptador || onlyAtaqueAereo || onlyLogistics;
 
             if (airBuildings.Count > 0 && anyAirDemand && (noLandOnlyFilter || airOnlyFilter))
             {
@@ -751,7 +760,7 @@ public class AIShoppingPlanner : MonoBehaviour
                     }
 
                     UnitData airUnit = PickAirUnit(building, remaining,
-                        wantsAirTransport, wantsCacaB, wantsCacaA, wantsApache, wantsBomba);
+                        wantsAirTransport, wantsCacaB, wantsCacaA, wantsApache, wantsBomba, wantsAirTanker);
                     if (airUnit == null)
                     {
                         Debug.Log($"[AI Shopping Air] {building.ConstructionDisplayName} @ {cell} — sem unidade aérea disponível ou sem budget");
@@ -772,8 +781,9 @@ public class AIShoppingPlanner : MonoBehaviour
                     else if (isIntercept &&  isElite)                   { if (openCacaASlots  > 0) openCacaASlots--;  wantsCacaA  = openCacaASlots  > 0; }
                     else if (isAtaque    && !isElite)                   { if (openApacheSlots > 0) openApacheSlots--; wantsApache = openApacheSlots > 0; }
                     else if (isAtaque    &&  isElite)                   { if (openBombaSlots  > 0) openBombaSlots--;  wantsBomba  = openBombaSlots  > 0; }
+                    else if (IsPrimaryRole(airUnit, UnitRole.Logistica)) { if (openAirTankerSlots > 0) openAirTankerSlots--; wantsAirTanker = openAirTankerSlots > 0; }
 
-                    if (!wantsAirTransport && !wantsCacaB && !wantsCacaA && !wantsApache && !wantsBomba) break;
+                    if (!wantsAirTransport && !wantsCacaB && !wantsCacaA && !wantsApache && !wantsBomba && !wantsAirTanker) break;
                     if (remaining <= 0) break;
                 }
             }
@@ -784,7 +794,7 @@ public class AIShoppingPlanner : MonoBehaviour
 
     private static UnitData PickAirUnit(
         ConstructionManager building, int budget,
-        bool wantsTransport, bool wantsCacaB, bool wantsCacaA, bool wantsApache, bool wantsBomba)
+        bool wantsTransport, bool wantsCacaB, bool wantsCacaA, bool wantsApache, bool wantsBomba, bool wantsAirTanker)
     {
         if (building == null || building.OfferedUnits == null) return null;
 
@@ -804,6 +814,7 @@ public class AIShoppingPlanner : MonoBehaviour
             else if (primary == UnitRole.Interceptador &&  elite && wantsCacaA) score = 30000 + u.cost;
             else if (primary == UnitRole.AtaqueAereo   && !elite && wantsApache) score = 20000 + u.cost;
             else if (primary == UnitRole.AtaqueAereo   &&  elite && wantsBomba) score = 22000 + u.cost;
+            else if (primary == UnitRole.Logistica && wantsAirTanker && IsAirTankerPurchase(u)) score = 24000 + u.cost;
             else continue;
 
             Debug.Log($"[AI Shopping Air] candidato {u.displayName} ${u.cost} role={primary} elite={elite} score={score}");
@@ -1542,6 +1553,14 @@ public class AIShoppingPlanner : MonoBehaviour
         return unit != null && unit.roles != null && unit.roles.Count > 0 && unit.roles[0] == role;
     }
 
+    private static bool IsAirTankerPurchase(UnitData unit)
+    {
+        return unit != null
+            && unit.domain == Domain.Air
+            && unit.isSupplier
+            && IsPrimaryRole(unit, UnitRole.Logistica);
+    }
+
     private static bool IsFireSupportPurchase(UnitData unit)
     {
         return unit != null
@@ -2184,8 +2203,8 @@ public class AIShoppingPlanner : MonoBehaviour
 
     private static int ComputeLogisticsDemand(AIWorldSnapshot snapshot, out int repairDemandCount, out int activeLogisticsCount)
     {
-        repairDemandCount = CountUnitsUnderRepair(snapshot);
-        activeLogisticsCount = CountActiveUnitsWithRole(snapshot, UnitRole.Logistica, requirePrimary: false);
+        repairDemandCount = CountGroundUnitsUnderRepair(snapshot);
+        activeLogisticsCount = CountActiveGroundLogistics(snapshot);
 
         if (snapshot != null && snapshot.TurnNumber <= 1)
         {
@@ -2199,21 +2218,12 @@ public class AIShoppingPlanner : MonoBehaviour
         if (repairDemandCount >= 5) desiredLogistics = 3;
         if (repairDemandCount >= 7) desiredLogistics = 4;
 
-        // Army-size floor for preventive maintenance coverage.
-        // Only scales up when there is already repair demand (avoids over-buying early).
-        if (desiredLogistics >= 1)
-        {
-            int myUnitCount = snapshot?.MyUnits?.Count ?? 0;
-            int desiredBySize = myUnitCount >= 35 ? 4 : myUnitCount >= 20 ? 3 : myUnitCount >= 13 ? 2 : 1;
-            desiredLogistics = Mathf.Max(desiredLogistics, desiredBySize);
-        }
-
         int demand = Mathf.Max(0, desiredLogistics - activeLogisticsCount);
-        Debug.Log($"[AI Shopping] logistics_demand: demand={demand} repairs={repairDemandCount} activeLog={activeLogisticsCount} desired={desiredLogistics} units={snapshot?.MyUnits?.Count ?? 0}");
+        Debug.Log($"[AI Shopping] logistics_demand: demand={demand} groundRepairs={repairDemandCount} activeLog={activeLogisticsCount} desired={desiredLogistics} units={snapshot?.MyUnits?.Count ?? 0}");
         return demand;
     }
 
-    private static int CountUnitsUnderRepair(AIWorldSnapshot snapshot)
+    private static int CountGroundUnitsUnderRepair(AIWorldSnapshot snapshot)
     {
         if (snapshot == null || snapshot.MyUnits == null)
             return 0;
@@ -2223,10 +2233,32 @@ public class AIShoppingPlanner : MonoBehaviour
         {
             if (unit == null || unit.IsDead || unit.IsEmbarked)
                 continue;
+            if (unit.TryGetUnitData(out UnitData data) && data != null && data.domain == Domain.Air)
+                continue;
             if (unit.IsUnderRepair)
                 count++;
         }
 
+        return count;
+    }
+
+    private static int CountActiveGroundLogistics(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null)
+                continue;
+            if (data.domain == Domain.Air)
+                continue;
+            if (data.roles != null && data.roles.Contains(UnitRole.Logistica))
+                count++;
+        }
         return count;
     }
 

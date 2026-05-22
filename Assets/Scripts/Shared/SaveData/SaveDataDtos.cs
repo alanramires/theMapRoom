@@ -148,6 +148,7 @@ public class UnitSaveData
     public int remainingMovementPoints;
     public bool hasActed;
     public bool receivedSuppliesThisTurn;
+    public bool isUnderRepair;
     public bool isEmbarked;
     public int transporterInstanceId;
     public int transporterSlotIndex;

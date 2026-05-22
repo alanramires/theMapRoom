@@ -6,6 +6,8 @@ public class AIOperationManager : MonoBehaviour
     private const int HomeThreatRange = 3;
     private const int SectorDefenseRange = 3;
     private const int DefensiveArmorThreatRange = 3;
+    private const int AirRefuelLowFuelPct = 35;
+    private const int AirRefuelCriticalFuelPct = 20;
 
     private static AIOperationManager instance;
     public static AIOperationManager Instance => EnsureInstance();
@@ -46,6 +48,7 @@ public class AIOperationManager : MonoBehaviour
         TryBuildBaseDefenseOp(team, snapshot, plan, ops);
         TryBuildSectorDefenseOps(team, snapshot, plan, ops);
         TryBuildAirliftCaptureOps(team, snapshot, plan, ops);
+        TryBuildAirRefuelSupportOp(team, snapshot, ops);
         TryBuildPreventiveDefenseOp(team, snapshot, ops);
 
         AssignExistingUnitsToOperations(team, snapshot, ops);
@@ -258,6 +261,54 @@ public class AIOperationManager : MonoBehaviour
         Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] PreventiveDefense: Artilleryx{artDeficit} AAAx{aaaDeficit} SAMx{samDeficit} activeArt={activeArt} activeAAA={activeAAA} activeSAM={activeSAM}");
     }
 
+    private void TryBuildAirRefuelSupportOp(TeamId team, AIWorldSnapshot snapshot, List<AIOperation> ops)
+    {
+        if (snapshot?.MyUnits == null)
+            return;
+
+        int lowFuelAircraft = 0;
+        int criticalFuelAircraft = 0;
+        int airFleet = 0;
+
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked) continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null || data.domain != Domain.Air) continue;
+            if (UnitDataSatisfiesNeed(data, AINeedKind.AirTanker)) continue;
+
+            airFleet++;
+            int maxFuel = Mathf.Max(1, unit.GetMaxFuel());
+            float fuelPct = unit.CurrentFuel * 100f / maxFuel;
+            if (fuelPct <= AirRefuelLowFuelPct)
+                lowFuelAircraft++;
+            if (fuelPct <= AirRefuelCriticalFuelPct)
+                criticalFuelAircraft++;
+        }
+
+        if (lowFuelAircraft <= 0)
+            return;
+
+        int desiredTankers = 1;
+        if ((airFleet >= 8 && lowFuelAircraft >= 4) || criticalFuelAircraft >= 2)
+            desiredTankers = 2;
+
+        int activeTankers = CountActiveNeed(snapshot, AINeedKind.AirTanker);
+        int tankerDeficit = Mathf.Max(0, desiredTankers - activeTankers);
+        if (tankerDeficit <= 0)
+        {
+            Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] AirRefuelSupport coberto: lowFuel={lowFuelAircraft} critical={criticalFuelAircraft} activeTankers={activeTankers}/{desiredTankers}");
+            return;
+        }
+
+        AIOperation op = CreateOperation(team, AIOperationType.AirRefuelSupport, 3, snapshot, snapshot.MyHQ != null ? snapshot.MyHQ.Sector : ConstructionSector.Base1);
+        op.AnchorCell = snapshot.MyHQ != null ? Normalize(snapshot.MyHQ.CurrentCellPosition) : Vector3Int.zero;
+        op.TargetCell = op.AnchorCell;
+        op.AddSlots(AINeedKind.AirTanker, tankerDeficit);
+
+        ops.Add(op);
+        Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] AirRefuelSupport: lowFuel={lowFuelAircraft} critical={criticalFuelAircraft} airFleet={airFleet} activeTankers={activeTankers} deficit={tankerDeficit}");
+    }
+
     private AIOperation CreateOperation(TeamId team, AIOperationType type, int priority, AIWorldSnapshot snapshot, ConstructionSector sector)
     {
         int turn = snapshot != null ? snapshot.TurnNumber : 0;
@@ -439,6 +490,8 @@ public class AIOperationManager : MonoBehaviour
                 return IsPrimaryRole(data, UnitRole.Interceptador) && data.eliteLevel >= 1;
             case AINeedKind.Apache:
                 return IsPrimaryRole(data, UnitRole.AtaqueAereo) && data.eliteLevel == 0;
+            case AINeedKind.AirTanker:
+                return data.domain == Domain.Air && IsPrimaryRole(data, UnitRole.Logistica) && data.isSupplier;
             default:
                 return false;
         }

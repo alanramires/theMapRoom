@@ -5,9 +5,9 @@ using UnityEngine.Tilemaps;
 
 public static class HexCohabitationVisualManager
 {
-    private static readonly Vector3 AirOffset = new Vector3(-0.1f, 0.2f, 0f);
-    private static readonly Vector3 SurfaceOffset = new Vector3(0f, -0.2f, 0f);
-    private static readonly Vector3 SharedScale = new Vector3(0.6f, 0.6f, 1f);
+    public static Vector3 AirOffset = new Vector3(-0.1f, 0.2f, 0f);
+    public static Vector3 SurfaceOffset = new Vector3(0f, -0.2f, 0f);
+    public static Vector3 SharedScale = new Vector3(0.6f, 0.6f, 1f);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()

@@ -167,6 +167,7 @@ public static class SaveDataMapper
             remainingMovementPoints = unit.RemainingMovementPoints,
             hasActed = unit.HasActed,
             receivedSuppliesThisTurn = unit.ReceivedSuppliesThisTurn,
+            isUnderRepair = unit.IsUnderRepair,
             isEmbarked = unit.IsEmbarked,
             transporterInstanceId = unit.EmbarkedTransporter != null ? unit.EmbarkedTransporter.InstanceId : 0,
             transporterSlotIndex = unit.IsEmbarked ? unit.EmbarkedTransporterSlotIndex : -1,
@@ -229,6 +230,7 @@ public static class SaveDataMapper
         unit.SetCurrentAmmo(saved.currentAmmo);
         unit.SetCurrentFuel(saved.currentFuel);
         unit.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
+        RestoreUnitRepairState(unit, saved);
         if (saved.hasActed)
             unit.MarkAsActed();
         else
@@ -271,6 +273,59 @@ public static class SaveDataMapper
 
         unit.SetRemainingMovementPoints(saved.remainingMovementPoints);
         unit.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
+        RestoreUnitRepairState(unit, saved);
+    }
+
+    private static void RestoreUnitRepairState(UnitManager unit, UnitSaveData saved)
+    {
+        if (unit == null || saved == null)
+            return;
+
+        bool shouldRepair = saved.isUnderRepair || ShouldEnterRepairFromLoadedState(unit);
+        unit.SetIsUnderRepair(shouldRepair);
+        unit.SetAIMaintenanceActive(shouldRepair);
+    }
+
+    private static bool ShouldEnterRepairFromLoadedState(UnitManager unit)
+    {
+        if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
+            return false;
+
+        if (data.repairTriggerHpBelow > 0 && unit.CurrentHP <= data.repairTriggerHpBelow)
+            return true;
+
+        int maxFuel = Mathf.Max(1, unit.GetMaxFuel());
+        if (data.repairTriggerAutonomyPct > 0
+            && unit.CurrentFuel * 100f / maxFuel <= data.repairTriggerAutonomyPct)
+            return true;
+
+        if (!data.repairTriggerAmmoEnabled)
+            return false;
+
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+        if (weapons == null)
+            return false;
+
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon weapon = weapons[i];
+            if (weapon == null)
+                continue;
+
+            int baseAmmo = data.embarkedWeapons != null
+                && i < data.embarkedWeapons.Count
+                && data.embarkedWeapons[i] != null
+                    ? data.embarkedWeapons[i].squadAmmunition
+                    : 0;
+            if (baseAmmo <= 0)
+                continue;
+
+            float ammoPct = weapon.squadAmmunition * 100f / baseAmmo;
+            if (ammoPct <= data.repairTriggerAmmoPct)
+                return true;
+        }
+
+        return false;
     }
 
     public static void ApplySavedEmbarkedSupplies(UnitManager unit, List<RuntimeSupplySaveData> savedSupplies)

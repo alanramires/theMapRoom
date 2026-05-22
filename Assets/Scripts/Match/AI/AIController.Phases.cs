@@ -14,8 +14,12 @@ public partial class AIController
         if (ShouldStopAIForMatchEnd("turn_start"))
             yield break;
 
+        int resumeStage = currentAITeam == aiTeam ? Mathf.Clamp(currentAIStage, 0, 4) : 0;
         currentAITeam = aiTeam;
-        if (emulateStage0)
+        if (resumeStage > 0)
+            Debug.Log($"[AI Stage] Retomando turno de {aiTeam} a partir do stage {resumeStage}.");
+
+        if (emulateStage0 && resumeStage <= 0)
         {
             currentAIStage = 0;
             yield return Phase0_WaitForTurnReady();
@@ -27,7 +31,9 @@ public partial class AIController
         }
         else
         {
-            Debug.Log("[AI Stage] Stage 0 desativado por emulação.");
+            Debug.Log(resumeStage > 0
+                ? "[AI Stage] Stage 0 ja concluido pelo save."
+                : "[AI Stage] Stage 0 desativado por emulacao.");
         }
 
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
@@ -37,44 +43,46 @@ public partial class AIController
                   $"| {snapshot.MyUnits.Count} unidades | {snapshot.EnemyUnits.Count} inimigos visíveis " +
                   $"| R$ {snapshot.Budget}");
 
-        if (emulateStage1 || emulateStage2 || emulateStage3)
+        if (resumeStage <= 3 && (emulateStage1 || emulateStage2 || emulateStage3))
         {
-            currentAIStage = 1;
+            currentAIStage = Mathf.Max(1, resumeStage);
             BuildObjectivePlan(snapshot);
             AIOperationManager.Instance.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
         }
 
-        if (emulateStage1)
+        if (emulateStage1 && resumeStage <= 1)
         {
             currentAIStage = 1;
             yield return Phase1_CommandService(snapshot);
             if (ShouldStopAIForMatchEnd("apos_stage1"))
                 yield break;
+            currentAIStage = 2;
             yield return WaitIfDebugPaused();
             if (ShouldStopAIForMatchEnd("apos_pause_stage1"))
                 yield break;
         }
         else
         {
-            Debug.Log($"{TL("Stage")} Stage 1 desativado por emulação.");
+            Debug.Log($"{TL("Stage")} Stage 1 {(resumeStage > 1 ? "ja concluido pelo save" : "desativado por emulacao")}.");
         }
 
-        if (emulateStage2)
+        if (emulateStage2 && resumeStage <= 2)
         {
             currentAIStage = 2;
             yield return Phase2_UnitActions(snapshot);
             if (ShouldStopAIForMatchEnd("apos_stage2"))
                 yield break;
+            currentAIStage = 3;
             yield return WaitIfDebugPaused();
             if (ShouldStopAIForMatchEnd("apos_pause_stage2"))
                 yield break;
         }
         else
         {
-            Debug.Log($"{TL("Stage")} Stage 2 desativado por emulação.");
+            Debug.Log($"{TL("Stage")} Stage 2 {(resumeStage > 2 ? "ja concluido pelo save" : "desativado por emulacao")}.");
         }
 
-        if (emulateStage3)
+        if (emulateStage3 && resumeStage <= 3)
         {
             yield return WaitIfDebugShoppingPaused();
             if (ShouldStopAIForMatchEnd("apos_pause_compras"))
@@ -86,16 +94,17 @@ public partial class AIController
             yield return Phase3_Shopping(snapshot);
             if (ShouldStopAIForMatchEnd("apos_stage3"))
                 yield break;
+            currentAIStage = 4;
             yield return WaitIfDebugPaused();
             if (ShouldStopAIForMatchEnd("apos_pause_stage3"))
                 yield break;
         }
         else
         {
-            Debug.Log($"{TL("Stage")} Stage 3 desativado por emulação.");
+            Debug.Log($"{TL("Stage")} Stage 3 {(resumeStage > 3 ? "ja concluido pelo save" : "desativado por emulacao")}.");
         }
 
-        if (emulateStage4)
+        if (emulateStage4 && resumeStage <= 4)
         {
             if (ShouldStopAIForMatchEnd("antes_stage4"))
                 yield break;
@@ -161,6 +170,7 @@ public partial class AIController
             yield return Phase1_CommandService(snapshot);
             if (ShouldStopAIForMatchEnd("debug_apos_stage1"))
                 yield break;
+            currentAIStage = 2;
             yield return WaitIfDebugPaused();
             if (ShouldStopAIForMatchEnd("debug_apos_pause_stage1"))
                 yield break;
@@ -176,6 +186,7 @@ public partial class AIController
             yield return Phase2_UnitActions(snapshot);
             if (ShouldStopAIForMatchEnd("debug_apos_stage2"))
                 yield break;
+            currentAIStage = 3;
             yield return WaitIfDebugPaused();
             if (ShouldStopAIForMatchEnd("debug_apos_pause_stage2"))
                 yield break;
@@ -198,6 +209,7 @@ public partial class AIController
             yield return Phase3_Shopping(snapshot);
             if (ShouldStopAIForMatchEnd("debug_apos_stage3"))
                 yield break;
+            currentAIStage = 4;
             yield return WaitIfDebugPaused();
             if (ShouldStopAIForMatchEnd("debug_apos_pause_stage3"))
                 yield break;

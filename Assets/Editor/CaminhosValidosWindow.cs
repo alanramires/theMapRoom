@@ -143,7 +143,7 @@ public class CaminhosValidosWindow : EditorWindow
             {
                 UnitData d = ActiveUnitData();
                 string info = d != null
-                    ? $"  {sceneUnit.name}  mov={d.movement}  PM restantes={sceneUnit.RemainingMovementPoints}  {sceneUnit.CurrentCellPosition}  layer={sceneUnit.GetDomain()}/{sceneUnit.GetHeightLevel()}"
+                    ? $"  {sceneUnit.name}  mov={d.movement}  PM restantes={sceneUnit.RemainingMovementPoints}  {sceneUnit.CurrentCellPosition}  layer={sceneUnit.GetDomain()}/{sceneUnit.GetHeightLevel()}  calc={DescribeEffectiveCalculationLayer(d)}  db={DescribeActiveUnitDatabase(d)}"
                     : $"  {sceneUnit.name}  (sem UnitData)";
                 EditorGUILayout.LabelField(info, EditorStyles.miniLabel);
 
@@ -391,7 +391,9 @@ public class CaminhosValidosWindow : EditorWindow
             {
                 if (alliedOccupied.Contains(cell)) continue; // não pode parar aqui
                 if (costFromDest.TryGetValue(cell, out int cellCost))
-                    progressMap[cell] = progressOriginCost >= 0 ? progressOriginCost - cellCost : 0;
+                    progressMap[cell] = progressOriginCost >= 0
+                        ? CalculateRouteProgressScore(origin, dest, cell, progressOriginCost, cellCost)
+                        : 0;
                 else
                     progressMap[cell] = int.MinValue;
             }
@@ -487,17 +489,53 @@ public class CaminhosValidosWindow : EditorWindow
         if (useSceneUnit && sceneUnit != null)
         {
             UnitDatabase sceneDb = s_unitDatabaseField?.GetValue(sceneUnit) as UnitDatabase;
-            if (sceneDb != null)
+            if (DatabaseContainsExactData(sceneDb, data))
                 return sceneDb;
         }
 
-        if (unitDatabase != null)
+        if (DatabaseContainsExactData(unitDatabase, data))
             return unitDatabase;
 
-        return FindUnitDatabaseFor(data);
+        UnitDatabase exactDb = FindUnitDatabaseFor(data, requireExactAsset: true);
+        if (exactDb != null)
+            return exactDb;
+
+        if (useSceneUnit && sceneUnit != null)
+        {
+            UnitDatabase sceneDb = s_unitDatabaseField?.GetValue(sceneUnit) as UnitDatabase;
+            if (DatabaseContainsCompatibleData(sceneDb, data))
+                return sceneDb;
+        }
+
+        if (DatabaseContainsCompatibleData(unitDatabase, data))
+            return unitDatabase;
+
+        return FindUnitDatabaseFor(data, requireExactAsset: false);
     }
 
-    private static UnitDatabase FindUnitDatabaseFor(UnitData data)
+    private static bool DatabaseContainsExactData(UnitDatabase db, UnitData data)
+    {
+        if (db == null || data == null || string.IsNullOrWhiteSpace(data.id))
+            return false;
+
+        return db.TryGetById(data.id, out UnitData resolved) && resolved == data;
+    }
+
+    private static bool DatabaseContainsCompatibleData(UnitDatabase db, UnitData data)
+    {
+        if (db == null || data == null || string.IsNullOrWhiteSpace(data.id))
+            return false;
+        if (!db.TryGetById(data.id, out UnitData resolved) || resolved == null)
+            return false;
+        if (resolved == data)
+            return true;
+
+        return resolved.unitClass == data.unitClass
+            && resolved.IsAircraft() == data.IsAircraft()
+            && (resolved.domain == data.domain || resolved.IsAircraft());
+    }
+
+    private static UnitDatabase FindUnitDatabaseFor(UnitData data, bool requireExactAsset)
     {
         if (data == null || string.IsNullOrWhiteSpace(data.id))
             return null;
@@ -506,10 +544,10 @@ public class CaminhosValidosWindow : EditorWindow
         for (int i = 0; i < guids.Length; i++)
         {
             UnitDatabase db = AssetDatabase.LoadAssetAtPath<UnitDatabase>(AssetDatabase.GUIDToAssetPath(guids[i]));
-            if (db == null)
-                continue;
-
-            if (db.TryGetById(data.id, out UnitData resolved) && resolved == data)
+            bool contains = requireExactAsset
+                ? DatabaseContainsExactData(db, data)
+                : DatabaseContainsCompatibleData(db, data);
+            if (contains)
                 return db;
         }
 
@@ -521,17 +559,92 @@ public class CaminhosValidosWindow : EditorWindow
         if (unit == null || data == null)
             return;
 
-        if (useSceneUnit && sceneUnit != null)
+        bool shouldCalculateAirborne = calculateAircraftAsAirborne && data.IsAircraft();
+
+        if (useSceneUnit && sceneUnit != null && !shouldCalculateAirborne)
             unit.ForceLayerStateForDebug(sceneUnit.GetDomain(), sceneUnit.GetHeightLevel());
 
-        if (!calculateAircraftAsAirborne || unit.GetAircraftType() == AircraftType.None)
+        if (!shouldCalculateAirborne)
             return;
 
-        HeightLevel airHeight = unit.GetPreferredAirHeight();
-        if (unit.TrySetCurrentLayerMode(Domain.Air, airHeight))
-            unit.SetAircraftGrounded(false);
-        else
-            statusMessage = "Aeronave sem camada Air valida para calcular caminhos em voo.";
+        HeightLevel airHeight = ResolveSceneOrDataAirHeight(data);
+        unit.ForceLayerStateForDebug(Domain.Air, airHeight);
+        unit.SetAircraftGrounded(false);
+    }
+
+    private string DescribeEffectiveCalculationLayer(UnitData data)
+    {
+        if (data == null)
+            return "-";
+        if (calculateAircraftAsAirborne && data.IsAircraft())
+            return $"Air/{ResolveSceneOrDataAirHeight(data)}";
+        if (useSceneUnit && sceneUnit != null)
+            return $"{sceneUnit.GetDomain()}/{sceneUnit.GetHeightLevel()}";
+        return $"{data.domain}/{data.heightLevel}";
+    }
+
+    private string DescribeActiveUnitDatabase(UnitData data)
+    {
+        UnitDatabase db = ActiveUnitDatabase(data);
+        return db != null ? db.name : "-";
+    }
+
+    private HeightLevel ResolveSceneOrDataAirHeight(UnitData data)
+    {
+        if (useSceneUnit && sceneUnit != null && sceneUnit.GetDomain() == Domain.Air)
+            return sceneUnit.GetHeightLevel() == HeightLevel.AirHigh ? HeightLevel.AirHigh : HeightLevel.AirLow;
+
+        return ResolveDataPreferredAirHeight(data);
+    }
+
+    private static HeightLevel ResolveDataPreferredAirHeight(UnitData data)
+    {
+        if (data == null)
+            return HeightLevel.AirLow;
+        if (data.preferredAirHeight == HeightLevel.AirHigh)
+            return HeightLevel.AirHigh;
+        return HeightLevel.AirLow;
+    }
+
+    private static int CalculateRouteProgressScore(
+        Vector3Int origin,
+        Vector3Int dest,
+        Vector3Int cell,
+        int originCostFromDest,
+        int cellCostFromDest)
+    {
+        int routeProgress = originCostFromDest - cellCostFromDest;
+        float hexProgress = SectorManager.HexDistance(origin, dest) - SectorManager.HexDistance(cell, dest);
+        float lineDeviation = DistanceFromHexLine(cell, origin, dest);
+
+        float score =
+            routeProgress * 10f
+            + hexProgress * 2f
+            - lineDeviation * 3f;
+
+        return Mathf.RoundToInt(score);
+    }
+
+    private static string FormatRouteScore(int score)
+    {
+        if (score % 10 == 0)
+            return (score / 10).ToString();
+        return (score / 10f).ToString("0.0");
+    }
+
+    private static float DistanceFromHexLine(Vector3Int cell, Vector3Int lineStart, Vector3Int lineEnd)
+    {
+        Vector2 p = new Vector2(cell.x, cell.y);
+        Vector2 a = new Vector2(lineStart.x, lineStart.y);
+        Vector2 b = new Vector2(lineEnd.x, lineEnd.y);
+        Vector2 ab = b - a;
+        float abLenSq = ab.sqrMagnitude;
+        if (abLenSq <= 0.0001f)
+            return Vector2.Distance(p, a);
+
+        float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / abLenSq);
+        Vector2 projection = a + ab * t;
+        return Vector2.Distance(p, projection);
     }
 
     // ── Scene GUI ─────────────────────────────────────────────────────────────
@@ -626,7 +739,7 @@ public class CaminhosValidosWindow : EditorWindow
                 {
                     float t = Mathf.Clamp01((float)prog / maxProgress);
                     col = Color.Lerp(new Color(0.3f, 0.85f, 0.3f, 0.55f), new Color(0.0f, 0.6f, 0.0f, 0.8f), t);
-                    lbl = "+" + prog;
+                    lbl = "+" + FormatRouteScore(prog);
                 }
                 else if (prog == 0)
                 {
@@ -637,7 +750,7 @@ public class CaminhosValidosWindow : EditorWindow
                 {
                     float t = minProgress != 0 ? Mathf.Clamp01((float)(-prog) / (-minProgress)) : 1f;
                     col = Color.Lerp(new Color(0.85f, 0.4f, 0.1f, 0.55f), new Color(0.8f, 0.1f, 0.1f, 0.8f), t);
-                    lbl = prog.ToString();
+                    lbl = "-" + FormatRouteScore(-prog);
                 }
 
                 Handles.color = col;

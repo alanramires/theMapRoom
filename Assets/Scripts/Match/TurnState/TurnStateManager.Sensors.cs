@@ -198,25 +198,7 @@ public partial class TurnStateManager
         if (selectedUnit == null || !UnitRulesDefinition.IsTotalWarEnabled())
             return false;
 
-        Vector3Int selectedCell = selectedUnit.CurrentCellPosition;
-        selectedCell.z = 0;
-
-        List<UnitManager> units = UnitManager.AllActive;
-        for (int i = 0; i < units.Count; i++)
-        {
-            UnitManager candidate = units[i];
-            if (candidate == null || candidate == selectedUnit || !candidate.gameObject.activeInHierarchy || candidate.IsEmbarked)
-                continue;
-            if (candidate.TeamId == selectedUnit.TeamId)
-                continue;
-
-            Vector3Int candidateCell = candidate.CurrentCellPosition;
-            candidateCell.z = 0;
-            if (candidateCell == selectedCell)
-                return true;
-        }
-
-        return false;
+        return HexOccupancyQuery.HasEnemyUnitAtCellLayer(selectedUnit);
     }
 
     private void ApplyContestedHexActionRestrictions()

@@ -22,6 +22,12 @@ public partial class AIController
             return attackAction;
         }
 
+        if (TryBuildFireSupportBlockedShotRepositionAction(unit, snapshot, fromCell, paths, occupied, defensiveContext: true, out PlayerAction blockedShotAction, out string blockedShotReason))
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reposiciona para linha de tiro {assigned.Sector} - {blockedShotReason}");
+            return blockedShotAction;
+        }
+
         // Embark on adjacent transport (e.g. supply truck tow) to reach better position.
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
         PlayerAction embarkAction = TryDecideAssaultEmbarkAction(unit, snapshot, plan);

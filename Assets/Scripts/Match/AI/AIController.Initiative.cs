@@ -193,6 +193,7 @@ public partial class AIController
                 SensorMovementMode.MoveuParado,
                 targets,
                 weaponPriorityData: weaponPriorityData,
+                dpqAirHeightConfig: turnStateManager != null ? turnStateManager.DpqAirHeightConfigRef : null,
                 fromCell: fromCell))
             return false;
 
@@ -239,6 +240,7 @@ public partial class AIController
                     mode,
                     targets,
                     weaponPriorityData: weaponPriorityData,
+                    dpqAirHeightConfig: turnStateManager != null ? turnStateManager.DpqAirHeightConfigRef : null,
                     fromCell: cell))
                 continue;
 

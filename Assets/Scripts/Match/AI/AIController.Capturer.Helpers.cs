@@ -643,7 +643,13 @@ public partial class AIController
 
         var targets = new List<PodeMirarTargetOption>();
         bool hasAny = PodeMirarSensor.CollectTargets(
-            unit, boardTilemap, terrainDatabase, mode, targets, fromCell: toCell);
+            unit,
+            boardTilemap,
+            terrainDatabase,
+            mode,
+            targets,
+            dpqAirHeightConfig: turnStateManager != null ? turnStateManager.DpqAirHeightConfigRef : null,
+            fromCell: toCell);
 
         if (!hasAny) return false;
         foreach (PodeMirarTargetOption opt in targets)

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public partial class AIController
 {
@@ -9,12 +10,19 @@ public partial class AIController
             return null;
 
         bool wasGrounded = unit.IsAircraftGrounded;
+        List<int> takeoffMoveOptions = null;
+        if (wasGrounded && !TryGetAITakeoffMoveOptions(unit, out takeoffMoveOptions, out string takeoffReason))
+        {
+            Debug.Log($"{TL("AirCombat")} {unit.InstanceId} sem acao: decolagem indisponivel ({takeoffReason})");
+            return null;
+        }
+
         if (wasGrounded)
             unit.SetAircraftGrounded(false);
 
         try
         {
-            return DecideRogueAirCombatAction(unit, snapshot);
+            return DecideRogueAirCombatAction(unit, snapshot, takeoffMoveOptions);
         }
         finally
         {
@@ -35,7 +43,7 @@ public partial class AIController
             || data.roles[0] == UnitRole.Interceptador;
     }
 
-    private PlayerAction DecideRogueAirCombatAction(UnitManager unit, AIWorldSnapshot snapshot)
+    private PlayerAction DecideRogueAirCombatAction(UnitManager unit, AIWorldSnapshot snapshot, List<int> takeoffMoveOptions = null)
     {
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
@@ -53,7 +61,7 @@ public partial class AIController
             : ResolveAirCombatFallbackAnchor(snapshot, fromCell);
         anchor.z = 0;
 
-        if (TryFindAirCombatAttack(unit, snapshot, fromCell, paths, occupied, anchor,
+        if (TryFindAirCombatAttack(unit, snapshot, fromCell, paths, occupied, anchor, takeoffMoveOptions,
                 out Vector3Int attackCell, out UnitManager target, out string attackReason))
         {
             Vector3Int targetCell = target.CurrentCellPosition;
@@ -63,9 +71,28 @@ public partial class AIController
                 target.InstanceId.ToString(), targetCell, paths);
         }
 
-        Vector3Int moveCell = FindAirCombatAdvanceMove(fromCell, anchor, paths, occupied, snapshot.AITeam);
+        Vector3Int moveCell = FindAirCombatAdvanceMove(fromCell, anchor, paths, occupied, snapshot.AITeam, takeoffMoveOptions);
         Debug.Log($"{TL("AirCombat")} {unit.InstanceId} rogue avanca via {moveCell} alvo={anchor}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+    }
+
+    private bool TryGetAITakeoffMoveOptions(UnitManager unit, out List<int> moveOptions, out string reason)
+    {
+        moveOptions = null;
+        reason = string.Empty;
+
+        Tilemap boardMap = boardTilemap != null ? boardTilemap : unit != null ? unit.BoardTilemap : null;
+        PodeDecolarReport takeoff = PodeDecolarSensor.Evaluate(unit, boardMap, terrainDatabase);
+        reason = takeoff != null ? takeoff.explicacao : "sensor indisponivel";
+
+        if (takeoff == null || takeoff.takeoffMoveOptions == null || takeoff.takeoffMoveOptions.Count == 0)
+            return false;
+
+        if (!takeoff.status)
+            return false;
+
+        moveOptions = new List<int>(takeoff.takeoffMoveOptions);
+        return true;
     }
 
     private Vector3Int ResolveAirCombatFallbackAnchor(AIWorldSnapshot snapshot, Vector3Int fromCell)
@@ -105,6 +132,7 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
         Vector3Int anchor,
+        List<int> takeoffMoveOptions,
         out Vector3Int bestCell,
         out UnitManager bestTarget,
         out string reason)
@@ -120,6 +148,8 @@ public partial class AIController
             Vector3Int cell = rawCell;
             cell.z = 0;
             if (cell != fromCell && occupied.Contains(cell))
+                continue;
+            if (!IsAITakeoffDestinationAllowed(paths, cell, takeoffMoveOptions))
                 continue;
 
             foreach (UnitManager enemy in UnitManager.AllActive)
@@ -201,12 +231,12 @@ public partial class AIController
         Vector3Int targetCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
-        TeamId aiTeam)
+        TeamId aiTeam,
+        List<int> takeoffMoveOptions = null)
     {
         Vector3Int bestCell = fromCell;
-        float bestDist = SectorManager.HexDistance(fromCell, targetCell);
-        float bestThreat = CalculateThreatLevel(fromCell, aiTeam);
-        const float eps = 0.01f;
+        float startDist = SectorManager.HexDistance(fromCell, targetCell);
+        float bestScore = float.MinValue;
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
@@ -214,21 +244,65 @@ public partial class AIController
             cell.z = 0;
             if (cell == fromCell || occupied.Contains(cell))
                 continue;
-
-            float dist = SectorManager.HexDistance(cell, targetCell);
-            float threat = CalculateThreatLevel(cell, aiTeam);
-
-            bool isBetter = dist < bestDist - eps
-                || (dist < bestDist + eps && threat < bestThreat - eps);
-
-            if (!isBetter)
+            if (!IsAITakeoffDestinationAllowed(paths, cell, takeoffMoveOptions))
                 continue;
 
-            bestCell = cell;
-            bestDist = dist;
-            bestThreat = threat;
+            float dist = SectorManager.HexDistance(cell, targetCell);
+            float progress = startDist - dist;
+            if (progress <= 0f)
+                continue;
+
+            float threat = CalculateThreatLevel(cell, aiTeam);
+            float routeLineDeviation = DistanceFromHexLine(cell, fromCell, targetCell);
+            int pathSteps = GetPathStepCount(paths, cell);
+
+            float score =
+                progress * 2400f
+                - dist * 180f
+                - routeLineDeviation * 420f
+                - threat * 120f
+                - pathSteps * 3f;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCell = cell;
+            }
         }
 
         return bestCell;
+    }
+
+    private static float DistanceFromHexLine(Vector3Int cell, Vector3Int lineStart, Vector3Int lineEnd)
+    {
+        Vector2 p = new Vector2(cell.x, cell.y);
+        Vector2 a = new Vector2(lineStart.x, lineStart.y);
+        Vector2 b = new Vector2(lineEnd.x, lineEnd.y);
+        Vector2 ab = b - a;
+        float abLenSq = ab.sqrMagnitude;
+        if (abLenSq <= 0.0001f)
+            return Vector2.Distance(p, a);
+
+        float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / abLenSq);
+        Vector2 projection = a + ab * t;
+        return Vector2.Distance(p, projection);
+    }
+
+    private static bool IsAITakeoffDestinationAllowed(
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        Vector3Int cell,
+        List<int> takeoffMoveOptions)
+    {
+        if (takeoffMoveOptions == null || takeoffMoveOptions.Count == 0)
+            return true;
+
+        if (takeoffMoveOptions.Contains(9) || takeoffMoveOptions.Contains(-1))
+            return true;
+
+        int movementHexes = 0;
+        if (paths != null && paths.TryGetValue(cell, out List<Vector3Int> path) && path != null)
+            movementHexes = Mathf.Max(0, path.Count - 1);
+
+        return takeoffMoveOptions.Contains(movementHexes);
     }
 }
