@@ -1,5 +1,7 @@
 ﻿# Relatorio de Terrenos e DPQ
 
+Data base: 2026-05-25 (revisado; base original: 2026-03-06)
+
 ## Base analisada
 - Assets de terreno: `Assets/DB/World Building/Terrain/*.asset`
 - Assets de construcoes: `Assets/DB/World Building/Construction/*.asset`
@@ -27,6 +29,12 @@
 
 ## Skills de pre-requisito e barateamento em terrenos
 Leitura dos assets atuais:
+
+- Planicie:
+- `blockedSkills`: `Linha de Trem` (trem nao pode parar em planicie sem estrutura de trilho)
+
+- Mar:
+- `blockedSkills`: `Linha de Trem`
 
 - Floresta:
 - `blockedSkills`: `Linha de Trem`
@@ -57,22 +65,26 @@ Detalhamento completo da cadeia de visao/spotting esta no relatorio 05 (`05_rela
 ## Construcoes (impacto tatico-economico)
 No banco atual, construcoes usam principalmente DPQ/renda/supply, com regras de skill de entrada vazias:
 
-| Construcao | baseMovementCost | requiredSkillsToEnter | blockedSkills | skillCostOverrides |
+| Construcao | baseMovementCost | DPQ | Supply | Observacao |
 |---|---:|---|---|---|
-| HQ | 1 | vazio | vazio | vazio |
-| Cidade | 1 | vazio | vazio | vazio |
-| Fabrica | 1 | vazio | vazio | vazio |
-| Aeroporto | 1 | vazio | vazio | vazio |
-| Porto Naval | 1 | vazio | vazio | vazio |
-| Barracks | 1 | vazio | vazio | vazio |
+| HQ | 1 | - | - | - |
+| Cidade | 1 | - | - | - |
+| Fabrica | 1 | - | - | - |
+| Aeroporto | 1 | - | - | - |
+| Porto Naval | 1 | - | - | - |
+| Barracks | 1 | - | - | - |
+| Estacao de Trem | 1 | Melhorado | infinito (3 tipos) | nova; permite supply logistico ilimitado |
+| flag | 1 | Padrao | limitado (3 tipos) | nova; ponto de controle simples com supply basico |
+
+Todas as construcoes acima tem `requiredSkillsToEnter`, `blockedSkills` e `skillCostOverrides` vazios.
 
 ## Estruturas (impacto de mobilidade e acesso)
 | Estrutura | baseMovementCost | requiredSkillsToEnter | blockedSkills | roadBoost |
 |---|---:|---|---|---|
 | Rodovia | 1 | vazio | Linha de Trem | sim |
 | Ponte Alta | 1 | vazio | Linha de Trem | nao |
-| Ponte para Trem | 1 | Linha de Trem | vazio | nao |
-| Trilho | 1 | vazio | vazio | nao |
+| Ponte com Trilhos | 2 | Linha de Trem | vazio | nao |
+| Trilhos | 2 | vazio | vazio | nao |
 
 ## Road Boost da estrada
 - A flag `roadBoost` da estrutura e consumida no pathfinding (`UnitMovementPathRules`).

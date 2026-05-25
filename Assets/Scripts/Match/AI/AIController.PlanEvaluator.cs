@@ -22,8 +22,10 @@ public partial class AIController
                 // Captura tanto a transição ofensivo→defensivo (1º turno pós-conquista)
                 // quanto turnos subsequentes (já Defending), evitando redistribuição dos defensores.
                 if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo defInf)
-                    && defInf.IsFullyControlled && defInf.ControllingTeam == aiTeam
+                    && IsOwnedDefensibleSector(defInf, aiTeam)
                     && (HasNearbyVisibleEnemy(defInf.RepresentativeCell, aiTeam, defenseEnemyRange)
+                        || defInf.IsDisputed
+                        || defInf.HasPartialCapture
                         || (IsCriticalHomeDefenseSector(defInf, aiTeam)
                             && IsHomeDefenseThreatened(defInf, aiTeam, HomeDefenseThreatRange))))
                 {
@@ -96,7 +98,7 @@ public partial class AIController
         var sectorCandidates = new List<SectorObjective>();
         foreach (SectorManager.SectorInfo info in allSectors)
         {
-            if (info.IsFullyControlled && info.ControllingTeam == aiTeam) continue;
+            if (IsOwnedDefensibleSector(info, aiTeam)) continue;
             bool hasCapturable = false;
             foreach (SectorManager.SectorConstructionInfo c in info.Constructions)
             {
@@ -325,25 +327,35 @@ public partial class AIController
             int defPriority = plan.Objectives.Count + 1;
             foreach (SectorManager.SectorInfo info in allSectors)
             {
-                if (!info.IsFullyControlled || info.ControllingTeam != aiTeam) continue;
-                if (plan.GetObjectiveForSector(info.Sector) != null) continue;
+                if (!IsOwnedDefensibleSector(info, aiTeam)) continue;
                 Vector3Int rc = info.RepresentativeCell; rc.z = 0;
                 bool criticalHomeThreat = IsCriticalHomeDefenseSector(info, aiTeam)
                     && IsHomeDefenseThreatened(info, aiTeam, HomeDefenseThreatRange);
-                if (!criticalHomeThreat && !HasNearbyVisibleEnemy(rc, aiTeam, DefenseEnemyRange)) continue;
+                bool sectorDefenseThreat = criticalHomeThreat
+                    || info.IsDisputed
+                    || info.HasPartialCapture
+                    || HasNearbyVisibleEnemy(rc, aiTeam, DefenseEnemyRange);
+                if (!sectorDefenseThreat) continue;
+
+                SectorObjective existingDefense = plan.GetObjectiveForSector(info.Sector);
+                if (existingDefense != null)
+                {
+                    if (existingDefense.Status != ObjectiveStatus.Defending)
+                    {
+                        existingDefense.Status = ObjectiveStatus.Defending;
+                        existingDefense.Priority = defPriority++;
+                        NormalizeDefenseObjectiveSlots(existingDefense, info.HasPartialCapture || criticalHomeThreat, !criticalHomeThreat, aiTeam);
+                        Debug.Log($"{TL("Plan")} Objetivo convertido para defesa: {info.Sector} (pri {existingDefense.Priority}, disputed={info.IsDisputed}, partialCapture={info.HasPartialCapture})");
+                    }
+                    continue;
+                }
 
                 var defObj = new SectorObjective
                 {
                     Sector = info.Sector, AssignedTeam = aiTeam,
                     Status = ObjectiveStatus.Defending, Priority = defPriority++,
                 };
-                // 2º capturer se inimigo já está recapturando — reforço urgente
-                int defSlots = info.HasPartialCapture || criticalHomeThreat ? 2 : 1;
-                for (int s = 0; s < defSlots; s++)
-                    defObj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
-                // Setor não-base com captura ativa: pede assault para expulsar o inimigo
-                if (!criticalHomeThreat)
-                    defObj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
+                NormalizeDefenseObjectiveSlots(defObj, info.HasPartialCapture || criticalHomeThreat, !criticalHomeThreat, aiTeam);
                 plan.Objectives.Add(defObj);
                 Debug.Log($"{TL("Plan")} Objetivo defensivo: {info.Sector} (pri {defPriority - 1}, inimigo ≤{DefenseEnemyRange}h, partialCapture={info.HasPartialCapture})");
             }
@@ -1194,6 +1206,51 @@ public partial class AIController
     // Mid-turn threat invalidation
     // -------------------------------------------------------------------------
 
+    private static bool IsOwnedDefensibleSector(SectorManager.SectorInfo info, TeamId aiTeam)
+    {
+        return info != null
+            && info.ControllingTeam == aiTeam
+            && (info.IsFullyControlled || info.IsDisputed || info.HasPartialCapture);
+    }
+
+    private void NormalizeDefenseObjectiveSlots(SectorObjective obj, bool urgentCapturer, bool addAssault, TeamId aiTeam)
+    {
+        if (obj == null)
+            return;
+
+        for (int i = obj.Slots.Count - 1; i >= 0; i--)
+        {
+            SlotNeed slot = obj.Slots[i];
+            if (slot.Role != UnitRole.Transportador)
+                continue;
+
+            if (slot.Filled)
+            {
+                UnitManager transUnit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                transUnit?.ClearAIAssignedPlan();
+            }
+            obj.Slots.RemoveAt(i);
+        }
+
+        int desiredCapturers = urgentCapturer ? 2 : 1;
+        int capturers = 0;
+        bool hasAssault = false;
+        foreach (SlotNeed slot in obj.Slots)
+        {
+            if (slot.Role == UnitRole.Capturador) capturers++;
+            if (slot.Role == UnitRole.Assalto) hasAssault = true;
+        }
+
+        while (capturers < desiredCapturers)
+        {
+            obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
+            capturers++;
+        }
+
+        if (addAssault && !hasAssault)
+            obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
+    }
+
     /// <summary>
     /// Removes Defending objectives whose threat was eliminated mid-turn.
     /// Called at the top of every Phase 2 iteration after fog refresh so that
@@ -1222,7 +1279,9 @@ public partial class AIController
                 else
                 {
                     Vector3Int rc = info.RepresentativeCell; rc.z = 0;
-                    stillThreatened = HasNearbyVisibleEnemy(rc, aiTeam, defenseEnemyRange);
+                    stillThreatened = info.IsDisputed
+                        || info.HasPartialCapture
+                        || HasNearbyVisibleEnemy(rc, aiTeam, defenseEnemyRange);
                     // Base sectors are rectangles — also scan each construction cell
                     // so enemies near corner buildings aren't missed by the representative cell.
                     if (!stillThreatened && ConstructionSectorHelper.IsBase(obj.Sector))

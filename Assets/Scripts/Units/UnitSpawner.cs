@@ -61,17 +61,6 @@ public class UnitSpawner : MonoBehaviour
     public GameObject Spawn(string unitId, TeamId teamId, Vector3 position, Quaternion rotation)
     {
         TryAutoAssignBoardTilemap();
-        if (boardTilemap != null)
-        {
-            Vector3Int targetCell = HexCoordinates.WorldToCell(boardTilemap, position);
-            targetCell.z = 0;
-            int targetSortingLayerId = GetTargetSortingLayerId();
-            if (IsCellOccupiedOnSortingLayer(targetCell, targetSortingLayerId, teamId))
-            {
-                Debug.LogWarning($"[UnitSpawner] Celula ocupada na mesma sorting layer em ({targetCell.x},{targetCell.y},0). Spawn cancelado.");
-                return null;
-            }
-        }
 
         if (unitDatabase == null)
         {
@@ -83,6 +72,18 @@ public class UnitSpawner : MonoBehaviour
         {
             Debug.LogWarning($"[UnitSpawner] Unidade '{unitId}' nao encontrada no banco.");
             return null;
+        }
+
+        if (boardTilemap != null)
+        {
+            Vector3Int targetCell = HexCoordinates.WorldToCell(boardTilemap, position);
+            targetCell.z = 0;
+            int targetSortingLayerId = GetTargetSortingLayerId();
+            if (IsCellOccupiedOnSortingLayer(targetCell, targetSortingLayerId, teamId, data))
+            {
+                Debug.LogWarning($"[UnitSpawner] Celula ocupada na mesma camada em ({targetCell.x},{targetCell.y},0). Spawn cancelado.");
+                return null;
+            }
         }
 
         return Spawn(data, teamId, position, rotation);
@@ -297,13 +298,20 @@ public class UnitSpawner : MonoBehaviour
             return null;
         }
 
+        UnitData data = null;
+        if (unitDatabase != null && !string.IsNullOrWhiteSpace(unitId))
+            unitDatabase.TryGetById(unitId, out data);
+
         Vector3Int fixedCell = new Vector3Int(cell.x, cell.y, 0);
         int targetSortingLayerId = GetTargetSortingLayerId();
-        if (IsCellOccupiedOnSortingLayer(fixedCell, targetSortingLayerId, teamId))
+        if (IsCellOccupiedOnSortingLayer(fixedCell, targetSortingLayerId, teamId, data))
         {
-            Debug.LogWarning($"[UnitSpawner] Celula ocupada na mesma sorting layer em ({fixedCell.x},{fixedCell.y},0). Spawn cancelado.");
+            Debug.LogWarning($"[UnitSpawner] Celula ocupada na mesma camada em ({fixedCell.x},{fixedCell.y},0). Spawn cancelado.");
             return null;
         }
+
+        if (data != null)
+            return Spawn(data, teamId, HexCoordinates.GetCellCenterWorld(boardTilemap, fixedCell), Quaternion.identity, enforceSpawnOccupancyRule: false);
 
         return Spawn(unitId, teamId, HexCoordinates.GetCellCenterWorld(boardTilemap, fixedCell), Quaternion.identity);
     }
@@ -324,13 +332,13 @@ public class UnitSpawner : MonoBehaviour
 
         Vector3Int fixedCell = new Vector3Int(cell.x, cell.y, 0);
         int targetSortingLayerId = GetTargetSortingLayerId();
-        if (IsCellOccupiedOnSortingLayer(fixedCell, targetSortingLayerId, teamId))
+        if (IsCellOccupiedOnSortingLayer(fixedCell, targetSortingLayerId, teamId, data))
         {
-            Debug.LogWarning($"[UnitSpawner] Celula ocupada na mesma sorting layer em ({fixedCell.x},{fixedCell.y},0). Spawn cancelado.");
+            Debug.LogWarning($"[UnitSpawner] Celula ocupada na mesma camada em ({fixedCell.x},{fixedCell.y},0). Spawn cancelado.");
             return null;
         }
 
-        return Spawn(data, teamId, HexCoordinates.GetCellCenterWorld(boardTilemap, fixedCell), Quaternion.identity);
+        return Spawn(data, teamId, HexCoordinates.GetCellCenterWorld(boardTilemap, fixedCell), Quaternion.identity, enforceSpawnOccupancyRule: false);
     }
 
     public void SpawnManual()
@@ -417,11 +425,14 @@ public class UnitSpawner : MonoBehaviour
         return renderer != null ? renderer.sortingLayerID : 0;
     }
 
-    private bool IsCellOccupiedOnSortingLayer(Vector3Int cell, int sortingLayerId, TeamId teamId)
+    private bool IsCellOccupiedOnSortingLayer(Vector3Int cell, int sortingLayerId, TeamId teamId, UnitData spawnData = null)
     {
         TryAutoAssignBoardTilemap();
         if (boardTilemap == null)
             return false;
+
+        if (spawnData != null && OccupancyResolver.IsLayerAwareRulesActive)
+            return IsCellOccupiedOnSpawnLayer(cell, teamId, spawnData);
 
         if (UnitRulesDefinition.IsTotalWarEnabled())
         {
@@ -452,6 +463,29 @@ public class UnitSpawner : MonoBehaviour
 
             occupiedCell.z = 0;
             if (occupiedCell == cell)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsCellOccupiedOnSpawnLayer(Vector3Int cell, TeamId teamId, UnitData spawnData)
+    {
+        HeightBand spawnBand = OccupancyResolver.GetHeightBand(spawnData.domain, spawnData.heightLevel);
+        if (spawnBand != HeightBand.Blocking)
+            return false;
+
+        List<UnitManager> units = UnitOccupancyRules.GetUnitsAtCell(boardTilemap, cell);
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null)
+                continue;
+
+            if (OccupancyResolver.GetHeightBand(unit) != spawnBand)
+                continue;
+
+            if (!UnitRulesDefinition.IsTotalWarEnabled() || unit.TeamId == teamId)
                 return true;
         }
 

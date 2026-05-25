@@ -12,7 +12,8 @@ Documento tecnico consolidado dos sistemas principais do projeto:
 
 ## 1. Unidades
 - Fonte principal: `UnitData` (`Assets/DB/Character/Unit/**`).
-- Campos nucleares: custo, HP max, autonomia, movimento, visao, defesa, elite, dominio/altura, armas embarcadas.
+- Campos nucleares: custo, HP max, movimento, visao, defesa, elite, dominio/altura, armas embarcadas.
+- Autonomia e controlada por `AutonomyData` (sistema proprio em `Assets/DB/Logistic/Autonomy/`): terrestre consome por hex movido; aereo consome upkeep fixo por turno.
 - Relatorio detalhado: `01_relatorio_unidades.md`.
 
 ## 2. Combate
@@ -21,6 +22,8 @@ Documento tecnico consolidado dos sistemas principais do projeto:
 `ataque (arma+RPS+elite) x HP` contra `defesa (base+DPQ+RPS+elite+ferido)`.
 - DPQ define outcome de arredondamento.
 - Resultado final aplica clamp por trava de HP para evitar overkill matematico acima do limite do confronto.
+- Guards pre-combate validados antes de consumir municao: defensor embarcado, bloqueio de camada, `CanFireAtLayer`.
+- Aeronave em solo: RPS de ataque e clampeado em `max(0, valor)` — nao pode ser penalizado em solo.
 - Relatorio detalhado: `02_relatorio_sistema_combate.md`.
 
 ## 3. Terrenos e DPQ
@@ -34,11 +37,13 @@ Documento tecnico consolidado dos sistemas principais do projeto:
 - `ServiceCostFormula.ComputeServiceMoneyCost`
 - `ServiceLogisticsFormula.EstimatePotentialServiceGains`
 - Runtime e tools (PodeSuprir + ServicoDoComando) convergem para esse nucleo.
+- Sistema de autonomia (`AutonomyData`): define consumo de combustivel por tipo de motor (Heavy Motor / Rotor / Turbo Helice / Jet).
 - Relatorio detalhado: `04_relatorio_logistica.md`.
 
 ## 5. Visao e spotting
-- Visao usa `UnitData.visao` + LoS por terreno/camada + regras globais.
-- Spotter habilita fogo indireto/fora de observacao direta em contexto valido.
+- Motor principal de FoW: `PodeDetectarSensor` — BFS por unidade observadora, 4-bucket de deteccao, cache por revisao de tabuleiro.
+- Visao usa `UnitData.visao` + especializacoes por dominio/camada + LoS por terreno + regras globais.
+- Spotter habilita fogo indireto/fora de observacao direta (apenas alvos Land/Naval Surface).
 - Relatorio detalhado: `05_relatorio_visao_spotting.md`.
 
 ## 6. Economia
@@ -48,13 +53,15 @@ Documento tecnico consolidado dos sistemas principais do projeto:
 - Relatorio detalhado: `06_relatorio_economia.md`.
 
 ## 7. Fluxo de turno
-- `TurnStateManager` conduz state machine por unidade/acao.
+- `TurnStateManager` conduz state machine por unidade/acao (34 estados no `CursorState`).
+- Padrao `*Executing`: cada acao assincrona tem um estado dedicado que bloqueia todo input ate a corrotina concluir.
 - `MatchController` conduz camada macro de turno/time/economia.
 - Relatorio detalhado: `07_relatorio_turn_state_manager.md`.
 
 ## 8. Sensores
 - Sensores encapsulam validacao tatico-contextual de cada acao.
-- `SensorHandle` orquestra parte do conjunto, e `TurnStateManager` consome os resultados para abrir estados de execucao.
+- `SensorHandle` orquestra mirar/embarcar/desembarcar; demais sensores (captura, fusao, supply, transfer, layer ops) sao chamados diretamente pelo `TurnStateManager`.
+- `PodeEmergirSensor` (novo): valida emersao de submarino antes de transitar para Naval/Surface.
 - Relatorio detalhado: `08_relatorio_sensores.md`.
 
 ## Conclusao executiva

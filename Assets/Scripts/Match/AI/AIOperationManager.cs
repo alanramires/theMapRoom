@@ -99,6 +99,7 @@ public class AIOperationManager : MonoBehaviour
     private void TryBuildBaseDefenseOp(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, List<AIOperation> ops)
     {
         int aircraftNearHQ = CountVisibleEnemyAircraftNearHQ(snapshot, InstanceSafeAntiAirCoverageRange());
+        int fighterANearHQ = CountVisibleEnemyFighterANearHQ(snapshot, InstanceSafeAntiAirCoverageRange());
         int armorNearBase = CountVisibleEnemyArmorNearOwnedBase(snapshot, DefensiveArmorThreatRange);
         bool captureActive = CountOwnedHomeConstructionsUnderCapture(snapshot, team) > 0;
         bool homeThreat = IsHomeDefenseThreatened(snapshot, team, HomeThreatRange) || captureActive;
@@ -114,7 +115,10 @@ public class AIOperationManager : MonoBehaviour
 
         if (aircraftNearHQ > 0)
         {
-            op.AddSlots(AINeedKind.FighterB, CountActiveNeed(snapshot, AINeedKind.FighterB) <= 0 ? 1 : 0);
+            if (fighterANearHQ > 0)
+                op.AddSlots(AINeedKind.FighterA, CountActiveNeed(snapshot, AINeedKind.FighterA) <= 0 ? 1 : 0);
+            else if (CountActiveNeed(snapshot, AINeedKind.FighterA) + CountActiveNeed(snapshot, AINeedKind.FighterB) <= 0)
+                op.AddSlots(AINeedKind.FighterB, 1);
             op.AddSlots(AINeedKind.AAA, Mathf.Max(0, InstanceMinBaseAAA() - CountActiveNeed(snapshot, AINeedKind.AAA)));
             if (CountActiveNeed(snapshot, AINeedKind.SAM) < 1)
                 op.AddSlots(AINeedKind.SAM, 1);
@@ -134,7 +138,7 @@ public class AIOperationManager : MonoBehaviour
             return;
 
         ops.Add(op);
-        Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] BaseDefense URGENTE aircraft={aircraftNearHQ} armor={armorNearBase} capture={captureActive} slots={DescribeSlots(op)}");
+        Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] BaseDefense URGENTE aircraft={aircraftNearHQ} fighterA={fighterANearHQ} armor={armorNearBase} capture={captureActive} slots={DescribeSlots(op)}");
     }
 
     private void TryBuildSectorDefenseOps(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, List<AIOperation> ops)
@@ -155,7 +159,7 @@ public class AIOperationManager : MonoBehaviour
         {
             if (info == null || ConstructionSectorHelper.IsBase(info.Sector)) continue;
             if (built.Contains(info.Sector)) continue;
-            if (!info.IsFullyControlled || info.ControllingTeam != team) continue;
+            if (!IsOwnedDefensibleSector(info, team)) continue;
             if (!HasNearbyVisibleEnemy(snapshot, info.RepresentativeCell, SectorDefenseRange)) continue;
             BuildSectorDefenseOp(team, snapshot, plan.GetObjectiveForSector(info.Sector), info, ops, built);
         }
@@ -218,8 +222,11 @@ public class AIOperationManager : MonoBehaviour
             op.AddSlots(AINeedKind.AirTransport, airDeficit);
             if (info.GetRiskLevelFor(team) >= SectorManager.SectorRiskLevel.High)
                 op.AddSlots(AINeedKind.Assault, 1);
-            if (CountTotalVisibleEnemyAircraft(snapshot) > 0)
-                op.AddSlots(AINeedKind.FighterB, CountActiveNeed(snapshot, AINeedKind.FighterB) <= 0 ? 1 : 0);
+            if (CountTotalVisibleEnemyFighterA(snapshot) > 0)
+                op.AddSlots(AINeedKind.FighterA, CountActiveNeed(snapshot, AINeedKind.FighterA) <= 0 ? 1 : 0);
+            else if (CountTotalVisibleEnemyAircraft(snapshot) > 0
+                && CountActiveNeed(snapshot, AINeedKind.FighterA) + CountActiveNeed(snapshot, AINeedKind.FighterB) <= 0)
+                op.AddSlots(AINeedKind.FighterB, 1);
 
             if (op.RequiredSlots.Count == 0)
                 continue;
@@ -604,6 +611,13 @@ public class AIOperationManager : MonoBehaviour
         return CountVisibleEnemyAircraftNearCell(snapshot, snapshot.MyHQ.CurrentCellPosition, range);
     }
 
+    private static int CountVisibleEnemyFighterANearHQ(AIWorldSnapshot snapshot, int range)
+    {
+        if (snapshot?.MyHQ == null)
+            return 0;
+        return CountVisibleEnemyFighterANearCell(snapshot, snapshot.MyHQ.CurrentCellPosition, range);
+    }
+
     private static int CountVisibleEnemyAircraftNearCell(AIWorldSnapshot snapshot, Vector3Int cell, int range)
     {
         if (snapshot?.EnemyUnits == null)
@@ -614,6 +628,22 @@ public class AIOperationManager : MonoBehaviour
         {
             if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
             if (!enemy.TryGetUnitData(out UnitData data) || data == null || data.domain != Domain.Air) continue;
+            if (SectorManager.HexDistance(center, Normalize(enemy.CurrentCellPosition)) <= range)
+                count++;
+        }
+        return count;
+    }
+
+    private static int CountVisibleEnemyFighterANearCell(AIWorldSnapshot snapshot, Vector3Int cell, int range)
+    {
+        if (snapshot?.EnemyUnits == null)
+            return 0;
+        Vector3Int center = Normalize(cell);
+        int count = 0;
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (!enemy.TryGetUnitData(out UnitData data) || !IsFighterA(data)) continue;
             if (SectorManager.HexDistance(center, Normalize(enemy.CurrentCellPosition)) <= range)
                 count++;
         }
@@ -632,6 +662,35 @@ public class AIOperationManager : MonoBehaviour
                 count++;
         }
         return count;
+    }
+
+    private static int CountTotalVisibleEnemyFighterA(AIWorldSnapshot snapshot)
+    {
+        if (snapshot?.EnemyUnits == null)
+            return 0;
+        int count = 0;
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.TryGetUnitData(out UnitData data) && IsFighterA(data))
+                count++;
+        }
+        return count;
+    }
+
+    private static bool IsFighterA(UnitData data)
+    {
+        return data != null
+            && data.domain == Domain.Air
+            && IsPrimaryRole(data, UnitRole.Interceptador)
+            && data.eliteLevel >= 1;
+    }
+
+    private static bool IsOwnedDefensibleSector(SectorManager.SectorInfo info, TeamId team)
+    {
+        return info != null
+            && info.ControllingTeam == team
+            && (info.IsFullyControlled || info.IsDisputed || info.HasPartialCapture);
     }
 
     private static int CountVisibleEnemyArmorNearOwnedBase(AIWorldSnapshot snapshot, int range)
@@ -668,7 +727,7 @@ public class AIOperationManager : MonoBehaviour
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
             if (!IsCriticalHomeConstruction(building, team)) continue;
-            if (HasEnemyNearCell(snapshot, building.CurrentCellPosition, range))
+            if (HasGroundEnemyNearCell(snapshot, building.CurrentCellPosition, range))
                 return true;
         }
         return false;
@@ -687,6 +746,21 @@ public class AIOperationManager : MonoBehaviour
         foreach (UnitManager enemy in snapshot.EnemyUnits)
         {
             if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (SectorManager.HexDistance(center, Normalize(enemy.CurrentCellPosition)) <= range)
+                return true;
+        }
+        return false;
+    }
+
+    private static bool HasGroundEnemyNearCell(AIWorldSnapshot snapshot, Vector3Int cell, int range)
+    {
+        if (snapshot?.EnemyUnits == null)
+            return false;
+        Vector3Int center = Normalize(cell);
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.GetHeightLevel() != HeightLevel.Surface) continue;
             if (SectorManager.HexDistance(center, Normalize(enemy.CurrentCellPosition)) <= range)
                 return true;
         }

@@ -1013,7 +1013,18 @@ public class ReplayManager : MonoBehaviour
         if (TryResolveRecordedCursorCell(action, preActionSnapshot, out Vector3Int cursorCell))
             yield return MoveCursorToCellWithTravel(NormalizeCell(cursorCell));
 
-        ExecuteReplayConfirmInput();
+        bool shoppingOpened = false;
+        Vector3Int normalizedCursorCell = NormalizeCell(cursorCell);
+        if (action != null
+            && action.IsAIGenerated
+            && action.SensorAction == SensorActionType.Shopping
+            && TryResolveShoppingConstruction(action, normalizedCursorCell, out ConstructionManager shoppingConstruction))
+        {
+            shoppingOpened = turnStateManager.TryAutomatedEnterShoppingAtConstruction(shoppingConstruction);
+        }
+
+        if (!shoppingOpened)
+            ExecuteReplayConfirmInput();
         yield return null;
 
         if (turnStateManager.CurrentCursorState != TurnStateManager.CursorState.ShoppingAndServices)
@@ -1078,6 +1089,51 @@ public class ReplayManager : MonoBehaviour
 
         yield return null;
     }
+
+    private static bool TryResolveShoppingConstruction(PlayerAction action, Vector3Int cursorCell, out ConstructionManager construction)
+    {
+        construction = null;
+        cursorCell.z = 0;
+
+        int targetId = 0;
+        bool hasTargetId = action != null
+            && !string.IsNullOrWhiteSpace(action.TargetConstructionId)
+            && int.TryParse(action.TargetConstructionId, out targetId);
+
+        List<ConstructionManager> constructions = ConstructionManager.AllActive;
+        if (constructions == null)
+            return false;
+
+        if (hasTargetId)
+        {
+            for (int i = 0; i < constructions.Count; i++)
+            {
+                ConstructionManager candidate = constructions[i];
+                if (candidate == null) continue;
+                if (candidate.InstanceId == targetId)
+                {
+                    construction = candidate;
+                    return true;
+                }
+            }
+        }
+
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager candidate = constructions[i];
+            if (candidate == null) continue;
+            Vector3Int cell = candidate.CurrentCellPosition;
+            cell.z = 0;
+            if (cell == cursorCell)
+            {
+                construction = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private IEnumerator ExecuteRecordedCommandServiceBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
     {
         Debug.Log("[Replay][CommandService] ExecuteRecordedCommandServiceBatch iniciado.");

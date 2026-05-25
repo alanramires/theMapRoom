@@ -97,7 +97,7 @@ public class AIShoppingPlanner : MonoBehaviour
         var orders = new List<ShoppingOrder>();
         if (snapshot == null) return orders;
 
-        var occupied  = new HashSet<Vector3Int>(snapshot.OccupiedCells);
+        var occupied  = BuildProductionOccupiedCells();
         int remaining = snapshot.Budget;
         int openCapturerSlots   = CountOpenSlots(snapshot.AITeam, UnitRole.Capturador);
         int openAssaultSlots    = CountOpenSlots(snapshot.AITeam, UnitRole.Assalto);
@@ -1432,6 +1432,26 @@ public class AIShoppingPlanner : MonoBehaviour
     private static bool IsEliteAssaultReserveReady(AIWorldSnapshot snapshot)
     {
         return IsEliteFireSupportReserveReady(snapshot);
+    }
+
+    private static HashSet<Vector3Int> BuildProductionOccupiedCells()
+    {
+        var occupied = new HashSet<Vector3Int>();
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+            if (unit.GetHeightLevel() != HeightLevel.Surface)
+                continue;
+
+            Vector3Int cell = unit.CurrentCellPosition;
+            cell.z = 0;
+            occupied.Add(cell);
+        }
+
+        return occupied;
     }
 
     private static int CountOpenSlots(TeamId aiTeam, UnitRole role)

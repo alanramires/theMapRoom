@@ -107,6 +107,8 @@ public partial class AIController
             {
                 List<PodeDesembarcarOption> optsFromMove = SimulateDisembarkFromCell(unit, candidate);
                 if (optsFromMove == null || optsFromMove.Count == 0) continue;
+                optsFromMove = FilterAirCourierSafeDisembarkOptions(optsFromMove, snapshot.AITeam);
+                if (optsFromMove.Count == 0) continue;
 
                 List<PodeDesembarcarOption> selectedFromMove =
                     SelectBestDisembarkPerPassenger(optsFromMove, passengers, plan, snapshot);
@@ -136,6 +138,7 @@ public partial class AIController
         bool canDisembark = PodeDesembarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, disembarkOptions);
         if (canDisembark && disembarkOptions.Count > 0 && (moveImprovement <= 1f || isStuck))
         {
+            disembarkOptions = FilterAirCourierSafeDisembarkOptions(disembarkOptions, snapshot.AITeam);
             List<PodeDesembarcarOption> selected =
                 SelectBestDisembarkPerPassenger(disembarkOptions, passengers, plan, snapshot);
             // Partial disembark — when stuck, release all; otherwise only passengers in range of their target.
@@ -160,9 +163,174 @@ public partial class AIController
             }
         }
 
+        if (TryBuildAirCourierAlternativeDropAction(
+                unit,
+                primaryPassenger,
+                passengers,
+                snapshot,
+                plan,
+                fromCell,
+                primaryTarget,
+                paths,
+                occupied,
+                out PlayerAction alternativeDropAction))
+        {
+            return alternativeDropAction;
+        }
+
+        if (moveTarget == fromCell)
+            return BuildAirTransportReturnToWaitTarget(unit, snapshot, fromCell, paths, occupied,
+                $"courier sem LZ seguro para #{primaryPassenger.InstanceId} em {primaryTarget}");
+
         // Priority 3: move toward target.
         Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier — move para {moveTarget} alvo={primaryTarget} dist={SectorManager.HexDistance(moveTarget, primaryTarget):F0}h passageiro=#{primaryPassenger.InstanceId}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
+    }
+
+    private bool TryBuildAirCourierAlternativeDropAction(
+        UnitManager unit,
+        UnitManager primaryPassenger,
+        List<UnitManager> passengers,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        Vector3Int fromCell,
+        Vector3Int primaryTarget,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || primaryPassenger == null || passengers == null || snapshot == null || paths == null)
+            return false;
+
+        Vector3Int bestTransporterCell = fromCell;
+        List<Vector3Int> bestPath = null;
+        List<PodeDesembarcarOption> bestSelected = null;
+        PodeDesembarcarOption bestPrimaryOpt = null;
+        float bestScore = float.MinValue;
+
+        foreach (KeyValuePair<Vector3Int, List<Vector3Int>> kvp in paths)
+        {
+            Vector3Int candidate = kvp.Key;
+            candidate.z = 0;
+            if (candidate != fromCell && occupied != null && occupied.Contains(candidate))
+                continue;
+
+            List<PodeDesembarcarOption> opts = candidate == fromCell
+                ? CollectCurrentDisembarkOptions(unit)
+                : SimulateDisembarkFromCell(unit, candidate);
+            if (opts == null || opts.Count == 0)
+                continue;
+
+            opts = FilterAirCourierSafeDisembarkOptions(opts, snapshot.AITeam);
+            if (opts.Count == 0)
+                continue;
+
+            List<PodeDesembarcarOption> selected = SelectBestDisembarkPerPassenger(opts, passengers, plan, snapshot);
+            selected = FilterDisembarkByTargetRange(selected, plan, snapshot, AirDropOffRange + 1);
+            PodeDesembarcarOption primaryOpt = selected.Find(o => o.passengerUnit == primaryPassenger);
+            if (primaryOpt == null)
+                continue;
+
+            Vector3Int dropCell = primaryOpt.disembarkCell;
+            dropCell.z = 0;
+            float dropDist = SectorManager.HexDistance(dropCell, primaryTarget);
+            float heliDist = SectorManager.HexDistance(candidate, primaryTarget);
+            if (dropDist > AirDropOffRange + 1 && heliDist > AirDropOffRange + 1)
+                continue;
+
+            float threat = CalculateThreatLevel(dropCell, snapshot.AITeam);
+            float moveCost = candidate == fromCell ? 0f : GetPathStepCount(paths, candidate);
+            float score =
+                -dropDist * 1200f
+                - heliDist * 80f
+                - threat * 180f
+                - moveCost * 4f
+                + GetTerrainDpqPontos(dropCell) * 30f
+                + selected.Count * 50f;
+
+            if (SimulateCaptureSensor(primaryPassenger, dropCell, out ConstructionManager capture)
+                && capture != null)
+            {
+                score += capture.TeamId != snapshot.AITeam ? 2500f : 500f;
+            }
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestTransporterCell = candidate;
+                bestPath = kvp.Value;
+                bestSelected = selected;
+                bestPrimaryOpt = primaryOpt;
+            }
+        }
+
+        if (bestSelected == null || bestPrimaryOpt == null)
+            return false;
+
+        Vector3Int dc = bestPrimaryOpt.disembarkCell;
+        dc.z = 0;
+        if (bestTransporterCell == fromCell)
+        {
+            Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier â€” LZ alternativo: desembarca #{primaryPassenger.InstanceId} @ {dc} alvo={primaryTarget} score={bestScore:F0}");
+            action = BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, bestSelected);
+            return true;
+        }
+
+        Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier â€” LZ alternativo: move+desembarca via {bestTransporterCell} @ {dc} alvo={primaryTarget} score={bestScore:F0}");
+        action = BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, bestSelected, bestTransporterCell, bestPath);
+        return true;
+    }
+
+    private List<PodeDesembarcarOption> CollectCurrentDisembarkOptions(UnitManager unit)
+    {
+        var options = new List<PodeDesembarcarOption>();
+        PodeDesembarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, options);
+        return options;
+    }
+
+    private List<PodeDesembarcarOption> FilterAirCourierSafeDisembarkOptions(List<PodeDesembarcarOption> options, TeamId aiTeam)
+    {
+        var safe = new List<PodeDesembarcarOption>();
+        if (options == null)
+            return safe;
+
+        for (int i = 0; i < options.Count; i++)
+        {
+            PodeDesembarcarOption opt = options[i];
+            if (opt == null || opt.passengerUnit == null)
+                continue;
+
+            Vector3Int cell = opt.disembarkCell;
+            cell.z = 0;
+            if (HasEnemyUnitAnyLayerAtCell(cell, aiTeam))
+                continue;
+
+            safe.Add(opt);
+        }
+
+        return safe;
+    }
+
+    private bool HasEnemyUnitAnyLayerAtCell(Vector3Int cell, TeamId aiTeam)
+    {
+        cell.z = 0;
+        foreach (UnitManager u in UnitManager.AllActive)
+        {
+            if (u == null || u.IsEmbarked || u.IsDead)
+                continue;
+            if (!u.gameObject.activeInHierarchy || u.TeamId == aiTeam)
+                continue;
+            if (u.BoardTilemap != boardTilemap)
+                continue;
+
+            Vector3Int uc = u.CurrentCellPosition;
+            uc.z = 0;
+            if (uc == cell)
+                return true;
+        }
+
+        return false;
     }
 
     private PlayerAction BuildAirTransportReturnToWaitTarget(

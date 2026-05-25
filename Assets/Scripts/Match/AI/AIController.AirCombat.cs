@@ -160,6 +160,8 @@ public partial class AIController
                     continue;
                 if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
                     continue;
+                if (!TryFindAttackDecisionOption(unit, enemy, cell, out PodeMirarTargetOption attackOption))
+                    continue;
                 if (!PassesAttackDecision(unit, enemy, cell, false, out string attackDecisionReason))
                     continue;
                 float combatScore = 0f;
@@ -179,10 +181,14 @@ public partial class AIController
                 Vector3Int enemyCell = enemy.CurrentCellPosition;
                 enemyCell.z = 0;
                 BazookaTargetPriority targetPreference = ResolveAirCombatTargetPreference(unit, enemy);
+                bool attacksFromCurrentCell = cell == fromCell;
+                float targetValueScore = ScoreAirCombatTargetValue(enemy, attackOption, unit);
                 float score =
                     GetAirCombatTargetPreferenceScore(targetPreference)
+                    + targetValueScore
                     + combatScore
                     + Mathf.Max(0, 20 - enemy.CurrentHP) * 700f
+                    + (attacksFromCurrentCell ? 5000f : 0f)
                     - SectorManager.HexDistance(enemyCell, anchor) * 350f
                     - SectorManager.HexDistance(cell, anchor) * 40f
                     - GetPathStepCount(paths, cell) * 8f
@@ -193,12 +199,60 @@ public partial class AIController
                     bestScore = score;
                     bestCell = cell;
                     bestTarget = enemy;
-                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP}{combatScoreReason} {attackDecisionReason}";
+                    string weaponName = attackOption.weapon != null ? ResolveWeaponName(attackOption.weapon) : "semArma";
+                    reason = $"score={score:F0} pref={targetPreference} value={targetValueScore:F0} weapon={weaponName} hp={enemy.CurrentHP} noMove={attacksFromCurrentCell}{combatScoreReason} {attackDecisionReason}";
                 }
             }
         }
 
         return bestTarget != null;
+    }
+
+    private float ScoreAirCombatTargetValue(UnitManager target, PodeMirarTargetOption option, UnitManager attacker)
+    {
+        if (target == null || !target.TryGetUnitData(out UnitData targetData) || targetData == null)
+            return 0f;
+
+        float score = targetData.cost * 1.2f + targetData.eliteLevel * 6000f;
+
+        bool isAirAttack = targetData.roles != null
+            && targetData.roles.Count > 0
+            && targetData.roles[0] == UnitRole.AtaqueAereo;
+        bool isTransport = targetData.roles != null
+            && targetData.roles.Count > 0
+            && targetData.roles[0] == UnitRole.Transportador;
+
+        if (targetData.domain == Domain.Air && isAirAttack)
+            score += targetData.eliteLevel >= 1 ? 18000f : 9000f;
+        if (targetData.domain == Domain.Air && targetData.unitClass == GameUnitClass.Plane)
+            score += 4500f;
+        if (targetData.domain == Domain.Air && isTransport)
+            score -= 6000f;
+
+        WeaponPriorityData weaponPriorityData = turnStateManager != null
+            ? turnStateManager.WeaponPriorityDataRef
+            : null;
+
+        if (option != null && option.weapon != null
+            && PodeMirarSensor.IsPreferredWeaponForTarget(weaponPriorityData, option.weapon, targetData.unitClass))
+        {
+            score += 6500f;
+        }
+
+        return score;
+    }
+
+    private static string ResolveWeaponName(WeaponData weapon)
+    {
+        if (weapon == null)
+            return "-";
+        if (!string.IsNullOrWhiteSpace(weapon.apelido))
+            return weapon.apelido.Trim();
+        if (!string.IsNullOrWhiteSpace(weapon.displayName))
+            return weapon.displayName.Trim();
+        if (!string.IsNullOrWhiteSpace(weapon.id))
+            return weapon.id.Trim();
+        return weapon.name;
     }
 
     private static BazookaTargetPriority ResolveAirCombatTargetPreference(UnitManager attacker, UnitManager target)

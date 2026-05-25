@@ -54,8 +54,8 @@ public partial class AIController
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
         int distance = Mathf.Max(1, Mathf.RoundToInt(SectorManager.HexDistance(attackCell, targetCell)));
-        PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(attackCell);
-        PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(targetCell);
+        PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(attacker, attackCell);
+        PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(target, targetCell);
         AICombatHpSimulator.AICombatHpResult sim;
         if (TryFindAttackDecisionOption(attacker, target, attackCell, out PodeMirarTargetOption option))
         {
@@ -198,10 +198,10 @@ public partial class AIController
             return true;
         }
 
-        PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(attackCell);
+        PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(attacker, attackCell);
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
-        PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(targetCell);
+        PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(target, targetCell);
         if (!TrySimulateAttackForAI(attacker, target, attackCell, out AIAttackSimulationSummary simSummary))
         {
             reason = "atkDecision=simInvalid";

@@ -5179,12 +5179,6 @@ public partial class TurnStateManager
 #else
                 return Input.GetKeyDown(KeyCode.M);
 #endif
-            case 'L':
-#if ENABLE_INPUT_SYSTEM
-                return Keyboard.current != null && Keyboard.current.lKey.wasPressedThisFrame;
-#else
-                return Input.GetKeyDown(KeyCode.L);
-#endif
             case 'D':
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current != null && Keyboard.current.dKey.wasPressedThisFrame;

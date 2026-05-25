@@ -587,6 +587,11 @@ public partial class AIController
         AIWorldSnapshot freshSnap = AIWorldSnapshot.Build(snapshot.AITeam, matchController);
         if (ShouldStopAIForMatchEnd("phase3_apos_snapshot"))
             yield break;
+
+        // Reavalia plano/operações com inimigos revelados durante a Fase 2.
+        BuildObjectivePlan(freshSnap);
+        AIOperationManager.Instance.Rebuild(snapshot.AITeam, freshSnap, ObjectiveManager.GetPlanForTeam(snapshot.AITeam));
+
         List<AIShoppingPlanner.ShoppingOrder> orders = AIShoppingPlanner.Decide(freshSnap);
 
         foreach (AIShoppingPlanner.ShoppingOrder order in orders)

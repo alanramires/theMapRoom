@@ -872,6 +872,21 @@ public partial class AIController
         return PositionDpqForAttackDecision.None;
     }
 
+    private PositionDpqForAttackDecision ResolveDpqForAttackDecision(UnitManager unit, Vector3Int cell)
+    {
+        if (unit != null
+            && unit.GetDomain() == Domain.Air
+            && turnStateManager != null
+            && turnStateManager.DpqAirHeightConfigRef != null
+            && turnStateManager.DpqAirHeightConfigRef.TryGetFor(unit.GetDomain(), unit.GetHeightLevel(), out DPQData airDpq)
+            && airDpq != null)
+        {
+            return new PositionDpqForAttackDecision(airDpq.Pontos, airDpq.DefesaBonus);
+        }
+
+        return ResolveDpqForAttackDecision(cell);
+    }
+
     private readonly struct PositionDpqForAttackDecision
     {
         public static PositionDpqForAttackDecision None => new PositionDpqForAttackDecision(0, 0);

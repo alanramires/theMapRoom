@@ -164,9 +164,12 @@ public partial class TurnStateManager
             return ActionSfx.None;
 
         Vector3Int cursorCell = cursorController.CurrentCell;
-        UnitManager unit = FindUnitAtCell(cursorCell);
         int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
 
+        if (TryEnterUnblockedConstructionShoppingBeforeUnit(cursorCell, activeTeam))
+            return ActionSfx.Confirm;
+
+        UnitManager unit = FindUnitAtCell(cursorCell);
         if (unit != null)
         {
             bool isAlly = (int)unit.TeamId == activeTeam;
@@ -223,6 +226,50 @@ public partial class TurnStateManager
         BeginInspectedConstructionHelper(construction);
         Advance(CursorState.InspectingBuilding, "HandleConfirmFromNeutralLikeState: ally construction inspect");
         return ActionSfx.Confirm;
+    }
+
+    private bool TryEnterUnblockedConstructionShoppingBeforeUnit(Vector3Int cursorCell, int activeTeam)
+    {
+        ConstructionManager construction = FindConstructionAtCell(cursorCell);
+        if (construction == null || activeTeam < 0 || (int)construction.TeamId != activeTeam)
+            return false;
+
+        if (HasBlockingUnitOnConstructionCell(cursorCell))
+            return false;
+
+        if (!TryEnterConstructionShoppingState(construction, activeTeam))
+            return false;
+
+        DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Produce);
+        return true;
+    }
+
+    private bool HasBlockingUnitOnConstructionCell(Vector3Int cell)
+    {
+        Tilemap referenceTilemap = terrainTilemap != null
+            ? terrainTilemap
+            : (cursorController != null ? cursorController.BoardTilemap : null);
+
+        if (referenceTilemap == null)
+            return false;
+
+        cell.z = 0;
+
+        List<UnitManager> units = UnitOccupancyRules.GetUnitsAtCell(referenceTilemap, cell);
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null)
+                continue;
+
+            if (!OccupancyResolver.IsLayerAwareRulesActive)
+                return true;
+
+            if (OccupancyResolver.GetHeightBand(unit) == HeightBand.Blocking)
+                return true;
+        }
+
+        return false;
     }
 
     private static void LogEnemyUnitInspection(UnitManager unit, int activeTeam)

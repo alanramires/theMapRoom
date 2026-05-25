@@ -482,6 +482,8 @@ public partial class AIController
 
             TargetHex             = cell,
 
+            TargetConstructionId   = order.Building != null ? order.Building.InstanceId.ToString() : null,
+
             SensorAction          = SensorActionType.Shopping,
 
             ShoppingSelectedIndex = order.SelectedIndex,
