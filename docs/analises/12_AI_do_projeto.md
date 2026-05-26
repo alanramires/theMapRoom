@@ -1,144 +1,178 @@
-# Levantamento Abril 2026
+# 12 - Sistema de IA do Projeto
 
-## A. Visão Geral do Projeto
+Data base: 2026-05-25
 
-### Estado Atual do Projeto (Baseado no Código-Fonte)
+## Visao geral: cadeia de comando em tres camadas
 
-O projeto "The Map Room" é um jogo de estratégia militar em tempo real desenvolvido em Unity, com foco em combate tático entre unidades terrestres, aéreas, navais e logística. O código-fonte atual indica um projeto maduro em termos de infraestrutura básica, mas com limitações significativas na inteligência artificial e balanceamento.
+A IA opera como uma forca-tarefa com cadeia de comando clara. Tres camadas coordenadas constroem o turno de dentro para fora:
 
-#### O Que Está Funcionando de Ponta a Ponta
-- **Sistema de Unidades e Movimento**: Unidades se movem pelo mapa hexagonal, respeitando regras de terreno, DPQ (defesa posicional) e custos de movimento. Combate é resolvido via simulador de HP com modificadores de elite, RPS (pedra-papel-tesoura) e habilidades especiais.
-- **Captura de Prédios**: Mecânica completa de captura de construções, com pontos de captura, ocupação e controle territorial. Integrado com planejamento de IA.
-- **Sistema de IA Básico**: IA controla unidades com perfis comportamentais (Artilheiro, Bazooka, Capturador, etc.), sensores de prioridade (Capture, Attack, Supply, Reposition) e flags de comportamento. Planejamento de missões por setor funciona para captura e escolta.
-- **Interface e HUD**: Sistema de UI para unidades, ícones de postura, debug visual e controles de câmera. Suporte a input de jogador humano.
-- **Persistência e Configuração**: Assets para perfis de IA, bancos de dados de combate e configurações de batalha. Sistema de snapshots para avaliação de IA.
+```
+AIOperationManager      â† Comando: detecta ameacas, cria Operacoes com slots de necessidade
+ObjectiveManager        â† Plano Territorial: gerencia SectorObjective por setor do mapa
+AIShoppingPlanner       â† Aquisicao: compra o que o Comando pede via GetDeficits()
+        |
+        v
+AIController            â† Unidades: executam dentro dos planos ou como rogues
+```
 
-#### O Que Está Parcialmente Implementado
-- **Análise de Postura Estratégica**: Mecanismo de mudança entre Attack/Defend/Invasion existe, mas usa critérios muito simples (apenas proximidade ao HQ e % de construções controladas). Não avalia perdas globais, força relativa ou tendências de avanço.
-- **Planejamento de IA**: Funciona para missões básicas de captura, mas faltam análises avançadas como ameaças secundárias, rotas otimizadas ou adaptação dinâmica a mudanças no campo de batalha.
-- **Modo Reparo e Supply**: Unidades entram em modo reparo quando danificadas, mas a lógica de supply (reabastecimento) é básica e não prioriza alvos críticos.
-- **Fog of War (FoW)**: Implementado parcialmente – unidades revelam visão, mas IA não explora ativamente áreas desconhecidas de forma inteligente.
-
-#### O Que Está Quebrado
-- **Balanceamento de Dificuldade**: IA "burra" devido a falta de análise global; continua atacando enquanto perde unidades em outras frentes. Sem memória entre turnos, não aprende com padrões de derrota.
-- **Dependências Cruzadas**: Mudanças em flags de IA (ex: `engageNearestEnemies`) podem causar comportamentos inesperados devido a interações não documentadas (ex: conflito entre `captureInterruptBias` e rescan pós-movimento).
-- **Performance em Grandes Mapas**: Overhead de planejamento pode ser alto com muitas unidades; não otimizado para cenários de alta densidade.
-- **Debug e Testabilidade**: Sistema de logs existe, mas falta ferramentas automatizadas de teste para comportamentos de IA complexos.
-
-#### O Que Ainda É Placeholder ou Stub
-- **Análise Global de Estado**: Placeholders para métricas como "perdas totais", "valor estratégico de prédios" ou "velocidade de avanço inimigo" – não implementadas no `EvaluateStance()`.
-- **IA Avançada**: Sem aprendizado de máquina ou comportamentos emergentes; tudo é rule-based hardcoded. Perfis de IA são estáticos, sem adaptação baseada em histórico de partidas.
-- **Multijogador e Networking**: Código focado em single-player; placeholders para sincronização de estado em multiplayer.
-- **Conteúdo e Assets**: Muitos assets de unidades e mapas existem, mas balanceamento de stats e curvas de progresso são placeholders (ex: thresholds de reparo fixos).
-
-#### Estado Geral
-O projeto está **jogável** com IA funcional para cenários básicos, mas limitado para experiências profundas. A arquitetura é sólida (Unity + C#), mas a IA precisa de refinamento para parecer "inteligente". Estimativa: 70% completo para um protótipo funcional, 40% para um produto polido.
+Toda a logica esta em `Assets/Scripts/Match/AI/`. `AIController` e uma `partial class` com ~45 arquivos. `AIOperationManager` e `AIShoppingPlanner` sao `MonoBehaviour` singletons separados.
 
 ---
 
-## Visão Geral (Original)
-Este documento consolida análises realizadas em abril de 2026 sobre o sistema de IA do jogo "The Map Room". Foco principal: perfis de comportamento de unidades e mecanismo de mudança de postura estratégica.
+## Camada 1 â€” AI de Comando: `AIOperationManager`
 
-## 1. Perfis de IA de Unidades (AI Unit Profiles)
+**Arquivo:** `AIOperationManager.cs`
 
-### Estrutura Atual
-- **Arquivo principal**: `docs/AI Unit Profile.md`
-- **Implementação**: `Assets/Scripts/AI/AIUnitProfile.cs` e relacionados
-- **Perfis ativos**: Artilheiro, Bazooka, Capturador, Estacionária, Híbrido, Kamikaze, Lutador, Supridor
+Reconstroi operacoes taticas a cada turno via `Rebuild(team, snapshot, plan)`. Identifica ameacas no campo e responde com operacoes que definem *quem e necessario e onde*.
 
-### Análise de Comportamentos
+### Tipos de operacao (`AIOperationType`)
+| Tipo | Gatilho |
+|---|---|
+| `BaseDefense` | Aeronaves ou blindados proximos ao HQ, ou captura ativa de construcao propria |
+| `SectorDefense` | Setor aliado com inimigo proximo ou em captura parcial |
+| `AirliftCapture` | Objetivo de captura com slot de Transportador no plano, deficit de capturadores/helicopteros |
+| `AirRefuelSupport` | Aeronaves proprias com combustivel baixo (< 35%) sem tanque ativo |
+| `PreventiveDefense` | Falta de artilharia/AAA/SAM de base apos turno minimo e com orcamento adequado |
+| `GroundCapture` | (enum definido, logica no plano de objetivos) |
+| `AirInterception` | (enum definido, uso futuro) |
+| `Reserve` | (enum definido, uso futuro) |
 
-#### Sensor Priority
-A ordem de sensores define prioridades de ação:
-- `Capture > Attack > Reposition` = capturador que briga se necessário
-- `Attack > Capture > Reposition` = combatente que captura se não tiver inimigo
+### Fases de operacao (`AIOperationPhase`)
+`Forming` â†’ `Moving` â†’ `Engaging` â†’ `Capturing` â†’ `Holding` â†’ `Complete` / `Aborted`
 
-#### Attack Decision
-Critérios para engajar inimigos:
-- Min/Max Damage %
-- Must Survive
-- Target Preference (Primary/Secondary)
+A fase e inferida automaticamente em `InferPhasesForAllOps()` com base na posicao das unidades atribuidas e no status do objetivo vinculado.
 
-#### Behavior Flags
-Flags principais:
-- `engageNearestEnemies`: permite ataques oportunistas
-- `captureInterruptBias`: controla interrupção de captura para atacar
-- `holdPositionWhenInRange`: atira parado quando em alcance
-- `retreatToHqWhenIdle`: volta ao HQ quando ocioso
+### Necessidades de unidade (`AINeedKind`)
+`Capturer`, `Assault`, `Artillery`, `FireSupport`, `AAA`, `SAM`, `GroundTransport`, `AirTransport`, `FighterA` (elite), `FighterB`, `Apache`, `AirTanker`
 
-### Problemas Identificados
+### Preenchimento de slots
+`AssignExistingUnitsToOperations()` tenta preencher cada slot primeiro a partir das unidades ja atribuidas ao `SectorObjective` vinculado, depois busca qualquer unidade ativa elegivel no snapshot.
 
-#### Capturador com Bias Passive
-- **Comportamento observado**: ataca inimigos "mais fáceis" fora do prédio alvo
-- **Causa**: `captureInterruptBias: Passive` permite interrupção se score ? 38000
-- **Impacto**: capturador deixa de ser "rush puro", ataca alvos no caminho
-
-#### Falta de Análise de Setor
-- **Limitação**: capturador não avalia ameaças secundárias
-- **Exemplo**: ignora inimigos em prédios adjacentes ao alvo principal
-- **Solução proposta**: lógica adicional de "peso de ameaças secundárias" (não implementada)
-
-## 2. Mecanismo de Mudança de Postura (Stance)
-
-### Estrutura Atual
-- **Arquivo**: `Assets/Scripts/AI/Profiles/BeginnerAIProfile.cs`
-- **Posturas**: Attack, Defend, Invasion
-- **Avaliação**: ocorre a cada turno via `EvaluateStance()`
-
-### Critérios de Mudança
-
-| Postura | Gatilho |
-|---------|---------|
-| **Invasion** | Controla > X% das construções capturáveis |
-| **Defend** | Inimigo visível dentro do raio do HQ |
-| **Attack** | Default (fallback) |
-
-### Problemas Identificados
-
-#### Ausência de Análise Global
-A IA **não avalia** sinais amplos de derrota:
-- Perdas de unidades (% de HP coletivo)
-- Destruição de frotas (comparação Our vs Enemy units)
-- Expansão territorial (células perdidas/ganhas)
-- Velocidade de avanço inimigo
-- Valor estratégico (prédios importantes perdidos)
-
-#### Por que Parece "Burra"
-- Muda para Defesa **só quando vê inimigo perto do HQ fisicamente**
-- Em mapas grandes, continua em Attack enquanto frota é destruída em outra região
-- Sem memória entre turnos ou percepção de "estou perdendo rápido"
-
-### Soluções Propostas (Não Implementadas)
-Expandir `BattleStanceDatabase` e `BeginnerAIProfile.EvaluateStance()` com:
-- `AlliedUnitLossesAbovePercent`: se perdeu > 40% das tropas
-- `EnemyArmyValueAboveRatio`: se força inimiga é 2x maior
-- `StrategicObjectivesLost`: se perdeu prédios críticos
-- `HqUnderActiveThreats`: quantos inimigos vendo o HQ
-
-## 3. Recomendações Gerais
-
-### Para IA de Unidades
-- **Capturador**: usar `captureInterruptBias: None` para rush puro
-- **Adicionar flags**: `sectorThreatAnalysis` para avaliar ameaças secundárias
-- **Testar combinações**: documentar impactos de flags conflitantes
-
-### Para Postura Estratégica
-- **Implementar análise global**: adicionar métricas de perda e avanço
-- **Memória entre turnos**: rastrear tendências (ex: "inimigo avançando rápido")
-- **Configurabilidade**: permitir ajustes via `BattleStanceDatabase`
-
-### Riscos de Mudanças
-- **Dependências cruzadas**: mudanças em `AIPlayerController.cs` afetam planejamento e execução
-- **Balanceamento**: novas lógicas podem quebrar equilíbrio de dificuldade
-- **Performance**: análises globais adicionam overhead computacional
-
-## 4. Próximos Passos
-- Priorizar implementação de análise de perdas para postura
-- Testar capturador com `bias: None` em cenários reais
-- Documentar novos perfis de unidade se criados
+`GetDeficits()` expoe os slots nao preenchidos por operacao â€” e a entrada principal do `AIShoppingPlanner`.
 
 ---
 
-**Data**: Abril 2026  
-**Analista**: GitHub Copilot  
-**Status**: Levantamento concluído, recomendações pendentes de implementação
+## Camada 2a â€” Plano Territorial: `ObjectiveManager`
+
+**Arquivo:** `ObjectiveManager.cs`
+
+Gerencia `TeamObjectivePlan`, que contem uma lista de `SectorObjective` por setor do mapa.
+
+### Status de objetivo (`ObjectiveStatus`)
+`Pending` â†’ `Pursuing` â†’ `Capturing` â†’ `Defending`
+
+### Slots de objetivo (`SlotNeed`)
+Cada `SectorObjective` tem slots com `UnitRole` (Capturador, Assalto, Transportador, FogoIndireto, Logistica) e `AssignedUnitId`. Quando uma unidade e atribuida, `Filled = true`.
+
+O plano e reconstruido no inicio de cada turno em `BuildObjectivePlan(snapshot)` e novamente ao final da Fase 2 antes das compras â€” garantindo que o shopping reflita o estado pos-acoes.
+
+---
+
+## Camada 2b â€” AI de Compras: `AIShoppingPlanner`
+
+**Arquivo:** `AIShoppingPlanner.cs`
+
+Singleton configuravel via Inspector. `Decide(snapshot)` retorna lista de `ShoppingOrder` com unidade e construcao alvo.
+
+### Logica de demanda (em ordem de avaliacao)
+1. **Capturadores** â€” preenche slots abertos no plano via `CountOpenSlots`
+2. **Assault** â€” minimo configuravel (`MinFilledAssaultSlots`)
+3. **Transportadores** â€” terrestres quando distancia ao HQ >= `MinDistanceForTransportSlot`; aereos (`AirTransport`) quando ha objetivos com slot de Transportador no plano
+4. **Fire Support / Artilharia** â€” apos turno minimo (`MinTurnForFireSupport`), ratio de capturadores e assalto ativos
+5. **AAA / SAM** â€” proativo apos ameaca aerea detectada pelo `AIOperationManager`
+6. **Interceptadores (CacaB/CacaA)** â€” gates por turno e ratio helicopteros/cacas
+7. **AtaqueAereo (Apache)** â€” apos turno minimo, ratio chinooks/apaches
+8. **Logistica** â€” caminhoes, tanques de combustivel aereo, etc.
+9. **Elite** â€” gate: `EliteCapturerFillRatio` (padrao 60%) dos slots de capturador preenchidos
+
+O `AIShoppingPlanner` consulta `AIOperationManager.GetDeficits()` para orientar compras de AAA/SAM/FighterA conforme os deficits ativos de operacoes.
+
+### Parametros Inspector relevantes
+| Campo | Descricao |
+|---|---|
+| `SavingPercentualForElite` | % do orcamento reservado para elite |
+| `EliteCapturerFillRatio` | gate de fill de capturadores para liberar elite |
+| `MinTurnForFireSupport` | turno minimo para comprar artilharia |
+| `MinBaseArtilharia` / `MinBaseAAA` | quantidades minimas de defesa de base |
+| `MaxAirTransporters` | teto de helicopteros de transporte |
+| `MinTurnForInterceptador` | turno minimo para comprar caca |
+
+---
+
+## Camada 3 â€” AI de Unidade: `AIController`
+
+**Arquivo:** `AIController.cs` (raiz) + ~45 arquivos partial
+
+Loop de turno em `AIController.Phases.cs` â€” corrotina `RunAITurn(TeamId)`:
+
+| Fase | Metodo | O que faz |
+|---|---|---|
+| 0 | `Phase0_WaitForTurnReady` | Aguarda servicos automaticos e delay |
+| 1 | `Phase1_CommandService` | Dispara servico do comando em lote se automatico |
+| 2 | `Phase2_UnitActions` | Loop principal â€” decide e executa por unidade |
+| 3 | `Phase3_Shopping` | Reconstroi plano e compras via `AIShoppingPlanner.Decide` |
+| 4 | `Phase4_EndTurn` | Passa o turno |
+
+### Roteamento de decisao (`AIController.Router.cs`)
+
+`DecideUnitAction(unit, snapshot)` chama handlers em ordem ate o primeiro retorno nao-nulo:
+
+1. `TryDecideCapturerAction` â€” papel Capturador (com plano)
+2. `TryDecideAssaultAction` â€” papel Assalto (com plano)
+3. `TryDecideFireSupportAction` â€” papel FogoIndireto (com plano)
+4. `TryDecideTransportadorAction` â€” papel Transportador (sempre, tem guard interno)
+5. `TryDecideLogisticsAction` â€” papel Logistica (com plano)
+6. `HexEvaluator` â€” fallback generico para unidades sem papel ou sem plano
+
+### Papeis implementados e seus arquivos
+
+| Papel | Arquivos |
+|---|---|
+| Capturador | `Capturer.cs`, `Capturer.Helpers.cs`, `Capturer.Embark.cs`, `Capturer.PontaLanca.cs`, `Capturer.Opportunist.cs`, `Capturer.Explorer.cs`, `Capturer.Rogue.cs`, `Capturer.Pursuer.cs`, `Capturer.Defender.cs` |
+| Assalto | `Assault.cs`, `Assault.Embark.cs`, `Assault.Explorer.cs`, `Assault.Defender.cs` |
+| Fogo Indireto | `FireSupport.cs`, `FireSupport.Helpers.cs`, `FireSupport.Rogue.cs`, `FireSupport.Defender.cs` |
+| Transportador | `Transportador.cs`, `Transportador.Shuttle.cs`, `Transportador.Courier.cs`, `Transportador.Assigned.cs`, `Transportador.Evac.cs`, `Transportador.Air.cs` |
+| Logistica | `Logistics.cs`, `Logistics.Helpers.cs` |
+| Combate Aereo | `AirCombat.cs` |
+
+### Unidades sem plano (rogues)
+Unidades sem `SectorObjective` atribuido caem no `HexEvaluator` (logica de avaliacao de hex generica: move/attack/capture pelo score). Capturadores rogues tem prioridade extra de embarque: agem antes de transportadores para garantir embarque disponivel.
+
+### Ordenacao de iniciativa (`AIController.Initiative.cs`)
+
+| Grupo | Condicao |
+|---|---|
+| 0 | Vacater handoff ou bloqueando hex de captura de aliado |
+| 1 | Helicoptero |
+| 2 | Em corredor ativo ou transportador com candidato de embarque proximo |
+| 3 | Com objetivo atribuido (por prioridade do objetivo) |
+| 4 | Rogue sem objetivo |
+| 5 | Em reparo |
+
+---
+
+## Fluxo de um turno completo
+
+```
+RunAITurn()
+  â”œâ”€â”€ Phase0: aguarda turn start
+  â”œâ”€â”€ BuildObjectivePlan()          â† ObjectiveManager reconstroi SectorObjectives
+  â”œâ”€â”€ AIOperationManager.Rebuild()  â† detecta ameacas, cria Operacoes com slots
+  â”œâ”€â”€ Phase1: ServicoDoComando
+  â”œâ”€â”€ Phase2: por unidade
+  â”‚     â””â”€â”€ DecideUnitAction()
+  â”‚           â”œâ”€â”€ handler de papel (Capturer/Assault/FireSupport/Transport/Logistics)
+  â”‚           â””â”€â”€ HexEvaluator (fallback rogue)
+  â”œâ”€â”€ BuildObjectivePlan() (reavaliacao pos-acoes)
+  â”œâ”€â”€ AIOperationManager.Rebuild() (reavaliacao pos-acoes)
+  â””â”€â”€ Phase3: AIShoppingPlanner.Decide()
+        â””â”€â”€ consulta GetDeficits() â†’ compra o que falta
+```
+
+---
+
+## O que ainda nao existe
+
+- **Memoria entre turnos**: nenhum tracking de tendencias (perdas acumuladas, velocidade de avanco inimigo). A IA e reativa a partir do snapshot atual.
+- **Postura estrategica dinamica**: a `Stance` existe no snapshot mas a IA nao muda de comportamento global com base nela de forma sistematica.
+- **Metricas de qualidade**: sem avaliacao quantitativa de decisoes por turno.

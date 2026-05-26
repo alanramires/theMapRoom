@@ -94,6 +94,52 @@ public partial class TurnStateManager
         return selectedUnit == unit && CurrentCursorState == CursorState.UnitSelected;
     }
 
+    public bool TryAutomatedSelectUnitByInstanceId(string unitInstanceId, Vector3Int expectedCell)
+    {
+        if (cursorController == null || string.IsNullOrWhiteSpace(unitInstanceId))
+            return false;
+        if (CurrentCursorState != CursorState.Neutral)
+            return false;
+        if (!int.TryParse(unitInstanceId, out int expectedId))
+            return false;
+
+        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        UnitManager unit = null;
+        foreach (UnitManager candidate in UnitManager.AllActive)
+        {
+            if (candidate == null || candidate.InstanceId != expectedId)
+                continue;
+            unit = candidate;
+            break;
+        }
+
+        if (unit == null || unit.IsDead || unit.IsEmbarked || unit.HasActed)
+            return false;
+        if (activeTeam >= 0 && (int)unit.TeamId != activeTeam)
+            return false;
+
+        expectedCell.z = 0;
+        Vector3Int unitCell = unit.CurrentCellPosition;
+        unitCell.z = 0;
+        if (unitCell != expectedCell)
+            return false;
+
+        cursorController.SetCell(unitCell, playMoveSfx: false);
+
+        double takeoffPerfStart = Time.realtimeSinceStartupAsDouble;
+        TryPrepareTemporaryTakeoffStateForSelection(unit, out string takeoffInfo);
+        RegisterPerfTakeoffPrepDuration((Time.realtimeSinceStartupAsDouble - takeoffPerfStart) * 1000d);
+        if (!string.IsNullOrWhiteSpace(takeoffInfo) && SensorLogGate.IsPodeDecolarEnabled())
+            SensorLogGate.Log("PodeDecolar", takeoffInfo);
+
+        replayManager?.EnsureCurrentUnitActionBuffer(unit, unitCell);
+        SetSelectedUnit(unit);
+        ClearInspectedHelper();
+        Advance(CursorState.UnitSelected, "TryAutomatedSelectUnitByInstanceId");
+        DialogManager.Instance?.MarkHintLearned(unit.TeamId, HelpHintId.Act);
+        return selectedUnit == unit && CurrentCursorState == CursorState.UnitSelected;
+    }
+
     public bool TryExecuteAutomatedAttackFirstTarget()
     {
         return TryExecuteAutomatedAttackBestTarget(null);
@@ -1286,7 +1332,6 @@ public partial class TurnStateManager
         return true;
     }
 }
-
 
 
 

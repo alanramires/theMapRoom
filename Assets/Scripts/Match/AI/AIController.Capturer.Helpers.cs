@@ -469,7 +469,9 @@ public partial class AIController
         Vector3Int currentCell = unit.CurrentCellPosition; currentCell.z = 0;
         foreach (Vector3Int cell in paths.Keys)
         {
-            if (occupied.Contains(cell) || cell == excludeCell) continue;
+            // Always consider the unit's own current cell, even if it shows as occupied by itself.
+            if (cell != currentCell && occupied.Contains(cell)) continue;
+            if (cell == excludeCell) continue;
             if (skippedCaptureCells != null && skippedCaptureCells.Contains(cell)) continue;
             if (excludeCurrentCell && cell == currentCell) continue;
             if (!SimulateCaptureSensor(unit, cell, out _)) continue;
@@ -503,8 +505,17 @@ public partial class AIController
                 captureCell,
                 out UnitManager assignedCapturer))
         {
-            reservedFor = assignedCapturer;
-            return true;
+            // Only reserve if the assigned capturer can reach as fast or faster than the opportunist.
+            Dictionary<Vector3Int, List<Vector3Int>> assignedPaths =
+                UnitMovementPathRules.CalcularCaminhosValidos(
+                    boardTilemap, assignedCapturer,
+                    Mathf.Max(0, assignedCapturer.RemainingMovementPoints), terrainDatabase);
+            int assignedCost = assignedPaths != null ? GetPathStepCount(assignedPaths, captureCell) : int.MaxValue;
+            if (assignedCost <= opportunistCost)
+            {
+                reservedFor = assignedCapturer;
+                return true;
+            }
         }
 
         foreach (UnitManager candidate in UnitManager.AllActive)

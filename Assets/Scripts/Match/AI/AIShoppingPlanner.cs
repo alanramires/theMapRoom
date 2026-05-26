@@ -351,6 +351,7 @@ public class AIShoppingPlanner : MonoBehaviour
             }
         }
         int activeFireSupportCount = CountActiveUnitsWithRole(snapshot, UnitRole.FogoIndireto, requirePrimary: false);
+        bool criticalBaseAirThreat = aaaThreat || proactiveSAM || forceSAMBypass;
 
         // Dream team pivot: once the AI has N+ elite assault units in the field, stop
         // adding more elite tanks and invest in elite defensive fire support instead.
@@ -464,7 +465,7 @@ public class AIShoppingPlanner : MonoBehaviour
             }
         }
         UnitData supremeFireSupport = null;
-        if (defensiveArmorThreat)
+        if (defensiveArmorThreat && !criticalBaseAirThreat)
         {
             supremeFireSupport = FindAffordableSupremeDefensiveFireSupportTarget(snapshot, remaining);
             if (supremeFireSupport != null)
@@ -478,6 +479,7 @@ public class AIShoppingPlanner : MonoBehaviour
             }
         }
         bool needsAffordableArmorFallback = defensiveArmorThreat
+            && !criticalBaseAirThreat
             && supremeFireSupport == null
             && reserveForEliteDefensiveTank <= 0
             && !CanAffordEliteDefensiveTank(snapshot, remaining);
@@ -544,6 +546,19 @@ public class AIShoppingPlanner : MonoBehaviour
         var sortedBuildings = landBuildings;
         sortedBuildings.Sort((a, b) =>
         {
+            bool baseDefenseProductionPending = criticalBaseAirThreat
+                || defensiveArmorThreat
+                || emergencyProductionDefense
+                || proactiveDefFireSupport
+                || openFireSupportSlots > 0
+                || openAssaultSlots > 0;
+            if (baseDefenseProductionPending)
+            {
+                int baseDefenseA = GetBaseDefenseProductionPriority(a, snapshot, criticalBaseAirThreat);
+                int baseDefenseB = GetBaseDefenseProductionPriority(b, snapshot, criticalBaseAirThreat);
+                if (baseDefenseA != baseDefenseB) return baseDefenseA.CompareTo(baseDefenseB);
+            }
+
             int eliteA = wantsEliteAssault && !eliteAssaultBought && CanOfferUnit(a, eliteAssaultTarget) ? 0 : 1;
             int eliteB = wantsEliteAssault && !eliteAssaultBought && CanOfferUnit(b, eliteAssaultTarget) ? 0 : 1;
             if (eliteA != eliteB) return eliteA.CompareTo(eliteB);
@@ -1238,7 +1253,9 @@ public class AIShoppingPlanner : MonoBehaviour
             }
 
             if (isAAADefense)
-                score += 100000; // visible aircraft near HQ: strongly prefer AAA over other assault units
+                score += 320000; // visible aircraft near HQ: AAA beats tanks while the base is exposed
+            if (proactiveAntiAir && isSAMType && openFireSupportSlots > 0)
+                score += 420000; // SAM deficit at base/HQ outranks generic artillery
             // Penalise slow units in non-defensive stance — only decisive in the fallback
             // case (no open slots), where the base score is just u.cost.
             if (!defensiveStance && u.movement < 3)
@@ -1908,6 +1925,76 @@ public class AIShoppingPlanner : MonoBehaviour
         if (building == null || target == null || building.OfferedUnits == null) return false;
         for (int i = 0; i < building.OfferedUnits.Count; i++)
             if (building.OfferedUnits[i] == target) return true;
+        return false;
+    }
+
+    private static int GetBaseDefenseProductionPriority(
+        ConstructionManager building,
+        AIWorldSnapshot snapshot,
+        bool criticalAirThreat)
+    {
+        if (building == null)
+            return int.MaxValue;
+
+        int distance = GetDistanceToOwnHQ(building, snapshot);
+        bool offersAirDefense = CanOfferAntiAirDefenseUnit(building);
+        bool offersDefensiveFire = CanOfferDefensiveFireSupportUnit(building);
+        bool offersBaseDefense = criticalAirThreat
+            ? offersAirDefense || offersDefensiveFire
+            : offersDefensiveFire || CanOfferFireSupportUnit(building) || CanOfferPrimaryRoleUnit(building, UnitRole.Assalto);
+
+        return (offersBaseDefense ? 0 : 10000) + distance;
+    }
+
+    private static int GetDistanceToOwnHQ(ConstructionManager building, AIWorldSnapshot snapshot)
+    {
+        if (building == null)
+            return int.MaxValue / 4;
+
+        Vector3Int cell = building.CurrentCellPosition;
+        cell.z = 0;
+
+        if (snapshot != null && snapshot.MyHQ != null)
+        {
+            Vector3Int hq = snapshot.MyHQ.CurrentCellPosition;
+            hq.z = 0;
+            return Mathf.RoundToInt(SectorManager.HexDistance(cell, hq));
+        }
+
+        if (building.IsPlayerHeadQuarter)
+            return 0;
+        if (ConstructionSectorHelper.IsBase(building.Sector))
+            return 1;
+        return 99;
+    }
+
+    private static bool CanOfferAntiAirDefenseUnit(ConstructionManager building)
+    {
+        if (building == null || building.OfferedUnits == null)
+            return false;
+
+        for (int i = 0; i < building.OfferedUnits.Count; i++)
+        {
+            UnitData unit = building.OfferedUnits[i];
+            if (unit != null && unit.domain == Domain.Land && IsAntiAirOnlyUnit(unit))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool CanOfferDefensiveFireSupportUnit(ConstructionManager building)
+    {
+        if (building == null || building.OfferedUnits == null)
+            return false;
+
+        for (int i = 0; i < building.OfferedUnits.Count; i++)
+        {
+            UnitData unit = building.OfferedUnits[i];
+            if (unit != null && unit.domain == Domain.Land && IsDefensiveFireSupportPurchase(unit))
+                return true;
+        }
+
         return false;
     }
 

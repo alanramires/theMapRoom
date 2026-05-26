@@ -30,6 +30,9 @@ public partial class AIController
             if (hasCargo)
                 return DecideAirCourierAction(unit, snapshot);
 
+            PlayerAction evacAction = TryDecideAirEvacShuttleAction(unit, snapshot, plan);
+            if (evacAction != null) return evacAction;
+
             return DecideAirShuttleAction(unit, snapshot, plan);
         }
         finally
@@ -59,6 +62,19 @@ public partial class AIController
         {
             Debug.LogWarning($"[AI] {TL("Transporte")} heli {unit.InstanceId} courier: cargo inconsistente, reverte para shuttle");
             return DecideAirShuttleAction(unit, snapshot, plan);
+        }
+
+        UnitManager evacuee = passengers.Find(p => p.IsUnderRepair);
+        if (evacuee != null)
+        {
+            int evacRemainingMP = Mathf.Max(0, unit.RemainingMovementPoints);
+            Dictionary<Vector3Int, List<Vector3Int>> evacPaths =
+                UnitMovementPathRules.CalcularCaminhosValidos(
+                    boardTilemap, unit, evacRemainingMP, terrainDatabase);
+            HashSet<Vector3Int> evacOccupied = BuildAirOccupied(unit);
+            if (evacPaths == null || evacPaths.Count == 0)
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+            return DecideEvacCourierAction(unit, evacuee, passengers, snapshot, fromCell, evacPaths, evacOccupied);
         }
 
         UnitManager primaryPassenger = ResolvePrimaryPassenger(passengers, plan);

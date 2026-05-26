@@ -407,6 +407,14 @@ public partial class AIController
             return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
         }
 
+        if (ShouldPreferRepairEvac(unit, fromCell, aiTeam))
+        {
+            TeamObjectivePlan repairPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+            PlayerAction evacAction = TryEvacEmbarkOrApproachAction(unit, snapshot, repairPlan, aiTeam, fromCell, paths);
+            if (evacAction != null)
+                return evacAction;
+        }
+
         // Avança para o destino: mínima distância hex + mínima ameaça
         // Pass HQ as secondary anchor — cells blocked relative to the primary target
         // may still make positive progress toward HQ, breaking the deadlock.
@@ -770,6 +778,11 @@ public partial class AIController
             if (c.TeamId != aiTeam)
             {
                 Debug.Log($"[Repair] skip {cc} team={c.TeamId} (need {aiTeam}) dist={dist:F1}");
+                continue;
+            }
+            if (!preferAircraftFacility && isAircraftFacility && !isHomeRepair)
+            {
+                Debug.Log($"[Repair] skip {cc} airport para unidade terrestre dist={dist:F1}");
                 continue;
             }
             if (c.CurrentCapturePoints < c.CapturePointsMax)

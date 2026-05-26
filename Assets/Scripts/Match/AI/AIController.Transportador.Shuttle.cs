@@ -194,6 +194,7 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> movementPaths = null)
     {
         bool fromIsProductionBldg = IsTeamProductionBuilding(fromCell, aiTeam);
+        bool fromCanReceivePassengers = CanUseTransporterPickupCell(unit, aiTeam, fromCell);
         bool hasObjective = objectiveCell != default && objectiveCell != Vector3Int.zero;
         bool preferGroupPickup = unit != null && unit.GetDomain() == Domain.Air;
         const float eps = 0.1f;
@@ -217,7 +218,9 @@ public partial class AIController
                 float bestThreat = float.MaxValue;
                 bool found = false;
 
-                if (IsPassengerInPickupRange(fromCell, candidateCell, pickupRange, passengerReachable) && !fromIsProductionBldg)
+                if (fromCanReceivePassengers
+                    && IsPassengerInPickupRange(fromCell, candidateCell, pickupRange, passengerReachable)
+                    && !fromIsProductionBldg)
                 {
                     best = fromCell;
                     bestDistToObj = SectorManager.HexDistance(fromCell, objectiveCell);
@@ -237,6 +240,7 @@ public partial class AIController
                     if (cell == fromCell) continue;
                     if (occupied.Contains(cell)) continue;
                     if (IsNonTeamConstruction(cell, aiTeam)) continue;
+                    if (!CanUseTransporterPickupCell(unit, aiTeam, cell)) continue;
                     if (!IsPassengerInPickupRange(cell, candidateCell, pickupRange, passengerReachable)) continue;
 
                     float distToObj = SectorManager.HexDistance(cell, objectiveCell);
@@ -291,7 +295,9 @@ public partial class AIController
         }
 
         // Fallback: original adjacent-first behavior
-        if (IsPassengerInPickupRange(fromCell, candidateCell, 1f, passengerReachable) && !fromIsProductionBldg)
+        if (fromCanReceivePassengers
+            && IsPassengerInPickupRange(fromCell, candidateCell, 1f, passengerReachable)
+            && !fromIsProductionBldg)
             return fromCell;
 
         Vector3Int bestAdj = fromCell;
@@ -306,6 +312,7 @@ public partial class AIController
             if (occupied.Contains(cell)) continue;
             if (!IsPassengerInPickupRange(cell, candidateCell, 1f, passengerReachable)) continue;
             if (IsNonTeamConstruction(cell, aiTeam)) continue;
+            if (!CanUseTransporterPickupCell(unit, aiTeam, cell)) continue;
 
             bool cellIsProductionBldg = IsTeamProductionBuilding(cell, aiTeam);
             bool cellIsConstruction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell) != null;
@@ -327,7 +334,7 @@ public partial class AIController
         }
 
         if (foundAdj) return bestAdj;
-        if (IsPassengerInPickupRange(fromCell, candidateCell, 1f, passengerReachable)) return fromCell;
+        if (fromCanReceivePassengers && IsPassengerInPickupRange(fromCell, candidateCell, 1f, passengerReachable)) return fromCell;
 
         // When we know the objective, head toward the rendezvous: the cell ~2h from the
         // capturer along the capturer→objective direction. This keeps the APC on the
@@ -338,7 +345,7 @@ public partial class AIController
             if (unit != null && unit.GetDomain() == Domain.Air)
             {
                 Dictionary<Vector3Int, List<Vector3Int>> airMovePaths = movementPaths ?? paths;
-                Vector3Int pickupReturnTarget = ResolveAirPickupReturnTarget(candidateCell, passengerReachable, aiTeam);
+                Vector3Int pickupReturnTarget = ResolveAirPickupReturnTarget(unit, candidateCell, passengerReachable, aiTeam, airMovePaths);
                 Vector3Int airPickupMove = FindAirTransportMove(fromCell, pickupReturnTarget, airMovePaths, occupied, aiTeam);
                 Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} pickup sem intersecao neste turno - retorna pickup/base alvo={pickupReturnTarget} passageiro={candidateCell} objetivo={objectiveCell} via {airPickupMove}");
                 return airPickupMove;
@@ -358,9 +365,11 @@ public partial class AIController
     }
 
     private Vector3Int ResolveAirPickupReturnTarget(
+        UnitManager transporter,
         Vector3Int candidateCell,
         HashSet<Vector3Int> passengerReachable,
-        TeamId aiTeam)
+        TeamId aiTeam,
+        Dictionary<Vector3Int, List<Vector3Int>> transportPaths)
     {
         candidateCell.z = 0;
         Vector3Int homeTarget = FindTransportWaitTarget(aiTeam, candidateCell);
@@ -370,24 +379,60 @@ public partial class AIController
         float bestCandidateDist = 0f;
         float bestThreat = CalculateThreatLevel(candidateCell, aiTeam);
         bool bestIsProduction = IsTeamProductionBuilding(candidateCell, aiTeam);
+        bool found = CanUseTransporterPickupCell(transporter, aiTeam, candidateCell)
+            && !IsNonTeamConstruction(candidateCell, aiTeam);
         const float eps = 0.01f;
 
         if (passengerReachable == null || passengerReachable.Count == 0)
-            return best;
+            return found ? best : homeTarget;
+
+        if (transportPaths != null && transportPaths.Count > 0)
+        {
+            foreach (Vector3Int rawCell in transportPaths.Keys)
+            {
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                if (IsNonTeamConstruction(cell, aiTeam)) continue;
+                if (!CanUseTransporterPickupCell(transporter, aiTeam, cell)) continue;
+                if (!CanPassengerReachEmbarkStopForTransporterCell(cell, passengerReachable)) continue;
+
+                float homeDist = SectorManager.HexDistance(cell, homeTarget);
+                float candidateDist = SectorManager.HexDistance(cell, candidateCell);
+                float threat = CalculateThreatLevel(cell, aiTeam);
+                bool isProduction = IsTeamProductionBuilding(cell, aiTeam);
+
+                bool isBetter = !found
+                    || candidateDist < bestCandidateDist - eps
+                    || (candidateDist < bestCandidateDist + eps && homeDist < bestHomeDist - eps)
+                    || (candidateDist < bestCandidateDist + eps && homeDist < bestHomeDist + eps && isProduction && !bestIsProduction)
+                    || (candidateDist < bestCandidateDist + eps && homeDist < bestHomeDist + eps && isProduction == bestIsProduction && threat < bestThreat - eps);
+
+                if (!isBetter)
+                    continue;
+
+                best = cell;
+                bestHomeDist = homeDist;
+                bestCandidateDist = candidateDist;
+                bestThreat = threat;
+                bestIsProduction = isProduction;
+                found = true;
+            }
+        }
 
         foreach (Vector3Int rawCell in passengerReachable)
         {
             Vector3Int cell = rawCell;
             cell.z = 0;
             if (IsNonTeamConstruction(cell, aiTeam)) continue;
-            if (HasBlockingGroundUnitAtCell(cell, aiTeam) && cell != candidateCell) continue;
+            if (!CanUseTransporterPickupCell(transporter, aiTeam, cell)) continue;
 
             float homeDist = SectorManager.HexDistance(cell, homeTarget);
             float candidateDist = SectorManager.HexDistance(cell, candidateCell);
             float threat = CalculateThreatLevel(cell, aiTeam);
             bool isProduction = IsTeamProductionBuilding(cell, aiTeam);
 
-            bool isBetter =
+            bool isBetter = !found
+                ||
                 homeDist < bestHomeDist - eps
                 || (homeDist < bestHomeDist + eps && isProduction && !bestIsProduction)
                 || (homeDist < bestHomeDist + eps && isProduction == bestIsProduction && candidateDist < bestCandidateDist - eps)
@@ -401,9 +446,44 @@ public partial class AIController
             bestCandidateDist = candidateDist;
             bestThreat = threat;
             bestIsProduction = isProduction;
+            found = true;
         }
 
-        return best;
+        return found ? best : homeTarget;
+    }
+
+    private static bool CanPassengerReachEmbarkStopForTransporterCell(
+        Vector3Int transporterCell,
+        HashSet<Vector3Int> passengerReachable)
+    {
+        if (passengerReachable == null || passengerReachable.Count == 0)
+            return false;
+
+        transporterCell.z = 0;
+        foreach (Vector3Int rawStop in passengerReachable)
+        {
+            Vector3Int stop = rawStop;
+            stop.z = 0;
+            if (SectorManager.HexDistance(stop, transporterCell) <= 1.5f)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool CanUseTransporterPickupCell(UnitManager transporter, TeamId aiTeam, Vector3Int cell)
+    {
+        if (transporter == null)
+            return true;
+        if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null)
+            return true;
+
+        cell.z = 0;
+        if (transporter.GetDomain() == Domain.Air && HasBlockingGroundUnitAtCell(cell, aiTeam))
+            return false;
+
+        return PodeEmbarcarSensor.IsTransporterCellValidForEmbark(
+            boardTilemap, terrainDatabase, transporterData, cell);
     }
 
     private float ScoreAirPickupCell(

@@ -708,7 +708,11 @@ public partial class AIController
             return false;
         }
 
-        int slotIdx = FindFittingSlotIndex(transporter, tData, unit, unitData);
+        int slotIdx = assignedRogueExtra
+            ? FindFittingSecondarySlotIndex(transporter, tData, unit, unitData)
+            : FindFittingSlotIndex(transporter, tData, unit, unitData);
+        if (slotIdx < 0 && assignedRogueExtra)
+            slotIdx = FindFittingSlotIndexRespectingFormalReservation(transporter, tData, unit, unitData, formalPassenger);
         if (slotIdx < 0)
         {
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO slot: sem slot disponível em transporter={transporter.InstanceId}");
@@ -779,11 +783,113 @@ public partial class AIController
 
         UnitManager formalPassenger = ResolveAssignedPassengerSlotUnit(transportObjective, aiTeam);
         if (formalPassenger == null)
-            return false;
+            return CountAvailableSeatsForPassenger(transporter, passenger) > 0;
         if (formalPassenger == passenger)
             return true;
 
-        return IsPassengerAlreadyOnboard(transporter, formalPassenger);
+        if (IsPassengerAlreadyOnboard(transporter, formalPassenger))
+            return CountAvailableSeatsForPassenger(transporter, passenger) > 0;
+
+        // Formal passenger already acted this turn without embarking — reservation is void.
+        if (formalPassenger.HasActed)
+            return CountAvailableSeatsForPassenger(transporter, passenger) > 0;
+
+        if (!passenger.TryGetUnitData(out UnitData passengerData) || passengerData == null)
+            return false;
+        if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null)
+            return false;
+
+        // A reserva do plano cobre o slot primario. Slot secundario fisicamente
+        // livre continua disponivel para rogue/oportunista.
+        if (FindFittingSecondarySlotIndex(transporter, transporterData, passenger, passengerData) >= 0)
+            return true;
+
+        return FindFittingSlotIndexRespectingFormalReservation(
+            transporter, transporterData, passenger, passengerData, formalPassenger) >= 0;
+    }
+
+    private static int FindFittingSecondarySlotIndex(
+        UnitManager transporter,
+        UnitData transporterData,
+        UnitManager passenger,
+        UnitData passengerData)
+    {
+        if (transporter == null || transporterData == null || transporterData.transportSlots == null)
+            return -1;
+
+        for (int i = 1; i < transporterData.transportSlots.Count; i++)
+        {
+            UnitTransportSlotRule slot = transporterData.transportSlots[i];
+            if (slot == null) continue;
+            if (!PodeEmbarcarSensor.CanUseSlot(passenger, passengerData, slot, out _)) continue;
+
+            int occupancy = transporter.GetOccupiedTransportSeatCountForSlot(i);
+            if (occupancy >= Mathf.Max(1, slot.capacity)) continue;
+            return i;
+        }
+
+        return -1;
+    }
+
+    private static int FindFittingSlotIndexRespectingFormalReservation(
+        UnitManager transporter,
+        UnitData transporterData,
+        UnitManager passenger,
+        UnitData passengerData,
+        UnitManager formalPassenger)
+    {
+        if (formalPassenger == null || formalPassenger == passenger || IsPassengerAlreadyOnboard(transporter, formalPassenger))
+            return FindFittingSlotIndex(transporter, transporterData, passenger, passengerData);
+        if (transporter == null || transporterData == null || transporterData.transportSlots == null)
+            return -1;
+        if (!formalPassenger.TryGetUnitData(out UnitData formalData) || formalData == null)
+            return FindFittingSlotIndex(transporter, transporterData, passenger, passengerData);
+
+        int bestSlot = -1;
+        int bestReservedSlot = -1;
+        int bestScore = int.MinValue;
+
+        for (int reserveIdx = 0; reserveIdx < transporterData.transportSlots.Count; reserveIdx++)
+        {
+            UnitTransportSlotRule reserveSlot = transporterData.transportSlots[reserveIdx];
+            if (reserveSlot == null) continue;
+            if (!PodeEmbarcarSensor.CanUseSlot(formalPassenger, formalData, reserveSlot, out _)) continue;
+
+            int reserveCapacity = Mathf.Max(1, reserveSlot.capacity);
+            int reserveOccupied = transporter.GetOccupiedTransportSeatCountForSlot(reserveIdx);
+            if (reserveOccupied >= reserveCapacity) continue;
+
+            for (int passengerIdx = 0; passengerIdx < transporterData.transportSlots.Count; passengerIdx++)
+            {
+                UnitTransportSlotRule passengerSlot = transporterData.transportSlots[passengerIdx];
+                if (passengerSlot == null) continue;
+                if (!PodeEmbarcarSensor.CanUseSlot(passenger, passengerData, passengerSlot, out _)) continue;
+
+                int passengerCapacity = Mathf.Max(1, passengerSlot.capacity);
+                int passengerOccupied = transporter.GetOccupiedTransportSeatCountForSlot(passengerIdx);
+                if (passengerIdx == reserveIdx)
+                    passengerOccupied++;
+                if (passengerOccupied >= passengerCapacity) continue;
+
+                // Prefer preserving the formal slot untouched; if both must share,
+                // prefer the arrangement with more remaining slack.
+                int score = passengerIdx == reserveIdx ? 0 : 1000;
+                score += passengerCapacity - passengerOccupied;
+                score += reserveCapacity - reserveOccupied;
+                if (score <= bestScore) continue;
+
+                bestScore = score;
+                bestSlot = passengerIdx;
+                bestReservedSlot = reserveIdx;
+            }
+        }
+
+        if (bestSlot >= 0)
+            return bestSlot;
+
+        // If no formal-compatible physical seat is currently open, do not consume
+        // a reserved transporter opportunistically; that would hide the real issue.
+        return bestReservedSlot >= 0 ? bestSlot : -1;
     }
 
     private static bool IsPassengerAlreadyOnboard(UnitManager transporter, UnitManager passenger)

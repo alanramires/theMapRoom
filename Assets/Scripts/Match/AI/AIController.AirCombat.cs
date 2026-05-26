@@ -142,6 +142,24 @@ public partial class AIController
         reason = "";
         float bestScore = float.MinValue;
         MatchController matchController = GetMatchController();
+        bool hasAttackableAircraft = HasAttackableAirCombatTarget(
+            unit,
+            snapshot,
+            fromCell,
+            paths,
+            occupied,
+            takeoffMoveOptions,
+            matchController,
+            preferredOnly: false);
+        bool hasPreferredAttackableAircraft = HasAttackableAirCombatTarget(
+            unit,
+            snapshot,
+            fromCell,
+            paths,
+            occupied,
+            takeoffMoveOptions,
+            matchController,
+            preferredOnly: true);
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
@@ -158,11 +176,16 @@ public partial class AIController
                     continue;
                 if (matchController != null && !matchController.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
                     continue;
+                bool isAirEnemy = enemy.TryGetUnitData(out UnitData _ed) && _ed != null && _ed.domain == Domain.Air;
                 if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
                     continue;
                 if (!TryFindAttackDecisionOption(unit, enemy, cell, out PodeMirarTargetOption attackOption))
                     continue;
-                if (!PassesAttackDecision(unit, enemy, cell, false, out string attackDecisionReason))
+                if (!ShouldConsiderAirCombatTarget(unit, enemy, hasAttackableAircraft, hasPreferredAttackableAircraft))
+                    continue;
+                // Aerial targets bypass PassesAttackDecision — a fighter always engages air threats.
+                string attackDecisionReason = "atkDecision=airPriority";
+                if (!isAirEnemy && !PassesAttackDecision(unit, enemy, cell, false, out attackDecisionReason))
                     continue;
                 float combatScore = 0f;
                 string combatScoreReason = "";
@@ -208,6 +231,69 @@ public partial class AIController
         return bestTarget != null;
     }
 
+    private bool HasAttackableAirCombatTarget(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        List<int> takeoffMoveOptions,
+        MatchController matchController,
+        bool preferredOnly)
+    {
+        if (unit == null || snapshot == null || paths == null)
+            return false;
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+            if (!IsAITakeoffDestinationAllowed(paths, cell, takeoffMoveOptions))
+                continue;
+
+            foreach (UnitManager enemy in UnitManager.AllActive)
+            {
+                if (enemy == null || enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked)
+                    continue;
+                if (matchController != null && !matchController.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
+                    continue;
+                if (!enemy.TryGetUnitData(out UnitData enemyData) || enemyData == null || enemyData.domain != Domain.Air)
+                    continue;
+                if (preferredOnly && ResolveAirCombatTargetPreference(unit, enemy) == BazookaTargetPriority.Tertiary)
+                    continue;
+                if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
+                    continue;
+                if (!TryFindAttackDecisionOption(unit, enemy, cell, out _))
+                    continue;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ShouldConsiderAirCombatTarget(
+        UnitManager attacker,
+        UnitManager target,
+        bool hasAttackableAircraft,
+        bool hasPreferredAttackableAircraft)
+    {
+        if (target == null || !target.TryGetUnitData(out UnitData targetData) || targetData == null)
+            return true;
+
+        bool targetIsAircraft = targetData.domain == Domain.Air;
+        if (hasAttackableAircraft && !targetIsAircraft)
+            return false;
+
+        if (hasPreferredAttackableAircraft
+            && (!targetIsAircraft || ResolveAirCombatTargetPreference(attacker, target) == BazookaTargetPriority.Tertiary))
+            return false;
+
+        return true;
+    }
+
     private float ScoreAirCombatTargetValue(UnitManager target, PodeMirarTargetOption option, UnitManager attacker)
     {
         if (target == null || !target.TryGetUnitData(out UnitData targetData) || targetData == null)
@@ -218,16 +304,27 @@ public partial class AIController
         bool isAirAttack = targetData.roles != null
             && targetData.roles.Count > 0
             && targetData.roles[0] == UnitRole.AtaqueAereo;
+        bool isInterceptor = targetData.roles != null
+            && targetData.roles.Count > 0
+            && targetData.roles[0] == UnitRole.Interceptador;
         bool isTransport = targetData.roles != null
             && targetData.roles.Count > 0
             && targetData.roles[0] == UnitRole.Transportador;
 
+        if (targetData.domain == Domain.Air)
+            score += 26000f;
         if (targetData.domain == Domain.Air && isAirAttack)
-            score += targetData.eliteLevel >= 1 ? 18000f : 9000f;
+            score += targetData.eliteLevel >= 1 ? 30000f : 18000f;
+        if (targetData.domain == Domain.Air && isInterceptor)
+            score += targetData.eliteLevel >= 1 ? 24000f : 15000f;
+        if (targetData.domain == Domain.Air && targetData.unitClass == GameUnitClass.Helicopter)
+            score += 22000f;
         if (targetData.domain == Domain.Air && targetData.unitClass == GameUnitClass.Plane)
-            score += 4500f;
+            score += 26000f;
+        if (targetData.domain == Domain.Air && targetData.unitClass == GameUnitClass.Jet)
+            score += 18000f;
         if (targetData.domain == Domain.Air && isTransport)
-            score -= 6000f;
+            score -= 3000f;
 
         WeaponPriorityData weaponPriorityData = turnStateManager != null
             ? turnStateManager.WeaponPriorityDataRef

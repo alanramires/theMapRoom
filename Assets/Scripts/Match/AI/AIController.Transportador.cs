@@ -62,6 +62,9 @@ public partial class AIController
 
     private static SectorObjective ResolveAssignedTransportObjective(UnitManager unit, TeamObjectivePlan plan)
     {
+        if (unit == null || plan?.Objectives == null)
+            return null;
+
         foreach (SectorObjective obj in plan.Objectives)
             foreach (SlotNeed slot in obj.Slots)
                 if (slot.Role == UnitRole.Transportador && slot.Filled && slot.AssignedUnitId == unit.InstanceId)

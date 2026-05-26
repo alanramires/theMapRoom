@@ -462,7 +462,15 @@ public class ReplayManager : MonoBehaviour
                 yield break;
             }
 
-            ExecuteReplayConfirmInput();
+            bool selectedById = false;
+            if (!string.IsNullOrWhiteSpace(action.UnitInstanceId) && turnStateManager != null)
+                selectedById = turnStateManager.TryAutomatedSelectUnitByInstanceId(action.UnitInstanceId, originCell);
+
+            if (!selectedById)
+                ExecuteReplayConfirmInput();
+            else
+                PlayReplayActionFeedback(TurnStateManager.ActionSfx.Confirm);
+
             yield return null;
 
             float selectionHold = GetEffectiveUnitSelectionHoldDelay();
@@ -1441,16 +1449,36 @@ public class ReplayManager : MonoBehaviour
             return false;
         }
 
+        UnitManager foundUnit = FindReplayUnitByInstanceId(expectedInstanceId);
+        if (foundUnit != null)
+        {
+            Vector3Int foundCell = foundUnit.CurrentCellPosition;
+            foundCell.z = 0;
+            if (foundCell == originCell)
+                return true;
+        }
+
         int preferredTeamId = matchController != null ? matchController.ActiveTeamId : -1;
-        UnitManager foundUnit = HexOccupancyQuery.FindUnitAtCell(originCell, preferredTeamId);
-        int foundInstanceId = foundUnit != null ? foundUnit.InstanceId : -1;
-        if (foundUnit != null && foundInstanceId == expectedInstanceId)
+        UnitManager occupant = HexOccupancyQuery.FindUnitAtCell(originCell, preferredTeamId);
+        int foundInstanceId = occupant != null ? occupant.InstanceId : -1;
+        if (occupant != null && foundInstanceId == expectedInstanceId)
             return true;
 
-        string foundLabel = foundUnit != null ? foundInstanceId.ToString() : "none";
+        string foundLabel = occupant != null ? foundInstanceId.ToString() : "none";
         mismatchDetails = $"UnitInstanceId divergiu - esperado {expectedInstanceId}, encontrado {foundLabel}";
         ReplayLogWarning($"[Replay] {mismatchDetails}");
         return false;
+    }
+
+    private static UnitManager FindReplayUnitByInstanceId(int instanceId)
+    {
+        foreach (UnitManager unit in UnitManager.AllActive)
+        {
+            if (unit != null && unit.InstanceId == instanceId)
+                return unit;
+        }
+
+        return null;
     }
 
     private void AbortReplayBatchDueToError(string dialogId, string fallbackTemplate, string errorText, float dialogDurationSeconds)
