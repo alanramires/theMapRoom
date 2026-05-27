@@ -64,6 +64,10 @@ public class AIOperation
 
     public bool IsUrgent;
     public bool IsPreventive;
+    public bool HasScreen;
+    public int ScreenUnitId = -1;
+    public float ScreenDistanceToTarget = -1f;
+    public string CohesionReason = "";
     public int CreatedTurn;
     public int LastUpdatedTurn;
 

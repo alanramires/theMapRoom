@@ -31,6 +31,7 @@ public partial class AIController
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
 
+
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 

@@ -732,6 +732,13 @@ public partial class TurnStateManager
             Confirmed = true,
             DebugLabel = $"Shopping: {ResolveUnitName(unit)} ({spawnedManager.InstanceId})"
         });
+
+        JogadasManager.EnsureInstance()?.RegistrarCompra(
+            matchController != null ? matchController.CurrentTurn : 0,
+            (int)buyingTeam,
+            normalizedSpawnCell.x, normalizedSpawnCell.y,
+            unit.apelido,
+            spawnedManager.InstanceId);
     }
 
     private static string ResolveUnitName(UnitData unit)

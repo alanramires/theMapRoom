@@ -111,6 +111,13 @@ public partial class TurnStateManager
         if (!WasLetterPressedThisFrame('X'))
             return;
 
+        if (CurrentCursorState == CursorState.CommandService)
+        {
+            if (!IsCommandServiceExecutionRunning)
+                TryConfirmPendingCommandServiceOrder();
+            return;
+        }
+
         if (CurrentCursorState != CursorState.Neutral)
             return;
 
@@ -153,8 +160,12 @@ public partial class TurnStateManager
     // logica para confirmar a ordem do Servico do Comando apos a fase de preview/confirmacao, sem emitir mensagens de feedback redundantes, para o caso de uso via hotkey, onde as mensagens ja sao emitidas durante a fase de preview.
     private bool TryStartCommandServiceOrder(out string message, bool emitLogs)
     {
+        Debug.Log("[CS] TryStartCommandServiceOrder chamado");
         if (!TryPrepareCommandServiceOrders(out message, emitLogs))
+        {
+            Debug.Log($"[CS] TryStartCommandServiceOrder: TryPrepareCommandServiceOrders falhou: {message}");
             return false;
+        }
 
         ClearPendingCommandServiceConfirmation();
         message = $"Servico do Comando (\"X\"): iniciando ordem com {commandServiceQueuedOrders.Count} unidade(s).";
@@ -165,6 +176,9 @@ public partial class TurnStateManager
                 "command_service.executing",
                 "Servico do comando: executando"),
             2.2f);
+        JogadasManager.EnsureInstance()?.RegistrarServicoComando(
+            matchController != null ? matchController.CurrentTurn : 0,
+            matchController != null ? (int)matchController.ActiveTeam : (int)TeamId.Neutral);
         EnterCommandServiceState("TryStartCommandServiceOrder");
         EnterCommandServiceExecutingState("TryStartCommandServiceOrder: executing");
         commandServiceExecutionRoutine = StartCoroutine(ExecuteCommandServiceOrderSequence());
@@ -793,10 +807,14 @@ public partial class TurnStateManager
     private bool TryConfirmPendingCommandServiceOrder()
     {
         if (!IsCommandServiceAwaitingConfirmation)
+        {
+            Debug.Log($"[CS] TryConfirmPendingCommandServiceOrder: IsCommandServiceAwaitingConfirmation=false (state={CurrentCursorState} executionRunning={IsCommandServiceExecutionRunning} ordersCount={commandServiceQueuedOrders.Count})");
             return false;
+        }
 
         if (commandServiceQueuedOrders.Count <= 0)
         {
+            Debug.Log("[CS] TryConfirmPendingCommandServiceOrder: ordersCount=0 — retornando sem registrar");
             ClearPendingCommandServiceConfirmation();
             cursorController?.PlayErrorSfx();
             return true;
@@ -822,6 +840,9 @@ public partial class TurnStateManager
             Confirmed = true,
             DebugLabel = "CommandService: confirm"
         });
+        JogadasManager.EnsureInstance()?.RegistrarServicoComando(
+            matchController != null ? matchController.CurrentTurn : 0,
+            matchController != null ? (int)matchController.ActiveTeam : (int)TeamId.Neutral);
         EnterCommandServiceExecutingState("TryConfirmPendingCommandServiceOrder");
         commandServiceExecutionRoutine = StartCoroutine(ExecuteCommandServiceOrderSequence());
         return true;
@@ -2266,6 +2287,7 @@ public partial class TurnStateManager
 
     private IEnumerator AutoCommandServiceRoutine()
     {
+        Debug.Log("[CS] AutoCommandServiceRoutine: iniciado");
         // Aguarda ao menos um frame para que todos os Start() das unidades
         // tenham sido executados antes de consultar UnitManager.AllActive.
         yield return null;
@@ -2283,6 +2305,9 @@ public partial class TurnStateManager
         // O helper panel mostra o resumo e o cursor vai para CommandService.
         if (!TryOpenCommandServiceFromMenu(out _))
         {
+            JogadasManager.EnsureInstance()?.RegistrarServicoComando(
+                matchController != null ? matchController.CurrentTurn : 0,
+                matchController != null ? matchController.ActiveTeamId : 0);
             autoCommandServiceRoutine = null;
             yield break;
         }

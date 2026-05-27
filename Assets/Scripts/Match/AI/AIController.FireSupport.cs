@@ -54,6 +54,14 @@ public partial class AIController
         }
 
         // Adjacent supply truck takes priority over walking — faster delivery to objective.
+        if (assigned.Status != ObjectiveStatus.Defending
+            && AIOperationManager.Instance != null
+            && !AIOperationManager.Instance.IsFireSupportScreenedForObjective(unit, snapshot.AITeam, assigned, out AIOperation op, out string screenReason))
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} segura {assigned.Sector}: task force sem screen ({screenReason})");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+        }
+
         if (TryBuildFireSupportBlockedShotRepositionAction(unit, snapshot, fromCell, paths, occupied, assigned.Status == ObjectiveStatus.Defending, out PlayerAction blockedShotAction, out string blockedShotReason))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reposiciona para linha de tiro {assigned.Sector} - {blockedShotReason}");

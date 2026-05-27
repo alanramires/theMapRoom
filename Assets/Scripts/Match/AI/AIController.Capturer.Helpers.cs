@@ -505,17 +505,10 @@ public partial class AIController
                 captureCell,
                 out UnitManager assignedCapturer))
         {
-            // Only reserve if the assigned capturer can reach as fast or faster than the opportunist.
-            Dictionary<Vector3Int, List<Vector3Int>> assignedPaths =
-                UnitMovementPathRules.CalcularCaminhosValidos(
-                    boardTilemap, assignedCapturer,
-                    Mathf.Max(0, assignedCapturer.RemainingMovementPoints), terrainDatabase);
-            int assignedCost = assignedPaths != null ? GetPathStepCount(assignedPaths, captureCell) : int.MaxValue;
-            if (assignedCost <= opportunistCost)
-            {
-                reservedFor = assignedCapturer;
-                return true;
-            }
+            // Assigned capturer can reach captureCell this turn (guaranteed by TryFindAssignedCapturerForCaptureTarget).
+            // Always yield to the designated owner regardless of step cost.
+            reservedFor = assignedCapturer;
+            return true;
         }
 
         foreach (UnitManager candidate in UnitManager.AllActive)
@@ -594,12 +587,8 @@ public partial class AIController
     private static bool IsAssignedToCaptureTarget(UnitManager unit, TeamObjectivePlan plan, ConstructionManager captureTarget, TeamId aiTeam)
     {
         if (plan == null || captureTarget == null) return false;
-
         SectorObjective assigned = ResolveAssignedObjective(unit, plan);
-        if (assigned == null || assigned.Sector != captureTarget.Sector) return false;
-
-        ConstructionManager assignedTarget = FindCapturableInSector(assigned.Sector, aiTeam, unit.CurrentCellPosition);
-        return assignedTarget == captureTarget;
+        return assigned != null && assigned.Sector == captureTarget.Sector;
     }
 
     private bool TryFindBestLoSCell(
@@ -631,13 +620,14 @@ public partial class AIController
     private float CalculateThreatLevel(Vector3Int cell, TeamId aiTeam)
     {
         float threat = 0f;
+        Vector3Int cellXY = cell; cellXY.z = 0;
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
-            float dist = Vector3Int.Distance(cell, ec);
+            float dist = SectorManager.HexDistance(cellXY, ec);
             if (dist <= ThreatRadius)
                 threat += (ThreatRadius - dist + 1f) * 10f;
         }

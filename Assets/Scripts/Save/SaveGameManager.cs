@@ -585,6 +585,7 @@ public class SaveGameManager : MonoBehaviour
             File.WriteAllBytes(path, compressedBytes);
             WriteSlotMetadataFile(path, data);
             WriteOrDeleteReplaySidecar(path);
+            WriteJogadasSidecar(path);
             WebGLSyncAfterWrite();
             LogSaveDiagnostics(normalizedSlot, json, compressedBytes);
             cursorController?.PlayLoadSfx();
@@ -966,6 +967,7 @@ public class SaveGameManager : MonoBehaviour
 
             // LoadRoutine controla loadInProgress e encerra o indicador no fim.
             yield return StartCoroutine(LoadRoutine(data, normalizedSlot));
+            RestoreJogadasSidecar(path);
             LogLoadPerf(normalizedSlot, "load_async.end", asyncStartMs, PerfNowMs() - asyncStartMs);
         }
         finally
@@ -1034,6 +1036,9 @@ public class SaveGameManager : MonoBehaviour
         string replayPath = ResolveReplayPathForSavePath(path);
         if (File.Exists(replayPath))
             File.Delete(replayPath);
+        string jogadasPath = ResolveJogadasPathForSavePath(path);
+        if (File.Exists(jogadasPath))
+            File.Delete(jogadasPath);
         Debug.Log($"[SaveGame] Slot {normalizedSlot} limpo: {path}");
     }
 
@@ -1731,7 +1736,7 @@ public class SaveGameManager : MonoBehaviour
     {
         int normalizedSlot = NormalizeSlot(slotIndex);
         string primaryPath = GetSlotPathFromTemplate(normalizedSlot);
-        if (File.Exists(primaryPath) && !IsMetadataSidecarPath(primaryPath) && !IsReplaySidecarPath(primaryPath))
+        if (File.Exists(primaryPath) && !IsMetadataSidecarPath(primaryPath) && !IsReplaySidecarPath(primaryPath) && !IsJogadasSidecarPath(primaryPath))
             return primaryPath;
 
         string saveDir = ResolveSaveDirectory();
@@ -1747,7 +1752,7 @@ public class SaveGameManager : MonoBehaviour
                     for (int i = 0; i < candidates.Length; i++)
                     {
                         string current = candidates[i];
-                        if (IsMetadataSidecarPath(current) || IsReplaySidecarPath(current))
+                        if (IsMetadataSidecarPath(current) || IsReplaySidecarPath(current) || IsJogadasSidecarPath(current))
                             continue;
 
                         DateTime currentWrite = File.GetLastWriteTimeUtc(current);
@@ -2088,6 +2093,67 @@ public class SaveGameManager : MonoBehaviour
         return Path.Combine(directory, $"{fileNameWithoutExtension}.replay");
     }
 
+    private string ResolveJogadasPathForSavePath(string savePath)
+    {
+        if (string.IsNullOrWhiteSpace(savePath))
+            return Path.Combine(ResolveSaveDirectory(), "slot.jogadas.json");
+
+        string directory = Path.GetDirectoryName(savePath) ?? ResolveSaveDirectory();
+        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(savePath);
+        return Path.Combine(directory, $"{fileNameWithoutExtension}.jogadas.json");
+    }
+
+    private static bool IsJogadasSidecarPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return false;
+
+        return path.EndsWith(".jogadas.json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void WriteJogadasSidecar(string savePath)
+    {
+        if (string.IsNullOrWhiteSpace(savePath))
+            return;
+
+        string jogadasPath = ResolveJogadasPathForSavePath(savePath);
+        try
+        {
+            JogadasManager manager = JogadasManager.EnsureInstance();
+            string json = JsonUtility.ToJson(manager.log, false);
+            Directory.CreateDirectory(Path.GetDirectoryName(jogadasPath) ?? ResolveSaveDirectory());
+            File.WriteAllText(jogadasPath, json, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[SaveGame] Falha ao salvar jogadas sidecar '{jogadasPath}': {ex.Message}");
+        }
+    }
+
+    private void RestoreJogadasSidecar(string savePath)
+    {
+        JogadasManager manager = JogadasManager.EnsureInstance();
+
+        string jogadasPath = ResolveJogadasPathForSavePath(savePath);
+        if (!File.Exists(jogadasPath))
+        {
+            manager.log = new JogadasLog();
+            return;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(jogadasPath, Encoding.UTF8);
+            JogadasLog restored = JsonUtility.FromJson<JogadasLog>(json);
+            manager.log = restored ?? new JogadasLog();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[SaveGame] Falha ao restaurar jogadas sidecar '{jogadasPath}': {ex.Message}");
+            manager.log = new JogadasLog();
+        }
+    }
+
     private static string SanitizeFileName(string raw)
     {
         string input = string.IsNullOrWhiteSpace(raw) ? "save_slot" : raw.Trim();
@@ -2347,4 +2413,3 @@ public class SaveGameManager : MonoBehaviour
         return resolved;
     }
 }
-

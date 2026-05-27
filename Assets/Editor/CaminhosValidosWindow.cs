@@ -16,6 +16,7 @@ public class CaminhosValidosWindow : EditorWindow
     [SerializeField] private int movementPoints = 3;
     [SerializeField] private Vector3Int destinationHex;
     [SerializeField] private Vector3Int waypointHex;
+    [SerializeField] private int progressHorizonTurns = 2;
 
     [SerializeField] private TeamId simulationTeam = TeamId.Green;
 
@@ -226,6 +227,7 @@ public class CaminhosValidosWindow : EditorWindow
         EditorGUILayout.LabelField("  Progresso de rota do AI por célula alcançável (respeita ocupação por aliados).", EditorStyles.miniLabel);
         EditorGUILayout.LabelField("  Verde = aproxima do destino | Vermelho = afasta | Amarelo = neutro", EditorStyles.miniLabel);
         EditorGUILayout.LabelField("  Usa Origem A (amarelo) e Destino B (ciano) definidos acima.", EditorStyles.miniLabel);
+        progressHorizonTurns = EditorGUILayout.IntSlider("Horizonte", progressHorizonTurns, 1, 2);
 
         EditorGUI.BeginDisabledGroup(!HasValidUnit());
         if (GUILayout.Button("Calcular Progressão", GUILayout.Height(26)))
@@ -243,7 +245,8 @@ public class CaminhosValidosWindow : EditorWindow
         EditorGUILayout.Space(8f);
 
         // ── Passando Por ──
-        EditorGUILayout.LabelField("Passando Por", EditorStyles.boldLabel);
+        /*
+        // Passando Por removido: a progressao agora cobre a analise de duas rodadas.
         EditorGUILayout.LabelField("  Rota A → B → C: compara custo via waypoint com a rota direta.", EditorStyles.miniLabel);
         EditorGUILayout.LabelField("  Gradiente = PM restantes até C (terreno, sem ocupação).", EditorStyles.miniLabel);
         EditorGUILayout.LabelField("  Azul = células alcançáveis de A no turno atual (com ocupação).", EditorStyles.miniLabel);
@@ -279,6 +282,8 @@ public class CaminhosValidosWindow : EditorWindow
                 : "?";
             EditorGUILayout.LabelField($"A→B = {leg1}  |  B→C = {leg2}  |  Total = {total}", EditorStyles.boldLabel);
         }
+
+        */
 
         if (!string.IsNullOrEmpty(statusMessage))
             EditorGUILayout.HelpBox(statusMessage, MessageType.Error);
@@ -321,7 +326,12 @@ public class CaminhosValidosWindow : EditorWindow
         RunWithTempUnit(origin, unit =>
         {
             var paths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, unit, movementPoints, terrainDatabase);
-            reachableCells = new HashSet<Vector3Int>(paths.Keys);
+            reachableCells = new HashSet<Vector3Int>();
+            foreach (Vector3Int cell in paths.Keys)
+            {
+                if (CanUseAsDebugStopCell(unit, cell, origin))
+                    reachableCells.Add(cell);
+            }
             lastOrigin = origin;
         });
 
@@ -380,22 +390,22 @@ public class CaminhosValidosWindow : EditorWindow
         RunWithTempUnit(origin, unit =>
         {
             var paths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, unit, movementPoints, terrainDatabase);
-            var costFromDest = UnitMovementPathRules.CalculateMovementCostMap(tilemap, unit, dest, 99, terrainDatabase);
-
-            progressOriginCost = costFromDest.TryGetValue(origin, out int oc) ? oc : -1;
+            // costMap dá o custo real em PM para cada célula, considerando bônus de estrada.
+            var costMap = UnitMovementPathRules.CalculateMovementCostMap(tilemap, unit, origin, movementPoints, terrainDatabase);
+            progressOriginCost = Mathf.CeilToInt(SectorManager.HexDistance(origin, dest));
             lastProgressOrigin = origin;
             lastProgressDest   = dest;
 
             progressMap = new Dictionary<Vector3Int, int>();
+            var debugStopOrigin = origin;
+            int horizon = Mathf.Clamp(progressHorizonTurns, 1, 2);
             foreach (Vector3Int cell in paths.Keys)
             {
+                if (!CanUseAsDebugStopCell(unit, cell, debugStopOrigin)) continue;
                 if (alliedOccupied.Contains(cell)) continue; // não pode parar aqui
-                if (costFromDest.TryGetValue(cell, out int cellCost))
-                    progressMap[cell] = progressOriginCost >= 0
-                        ? CalculateRouteProgressScore(origin, dest, cell, progressOriginCost, cellCost)
-                        : 0;
-                else
-                    progressMap[cell] = int.MinValue;
+                progressMap[cell] = horizon <= 1
+                    ? CalculateReachableProgressScore(origin, dest, cell, paths[cell])
+                    : CalculateTwoTurnProgressScore(unit, origin, dest, cell, paths[cell], costMap);
             }
 
             hasProgressResult = true;
@@ -431,7 +441,12 @@ public class CaminhosValidosWindow : EditorWindow
 
             // Células alcançáveis de A no turno atual (respeita ocupação — mostra congestionamento real)
             var reachPaths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, unit, movementPoints, terrainDatabase);
-            waypointReachable = new HashSet<Vector3Int>(reachPaths.Keys);
+            waypointReachable = new HashSet<Vector3Int>();
+            foreach (Vector3Int cell in reachPaths.Keys)
+            {
+                if (CanUseAsDebugStopCell(unit, cell, origin))
+                    waypointReachable.Add(cell);
+            }
 
             lastWayOrigin   = origin;
             lastWayWaypoint = waypoint;
@@ -482,6 +497,43 @@ public class CaminhosValidosWindow : EditorWindow
         }
         catch (System.Exception e) { statusMessage = e.Message; }
         finally { DestroyImmediate(go); }
+    }
+
+    private bool CanUseAsDebugStopCell(UnitManager mover, Vector3Int cell, Vector3Int origin)
+    {
+        if (mover == null)
+            return false;
+
+        cell.z = 0;
+        origin.z = 0;
+        if (cell == origin)
+            return true;
+
+        if (!OccupancyResolver.IsLayerAwareRulesActive)
+            return true;
+
+        HeightBand moverBand = OccupancyResolver.GetHeightBand(mover);
+        if (moverBand != HeightBand.Blocking)
+            return true;
+
+        foreach (UnitManager occupant in UnitManager.AllActive)
+        {
+            if (occupant == null || occupant.IsDead || occupant.IsEmbarked)
+                continue;
+            if (useSceneUnit && sceneUnit != null && occupant == sceneUnit)
+                continue;
+
+            Vector3Int occupantCell = occupant.CurrentCellPosition;
+            occupantCell.z = 0;
+            if (occupantCell != cell)
+                continue;
+
+            occupant.SyncLayerStateFromData(forceNativeDefault: false);
+            if (OccupancyResolver.GetHeightBand(occupant) == moverBand)
+                return false;
+        }
+
+        return true;
     }
 
     private UnitDatabase ActiveUnitDatabase(UnitData data)
@@ -621,6 +673,68 @@ public class CaminhosValidosWindow : EditorWindow
             routeProgress * 10f
             + hexProgress * 2f
             - lineDeviation * 3f;
+
+        return Mathf.RoundToInt(score);
+    }
+
+    private int CalculateTwoTurnProgressScore(
+        UnitManager tempUnit,
+        Vector3Int origin,
+        Vector3Int dest,
+        Vector3Int firstStop,
+        IReadOnlyList<Vector3Int> firstPath,
+        Dictionary<Vector3Int, int> costMap = null)
+    {
+        float originDistance = SectorManager.HexDistance(origin, dest);
+        float bestDistanceAfterNextMove = SectorManager.HexDistance(firstStop, dest);
+        // Real MP cost (road-bonus aware); fall back to path waypoint count if costMap absent.
+        int firstMoveCost = costMap != null && costMap.TryGetValue(firstStop, out int c)
+            ? c
+            : (firstPath != null ? Mathf.Max(0, firstPath.Count - 1) : 0);
+
+        tempUnit.SetCurrentCellPosition(firstStop, enforceFinalOccupancyRule: false);
+        var nextPaths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, tempUnit, movementPoints, terrainDatabase);
+        foreach (Vector3Int nextStop in nextPaths.Keys)
+        {
+            if (!CanUseAsDebugStopCell(tempUnit, nextStop, firstStop))
+                continue;
+
+            float nextDistance = SectorManager.HexDistance(nextStop, dest);
+            if (nextDistance < bestDistanceAfterNextMove)
+                bestDistanceAfterNextMove = nextDistance;
+        }
+
+        float twoTurnProgress = originDistance - bestDistanceAfterNextMove;
+        // Tiebreaker: how close firstStop itself is to dest — credits road cells that cost the
+        // same MP as a shorter non-road path but land geometrically closer to the objective.
+        float firstTurnProgress = originDistance - SectorManager.HexDistance(firstStop, dest);
+        float lineDeviation = DistanceFromHexLine(firstStop, origin, dest);
+
+        float score =
+            twoTurnProgress * 10f
+            + firstTurnProgress * 2f
+            - lineDeviation * 2f
+            - firstMoveCost * 0.5f;
+
+        return Mathf.RoundToInt(score);
+    }
+
+    private static int CalculateReachableProgressScore(
+        Vector3Int origin,
+        Vector3Int dest,
+        Vector3Int cell,
+        IReadOnlyList<Vector3Int> validPath)
+    {
+        float originDistance = SectorManager.HexDistance(origin, dest);
+        float cellDistance = SectorManager.HexDistance(cell, dest);
+        float hexProgress = originDistance - cellDistance;
+        float lineDeviation = DistanceFromHexLine(cell, origin, dest);
+        int pathSteps = validPath != null ? Mathf.Max(0, validPath.Count - 1) : 0;
+
+        float score =
+            hexProgress * 10f
+            - lineDeviation * 3f
+            - pathSteps * 0.5f;
 
         return Mathf.RoundToInt(score);
     }

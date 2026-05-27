@@ -213,7 +213,7 @@ public partial class TurnStateManager
                     }
                 }
 
-                if (!OccupancyResolver.CanEndMove(selectedUnit, cell, occupants))
+                if (!CanPaintMovementStopAtCell(selectedUnit, cell, occupants))
                 {
                     if (PathManager.IsPathfindingDebugLogsEnabled && Application.isPlaying)
                     {
@@ -225,6 +225,8 @@ public partial class TurnStateManager
                             $"mover={selectedUnit.name}[team={(int)selectedUnit.TeamId},band={OccupancyResolver.GetHeightBand(selectedUnit)}] " +
                             $"occupants={info}");
                     }
+
+                    continue;
                 }
             }
 
@@ -256,6 +258,32 @@ public partial class TurnStateManager
             rangeMapTilemap.SetTileFlags(cell, TileFlags.None);
             rangeMapTilemap.SetColor(cell, overlayColor);
         }
+    }
+
+    private static bool CanPaintMovementStopAtCell(UnitManager mover, Vector3Int cell, IEnumerable<UnitManager> occupants)
+    {
+        if (mover == null)
+            return false;
+
+        if (!OccupancyResolver.IsLayerAwareRulesActive)
+            return OccupancyResolver.CanEndMove(mover, cell, occupants);
+
+        HeightBand moverBand = OccupancyResolver.GetHeightBand(mover);
+        if (moverBand != HeightBand.Blocking)
+            return true;
+
+        if (occupants == null)
+            return true;
+
+        foreach (UnitManager occupant in occupants)
+        {
+            if (occupant == null || occupant == mover || occupant.IsDead || occupant.IsEmbarked)
+                continue;
+            if (OccupancyResolver.GetHeightBand(occupant) == moverBand)
+                return false;
+        }
+
+        return true;
     }
 
     private IEnumerable<UnitManager> GetOccupantsAtCellForRange(Vector3Int cell, UnitManager exceptUnit)

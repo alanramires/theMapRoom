@@ -36,7 +36,7 @@ public partial class AIController
         if (bestCandidate != null)
         {
             if (TryFindTransportBreakerAttack(unit, snapshot, fromCell, paths, occupied, candidateCell,
-                    out Vector3Int attackCell, out UnitManager attackTarget, preferNoMove))
+                    out Vector3Int attackCell, out UnitManager attackTarget, preferNoMove, plan))
             {
                 Vector3Int targetCell = attackTarget.CurrentCellPosition; targetCell.z = 0;
                 Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — ataca oportunista {attackTarget.InstanceId} via {attackCell}");
@@ -619,26 +619,14 @@ public partial class AIController
         Vector3Int candidateCell,
         out Vector3Int bestCell,
         out UnitManager bestTarget,
-        bool preferNoMove = false)
+        bool preferNoMove = false,
+        TeamObjectivePlan plan = null)
     {
         bestCell = fromCell;
         bestTarget = null;
 
         List<UnitManager> enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
         if (enemies == null || enemies.Count == 0) return false;
-
-        // When prioritizeDpqAtBattle: try attacking from current position first (no movement).
-        if (preferNoMove)
-        {
-            foreach (UnitManager enemy in enemies)
-            {
-                if (!CanAttackTargetFrom(fromCell, fromCell, unit, enemy)) continue;
-                if (!PassesAttackDecision(unit, enemy, fromCell, false, out _)) continue;
-                bestCell = fromCell;
-                bestTarget = enemy;
-                return true;
-            }
-        }
 
         float fromDistToCandidate = SectorManager.HexDistance(fromCell, candidateCell);
         float bestScore = float.MinValue;
@@ -648,13 +636,24 @@ public partial class AIController
             if (cell != fromCell && occupied.Contains(cell)) continue;
             if (SectorManager.HexDistance(cell, candidateCell) > fromDistToCandidate + 1f) continue;
 
+            // Don't park on a capturable building that an assigned capturer can reach this turn.
+            if (cell != fromCell && plan != null)
+            {
+                ConstructionManager captureAtCell = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+                if (captureAtCell != null && captureAtCell.IsCapturable
+                    && TryFindAssignedCapturerForCaptureTarget(unit, plan, captureAtCell, snapshot.AITeam, cell, out _))
+                    continue;
+            }
+
             foreach (UnitManager enemy in enemies)
             {
                 if (!CanAttackTargetFrom(fromCell, cell, unit, enemy)) continue;
                 if (!PassesAttackDecision(unit, enemy, cell, false, out _)) continue;
 
+                float dpqBonus = preferNoMove ? GetTerrainDpqPontos(cell) * 200f : 0f;
                 float score = (20f - enemy.CurrentHP) * 100f
-                    - SectorManager.HexDistance(cell, candidateCell) * 50f;
+                    - SectorManager.HexDistance(cell, candidateCell) * 50f
+                    + dpqBonus;
                 if (score > bestScore)
                 {
                     bestScore = score;

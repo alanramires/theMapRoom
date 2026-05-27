@@ -2132,6 +2132,10 @@ public class ReplayManager : MonoBehaviour
             currentBuffer.ActingTeam = matchController.ActiveTeam;
 
         RecordStandaloneAction(currentBuffer);
+
+        if (!currentBuffer.IsAIGenerated && !isLiveAIBatchExecution)
+            JogadasManager.RegistrarPlayerAction(currentBuffer);
+
         currentBuffer = new PlayerAction();
     }
 

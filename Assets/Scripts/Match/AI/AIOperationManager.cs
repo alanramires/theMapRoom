@@ -45,13 +45,17 @@ public class AIOperationManager : MonoBehaviour
         if (snapshot == null)
             return;
 
-        TryBuildBaseDefenseOp(team, snapshot, plan, ops);
-        TryBuildSectorDefenseOps(team, snapshot, plan, ops);
-        TryBuildAirliftCaptureOps(team, snapshot, plan, ops);
+        AIIntelReport intel = BuildOperationIntelReport(team, snapshot);
+
+        TryBuildBaseDefenseOp(team, snapshot, plan, ops, intel);
+        TryBuildSectorDefenseOps(team, snapshot, plan, ops, intel);
+        TryBuildGroundCaptureOps(team, snapshot, plan, ops, intel);
+        TryBuildAirliftCaptureOps(team, snapshot, plan, ops, intel);
         TryBuildAirRefuelSupportOp(team, snapshot, ops);
         TryBuildPreventiveDefenseOp(team, snapshot, ops);
 
         AssignExistingUnitsToOperations(team, snapshot, ops);
+        InferCohesionForAllOps(snapshot, ops);
         InferPhasesForAllOps(snapshot, ops);
         LogOperations(team, snapshot.TurnNumber, ops);
     }
@@ -61,6 +65,52 @@ public class AIOperationManager : MonoBehaviour
         if (operationsByTeam.TryGetValue(team, out List<AIOperation> ops))
             return ops;
         return System.Array.Empty<AIOperation>();
+    }
+
+    public bool TryGetCaptureOperationForObjective(TeamId team, SectorObjective objective, out AIOperation operation)
+    {
+        operation = null;
+        if (objective == null || !operationsByTeam.TryGetValue(team, out List<AIOperation> ops))
+            return false;
+
+        foreach (AIOperation op in ops)
+        {
+            if (op == null || !IsCaptureOperation(op))
+                continue;
+            if (op.LinkedObjective == objective || op.Sector == objective.Sector)
+            {
+                operation = op;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public bool IsFireSupportScreenedForObjective(UnitManager fireSupport, TeamId team, SectorObjective objective, out AIOperation operation, out string reason)
+    {
+        operation = null;
+        reason = "";
+        if (fireSupport == null || objective == null)
+            return true;
+        if (!TryGetCaptureOperationForObjective(team, objective, out operation))
+            return true;
+
+        Vector3Int fireCell = Normalize(fireSupport.CurrentCellPosition);
+        float fireDist = SectorManager.HexDistance(fireCell, operation.TargetCell);
+        UnitManager screen = FindBestScreenUnitForOperation(operation, fireSupport.InstanceId);
+        if (screen == null)
+        {
+            reason = $"sem assalto/tank screen em {operation.Type} {operation.Sector}";
+            return false;
+        }
+
+        float screenDist = SectorManager.HexDistance(Normalize(screen.CurrentCellPosition), operation.TargetCell);
+        bool screened = screenDist <= fireDist + 0.5f;
+        reason = screened
+            ? $"screen #{screen.InstanceId} dist={screenDist:F1} <= fire={fireDist:F1}"
+            : $"screen #{screen.InstanceId} atrasado dist={screenDist:F1} > fire={fireDist:F1}";
+        return screened;
     }
 
     public List<OperationDeficit> GetDeficits(TeamId team)
@@ -96,15 +146,17 @@ public class AIOperationManager : MonoBehaviour
         return deficits;
     }
 
-    private void TryBuildBaseDefenseOp(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, List<AIOperation> ops)
+    private void TryBuildBaseDefenseOp(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, List<AIOperation> ops, AIIntelReport intel)
     {
         int aircraftNearHQ = CountVisibleEnemyAircraftNearHQ(snapshot, InstanceSafeAntiAirCoverageRange());
         int fighterANearHQ = CountVisibleEnemyFighterANearHQ(snapshot, InstanceSafeAntiAirCoverageRange());
         int armorNearBase = CountVisibleEnemyArmorNearOwnedBase(snapshot, DefensiveArmorThreatRange);
         bool captureActive = CountOwnedHomeConstructionsUnderCapture(snapshot, team) > 0;
         bool homeThreat = IsHomeDefenseThreatened(snapshot, team, HomeThreatRange) || captureActive;
+        AISectorIntel homeIntel = FindIntelForSector(intel, snapshot.MyHQ != null ? snapshot.MyHQ.Sector : ConstructionSector.Base1);
+        bool intelHomeThreat = homeIntel != null && IsHotIntelSector(homeIntel);
 
-        if (aircraftNearHQ <= 0 && armorNearBase <= 0 && !homeThreat)
+        if (aircraftNearHQ <= 0 && armorNearBase <= 0 && !homeThreat && !intelHomeThreat)
             return;
 
         AIOperation op = CreateOperation(team, AIOperationType.BaseDefense, 1, snapshot, snapshot.MyHQ != null ? snapshot.MyHQ.Sector : ConstructionSector.Base1);
@@ -113,7 +165,7 @@ public class AIOperationManager : MonoBehaviour
         op.TargetCell = op.AnchorCell;
         op.LinkedObjective = FindHomeDefenseObjective(plan, team);
 
-        if (aircraftNearHQ > 0)
+        if (aircraftNearHQ > 0 || (homeIntel != null && intel.enemyAirThreatScore >= 2f))
         {
             if (fighterANearHQ > 0)
                 op.AddSlots(AINeedKind.FighterA, CountActiveNeed(snapshot, AINeedKind.FighterA) <= 0 ? 1 : 0);
@@ -124,13 +176,13 @@ public class AIOperationManager : MonoBehaviour
                 op.AddSlots(AINeedKind.SAM, 1);
         }
 
-        if (homeThreat || armorNearBase > 0)
+        if (homeThreat || armorNearBase > 0 || intelHomeThreat)
         {
-            if (captureActive)
+            if (captureActive || (homeIntel != null && homeIntel.capturePressure > 0f))
                 op.AddSlots(AINeedKind.Capturer, 2);
             else if (CountOwnedConstructionsUnderCapture(snapshot, team) > 0)
                 op.AddSlots(AINeedKind.Capturer, 1);
-            op.AddSlots(AINeedKind.Assault, armorNearBase > 0 ? 2 : 1);
+            op.AddSlots(AINeedKind.Assault, armorNearBase > 0 || (intel != null && intel.enemyArmorThreatScore >= 2f) ? 2 : 1);
             op.AddSlots(AINeedKind.Artillery, 1);
         }
 
@@ -138,10 +190,10 @@ public class AIOperationManager : MonoBehaviour
             return;
 
         ops.Add(op);
-        Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] BaseDefense URGENTE aircraft={aircraftNearHQ} fighterA={fighterANearHQ} armor={armorNearBase} capture={captureActive} slots={DescribeSlots(op)}");
+        Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] BaseDefense URGENTE aircraft={aircraftNearHQ} fighterA={fighterANearHQ} armor={armorNearBase} capture={captureActive} intelHot={(homeIntel != null ? homeIntel.hotScore.ToString("F1") : "-")} slots={DescribeSlots(op)}");
     }
 
-    private void TryBuildSectorDefenseOps(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, List<AIOperation> ops)
+    private void TryBuildSectorDefenseOps(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, List<AIOperation> ops, AIIntelReport intel)
     {
         if (plan == null)
             return;
@@ -152,7 +204,7 @@ public class AIOperationManager : MonoBehaviour
             if (obj == null || obj.Status != ObjectiveStatus.Defending) continue;
             if (ConstructionSectorHelper.IsBase(obj.Sector)) continue;
             if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info)) continue;
-            BuildSectorDefenseOp(team, snapshot, obj, info, ops, built);
+            BuildSectorDefenseOp(team, snapshot, obj, info, ops, built, FindIntelForSector(intel, info.Sector));
         }
 
         foreach (SectorManager.SectorInfo info in SectorManager.GetAllSectorInfos())
@@ -160,8 +212,52 @@ public class AIOperationManager : MonoBehaviour
             if (info == null || ConstructionSectorHelper.IsBase(info.Sector)) continue;
             if (built.Contains(info.Sector)) continue;
             if (!IsOwnedDefensibleSector(info, team)) continue;
-            if (!HasNearbyVisibleEnemy(snapshot, info.RepresentativeCell, SectorDefenseRange)) continue;
-            BuildSectorDefenseOp(team, snapshot, plan.GetObjectiveForSector(info.Sector), info, ops, built);
+            AISectorIntel sectorIntel = FindIntelForSector(intel, info.Sector);
+            if (!HasNearbyVisibleEnemy(snapshot, info.RepresentativeCell, SectorDefenseRange) && !IsHotIntelSector(sectorIntel)) continue;
+            BuildSectorDefenseOp(team, snapshot, plan.GetObjectiveForSector(info.Sector), info, ops, built, sectorIntel);
+        }
+    }
+
+    private void TryBuildGroundCaptureOps(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, List<AIOperation> ops, AIIntelReport intel)
+    {
+        if (plan == null || snapshot == null)
+            return;
+
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj == null || obj.Slots == null)
+                continue;
+            if (obj.Status != ObjectiveStatus.Pending
+                && obj.Status != ObjectiveStatus.Pursuing
+                && obj.Status != ObjectiveStatus.Capturing
+                && obj.Status != ObjectiveStatus.PartialReadyForHandoff)
+                continue;
+            if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info))
+                continue;
+            if (HasAnySlot(obj, UnitRole.Transportador)
+                && info.GetTransportPreference(team) == SectorManager.SectorInfo.TransportPreference.Air)
+                continue;
+
+            int capturers = CountSlots(obj, UnitRole.Capturador);
+            int assaults = CountSlots(obj, UnitRole.Assalto);
+            int fireSupport = CountSlots(obj, UnitRole.FogoIndireto);
+            AISectorIntel sectorIntel = FindIntelForSector(intel, obj.Sector);
+            bool risky = info.GetRiskLevelFor(team) >= SectorManager.SectorRiskLevel.Medium || IsHotIntelSector(sectorIntel);
+            bool needsScreen = fireSupport > 0 || risky;
+
+            AIOperation op = CreateOperation(team, AIOperationType.GroundCapture, 4, snapshot, obj.Sector);
+            op.LinkedObjective = obj;
+            op.AnchorCell = snapshot.MyHQ != null ? Normalize(snapshot.MyHQ.CurrentCellPosition) : Vector3Int.zero;
+            op.TargetCell = Normalize(info.RepresentativeCell);
+            op.AddSlots(AINeedKind.Capturer, Mathf.Max(0, capturers));
+            op.AddSlots(AINeedKind.Assault, Mathf.Max(assaults, needsScreen ? 1 : 0));
+            op.AddSlots(AINeedKind.FireSupport, Mathf.Max(0, fireSupport));
+
+            if (op.RequiredSlots.Count == 0)
+                continue;
+
+            ops.Add(op);
+            Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] GroundCapture {obj.Sector}: cap={capturers} ass={assaults} fire={fireSupport} risky={risky} slots={DescribeSlots(op)}");
         }
     }
 
@@ -171,7 +267,8 @@ public class AIOperationManager : MonoBehaviour
         SectorObjective linked,
         SectorManager.SectorInfo info,
         List<AIOperation> ops,
-        HashSet<ConstructionSector> built)
+        HashSet<ConstructionSector> built,
+        AISectorIntel sectorIntel = null)
     {
         AIOperation op = CreateOperation(team, AIOperationType.SectorDefense, 2, snapshot, info.Sector);
         op.LinkedObjective = linked;
@@ -180,18 +277,24 @@ public class AIOperationManager : MonoBehaviour
 
         if (info.HasPartialCapture)
             op.AddSlots(AINeedKind.Capturer, 1);
+        if (sectorIntel != null && sectorIntel.capturePressure > 0f)
+            op.AddSlots(AINeedKind.Capturer, 1);
         op.AddSlots(AINeedKind.Assault, 1);
+        if (sectorIntel != null && (sectorIntel.enemyPresence >= 2f || sectorIntel.landingPressure > 0f))
+            op.AddSlots(AINeedKind.Assault, 1);
         if (info.GetDistanceToHQ(team) <= GetEffectiveTransportThreshold(team))
+            op.AddSlots(AINeedKind.Artillery, 1);
+        else if (sectorIntel != null && sectorIntel.damageTaken > 0f)
             op.AddSlots(AINeedKind.Artillery, 1);
         if (CountVisibleEnemyAircraftNearCell(snapshot, info.RepresentativeCell, 2) > 0)
             op.AddSlots(AINeedKind.AAA, 1);
 
         ops.Add(op);
         built.Add(info.Sector);
-        Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] SectorDefense {info.Sector}: partial={info.HasPartialCapture} slots={DescribeSlots(op)}");
+        Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] SectorDefense {info.Sector}: partial={info.HasPartialCapture} intelHot={(sectorIntel != null ? sectorIntel.hotScore.ToString("F1") : "-")} slots={DescribeSlots(op)}");
     }
 
-    private void TryBuildAirliftCaptureOps(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, List<AIOperation> ops)
+    private void TryBuildAirliftCaptureOps(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, List<AIOperation> ops, AIIntelReport intel)
     {
         if (plan == null)
             return;
@@ -218,10 +321,13 @@ public class AIOperationManager : MonoBehaviour
             op.LinkedObjective = obj;
             op.AnchorCell = snapshot.MyHQ != null ? Normalize(snapshot.MyHQ.CurrentCellPosition) : Vector3Int.zero;
             op.TargetCell = Normalize(info.RepresentativeCell);
+            AISectorIntel sectorIntel = FindIntelForSector(intel, obj.Sector);
             op.AddSlots(AINeedKind.Capturer, capturerDeficit);
             op.AddSlots(AINeedKind.AirTransport, airDeficit);
-            if (info.GetRiskLevelFor(team) >= SectorManager.SectorRiskLevel.High)
+            if (info.GetRiskLevelFor(team) >= SectorManager.SectorRiskLevel.High || IsHotIntelSector(sectorIntel))
                 op.AddSlots(AINeedKind.Assault, 1);
+            if (sectorIntel != null && sectorIntel.damageTaken > 0f)
+                op.AddSlots(AINeedKind.Artillery, 1);
             if (CountTotalVisibleEnemyFighterA(snapshot) > 0)
                 op.AddSlots(AINeedKind.FighterA, CountActiveNeed(snapshot, AINeedKind.FighterA) <= 0 ? 1 : 0);
             else if (CountTotalVisibleEnemyAircraft(snapshot) > 0
@@ -232,7 +338,7 @@ public class AIOperationManager : MonoBehaviour
                 continue;
 
             ops.Add(op);
-            Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] AirliftCapture {obj.Sector}: desejado={desiredPassengers} qualified={qualifiedCapturers} embarked={embarkedCapturers} cap_deficit={capturerDeficit} air_deficit={airDeficit}");
+            Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] AirliftCapture {obj.Sector}: desejado={desiredPassengers} qualified={qualifiedCapturers} embarked={embarkedCapturers} cap_deficit={capturerDeficit} air_deficit={airDeficit} intelHot={(sectorIntel != null ? sectorIntel.hotScore.ToString("F1") : "-")}");
         }
     }
 
@@ -316,6 +422,46 @@ public class AIOperationManager : MonoBehaviour
         Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] AirRefuelSupport: lowFuel={lowFuelAircraft} critical={criticalFuelAircraft} airFleet={airFleet} activeTankers={activeTankers} deficit={tankerDeficit}");
     }
 
+    private static AIIntelReport BuildOperationIntelReport(TeamId team, AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null)
+            return null;
+
+        JogadasManager jogadas = JogadasManager.EnsureInstance();
+        if (jogadas == null || jogadas.log == null || jogadas.log.jogadas == null || jogadas.log.jogadas.Count == 0)
+            return null;
+
+        int lookback = AIShoppingPlanner.Instance != null ? Mathf.Max(1, AIShoppingPlanner.Instance.IntelShoppingLookbackTurns) : 4;
+        return AIIntelAnalyzer.BuildReport(jogadas.log, team, lookback, 5, snapshot.TurnNumber);
+    }
+
+    private static AISectorIntel FindIntelForSector(AIIntelReport intel, ConstructionSector sector)
+    {
+        if (intel == null || intel.sectors == null)
+            return null;
+
+        string sectorName = sector.ToString();
+        for (int i = 0; i < intel.sectors.Count; i++)
+        {
+            AISectorIntel entry = intel.sectors[i];
+            if (entry != null && entry.sector == sectorName)
+                return entry;
+        }
+        return null;
+    }
+
+    private static bool IsHotIntelSector(AISectorIntel intel)
+    {
+        if (intel == null)
+            return false;
+
+        return intel.hotScore >= 2f
+            || intel.capturePressure > 0f
+            || intel.landingPressure > 0f
+            || intel.damageTaken > 0f
+            || intel.enemyPresence >= 2f;
+    }
+
     private AIOperation CreateOperation(TeamId team, AIOperationType type, int priority, AIWorldSnapshot snapshot, ConstructionSector sector)
     {
         int turn = snapshot != null ? snapshot.TurnNumber : 0;
@@ -351,6 +497,30 @@ public class AIOperationManager : MonoBehaviour
                     op.AssignedUnitIds.Add(unit.InstanceId);
                 used.Add(unit.InstanceId);
             }
+        }
+    }
+
+    private void InferCohesionForAllOps(AIWorldSnapshot snapshot, List<AIOperation> ops)
+    {
+        foreach (AIOperation op in ops)
+        {
+            if (op == null || !IsCaptureOperation(op))
+                continue;
+
+            UnitManager screen = FindBestScreenUnitForOperation(op);
+            if (screen == null)
+            {
+                op.HasScreen = false;
+                op.ScreenUnitId = -1;
+                op.ScreenDistanceToTarget = -1f;
+                op.CohesionReason = "sem assalto/tank";
+                continue;
+            }
+
+            op.HasScreen = true;
+            op.ScreenUnitId = screen.InstanceId;
+            op.ScreenDistanceToTarget = SectorManager.HexDistance(Normalize(screen.CurrentCellPosition), op.TargetCell);
+            op.CohesionReason = $"screen #{screen.InstanceId} dist={op.ScreenDistanceToTarget:F1}";
         }
     }
 
@@ -429,7 +599,7 @@ public class AIOperationManager : MonoBehaviour
     private void LogOperations(TeamId team, int turn, List<AIOperation> ops)
     {
         foreach (AIOperation op in ops)
-            Debug.Log($"[AI Ops][T{turn}][{team}] {op.Type} {op.Sector} pri={op.Priority} phase={op.Phase} urgent={op.IsUrgent} preventive={op.IsPreventive} slots={DescribeSlots(op)} assigned={op.AssignedUnitIds.Count}");
+            Debug.Log($"[AI Ops][T{turn}][{team}] {op.Type} {op.Sector} pri={op.Priority} phase={op.Phase} urgent={op.IsUrgent} preventive={op.IsPreventive} slots={DescribeSlots(op)} assigned={op.AssignedUnitIds.Count} screen={(op.HasScreen ? op.ScreenUnitId.ToString() : "-")} reason={op.CohesionReason}");
     }
 
     private static string DescribeSlots(AIOperation op)
@@ -467,6 +637,38 @@ public class AIOperationManager : MonoBehaviour
             best = Mathf.Min(best, Mathf.RoundToInt(SectorManager.HexDistance(cell, op.TargetCell)));
         }
         return best == int.MaxValue ? 0 : best;
+    }
+
+    private static bool IsCaptureOperation(AIOperation op)
+    {
+        return op != null
+            && (op.Type == AIOperationType.GroundCapture
+                || op.Type == AIOperationType.AirliftCapture);
+    }
+
+    private static UnitManager FindBestScreenUnitForOperation(AIOperation op, int excludedUnitId = -1)
+    {
+        if (op == null)
+            return null;
+
+        UnitManager best = null;
+        float bestDist = float.MaxValue;
+        foreach (int id in op.AssignedUnitIds)
+        {
+            if (id == excludedUnitId)
+                continue;
+            UnitManager unit = FindActiveUnit(id);
+            if (!UnitSatisfiesNeed(unit, AINeedKind.Assault))
+                continue;
+
+            float dist = SectorManager.HexDistance(Normalize(unit.CurrentCellPosition), op.TargetCell);
+            if (best == null || dist < bestDist)
+            {
+                best = unit;
+                bestDist = dist;
+            }
+        }
+        return best;
     }
 
     public static bool UnitDataSatisfiesNeed(UnitData data, AINeedKind kind)

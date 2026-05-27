@@ -684,8 +684,9 @@ public partial class AIController
             // overflow: slot físico check abaixo confirma capacidade disponível
         }
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
-        Vector3Int embarkDecisionCell = fromHex; embarkDecisionCell.z = 0;
-        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, embarkDecisionCell, "hex embarque"))
+        // Short-walk guard uses the unit's actual position, not the intermediate stop cell —
+        // moving 1-2h toward the transporter should not make the destination appear "walkable."
+        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromCell, "hex embarque"))
             return false;
 
         // Pickup range: usa fromHex (posição após movimento) para não bloquear embarque estendido.

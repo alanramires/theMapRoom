@@ -546,6 +546,10 @@ public partial class TurnStateManager
                 yield break;
             }
 
+            int targetUid = target.InstanceId;
+            string targetSigla = target.TryGetUnitData(out UnitData targetData) && targetData != null
+                ? targetData.apelido
+                : "-";
             Vector3 worldPos = target.transform.position;
             target.SetCurrentHP(0);
             target.MarkDead("morto pelo comando destroy unit");
@@ -565,6 +569,13 @@ public partial class TurnStateManager
                 Confirmed = true,
                 DebugLabel = "RemoveUnit: confirm"
             });
+            JogadasManager.EnsureInstance()?.RegistrarDestruir(
+                actionTurn,
+                (int)actionTeam,
+                actionCell.x,
+                actionCell.y,
+                targetSigla,
+                targetUid);
 
             planningManager?.NotifyUnitVisibilityPossiblyChanged(target);
             ExitRemovingUnitStateToNeutral(logCanceled: false);

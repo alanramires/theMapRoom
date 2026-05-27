@@ -297,6 +297,8 @@ public partial class AIController
         if (ShouldStopAIForMatchEnd("phase1_apos_command_service"))
             yield break;
 
+        JogadasManager.EnsureInstance()?.RegistrarServicoComando(snapshot.TurnNumber, (int)snapshot.AITeam);
+
         float delay = GetBatchDelay();
         if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
 
@@ -318,6 +320,8 @@ public partial class AIController
         if (initial.Count == 0)
         {
             Debug.Log($"{TL()} Fase 2 — sem unidades em campo, pulando.");
+            if (matchController == null || !matchController.IsPlayerCommandServiceAutomatic(snapshot.AITeam))
+                JogadasManager.EnsureInstance()?.RegistrarServicoComando(snapshot.TurnNumber, (int)aiTeam);
             yield break;
         }
 
@@ -363,7 +367,13 @@ public partial class AIController
 
             // Pre-pass: atualiza estado de reparo antes do sort para que IsUnderRepair
             // esteja correto quando GetInitiativeGroup classificar cada unidade.
-            foreach (UnitManager u in available) UpdateRepairState(u, activePlan);
+            // Inclui embarcados: passageiro curado pelo CommandService precisa sair do
+            // modo reparo antes que o transporter decida rota de evac vs entrega.
+            foreach (UnitManager u in UnitManager.AllActive)
+            {
+                if (u.TeamId == aiTeam && !u.IsDead)
+                    UpdateRepairState(u, activePlan);
+            }
 
             // Pre-computa grupos uma vez por unidade (evita O(N log N) chamadas no comparador).
             var groupCache = new Dictionary<int, int>(available.Count);
@@ -487,6 +497,7 @@ public partial class AIController
             // ter morrido, liberando LOS para células antes bloqueadas).
             bool unitMoved    = action.HasMoveTo && action.MoveTo != action.MoveFrom;
             bool unitAttacked = !string.IsNullOrEmpty(action.TargetInstanceId);
+            JogadasManager.RegistrarPlayerAction(action);
             yield return ExecuteAIBatchWithDebugStep(action);
             SyncAIUnitCellsFromTransforms();
             if (ShouldStopAIForMatchEnd("phase2_apos_batch"))
@@ -613,6 +624,7 @@ public partial class AIController
             yield return ExecuteAIBatchWithDebugStep(batch);
             if (ShouldStopAIForMatchEnd("phase3_apos_batch"))
                 yield break;
+
             yield return WaitIfDebugPaused();
             if (ShouldStopAIForMatchEnd("phase3_apos_pause_batch"))
                 yield break;

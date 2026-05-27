@@ -147,6 +147,8 @@ public partial class AIController
         float      bestScore     = float.MinValue;
         float      bestSectorTie = float.MinValue;
         float      bestHqTie     = float.MinValue;
+        float      bestRoute2    = 0f;
+        float      bestNextDist  = float.MaxValue;
         bool       canAdvance    = false;
 
         Vector3Int attackMove       = fromCell;
@@ -192,14 +194,19 @@ public partial class AIController
             float dpq       = preferDpqMove ? dpqPontos * DpqWeight : 0f;
             float moveCost  = paths[cell].Count;
             float score     = prox - moveCost + dpq - threat * ThreatWeight;
+            float route2    = 0f;
+            float nextDist  = float.MaxValue;
+            if (TryScoreTwoTurnProgression(unit, fromCell, targetCell, cell, paths[cell], occupied, out route2, out nextDist))
+                score += route2;
             float sectorTie = -effectiveDist;
             float hqDist    = CalculateEnemyHqDistance(cell, snapshot, unit);
             float hqTie     = CalculateEnemyHqTieBreak(hqDist);
 
             string hqDistText = hqDist < float.MaxValue ? hqDist.ToString("F1") : "?";
             string routeText = cellRouteFound ? routeDist.ToString("F1") : "?";
+            string route2Text = nextDist < float.MaxValue ? nextDist.ToString("F1") : "?";
             // dpqPontos sempre exibido (independente de preferDpqMove) para diagnóstico
-            scoringLog?.AppendLine($"  {cell} dist={dist:F1} rota={routeText} progRota={routeProgress:+0.0;-0.0;0.0} prox={prox:F0} mv={moveCost:F0} dpqPts={dpqPontos:F1} dpq={dpq:F0} thr={threat:F0} secTie={sectorTie:F1} hq={hqDistText} hqTie={hqTie:F1} -> {score:F0}");
+            scoringLog?.AppendLine($"  {cell} dist={dist:F1} rota={routeText} progRota={routeProgress:+0.0;-0.0;0.0} rota2={route2:F0}/{route2Text} prox={prox:F0} mv={moveCost:F0} dpqPts={dpqPontos:F1} dpq={dpq:F0} thr={threat:F0} secTie={sectorTie:F1} hq={hqDistText} hqTie={hqTie:F1} -> {score:F0}");
 
             // bestMove: só células que avançam em direção ao objetivo
             if (advances && IsBetterScore(score, sectorTie, hqTie, bestScore, bestSectorTie, bestHqTie))
@@ -212,6 +219,8 @@ public partial class AIController
                     bestScore     = score;
                     bestSectorTie = sectorTie;
                     bestHqTie     = hqTie;
+                    bestRoute2    = route2;
+                    bestNextDist  = nextDist;
                     bestMove      = cell;
                     canAdvance    = true;
                 }
@@ -344,6 +353,8 @@ public partial class AIController
             && (mcAdv == null || !mcAdv.IsUnitVisibleForTeam(advOccupant, snapshot.AITeam));
         bool sectorInContest = HasNearbyVisibleEnemy(targetCell, snapshot.AITeam, DefenseEnemyRange);
         string advTag = hiddenOccupant ? "Explorador" : sectorInContest ? "Perseguidor" : "PontaLanca";
+        string bestNextText = bestNextDist < float.MaxValue ? bestNextDist.ToString("F1") : "?";
+        Debug.Log($"{TL("Progressao2")} capturador {unit.InstanceId} {assigned.Sector} escolheu {bestMove} rota2={bestRoute2:F0}/{bestNextText}");
         Debug.Log($"{TL(advTag)} {unit.InstanceId} avança para {assigned.Sector} via {bestMove} (score={bestScore:F0}, secTie={bestSectorTie:F1}, hq={bestHqText}, hqTie={bestHqTie:F1})");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestMove, paths);
     }

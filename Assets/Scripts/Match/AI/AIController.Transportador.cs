@@ -93,6 +93,10 @@ public partial class AIController
         // terrain chokepoints, and a short horizon looks like a false blockade.
         Dictionary<Vector3Int, int> costFromTarget =
             UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, pressureTarget, 120, terrainDatabase);
+        // Forward cost map from origin (no road bonus — cells reachable only via the free road step
+        // will be absent and handled as full-budget cost in TryScoreTwoTurnProgression).
+        Dictionary<Vector3Int, int> costFromOrigin =
+            UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, fromCell, unit.RemainingMovementPoints, terrainDatabase);
 
         float GetCost(Vector3Int c) =>
             costFromTarget.TryGetValue(c, out int v) ? (float)v : float.MaxValue;
@@ -103,6 +107,9 @@ public partial class AIController
         float bestThreat = float.MaxValue;
         bool foundReachableRoute = bestDist < float.MaxValue;
         bool foundImprovingMove = false;
+        Vector3Int bestHorizonCell = fromCell;
+        float bestHorizonScore = float.MinValue;
+        bool foundHorizonMove = false;
 
         const float eps = 0.01f;
 
@@ -116,6 +123,18 @@ public partial class AIController
             float threat = CalculateThreatLevel(cell, aiTeam);
             if (dist < float.MaxValue)
                 foundReachableRoute = true;
+
+            if (TryScoreTwoTurnProgression(unit, fromCell, pressureTarget, cell, paths[cell], occupied, out float horizonScore, out _, costFromOrigin))
+            {
+                horizonScore -= threat * 0.5f;
+                horizonScore -= isNonTeamBldg ? 300f : 0f;
+                if (horizonScore > bestHorizonScore)
+                {
+                    bestHorizonScore = horizonScore;
+                    bestHorizonCell = cell;
+                    foundHorizonMove = true;
+                }
+            }
 
             bool isBetter;
             if (dist < bestDist - eps)
@@ -135,6 +154,13 @@ public partial class AIController
                 if (dist < GetCost(fromCell) - eps)
                     foundImprovingMove = true;
             }
+        }
+
+
+        if (foundHorizonMove && bestHorizonScore > 0f)
+        {
+            Debug.Log($"{TL("Progressao2")} transporte {unit.InstanceId} alvo={pressureTarget} escolheu {bestHorizonCell} score={bestHorizonScore:F0}");
+            return bestHorizonCell;
         }
 
         if (foundReachableRoute && (bestCell != fromCell || foundImprovingMove))
@@ -178,7 +204,7 @@ public partial class AIController
                 Mathf.Min(pathSteps, 8) * 55f
                 + Mathf.Max(0f, progress) * 35f
                 - Mathf.Max(0f, -progress) * 18f
-                - threat * 8f
+                - threat * 0.5f
                 - (isNonTeamBldg ? 300f : 0f);
 
             if (score > bestScore)

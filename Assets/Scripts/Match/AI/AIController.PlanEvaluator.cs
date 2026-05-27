@@ -3,6 +3,9 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private const int RecentlyCapturedGarrisonTurns = 2;
+    private static readonly Dictionary<string, int> recentlyCapturedSectorTurns = new Dictionary<string, int>();
+
     // -------------------------------------------------------------------------
     // Planejamento de objetivos de captura
     // -------------------------------------------------------------------------
@@ -11,6 +14,7 @@ public partial class AIController
     {
         TeamId aiTeam = snapshot.AITeam;
         TeamObjectivePlan plan = ObjectiveManager.GetOrCreatePlanForTeam(aiTeam);
+        AIIntelReport intel = BuildPlanIntelReport(snapshot);
 
         // Passo 1: valida objetivos existentes
         for (int i = plan.Objectives.Count - 1; i >= 0; i--)
@@ -18,12 +22,17 @@ public partial class AIController
             SectorObjective obj = plan.Objectives[i];
             if (FindCapturableInSector(obj.Sector, aiTeam) == null)
             {
+                bool wasCaptureObjective = IsCaptureProgressStatus(obj.Status);
+                if (wasCaptureObjective)
+                    RememberRecentlyCapturedSector(aiTeam, obj.Sector, snapshot.TurnNumber);
+                bool recentlyCaptured = IsRecentlyCapturedSector(aiTeam, obj.Sector, snapshot.TurnNumber);
                 // Setor já conquistado: transita para Defending e preserva enquanto a ameaça persistir.
                 // Captura tanto a transição ofensivo→defensivo (1º turno pós-conquista)
                 // quanto turnos subsequentes (já Defending), evitando redistribuição dos defensores.
                 if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo defInf)
                     && IsOwnedDefensibleSector(defInf, aiTeam)
-                    && (HasNearbyVisibleEnemy(defInf.RepresentativeCell, aiTeam, defenseEnemyRange)
+                    && (recentlyCaptured
+                        || HasNearbyVisibleEnemy(defInf.RepresentativeCell, aiTeam, defenseEnemyRange)
                         || defInf.IsDisputed
                         || defInf.HasPartialCapture
                         || (IsCriticalHomeDefenseSector(defInf, aiTeam)
@@ -54,6 +63,8 @@ public partial class AIController
                     }
                     if (obj.Slots.Count == 0)
                         obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
+                    if (recentlyCaptured)
+                        Debug.Log($"{TL("Plan")} Guarnicao: {obj.Sector} recem-capturado, segurando capturador por {GetRecentlyCapturedTurnsLeft(aiTeam, obj.Sector, snapshot.TurnNumber)}T");
                     continue;
                 }
                 ClearObjectiveHUD(obj);
@@ -87,12 +98,13 @@ public partial class AIController
                 existingOffensive++;
 
         int configuredMaxObj = Instance != null ? Instance.MaxActiveObjectives : 4;
-        int sectorScaledMaxObj = allSectors != null && allSectors.Count > 0
-            ? Mathf.CeilToInt(allSectors.Count / 3f)
+        int sectorCount = allSectors != null ? allSectors.Count : 0;
+        int sectorScaledMaxObj = sectorCount > configuredMaxObj
+            ? configuredMaxObj + Mathf.CeilToInt((sectorCount - configuredMaxObj) / 2f)
             : configuredMaxObj;
-        int maxObj = Mathf.Max(configuredMaxObj, sectorScaledMaxObj);
+        int maxObj = Mathf.Clamp(Mathf.Max(configuredMaxObj, sectorScaledMaxObj), 1, 8);
         if (maxObj != configuredMaxObj)
-            Debug.Log($"{TL("Plan")} cap objetivos escalado: config={configuredMaxObj} setores={allSectors.Count} -> {maxObj}");
+            Debug.Log($"{TL("Plan")} cap objetivos escalado: piso={configuredMaxObj} setores={sectorCount} -> {maxObj}");
         int newSlots = Mathf.Max(0, maxObj - existingOffensive);
 
         var sectorCandidates = new List<SectorObjective>();
@@ -159,7 +171,7 @@ public partial class AIController
                 Sector       = info.Sector,
                 AssignedTeam = aiTeam,
                 Status       = ObjectiveStatus.Pending,
-                Priority     = CalculateSectorPriority(info, aiTeam, snapshot.Stance),
+                Priority     = CalculateSectorPriority(info, aiTeam, snapshot.Stance) + GetIntelSectorPriorityBonus(intel, info.Sector),
             };
             int slots = Mathf.Clamp(Mathf.CeilToInt(info.ConstructionCount / 2f), 1, 4);
             bool highRisk = info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High;
@@ -259,7 +271,7 @@ public partial class AIController
                 Sector       = baseInfo.Sector,
                 AssignedTeam = aiTeam,
                 Status       = ObjectiveStatus.Pending,
-                Priority     = CalculateSectorPriority(baseInfo, aiTeam, snapshot.Stance),
+                Priority     = CalculateSectorPriority(baseInfo, aiTeam, snapshot.Stance) + GetIntelSectorPriorityBonus(intel, baseInfo.Sector),
             };
             for (int s = 0; s < capturerSlots; s++)
                 baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
@@ -300,7 +312,7 @@ public partial class AIController
                     Sector       = closest.Sector,
                     AssignedTeam = aiTeam,
                     Status       = ObjectiveStatus.Pending,
-                    Priority     = CalculateSectorPriority(closest, aiTeam, snapshot.Stance),
+                    Priority     = CalculateSectorPriority(closest, aiTeam, snapshot.Stance) + GetIntelSectorPriorityBonus(intel, closest.Sector),
                 };
                 fallback.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
                 plan.Objectives.Add(fallback);
@@ -314,7 +326,7 @@ public partial class AIController
         {
             if (obj.Status == ObjectiveStatus.Defending) continue;
             if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo inf))
-                obj.Priority = CalculateSectorPriority(inf, aiTeam, snapshot.Stance);
+                obj.Priority = CalculateSectorPriority(inf, aiTeam, snapshot.Stance) + GetIntelSectorPriorityBonus(intel, inf.Sector);
         }
 
         SortPlanObjectivesByStrategicPriority(plan, aiTeam, priorityNumberAscending: false);
@@ -331,10 +343,13 @@ public partial class AIController
                 Vector3Int rc = info.RepresentativeCell; rc.z = 0;
                 bool criticalHomeThreat = IsCriticalHomeDefenseSector(info, aiTeam)
                     && IsHomeDefenseThreatened(info, aiTeam, HomeDefenseThreatRange);
+                AISectorIntel sectorIntel = FindIntelForSector(intel, info.Sector);
+                bool intelDefenseThreat = IsHotPlanIntelSector(sectorIntel);
                 bool sectorDefenseThreat = criticalHomeThreat
                     || info.IsDisputed
                     || info.HasPartialCapture
-                    || HasNearbyVisibleEnemy(rc, aiTeam, DefenseEnemyRange);
+                    || HasNearbyVisibleEnemy(rc, aiTeam, DefenseEnemyRange)
+                    || intelDefenseThreat;
                 if (!sectorDefenseThreat) continue;
 
                 SectorObjective existingDefense = plan.GetObjectiveForSector(info.Sector);
@@ -344,7 +359,7 @@ public partial class AIController
                     {
                         existingDefense.Status = ObjectiveStatus.Defending;
                         existingDefense.Priority = defPriority++;
-                        NormalizeDefenseObjectiveSlots(existingDefense, info.HasPartialCapture || criticalHomeThreat, !criticalHomeThreat, aiTeam);
+                        NormalizeDefenseObjectiveSlots(existingDefense, info.HasPartialCapture || criticalHomeThreat || (sectorIntel != null && sectorIntel.capturePressure > 0f), !criticalHomeThreat || intelDefenseThreat, aiTeam);
                         Debug.Log($"{TL("Plan")} Objetivo convertido para defesa: {info.Sector} (pri {existingDefense.Priority}, disputed={info.IsDisputed}, partialCapture={info.HasPartialCapture})");
                     }
                     continue;
@@ -355,7 +370,7 @@ public partial class AIController
                     Sector = info.Sector, AssignedTeam = aiTeam,
                     Status = ObjectiveStatus.Defending, Priority = defPriority++,
                 };
-                NormalizeDefenseObjectiveSlots(defObj, info.HasPartialCapture || criticalHomeThreat, !criticalHomeThreat, aiTeam);
+                NormalizeDefenseObjectiveSlots(defObj, info.HasPartialCapture || criticalHomeThreat || (sectorIntel != null && sectorIntel.capturePressure > 0f), !criticalHomeThreat || intelDefenseThreat, aiTeam);
                 plan.Objectives.Add(defObj);
                 Debug.Log($"{TL("Plan")} Objetivo defensivo: {info.Sector} (pri {defPriority - 1}, inimigo ≤{DefenseEnemyRange}h, partialCapture={info.HasPartialCapture})");
             }
@@ -711,7 +726,7 @@ public partial class AIController
 
             if (freeAssaults.Count > 0)
             {
-                // Fallback escort: Medium sectors first, then Low sectors with risk >= threshold.
+                // Fallback escort: High/Medium sectors first, then Low sectors with risk >= threshold.
                 // Low sectors below MinLowRiskForEscort (safe backyard near own HQ) are excluded.
                 const float MinLowRiskForEscort = 0.45f;
                 var escortFallbacks = new List<SectorObjective>();
@@ -721,20 +736,21 @@ public partial class AIController
                     if (HasAnySlot(obj, UnitRole.Assalto)) continue;
                     if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
                     var riskLevel = escortInfo.GetRiskLevelFor(aiTeam);
+                    bool isHigh = riskLevel == SectorManager.SectorRiskLevel.High;
                     bool isMedium = riskLevel == SectorManager.SectorRiskLevel.Medium;
                     bool isLow = riskLevel == SectorManager.SectorRiskLevel.Low
                         && escortInfo.GetRiskRatioFor(aiTeam) >= MinLowRiskForEscort;
-                    if (!isMedium && !isLow) continue;
+                    if (!isHigh && !isMedium && !isLow) continue;
                     escortFallbacks.Add(obj);
                 }
 
                 escortFallbacks.Sort((a, b) =>
                 {
-                    bool aIsMed = TryGetAnySectorInfo(a.Sector, out SectorManager.SectorInfo ai)
-                        && ai.GetRiskLevelFor(aiTeam) == SectorManager.SectorRiskLevel.Medium;
-                    bool bIsMed = TryGetAnySectorInfo(b.Sector, out SectorManager.SectorInfo bi)
-                        && bi.GetRiskLevelFor(aiTeam) == SectorManager.SectorRiskLevel.Medium;
-                    if (aIsMed != bIsMed) return aIsMed ? -1 : 1; // Medium first
+                    int aRank = TryGetAnySectorInfo(a.Sector, out SectorManager.SectorInfo ai)
+                        ? GetEscortFallbackRiskRank(ai.GetRiskLevelFor(aiTeam)) : 0;
+                    int bRank = TryGetAnySectorInfo(b.Sector, out SectorManager.SectorInfo bi)
+                        ? GetEscortFallbackRiskRank(bi.GetRiskLevelFor(aiTeam)) : 0;
+                    if (aRank != bRank) return bRank.CompareTo(aRank);
                     float ar = SectorManager.TryGetSectorInfo(a.Sector, out SectorManager.SectorInfo aInfo)
                         ? aInfo.GetRiskRatioFor(aiTeam) : 0f;
                     float br = SectorManager.TryGetSectorInfo(b.Sector, out SectorManager.SectorInfo bInfo)
@@ -2069,6 +2085,117 @@ public partial class AIController
         }
 
         return false;
+    }
+
+    private static AIIntelReport BuildPlanIntelReport(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null)
+            return null;
+
+        JogadasManager jogadas = JogadasManager.EnsureInstance();
+        if (jogadas == null || jogadas.log == null || jogadas.log.jogadas == null || jogadas.log.jogadas.Count == 0)
+            return null;
+
+        int lookback = AIShoppingPlanner.Instance != null ? Mathf.Max(1, AIShoppingPlanner.Instance.IntelShoppingLookbackTurns) : 4;
+        return AIIntelAnalyzer.BuildReport(jogadas.log, snapshot.AITeam, lookback, 5, snapshot.TurnNumber);
+    }
+
+    private static AISectorIntel FindIntelForSector(AIIntelReport intel, ConstructionSector sector)
+    {
+        if (intel == null || intel.sectors == null)
+            return null;
+
+        string sectorName = sector.ToString();
+        for (int i = 0; i < intel.sectors.Count; i++)
+        {
+            AISectorIntel entry = intel.sectors[i];
+            if (entry != null && entry.sector == sectorName)
+                return entry;
+        }
+        return null;
+    }
+
+    private static bool IsHotPlanIntelSector(AISectorIntel intel)
+    {
+        if (intel == null)
+            return false;
+
+        return intel.hotScore >= 2f
+            || intel.capturePressure > 0f
+            || intel.landingPressure > 0f
+            || intel.damageTaken > 0f
+            || intel.enemyPresence >= 2f;
+    }
+
+    private static int GetEscortFallbackRiskRank(SectorManager.SectorRiskLevel risk)
+    {
+        switch (risk)
+        {
+            case SectorManager.SectorRiskLevel.High: return 3;
+            case SectorManager.SectorRiskLevel.Medium: return 2;
+            case SectorManager.SectorRiskLevel.Low: return 1;
+            default: return 0;
+        }
+    }
+
+    private static int GetIntelSectorPriorityBonus(AIIntelReport intel, ConstructionSector sector)
+    {
+        AISectorIntel entry = FindIntelForSector(intel, sector);
+        if (entry == null)
+            return 0;
+
+        float raw = entry.enemyActivity * 2f
+            + entry.enemyPresence * 3f
+            + entry.capturePressure * 5f
+            + entry.landingPressure * 4f
+            + entry.damageTaken * 4f;
+        return Mathf.Clamp(Mathf.RoundToInt(raw), 0, 35);
+    }
+
+    private static bool IsCaptureProgressStatus(ObjectiveStatus status)
+    {
+        return status == ObjectiveStatus.Pending
+            || status == ObjectiveStatus.Pursuing
+            || status == ObjectiveStatus.Capturing
+            || status == ObjectiveStatus.PartialReadyForHandoff;
+    }
+
+    private static string RecentlyCapturedKey(TeamId team, ConstructionSector sector)
+    {
+        return ((int)team).ToString() + ":" + sector.ToString();
+    }
+
+    private static void RememberRecentlyCapturedSector(TeamId team, ConstructionSector sector, int turn)
+    {
+        int safeTurn = Mathf.Max(0, turn);
+        string key = RecentlyCapturedKey(team, sector);
+        if (recentlyCapturedSectorTurns.TryGetValue(key, out int rememberedTurn)
+            && safeTurn >= rememberedTurn
+            && safeTurn - rememberedTurn < RecentlyCapturedGarrisonTurns)
+            return;
+
+        recentlyCapturedSectorTurns[key] = safeTurn;
+    }
+
+    private static bool IsRecentlyCapturedSector(TeamId team, ConstructionSector sector, int turn)
+    {
+        if (!recentlyCapturedSectorTurns.TryGetValue(RecentlyCapturedKey(team, sector), out int capturedTurn))
+            return false;
+
+        int safeTurn = Mathf.Max(0, turn);
+        return safeTurn >= capturedTurn
+            && safeTurn - capturedTurn < RecentlyCapturedGarrisonTurns;
+    }
+
+    private static int GetRecentlyCapturedTurnsLeft(TeamId team, ConstructionSector sector, int turn)
+    {
+        if (!recentlyCapturedSectorTurns.TryGetValue(RecentlyCapturedKey(team, sector), out int capturedTurn))
+            return 0;
+
+        int safeTurn = Mathf.Max(0, turn);
+        if (safeTurn < capturedTurn)
+            return 0;
+        return Mathf.Max(0, RecentlyCapturedGarrisonTurns - (safeTurn - capturedTurn));
     }
 
     private static int CalculateSectorPriority(SectorManager.SectorInfo info, TeamId aiTeam, AIStance stance = AIStance.Tactical)
