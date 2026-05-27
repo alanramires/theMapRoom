@@ -24,11 +24,40 @@ Em `FindTransportMove` e `FindTransportExplorationMove`, a formula aplicava `thr
 - Inimigos visiveis proximos continuam influenciando a rota de transporte, mas sem vetar completamente hexes com vantagem de entrega.
 - Valores de ameaca sao agora multiplos de 10, consistentes com o raio hexagonal de `ThreatRadius = 3`.
 
+### 4. Ferramenta de progressao atualizada (`CaminhosValidosWindow`)
+
+A aba de Progressao da ferramenta "Caminhos Validos" foi refatorada para alinhar com a logica real da IA:
+
+- **Slider de horizonte (1 ou 2 turnos):** modo 1 exibe apenas o progresso imediato; modo 2 ativa `CalculateTwoTurnProgressScore`, identico ao score usado pela IA.
+- **Custo real em PM:** a ferramenta agora computa `costMap` via `CalculateMovementCostMap` a partir da origem e passa para a funcao de score, substituindo a contagem de waypoints.
+- **`CanUseAsDebugStopCell`:** filtra celulas onde a unidade nao pode realmente parar (aliados ocupando o hex), eliminando resultados falso-positivos na visualizacao.
+- **Secao "Passando Por" comentada:** substituida pela analise de dois turnos, que cobre o mesmo caso de uso com mais fidelidade.
+- **`CalculateReachableProgressScore`:** funcao de horizonte simples (1 turno) adicionada como alternativa leve ao calculo completo de 2 turnos.
+
+### 5. AI Intel Analyzer (`AIIntelAnalyzer.cs`) — novo componente
+
+Novo `MonoBehaviour` que produz um relatorio estruturado (`AIIntelReport`) sobre o estado atual da IA para uma equipe:
+
+- Consolida snapshot de objetivos, operacoes ativas, setores disputados, unidades por papel e estado de compras.
+- Atualiza automaticamente ao trocar de time ativo, apos load, no Start/Enable ou a cada frame (configuravel por flags).
+- Exibe resumo legivel em `[TextArea]` no Inspector para inspecao em tempo de execucao sem abrir logs.
+- Integrado ao `AIOperationManager`: novas consultas `TryGetCaptureOperationForObjective` e `IsFireSupportScreenedForObjective` alimentam o relatorio de inteligencia operacional.
+
+### 6. AIOperationManager — consultas de inteligencia operacional
+
+- `TryGetCaptureOperationForObjective`: localiza a operacao de captura vinculada a um `SectorObjective`.
+- `IsFireSupportScreenedForObjective`: verifica se uma unidade de fogo indireto possui escolta adequada antes de atirar, usando a operacao vinculada ao objetivo.
+- Construcao de operacoes refatorada para receber e usar `AIIntelReport` como contexto.
+
 ## Arquivos alterados
 
 - `Assets/Scripts/Match/AI/AIController.Capturer.Helpers.cs` — `CalculateThreatLevel`: euclidiana → hexagonal
 - `Assets/Scripts/Match/AI/AIController.Transportador.cs` — `FindTransportMove` e `FindTransportExplorationMove`: `threat * 8f → * 0.5f`
-- `Assets/Scripts/Match/AI/AIController.Progression.cs` — `TryScoreTwoTurnProgression`: fallback de custo usa `unit.RemainingMovementPoints` para celulas de bonus de estrada
+- `Assets/Scripts/Match/AI/AIController.Progression.cs` — novo arquivo; `TryScoreTwoTurnProgression` com fallback de custo para celulas de bonus de estrada
+- `Assets/Editor/CaminhosValidosWindow.cs` — ferramenta de progressao com horizonte configuravel, custo real e `CanUseAsDebugStopCell`
+- `Assets/Scripts/Shared/Jogadas/AIIntelAnalyzer.cs` — novo componente de inteligencia operacional
+- `Assets/Scripts/Shared/Jogadas/JogadasManager.cs` / `JogadasLog.cs` — sistema de registro de jogadas
+- `Assets/Scripts/Match/AI/AIOperationManager.cs` — consultas de intel e construcao de operacoes com contexto de relatorio
 
 ## Validacao
 
