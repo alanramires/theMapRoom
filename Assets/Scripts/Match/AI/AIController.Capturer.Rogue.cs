@@ -22,6 +22,23 @@ public partial class AIController
             if (stayBest != null)
             {
                 Vector3Int stCell = stayBest.CurrentCellPosition; stCell.z = 0;
+                if (unit.TryGetUnitData(out UnitData rogueData)
+                    && rogueData != null
+                    && rogueData.prioritizeDpqAtBattle)
+                {
+                    Dictionary<Vector3Int, List<Vector3Int>> dpqPaths =
+                        UnitMovementPathRules.CalcularCaminhosValidos(
+                            boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+                    HashSet<Vector3Int> dpqOccupied = BuildOccupied(unit);
+
+                    if (TryFindBetterDpqAttackCellForTarget(unit, snapshot.AITeam, from, stayBest, dpqPaths, dpqOccupied,
+                            out Vector3Int dpqAttackCell, out string dpqReason))
+                    {
+                        Debug.Log($"{TL("Rogue")} {unit.InstanceId} reposiciona DPQ e ataca {stayBest.UnitDisplayName}#{stayBest.InstanceId} via {dpqAttackCell} ({dpqReason})");
+                        return BuildAttackBatch(unit, snapshot.AITeam, from, dpqAttackCell,
+                            stayBest.InstanceId.ToString(), stCell, dpqPaths);
+                    }
+                }
                 Debug.Log($"{TL("Rogue")} {unit.InstanceId} ataca {stayBest.UnitDisplayName}#{stayBest.InstanceId} da posição atual");
                 return BuildAttackBatch(unit, snapshot.AITeam, from, from,
                     stayBest.InstanceId.ToString(), stCell);

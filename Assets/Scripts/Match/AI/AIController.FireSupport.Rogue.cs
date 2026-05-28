@@ -46,6 +46,19 @@ public partial class AIController
             }
         }
 
+        if (IsFireSupportConservative(unit))
+        {
+            Vector3Int conservativeCell = FindConservativeRogueFireSupportCell(unit, snapshot, fromCell, paths, occupied);
+            if (conservativeCell != fromCell)
+            {
+                Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rogue conservador reagrupa via {conservativeCell}");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, conservativeCell, paths);
+            }
+
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rogue conservador segura @ {fromCell} - sem alvo");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+        }
+
         if (IsLongRangeStationary(unit) && IsFireSupportCloseEnoughToHold(unit, fromCell, anchor))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rogue estacionario @ {fromCell} - sem alvo");

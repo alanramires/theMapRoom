@@ -243,18 +243,40 @@ public class AIShoppingPlanner : MonoBehaviour
                         break;
                     case AINeedKind.Artillery:
                         {
-                            int before = openFireSupportSlots;
-                            openFireSupportSlots = Mathf.Max(openFireSupportSlots, deficit.Count);
-                            preferDefensiveFireSupport = true;
-                            proactiveDefFireSupport = true;
-                            elevated = openFireSupportSlots != before;
+                            if (IsFireSupportSaturated(snapshot))
+                            {
+                                int beforeAssault = openAssaultSlots;
+                                openAssaultSlots = Mathf.Max(openAssaultSlots, 1);
+                                elevated = openAssaultSlots != beforeAssault;
+                                if (elevated)
+                                    Debug.Log($"[AI Shopping] op_deficit: {deficit.Operation?.Type}({deficit.Operation?.Sector}) {deficit.Kind}x{deficit.Count} saturado por artilharia ativa -> Assaultx1");
+                            }
+                            else
+                            {
+                                int before = openFireSupportSlots;
+                                openFireSupportSlots = Mathf.Max(openFireSupportSlots, deficit.Count);
+                                preferDefensiveFireSupport = true;
+                                proactiveDefFireSupport = true;
+                                elevated = openFireSupportSlots != before;
+                            }
                         }
                         break;
                     case AINeedKind.FireSupport:
                         {
-                            int before = openFireSupportSlots;
-                            openFireSupportSlots = Mathf.Max(openFireSupportSlots, deficit.Count);
-                            elevated = openFireSupportSlots != before;
+                            if (IsFireSupportSaturated(snapshot))
+                            {
+                                int beforeAssault = openAssaultSlots;
+                                openAssaultSlots = Mathf.Max(openAssaultSlots, 1);
+                                elevated = openAssaultSlots != beforeAssault;
+                                if (elevated)
+                                    Debug.Log($"[AI Shopping] op_deficit: {deficit.Operation?.Type}({deficit.Operation?.Sector}) {deficit.Kind}x{deficit.Count} saturado por artilharia ativa -> Assaultx1");
+                            }
+                            else
+                            {
+                                int before = openFireSupportSlots;
+                                openFireSupportSlots = Mathf.Max(openFireSupportSlots, deficit.Count);
+                                elevated = openFireSupportSlots != before;
+                            }
                         }
                         break;
                     case AINeedKind.AirTransport:
@@ -316,6 +338,7 @@ public class AIShoppingPlanner : MonoBehaviour
         int rawOpenCapturerSlots = openCapturerSlots;
         openCapturerSlots = LimitCapturerDemandForProgression(snapshot, openCapturerSlots, openAssaultSlots, openTransportSlots, openLogisticsSlots, openFireSupportSlots);
         openCapturerSlots = RestoreCapturerDemandForIdleAirlift(snapshot, rawOpenCapturerSlots, openCapturerSlots);
+        openCapturerSlots = RestoreStrategicPrimaryCapturerDemand(snapshot, rawOpenCapturerSlots, openCapturerSlots, ref openFireSupportSlots, ref preferDefensiveFireSupport);
         if (urgentCapturerFloor > 0)
             openCapturerSlots = Mathf.Max(openCapturerSlots, urgentCapturerFloor);
 
@@ -512,7 +535,8 @@ public class AIShoppingPlanner : MonoBehaviour
             && !criticalBaseAirThreat
             && supremeFireSupport == null
             && reserveForEliteDefensiveTank <= 0
-            && !CanAffordEliteDefensiveTank(snapshot, remaining);
+            && !CanAffordEliteDefensiveTank(snapshot, remaining)
+            && FindAffordableDefensiveBaseAssaultTankTarget(snapshot, remaining) == null;
         if (needsAffordableArmorFallback)
         {
             UnitData armorFallbackFireSupport = FindAffordableArmorFallbackFireSupportTarget(snapshot, remaining);
@@ -1245,6 +1269,13 @@ public class AIShoppingPlanner : MonoBehaviour
 
         bool defensiveStance  = snapshot.Stance == AIStance.Defensive;
         bool hasOpenDefensiveSlot = HasOpenDefensiveSlot(snapshot.AITeam);
+        bool decisiveDefensiveFireNeeded = ShouldPrioritizeDecisiveDefensiveFire(
+            snapshot,
+            budget,
+            openFireSupportSlots,
+            preferDefensiveFireSupport,
+            defensiveBaseThreat,
+            activeFireSupportCount);
 
         UnitData best      = null;
         int      bestScore = int.MinValue;
@@ -1403,6 +1434,11 @@ public class AIShoppingPlanner : MonoBehaviour
                 }
                 if (!preferredProfile && !fallbackProfile)
                     score -= 25000;
+            }
+            if (decisiveDefensiveFireNeeded && IsDecisiveDefensiveFirePurchase(u))
+            {
+                score += 45000;
+                Debug.Log($"[AI PickUnit] decisive_fire_bonus {u.displayName} +45000 budget={budget} fire={openFireSupportSlots} activeFire={activeFireSupportCount} stance={snapshot.Stance}");
             }
             if (openCapturerSlots > 0)
             {
@@ -1601,6 +1637,31 @@ public class AIShoppingPlanner : MonoBehaviour
         return best;
     }
 
+    private static UnitData FindAffordableDefensiveBaseAssaultTankTarget(AIWorldSnapshot snapshot, int budget)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null) return null;
+
+        UnitData best = null;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building.OfferedUnits == null) continue;
+
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (unit == null || unit.cost > budget) continue;
+                if (!IsDefensiveBaseAssaultTankPurchase(unit)) continue;
+
+                if (best == null
+                    || unit.eliteLevel > best.eliteLevel
+                    || (unit.eliteLevel == best.eliteLevel && unit.cost > best.cost))
+                    best = unit;
+            }
+        }
+
+        return best;
+    }
+
     private static bool IsEliteFireSupportReserveReady(AIWorldSnapshot snapshot)
     {
         if (snapshot == null) return false;
@@ -1662,6 +1723,7 @@ public class AIShoppingPlanner : MonoBehaviour
             return 0;
 
         int activeCapturers = CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: false);
+        int activePrimaryCapturers = CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: true);
 
         // T1 / opener: no active capturers yet — buy the full demand as the plan specifies.
         // The batch limit exists to slow down purchases once the army is running, not to cap T1.
@@ -1691,12 +1753,12 @@ public class AIShoppingPlanner : MonoBehaviour
         // Pause capturer purchases once we have enough active capturers.
         // supportDemand check removed: when all support slots are already filled (demand=0)
         // and activeCap exceeds the threshold, we should still stop buying more capturers.
-        if (activeCapturers >= supportPauseThreshold && activeAssault >= 1)
+        if (activeCapturers >= supportPauseThreshold && activePrimaryCapturers >= supportPauseThreshold && activeAssault >= 1)
             capped = 0;
 
         if (capped != openCapturerSlots)
         {
-            Debug.Log($"[AI Shopping] capturer_progression: raw={openCapturerSlots} capped={capped} activeCap={activeCapturers} activeAss={activeAssault} supportDemand={supportDemand} batch={batchSize} pauseAt={supportPauseThreshold} totalCapSlots={totalCapSlots}");
+            Debug.Log($"[AI Shopping] capturer_progression: raw={openCapturerSlots} capped={capped} activeCap={activeCapturers} primaryCap={activePrimaryCapturers} activeAss={activeAssault} supportDemand={supportDemand} batch={batchSize} pauseAt={supportPauseThreshold} totalCapSlots={totalCapSlots}");
         }
 
         return capped;
@@ -1725,6 +1787,89 @@ public class AIShoppingPlanner : MonoBehaviour
         restored = Mathf.Min(restored, spareSeats);
         Debug.Log($"[AI Shopping] capturer_airlift_feed: raw={rawOpenCapturerSlots} capped={cappedOpenCapturerSlots}->{restored} emptyAir={emptyAirTransporters} pickupCap={pickupCapturers} spareSeats={spareSeats} batch={batchSize} airliftSeats={airliftSeats} minDist={minDist}");
         return restored;
+    }
+
+    private static int RestoreStrategicPrimaryCapturerDemand(
+        AIWorldSnapshot snapshot,
+        int rawOpenCapturerSlots,
+        int cappedOpenCapturerSlots,
+        ref int openFireSupportSlots,
+        ref bool preferDefensiveFireSupport)
+    {
+        if (snapshot == null || rawOpenCapturerSlots <= 0)
+            return cappedOpenCapturerSlots;
+        if (!HasUnownedCapturableBuilding(snapshot))
+            return cappedOpenCapturerSlots;
+        if (!CanAffordPurePrimaryRole(snapshot, UnitRole.Capturador, snapshot.Budget))
+            return cappedOpenCapturerSlots;
+
+        int activePrimaryCapturers = CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: true);
+        int activeHybridCapturers = Mathf.Max(0, CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: false) - activePrimaryCapturers);
+        int activeCombatFireSupport = CountActiveCombatFireSupport(snapshot);
+        int strategicFloor = GetStrategicPrimaryCapturerFloor(snapshot);
+        bool belowStrategicFloor = activePrimaryCapturers < strategicFloor;
+        bool fireSupportSkew = activeCombatFireSupport >= Mathf.Max(4, activePrimaryCapturers * 2 + 2);
+
+        if (!belowStrategicFloor && !fireSupportSkew)
+            return cappedOpenCapturerSlots;
+
+        int restored = Mathf.Max(cappedOpenCapturerSlots, 1);
+        if (fireSupportSkew && openFireSupportSlots > 0)
+        {
+            Debug.Log($"[AI Shopping] capturer_composition: fire skew activeFire={activeCombatFireSupport} primaryCap={activePrimaryCapturers} hybridCap={activeHybridCapturers} -> suspendendo fire_slots {openFireSupportSlots}->0");
+            openFireSupportSlots = 0;
+            preferDefensiveFireSupport = false;
+        }
+
+        if (restored != cappedOpenCapturerSlots)
+        {
+            Debug.Log($"[AI Shopping] capturer_composition: restaurando cap {cappedOpenCapturerSlots}->{restored} raw={rawOpenCapturerSlots} primaryCap={activePrimaryCapturers}/{strategicFloor} hybridCap={activeHybridCapturers} activeFire={activeCombatFireSupport} skew={fireSupportSkew}");
+        }
+
+        return restored;
+    }
+
+    private static int GetStrategicPrimaryCapturerFloor(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null)
+            return 3;
+
+        int capturableFronts = CountUnownedCapturableSectors(snapshot);
+        int floor = capturableFronts >= 4 ? 4 : 3;
+        if (snapshot.Stance == AIStance.Offensive && capturableFronts >= 2)
+            floor = Mathf.Max(floor, 4);
+        if (snapshot.MyUnits != null && snapshot.MyUnits.Count <= 5)
+            floor = Mathf.Min(floor, 2);
+        return floor;
+    }
+
+    private static bool HasUnownedCapturableBuilding(AIWorldSnapshot snapshot)
+    {
+        return CountUnownedCapturableSectors(snapshot) > 0;
+    }
+
+    private static int CountUnownedCapturableSectors(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null)
+            return 0;
+
+        var sectors = new HashSet<ConstructionSector>();
+        AddCapturableSectors(snapshot.NeutralBuildings, sectors);
+        AddCapturableSectors(snapshot.EnemyBuildings, sectors);
+        return sectors.Count;
+    }
+
+    private static void AddCapturableSectors(List<ConstructionManager> buildings, HashSet<ConstructionSector> sectors)
+    {
+        if (buildings == null || sectors == null)
+            return;
+
+        foreach (ConstructionManager building in buildings)
+        {
+            if (building == null || !building.IsCapturable)
+                continue;
+            sectors.Add(building.Sector);
+        }
     }
 
     private static void CountSlots(TeamId aiTeam, UnitRole role, out int total, out int filled)
@@ -1771,6 +1916,93 @@ public class AIShoppingPlanner : MonoBehaviour
             && unit.domain == Domain.Land
             && unit.roles != null
             && unit.roles.Contains(UnitRole.FogoIndireto);
+    }
+
+    private static bool IsFireSupportSaturated(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null)
+            return false;
+
+        int activeFireSupport = CountActiveCombatFireSupport(snapshot);
+        int saturationLimit = GetFireSupportSaturationLimit(snapshot);
+        return activeFireSupport >= saturationLimit;
+    }
+
+    private static int GetFireSupportSaturationLimit(AIWorldSnapshot snapshot)
+    {
+        int activeAssault = CountActiveUnitsWithRole(snapshot, UnitRole.Assalto, requirePrimary: true);
+        int ratio = Instance != null ? Mathf.Max(1, Instance.AssaultPerFireSupportRatio) : 2;
+        int compositionLimit = Mathf.Max(1, Mathf.CeilToInt(activeAssault / (float)ratio));
+        return Mathf.Max(2, compositionLimit + 1);
+    }
+
+    private static int CountActiveCombatFireSupport(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null)
+                continue;
+            if (data.roles == null || !data.roles.Contains(UnitRole.FogoIndireto))
+                continue;
+            if (IsAntiAirOnlyUnit(data))
+                continue;
+            count++;
+        }
+
+        return count;
+    }
+
+    private static bool IsDecisiveDefensiveFirePurchase(UnitData unit)
+    {
+        return unit != null
+            && IsFireSupportPurchase(unit)
+            && IsPrimaryRole(unit, UnitRole.FogoIndireto)
+            && !IsAntiAirOnlyUnit(unit)
+            && unit.cost >= 10000;
+    }
+
+    private static bool ShouldPrioritizeDecisiveDefensiveFire(
+        AIWorldSnapshot snapshot,
+        int budget,
+        int openFireSupportSlots,
+        bool preferDefensiveFireSupport,
+        bool defensiveBaseThreat,
+        int activeFireSupportCount)
+    {
+        if (snapshot == null)
+            return false;
+        if (openFireSupportSlots <= 0 || !preferDefensiveFireSupport)
+            return false;
+        if (budget < 10000)
+            return false;
+        if (defensiveBaseThreat)
+            return true;
+
+        bool fireBacklog = openFireSupportSlots >= 2 || activeFireSupportCount <= 1;
+        if (snapshot.Stance == AIStance.Defensive && fireBacklog)
+            return true;
+
+        IReadOnlyDictionary<ConstructionSector, AISectorIntent> intents = AISectorIntentAnalyzer.GetIntents(snapshot.AITeam);
+        if (intents == null)
+            return false;
+
+        foreach (AISectorIntent intent in intents.Values)
+        {
+            if (intent == null)
+                continue;
+            if (intent.Kind != AISectorIntentKind.Defend)
+                continue;
+            if (intent.Confidence >= 0.70f && intent.HotScore >= 6f)
+                return true;
+        }
+
+        return false;
     }
 
     private static bool IsFireSupportAllowedByTiming(AIWorldSnapshot snapshot)
@@ -2418,8 +2650,16 @@ public class AIShoppingPlanner : MonoBehaviour
                 if (IsDefensiveFireSupportPurchase(d)) activeDefFS++;
             }
 
+        int activeCombatFireSupport = CountActiveCombatFireSupport(snapshot);
+        int saturationLimit = GetFireSupportSaturationLimit(snapshot);
+        if (activeCombatFireSupport >= saturationLimit)
+        {
+            Debug.Log($"[AI Shopping] proactive_def_fire_support: bloqueado por saturacao fire={activeCombatFireSupport}/{saturationLimit} ass={activeAssault}");
+            return false;
+        }
+
         bool needed = activeDefFS < cap;
-        Debug.Log($"[AI Shopping] proactive_def_fire_support: needed={needed} activeDefFS={activeDefFS} cap={cap} cap={activeCapturers}/{minCap} ass={activeAssault}/{minAss} richEarly={richEarly}");
+        Debug.Log($"[AI Shopping] proactive_def_fire_support: needed={needed} activeDefFS={activeDefFS} activeFire={activeCombatFireSupport}/{saturationLimit} cap={cap} cap={activeCapturers}/{minCap} ass={activeAssault}/{minAss} richEarly={richEarly}");
         return needed;
     }
 

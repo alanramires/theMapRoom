@@ -72,6 +72,126 @@ public partial class AIController
         return false;
     }
 
+    private bool TryFindProductionUnlockVacateAction(UnitManager unit, AIWorldSnapshot snapshot, out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null)
+            return false;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        ConstructionManager current = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
+        if (current == null || !current.CanProduceUnitsForTeam(snapshot.AITeam))
+            return false;
+        if (!AreAllAffordableHomeProducersOccupied(snapshot, out int occupiedProducers, out int totalProducers, out int cheapestOffer))
+            return false;
+
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        if (paths == null || paths.Count == 0)
+            return false;
+
+        if (!TryFindProductionUnlockVacateCell(unit, snapshot, fromCell, paths, occupied, out Vector3Int moveCell, out string reason))
+            return false;
+
+        Debug.Log($"{TL("Base")} {unit.InstanceId} libera produtora travada ({occupiedProducers}/{totalProducers} ocupadas, cheapest=${cheapestOffer}) via {moveCell} ({reason})");
+        action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+        return true;
+    }
+
+    private bool AreAllAffordableHomeProducersOccupied(
+        AIWorldSnapshot snapshot,
+        out int occupiedProducers,
+        out int totalProducers,
+        out int cheapestOffer)
+    {
+        occupiedProducers = 0;
+        totalProducers = 0;
+        cheapestOffer = int.MaxValue;
+        if (snapshot?.MyBuildings == null)
+            return false;
+
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam))
+                continue;
+            if (building.OfferedUnits == null || building.OfferedUnits.Count == 0)
+                continue;
+
+            int localCheapest = int.MaxValue;
+            foreach (UnitData offered in building.OfferedUnits)
+            {
+                if (offered == null)
+                    continue;
+                localCheapest = Mathf.Min(localCheapest, offered.cost);
+            }
+            if (localCheapest == int.MaxValue)
+                continue;
+
+            cheapestOffer = Mathf.Min(cheapestOffer, localCheapest);
+            totalProducers++;
+
+            Vector3Int cell = building.CurrentCellPosition;
+            cell.z = 0;
+            if (UnitOccupancyRules.GetUnitAtCell(boardTilemap, cell, null) != null)
+                occupiedProducers++;
+        }
+
+        return totalProducers > 0
+            && occupiedProducers >= totalProducers
+            && cheapestOffer != int.MaxValue
+            && snapshot.Budget >= cheapestOffer;
+    }
+
+    private bool TryFindProductionUnlockVacateCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestCell,
+        out string reason)
+    {
+        bestCell = fromCell;
+        reason = "";
+        float bestScore = float.MinValue;
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell) continue;
+            if (occupied != null && occupied.Contains(cell)) continue;
+
+            ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+            if (construction != null && construction.CanProduceUnitsForTeam(snapshot.AITeam))
+                continue;
+
+            int pathCost = GetPathStepCount(paths, cell);
+            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+            float dpq = GetTerrainDpqPontos(cell);
+            float distFromProducer = SectorManager.HexDistance(fromCell, cell);
+            float allyCohesion = CalculateFireSupportCohesionScore(unit, snapshot, cell);
+            float score =
+                dpq * 80f
+                + allyCohesion * 0.15f
+                - threat * 90f
+                - pathCost * 20f
+                - distFromProducer * 15f;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCell = cell;
+                reason = $"score={score:F0} dpq={dpq:F1} threat={threat:F1} path={pathCost}";
+            }
+        }
+
+        return bestCell != fromCell;
+    }
+
     private bool IsActiveUnitBlockingThreatenedHomeProduction(UnitManager unit, AIWorldSnapshot snapshot, TeamId aiTeam, Vector3Int fromCell, out string reason)
     {
         reason = "";
@@ -656,6 +776,56 @@ public partial class AIController
         foreach (PodeMirarTargetOption opt in targets)
             if (opt?.targetUnit == target) return true;
         return false;
+    }
+
+    private bool TryFindBetterDpqAttackCellForTarget(
+        UnitManager unit,
+        TeamId aiTeam,
+        Vector3Int fromCell,
+        UnitManager target,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestCell,
+        out string reason)
+    {
+        bestCell = fromCell;
+        reason = "";
+        if (unit == null || target == null || paths == null || paths.Count == 0)
+            return false;
+
+        float currentDpq = GetTerrainDpqPontos(fromCell);
+        float bestScore = float.MinValue;
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell) continue;
+            if (occupied != null && occupied.Contains(cell)) continue;
+            if (!CanAttackTargetFrom(fromCell, cell, unit, target)) continue;
+            if (!PassesAttackDecision(unit, target, cell, false, out string attackDecisionReason)) continue;
+
+            float dpq = GetTerrainDpqPontos(cell);
+            if (dpq <= currentDpq + 0.01f) continue;
+
+            int pathCost = GetPathStepCount(paths, cell);
+            float threat = CalculateThreatLevel(cell, aiTeam);
+            Vector3Int targetCell = target.CurrentCellPosition;
+            targetCell.z = 0;
+            float score =
+                (dpq - currentDpq) * 10000f
+                - pathCost * 25f
+                - threat * 5f
+                - SectorManager.HexDistance(cell, targetCell) * 10f;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCell = cell;
+                reason = $"dpq {currentDpq:F1}->{dpq:F1} path={pathCost} threat={threat:F1} score={score:F0} {attackDecisionReason}";
+            }
+        }
+
+        return bestCell != fromCell;
     }
 
     private void AppendMissingDpqReachabilityDiagnostics(

@@ -60,6 +60,24 @@ public partial class AIController
             && data.playConservative;
     }
 
+    private static int GetFireSupportConservativeAvoidEnemyRange(UnitManager unit)
+    {
+        if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null || !data.playConservative)
+            return 0;
+
+        return Mathf.Max(0, data.aiConservativeSupplyAvoidEnemyRange);
+    }
+
+    private bool IsFireSupportConservativeCellAllowed(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell)
+    {
+        int avoidRange = GetFireSupportConservativeAvoidEnemyRange(unit);
+        if (avoidRange <= 0)
+            return true;
+
+        TeamId aiTeam = snapshot != null ? snapshot.AITeam : unit != null ? unit.TeamId : TeamId.Neutral;
+        return !HasNearbyVisibleEnemy(cell, aiTeam, avoidRange);
+    }
+
     private static bool PreferFireSupportBestDpq(UnitManager unit)
     {
         return unit != null
@@ -177,6 +195,114 @@ public partial class AIController
         return fallback;
     }
 
+    private Vector3Int FindConservativeRogueFireSupportCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied)
+    {
+        if (unit == null || snapshot == null || paths == null || paths.Count == 0)
+            return fromCell;
+
+        Vector3Int home = snapshot.MyHQ != null ? snapshot.MyHQ.CurrentCellPosition : fromCell;
+        home.z = 0;
+        float fromHomeDist = SectorManager.HexDistance(fromCell, home);
+        float fromScore = ScoreConservativeRogueFireSupportCell(unit, snapshot, fromCell, fromCell, home, 0);
+
+        Vector3Int best = fromCell;
+        float bestScore = fromScore;
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell) continue;
+            if (occupied != null && occupied.Contains(cell)) continue;
+            if (IsCellACapturerTarget(cell, plan, snapshot.AITeam)) continue;
+
+            if (!IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
+                continue;
+
+            float homeDist = SectorManager.HexDistance(cell, home);
+            if (snapshot.MyHQ != null && homeDist > fromHomeDist + 0.1f)
+                continue;
+
+            float score = ScoreConservativeRogueFireSupportCell(
+                unit,
+                snapshot,
+                cell,
+                fromCell,
+                home,
+                GetPathStepCount(paths, cell));
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = cell;
+            }
+        }
+
+        return bestScore >= fromScore + 45f ? best : fromCell;
+    }
+
+    private float ScoreConservativeRogueFireSupportCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int cell,
+        Vector3Int fromCell,
+        Vector3Int home,
+        int pathCost)
+    {
+        float homeDist = SectorManager.HexDistance(cell, home);
+        float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+        float cohesion = CalculateFireSupportCohesionScore(unit, snapshot, cell);
+        float dpq = GetTerrainDpqPontos(cell);
+        float holdBias = cell == fromCell ? 35f : 0f;
+
+        return cohesion
+            + dpq * 45f
+            - homeDist * 35f
+            - threat * 220f
+            - pathCost * 20f
+            + holdBias;
+    }
+
+    private bool IsCellACapturerTarget(Vector3Int cell, TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (plan == null) return false;
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            bool hasCapturerSlot = false;
+            foreach (SlotNeed slot in obj.Slots)
+                if (slot.Role == UnitRole.Capturador && slot.Filled) { hasCapturerSlot = true; break; }
+            if (!hasCapturerSlot) continue;
+            ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
+            if (tgt == null) continue;
+            Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
+            if (tc == cell) return true;
+        }
+        return false;
+    }
+
+    private Vector3Int FindFireSupportCapturerVacateCell(
+        UnitManager unit, AIWorldSnapshot snapshot, Vector3Int fromCell,
+        TeamObjectivePlan plan, Dictionary<Vector3Int, List<Vector3Int>> paths, HashSet<Vector3Int> occupied)
+    {
+        Vector3Int best = fromCell;
+        float bestScore = float.MinValue;
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell; cell.z = 0;
+            if (cell == fromCell || occupied.Contains(cell)) continue;
+            if (IsCellACapturerTarget(cell, plan, snapshot.AITeam)) continue;
+            float score = GetTerrainDpqPontos(cell) * 25f - CalculateThreatLevel(cell, snapshot.AITeam) * 50f;
+            if (score > bestScore) { bestScore = score; best = cell; }
+        }
+        return best;
+    }
+
     private bool TryBuildBestFireSupportAttack(
         UnitManager unit,
         AIWorldSnapshot snapshot,
@@ -204,12 +330,14 @@ public partial class AIController
         // Artillery-mode filter: only allow attacks at the unit's max weapon range.
         // preferArtilleryModeBeforeCombatant means "fire from distance, not close combat."
         int artilleryMaxRange = indirectOnly ? GetFireSupportMaxWeaponRange(unit) : 0;
+        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
 
         foreach (Vector3Int rawCell in EnumerateFireSupportCandidateCells(fromCell, paths, stationary))
         {
             Vector3Int cell = rawCell;
             cell.z = 0;
             if (cell != fromCell && occupied != null && occupied.Contains(cell)) continue;
+            if (cell != fromCell && IsCellACapturerTarget(cell, capPlan, snapshot.AITeam)) continue;
 
             SensorMovementMode mode = cell != fromCell
                 ? SensorMovementMode.MoveuAndando
@@ -315,6 +443,7 @@ public partial class AIController
         float bestScore = float.MinValue;
         Vector3Int bestCell = fromCell;
         string bestDetails = "";
+        TeamObjectivePlan blockedCapPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
@@ -322,9 +451,10 @@ public partial class AIController
             cell.z = 0;
             if (cell == fromCell) continue;
             if (occupied != null && occupied.Contains(cell)) continue;
+            if (IsCellACapturerTarget(cell, blockedCapPlan, snapshot.AITeam)) continue;
 
             float threat = CalculateThreatLevel(cell, snapshot.AITeam);
-            if (conservative && threat > fromThreat + 0.1f)
+            if (conservative && !IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
                 continue;
 
             SensorMovementMode mode = SensorMovementMode.MoveuAndando;
@@ -731,6 +861,11 @@ public partial class AIController
         float bestAdvanceThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
         int bestAdvancePathCost = int.MaxValue;
         bool foundAdvance = false;
+        TeamObjectivePlan repositionCapPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        // Pre-compute so the advance fallback can check it before the loop result is available.
+        bool shouldAdvanceToAssignedEarly = fromEffectiveDist > Mathf.Max(1, maxRange + 1);
+        // Conservative preferMaxRange units are allowed to advance when too far from firing range.
+        bool conservativeAdvanceAllowed = conservative && preferMaxRange && shouldAdvanceToAssignedEarly;
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
@@ -738,8 +873,9 @@ public partial class AIController
             cell.z = 0;
             if (cell == fromCell) continue;
             if (occupied != null && occupied.Contains(cell)) continue;
+            if (IsCellACapturerTarget(cell, repositionCapPlan, snapshot.AITeam)) continue;
             float threat = CalculateThreatLevel(cell, snapshot.AITeam);
-            if (conservative && threat > fromThreat + 0.1f)
+            if (conservative && !IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
                 continue;
 
             float progress = fromDist - SectorManager.HexDistance(cell, anchor);
@@ -815,7 +951,9 @@ public partial class AIController
         float moveMargin = moveMarginOverride >= 0f ? moveMarginOverride : 120f;
         bool enemyNearAnchor = HasNearbyVisibleEnemy(anchor, snapshot.AITeam, defenseEnemyRange + maxRange);
         bool shouldAdvanceToAssigned = fromEffectiveDist > Mathf.Max(1, maxRange + 1);
+        bool canUseAdvanceFallback = !conservative || conservativeAdvanceAllowed;
         if (!requireImmediateThreat
+            && canUseAdvanceFallback
             && shouldAdvanceToAssigned
             && foundAdvance
             && bestAdvanceCell != fromCell)
@@ -827,7 +965,7 @@ public partial class AIController
 
         if (!found || bestCell == fromCell)
         {
-            if (foundAdvance && (shouldAdvanceToAssigned || enemyNearAnchor))
+            if (canUseAdvanceFallback && foundAdvance && (shouldAdvanceToAssigned || enemyNearAnchor))
             {
                 bestCell = bestAdvanceCell;
                 reason = $"advanceRoute route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} fromRoute={(fromRouteFound ? fromRouteDist.ToString("F1") : "?")} maxRange={maxRange} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
@@ -839,7 +977,7 @@ public partial class AIController
 
         if (bestScore < fromScore + moveMargin)
         {
-            if (foundAdvance && (shouldAdvanceToAssigned || enemyNearAnchor))
+            if (canUseAdvanceFallback && foundAdvance && (shouldAdvanceToAssigned || enemyNearAnchor))
             {
                 bestCell = bestAdvanceCell;
                 reason = $"advanceRoute score={bestScore:F0} hold={fromScore:F0} route={bestAdvanceRouteFound} prog={bestAdvanceProgress:F1} hexProg={bestAdvanceHexProgress:F1} fromRoute={(fromRouteFound ? fromRouteDist.ToString("F1") : "?")} maxRange={maxRange} dpq={bestAdvanceDpq:F1} threat={bestAdvanceThreat:F1} path={bestAdvancePathCost}";
@@ -865,6 +1003,221 @@ public partial class AIController
             out string scoreDetails);
         reason = $"score={bestScore:F0} hold={fromScore:F0} {scoreDetails}";
         return true;
+    }
+
+    private bool TryFindFireSupportMaxRangeThreatCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestCell,
+        out string reason)
+    {
+        bestCell = fromCell;
+        reason = "";
+        if (!PreferFireSupportWeaponMaxRange(unit)
+            || unit == null
+            || snapshot == null
+            || paths == null
+            || paths.Count == 0)
+            return false;
+
+        int maxRange = GetFireSupportMaxWeaponRange(unit);
+        if (maxRange <= 0)
+            return false;
+
+        WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
+        bool conservative = IsFireSupportConservative(unit);
+        float fromThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        float bestScore = float.MinValue;
+        float bestThreat = 0f;
+        float bestDpq = 0f;
+        float bestPosture = 0f;
+        int bestPath = 0;
+        string bestPostureReason = "";
+        int considered = 0;
+        int occupiedRejected = 0;
+        int capRejected = 0;
+        int noPostureRejected = 0;
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell) continue;
+            considered++;
+            if (occupied != null && occupied.Contains(cell))
+            {
+                occupiedRejected++;
+                continue;
+            }
+
+            if (IsCellACapturerTarget(cell, plan, snapshot.AITeam))
+            {
+                capRejected++;
+                continue;
+            }
+
+            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+            float posture = ScoreFireSupportMaxRangeSensorPosture(
+                unit,
+                snapshot,
+                cell,
+                maxRange,
+                weaponPriorityData,
+                out string postureReason);
+            if (posture <= 0f)
+            {
+                noPostureRejected++;
+                continue;
+            }
+
+            int pathCost = GetPathStepCount(paths, cell);
+            float dpq = GetTerrainDpqPontos(cell);
+            float cohesion = conservative ? CalculateFireSupportCohesionScore(unit, snapshot, cell) : 0f;
+            float score = posture
+                + dpq * 85f
+                + cohesion
+                - threat * (conservative ? 220f : 70f)
+                - pathCost * 18f;
+            if (conservative && threat > fromThreat + 0.1f)
+                score -= (threat - fromThreat) * 180f;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCell = cell;
+                bestThreat = threat;
+                bestDpq = dpq;
+                bestPosture = posture;
+                bestPath = pathCost;
+                bestPostureReason = postureReason;
+            }
+        }
+
+        if (bestCell == fromCell)
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} max-range sem candidato: paths={paths.Count} considered={considered} occ={occupiedRejected} cap={capRejected} noPosture={noPostureRejected} fromThreat={fromThreat:F1}");
+
+            // Use known enemy positions (hex distance 1:1 — artillery range ignores terrain cost)
+            return false;
+        }
+
+        reason = $"posture={bestPosture:F0} {bestPostureReason} dpq={bestDpq:F1} threat={bestThreat:F1} path={bestPath}";
+        return true;
+    }
+
+    private float ScoreFireSupportMaxRangeSensorPosture(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int cell,
+        int maxRange,
+        WeaponPriorityData weaponPriorityData,
+        out string reason)
+    {
+        reason = "";
+        if (unit == null || snapshot == null || maxRange <= 0)
+            return 0f;
+
+        var targets = new List<PodeMirarTargetOption>();
+        var invalids = new List<PodeMirarInvalidOption>();
+        PodeMirarSensor.CollectTargets(
+            unit,
+            boardTilemap,
+            terrainDatabase,
+            SensorMovementMode.MoveuAndando,
+            targets,
+            invalids,
+            weaponPriorityData: weaponPriorityData,
+            dpqAirHeightConfig: turnStateManager != null ? turnStateManager.DpqAirHeightConfigRef : null,
+            fromCell: cell);
+
+        float best = 0f;
+        UnitManager bestTarget = null;
+        string bestKind = "";
+        int bestDistance = 0;
+
+        for (int i = 0; i < targets.Count; i++)
+        {
+            PodeMirarTargetOption opt = targets[i];
+            UnitManager target = opt != null ? opt.targetUnit : null;
+            if (target == null || target.TeamId == snapshot.AITeam || target.IsDead || target.IsEmbarked)
+                continue;
+
+            float targetScore = GetFireSupportTargetPreferenceScore(ResolveFireSupportTargetPreference(unit, target));
+            float rangeFit = GetFireSupportRangeFitScore(unit, target, opt.distance, opt.weapon, weaponPriorityData);
+            if (rangeFit <= 0f)
+                continue;
+
+            float idealRange = Mathf.Max(0f, 4200f - Mathf.Abs(opt.distance - maxRange) * 900f);
+            float decisionBonus = PassesAttackDecision(unit, target, cell, defensiveContext: false, out _)
+                ? 2400f
+                : 600f;
+            float score = targetScore + rangeFit + idealRange + decisionBonus - target.InstanceId * 0.001f;
+            if (score > best)
+            {
+                best = score;
+                bestTarget = target;
+                bestKind = "valid";
+                bestDistance = opt.distance;
+            }
+        }
+
+        for (int i = 0; i < invalids.Count; i++)
+        {
+            PodeMirarInvalidOption invalid = invalids[i];
+            UnitManager target = invalid != null ? invalid.targetUnit : null;
+            if (target == null || target.TeamId == snapshot.AITeam || target.IsDead || target.IsEmbarked)
+                continue;
+
+            bool usefulInvalid =
+                IsBlockedLineReason(invalid.reasonId)
+                || invalid.reasonId == PodeMirarInvalidOption.ReasonIdNoForwardObserver
+                || invalid.reasonId == PodeMirarInvalidOption.ReasonIdOutOfRange;
+            if (!usefulInvalid)
+                continue;
+
+            float rangeFit = GetFireSupportRangeFitScore(unit, target, invalid.distance, invalid.weapon, weaponPriorityData);
+            bool nearMaxRange = Mathf.Abs(invalid.distance - maxRange) <= 1;
+            if (rangeFit <= 0f && !nearMaxRange && !IsBlockedLineReason(invalid.reasonId))
+            {
+                // Enemy is visible but too far for max-range engagement.
+                // Give a small approach score so the cell isn't rejected as "no posture",
+                // letting the unit navigate toward firing range rather than staying idle.
+                if (invalid.reasonId == PodeMirarInvalidOption.ReasonIdOutOfRange && invalid.distance > maxRange)
+                {
+                    float approachScore = Mathf.Max(1f, 800f - (invalid.distance - maxRange) * 80f);
+                    if (approachScore > best)
+                    {
+                        best = approachScore;
+                        bestTarget = target;
+                        bestKind = "approach";
+                        bestDistance = invalid.distance;
+                    }
+                }
+                continue;
+            }
+
+            float targetScore = GetFireSupportTargetPreferenceScore(ResolveFireSupportTargetPreference(unit, target));
+            float blockedBonus = IsBlockedLineReason(invalid.reasonId) ? 3200f : 0f;
+            float observerBonus = invalid.reasonId == PodeMirarInvalidOption.ReasonIdNoForwardObserver ? 1600f : 0f;
+            float rangePosture = Mathf.Max(0f, 3600f - Mathf.Abs(invalid.distance - maxRange) * 850f);
+            float score = targetScore + rangeFit + blockedBonus + observerBonus + rangePosture - target.InstanceId * 0.001f;
+            if (score > best)
+            {
+                best = score;
+                bestTarget = target;
+                bestKind = invalid.reasonId;
+                bestDistance = invalid.distance;
+            }
+        }
+
+        if (bestTarget != null)
+            reason = $"target={bestTarget.UnitDisplayName}#{bestTarget.InstanceId} dist={bestDistance} mode={bestKind}";
+
+        return best;
     }
 
     private static bool IsBetterFireSupportAdvanceFallback(

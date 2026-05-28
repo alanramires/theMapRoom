@@ -23,6 +23,18 @@ public partial class AIController
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
 
+        // Swap: se um capturador mais forte do mesmo objetivo consegue chegar este turno,
+        // cede o edificio e sai do caminho.
+        if (plan != null)
+        {
+            UnitManager incoming = FindSwapIncomingCapturer(unit, plan, snapshot.AITeam);
+            if (incoming != null)
+            {
+                PlayerAction swapAction = DecideSwapVacateAction(unit, incoming, snapshot);
+                if (swapAction != null) return swapAction;
+            }
+        }
+
         // Opportunistic capture of current cell — takes priority over embark.
         // If already standing on a capturable construction not claimed by another capturer, capture now.
         {

@@ -114,6 +114,10 @@ public partial class AIController
         // com tiro possivel deve agir antes da infantaria defensora se reposicionar.
         if (!unit.IsUnderRepair && HasFireSupportShotAtOwnedConstructionCapturer(unit, aiTeam)) return 0;
 
+        // Swap: capturador fraco sobre o edificio do seu objetivo cede o hex para o
+        // colega mais forte do mesmo objetivo que consegue chegar este turno.
+        if (!unit.IsUnderRepair && plan != null && HasSwapIncomingCapturerFast(unit, plan, aiTeam)) return 0;
+
         // Manutencao nao preempta a fila. Se estiver em cima de alvo de captura,
         // IsBlockingCaptureTarget ja colocou no grupo 0 acima.
         if (unit.IsUnderRepair) return 5;

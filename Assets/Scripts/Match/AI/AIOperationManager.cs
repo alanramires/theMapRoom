@@ -101,7 +101,7 @@ public class AIOperationManager : MonoBehaviour
         UnitManager screen = FindBestScreenUnitForOperation(operation, fireSupport.InstanceId);
         if (screen == null)
         {
-            reason = $"sem assalto/tank screen em {operation.Type} {operation.Sector}";
+            reason = $"sem screen minimo em {operation.Type} {operation.Sector}";
             return false;
         }
 
@@ -204,6 +204,11 @@ public class AIOperationManager : MonoBehaviour
             if (obj == null || obj.Status != ObjectiveStatus.Defending) continue;
             if (ConstructionSectorHelper.IsBase(obj.Sector)) continue;
             if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info)) continue;
+            if (!IsOwnedDefensibleSector(info, team))
+            {
+                Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] SectorDefense skip {obj.Sector}: stale defense owner={info.ControllingTeam}");
+                continue;
+            }
             BuildSectorDefenseOp(team, snapshot, obj, info, ops, built, FindIntelForSector(intel, info.Sector));
         }
 
@@ -243,14 +248,15 @@ public class AIOperationManager : MonoBehaviour
             int fireSupport = CountSlots(obj, UnitRole.FogoIndireto);
             AISectorIntel sectorIntel = FindIntelForSector(intel, obj.Sector);
             bool risky = info.GetRiskLevelFor(team) >= SectorManager.SectorRiskLevel.Medium || IsHotIntelSector(sectorIntel);
-            bool needsScreen = fireSupport > 0 || risky;
+            bool hasBasicTaskForce = capturers > 0 && (assaults > 0 || fireSupport > 0);
+            bool needsAssaultScreen = risky && !hasBasicTaskForce;
 
             AIOperation op = CreateOperation(team, AIOperationType.GroundCapture, 4, snapshot, obj.Sector);
             op.LinkedObjective = obj;
             op.AnchorCell = snapshot.MyHQ != null ? Normalize(snapshot.MyHQ.CurrentCellPosition) : Vector3Int.zero;
             op.TargetCell = Normalize(info.RepresentativeCell);
             op.AddSlots(AINeedKind.Capturer, Mathf.Max(0, capturers));
-            op.AddSlots(AINeedKind.Assault, Mathf.Max(assaults, needsScreen ? 1 : 0));
+            op.AddSlots(AINeedKind.Assault, Mathf.Max(assaults, needsAssaultScreen ? 1 : 0));
             op.AddSlots(AINeedKind.FireSupport, Mathf.Max(0, fireSupport));
 
             if (op.RequiredSlots.Count == 0)
@@ -513,7 +519,7 @@ public class AIOperationManager : MonoBehaviour
                 op.HasScreen = false;
                 op.ScreenUnitId = -1;
                 op.ScreenDistanceToTarget = -1f;
-                op.CohesionReason = "sem assalto/tank";
+                op.CohesionReason = "sem screen minimo";
                 continue;
             }
 
@@ -651,14 +657,27 @@ public class AIOperationManager : MonoBehaviour
         if (op == null)
             return null;
 
+        UnitManager bestAssault = FindBestAssignedUnitForNeed(op, AINeedKind.Assault, excludedUnitId);
+        if (bestAssault != null)
+            return bestAssault;
+
+        if (op.Type == AIOperationType.GroundCapture)
+            return FindBestAssignedUnitForNeed(op, AINeedKind.Capturer, excludedUnitId);
+
+        return null;
+    }
+
+    private static UnitManager FindBestAssignedUnitForNeed(AIOperation op, AINeedKind need, int excludedUnitId = -1)
+    {
         UnitManager best = null;
         float bestDist = float.MaxValue;
         foreach (int id in op.AssignedUnitIds)
         {
             if (id == excludedUnitId)
                 continue;
+
             UnitManager unit = FindActiveUnit(id);
-            if (!UnitSatisfiesNeed(unit, AINeedKind.Assault))
+            if (!UnitSatisfiesNeed(unit, need))
                 continue;
 
             float dist = SectorManager.HexDistance(Normalize(unit.CurrentCellPosition), op.TargetCell);
@@ -668,6 +687,7 @@ public class AIOperationManager : MonoBehaviour
                 bestDist = dist;
             }
         }
+
         return best;
     }
 

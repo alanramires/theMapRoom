@@ -75,6 +75,15 @@ public class JogadasManager : MonoBehaviour
         });
     }
 
+    public void RegistrarTransferir(int turno, int team, int cx, int cy, string sigla, int uid)
+    {
+        log.Registrar(new Jogada
+        {
+            turno = turno, team = team, acao = "Transferir",
+            cx = cx, cy = cy, unidadeSigla = sigla, uid = uid
+        });
+    }
+
     public void RegistrarEstacionario(int turno, int team, int cx, int cy, string sigla, int uid)
     {
         log.Registrar(new Jogada
@@ -178,15 +187,16 @@ public class JogadasManager : MonoBehaviour
         bool isDesembarque = action.SensorAction == SensorActionType.Disembark;
         bool isFusao       = action.SensorAction == SensorActionType.Merge;
         bool isSuprir      = action.SensorAction == SensorActionType.Supply;
-        bool isEstacionario = !isCaptura && !isEmbarque && !isAtaque && !isDesembarque && !isFusao && !isSuprir
+        bool isTransferir  = action.SensorAction == SensorActionType.Transfer;
+        bool isEstacionario = !isCaptura && !isEmbarque && !isAtaque && !isDesembarque && !isFusao && !isSuprir && !isTransferir
                               && action.HasMoveTo && action.HasMoveFrom
                               && action.MoveTo == action.MoveFrom
                               && string.IsNullOrEmpty(action.TargetInstanceId);
-        bool isMover = !isCaptura && !isEmbarque && !isAtaque && !isDesembarque && !isFusao && !isSuprir && !isEstacionario
+        bool isMover = !isCaptura && !isEmbarque && !isAtaque && !isDesembarque && !isFusao && !isSuprir && !isTransferir && !isEstacionario
                        && action.HasMoveTo && action.HasMoveFrom
                        && action.MoveTo != action.MoveFrom
                        && string.IsNullOrEmpty(action.TargetInstanceId);
-        if (!isCaptura && !isEmbarque && !isAtaque && !isDesembarque && !isFusao && !isSuprir && !isEstacionario && !isMover)
+        if (!isCaptura && !isEmbarque && !isAtaque && !isDesembarque && !isFusao && !isSuprir && !isTransferir && !isEstacionario && !isMover)
         {
             Debug.Log($"[Jogadas] RegistrarPlayerAction ignorada: ActionType={action.ActionType} SensorAction={action.SensorAction} HasMoveTo={action.HasMoveTo} HasMoveFrom={action.HasMoveFrom} MoveFrom={action.MoveFrom} MoveTo={action.MoveTo}");
             return;
@@ -232,6 +242,12 @@ public class JogadasManager : MonoBehaviour
                     manager.RegistrarSuprindo(turno, team, alvoCell.x, alvoCell.y, alvoSigla, uidAlvo);
                 }
             }
+            return;
+        }
+
+        if (isTransferir)
+        {
+            manager.RegistrarTransferir(turno, team, from.x, from.y, sigla, uid);
             return;
         }
 

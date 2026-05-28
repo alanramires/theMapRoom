@@ -16,6 +16,9 @@ public partial class AIController
 
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
 
+        if (TryFindProductionUnlockVacateAction(unit, snapshot, out PlayerAction productionUnlockAction))
+            return productionUnlockAction;
+
         if (plan != null)
 
         {

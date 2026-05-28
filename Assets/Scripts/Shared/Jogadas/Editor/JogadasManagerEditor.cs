@@ -41,7 +41,7 @@ public class JogadasManagerEditor : Editor
         IEnumerable<Jogada> filtradas = all;
         if (_filtroTeam >= 0)  filtradas = filtradas.Where(j => j.team  == _filtroTeam);
         if (_filtroTurno > 0)  filtradas = filtradas.Where(j => j.turno == _filtroTurno);
-        List<Jogada> lista = filtradas.OrderBy(j => j.jogadaId).ToList();
+        List<Jogada> lista = filtradas.OrderByDescending(j => j.jogadaId).ToList();
 
         if (lista.Count == 0)
         {
@@ -56,7 +56,7 @@ public class JogadasManagerEditor : Editor
 
         if (_agruparPorTurno)
         {
-            foreach (int turno in lista.Select(j => j.turno).Distinct().OrderBy(t => t))
+            foreach (int turno in lista.Select(j => j.turno).Distinct().OrderByDescending(t => t))
             {
                 EditorGUILayout.Space(2);
                 EditorGUILayout.LabelField($"── Turno {turno} ──", EditorStyles.miniLabel);
