@@ -9,6 +9,20 @@ public enum AISectorIntentKind
     Defend,
     Avoid,
     Intercept,
+    Secure,
+    Covered,
+}
+
+public enum AISectorRelation
+{
+    Unknown,
+    OwnBase,
+    EnemyBase,
+    OwnNatural,
+    EnemyNatural,
+    NeutralCenter,
+    Owned,
+    EnemyOwned,
 }
 
 [Serializable]
@@ -17,6 +31,7 @@ public class AISectorIntent
     public TeamId Team;
     public ConstructionSector Sector;
     public AISectorIntentKind Kind;
+    public AISectorRelation Relation;
     public float Confidence;
     public float HotScore;
     public string Reason = "";
@@ -101,16 +116,25 @@ public static class AISectorIntentAnalyzer
         SectorManager.SectorInfo info = TryGetSectorInfo(sector);
 
         bool owned = info != null && info.ControllingTeam == team;
+        AISectorRelation relation = ClassifyRelation(team, info);
+        bool ownNaturalNeutral = relation == AISectorRelation.OwnNatural
+            && info != null
+            && info.ControllingTeam == TeamId.Neutral;
         bool disputed = info != null && info.IsDisputed;
         bool partial = info != null && info.HasPartialCapture;
         bool hasObjective = obj != null;
         bool defensiveObjective = obj != null && obj.Status == ObjectiveStatus.Defending;
         bool staleDefensiveObjective = defensiveObjective && !owned;
         bool offensiveObjective = obj != null && IsOffensiveStatus(obj.Status);
+        bool coveredByCascade = obj == null && IsCoveredByObjectiveCascade(plan, team, sector);
         bool hot = IsHot(sectorIntel);
         bool capturePressure = sectorIntel != null && sectorIntel.capturePressure > 0f;
         bool damagePressure = sectorIntel != null && sectorIntel.damageTaken > 0f;
         bool enemyPresence = sectorIntel != null && sectorIntel.enemyPresence >= 2f;
+        bool projectedThreat = capturePressure
+            || damagePressure
+            || enemyPresence
+            || (sectorIntel != null && sectorIntel.landingPressure > 0f);
         float hotScore = sectorIntel != null ? sectorIntel.hotScore : 0f;
 
         AISectorIntentKind kind;
@@ -123,7 +147,11 @@ public static class AISectorIntentAnalyzer
                 ? AISectorIntentKind.Intercept
                 : AISectorIntentKind.Attack;
         else if (offensiveObjective)
-            kind = AISectorIntentKind.Attack;
+            kind = ownNaturalNeutral ? AISectorIntentKind.Secure : AISectorIntentKind.Attack;
+        else if (relation == AISectorRelation.EnemyBase && !projectedThreat)
+            kind = AISectorIntentKind.Avoid;
+        else if (coveredByCascade)
+            kind = AISectorIntentKind.Covered;
         else if (!owned && hot && (sectorIntel.enemyActivity > 0f || enemyPresence))
             kind = AISectorIntentKind.Intercept;
         else if (!owned && hotScore >= 10f)
@@ -143,18 +171,21 @@ public static class AISectorIntentAnalyzer
             Team = team,
             Sector = sector,
             Kind = kind,
+            Relation = relation,
             Confidence = confidence,
             HotScore = hotScore,
             Source = source ?? "",
-            Reason = BuildReason(obj, info, sectorIntel, staleDefensiveObjective),
+            Reason = BuildReason(obj, info, relation, sectorIntel, staleDefensiveObjective, coveredByCascade),
         };
     }
 
-    private static string BuildReason(SectorObjective obj, SectorManager.SectorInfo info, AISectorIntel intel, bool staleDefensiveObjective)
+    private static string BuildReason(SectorObjective obj, SectorManager.SectorInfo info, AISectorRelation relation, AISectorIntel intel, bool staleDefensiveObjective, bool coveredByCascade)
     {
         var parts = new List<string>();
         if (obj != null)
             parts.Add($"obj={obj.Status}/pri{obj.Priority}");
+        if (coveredByCascade)
+            parts.Add("covered_by_cascade");
         if (staleDefensiveObjective)
             parts.Add("stale_defense_owner_mismatch");
         if (info != null)
@@ -162,12 +193,13 @@ public static class AISectorIntentAnalyzer
             if (info.IsDisputed) parts.Add("disputed");
             if (info.HasPartialCapture) parts.Add("partial");
             parts.Add($"owner={info.ControllingTeam}");
+            parts.Add($"zone={relation}");
         }
         if (intel != null)
         {
             if (intel.hotScore > 0f) parts.Add($"hot={intel.hotScore:F1}");
-            if (intel.enemyActivity > 0f) parts.Add($"enemy={intel.enemyActivity:F1}");
-            if (intel.enemyPresence > 0f) parts.Add($"presence={intel.enemyPresence:F1}");
+            if (intel.enemyActivity > 0f) parts.Add($"enemyAct={intel.enemyActivity:F1}");
+            if (intel.enemyPresence > 0f) parts.Add($"inferredPresence={intel.enemyPresence:F1}");
             if (intel.damageTaken > 0f) parts.Add($"dmg={intel.damageTaken:F1}");
             if (intel.capturePressure > 0f) parts.Add($"cap={intel.capturePressure:F1}");
             if (intel.landingPressure > 0f) parts.Add($"landing={intel.landingPressure:F1}");
@@ -182,7 +214,7 @@ public static class AISectorIntentAnalyzer
             if (intent.Kind == AISectorIntentKind.Hold && intent.HotScore <= 0f)
                 continue;
 
-            Debug.Log($"[AI Intel][Intent][T{turn}][{team}][{source}] {intent.Sector}={intent.Kind} conf={intent.Confidence:F2} reason={intent.Reason}");
+            Debug.Log($"[AI Intel][Intent][T{turn}][{team}][{source}] {intent.Sector}={intent.Kind} relation={intent.Relation} conf={intent.Confidence:F2} reason={intent.Reason}");
         }
     }
 
@@ -236,5 +268,75 @@ public static class AISectorIntentAnalyzer
             || status == ObjectiveStatus.Pursuing
             || status == ObjectiveStatus.Capturing
             || status == ObjectiveStatus.PartialReadyForHandoff;
+    }
+
+    private static bool IsCoveredByObjectiveCascade(TeamObjectivePlan plan, TeamId team, ConstructionSector sector)
+    {
+        if (plan == null || plan.Objectives == null)
+            return false;
+
+        for (int i = 0; i < plan.Objectives.Count; i++)
+        {
+            SectorObjective obj = plan.Objectives[i];
+            if (obj == null || obj.Status == ObjectiveStatus.Defending)
+                continue;
+            if (!IsOffensiveStatus(obj.Status))
+                continue;
+            if (ComputeForwardNeighborSector(obj.Sector, team) == sector)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static ConstructionSector ComputeForwardNeighborSector(ConstructionSector sector, TeamId team)
+    {
+        if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info))
+            return default;
+
+        float myHQDist = info.GetDistanceToHQ(team);
+        if (info.ClosestNeighbor1 != default
+            && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1)
+            && n1.GetDistanceToHQ(team) > myHQDist)
+            return info.ClosestNeighbor1;
+        if (info.ClosestNeighbor2 != default
+            && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2)
+            && n2.GetDistanceToHQ(team) > myHQDist)
+            return info.ClosestNeighbor2;
+        return default;
+    }
+
+    public static AISectorRelation ClassifyRelation(TeamId team, SectorManager.SectorInfo info)
+    {
+        if (info == null)
+            return AISectorRelation.Unknown;
+
+        if (ConstructionSectorHelper.IsBase(info.Sector))
+        {
+            TeamId hqTeam = FindHQTeamInSector(info.Sector);
+            if (hqTeam == team) return AISectorRelation.OwnBase;
+            if (hqTeam != TeamId.Neutral) return AISectorRelation.EnemyBase;
+            return AISectorRelation.Unknown;
+        }
+
+        if (info.ControllingTeam == team)
+            return AISectorRelation.Owned;
+        if (info.ControllingTeam != TeamId.Neutral)
+            return AISectorRelation.EnemyOwned;
+
+        TeamId nearest = info.NearestTeam();
+        if (nearest == team)
+            return AISectorRelation.OwnNatural;
+        if (nearest != TeamId.Neutral)
+            return AISectorRelation.EnemyNatural;
+        return AISectorRelation.NeutralCenter;
+    }
+
+    private static TeamId FindHQTeamInSector(ConstructionSector sector)
+    {
+        foreach (ConstructionManager c in ConstructionManager.AllActive)
+            if (c != null && c.Sector == sector && c.IsPlayerHeadQuarter)
+                return c.TeamId;
+        return TeamId.Neutral;
     }
 }

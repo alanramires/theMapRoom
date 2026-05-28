@@ -226,6 +226,12 @@ public partial class TurnStateManager
                             $"occupants={info}");
                     }
 
+                    // Cannot stop here, but paint and keep navigable for cursor passthrough.
+                    // Confirmation will be blocked by CanEndMove / FindUnitAtCell.
+                    paintCells.Add(cell);
+                    paintedRangeCells.Add(cell);
+                    paintedRangeLookup.Add(cell);
+                    movementPathsByCell[cell] = pair.Value;
                     continue;
                 }
             }

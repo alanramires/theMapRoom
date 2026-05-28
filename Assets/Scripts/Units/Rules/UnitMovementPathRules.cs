@@ -1225,7 +1225,7 @@ public static class UnitMovementPathRules
         {
             if (unit == null || referenceTilemap == null)
                 return false;
-            if (unit.BoardTilemap == null || !IsCompatibleReference(referenceTilemap, unit.BoardTilemap))
+            if (unit.BoardTilemap == null || unit.BoardTilemap != referenceTilemap)
                 return false;
 
             return unit.gameObject.scene == referenceTilemap.gameObject.scene;

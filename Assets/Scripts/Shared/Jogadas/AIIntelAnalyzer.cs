@@ -185,7 +185,7 @@ public class AIIntelAnalyzer : MonoBehaviour
 
         AppendLiveCounts(result, aiTeam);
         result.enemyMomentum = result.enemyActions - result.friendlyActions;
-        result.numericalPressure = result.enemyKnownUnits + result.enemyPurchasesRecent - result.friendlyKnownUnits - result.friendlyPurchasesRecent;
+        result.numericalPressure = result.enemyKnownUnits - result.friendlyKnownUnits;
 
         result.sectors.AddRange(sectorsByName.Values);
         result.sectors.Sort((a, b) => b.hotScore.CompareTo(a.hotScore));
@@ -557,9 +557,10 @@ public class AIIntelReport
         if (!string.IsNullOrWhiteSpace(observacao))
             sb.AppendLine(observacao);
 
-        sb.AppendLine($"Acoes recentes: aliado={friendlyActions} inimigo={enemyActions} momentum={enemyMomentum:0.0}");
-        sb.AppendLine($"Forca: aliado={friendlyKnownUnits} inimigo={enemyKnownUnits} pressaoNumerica={numericalPressure:0.0}");
-        sb.AppendLine($"Dano: tomado={damageTakenScore:0.0} causado={damageDealtScore:0.0} captura={capturePressure:0.0} desembarque={landingPressure:0.0}");
+        sb.AppendLine($"Atividade recente: propria={friendlyActions} eventos inimiga={enemyActions} eventos iniciativaInimiga={enemyMomentum:0.0}");
+        sb.AppendLine($"Forca conhecida: aliado={friendlyKnownUnits} inimigo={enemyKnownUnits} pressaoNumerica={numericalPressure:0.0}");
+        sb.AppendLine($"Reforcos recentes: aliado={friendlyPurchasesRecent} inimigo={enemyPurchasesRecent}");
+        sb.AppendLine($"Pressao operacional: danoTomado={damageTakenScore:0.0} danoCausado={damageDealtScore:0.0} capturaInimiga={capturePressure:0.0} desembarqueInimigo={landingPressure:0.0}");
         sb.AppendLine($"Compras inimigas: elite={enemyElitePurchaseScore:0.0} ar={enemyAirThreatScore:0.0} blindado={enemyArmorThreatScore:0.0} artilharia={enemyArtilleryThreatScore:0.0} infantaria={enemyInfantryPressureScore:0.0}");
 
         if (sectors != null && sectors.Count > 0)
@@ -569,7 +570,8 @@ public class AIIntelReport
             for (int i = 0; i < count; i++)
             {
                 AISectorIntel s = sectors[i];
-                sb.AppendLine($"- {s.sector}: hot={s.hotScore:0.0} inimigo={s.enemyActivity:0.0} dano={s.damageTaken:0.0} captura={s.capturePressure:0.0} landing={s.landingPressure:0.0}");
+                string zone = ResolveSectorZoneLabel(aiTeam, s.sector);
+                sb.AppendLine($"- {s.sector}: zone={zone} hot={s.hotScore:0.0} atividadeInimiga={s.enemyActivity:0.0} presencaInferida={s.enemyPresence:0.0} dano={s.damageTaken:0.0} captura={s.capturePressure:0.0} landing={s.landingPressure:0.0}");
             }
         }
 
@@ -594,6 +596,20 @@ public class AIIntelReport
             sb.AppendLine($"Lacunas: {string.Join("  ", lacunas)}");
 
         return sb.ToString();
+    }
+
+    private static string ResolveSectorZoneLabel(TeamId team, string sectorName)
+    {
+        if (string.IsNullOrWhiteSpace(sectorName)
+            || !Enum.TryParse(sectorName, out ConstructionSector sector))
+            return "-";
+
+        SectorManager.SectorInfo info = null;
+        if (!SectorManager.TryGetSectorInfo(sector, out info)
+            && !SectorManager.TryGetBaseInfo(sector, out info))
+            return "-";
+
+        return AISectorIntentAnalyzer.ClassifyRelation(team, info).ToString();
     }
 }
 

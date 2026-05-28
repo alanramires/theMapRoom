@@ -509,9 +509,6 @@ public class CaminhosValidosWindow : EditorWindow
         if (cell == origin)
             return true;
 
-        if (!OccupancyResolver.IsLayerAwareRulesActive)
-            return true;
-
         HeightBand moverBand = OccupancyResolver.GetHeightBand(mover);
         if (moverBand != HeightBand.Blocking)
             return true;
@@ -529,7 +526,15 @@ public class CaminhosValidosWindow : EditorWindow
                 continue;
 
             occupant.SyncLayerStateFromData(forceNativeDefault: false);
-            if (OccupancyResolver.GetHeightBand(occupant) == moverBand)
+            if (OccupancyResolver.GetHeightBand(occupant) != moverBand)
+                continue;
+
+            // Same blocking band + same team: allied units can never share a blocking hex.
+            if (occupant.TeamId == mover.TeamId)
+                return false;
+
+            // Same blocking band + enemy: only stoppable in TW mode.
+            if (!OccupancyResolver.IsLayerAwareRulesActive)
                 return false;
         }
 

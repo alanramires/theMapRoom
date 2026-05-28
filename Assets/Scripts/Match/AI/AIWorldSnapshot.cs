@@ -119,6 +119,9 @@ public class AIWorldSnapshot
         }
 
         // Ofensiva: AI tem ≥65% do HP total combinado
+        if (snap.EnemyUnits.Count == 0 && HasBlindIntelPressure(snap))
+            return AIStance.Tactical;
+
         int myHp = 0, enemyHp = 0;
         foreach (UnitManager u in snap.MyUnits)    myHp    += u.CurrentHP;
         foreach (UnitManager u in snap.EnemyUnits) enemyHp += u.CurrentHP;
@@ -131,6 +134,29 @@ public class AIWorldSnapshot
         }
 
         return AIStance.Tactical;
+    }
+
+    private static bool HasBlindIntelPressure(AIWorldSnapshot snap)
+    {
+        if (snap == null)
+            return false;
+
+        JogadasManager jogadas = JogadasManager.EnsureInstance();
+        if (jogadas == null || jogadas.log == null || jogadas.log.jogadas == null || jogadas.log.jogadas.Count == 0)
+            return false;
+
+        int lookback = AIShoppingPlanner.Instance != null ? Mathf.Max(1, AIShoppingPlanner.Instance.IntelShoppingLookbackTurns) : 4;
+        AIIntelReport intel = AIIntelAnalyzer.BuildReport(jogadas.log, snap.AITeam, lookback, 5, snap.TurnNumber);
+        if (intel == null)
+            return false;
+
+        float topHot = 0f;
+        if (intel.sectors != null && intel.sectors.Count > 0 && intel.sectors[0] != null)
+            topHot = intel.sectors[0].hotScore;
+
+        return intel.enemyMomentum >= 5f
+            || intel.capturePressure >= 6f
+            || topHot >= 10f;
     }
 
     // Aproximação rápida de distância hex por Chebyshev (suficiente para trigger de stance)
