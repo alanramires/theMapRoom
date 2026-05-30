@@ -121,6 +121,18 @@ public partial class AIController
             : FindTransportMove(unit, fromCell, target, paths, occupied, snapshot.AITeam);
         float moveImprovement = distToTarget - SectorManager.HexDistance(moveTarget, target);
 
+        // Park adjacent to the repair building so the passenger lands on it,
+        // rather than the APC occupying the building cell itself.
+        if (moveTarget == target && repairDest != null)
+        {
+            Vector3Int park = FindEvacParkCell(unit, target, paths, occupied, evacuee, snapshot.AITeam);
+            if (park != target)
+            {
+                moveTarget = park;
+                moveImprovement = distToTarget - SectorManager.HexDistance(moveTarget, target);
+            }
+        }
+
         int dropOffRange = airTransport ? AirDropOffRange : TransportDropOffRange;
 
         // Priority 1: move + disembark when making progress
@@ -395,6 +407,45 @@ public partial class AIController
         }
 
         return false;
+    }
+
+    // Returns a cell adjacent to buildingCell from which the APC can drop the passenger
+    // directly onto the building. Falls back to buildingCell if none is found.
+    private Vector3Int FindEvacParkCell(
+        UnitManager unit, Vector3Int buildingCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        UnitManager evacuee, TeamId aiTeam)
+    {
+        var neighbors = new List<Vector3Int>(6);
+        UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, buildingCell, neighbors);
+
+        Vector3Int best = buildingCell;
+        float bestThreat = float.MaxValue;
+
+        foreach (Vector3Int raw in neighbors)
+        {
+            Vector3Int nc = raw; nc.z = 0;
+            if (!paths.ContainsKey(nc)) continue;
+            if (occupied.Contains(nc)) continue;
+
+            List<PodeDesembarcarOption> opts = SimulateDisembarkFromCell(unit, nc);
+            if (opts == null || opts.Count == 0) continue;
+
+            bool canDropAtBuilding = false;
+            foreach (PodeDesembarcarOption opt in opts)
+            {
+                if (opt.passengerUnit != evacuee) continue;
+                Vector3Int dc = opt.disembarkCell; dc.z = 0;
+                if (dc == buildingCell) { canDropAtBuilding = true; break; }
+            }
+            if (!canDropAtBuilding) continue;
+
+            float threat = CalculateThreatLevel(nc, aiTeam);
+            if (threat < bestThreat) { bestThreat = threat; best = nc; }
+        }
+
+        return best;
     }
 
     private UnitManager FindBestRepairEvacTransporterForPassenger(UnitManager passenger, TeamId aiTeam, Vector3Int passengerCell)

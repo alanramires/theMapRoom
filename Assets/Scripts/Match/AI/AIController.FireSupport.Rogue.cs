@@ -46,6 +46,37 @@ public partial class AIController
             }
         }
 
+        // Stationary fire support: hold position when the active front is within firing range.
+        // Prevents artillery bought from lateral factories from drifting toward HQ when idle.
+        if (IsLongRangeStationary(unit))
+        {
+            int maxRange = GetFireSupportMaxWeaponRange(unit);
+            int holdRange = maxRange + 2;
+            bool nearFront = false;
+
+            if (snapshot?.EnemyUnits != null)
+                foreach (UnitManager enemy in snapshot.EnemyUnits)
+                {
+                    if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
+                    Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+                    if (SectorManager.HexDistance(fromCell, ec) <= holdRange) { nearFront = true; break; }
+                }
+
+            if (!nearFront && snapshot?.EnemyBuildings != null)
+                foreach (ConstructionManager bldg in snapshot.EnemyBuildings)
+                {
+                    if (bldg == null) continue;
+                    Vector3Int bc = bldg.CurrentCellPosition; bc.z = 0;
+                    if (SectorManager.HexDistance(fromCell, bc) <= holdRange) { nearFront = true; break; }
+                }
+
+            if (nearFront)
+            {
+                Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rogue estacionario @ {fromCell} — frente a ≤{holdRange}h, segura");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+            }
+        }
+
         if (IsFireSupportConservative(unit))
         {
             Vector3Int conservativeCell = FindConservativeRogueFireSupportCell(unit, snapshot, fromCell, paths, occupied);

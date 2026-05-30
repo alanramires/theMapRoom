@@ -2721,7 +2721,8 @@ public class UnitManager : MonoBehaviour
 
         // Stance icon is independent of the plan badge.
         unitHud.SetStanceIcon(aiHasStance && aiStanceVisible ? aiStanceIcon : null);
-        unitHud.SetMaintenanceIconVisible(aiMaintenanceActive);
+        bool isAIUnit = matchController != null && matchController.IsPlayerAI(TeamId);
+        unitHud.SetMaintenanceIconVisible(aiMaintenanceActive && isAIUnit);
 
         // Plan badge: only show when a plan is actually assigned.
         bool hasPlan = aiHasAssignedPlan && aiAssignedPlanBadgeVisible

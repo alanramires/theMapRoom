@@ -254,7 +254,7 @@ public class AIShoppingPlanner : MonoBehaviour
                             else
                             {
                                 int before = openFireSupportSlots;
-                                openFireSupportSlots = Mathf.Max(openFireSupportSlots, deficit.Count);
+                                openFireSupportSlots += deficit.Count;
                                 preferDefensiveFireSupport = true;
                                 proactiveDefFireSupport = true;
                                 elevated = openFireSupportSlots != before;
@@ -274,7 +274,7 @@ public class AIShoppingPlanner : MonoBehaviour
                             else
                             {
                                 int before = openFireSupportSlots;
-                                openFireSupportSlots = Mathf.Max(openFireSupportSlots, deficit.Count);
+                                openFireSupportSlots += deficit.Count;
                                 elevated = openFireSupportSlots != before;
                             }
                         }
@@ -329,6 +329,22 @@ public class AIShoppingPlanner : MonoBehaviour
             preferDefensiveFireSupport = true;
             Debug.Log($"[AI Shopping] op_deficit: SAM bypass force={forceSAMBypass} activeAAAs={activeAAAs} activeSAMs={activeSAMs}/{maxSAMCap}");
         }
+        // Defensive burst: when stance=Defensive and SectorDefense ops have no assigned units,
+        // open fire support slots beyond the normal saturation cap so the AI actively buys
+        // artillery for hot undefended owned sectors instead of sitting on cash.
+        if (snapshot.Stance == AIStance.Defensive)
+        {
+            int unfilledDefOps = CountUnfilledDefenseOps(snapshot.AITeam);
+            if (unfilledDefOps > 0 && openFireSupportSlots < unfilledDefOps)
+            {
+                int before = openFireSupportSlots;
+                openFireSupportSlots = unfilledDefOps;
+                preferDefensiveFireSupport = true;
+                proactiveDefFireSupport = true;
+                if (openFireSupportSlots != before)
+                    Debug.Log($"[AI Shopping] defensive_burst: stance=Defensive ops_sem_defesa={unfilledDefOps} → fire_slots={openFireSupportSlots}");
+            }
+        }
         if (openAssaultSlots <= 0
             && !HasActivePrimaryRole(snapshot, UnitRole.Assalto)
             && CanAffordPurePrimaryRole(snapshot, UnitRole.Assalto, remaining))
@@ -341,6 +357,17 @@ public class AIShoppingPlanner : MonoBehaviour
         openCapturerSlots = RestoreStrategicPrimaryCapturerDemand(snapshot, rawOpenCapturerSlots, openCapturerSlots, ref openFireSupportSlots, ref preferDefensiveFireSupport);
         if (urgentCapturerFloor > 0)
             openCapturerSlots = Mathf.Max(openCapturerSlots, urgentCapturerFloor);
+
+        // Numerical pressure: when the enemy has significantly more units, buy extra capturers
+        // for body count regardless of plan objectives — same way a human player would.
+        {
+            int bulkFloor = ComputeNumericalBulkCapturerDemand(snapshot, intelReport);
+            if (bulkFloor > 0 && openCapturerSlots < bulkFloor)
+            {
+                openCapturerSlots = bulkFloor;
+                Debug.Log($"[AI Shopping] bulk_cap: pressaoNumerica={intelReport?.numericalPressure:F1} → cap_floor={bulkFloor}");
+            }
+        }
 
         // Cap assault demand to 1 per 2 active capturers (min 1). Prevents the plan from
         // creating 5+ assault slots in T1 when all sectors are high-risk and no units exist,
@@ -487,7 +514,27 @@ public class AIShoppingPlanner : MonoBehaviour
             && !dreamTeamPivot
             && remaining < eliteAssaultTargetForReserve.cost
             && remaining + Mathf.Max(0, snapshot.IncomePerTurn) >= eliteAssaultTargetForReserve.cost
-            && reserveCapFill >= reserveCapThreshold;
+            && reserveCapFill >= reserveCapThreshold
+            && !(preferDefensiveFireSupport && openFireSupportSlots >= 2);
+        bool defensiveEmergencyBlocksElite = snapshot.Stance == AIStance.Defensive
+            && preferDefensiveFireSupport
+            && openFireSupportSlots >= 2;
+        if (defensiveEmergencyBlocksElite)
+        {
+            eliteAssaultTarget = null;
+            eliteAssaultTargetForReserve = null;
+            openCapturerSlots = 0;
+            // Force elite fire support purchase when affordable — overrides the
+            // "no elite on first buy" gate and the composition checks, so the AI
+            // goes straight for the best fire support unit it can afford.
+            if (eliteFireSupportTarget != null && remaining >= eliteFireSupportTarget.cost)
+            {
+                wantsEliteFireSupport = true;
+                eliteFireSupportNowAffordable = true;
+                openFireSupportSlots = Mathf.Max(openFireSupportSlots, 1);
+            }
+            Debug.Log($"[AI Shopping] elite_assault_bloqueado: stance=Defensive fire_slots={openFireSupportSlots} → elite assault suprimido, cap_slots zerados, elite_fire={wantsEliteFireSupport}");
+        }
         bool wantsEliteAssault = eliteAssaultTarget != null
             && (openAssaultSlots > 0 || strategicEliteAssaultReserve || nextTurnEliteAssaultReserve);
         if (strategicEliteAssaultReserve)
@@ -684,23 +731,33 @@ public class AIShoppingPlanner : MonoBehaviour
                 && (HasDefensiveBaseManpowerShortage(snapshot) || defensiveArmorThreat);
             int defensiveTankReserveCost = defensiveArmorThreat ? 0 : defensiveBaseResponseReserveCost;
             int defensiveMassReserveCost = defensiveArmorThreat ? 0 : defensiveBaseBasicMassCost;
+            // Forced production: when enemies are within range of this building, or the army is
+            // critically small in Defensive stance, spend the full remaining budget — no hoarding.
+            const int ForcedProductionEnemyRange = 7;
+            bool forcedProduction = snapshot.Stance == AIStance.Defensive
+                && (HasVisibleEnemyNearCell(cell, snapshot, ForcedProductionEnemyRange)
+                    || (snapshot.MyUnits != null && snapshot.MyUnits.Count <= 5));
+
             int spendBudget = remaining;
-            if (defensiveArmorThreat
+            if (forcedProduction)
+            {
+                // Zero all reserves — must produce something now.
+                spendBudget = remaining;
+                if (spendBudget != remaining)
+                    Debug.Log($"[AI Shopping] {building.ConstructionDisplayName} @ {cell} — producao_forcada: inimigos próximos ou exercito critico, reservas ignoradas");
+            }
+            else if (defensiveArmorThreat
                 && reserveForEliteDefensiveTank > 0
                 && (eliteDefensiveTankTarget == null || remaining < eliteDefensiveTankTarget.cost))
             {
                 spendBudget = Mathf.Max(0, remaining - reserveForEliteDefensiveTank);
             }
-            if (!eliteAssaultBought)
+            if (!eliteAssaultBought && !forcedProduction)
             {
                 bool canBuyEliteNow = wantsEliteAssault && !defensiveBaseThreat
                     && eliteAssaultTarget != null && remaining >= eliteAssaultTarget.cost;
                 if (canBuyEliteNow)
                 {
-                    // Composition OK and can afford.
-                    // If this building offers the elite: full budget.
-                    // Otherwise: reserve the elite cost and allow spending the excess on other units —
-                    // zeroing budget here causes the AI to accumulate cash when the elite factory is occupied.
                     spendBudget = CanOfferUnit(building, eliteAssaultTarget)
                         ? remaining
                         : Mathf.Max(0, remaining - eliteAssaultTarget.cost);
@@ -708,17 +765,14 @@ public class AIShoppingPlanner : MonoBehaviour
                 else if (reserveForEliteAssault > 0
                          && (!defensiveBaseThreat || (!defensiveArmorThreat && !emergencyProductionDefense)))
                 {
-                    // Saving for elite (composition not yet ready, or can't afford):
-                    // honour the reserve in non-emergency scenarios.
                     spendBudget = Mathf.Min(spendBudget, Mathf.Max(0, remaining - reserveForEliteAssault));
                 }
             }
-            if (wantsEliteFireSupport && !eliteFireSupportBought)
+            if (wantsEliteFireSupport && !eliteFireSupportBought && !forcedProduction)
             {
                 if (!defensiveBaseThreat)
                 {
                     if (remaining >= eliteFireSupportTarget.cost)
-                        // Same fix: reserve elite fire support cost, spend excess elsewhere.
                         spendBudget = CanOfferUnit(building, eliteFireSupportTarget)
                             ? spendBudget
                             : Mathf.Max(0, spendBudget - eliteFireSupportTarget.cost);
@@ -728,12 +782,11 @@ public class AIShoppingPlanner : MonoBehaviour
                 else if (!defensiveArmorThreat && !emergencyProductionDefense
                          && remaining < eliteFireSupportTarget.cost && reserveForEliteFireSupport > 0)
                 {
-                    // Proximity threat only: still honour the elite fire support reserve.
                     spendBudget = Mathf.Min(spendBudget, Mathf.Max(0, remaining - reserveForEliteFireSupport));
                 }
             }
-            // Reserva para transporte aéreo + combate aéreo — suspensa em emergências defensivas.
-            if ((reserveForAirTransport > 0 || reserveForAirCombat > 0) && !defensiveBaseThreat)
+            // Reserva para transporte aéreo + combate aéreo — suspensa em emergências e modo defensivo.
+            if ((reserveForAirTransport > 0 || reserveForAirCombat > 0) && !defensiveBaseThreat && !forcedProduction)
                 spendBudget = Mathf.Min(spendBudget, Mathf.Max(0, remaining - reserveForAirTransport - reserveForAirCombat));
 
             // Log das opções deste edifício
@@ -754,6 +807,12 @@ public class AIShoppingPlanner : MonoBehaviour
                 defensiveBaseManpowerShortage, defensiveMassReserveCost, defensiveBaseTankBought,
                 defensiveArmorThreat, wantsEliteFireSupport, activeFireSupportCount,
                 proactiveDefFireSupport, proactiveAntiAir, activeSAMs, activeAAAs, aaaCap, aaaThreat);
+            if (unit == null && forcedProduction)
+            {
+                unit = FindCheapestAffordableLandUnit(building, remaining);
+                if (unit != null)
+                    Debug.Log($"[AI Shopping] {building.ConstructionDisplayName} @ {cell} — producao_forcada: comprando {unit.displayName} ${unit.cost} (fallback emergencia)");
+            }
             if (unit == null)
             {
                 Debug.Log($"[AI Shopping] {building.ConstructionDisplayName} @ {cell} — nenhuma unidade selecionada (sem fit ou sem budget)");
@@ -1699,6 +1758,30 @@ public class AIShoppingPlanner : MonoBehaviour
         return occupied;
     }
 
+    private static int ComputeNumericalBulkCapturerDemand(AIWorldSnapshot snapshot, AIIntelReport intel)
+    {
+        if (intel == null || Instance == null || snapshot == null) return 0;
+        float pressure = intel.numericalPressure;
+        float threshold = Instance.IntelNumericalPressureThreshold;
+        if (pressure < threshold) return 0;
+        // 1 extra capturer per 2 units of deficit, capped at 3 per turn.
+        return Mathf.Clamp(Mathf.CeilToInt(pressure / 2f), 1, 3);
+    }
+
+    private static int CountUnfilledDefenseOps(TeamId aiTeam)
+    {
+        AIOperationManager mgr = AIOperationManager.Instance;
+        if (mgr == null) return 0;
+        int count = 0;
+        foreach (AIOperation op in mgr.GetOperationsForTeam(aiTeam))
+        {
+            if (op.Type != AIOperationType.SectorDefense) continue;
+            if (op.CountOpenSlots(AINeedKind.Assault) > 0 || op.CountOpenSlots(AINeedKind.Artillery) > 0)
+                count++;
+        }
+        return count;
+    }
+
     private static int CountOpenSlots(TeamId aiTeam, UnitRole role)
     {
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
@@ -1749,6 +1832,12 @@ public class AIShoppingPlanner : MonoBehaviour
         {
             supportPauseThreshold = Instance != null ? Instance.CapturersPerPreventiveTransport : 4;
         }
+
+        // Floor: AI needs at least 1 capturer per sector before pausing,
+        // so it can contest every objective on the map.
+        int numSectors = SectorManager.GetAllSectorInfos().Count;
+        if (numSectors > 0)
+            supportPauseThreshold = Mathf.Max(supportPauseThreshold, numSectors);
 
         // Pause capturer purchases once we have enough active capturers.
         // supportDemand check removed: when all support slots are already filled (demand=0)
@@ -2211,6 +2300,32 @@ public class AIShoppingPlanner : MonoBehaviour
         }
 
         return cheapest < int.MaxValue ? cheapest : 0;
+    }
+
+    private static bool HasVisibleEnemyNearCell(Vector3Int cell, AIWorldSnapshot snapshot, int range)
+    {
+        if (snapshot == null || snapshot.EnemyUnits == null) return false;
+        cell.z = 0;
+        int safeRange = Mathf.Max(0, range);
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
+            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+            if (SectorManager.HexDistance(cell, ec) <= safeRange) return true;
+        }
+        return false;
+    }
+
+    private static UnitData FindCheapestAffordableLandUnit(ConstructionManager building, int budget)
+    {
+        if (building == null || building.OfferedUnits == null) return null;
+        UnitData cheapest = null;
+        foreach (UnitData u in building.OfferedUnits)
+        {
+            if (u == null || u.domain != Domain.Land || u.cost > budget || u.cost <= 0) continue;
+            if (cheapest == null || u.cost < cheapest.cost) cheapest = u;
+        }
+        return cheapest;
     }
 
     private static bool HasVisibleEnemyNearBase(ConstructionManager building, AIWorldSnapshot snapshot, int range)

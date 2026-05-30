@@ -796,11 +796,6 @@ public partial class AIController
                 Debug.Log($"[Repair] skip {cc} team={c.TeamId} (need {aiTeam}) dist={dist:F1}");
                 continue;
             }
-            if (!preferAircraftFacility && isAircraftFacility && !isHomeRepair)
-            {
-                Debug.Log($"[Repair] skip {cc} airport para unidade terrestre dist={dist:F1}");
-                continue;
-            }
             if (c.CurrentCapturePoints < c.CapturePointsMax)
             {
                 Debug.Log($"[Repair] skip {cc} cap={c.CurrentCapturePoints}/{c.CapturePointsMax} (incompleto) dist={dist:F1}");
