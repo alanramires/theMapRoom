@@ -23,6 +23,7 @@ public class AIIntelAnalyzer : MonoBehaviour
 
     [Header("Report")]
     [TextArea(5, 18)] public string resumo;
+    public string stanceLabel;
     public AIIntelReport report = new AIIntelReport();
 
     private void OnEnable()
@@ -87,6 +88,16 @@ public class AIIntelAnalyzer : MonoBehaviour
         aiTeam = perspectiveTeam;
         report = BuildReport(log, perspectiveTeam, lookbackTurns, maxSectorSnapDistance, currentTurnOverride);
         resumo = report != null ? report.BuildResumo() : string.Empty;
+
+        if (match != null)
+        {
+            AIWorldSnapshot snap = AIWorldSnapshot.Build(perspectiveTeam, match);
+            stanceLabel = snap != null ? snap.Stance.ToString() : "-";
+        }
+        else
+        {
+            stanceLabel = "-";
+        }
     }
 
     private TeamId ResolvePerspectiveTeam(MatchController match)
@@ -281,6 +292,9 @@ public class AIIntelAnalyzer : MonoBehaviour
                 result.enemyArmorThreatScore += armor ? 2f * weight : 0f;
                 result.enemyArtilleryThreatScore += artillery ? 2f * weight : 0f;
                 result.enemyInfantryPressureScore += infantry ? 1f * weight : 0f;
+
+                if (siglaMap != null && siglaMap.TryGetValue(sigla, out UnitData purchasedUd) && purchasedUd != null)
+                    AccumulateEnemyForceFamily(result, purchasedUd.unitClass, weight);
             }
         }
         else if (string.Equals(action, "Destruir", StringComparison.OrdinalIgnoreCase))
@@ -323,7 +337,31 @@ public class AIIntelAnalyzer : MonoBehaviour
                 }
             }
             else if (unit.TeamId != TeamId.Neutral)
+            {
                 result.enemyKnownUnits++;
+                if (unit.TryGetUnitData(out UnitData enemyData) && enemyData != null)
+                    AccumulateEnemyForceFamily(result, enemyData.unitClass, 1f);
+            }
+        }
+    }
+
+    private static void AccumulateEnemyForceFamily(AIIntelReport result, GameUnitClass unitClass, float weight)
+    {
+        switch (unitClass)
+        {
+            case GameUnitClass.Infantry:
+            case GameUnitClass.Vehicle:
+                result.enemyInfantryForce += weight; break;
+            case GameUnitClass.Armored:
+            case GameUnitClass.Artillery:
+                result.enemyArmorForce += weight; break;
+            case GameUnitClass.Jet:
+            case GameUnitClass.Helicopter:
+            case GameUnitClass.Plane:
+                result.enemyAirForce += weight; break;
+            case GameUnitClass.Ship:
+            case GameUnitClass.Submarine:
+                result.enemyNavalForce += weight; break;
         }
     }
 
@@ -546,6 +584,15 @@ public class AIIntelReport
     public float enemyArtilleryThreatScore;
     public float enemyInfantryPressureScore;
 
+    [Header("Enemy Force Families")]
+    public float enemyInfantryForce;
+    public float enemyArmorForce;
+    public float enemyAirForce;
+    public float enemyNavalForce;
+
+    [Header("Gaps")]
+    public List<string> lacunas = new List<string>();
+
     public List<AISectorIntel> sectors = new List<AISectorIntel>();
     public List<AIUnitIntel> enemyLastKnownUnits = new List<AIUnitIntel>();
     public List<AIPurchaseIntel> enemyPurchases = new List<AIPurchaseIntel>();
@@ -562,6 +609,7 @@ public class AIIntelReport
         sb.AppendLine($"Reforcos recentes: aliado={friendlyPurchasesRecent} inimigo={enemyPurchasesRecent}");
         sb.AppendLine($"Pressao operacional: danoTomado={damageTakenScore:0.0} danoCausado={damageDealtScore:0.0} capturaInimiga={capturePressure:0.0} desembarqueInimigo={landingPressure:0.0}");
         sb.AppendLine($"Compras inimigas: elite={enemyElitePurchaseScore:0.0} ar={enemyAirThreatScore:0.0} blindado={enemyArmorThreatScore:0.0} artilharia={enemyArtilleryThreatScore:0.0} infantaria={enemyInfantryPressureScore:0.0}");
+        sb.AppendLine($"Forca inimiga: inf={enemyInfantryForce:0.0} arm={enemyArmorForce:0.0} ar={enemyAirForce:0.0} nav={enemyNavalForce:0.0}");
 
         if (sectors != null && sectors.Count > 0)
         {
@@ -587,7 +635,7 @@ public class AIIntelReport
         }
 
         sb.AppendLine($"Composicao propria: cap={friendlyCapturerCount} ass={friendlyAssaultCount} fogo={friendlyFireSupportCount} trans={friendlyTransportCount} ar={friendlyAirCount}");
-        var lacunas = new System.Collections.Generic.List<string>();
+        lacunas.Clear();
         if (friendlyFireSupportCount == 0) lacunas.Add(enemyArtilleryThreatScore > 0 ? "!sem_fogo_indireto(inimigo_tem)" : "sem_fogo_indireto");
         if (friendlyAssaultCount == 0)     lacunas.Add("!sem_assalto");
         if (friendlyAirCount == 0 && enemyAirThreatScore > 0) lacunas.Add("!sem_ar(inimigo_tem)");

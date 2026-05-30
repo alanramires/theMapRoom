@@ -553,6 +553,13 @@ public class AIShoppingPlanner : MonoBehaviour
             Debug.Log($"[AI Shopping] defesa blindada: visible={defensiveArmorThreatCount} <= {DefensiveArmorThreatRange}h base/HQ intelHome={intelArmorNearHome}");
         else if (strategicArmorThreat)
             Debug.Log($"[AI Shopping] blindado inimigo por intel: preparando resposta sem acionar defesa de base");
+        int defensiveInfantryThreatCount = !defensiveArmorThreat
+            ? CountVisibleEnemyInfantryNearOwnedBase(snapshot, DefensiveArmorThreatRange) : 0;
+        bool intelInfantryNearHome = !defensiveArmorThreat
+            && intelReport != null
+            && (intelReport.enemyInfantryForce >= 3f || intelReport.enemyInfantryPressureScore >= 3f)
+            && intelReport.enemyArmorForce < 2f;
+        bool defensiveInfantryThreat = defensiveInfantryThreatCount >= 2 || intelInfantryNearHome;
         UnitData eliteDefensiveTankTarget = defensiveArmorThreat ? FindEliteDefensiveTankReserveTarget(snapshot) : null;
         int reserveForEliteDefensiveTank = 0;
         if (eliteDefensiveTankTarget != null && remaining < eliteDefensiveTankTarget.cost)
@@ -576,6 +583,19 @@ public class AIShoppingPlanner : MonoBehaviour
                 wantsEliteFireSupport = true;
                 reserveForEliteFireSupport = 0;
                 Debug.Log($"[AI Shopping] defesa blindada suprema: priorizando fire_support elite{supremeFireSupport.eliteLevel} {supremeFireSupport.displayName} custo={supremeFireSupport.cost} cash={remaining}");
+            }
+        }
+        if (defensiveInfantryThreat && !criticalBaseAirThreat)
+        {
+            UnitData antiInfTarget = FindAntiInfantryDefensiveTarget(snapshot, remaining);
+            if (antiInfTarget != null)
+            {
+                eliteFireSupportTarget = antiInfTarget;
+                openFireSupportSlots = Mathf.Max(openFireSupportSlots, 1);
+                preferDefensiveFireSupport = true;
+                wantsEliteFireSupport = antiInfTarget.eliteLevel > 0;
+                reserveForEliteFireSupport = 0;
+                Debug.Log($"[AI Shopping] defesa anti-inf: {defensiveInfantryThreatCount} inf visíveis intelPressure={intelReport?.enemyInfantryPressureScore:F1}, alvo={antiInfTarget.displayName} custo={antiInfTarget.cost}");
             }
         }
         bool needsAffordableArmorFallback = defensiveArmorThreat
@@ -672,7 +692,7 @@ public class AIShoppingPlanner : MonoBehaviour
             if (eliteFireA != eliteFireB) return eliteFireA.CompareTo(eliteFireB);
 
             bool manpowerShortage = HasDefensiveBaseManpowerShortage(snapshot);
-            bool tankThreat = defensiveArmorThreat || manpowerShortage;
+            bool tankThreat = defensiveArmorThreat || manpowerShortage || defensiveInfantryThreat;
             bool supremeFirePending = defensiveArmorThreat
                 && wantsEliteFireSupport
                 && !eliteFireSupportBought
@@ -806,7 +826,8 @@ public class AIShoppingPlanner : MonoBehaviour
                 allowDefensiveEliteAssault, defensiveTankReserveCost,
                 defensiveBaseManpowerShortage, defensiveMassReserveCost, defensiveBaseTankBought,
                 defensiveArmorThreat, wantsEliteFireSupport, activeFireSupportCount,
-                proactiveDefFireSupport, proactiveAntiAir, activeSAMs, activeAAAs, aaaCap, aaaThreat);
+                proactiveDefFireSupport, proactiveAntiAir, activeSAMs, activeAAAs, aaaCap, aaaThreat,
+                defensiveInfantryThreat);
             if (unit == null && forcedProduction)
             {
                 unit = FindCheapestAffordableLandUnit(building, remaining);
@@ -1322,7 +1343,8 @@ public class AIShoppingPlanner : MonoBehaviour
         int activeSAMs = 0,
         int activeAAAs = 0,
         int aaaCap = 0,
-        bool aaaThreat = false)
+        bool aaaThreat = false,
+        bool defensiveInfantryThreat = false)
     {
         if (building.OfferedUnits == null || building.OfferedUnits.Count == 0) return null;
 
@@ -1461,6 +1483,12 @@ public class AIShoppingPlanner : MonoBehaviour
             }
             if (defensiveArmorThreat && IsDefensiveBaseThreatPurchase(u))
                 score += 80000;
+            if (defensiveInfantryThreat && IsAntiInfantryFireSupportPurchase(u))
+                score += 80000;
+            if (defensiveInfantryThreat && !defensiveArmorThreat
+                && IsDefensiveBaseAssaultTankPurchase(u)
+                && u.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Infantry) == BazookaTargetPriority.Primary)
+                score += 75000;
             if (openTransportSlots > 0 && isPrimaryTransporter)
                 score += urgentTransportDemand ? 144000 : 108000;
             if (openLogisticsSlots > 0 && isPrimaryLogistics)
@@ -2389,6 +2417,65 @@ public class AIShoppingPlanner : MonoBehaviour
             if (d.domain == Domain.Air) count++;
         }
         return count;
+    }
+
+    private static int CountVisibleEnemyInfantryNearOwnedBase(AIWorldSnapshot snapshot, int range)
+    {
+        if (snapshot == null || snapshot.EnemyUnits == null || snapshot.MyBuildings == null)
+            return 0;
+
+        int safeRange = Mathf.Max(0, range);
+        int count = 0;
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (!enemy.TryGetUnitData(out UnitData d) || d == null) continue;
+            if (d.unitClass != GameUnitClass.Infantry) continue;
+            if (d.roles == null || d.roles.Count == 0 || d.roles[0] != UnitRole.Capturador) continue;
+
+            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+            foreach (ConstructionManager building in snapshot.MyBuildings)
+            {
+                if (building == null) continue;
+                if (!IsCriticalHomeConstruction(building, snapshot.AITeam)) continue;
+                Vector3Int bc = building.CurrentCellPosition; bc.z = 0;
+                if (SectorManager.HexDistance(bc, ec) <= safeRange) { count++; break; }
+            }
+        }
+        return count;
+    }
+
+    private static bool IsAntiInfantryFireSupportPurchase(UnitData unit)
+    {
+        return unit != null
+            && unit.domain == Domain.Land
+            && IsFireSupportPurchase(unit)
+            && unit.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Infantry) == BazookaTargetPriority.Primary;
+    }
+
+    private static UnitData FindAntiInfantryDefensiveTarget(AIWorldSnapshot snapshot, int budget)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null) return null;
+
+        UnitData best = null;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building.OfferedUnits == null) continue;
+
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (unit == null || unit.domain != Domain.Land) continue;
+                if (!IsAntiInfantryFireSupportPurchase(unit)) continue;
+                if (unit.cost > budget) continue;
+
+                if (best == null
+                    || unit.eliteLevel > best.eliteLevel
+                    || (unit.eliteLevel == best.eliteLevel && unit.cost > best.cost))
+                    best = unit;
+            }
+        }
+        return best;
     }
 
     private static int CountVisibleEnemyArmorNearOwnedBase(AIWorldSnapshot snapshot, int range)
