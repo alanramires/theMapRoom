@@ -41,6 +41,8 @@ MonoBehaviour:
     priority: 1
   - targetClass: 2
     priority: 1
+  - targetClass: 5
+    priority: 1
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 1
   playConservative: 0

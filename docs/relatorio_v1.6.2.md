@@ -1,1 +1,0 @@
-Refinamento de AI

@@ -37,6 +37,8 @@ MonoBehaviour:
   aiTargetPreferenceByClass:
   - targetClass: 6
     priority: 2
+  - targetClass: 5
+    priority: 2
   - targetClass: 4
     priority: 1
   aiSensorPriority: 0000000002000000

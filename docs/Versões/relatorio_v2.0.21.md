@@ -1,48 +1,57 @@
 # Relatorio de Atualizacao - v2.0.21
 
+## AI victory conditions
+
+Esta versao fecha uma serie de casos extremos da IA em torno de fim de partida, suporte de fogo, rota terrestre real, reparo cercado e defesa emergencial de producao.
+
 ## Em uma frase
-AI de Fogo Indireto documentada e validada: artilharia já opera com doutrina própria, forward observer obrigatório e dois perfis de posicionamento configuráveis por `UnitData`.
 
-## O que isso trouxe na pratica
-- Artilharia prioriza alvos próximos ao setor de interesse, com bônus para inimigos enfraquecidos e dentro de prédios.
-- Unidades estacionárias (`longRangeStationary`) ficam na posição e nunca avançam às cegas.
-- Unidades móveis reposicionam para trás (`preferRepositionToMaxRange`) ou avançam em direção ao anchor, dependendo do perfil.
-- Forward observer já é exigência do sensor — a IA não consegue atirar além da sua visão sem aliado com LoS ao alvo.
+A IA agora para de jogar assim que a partida tem vencedor e toma decisoes mais coerentes quando esta encurralada, bloqueando fabrica, sem rota direta ou escolhendo alvos para fogo indireto.
 
-## Doutrina implementada
+## Condicao de vitoria e parada da IA
 
-**Anchor**: célula do prédio-alvo do objetivo atribuído (ou HQ inimigo / inimigo mais próximo quando rogue).
+- O `AIController` passa a consultar `MatchController.HasVictoryWinner` antes de iniciar turno de IA.
+- A mesma guarda foi adicionada entre fases, dentro dos waits de debug/shopping, antes/depois de batches e antes de passar turno.
+- Se uma acao da IA dispara a vitoria, a coroutine e interrompida antes de compras, novas acoes ou troca de turno.
+- O estado interno da IA e limpo: stage volta a zero, time atual volta para `Neutral`, previews de debug sao cancelados e pausas sao liberadas.
+- O log passa a registrar o contexto da interrupcao, por exemplo `Partida encerrada (batch_end); IA interrompida.`
 
-**Num turno típico:**
+## Fire Support
 
-1. Varre células alcançáveis + posição atual, coleta alvos via `PodeMirarSensor`.
-2. Escolhe melhor alvo por score:
-   - Base 10 000
-   - −500 × distância do alvo ao anchor (foca no setor de interesse)
-   - +120 × HP faltando (prefere alvos enfraquecidos)
-   - +1 500 se alvo está em prédio (interrompe captura)
-   - ±score de alcance: `preferRepositionToMaxRange` → +30 × distância; caso contrário −5 × distância
-3. Se sem alvo: reposiciona ou aguarda (estacionário fica parado).
+- O score de alvo agora inclui a simulacao de combate da matriz de HP.
+- O log de ataque de fire support mostra dano simulado, percentual, kill garantido e score da simulacao.
+- A preferencia de alvo configurada no `UnitData` ficou mais forte.
+- Alvos `Primary` e `Secondary` nao sao penalizados por estarem em range 1 quando a arma aceita range 1-2.
+- Range maximo continua sendo uma preferencia de posicionamento, nao uma razao para ignorar alvo favorito valido.
 
-**Forward observer** (regra do sensor `PodeMirarSensor`): se o atirador não enxerga o alvo diretamente, é exigido um aliado a ≤3h do alvo com LoS válida. Sem observador → disparo bloqueado.
+## Rotas e progressao
 
-## Estados de decisão
+- Fire support ganhou fallback de avanco quando o score defensivo prefere ficar parado, mas existe hex valido que melhora a rota real ate o objetivo.
+- Capturador, pursuer, rogue, assault, repair e transportador passaram a considerar distancia terrestre real quando disponivel.
+- Quando a rota real nao existe, a IA ainda usa distancia hex como fallback.
+- Isso reduz casos em que montanha, bloqueio ou estrada lateral fazem a IA parecer sem caminho mesmo havendo uma progressao valida.
 
-| Contexto | Handler |
-|----------|---------|
-| Sem objetivo no plano (rogue) | `DecideRogueFireSupportAction` — anchor = inimigo mais próximo ou HQ inimigo |
-| Objetivo em `Defending` | `DecideFireSupportDefenderAction` — mesmo scoring, `defensiveContext = true` |
-| Objetivo em andamento | `DecideAssignedFireSupportAction` — anchor = prédio capturável do setor |
+## Reparo e ultimo recurso
 
-## Arquivos
+- Unidade em reparo cercada, fora de construcao aliada, agora tenta lutar se nao houver caminho livre de fuga.
+- A regra funciona como ultimo recurso: primeiro tenta o fluxo normal de reparo; se nao ha movimento util, procura alvo valido e aceita combate.
+- Isso evita a unidade ficar parada esperando morrer quando todos os hexes ao redor estao bloqueados por inimigos.
 
-- `Assets/Scripts/Match/AI/AIController.FireSupport.cs` — entrada, roteamento por estado do objetivo
-- `Assets/Scripts/Match/AI/AIController.FireSupport.Defender.cs` — contexto defensivo
-- `Assets/Scripts/Match/AI/AIController.FireSupport.Rogue.cs` — sem plano atribuído
-- `Assets/Scripts/Match/AI/AIController.FireSupport.Helpers.cs` — `TryBuildBestFireSupportAttack`, `ScoreFireSupportTarget`, `TryFindFireSupportRepositionCell`, `EnumerateFireSupportCandidateCells`
-- `Assets/Scripts/Match/AI/AIController.Router.cs` — `TryDecideFireSupportAction` chamado antes do fallback `HexEvaluator`
+## Defesa emergencial de producao
 
-## Campos relevantes em UnitData
+- Se a IA tem apenas uma unidade viva em cima de uma fabrica, construcoes proprias em captura e dinheiro para uma defesa relevante, ela tenta liberar a fabrica.
+- A unidade bloqueadora tenta sair atacando; se nao houver ataque, reposiciona para um hex livre.
+- Na fase de compras, esse mesmo estado abre demanda defensiva e prioriza fire support ou blindado de assalto acessivel.
+- O objetivo e permitir compra emergencial, como um obus medio, em vez de manter a unica unidade parada bloqueando a producao.
 
-- `longRangeStationary` — não move se não tiver alvo (ex: canhão fixo)
-- `preferRepositionToMaxRange` — ao reposicionar, prefere célula mais distante do anchor (fica na retaguarda)
+## Debug
+
+- Logs novos deixam claro quando a IA libera producao por `emergencia_fabrica`.
+- Logs de fire support agora explicitam `pref=Primary/Secondary/Tertiary`.
+- Logs de rota indicam fallback de avanco com progresso por rota e por hex.
+
+## Validacao
+
+- Build validado com `dotnet build Assembly-CSharp.csproj --no-restore`.
+- Resultado: `0 Erro(s)`.
+- Permanecem apenas os warnings obsoletos do Unity ja existentes no projeto.

@@ -4,8 +4,10 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 
 /// <summary>
-/// CÃ©rebro da IA V2. Orquestra as 4 fases do turno via coroutine,
-/// usando HexEvaluator para posicionamento e ExecuteLiveAIBatch para execuÃ§Ã£o.
+// Controla a IA inimiga, incluindo a execução de suas ações, planejamento de objetivos e tomada de decisões.
+// Implementa uma abordagem baseada em estágios para organizar o comportamento da IA,
+// desde a avaliação do estado do jogo até a execução de ações específicas.
+
 /// </summary>
 public partial class AIController : MonoBehaviour
 {

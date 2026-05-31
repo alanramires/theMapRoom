@@ -337,11 +337,7 @@ public class AIIntelAnalyzer : MonoBehaviour
                 }
             }
             else if (unit.TeamId != TeamId.Neutral)
-            {
                 result.enemyKnownUnits++;
-                if (unit.TryGetUnitData(out UnitData enemyData) && enemyData != null)
-                    AccumulateEnemyForceFamily(result, enemyData.unitClass, 1f);
-            }
         }
     }
 

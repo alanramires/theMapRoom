@@ -7,6 +7,8 @@ public partial class AIController
     // -------------------------------------------------------------------------
 
     // Helpers
+    // Retorna a distância em hexes do centro da unidade até o centro do seu objetivo designado, 
+    // ou float.MaxValue se não tiver objetivo.
 
     // -------------------------------------------------------------------------
 

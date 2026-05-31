@@ -7,6 +7,17 @@ public partial class AIController
     // -------------------------------------------------------------------------
 
     // Construtores de PlayerAction
+    // Cada um desses métodos constrói um PlayerAction específico para uma ação de IA, 
+    // preenchendo os campos relevantes com base nos parâmetros fornecidos. 
+    // Isso inclui informações como a unidade envolvida, a equipe, as posições de origem e destino, 
+    // o tipo de ação sensorial (se aplicável), o caminho de movimento (se disponível) 
+    // e rótulos de depuração para facilitar o rastreamento das ações geradas pela IA durante 
+    // o desenvolvimento e testes.
+    // Esses métodos ajudam a centralizar a lógica de construção de ações de IA, 
+    // garantindo consistência e facilitando a manutenção do código. 
+    // Ao usar esses métodos, o restante do código de IA pode se concentrar na lógica de decisão 
+    // e planejamento, delegando a construção das ações para esses construtores especializados.
+
 
     // -------------------------------------------------------------------------
 
@@ -354,7 +365,7 @@ public partial class AIController
             MoveFrom       = from, HasMoveFrom = true,
             MoveTo         = from, HasMoveTo   = true,
             SensorAction   = SensorActionType.Disembark,
-            DebugLabel     = $"AI Disembark â† {transporter.InstanceId} ({disembarkOrders.Count} passageiro(s))",
+            DebugLabel     = $"AI Disembark â† {transporter.InstanceId} ({disembarkOrders.Count} passageiro(s))",
         };
         foreach (PodeDesembarcarOption order in disembarkOrders)
         {
@@ -390,7 +401,7 @@ public partial class AIController
             MoveTo         = moveTo, HasMoveTo  = true,
             SensorAction   = SensorActionType.Disembark,
             MovementPath   = movementPath,
-            DebugLabel     = $"AI Disembark â† {transporter.InstanceId} ({disembarkOrders.Count} passageiro(s)) via {moveTo}",
+            DebugLabel     = $"AI Disembark â† {transporter.InstanceId} ({disembarkOrders.Count} passageiro(s)) via {moveTo}",
         };
         foreach (PodeDesembarcarOption order in disembarkOrders)
         {

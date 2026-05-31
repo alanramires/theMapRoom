@@ -6,7 +6,12 @@ public partial class AIController
 {
     // -------------------------------------------------------------------------
 
-    // DecisÃ£o de aÃ§Ã£o de unidade
+    // Definição parcial da classe AIController, organizada em múltiplos arquivos para melhor legibilidade 
+    // e manutenção. Cada arquivo foca em um aspecto específico do comportamento da IA, como ciclo de vida,
+    // tomada de decisões, avaliação de hexágonos e interação com o sistema de objetivos.
+    // A classe é responsável por controlar a IA inimiga, incluindo a execução de suas ações, 
+    // planejamento de objetivos e tomada de decisões, utilizando uma abordagem baseada
+    //  em estágios para organizar seu comportamento.    
 
     // -------------------------------------------------------------------------
 

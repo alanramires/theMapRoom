@@ -6,6 +6,8 @@ public partial class AIController
 {
     /// <summary>
     /// Pausa ou retoma o loop da IA sem cancelar o batch em andamento.
+    /// Enquanto pausada, a IA aguarda um comando de "AI RESUME" para retomar 
+    /// ou "AI STEP" para executar o próximo batch preparado.
     /// </summary>
     public void SetDebugPaused(bool paused)
     {

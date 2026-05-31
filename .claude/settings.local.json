@@ -26,7 +26,12 @@
       "Bash(git commit -m ' *)",
       "Bash(git tag *)",
       "Bash(git push *)",
-      "Bash(Get-ChildItem -Path \"d:\\\\Unity Projects\\\\The Map Room\\\\Assets\\\\Scripts\\\\Match\\\\AI\\\\\" -Recurse -File | Select-Object -ExpandProperty FullName)"
+      "Bash(Get-ChildItem -Path \"d:\\\\Unity Projects\\\\The Map Room\\\\Assets\\\\Scripts\\\\Match\\\\AI\\\\\" -Recurse -File | Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Path \"d:/Unity Projects/The Map Room/Assets/Scripts/Match/AI/\" -Recurse)",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "Bash(Sort-Object FullName)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(grep -v \"//\")"
     ]
   }
 }

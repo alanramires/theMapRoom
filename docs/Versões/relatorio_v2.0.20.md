@@ -1,50 +1,93 @@
 # Relatorio de Atualizacao - v2.0.20
 
+## AI Defesa
+
+Esta versao consolida a rodada de ajustes defensivos da IA, com foco em proteger Base/HQ, responder a blindados proximos, limpar planos incoerentes e tornar reparo, transporte e apoio mais consistentes.
+
 ## Em uma frase
-AI Assault completada: escolta lê congestionamento de rota e escolhe caminhos laterais livres, com modo de avanço automático quando o capturador está próximo do objetivo.
+
+A IA passa a tratar ameaca no quintal da base como prioridade real: compra contra-medidas melhores, evita apoio sem capturador, reorganiza transporte vazio e usa construcoes de BaseX para reparo sem travar por estado defensivo.
 
 ## O que isso trouxe na pratica
-- Tanques escolta param de ficar presos atrás de grupos de aliados — preferem rotas laterais desimpedidas.
-- Quando o capturador já está perto do objetivo, a escolta entra em modo de avanço e para de rondar a zona de cobertura.
-- Escoltas não são mais enviadas para defesa de base estável a distâncias absurdas (cap de 8 PM).
-- Badges no HUD identificam corretamente ataque a HQ inimigo (`>>`) vs defesa do próprio HQ (`!`).
-- Ferramenta de diagnóstico "Caminhos Válidos" ganha modo "Passando Por" (A→B→C) e filtra células de trânsito no mapa de progressão.
 
-## Principais melhorias
+- BaseX agora e interpretada pelo dono do HQ do setor; Base inimiga gera ataque, nao SOS de defesa.
+- Planos ofensivos sem capturador deixam de manter Assalto, Fogo Indireto ou Transportador sozinhos no setor.
+- Transporte vazio perto demais do objetivo deixa a vaga logistica e volta ao pool para shuttle/HQ.
+- Capturador perto do objetivo nao embarca sem necessidade quando consegue chegar andando em 1 ou 2 turnos.
+- Transporte atribuido prioriza buscar passageiro antes de lutar quando foi alocado para pickup.
+- Assalto em avanco pode atacar alvo no caminho quando o scan do setor encontrou inimigos relevantes.
+- Reparos em BaseX aceitam qualquer construcao propria completa do setor, nao apenas HQ.
+- Construcoes de BaseX seguem validas para reparo mesmo se o plano local esta em defesa.
+- Celula home ocupada vira apenas fallback de reparo; uma fabrica livre deve vencer o HQ ocupado.
+- HUD de base propria usa `#` em vez de `B`, evitando conflito visual com setor Bravo.
+- Servico do Comando atualiza o HUD dos alvos atendidos apos recuperar municao.
 
-1. **Forward Congestion Penalty**
-   - `ComputeForwardCongestion`: mede a fração de vizinhos "à frente" (menor custo ao destino) que estão ocupados por aliados.
-   - Penalidade de `700 × congestion` no score da célula candidata.
-   - Resultado: centro da estrada com 5 aliados à frente (cong=1.0 → −700) perde para estrada lateral livre (cong=0.0 → sem penalidade).
+## Compras defensivas
 
-2. **Advance Mode para escolta**
-   - Quando o capturador mais próximo do objetivo tem `DistanceToObjective ≤ 6 PM`, a escolta entra em advance mode.
-   - Efeitos: `scoutRingBonus = 0` (suprime penalidade de anel que chegava a −600), pesos de progressão dobrados (`routeProgressWeight` 450→900, `routeProgressBonus` 350→700, `routeProgressPenalty` 600→1200).
-   - Resultado: escolta segue ativamente o capturador em vez de rondar uma zona de cobertura ampla.
+1. Ameaca blindada perto da base
+- A IA detecta blindados visiveis perto de Base/HQ em raio defensivo ampliado.
+- Com caixa suficiente, `Artilharia de Campanha` entra como resposta suprema de fire support elite 2.
+- Se nao houver caixa para a defesa elite/suprema nem para elite tank, a IA abre fallback anti-blindado acessivel.
 
-3. **Cap de distância para defesa estável (Loop 3)**
-   - `DefenseEscortMaxPM = 8f`: escoltas só são alocadas a planos de defesa de base se estiverem a ≤8 PM.
-   - Impede que tanques do front sejam reatribuídos a bases distantes sem sentido tático.
+2. Ordem de fallback anti-blindado
+- Primeiro tenta unidade `Assalto/FogoIndireto`, como `Obus Leve`.
+- Depois tenta `FogoIndireto`, como lancador/ASTROS quando disponivel.
+- Por ultimo aceita `Assalto/Capturador`, como `Bazooka`.
+- Soldado comum e massa basica deixam de passar na frente quando a ameaca e blindada e existe resposta anti-armor acessivel.
 
-4. **Badges de HQ corretas**
-   - `ApplyPlanHUD` detecta se o setor é uma base (Base1–Base4) e, em caso positivo, consulta `ConstructionManager.AllActive` para identificar o dono do HQ no setor.
-   - `>>` = atacar HQ inimigo; `!` = defender o próprio HQ.
-   - Setor não-base continua usando a inicial da letra (`B` = Bravo, `C` = Charlie, etc.).
+3. Reserva e gasto
+- Reserva de elite fire support nao bloqueia mais uma compra defensiva urgente quando a ameaca ja esta no quintal.
+- Tanque leve ainda pode ser comprado, mas nao deve atropelar a fila anti-blindado quando a regra de fallback esta ativa.
+- O log agora explicita quando entrou `defesa blindada`, fallback anti-blindado ou defesa suprema.
 
-5. **Tool: Caminhos Válidos — "Passando Por" (A→B→C)**
-   - Novo campo **B (waypoint)** no painel de progressão.
-   - Calcula perna 1 (A→B via `CalculateMovementCostMap`) e perna 2 (B→C via cost map reverso da chegada).
-   - Exibe custo total `leg1 + leg2 PM` com indicação se B é alcançável na perna 1.
-   - Ponto A = amarelo, B = magenta com label `"3+8=11PM"`, C = ciano.
+## Planejamento defensivo
 
-6. **Tool: filtragem de células de trânsito na progressão**
-   - `CalcularCaminhosValidos` retorna apenas onde a unidade pode *parar*.
-   - Círculos de progressão são suprimidos em células ocupadas por aliados (trânsito permitido pelo pathfinding, mas parada inválida).
-   - Nota atualizada no painel: "respeita ocupação por aliados".
+1. Dono correto de BaseX
+- O setor BaseX passa a ser considerado proprio apenas quando o HQ daquele setor pertence ao time da IA.
+- Isso impede `SOS Base2` para o time verde quando Base2 e a base vermelha.
+- O mesmo setor, nesse caso, passa a ser alvo ofensivo normal.
 
-## Arquivos modificados
+2. Apoio precisa de capturador
+- Assalto, Fogo Indireto e Transporte nao ficam pendurados em plano ofensivo sem Capturador.
+- Se o plano perde o capturador, essas unidades sao liberadas para reatribuicao.
+- Isso reduz casos de APC ou assalto sozinho guardando Delta sem ninguem capaz de capturar.
 
-- `Assets/Scripts/Match/AI/AIController.Assault.cs` — constantes `AdvancedCapturerThreshold`, `ForwardCongestionWeight`; `GetBestCapturerDistanceToObjective`; passagem de `bestCapturerDist` para `FindAssaultEscortCoverCell`.
-- `Assets/Scripts/Match/AI/AIController.Assault.Defender.cs` — `FindAssaultEscortCoverCell` e `ScoreAssaultEscortCover` com `bestCapturerDist`/`occupied`; `ComputeForwardCongestion`; struct `AssaultEscortCoverEvaluation` ampliado; log `cong=` e `[ADVANCE MODE]`.
-- `Assets/Scripts/Match/AI/AIController.PlanEvaluator.cs` — `DefenseEscortMaxPM = 8f` no loop 3; `ApplyPlanHUD` reescrito com `FindHQTeamInSector`.
-- `Assets/Editor/CaminhosValidosWindow.cs` — modo Passando Por completo; filtro de ocupação aliada; detecção de mudança em B.
+3. Estabilidade durante Phase2
+- Ajustes de SOS/defesa nao removem slots no meio da execucao da Phase2.
+- Isso evita o caso em que o transporte se move para buscar passageiro e o plano muda antes do capturador embarcar.
+
+## Transporte e embarque
+
+- Capturador so embarca quando a distancia ao objetivo justifica o transporte.
+- Transporte vazio proximo do alvo e sem carga util volta a procurar passageiro ou reatribuicao.
+- Se o APC esta em plano de pickup, buscar passageiro vence ataque oportunista.
+- Transporte continua podendo apoiar combate quando o plano realmente precisa de apoio defensivo.
+
+## Reparo
+
+- BaseX e HQ nunca sao bloqueados por estarem em estado defensivo.
+- Qualquer construcao propria completa de BaseX serve como destino de reparo.
+- Se uma celula home esta ocupada, ela fica como fallback com penalidade alta.
+- A IA deve preferir uma fabrica livre da Base1 em vez de tentar marchar para um HQ ocupado.
+
+## UI e debug
+
+- Badge de base propria normal virou `#`.
+- `!` continua indicando defesa critica.
+- `>>` continua indicando ataque contra base inimiga.
+- O Servico do Comando agora refresca o HUD dos alvos tocados e tambem atualiza imediatamente quando recupera municao.
+- Isso evita a impressao de bug em que a munição so aparecia correta apos selecionar a unidade.
+
+## Bloco tecnico curto
+
+- Ajustado `AIController.PlanEvaluator.cs` para ownership de BaseX por HQ, limpeza de apoio sem capturador, liberacao de transporte vazio perto do alvo e badge `#`.
+- Ajustados fluxos de Phase2 em `AIController.Phases.cs` para evitar mutacao de plano durante execucao de lote.
+- Ajustados `AIController.Capturer.Embark.cs` e arquivos de transporte para evitar embarque inutil e priorizar pickup.
+- Ajustado `AIController.Assault.cs` para ataque oportunista no caminho em modo de avanco.
+- Ajustado `AIController.Repair.cs` para destino de reparo em BaseX e fallback de home ocupado.
+- Ajustado `AIShoppingPlanner.cs` para defesa blindada, artilharia suprema e fallback anti-blindado.
+- Ajustado `TurnStateManager.CommandService.cs` para refresh de HUD apos servico de comando.
+
+## Resultado
+
+Versao preparada como pacote `AI Defesa`, focada em deixar a IA mais coerente quando a base esta sob pressao e em reduzir decisoes defensivas visualmente ou taticamente confusas.

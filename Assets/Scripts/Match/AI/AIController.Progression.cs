@@ -1,6 +1,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// -------------------------------------------------------------------------
+// Controla a IA inimiga, incluindo a execução de suas ações, planejamento de objetivos e tomada de decisões.
+// Implementa uma abordagem baseada em estágios para organizar o comportamento da IA,
+// desde a avaliação do estado do jogo até a execução de ações específicas.
+// -------------------------------------------------------------------------    
 public partial class AIController
 {
     private bool TryScoreTwoTurnProgression(
