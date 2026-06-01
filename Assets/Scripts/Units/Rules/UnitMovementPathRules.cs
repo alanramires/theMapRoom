@@ -953,7 +953,8 @@ public static class UnitMovementPathRules
                 if (occupiedCell != cell)
                     continue;
 
-                found = construction;
+                if (!construction.IsFakeBuilding)
+                    found = construction;
                 break;
             }
 

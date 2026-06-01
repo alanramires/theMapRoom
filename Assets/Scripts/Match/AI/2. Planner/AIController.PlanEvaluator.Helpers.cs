@@ -24,7 +24,11 @@ public partial class AIController
     {
         string sectorName = obj.Sector.ToString();
         string badge;
-        if (ConstructionSectorHelper.IsBase(obj.Sector))
+        if (IsRallyAssemblyObjective(obj))
+        {
+            badge = "R";
+        }
+        else if (ConstructionSectorHelper.IsBase(obj.Sector))
         {
             TeamId hqTeam = FindHQTeamInSector(obj.Sector);
             badge = hqTeam != obj.AssignedTeam

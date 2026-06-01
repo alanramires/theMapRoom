@@ -11,7 +11,8 @@ public partial class AIController
     private PlayerAction TryDecideAssaultEmbarkAction(
         UnitManager unit,
         AIWorldSnapshot snapshot,
-        TeamObjectivePlan plan)
+        TeamObjectivePlan plan,
+        int minDeliveryDistance = TowDeliveryThreshold)
     {
         // Pass 1: find adjacent compatible transporters via sensor.
         // PodeEmbarcarSensor already checks slot rules (reboque skill, class, domain/height).
@@ -26,7 +27,7 @@ public partial class AIController
         if (!TryFindTowDeliveryTarget(unit, fromCell, snapshot, plan, out Vector3Int deliveryTarget)) return null;
 
         float distToTarget = SectorManager.HexDistance(fromCell, deliveryTarget);
-        if (distToTarget < TowDeliveryThreshold) return null;
+        if (distToTarget < minDeliveryDistance) return null;
 
         Dictionary<Vector3Int, List<Vector3Int>> paths =
             UnitMovementPathRules.CalcularCaminhosValidos(

@@ -19,7 +19,7 @@ public static class ConstructionOccupancyRules
                 : HexCoordinates.WorldToCell(referenceTilemap, construction.transform.position);
 
             occupiedCell.z = 0;
-            if (occupiedCell == cell)
+            if (occupiedCell == cell && !construction.IsFakeBuilding)
                 return construction;
         }
 

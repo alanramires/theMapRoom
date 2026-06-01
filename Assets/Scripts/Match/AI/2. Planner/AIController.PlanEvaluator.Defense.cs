@@ -571,12 +571,6 @@ public partial class AIController
             if (construction == null || construction.Sector != sector)
                 continue;
 
-            if (construction.IsCapturable
-                && construction.CapturePointsMax > 0
-                && (construction.TeamId == aiTeam || construction.TeamId == TeamId.Neutral)
-                && construction.CurrentCapturePoints < construction.CapturePointsMax)
-                return true;
-
             Vector3Int cc = construction.CurrentCellPosition; cc.z = 0;
             foreach (UnitManager enemy in UnitManager.AllActive)
             {

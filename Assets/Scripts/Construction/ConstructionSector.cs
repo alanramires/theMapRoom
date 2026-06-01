@@ -1,5 +1,6 @@
 public enum ConstructionSector
 {
+    None    = -1,
     Alpha   = 0,
     Bravo   = 1,
     Charlie = 2,

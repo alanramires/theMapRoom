@@ -61,6 +61,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Range(0f, 10f)] public float IntelNumericalPressureThreshold = 1.5f;
     [Range(0f, 30f)] public float IntelFireSupportGapHotThreshold = 8f;
     [Range(0f, 20f)] public float IntelFireSupportGapDamageThreshold = 3f;
+    [Range(0f, 10f)] public float IntelOffensiveAntiInfantryFireThreshold = 2.5f;
 
     [Header("Logistica")]
     [Range(1, 8)] public int RepairsPerGroundSupplier = 4;
@@ -133,6 +134,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
         int openAirTankerSlots = 0;
         AIIntelReport intelReport = BuildShoppingIntelReport(snapshot);
         bool intelArmorThreat = false;
+        bool offensiveAntiInfantryFireSupport = false;
         bool proactiveDefFireSupport = !preferDefensiveFireSupport
             && ComputeProactiveDefensiveFireSupportNeeded(snapshot);
         if (proactiveDefFireSupport)
@@ -352,6 +354,15 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 if (openFireSupportSlots != before)
                     Debug.Log($"[AI Shopping] defensive_burst: stance=Defensive ops_sem_defesa={unfilledDefOps} → fire_slots={openFireSupportSlots}");
             }
+        }
+        if (ComputeOffensiveAntiInfantryFireSupportDemand(snapshot, intelReport, out offensiveAntiInfantryFireSupport))
+        {
+            int before = openFireSupportSlots;
+            openFireSupportSlots = Mathf.Max(openFireSupportSlots, 1);
+            if (!proactiveAntiAir && !intelArmorThreat && !HasAnyVisibleEnemyNearOwnedBase(snapshot, DefensiveBaseThreatRange))
+                preferDefensiveFireSupport = false;
+            if (openFireSupportSlots != before || !preferDefensiveFireSupport)
+                Debug.Log($"[AI Shopping] offensive_anti_inf_fire: abrindo/priorizando fire ofensivo anti-infantaria fire={openFireSupportSlots} preferDef={preferDefensiveFireSupport}");
         }
         if (openAssaultSlots <= 0
             && !HasActivePrimaryRole(snapshot, UnitRole.Assalto)
@@ -833,7 +844,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 defensiveBaseManpowerShortage, defensiveMassReserveCost, defensiveBaseTankBought,
                 defensiveArmorThreat, wantsEliteFireSupport, activeFireSupportCount,
                 proactiveDefFireSupport, proactiveAntiAir, activeSAMs, activeAAAs, aaaCap, aaaThreat,
-                defensiveInfantryThreat);
+                defensiveInfantryThreat, offensiveAntiInfantryFireSupport);
             if (unit == null && forcedProduction)
             {
                 unit = FindCheapestAffordableLandUnit(building, remaining);

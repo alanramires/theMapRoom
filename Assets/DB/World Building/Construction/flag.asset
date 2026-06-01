@@ -21,6 +21,7 @@ MonoBehaviour:
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   baseMovementCost: 1
+  isFakeBuilding: 1
   dpqData: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
   requiredSkillsToEnter: []
   blockedSkills: []
@@ -52,9 +53,9 @@ MonoBehaviour:
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isVictoryBuilding: 0
-    isCapturable: 1
-    capturePointsMax: 20
-    capturedIncoming: 500
+    isCapturable: 0
+    capturePointsMax: 0
+    capturedIncoming: 0
     sellingRule: 3
     legacyCanProduceAndSellUnits: 
     offeredUnits: []

@@ -95,7 +95,8 @@ public partial class AIShoppingPlanner
         int activeAAAs = 0,
         int aaaCap = 0,
         bool aaaThreat = false,
-        bool defensiveInfantryThreat = false)
+        bool defensiveInfantryThreat = false,
+        bool offensiveAntiInfantryFireSupport = false)
     {
         if (building.OfferedUnits == null || building.OfferedUnits.Count == 0) return null;
 
@@ -211,6 +212,13 @@ public partial class AIShoppingPlanner
                 score += 80000;
             if (defensiveInfantryThreat && IsAntiInfantryFireSupportPurchase(u))
                 score += 80000;
+            if (offensiveAntiInfantryFireSupport && IsAntiInfantryFireSupportPurchase(u))
+            {
+                score += IsOffensiveFireSupportPurchase(u) ? 180000 : 115000;
+                if (isPrimaryFireSupport) score += 25000;
+                if (u.cost >= 6000) score += 15000;
+                Debug.Log($"[AI PickUnit] offensive_anti_inf_fire_bonus {u.displayName} fire={openFireSupportSlots} preferDef={preferDefensiveFireSupport}");
+            }
             if (defensiveInfantryThreat && !defensiveArmorThreat
                 && IsDefensiveBaseAssaultTankPurchase(u)
                 && u.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Infantry) == BazookaTargetPriority.Primary)

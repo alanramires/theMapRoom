@@ -238,6 +238,56 @@ public partial class AIShoppingPlanner
         return demand;
     }
 
+    private static bool ComputeOffensiveAntiInfantryFireSupportDemand(
+        AIWorldSnapshot snapshot,
+        AIIntelReport intel,
+        out bool offensiveAntiInfantryFireSupport)
+    {
+        offensiveAntiInfantryFireSupport = false;
+        if (snapshot == null || Instance == null)
+            return false;
+        if (snapshot.Stance == AIStance.Defensive)
+            return false;
+        if (!HasAnyOffensiveObjective(snapshot.AITeam))
+            return false;
+
+        int activeCapturers = CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: false);
+        int activeAssault = CountActiveUnitsWithRole(snapshot, UnitRole.Assalto, requirePrimary: true);
+        int activeFireSupport = CountActiveCombatFireSupport(snapshot);
+        int minCapturers = Mathf.Max(5, (Instance.MinActiveCapturersForFireSupport > 0 ? Instance.MinActiveCapturersForFireSupport : 2) + 3);
+        int minAssault = Mathf.Max(1, Instance.MinActiveAssaultForFireSupport);
+        if (activeCapturers < minCapturers || activeAssault < minAssault)
+            return false;
+
+        float infantryPressure = intel != null ? intel.enemyInfantryPressureScore : 0f;
+        float enemyInfantryForce = intel != null ? intel.enemyInfantryForce : 0f;
+        float topHot = 0f;
+        float topEnemyActivity = 0f;
+        string topSector = "-";
+        if (intel != null && intel.sectors != null && intel.sectors.Count > 0 && intel.sectors[0] != null)
+        {
+            topHot = intel.sectors[0].hotScore;
+            topEnemyActivity = intel.sectors[0].enemyActivity;
+            topSector = intel.sectors[0].sector;
+        }
+
+        float threshold = Instance.IntelOffensiveAntiInfantryFireThreshold;
+        bool infantryMass = infantryPressure >= threshold
+            || enemyInfantryForce >= threshold;
+        bool hotOffensiveSector = topHot >= Instance.IntelFireSupportGapHotThreshold && topEnemyActivity > 0f;
+        if (!infantryMass && !hotOffensiveSector)
+            return false;
+
+        int desiredFireSupport = infantryPressure >= threshold * 2f || enemyInfantryForce >= threshold * 2f || topHot >= Instance.IntelFireSupportGapHotThreshold + 3f
+            ? 2
+            : 1;
+        bool needed = activeFireSupport < desiredFireSupport;
+        offensiveAntiInfantryFireSupport = needed;
+        if (needed)
+            Debug.Log($"[AI Shopping] offensive_anti_inf_fire_demand: needed=True activeFire={activeFireSupport}/{desiredFireSupport} cap={activeCapturers}/{minCapturers} ass={activeAssault}/{minAssault} infantry={infantryPressure:F1}/{enemyInfantryForce:F1} top={topSector} hot={topHot:F1} enemy={topEnemyActivity:F1}");
+        return needed;
+    }
+
     private static int ComputeNumericalBulkCapturerDemand(AIWorldSnapshot snapshot, AIIntelReport intel)
     {
         if (intel == null || Instance == null || snapshot == null) return 0;

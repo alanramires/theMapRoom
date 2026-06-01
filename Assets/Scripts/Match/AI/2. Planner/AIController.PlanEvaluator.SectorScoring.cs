@@ -141,6 +141,164 @@ public partial class AIController
         return true;
     }
 
+    private static bool ShouldDelayEnemyNaturalByFrontier(
+        SectorManager.SectorInfo info,
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        out ConstructionSector requiredRearSector)
+    {
+        requiredRearSector = ConstructionSector.None;
+        if (info == null)
+            return false;
+        if (AISectorIntentAnalyzer.ClassifyRelation(aiTeam, info) != AISectorRelation.EnemyNatural)
+            return false;
+
+        if (TryGetRequiredCampaignPredecessor(info.Sector, aiTeam, out ConstructionSector campaignRear))
+        {
+            requiredRearSector = campaignRear;
+            return !TryGetCampaignPredecessor(info.Sector, plan, aiTeam, out _, out _);
+        }
+
+        if (!TryGetSuggestedRearNeighborTowardHQ(info, aiTeam, out SectorManager.SectorInfo rearInfo))
+            return false;
+
+        requiredRearSector = rearInfo.Sector;
+        return !HasAvailableRearNeighborTowardHQ(info, plan, aiTeam, out _);
+    }
+
+    private static bool HasAvailableRearNeighborTowardHQ(
+        SectorManager.SectorInfo info,
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        out ConstructionSector rearSector)
+    {
+        rearSector = ConstructionSector.None;
+        if (info == null)
+            return false;
+
+        if (TryGetCampaignPredecessor(info.Sector, plan, aiTeam, out ConstructionSector campaignRear, out _))
+        {
+            rearSector = campaignRear;
+            return true;
+        }
+
+        float myHQDist = info.GetDistanceToHQ(aiTeam);
+        float bestDist = float.MinValue;
+        if (TryRearNeighborAvailable(info.ClosestNeighbor1, myHQDist, plan, aiTeam, ref bestDist, out ConstructionSector rear1))
+            rearSector = rear1;
+        if (TryRearNeighborAvailable(info.ClosestNeighbor2, myHQDist, plan, aiTeam, ref bestDist, out ConstructionSector rear2))
+            rearSector = rear2;
+
+        return rearSector != ConstructionSector.None;
+    }
+
+    private static bool TryRearNeighborAvailable(
+        ConstructionSector sector,
+        float currentHQDistance,
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        ref float bestDist,
+        out ConstructionSector rearSector)
+    {
+        rearSector = ConstructionSector.None;
+        if (sector == ConstructionSector.None || !SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo rearInfo))
+            return false;
+
+        float rearDist = rearInfo.GetDistanceToHQ(aiTeam);
+        if (rearDist >= currentHQDistance || rearDist <= bestDist)
+            return false;
+
+        bool available = IsOwnedDefensibleSector(rearInfo, aiTeam);
+        if (!available)
+        {
+            SectorObjective rearObjective = plan != null ? plan.GetObjectiveForSector(rearInfo.Sector) : null;
+            available = rearObjective != null
+                && rearObjective.Status != ObjectiveStatus.Complete
+                && rearObjective.Status != ObjectiveStatus.Abandoned
+                && rearObjective.Status != ObjectiveStatus.Defending;
+        }
+
+        if (!available)
+            return false;
+
+        bestDist = rearDist;
+        rearSector = rearInfo.Sector;
+        return true;
+    }
+
+    private static bool TryGetSuggestedRearNeighborTowardHQ(
+        SectorManager.SectorInfo info,
+        TeamId aiTeam,
+        out SectorManager.SectorInfo rearInfo)
+    {
+        rearInfo = null;
+        if (info == null)
+            return false;
+
+        float myHQDist = info.GetDistanceToHQ(aiTeam);
+        float bestDist = float.MinValue;
+
+        if (info.ClosestNeighbor1 != default
+            && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1))
+        {
+            float d = n1.GetDistanceToHQ(aiTeam);
+            if (d < myHQDist && d > bestDist)
+            {
+                rearInfo = n1;
+                bestDist = d;
+            }
+        }
+
+        if (info.ClosestNeighbor2 != default
+            && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2))
+        {
+            float d = n2.GetDistanceToHQ(aiTeam);
+            if (d < myHQDist && d > bestDist)
+            {
+                rearInfo = n2;
+                bestDist = d;
+            }
+        }
+
+        return rearInfo != null;
+    }
+
+    private void PruneDelayedEnemyNaturalObjectives(
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        AIWorldSnapshot snapshot,
+        AIIntelReport intel,
+        AIMacroTerritoryContext macro)
+    {
+        if (plan == null || plan.Objectives == null)
+            return;
+
+        for (int i = plan.Objectives.Count - 1; i >= 0; i--)
+        {
+            SectorObjective obj = plan.Objectives[i];
+            if (obj == null
+                || obj.Status == ObjectiveStatus.Defending
+                || obj.Status == ObjectiveStatus.Complete
+                || obj.Status == ObjectiveStatus.Abandoned)
+                continue;
+            if (ConstructionSectorHelper.IsBase(obj.Sector))
+                continue;
+            if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo info))
+                continue;
+            bool delayedByOpening = ShouldDelayEnemyNaturalOpening(info, aiTeam, snapshot, intel, macro);
+            bool delayedByFrontier = ShouldDelayEnemyNaturalByFrontier(info, plan, aiTeam, out ConstructionSector rearSector);
+            if (!delayedByOpening && !delayedByFrontier)
+                continue;
+
+            ClearObjectiveHUD(obj);
+            plan.Objectives.RemoveAt(i);
+            string reason = delayedByFrontier
+                ? $"fronteira exige {rearSector} antes"
+                : "EarlyExpansion EnemyNatural sem pressao local";
+            Debug.Log($"{TL("Plan")} objetivo adiado: {obj.Sector} {reason}");
+        }
+    }
+
     private static bool ShouldDelayEnemyBaseOpening(
         SectorManager.SectorInfo info,
         TeamId aiTeam,
@@ -176,12 +334,13 @@ public partial class AIController
         SectorObjective candidate,
         TeamId aiTeam,
         AIIntelReport intel,
+        AIRallyPlanContext rallyContext,
         int turn,
         int maxObj,
         out SectorObjective removed)
     {
         removed = null;
-        if (plan == null || candidate == null || !IsPreemptiveHotCandidate(candidate, intel))
+        if (plan == null || candidate == null || !IsPreemptiveHotCandidate(candidate, intel, rallyContext))
             return false;
 
         SectorObjective best = null;
@@ -210,7 +369,7 @@ public partial class AIController
         return true;
     }
 
-    private static bool IsPreemptiveHotCandidate(SectorObjective candidate, AIIntelReport intel)
+    private static bool IsPreemptiveHotCandidate(SectorObjective candidate, AIIntelReport intel, AIRallyPlanContext rallyContext)
     {
         AISectorIntel entry = FindIntelForSector(intel, candidate.Sector);
         if (entry == null)

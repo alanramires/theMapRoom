@@ -109,6 +109,7 @@ public class AIObjectiveSaveData
     public int sector;
     public int assignedTeam;
     public int status;
+    public int objectiveType;
     public int priority;
     public int budgetReserved;
     public bool handoffEligible;
@@ -192,8 +193,11 @@ public class ConstructionSaveData
     public int instanceId;
     public string constructionId;
     public bool isActiveInHierarchy = true;
+    public bool isVisible = true;
     public int teamId;
     public int sector;
+    public int rallyTargetSlotIndex = -1;
+    public List<int> rallyTargetSlotIndexes = new List<int>();
     public int cellX;
     public int cellY;
     public float worldX;

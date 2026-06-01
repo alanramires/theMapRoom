@@ -38,7 +38,7 @@ public partial class AIController
         SectorObjective assigned = ResolveAssignedFireSupportObjective(unit, plan);
         if (assigned == null)
         {
-            PlayerAction embarkAction = TryDecideAssaultEmbarkAction(unit, snapshot, plan);
+            PlayerAction embarkAction = TryDecideFireSupportEmbarkAction(unit, snapshot, plan);
             if (embarkAction != null) return embarkAction;
             return DecideRogueFireSupportAction(unit, snapshot);
         }
@@ -64,15 +64,12 @@ public partial class AIController
             return attackAction;
         }
 
-        // Adjacent supply truck takes priority over walking — faster delivery to objective.
+        // Missing screen is a planning signal now; rendezvous/repositioning decides the movement.
         if (assigned.Status != ObjectiveStatus.Defending
             && AITacticalAnalyzer.Instance != null
-            && !AITacticalAnalyzer.Instance.IsFireSupportScreenedForObjective(unit, snapshot.AITeam, assigned, out AITacticalNeed op, out string screenReason))
+            && !AITacticalAnalyzer.Instance.IsFireSupportScreenedForObjective(unit, snapshot.AITeam, assigned, out _, out string screenReason))
         {
-            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} segura {assigned.Sector}: task force sem screen ({screenReason})");
-            PlayerAction rendezvousEarlyAction = TryFireSupportRendezvousAction(unit, snapshot, assigned, fromCell, paths, occupied);
-            if (rendezvousEarlyAction != null) return rendezvousEarlyAction;
-            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} {assigned.Sector}: screen ausente, segue reposicionamento/rendezvous ({screenReason})");
         }
 
         if (TryBuildFireSupportBlockedShotRepositionAction(unit, snapshot, fromCell, paths, occupied, assigned.Status == ObjectiveStatus.Defending, out PlayerAction blockedShotAction, out string blockedShotReason))
@@ -81,7 +78,7 @@ public partial class AIController
             return blockedShotAction;
         }
 
-        PlayerAction embarkAction = TryDecideAssaultEmbarkAction(unit, snapshot, plan);
+        PlayerAction embarkAction = TryDecideFireSupportEmbarkAction(unit, snapshot, plan, assigned);
         if (embarkAction != null) return embarkAction;
 
         if (TryFindFireSupportRepositionCell(unit, snapshot, fromCell, anchor, paths, occupied, out Vector3Int moveCell, out string moveReason))

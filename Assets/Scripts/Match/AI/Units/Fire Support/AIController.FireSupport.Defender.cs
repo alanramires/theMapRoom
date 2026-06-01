@@ -30,7 +30,7 @@ public partial class AIController
 
         // Embark on adjacent transport (e.g. supply truck tow) to reach better position.
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
-        PlayerAction embarkAction = TryDecideAssaultEmbarkAction(unit, snapshot, plan);
+        PlayerAction embarkAction = TryDecideFireSupportEmbarkAction(unit, snapshot, plan, assigned);
         if (embarkAction != null) return embarkAction;
 
         if (IsLongRangeStationary(unit) && IsFireSupportCloseEnoughToHold(unit, fromCell, anchor))

@@ -23,11 +23,13 @@ public class ConstructionManager : MonoBehaviour
     [Tooltip("Slot do MatchController que controla este time. -1 = Neutral fixo (sem slot).")]
     [SerializeField] private int slotIndex = -1;
     [Tooltip("Setor estratégico ao qual esta construção pertence. Use Base1-Base4 para areas de base de cada jogador.")]
-    [SerializeField] private ConstructionSector sector = ConstructionSector.Alpha;
+    [SerializeField] private ConstructionSector sector = ConstructionSector.None;
     [SerializeField] private string constructionId;
     [SerializeField] private int instanceId;
     [SerializeField] private Vector3 currentPosition = Vector3.zero;
     [SerializeField] private string constructionDisplayName;
+    [Tooltip("Override visual desta construcao na cena. Quando desligado, o objeto continua existindo para regras, mas sprite/HUD/overlay ficam ocultos.")]
+    [SerializeField] private bool isVisible = true;
     [SerializeField] private bool autoApplyOnStart = true;
     [SerializeField] private ConstructionSiteRuntime siteRuntime = new ConstructionSiteRuntime();
     [SerializeField, HideInInspector] private bool hasSiteRuntimeOverride;
@@ -41,6 +43,15 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] [Range(0f, 1f)] private float occupiedByReadyUnitDarkenFactor = 0.4f;
     [SerializeField] private ConstructionHudController hudController;
     [SerializeField] private MatchController matchController;
+    [Header("Tactical Role")]
+    [Tooltip("Este prédio serve como ponto de observação avançada (Forward Observer) para artilharia.")]
+    [SerializeField] private bool isForwardObserverSpot;
+    [Tooltip("Este prédio serve como ponto de reunião (Rally Point) para unidades recém-compradas.")]
+    [SerializeField] private bool isRallyPoint;
+    [HideInInspector, SerializeField] private int rallyTargetSlotIndex = -1;
+    [Tooltip("Slots dos HQs alvo deste Rally Point. Vazio = nenhum alvo configurado.")]
+    [SerializeField] private List<int> rallyTargetSlotIndexes = new List<int>();
+
     [Header("Victory Building")]
     [SerializeField] private SpriteRenderer victoryBuildingOverlayRenderer;
     [SerializeField] private Sprite victoryBuildingOverlaySprite;
@@ -61,6 +72,10 @@ public class ConstructionManager : MonoBehaviour
     public TeamId TeamId => teamId;
     public int SlotIndex => slotIndex;
     public ConstructionSector Sector => sector;
+    public bool IsForwardObserverSpot => isForwardObserverSpot;
+    public bool IsRallyPoint => isRallyPoint;
+    public int RallyTargetSlotIndex => rallyTargetSlotIndexes != null && rallyTargetSlotIndexes.Count > 0 ? rallyTargetSlotIndexes[0] : rallyTargetSlotIndex;
+    public IReadOnlyList<int> RallyTargetSlotIndexes => rallyTargetSlotIndexes != null ? rallyTargetSlotIndexes : System.Array.Empty<int>();
 
     public void SetSlotIndex(int index)
     {
@@ -73,6 +88,7 @@ public class ConstructionManager : MonoBehaviour
     public int InstanceId => instanceId;
     public Vector3 CurrentPosition => currentPosition;
     public string ConstructionDisplayName => constructionDisplayName;
+    public bool IsVisible => isVisible;
     public ConstructionDatabase ConstructionDatabase => constructionDatabase;
     public bool IsCapturable => siteRuntime != null && siteRuntime.isCapturable;
     public int CapturePointsMax => siteRuntime != null ? siteRuntime.capturePointsMax : 0;
@@ -125,6 +141,16 @@ public class ConstructionManager : MonoBehaviour
             return data.alwaysAllowAirDomain;
 
         return false;
+    }
+
+    public bool IsFakeBuilding
+    {
+        get
+        {
+            if (TryGetConstructionData(out ConstructionData data))
+                return data.isFakeBuilding;
+            return false;
+        }
     }
 
     public int GetBaseMovementCost()
@@ -316,6 +342,48 @@ public class ConstructionManager : MonoBehaviour
         transform.position = position;
         if (boardTilemap != null)
             currentCellPosition = HexCoordinates.WorldToCell(boardTilemap, position);
+    }
+
+    public void SetVisible(bool value)
+    {
+        if (isVisible == value)
+            return;
+
+        isVisible = value;
+        RefreshRuntimeVisualState(force: true);
+    }
+
+    public void SetRallyTargetSlotIndex(int value)
+    {
+        rallyTargetSlotIndex = Mathf.Max(-1, value);
+        if (rallyTargetSlotIndexes == null)
+            rallyTargetSlotIndexes = new List<int>();
+        rallyTargetSlotIndexes.Clear();
+        if (rallyTargetSlotIndex >= 0)
+            rallyTargetSlotIndexes.Add(rallyTargetSlotIndex);
+    }
+
+    public void SetRallyTargetSlotIndexes(IEnumerable<int> values)
+    {
+        List<int> sanitizedSlots = new List<int>();
+
+        if (values != null)
+        {
+            foreach (int value in values)
+            {
+                int slot = Mathf.Max(-1, value);
+                if (slot < 0 || sanitizedSlots.Contains(slot))
+                    continue;
+
+                sanitizedSlots.Add(slot);
+            }
+        }
+
+        if (rallyTargetSlotIndexes == null)
+            rallyTargetSlotIndexes = new List<int>();
+        rallyTargetSlotIndexes.Clear();
+        rallyTargetSlotIndexes.AddRange(sanitizedSlots);
+        rallyTargetSlotIndex = rallyTargetSlotIndexes.Count > 0 ? rallyTargetSlotIndexes[0] : -1;
     }
 
     public void SetTeamId(TeamId team)
@@ -578,6 +646,7 @@ public class ConstructionManager : MonoBehaviour
         if (siteRuntime == null)
             siteRuntime = new ConstructionSiteRuntime();
         siteRuntime.Sanitize();
+        SanitizeRallyTargetSlots();
         if (spriteRenderer == null)
             spriteRenderer = ResolvePrimarySpriteRenderer();
         if (victoryBuildingOverlayRenderer == null)
@@ -599,9 +668,27 @@ public class ConstructionManager : MonoBehaviour
                 break;
             }
         }
+        if (hudController == null && Application.isPlaying)
+            hudController = CreateRuntimeHudController();
         if (hudController != null)
             hudController.RefreshBindings();
         EnsureCapturePointsInitialized();
+    }
+
+    private ConstructionHudController CreateRuntimeHudController()
+    {
+        GameObject hudGo = new GameObject("Construction HUD", typeof(RectTransform), typeof(Canvas));
+        hudGo.transform.SetParent(transform, false);
+        RectTransform rect = hudGo.GetComponent<RectTransform>();
+        rect.localPosition = Vector3.zero;
+        rect.localRotation = Quaternion.identity;
+        rect.localScale = Vector3.one;
+
+        Canvas canvas = hudGo.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.overrideSorting = true;
+
+        return hudGo.AddComponent<ConstructionHudController>();
     }
 
     private void ApplyDefaultSiteRuntime(ConstructionData data)
@@ -618,6 +705,24 @@ public class ConstructionManager : MonoBehaviour
 
         siteRuntime = data.constructionConfiguration.Clone();
         EnsureCapturePointsInitialized();
+    }
+
+    private void SanitizeRallyTargetSlots()
+    {
+        if (rallyTargetSlotIndexes == null)
+            rallyTargetSlotIndexes = new List<int>();
+
+        for (int i = rallyTargetSlotIndexes.Count - 1; i >= 0; i--)
+        {
+            int slot = rallyTargetSlotIndexes[i];
+            if (slot < 0 || rallyTargetSlotIndexes.IndexOf(slot) != i)
+                rallyTargetSlotIndexes.RemoveAt(i);
+        }
+
+        if (rallyTargetSlotIndexes.Count == 0 && rallyTargetSlotIndex >= 0)
+            rallyTargetSlotIndexes.Add(rallyTargetSlotIndex);
+
+        rallyTargetSlotIndex = rallyTargetSlotIndexes.Count > 0 ? rallyTargetSlotIndexes[0] : -1;
     }
 
     public bool CanProduceUnitsForTeam(TeamId buyerTeam)
@@ -869,6 +974,10 @@ public class ConstructionManager : MonoBehaviour
 
         if (spriteRenderer.color != targetColor)
             spriteRenderer.color = targetColor;
+
+        bool effectiveVisible = IsRuntimeVisible();
+        if (spriteRenderer.enabled != effectiveVisible)
+            spriteRenderer.enabled = effectiveVisible;
     }
 
     private bool ShouldDarkenForOccupant(UnitManager occupant)
@@ -884,6 +993,14 @@ public class ConstructionManager : MonoBehaviour
         if (hudController == null)
             hudController = GetComponentInChildren<ConstructionHudController>(true);
         if (hudController == null)
+            EnsureDefaults();
+        if (hudController == null)
+            return;
+
+        bool effectiveVisible = IsRuntimeVisible();
+        if (hudController.gameObject.activeSelf != effectiveVisible)
+            hudController.gameObject.SetActive(effectiveVisible);
+        if (!effectiveVisible)
             return;
 
         bool occupantVisible = IsOccupantVisibleForHud(occupant);
@@ -901,11 +1018,12 @@ public class ConstructionManager : MonoBehaviour
             hasUnitOnTop,
             showFlagThreatOutline);
 
-        hudController.ApplySectorBadge(AIController.ShowAIHUD, hasUnitOnTop, sector);
+        hudController.ApplySectorBadge(AIController.ShowAIHUD, hasUnitOnTop, sector, IsFakeBuilding);
     }
 
-    private void RefreshRuntimeVisualState(bool force)
+    public void RefreshRuntimeVisualState(bool force = true)
     {
+        ApplyPrimaryVisibility();
         RefreshVictoryBuildingOverlayVisual();
 
         UnitManager occupant = TryGetOccupantOnTop();
@@ -946,7 +1064,7 @@ public class ConstructionManager : MonoBehaviour
 
     private void RefreshVictoryBuildingOverlayVisual()
     {
-        bool shouldShow = siteRuntime != null && siteRuntime.isVictoryBuilding;
+        bool shouldShow = IsRuntimeVisible() && siteRuntime != null && siteRuntime.isVictoryBuilding;
         if (!shouldShow && victoryBuildingOverlayRenderer == null)
             return;
 
@@ -1032,6 +1150,26 @@ public class ConstructionManager : MonoBehaviour
         }
 
         return null;
+    }
+
+    private void ApplyPrimaryVisibility()
+    {
+        bool effectiveVisible = IsRuntimeVisible();
+        if (spriteRenderer == null)
+            spriteRenderer = ResolvePrimarySpriteRenderer();
+        if (spriteRenderer != null && spriteRenderer.enabled != effectiveVisible)
+            spriteRenderer.enabled = effectiveVisible;
+
+        if (!effectiveVisible && victoryBuildingOverlayRenderer != null && victoryBuildingOverlayRenderer.gameObject.activeSelf)
+            victoryBuildingOverlayRenderer.gameObject.SetActive(false);
+
+        if (!effectiveVisible && hudController != null && hudController.gameObject.activeSelf)
+            hudController.gameObject.SetActive(false);
+    }
+
+    private bool IsRuntimeVisible()
+    {
+        return !Application.isPlaying || isVisible;
     }
 
     private void HandleActiveTeamChanged(int _)

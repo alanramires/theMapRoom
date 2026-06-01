@@ -128,6 +128,13 @@ public partial class AIController
 
         if (HasFireSupportAttackInCurrentPosition(unit, aiTeam)) return 2;
 
+        // Forward observer: se o alvo do setor ainda esta coberto pelo FoW,
+        // infantaria capturadora que consegue ocupar um spot marcado no mapa
+        // age antes dos blindados/batedores do mesmo plano.
+        if (!unit.IsUnderRepair && plan != null
+            && HasForwardObserverApproachForHiddenObjective(unit, plan, aiTeam))
+            return 0;
+
         // Capturador no corredor de outro setor (mais perto do objetivo alheio que o capturador
         // designado a ele) → age antes (grupo 1) para liberar o caminho.
         if (!unit.IsUnderRepair && plan != null)
@@ -787,3 +794,4 @@ public partial class AIController
 
     }
 }
+

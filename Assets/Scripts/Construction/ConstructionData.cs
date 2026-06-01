@@ -39,6 +39,8 @@ public class ConstructionData : ScriptableObject
     [Tooltip("Custo basico de movimento/autonomia para entrar neste hex de construcao. Minimo 1.")]
     [Min(1)]
     public int baseMovementCost = 1;
+    [Tooltip("Se true, esta construcao e um edificio falso (decoy) e nao deve ser tratada como alvo real pela IA ou sistemas de captura.")]
+    public bool isFakeBuilding = false;
     [Header("DPQ")]
     [Tooltip("Referencia de qualidade de posicao (DPQ) aplicada a esta construcao.")]
     public DPQData dpqData;

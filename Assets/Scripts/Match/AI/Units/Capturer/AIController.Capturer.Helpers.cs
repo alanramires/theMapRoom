@@ -7,6 +7,42 @@ public partial class AIController
     // Helpers de captura: sensor, atribuição e seleção de alvos
     // -------------------------------------------------------------------------
 
+    // Ameaça local por inimigos visíveis dentro do raio ThreatRadius.
+    private float CalculateThreatLevel(Vector3Int cell, TeamId aiTeam)
+    {
+        float threat = 0f;
+        Vector3Int cellXY = cell; cellXY.z = 0;
+        MatchController mc = GetMatchController();
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+            float dist = SectorManager.HexDistance(cellXY, ec);
+            if (dist <= ThreatRadius)
+                threat += (ThreatRadius - dist + 1f) * 10f;
+        }
+        return threat;
+    }
+
+    // Inimigo visível no hex alvo ou num dos seus adjacentes (ameaça direta ao objetivo).
+    private bool HasEnemyNearCell(Vector3Int cell, TeamId aiTeam)
+    {
+        var neighbors = new List<Vector3Int>();
+        UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, cell, neighbors);
+        var nearCells = new HashSet<Vector3Int>(neighbors) { cell };
+
+        MatchController mc = GetMatchController();
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+            if (nearCells.Contains(ec)) return true;
+        }
+        return false;
+    }
+
     private bool TryFindOpportunisticCapture(
         UnitManager unit,
         Dictionary<Vector3Int, List<Vector3Int>> paths,

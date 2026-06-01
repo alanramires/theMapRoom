@@ -90,7 +90,6 @@ public class SectorManagerEditor : Editor
     private static readonly Color singleSectorLineColor = new Color(0.15f, 0.9f, 1f, 1f);
     private static readonly Color allSectorLineColor = new Color(1f, 0.82f, 0.2f, 1f);
     private static readonly Color pathMarkerColor = new Color(1f, 0.25f, 0.15f, 1f);
-    private static readonly Color repLineColor = new Color(0.2f, 1f, 0.35f, 1f);
 
     private struct SectorEdgeLine
     {
@@ -330,10 +329,153 @@ public class SectorManagerEditor : Editor
         {
             if (info == null)
                 continue;
-            AddNeighborLine(info, info.ClosestNeighbor1, info.ClosestNeighbor1Distance, allSectorLineColor, seen);
-            AddNeighborLine(info, info.ClosestNeighbor2, info.ClosestNeighbor2Distance, allSectorLineColor, seen);
+            AddNeighborLine(info, info.ClosestNeighbor1, info.ClosestNeighbor1Distance, ResolveNeighborLineColor(info, info.ClosestNeighbor1), seen);
+            AddNeighborLine(info, info.ClosestNeighbor2, info.ClosestNeighbor2Distance, ResolveNeighborLineColor(info, info.ClosestNeighbor2), seen);
         }
+
+        DrawHQToNearestRallyPointLines();
         SceneView.RepaintAll();
+    }
+
+    private static void DrawHQToNearestRallyPointLines()
+    {
+        ConstructionManager[] all = Object.FindObjectsByType<ConstructionManager>(FindObjectsSortMode.None);
+
+        var rallyPoints = new System.Collections.Generic.List<ConstructionManager>();
+        var hqs = new System.Collections.Generic.List<ConstructionManager>();
+        foreach (ConstructionManager c in all)
+        {
+            if (c == null) continue;
+            if (c.IsPlayerHeadQuarter) hqs.Add(c);
+            if (c.IsRallyPoint) rallyPoints.Add(c);
+        }
+
+        if (hqs.Count == 0 || rallyPoints.Count == 0)
+            return;
+
+        foreach (ConstructionManager rally in rallyPoints)
+        {
+            Vector3Int rallyCell = rally.CurrentCellPosition; rallyCell.z = 0;
+
+            bool drewExplicitTarget = false;
+            System.Collections.Generic.IReadOnlyList<int> targetSlots = rally.RallyTargetSlotIndexes;
+            if (targetSlots != null && targetSlots.Count > 0)
+            {
+                for (int i = 0; i < targetSlots.Count; i++)
+                {
+                    int targetSlot = targetSlots[i];
+                    if (targetSlot < 0)
+                        continue;
+
+                    AddRallyTargetLine(rallyCell, hqs, targetSlot, explicitTarget: true);
+                    drewExplicitTarget = true;
+                }
+            }
+
+            if (!drewExplicitTarget)
+                AddRallyTargetLine(rallyCell, hqs, targetSlot: -1, explicitTarget: false);
+        }
+    }
+
+    private static void AddRallyTargetLine(
+        Vector3Int rallyCell,
+        System.Collections.Generic.List<ConstructionManager> hqs,
+        int targetSlot,
+        bool explicitTarget)
+    {
+        ConstructionManager targetHQ = null;
+        float targetDist = float.MaxValue;
+
+        if (explicitTarget)
+        {
+            foreach (ConstructionManager hq in hqs)
+            {
+                if (hq == null || hq.SlotIndex != targetSlot)
+                    continue;
+
+                Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
+                targetDist = SectorManager.HexDistance(rallyCell, hqCell);
+                targetHQ = hq;
+                break;
+            }
+        }
+        else
+        {
+            foreach (ConstructionManager hq in hqs)
+            {
+                if (hq == null)
+                    continue;
+
+                Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
+                float d = SectorManager.HexDistance(rallyCell, hqCell);
+                if (d < targetDist) { targetDist = d; targetHQ = hq; }
+            }
+        }
+
+        if (targetHQ == null)
+        {
+            drawnLines.Add(new SectorEdgeLine
+            {
+                FromCell = rallyCell,
+                ToCell   = rallyCell,
+                Label    = $"Rally target slot {targetSlot} sem HQ",
+                Color    = new Color(1f, 0.1f, 0.8f, 1f),
+            });
+            return;
+        }
+
+        Vector3Int targetHQCell = targetHQ.CurrentCellPosition; targetHQCell.z = 0;
+        Color lineColor = TeamUtils.GetColor(targetHQ.TeamId);
+        lineColor.a = 1f;
+        drawnLines.Add(new SectorEdgeLine
+        {
+            FromCell = targetHQCell,
+            ToCell   = rallyCell,
+            Label    = explicitTarget
+                ? $"Rally -> HQ({targetHQ.TeamId}) slot {targetSlot} ({targetDist:F0}h)"
+                : $"Rally -> HQ({targetHQ.TeamId}) auto ({targetDist:F0}h)",
+            Color    = lineColor,
+        });
+    }
+
+    private static Color ResolveNeighborLineColor(SectorManager.SectorInfo from, ConstructionSector toSector)
+    {
+        if (from == null || !SectorManager.TryGetSectorInfo(toSector, out SectorManager.SectorInfo to) || to == null)
+            return allSectorLineColor;
+
+        TeamId fromTeam = from.ControllingTeam;
+        TeamId toTeam = to.ControllingTeam;
+        if (fromTeam == TeamId.Neutral && toTeam == TeamId.Neutral)
+            return new Color(0.75f, 0.75f, 0.75f, 1f);
+
+        if (fromTeam == toTeam)
+            return ResolveTeamLineColor(fromTeam);
+
+        if (fromTeam == TeamId.Neutral)
+            return WithAlpha(ResolveTeamLineColor(toTeam), 0.7f);
+
+        if (toTeam == TeamId.Neutral)
+            return WithAlpha(ResolveTeamLineColor(fromTeam), 0.7f);
+
+        Color mixed = Color.Lerp(ResolveTeamLineColor(fromTeam), ResolveTeamLineColor(toTeam), 0.5f);
+        mixed.a = 1f;
+        return mixed;
+    }
+
+    private static Color ResolveTeamLineColor(TeamId team)
+    {
+        if (team == TeamId.Neutral)
+            return new Color(0.75f, 0.75f, 0.75f, 1f);
+
+        Color color = TeamUtils.GetColor(team);
+        color.a = 1f;
+        return color;
+    }
+
+    private static Color WithAlpha(Color color, float alpha)
+    {
+        color.a = alpha;
+        return color;
     }
 
     private static void AddNeighborLine(
@@ -402,7 +544,7 @@ public class SectorManagerEditor : Editor
                 FromCell = hqCell,
                 ToCell   = repCell,
                 Label    = $"HQ({c.TeamId}) → {sector}{distLabel}",
-                Color    = repLineColor,
+                Color    = ResolveTeamLineColor(c.TeamId),
             });
         }
         SceneView.RepaintAll();
@@ -441,7 +583,7 @@ public class SectorManagerEditor : Editor
                 FromCell = hqCell,
                 ToCell   = repCell,
                 Label    = $"HQ({hq.TeamId}) → {info.Sector}{distLabel}",
-                Color    = repLineColor,
+                Color    = ResolveTeamLineColor(hq.TeamId),
             });
         }
     }

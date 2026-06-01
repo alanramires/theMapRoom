@@ -148,12 +148,18 @@ public class ConstructionHudController : MonoBehaviour
         }
     }
 
-    public void ApplySectorBadge(bool showAIHUD, bool isOccupied, ConstructionSector sector)
+    public void ApplySectorBadge(bool showAIHUD, bool isOccupied, ConstructionSector sector, bool isFakeBuilding)
     {
+        if (sectorBadge == null)
+            AutoAssignReferences();
         if (sectorBadge == null)
             return;
 
-        bool show = showAIHUD && !isOccupied && !ConstructionSectorHelper.IsBase(sector);
+        bool show = showAIHUD
+            && !isOccupied
+            && !isFakeBuilding
+            && sector != ConstructionSector.None
+            && !ConstructionSectorHelper.IsBase(sector);
         if (sectorBadge.gameObject.activeSelf != show)
             sectorBadge.gameObject.SetActive(show);
 
@@ -257,6 +263,32 @@ public class ConstructionHudController : MonoBehaviour
             if (badgeTransform != null)
                 sectorBadge = badgeTransform.GetComponent<TMP_Text>();
         }
+        if (sectorBadge == null && Application.isPlaying)
+            sectorBadge = CreateRuntimeSectorBadge();
+    }
+
+    private TMP_Text CreateRuntimeSectorBadge()
+    {
+        GameObject badgeGo = new GameObject("text_badge", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        badgeGo.transform.SetParent(transform, false);
+
+        RectTransform rect = badgeGo.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(0.4f, -31.7f);
+        rect.sizeDelta = new Vector2(50f, 15f);
+        rect.localRotation = Quaternion.identity;
+        rect.localScale = Vector3.one;
+
+        TextMeshProUGUI text = badgeGo.GetComponent<TextMeshProUGUI>();
+        text.text = string.Empty;
+        text.color = Color.white;
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontSize = 12f;
+        text.raycastTarget = false;
+        text.enabled = false;
+        badgeGo.SetActive(false);
+        return text;
     }
 
     private void EnsureFlagThreatOutline()

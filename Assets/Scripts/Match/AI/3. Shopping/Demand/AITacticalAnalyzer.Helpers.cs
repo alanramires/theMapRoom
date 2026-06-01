@@ -310,7 +310,7 @@ public partial class AITacticalAnalyzer
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
             if (!IsCriticalHomeConstruction(building, team)) continue;
-            if (IsOwnedConstructionUnderCapture(building, team))
+            if (IsOwnedConstructionUnderActiveCapture(building, team, snapshot, HomeThreatRange))
                 count++;
         }
         return count;
@@ -334,6 +334,13 @@ public partial class AITacticalAnalyzer
             && building.CapturePointsMax > 0
             && building.CurrentCapturePoints > 0
             && building.CurrentCapturePoints < building.CapturePointsMax;
+    }
+
+    private static bool IsOwnedConstructionUnderActiveCapture(ConstructionManager building, TeamId team, AIWorldSnapshot snapshot, int range)
+    {
+        if (!IsOwnedConstructionUnderCapture(building, team))
+            return false;
+        return snapshot != null && HasGroundEnemyNearCell(snapshot, building.CurrentCellPosition, range);
     }
 
     private static bool IsCriticalHomeConstruction(ConstructionManager building, TeamId team)

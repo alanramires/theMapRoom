@@ -16,6 +16,13 @@ public enum ObjectiveStatus
     Abandoned,             // descartado por realocação ou pressão insuportável
 }
 
+public enum AIObjectiveType
+{
+    CaptureSector,
+    RallyAssembly,
+    InvasionAttack
+}
+
 // UnitRole está em Assets/Scripts/Units/UnitRole.cs
 // valores: None, Capturador, Assalto, Transportador, Logistica, FogoIndireto
 
@@ -37,6 +44,7 @@ public class SectorObjective
     public ConstructionSector Sector;
     public TeamId             AssignedTeam;
     public ObjectiveStatus    Status;
+    public AIObjectiveType    ObjectiveType;
     public int                Priority;
 
     [Header("Slots de unidade")]
@@ -198,6 +206,7 @@ public class ObjectiveManager : MonoBehaviour
                         sector = (int)obj.Sector,
                         assignedTeam = (int)obj.AssignedTeam,
                         status = (int)obj.Status,
+                        objectiveType = (int)obj.ObjectiveType,
                         priority = obj.Priority,
                         budgetReserved = obj.BudgetReserved,
                         handoffEligible = obj.HandoffEligible,
@@ -269,6 +278,9 @@ public class ObjectiveManager : MonoBehaviour
                         Sector = (ConstructionSector)savedObj.sector,
                         AssignedTeam = (TeamId)savedObj.assignedTeam,
                         Status = (ObjectiveStatus)savedObj.status,
+                        ObjectiveType = System.Enum.IsDefined(typeof(AIObjectiveType), savedObj.objectiveType)
+                            ? (AIObjectiveType)savedObj.objectiveType
+                            : AIObjectiveType.CaptureSector,
                         Priority = savedObj.priority,
                         BudgetReserved = savedObj.budgetReserved,
                         HandoffEligible = savedObj.handoffEligible,

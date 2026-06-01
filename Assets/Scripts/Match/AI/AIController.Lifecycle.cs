@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 //-------------------------------------------------------------------------
 // Controla a IA inimiga, incluindo a execução de suas ações, planejamento de objetivos e tomada de decisões.
@@ -76,6 +77,8 @@ public partial class AIController
 
         Debug.Log($"[AI] Start â€” matchController={matchController != null} replayManager={replayManager != null} turnStateManager={turnStateManager != null}");
 
+        RefreshConstructionHudAfterAIHudReady();
+
         // OnActiveTeamChanged pode ter disparado antes do Awake (raro mas possÃ­vel).
 
         // Verifica se o time jÃ¡ ativo Ã© IA e inicia o turno se necessÃ¡rio.
@@ -92,6 +95,21 @@ public partial class AIController
 
     }
 
+    private static void RefreshConstructionHudAfterAIHudReady()
+    {
+        List<ConstructionManager> constructions = ConstructionManager.AllActive;
+        if (constructions == null || constructions.Count == 0)
+            return;
+
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+
+            construction.RefreshRuntimeVisualState(force: true);
+        }
+    }
     private void OnDestroy()
 
     {

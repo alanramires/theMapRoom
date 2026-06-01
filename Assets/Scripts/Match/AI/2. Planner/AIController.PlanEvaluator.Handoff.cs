@@ -169,7 +169,7 @@ public partial class AIController
 
         float myHQDist = info.GetDistanceToHQ(aiTeam);
 
-        ConstructionSector candidate     = default;
+        ConstructionSector candidate     = ConstructionSector.None;
         float              candidateDist = float.MaxValue;
 
         if (info.ClosestNeighbor1 != default
@@ -187,7 +187,7 @@ public partial class AIController
             candidateDist = info.ClosestNeighbor2Distance;
         }
 
-        if (candidate == default) return;
+        if (candidate == ConstructionSector.None) return;
 
         if (vacaterProtected != null && vacaterProtected.Contains(candidate))
         {
@@ -205,7 +205,7 @@ public partial class AIController
             return;
 
         ConstructionSector forward = ComputeForwardNeighborSector(sector, aiTeam);
-        if (forward == default)
+        if (forward == ConstructionSector.None)
             return;
 
         covered.Add(forward);
@@ -214,7 +214,10 @@ public partial class AIController
 
     private static ConstructionSector ComputeForwardNeighborSector(ConstructionSector sector, TeamId aiTeam)
     {
-        if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return default;
+        if (TryGetPrimaryCampaignSuccessor(sector, aiTeam, out ConstructionSector campaignForward))
+            return campaignForward;
+
+        if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return ConstructionSector.None;
         float myHQDist = info.GetDistanceToHQ(aiTeam);
         if (info.ClosestNeighbor1 != default
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1)
@@ -224,7 +227,7 @@ public partial class AIController
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2)
             && n2.GetDistanceToHQ(aiTeam) > myHQDist)
             return info.ClosestNeighbor2;
-        return default;
+        return ConstructionSector.None;
     }
 
     private static bool HasOpenObjectiveOtherThan(TeamObjectivePlan plan, SectorObjective exclude)

@@ -223,7 +223,10 @@ public class ConstructionSpawner : MonoBehaviour
 
             ConstructionManager spawnedManager = spawned.GetComponent<ConstructionManager>();
             if (spawnedManager != null)
+            {
                 spawnedManager.SetSlotIndex(entry.initialSlotIndex);
+                spawnedManager.SetSector(entry.sector);
+            }
 
             if (!entry.useConstructionConfigurationOverride)
             {

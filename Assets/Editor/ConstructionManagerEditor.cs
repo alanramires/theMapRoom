@@ -23,6 +23,7 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty instanceIdProp;
     private SerializedProperty currentPositionProp;
     private SerializedProperty constructionDisplayNameProp;
+    private SerializedProperty isVisibleProp;
     private SerializedProperty autoApplyOnStartProp;
     private SerializedProperty siteRuntimeProp;
     private SerializedProperty hasSiteRuntimeOverrideProp;
@@ -32,6 +33,9 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty firstOwnerTeamIdProp;
     private SerializedProperty firstOwnerInitializedProp;
     private SerializedProperty sectorProp;
+    private SerializedProperty isForwardObserverSpotProp;
+    private SerializedProperty isRallyPointProp;
+    private SerializedProperty rallyTargetSlotIndexesProp;
     private ForceCopyFilter forceCopyFilter = ForceCopyFilter.Army;
 
     private static readonly Color[] SectorColors = new Color[]
@@ -72,6 +76,7 @@ public class ConstructionManagerEditor : Editor
         instanceIdProp = serializedObject.FindProperty("instanceId");
         currentPositionProp = serializedObject.FindProperty("currentPosition");
         constructionDisplayNameProp = serializedObject.FindProperty("constructionDisplayName");
+        isVisibleProp = serializedObject.FindProperty("isVisible");
         autoApplyOnStartProp = serializedObject.FindProperty("autoApplyOnStart");
         siteRuntimeProp = serializedObject.FindProperty("siteRuntime");
         hasSiteRuntimeOverrideProp = serializedObject.FindProperty("hasSiteRuntimeOverride");
@@ -81,6 +86,9 @@ public class ConstructionManagerEditor : Editor
         firstOwnerTeamIdProp = serializedObject.FindProperty("firstOwnerTeamId");
         firstOwnerInitializedProp = serializedObject.FindProperty("firstOwnerInitialized");
         sectorProp = serializedObject.FindProperty("sector");
+        isForwardObserverSpotProp = serializedObject.FindProperty("isForwardObserverSpot");
+        isRallyPointProp = serializedObject.FindProperty("isRallyPoint");
+        rallyTargetSlotIndexesProp = serializedObject.FindProperty("rallyTargetSlotIndexes");
     }
 
     public override void OnInspectorGUI()
@@ -103,6 +111,7 @@ public class ConstructionManagerEditor : Editor
         DrawSlotAndTeamBlock();
         DrawSectorPopup();
 
+        DrawRoleBlock();
         DrawConstructionIdPopup();
 
         using (new EditorGUI.DisabledScope(true))
@@ -161,6 +170,125 @@ public class ConstructionManagerEditor : Editor
             construction.PullCellFromTransform();
     }
 
+    private void DrawRoleBlock()
+    {
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Role", EditorStyles.boldLabel);
+        if (isForwardObserverSpotProp != null)
+            EditorGUILayout.PropertyField(isForwardObserverSpotProp, new GUIContent("Forward Observer Spot"));
+        if (isRallyPointProp != null)
+            EditorGUILayout.PropertyField(isRallyPointProp, new GUIContent("Rally Point"));
+        DrawRallyTargetSlotsList();
+        if (isVisibleProp != null)
+        {
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(isVisibleProp, new GUIContent("Is Visible"));
+            bool visibilityChanged = EditorGUI.EndChangeCheck();
+            bool nextVisibility = isVisibleProp.boolValue;
+            if (visibilityChanged && Application.isPlaying)
+            {
+                for (int i = 0; i < targets.Length; i++)
+                {
+                    if (targets[i] is ConstructionManager manager)
+                    {
+                        manager.SetVisible(nextVisibility);
+                        EditorUtility.SetDirty(manager);
+                    }
+                }
+            }
+        }
+    }
+
+    private void DrawRallyTargetSlotsList()
+    {
+        if (rallyTargetSlotIndexesProp == null)
+            return;
+
+        using (new EditorGUI.DisabledScope(isRallyPointProp != null && !isRallyPointProp.boolValue))
+        {
+            MatchController mc = Object.FindAnyObjectByType<MatchController>();
+            int slotCount = mc != null ? mc.SlotCount : 0;
+            if (slotCount <= 0)
+            {
+                EditorGUILayout.PropertyField(rallyTargetSlotIndexesProp, new GUIContent("Rally Target Slots"), includeChildren: true);
+                return;
+            }
+
+            string[] labels = new string[slotCount];
+            for (int i = 0; i < slotCount; i++)
+            {
+                TeamId team = mc.GetTeamIdForSlot(i);
+                labels[i] = $"Slot {i} - {TeamUtils.GetName(team)}";
+            }
+
+            EditorGUILayout.LabelField("Rally Target Slots", EditorStyles.miniBoldLabel);
+            EditorGUI.indentLevel++;
+            for (int i = 0; i < rallyTargetSlotIndexesProp.arraySize; i++)
+            {
+                SerializedProperty item = rallyTargetSlotIndexesProp.GetArrayElementAtIndex(i);
+                if (item == null)
+                    continue;
+
+                EditorGUILayout.BeginHorizontal();
+                int currentSlot = Mathf.Clamp(item.intValue, 0, slotCount - 1);
+                int selectedSlot = EditorGUILayout.Popup($"Target {i + 1}", currentSlot, labels);
+                if (IsRallyTargetSlotUsed(selectedSlot, i))
+                    selectedSlot = FindFirstUnusedRallyTargetSlot(slotCount, currentSlot, i);
+                item.intValue = selectedSlot;
+                if (GUILayout.Button("-", GUILayout.Width(24f)))
+                {
+                    rallyTargetSlotIndexesProp.DeleteArrayElementAtIndex(i);
+                    i--;
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+
+            using (new EditorGUI.DisabledScope(rallyTargetSlotIndexesProp.arraySize >= slotCount))
+            {
+                if (GUILayout.Button("Add Rally Target Slot"))
+                {
+                    int nextSlot = FindFirstUnusedRallyTargetSlot(slotCount, 0, exceptIndex: -1);
+
+                    int index = rallyTargetSlotIndexesProp.arraySize;
+                    rallyTargetSlotIndexesProp.InsertArrayElementAtIndex(index);
+                    SerializedProperty item = rallyTargetSlotIndexesProp.GetArrayElementAtIndex(index);
+                    if (item != null)
+                        item.intValue = Mathf.Clamp(nextSlot, 0, slotCount - 1);
+                }
+            }
+            EditorGUI.indentLevel--;
+        }
+    }
+
+    private bool IsRallyTargetSlotUsed(int slot, int exceptIndex)
+    {
+        if (rallyTargetSlotIndexesProp == null)
+            return false;
+
+        for (int i = 0; i < rallyTargetSlotIndexesProp.arraySize; i++)
+        {
+            if (i == exceptIndex)
+                continue;
+
+            SerializedProperty item = rallyTargetSlotIndexesProp.GetArrayElementAtIndex(i);
+            if (item != null && item.intValue == slot)
+                return true;
+        }
+
+        return false;
+    }
+
+    private int FindFirstUnusedRallyTargetSlot(int slotCount, int fallback, int exceptIndex)
+    {
+        for (int slot = 0; slot < slotCount; slot++)
+        {
+            if (!IsRallyTargetSlotUsed(slot, exceptIndex))
+                return slot;
+        }
+
+        return Mathf.Clamp(fallback, 0, Mathf.Max(0, slotCount - 1));
+    }
+
     private void DrawSectorPopup()
     {
         if (sectorProp == null)
@@ -173,8 +301,8 @@ public class ConstructionManagerEditor : Editor
         EditorGUILayout.PrefixLabel("Sector");
 
         Color prev = GUI.backgroundColor;
-        if (current >= 0 && current < SectorColors.Length)
-            GUI.backgroundColor = SectorColors[current];
+        if (current > 0 && current - 1 < SectorColors.Length)
+            GUI.backgroundColor = SectorColors[current - 1];
 
         int next = EditorGUILayout.Popup(current, names);
         GUI.backgroundColor = prev;
@@ -469,4 +597,3 @@ public class ConstructionManagerEditor : Editor
     }
 
 }
-

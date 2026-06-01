@@ -917,6 +917,8 @@ MonoBehaviour:
   occupiedByReadyUnitDarkenFactor: 0.4
   hudController: {fileID: 1370441032517419065}
   matchController: {fileID: 0}
+  isForwardObserverSpot: 0
+  isRallyPoint: 0
   victoryBuildingOverlayRenderer: {fileID: 0}
   victoryBuildingOverlaySprite: {fileID: 0}
   victoryBuildingOverlayColor: {r: 1, g: 0.84, b: 0.22, a: 1}

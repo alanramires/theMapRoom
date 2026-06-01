@@ -209,6 +209,10 @@ public partial class AIController
 
             }
 
+            if (TryBuildFallbackAttackFromEvaluations(
+                    unit, snapshot, fromCell, paths, evaluations, destCell, out PlayerAction fallbackAttack))
+                return fallbackAttack;
+
         }
 
         // 3. Movimento simples
@@ -226,6 +230,59 @@ public partial class AIController
         return data.preferArtilleryModeBeforeCombatant
             && data.roles != null
             && data.roles.Contains(UnitRole.FogoIndireto);
+    }
+
+    private bool TryBuildFallbackAttackFromEvaluations(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        List<HexEvaluation> evaluations,
+        Vector3Int excludedCell,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null || evaluations == null || evaluations.Count == 0)
+            return false;
+
+        var ordered = new List<HexEvaluation>();
+        foreach (HexEvaluation eval in evaluations)
+        {
+            if (eval.cell == excludedCell) continue;
+            if (eval.combatValue <= 0f) continue;
+            ordered.Add(eval);
+        }
+
+        ordered.Sort((a, b) => b.total.CompareTo(a.total));
+
+        foreach (HexEvaluation eval in ordered)
+        {
+            Vector3Int attackCell = eval.cell;
+            attackCell.z = 0;
+            bool hasMoved = attackCell != fromCell;
+            var attackCandidates = FindAttackTargetsSorted(unit, attackCell, hasMoved);
+            if (attackCandidates == null) continue;
+
+            foreach (var (target, _) in attackCandidates)
+            {
+                if (target?.targetUnit == null) continue;
+                if (!PassesAttackDecision(unit, target.targetUnit, attackCell, false, out string atkReason))
+                {
+                    Debug.Log($"[AI] {unit.InstanceId} -> fallback ataque bloqueado por AttackDecision ({target.targetUnit.InstanceId}): {atkReason}");
+                    continue;
+                }
+
+                Vector3Int targetCell = target.targetUnit.CurrentCellPosition;
+                targetCell.z = 0;
+                Debug.Log($"[AI] {unit.InstanceId} -> fallback ataca {target.targetUnit.InstanceId} de {attackCell}");
+                action = BuildAttackBatch(
+                    unit, snapshot.AITeam, fromCell, attackCell,
+                    target.targetUnit.InstanceId.ToString(), targetCell, paths);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private List<(PodeMirarTargetOption opt, int score)> FindAttackTargetsSorted(UnitManager unit, Vector3Int fromCell, bool hasMoved)
@@ -261,6 +318,9 @@ public partial class AIController
             if (opt?.targetUnit == null || opt.targetUnit.IsDead) continue;
 
             int score = 0;
+
+            BazookaTargetPriority targetPreference = ResolveAssaultTargetPreference(unit, opt.targetUnit);
+            score += Mathf.RoundToInt(GetAssaultTargetPreferenceScore(targetPreference));
 
             // Capturadores priorizam inimigos sobre construções
 

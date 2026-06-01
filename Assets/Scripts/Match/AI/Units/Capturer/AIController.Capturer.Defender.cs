@@ -19,7 +19,10 @@ public partial class AIController
 
         bool activeCriticalHomeDefense = IsCriticalHomeDefenseObjective(assigned, snapshot.AITeam);
         bool activeRecentGarrison = IsRecentlyCapturedSector(snapshot.AITeam, assigned.Sector, snapshot.TurnNumber);
-        assigned.Status = (activeCriticalHomeDefense || activeRecentGarrison) ? ObjectiveStatus.Defending : ObjectiveStatus.Complete;
+        bool activeRallyAssembly = IsRallyAssemblyObjective(assigned);
+        assigned.Status = activeRallyAssembly
+            ? ObjectiveStatus.Pursuing
+            : (activeCriticalHomeDefense || activeRecentGarrison) ? ObjectiveStatus.Defending : ObjectiveStatus.Complete;
         ApplyPlanHUD(unit, assigned, UnitRole.Capturador);
 
         TryGetAnySectorInfo(assigned.Sector, out SectorManager.SectorInfo secInfo);
@@ -28,7 +31,7 @@ public partial class AIController
         // No active SOS: release to HexEvaluator if no enemy is near the defended sector.
         // The snapshot is rebuilt each iteration, so a tank destroyed earlier this turn
         // will already be absent from EnemyUnits here.
-        if (!activeCriticalHomeDefense && !activeRecentGarrison)
+        if (!activeCriticalHomeDefense && !activeRecentGarrison && !activeRallyAssembly)
         {
             bool enemyNearby = false;
             foreach (UnitManager e in snapshot.EnemyUnits)
@@ -91,7 +94,7 @@ public partial class AIController
             bool isLongRangeStationary = unit.TryGetUnitData(out UnitData stationaryUd) && stationaryUd != null && stationaryUd.longRangeStationary;
             if (!activeCriticalHomeDefense || activeRecentGarrison || isLongRangeStationary)
             {
-                string holdKind = activeCriticalHomeDefense ? "SOS" : (activeRecentGarrison ? "guarnicao" : "guarda");
+                string holdKind = activeRallyAssembly ? "rally" : (activeCriticalHomeDefense ? "SOS" : (activeRecentGarrison ? "guarnicao" : "guarda"));
                 Debug.Log($"{TL("Defensor")} {unit.InstanceId} segura {assigned.Sector} ({holdKind}) — mantém posição");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
             }
