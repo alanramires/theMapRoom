@@ -128,13 +128,16 @@ public partial class AIController
 
         if (HasFireSupportAttackInCurrentPosition(unit, aiTeam)) return 2;
 
+        // Combate local de assalto preempta progressao/revelacao: se ha um tanque/APC
+        // capaz de resolver a ameaca agora, nao puxa infantaria distante para esse duelo.
+        if (HasPrimaryAssaultAttackOpportunity(unit, aiTeam)) return 2;
+
         // Forward observer: se o alvo do setor ainda esta coberto pelo FoW,
         // infantaria capturadora que consegue ocupar um spot marcado no mapa
-        // age antes dos blindados/batedores do mesmo plano.
+        // age antes do avanco normal; combate local ainda preempta.
         if (!unit.IsUnderRepair && plan != null
             && HasForwardObserverApproachForHiddenObjective(unit, plan, aiTeam))
-            return 0;
-
+            return 2;
         // Capturador no corredor de outro setor (mais perto do objetivo alheio que o capturador
         // designado a ele) → age antes (grupo 1) para liberar o caminho.
         if (!unit.IsUnderRepair && plan != null)
@@ -221,6 +224,81 @@ public partial class AIController
         return false;
     }
 
+    private bool HasInitiativeCombatOpportunity(UnitManager unit, TeamId aiTeam)
+    {
+        return HasFireSupportAttackInCurrentPosition(unit, aiTeam)
+            || HasPrimaryAssaultAttackOpportunity(unit, aiTeam);
+    }
+
+    private bool HasPrimaryAssaultAttackOpportunity(UnitManager unit, TeamId aiTeam)
+    {
+        if (!IsPrimaryAssaultInitiativeUnit(unit))
+            return false;
+        if (unit.IsUnderRepair || unit.IsDead || unit.IsEmbarked)
+            return false;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+
+        if (paths == null || paths.Count == 0)
+            return false;
+
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        MatchController mc = GetMatchController();
+        WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+
+            SensorMovementMode mode = cell != fromCell
+                ? SensorMovementMode.MoveuAndando
+                : SensorMovementMode.MoveuParado;
+
+            var targets = new List<PodeMirarTargetOption>();
+            if (!PodeMirarSensor.CollectTargets(
+                    unit,
+                    boardTilemap,
+                    terrainDatabase,
+                    mode,
+                    targets,
+                    weaponPriorityData: weaponPriorityData,
+                    dpqAirHeightConfig: turnStateManager != null ? turnStateManager.DpqAirHeightConfigRef : null,
+                    fromCell: cell))
+                continue;
+
+            foreach (PodeMirarTargetOption opt in targets)
+            {
+                UnitManager target = opt != null ? opt.targetUnit : null;
+                if (target == null || target.TeamId == aiTeam || target.IsDead || target.IsEmbarked)
+                    continue;
+                if (mc != null && !mc.IsUnitVisibleForTeam(target, aiTeam))
+                    continue;
+                if (PassesAttackDecision(unit, target, cell, defensiveContext: false, out _))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsPrimaryAssaultInitiativeUnit(UnitManager unit)
+    {
+        if (unit == null)
+            return false;
+        if (!unit.TryGetUnitData(out UnitData data) || data == null)
+            return false;
+        return data.roles != null
+            && data.roles.Count > 0
+            && data.roles[0] == UnitRole.Assalto;
+    }
     private bool HasFireSupportShotAtOwnedConstructionCapturer(UnitManager unit, TeamId aiTeam)
     {
         if (!IsFireSupportUnit(unit))

@@ -278,13 +278,16 @@ public partial class AIShoppingPlanner
         if (!infantryMass && !hotOffensiveSector)
             return false;
 
-        int desiredFireSupport = infantryPressure >= threshold * 2f || enemyInfantryForce >= threshold * 2f || topHot >= Instance.IntelFireSupportGapHotThreshold + 3f
+        bool strongInfantryMass = infantryPressure >= threshold * 2f || enemyInfantryForce >= threshold * 2f;
+        bool strongHotSector = topHot >= Instance.IntelFireSupportGapHotThreshold + 3f;
+        bool hasScreenForSecondFireSupport = activeAssault >= minAssault + 1 || activeCapturers >= minCapturers + 2;
+        int desiredFireSupport = (strongInfantryMass || strongHotSector) && hasScreenForSecondFireSupport
             ? 2
             : 1;
         bool needed = activeFireSupport < desiredFireSupport;
         offensiveAntiInfantryFireSupport = needed;
         if (needed)
-            Debug.Log($"[AI Shopping] offensive_anti_inf_fire_demand: needed=True activeFire={activeFireSupport}/{desiredFireSupport} cap={activeCapturers}/{minCapturers} ass={activeAssault}/{minAssault} infantry={infantryPressure:F1}/{enemyInfantryForce:F1} top={topSector} hot={topHot:F1} enemy={topEnemyActivity:F1}");
+            Debug.Log($"[AI Shopping] offensive_anti_inf_fire_demand: needed=True activeFire={activeFireSupport}/{desiredFireSupport} cap={activeCapturers}/{minCapturers} ass={activeAssault}/{minAssault} screen2={hasScreenForSecondFireSupport} infantry={infantryPressure:F1}/{enemyInfantryForce:F1} top={topSector} hot={topHot:F1} enemy={topEnemyActivity:F1}");
         return needed;
     }
 

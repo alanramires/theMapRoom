@@ -111,6 +111,15 @@ public partial class AIController
                         if (blockerA != blockerB) return blockerA ? -1 : 1;
                     }
 
+                    // Dentro do grupo 2: combate local real vem antes de apoio de posicionamento
+                    // (observador, liberacao de corredor, pickup etc.).
+                    if (groupA == 2)
+                    {
+                        bool combatA = HasInitiativeCombatOpportunity(a, aiTeam);
+                        bool combatB = HasInitiativeCombatOpportunity(b, aiTeam);
+                        if (combatA != combatB) return combatA ? -1 : 1;
+                    }
+
                     // Dentro do grupo 3: prioridade do objetivo (pri=1 = age primeiro)
                     if (groupA == 3 && activePlan != null)
                     {
@@ -205,10 +214,8 @@ public partial class AIController
             if (ShouldStopAIForMatchEnd("phase2_apos_pause_batch"))
                 yield break;
 
-            if (unitMoved || unitAttacked)
-            {
-                matchController?.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.DataOnly);
-            }
+            if (!IsNoOpUnitAction(action) || unitMoved || unitAttacked)
+                yield return CommitAIWorldAfterAction(aiTeam, $"phase2:{FormatInitiativeUnitName(unit)}");
 
             float delay = GetBatchDelay();
             if (delay > 0f) yield return new WaitForSecondsRealtime(delay);

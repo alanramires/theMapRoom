@@ -41,6 +41,8 @@ public partial class AIController
                 : "[AI Stage] Stage 0 desativado por emulacao.");
         }
 
+        yield return CommitAIWorldAfterAction(aiTeam, "turn-start", rebuildPlan: false);
+
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
         aiTurnNumber = snapshot.TurnNumber;
         aiTeamTag    = TeamUtils.GetName(aiTeam).ToUpper();

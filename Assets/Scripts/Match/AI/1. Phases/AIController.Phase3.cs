@@ -15,6 +15,8 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase3 — compras.");
 
+        yield return CommitAIWorldAfterAction(snapshot.AITeam, "phase3:pre-shopping");
+
         // Reconstrói snapshot para refletir o saldo atual pós-ações
         AIWorldSnapshot freshSnap = AIWorldSnapshot.Build(snapshot.AITeam, matchController);
         if (ShouldStopAIForMatchEnd("phase3_apos_snapshot"))
@@ -49,6 +51,8 @@ public partial class AIController
             yield return ExecuteAIBatchWithDebugStep(batch);
             if (ShouldStopAIForMatchEnd("phase3_apos_batch"))
                 yield break;
+
+            yield return CommitAIWorldAfterAction(snapshot.AITeam, $"phase3:shopping:{order.UnitToBuy.name}");
 
             yield return WaitIfDebugPaused();
             if (ShouldStopAIForMatchEnd("phase3_apos_pause_batch"))
