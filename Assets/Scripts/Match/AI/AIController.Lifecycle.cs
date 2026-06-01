@@ -165,9 +165,11 @@ public partial class AIController
 
             isActive = false;
 
-            currentAIStage = 0;
-
-            currentAITeam = TeamId.Neutral;
+            if (currentAIStage < 4)
+            {
+                currentAIStage = 0;
+                currentAITeam = TeamId.Neutral;
+            }
 
         }
 

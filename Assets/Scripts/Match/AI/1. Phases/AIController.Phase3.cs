@@ -25,6 +25,10 @@ public partial class AIController
         AITacticalAnalyzer.Instance.Rebuild(snapshot.AITeam, freshSnap, ObjectiveManager.GetPlanForTeam(snapshot.AITeam));
 
         List<AIShoppingPlanner.ShoppingOrder> orders = AIShoppingPlanner.Decide(freshSnap);
+        // A partir daqui a fase de compras fica comprometida: se salvar/carregar
+        // durante um batch de compra, o load deve seguir para o fim do turno em vez
+        // de recalcular compras sobre um estado parcialmente comprado.
+        currentAIStage = 4;
 
         foreach (AIShoppingPlanner.ShoppingOrder order in orders)
         {

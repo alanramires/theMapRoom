@@ -869,6 +869,7 @@ MonoBehaviour:
   instanceId: 0
   currentPosition: {x: 0, y: 0, z: 0}
   constructionDisplayName: HQ
+  isVisible: 1
   autoApplyOnStart: 1
   siteRuntime:
     isPlayerHeadQuarter: 1
@@ -919,6 +920,8 @@ MonoBehaviour:
   matchController: {fileID: 0}
   isForwardObserverSpot: 0
   isRallyPoint: 0
+  rallyTargetSlotIndex: -1
+  rallyTargetSlotIndexes: 
   victoryBuildingOverlayRenderer: {fileID: 0}
   victoryBuildingOverlaySprite: {fileID: 0}
   victoryBuildingOverlayColor: {r: 1, g: 0.84, b: 0.22, a: 1}

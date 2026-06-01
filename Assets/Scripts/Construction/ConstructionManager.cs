@@ -51,6 +51,10 @@ public class ConstructionManager : MonoBehaviour
     [HideInInspector, SerializeField] private int rallyTargetSlotIndex = -1;
     [Tooltip("Slots dos HQs alvo deste Rally Point. Vazio = nenhum alvo configurado.")]
     [SerializeField] private List<int> rallyTargetSlotIndexes = new List<int>();
+    [Tooltip("Este prédio marca o setor como fundação econômica/territorial para a AI de um slot.")]
+    [SerializeField] private bool isAnchorSector;
+    [Tooltip("Slot da AI para o qual este setor funciona como Anchor Sector. -1 = nenhum slot.")]
+    [SerializeField] private int anchorSectorSlotIndex = -1;
 
     [Header("Victory Building")]
     [SerializeField] private SpriteRenderer victoryBuildingOverlayRenderer;
@@ -76,6 +80,8 @@ public class ConstructionManager : MonoBehaviour
     public bool IsRallyPoint => isRallyPoint;
     public int RallyTargetSlotIndex => rallyTargetSlotIndexes != null && rallyTargetSlotIndexes.Count > 0 ? rallyTargetSlotIndexes[0] : rallyTargetSlotIndex;
     public IReadOnlyList<int> RallyTargetSlotIndexes => rallyTargetSlotIndexes != null ? rallyTargetSlotIndexes : System.Array.Empty<int>();
+    public bool IsAnchorSector => isAnchorSector;
+    public int AnchorSectorSlotIndex => anchorSectorSlotIndex;
 
     public void SetSlotIndex(int index)
     {
@@ -353,6 +359,11 @@ public class ConstructionManager : MonoBehaviour
         RefreshRuntimeVisualState(force: true);
     }
 
+    public void SetForwardObserverSpot(bool value)
+    {
+        isForwardObserverSpot = value;
+    }
+
     public void SetRallyTargetSlotIndex(int value)
     {
         rallyTargetSlotIndex = Mathf.Max(-1, value);
@@ -384,6 +395,16 @@ public class ConstructionManager : MonoBehaviour
         rallyTargetSlotIndexes.Clear();
         rallyTargetSlotIndexes.AddRange(sanitizedSlots);
         rallyTargetSlotIndex = rallyTargetSlotIndexes.Count > 0 ? rallyTargetSlotIndexes[0] : -1;
+    }
+
+    public void SetAnchorSectorSlotIndex(int value)
+    {
+        anchorSectorSlotIndex = Mathf.Max(-1, value);
+    }
+
+    public void SetAnchorSector(bool value)
+    {
+        isAnchorSector = value;
     }
 
     public void SetTeamId(TeamId team)
@@ -647,6 +668,7 @@ public class ConstructionManager : MonoBehaviour
             siteRuntime = new ConstructionSiteRuntime();
         siteRuntime.Sanitize();
         SanitizeRallyTargetSlots();
+        SanitizeAnchorSectorSlot();
         if (spriteRenderer == null)
             spriteRenderer = ResolvePrimarySpriteRenderer();
         if (victoryBuildingOverlayRenderer == null)
@@ -723,6 +745,11 @@ public class ConstructionManager : MonoBehaviour
             rallyTargetSlotIndexes.Add(rallyTargetSlotIndex);
 
         rallyTargetSlotIndex = rallyTargetSlotIndexes.Count > 0 ? rallyTargetSlotIndexes[0] : -1;
+    }
+
+    private void SanitizeAnchorSectorSlot()
+    {
+        anchorSectorSlotIndex = Mathf.Max(-1, anchorSectorSlotIndex);
     }
 
     public bool CanProduceUnitsForTeam(TeamId buyerTeam)

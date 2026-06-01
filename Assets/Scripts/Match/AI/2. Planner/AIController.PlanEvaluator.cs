@@ -16,6 +16,7 @@ public partial class AIController
         TeamObjectivePlan plan = ObjectiveManager.GetOrCreatePlanForTeam(aiTeam);
         AIIntelReport intel = BuildPlanIntelReport(snapshot);
         AIRallyPlanContext rallyContext = BuildRallyPlanContext(aiTeam, snapshot.TurnNumber);
+        AIAnchorPlanContext anchorContext = BuildAnchorPlanContext(aiTeam, snapshot.TurnNumber);
 
         // Passo 1: valida objetivos existentes
         for (int i = plan.Objectives.Count - 1; i >= 0; i--)
@@ -238,7 +239,10 @@ public partial class AIController
                 Priority     = CalculateSectorPriority(info, aiTeam, snapshot.Stance)
                     + GetIntelSectorPriorityBonus(intel, info.Sector)
                     + GetCampaignAdvancePriorityBonus(info.Sector, plan, aiTeam)
-                    + GetRallySectorPriorityBonus(rallyContext, info.Sector, aiTeam),
+                    + GetAnchorSectorPriorityBonus(anchorContext, info.Sector, macro.Phase)
+                    + (macro.Phase == AIMacroTerritoryPhase.Collapsing
+                        ? 0
+                        : GetRallySectorPriorityBonus(rallyContext, info.Sector, aiTeam)),
             };
             int slots = Mathf.Clamp(Mathf.CeilToInt(info.ConstructionCount / 2f), 1, 4);
             bool highRisk = info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High;
@@ -317,6 +321,11 @@ public partial class AIController
         foreach (SectorManager.SectorInfo baseInfo in allBases)
         {
             if (FindHQTeamInSector(baseInfo.Sector) == aiTeam) continue;
+            if (macro.Phase == AIMacroTerritoryPhase.Collapsing)
+            {
+                Debug.Log($"{TL("Plan")} skip base inimiga {baseInfo.Sector}: Collapsing suprime plano de invasao");
+                continue;
+            }
             if (plan.GetObjectiveForSector(baseInfo.Sector) != null) continue;
 
             bool hasCapturable = false;
@@ -382,6 +391,7 @@ public partial class AIController
                 Status       = ObjectiveStatus.Pending,
                 Priority     = CalculateSectorPriority(baseInfo, aiTeam, snapshot.Stance)
                     + GetIntelSectorPriorityBonus(intel, baseInfo.Sector)
+                    + GetAnchorSectorPriorityBonus(anchorContext, baseInfo.Sector, macro.Phase)
                     + GetRallySectorPriorityBonus(rallyContext, baseInfo.Sector, aiTeam),
             };
             for (int s = 0; s < capturerSlots; s++)
@@ -425,6 +435,7 @@ public partial class AIController
                     Status       = ObjectiveStatus.Pending,
                     Priority     = CalculateSectorPriority(closest, aiTeam, snapshot.Stance)
                         + GetIntelSectorPriorityBonus(intel, closest.Sector)
+                        + GetAnchorSectorPriorityBonus(anchorContext, closest.Sector, macro.Phase)
                         + GetRallySectorPriorityBonus(rallyContext, closest.Sector, aiTeam),
                 };
                 fallback.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
@@ -440,6 +451,7 @@ public partial class AIController
             if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo inf))
                 obj.Priority = CalculateSectorPriority(inf, aiTeam, snapshot.Stance)
                     + GetIntelSectorPriorityBonus(intel, inf.Sector)
+                    + GetAnchorSectorPriorityBonus(anchorContext, inf.Sector, macro.Phase)
                     + GetRallySectorPriorityBonus(rallyContext, inf.Sector, aiTeam);
         }
 
@@ -502,6 +514,11 @@ public partial class AIController
         // Passo 3e: suporte ofensivo sem capturador
         ReleaseOffensiveSupportWithoutCapturer(plan, aiTeam);
 
+        // Passo 3f: anchors abertos seguram capturadores antes de avanço/rally.
+        ReleaseNonAnchorCapturersForAnchorNeed(plan, aiTeam, anchorContext, macro.Phase, snapshot.TurnNumber);
+        bool anchorCapturerReserveActive = ShouldReserveCapturersForAnchors(anchorContext, macro.Phase)
+            && HasOpenAnchorCapturerNeed(plan, anchorContext);
+
         // Passo 4: coleta IDs já atribuídos
         var assignedIds = new HashSet<int>();
         foreach (SectorObjective obj in plan.Objectives)
@@ -515,6 +532,28 @@ public partial class AIController
         foreach (UnitManager u in allCapturers)
             if (!assignedIds.Contains(u.InstanceId)) freeCapturers.Add(u);
 
+        // 5a-0: guarnicao local. Se o setor acabou de virar defesa e o capturador
+        // ainda esta no predio, nao deixa o solver global puxa-lo para outra frente.
+        var localGarrisonList = new List<UnitManager>();
+        foreach (UnitManager u in freeCapturers)
+        {
+            ConstructionSector currentSector = ResolveUnitSectorForPlan(u);
+            if (currentSector == ConstructionSector.None)
+                continue;
+
+            SectorObjective obj = plan.GetObjectiveForSector(currentSector);
+            if (obj == null
+                || obj.Status != ObjectiveStatus.Defending
+                || !obj.HasOpenSlot(UnitRole.Capturador))
+                continue;
+
+            obj.TryFillSlot(UnitRole.Capturador, u.InstanceId);
+            ApplyPlanHUD(u, obj);
+            localGarrisonList.Add(u);
+            Debug.Log($"{TL("Plan")} {u.InstanceId} permanece em {currentSector} como guarnicao local");
+        }
+        foreach (UnitManager u in localGarrisonList) freeCapturers.Remove(u);
+
         // 5a: captura imediata
         var immediateList = new List<UnitManager>();
         foreach (UnitManager u in freeCapturers)
@@ -523,6 +562,7 @@ public partial class AIController
             if (!SimulateCaptureSensor(u, uCell, out ConstructionManager bldg)) continue;
             SectorObjective obj = plan.GetObjectiveForSector(bldg.Sector);
             if (obj == null || !obj.HasOpenSlot(UnitRole.Capturador)) continue;
+            if (anchorCapturerReserveActive && !IsOwnAnchorSector(anchorContext, obj.Sector)) continue;
             obj.TryFillSlot(UnitRole.Capturador, u.InstanceId);
             if (obj.Status != ObjectiveStatus.Defending) obj.Status = ObjectiveStatus.Pursuing;
             ApplyPlanHUD(u, obj);
@@ -546,6 +586,8 @@ public partial class AIController
             if (!obj.HasOpenSlot(UnitRole.Capturador)) continue;
             if (obj.Status == ObjectiveStatus.Defending)
                 continue;
+            if (anchorCapturerReserveActive && !IsOwnAnchorSector(anchorContext, obj.Sector))
+                continue;
             bool isDefensive = false;
             ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
             Vector3Int tc;
@@ -560,7 +602,7 @@ public partial class AIController
                 tc = defInfo.RepresentativeCell; tc.z = 0;
             }
             else continue;
-            if (!isDefensive && cascadeCovered.Contains(obj.Sector)) continue;
+            if (!isDefensive && cascadeCovered.Contains(obj.Sector) && !IsOwnAnchorSector(anchorContext, obj.Sector)) continue;
 
             if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo slotInfo)
                 && slotInfo.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
@@ -665,7 +707,11 @@ public partial class AIController
                         rawDist = terrainCost;
                     else
                         rawDist = SectorManager.HexDistance(uc, tc);
-                    distMatrix[ui, oj] = rawDist * riskMultipliers[oj];
+                    float continuityCost = CalculateSectorContinuityAssignmentCost(
+                        u,
+                        assignableObjs[oj].obj.Sector,
+                        aiTeam);
+                    distMatrix[ui, oj] = Mathf.Max(0.1f, rawDist * riskMultipliers[oj] + continuityCost);
                 }
             }
 
@@ -1244,6 +1290,74 @@ public partial class AIController
         AISectorIntentAnalyzer.RebuildAndLog(aiTeam, snapshot, plan, intel, "Plan");
     }
 
+    private ConstructionSector ResolveUnitSectorForPlan(UnitManager unit)
+    {
+        if (unit == null)
+            return ConstructionSector.None;
+
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+        if (construction != null && construction.Sector != ConstructionSector.None)
+            return construction.Sector;
+
+        ConstructionSector bestSector = ConstructionSector.None;
+        float bestDist = float.MaxValue;
+        foreach (SectorManager.SectorInfo info in SectorManager.GetAllSectorInfos())
+        {
+            if (info == null) continue;
+            Vector3Int rc = info.RepresentativeCell;
+            rc.z = 0;
+            float dist = SectorManager.HexDistance(cell, rc);
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                bestSector = info.Sector;
+            }
+        }
+
+        return bestDist <= 2f ? bestSector : ConstructionSector.None;
+    }
+
+    private float CalculateSectorContinuityAssignmentCost(UnitManager unit, ConstructionSector targetSector, TeamId aiTeam)
+    {
+        if (unit == null || targetSector == ConstructionSector.None)
+            return 0f;
+
+        ConstructionSector originSector = ResolveUnitSectorForPlan(unit);
+        if (originSector == ConstructionSector.None)
+            return 0f;
+        if (originSector == targetSector)
+            return -8f;
+        if (IsSectorContinuityNeighbor(originSector, targetSector, aiTeam))
+            return -6f;
+
+        if (TryGetAnySectorInfo(originSector, out SectorManager.SectorInfo originInfo)
+            && TryGetAnySectorInfo(targetSector, out SectorManager.SectorInfo targetInfo))
+        {
+            float originHqDist = originInfo.GetDistanceToHQ(aiTeam);
+            float targetHqDist = targetInfo.GetDistanceToHQ(aiTeam);
+            if (targetHqDist > originHqDist)
+                return 12f;
+        }
+
+        return 0f;
+    }
+
+    private static bool IsSectorContinuityNeighbor(ConstructionSector originSector, ConstructionSector targetSector, TeamId aiTeam)
+    {
+        if (originSector == ConstructionSector.None || targetSector == ConstructionSector.None)
+            return false;
+        if (ComputeForwardNeighborSector(originSector, aiTeam) == targetSector)
+            return true;
+        if (TryGetRequiredCampaignPredecessor(targetSector, aiTeam, out ConstructionSector campaignRear)
+            && campaignRear == originSector)
+            return true;
+        if (!SectorManager.TryGetSectorInfo(originSector, out SectorManager.SectorInfo originInfo))
+            return false;
+        return originInfo.ClosestNeighbor1 == targetSector || originInfo.ClosestNeighbor2 == targetSector;
+    }
     private void RefreshSlotDistances(TeamObjectivePlan plan, TeamId aiTeam)
     {
         foreach (SectorObjective obj in plan.Objectives)
@@ -1322,6 +1436,14 @@ public partial class AIController
         }
     }
 }
+
+
+
+
+
+
+
+
 
 
 

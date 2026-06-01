@@ -36,6 +36,8 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty isForwardObserverSpotProp;
     private SerializedProperty isRallyPointProp;
     private SerializedProperty rallyTargetSlotIndexesProp;
+    private SerializedProperty isAnchorSectorProp;
+    private SerializedProperty anchorSectorSlotIndexProp;
     private ForceCopyFilter forceCopyFilter = ForceCopyFilter.Army;
 
     private static readonly Color[] SectorColors = new Color[]
@@ -89,6 +91,8 @@ public class ConstructionManagerEditor : Editor
         isForwardObserverSpotProp = serializedObject.FindProperty("isForwardObserverSpot");
         isRallyPointProp = serializedObject.FindProperty("isRallyPoint");
         rallyTargetSlotIndexesProp = serializedObject.FindProperty("rallyTargetSlotIndexes");
+        isAnchorSectorProp = serializedObject.FindProperty("isAnchorSector");
+        anchorSectorSlotIndexProp = serializedObject.FindProperty("anchorSectorSlotIndex");
     }
 
     public override void OnInspectorGUI()
@@ -179,6 +183,9 @@ public class ConstructionManagerEditor : Editor
         if (isRallyPointProp != null)
             EditorGUILayout.PropertyField(isRallyPointProp, new GUIContent("Rally Point"));
         DrawRallyTargetSlotsList();
+        if (isAnchorSectorProp != null)
+            EditorGUILayout.PropertyField(isAnchorSectorProp, new GUIContent("Anchor Sector"));
+        DrawAnchorSectorSlot();
         if (isVisibleProp != null)
         {
             EditorGUI.BeginChangeCheck();
@@ -196,6 +203,35 @@ public class ConstructionManagerEditor : Editor
                     }
                 }
             }
+        }
+    }
+
+    private void DrawAnchorSectorSlot()
+    {
+        if (anchorSectorSlotIndexProp == null)
+            return;
+
+        using (new EditorGUI.DisabledScope(isAnchorSectorProp != null && !isAnchorSectorProp.boolValue))
+        {
+            MatchController mc = Object.FindAnyObjectByType<MatchController>();
+            int slotCount = mc != null ? mc.SlotCount : 0;
+            if (slotCount <= 0)
+            {
+                EditorGUILayout.PropertyField(anchorSectorSlotIndexProp, new GUIContent("Anchor Sector Slot"));
+                return;
+            }
+
+            string[] labels = new string[slotCount + 1];
+            labels[0] = "None";
+            for (int i = 0; i < slotCount; i++)
+            {
+                TeamId team = mc.GetTeamIdForSlot(i);
+                labels[i + 1] = $"Slot {i} - {TeamUtils.GetName(team)}";
+            }
+
+            int currentOption = Mathf.Clamp(anchorSectorSlotIndexProp.intValue + 1, 0, slotCount);
+            int selectedOption = EditorGUILayout.Popup("Anchor Sector Slot", currentOption, labels);
+            anchorSectorSlotIndexProp.intValue = selectedOption - 1;
         }
     }
 

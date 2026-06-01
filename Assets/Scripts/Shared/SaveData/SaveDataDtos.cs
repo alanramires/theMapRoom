@@ -194,10 +194,13 @@ public class ConstructionSaveData
     public string constructionId;
     public bool isActiveInHierarchy = true;
     public bool isVisible = true;
+    public bool isForwardObserverSpot;
     public int teamId;
     public int sector;
     public int rallyTargetSlotIndex = -1;
     public List<int> rallyTargetSlotIndexes = new List<int>();
+    public bool isAnchorSector;
+    public int anchorSectorSlotIndex = -1;
     public int cellX;
     public int cellY;
     public float worldX;

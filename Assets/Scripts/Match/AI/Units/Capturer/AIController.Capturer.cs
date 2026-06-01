@@ -129,7 +129,27 @@ public partial class AIController
             return DecideCapturerOpportunistAction(unit, snapshot, assigned, fromCell, opCell, paths);
         }
 
-        if (TryDecideCapturerExplorer(unit, snapshot, assigned, fromCell, targetCell, paths, occupied, out PlayerAction explorerAction))
+        bool hasRecommendedAdvanceCell = TryFindRecommendedCapturerAdvanceCell(
+            unit,
+            snapshot,
+            assigned,
+            fromCell,
+            targetCell,
+            paths,
+            occupied,
+            out Vector3Int recommendedAdvanceCell);
+
+        if (TryDecideCapturerExplorer(
+            unit,
+            snapshot,
+            assigned,
+            fromCell,
+            targetCell,
+            paths,
+            occupied,
+            recommendedAdvanceCell,
+            hasRecommendedAdvanceCell,
+            out PlayerAction explorerAction))
             return explorerAction;
 
         // Scoring: avança pelo melhor hex (PontaLanca) — ataca defensor visível (Perseguidor)
@@ -392,5 +412,70 @@ public partial class AIController
             }
         }
         return false;
+    }
+
+    private bool TryFindRecommendedCapturerAdvanceCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        SectorObjective assigned,
+        Vector3Int fromCell,
+        Vector3Int targetCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestMove)
+    {
+        bestMove = fromCell;
+        if (unit == null || snapshot == null || assigned == null || paths == null || paths.Count == 0)
+            return false;
+
+        float fromDist = SectorManager.HexDistance(fromCell, targetCell);
+        bool fromRouteFound = TryCalculateRouteDistance(unit, fromCell, targetCell, out float fromRouteDist);
+        bool preferDpqMove = unit.TryGetUnitData(out UnitData moveUd) && moveUd.preferMoveOnBestDPQ;
+        bool conservative = unit.TryGetUnitData(out UnitData consUd) && consUd.playConservative;
+
+        float bestScore = float.MinValue;
+        float bestSectorTie = float.MinValue;
+        float bestHqTie = float.MinValue;
+
+        foreach (Vector3Int cell in paths.Keys)
+        {
+            if (occupied != null && occupied.Contains(cell))
+                continue;
+
+            float dist = SectorManager.HexDistance(cell, targetCell);
+            bool cellRouteFound = TryCalculateRouteDistance(unit, cell, targetCell, out float routeDist);
+            float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - routeDist : 0f;
+            bool recoversMissingRoute = !fromRouteFound && cellRouteFound;
+            bool advancesByRoute = recoversMissingRoute || routeProgress > 0f;
+            bool advancesByHex = !fromRouteFound && !cellRouteFound && dist < fromDist;
+            if (!advancesByRoute && !advancesByHex)
+                continue;
+
+            TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+            if (IsOtherAssignedCapturerTarget(cell, unit, assigned, capPlan, snapshot.AITeam))
+                continue;
+
+            float threat = conservative ? CalculateThreatLevel(cell, snapshot.AITeam) : 0f;
+            float effectiveDist = cellRouteFound ? routeDist : dist;
+            float prox = (1f / (effectiveDist + 1f)) * CaptureProximityBase;
+            float dpq = preferDpqMove ? GetTerrainDpqPontos(cell) * DpqWeight : 0f;
+            float moveCost = paths[cell].Count;
+            float score = prox - moveCost + dpq - threat * ThreatWeight;
+            if (TryScoreTwoTurnProgression(unit, fromCell, targetCell, cell, paths[cell], occupied, out float route2, out _))
+                score += route2;
+
+            float sectorTie = -effectiveDist;
+            float hqDist = CalculateEnemyHqDistance(cell, snapshot, unit);
+            float hqTie = CalculateEnemyHqTieBreak(hqDist);
+            if (!IsBetterScore(score, sectorTie, hqTie, bestScore, bestSectorTie, bestHqTie))
+                continue;
+
+            bestScore = score;
+            bestSectorTie = sectorTie;
+            bestHqTie = hqTie;
+            bestMove = cell;
+        }
+
+        return bestMove != fromCell || bestScore > float.MinValue;
     }
 }

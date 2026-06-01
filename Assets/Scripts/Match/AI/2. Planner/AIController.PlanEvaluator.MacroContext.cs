@@ -74,7 +74,7 @@ public partial class AIController
         if (ctx.OwnedRatio <= 0.35f)
         {
             ctx.Phase = AIMacroTerritoryPhase.Collapsing;
-            ctx.OffensiveCap = 1;
+            ctx.OffensiveCap = Mathf.Clamp(defaultOffensiveCap, 2, 3);
             ctx.AppliesCap = true;
         }
         else if (ctx.OwnedRatio >= 0.65f)
@@ -110,7 +110,10 @@ public partial class AIController
             if (!IsMacroOffensiveObjective(obj))
                 continue;
 
-            if (IsMacroProtectedOffensiveObjective(obj, aiTeam))
+            if (ShouldSuppressEnemyBaseInvasion(macro, obj, aiTeam))
+                continue;
+
+            if (IsMacroProtectedOffensiveObjective(obj, aiTeam, macro))
             {
                 protectedObjectives.Add(obj);
                 Debug.Log($"[AI Macro][T{turnNumber}][{aiTeam}] preservando {obj.Sector}: progresso/captura ativa");
@@ -133,7 +136,19 @@ public partial class AIController
         for (int i = plan.Objectives.Count - 1; i >= 0; i--)
         {
             SectorObjective obj = plan.Objectives[i];
-            if (!IsMacroOffensiveObjective(obj) || keep.Contains(obj))
+            if (!IsMacroOffensiveObjective(obj))
+                continue;
+
+            if (ShouldSuppressEnemyBaseInvasion(macro, obj, aiTeam))
+            {
+                Debug.Log($"[AI Macro][T{turnNumber}][{aiTeam}] removendo {obj.Sector}: Collapsing suprime invasao de base");
+                ClearObjectiveHUD(obj);
+                obj.Status = ObjectiveStatus.Abandoned;
+                plan.Objectives.RemoveAt(i);
+                continue;
+            }
+
+            if (keep.Contains(obj))
                 continue;
 
             Debug.Log($"[AI Macro][T{turnNumber}][{aiTeam}] removendo {obj.Sector}: {macro.Phase} off-axis score={ScoreMacroOffensiveObjective(obj, aiTeam, intel):F0}");
@@ -141,6 +156,14 @@ public partial class AIController
             obj.Status = ObjectiveStatus.Abandoned;
             plan.Objectives.RemoveAt(i);
         }
+    }
+
+    private static bool ShouldSuppressEnemyBaseInvasion(AIMacroTerritoryContext macro, SectorObjective obj, TeamId aiTeam)
+    {
+        return obj != null
+            && macro.Phase == AIMacroTerritoryPhase.Collapsing
+            && ConstructionSectorHelper.IsBase(obj.Sector)
+            && FindHQTeamInSector(obj.Sector) != aiTeam;
     }
 
     private static bool IsMacroOffensiveObjective(SectorObjective obj)
@@ -154,9 +177,13 @@ public partial class AIController
             || obj.Status == ObjectiveStatus.PartialReadyForHandoff;
     }
 
-    private static bool IsMacroProtectedOffensiveObjective(SectorObjective obj, TeamId aiTeam)
+    private static bool IsMacroProtectedOffensiveObjective(SectorObjective obj, TeamId aiTeam, AIMacroTerritoryContext macro)
     {
         if (obj == null)
+            return false;
+        if (macro.Phase == AIMacroTerritoryPhase.Collapsing
+            && ConstructionSectorHelper.IsBase(obj.Sector)
+            && FindHQTeamInSector(obj.Sector) != aiTeam)
             return false;
 
         if (obj.Status == ObjectiveStatus.Capturing || obj.Status == ObjectiveStatus.PartialReadyForHandoff)

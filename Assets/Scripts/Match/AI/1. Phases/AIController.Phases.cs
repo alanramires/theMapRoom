@@ -17,7 +17,9 @@ public partial class AIController
         if (ShouldStopAIForMatchEnd("turn_start"))
             yield break;
 
-        int resumeStage = currentAITeam == aiTeam ? Mathf.Clamp(currentAIStage, 0, 4) : 0;
+        int activeTurn = matchController != null ? matchController.CurrentTurn : aiTurnNumber;
+        bool sameRuntimeTurn = currentAITeam == aiTeam && aiTurnNumber == activeTurn;
+        int resumeStage = sameRuntimeTurn ? Mathf.Clamp(currentAIStage, 0, 4) : 0;
         currentAITeam = aiTeam;
         if (resumeStage > 0)
             Debug.Log($"[AI Stage] Retomando turno de {aiTeam} a partir do stage {resumeStage}.");
@@ -120,8 +122,8 @@ public partial class AIController
             isActive = false;
         }
 
-        currentAIStage = 0;
-        currentAITeam = TeamId.Neutral;
+        currentAIStage = 4;
+        currentAITeam = aiTeam;
         aiCoroutine = null;
     }
 
@@ -235,8 +237,8 @@ public partial class AIController
             isActive = false;
         }
 
-        currentAIStage = 0;
-        currentAITeam = TeamId.Neutral;
+        currentAIStage = 4;
+        currentAITeam = aiTeam;
         aiCoroutine = null;
     }
 }

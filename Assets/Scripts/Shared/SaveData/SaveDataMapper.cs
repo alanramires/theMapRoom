@@ -379,10 +379,13 @@ public static class SaveDataMapper
             constructionId = construction.ConstructionId,
             isActiveInHierarchy = construction.gameObject.activeInHierarchy,
             isVisible = construction.IsVisible,
+            isForwardObserverSpot = construction.IsForwardObserverSpot,
             teamId = (int)construction.TeamId,
             sector = (int)construction.Sector,
             rallyTargetSlotIndex = construction.RallyTargetSlotIndex,
             rallyTargetSlotIndexes = new List<int>(construction.RallyTargetSlotIndexes),
+            isAnchorSector = construction.IsAnchorSector,
+            anchorSectorSlotIndex = construction.AnchorSectorSlotIndex,
             cellX = construction.CurrentCellPosition.x,
             cellY = construction.CurrentCellPosition.y,
             worldX = construction.transform.position.x,
@@ -407,10 +410,13 @@ public static class SaveDataMapper
 
         manager.AssignSpawnInstanceId(saved.instanceId);
         manager.SetVisible(saved.isVisible);
+        manager.SetForwardObserverSpot(saved.isForwardObserverSpot);
         if (saved.rallyTargetSlotIndexes != null && saved.rallyTargetSlotIndexes.Count > 0)
             manager.SetRallyTargetSlotIndexes(saved.rallyTargetSlotIndexes);
         else
             manager.SetRallyTargetSlotIndex(saved.rallyTargetSlotIndex);
+        manager.SetAnchorSector(saved.isAnchorSector);
+        manager.SetAnchorSectorSlotIndex(saved.anchorSectorSlotIndex);
         manager.SetSector(System.Enum.IsDefined(typeof(ConstructionSector), saved.sector) ? (ConstructionSector)saved.sector : manager.Sector);
         manager.SetCurrentCellPosition(new Vector3Int(saved.cellX, saved.cellY, 0));
         manager.ApplyOwnershipState(
