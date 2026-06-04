@@ -115,6 +115,12 @@ public partial class AIController
                 return false;
         }
 
+        if (hasRecommendedAdvanceCell && IsObjectiveCellVisibleForExplorer(snapshot.AITeam, targetCell))
+        {
+            Debug.Log($"{TL("Explorador")} {unit.InstanceId} ignora observador avancado em {assigned.Sector}: objetivo visivel e avancavel via {recommendedAdvanceCell}");
+            return false;
+        }
+
         if (HasCapturerCombatOpportunityNearObjective(
             unit,
             snapshot,
@@ -163,6 +169,16 @@ public partial class AIController
         }
 
         return false;
+    }
+
+    private bool IsObjectiveCellVisibleForExplorer(TeamId aiTeam, Vector3Int targetCell)
+    {
+        MatchController mc = GetMatchController();
+        if (mc == null)
+            return true;
+
+        targetCell.z = 0;
+        return mc.IsCellVisibleForActiveTeam(targetCell);
     }
 
     private bool TryFindBestForwardObserverSpot(

@@ -27,9 +27,15 @@ public partial class AIController
         SectorObjective assigned = ResolveAssignedAssaultObjective(unit, plan);
         if (assigned == null)
         {
+            if (TryFindCriticalHomeDefenseObjectiveForUnit(plan, snapshot.AITeam, unit, unit.CurrentCellPosition, "Assalto Rogue", out SectorObjective rogueCriticalHome))
+            {
+                Debug.Log($"{TL("Assalto")} {unit.InstanceId} rogue redireciona -> {rogueCriticalHome.Sector}: Base/HQ sob ameaca");
+                return DecideAssignedAssaultEscortAction(unit, snapshot, rogueCriticalHome);
+            }
+
             PlayerAction embarkAction = TryDecideAssaultEmbarkAction(unit, snapshot, plan);
             if (embarkAction != null) return embarkAction;
-            return DecideRogueAssaultBreakerAction(unit, snapshot);
+            return DecideRogueAssaultBreakerAction(unit, snapshot, plan);
         }
 
         if (!IsCriticalHomeDefenseObjective(assigned, snapshot.AITeam)
@@ -45,7 +51,7 @@ public partial class AIController
         return DecideAssignedAssaultEscortAction(unit, snapshot, assigned);
     }
 
-    private PlayerAction DecideRogueAssaultBreakerAction(UnitManager unit, AIWorldSnapshot snapshot)
+    private PlayerAction DecideRogueAssaultBreakerAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
         Dictionary<Vector3Int, List<Vector3Int>> paths =
@@ -69,11 +75,19 @@ public partial class AIController
                 attackTarget.InstanceId.ToString(), targetCell, paths);
         }
 
+        if (TryBuildNearbyHeldRallyObjective(snapshot.AITeam, fromCell, plan, snapshot.TurnNumber, out SectorObjective rallyObjective, out string rallyReason))
+        {
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} rogue segura rally {rallyObjective.Sector}: {rallyReason}");
+            return DecideRallyAssemblyAssaultAction(unit, snapshot, rallyObjective);
+        }
+        if (!string.IsNullOrEmpty(rallyReason))
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} rogue rally scan: {rallyReason}");
+
         Vector3Int pressureTarget = ResolveAssaultPressureTarget(snapshot, enemies, fromCell);
-        Vector3Int bestMove = FindAssaultPressureMove(unit, snapshot, fromCell, pressureTarget, paths, occupied);
+        Vector3Int bestMove = FindAssaultPressureMove(unit, snapshot, fromCell, pressureTarget, paths, occupied, out string pressureReason);
         if (bestMove != fromCell)
         {
-            Debug.Log($"{TL("Assalto")} {unit.InstanceId} breaker — pressiona via {bestMove} alvo={pressureTarget}");
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} breaker — pressiona via {bestMove} alvo={pressureTarget} ({pressureReason})");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestMove, paths);
         }
 
@@ -345,10 +359,21 @@ public partial class AIController
         Vector3Int fromCell,
         Vector3Int pressureTarget,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
-        HashSet<Vector3Int> occupied)
+        HashSet<Vector3Int> occupied,
+        out string reason)
     {
+        reason = "sem progresso";
         float fromDist = SectorManager.HexDistance(fromCell, pressureTarget);
         bool fromRouteFound = TryCalculateRouteDistance(unit, fromCell, pressureTarget, out float fromRouteDist);
+        Vector3Int bestToolCell = fromCell;
+        float bestToolScore = float.MinValue;
+        int bestToolProgress = int.MinValue;
+        float bestToolNextDistance = float.MaxValue;
+        int bestToolMoveCost = 0;
+        float bestToolThreat = 0f;
+        float bestToolDpq = 0f;
+        float bestToolLine = 0f;
+        bool foundToolMove = false;
         Vector3Int bestCell = fromCell;
         Vector3Int bestFallbackCell = fromCell;
         float bestProgress = float.MinValue;
@@ -379,6 +404,39 @@ public partial class AIController
             float line = CalculateLineProgressTieBreak(fromCell, pressureTarget, cell);
             int pathCost = GetPathStepCount(paths, cell);
 
+            if (TryScoreToolRouteProgression(
+                    unit,
+                    fromCell,
+                    pressureTarget,
+                    cell,
+                    paths[cell],
+                    occupied,
+                    out int toolProgress,
+                    out float toolNextDistance,
+                    out int toolMoveCost)
+                && toolProgress > 0)
+            {
+                float toolScore = toolProgress * 1000f
+                    + line * 120f
+                    + dpq * 35f
+                    - threat * 35f
+                    - toolMoveCost * 2f
+                    - SectorManager.HexDistance(cell, pressureTarget) * 0.01f;
+
+                if (toolScore > bestToolScore)
+                {
+                    bestToolScore = toolScore;
+                    bestToolProgress = toolProgress;
+                    bestToolNextDistance = toolNextDistance;
+                    bestToolMoveCost = toolMoveCost;
+                    bestToolThreat = threat;
+                    bestToolDpq = dpq;
+                    bestToolLine = line;
+                    bestToolCell = cell;
+                    foundToolMove = true;
+                }
+            }
+
             if (IsBetterAssaultPressureMove(progress, line, pathCost, threat, dpq,
                     bestFallbackProgress, bestFallbackLine, bestFallbackPathCost, bestFallbackThreat, GetTerrainDpqPontos(bestFallbackCell)))
             {
@@ -406,7 +464,21 @@ public partial class AIController
             }
         }
 
-        return foundMove ? bestCell : bestFallbackCell;
+        if (foundToolMove)
+        {
+            reason = $"toolProgress={bestToolProgress} next={bestToolNextDistance:F1} moveCost={bestToolMoveCost} threat={bestToolThreat:F1} dpq={bestToolDpq:F1} line={bestToolLine:F1} score={bestToolScore:F0}";
+            return bestToolCell;
+        }
+
+        Vector3Int fallback = foundMove ? bestCell : bestFallbackCell;
+        if (fallback != fromCell)
+        {
+            reason = foundMove
+                ? $"fallback progress={bestProgress:F1} line={bestLine:F1} path={bestPathCost} threat={bestThreat:F1}"
+                : $"fallbackAny progress={bestFallbackProgress:F1} line={bestFallbackLine:F1} path={bestFallbackPathCost} threat={bestFallbackThreat:F1}";
+        }
+
+        return fallback;
     }
 
     private static bool IsBetterAssaultPressureMove(

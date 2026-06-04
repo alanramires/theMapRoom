@@ -15,16 +15,12 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase3 — compras.");
 
-        yield return CommitAIWorldAfterAction(snapshot.AITeam, "phase3:pre-shopping");
+        yield return CommitAIWorldHeavy(snapshot.AITeam, "phase3:pre-shopping");
 
         // Reconstrói snapshot para refletir o saldo atual pós-ações
         AIWorldSnapshot freshSnap = AIWorldSnapshot.Build(snapshot.AITeam, matchController);
         if (ShouldStopAIForMatchEnd("phase3_apos_snapshot"))
             yield break;
-
-        // Reavalia plano/operações com inimigos revelados durante a Fase 2.
-        BuildObjectivePlan(freshSnap);
-        AITacticalAnalyzer.Instance.Rebuild(snapshot.AITeam, freshSnap, ObjectiveManager.GetPlanForTeam(snapshot.AITeam));
 
         List<AIShoppingPlanner.ShoppingOrder> orders = AIShoppingPlanner.Decide(freshSnap);
         // A partir daqui a fase de compras fica comprometida: se salvar/carregar
@@ -51,8 +47,6 @@ public partial class AIController
             yield return ExecuteAIBatchWithDebugStep(batch);
             if (ShouldStopAIForMatchEnd("phase3_apos_batch"))
                 yield break;
-
-            yield return CommitAIWorldAfterAction(snapshot.AITeam, $"phase3:shopping:{order.UnitToBuy.name}");
 
             yield return WaitIfDebugPaused();
             if (ShouldStopAIForMatchEnd("phase3_apos_pause_batch"))

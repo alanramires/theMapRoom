@@ -163,7 +163,7 @@ public partial class AIController
         }
     }
 
-    private void MarkCascadeNeighbor1(ConstructionSector sector, HashSet<ConstructionSector> covered, TeamId aiTeam, HashSet<ConstructionSector> vacaterProtected = null)
+    private void MarkCascadeNeighbor1(ConstructionSector sector, HashSet<ConstructionSector> covered, TeamId aiTeam, HashSet<ConstructionSector> vacaterProtected = null, AIRallyPlanContext rallyContext = default)
     {
         if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return;
 
@@ -195,11 +195,17 @@ public partial class AIController
             return;
         }
 
+        if (IsEnemyHQRallySector(rallyContext, candidate))
+        {
+            Debug.Log($"{TL("Plan")} cascata: {sector} -> {candidate} ignorada; rally point de invasao");
+            return;
+        }
+
         covered.Add(candidate);
         Debug.Log($"{TL("Plan")} cascata: {sector} → {candidate} ({candidateDist:F1}h)");
     }
 
-    private void MarkSelectionCascadeNeighbor(ConstructionSector sector, HashSet<ConstructionSector> covered, TeamId aiTeam)
+    private void MarkSelectionCascadeNeighbor(ConstructionSector sector, HashSet<ConstructionSector> covered, TeamId aiTeam, AIRallyPlanContext rallyContext = default)
     {
         if (covered == null)
             return;
@@ -207,6 +213,12 @@ public partial class AIController
         ConstructionSector forward = ComputeForwardNeighborSector(sector, aiTeam);
         if (forward == ConstructionSector.None)
             return;
+
+        if (IsEnemyHQRallySector(rallyContext, forward))
+        {
+            Debug.Log($"{TL("Plan")} cascata inicial: {sector} nao cobre {forward}; rally point de invasao");
+            return;
+        }
 
         covered.Add(forward);
         Debug.Log($"{TL("Plan")} cascata inicial: {sector} cobre {forward}");

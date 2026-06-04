@@ -195,6 +195,7 @@ public class ConstructionSaveData
     public bool isActiveInHierarchy = true;
     public bool isVisible = true;
     public bool isForwardObserverSpot;
+    public bool isRallyPoint;
     public int teamId;
     public int sector;
     public int rallyTargetSlotIndex = -1;

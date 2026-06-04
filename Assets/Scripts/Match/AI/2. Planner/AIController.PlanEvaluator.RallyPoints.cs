@@ -66,13 +66,34 @@ public partial class AIController
     private static HashSet<int> CollectEnemyHQSlots(TeamId aiTeam)
     {
         HashSet<int> slots = new HashSet<int>();
+        int ownSlot = -1;
+
         foreach (ConstructionManager construction in ConstructionManager.AllActive)
         {
             if (construction == null || !construction.IsPlayerHeadQuarter)
                 continue;
-            if (construction.TeamId == aiTeam || construction.TeamId == TeamId.Neutral)
+            if (construction.TeamId == aiTeam && construction.SlotIndex >= 0)
+            {
+                ownSlot = construction.SlotIndex;
+                break;
+            }
+        }
+
+        foreach (ConstructionManager construction in ConstructionManager.AllActive)
+        {
+            if (construction == null || !construction.IsPlayerHeadQuarter)
                 continue;
             if (construction.SlotIndex < 0)
+                continue;
+
+            if (ownSlot >= 0)
+            {
+                if (construction.SlotIndex != ownSlot)
+                    slots.Add(construction.SlotIndex);
+                continue;
+            }
+
+            if (construction.TeamId == aiTeam || construction.TeamId == TeamId.Neutral)
                 continue;
 
             slots.Add(construction.SlotIndex);
@@ -95,7 +116,7 @@ public partial class AIController
 
     private static int GetRallySectorPriorityBonus(AIRallyPlanContext context, ConstructionSector sector, TeamId aiTeam)
     {
-        return IsEnemyHQRallySectorHeld(context, sector, aiTeam) ? RallyPointSectorPriorityBonus : 0;
+        return IsEnemyHQRallySector(context, sector) ? RallyPointSectorPriorityBonus : 0;
     }
 
     private static bool TryGetFirstEnemyRallyTargetSlot(IReadOnlyList<int> targetSlots, HashSet<int> enemyHQSlots, out int targetSlot)

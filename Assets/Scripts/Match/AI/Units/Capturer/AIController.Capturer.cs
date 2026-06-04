@@ -273,12 +273,16 @@ public partial class AIController
                     }
                     Vector3Int enemyCell = nearbyEnemy.CurrentCellPosition; enemyCell.z = 0;
                     float targetPriority = AttackTargetPriorityPursuer(enemyCell, targetCell);
+                    BazookaTargetPriority targetPreference = ResolveCapturerTargetPreference(unit, nearbyEnemy);
+                    float targetPreferenceScore = GetCapturerTargetPreferenceScore(targetPreference);
+                    float targetPreferenceTie = GetCapturerTargetPreferenceTie(targetPreference);
+                    float targetPriorityWithPreference = targetPriority + targetPreferenceTie;
                     float objectiveBonus = enemyCell == targetCell ? 100000f : 0f;
                     float attackDpq = preferDpqAtBattle ? dpqPontos : 0f;
-                    float aScore    = objectiveBonus + targetPriority * 1000f + score + AttackHexBonus;
+                    float aScore    = objectiveBonus + targetPreferenceScore + targetPriority * 1000f + score + AttackHexBonus;
                     bool  isNewBest = IsBetterAttackCandidate(
                         preferDpqAtBattle,
-                        targetPriority,
+                        targetPriorityWithPreference,
                         attackDpq,
                         aScore,
                         sectorTie,
@@ -288,11 +292,11 @@ public partial class AIController
                         attackScore,
                         attackSectorTie,
                         attackHqTie);
-                    scoringLog?.AppendLine($"    ↳ ATK {nearbyEnemy.UnitDisplayName}#{nearbyEnemy.InstanceId} pri={targetPriority:F1} objBonus={objectiveBonus:F0} atkDpqPts={attackDpq:F1} aScore={aScore:F0} defCtx={defCtx} {attackDecisionReason}{(isNewBest ? " ★" : "")}");
+                    scoringLog?.AppendLine($"    ↳ ATK {nearbyEnemy.UnitDisplayName}#{nearbyEnemy.InstanceId} pri={targetPriority:F1} pref={targetPreference} prefScore={targetPreferenceScore:F0} objBonus={objectiveBonus:F0} atkDpqPts={attackDpq:F1} aScore={aScore:F0} defCtx={defCtx} {attackDecisionReason}{(isNewBest ? " ★" : "")}");
                     if (isNewBest)
                     {
                         attackScore      = aScore;
-                        attackPriority   = targetPriority;
+                        attackPriority   = targetPriorityWithPreference;
                         attackDpqTie     = attackDpq;
                         attackSectorTie  = sectorTie;
                         attackHqTie      = hqTie;

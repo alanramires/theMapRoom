@@ -922,6 +922,8 @@ MonoBehaviour:
   isRallyPoint: 0
   rallyTargetSlotIndex: -1
   rallyTargetSlotIndexes: 
+  isAnchorSector: 0
+  anchorSectorSlotIndex: -1
   victoryBuildingOverlayRenderer: {fileID: 0}
   victoryBuildingOverlaySprite: {fileID: 0}
   victoryBuildingOverlayColor: {r: 1, g: 0.84, b: 0.22, a: 1}

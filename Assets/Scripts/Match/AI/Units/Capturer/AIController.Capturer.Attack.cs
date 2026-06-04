@@ -26,6 +26,44 @@ public partial class AIController
         return 2f - dist * 0.1f + bldgBonus;
     }
 
+    private static BazookaTargetPriority ResolveCapturerTargetPreference(UnitManager attacker, UnitManager target)
+    {
+        if (attacker == null || target == null)
+            return BazookaTargetPriority.Tertiary;
+        if (!attacker.TryGetUnitData(out UnitData attackerData) || attackerData == null)
+            return BazookaTargetPriority.Tertiary;
+        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
+            return BazookaTargetPriority.Tertiary;
+
+        return attackerData.ResolveAiTargetPriorityForTargetClass(targetData.unitClass);
+    }
+
+    private static float GetCapturerTargetPreferenceScore(BazookaTargetPriority priority)
+    {
+        switch (priority)
+        {
+            case BazookaTargetPriority.Primary:
+                return 30000f;
+            case BazookaTargetPriority.Secondary:
+                return 15000f;
+            default:
+                return 0f;
+        }
+    }
+
+    private static float GetCapturerTargetPreferenceTie(BazookaTargetPriority priority)
+    {
+        switch (priority)
+        {
+            case BazookaTargetPriority.Primary:
+                return 20f;
+            case BazookaTargetPriority.Secondary:
+                return 10f;
+            default:
+                return 0f;
+        }
+    }
+
     private UnitManager PickBestRogueTarget(List<PodeMirarTargetOption> options, TeamId aiTeam)
     {
         return PickBestRogueTarget(options, aiTeam, null, default, false, out _);

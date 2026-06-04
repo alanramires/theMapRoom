@@ -380,6 +380,7 @@ public static class SaveDataMapper
             isActiveInHierarchy = construction.gameObject.activeInHierarchy,
             isVisible = construction.IsVisible,
             isForwardObserverSpot = construction.IsForwardObserverSpot,
+            isRallyPoint = construction.IsRallyPoint,
             teamId = (int)construction.TeamId,
             sector = (int)construction.Sector,
             rallyTargetSlotIndex = construction.RallyTargetSlotIndex,
@@ -411,6 +412,9 @@ public static class SaveDataMapper
         manager.AssignSpawnInstanceId(saved.instanceId);
         manager.SetVisible(saved.isVisible);
         manager.SetForwardObserverSpot(saved.isForwardObserverSpot);
+        bool savedHasRallyTarget = saved.rallyTargetSlotIndex >= 0
+            || (saved.rallyTargetSlotIndexes != null && saved.rallyTargetSlotIndexes.Count > 0);
+        manager.SetRallyPoint(saved.isRallyPoint || savedHasRallyTarget);
         if (saved.rallyTargetSlotIndexes != null && saved.rallyTargetSlotIndexes.Count > 0)
             manager.SetRallyTargetSlotIndexes(saved.rallyTargetSlotIndexes);
         else

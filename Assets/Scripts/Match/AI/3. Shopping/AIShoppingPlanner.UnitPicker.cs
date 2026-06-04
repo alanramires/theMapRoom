@@ -87,6 +87,7 @@ public partial class AIShoppingPlanner
         int defensiveBaseBasicMassCost = 0,
         bool defensiveBaseTankBought = false,
         bool defensiveArmorThreat = false,
+        bool strategicArmorParity = false,
         bool wantsEliteFireSupport = false,
         int activeFireSupportCount = 0,
         bool proactiveDefFireSupport = false,
@@ -105,6 +106,13 @@ public partial class AIShoppingPlanner
         bool decisiveDefensiveFireNeeded = ShouldPrioritizeDecisiveDefensiveFire(
             snapshot, budget, openFireSupportSlots, preferDefensiveFireSupport,
             defensiveBaseThreat, activeFireSupportCount);
+        if (decisiveDefensiveFireNeeded
+            && ShouldYieldDecisiveFireToAffordableAssault(
+                building, snapshot, budget, openAssaultSlots, activeFireSupportCount, defensiveBaseThreat))
+        {
+            decisiveDefensiveFireNeeded = false;
+            Debug.Log($"[AI PickUnit] decisive_fire_suppressed: assalto pesado compravel budget={budget} ass={openAssaultSlots} activeFire={activeFireSupportCount} stance={snapshot.Stance}");
+        }
 
         UnitData best      = null;
         int      bestScore = int.MinValue;
@@ -210,6 +218,13 @@ public partial class AIShoppingPlanner
             }
             if (defensiveArmorThreat && IsDefensiveBaseThreatPurchase(u))
                 score += 80000;
+            if (strategicArmorParity && IsDefensiveBaseAssaultTankPurchase(u))
+            {
+                score += 85000 + Mathf.Max(0, u.eliteLevel) * 10000;
+                if (u.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Armored) == BazookaTargetPriority.Primary)
+                    score += 20000;
+                Debug.Log($"[AI PickUnit] armor_parity_bonus {u.displayName} +{(85000 + Mathf.Max(0, u.eliteLevel) * 10000)}");
+            }
             if (defensiveInfantryThreat && IsAntiInfantryFireSupportPurchase(u))
                 score += 80000;
             if (offensiveAntiInfantryFireSupport && IsAntiInfantryFireSupportPurchase(u))
@@ -406,6 +421,32 @@ public partial class AIShoppingPlanner
             if (intent == null) continue;
             if (intent.Kind != AISectorIntentKind.Defend) continue;
             if (intent.Confidence >= 0.70f && intent.HotScore >= 6f)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool ShouldYieldDecisiveFireToAffordableAssault(
+        ConstructionManager building,
+        AIWorldSnapshot snapshot,
+        int budget,
+        int openAssaultSlots,
+        int activeFireSupportCount,
+        bool defensiveBaseThreat)
+    {
+        if (building == null || building.OfferedUnits == null || snapshot == null)
+            return false;
+        if (defensiveBaseThreat || snapshot.Stance != AIStance.Offensive)
+            return false;
+        if (openAssaultSlots <= 0 || activeFireSupportCount < 2)
+            return false;
+
+        foreach (UnitData unit in building.OfferedUnits)
+        {
+            if (unit == null || unit.cost > budget || unit.domain != Domain.Land)
+                continue;
+            if (IsPurePrimaryAssault(unit))
                 return true;
         }
 

@@ -364,6 +364,11 @@ public class ConstructionManager : MonoBehaviour
         isForwardObserverSpot = value;
     }
 
+    public void SetRallyPoint(bool value)
+    {
+        isRallyPoint = value;
+    }
+
     public void SetRallyTargetSlotIndex(int value)
     {
         rallyTargetSlotIndex = Mathf.Max(-1, value);

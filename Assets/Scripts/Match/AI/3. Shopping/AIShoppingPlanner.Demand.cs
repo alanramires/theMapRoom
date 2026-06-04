@@ -422,6 +422,32 @@ public partial class AIShoppingPlanner
         return count;
     }
 
+    private static int CountActiveArmoredAssaultUnits(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyUnits == null) return 0;
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair) continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null) continue;
+            if (IsDefensiveBaseAssaultTankPurchase(data)) count++;
+        }
+        return count;
+    }
+
+    private static int CountVisibleEnemyArmor(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.EnemyUnits == null) return 0;
+        int count = 0;
+        foreach (UnitManager unit in snapshot.EnemyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked) continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null) continue;
+            if (data.domain == Domain.Land && data.unitClass == GameUnitClass.Armored) count++;
+        }
+        return count;
+    }
+
     private static int CountGroundUnitsUnderRepair(AIWorldSnapshot snapshot)
     {
         if (snapshot == null || snapshot.MyUnits == null)

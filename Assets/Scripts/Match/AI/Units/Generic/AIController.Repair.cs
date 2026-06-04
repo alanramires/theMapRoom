@@ -597,6 +597,12 @@ public partial class AIController
         bool fromRouteFound = TryCalculateRouteDistance(unit, fromCell, target, out float fromRouteDist);
         Vector3Int bestStep = fromCell;
         float bestScore = float.MinValue;
+        int bestToolScore = int.MinValue;
+        float bestToolNextDist = float.MaxValue;
+        int bestToolMoveCost = int.MaxValue;
+        float bestLegacyScore = float.MinValue;
+        float bestThreat = float.MaxValue;
+        bool bestRoadBonus = false;
 
         foreach (Vector3Int cell in paths.Keys)
         {
@@ -631,11 +637,56 @@ public partial class AIController
             if (cell == target)
                 score += 10000f;
 
-            if (score > bestScore)
+            bool hasToolScore = TryScoreToolRouteProgression(
+                unit,
+                fromCell,
+                target,
+                cell,
+                paths[cell],
+                occupied,
+                out int toolScore,
+                out float toolNextDist,
+                out int toolMoveCost);
+
+            int candidateToolScore = hasToolScore ? toolScore : int.MinValue;
+            float candidateToolNextDist = hasToolScore ? toolNextDist : float.MaxValue;
+            int candidateToolMoveCost = hasToolScore ? toolMoveCost : int.MaxValue;
+            bool roadBonus = cell != fromCell
+                && UnitMovementPathRules.DidUseRoadFullMoveBonus(boardTilemap, unit, paths[cell], terrainDatabase);
+
+            float candidateScore = hasToolScore ? candidateToolScore * 1000f : score;
+            if (roadBonus)
+                candidateScore += 500f;
+            if (cell == target)
+                candidateScore += 25000f;
+            if (homeRepair && progress > 0f)
+                candidateScore += 350f;
+            candidateScore += Mathf.Clamp(score, -5000f, 5000f) * 0.01f;
+            candidateScore -= threat * ThreatWeight * threatMult;
+
+            bool better =
+                candidateScore > bestScore + 0.01f
+                || (Mathf.Abs(candidateScore - bestScore) <= 0.01f && candidateToolNextDist < bestToolNextDist - 0.01f)
+                || (Mathf.Abs(candidateScore - bestScore) <= 0.01f && Mathf.Abs(candidateToolNextDist - bestToolNextDist) <= 0.01f && candidateToolMoveCost < bestToolMoveCost)
+                || (Mathf.Abs(candidateScore - bestScore) <= 0.01f && Mathf.Abs(candidateToolNextDist - bestToolNextDist) <= 0.01f && candidateToolMoveCost == bestToolMoveCost && threat < bestThreat);
+
+            if (better)
             {
-                bestScore = score;
+                bestScore = candidateScore;
+                bestToolScore = candidateToolScore;
+                bestToolNextDist = candidateToolNextDist;
+                bestToolMoveCost = candidateToolMoveCost;
+                bestLegacyScore = score;
+                bestThreat = threat;
+                bestRoadBonus = roadBonus;
                 bestStep = cell;
             }
+        }
+
+        if (bestStep != fromCell && bestToolScore != int.MinValue)
+        {
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} tool-progress repair via {bestStep} target={target} " +
+                      $"tool={bestToolScore} nextDist={bestToolNextDist:F1} moveCost={bestToolMoveCost} roadBonus={bestRoadBonus} final={bestScore:F0} legacy={bestLegacyScore:F0}");
         }
 
         return bestStep;
@@ -1091,3 +1142,4 @@ public partial class AIController
         return best;
     }
 }
+

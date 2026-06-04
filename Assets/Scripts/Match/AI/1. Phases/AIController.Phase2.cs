@@ -207,7 +207,6 @@ public partial class AIController
             bool unitAttacked = !string.IsNullOrEmpty(action.TargetInstanceId);
             JogadasManager.RegistrarPlayerAction(action);
             yield return ExecuteAIBatchWithDebugStep(action);
-            SyncAIUnitCellsFromTransforms();
             if (ShouldStopAIForMatchEnd("phase2_apos_batch"))
                 yield break;
             yield return WaitIfDebugPaused();
@@ -215,7 +214,11 @@ public partial class AIController
                 yield break;
 
             if (!IsNoOpUnitAction(action) || unitMoved || unitAttacked)
-                yield return CommitAIWorldAfterAction(aiTeam, $"phase2:{FormatInitiativeUnitName(unit)}");
+            {
+                bool targetedConstruction = !string.IsNullOrEmpty(action.TargetConstructionId);
+                bool refreshFoW = unitMoved || unitAttacked || targetedConstruction;
+                CommitAIWorldLightAfterAction(aiTeam, $"phase2:{FormatInitiativeUnitName(unit)}", refreshFoW);
+            }
 
             float delay = GetBatchDelay();
             if (delay > 0f) yield return new WaitForSecondsRealtime(delay);

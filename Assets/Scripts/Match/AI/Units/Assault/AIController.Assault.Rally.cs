@@ -4,6 +4,7 @@ using UnityEngine;
 public partial class AIController
 {
     private const int RallyAssemblyAssaultRadius = 2;
+    private const int RogueAssaultHeldRallySearchRadius = 5;
 
     private PlayerAction DecideRallyAssemblyAssaultAction(UnitManager unit, AIWorldSnapshot snapshot, SectorObjective assigned)
     {
@@ -75,5 +76,225 @@ public partial class AIController
             return Mathf.Max(RallyAssemblyAssaultRadius, Mathf.Min(3, data.movement));
 
         return RallyAssemblyAssaultRadius;
+    }
+
+    private bool TryBuildNearbyHeldRallyObjective(
+        TeamId aiTeam,
+        Vector3Int fromCell,
+        TeamObjectivePlan plan,
+        int turnNumber,
+        out SectorObjective objective,
+        out string reason)
+    {
+        objective = null;
+        reason = "";
+
+        HashSet<int> enemyHQSlots = CollectEnemyHQSlots(aiTeam);
+        HashSet<ConstructionSector> plannedRallySectors = CollectPlannedRallyAssemblySectors(plan);
+        if (enemyHQSlots.Count == 0)
+            reason = "sem HQ inimigo com slot para validar target";
+
+        ConstructionManager bestRally = null;
+        float bestDist = float.MaxValue;
+        int activeConstructions = ConstructionManager.AllActive != null ? ConstructionManager.AllActive.Count : 0;
+        int seen = 0;
+        int skippedNoTarget = 0;
+        int skippedNoInfo = 0;
+        int skippedNotHeld = 0;
+        int skippedFar = 0;
+        string firstNoTarget = "";
+        foreach (ConstructionManager rally in ConstructionManager.AllActive)
+        {
+            if (rally == null || !rally.IsRallyPoint || rally.Sector == ConstructionSector.None)
+                continue;
+
+            seen++;
+            IReadOnlyList<int> targetSlots = rally.RallyTargetSlotIndexes;
+            bool targetsEnemyHQ = enemyHQSlots.Count > 0
+                && targetSlots != null
+                && targetSlots.Count > 0
+                && TryGetFirstEnemyRallyTargetSlot(targetSlots, enemyHQSlots, out _);
+            bool plannedRally = plannedRallySectors.Contains(rally.Sector);
+            if (!targetsEnemyHQ && !plannedRally)
+            {
+                skippedNoTarget++;
+                if (string.IsNullOrEmpty(firstNoTarget))
+                    firstNoTarget = $"{rally.Sector}/{rally.name} slots={FormatSlotList(targetSlots)}";
+                continue;
+            }
+            if (!TryGetAnySectorInfo(rally.Sector, out SectorManager.SectorInfo info))
+            {
+                skippedNoInfo++;
+                continue;
+            }
+            bool held = IsRallySectorHeldByTeam(info, aiTeam)
+                || EvaluateRallyReadiness(rally, aiTeam).Held;
+            if (!held)
+            {
+                skippedNotHeld++;
+                continue;
+            }
+
+            Vector3Int rallyCell = rally.CurrentCellPosition;
+            rallyCell.z = 0;
+            float dist = SectorManager.HexDistance(fromCell, rallyCell);
+            if (dist > RogueAssaultHeldRallySearchRadius)
+            {
+                skippedFar++;
+                continue;
+            }
+
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                bestRally = rally;
+            }
+        }
+
+        if (bestRally == null)
+        {
+            if (TryBuildNearbyRecentlyCapturedAssemblyObjective(aiTeam, fromCell, turnNumber, out objective, out string recentReason))
+            {
+                reason = $"{recentReason}; fallback sem construction-rally active={activeConstructions} seen={seen} planned={plannedRallySectors.Count}";
+                return true;
+            }
+
+            reason = $"sem rally elegivel perto active={activeConstructions} seen={seen} enemyHQSlots={FormatSlotSet(enemyHQSlots)} noTarget={skippedNoTarget} firstNoTarget={firstNoTarget} noInfo={skippedNoInfo} notHeld={skippedNotHeld} far>{RogueAssaultHeldRallySearchRadius}={skippedFar} planned={plannedRallySectors.Count}; {recentReason}";
+            return false;
+        }
+
+        objective = new SectorObjective
+        {
+            Sector = bestRally.Sector,
+            AssignedTeam = aiTeam,
+            Status = ObjectiveStatus.Defending,
+            ObjectiveType = AIObjectiveType.RallyAssembly,
+            Priority = 1
+        };
+        objective.Slots.Add(new SlotNeed { Role = UnitRole.Assalto, Filled = true });
+        reason = $"rally conquistado perto dist={bestDist:F0}h";
+        return true;
+    }
+
+    private static string FormatSlotSet(HashSet<int> slots)
+    {
+        if (slots == null || slots.Count == 0)
+            return "-";
+
+        string result = "";
+        foreach (int slot in slots)
+        {
+            if (!string.IsNullOrEmpty(result))
+                result += ",";
+            result += slot.ToString();
+        }
+
+        return result;
+    }
+
+    private static string FormatSlotList(IReadOnlyList<int> slots)
+    {
+        if (slots == null || slots.Count == 0)
+            return "-";
+
+        string result = "";
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (!string.IsNullOrEmpty(result))
+                result += ",";
+            result += slots[i].ToString();
+        }
+
+        return result;
+    }
+
+    private bool TryBuildNearbyRecentlyCapturedAssemblyObjective(
+        TeamId aiTeam,
+        Vector3Int fromCell,
+        int turnNumber,
+        out SectorObjective objective,
+        out string reason)
+    {
+        objective = null;
+        reason = "";
+
+        SectorManager.SectorInfo bestInfo = null;
+        float bestDist = float.MaxValue;
+        int recentSeen = 0;
+        int skippedBase = 0;
+        int skippedNotHeld = 0;
+        int skippedFar = 0;
+
+        IReadOnlyList<SectorManager.SectorInfo> infos = SectorManager.GetAllSectorInfos();
+        for (int i = 0; i < infos.Count; i++)
+        {
+            SectorManager.SectorInfo info = infos[i];
+            if (info == null || info.Sector == ConstructionSector.None)
+                continue;
+            if (!IsRecentlyCapturedSector(aiTeam, info.Sector, turnNumber))
+                continue;
+
+            recentSeen++;
+            if (ConstructionSectorHelper.IsBase(info.Sector))
+            {
+                skippedBase++;
+                continue;
+            }
+            if (!IsRallySectorHeldByTeam(info, aiTeam))
+            {
+                skippedNotHeld++;
+                continue;
+            }
+
+            Vector3Int repCell = info.RepresentativeCell;
+            repCell.z = 0;
+            float dist = SectorManager.HexDistance(fromCell, repCell);
+            if (dist > RogueAssaultHeldRallySearchRadius)
+            {
+                skippedFar++;
+                continue;
+            }
+
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                bestInfo = info;
+            }
+        }
+
+        if (bestInfo == null)
+        {
+            reason = $"sem setor recem-capturado perto recent={recentSeen} base={skippedBase} notHeld={skippedNotHeld} far>{RogueAssaultHeldRallySearchRadius}={skippedFar}";
+            return false;
+        }
+
+        objective = new SectorObjective
+        {
+            Sector = bestInfo.Sector,
+            AssignedTeam = aiTeam,
+            Status = ObjectiveStatus.Defending,
+            ObjectiveType = AIObjectiveType.RallyAssembly,
+            Priority = 1
+        };
+        objective.Slots.Add(new SlotNeed { Role = UnitRole.Assalto, Filled = true });
+        reason = $"setor recem-capturado segurado perto {bestInfo.Sector} dist={bestDist:F0}h";
+        return true;
+    }
+
+    private static HashSet<ConstructionSector> CollectPlannedRallyAssemblySectors(TeamObjectivePlan plan)
+    {
+        HashSet<ConstructionSector> sectors = new HashSet<ConstructionSector>();
+        if (plan == null || plan.Objectives == null)
+            return sectors;
+
+        for (int i = 0; i < plan.Objectives.Count; i++)
+        {
+            SectorObjective obj = plan.Objectives[i];
+            if (obj == null || obj.ObjectiveType != AIObjectiveType.RallyAssembly)
+                continue;
+            sectors.Add(obj.Sector);
+        }
+
+        return sectors;
     }
 }

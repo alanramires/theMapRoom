@@ -86,4 +86,128 @@ public partial class AIController
 
         return true;
     }
+    private bool TryScoreToolRouteProgression(
+        UnitManager unit,
+        Vector3Int origin,
+        Vector3Int target,
+        Vector3Int firstStop,
+        IReadOnlyList<Vector3Int> firstPath,
+        HashSet<Vector3Int> occupied,
+        out int score,
+        out float bestDistanceAfterNextMove,
+        out int firstMoveCost)
+    {
+        score = 0;
+        bestDistanceAfterNextMove = float.MaxValue;
+        firstMoveCost = int.MaxValue;
+        if (unit == null || boardTilemap == null)
+            return false;
+
+        origin.z = 0;
+        target.z = 0;
+        firstStop.z = 0;
+        if (firstStop == origin)
+            return false;
+
+        Vector3Int originalCell = unit.CurrentCellPosition;
+        originalCell.z = 0;
+
+        float originDistance = SectorManager.HexDistance(origin, target);
+        bestDistanceAfterNextMove = SectorManager.HexDistance(firstStop, target);
+
+        int movementPoints = Mathf.Max(0, unit.RemainingMovementPoints);
+        Dictionary<Vector3Int, int> costMap =
+            UnitMovementPathRules.CalculateMovementCostMap(
+                boardTilemap,
+                unit,
+                origin,
+                movementPoints,
+                terrainDatabase);
+
+        firstMoveCost = costMap != null && costMap.TryGetValue(firstStop, out int cost)
+            ? cost
+            : (firstPath != null ? Mathf.Max(0, firstPath.Count - 1) : 0);
+
+        try
+        {
+            unit.SetCurrentCellPosition(firstStop, enforceFinalOccupancyRule: false);
+            Dictionary<Vector3Int, List<Vector3Int>> nextPaths =
+                UnitMovementPathRules.CalcularCaminhosValidos(
+                    boardTilemap,
+                    unit,
+                    movementPoints,
+                    terrainDatabase);
+
+            if (nextPaths != null)
+            {
+                foreach (Vector3Int rawNextStop in nextPaths.Keys)
+                {
+                    Vector3Int nextStop = rawNextStop;
+                    nextStop.z = 0;
+                    if (!CanUseAsToolProgressStopCell(unit, nextStop, firstStop))
+                        continue;
+
+                    float nextDistance = SectorManager.HexDistance(nextStop, target);
+                    if (nextDistance < bestDistanceAfterNextMove)
+                        bestDistanceAfterNextMove = nextDistance;
+                }
+            }
+        }
+        finally
+        {
+            unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
+        }
+
+        float twoTurnProgress = originDistance - bestDistanceAfterNextMove;
+        float firstTurnProgress = originDistance - SectorManager.HexDistance(firstStop, target);
+        float lineDeviation = DistanceFromHexLine(firstStop, origin, target);
+
+        float rawScore =
+            twoTurnProgress * 10f
+            + firstTurnProgress * 2f
+            - lineDeviation * 2f
+            - firstMoveCost * 0.5f;
+
+        score = Mathf.RoundToInt(rawScore);
+        return true;
+    }
+
+    private static bool CanUseAsToolProgressStopCell(UnitManager mover, Vector3Int cell, Vector3Int origin)
+    {
+        if (mover == null)
+            return false;
+
+        cell.z = 0;
+        origin.z = 0;
+        if (cell == origin)
+            return true;
+
+        HeightBand moverBand = OccupancyResolver.GetHeightBand(mover);
+        if (moverBand != HeightBand.Blocking)
+            return true;
+
+        foreach (UnitManager occupant in UnitManager.AllActive)
+        {
+            if (occupant == null || occupant == mover || occupant.IsDead || occupant.IsEmbarked)
+                continue;
+
+            Vector3Int occupantCell = occupant.CurrentCellPosition;
+            occupantCell.z = 0;
+            if (occupantCell != cell)
+                continue;
+
+            occupant.SyncLayerStateFromData(forceNativeDefault: false);
+            if (OccupancyResolver.GetHeightBand(occupant) != moverBand)
+                continue;
+
+            if (occupant.TeamId == mover.TeamId)
+                return false;
+
+            if (!OccupancyResolver.IsLayerAwareRulesActive)
+                return false;
+        }
+
+        return true;
+    }
 }
+

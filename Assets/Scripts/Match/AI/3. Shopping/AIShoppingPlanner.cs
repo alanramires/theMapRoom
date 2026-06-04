@@ -347,12 +347,21 @@ public partial class AIShoppingPlanner : MonoBehaviour
             int unfilledDefOps = CountUnfilledDefenseOps(snapshot.AITeam);
             if (unfilledDefOps > 0 && openFireSupportSlots < unfilledDefOps)
             {
-                int before = openFireSupportSlots;
-                openFireSupportSlots = unfilledDefOps;
-                preferDefensiveFireSupport = true;
-                proactiveDefFireSupport = true;
-                if (openFireSupportSlots != before)
-                    Debug.Log($"[AI Shopping] defensive_burst: stance=Defensive ops_sem_defesa={unfilledDefOps} → fire_slots={openFireSupportSlots}");
+                if (IsFireSupportSaturated(snapshot))
+                {
+                    int beforeAssault = openAssaultSlots;
+                    openAssaultSlots = Mathf.Max(openAssaultSlots, 1);
+                    Debug.Log($"[AI Shopping] defensive_burst: stance=Defensive ops_sem_defesa={unfilledDefOps} saturado por artilharia ativa -> Assaultx{openAssaultSlots} fire_slots={openFireSupportSlots} ass_before={beforeAssault}");
+                }
+                else
+                {
+                    int before = openFireSupportSlots;
+                    openFireSupportSlots = unfilledDefOps;
+                    preferDefensiveFireSupport = true;
+                    proactiveDefFireSupport = true;
+                    if (openFireSupportSlots != before)
+                        Debug.Log($"[AI Shopping] defensive_burst: stance=Defensive ops_sem_defesa={unfilledDefOps} → fire_slots={openFireSupportSlots}");
+                }
             }
         }
         if (ComputeOffensiveAntiInfantryFireSupportDemand(snapshot, intelReport, out offensiveAntiInfantryFireSupport))
@@ -568,10 +577,22 @@ public partial class AIShoppingPlanner : MonoBehaviour
         bool intelArmorNearHome = HasIntelArmorThreatNearOwnBase(snapshot, intelReport, intelArmorThreat);
         bool defensiveArmorThreat = defensiveArmorThreatCount > 0 || intelArmorNearHome;
         bool strategicArmorThreat = intelArmorThreat && !defensiveArmorThreat;
+        int activeArmorAssault = CountActiveArmoredAssaultUnits(snapshot);
+        int visibleEnemyArmor = CountVisibleEnemyArmor(snapshot);
+        int inferredEnemyArmor = Mathf.Max(
+            visibleEnemyArmor,
+            intelReport != null ? Mathf.CeilToInt(Mathf.Max(intelReport.enemyArmorForce, intelReport.enemyArmorThreatScore)) : 0);
+        bool strategicArmorParity = !defensiveArmorThreat
+            && inferredEnemyArmor > activeArmorAssault
+            && (snapshot.Stance != AIStance.Defensive || visibleEnemyArmor > 0);
+        if (strategicArmorParity && openAssaultSlots <= 0)
+            openAssaultSlots = 1;
         if (defensiveArmorThreat)
             Debug.Log($"[AI Shopping] defesa blindada: visible={defensiveArmorThreatCount} <= {DefensiveArmorThreatRange}h base/HQ intelHome={intelArmorNearHome}");
         else if (strategicArmorThreat)
             Debug.Log($"[AI Shopping] blindado inimigo por intel: preparando resposta sem acionar defesa de base");
+        if (strategicArmorParity)
+            Debug.Log($"[AI Shopping] paridade blindada: enemy={inferredEnemyArmor} visible={visibleEnemyArmor} own={activeArmorAssault} -> assault_slots={openAssaultSlots}");
         int defensiveInfantryThreatCount = !defensiveArmorThreat
             ? CountVisibleEnemyInfantryNearOwnedBase(snapshot, DefensiveArmorThreatRange) : 0;
         bool intelInfantryNearHome = !defensiveArmorThreat
@@ -842,7 +863,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 eliteAssaultTarget, eliteFireSupportTarget, defensiveBaseThreat,
                 allowDefensiveEliteAssault, defensiveTankReserveCost,
                 defensiveBaseManpowerShortage, defensiveMassReserveCost, defensiveBaseTankBought,
-                defensiveArmorThreat, wantsEliteFireSupport, activeFireSupportCount,
+                defensiveArmorThreat, strategicArmorParity, wantsEliteFireSupport, activeFireSupportCount,
                 proactiveDefFireSupport, proactiveAntiAir, activeSAMs, activeAAAs, aaaCap, aaaThreat,
                 defensiveInfantryThreat, offensiveAntiInfantryFireSupport);
             if (unit == null && forcedProduction)

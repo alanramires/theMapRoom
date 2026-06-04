@@ -53,6 +53,11 @@ public partial class AIController
         }
 
         UnitManager serviceTarget = FindLogisticsServiceTarget(unit, snapshot, fromCell, paths, occupied, baseDefense);
+        if (TryBuildTargetedLogisticsSupplyAction(unit, snapshot, fromCell, serviceTarget, paths, occupied, baseDefense, out PlayerAction targetedSupplyAction, out string targetedSupplyReason))
+        {
+            Debug.Log($"{TL("Logistics")} {unit.InstanceId} atende alvo logistica {targetedSupplyReason}");
+            return targetedSupplyAction;
+        }
 
         if (paths == null || paths.Count == 0)
         {
@@ -74,16 +79,16 @@ public partial class AIController
         {
             Debug.Log($"{TL("Logistics")} {unit.InstanceId} move retaguarda via {moveCell} {reason}");
 
-            // When forced to vacate a producer, opportunistically supply from the destination.
-            if (reason.StartsWith("desocupa_produtora") && moveCell != fromCell)
+            // If repositioning already lands in a valid service cell, do the service in the same action.
+            if (moveCell != fromCell)
             {
                 bool allowPreventive = IsPreventiveLogisticsAllowed(unit, snapshot, fromCell, paths, occupied);
                 int limit = GetLogisticsServiceLimit(unit);
-                List<UnitManager> vacateSupply = CollectLogisticsTargetsInServiceRange(unit, snapshot, moveCell, limit, allowPreventive);
-                if (vacateSupply.Count > 0 && IsLogisticsServiceCellAllowed(unit, snapshot, moveCell))
+                List<UnitManager> moveSupply = CollectLogisticsTargetsInServiceRange(unit, snapshot, moveCell, limit, allowPreventive);
+                if (moveSupply.Count > 0 && IsLogisticsServiceCellAllowed(unit, snapshot, moveCell))
                 {
-                    Debug.Log($"{TL("Logistics")} {unit.InstanceId} desocupa_produtora + supre {vacateSupply.Count} unidade(s) via {moveCell}");
-                    return BuildSupplyBatch(unit, snapshot.AITeam, fromCell, moveCell, vacateSupply, paths);
+                    Debug.Log($"{TL("Logistics")} {unit.InstanceId} move retaguarda + supre {moveSupply.Count} unidade(s) via {moveCell}");
+                    return BuildSupplyBatch(unit, snapshot.AITeam, fromCell, moveCell, moveSupply, paths);
                 }
             }
 

@@ -32,8 +32,10 @@ public partial class AIShoppingPlanner
 
         int activeCapturers = CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: false);
         int activeAssault = CountActiveUnitsWithRole(snapshot, UnitRole.Assalto, requirePrimary: true);
+        int openCapturerSlots = CountOpenSlots(aiTeam, UnitRole.Capturador);
         int assignedNeeded = 0;
         int preventiveNeeded = 0;
+        int projectionNeeded = 0;
         foreach (SectorObjective obj in plan.Objectives)
         {
             if (obj == null || obj.Status == ObjectiveStatus.Complete || obj.Status == ObjectiveStatus.Abandoned)
@@ -83,6 +85,26 @@ public partial class AIShoppingPlanner
             if (dist >= minDist) assignedNeeded++;
         }
 
+        bool anchorsReady = AreOwnAnchorSectorsHeld(aiTeam, out int heldAnchors, out int totalAnchors);
+        if (anchorsReady
+            && activeTransporters <= 0
+            && HasLongRangeGroundProjectionOpportunity(snapshot, minDist,
+                out ConstructionSector projectionSector,
+                out float projectionFootDistance,
+                out float projectionVehicleDistance,
+                out float projectionAirDistance))
+        {
+            int waitingHomeCapturers = CountGroundCapturersWaitingNearHome(snapshot);
+            int batchSize = Instance != null ? Instance.ProgressiveCapturerBatchSize : 2;
+            int incomingCapturers = openCapturerSlots > 0 ? batchSize : 0;
+            int projectionPassengers = waitingHomeCapturers + incomingCapturers;
+            if (projectionPassengers > 0)
+            {
+                projectionNeeded = 1;
+                Debug.Log($"[AI Shopping] transport_projection: anchors={heldAnchors}/{totalAnchors} sector={projectionSector} foot={projectionFootDistance:F1}>={minDist} veh={projectionVehicleDistance:F1} air={projectionAirDistance:F1} openCap={openCapturerSlots} incoming={incomingCapturers} waitingHome={waitingHomeCapturers} activeCap={activeCapturers} -> APC");
+            }
+        }
+
         CountSlots(snapshot.AITeam, UnitRole.Capturador, out int totalCapSlotsForMass, out int _);
         int capturersPerTransport;
         if (totalCapSlotsForMass > 0)
@@ -99,13 +121,109 @@ public partial class AIShoppingPlanner
             massNeeded = activeCapturers / Mathf.Max(1, capturersPerTransport);
 
         int assignedDeficit = Mathf.Max(0, assignedNeeded - freeAPCs);
-        int preventiveDeficit = Mathf.Max(0, Mathf.Max(preventiveNeeded, massNeeded) - activeTransporters);
+        int preventiveDeficit = Mathf.Max(0, Mathf.Max(preventiveNeeded, Mathf.Max(massNeeded, projectionNeeded)) - activeTransporters);
         urgentTransportDemand = assignedDeficit > 0;
-        int needed = Mathf.Max(assignedNeeded, Mathf.Max(preventiveNeeded, massNeeded));
+        int needed = Mathf.Max(assignedNeeded, Mathf.Max(preventiveNeeded, Mathf.Max(massNeeded, projectionNeeded)));
         int deficit = urgentTransportDemand ? assignedDeficit : preventiveDeficit;
         int demand  = Mathf.Min(deficit, 1);
-        Debug.Log($"[AI Shopping] transport_demand: needed={needed} assigned={assignedNeeded} preventive={preventiveNeeded} mass={massNeeded} capPerTrans={capturersPerTransport} activeCap={activeCapturers} activeAss={activeAssault} activeAPCs={activeTransporters} freeAPCs={freeAPCs} assignedDef={assignedDeficit} preventiveDef={preventiveDeficit} urgent={urgentTransportDemand} demand={demand} minDist={minDist}");
+        Debug.Log($"[AI Shopping] transport_demand: needed={needed} assigned={assignedNeeded} preventive={preventiveNeeded} projection={projectionNeeded} mass={massNeeded} capPerTrans={capturersPerTransport} activeCap={activeCapturers} activeAss={activeAssault} activeAPCs={activeTransporters} freeAPCs={freeAPCs} anchors={heldAnchors}/{totalAnchors} assignedDef={assignedDeficit} preventiveDef={preventiveDeficit} urgent={urgentTransportDemand} demand={demand} minDist={minDist}");
         return demand;
+    }
+
+    private static bool AreOwnAnchorSectorsHeld(TeamId aiTeam, out int heldAnchors, out int totalAnchors)
+    {
+        heldAnchors = 0;
+        totalAnchors = 0;
+
+        HashSet<int> ownSlots = CollectOwnHQSlotsForShopping(aiTeam);
+        if (ownSlots.Count == 0)
+            return false;
+
+        HashSet<ConstructionSector> counted = new HashSet<ConstructionSector>();
+        foreach (ConstructionManager anchor in ConstructionManager.AllActive)
+        {
+            if (anchor == null || !anchor.IsAnchorSector)
+                continue;
+            if (anchor.Sector == ConstructionSector.None)
+                continue;
+            if (!ownSlots.Contains(anchor.AnchorSectorSlotIndex))
+                continue;
+            if (!counted.Add(anchor.Sector))
+                continue;
+
+            totalAnchors++;
+            if (SectorManager.TryGetSectorInfo(anchor.Sector, out SectorManager.SectorInfo info)
+                && info.IsFullyControlled
+                && info.ControllingTeam == aiTeam)
+            {
+                heldAnchors++;
+            }
+        }
+
+        return totalAnchors > 0 && heldAnchors >= totalAnchors;
+    }
+
+    private static HashSet<int> CollectOwnHQSlotsForShopping(TeamId aiTeam)
+    {
+        HashSet<int> slots = new HashSet<int>();
+        foreach (ConstructionManager construction in ConstructionManager.AllActive)
+        {
+            if (construction == null || !construction.IsPlayerHeadQuarter)
+                continue;
+            if (construction.TeamId != aiTeam)
+                continue;
+            if (construction.SlotIndex < 0)
+                continue;
+
+            slots.Add(construction.SlotIndex);
+        }
+
+        return slots;
+    }
+
+    private static bool HasLongRangeGroundProjectionOpportunity(
+        AIWorldSnapshot snapshot,
+        int minDist,
+        out ConstructionSector sector,
+        out float footDistance,
+        out float vehicleDistance,
+        out float airDistance)
+    {
+        sector = ConstructionSector.None;
+        footDistance = 0f;
+        vehicleDistance = 0f;
+        airDistance = 0f;
+        if (snapshot == null)
+            return false;
+
+        TeamId aiTeam = snapshot.AITeam;
+        foreach (SectorManager.SectorInfo info in SectorManager.GetAllSectorInfos())
+        {
+            if (info == null)
+                continue;
+            if (info.IsFullyControlled && info.ControllingTeam == aiTeam)
+                continue;
+            if (ConstructionSectorHelper.IsBase(info.Sector))
+                continue;
+            if (info.GetTransportPreference(aiTeam) == SectorManager.SectorInfo.TransportPreference.Air)
+                continue;
+
+            float foot = info.GetDistanceToHQ(aiTeam);
+            if (foot < minDist)
+                continue;
+
+            ConstructionManager target = AIController.FindCapturableInSector(info.Sector, aiTeam);
+            if (target == null)
+                continue;
+
+            sector = info.Sector;
+            footDistance = foot;
+            vehicleDistance = info.GetVehicleDistanceToHQ(aiTeam);
+            airDistance = info.GetAirDistanceToHQ(aiTeam);
+            return true;
+        }
+
+        return false;
     }
 
     private static int ComputeAirTransportDemand(AIWorldSnapshot snapshot, int openCapturerSlots = 0)

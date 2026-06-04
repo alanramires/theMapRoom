@@ -236,6 +236,111 @@ public partial class AIController
         return result;
     }
 
+    private bool TryBuildTargetedLogisticsSupplyAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        UnitManager serviceTarget,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        bool baseDefense,
+        out PlayerAction action,
+        out string reason)
+    {
+        action = null;
+        reason = "";
+        if (unit == null || snapshot == null || snapshot.MyUnits == null)
+            return false;
+
+        int limit = GetLogisticsServiceLimit(unit);
+        if (limit <= 0)
+            return false;
+
+        bool allowPreventiveMaintenance = IsPreventiveLogisticsAllowed(unit, snapshot, fromCell, paths, occupied);
+        if (paths == null || paths.Count == 0)
+            return false;
+
+        Vector3Int anchor = ResolveLogisticsAnchor(snapshot, fromCell);
+        Vector3Int bestCell = fromCell;
+        List<UnitManager> bestTargets = null;
+        float bestScore = float.MinValue;
+        string bestDetails = "";
+
+        for (int u = 0; u < snapshot.MyUnits.Count; u++)
+        {
+            UnitManager candidateTarget = snapshot.MyUnits[u];
+            if (!IsLogisticsServiceTarget(unit, candidateTarget, allowPreventiveMaintenance))
+                continue;
+
+            Vector3Int targetCell = candidateTarget.CurrentCellPosition;
+            targetCell.z = 0;
+            bool critical = candidateTarget.IsUnderRepair;
+
+            foreach (Vector3Int rawCell in paths.Keys)
+            {
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                    continue;
+                if (!IsLogisticsServiceCellAllowed(unit, snapshot, cell))
+                    continue;
+                if (!IsInLogisticsServiceRange(unit, cell, candidateTarget))
+                    continue;
+
+                List<UnitManager> targets = CollectLogisticsTargetsInServiceRange(unit, snapshot, cell, limit, allowPreventiveMaintenance);
+                bool containsTarget = false;
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    if (targets[i] != null && targets[i].InstanceId == candidateTarget.InstanceId)
+                    {
+                        containsTarget = true;
+                        break;
+                    }
+                }
+                if (!containsTarget)
+                    continue;
+
+                float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+                float dpq = GetTerrainDpqPontos(cell);
+                float rearArea = CalculateLogisticsRearAreaScore(unit, snapshot, cell, anchor);
+                float targetNeed = ScoreLogisticsTargetNeed(snapshot, cell, candidateTarget);
+                float serviceDist = SectorManager.HexDistance(cell, targetCell);
+                int pathCost = GetPathStepCount(paths, cell);
+                bool forward = !baseDefense && IsLogisticsForwardOfMainLine(unit, snapshot, cell, anchor);
+                bool preferred = serviceTarget != null && candidateTarget.InstanceId == serviceTarget.InstanceId;
+
+                float score = targetNeed
+                    + (critical ? 8000f : 0f)
+                    + (preferred ? 2500f : 0f)
+                    + targets.Count * 1200f
+                    + dpq * 80f
+                    + rearArea * 0.45f
+                    - threat * (baseDefense ? 35f : 120f)
+                    - pathCost * 14f
+                    - serviceDist * 50f
+                    - candidateTarget.InstanceId * 0.001f;
+
+                if (forward)
+                    score -= critical ? 900f : 2600f;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestCell = cell;
+                    bestTargets = targets;
+                    bestDetails = $"target={candidateTarget.UnitDisplayName}#{candidateTarget.InstanceId} critical={critical} preferred={preferred} count={targets.Count} need={targetNeed:F0} threat={threat:F1} dpq={dpq:F1} rear={rearArea:F0} path={pathCost} forward={forward}";
+                }
+            }
+        }
+
+        if (bestTargets == null || bestTargets.Count <= 0)
+            return false;
+
+        action = BuildSupplyBatch(unit, snapshot.AITeam, fromCell, bestCell, bestTargets, paths);
+        reason = $"via={bestCell} score={bestScore:F0} {bestDetails}";
+        return true;
+    }
+
     private float ScoreLogisticsSupplyOption(AIWorldSnapshot snapshot, Vector3Int serviceCell, PodeSuprirOption option)
     {
         UnitManager target = option != null ? option.targetUnit : null;

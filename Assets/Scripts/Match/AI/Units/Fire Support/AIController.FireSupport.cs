@@ -81,7 +81,15 @@ public partial class AIController
         PlayerAction embarkAction = TryDecideFireSupportEmbarkAction(unit, snapshot, plan, assigned);
         if (embarkAction != null) return embarkAction;
 
-        if (TryFindFireSupportRepositionCell(unit, snapshot, fromCell, anchor, paths, occupied, out Vector3Int moveCell, out string moveReason))
+        if (TryRogueFireSupportKnownTargetRangeStep(unit, snapshot, fromCell, paths, occupied,
+                out Vector3Int assignedRangeStepCell, out string assignedRangeStepReason))
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reposiciona para por alvo na mira {assigned.Sector} via {assignedRangeStepCell} ({assignedRangeStepReason})");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, assignedRangeStepCell, paths);
+        }
+
+        if (TryFindFireSupportRepositionCell(unit, snapshot, fromCell, anchor, paths, occupied,
+            out Vector3Int moveCell, out string moveReason, assigned: assigned))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reposiciona para apoiar {assigned.Sector} via {moveCell} ({moveReason})");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
@@ -126,7 +134,7 @@ public partial class AIController
         if (rendezvousTarget == null || bestDist <= 1f) return null;
 
         Vector3Int targetCell = rendezvousTarget.CurrentCellPosition; targetCell.z = 0;
-        Vector3Int moveCell = FindAssaultPressureMove(unit, snapshot, fromCell, targetCell, paths, occupied);
+        Vector3Int moveCell = FindAssaultPressureMove(unit, snapshot, fromCell, targetCell, paths, occupied, out string moveReason);
         if (moveCell == fromCell) return null;
         if (CalculateThreatLevel(moveCell, snapshot.AITeam) > CalculateThreatLevel(fromCell, snapshot.AITeam) + 0.1f)
             return null;

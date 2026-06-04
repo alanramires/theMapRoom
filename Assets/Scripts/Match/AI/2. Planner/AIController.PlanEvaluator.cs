@@ -267,7 +267,9 @@ public partial class AIController
         var selectionCascadeDeferred = new List<SectorObjective>();
         foreach (SectorObjective obj in sectorCandidates)
         {
-            if (addedSectors < newSlots && selectionCascadeCovered.Contains(obj.Sector))
+            if (addedSectors < newSlots
+                && selectionCascadeCovered.Contains(obj.Sector)
+                && !IsEnemyHQRallySector(rallyContext, obj.Sector))
             {
                 selectionCascadeDeferred.Add(obj);
                 Debug.Log($"{TL("Plan")} defer {obj.Sector}: coberto por cascata inicial");
@@ -284,7 +286,7 @@ public partial class AIController
                     Debug.Log($"{TL("Plan")} preempt hot {obj.Sector}: remove {removed.Sector} para abrir cap ({maxObj}) " +
                               $"add={capSlotsAdded}xCap{(hasAssAdded ? " +Ass" : "")}{(hasTransAdded ? " +Trans" : "")} pri={obj.Priority}");
                     plan.Objectives.Add(obj);
-                    MarkSelectionCascadeNeighbor(obj.Sector, selectionCascadeCovered, aiTeam);
+                    MarkSelectionCascadeNeighbor(obj.Sector, selectionCascadeCovered, aiTeam, rallyContext);
                     addedSectors++;
                     continue;
                 }
@@ -296,7 +298,7 @@ public partial class AIController
             bool hasTrans = obj.Slots.Exists(s => s.Role == UnitRole.Transportador);
             Debug.Log($"{TL("Plan")} {obj.Sector}: {capSlots}xCap{(hasAss ? " +Ass" : "")}{(hasTrans ? " +Trans" : "")} pri={obj.Priority}");
             plan.Objectives.Add(obj);
-            MarkSelectionCascadeNeighbor(obj.Sector, selectionCascadeCovered, aiTeam);
+            MarkSelectionCascadeNeighbor(obj.Sector, selectionCascadeCovered, aiTeam, rallyContext);
             addedSectors++;
         }
 
@@ -602,7 +604,11 @@ public partial class AIController
                 tc = defInfo.RepresentativeCell; tc.z = 0;
             }
             else continue;
-            if (!isDefensive && cascadeCovered.Contains(obj.Sector) && !IsOwnAnchorSector(anchorContext, obj.Sector)) continue;
+            if (!isDefensive
+                && cascadeCovered.Contains(obj.Sector)
+                && !IsOwnAnchorSector(anchorContext, obj.Sector)
+                && !IsEnemyHQRallySector(rallyContext, obj.Sector))
+                continue;
 
             if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo slotInfo)
                 && slotInfo.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
@@ -639,7 +645,7 @@ public partial class AIController
                 assignableObjs.Add((obj, tc));
 
             if (isInitialDistribution && !isDefensive)
-                MarkCascadeNeighbor1(obj.Sector, cascadeCovered, aiTeam, plan.VacaterForwardSectors);
+                MarkCascadeNeighbor1(obj.Sector, cascadeCovered, aiTeam, plan.VacaterForwardSectors, rallyContext);
         }
 
         int nu = Mathf.Min(freeCapturers.Count, assignableObjs.Count);

@@ -61,6 +61,18 @@ public partial class AIController
             if (bestAdj != Vector3Int.zero) moveTarget = bestAdj;
         }
 
+        bool invasionDelivery = IsTransportInvasionDelivery(primaryPassenger, plan, snapshot, primaryTarget);
+        if (invasionDelivery && !IsTransportInvasionCourierCellAllowed(unit, snapshot, moveTarget, primaryTarget))
+        {
+            Vector3Int rendezvousCell = FindTransportInvasionRendezvousCell(
+                unit, snapshot, fromCell, primaryTarget, paths, occupied, out string rendezvousReason);
+            if (rendezvousCell != moveTarget)
+            {
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier invasao — bloqueia avanco {moveTarget}, rendezvous via {rendezvousCell} ({rendezvousReason})");
+                moveTarget = rendezvousCell;
+            }
+        }
+
         float moveImprovement = CalculateRouteDistanceOrHex(unit, fromCell, primaryTarget)
                               - CalculateRouteDistanceOrHex(unit, moveTarget, primaryTarget);
 
@@ -156,9 +168,16 @@ public partial class AIController
                     bool truckInRange = SectorManager.HexDistance(moveTarget, primaryTarget) <= dropOffRange;
                     if (dcInRange || truckInRange)
                     {
-                        paths.TryGetValue(moveTarget, out List<Vector3Int> movePath);
-                        Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — move+desembarca {selectedFromMove.Count} passageiro(s) via {moveTarget} dc={dc} dcDist={SectorManager.HexDistance(dc, primaryTarget):F0}h truckDist={SectorManager.HexDistance(moveTarget, primaryTarget):F0}h → {primaryTarget}");
-                        return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selectedFromMove, moveTarget, movePath);
+                        if (invasionDelivery && !IsTransportInvasionDropAllowed(unit, snapshot, moveTarget, dc, primaryTarget))
+                        {
+                            Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier invasao — segura desembarque hostil dc={dc} via {moveTarget}");
+                        }
+                        else
+                        {
+                            paths.TryGetValue(moveTarget, out List<Vector3Int> movePath);
+                            Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — move+desembarca {selectedFromMove.Count} passageiro(s) via {moveTarget} dc={dc} dcDist={SectorManager.HexDistance(dc, primaryTarget):F0}h truckDist={SectorManager.HexDistance(moveTarget, primaryTarget):F0}h → {primaryTarget}");
+                            return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selectedFromMove, moveTarget, movePath);
+                        }
                     }
                 }
             }
@@ -185,9 +204,16 @@ public partial class AIController
                         || SectorManager.HexDistance(fromCell, primaryTarget) <= dropOffRange;
                     if (inRangeP2)
                     {
-                        string reason = isStuck ? "bloqueado, libera carga" : $"desembarca para {primaryTarget}";
-                        Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — {reason} ({selected.Count} passageiro(s))");
-                        return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selected);
+                        if (invasionDelivery && !IsTransportInvasionDropAllowed(unit, snapshot, fromCell, dc, primaryTarget))
+                        {
+                            Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier invasao — segura desembarque no lugar dc={dc}");
+                        }
+                        else
+                        {
+                            string reason = isStuck ? "bloqueado, libera carga" : $"desembarca para {primaryTarget}";
+                            Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — {reason} ({selected.Count} passageiro(s))");
+                            return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selected);
+                        }
                     }
                 }
             }
@@ -200,6 +226,174 @@ public partial class AIController
         float distRemaining = SectorManager.HexDistance(moveTarget, primaryTarget);
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — move para {moveTarget} alvo={primaryTarget} dist={distRemaining:F0}h passageiro=#{primaryPassenger.InstanceId}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
+    }
+
+    private bool IsTransportInvasionDelivery(
+        UnitManager passenger,
+        TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot,
+        Vector3Int target)
+    {
+        if (passenger == null || snapshot == null)
+            return false;
+
+        SectorObjective objective = ResolveAnyAssignedObjective(passenger, plan);
+        if (objective != null)
+        {
+            if (objective.ObjectiveType == AIObjectiveType.InvasionAttack)
+                return true;
+            if (ConstructionSectorHelper.IsBase(objective.Sector)
+                && !IsCriticalHomeDefenseObjective(objective, snapshot.AITeam))
+                return true;
+        }
+
+        target.z = 0;
+        ConstructionManager building = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, target);
+        if (building != null
+            && building.TeamId != snapshot.AITeam
+            && (building.IsPlayerHeadQuarter || ConstructionSectorHelper.IsBase(building.Sector)))
+            return true;
+
+        if (snapshot.EnemyHQ != null)
+        {
+            Vector3Int hq = snapshot.EnemyHQ.CurrentCellPosition;
+            hq.z = 0;
+            if (SectorManager.HexDistance(target, hq) <= 4f)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsTransportInvasionCourierCellAllowed(
+        UnitManager transporter,
+        AIWorldSnapshot snapshot,
+        Vector3Int cell,
+        Vector3Int target)
+    {
+        if (cell == transporter.CurrentCellPosition)
+            return true;
+
+        return TryGetTransportScreenMetrics(transporter, snapshot, cell, target,
+            out float gap, out _, out _)
+            && gap >= 0.75f;
+    }
+
+    private bool IsTransportInvasionDropAllowed(
+        UnitManager transporter,
+        AIWorldSnapshot snapshot,
+        Vector3Int transporterCell,
+        Vector3Int dropCell,
+        Vector3Int target)
+    {
+        if (!IsTransportInvasionCourierCellAllowed(transporter, snapshot, transporterCell, target))
+            return false;
+
+        return TryGetTransportScreenMetrics(transporter, snapshot, dropCell, target,
+            out float gap, out _, out _)
+            && gap >= 0.25f;
+    }
+
+    private Vector3Int FindTransportInvasionRendezvousCell(
+        UnitManager transporter,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int target,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out string reason)
+    {
+        Vector3Int best = fromCell;
+        float bestScore = float.MinValue;
+        reason = "sem screen";
+
+        var candidates = new List<Vector3Int> { fromCell };
+        if (paths != null)
+            candidates.AddRange(paths.Keys);
+
+        foreach (Vector3Int rawCell in candidates)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+            if (cell != fromCell && IsNonTeamConstruction(cell, snapshot.AITeam))
+                continue;
+            if (!TryGetTransportScreenMetrics(transporter, snapshot, cell, target,
+                    out float gap, out float nearestScreenDist, out float cellDist))
+                continue;
+            if (gap < 0.75f)
+                continue;
+
+            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+            int pathCost = cell == fromCell ? 0 : GetPathStepCount(paths, cell);
+            float dpq = GetTerrainDpqPontos(cell);
+            float idealGap = 2f;
+            float score = 3000f
+                - Mathf.Abs(gap - idealGap) * 420f
+                - threat * 90f
+                - pathCost * 12f
+                - cellDist * 4f
+                + dpq * 25f
+                + (cell == fromCell ? 120f : 0f);
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = cell;
+                reason = $"gap={gap:F1} screenDist={nearestScreenDist:F1} cellDist={cellDist:F1} threat={threat:F1} path={pathCost} score={score:F0}";
+            }
+        }
+
+        return best;
+    }
+
+    private bool TryGetTransportScreenMetrics(
+        UnitManager transporter,
+        AIWorldSnapshot snapshot,
+        Vector3Int cell,
+        Vector3Int target,
+        out float gap,
+        out float nearestScreenDist,
+        out float cellDist)
+    {
+        gap = 0f;
+        nearestScreenDist = float.MaxValue;
+        cell.z = 0;
+        target.z = 0;
+        cellDist = SectorManager.HexDistance(cell, target);
+
+        if (snapshot == null || snapshot.MyUnits == null)
+            return false;
+
+        foreach (UnitManager ally in snapshot.MyUnits)
+        {
+            if (!IsTransportInvasionScreenUnit(ally, transporter))
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            float dist = SectorManager.HexDistance(allyCell, target);
+            if (dist < nearestScreenDist)
+                nearestScreenDist = dist;
+        }
+
+        if (nearestScreenDist >= float.MaxValue)
+            return false;
+
+        gap = cellDist - nearestScreenDist;
+        return true;
+    }
+
+    private static bool IsTransportInvasionScreenUnit(UnitManager ally, UnitManager transporter)
+    {
+        if (ally == null || ally == transporter || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
+            return false;
+        if (!ally.TryGetUnitData(out UnitData data) || data == null || data.roles == null)
+            return false;
+
+        return data.roles.Contains(UnitRole.Assalto)
+            || data.roles.Contains(UnitRole.Capturador);
     }
 
     // -------------------------------------------------------------------------

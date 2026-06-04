@@ -91,6 +91,7 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         out Vector3Int bestCell,
         out string reason,
+        SectorObjective assigned = null,
         bool requireImmediateThreat = false,
         float moveMarginOverride = -1f)
     {
@@ -106,6 +107,9 @@ public partial class AIController
         bool conservative = IsFireSupportConservative(unit);
         bool preferBestDpq = PreferFireSupportBestDpq(unit);
         int maxRange = GetFireSupportMaxWeaponRange(unit);
+        bool conservativeInvasion = conservative
+            && assigned != null
+            && assigned.ObjectiveType == AIObjectiveType.InvasionAttack;
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
         Dictionary<Vector3Int, int> routeCostToAnchor =
             UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, anchor, 160, terrainDatabase);
@@ -132,7 +136,6 @@ public partial class AIController
         bool foundAdvance = false;
         TeamObjectivePlan repositionCapPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
         bool shouldAdvanceToAssignedEarly = fromEffectiveDist > Mathf.Max(1, maxRange + 1);
-        bool conservativeAdvanceAllowed = conservative && preferMaxRange && shouldAdvanceToAssignedEarly;
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
@@ -144,17 +147,23 @@ public partial class AIController
             float threat = CalculateThreatLevel(cell, snapshot.AITeam);
             if (conservative && !IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
                 continue;
+            if (conservativeInvasion && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor))
+                continue;
 
             float progress = fromDist - SectorManager.HexDistance(cell, anchor);
             float dpq = GetTerrainDpqPontos(cell);
             int pathCost = GetPathStepCount(paths, cell);
+            float tacticalPressure = CalculateFireSupportTacticalPressureScore(unit, snapshot, cell, weaponPriorityData);
+            float rearLine = conservative ? CalculateFireSupportRearLineScore(unit, snapshot, cell, anchor) : 0f;
             float cellRouteDist = GetAnchorRouteCost(cell);
             bool cellRouteFound = cellRouteDist < float.MaxValue
                 || TryCalculateFireSupportRouteDistance(unit, cell, anchor, out cellRouteDist);
             float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - cellRouteDist : 0f;
             bool recoversMissingRoute = !fromRouteFound && cellRouteFound;
             bool advancesByRoute = recoversMissingRoute || routeProgress > 0f;
-            if (requireImmediateThreat && CalculateFireSupportTacticalPressureScore(unit, snapshot, cell, weaponPriorityData) <= 0f)
+            if (requireImmediateThreat && tacticalPressure <= 0f)
+                continue;
+            if (conservative && progress > 0f && tacticalPressure <= 0f && rearLine < -350f)
                 continue;
 
             float score = ScoreFireSupportRepositionCell(
@@ -198,7 +207,7 @@ public partial class AIController
         float moveMargin = moveMarginOverride >= 0f ? moveMarginOverride : 120f;
         bool enemyNearAnchor = HasNearbyVisibleEnemy(anchor, snapshot.AITeam, defenseEnemyRange + maxRange);
         bool shouldAdvanceToAssigned = fromEffectiveDist > Mathf.Max(1, maxRange + 1);
-        bool canUseAdvanceFallback = !conservative || conservativeAdvanceAllowed;
+        bool canUseAdvanceFallback = !conservative;
         if (!requireImmediateThreat
             && canUseAdvanceFallback
             && shouldAdvanceToAssigned

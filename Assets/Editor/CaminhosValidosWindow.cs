@@ -92,10 +92,20 @@ public class CaminhosValidosWindow : EditorWindow
             sceneUnit = Selection.activeGameObject.GetComponent<UnitManager>();
     }
 
+    private static readonly FieldInfo s_spawnerUnitDatabaseField =
+        typeof(UnitSpawner).GetField("unitDatabase", BindingFlags.NonPublic | BindingFlags.Instance);
+    private static readonly FieldInfo s_spawnerTilemapField =
+        typeof(UnitSpawner).GetField("boardTilemap", BindingFlags.NonPublic | BindingFlags.Instance);
+
     private void AutoDetectContext()
     {
         if (tilemap == null)
-            tilemap = FindFirstObjectByType<Tilemap>();
+        {
+            UnitSpawner spawner = FindFirstObjectByType<UnitSpawner>();
+            if (spawner != null)
+                tilemap = s_spawnerTilemapField?.GetValue(spawner) as Tilemap;
+            if (tilemap == null) tilemap = FindFirstObjectByType<Tilemap>();
+        }
         if (terrainDatabase == null)
         {
             string[] guids = AssetDatabase.FindAssets("t:TerrainDatabase");
@@ -105,10 +115,16 @@ public class CaminhosValidosWindow : EditorWindow
         }
         if (unitDatabase == null)
         {
-            string[] guids = AssetDatabase.FindAssets("t:UnitDatabase");
-            if (guids.Length > 0)
-                unitDatabase = AssetDatabase.LoadAssetAtPath<UnitDatabase>(
-                    AssetDatabase.GUIDToAssetPath(guids[0]));
+            UnitSpawner spawner = FindFirstObjectByType<UnitSpawner>();
+            if (spawner != null)
+                unitDatabase = s_spawnerUnitDatabaseField?.GetValue(spawner) as UnitDatabase;
+            if (unitDatabase == null)
+            {
+                string[] guids = AssetDatabase.FindAssets("t:UnitDatabase");
+                if (guids.Length > 0)
+                    unitDatabase = AssetDatabase.LoadAssetAtPath<UnitDatabase>(
+                        AssetDatabase.GUIDToAssetPath(guids[0]));
+            }
         }
     }
 
@@ -699,6 +715,8 @@ public class CaminhosValidosWindow : EditorWindow
 
         tempUnit.SetCurrentCellPosition(firstStop, enforceFinalOccupancyRule: false);
         var nextPaths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, tempUnit, movementPoints, terrainDatabase);
+        int goodSecondOptions = 0;
+        float firstStopDistToDest = SectorManager.HexDistance(firstStop, dest);
         foreach (Vector3Int nextStop in nextPaths.Keys)
         {
             if (!CanUseAsDebugStopCell(tempUnit, nextStop, firstStop))
@@ -707,6 +725,8 @@ public class CaminhosValidosWindow : EditorWindow
             float nextDistance = SectorManager.HexDistance(nextStop, dest);
             if (nextDistance < bestDistanceAfterNextMove)
                 bestDistanceAfterNextMove = nextDistance;
+            if (nextDistance < firstStopDistToDest)
+                goodSecondOptions++;
         }
 
         float twoTurnProgress = originDistance - bestDistanceAfterNextMove;
@@ -719,7 +739,8 @@ public class CaminhosValidosWindow : EditorWindow
             twoTurnProgress * 10f
             + firstTurnProgress * 2f
             - lineDeviation * 2f
-            - firstMoveCost * 0.5f;
+            - firstMoveCost * 0.5f
+            + goodSecondOptions * 0.4f;
 
         return Mathf.RoundToInt(score);
     }
