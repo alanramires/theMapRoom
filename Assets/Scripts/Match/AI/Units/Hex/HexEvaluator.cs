@@ -158,7 +158,7 @@ public static class HexEvaluator
         int   bestIdx   = 0;
         for (int i = 0; i < results.Count; i++)
         {
-            if (IsBetterEvaluation(results[i], results[bestIdx], ctx))
+            if (IsBetterEvaluation(results[i], results[bestIdx], ctx, prioritizeDpqAtBattle))
             {
                 bestIdx   = i;
             }
@@ -592,7 +592,11 @@ public static class HexEvaluator
         return Vector2.Distance(wa, wb);
     }
 
-    private static bool IsBetterEvaluation(HexEvaluation candidate, HexEvaluation current, CaptureContext ctx)
+    private static bool IsBetterEvaluation(
+        HexEvaluation candidate,
+        HexEvaluation current,
+        CaptureContext ctx,
+        bool prioritizeDpqAtBattle)
     {
         if (ctx.role == CandidateType.CaptureAdvance && ctx.hasTarget)
         {
@@ -600,6 +604,13 @@ public static class HexEvaluator
             bool currentHasCombat = current.combatValue > 0f;
             if (candidateHasCombat != currentHasCombat)
                 return candidateHasCombat;
+
+            if (prioritizeDpqAtBattle && candidateHasCombat)
+            {
+                const float DpqEpsilon = 0.0001f;
+                if (Mathf.Abs(candidate.positionQuality - current.positionQuality) > DpqEpsilon)
+                    return candidate.positionQuality > current.positionQuality;
+            }
 
             if (!candidateHasCombat)
             {

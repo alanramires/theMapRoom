@@ -48,15 +48,16 @@ public static class ConstructionDataTools
             SerializedProperty hasOverrideProp = so.FindProperty("hasSiteRuntimeOverride");
             SerializedProperty captureProp = so.FindProperty("currentCapturePoints");
             SerializedProperty teamProp = so.FindProperty("teamId");
-            SerializedProperty originalOwnerTeamProp = so.FindProperty("originalOwnerTeamId");
+            SerializedProperty originalOwnerSlotProp = so.FindProperty("originalOwnerSlotIndex");
             SerializedProperty originalOwnerInitializedProp = so.FindProperty("originalOwnerInitialized");
+            SerializedProperty slotProp = so.FindProperty("slotIndex");
             if (hasOverrideProp != null)
                 hasOverrideProp.boolValue = false;
             // -1 garante reinit para o maximo quando aplicar os defaults.
             if (captureProp != null)
                 captureProp.intValue = -1;
-            if (teamProp != null && originalOwnerTeamProp != null)
-                originalOwnerTeamProp.intValue = teamProp.intValue;
+            if (originalOwnerSlotProp != null && slotProp != null)
+                originalOwnerSlotProp.intValue = slotProp.intValue;
             if (originalOwnerInitializedProp != null)
                 originalOwnerInitializedProp.boolValue = true;
             so.ApplyModifiedPropertiesWithoutUndo();

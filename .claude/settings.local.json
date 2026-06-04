@@ -31,7 +31,8 @@
       "Bash(Select-Object FullName, PSIsContainer)",
       "Bash(Sort-Object FullName)",
       "Bash(Format-Table -AutoSize)",
-      "Bash(grep -v \"//\")"
+      "Bash(grep -v \"//\")",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

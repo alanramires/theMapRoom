@@ -1,23 +1,10 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
 public class ConstructionSpawner : MonoBehaviour
 {
-    [System.Serializable]
-    public class MapSpawnEntry
-    {
-        public TeamId teamId = TeamId.Green;
-        public string constructionId;
-        public Vector3Int cellPosition = Vector3Int.zero;
-        [Header("Site Overrides")]
-        public bool useSiteOverrides = false;
-        public ConstructionSiteRuntime siteRuntime = new ConstructionSiteRuntime();
-    }
-
     [Header("Data")]
     [SerializeField] private ConstructionDatabase constructionDatabase;
-    [SerializeField] private ConstructionFieldDatabase constructionFieldDatabase;
     [SerializeField] private MatchController matchController;
     [SerializeField] private int currentId = 1;
 
@@ -27,26 +14,9 @@ public class ConstructionSpawner : MonoBehaviour
     [SerializeField] private Tilemap boardTilemap;
     [SerializeField] private Transform spawnParent;
 
-    [Header("Manual Spawn")]
-    [SerializeField] private TeamId manualTeamId = TeamId.Green;
-    [SerializeField] private string manualConstructionId;
-    [SerializeField] private Vector3Int manualCellPosition = Vector3Int.zero;
-
-    [Header("Map Spawn")]
-    [SerializeField] private bool spawnMapListOnStart = false;
-    [SerializeField] private List<MapSpawnEntry> mapSpawnEntries = new List<MapSpawnEntry>();
-    [SerializeField] private bool spawnFieldDatabaseOnStart = false;
-
-    private bool mapSpawnExecuted;
-    private bool fieldDatabaseSpawnExecuted;
-
     private void Start()
     {
         TryAutoAssignMatchController();
-        if (spawnFieldDatabaseOnStart)
-            SpawnFieldDatabase();
-        if (spawnMapListOnStart)
-            SpawnMapList();
         if (matchController != null)
             matchController.AutoComputeFlipXFromHqPositions();
     }
@@ -139,142 +109,6 @@ public class ConstructionSpawner : MonoBehaviour
         }
 
         return Spawn(constructionId, teamId, HexCoordinates.GetCellCenterWorld(boardTilemap, fixedCell), Quaternion.identity);
-    }
-
-    public GameObject SpawnAtCell(MapSpawnEntry entry)
-    {
-        if (entry == null || string.IsNullOrWhiteSpace(entry.constructionId))
-            return null;
-
-        Vector3Int fixedCell = new Vector3Int(entry.cellPosition.x, entry.cellPosition.y, 0);
-        GameObject spawned = SpawnAtCell(entry.constructionId, entry.teamId, fixedCell);
-        if (spawned == null || !entry.useSiteOverrides)
-            return spawned;
-
-        ConstructionManager manager = spawned.GetComponent<ConstructionManager>();
-        if (manager != null)
-            manager.ApplySiteRuntime(entry.siteRuntime);
-
-        return spawned;
-    }
-
-    public void SpawnManual()
-    {
-        Vector3Int fixedCell = new Vector3Int(manualCellPosition.x, manualCellPosition.y, 0);
-        SpawnAtCell(manualConstructionId, manualTeamId, fixedCell);
-    }
-
-    public void SpawnMapList(bool force = false)
-    {
-        if (!CanRunMapSpawn())
-        {
-            Debug.LogWarning("[ConstructionSpawner] Map Spawn so pode rodar no turno 0 do MatchController.");
-            return;
-        }
-
-        if (mapSpawnExecuted && !force)
-            return;
-
-        for (int i = 0; i < mapSpawnEntries.Count; i++)
-        {
-            MapSpawnEntry entry = mapSpawnEntries[i];
-            if (entry == null || string.IsNullOrWhiteSpace(entry.constructionId))
-                continue;
-
-            SpawnAtCell(entry);
-        }
-
-        mapSpawnExecuted = true;
-    }
-
-    public void SpawnFieldDatabase(bool force = false)
-    {
-        if (!CanRunMapSpawn())
-        {
-            Debug.LogWarning("[ConstructionSpawner] Field Database Spawn so pode rodar no turno 0 do MatchController.");
-            return;
-        }
-
-        if (fieldDatabaseSpawnExecuted && !force)
-            return;
-
-        IReadOnlyList<ConstructionFieldEntry> entries = null;
-        if (constructionDatabase != null && constructionDatabase.FieldEntries != null && constructionDatabase.FieldEntries.Count > 0)
-            entries = constructionDatabase.FieldEntries;
-        else if (constructionFieldDatabase != null && constructionFieldDatabase.Entries != null)
-            entries = constructionFieldDatabase.Entries;
-
-        if (entries == null)
-            return;
-
-        for (int i = 0; i < entries.Count; i++)
-        {
-            ConstructionFieldEntry entry = entries[i];
-            if (entry == null || entry.construction == null || string.IsNullOrWhiteSpace(entry.construction.id))
-                continue;
-
-            Vector3Int fixedCell = new Vector3Int(entry.cellPosition.x, entry.cellPosition.y, 0);
-            TeamId resolvedTeam = matchController != null
-                ? matchController.GetTeamIdForSlot(entry.initialSlotIndex)
-                : TeamId.Neutral;
-            GameObject spawned = SpawnAtCell(entry.construction.id, resolvedTeam, fixedCell);
-            if (spawned == null)
-                continue;
-
-            ConstructionManager spawnedManager = spawned.GetComponent<ConstructionManager>();
-            if (spawnedManager != null)
-            {
-                spawnedManager.SetSlotIndex(entry.initialSlotIndex);
-                spawnedManager.SetSector(entry.sector);
-            }
-
-            if (!entry.useConstructionConfigurationOverride)
-            {
-                if (spawnedManager != null)
-                {
-                    int initialCaptureNoOverride = entry.initialCapturePoints >= 0
-                        ? entry.initialCapturePoints
-                        : spawnedManager.CapturePointsMax;
-                    spawnedManager.SetCurrentCapturePoints(initialCaptureNoOverride);
-                }
-                continue;
-            }
-
-            ConstructionManager manager = spawnedManager;
-            if (manager != null)
-            {
-                manager.ApplySiteRuntime(entry.constructionConfiguration);
-                int initialCapture = entry.initialCapturePoints >= 0
-                    ? entry.initialCapturePoints
-                    : manager.CapturePointsMax;
-                manager.SetCurrentCapturePoints(initialCapture);
-            }
-        }
-
-        fieldDatabaseSpawnExecuted = true;
-    }
-
-    private bool CanRunMapSpawn()
-    {
-        TryAutoAssignMatchController();
-        return matchController != null && matchController.CurrentTurn == 0;
-    }
-
-    private void OnValidate()
-    {
-        if (mapSpawnEntries == null)
-            mapSpawnEntries = new List<MapSpawnEntry>();
-
-        for (int i = 0; i < mapSpawnEntries.Count; i++)
-        {
-            MapSpawnEntry entry = mapSpawnEntries[i];
-            if (entry == null)
-                continue;
-
-            if (entry.siteRuntime == null)
-                entry.siteRuntime = new ConstructionSiteRuntime();
-            entry.siteRuntime.Sanitize();
-        }
     }
 
     private void TryAutoAssignMatchController()

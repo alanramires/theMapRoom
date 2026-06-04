@@ -28,6 +28,47 @@ public partial class AIController
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
         float fromDist = SectorManager.HexDistance(fromCell, targetCell);
+
+        if (TryFindBestToolProgressionCell(
+                unit,
+                snapshot,
+                fromCell,
+                targetCell,
+                paths,
+                occupied,
+                ToolProgressionIntent.LogisticsReload,
+                out Vector3Int toolReloadCell,
+                out ToolProgressionCandidate toolReloadCandidate,
+                out string toolReloadReason,
+                tacticalScore: (cell, candidate) =>
+                {
+                    float dist = SectorManager.HexDistance(cell, targetCell);
+                    float progress = fromDist - dist;
+                    float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+                    float dpq = GetTerrainDpqPontos(cell);
+                    float score = progress * 650f
+                        - dist * 80f
+                        + dpq * 40f
+                        - threat * 120f
+                        - candidate.MoveCost * 8f;
+
+                    if (cell == targetCell)
+                        score += 4000f;
+
+                    return score;
+                }))
+        {
+            bool hasReloadProgress = toolReloadCandidate.ToolScore > 0
+                || toolReloadCandidate.FirstTurnProgress > 0f
+                || toolReloadCandidate.TwoTurnProgress > 0f;
+            if (hasReloadProgress || toolReloadCell == targetCell)
+            {
+                bestCell = toolReloadCell;
+                reason = $"toolProgress dest={targetCell} {toolReloadReason}";
+                return true;
+            }
+        }
+
         float bestScore = float.MinValue;
         foreach (Vector3Int rawCell in paths.Keys)
         {
@@ -127,6 +168,52 @@ public partial class AIController
         float fromScore = ScoreLogisticsCell(
             unit, snapshot, fromCell, fromCell, anchor, serviceCell,
             hasServiceTarget, serviceTarget, baseDefense, preferBestDpq, 0, out string fromDetails);
+
+        Vector3Int progressionTarget = hasServiceTarget ? serviceCell : anchor;
+        ToolProgressionIntent progressionIntent = hasServiceTarget
+            ? ToolProgressionIntent.LogisticsService
+            : ToolProgressionIntent.LogisticsReload;
+
+        if (TryFindBestToolProgressionCell(
+                unit,
+                snapshot,
+                fromCell,
+                progressionTarget,
+                paths,
+                occupied,
+                progressionIntent,
+                out Vector3Int toolCell,
+                out ToolProgressionCandidate toolCandidate,
+                out string toolReason,
+                allowCell: cell => !(currentBlocksProduction && cell == fromCell),
+                tacticalScore: (cell, candidate) =>
+                {
+                    int pathCost = cell == fromCell ? 0 : candidate.MoveCost;
+                    return ScoreLogisticsCell(
+                        unit,
+                        snapshot,
+                        cell,
+                        fromCell,
+                        anchor,
+                        serviceCell,
+                        hasServiceTarget,
+                        serviceTarget,
+                        baseDefense,
+                        preferBestDpq,
+                        pathCost,
+                        out _);
+                }))
+        {
+            float toolHoldMargin = preferBestDpq ? 35f : 80f;
+            if (currentBlocksProduction || toolCandidate.TacticalScore >= fromScore + toolHoldMargin)
+            {
+                bestCell = toolCell;
+                reason = currentBlocksProduction
+                    ? $"toolProgress desocupa_produtora {toolReason}"
+                    : $"toolProgress hold={fromScore:F0} {toolReason}";
+                return true;
+            }
+        }
 
         float bestScore = float.MinValue;
         string bestDetails = "";

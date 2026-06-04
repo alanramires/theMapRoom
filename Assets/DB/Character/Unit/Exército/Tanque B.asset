@@ -50,7 +50,7 @@ MonoBehaviour:
   preferRepositionAtWeaponMaxRange: 0
   preferArtilleryModeBeforeCombatant: 0
   useAttackDecision: 1
-  attackAcceptHpLossPercent: 60
+  attackAcceptHpLossPercent: 80
   attackEliminationMinPercent: 10
   attackMustSurvive: 1
   ignoreAttackDecisionWhenDefending: 0

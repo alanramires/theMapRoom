@@ -253,7 +253,20 @@ public partial class AIController
             ordered.Add(eval);
         }
 
-        ordered.Sort((a, b) => b.total.CompareTo(a.total));
+        bool prioritizeDpqAtBattle = unit.TryGetUnitData(out UnitData data)
+            && data != null
+            && data.prioritizeDpqAtBattle;
+
+        ordered.Sort((a, b) =>
+        {
+            if (prioritizeDpqAtBattle)
+            {
+                int dpqCompare = b.positionQuality.CompareTo(a.positionQuality);
+                if (dpqCompare != 0) return dpqCompare;
+            }
+
+            return b.total.CompareTo(a.total);
+        });
 
         foreach (HexEvaluation eval in ordered)
         {

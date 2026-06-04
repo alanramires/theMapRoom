@@ -113,6 +113,36 @@ public partial class AIController
 
         const float eps = 0.01f;
 
+        if (TryFindBestToolProgressionCell(
+                unit,
+                new AIWorldSnapshot { AITeam = aiTeam },
+                fromCell,
+                pressureTarget,
+                paths,
+                occupied,
+                ToolProgressionIntent.TransportDelivery,
+                out Vector3Int toolTransportCell,
+                out ToolProgressionCandidate toolTransportCandidate,
+                out string toolTransportReason,
+                allowCell: cell => !IsNonTeamConstruction(cell, aiTeam),
+                tacticalScore: (cell, candidate) =>
+                {
+                    float threat = CalculateThreatLevel(cell, aiTeam);
+                    bool isNonTeamBldg = IsNonTeamConstruction(cell, aiTeam);
+                    return -threat * 0.5f
+                        - (isNonTeamBldg ? 300f : 0f);
+                }))
+        {
+            bool hasToolProgress = toolTransportCandidate.ToolScore > 0
+                || toolTransportCandidate.FirstTurnProgress > 0f
+                || toolTransportCandidate.TwoTurnProgress > 0f;
+            if (hasToolProgress)
+            {
+                Debug.Log($"{TL("Progressao2")} transporte {unit.InstanceId} alvo={pressureTarget} tool escolheu {toolTransportCell} {toolTransportReason}");
+                return toolTransportCell;
+            }
+        }
+
         foreach (Vector3Int cell in paths.Keys)
         {
             if (cell == fromCell) continue;

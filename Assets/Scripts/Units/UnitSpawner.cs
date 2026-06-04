@@ -1,18 +1,11 @@
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using System.Text;
 
 public class UnitSpawner : MonoBehaviour
 {
-    [System.Serializable]
-    public class MapSpawnEntry
-    {
-        public TeamId teamId = TeamId.Green;
-        public string unitId;
-        public Vector3Int cellPosition = Vector3Int.zero;
-    }
-
     [Header("Data")]
     [SerializeField] private UnitDatabase unitDatabase;
     [SerializeField] private MatchController matchController;
@@ -27,23 +20,11 @@ public class UnitSpawner : MonoBehaviour
 
     [SerializeField] private Transform spawnParent;
 
-    [Header("Manual Spawn")]
-    [SerializeField] private TeamId manualTeamId = TeamId.Green;
-    [SerializeField] private string manualUnitId;
-    [SerializeField] private Vector3Int manualCellPosition = Vector3Int.zero;
-
-    [Header("Map Spawn")]
-    [SerializeField] private bool spawnMapListOnStart = false;
-    [SerializeField] private List<MapSpawnEntry> mapSpawnEntries = new List<MapSpawnEntry>();
-
-    private bool mapSpawnExecuted;
-
     private void Start()
     {
         TryAutoAssignBoardTilemap();
         TryAutoAssignMatchController();
-        if (spawnMapListOnStart)
-            SpawnMapList();
+        ResetNextIdAfterSceneUnits();
     }
 
 #if UNITY_EDITOR
@@ -341,42 +322,6 @@ public class UnitSpawner : MonoBehaviour
         return Spawn(data, teamId, HexCoordinates.GetCellCenterWorld(boardTilemap, fixedCell), Quaternion.identity, enforceSpawnOccupancyRule: false);
     }
 
-    public void SpawnManual()
-    {
-        Vector3Int fixedCell = new Vector3Int(manualCellPosition.x, manualCellPosition.y, 0);
-        SpawnAtCell(manualUnitId, manualTeamId, fixedCell);
-    }
-
-    public void SpawnMapList(bool force = false)
-    {
-        if (!CanRunMapSpawn())
-        {
-            Debug.LogWarning("[UnitSpawner] Map Spawn so pode rodar no turno 0 do MatchController.");
-            return;
-        }
-
-        if (mapSpawnExecuted && !force)
-            return;
-
-        for (int i = 0; i < mapSpawnEntries.Count; i++)
-        {
-            MapSpawnEntry entry = mapSpawnEntries[i];
-            if (entry == null || string.IsNullOrWhiteSpace(entry.unitId))
-                continue;
-
-            Vector3Int fixedCell = new Vector3Int(entry.cellPosition.x, entry.cellPosition.y, 0);
-            SpawnAtCell(entry.unitId, entry.teamId, fixedCell);
-        }
-
-        mapSpawnExecuted = true;
-    }
-
-    private bool CanRunMapSpawn()
-    {
-        TryAutoAssignMatchController();
-        return matchController != null && matchController.CurrentTurn == 0;
-    }
-
     private void TryAutoAssignMatchController()
     {
         if (matchController == null)
@@ -402,6 +347,27 @@ public class UnitSpawner : MonoBehaviour
     public void SetNextIdAfterMax(int maxUsedId)
     {
         currentId = Mathf.Max(1, maxUsedId + 1);
+    }
+
+    public int ResetNextIdAfterSceneUnits()
+    {
+        int maxUnitId = 0;
+        Scene activeScene = SceneManager.GetActiveScene();
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || unit.gameObject.scene != activeScene)
+                continue;
+
+            if (unit.InstanceId > maxUnitId)
+                maxUnitId = unit.InstanceId;
+        }
+
+        SetNextIdAfterMax(maxUnitId);
+        Debug.Log($"[UnitSpawner] NextId ajustado por unidades em cena: maxUnitId={maxUnitId} nextId={currentId}.");
+        return maxUnitId;
     }
 
     private int ResolveSlotIndexForTeam(TeamId teamId)

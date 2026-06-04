@@ -1864,6 +1864,21 @@ public class SaveGameManager : MonoBehaviour
             SetCustomSaveDirectory(pendingNewGameSaveDirectory);
 
         pendingNewGameSaveDirectory = null;
+        ResetUnitSpawnerNextIdForNewGame();
+    }
+
+    private void ResetUnitSpawnerNextIdForNewGame()
+    {
+        if (unitSpawner == null)
+            unitSpawner = FindAnyObjectByType<UnitSpawner>();
+
+        if (unitSpawner == null)
+            return;
+
+        int maxUnitId = unitSpawner.ResetNextIdAfterSceneUnits();
+
+        if (verboseLogs)
+            Debug.Log($"[SaveGame] NewGame: UnitSpawner ajustado apos maxUnitId={maxUnitId}.");
     }
 
     private static string ResolveHelper(string id, string fallback)

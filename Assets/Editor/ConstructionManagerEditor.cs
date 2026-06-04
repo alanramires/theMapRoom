@@ -29,9 +29,8 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty hasSiteRuntimeOverrideProp;
     private SerializedProperty currentCapturePointsProp;
     private SerializedProperty hasInfiniteSuppliesOverrideProp;
-    private SerializedProperty originalOwnerTeamIdProp;
-    private SerializedProperty firstOwnerTeamIdProp;
-    private SerializedProperty firstOwnerInitializedProp;
+    private SerializedProperty originalOwnerSlotIndexProp;
+    private SerializedProperty firstOwnerSlotIndexProp;
     private SerializedProperty sectorProp;
     private SerializedProperty isForwardObserverSpotProp;
     private SerializedProperty isRallyPointProp;
@@ -84,9 +83,8 @@ public class ConstructionManagerEditor : Editor
         hasSiteRuntimeOverrideProp = serializedObject.FindProperty("hasSiteRuntimeOverride");
         currentCapturePointsProp = serializedObject.FindProperty("currentCapturePoints");
         hasInfiniteSuppliesOverrideProp = serializedObject.FindProperty("hasInfiniteSuppliesOverride");
-        originalOwnerTeamIdProp = serializedObject.FindProperty("originalOwnerTeamId");
-        firstOwnerTeamIdProp = serializedObject.FindProperty("firstOwnerTeamId");
-        firstOwnerInitializedProp = serializedObject.FindProperty("firstOwnerInitialized");
+        originalOwnerSlotIndexProp = serializedObject.FindProperty("originalOwnerSlotIndex");
+        firstOwnerSlotIndexProp = serializedObject.FindProperty("firstOwnerSlotIndex");
         sectorProp = serializedObject.FindProperty("sector");
         isForwardObserverSpotProp = serializedObject.FindProperty("isForwardObserverSpot");
         isRallyPointProp = serializedObject.FindProperty("isRallyPoint");
@@ -127,12 +125,8 @@ public class ConstructionManagerEditor : Editor
 
         DrawCaptureEditorBlock();
 
-        if (originalOwnerTeamIdProp != null)
-            EditorGUILayout.PropertyField(originalOwnerTeamIdProp, new GUIContent("Original Owner Team"));
-        if (firstOwnerInitializedProp != null)
-            EditorGUILayout.PropertyField(firstOwnerInitializedProp, new GUIContent("First Owner Initialized"));
-        if (firstOwnerTeamIdProp != null)
-            EditorGUILayout.PropertyField(firstOwnerTeamIdProp, new GUIContent("First Owner Team"));
+        DrawOwnershipReadOnlySlot("Original Owner Slot", originalOwnerSlotIndexProp);
+        DrawOwnershipReadOnlySlot("First Owner Slot", firstOwnerSlotIndexProp);
 
         if (hasSiteRuntimeOverrideProp != null)
         {
@@ -267,7 +261,7 @@ public class ConstructionManagerEditor : Editor
 
                 EditorGUILayout.BeginHorizontal();
                 int currentSlot = Mathf.Clamp(item.intValue, 0, slotCount - 1);
-                int selectedSlot = EditorGUILayout.Popup($"Target {i + 1}", currentSlot, labels);
+                int selectedSlot = EditorGUILayout.Popup($"Invasion Target {i + 1}", currentSlot, labels);
                 if (IsRallyTargetSlotUsed(selectedSlot, i))
                     selectedSlot = FindFirstUnusedRallyTargetSlot(slotCount, currentSlot, i);
                 item.intValue = selectedSlot;
@@ -348,6 +342,26 @@ public class ConstructionManagerEditor : Editor
             sectorProp.enumValueIndex = next;
     }
 
+    private static void DrawOwnershipReadOnlySlot(string label, SerializedProperty slotProp)
+    {
+        if (slotProp == null) return;
+        int currentSlot = slotProp.intValue;
+        string display;
+        if (currentSlot < 0)
+        {
+            display = "Neutral";
+        }
+        else
+        {
+            MatchController mc = Object.FindAnyObjectByType<MatchController>();
+            display = mc != null && currentSlot < mc.SlotCount
+                ? "Slot " + currentSlot + " — " + TeamUtils.GetName(mc.GetTeamIdForSlot(currentSlot))
+                : "Slot " + currentSlot;
+        }
+        using (new EditorGUI.DisabledScope(true))
+            EditorGUILayout.LabelField(label, display);
+    }
+
     private void DrawSlotAndTeamBlock()
     {
         if (slotIndexProp == null)
@@ -366,7 +380,7 @@ public class ConstructionManagerEditor : Editor
         for (int i = 0; i < slotCount; i++)
         {
             TeamId t = mc.GetTeamIdForSlot(i);
-            labels[i + 1] = $"Slot {i} â€” {TeamUtils.GetName(t)}";
+            labels[i + 1] = "Slot " + i + " — " + TeamUtils.GetName(t);
         }
 
         int currentSlot = slotIndexProp.intValue;
@@ -387,7 +401,7 @@ public class ConstructionManagerEditor : Editor
             EditorUtility.SetDirty(cm);
         }
 
-        // Team ID como read-only â€” derivado do slot
+        // Team ID como read-only — derivado do slot
         using (new EditorGUI.DisabledScope(true))
             EditorGUILayout.PropertyField(teamIdProp, new GUIContent("Team ID (resolved)"));
     }

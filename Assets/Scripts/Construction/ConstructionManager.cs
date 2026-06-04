@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.Tilemaps;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -35,10 +36,14 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField, HideInInspector] private bool hasSiteRuntimeOverride;
     [SerializeField] private int currentCapturePoints;
     [SerializeField] private bool hasInfiniteSuppliesOverride;
-    [SerializeField] private TeamId originalOwnerTeamId = TeamId.Neutral;
-    [SerializeField] private bool originalOwnerInitialized;
-    [SerializeField] private TeamId firstOwnerTeamId = TeamId.Neutral;
-    [SerializeField] private bool firstOwnerInitialized;
+    [FormerlySerializedAs("originalOwnerTeamId")]
+    [SerializeField, HideInInspector] private int originalOwnerSlotIndex = -1;
+    [FormerlySerializedAs("originalOwnerInitialized")]
+    [SerializeField, HideInInspector] private bool originalOwnerInitialized;
+    [FormerlySerializedAs("firstOwnerTeamId")]
+    [SerializeField, HideInInspector] private int firstOwnerSlotIndex = -1;
+    [FormerlySerializedAs("firstOwnerInitialized")]
+    [SerializeField, HideInInspector] private bool firstOwnerInitialized;
     [Header("Runtime Visual")]
     [SerializeField] [Range(0f, 1f)] private float occupiedByReadyUnitDarkenFactor = 0.4f;
     [SerializeField] private ConstructionHudController hudController;
@@ -105,13 +110,16 @@ public class ConstructionManager : MonoBehaviour
     public bool IsPlayerHeadQuarter => siteRuntime != null && siteRuntime.isPlayerHeadQuarter;
     public bool IsVictoryBuilding => siteRuntime != null && siteRuntime.isVictoryBuilding;
     public int CapturedIncoming => siteRuntime != null ? Mathf.Max(0, siteRuntime.capturedIncoming) : 0;
+    public ConstructionUnitMarketRule SellingRule => siteRuntime != null ? siteRuntime.sellingRule : ConstructionUnitMarketRule.Disabled;
     public IReadOnlyList<ServiceData> OfferedServices => siteRuntime != null && siteRuntime.offeredServices != null ? siteRuntime.offeredServices : System.Array.Empty<ServiceData>();
     public IReadOnlyList<UnitData> OfferedUnits => siteRuntime != null && siteRuntime.offeredUnits != null ? siteRuntime.offeredUnits : System.Array.Empty<UnitData>();
     public IReadOnlyList<ConstructionSupplyOffer> OfferedSupplies => siteRuntime != null && siteRuntime.offeredSupplies != null ? siteRuntime.offeredSupplies : System.Array.Empty<ConstructionSupplyOffer>();
-    public TeamId OriginalOwnerTeamId => originalOwnerTeamId;
+    public int OriginalOwnerSlotIndex => originalOwnerSlotIndex;
     public bool HasOriginalOwner => originalOwnerInitialized;
-    public TeamId FirstOwnerTeamId => firstOwnerTeamId;
+    public int FirstOwnerSlotIndex => firstOwnerSlotIndex;
     public bool HasFirstOwner => firstOwnerInitialized;
+    public TeamId OriginalOwnerTeamId => ResolveTeamForSlot(originalOwnerSlotIndex);
+    public TeamId FirstOwnerTeamId => ResolveTeamForSlot(firstOwnerSlotIndex);
 
     public static void ResetActiveTeamChangedPerfCounters()
     {
@@ -420,13 +428,13 @@ public class ConstructionManager : MonoBehaviour
         slotIndex = matchController != null ? matchController.GetSlotIndexForTeam(team) : (team == TeamId.Neutral ? -1 : slotIndex);
         if (!originalOwnerInitialized)
         {
-            originalOwnerTeamId = team;
+            originalOwnerSlotIndex = slotIndex;
             originalOwnerInitialized = true;
         }
 
-        if (!firstOwnerInitialized && team != TeamId.Neutral)
+        if (!firstOwnerInitialized && slotIndex >= 0)
         {
-            firstOwnerTeamId = team;
+            firstOwnerSlotIndex = slotIndex;
             firstOwnerInitialized = true;
         }
 
@@ -450,18 +458,23 @@ public class ConstructionManager : MonoBehaviour
     {
         TeamId previousTeam = teamId;
         teamId = initialTeam;
-        originalOwnerTeamId = initialTeam;
+        TryAutoAssignMatchController();
+        int initSlot = matchController != null
+            ? matchController.GetSlotIndexForTeam(initialTeam)
+            : (initialTeam == TeamId.Neutral ? -1 : slotIndex);
+        slotIndex = initSlot;
+        originalOwnerSlotIndex = initSlot;
         originalOwnerInitialized = true;
 
-        if (initialTeam == TeamId.Neutral)
+        if (initSlot >= 0)
         {
-            firstOwnerTeamId = TeamId.Neutral;
-            firstOwnerInitialized = false;
+            firstOwnerSlotIndex = initSlot;
+            firstOwnerInitialized = true;
         }
         else
         {
-            firstOwnerTeamId = initialTeam;
-            firstOwnerInitialized = true;
+            firstOwnerSlotIndex = -1;
+            firstOwnerInitialized = false;
         }
 
         if (!ApplyFromDatabase())
@@ -470,13 +483,13 @@ public class ConstructionManager : MonoBehaviour
         ThreatRevisionTracker.NotifyConstructionTeamChanged(previousTeam, teamId);
     }
 
-    public void ApplyOwnershipState(TeamId currentTeam, TeamId originalOwner, bool hasOriginalOwner, TeamId firstOwner, bool hasFirstOwner)
+    public void ApplyOwnershipState(TeamId currentTeam, int originalOwnerSlot, bool hasOriginalOwner, int firstOwnerSlot, bool hasFirstOwner)
     {
         TeamId previousTeam = teamId;
         teamId = currentTeam;
-        originalOwnerTeamId = originalOwner;
+        originalOwnerSlotIndex = originalOwnerSlot;
         originalOwnerInitialized = hasOriginalOwner;
-        firstOwnerTeamId = firstOwner;
+        firstOwnerSlotIndex = firstOwnerSlot;
         firstOwnerInitialized = hasFirstOwner;
 
         if (!ApplyFromDatabase())
@@ -775,9 +788,9 @@ public class ConstructionManager : MonoBehaviour
             case ConstructionUnitMarketRule.FreeMarket:
                 return true;
             case ConstructionUnitMarketRule.OriginalOwner:
-                return buyerTeam == originalOwnerTeamId;
+                return originalOwnerInitialized && slotIndex == originalOwnerSlotIndex;
             case ConstructionUnitMarketRule.FirstOwner:
-                return firstOwnerInitialized && buyerTeam == firstOwnerTeamId;
+                return firstOwnerInitialized && slotIndex == firstOwnerSlotIndex;
             default:
                 return false;
         }
@@ -1199,6 +1212,13 @@ public class ConstructionManager : MonoBehaviour
             hudController.gameObject.SetActive(false);
     }
 
+    private TeamId ResolveTeamForSlot(int slot)
+    {
+        if (slot < 0) return TeamId.Neutral;
+        TryAutoAssignMatchController();
+        return matchController != null ? matchController.GetTeamIdForSlot(slot) : TeamId.Neutral;
+    }
+
     private bool IsRuntimeVisible()
     {
         return !Application.isPlaying || isVisible;
@@ -1255,6 +1275,18 @@ public class ConstructionManager : MonoBehaviour
         if (teamId != resolved)
         {
             teamId = resolved;
+
+            if (!originalOwnerInitialized)
+            {
+                originalOwnerSlotIndex = slotIndex;
+                originalOwnerInitialized = true;
+            }
+
+            if (!firstOwnerInitialized && slotIndex >= 0)
+            {
+                firstOwnerSlotIndex = slotIndex;
+                firstOwnerInitialized = true;
+            }
 
             if (!ApplyFromDatabase())
                 UpdateDynamicName();

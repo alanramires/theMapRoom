@@ -136,6 +136,87 @@ public partial class AIController
         bool foundAdvance = false;
         TeamObjectivePlan repositionCapPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
         bool shouldAdvanceToAssignedEarly = fromEffectiveDist > Mathf.Max(1, maxRange + 1);
+        float moveMargin = moveMarginOverride >= 0f ? moveMarginOverride : 120f;
+
+        if (TryFindBestToolProgressionCell(
+                unit,
+                snapshot,
+                fromCell,
+                anchor,
+                paths,
+                occupied,
+                ToolProgressionIntent.FireSupportReposition,
+                out Vector3Int toolCell,
+                out ToolProgressionCandidate toolCandidate,
+                out string toolReason,
+                allowCell: cell =>
+                {
+                    if (IsCellACapturerTarget(cell, repositionCapPlan, snapshot.AITeam))
+                        return false;
+                    if (conservative && !IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
+                        return false;
+                    if (conservativeInvasion && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor))
+                        return false;
+
+                    float tacticalPressure = CalculateFireSupportTacticalPressureScore(unit, snapshot, cell, weaponPriorityData);
+                    if (requireImmediateThreat && tacticalPressure <= 0f)
+                        return false;
+
+                    float progress = fromDist - SectorManager.HexDistance(cell, anchor);
+                    float rearLine = conservative ? CalculateFireSupportRearLineScore(unit, snapshot, cell, anchor) : 0f;
+                    if (conservative && progress > 0f && tacticalPressure <= 0f && rearLine < -350f)
+                        return false;
+
+                    return true;
+                },
+                tacticalScore: (cell, candidate) =>
+                {
+                    int pathCost = GetPathStepCount(paths, cell);
+                    float localScore = ScoreFireSupportRepositionCell(
+                        unit,
+                        snapshot,
+                        cell,
+                        fromCell,
+                        anchor,
+                        fromDist,
+                        pathCost,
+                        preferMaxRange,
+                        conservative,
+                        preferBestDpq,
+                        maxRange,
+                        weaponPriorityData,
+                        out _);
+
+                    float progress = fromDist - SectorManager.HexDistance(cell, anchor);
+                    float tacticalPressure = CalculateFireSupportTacticalPressureScore(unit, snapshot, cell, weaponPriorityData);
+                    float rearLine = conservative ? CalculateFireSupportRearLineScore(unit, snapshot, cell, anchor) : 0f;
+                    float dpq = GetTerrainDpqPontos(cell);
+
+                    if (!preferMaxRange && progress < 0f)
+                        localScore -= 500f;
+                    if (preferBestDpq && dpq <= GetTerrainDpqPontos(fromCell) && pathCost <= 1)
+                        localScore -= 250f;
+
+                    return localScore
+                        + tacticalPressure * 0.35f
+                        + rearLine * 0.15f;
+                }))
+        {
+            bool toolHasProgress = toolCandidate.ToolScore > 0
+                || toolCandidate.FirstTurnProgress > 0f
+                || toolCandidate.TwoTurnProgress > 0f;
+            bool toolBeatsHold = toolCandidate.TacticalScore >= fromScore + moveMargin;
+            bool toolPressureMove = requireImmediateThreat && toolCandidate.TacticalScore > fromScore;
+
+            if (toolCell != fromCell
+                && toolHasProgress
+                && (shouldAdvanceToAssignedEarly || toolBeatsHold || toolPressureMove))
+            {
+                bestCell = toolCell;
+                reason = $"toolProgress {toolReason} hold={fromScore:F0} maxRange={maxRange}";
+                return true;
+            }
+        }
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
@@ -204,7 +285,6 @@ public partial class AIController
             }
         }
 
-        float moveMargin = moveMarginOverride >= 0f ? moveMarginOverride : 120f;
         bool enemyNearAnchor = HasNearbyVisibleEnemy(anchor, snapshot.AITeam, defenseEnemyRange + maxRange);
         bool shouldAdvanceToAssigned = fromEffectiveDist > Mathf.Max(1, maxRange + 1);
         bool canUseAdvanceFallback = !conservative;

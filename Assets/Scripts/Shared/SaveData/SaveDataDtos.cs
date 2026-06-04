@@ -197,6 +197,7 @@ public class ConstructionSaveData
     public bool isForwardObserverSpot;
     public bool isRallyPoint;
     public int teamId;
+    public int slotIndex = -1;
     public int sector;
     public int rallyTargetSlotIndex = -1;
     public List<int> rallyTargetSlotIndexes = new List<int>();
@@ -207,9 +208,9 @@ public class ConstructionSaveData
     public float worldX;
     public float worldY;
     public int currentCapturePoints;
-    public int originalOwnerTeamId;
+    public int originalOwnerSlotIndex = -1;
     public bool hasOriginalOwner;
-    public int firstOwnerTeamId;
+    public int firstOwnerSlotIndex = -1;
     public bool hasFirstOwner;
     public bool hasInfiniteSuppliesOverride;
     public ConstructionSiteRuntimeSaveData siteRuntime;

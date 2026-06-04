@@ -382,6 +382,7 @@ public static class SaveDataMapper
             isForwardObserverSpot = construction.IsForwardObserverSpot,
             isRallyPoint = construction.IsRallyPoint,
             teamId = (int)construction.TeamId,
+            slotIndex = construction.SlotIndex,
             sector = (int)construction.Sector,
             rallyTargetSlotIndex = construction.RallyTargetSlotIndex,
             rallyTargetSlotIndexes = new List<int>(construction.RallyTargetSlotIndexes),
@@ -392,9 +393,9 @@ public static class SaveDataMapper
             worldX = construction.transform.position.x,
             worldY = construction.transform.position.y,
             currentCapturePoints = construction.CurrentCapturePoints,
-            originalOwnerTeamId = (int)construction.OriginalOwnerTeamId,
+            originalOwnerSlotIndex = construction.OriginalOwnerSlotIndex,
             hasOriginalOwner = construction.HasOriginalOwner,
-            firstOwnerTeamId = (int)construction.FirstOwnerTeamId,
+            firstOwnerSlotIndex = construction.FirstOwnerSlotIndex,
             hasFirstOwner = construction.HasFirstOwner,
             hasInfiniteSuppliesOverride = construction.HasInfiniteSuppliesOverride,
             siteRuntime = BuildConstructionSiteRuntimeSaveData(construction.GetSiteRuntimeSnapshot())
@@ -421,13 +422,17 @@ public static class SaveDataMapper
             manager.SetRallyTargetSlotIndex(saved.rallyTargetSlotIndex);
         manager.SetAnchorSector(saved.isAnchorSector);
         manager.SetAnchorSectorSlotIndex(saved.anchorSectorSlotIndex);
+        if (saved.slotIndex >= 0)
+            manager.SetSlotIndex(saved.slotIndex);
+        else
+            manager.SetTeamId((TeamId)saved.teamId);
         manager.SetSector(System.Enum.IsDefined(typeof(ConstructionSector), saved.sector) ? (ConstructionSector)saved.sector : manager.Sector);
         manager.SetCurrentCellPosition(new Vector3Int(saved.cellX, saved.cellY, 0));
         manager.ApplyOwnershipState(
             (TeamId)saved.teamId,
-            (TeamId)saved.originalOwnerTeamId,
+            saved.originalOwnerSlotIndex,
             saved.hasOriginalOwner,
-            (TeamId)saved.firstOwnerTeamId,
+            saved.firstOwnerSlotIndex,
             saved.hasFirstOwner);
 
         ConstructionSiteRuntime runtime = siteRuntimeResolver != null

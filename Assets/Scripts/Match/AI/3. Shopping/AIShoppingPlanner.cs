@@ -677,15 +677,22 @@ public partial class AIShoppingPlanner : MonoBehaviour
         {
             if (b == null) continue;
             bool offersLand = false, offersAir = false;
+            int offeredCount = 0;
             if (b.OfferedUnits != null)
                 foreach (UnitData u in b.OfferedUnits)
                 {
                     if (u == null) continue;
+                    offeredCount++;
                     if (u.domain == Domain.Land) offersLand = true;
                     else if (u.domain == Domain.Air) offersAir = true;
                 }
             if (offersLand) landBuildings.Add(b);
             else if (offersAir) airBuildings.Add(b);
+            else
+            {
+                Vector3Int cell = b.CurrentCellPosition; cell.z = 0;
+                Debug.Log($"[AI Shopping] produtor ignorado {b.ConstructionDisplayName}#{b.InstanceId} id={b.ConstructionId} @ {cell} team={b.TeamId} selling={b.SellingRule} offers={offeredCount} land={offersLand} air={offersAir}");
+            }
         }
 
         if (airBuildings.Count > 0)
