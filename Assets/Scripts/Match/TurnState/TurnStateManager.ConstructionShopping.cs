@@ -152,6 +152,13 @@ public partial class TurnStateManager
 
         Vector3Int spawnCell = shoppingConstruction.CurrentCellPosition;
         spawnCell.z = 0;
+        if (IsShoppingSpawnCellBlocked(shoppingConstruction, unit, spawnCell, spawnTeam, out string blockedReason))
+        {
+            PushPanelUnitMessage(blockedReason, 2.8f);
+            cursorController?.PlayErrorSfx();
+            Debug.LogWarning($"[Shopping] Compra bloqueada em {spawnCell}: {blockedReason}");
+            return false;
+        }
 
         GameObject spawned = unitSpawner.SpawnAtCell(unit, spawnTeam, spawnCell);
         if (spawned == null)
@@ -315,6 +322,13 @@ public partial class TurnStateManager
 
         Vector3Int spawnCell = construction.CurrentCellPosition;
         spawnCell.z = 0;
+        if (IsShoppingSpawnCellBlocked(construction, unit, spawnCell, team, out string blockedReason))
+        {
+            if (enableTurnStateRuntimeLogs)
+                Debug.Log($"[AI][Shopping] Compra bloqueada em {spawnCell}: {blockedReason}");
+            return false;
+        }
+
         int economyBefore = matchController != null ? matchController.GetActualMoney(team) : 0;
 
         GameObject spawned = unitSpawner.SpawnAtCell(unit, team, spawnCell);
@@ -344,6 +358,90 @@ public partial class TurnStateManager
 
         OnUnitPurchased?.Invoke(spawnedManager);
         return true;
+    }
+
+    private bool IsShoppingSpawnCellBlocked(
+        ConstructionManager construction,
+        UnitData unit,
+        Vector3Int spawnCell,
+        TeamId spawnTeam,
+        out string reason)
+    {
+        reason = "";
+        if (construction == null || unit == null)
+            return false;
+
+        spawnCell.z = 0;
+        HeightBand spawnBand = ResolveShoppingSpawnHeightBand(unit, spawnCell);
+        if (spawnBand != HeightBand.Blocking)
+            return false;
+
+        foreach (UnitManager occupant in UnitManager.AllActive)
+        {
+            if (occupant == null || occupant.IsDead || occupant.IsEmbarked)
+                continue;
+
+            Vector3Int occupantCell = occupant.CurrentCellPosition;
+            occupantCell.z = 0;
+            if (occupantCell != spawnCell)
+                continue;
+            if (OccupancyResolver.GetHeightBand(occupant) != HeightBand.Blocking)
+                continue;
+
+            bool enemy = occupant.TeamId != spawnTeam;
+            reason = enemy
+                ? "Predio ocupado por oponente, compra bloqueada."
+                : "Predio ocupado por unidade aliada, compra bloqueada.";
+            return true;
+        }
+
+        return false;
+    }
+
+    private HeightBand ResolveShoppingSpawnHeightBand(UnitData unit, Vector3Int spawnCell)
+    {
+        if (unit == null)
+            return HeightBand.Blocking;
+
+        Domain spawnDomain = unit.domain;
+        HeightLevel spawnHeight = unit.heightLevel;
+        Tilemap boardMap = terrainTilemap;
+        if (boardMap != null
+            && TryResolveForcedEndMovementTargetForCell(
+                boardMap,
+                terrainDatabase,
+                spawnCell,
+                spawnDomain,
+                spawnHeight,
+                out Domain forcedDomain,
+                out HeightLevel forcedHeight,
+                out _)
+            && UnitDataSupportsLayerMode(unit, forcedDomain, forcedHeight))
+        {
+            spawnDomain = forcedDomain;
+            spawnHeight = forcedHeight;
+        }
+
+        return OccupancyResolver.GetHeightBand(spawnDomain, spawnHeight);
+    }
+
+    private static bool UnitDataSupportsLayerMode(UnitData unit, Domain domain, HeightLevel height)
+    {
+        if (unit == null)
+            return false;
+        if (unit.domain == domain && unit.heightLevel == height)
+            return true;
+        if (unit.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0; i < unit.aditionalDomainsAllowed.Count; i++)
+        {
+            UnitLayerMode mode = unit.aditionalDomainsAllowed[i];
+            if (mode.domain == domain && mode.heightLevel == height)
+                return true;
+        }
+
+        return false;
     }
     private bool TryResolveShoppingCursorMove(Vector3Int currentCell, Vector3Int inputDelta)
     {
