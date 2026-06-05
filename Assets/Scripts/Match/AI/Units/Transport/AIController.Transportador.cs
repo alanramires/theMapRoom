@@ -78,6 +78,52 @@ public partial class AIController
         return bldg != null && bldg.TeamId != aiTeam;
     }
 
+    private float ScoreTransportTrafficPenalty(UnitManager unit, Vector3Int cell, Vector3Int targetCell, TeamId aiTeam)
+    {
+        if (unit == null)
+            return 0f;
+
+        cell.z = 0;
+        targetCell.z = 0;
+        float cellDistToTarget = SectorManager.HexDistance(cell, targetCell);
+        HeightBand moverBand = OccupancyResolver.GetHeightBand(unit);
+        float penalty = 0f;
+
+        foreach (UnitManager ally in UnitManager.AllActive)
+        {
+            if (ally == null || ally == unit || ally.TeamId != aiTeam || ally.IsDead || ally.IsEmbarked)
+                continue;
+
+            ally.SyncLayerStateFromData(forceNativeDefault: false);
+            if (OccupancyResolver.GetHeightBand(ally) != moverBand)
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            float allyDistFromCandidate = SectorManager.HexDistance(cell, allyCell);
+            float allyDistToTarget = SectorManager.HexDistance(allyCell, targetCell);
+            bool allyAhead = allyDistToTarget < cellDistToTarget + 0.1f;
+            float lineDeviation = DistanceFromHexLine(allyCell, cell, targetCell);
+
+            if (allyDistFromCandidate <= 1.5f)
+            {
+                penalty += 1800f;
+                continue;
+            }
+
+            if (allyAhead && lineDeviation <= 1.25f)
+            {
+                penalty += 1500f;
+                continue;
+            }
+
+            if (allyAhead && allyDistFromCandidate <= 3f && lineDeviation <= 2.25f)
+                penalty += 800f;
+        }
+
+        return penalty;
+    }
+
     // Max-displacement move: minimises real MP cost to target (unit-aware terrain costs),
     // prefers cells without non-team constructions, uses threat as tiebreaker.
     private Vector3Int FindTransportMove(
@@ -129,7 +175,9 @@ public partial class AIController
                 {
                     float threat = CalculateThreatLevel(cell, aiTeam);
                     bool isNonTeamBldg = IsNonTeamConstruction(cell, aiTeam);
+                    float trafficPenalty = ScoreTransportTrafficPenalty(unit, cell, pressureTarget, aiTeam);
                     return -threat * 0.5f
+                        - trafficPenalty
                         - (isNonTeamBldg ? 300f : 0f);
                 }))
         {
@@ -138,7 +186,7 @@ public partial class AIController
                 || toolTransportCandidate.TwoTurnProgress > 0f;
             if (hasToolProgress)
             {
-                Debug.Log($"{TL("Progressao2")} transporte {unit.InstanceId} alvo={pressureTarget} tool escolheu {toolTransportCell} {toolTransportReason}");
+                Debug.Log($"{TL("Progressao2")} transporte {unit.InstanceId} alvo={pressureTarget} via {toolTransportCell} (progressao {toolTransportReason})");
                 return toolTransportCell;
             }
         }
@@ -157,6 +205,7 @@ public partial class AIController
             if (TryScoreTwoTurnProgression(unit, fromCell, pressureTarget, cell, paths[cell], occupied, out float horizonScore, out _, costFromOrigin))
             {
                 horizonScore -= threat * 0.5f;
+                horizonScore -= ScoreTransportTrafficPenalty(unit, cell, pressureTarget, aiTeam);
                 horizonScore -= isNonTeamBldg ? 300f : 0f;
                 if (horizonScore > bestHorizonScore)
                 {
@@ -189,12 +238,15 @@ public partial class AIController
 
         if (foundHorizonMove && bestHorizonScore > 0f)
         {
-            Debug.Log($"{TL("Progressao2")} transporte {unit.InstanceId} alvo={pressureTarget} escolheu {bestHorizonCell} score={bestHorizonScore:F0}");
+            Debug.Log($"{TL("Progressao2")} transporte {unit.InstanceId} alvo={pressureTarget} via {bestHorizonCell} (heuristica score={bestHorizonScore:F0})");
             return bestHorizonCell;
         }
 
         if (foundReachableRoute && (bestCell != fromCell || foundImprovingMove))
+        {
+            Debug.Log($"{TL("Progressao2")} transporte {unit.InstanceId} alvo={pressureTarget} via {bestCell} (heuristica dist={bestDist:F0})");
             return bestCell;
+        }
 
         return FindTransportExplorationMove(unit, fromCell, pressureTarget, paths, occupied, aiTeam);
     }

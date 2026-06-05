@@ -18,12 +18,15 @@ public partial class AIController
     {
         bestCell = fromCell;
         reason = "";
-        if (paths == null || paths.Count == 0 || snapshot == null || snapshot.MyBuildings == null)
+        if (paths == null || paths.Count == 0 || snapshot == null)
             return false;
 
         ConstructionManager target = FindSafeLogisticsReloadConstruction(snapshot, fromCell);
         if (target == null)
+        {
+            reason = "sem construcao aliada para restock";
             return false;
+        }
 
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
@@ -70,6 +73,8 @@ public partial class AIController
         }
 
         float bestScore = float.MinValue;
+        Vector3Int bestFallbackMove = fromCell;
+        float bestFallbackScore = float.MinValue;
         foreach (Vector3Int rawCell in paths.Keys)
         {
             Vector3Int cell = rawCell;
@@ -90,6 +95,12 @@ public partial class AIController
             if (cell == targetCell)
                 score += 4000f;
 
+            if (cell != fromCell && score > bestFallbackScore)
+            {
+                bestFallbackScore = score;
+                bestFallbackMove = cell;
+            }
+
             if (score > bestScore)
             {
                 bestScore = score;
@@ -98,7 +109,15 @@ public partial class AIController
         }
 
         if (bestCell == fromCell && fromDist > 0f)
+        {
+            if (bestFallbackMove != fromCell)
+            {
+                bestCell = bestFallbackMove;
+                reason = $"dest={targetCell} fallbackMove dist={SectorManager.HexDistance(bestCell, targetCell):F1} score={bestFallbackScore:F0}";
+                return true;
+            }
             return false;
+        }
 
         reason = $"dest={targetCell} dist={SectorManager.HexDistance(bestCell, targetCell):F1} score={bestScore:F0}";
         return true;
@@ -108,23 +127,42 @@ public partial class AIController
     {
         ConstructionManager best = null;
         float bestScore = float.MinValue;
-        for (int i = 0; i < snapshot.MyBuildings.Count; i++)
+        ConstructionManager fallbackHome = null;
+        float fallbackHomeScore = float.MinValue;
+        for (int i = 0; i < ConstructionManager.AllActive.Count; i++)
         {
-            ConstructionManager building = snapshot.MyBuildings[i];
+            ConstructionManager building = ConstructionManager.AllActive[i];
             if (building == null || building.TeamId != snapshot.AITeam)
                 continue;
             if (building.CurrentCapturePoints < building.CapturePointsMax)
-                continue;
-            if (!IsLogisticsReloadConstruction(building))
                 continue;
 
             Vector3Int cell = building.CurrentCellPosition;
             cell.z = 0;
             float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+            bool home = IsLogisticsHomeConstruction(building, snapshot.AITeam);
+            if (home)
+            {
+                float homeScore = -threat * 1000f
+                    - SectorManager.HexDistance(fromCell, cell) * 65f
+                    + (building.IsPlayerHeadQuarter ? 1000f : 500f)
+                    + (building.CanProduceUnitsForTeam(snapshot.AITeam) ? 200f : 0f);
+
+                if (homeScore > fallbackHomeScore)
+                {
+                    fallbackHomeScore = homeScore;
+                    fallbackHome = building;
+                }
+            }
+
             if (threat > 0f)
+                continue;
+            if (!home && !IsRepairConstructionSectorSafe(building, snapshot.AITeam))
                 continue;
 
             float score = -SectorManager.HexDistance(fromCell, cell) * 100f
+                + (IsLogisticsReloadConstruction(building) ? 300f : 0f)
+                + (home ? 150f : 0f)
                 + (building.IsPlayerHeadQuarter ? 250f : 0f)
                 + (building.CanProduceUnitsForTeam(snapshot.AITeam) ? 100f : 0f);
 
@@ -135,7 +173,14 @@ public partial class AIController
             }
         }
 
-        return best;
+        return best != null ? best : fallbackHome;
+    }
+
+    private static bool IsLogisticsHomeConstruction(ConstructionManager construction, TeamId aiTeam)
+    {
+        return construction != null
+            && construction.TeamId == aiTeam
+            && (construction.IsPlayerHeadQuarter || ConstructionSectorHelper.IsBase(construction.Sector));
     }
 
     private bool TryFindLogisticsRepositionCell(

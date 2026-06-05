@@ -6,6 +6,35 @@ using UnityEngine.Tilemaps;
 
 public class CaminhosValidosWindow : EditorWindow
 {
+    private enum ProgressDebugIntent
+    {
+        Bruto,
+        CaptureAdvance,
+        AssaultPressure,
+        FireSupportReposition,
+        FireSupportRendezvous,
+        LogisticsService,
+        LogisticsReload,
+        RepairReturn,
+        TransportDelivery,
+        TransportRendezvous,
+        ObserverSpot
+    }
+
+    private struct ProgressDebugCandidate
+    {
+        public int ToolScore;
+        public float NextDistance;
+        public int MoveCost;
+        public bool RoadBonus;
+        public float FirstTurnProgress;
+        public float TwoTurnProgress;
+        public float LineDeviation;
+        public float Threat;
+        public float Dpq;
+        public float FinalScore;
+    }
+
     [SerializeField] private UnitData unitData;
     [SerializeField] private UnitDatabase unitDatabase;
     [SerializeField] private Tilemap tilemap;
@@ -17,6 +46,8 @@ public class CaminhosValidosWindow : EditorWindow
     [SerializeField] private Vector3Int destinationHex;
     [SerializeField] private Vector3Int waypointHex;
     [SerializeField] private int progressHorizonTurns = 2;
+    [SerializeField] private ProgressDebugIntent progressIntent = ProgressDebugIntent.TransportDelivery;
+    [SerializeField] private bool progressIntentInitialized;
 
     [SerializeField] private TeamId simulationTeam = TeamId.Green;
 
@@ -45,6 +76,7 @@ public class CaminhosValidosWindow : EditorWindow
 
     // Progressão de Rota
     private Dictionary<Vector3Int, int> progressMap;
+    private Dictionary<Vector3Int, ProgressDebugCandidate> progressCandidateMap;
     private bool hasProgressResult;
     private Vector3Int lastProgressOrigin;
     private Vector3Int lastProgressDest;
@@ -66,6 +98,12 @@ public class CaminhosValidosWindow : EditorWindow
 
     private void OnEnable()
     {
+        if (!progressIntentInitialized)
+        {
+            progressIntent = ProgressDebugIntent.TransportDelivery;
+            progressIntentInitialized = true;
+        }
+
         SceneView.duringSceneGui += OnSceneGUI;
         AutoDetectContext();
     }
@@ -244,6 +282,10 @@ public class CaminhosValidosWindow : EditorWindow
         EditorGUILayout.LabelField("  Verde = aproxima do destino | Vermelho = afasta | Amarelo = neutro", EditorStyles.miniLabel);
         EditorGUILayout.LabelField("  Usa Origem A (amarelo) e Destino B (ciano) definidos acima.", EditorStyles.miniLabel);
         progressHorizonTurns = EditorGUILayout.IntSlider("Horizonte", progressHorizonTurns, 1, 2);
+        progressIntent = (ProgressDebugIntent)EditorGUILayout.EnumPopup("Intent runtime", progressIntent);
+        EditorGUILayout.LabelField(progressIntent == ProgressDebugIntent.Bruto
+            ? "  Exibe toolScore bruto da progressao em dois turnos."
+            : "  Exibe FinalScore/1000 com a formula runtime do intent selecionado.", EditorStyles.miniLabel);
 
         EditorGUI.BeginDisabledGroup(!HasValidUnit());
         if (GUILayout.Button("Calcular Progressão", GUILayout.Height(26)))
@@ -335,6 +377,7 @@ public class CaminhosValidosWindow : EditorWindow
         distanceCostMap = null;
         hasProgressResult = false;
         progressMap = null;
+        progressCandidateMap = null;
         hasWaypointResult = false;
         statusMessage = string.Empty;
 
@@ -361,6 +404,7 @@ public class CaminhosValidosWindow : EditorWindow
         reachableCells = null;
         hasProgressResult = false;
         progressMap = null;
+        progressCandidateMap = null;
         hasWaypointResult = false;
         statusMessage = string.Empty;
 
@@ -384,6 +428,7 @@ public class CaminhosValidosWindow : EditorWindow
     {
         hasProgressResult = false;
         progressMap = null;
+        progressCandidateMap = null;
         reachableCells = null;
         hasDistResult = false;
         distanceCostMap = null;
@@ -413,15 +458,33 @@ public class CaminhosValidosWindow : EditorWindow
             lastProgressDest   = dest;
 
             progressMap = new Dictionary<Vector3Int, int>();
+            progressCandidateMap = new Dictionary<Vector3Int, ProgressDebugCandidate>();
             var debugStopOrigin = origin;
             int horizon = Mathf.Clamp(progressHorizonTurns, 1, 2);
             foreach (Vector3Int cell in paths.Keys)
             {
                 if (!CanUseAsDebugStopCell(unit, cell, debugStopOrigin)) continue;
                 if (alliedOccupied.Contains(cell)) continue; // não pode parar aqui
-                progressMap[cell] = horizon <= 1
-                    ? CalculateReachableProgressScore(origin, dest, cell, paths[cell])
-                    : CalculateTwoTurnProgressScore(unit, origin, dest, cell, paths[cell], costMap);
+                ProgressDebugCandidate candidate;
+                int rawScore;
+                if (horizon <= 1)
+                {
+                    rawScore = CalculateReachableProgressScore(origin, dest, cell, paths[cell]);
+                    candidate = BuildOneTurnProgressCandidate(unit, origin, dest, cell, paths[cell], costMap);
+                }
+                else
+                {
+                    rawScore = CalculateTwoTurnProgressScore(unit, origin, dest, cell, paths[cell], costMap, out candidate);
+                }
+
+                candidate.FinalScore = progressIntent == ProgressDebugIntent.Bruto
+                    ? rawScore
+                    : ScoreProgressIntent(progressIntent, candidate);
+
+                progressCandidateMap[cell] = candidate;
+                progressMap[cell] = progressIntent == ProgressDebugIntent.Bruto
+                    ? rawScore
+                    : Mathf.RoundToInt(candidate.FinalScore / 1000f);
             }
 
             hasProgressResult = true;
@@ -439,6 +502,7 @@ public class CaminhosValidosWindow : EditorWindow
         distanceCostMap = null;
         hasProgressResult = false;
         progressMap = null;
+        progressCandidateMap = null;
         statusMessage = string.Empty;
 
         Vector3Int origin  = originHex;      origin.z = 0;
@@ -481,6 +545,7 @@ public class CaminhosValidosWindow : EditorWindow
         distanceCostMap = null;
         hasProgressResult = false;
         progressMap = null;
+        progressCandidateMap = null;
         hasWaypointResult = false;
         waypointCostFromDest = null;
         waypointReachable = null;
@@ -704,7 +769,8 @@ public class CaminhosValidosWindow : EditorWindow
         Vector3Int dest,
         Vector3Int firstStop,
         IReadOnlyList<Vector3Int> firstPath,
-        Dictionary<Vector3Int, int> costMap = null)
+        Dictionary<Vector3Int, int> costMap,
+        out ProgressDebugCandidate candidate)
     {
         float originDistance = SectorManager.HexDistance(origin, dest);
         float bestDistanceAfterNextMove = SectorManager.HexDistance(firstStop, dest);
@@ -713,20 +779,25 @@ public class CaminhosValidosWindow : EditorWindow
             ? c
             : (firstPath != null ? Mathf.Max(0, firstPath.Count - 1) : 0);
 
-        tempUnit.SetCurrentCellPosition(firstStop, enforceFinalOccupancyRule: false);
-        var nextPaths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, tempUnit, movementPoints, terrainDatabase);
-        int goodSecondOptions = 0;
-        float firstStopDistToDest = SectorManager.HexDistance(firstStop, dest);
-        foreach (Vector3Int nextStop in nextPaths.Keys)
+        Vector3Int originalCell = tempUnit.CurrentCellPosition;
+        originalCell.z = 0;
+        try
         {
-            if (!CanUseAsDebugStopCell(tempUnit, nextStop, firstStop))
-                continue;
+            tempUnit.SetCurrentCellPosition(firstStop, enforceFinalOccupancyRule: false);
+            var nextPaths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, tempUnit, movementPoints, terrainDatabase);
+            foreach (Vector3Int nextStop in nextPaths.Keys)
+            {
+                if (!CanUseAsDebugStopCell(tempUnit, nextStop, firstStop))
+                    continue;
 
-            float nextDistance = SectorManager.HexDistance(nextStop, dest);
-            if (nextDistance < bestDistanceAfterNextMove)
-                bestDistanceAfterNextMove = nextDistance;
-            if (nextDistance < firstStopDistToDest)
-                goodSecondOptions++;
+                float nextDistance = SectorManager.HexDistance(nextStop, dest);
+                if (nextDistance < bestDistanceAfterNextMove)
+                    bestDistanceAfterNextMove = nextDistance;
+            }
+        }
+        finally
+        {
+            tempUnit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
         }
 
         float twoTurnProgress = originDistance - bestDistanceAfterNextMove;
@@ -739,8 +810,20 @@ public class CaminhosValidosWindow : EditorWindow
             twoTurnProgress * 10f
             + firstTurnProgress * 2f
             - lineDeviation * 2f
-            - firstMoveCost * 0.5f
-            + goodSecondOptions * 0.4f;
+            - firstMoveCost * 0.5f;
+
+        candidate = BuildProgressCandidate(
+            tempUnit,
+            origin,
+            dest,
+            firstStop,
+            firstPath,
+            Mathf.RoundToInt(score),
+            bestDistanceAfterNextMove,
+            firstMoveCost,
+            firstTurnProgress,
+            twoTurnProgress,
+            lineDeviation);
 
         return Mathf.RoundToInt(score);
     }
@@ -763,6 +846,169 @@ public class CaminhosValidosWindow : EditorWindow
             - pathSteps * 0.5f;
 
         return Mathf.RoundToInt(score);
+    }
+
+    private ProgressDebugCandidate BuildOneTurnProgressCandidate(
+        UnitManager tempUnit,
+        Vector3Int origin,
+        Vector3Int dest,
+        Vector3Int cell,
+        IReadOnlyList<Vector3Int> path,
+        Dictionary<Vector3Int, int> costMap)
+    {
+        float originDistance = SectorManager.HexDistance(origin, dest);
+        float firstTurnProgress = originDistance - SectorManager.HexDistance(cell, dest);
+        float lineDeviation = DistanceFromHexLine(cell, origin, dest);
+        int moveCost = costMap != null && costMap.TryGetValue(cell, out int c)
+            ? c
+            : (path != null ? Mathf.Max(0, path.Count - 1) : 0);
+        float rawScore = firstTurnProgress * 10f - lineDeviation * 3f - moveCost * 0.5f;
+
+        return BuildProgressCandidate(
+            tempUnit,
+            origin,
+            dest,
+            cell,
+            path,
+            Mathf.RoundToInt(rawScore),
+            SectorManager.HexDistance(cell, dest),
+            moveCost,
+            firstTurnProgress,
+            firstTurnProgress,
+            lineDeviation);
+    }
+
+    private ProgressDebugCandidate BuildProgressCandidate(
+        UnitManager tempUnit,
+        Vector3Int origin,
+        Vector3Int dest,
+        Vector3Int cell,
+        IReadOnlyList<Vector3Int> path,
+        int toolScore,
+        float nextDistance,
+        int moveCost,
+        float firstTurnProgress,
+        float twoTurnProgress,
+        float lineDeviation)
+    {
+        bool roadBonus = path != null
+            && UnitMovementPathRules.DidUseRoadFullMoveBonus(tilemap, tempUnit, path, terrainDatabase);
+
+        return new ProgressDebugCandidate
+        {
+            ToolScore = toolScore,
+            NextDistance = nextDistance,
+            MoveCost = moveCost,
+            RoadBonus = roadBonus,
+            FirstTurnProgress = firstTurnProgress,
+            TwoTurnProgress = twoTurnProgress,
+            LineDeviation = lineDeviation,
+            Threat = CalculateDebugThreatLevel(cell, ActiveTeam()),
+            Dpq = GetDebugTerrainDpqPontos(cell)
+        };
+    }
+
+    private static float ScoreProgressIntent(ProgressDebugIntent intent, ProgressDebugCandidate candidate)
+    {
+        float score = candidate.ToolScore * 1000f
+            + candidate.TwoTurnProgress * 220f
+            + Mathf.Max(0f, candidate.FirstTurnProgress) * 90f
+            - candidate.LineDeviation * 80f
+            - candidate.MoveCost * 18f
+            + (candidate.RoadBonus ? 650f : 0f);
+
+        switch (intent)
+        {
+            case ProgressDebugIntent.FireSupportReposition:
+            case ProgressDebugIntent.FireSupportRendezvous:
+                score += candidate.Dpq * 35f;
+                score -= candidate.Threat * 80f;
+                break;
+            case ProgressDebugIntent.LogisticsService:
+            case ProgressDebugIntent.LogisticsReload:
+                score += candidate.Dpq * 30f;
+                score -= candidate.Threat * 120f;
+                break;
+            case ProgressDebugIntent.RepairReturn:
+                score -= candidate.Threat * 60f;
+                break;
+            case ProgressDebugIntent.TransportDelivery:
+            case ProgressDebugIntent.TransportRendezvous:
+                score -= candidate.Threat * 50f;
+                break;
+            case ProgressDebugIntent.ObserverSpot:
+                score += candidate.Dpq * 45f;
+                score -= candidate.Threat * 90f;
+                break;
+            case ProgressDebugIntent.AssaultPressure:
+            case ProgressDebugIntent.CaptureAdvance:
+            default:
+                score += candidate.Dpq * 20f;
+                score -= candidate.Threat * 35f;
+                break;
+        }
+
+        return score;
+    }
+
+    private float CalculateDebugThreatLevel(Vector3Int cell, TeamId aiTeam)
+    {
+        const int threatRadius = 3;
+        float threat = 0f;
+        cell.z = 0;
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy == null || enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked)
+                continue;
+
+            Vector3Int ec = enemy.CurrentCellPosition;
+            ec.z = 0;
+            float dist = SectorManager.HexDistance(cell, ec);
+            if (dist <= threatRadius)
+                threat += (threatRadius - dist + 1f) * 10f;
+        }
+
+        return threat;
+    }
+
+    private float GetDebugTerrainDpqPontos(Vector3Int cell)
+    {
+        if (tilemap == null || terrainDatabase == null)
+            return 0f;
+
+        cell.z = 0;
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(tilemap, cell);
+        if (construction != null
+            && construction.TryResolveConstructionData(out ConstructionData constructionData)
+            && constructionData != null
+            && constructionData.dpqData != null)
+            return constructionData.dpqData.Pontos;
+
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(tilemap, cell);
+        if (structure != null && structure.dpqData != null)
+            return structure.dpqData.Pontos;
+
+        TileBase tile = tilemap.GetTile(cell);
+        if (tile != null && terrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData data) && data?.dpqData != null)
+            return data.dpqData.Pontos;
+
+        GridLayout grid = tilemap.layoutGrid;
+        if (grid != null)
+        {
+            Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
+            for (int i = 0; i < maps.Length; i++)
+            {
+                Tilemap map = maps[i];
+                if (map == null || map == tilemap)
+                    continue;
+
+                TileBase other = map.GetTile(cell);
+                if (other != null && terrainDatabase.TryGetByPaletteTile(other, out TerrainTypeData otherData) && otherData?.dpqData != null)
+                    return otherData.dpqData.Pontos;
+            }
+        }
+
+        return 0f;
     }
 
     private static string FormatRouteScore(int score)

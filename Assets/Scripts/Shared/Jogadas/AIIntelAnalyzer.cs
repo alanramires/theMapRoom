@@ -199,6 +199,7 @@ public class AIIntelAnalyzer : MonoBehaviour
         result.numericalPressure = result.enemyKnownUnits - result.friendlyKnownUnits;
 
         result.sectors.AddRange(sectorsByName.Values);
+        ComputeStalemateSignals(result);
         result.sectors.Sort((a, b) => b.hotScore.CompareTo(a.hotScore));
 
         foreach (AIUnitIntel unit in unitsByUid.Values)
@@ -251,7 +252,12 @@ public class AIIntelAnalyzer : MonoBehaviour
         }
         else if (string.Equals(action, "Capturar", StringComparison.OrdinalIgnoreCase))
         {
-            if (enemy)
+            if (friendly)
+            {
+                sector.friendlyCapturePressure += 3f * weight;
+                result.friendlyCapturePressure += 3f * weight;
+            }
+            else if (enemy)
             {
                 sector.capturePressure += 3f * weight;
                 result.capturePressure += 3f * weight;
@@ -306,6 +312,57 @@ public class AIIntelAnalyzer : MonoBehaviour
         }
 
         sector.hotScore = sector.enemyActivity + sector.damageTaken + sector.capturePressure + sector.landingPressure + sector.enemyPresence;
+    }
+
+    private static void ComputeStalemateSignals(AIIntelReport result)
+    {
+        if (result == null || result.sectors == null)
+            return;
+
+        result.stalemateScore = 0f;
+        result.stalemateElitePressure = 0f;
+        result.stalemateSectorCount = 0;
+        result.topStalemateSector = string.Empty;
+
+        float bestSectorScore = 0f;
+        string bestSector = string.Empty;
+
+        for (int i = 0; i < result.sectors.Count; i++)
+        {
+            AISectorIntel sector = result.sectors[i];
+            if (sector == null)
+                continue;
+
+            float contestedActivity = Mathf.Min(sector.friendlyActivity, sector.enemyActivity);
+            float contestedDamage = Mathf.Min(sector.damageDealt, sector.damageTaken);
+            float captureBackAndForth = Mathf.Min(sector.friendlyCapturePressure, sector.capturePressure);
+            float actionBalance = 1f / (1f + Mathf.Abs(sector.friendlyActivity - sector.enemyActivity));
+
+            sector.stalemateScore =
+                contestedActivity * 0.8f
+                + contestedDamage * 1.25f
+                + captureBackAndForth * 2.25f
+                + actionBalance * Mathf.Min(sector.totalActivity, 4f) * 0.35f;
+
+            if (sector.stalemateScore >= 3f)
+                result.stalemateSectorCount++;
+
+            if (sector.stalemateScore > bestSectorScore)
+            {
+                bestSectorScore = sector.stalemateScore;
+                bestSector = sector.sector;
+            }
+        }
+
+        result.stalemateScore = bestSectorScore;
+        result.topStalemateSector = bestSector;
+
+        bool activeWar = result.friendlyActions + result.enemyActions >= Mathf.Max(4, result.lookbackTurns);
+        bool lowCaptureDelta = Mathf.Abs(result.capturePressure - result.friendlyCapturePressure) <= 2.5f;
+        bool balancedLosses = Mathf.Abs(result.enemyDestroyedRecent - result.friendlyDestroyedRecent) <= 1;
+
+        if (activeWar && bestSectorScore >= 3f && (lowCaptureDelta || balancedLosses))
+            result.stalemateElitePressure = Mathf.Clamp(bestSectorScore, 0f, 10f);
     }
 
     private static void AppendLiveCounts(AIIntelReport result, TeamId aiTeam)
@@ -572,8 +629,13 @@ public class AIIntelReport
     [Header("Threat Scores")]
     public float damageTakenScore;
     public float damageDealtScore;
+    public float friendlyCapturePressure;
     public float capturePressure;
     public float landingPressure;
+    public float stalemateScore;
+    public float stalemateElitePressure;
+    public int stalemateSectorCount;
+    public string topStalemateSector;
     public float enemyElitePurchaseScore;
     public float enemyAirThreatScore;
     public float enemyArmorThreatScore;
@@ -604,6 +666,7 @@ public class AIIntelReport
         sb.AppendLine($"Forca conhecida: aliado={friendlyKnownUnits} inimigo={enemyKnownUnits} pressaoNumerica={numericalPressure:0.0}");
         sb.AppendLine($"Reforcos recentes: aliado={friendlyPurchasesRecent} inimigo={enemyPurchasesRecent}");
         sb.AppendLine($"Pressao operacional: danoTomado={damageTakenScore:0.0} danoCausado={damageDealtScore:0.0} capturaInimiga={capturePressure:0.0} desembarqueInimigo={landingPressure:0.0}");
+        sb.AppendLine($"Stalemate: score={stalemateScore:0.0} elitePressure={stalemateElitePressure:0.0} setores={stalemateSectorCount} top={(!string.IsNullOrWhiteSpace(topStalemateSector) ? topStalemateSector : "-")}");
         sb.AppendLine($"Compras inimigas: elite={enemyElitePurchaseScore:0.0} ar={enemyAirThreatScore:0.0} blindado={enemyArmorThreatScore:0.0} artilharia={enemyArtilleryThreatScore:0.0} infantaria={enemyInfantryPressureScore:0.0}");
         sb.AppendLine($"Forca inimiga: inf={enemyInfantryForce:0.0} arm={enemyArmorForce:0.0} ar={enemyAirForce:0.0} nav={enemyNavalForce:0.0}");
 
@@ -615,7 +678,7 @@ public class AIIntelReport
             {
                 AISectorIntel s = sectors[i];
                 string zone = ResolveSectorZoneLabel(aiTeam, s.sector);
-                sb.AppendLine($"- {s.sector}: zone={zone} hot={s.hotScore:0.0} atividadeInimiga={s.enemyActivity:0.0} presencaInferida={s.enemyPresence:0.0} dano={s.damageTaken:0.0} captura={s.capturePressure:0.0} landing={s.landingPressure:0.0}");
+                sb.AppendLine($"- {s.sector}: zone={zone} hot={s.hotScore:0.0} stalemate={s.stalemateScore:0.0} atividade={s.friendlyActivity:0.0}/{s.enemyActivity:0.0} presencaInferida={s.enemyPresence:0.0} dano={s.damageDealt:0.0}/{s.damageTaken:0.0} captura={s.friendlyCapturePressure:0.0}/{s.capturePressure:0.0} landing={s.landingPressure:0.0}");
             }
         }
 
@@ -669,8 +732,10 @@ public class AISectorIntel
     public float enemyPresence;
     public float damageTaken;
     public float damageDealt;
+    public float friendlyCapturePressure;
     public float capturePressure;
     public float landingPressure;
+    public float stalemateScore;
 }
 
 [Serializable]

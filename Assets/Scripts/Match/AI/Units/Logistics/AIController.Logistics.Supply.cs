@@ -113,6 +113,72 @@ public partial class AIController
         return true;
     }
 
+    private bool TryBuildLogisticsTransferReceiveActionAtCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int transferCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        out PlayerAction action,
+        out string reason)
+    {
+        action = null;
+        reason = "";
+        if (unit == null)
+            return false;
+
+        Vector3Int originalCell = unit.CurrentCellPosition;
+        originalCell.z = 0;
+        transferCell.z = 0;
+
+        unit.SetCurrentCellPosition(transferCell, enforceFinalOccupancyRule: false);
+        try
+        {
+            var options = new List<PodeTransferirOption>();
+            if (!PodeTransferirSensor.CollectOptions(unit, boardTilemap, options, out string sensorReason) || options.Count <= 0)
+            {
+                reason = sensorReason;
+                return false;
+            }
+
+            PodeTransferirOption best = null;
+            float bestScore = float.MinValue;
+            for (int i = 0; i < options.Count; i++)
+            {
+                PodeTransferirOption option = options[i];
+                if (option == null || option.flowMode != TransferFlowMode.Recebedor)
+                    continue;
+
+                Vector3Int cell = option.targetCell;
+                cell.z = 0;
+                float score = -CalculateThreatLevel(transferCell, snapshot.AITeam) * 100f
+                    - SectorManager.HexDistance(transferCell, cell) * 10f
+                    + (option.targetConstruction != null ? 50f : 0f);
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = option;
+                }
+            }
+
+            if (best == null)
+            {
+                reason = "sem opcao Recebedor apos mover";
+                return false;
+            }
+
+            action = BuildTransferReceiveBatch(unit, snapshot.AITeam, fromCell, transferCell, best, paths);
+            reason = $"aposMover={transferCell} alvo={best.targetCell} score={bestScore:F0}";
+
+            return true;
+        }
+        finally
+        {
+            unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
+        }
+    }
+
     private bool TryBuildLogisticsSupplyAction(
         UnitManager unit,
         AIWorldSnapshot snapshot,

@@ -26,7 +26,7 @@ public partial class AIController
         string badge;
         if (IsRallyAssemblyObjective(obj))
         {
-            badge = "R";
+            badge = "+";
         }
         else if (ConstructionSectorHelper.IsBase(obj.Sector))
         {

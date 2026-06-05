@@ -125,8 +125,8 @@ public class ConstructionManagerEditor : Editor
 
         DrawCaptureEditorBlock();
 
-        DrawOwnershipReadOnlySlot("Original Owner Slot", originalOwnerSlotIndexProp);
-        DrawOwnershipReadOnlySlot("First Owner Slot", firstOwnerSlotIndexProp);
+        DrawOwnershipSlotPopup("Original Owner Slot", originalOwnerSlotIndexProp);
+        DrawOwnershipSlotPopup("First Owner Slot", firstOwnerSlotIndexProp);
 
         if (hasSiteRuntimeOverrideProp != null)
         {
@@ -342,24 +342,31 @@ public class ConstructionManagerEditor : Editor
             sectorProp.enumValueIndex = next;
     }
 
-    private static void DrawOwnershipReadOnlySlot(string label, SerializedProperty slotProp)
+    private void DrawOwnershipSlotPopup(string label, SerializedProperty slotProp)
     {
         if (slotProp == null) return;
+        MatchController mc = Object.FindAnyObjectByType<MatchController>();
+        int slotCount = mc != null ? mc.SlotCount : 0;
+
+        int totalOptions = slotCount + 1;
+        string[] labels = new string[totalOptions];
+        labels[0] = "Neutral";
+        for (int i = 0; i < slotCount; i++)
+        {
+            TeamId t = mc.GetTeamIdForSlot(i);
+            labels[i + 1] = "Slot " + i + " — " + TeamUtils.GetName(t);
+        }
+
         int currentSlot = slotProp.intValue;
-        string display;
-        if (currentSlot < 0)
+        int popupIndex = currentSlot < 0 ? 0 : Mathf.Clamp(currentSlot + 1, 0, totalOptions - 1);
+
+        EditorGUI.BeginChangeCheck();
+        int newPopupIndex = EditorGUILayout.Popup(label, popupIndex, labels);
+        if (EditorGUI.EndChangeCheck())
         {
-            display = "Neutral";
+            slotProp.intValue = newPopupIndex == 0 ? -1 : newPopupIndex - 1;
+            serializedObject.ApplyModifiedProperties();
         }
-        else
-        {
-            MatchController mc = Object.FindAnyObjectByType<MatchController>();
-            display = mc != null && currentSlot < mc.SlotCount
-                ? "Slot " + currentSlot + " — " + TeamUtils.GetName(mc.GetTeamIdForSlot(currentSlot))
-                : "Slot " + currentSlot;
-        }
-        using (new EditorGUI.DisabledScope(true))
-            EditorGUILayout.LabelField(label, display);
     }
 
     private void DrawSlotAndTeamBlock()

@@ -104,6 +104,10 @@ public class UnitDataEditor : Editor
             "repairTriggerAmmoPct",
             "repairRecoverHpAbove",
             "fuseWhileInRepair",
+            "restockTriggerGallonPct",
+            "restockTriggerAmmoBoxPct",
+            "restockTriggerToolsPct",
+            "restockWhenAnyRuntimeSupplyEmpty",
             "stealthSkills",
             "stealthSkillRules",
             "useExplicitPreferredAirHeight",
@@ -257,6 +261,26 @@ public class UnitDataEditor : Editor
         SerializedProperty fuseWhileInRepairProp = serializedObject.FindProperty("fuseWhileInRepair");
         if (fuseWhileInRepairProp != null)
             EditorGUILayout.PropertyField(fuseWhileInRepairProp, new GUIContent("Fuse While In Repair", "While under repair, attempt to fuse with a damaged allied unit of the same type nearby instead of waiting passively."));
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Restock Decision", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Supplier-only thresholds for returning to a safe allied captured reload/transfer point. Uses PodeTransferir when available.",
+            MessageType.None);
+
+        SerializedProperty restockGallonProp = serializedObject.FindProperty("restockTriggerGallonPct");
+        SerializedProperty restockAmmoBoxProp = serializedObject.FindProperty("restockTriggerAmmoBoxPct");
+        SerializedProperty restockToolsProp = serializedObject.FindProperty("restockTriggerToolsPct");
+        SerializedProperty restockEmptyProp = serializedObject.FindProperty("restockWhenAnyRuntimeSupplyEmpty");
+
+        if (restockGallonProp != null)
+            EditorGUILayout.PropertyField(restockGallonProp, new GUIContent("Gallon Stock <= %", "Return to restock when gallon stock reaches this % of default embarked supply. 0 disables."));
+        if (restockAmmoBoxProp != null)
+            EditorGUILayout.PropertyField(restockAmmoBoxProp, new GUIContent("Ammo Box Stock <= %", "Return to restock when ammo box stock reaches this % of default embarked supply. 0 disables."));
+        if (restockToolsProp != null)
+            EditorGUILayout.PropertyField(restockToolsProp, new GUIContent("Tools Stock <= %", "Return to restock when tools/parts stock reaches this % of default embarked supply. 0 disables."));
+        if (restockEmptyProp != null)
+            EditorGUILayout.PropertyField(restockEmptyProp, new GUIContent("Any Runtime Supply Empty", "Return to restock when any supplier runtime embarked supply reaches 0."));
     }
 
     private void DrawNativeDomainSection()

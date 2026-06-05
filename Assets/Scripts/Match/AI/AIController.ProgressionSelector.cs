@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 
 public partial class AIController
@@ -61,19 +62,41 @@ public partial class AIController
         float originDistance = SectorManager.HexDistance(fromCell, targetCell);
         float bestScore = float.MinValue;
         bool found = false;
+        bool debugTransportProgression = intent == ToolProgressionIntent.TransportDelivery
+            || intent == ToolProgressionIntent.TransportRendezvous;
+        int skipOrigin = 0;
+        int skipOccupied = 0;
+        int skipStopCell = 0;
+        int skipAllow = 0;
+        int skipScore = 0;
+        List<ToolProgressionCandidate> debugCandidates = debugTransportProgression
+            ? new List<ToolProgressionCandidate>()
+            : null;
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
             Vector3Int cell = rawCell;
             cell.z = 0;
             if (cell == fromCell)
+            {
+                skipOrigin++;
                 continue;
+            }
             if (occupied != null && occupied.Contains(cell))
+            {
+                skipOccupied++;
                 continue;
+            }
             if (!CanUseAsToolProgressStopCell(unit, cell, fromCell))
+            {
+                skipStopCell++;
                 continue;
+            }
             if (allowCell != null && !allowCell(cell))
+            {
+                skipAllow++;
                 continue;
+            }
 
             if (!paths.TryGetValue(rawCell, out List<Vector3Int> path))
                 path = null;
@@ -88,7 +111,10 @@ public partial class AIController
                     out int toolScore,
                     out float nextDistance,
                     out int moveCost))
+            {
+                skipScore++;
                 continue;
+            }
 
             bool roadBonus = path != null
                 && UnitMovementPathRules.DidUseRoadFullMoveBonus(boardTilemap, unit, path, terrainDatabase);
@@ -117,6 +143,7 @@ public partial class AIController
             float extraScore = tacticalScore != null ? tacticalScore(cell, candidate) : 0f;
             candidate.TacticalScore = extraScore;
             candidate.FinalScore = intentScore + extraScore;
+            debugCandidates?.Add(candidate);
 
             if (candidate.FinalScore > bestScore)
             {
@@ -131,7 +158,54 @@ public partial class AIController
             return false;
 
         reason = FormatToolProgressionReason(intent, bestCandidate);
+        if (debugTransportProgression)
+            LogToolProgressionCandidates(unit, intent, fromCell, targetCell, bestCandidate, debugCandidates,
+                skipOrigin, skipOccupied, skipStopCell, skipAllow, skipScore);
         return true;
+    }
+
+    private static void LogToolProgressionCandidates(
+        UnitManager unit,
+        ToolProgressionIntent intent,
+        Vector3Int fromCell,
+        Vector3Int targetCell,
+        ToolProgressionCandidate bestCandidate,
+        List<ToolProgressionCandidate> candidates,
+        int skipOrigin,
+        int skipOccupied,
+        int skipStopCell,
+        int skipAllow,
+        int skipScore)
+    {
+        if (unit == null || candidates == null || candidates.Count == 0)
+            return;
+
+        candidates.Sort((a, b) => b.FinalScore.CompareTo(a.FinalScore));
+        int limit = Mathf.Min(12, candidates.Count);
+        var sb = new StringBuilder(768);
+        sb.Append($"[AI][Progressao2][Top] unit={unit.InstanceId} intent={intent} from={fromCell} target={targetCell} ");
+        sb.Append($"best={bestCandidate.Cell} final={bestCandidate.FinalScore:F0} ");
+        sb.Append($"candidatos={candidates.Count} skips origin={skipOrigin} occupied={skipOccupied} stop={skipStopCell} allow={skipAllow} score={skipScore}");
+
+        for (int i = 0; i < limit; i++)
+        {
+            ToolProgressionCandidate c = candidates[i];
+            sb.AppendLine();
+            sb.Append("  #").Append(i + 1).Append(' ')
+                .Append(c.Cell)
+                .Append(" final=").Append(c.FinalScore.ToString("F0"))
+                .Append(" tool=").Append(c.ToolScore)
+                .Append(" next=").Append(c.NextDistance.ToString("F1"))
+                .Append(" move=").Append(c.MoveCost)
+                .Append(" road=").Append(c.RoadBonus)
+                .Append(" prog=").Append(c.FirstTurnProgress.ToString("F1")).Append('/').Append(c.TwoTurnProgress.ToString("F1"))
+                .Append(" line=").Append(c.LineDeviation.ToString("F1"))
+                .Append(" threat=").Append(c.Threat.ToString("F1"))
+                .Append(" dpq=").Append(c.Dpq.ToString("F1"))
+                .Append(" tactical=").Append(c.TacticalScore.ToString("F0"));
+        }
+
+        Debug.Log(sb.ToString());
     }
 
     private static float ScoreToolProgressionIntent(

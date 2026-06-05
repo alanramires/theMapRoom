@@ -62,6 +62,10 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Range(0f, 30f)] public float IntelFireSupportGapHotThreshold = 8f;
     [Range(0f, 20f)] public float IntelFireSupportGapDamageThreshold = 3f;
     [Range(0f, 10f)] public float IntelOffensiveAntiInfantryFireThreshold = 2.5f;
+    [Range(0f, 10f)] public float IntelStalemateElitePressureThreshold = 3.5f;
+    [Range(0f, 10f)] public float IntelStalemateFireSupportThreshold = 6f;
+    [Range(0f, 1f)] public float StalemateEliteCapturerFillRatio = 0.3f;
+    [Range(1, 12)] public int StalemateEliteCapturerRange = 8;
 
     [Header("Logistica")]
     [Range(1, 8)] public int RepairsPerGroundSupplier = 4;
@@ -427,10 +431,19 @@ public partial class AIShoppingPlanner : MonoBehaviour
             CountSlots(snapshot.AITeam, UnitRole.Assalto, out int totalAss, out int filledAss);
             float capFill       = totalCap > 0 ? filledCap / (float)totalCap : 0f;
             float fillThreshold = Instance != null ? Instance.EliteCapturerFillRatio : 0.6f;
+            bool stalemateCapturerReady = HasStalemateCapturerCommitment(snapshot, intelReport, out string stalemateCapturerReason);
+            if (stalemateCapturerReady)
+            {
+                float stalemateThreshold = Instance != null
+                    ? Mathf.Clamp01(Instance.StalemateEliteCapturerFillRatio)
+                    : 0.3f;
+                fillThreshold = Mathf.Min(fillThreshold, stalemateThreshold);
+            }
             int   minAssault    = Instance != null ? Instance.MinFilledAssaultSlots   : 1;
             bool  capOk         = capFill >= fillThreshold;
             bool  assOk         = filledAss >= minAssault;
-            string status       = (capOk && assOk) ? "ELITE LIBERADO" : $"bloqueado ({(!capOk ? $"cap {filledCap}/{totalCap} {capFill:P0}<{fillThreshold:P0}" : "cap OK")} | {(!assOk ? $"ass {filledAss}<{minAssault}" : "ass OK")})";
+            string stalemateText = stalemateCapturerReady ? $" stalemateCap={stalemateCapturerReason}" : "";
+            string status       = (capOk && assOk) ? $"ELITE LIBERADO{stalemateText}" : $"bloqueado ({(!capOk ? $"cap {filledCap}/{totalCap} {capFill:P0}<{fillThreshold:P0}" : "cap OK")} | {(!assOk ? $"ass {filledAss}<{minAssault}" : "ass OK")}){stalemateText}";
             Debug.Log($"[AI Shopping] composição: cap={filledCap}/{totalCap} ({capFill:P0}) ass={filledAss}/{totalAss} — {status}");
             if (!capOk || !assOk)
                 eliteAssaultTarget = null; // blocks purchase; eliteAssaultTargetForReserve still set
@@ -686,8 +699,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
                     if (u.domain == Domain.Land) offersLand = true;
                     else if (u.domain == Domain.Air) offersAir = true;
                 }
-            if (offersLand) landBuildings.Add(b);
-            else if (offersAir) airBuildings.Add(b);
+            if (offersLand) { landBuildings.Add(b); Vector3Int lc = b.CurrentCellPosition; lc.z = 0; Debug.Log($"[AI Shopping] produtor terrestre {b.ConstructionDisplayName}#{b.InstanceId} @ {lc} selling={b.SellingRule} offers={offeredCount}"); }
+            else if (offersAir) { airBuildings.Add(b); Vector3Int ac = b.CurrentCellPosition; ac.z = 0; Debug.Log($"[AI Shopping] produtor aéreo {b.ConstructionDisplayName}#{b.InstanceId} @ {ac} selling={b.SellingRule} offers={offeredCount}"); }
             else
             {
                 Vector3Int cell = b.CurrentCellPosition; cell.z = 0;

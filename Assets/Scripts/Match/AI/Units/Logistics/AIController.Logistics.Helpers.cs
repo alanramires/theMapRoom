@@ -115,27 +115,173 @@ public partial class AIController
         return fallback;
     }
 
-    private bool LogisticsHasEmptyCargoProduct(UnitManager unit)
+    private bool ShouldRestockLogisticsUnit(UnitManager unit, out string reason)
     {
+        reason = "";
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null || data.supplierResources == null)
+            return false;
+        if (!data.isSupplier)
             return false;
 
         IReadOnlyList<UnitEmbarkedSupply> resources = unit.GetEmbarkedResources();
         if (resources == null)
             return false;
 
-        int count = Mathf.Min(resources.Count, data.supplierResources.Count);
+        int count = data.supplierResources.Count;
+        bool emptySupplyTriggersRestock = data.restockWhenAnyRuntimeSupplyEmpty || !HasAnyRestockThresholdConfigured(data);
         for (int i = 0; i < count; i++)
         {
             UnitEmbarkedSupply baseline = data.supplierResources[i];
-            UnitEmbarkedSupply runtime = resources[i];
             if (baseline == null || baseline.supply == null || baseline.amount <= 0)
                 continue;
-            if (runtime == null || runtime.amount <= 0)
+
+            int runtimeAmount = GetRuntimeSupplyAmount(resources, baseline.supply);
+            int threshold = ResolveRestockThresholdForSupply(data, baseline.supply);
+            bool coreRestockSupply = threshold > 0 || IsCoreRestockSupply(baseline.supply);
+            if (runtimeAmount <= 0 && (coreRestockSupply || emptySupplyTriggersRestock))
+            {
+                reason = $"restock vazio {GetSupplyDebugName(baseline.supply)}";
                 return true;
+            }
+
+            if (threshold <= 0)
+                continue;
+
+            float pct = runtimeAmount * 100f / baseline.amount;
+            if (pct <= threshold)
+            {
+                reason = $"restock {GetSupplyDebugName(baseline.supply)} {pct:F0}%<={threshold}%";
+                return true;
+            }
         }
 
+        reason = BuildRestockStockSummary(data, resources);
         return false;
+    }
+
+    private static int GetRuntimeSupplyAmount(IReadOnlyList<UnitEmbarkedSupply> resources, SupplyData supply)
+    {
+        if (resources == null || supply == null)
+            return 0;
+
+        bool foundExact = false;
+        int exactTotal = 0;
+        for (int i = 0; i < resources.Count; i++)
+        {
+            UnitEmbarkedSupply entry = resources[i];
+            if (entry == null || !IsSameSupply(entry.supply, supply))
+                continue;
+
+            foundExact = true;
+            exactTotal += Mathf.Max(0, entry.amount);
+        }
+
+        if (foundExact)
+            return exactTotal;
+
+        int kind = ResolveRestockSupplyKind(supply);
+        if (kind == 0)
+            return 0;
+
+        int kindTotal = 0;
+        for (int i = 0; i < resources.Count; i++)
+        {
+            UnitEmbarkedSupply entry = resources[i];
+            if (entry == null || ResolveRestockSupplyKind(entry.supply) != kind)
+                continue;
+
+            kindTotal += Mathf.Max(0, entry.amount);
+        }
+
+        return kindTotal;
+    }
+
+    private static bool IsSameSupply(SupplyData a, SupplyData b)
+    {
+        if (a == null || b == null)
+            return false;
+        if (ReferenceEquals(a, b))
+            return true;
+        if (!string.IsNullOrWhiteSpace(a.id) && !string.IsNullOrWhiteSpace(b.id))
+            return a.id == b.id;
+        return a.name == b.name;
+    }
+
+    private static string BuildRestockStockSummary(UnitData data, IReadOnlyList<UnitEmbarkedSupply> resources)
+    {
+        if (data == null || data.supplierResources == null)
+            return "restockCheck sem UnitData";
+
+        string summary = "restockCheck ok";
+        for (int i = 0; i < data.supplierResources.Count; i++)
+        {
+            UnitEmbarkedSupply baseline = data.supplierResources[i];
+            if (baseline == null || baseline.supply == null || baseline.amount <= 0)
+                continue;
+
+            int kind = ResolveRestockSupplyKind(baseline.supply);
+            if (kind == 0)
+                continue;
+
+            int runtimeAmount = GetRuntimeSupplyAmount(resources, baseline.supply);
+            summary += $" {GetSupplyDebugName(baseline.supply)}={runtimeAmount}/{baseline.amount}";
+        }
+
+        return summary;
+    }
+
+    private static bool IsCoreRestockSupply(SupplyData supply)
+    {
+        return ResolveRestockSupplyKind(supply) != 0;
+    }
+
+    private static bool HasAnyRestockThresholdConfigured(UnitData data)
+    {
+        return data != null
+            && (data.restockTriggerGallonPct > 0
+                || data.restockTriggerAmmoBoxPct > 0
+                || data.restockTriggerToolsPct > 0);
+    }
+
+    private static int ResolveRestockThresholdForSupply(UnitData data, SupplyData supply)
+    {
+        if (data == null || supply == null)
+            return 0;
+
+        switch (ResolveRestockSupplyKind(supply))
+        {
+            case 1: return data.restockTriggerGallonPct;
+            case 2: return data.restockTriggerAmmoBoxPct;
+            case 3: return data.restockTriggerToolsPct;
+            default: return 0;
+        }
+    }
+
+    private static int ResolveRestockSupplyKind(SupplyData supply)
+    {
+        if (supply == null)
+            return 0;
+
+        string key = ((supply.id ?? "") + " " + (supply.displayName ?? "") + " " + supply.name).ToLowerInvariant();
+        if (key.Contains("gasolina") || key.Contains("gala") || key.Contains("fuel"))
+            return 1;
+        if (key.Contains("municao") || key.Contains("muni") || key.Contains("ammo"))
+            return 2;
+        if (key.Contains("pecas") || key.Contains("peca") || key.Contains("tool") || key.Contains("part"))
+            return 3;
+
+        return 0;
+    }
+
+    private static string GetSupplyDebugName(SupplyData supply)
+    {
+        if (supply == null)
+            return "(supply)";
+        if (!string.IsNullOrWhiteSpace(supply.displayName))
+            return supply.displayName;
+        if (!string.IsNullOrWhiteSpace(supply.id))
+            return supply.id;
+        return supply.name;
     }
 
     private int GetLogisticsServiceLimit(UnitManager unit)

@@ -152,11 +152,12 @@ public partial class AIShoppingPlanner
             bool fireSupportAllowedNow = openFireSupportSlots > 0 || IsFireSupportAllowedByTiming(snapshot);
             bool isDefensiveOnlyUnit = u.aiPurchaseMode == AIPurchaseMode.Defensive;
             bool isOffensiveOnlyUnit = u.aiPurchaseMode == AIPurchaseMode.Offensive;
+            bool strategicArmorParityBypass = strategicArmorParity && IsDefensiveBaseAssaultTankPurchase(u);
 
             bool proactiveAntiAirSAMBypass = proactiveAntiAir && isSAMType;
             bool proactiveAntiAirAAABypass = proactiveAntiAir && isAAAType && (aaaCap == 0 || activeAAAs < aaaCap);
             bool proactiveDefBypass = (proactiveDefFireSupport || proactiveAntiAirSAMBypass) && isDefensiveOnlyUnit && isFireSupportCapable;
-            if (!defensiveBaseThreat && isDefensiveOnlyUnit && !proactiveDefBypass && !proactiveAntiAirAAABypass)
+            if (!defensiveBaseThreat && isDefensiveOnlyUnit && !proactiveDefBypass && !proactiveAntiAirAAABypass && !strategicArmorParityBypass)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — Defensive-only, sem ameaça"); continue; }
             if (defensiveBaseThreat && isOffensiveOnlyUnit)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — Offensive-only, modo defensivo"); continue; }
@@ -167,7 +168,7 @@ public partial class AIShoppingPlanner
             if (isPrimaryLogistics && openLogisticsSlots <= 0)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda logistics"); continue; }
 
-            if (isPrimaryAssault && !isHybridCapturer && openAssaultSlots <= 0 && !defensiveBaseThreat && !proactiveAntiAirAAABypass)
+            if (isPrimaryAssault && !isHybridCapturer && openAssaultSlots <= 0 && !defensiveBaseThreat && !proactiveAntiAirAAABypass && !strategicArmorParityBypass)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda assault"); continue; }
 
             if (isPrimaryTransporter && openTransportSlots <= 0 && !urgentTransportDemand && !defensiveBaseThreat)
@@ -218,12 +219,14 @@ public partial class AIShoppingPlanner
             }
             if (defensiveArmorThreat && IsDefensiveBaseThreatPurchase(u))
                 score += 80000;
-            if (strategicArmorParity && IsDefensiveBaseAssaultTankPurchase(u))
+            if (strategicArmorParityBypass)
             {
-                score += 85000 + Mathf.Max(0, u.eliteLevel) * 10000;
+                score += IsDefensiveBaseAssaultTankPurchase(u)
+                    ? 85000 + Mathf.Max(0, u.eliteLevel) * 10000
+                    : 145000;
                 if (u.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Armored) == BazookaTargetPriority.Primary)
                     score += 20000;
-                Debug.Log($"[AI PickUnit] armor_parity_bonus {u.displayName} +{(85000 + Mathf.Max(0, u.eliteLevel) * 10000)}");
+                Debug.Log($"[AI PickUnit] armor_parity_bonus {u.displayName} strategic_at={strategicArmorParityBypass}");
             }
             if (defensiveInfantryThreat && IsAntiInfantryFireSupportPurchase(u))
                 score += 80000;

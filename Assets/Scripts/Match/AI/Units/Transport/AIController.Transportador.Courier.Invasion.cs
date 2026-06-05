@@ -50,6 +50,9 @@ public partial class AIController
         if (cell == transporter.CurrentCellPosition)
             return true;
 
+        if (!HasTransportInvasionGoGreen(transporter, snapshot, target, out _))
+            return false;
+
         return TryGetTransportScreenMetrics(transporter, snapshot, cell, target,
             out float gap, out _, out _)
             && gap >= 0.75f;
@@ -66,9 +69,51 @@ public partial class AIController
         if (!IsTransportInvasionCourierCellAllowed(transporter, snapshot, transporterCell, target))
             return false;
 
+        if (!HasTransportInvasionGoGreen(transporter, snapshot, target, out _))
+            return false;
+
         return TryGetTransportScreenMetrics(transporter, snapshot, dropCell, target,
             out float gap, out _, out _)
             && gap >= 0.25f;
+    }
+
+
+    private bool HasTransportInvasionGoGreen(
+        UnitManager transporter,
+        AIWorldSnapshot snapshot,
+        Vector3Int target,
+        out string reason)
+    {
+        const float assaultReadyRange = 2f;
+        int assaultReady = 0;
+        float nearestAssault = float.MaxValue;
+        target.z = 0;
+
+        if (snapshot?.MyUnits == null)
+        {
+            reason = "sem snapshot";
+            return false;
+        }
+
+        foreach (UnitManager ally in snapshot.MyUnits)
+        {
+            if (!IsTransportInvasionAssaultReadyUnit(ally, transporter))
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            float dist = SectorManager.HexDistance(allyCell, target);
+            if (dist < nearestAssault)
+                nearestAssault = dist;
+            if (dist <= assaultReadyRange)
+                assaultReady++;
+        }
+
+        bool ready = assaultReady >= 1;
+        reason = ready
+            ? $"goGreen assalto={assaultReady}<=2h"
+            : $"aguarda assalto<=2h nearest={(nearestAssault < float.MaxValue ? nearestAssault.ToString("F1") : "?")}";
+        return ready;
     }
 
 
@@ -217,6 +262,17 @@ public partial class AIController
 
         return data.roles.Contains(UnitRole.Assalto)
             || data.roles.Contains(UnitRole.Capturador);
+    }
+
+
+    private static bool IsTransportInvasionAssaultReadyUnit(UnitManager ally, UnitManager transporter)
+    {
+        if (ally == null || ally == transporter || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
+            return false;
+        if (!ally.TryGetUnitData(out UnitData data) || data == null || data.roles == null)
+            return false;
+
+        return data.roles.Contains(UnitRole.Assalto);
     }
 
     // -------------------------------------------------------------------------

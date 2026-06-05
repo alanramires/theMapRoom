@@ -39,6 +39,7 @@ public partial class AIShoppingPlanner
         float airThreat = intel.enemyAirThreatScore;
         float armorThreat = intel.enemyArmorThreatScore;
         float captureThreat = Mathf.Max(intel.capturePressure, intel.landingPressure, intel.damageTakenScore);
+        float stalemateElitePressure = intel.stalemateElitePressure;
         AISectorIntel topSectorIntel = intel.sectors != null && intel.sectors.Count > 0 ? intel.sectors[0] : null;
         string topSector = topSectorIntel != null ? topSectorIntel.sector : "-";
         float topHot = topSectorIntel != null ? topSectorIntel.hotScore : 0f;
@@ -87,6 +88,24 @@ public partial class AIShoppingPlanner
             Debug.Log($"[AI Shopping][IntelGap] sem_fogo_indireto team={snapshot.AITeam} top={topSector} hot={topHot:F1} enemy={topEnemyActivity:F1} dmg={intel.damageTakenScore:F1}/{topDamageTaken:F1} capture={intel.capturePressure:F1}/{topCapturePressure:F1} enemyArt={intel.enemyArtilleryThreatScore:F1} -> fire={openFireSupportSlots} fireDef={preferDefensiveFireSupport}");
         }
 
+        if (stalemateElitePressure >= Instance.IntelStalemateElitePressureThreshold)
+        {
+            int beforeAssault = openAssaultSlots;
+            int beforeFire = openFireSupportSlots;
+            openAssaultSlots = Mathf.Max(openAssaultSlots, 1);
+
+            bool heavyStalemate = stalemateElitePressure >= Instance.IntelStalemateFireSupportThreshold;
+            if (heavyStalemate)
+            {
+                openFireSupportSlots = Mathf.Max(openFireSupportSlots, 1);
+                if (!proactiveAntiAir && armorThreat <= 0f)
+                    preferDefensiveFireSupport = false;
+            }
+
+            changed |= openAssaultSlots != beforeAssault || openFireSupportSlots != beforeFire;
+            Debug.Log($"[AI Shopping][Stalemate] team={snapshot.AITeam} setor={intel.topStalemateSector} score={intel.stalemateScore:F1} elitePressure={stalemateElitePressure:F1} heavy={heavyStalemate} -> ass={openAssaultSlots} fire={openFireSupportSlots} fireDef={preferDefensiveFireSupport}");
+        }
+
         if (airThreat >= Instance.IntelAirThreatAntiAirThreshold)
         {
             int beforeAssault = openAssaultSlots;
@@ -117,7 +136,7 @@ public partial class AIShoppingPlanner
 
         if (changed)
         {
-            Debug.Log($"[AI Shopping][Intel] team={snapshot.AITeam} top={topSector} infantry={infantryPressure:F1} num={numericalPressure:F1} air={airThreat:F1} armor={armorThreat:F1} capture={captureThreat:F1} -> ass={openAssaultSlots} fire={openFireSupportSlots} cacaB={openCacaBSlots} antiAir={proactiveAntiAir}");
+            Debug.Log($"[AI Shopping][Intel] team={snapshot.AITeam} top={topSector} infantry={infantryPressure:F1} num={numericalPressure:F1} air={airThreat:F1} armor={armorThreat:F1} capture={captureThreat:F1} stalemate={stalemateElitePressure:F1} -> ass={openAssaultSlots} fire={openFireSupportSlots} cacaB={openCacaBSlots} antiAir={proactiveAntiAir}");
         }
     }
 
@@ -137,6 +156,74 @@ public partial class AIShoppingPlanner
         }
 
         return null;
+    }
+
+    private static bool HasStalemateCapturerCommitment(
+        AIWorldSnapshot snapshot,
+        AIIntelReport intel,
+        out string reason)
+    {
+        reason = "-";
+        if (snapshot == null || intel == null || Instance == null)
+            return false;
+        if (intel.stalemateElitePressure < Instance.IntelStalemateElitePressureThreshold)
+            return false;
+        if (string.IsNullOrWhiteSpace(intel.topStalemateSector)
+            || !System.Enum.TryParse(intel.topStalemateSector, out ConstructionSector sector)
+            || sector == ConstructionSector.None)
+            return false;
+
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        SectorObjective objective = plan != null ? plan.GetObjectiveForSector(sector) : null;
+        if (objective != null && objective.Slots != null)
+        {
+            for (int i = 0; i < objective.Slots.Count; i++)
+            {
+                SlotNeed slot = objective.Slots[i];
+                if (slot == null || slot.Role != UnitRole.Capturador || !slot.Filled)
+                    continue;
+
+                reason = $"{sector}:slot Unit{slot.AssignedUnitId}";
+                return true;
+            }
+        }
+
+        if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info) || info == null)
+            return false;
+
+        Vector3Int targetCell = info.RepresentativeCell;
+        targetCell.z = 0;
+        int maxRange = Mathf.Max(1, Instance.StalemateEliteCapturerRange);
+        UnitManager best = null;
+        float bestDist = float.MaxValue;
+
+        if (snapshot.MyUnits != null)
+        {
+            for (int i = 0; i < snapshot.MyUnits.Count; i++)
+            {
+                UnitManager unit = snapshot.MyUnits[i];
+                if (unit == null || unit.IsDead || unit.IsEmbarked)
+                    continue;
+                if (!unit.TryGetUnitData(out UnitData data) || data == null
+                    || data.roles == null || !data.roles.Contains(UnitRole.Capturador))
+                    continue;
+
+                Vector3Int cell = unit.CurrentCellPosition;
+                cell.z = 0;
+                float dist = SectorManager.HexDistance(cell, targetCell);
+                if (dist > maxRange || dist >= bestDist)
+                    continue;
+
+                best = unit;
+                bestDist = dist;
+            }
+        }
+
+        if (best == null)
+            return false;
+
+        reason = $"{sector}:near Unit{best.InstanceId} {bestDist:F0}h";
+        return true;
     }
 
     private static bool IsBaseDefenseHotIntelSector(AISectorIntel intel)

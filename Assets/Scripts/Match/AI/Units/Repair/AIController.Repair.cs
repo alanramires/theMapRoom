@@ -83,6 +83,37 @@ public partial class AIController
         return count;
     }
 
+    private bool TryBuildRepairFireSupportHoldAttack(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        HashSet<Vector3Int> occupied,
+        out PlayerAction action,
+        out string reason)
+    {
+        action = null;
+        reason = "";
+        if (unit == null || snapshot == null || !IsFireSupportUnit(unit))
+            return false;
+
+        Vector3Int anchor = fromCell;
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        SectorObjective assigned = ResolveAssignedFireSupportObjective(unit, plan);
+        if (assigned != null)
+            anchor = ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell);
+
+        return TryBuildBestFireSupportAttack(
+            unit,
+            snapshot,
+            fromCell,
+            null,
+            occupied,
+            anchor,
+            defensiveContext: true,
+            out action,
+            out reason);
+    }
+
     private static bool EvaluateRepairTriggers(UnitManager unit, UnitData data)
     {
         if (data.repairTriggerHpBelow > 0 && unit.CurrentHP <= data.repairTriggerHpBelow)
@@ -166,6 +197,14 @@ public partial class AIController
                 && !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);
             if (safe && !isBlockingCapTarget)
             {
+                if (IsFireSupportUnit(unit)
+                    && TryBuildRepairFireSupportHoldAttack(unit, snapshot, fromCell, occupied,
+                        out PlayerAction fireSupportHoldAction, out string fireSupportHoldReason))
+                {
+                    Debug.Log($"{TL("Repair")} {unit.InstanceId} aguarda reparo em {fromCell} (conquistado, setor seguro) + dispara {fireSupportHoldReason}");
+                    return fireSupportHoldAction;
+                }
+
                 // While waiting for repair, a logistics unit can still receive a factory transfer.
                 if (IsPrimaryLogisticsUnit(unit)
                     && TryBuildLogisticsTransferReceiveAction(unit, snapshot, fromCell, paths, out PlayerAction transferAction, out string transferReason))

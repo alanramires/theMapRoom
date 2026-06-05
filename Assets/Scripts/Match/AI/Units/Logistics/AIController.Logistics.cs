@@ -29,21 +29,33 @@ public partial class AIController
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
         bool baseDefense = IsLogisticsBaseDefenseEmergency(snapshot);
         Vector3Int anchor = ResolveLogisticsAnchor(snapshot, fromCell);
-        bool needsReload = LogisticsHasEmptyCargoProduct(unit);
+        bool needsReload = ShouldRestockLogisticsUnit(unit, out string restockReason);
+        Debug.Log($"{TL("Logistics")} {unit.InstanceId} restockCheck {(needsReload ? "SIM" : "nao")} {restockReason}");
 
         if (needsReload)
         {
             if (TryBuildLogisticsTransferReceiveAction(unit, snapshot, fromCell, paths, out PlayerAction transferAction, out string transferReason))
             {
-                Debug.Log($"{TL("Logistics")} {unit.InstanceId} recarrega por transferencia {transferReason}");
+                Debug.Log($"{TL("Logistics")} {unit.InstanceId} recarrega por transferencia {restockReason} {transferReason}");
                 return transferAction;
             }
 
+            Debug.Log($"{TL("Logistics")} {unit.InstanceId} restock sem transferencia imediata {restockReason} motivo={transferReason}");
+
             if (TryFindLogisticsReloadCell(unit, snapshot, fromCell, paths, occupied, out Vector3Int reloadCell, out string reloadReason))
             {
-                Debug.Log($"{TL("Logistics")} {unit.InstanceId} volta para recarga via {reloadCell} {reloadReason}");
+                if (TryBuildLogisticsTransferReceiveActionAtCell(unit, snapshot, fromCell, reloadCell, paths, out PlayerAction moveTransferAction, out string moveTransferReason))
+                {
+                    Debug.Log($"{TL("Logistics")} {unit.InstanceId} move + recarrega por transferencia {restockReason} {moveTransferReason} {reloadReason}");
+                    return moveTransferAction;
+                }
+
+                Debug.Log($"{TL("Logistics")} {unit.InstanceId} volta para recarga via {reloadCell} {restockReason} {reloadReason}");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, reloadCell, paths);
             }
+
+            Debug.Log($"{TL("Logistics")} {unit.InstanceId} restock bloqueado: sem transferencia/rota segura {restockReason} reload={reloadReason}");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
         }
 
         if (TryBuildLogisticsSupplyAction(unit, snapshot, fromCell, paths, occupied, baseDefense, out PlayerAction supplyAction, out string supplyReason))

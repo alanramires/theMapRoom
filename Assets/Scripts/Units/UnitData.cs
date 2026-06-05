@@ -179,6 +179,17 @@ public class UnitData : ScriptableObject
     [Range(1, 10)] public int repairRecoverHpAbove = 8;
     [Tooltip("BEHAVIOR — While under repair, attempt to fuse with a damaged allied unit of the same type nearby instead of waiting passively.")]
     public bool fuseWhileInRepair = false;
+
+    [Header("Restock Decision")]
+    [Tooltip("TRIGGER - Supplier returns to a safe allied reload/transfer point when gallon stock is at or below this percentage. Set 0 to disable.")]
+    [Range(0, 100)] public int restockTriggerGallonPct = 0;
+    [Tooltip("TRIGGER - Supplier returns to a safe allied reload/transfer point when ammo box stock is at or below this percentage. Set 0 to disable.")]
+    [Range(0, 100)] public int restockTriggerAmmoBoxPct = 0;
+    [Tooltip("TRIGGER - Supplier returns to a safe allied reload/transfer point when tools/parts stock is at or below this percentage. Set 0 to disable.")]
+    [Range(0, 100)] public int restockTriggerToolsPct = 0;
+    [Tooltip("TRIGGER - Supplier returns to restock when any runtime embarked supply reaches 0. Preserves the old empty-cargo reload behavior.")]
+    public bool restockWhenAnyRuntimeSupplyEmpty = true;
+
     [Header("Logistics AI")]
     [Tooltip("Se ativo, a IA usa este supridor em manutencao preventiva.")]
     public bool aiPreventiveMaintenanceEnabled = true;
