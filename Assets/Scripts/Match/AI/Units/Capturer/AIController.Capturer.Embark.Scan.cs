@@ -193,6 +193,7 @@ public partial class AIController
         UnitManager best = null;
         float bestDist = float.MaxValue;
         Vector3Int fromCell = capturer.CurrentCellPosition; fromCell.z = 0;
+        int pickupThreshold = Mathf.Max(4, GetEffectiveTransportThreshold(capturer.TeamId) / 2 + 1);
 
         foreach (UnitManager t in UnitManager.AllActive)
         {
@@ -204,6 +205,7 @@ public partial class AIController
             if (FindFittingSlotIndex(t, tData, capturer, capturerData) < 0) continue;
             Vector3Int tCell = t.CurrentCellPosition; tCell.z = 0;
             float dist = SectorManager.HexDistance(fromCell, tCell);
+            if (dist > pickupThreshold) continue;
             if (dist < bestDist) { bestDist = dist; best = t; }
         }
 

@@ -120,14 +120,83 @@ public partial class AIShoppingPlanner
         if (activeCapturers >= capturersPerTransport && activeAssault >= 1)
             massNeeded = activeCapturers / Mathf.Max(1, capturersPerTransport);
 
+        int endgameNeeded = ComputeEndgameTransportDemand(
+            snapshot, plan, activeCapturers, activeAssault, openCapturerSlots,
+            out string endgameReason);
+
+        int preventiveTarget = Mathf.Max(preventiveNeeded, Mathf.Max(massNeeded, Mathf.Max(projectionNeeded, endgameNeeded)));
         int assignedDeficit = Mathf.Max(0, assignedNeeded - freeAPCs);
-        int preventiveDeficit = Mathf.Max(0, Mathf.Max(preventiveNeeded, Mathf.Max(massNeeded, projectionNeeded)) - activeTransporters);
+        int preventiveDeficit = Mathf.Max(0, preventiveTarget - activeTransporters);
         urgentTransportDemand = assignedDeficit > 0;
-        int needed = Mathf.Max(assignedNeeded, Mathf.Max(preventiveNeeded, Mathf.Max(massNeeded, projectionNeeded)));
+        int needed = Mathf.Max(assignedNeeded, preventiveTarget);
         int deficit = urgentTransportDemand ? assignedDeficit : preventiveDeficit;
         int demand  = Mathf.Min(deficit, 1);
-        Debug.Log($"[AI Shopping] transport_demand: needed={needed} assigned={assignedNeeded} preventive={preventiveNeeded} projection={projectionNeeded} mass={massNeeded} capPerTrans={capturersPerTransport} activeCap={activeCapturers} activeAss={activeAssault} activeAPCs={activeTransporters} freeAPCs={freeAPCs} anchors={heldAnchors}/{totalAnchors} assignedDef={assignedDeficit} preventiveDef={preventiveDeficit} urgent={urgentTransportDemand} demand={demand} minDist={minDist}");
+        Debug.Log($"[AI Shopping] transport_demand: needed={needed} assigned={assignedNeeded} preventive={preventiveNeeded} projection={projectionNeeded} mass={massNeeded} endgame={endgameNeeded}({endgameReason}) capPerTrans={capturersPerTransport} activeCap={activeCapturers} activeAss={activeAssault} activeAPCs={activeTransporters} freeAPCs={freeAPCs} anchors={heldAnchors}/{totalAnchors} assignedDef={assignedDeficit} preventiveDef={preventiveDeficit} urgent={urgentTransportDemand} demand={demand} minDist={minDist}");
         return demand;
+    }
+
+    private static int ComputeEndgameTransportDemand(
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        int activeCapturers,
+        int activeAssault,
+        int openCapturerSlots,
+        out string reason)
+    {
+        reason = "off";
+        if (snapshot == null || plan == null)
+            return 0;
+
+        if (activeAssault <= 0)
+        {
+            reason = "semAssalto";
+            return 0;
+        }
+
+        if (!HasGroundEndgameObjective(snapshot.AITeam, plan, out ConstructionSector sector))
+            return 0;
+
+        int batchSize = Instance != null ? Instance.ProgressiveCapturerBatchSize : 2;
+        int incomingCapturers = openCapturerSlots > 0 ? Mathf.Min(openCapturerSlots, batchSize) : 0;
+        int projectedCapturers = activeCapturers + incomingCapturers;
+        if (projectedCapturers < 3)
+        {
+            reason = $"{sector} cap={projectedCapturers}<3";
+            return 0;
+        }
+
+        int desiredFleet = Mathf.Clamp(Mathf.CeilToInt(projectedCapturers / 4f), 1, 2);
+        reason = $"{sector} cap={projectedCapturers} incoming={incomingCapturers} fleet={desiredFleet}";
+        return desiredFleet;
+    }
+
+    private static bool HasGroundEndgameObjective(TeamId aiTeam, TeamObjectivePlan plan, out ConstructionSector sector)
+    {
+        sector = ConstructionSector.None;
+        if (plan == null || plan.Objectives == null)
+            return false;
+
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj == null || obj.Status == ObjectiveStatus.Complete || obj.Status == ObjectiveStatus.Abandoned)
+                continue;
+
+            if (obj.ObjectiveType != AIObjectiveType.InvasionAttack && !ConstructionSectorHelper.IsBase(obj.Sector))
+                continue;
+
+            ConstructionManager target = AIController.FindCapturableInSector(obj.Sector, aiTeam);
+            if (target == null)
+                continue;
+
+            if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info)
+                && info.GetTransportPreference(aiTeam) == SectorManager.SectorInfo.TransportPreference.Air)
+                continue;
+
+            sector = obj.Sector;
+            return true;
+        }
+
+        return false;
     }
 
     private static bool AreOwnAnchorSectorsHeld(TeamId aiTeam, out int heldAnchors, out int totalAnchors)

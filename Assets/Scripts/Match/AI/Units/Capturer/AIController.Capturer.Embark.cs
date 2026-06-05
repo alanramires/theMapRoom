@@ -91,6 +91,13 @@ public partial class AIController
                 fromCell, options.Count, best, bestPriority, "sem paths"));
             return null;
         }
+
+        if (assigned == null && ShouldSkipRogueTransportForFinalPressure(unit, snapshot, fromCell))
+            return null;
+
+        if (assigned == null && ShouldRogueCapturerFightBeforeTransport(unit, snapshot, fromCell, paths))
+            return null;
+
         PlayerAction formalExtendedEmbark =
             TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths, requireFormalPassenger: true);
         if (formalExtendedEmbark != null) return formalExtendedEmbark;
@@ -130,6 +137,82 @@ public partial class AIController
         Debug.Log(BuildCapturerEmbarkScanDebug(unit, data, assigned, plan, snapshot,
             fromCell, options.Count, best, bestPriority, "sem embarque valido"));
         return null;
+    }
+
+    private bool ShouldSkipRogueTransportForFinalPressure(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell)
+    {
+        if (unit == null || snapshot?.EnemyHQ == null)
+            return false;
+
+        Vector3Int hqCell = snapshot.EnemyHQ.CurrentCellPosition;
+        hqCell.z = 0;
+        int threshold = Mathf.Max(3, GetEffectiveTransportThreshold(snapshot.AITeam));
+        int terrainCost = TerrainCostToCell(unit, fromCell, hqCell, threshold);
+        float hexDist = SectorManager.HexDistance(fromCell, hqCell);
+        if (terrainCost > threshold && hexDist > Mathf.Max(3, threshold - 1))
+            return false;
+
+        Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue ignora transporte: pressao final HQ dist={hexDist:F0} terreno={terrainCost}<={threshold}");
+        return true;
+    }
+
+    private bool ShouldRogueCapturerFightBeforeTransport(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths)
+    {
+        if (unit == null || snapshot == null || paths == null || paths.Count == 0)
+            return false;
+
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        Vector3Int pressureTarget = snapshot.EnemyHQ != null
+            ? snapshot.EnemyHQ.CurrentCellPosition
+            : fromCell;
+        pressureTarget.z = 0;
+
+        if (TryFindOpportunisticCapture(unit, paths, occupied, pressureTarget, out Vector3Int captureCell))
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue ignora transporte: captura/pressao disponivel @ {captureCell}");
+            return true;
+        }
+
+        if (HasAttackTargetAtCurrentPos(unit))
+        {
+            var stayTargets = new List<PodeMirarTargetOption>();
+            PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                SensorMovementMode.MoveuParado, stayTargets);
+            UnitManager stayBest = PickBestRogueTarget(stayTargets, snapshot.AITeam, unit, fromCell, false, out _);
+            if (stayBest != null)
+            {
+                Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue ignora transporte: alvo atual {stayBest.UnitDisplayName}#{stayBest.InstanceId}");
+                return true;
+            }
+        }
+
+        var targets = new List<PodeMirarTargetOption>();
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (occupied.Contains(cell))
+                continue;
+
+            targets.Clear();
+            PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                SensorMovementMode.MoveuAndando, targets, fromCell: cell);
+            UnitManager bestTarget = PickBestRogueTarget(targets, snapshot.AITeam, unit, cell, false, out _);
+            if (bestTarget == null)
+                continue;
+
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue ignora transporte: ataque disponivel {bestTarget.UnitDisplayName}#{bestTarget.InstanceId} via {cell}");
+            return true;
+        }
+
+        return false;
     }
 
 }

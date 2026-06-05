@@ -235,6 +235,93 @@ public partial class AIController
         return bestCell != fromCell;
     }
 
+    private bool TryDecideCapturerDefensiveOpportunityAttack(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        SectorObjective assigned,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null || assigned == null || paths == null || paths.Count == 0)
+            return false;
+        if (!unit.TryGetUnitData(out UnitData unitData) || unitData == null)
+            return false;
+
+        bool defensiveCombatant = unitData.aiPurchaseMode == AIPurchaseMode.Defensive
+            || unitData.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Armored) != BazookaTargetPriority.Tertiary;
+        bool defensiveContext = snapshot.Stance == AIStance.Defensive
+            || assigned.Status == ObjectiveStatus.Defending
+            || defensiveCombatant;
+        if (!defensiveContext)
+            return false;
+
+        MatchController mc = GetMatchController();
+        UnitManager bestTarget = null;
+        Vector3Int bestAttackCell = fromCell;
+        float bestScore = float.MinValue;
+        string bestReason = "";
+
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy == null || enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked)
+                continue;
+            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
+                continue;
+
+            Vector3Int enemyCell = enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            BazookaTargetPriority targetPreference = ResolveCapturerTargetPreference(unit, enemy);
+
+            foreach (Vector3Int rawCell in paths.Keys)
+            {
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                if (occupied != null && occupied.Contains(cell))
+                    continue;
+                if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
+                    continue;
+                if (!PassesAttackDecision(unit, enemy, cell, true, out string attackDecisionReason))
+                    continue;
+
+                float dpq = GetTerrainDpqPontos(cell);
+                int pathCost = GetPathStepCount(paths, cell);
+                float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+                float score =
+                    GetCapturerTargetPreferenceScore(targetPreference)
+                    + AttackTargetPriorityPursuer(enemyCell, fromCell) * 3000f
+                    + Mathf.Max(0, 20 - enemy.CurrentHP) * 250f
+                    + dpq * 800f
+                    - pathCost * 35f
+                    - threat * 80f
+                    - SectorManager.HexDistance(cell, enemyCell) * 25f;
+
+                if (cell == fromCell)
+                    score += 500f;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestTarget = enemy;
+                    bestAttackCell = cell;
+                    bestReason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} dpq={dpq:F1} threat={threat:F1} {attackDecisionReason}";
+                }
+            }
+        }
+
+        if (bestTarget == null)
+            return false;
+
+        Vector3Int targetCell = bestTarget.CurrentCellPosition;
+        targetCell.z = 0;
+        Debug.Log($"{TL("Capturador")} {unit.InstanceId} defesa oportunista: ataca {bestTarget.UnitDisplayName}#{bestTarget.InstanceId} via {bestAttackCell} ({bestReason})");
+        action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, bestAttackCell,
+            bestTarget.InstanceId.ToString(), targetCell, paths);
+        return true;
+    }
+
     private void AppendMissingDpqReachabilityDiagnostics(
         System.Text.StringBuilder log,
         UnitManager unit,

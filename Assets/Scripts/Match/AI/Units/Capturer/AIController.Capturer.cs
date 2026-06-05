@@ -139,6 +139,16 @@ public partial class AIController
             occupied,
             out Vector3Int recommendedAdvanceCell);
 
+        if (TryDecideCapturerDefensiveOpportunityAttack(
+            unit,
+            snapshot,
+            assigned,
+            fromCell,
+            paths,
+            occupied,
+            out PlayerAction defensiveOpportunityAttack))
+            return defensiveOpportunityAttack;
+
         if (TryDecideCapturerExplorer(
             unit,
             snapshot,

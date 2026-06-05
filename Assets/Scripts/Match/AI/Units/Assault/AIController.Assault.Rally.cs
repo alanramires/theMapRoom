@@ -78,6 +78,72 @@ public partial class AIController
         return RallyAssemblyAssaultRadius;
     }
 
+    private bool ShouldReleaseRogueAssaultFromRally(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        out string reason)
+    {
+        reason = "";
+        if (unit == null || snapshot == null || snapshot.EnemyHQ == null)
+            return false;
+
+        Vector3Int hqCell = snapshot.EnemyHQ.CurrentCellPosition;
+        hqCell.z = 0;
+        float selfHqDist = SectorManager.HexDistance(fromCell, hqCell);
+        int finalPressureRadius = Mathf.Max(5, GetEffectiveTransportThreshold(snapshot.AITeam));
+        if (selfHqDist <= finalPressureRadius)
+        {
+            reason = $"pressao final: selfHQ={selfHqDist:F0}<={finalPressureRadius}";
+            return true;
+        }
+
+        int pressureUnits = 0;
+        float nearest = float.MaxValue;
+        foreach (UnitManager ally in UnitManager.AllActive)
+        {
+            if (ally == null || ally == unit || ally.TeamId != snapshot.AITeam || ally.IsDead || ally.IsEmbarked)
+                continue;
+            if (!ally.TryGetUnitData(out UnitData data) || data == null || data.roles == null || data.roles.Count == 0)
+                continue;
+            if (!IsRallyReleasePressureUnit(data))
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            float dist = SectorManager.HexDistance(allyCell, hqCell);
+            if (dist < nearest)
+                nearest = dist;
+            if (dist <= finalPressureRadius)
+                pressureUnits++;
+        }
+
+        if (pressureUnits >= 2)
+        {
+            reason = $"pressao final: aliadosHQ={pressureUnits}<= {finalPressureRadius} nearest={(nearest < float.MaxValue ? nearest.ToString("F0") : "?")}";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsRallyReleasePressureUnit(UnitData data)
+    {
+        if (data == null || data.roles == null)
+            return false;
+
+        for (int i = 0; i < data.roles.Count; i++)
+        {
+            UnitRole role = data.roles[i];
+            if (role == UnitRole.Assalto
+                || role == UnitRole.Capturador
+                || role == UnitRole.FogoIndireto)
+                return true;
+        }
+
+        return false;
+    }
+
     private bool TryBuildNearbyHeldRallyObjective(
         TeamId aiTeam,
         Vector3Int fromCell,

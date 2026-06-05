@@ -27,11 +27,16 @@ public partial class AIController
                 attackTarget.InstanceId.ToString(), targetCell, paths);
         }
 
-        if (TryBuildNearbyHeldRallyObjective(snapshot.AITeam, fromCell, plan, snapshot.TurnNumber, out SectorObjective rallyObjective, out string rallyReason))
+        bool releaseRally = ShouldReleaseRogueAssaultFromRally(unit, snapshot, fromCell, out string releaseRallyReason);
+        string rallyReason = "";
+        if (!releaseRally
+            && TryBuildNearbyHeldRallyObjective(snapshot.AITeam, fromCell, plan, snapshot.TurnNumber, out SectorObjective rallyObjective, out rallyReason))
         {
             Debug.Log($"{TL("Assalto")} {unit.InstanceId} rogue segura rally {rallyObjective.Sector}: {rallyReason}");
             return DecideRallyAssemblyAssaultAction(unit, snapshot, rallyObjective);
         }
+        if (releaseRally)
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} rogue libera rally: {releaseRallyReason}");
         if (!string.IsNullOrEmpty(rallyReason))
             Debug.Log($"{TL("Assalto")} {unit.InstanceId} rogue rally scan: {rallyReason}");
 

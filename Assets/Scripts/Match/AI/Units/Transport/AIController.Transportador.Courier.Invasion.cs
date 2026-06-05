@@ -53,6 +53,9 @@ public partial class AIController
         if (!HasTransportInvasionGoGreen(transporter, snapshot, target, out _))
             return false;
 
+        if (HasTransportInvasionBridgeheadGoGreen(transporter, snapshot, out _))
+            return true;
+
         return TryGetTransportScreenMetrics(transporter, snapshot, cell, target,
             out float gap, out _, out _)
             && gap >= 0.75f;
@@ -72,6 +75,9 @@ public partial class AIController
         if (!HasTransportInvasionGoGreen(transporter, snapshot, target, out _))
             return false;
 
+        if (HasTransportInvasionBridgeheadGoGreen(transporter, snapshot, out _))
+            return true;
+
         return TryGetTransportScreenMetrics(transporter, snapshot, dropCell, target,
             out float gap, out _, out _)
             && gap >= 0.25f;
@@ -85,8 +91,14 @@ public partial class AIController
         out string reason)
     {
         const float assaultReadyRange = 2f;
+        const float bridgeheadAssaultRange = 2f;
+        const float bridgeheadArtilleryRange = 5f;
         int assaultReady = 0;
+        int bridgeheadAssault = 0;
+        int bridgeheadArtillery = 0;
         float nearestAssault = float.MaxValue;
+        float nearestBridgeheadAssault = float.MaxValue;
+        float nearestBridgeheadArtillery = float.MaxValue;
         target.z = 0;
 
         if (snapshot?.MyUnits == null)
@@ -97,22 +109,98 @@ public partial class AIController
 
         foreach (UnitManager ally in snapshot.MyUnits)
         {
-            if (!IsTransportInvasionAssaultReadyUnit(ally, transporter))
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            if (IsTransportInvasionAssaultReadyUnit(ally, transporter))
+            {
+                float dist = SectorManager.HexDistance(allyCell, target);
+                if (dist < nearestAssault)
+                    nearestAssault = dist;
+                if (dist <= assaultReadyRange)
+                    assaultReady++;
+
+                Vector3Int transportCell = transporter != null ? transporter.CurrentCellPosition : Vector3Int.zero;
+                transportCell.z = 0;
+                float bridgeDist = SectorManager.HexDistance(allyCell, transportCell);
+                if (bridgeDist < nearestBridgeheadAssault)
+                    nearestBridgeheadAssault = bridgeDist;
+                if (bridgeDist <= bridgeheadAssaultRange)
+                    bridgeheadAssault++;
+            }
+
+            if (IsTransportInvasionArtilleryReadyUnit(ally, transporter))
+            {
+                Vector3Int transportCell = transporter != null ? transporter.CurrentCellPosition : Vector3Int.zero;
+                transportCell.z = 0;
+                float artDist = SectorManager.HexDistance(allyCell, transportCell);
+                if (artDist < nearestBridgeheadArtillery)
+                    nearestBridgeheadArtillery = artDist;
+                if (artDist <= bridgeheadArtilleryRange)
+                    bridgeheadArtillery++;
+            }
+        }
+
+        bool targetReady = assaultReady >= 1;
+        bool bridgeheadReady = bridgeheadAssault >= 1 && bridgeheadArtillery >= 1;
+        bool ready = targetReady || bridgeheadReady;
+        reason = ready
+            ? targetReady
+                ? $"goGreen assalto={assaultReady}<=2h alvo"
+                : $"goGreen ponte assalto={bridgeheadAssault}<=2h apc art={bridgeheadArtillery}<=5h"
+            : $"aguarda assalto<=2h alvo nearest={(nearestAssault < float.MaxValue ? nearestAssault.ToString("F1") : "?")} ponteAss={(nearestBridgeheadAssault < float.MaxValue ? nearestBridgeheadAssault.ToString("F1") : "?")} ponteArt={(nearestBridgeheadArtillery < float.MaxValue ? nearestBridgeheadArtillery.ToString("F1") : "?")}";
+        return ready;
+    }
+
+
+    private bool HasTransportInvasionBridgeheadGoGreen(
+        UnitManager transporter,
+        AIWorldSnapshot snapshot,
+        out string reason)
+    {
+        const float bridgeheadAssaultRange = 2f;
+        const float bridgeheadArtilleryRange = 5f;
+        int bridgeheadAssault = 0;
+        int bridgeheadArtillery = 0;
+        float nearestAssault = float.MaxValue;
+        float nearestArtillery = float.MaxValue;
+        reason = "sem snapshot";
+
+        if (transporter == null || snapshot?.MyUnits == null)
+            return false;
+
+        Vector3Int transportCell = transporter.CurrentCellPosition;
+        transportCell.z = 0;
+
+        foreach (UnitManager ally in snapshot.MyUnits)
+        {
+            if (ally == null || ally == transporter || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
                 continue;
 
             Vector3Int allyCell = ally.CurrentCellPosition;
             allyCell.z = 0;
-            float dist = SectorManager.HexDistance(allyCell, target);
-            if (dist < nearestAssault)
-                nearestAssault = dist;
-            if (dist <= assaultReadyRange)
-                assaultReady++;
+            float dist = SectorManager.HexDistance(allyCell, transportCell);
+
+            if (IsTransportInvasionAssaultReadyUnit(ally, transporter))
+            {
+                if (dist < nearestAssault)
+                    nearestAssault = dist;
+                if (dist <= bridgeheadAssaultRange)
+                    bridgeheadAssault++;
+            }
+
+            if (IsTransportInvasionArtilleryReadyUnit(ally, transporter))
+            {
+                if (dist < nearestArtillery)
+                    nearestArtillery = dist;
+                if (dist <= bridgeheadArtilleryRange)
+                    bridgeheadArtillery++;
+            }
         }
 
-        bool ready = assaultReady >= 1;
+        bool ready = bridgeheadAssault >= 1 && bridgeheadArtillery >= 1;
         reason = ready
-            ? $"goGreen assalto={assaultReady}<=2h"
-            : $"aguarda assalto<=2h nearest={(nearestAssault < float.MaxValue ? nearestAssault.ToString("F1") : "?")}";
+            ? $"ponte assalto={bridgeheadAssault}<=2h art={bridgeheadArtillery}<=5h"
+            : $"ponte aguarda ass={(nearestAssault < float.MaxValue ? nearestAssault.ToString("F1") : "?")} art={(nearestArtillery < float.MaxValue ? nearestArtillery.ToString("F1") : "?")}";
         return ready;
     }
 
@@ -273,6 +361,17 @@ public partial class AIController
             return false;
 
         return data.roles.Contains(UnitRole.Assalto);
+    }
+
+
+    private static bool IsTransportInvasionArtilleryReadyUnit(UnitManager ally, UnitManager transporter)
+    {
+        if (ally == null || ally == transporter || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
+            return false;
+        if (!ally.TryGetUnitData(out UnitData data) || data == null || data.roles == null)
+            return false;
+
+        return data.roles.Contains(UnitRole.FogoIndireto);
     }
 
     // -------------------------------------------------------------------------
