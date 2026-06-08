@@ -68,7 +68,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Range(1, 12)] public int StalemateEliteCapturerRange = 8;
 
     [Header("Logistica")]
-    [Range(1, 8)] public int RepairsPerGroundSupplier = 4;
+    [Range(1, 8)] public int RepairsPerGroundSupplier = 2;
 
     [Header("Economia Aeronáutica")]
     [Range(1, 8)]    public int   MaxAirTransporters               = 3;

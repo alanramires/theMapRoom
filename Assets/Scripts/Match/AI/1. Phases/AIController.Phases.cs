@@ -50,7 +50,13 @@ public partial class AIController
                   $"| {snapshot.MyUnits.Count} unidades | {snapshot.EnemyUnits.Count} inimigos visíveis " +
                   $"| R$ {snapshot.Budget}");
 
-        if (resumeStage <= 3 && (emulateStage1 || emulateStage2 || emulateStage3))
+        bool shouldReuseSavedPlan = resumeStage >= 2 && HasUsableSavedObjectivePlan(aiTeam);
+        if (shouldReuseSavedPlan)
+        {
+            Debug.Log($"{TL("Stage")} Retomando stage {resumeStage} com plano salvo; BuildObjectivePlan ignorado.");
+            AITacticalAnalyzer.Instance.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
+        }
+        else if (resumeStage <= 3 && (emulateStage1 || emulateStage2 || emulateStage3))
         {
             currentAIStage = Mathf.Max(1, resumeStage);
             BuildObjectivePlan(snapshot);
@@ -127,6 +133,16 @@ public partial class AIController
         currentAIStage = 4;
         currentAITeam = aiTeam;
         aiCoroutine = null;
+    }
+
+    private static bool HasUsableSavedObjectivePlan(TeamId aiTeam)
+    {
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        if (plan == null)
+            return false;
+        bool hasObjectives = plan.Objectives != null && plan.Objectives.Count > 0;
+        bool hasRogues = plan.RogueUnitIds != null && plan.RogueUnitIds.Count > 0;
+        return hasObjectives || hasRogues;
     }
 
     private IEnumerator RunAIDebugStage(TeamId aiTeam, int stage, bool resetPlan = false)

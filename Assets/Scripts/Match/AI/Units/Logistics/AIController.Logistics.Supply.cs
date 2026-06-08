@@ -198,33 +198,57 @@ public partial class AIController
         if (limit <= 0)
             return false;
         bool allowPreventiveMaintenance = IsPreventiveLogisticsAllowed(unit, snapshot, fromCell, paths, occupied);
-
-        var currentOptions = new List<PodeSuprirOption>();
-        if (PodeSuprirSensor.CollectOptions(unit, boardTilemap, terrainDatabase, matchController, currentOptions, out _))
-        {
-            List<UnitManager> currentTargets = PickBestLogisticsSupplyTargets(unit, snapshot, fromCell, currentOptions, limit, allowPreventiveMaintenance);
-            if (currentTargets.Count > 0)
-            {
-                action = BuildSupplyBatch(unit, snapshot.AITeam, fromCell, fromCell, currentTargets, paths);
-                reason = allowPreventiveMaintenance ? $"preventivo agora count={currentTargets.Count}" : $"agora count={currentTargets.Count}";
-                return true;
-            }
-        }
-
-        if (paths == null || paths.Count == 0)
-            return false;
+        bool hasReachableCritical = HasReachableCriticalLogisticsTarget(unit, snapshot, fromCell, paths, occupied);
 
         Vector3Int bestCell = fromCell;
         List<UnitManager> bestTargets = null;
         float bestScore = float.MinValue;
         Vector3Int anchor = ResolveLogisticsAnchor(snapshot, fromCell);
+        var currentOptions = new List<PodeSuprirOption>();
+        var currentInvalidOptions = new List<PodeSuprirInvalidOption>();
+        if (PodeSuprirSensor.CollectOptions(unit, boardTilemap, terrainDatabase, matchController, currentOptions, out _, currentInvalidOptions))
+        {
+            List<UnitManager> currentTargets = PickBestLogisticsSupplyTargets(unit, snapshot, fromCell, currentOptions, limit, allowPreventiveMaintenance);
+            if (currentTargets.Count < Mathf.Min(limit, currentOptions.Count) || currentInvalidOptions.Count > 0)
+            {
+                Debug.Log($"{TL("Logistics")} {unit.InstanceId} supplySensor agora valid={currentOptions.Count} selected={currentTargets.Count}/{limit} invalid={currentInvalidOptions.Count} " +
+                          $"{BuildLogisticsSupplyDebug(unit, currentOptions, currentTargets, currentInvalidOptions, allowPreventiveMaintenance)}");
+            }
+            if (currentTargets.Count > 0)
+            {
+                bestTargets = currentTargets;
+                bestScore = ScoreLogisticsSupplyCell(unit, snapshot, fromCell, fromCell, currentTargets, paths, anchor, baseDefense, preferCurrentCell: true);
+                bool currentHasCritical = HasCriticalLogisticsTarget(currentTargets);
+                bool preventiveWouldPreemptCritical = hasReachableCritical && !currentHasCritical;
+                if ((currentTargets.Count >= limit || paths == null || paths.Count == 0) && !preventiveWouldPreemptCritical)
+                {
+                    action = BuildSupplyBatch(unit, snapshot.AITeam, fromCell, fromCell, currentTargets, paths);
+                    reason = currentHasCritical
+                        ? $"critico agora count={currentTargets.Count}"
+                        : allowPreventiveMaintenance ? $"preventivo agora count={currentTargets.Count}" : $"agora count={currentTargets.Count}";
+                    return true;
+                }
+
+                Debug.Log($"{TL("Logistics")} {unit.InstanceId} encontrou {currentTargets.Count}/{limit} agora; verifica se andar atende mais alvos" +
+                          (preventiveWouldPreemptCritical ? " (critico alcancavel tem prioridade)" : ""));
+            }
+        }
+        else if (currentInvalidOptions.Count > 0)
+        {
+            Debug.Log($"{TL("Logistics")} {unit.InstanceId} supplySensor agora sem validos invalid={currentInvalidOptions.Count} " +
+                      $"{BuildLogisticsSupplyDebug(unit, currentOptions, null, currentInvalidOptions, allowPreventiveMaintenance)}");
+        }
+
+        if (paths == null || paths.Count == 0)
+            return false;
+
         foreach (Vector3Int rawCell in paths.Keys)
         {
             Vector3Int cell = rawCell;
             cell.z = 0;
-            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+            if (cell == fromCell && bestTargets != null)
                 continue;
-            if (!baseDefense && cell != fromCell && IsLogisticsForwardOfMainLine(unit, snapshot, cell, anchor))
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
                 continue;
             if (!IsLogisticsServiceCellAllowed(unit, snapshot, cell))
                 continue;
@@ -232,26 +256,13 @@ public partial class AIController
             List<UnitManager> targets = CollectLogisticsTargetsInServiceRange(unit, snapshot, cell, limit, allowPreventiveMaintenance);
             if (targets.Count <= 0)
                 continue;
+            bool hasCriticalTarget = HasCriticalLogisticsTarget(targets);
+            if (hasReachableCritical && !hasCriticalTarget)
+                continue;
+            if (!baseDefense && cell != fromCell && IsLogisticsForwardOfMainLine(unit, snapshot, cell, anchor) && !hasCriticalTarget)
+                continue;
 
-            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
-            float dpq = GetTerrainDpqPontos(cell);
-            float pairBonus = targets.Count >= 2 ? 1500f : 0f;
-            float hpNeed = 0f;
-            for (int i = 0; i < targets.Count; i++)
-                hpNeed += Mathf.Max(0, 10 - targets[i].CurrentHP) * 70f;
-
-            float rearArea = CalculateLogisticsRearAreaScore(unit, snapshot, cell, anchor);
-            float score = targets.Count * 5000f
-                + pairBonus
-                + hpNeed
-                + dpq * 80f
-                + rearArea * 0.55f
-                - threat * (baseDefense ? 30f : 110f)
-                - GetPathStepCount(paths, cell) * 12f
-                - cell.GetHashCode() * 0.000001f;
-
-            if (!baseDefense && IsLogisticsForwardOfMainLine(unit, snapshot, cell, anchor))
-                score -= 2200f;
+            float score = ScoreLogisticsSupplyCell(unit, snapshot, fromCell, cell, targets, paths, anchor, baseDefense, preferCurrentCell: false);
 
             if (score > bestScore)
             {
@@ -265,8 +276,119 @@ public partial class AIController
             return false;
 
         action = BuildSupplyBatch(unit, snapshot.AITeam, fromCell, bestCell, bestTargets, paths);
-        reason = allowPreventiveMaintenance ? $"preventivo via={bestCell} count={bestTargets.Count} score={bestScore:F0}" : $"via={bestCell} count={bestTargets.Count} score={bestScore:F0}";
+        bool now = bestCell == fromCell;
+        bool bestHasCritical = HasCriticalLogisticsTarget(bestTargets);
+        bool bestHasPreventive = HasPreventiveLogisticsTarget(unit, bestTargets);
+        reason = bestHasCritical && bestHasPreventive
+            ? (now ? $"critico+preventivo agora count={bestTargets.Count} score={bestScore:F0}" : $"critico+preventivo via={bestCell} count={bestTargets.Count} score={bestScore:F0}")
+            : bestHasCritical
+            ? (now ? $"critico agora count={bestTargets.Count} score={bestScore:F0}" : $"critico via={bestCell} count={bestTargets.Count} score={bestScore:F0}")
+            : allowPreventiveMaintenance
+                ? (now ? $"preventivo agora count={bestTargets.Count} score={bestScore:F0}" : $"preventivo via={bestCell} count={bestTargets.Count} score={bestScore:F0}")
+                : (now ? $"agora count={bestTargets.Count} score={bestScore:F0}" : $"via={bestCell} count={bestTargets.Count} score={bestScore:F0}");
         return true;
+    }
+
+    private float ScoreLogisticsSupplyCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int cell,
+        List<UnitManager> targets,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        Vector3Int anchor,
+        bool baseDefense,
+        bool preferCurrentCell)
+    {
+        if (targets == null || targets.Count <= 0)
+            return float.MinValue;
+
+        float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+        float dpq = GetTerrainDpqPontos(cell);
+        float pairBonus = targets.Count >= 2 ? 1500f : 0f;
+        float hpNeed = 0f;
+        int criticalCount = 0;
+        int emergencyCriticalCount = 0;
+        int preventiveCount = 0;
+        for (int i = 0; i < targets.Count; i++)
+        {
+            if (targets[i] == null)
+                continue;
+
+            int maxHp = Mathf.Max(1, targets[i].GetMaxHP());
+            int missingHp = Mathf.Max(0, maxHp - targets[i].CurrentHP);
+            bool critical = targets[i].IsUnderRepair;
+            hpNeed += missingHp * (critical ? 1400f : 90f);
+            if (critical && targets[i].CurrentHP * 2 <= maxHp)
+            {
+                hpNeed += 7500f;
+                emergencyCriticalCount++;
+            }
+            if (critical)
+            {
+                criticalCount++;
+                hpNeed += ScoreCriticalLogisticsStrategicBonus(snapshot, targets[i]);
+            }
+            else if (IsPreventiveLogisticsTarget(unit, targets[i]))
+            {
+                preventiveCount++;
+                hpNeed += ScorePreventiveLogisticsStrategicBonus(targets[i]);
+            }
+        }
+        float criticalPreventiveComboBonus = criticalCount > 0 && preventiveCount > 0 ? 6500f : 0f;
+        float multiCriticalBonus = criticalCount >= 2 ? 11000f + emergencyCriticalCount * 3500f : 0f;
+
+        float rearArea = CalculateLogisticsRearAreaScore(unit, snapshot, cell, anchor);
+        int pathCost = cell == fromCell || paths == null ? 0 : GetPathStepCount(paths, cell);
+        float score = targets.Count * 5000f
+            + criticalCount * 9000f
+            + preventiveCount * 1800f
+            + criticalPreventiveComboBonus
+            + multiCriticalBonus
+            + pairBonus
+            + hpNeed
+            + dpq * 80f
+            + rearArea * 0.55f
+            - threat * (baseDefense ? 30f : 110f)
+            - pathCost * 12f
+            - cell.GetHashCode() * 0.000001f;
+
+        if (preferCurrentCell)
+            score += 250f;
+        if (!baseDefense && IsLogisticsForwardOfMainLine(unit, snapshot, cell, anchor))
+            score -= 2200f;
+
+        return score;
+    }
+
+    private static bool HasCriticalLogisticsTarget(List<UnitManager> targets)
+    {
+        if (targets == null)
+            return false;
+
+        for (int i = 0; i < targets.Count; i++)
+        {
+            UnitManager target = targets[i];
+            if (target != null && target.IsUnderRepair)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasPreventiveLogisticsTarget(UnitManager logistics, List<UnitManager> targets)
+    {
+        if (logistics == null || targets == null)
+            return false;
+
+        for (int i = 0; i < targets.Count; i++)
+        {
+            UnitManager target = targets[i];
+            if (target != null && !target.IsUnderRepair && IsPreventiveLogisticsTarget(logistics, target))
+                return true;
+        }
+
+        return false;
     }
 
     private List<UnitManager> PickBestLogisticsSupplyTargets(
@@ -300,6 +422,69 @@ public partial class AIController
         }
 
         return result;
+    }
+
+    private string BuildLogisticsSupplyDebug(
+        UnitManager logistics,
+        List<PodeSuprirOption> validOptions,
+        List<UnitManager> selectedTargets,
+        List<PodeSuprirInvalidOption> invalidOptions,
+        bool allowPreventiveMaintenance)
+    {
+        var selectedIds = new HashSet<int>();
+        if (selectedTargets != null)
+        {
+            for (int i = 0; i < selectedTargets.Count; i++)
+            {
+                UnitManager target = selectedTargets[i];
+                if (target != null)
+                    selectedIds.Add(target.InstanceId);
+            }
+        }
+
+        string valid = "valid=[";
+        if (validOptions != null)
+        {
+            for (int i = 0; i < validOptions.Count; i++)
+            {
+                UnitManager target = validOptions[i] != null ? validOptions[i].targetUnit : null;
+                if (target == null)
+                    continue;
+
+                if (valid.Length > 7)
+                    valid += "; ";
+                bool eligible = IsLogisticsServiceTarget(logistics, target, allowPreventiveMaintenance);
+                valid += $"#{target.InstanceId}@{FormatCellForDebug(target.CurrentCellPosition)} hp={target.CurrentHP}/{target.GetMaxHP()} repair={target.IsUnderRepair} recv={target.ReceivedSuppliesThisTurn} aiEligible={eligible} selected={selectedIds.Contains(target.InstanceId)}";
+            }
+        }
+        valid += "]";
+
+        string invalid = "invalid=[";
+        if (invalidOptions != null)
+        {
+            int shown = 0;
+            for (int i = 0; i < invalidOptions.Count && shown < 6; i++)
+            {
+                PodeSuprirInvalidOption option = invalidOptions[i];
+                UnitManager target = option != null ? option.targetUnit : null;
+                if (target == null)
+                    continue;
+
+                if (shown > 0)
+                    invalid += "; ";
+                invalid += $"#{target.InstanceId}@{FormatCellForDebug(option.targetCell)} hp={target.CurrentHP}/{target.GetMaxHP()} repair={target.IsUnderRepair} recv={target.ReceivedSuppliesThisTurn} reason={option.reason}";
+                shown++;
+            }
+        }
+        invalid += "]";
+
+        return $"{valid} {invalid}";
+    }
+
+    private static string FormatCellForDebug(Vector3Int cell)
+    {
+        cell.z = 0;
+        return $"({cell.x},{cell.y})";
     }
 
     private bool TryBuildTargetedLogisticsSupplyAction(
@@ -572,7 +757,7 @@ public partial class AIController
 
     private static bool HasAnyWeaponAmmoAtOrBelow(UnitManager unit, int ammoThreshold)
     {
-        if (ammoThreshold <= 0 || unit == null || !unit.TryGetUnitData(out UnitData data) || data == null || data.embarkedWeapons == null)
+        if (ammoThreshold < 0 || unit == null || !unit.TryGetUnitData(out UnitData data) || data == null || data.embarkedWeapons == null)
             return false;
 
         IReadOnlyList<UnitEmbarkedWeapon> runtimeWeapons = unit.GetEmbarkedWeapons();
@@ -601,16 +786,118 @@ public partial class AIController
         float valueBonus = target.TryGetUnitData(out UnitData vd) && vd != null ? vd.cost / 100f : 0f;
 
         if (target.IsUnderRepair)
-            return 10000f + Mathf.Max(0, target.GetMaxHP() - target.CurrentHP) * 120f + valueBonus;
+        {
+            int criticalMaxHp = Mathf.Max(1, target.GetMaxHP());
+            int criticalMissingHp = Mathf.Max(0, criticalMaxHp - target.CurrentHP);
+            float emergencyBonus = target.CurrentHP * 2 <= criticalMaxHp ? 7500f : 0f;
+            return 10000f
+                + criticalMissingHp * 1800f
+                + emergencyBonus
+                + valueBonus
+                + ScoreCriticalLogisticsStrategicBonus(snapshot, target);
+        }
 
         float score = valueBonus;
         int maxHp = Mathf.Max(1, target.GetMaxHP());
         int maxFuel = Mathf.Max(1, target.GetMaxFuel());
         score += Mathf.Max(0f, 100f - target.CurrentHP * 100f / maxHp) * 18f;
         score += Mathf.Max(0f, 100f - target.CurrentFuel * 100f / maxFuel) * 10f;
-        if (vd != null && HasAnyWeaponAmmoAtOrBelow(target, 1))
-            score += 1400f;
+        score += ScorePreventiveLogisticsStrategicBonus(target);
         return score;
+    }
+
+    private float ScoreCriticalLogisticsStrategicBonus(AIWorldSnapshot snapshot, UnitManager target)
+    {
+        if (target == null || !target.TryGetUnitData(out UnitData data) || data == null)
+            return 0f;
+
+        float score = data.cost / 12f;
+        score += Mathf.Max(0, data.eliteLevel) * 3000f;
+
+        bool fireSupport = HasLogisticsRole(data, UnitRole.FogoIndireto) || data.unitClass == GameUnitClass.Artillery
+            || data.preferArtilleryModeBeforeCombatant || data.longRangeStationary;
+        if (fireSupport)
+        {
+            score += 6500f;
+            if (HasAnyWeaponAmmoAtOrBelow(target, 0))
+                score += 9500f;
+            else if (HasAnyWeaponAmmoAtOrBelow(target, 1))
+                score += 4500f;
+        }
+
+        if (HasLogisticsRole(data, UnitRole.Logistica))
+            score += 5500f;
+        if (HasLogisticsRole(data, UnitRole.Transportador))
+            score += 2500f;
+        if (HasLogisticsRole(data, UnitRole.Assalto))
+            score += 1800f;
+
+        bool mergeableInfantry = data.fuseWhileInRepair
+            && data.unitClass == GameUnitClass.Infantry
+            && HasNearbyFusionCandidate(snapshot, target, data);
+        if (mergeableInfantry)
+            score -= 9000f;
+
+        return score;
+    }
+
+    private static float ScorePreventiveLogisticsStrategicBonus(UnitManager target)
+    {
+        if (target == null || !target.TryGetUnitData(out UnitData data) || data == null)
+            return 0f;
+
+        float score = data.cost / 25f + Mathf.Max(0, data.eliteLevel) * 900f;
+        bool fireSupport = HasLogisticsRole(data, UnitRole.FogoIndireto) || data.unitClass == GameUnitClass.Artillery
+            || data.preferArtilleryModeBeforeCombatant || data.longRangeStationary;
+        if (fireSupport)
+        {
+            if (HasAnyWeaponAmmoAtOrBelow(target, 0))
+                score += 9000f;
+            else if (HasAnyWeaponAmmoAtOrBelow(target, 1))
+                score += 4200f;
+            else
+                score += 1200f;
+        }
+        else if (HasAnyWeaponAmmoAtOrBelow(target, 1))
+        {
+            score += 1400f;
+        }
+
+        return score;
+    }
+
+    private static bool HasLogisticsRole(UnitData data, UnitRole role)
+    {
+        return data != null && data.roles != null && data.roles.Contains(role);
+    }
+
+    private static bool HasNearbyFusionCandidate(AIWorldSnapshot snapshot, UnitManager target, UnitData targetData)
+    {
+        if (snapshot == null || snapshot.MyUnits == null || target == null || targetData == null)
+            return false;
+
+        Vector3Int targetCell = target.CurrentCellPosition;
+        targetCell.z = 0;
+        for (int i = 0; i < snapshot.MyUnits.Count; i++)
+        {
+            UnitManager ally = snapshot.MyUnits[i];
+            if (ally == null
+                || ally == target
+                || ally.IsDead
+                || ally.IsEmbarked
+                || ally.IsUnderRepair
+                || ally.TeamId != target.TeamId
+                || !ally.TryGetUnitData(out UnitData allyData)
+                || allyData != targetData)
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            if (SectorManager.HexDistance(targetCell, allyCell) <= 2f)
+                return true;
+        }
+
+        return false;
     }
 
     private static bool IsInLogisticsServiceRange(UnitManager logistics, Vector3Int serviceCell, UnitManager target)

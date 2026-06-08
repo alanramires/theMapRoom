@@ -87,7 +87,7 @@ public partial class AIController
 
         // ---- Tier 4: setor home lotado/inacessível → qualquer célula de baixa ameaça atrás das linhas ----
         Debug.Log($"{TL("Repair")} {unit.InstanceId} T4 último recurso atrás das linhas para art #{artPassenger.InstanceId}");
-        return TryDropFireSupportConservative(unit, artPassenger, passengers, snapshot, plan, fromCell, paths, occupied);
+        return TryDropFireSupportConservative(unit, artPassenger, passengers, snapshot, plan, fromCell, fromCell, paths, occupied);
     }
 
     // Tries to disembark artPassenger onto a construction building near targetCell.

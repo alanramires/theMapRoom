@@ -54,9 +54,7 @@ public partial class AIController
         PlayerAction evacAction = TryDecideEvacShuttleAction(unit, snapshot, plan, paths, occupied);
         if (evacAction != null) return evacAction;
 
-        // No pickup candidate: release to HexEvaluator for opportunistic combat/positioning.
-        // Capture actions are suppressed for Transportador units in the Router.
-        Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — sem candidato, libera para suporte de combate");
+        Debug.Log($"{TL("Transporte")} {unit.InstanceId} shuttle — sem candidato de embarque");
         return null;
     }
 

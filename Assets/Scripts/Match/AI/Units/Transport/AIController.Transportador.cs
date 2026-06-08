@@ -38,7 +38,9 @@ public partial class AIController
 
         PlayerAction rogueAction = DecideRogueShuttleAction(unit, snapshot, plan);
         if (rogueAction != null) return rogueAction;
-        return TryDecideTowShuttleAction(unit, snapshot, plan);
+        PlayerAction towAction = TryDecideTowShuttleAction(unit, snapshot, plan);
+        if (towAction != null) return towAction;
+        return DecideIdleTransportReturnAction(unit, snapshot);
     }
 
     // -------------------------------------------------------------------------
@@ -58,6 +60,26 @@ public partial class AIController
         if (unit == null) return false;
         if (!unit.TryGetUnitData(out UnitData data) || data == null) return false;
         return data.isTransporter && data.domain == Domain.Air;
+    }
+
+    private PlayerAction DecideIdleTransportReturnAction(UnitManager unit, AIWorldSnapshot snapshot)
+    {
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+        if (paths == null || paths.Count == 0)
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        Vector3Int waitTarget = FindTransportWaitTarget(snapshot.AITeam, fromCell);
+        waitTarget.z = 0;
+        Vector3Int moveTarget = FindTransportMove(unit, fromCell, waitTarget, paths, occupied, snapshot.AITeam);
+
+        Debug.Log($"{TL("Transporte")} {unit.InstanceId} vazio sem passageiro/TOW — retorna pickup/base alvo={waitTarget} via {moveTarget}");
+        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
     }
 
     private static SectorObjective ResolveAssignedTransportObjective(UnitManager unit, TeamObjectivePlan plan)

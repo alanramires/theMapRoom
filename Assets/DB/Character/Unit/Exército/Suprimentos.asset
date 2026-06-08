@@ -56,6 +56,10 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 0
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 1
   aiConservativeSupplyAvoidEnemyRange: 1
@@ -82,7 +86,7 @@ MonoBehaviour:
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 1
   supplierTier: 1
-  maxUnitsServedPerTurn: 2
+  maxUnitsServedPerTurn: 1
   serviceRange: 1
   collectionRange: 0
   supplierOperationDomains:

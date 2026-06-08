@@ -245,7 +245,7 @@ public partial class AIShoppingPlanner
                 score += urgentTransportDemand ? 144000 : 108000;
             if (openLogisticsSlots > 0 && isPrimaryLogistics)
             {
-                score += openLogisticsSlots >= 2 ? 128000 : 108000;
+                score += openLogisticsSlots >= 2 ? 220000 : 185000;
                 if (defensiveBaseThreat) score -= 25000;
             }
             if (openFireSupportSlots > 0 && isFireSupportCapable)

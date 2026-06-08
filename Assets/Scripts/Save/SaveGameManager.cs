@@ -113,11 +113,17 @@ public class SaveGameManager : MonoBehaviour
     private SlotPromptState promptState;
     private int promptOpenedFrame = -1;
     private int overwritePendingSlot;
+#if UNITY_WEBGL && !UNITY_EDITOR
+    private bool webGLStorageReady;
+    private bool webGLSaveSyncInProgress;
+    private int pendingWebGLSaveSlot;
+    private string pendingWebGLSavePath;
+#endif
     private readonly Dictionary<string, ServiceData> cachedServicesById = new Dictionary<string, ServiceData>(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SupplyData> cachedSuppliesById = new Dictionary<string, SupplyData>(StringComparer.OrdinalIgnoreCase);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-    [DllImport("__Internal")] private static extern void SyncFilesToIndexedDB();
+    [DllImport("__Internal")] private static extern void SyncFilesToIndexedDB(string objectName, string callbackMethod);
     [DllImport("__Internal")] private static extern void LoadFilesFromIndexedDB(string objectName, string callbackMethod);
 #endif
 
@@ -126,26 +132,75 @@ public class SaveGameManager : MonoBehaviour
         EnsureDefaultSaveDirectoryConfigured();
         TryAutoAssignReferences();
 #if UNITY_WEBGL && !UNITY_EDITOR
+        webGLStorageReady = false;
         LoadFilesFromIndexedDB(gameObject.name, nameof(OnWebGLInitSyncComplete));
 #endif
     }
 
-    private void OnWebGLInitSyncComplete()
-    {
-        Debug.Log("[SaveGame] WebGL: IndexedDB sincronizado e pronto.");
-    }
-
-    private static void WebGLSyncAfterWrite()
+    private void OnWebGLInitSyncComplete(string status)
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
-        SyncFilesToIndexedDB();
+        webGLStorageReady = true;
+        if (!string.IsNullOrWhiteSpace(status) && status.StartsWith("ERR:", StringComparison.OrdinalIgnoreCase))
+            Debug.LogWarning($"[SaveGame] WebGL: falha ao carregar IndexedDB ({status}). Saves locais podem aparecer vazios nesta sessao.");
+        else
+            Debug.Log("[SaveGame] WebGL: IndexedDB sincronizado e pronto.");
+
+        TryStartPendingMainMenuLoadForActiveScene();
+#endif
+    }
+
+    private void BeginWebGLSyncAfterWrite(int slotIndex, string path)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        webGLStorageReady = false;
+        webGLSaveSyncInProgress = true;
+        pendingWebGLSaveSlot = slotIndex;
+        pendingWebGLSavePath = path;
+        SyncFilesToIndexedDB(gameObject.name, nameof(OnWebGLSaveSyncComplete));
+#endif
+    }
+
+    private void OnWebGLSaveSyncComplete(string status)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        int slot = pendingWebGLSaveSlot;
+        string path = pendingWebGLSavePath;
+        pendingWebGLSaveSlot = 0;
+        pendingWebGLSavePath = string.Empty;
+        webGLSaveSyncInProgress = false;
+        webGLStorageReady = true;
+
+        if (!string.IsNullOrWhiteSpace(status) && status.StartsWith("ERR:", StringComparison.OrdinalIgnoreCase))
+        {
+            cursorController?.PlayErrorSfx();
+            string errorText = ResolveDialog(
+                "dialog.save_status.webgl_sync_failed",
+                "Falha ao persistir o save no navegador. Tente salvar novamente.");
+            PanelDialogController.TrySetTransientText(errorText, 3.2f);
+            Debug.LogError($"[SaveGame] WebGL: falha ao sincronizar IndexedDB para slot {slot}: {status}");
+            return;
+        }
+
+        cursorController?.PlayLoadSfx();
+        string savedText = ResolveDialog(
+            "dialog.save_status.success_webgl",
+            ResolveHelper("helper.save_status.success_webgl", "Jogo salvo no navegador no slot <slot>"),
+            new Dictionary<string, string> { { "slot", slot.ToString() } });
+        PanelDialogController.TrySetTransientText(savedText, 2.2f);
+        Debug.Log($"[SaveGame] WebGL: Slot {slot} persistido no IndexedDB: {path}");
 #endif
     }
 
     private void Start()
     {
-        TryStartPendingMainMenuLoadForActiveScene();
         ApplyPendingNewGame();
+#if UNITY_WEBGL && !UNITY_EDITOR
+        if (webGLStorageReady)
+            TryStartPendingMainMenuLoadForActiveScene();
+#else
+        TryStartPendingMainMenuLoadForActiveScene();
+#endif
     }
 
 #if UNITY_EDITOR
@@ -248,6 +303,9 @@ public class SaveGameManager : MonoBehaviour
 
     private void OpenSaveSlotPrompt(double inputStartMs = -1d)
     {
+        if (!IsWebGLStorageAvailable(showFeedback: true))
+            return;
+
         double promptStartMs = inputStartMs >= 0d ? inputStartMs : PerfNowMs();
         double refsStartMs = PerfNowMs();
         TryAutoAssignReferences();
@@ -288,6 +346,9 @@ public class SaveGameManager : MonoBehaviour
 
     private void OpenLoadSlotPrompt(double inputStartMs = -1d)
     {
+        if (!IsWebGLStorageAvailable(showFeedback: true))
+            return;
+
         double promptStartMs = inputStartMs >= 0d ? inputStartMs : PerfNowMs();
         double refsStartMs = PerfNowMs();
         TryAutoAssignReferences();
@@ -535,6 +596,9 @@ public class SaveGameManager : MonoBehaviour
 
     public void SaveSlot(int slotIndex)
     {
+        if (!IsWebGLStorageAvailable(showFeedback: true))
+            return;
+
         if (IsPersistenceBlockedByActiveAI(showFeedback: true))
             return;
         if (IsPersistenceBlockedByTurnState(showFeedback: true, allowPersistencePromptState: promptState != SlotPromptState.None))
@@ -586,8 +650,14 @@ public class SaveGameManager : MonoBehaviour
             WriteSlotMetadataFile(path, data);
             WriteOrDeleteReplaySidecar(path);
             WriteJogadasSidecar(path);
-            WebGLSyncAfterWrite();
             LogSaveDiagnostics(normalizedSlot, json, compressedBytes);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            string syncingText = ResolveDialog(
+                "dialog.save_status.webgl_syncing",
+                "Salvando no navegador...");
+            PanelDialogController.TrySetTransientText(syncingText, 2.2f);
+            BeginWebGLSyncAfterWrite(normalizedSlot, path);
+#else
             cursorController?.PlayLoadSfx();
             string savedText = ResolveDialog(
                 "dialog.save_status.success",
@@ -595,6 +665,7 @@ public class SaveGameManager : MonoBehaviour
                 new Dictionary<string, string> { { "slot", normalizedSlot.ToString() } });
             PanelDialogController.TrySetTransientText(savedText, 2.2f);
             Debug.Log($"[SaveGame] Slot {normalizedSlot} salvo em: {path}");
+#endif
         }
         catch (Exception ex)
         {
@@ -619,6 +690,9 @@ public class SaveGameManager : MonoBehaviour
 
     public bool HasSaveInSlot(int slotIndex)
     {
+        if (!IsWebGLStorageAvailable(showFeedback: false))
+            return false;
+
         int normalizedSlot = NormalizeSlot(slotIndex);
         string path = ResolveReadableSlotPath(normalizedSlot);
         return File.Exists(path);
@@ -645,6 +719,9 @@ public class SaveGameManager : MonoBehaviour
 
     public bool BeginLoadFromMainMenuSlot(int slotIndex)
     {
+        if (!IsWebGLStorageAvailable(showFeedback: true))
+            return false;
+
         if (!Application.isPlaying)
         {
             Debug.LogWarning("[SaveGame] MainMenu load funciona apenas em Play Mode.");
@@ -700,6 +777,9 @@ public class SaveGameManager : MonoBehaviour
 
     public void LoadSlot(int slotIndex)
     {
+        if (!IsWebGLStorageAvailable(showFeedback: true))
+            return;
+
         if (IsPersistenceBlockedByActiveAI(showFeedback: true))
             return;
         if (IsPersistenceBlockedByTurnState(showFeedback: true, allowPersistencePromptState: promptState != SlotPromptState.None))
@@ -781,6 +861,33 @@ public class SaveGameManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    private bool IsWebGLStorageAvailable(bool showFeedback)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        if (webGLStorageReady && !webGLSaveSyncInProgress)
+            return true;
+
+        if (showFeedback)
+        {
+            cursorController?.PlayErrorSfx();
+            string message = webGLSaveSyncInProgress
+                ? ResolveDialog(
+                    "dialog.save_load.webgl_sync_pending",
+                    "Save em andamento: aguarde o navegador confirmar.")
+                : ResolveDialog(
+                    "dialog.save_load.webgl_storage_loading",
+                    "Carregando saves do navegador...");
+            PanelDialogController.TrySetTransientText(message, 2.4f);
+        }
+
+        if (verboseLogs)
+            Debug.LogWarning($"[SaveGame] WebGL storage indisponivel: ready={webGLStorageReady} sync={webGLSaveSyncInProgress}");
+        return false;
+#else
+        return true;
+#endif
     }
 
     private bool IsPersistenceBlockedByTurnState(bool showFeedback = false, bool allowPersistencePromptState = false)
@@ -1134,6 +1241,10 @@ public class SaveGameManager : MonoBehaviour
 
     private void TryStartPendingMainMenuLoadForActiveScene()
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        if (!webGLStorageReady)
+            return;
+#endif
         if (pendingMainMenuLoad == null)
             return;
 
@@ -1801,9 +1912,13 @@ public class SaveGameManager : MonoBehaviour
 
     private string ResolveSaveDirectory()
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        string basePath = Application.persistentDataPath;
+#else
         string basePath = string.IsNullOrWhiteSpace(customSaveDirectory)
             ? Application.persistentDataPath
             : customSaveDirectory.Trim();
+#endif
 
         if (!Path.IsPathRooted(basePath))
             basePath = Path.Combine(Application.persistentDataPath, basePath);
@@ -1822,8 +1937,12 @@ public class SaveGameManager : MonoBehaviour
 
     private void EnsureDefaultSaveDirectoryConfigured()
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        customSaveDirectory = Application.persistentDataPath;
+#else
         if (string.IsNullOrWhiteSpace(customSaveDirectory))
             customSaveDirectory = Application.persistentDataPath;
+#endif
     }
 
     public string GetResolvedSaveDirectory()
@@ -1833,9 +1952,13 @@ public class SaveGameManager : MonoBehaviour
 
     public void SetCustomSaveDirectory(string directoryPath)
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        customSaveDirectory = Application.persistentDataPath;
+#else
         customSaveDirectory = string.IsNullOrWhiteSpace(directoryPath)
             ? Application.persistentDataPath
             : directoryPath.Trim();
+#endif
     }
 
     [ContextMenu("Log Save Directory")]

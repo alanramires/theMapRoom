@@ -221,6 +221,7 @@ public partial class AIShoppingPlanner
     {
         repairDemandCount = CountGroundUnitsUnderRepair(snapshot);
         activeLogisticsCount = CountActiveGroundLogistics(snapshot);
+        int activeLogisticsCapacity = CountActiveGroundLogisticsCapacity(snapshot);
 
         if (snapshot != null && snapshot.TurnNumber <= 1)
         {
@@ -228,13 +229,15 @@ public partial class AIShoppingPlanner
             return 0;
         }
 
-        int repairsPerSupplier = Instance != null ? Mathf.Max(1, Instance.RepairsPerGroundSupplier) : 4;
+        int repairsPerSupplier = Instance != null ? Mathf.Max(1, Instance.RepairsPerGroundSupplier) : 2;
         int desiredLogistics = repairDemandCount > 0
             ? Mathf.CeilToInt(repairDemandCount / (float)repairsPerSupplier)
             : 0;
+        int logisticsCap = repairDemandCount >= 6 ? 3 : 2;
+        desiredLogistics = Mathf.Min(desiredLogistics, logisticsCap);
 
         int demand = Mathf.Max(0, desiredLogistics - activeLogisticsCount);
-        Debug.Log($"[AI Shopping] logistics_demand: demand={demand} groundRepairs={repairDemandCount} activeLog={activeLogisticsCount} desired={desiredLogistics} repairsPerSupplier={repairsPerSupplier} units={snapshot?.MyUnits?.Count ?? 0}");
+        Debug.Log($"[AI Shopping] logistics_demand: demand={demand} groundRepairs={repairDemandCount} activeLog={activeLogisticsCount} activeCap={activeLogisticsCapacity} desired={desiredLogistics} repairsPerSupplier={repairsPerSupplier} cap={logisticsCap} units={snapshot?.MyUnits?.Count ?? 0}");
         return demand;
     }
 
@@ -485,6 +488,30 @@ public partial class AIShoppingPlanner
                 count++;
         }
         return count;
+    }
+
+    private static int CountActiveGroundLogisticsCapacity(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return 0;
+
+        int capacity = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null)
+                continue;
+            if (data.domain == Domain.Air)
+                continue;
+            if (data.roles == null || !data.roles.Contains(UnitRole.Logistica))
+                continue;
+            if (!data.isSupplier || data.maxUnitsServedPerTurn <= 0)
+                continue;
+
+            capacity += data.maxUnitsServedPerTurn;
+        }
+        return capacity;
     }
 
     private static bool HasActivePrimaryRole(AIWorldSnapshot snapshot, UnitRole role)

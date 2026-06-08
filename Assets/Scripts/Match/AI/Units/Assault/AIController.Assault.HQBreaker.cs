@@ -14,6 +14,9 @@ public partial class AIController
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
+        if (TryFindAssaultCaptureTargetVacateAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction targetVacateAction))
+            return targetVacateAction;
+
         if (TryFindHomeProductionVacateCombatAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction vacateAction))
             return vacateAction;
 
@@ -212,15 +215,23 @@ public partial class AIController
         reason = "sem progresso";
         float fromDist = SectorManager.HexDistance(fromCell, pressureTarget);
         bool fromRouteFound = TryCalculateRouteDistance(unit, fromCell, pressureTarget, out float fromRouteDist);
-        Vector3Int bestToolCell = fromCell;
-        float bestToolScore = float.MinValue;
-        int bestToolProgress = int.MinValue;
-        float bestToolNextDistance = float.MaxValue;
-        int bestToolMoveCost = 0;
-        float bestToolThreat = 0f;
-        float bestToolDpq = 0f;
-        float bestToolLine = 0f;
-        bool foundToolMove = false;
+        if (TryFindBestToolProgressionCell(
+                unit,
+                snapshot,
+                fromCell,
+                pressureTarget,
+                paths,
+                occupied,
+                ToolProgressionIntent.AssaultPressure,
+                out Vector3Int toolCell,
+                out ToolProgressionCandidate toolCandidate,
+                out string toolReason)
+            && toolCandidate.ToolScore > 0)
+        {
+            reason = toolReason;
+            return toolCell;
+        }
+
         Vector3Int bestCell = fromCell;
         Vector3Int bestFallbackCell = fromCell;
         float bestProgress = float.MinValue;
@@ -251,39 +262,6 @@ public partial class AIController
             float line = CalculateLineProgressTieBreak(fromCell, pressureTarget, cell);
             int pathCost = GetPathStepCount(paths, cell);
 
-            if (TryScoreToolRouteProgression(
-                    unit,
-                    fromCell,
-                    pressureTarget,
-                    cell,
-                    paths[cell],
-                    occupied,
-                    out int toolProgress,
-                    out float toolNextDistance,
-                    out int toolMoveCost)
-                && toolProgress > 0)
-            {
-                float toolScore = toolProgress * 1000f
-                    + line * 120f
-                    + dpq * 35f
-                    - threat * 35f
-                    - toolMoveCost * 2f
-                    - SectorManager.HexDistance(cell, pressureTarget) * 0.01f;
-
-                if (toolScore > bestToolScore)
-                {
-                    bestToolScore = toolScore;
-                    bestToolProgress = toolProgress;
-                    bestToolNextDistance = toolNextDistance;
-                    bestToolMoveCost = toolMoveCost;
-                    bestToolThreat = threat;
-                    bestToolDpq = dpq;
-                    bestToolLine = line;
-                    bestToolCell = cell;
-                    foundToolMove = true;
-                }
-            }
-
             if (IsBetterAssaultPressureMove(progress, line, pathCost, threat, dpq,
                     bestFallbackProgress, bestFallbackLine, bestFallbackPathCost, bestFallbackThreat, GetTerrainDpqPontos(bestFallbackCell)))
             {
@@ -309,12 +287,6 @@ public partial class AIController
                 bestCell = cell;
                 foundMove = true;
             }
-        }
-
-        if (foundToolMove)
-        {
-            reason = $"toolProgress={bestToolProgress} next={bestToolNextDistance:F1} moveCost={bestToolMoveCost} threat={bestToolThreat:F1} dpq={bestToolDpq:F1} line={bestToolLine:F1} score={bestToolScore:F0}";
-            return bestToolCell;
         }
 
         Vector3Int fallback = foundMove ? bestCell : bestFallbackCell;

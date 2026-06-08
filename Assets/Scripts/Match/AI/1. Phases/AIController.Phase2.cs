@@ -115,6 +115,10 @@ public partial class AIController
                     // (observador, liberacao de corredor, pickup etc.).
                     if (groupA == 2)
                     {
+                        bool fireSupportA = HasFireSupportAttackInCurrentPosition(a, aiTeam);
+                        bool fireSupportB = HasFireSupportAttackInCurrentPosition(b, aiTeam);
+                        if (fireSupportA != fireSupportB) return fireSupportA ? -1 : 1;
+
                         bool combatA = HasInitiativeCombatOpportunity(a, aiTeam);
                         bool combatB = HasInitiativeCombatOpportunity(b, aiTeam);
                         if (combatA != combatB) return combatA ? -1 : 1;
@@ -170,7 +174,16 @@ public partial class AIController
             UnitManager unit = available[0];
             PlayerAction action = DecideUnitAction(unit, current);
 
-            if (ShouldDeferCapturerForRogueEmbarkBlocker(unit, activePlan, aiTeam,
+            if (ShouldDeferAttackForFireSupportPrep(unit, action, aiTeam,
+                    out UnitManager prepFireSupport, out UnitManager prepTarget, out Vector3Int prepCell))
+            {
+                deferredUnitIds.Add(unit.InstanceId);
+                Debug.Log($"{TL()} Fase2 — {FormatInitiativeUnitName(unit)} cede ataque em {prepTarget.InstanceId} para artilharia {prepFireSupport.InstanceId} amaciar via {prepCell}");
+                continue;
+            }
+
+            if ((action == null || IsNoOpUnitAction(action))
+                && ShouldDeferCapturerForRogueEmbarkBlocker(unit, activePlan, aiTeam,
                     out UnitManager embarkBlocker, out UnitManager blockedTransporter))
             {
                 deferredUnitIds.Add(unit.InstanceId);
@@ -287,6 +300,125 @@ public partial class AIController
             UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
             if (capturer != null && !capturer.HasActed)
                 return true;
+        }
+
+        return false;
+    }
+
+    private bool ShouldDeferAttackForFireSupportPrep(
+        UnitManager attacker,
+        PlayerAction action,
+        TeamId aiTeam,
+        out UnitManager fireSupport,
+        out UnitManager target,
+        out Vector3Int fireCell)
+    {
+        fireSupport = null;
+        target = null;
+        fireCell = Vector3Int.zero;
+
+        if (attacker == null || action == null)
+            return false;
+        if (action.SensorAction != SensorActionType.Attack || string.IsNullOrEmpty(action.TargetInstanceId))
+            return false;
+        if (IsFireSupportUnit(attacker))
+            return false;
+        if (!int.TryParse(action.TargetInstanceId, out int targetId))
+            return false;
+
+        target = FindAttackPrepTarget(targetId, aiTeam);
+        if (target == null)
+            return false;
+
+        foreach (UnitManager candidate in UnitManager.AllActive)
+        {
+            if (candidate == null || candidate == attacker)
+                continue;
+            if (candidate.TeamId != aiTeam || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked)
+                continue;
+            if (!IsFireSupportUnit(candidate))
+                continue;
+            if (TryFindFireSupportPrepShot(candidate, target, aiTeam, out Vector3Int candidateCell))
+            {
+                fireSupport = candidate;
+                fireCell = candidateCell;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private UnitManager FindAttackPrepTarget(int targetId, TeamId aiTeam)
+    {
+        MatchController mc = GetMatchController();
+        foreach (UnitManager unit in UnitManager.AllActive)
+        {
+            if (unit == null || unit.InstanceId != targetId)
+                continue;
+            if (unit.TeamId == aiTeam || unit.IsDead || unit.IsEmbarked)
+                return null;
+            if (mc != null && !mc.IsUnitVisibleForTeam(unit, aiTeam))
+                return null;
+            return unit;
+        }
+
+        return null;
+    }
+
+    private bool TryFindFireSupportPrepShot(
+        UnitManager fireSupport,
+        UnitManager target,
+        TeamId aiTeam,
+        out Vector3Int fireCell)
+    {
+        fireCell = Vector3Int.zero;
+        if (fireSupport == null || target == null)
+            return false;
+
+        Vector3Int fromCell = fireSupport.CurrentCellPosition;
+        fromCell.z = 0;
+        Dictionary<Vector3Int, List<Vector3Int>> paths = BuildFireSupportPaths(fireSupport);
+        HashSet<Vector3Int> occupied = BuildOccupied(fireSupport);
+        bool stationary = IsLongRangeStationary(fireSupport);
+        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
+
+        foreach (Vector3Int rawCell in EnumerateFireSupportCandidateCells(fromCell, paths, stationary))
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+            if (cell != fromCell && IsCellACapturerTarget(cell, capPlan, aiTeam))
+                continue;
+
+            SensorMovementMode mode = cell != fromCell
+                ? SensorMovementMode.MoveuAndando
+                : SensorMovementMode.MoveuParado;
+
+            var targets = new List<PodeMirarTargetOption>();
+            if (!PodeMirarSensor.CollectTargets(
+                    fireSupport,
+                    boardTilemap,
+                    terrainDatabase,
+                    mode,
+                    targets,
+                    weaponPriorityData: weaponPriorityData,
+                    dpqAirHeightConfig: turnStateManager != null ? turnStateManager.DpqAirHeightConfigRef : null,
+                    fromCell: cell))
+                continue;
+
+            foreach (PodeMirarTargetOption opt in targets)
+            {
+                if (opt == null || opt.targetUnit != target)
+                    continue;
+                if (!PassesAttackDecision(fireSupport, target, cell, defensiveContext: false, out _))
+                    continue;
+
+                fireCell = cell;
+                return true;
+            }
         }
 
         return false;

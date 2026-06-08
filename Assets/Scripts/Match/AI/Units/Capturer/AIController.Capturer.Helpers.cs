@@ -67,6 +67,43 @@ public partial class AIController
         return false;
     }
 
+    private bool TryFindUnreservedOpportunisticCapture(
+        UnitManager unit,
+        TeamId aiTeam,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        Vector3Int excludeCell,
+        out Vector3Int captureCell,
+        string context,
+        bool excludeCurrentCell = false)
+    {
+        captureCell = Vector3Int.zero;
+        HashSet<Vector3Int> skippedCaptureCells = null;
+
+        while (TryFindOpportunisticCapture(
+            unit,
+            paths,
+            occupied,
+            excludeCell,
+            out Vector3Int candidateCell,
+            excludeCurrentCell,
+            skippedCaptureCells))
+        {
+            if (ShouldReserveOpportunisticCaptureForCloserUnit(unit, aiTeam, candidateCell, paths, out UnitManager reservedFor))
+            {
+                Debug.Log($"{TL("Oportunista")} {unit.InstanceId} cede captura oportunista @ {candidateCell} para {reservedFor.InstanceId} ({context})");
+                skippedCaptureCells ??= new HashSet<Vector3Int>();
+                skippedCaptureCells.Add(candidateCell);
+                continue;
+            }
+
+            captureCell = candidateCell;
+            return true;
+        }
+
+        return false;
+    }
+
     private bool ShouldReserveOpportunisticCaptureForCloserUnit(
         UnitManager opportunist,
         TeamId aiTeam,

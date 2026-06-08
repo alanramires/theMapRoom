@@ -174,7 +174,7 @@ public partial class AIController
             : fromCell;
         pressureTarget.z = 0;
 
-        if (TryFindOpportunisticCapture(unit, paths, occupied, pressureTarget, out Vector3Int captureCell))
+        if (TryFindUnreservedOpportunisticCapture(unit, snapshot.AITeam, paths, occupied, pressureTarget, out Vector3Int captureCell, "rogue transporte"))
         {
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue ignora transporte: captura/pressao disponivel @ {captureCell}");
             return true;

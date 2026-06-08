@@ -40,6 +40,11 @@ public partial class AIController
         if (evacuee != null)
             return DecideEvacCourierAction(unit, evacuee, passengers, snapshot, fromCell, paths, occupied);
 
+        if (assignedSectorTarget == Vector3Int.zero
+            && TryBuildRogueCourierLocalOpportunityDrop(
+                unit, passengers, snapshot, plan, fromCell, paths, occupied, out PlayerAction localOpportunity))
+            return localOpportunity;
+
         Vector3Int moveTarget = FindTransportMove(unit, fromCell, primaryTarget, paths, occupied, snapshot.AITeam);
 
         // If FindTransportMove landed on the objective building itself, redirect to an adjacent
@@ -84,7 +89,7 @@ public partial class AIController
             // objective — the truck will never reach the front. Instead, drop the artillery at the
             // best safe rear-area cell reachable this turn (allied building > allies nearby > low threat).
             if (unit.TryGetUnitData(out UnitData towData) && towData != null && towData.playConservative)
-                return TryDropFireSupportConservative(unit, primaryPassenger, passengers, snapshot, plan, fromCell, paths, occupied);
+                return TryDropFireSupportConservative(unit, primaryPassenger, passengers, snapshot, plan, fromCell, moveTarget, paths, occupied);
 
             SectorObjective fsObj = ResolveAssignedFireSupportObjective(primaryPassenger, plan);
             string fsSector = fsObj != null ? fsObj.Sector.ToString() : "?";
@@ -157,6 +162,19 @@ public partial class AIController
             {
                 var optCells = string.Join(", ", optionsFromMove.ConvertAll(o => { var c = o.disembarkCell; c.z = 0; return $"{c}({SectorManager.HexDistance(c, primaryTarget):F0}h)"; }));
                 Debug.Log($"{TL("Transporte")} {unit.InstanceId} simDisembark from {moveTarget}: [{optCells}] → target={primaryTarget}");
+                if (invasionDelivery
+                    && TryBuildRogueCourierContestedRendezvousDrop(
+                        unit,
+                        passengers,
+                        snapshot,
+                        plan,
+                        fromCell,
+                        moveTarget,
+                        optionsFromMove,
+                        paths,
+                        out PlayerAction contestedDrop))
+                    return contestedDrop;
+
                 List<PodeDesembarcarOption> selectedFromMove =
                     SelectBestDisembarkPerPassenger(optionsFromMove, passengers, plan, snapshot);
                 PodeDesembarcarOption primaryOpt = selectedFromMove.Count > 0

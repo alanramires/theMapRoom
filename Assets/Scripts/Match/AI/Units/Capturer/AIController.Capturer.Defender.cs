@@ -52,7 +52,8 @@ public partial class AIController
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
         HashSet<Vector3Int> defOcc = BuildOccupied(unit);
-        if (defPaths != null && TryFindOpportunisticCapture(unit, defPaths, defOcc, repCell, out Vector3Int defOpCell))
+        if (defPaths != null
+            && TryFindUnreservedOpportunisticCapture(unit, snapshot.AITeam, defPaths, defOcc, repCell, out Vector3Int defOpCell, "defensor"))
         {
             Debug.Log($"{TL("Oportunista")} {unit.InstanceId} captura oportunista @ {defOpCell} (defende {assigned.Sector})");
             return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, defOpCell, defPaths);

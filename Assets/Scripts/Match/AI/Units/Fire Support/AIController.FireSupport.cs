@@ -136,6 +136,31 @@ public partial class AIController
         Vector3Int targetCell = rendezvousTarget.CurrentCellPosition; targetCell.z = 0;
         Vector3Int moveCell = FindAssaultPressureMove(unit, snapshot, fromCell, targetCell, paths, occupied, out string moveReason);
         if (moveCell == fromCell) return null;
+        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        if (IsCellACapturerTarget(moveCell, capPlan, snapshot.AITeam))
+        {
+            if (!TryFindBestToolProgressionCell(
+                    unit,
+                    snapshot,
+                    fromCell,
+                    targetCell,
+                    paths,
+                    occupied,
+                    ToolProgressionIntent.FireSupportRendezvous,
+                    out Vector3Int alternateCell,
+                    out ToolProgressionCandidate alternateCandidate,
+                    out string alternateReason,
+                    allowCell: cell => !IsCellACapturerTarget(cell, capPlan, snapshot.AITeam))
+                || alternateCell == fromCell
+                || alternateCandidate.ToolScore <= 0)
+            {
+                Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rendezvous {assigned.Sector} evita predio reservado {moveCell} - sem alternativa");
+                return null;
+            }
+
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rendezvous {assigned.Sector} evita predio reservado {moveCell}, usa {alternateCell} ({alternateReason})");
+            moveCell = alternateCell;
+        }
         if (CalculateThreatLevel(moveCell, snapshot.AITeam) > CalculateThreatLevel(fromCell, snapshot.AITeam) + 0.1f)
             return null;
 

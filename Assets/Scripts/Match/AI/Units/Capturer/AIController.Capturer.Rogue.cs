@@ -54,7 +54,7 @@ public partial class AIController
 
             // Captura oportunista tem prioridade sobre o combate: prédio disponível é mais
             // valioso do que eliminar um inimigo que não bloqueia o caminho.
-            if (TryFindOpportunisticCapture(unit, engagePaths, engageOccupied, target, out Vector3Int engageOpCell))
+            if (TryFindUnreservedOpportunisticCapture(unit, snapshot.AITeam, engagePaths, engageOccupied, target, out Vector3Int engageOpCell, "rogue combate"))
             {
                 Debug.Log($"{TL("Rogue")} {unit.InstanceId} captura oportunista (inimigos no raio) @ {engageOpCell}");
                 return BuildCaptureBatch(unit, snapshot.AITeam, from, engageOpCell, engagePaths);
@@ -98,7 +98,7 @@ public partial class AIController
         }
 
         // Captura oportunista: qualquer prédio capturável no caminho ao HQ
-        if (TryFindOpportunisticCapture(unit, paths, occupied, target, out Vector3Int opCell))
+        if (TryFindUnreservedOpportunisticCapture(unit, snapshot.AITeam, paths, occupied, target, out Vector3Int opCell, "rogue"))
         {
             Debug.Log($"{TL("Rogue")} {unit.InstanceId} captura oportunista @ {opCell}");
             return BuildCaptureBatch(unit, snapshot.AITeam, from, opCell, paths);

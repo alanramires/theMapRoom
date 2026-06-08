@@ -22,6 +22,9 @@ public partial class AIController
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
+        if (TryFindAssaultCaptureTargetVacateAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction targetVacateAction))
+            return targetVacateAction;
+
         if (TryFindHomeProductionVacateCombatAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction vacateAction))
             return vacateAction;
 
