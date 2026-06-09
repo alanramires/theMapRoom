@@ -1,12 +1,13 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
 /// <summary>
-// Controla a IA inimiga, incluindo a execução de suas ações, planejamento de objetivos e tomada de decisões.
-// Implementa uma abordagem baseada em estágios para organizar o comportamento da IA,
-// desde a avaliação do estado do jogo até a execução de ações específicas.
+// Controla a IA inimiga, incluindo a execuï¿½ï¿½o de suas aï¿½ï¿½es, planejamento de objetivos e tomada de decisï¿½es.
+// Implementa uma abordagem baseada em estï¿½gios para organizar o comportamento da IA,
+// desde a avaliaï¿½ï¿½o do estado do jogo atï¿½ a execuï¿½ï¿½o de aï¿½ï¿½es especï¿½ficas.
 
 /// </summary>
 public partial class AIController : MonoBehaviour
@@ -68,6 +69,15 @@ public partial class AIController : MonoBehaviour
     public static bool ShowAIHUD => _instance != null && _instance.showAIUnitHUD;
 
     private readonly HashSet<Vector3Int> plannedDestinations = new HashSet<Vector3Int>();
+
+    // Buffers reutilizÃ¡veis â€” evitam alocaÃ§Ãµes por fase/iteraÃ§Ã£o
+    private readonly List<UnitManager> _availableUnitsBuffer = new List<UnitManager>();
+    private readonly Dictionary<int, int> _groupCache = new Dictionary<int, int>();
+    private static readonly System.Text.StringBuilder _initLogBuilder = new System.Text.StringBuilder();
+    private Comparison<UnitManager> _availableUnitsComparison;
+    private Comparison<UnitManager> _initiativeComparison;
+    private TeamId _sortAiTeam;
+    private TeamObjectivePlan _sortActivePlan;
 
     private bool   isActive;
     private bool   isDebugPaused;

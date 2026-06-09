@@ -32,7 +32,8 @@
       "Bash(Sort-Object FullName)",
       "Bash(Format-Table -AutoSize)",
       "Bash(grep -v \"//\")",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(powershell -Command \"Select-String -Path 'Assets\\\\Scripts\\\\UI\\\\MainMenuStateController.cs' -Pattern 'IsAnyTextInputFocusedInUi' -Context 2\")"
     ]
   }
 }

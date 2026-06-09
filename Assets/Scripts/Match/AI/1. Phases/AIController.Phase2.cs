@@ -15,8 +15,8 @@ public partial class AIController
 
         TeamId aiTeam = snapshot.AITeam;
 
-        List<UnitManager> initial = GetAvailableUnits(aiTeam);
-        if (initial.Count == 0)
+        List<UnitManager> units = GetAvailableUnits(aiTeam);
+        if (units.Count == 0)
         {
             Debug.Log($"{TL()} Fase 2 — sem unidades em campo, pulando.");
             if (matchController == null || !matchController.IsPlayerCommandServiceAutomatic(snapshot.AITeam))
@@ -26,8 +26,44 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase2 — iniciando ações.");
         plannedDestinations.Clear();
+
+        // ---- Setup: executado uma única vez por fase ----
+        SyncAIUnitCellsFromTransforms();
+        AIWorldSnapshot current = AIWorldSnapshot.BuildLight(aiTeam, matchController);
+        TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        InvalidateStaleThreatObjectives(activePlan, aiTeam);
+
+        foreach (UnitManager u in UnitManager.AllActive)
+        {
+            if (u.TeamId == aiTeam && !u.IsDead)
+                UpdateRepairState(u, activePlan);
+        }
+
+        _groupCache.Clear();
+        foreach (UnitManager u in units)
+            _groupCache[u.InstanceId] = GetInitiativeGroup(u, activePlan, aiTeam);
+
+        _sortAiTeam = aiTeam;
+        _sortActivePlan = activePlan;
+        units.Sort(_initiativeComparison);
+
+        _initLogBuilder.Clear();
+        _initLogBuilder.AppendLine($"{TL()} Fase2 iniciativa ({units.Count} unidades):");
+        foreach (UnitManager u in units)
+        {
+            int g = _groupCache[u.InstanceId];
+            Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+            Vector3Int? tgt = GetAssignedTargetCell(u, activePlan);
+            string tgtStr = tgt.HasValue ? tgt.Value.ToString() : "null";
+            _initLogBuilder.AppendLine($"  [grp={g}] {FormatInitiativeUnitName(u)} @ {uc} target={tgtStr}");
+        }
+        Debug.Log(_initLogBuilder.ToString());
+        _initLogBuilder.Clear();
+
+        // ---- Loop por unidade: decisão + execução ----
         var deferredUnitIds = new HashSet<int>();
-        Dictionary<int, int> prevGroupCache = null;
+        int cursor = 0;
+        bool secondPass = false;
 
         while (isActive && !IsMatchEnded())
         {
@@ -35,148 +71,28 @@ public partial class AIController
             if (ShouldStopAIForMatchEnd("phase2_loop_apos_pause"))
                 yield break;
 
-            List<UnitManager> available = GetAvailableUnits(aiTeam);
-            if (available.Count == 0) break;
-            if (deferredUnitIds.Count > 0)
+            // Avança o cursor sobre unidades já agidas, mortas ou deferidas (1ª passagem)
+            while (cursor < units.Count &&
+                   (units[cursor] == null || units[cursor].IsDead || units[cursor].HasActed ||
+                    (!secondPass && deferredUnitIds.Contains(units[cursor].InstanceId))))
             {
-                available.RemoveAll(u => u != null && deferredUnitIds.Contains(u.InstanceId));
-                if (available.Count == 0)
+                cursor++;
+            }
+
+            if (cursor >= units.Count)
+            {
+                if (!secondPass && deferredUnitIds.Count > 0)
                 {
+                    // Todas as unidades não-deferidas agiram; processa as deferidas
                     deferredUnitIds.Clear();
-                    available = GetAvailableUnits(aiTeam);
-                    if (available.Count == 0) break;
+                    cursor = 0;
+                    secondPass = true;
+                    continue;
                 }
+                break;
             }
 
-            SyncAIUnitCellsFromTransforms();
-
-            // Reconstrói a foto do mundo após cada batch — hexes ocupados mudam
-            // BuildLight omite campos não usados pelos handlers (MyUnits, EnemyUnits,
-            // OccupiedCells, Stance), reduzindo custo de ~50 iterações por unidade.
-            AIWorldSnapshot current = AIWorldSnapshot.BuildLight(aiTeam, matchController);
-
-            // Ordena iniciativa por grupo (menor = age primeiro):
-            // 0 = vacater handoff / blocker com inimigo adjacente
-            // 1 = helicoptero
-            // 2 = unidade ativa liberando corredor/posicionamento
-            // 3 = objetivo normal  4 = rogue/sem objetivo
-            // 5 = IsUnderRepair / manutencao - age por ultimo
-            TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
-            InvalidateStaleThreatObjectives(activePlan, aiTeam);
-
-            // Pre-pass: atualiza estado de reparo antes do sort para que IsUnderRepair
-            // esteja correto quando GetInitiativeGroup classificar cada unidade.
-            // Inclui embarcados: passageiro curado pelo CommandService precisa sair do
-            // modo reparo antes que o transporter decida rota de evac vs entrega.
-            foreach (UnitManager u in UnitManager.AllActive)
-            {
-                if (u.TeamId == aiTeam && !u.IsDead)
-                    UpdateRepairState(u, activePlan);
-            }
-
-            // Pre-computa grupos uma vez por unidade (evita O(N log N) chamadas no comparador).
-            var groupCache = new Dictionary<int, int>(available.Count);
-            foreach (UnitManager u in available)
-                groupCache[u.InstanceId] = GetInitiativeGroup(u, activePlan, aiTeam);
-
-            // Dirty flag: grupos podem mudar após cada ação (captura concluída, reparo, etc.).
-            // Só re-sort quando ao menos um grupo mudou em relação à iteração anterior.
-            bool needsSort = true;
-            if (!needsSort)
-            {
-                foreach (UnitManager u in available)
-                {
-                    if (!prevGroupCache.TryGetValue(u.InstanceId, out int prev) || prev != groupCache[u.InstanceId])
-                    {
-                        needsSort = true;
-                        break;
-                    }
-                }
-            }
-
-            if (needsSort)
-            {
-                available.Sort((a, b) =>
-                {
-                    int groupA = groupCache[a.InstanceId];
-                    int groupB = groupCache[b.InstanceId];
-
-                    if (groupA != groupB) return groupA.CompareTo(groupB);
-
-                    // Dentro do grupo 0: blocker (IsBlockingCaptureTarget) age antes de vacater/outros
-                    if (groupA == 0 && activePlan != null)
-                    {
-                        bool blockerA = IsBlockingCaptureTarget(a, activePlan, aiTeam);
-                        bool blockerB = IsBlockingCaptureTarget(b, activePlan, aiTeam);
-                        if (blockerA != blockerB) return blockerA ? -1 : 1;
-
-                        int fireCmp = CompareFireSupportAttackInitiative(a, b, aiTeam);
-                        if (fireCmp != 0) return fireCmp;
-                    }
-
-                    // Dentro do grupo 2: combate local real vem antes de apoio de posicionamento
-                    // (observador, liberacao de corredor, pickup etc.).
-                    if (groupA == 2)
-                    {
-                        bool fireSupportA = HasFireSupportAttackInCurrentPosition(a, aiTeam);
-                        bool fireSupportB = HasFireSupportAttackInCurrentPosition(b, aiTeam);
-                        if (fireSupportA != fireSupportB) return fireSupportA ? -1 : 1;
-                        int fireCmp = CompareFireSupportAttackInitiative(a, b, aiTeam);
-                        if (fireCmp != 0) return fireCmp;
-
-                        bool combatA = HasInitiativeCombatOpportunity(a, aiTeam);
-                        bool combatB = HasInitiativeCombatOpportunity(b, aiTeam);
-                        if (combatA != combatB) return combatA ? -1 : 1;
-                    }
-
-                    // Dentro do grupo 3: prioridade do objetivo (pri=1 = age primeiro)
-                    if (groupA == 3 && activePlan != null)
-                    {
-                        SectorObjective objA = ResolveAnyAssignedObjective(a, activePlan);
-                        SectorObjective objB = ResolveAnyAssignedObjective(b, activePlan);
-                        if (objA == null && objB == null) return b.CurrentHP.CompareTo(a.CurrentHP);
-                        if (objA == null) return 1;
-                        if (objB == null) return -1;
-
-                        int cmp = objA.Priority.CompareTo(objB.Priority);
-                        if (cmp != 0) return cmp;
-
-                        return b.CurrentHP.CompareTo(a.CurrentHP);
-                    }
-
-                    // Dentro do grupo 4 (rogues): capturadores mais próximos de um
-                    // transporter com slot livre agem primeiro — garante embarque antes do heli encher.
-                    if (groupA == 4)
-                    {
-                        float transA = GetDistanceToNearestAvailableTransporter(a, aiTeam);
-                        float transB = GetDistanceToNearestAvailableTransporter(b, aiTeam);
-                        if (Mathf.Abs(transA - transB) > 0.5f)
-                            return transA.CompareTo(transB); // mais perto age primeiro; distantes agem por último
-                    }
-
-                    int initiativeCmp = CompareUnitInitiative(a, b);
-                    return initiativeCmp != 0 ? initiativeCmp : b.CurrentHP.CompareTo(a.CurrentHP);
-                });
-            }
-
-            prevGroupCache = groupCache;
-
-            // LOG: ordem de iniciativa apos o sort real.
-            {
-                var initLog = new System.Text.StringBuilder();
-                initLog.AppendLine($"{TL()} Fase2 iniciativa ({available.Count} unidades):");
-                foreach (UnitManager u in available)
-                {
-                    int g  = groupCache[u.InstanceId];
-                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
-                    Vector3Int? tgt = GetAssignedTargetCell(u, activePlan);
-                    string tgtStr = tgt.HasValue ? tgt.Value.ToString() : "null";
-                    initLog.AppendLine($"  [grp={g}] {FormatInitiativeUnitName(u)} @ {uc} target={tgtStr}");
-                }
-                Debug.Log(initLog.ToString());
-            }
-
-            UnitManager unit = available[0];
+            UnitManager unit = units[cursor];
             PlayerAction action = DecideUnitAction(unit, current);
 
             if (ShouldDeferAttackForFireSupportPrep(unit, action, aiTeam,
@@ -184,6 +100,8 @@ public partial class AIController
             {
                 deferredUnitIds.Add(unit.InstanceId);
                 Debug.Log($"{TL()} Fase2 — {FormatInitiativeUnitName(unit)} cede ataque em {prepTarget.InstanceId} para artilharia {prepFireSupport.InstanceId} amaciar via {prepCell}");
+                cursor++;
+                yield return null;
                 continue;
             }
 
@@ -193,6 +111,8 @@ public partial class AIController
             {
                 deferredUnitIds.Add(unit.InstanceId);
                 Debug.Log($"{TL()} Fase2 — capturador {unit.InstanceId} cede vez para rogue {embarkBlocker.InstanceId} liberar embarque no transporte {blockedTransporter.InstanceId}");
+                cursor++;
+                yield return null;
                 continue;
             }
 
@@ -201,6 +121,8 @@ public partial class AIController
                 SectorObjective obj = ResolveAssignedAssaultObjective(unit, activePlan);
                 deferredUnitIds.Add(unit.InstanceId);
                 Debug.Log($"{TL()} Fase2 — batedor {unit.InstanceId} cede vez para capturador de {obj.Sector}");
+                cursor++;
+                yield return null;
                 continue;
             }
 
@@ -208,19 +130,16 @@ public partial class AIController
             {
                 Debug.LogWarning($"[AI] Sem decisão para {unit.InstanceId} — marcando como agida.");
                 unit.MarkAsActed();
+                cursor++;
                 continue;
             }
 
-            // Registra destino para que unidades subsequentes não colidam
             if (action.HasMoveTo && action.MoveTo != action.MoveFrom)
             {
                 Vector3Int dest = action.MoveTo; dest.z = 0;
                 plannedDestinations.Add(dest);
             }
 
-            // Recalcula FoW apenas quando algo que altera visibilidade ocorreu:
-            // movimento (nova posição = novo cone de visão) ou ataque (inimigo pode
-            // ter morrido, liberando LOS para células antes bloqueadas).
             bool unitMoved    = action.HasMoveTo && action.MoveTo != action.MoveFrom;
             bool unitAttacked = !string.IsNullOrEmpty(action.TargetInstanceId);
             JogadasManager.RegistrarPlayerAction(action);
@@ -238,8 +157,13 @@ public partial class AIController
                 CommitAIWorldLightAfterAction(aiTeam, $"phase2:{FormatInitiativeUnitName(unit)}", refreshFoW);
             }
 
+            // Reconstrói o snapshot para a próxima decisão (hexes ocupados mudam após cada ação)
+            current = AIWorldSnapshot.BuildLight(aiTeam, matchController);
+
             float delay = GetBatchDelay();
             if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
+
+            cursor++;
         }
 
         Debug.Log($"{TL()} Fase2 concluída.");

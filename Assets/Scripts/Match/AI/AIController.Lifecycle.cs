@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 //-------------------------------------------------------------------------
-// Controla a IA inimiga, incluindo a execução de suas ações, planejamento de objetivos e tomada de decisões.
-// Implementa uma abordagem baseada em estágios para organizar o comportamento da IA,
-// desde a avaliação do estado do jogo até a execução de ações específicas. 
+// Controla a IA inimiga, incluindo a execuï¿½ï¿½o de suas aï¿½ï¿½es, planejamento de objetivos e tomada de decisï¿½es.
+// Implementa uma abordagem baseada em estï¿½gios para organizar o comportamento da IA,
+// desde a avaliaï¿½ï¿½o do estado do jogo atï¿½ a execuï¿½ï¿½o de aï¿½ï¿½es especï¿½ficas. 
 //-------------------------------------------------------------------------
 
 public partial class AIController
@@ -48,6 +48,8 @@ public partial class AIController
 
         _instance = this;
         MatchController.OnActiveTeamChanged += HandleTeamChanged;
+        _availableUnitsComparison = CompareAvailableUnits;
+        _initiativeComparison = CompareUnitsByInitiative;
 
     }
 

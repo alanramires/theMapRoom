@@ -31,6 +31,7 @@ public class MainMenuStateController : MonoBehaviour
     [SerializeField] private MainMenuLoadPanelController loadPanelController;
     [SerializeField] private MainMenuCinematicController cinematicController;
 
+    private bool _referencesResolved;
     private MainMenuState currentState;
     private int enteredNeutralFrame = -1;
     private int previousRootMenuIndex = -1;
@@ -89,6 +90,12 @@ public class MainMenuStateController : MonoBehaviour
         ResolveReferences();
         ResetUiInputTracking();
         ChangeState(initialState);
+    }
+
+    private void Start()
+    {
+        if (panelMenu == null)
+            enabled = false;
     }
 
     private void OnDestroy()
@@ -436,6 +443,8 @@ public class MainMenuStateController : MonoBehaviour
 
     private void ResolveReferences()
     {
+        if (_referencesResolved) return;
+
         if (panelMenu == null)
             panelMenu = FindInActiveScene<PanelMenu>();
         if (loadPanelController == null)
@@ -483,6 +492,9 @@ public class MainMenuStateController : MonoBehaviour
 
         if (sharedMenuContainer == null)
             sharedMenuContainer = ResolveSharedMenuContainer();
+
+        if (panelMenu != null && loadPanelController != null && cinematicController != null)
+            _referencesResolved = true;
     }
 
     private RectTransform ResolveSharedMenuContainer()

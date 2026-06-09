@@ -7,59 +7,92 @@ public partial class AIController
     // -------------------------------------------------------------------------
 
     // Helpers
-    // Retorna a distância em hexes do centro da unidade até o centro do seu objetivo designado, 
-    // ou float.MaxValue se não tiver objetivo.
+    // Retorna a distï¿½ncia em hexes do centro da unidade atï¿½ o centro do seu objetivo designado, 
+    // ou float.MaxValue se nï¿½o tiver objetivo.
 
     // -------------------------------------------------------------------------
 
     private List<UnitManager> GetAvailableUnits(TeamId aiTeam)
-
     {
-
-        var list = new List<UnitManager>();
-
+        _availableUnitsBuffer.Clear();
         foreach (UnitManager u in UnitManager.AllActive)
-
         {
-
             if (u.TeamId != aiTeam || u.HasActed || u.IsDead || u.IsEmbarked)
-
                 continue;
+            _availableUnitsBuffer.Add(u);
+        }
+        _sortAiTeam = aiTeam;
+        _sortActivePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        _availableUnitsBuffer.Sort(_availableUnitsComparison);
+        return _availableUnitsBuffer;
+    }
 
-            list.Add(u);
+    private int CompareAvailableUnits(UnitManager a, UnitManager b)
+    {
+        float da = GetDistanceToAssignedTarget(a, _sortAiTeam, _sortActivePlan);
+        float db = GetDistanceToAssignedTarget(b, _sortAiTeam, _sortActivePlan);
+        int cmp = da.CompareTo(db);
+        if (cmp != 0) return cmp;
+        int ia = a.TryGetUnitData(out UnitData ua) ? (int)ua.aiInitiative : (int)AiInitiative.Medium;
+        int ib = b.TryGetUnitData(out UnitData ub) ? (int)ub.aiInitiative : (int)AiInitiative.Medium;
+        cmp = ia.CompareTo(ib);
+        return cmp != 0 ? cmp : b.CurrentHP.CompareTo(a.CurrentHP);
+    }
 
+    private int CompareUnitsByInitiative(UnitManager a, UnitManager b)
+    {
+        int groupA = _groupCache[a.InstanceId];
+        int groupB = _groupCache[b.InstanceId];
+
+        if (groupA != groupB) return groupA.CompareTo(groupB);
+
+        if (groupA == 0 && _sortActivePlan != null)
+        {
+            bool blockerA = IsBlockingCaptureTarget(a, _sortActivePlan, _sortAiTeam);
+            bool blockerB = IsBlockingCaptureTarget(b, _sortActivePlan, _sortAiTeam);
+            if (blockerA != blockerB) return blockerA ? -1 : 1;
+
+            int fireCmp = CompareFireSupportAttackInitiative(a, b, _sortAiTeam);
+            if (fireCmp != 0) return fireCmp;
         }
 
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
-
-        list.Sort((a, b) =>
-
+        if (groupA == 2)
         {
+            bool fireSupportA = HasFireSupportAttackInCurrentPosition(a, _sortAiTeam);
+            bool fireSupportB = HasFireSupportAttackInCurrentPosition(b, _sortAiTeam);
+            if (fireSupportA != fireSupportB) return fireSupportA ? -1 : 1;
+            int fireCmp = CompareFireSupportAttackInitiative(a, b, _sortAiTeam);
+            if (fireCmp != 0) return fireCmp;
 
-            // Unidades mais prÃ³ximas do objetivo agem primeiro â€” evita bloqueio de rotas
+            bool combatA = HasInitiativeCombatOpportunity(a, _sortAiTeam);
+            bool combatB = HasInitiativeCombatOpportunity(b, _sortAiTeam);
+            if (combatA != combatB) return combatA ? -1 : 1;
+        }
 
-            float da = GetDistanceToAssignedTarget(a, aiTeam, plan);
+        if (groupA == 3 && _sortActivePlan != null)
+        {
+            SectorObjective objA = ResolveAnyAssignedObjective(a, _sortActivePlan);
+            SectorObjective objB = ResolveAnyAssignedObjective(b, _sortActivePlan);
+            if (objA == null && objB == null) return b.CurrentHP.CompareTo(a.CurrentHP);
+            if (objA == null) return 1;
+            if (objB == null) return -1;
 
-            float db = GetDistanceToAssignedTarget(b, aiTeam, plan);
-
-            int cmp = da.CompareTo(db);
-
+            int cmp = objA.Priority.CompareTo(objB.Priority);
             if (cmp != 0) return cmp;
 
-            // Desempate: aiInitiative menor age primeiro, depois HP maior
+            return b.CurrentHP.CompareTo(a.CurrentHP);
+        }
 
-            int ia = a.TryGetUnitData(out UnitData ua) ? (int)ua.aiInitiative : (int)AiInitiative.Medium;
+        if (groupA == 4)
+        {
+            float transA = GetDistanceToNearestAvailableTransporter(a, _sortAiTeam);
+            float transB = GetDistanceToNearestAvailableTransporter(b, _sortAiTeam);
+            if (Mathf.Abs(transA - transB) > 0.5f)
+                return transA.CompareTo(transB);
+        }
 
-            int ib = b.TryGetUnitData(out UnitData ub) ? (int)ub.aiInitiative : (int)AiInitiative.Medium;
-
-            cmp = ia.CompareTo(ib);
-
-            return cmp != 0 ? cmp : b.CurrentHP.CompareTo(a.CurrentHP);
-
-        });
-
-        return list;
-
+        int initiativeCmp = CompareUnitInitiative(a, b);
+        return initiativeCmp != 0 ? initiativeCmp : b.CurrentHP.CompareTo(a.CurrentHP);
     }
 
     private static Vector3Int? GetAssignedTargetCell(UnitManager unit, TeamObjectivePlan plan)
