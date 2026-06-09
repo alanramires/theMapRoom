@@ -123,8 +123,10 @@ public partial class AIController
                 float dpq = GetTerrainDpqPontos(cell);
                 BazookaTargetPriority targetPreference = ResolveAssaultTargetPreference(unit, enemy);
                 float targetPreferenceScore = GetAssaultTargetPreferenceScore(targetPreference);
+                int targetElite = enemy.TryGetUnitData(out UnitData enemyUd) && enemyUd != null ? Mathf.Max(0, enemyUd.eliteLevel) : 0;
                 float score =
                     targetPreferenceScore
+                    + targetElite * 4000f
                     + Mathf.Max(0, 20 - enemy.CurrentHP) * 1000f
                     + Mathf.Max(0, scoutZoneRadius + 1 - targetDist) * 500f
                     - coverDist * 80f
@@ -140,7 +142,7 @@ public partial class AIController
                     bestScore = score;
                     bestCell = cell;
                     bestTarget = enemy;
-                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} threatDist={targetDist:F1} coverDist={coverDist:F1} dpq={dpq:F1} dpqW={dpqWeight:F0} {attackDecisionReason}";
+                    reason = $"score={score:F0} pref={targetPreference} elite={targetElite} hp={enemy.CurrentHP} threatDist={targetDist:F1} coverDist={coverDist:F1} dpq={dpq:F1} dpqW={dpqWeight:F0} {attackDecisionReason}";
                 }
             }
         }
@@ -202,8 +204,10 @@ public partial class AIController
                 float dpq = GetTerrainDpqPontos(cell);
                 BazookaTargetPriority targetPreference = ResolveAssaultTargetPreference(unit, enemy);
                 float targetPreferenceScore = GetAssaultTargetPreferenceScore(targetPreference);
+                int targetElite = enemy.TryGetUnitData(out UnitData enemyUd2) && enemyUd2 != null ? Mathf.Max(0, enemyUd2.eliteLevel) : 0;
                 float score =
                     targetPreferenceScore
+                    + targetElite * 4000f
                     + Mathf.Max(0, 20 - enemy.CurrentHP) * 1000f
                     + routeProgress * 1200f
                     + hexProgress * 250f
@@ -220,7 +224,7 @@ public partial class AIController
                     bestScore = score;
                     bestCell = cell;
                     bestTarget = enemy;
-                    reason = $"advanceRoute score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} progRota={routeProgress:+0.0;-0.0;0.0} rota={routeDist:F1} alvoZona={targetDist:F1} tiroDist={enemyDist:F1} dpq={dpq:F1} {attackDecisionReason}";
+                    reason = $"advanceRoute score={score:F0} pref={targetPreference} elite={targetElite} hp={enemy.CurrentHP} progRota={routeProgress:+0.0;-0.0;0.0} rota={routeDist:F1} alvoZona={targetDist:F1} tiroDist={enemyDist:F1} dpq={dpq:F1} {attackDecisionReason}";
                 }
             }
         }

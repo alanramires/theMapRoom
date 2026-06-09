@@ -18,7 +18,8 @@ public partial class AIController
         bool defensiveContext,
         out PlayerAction action,
         out string reason,
-        bool indirectOnly = false)
+        bool indirectOnly = false,
+        bool stationaryOnly = false)
     {
         action = null;
         reason = "";
@@ -35,7 +36,7 @@ public partial class AIController
         int artilleryMaxRange = indirectOnly ? GetFireSupportMaxWeaponRange(unit) : 0;
         TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
 
-        foreach (Vector3Int rawCell in EnumerateFireSupportCandidateCells(fromCell, paths, stationary))
+        foreach (Vector3Int rawCell in EnumerateFireSupportCandidateCells(fromCell, paths, stationary || stationaryOnly))
         {
             Vector3Int cell = rawCell;
             cell.z = 0;

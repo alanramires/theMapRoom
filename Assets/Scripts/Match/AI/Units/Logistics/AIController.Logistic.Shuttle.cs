@@ -29,6 +29,13 @@ public partial class AIController
             out Vector3Int towCandidateCell, out Vector3Int deliveryTarget);
         if (towCandidate == null) return null;
 
+        // Already adjacent — stay in place; artillery will embark this same iteration.
+        if (SectorManager.HexDistance(fromCell, towCandidateCell) <= 1f)
+        {
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} tow-shuttle — adjacente a #{towCandidate.InstanceId}@{towCandidateCell}, aguarda embarque");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+        }
+
         // Head straight toward the artillery — it can't walk to meet us.
         Vector3Int moveTarget = FindTransportMove(unit, fromCell, towCandidateCell, paths, occupied, snapshot.AITeam);
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} tow-shuttle — reboca {towCandidate.InstanceId}@{towCandidateCell} → {deliveryTarget} via {moveTarget}");

@@ -40,8 +40,7 @@ public partial class AIController
         if (evacuee != null)
             return DecideEvacCourierAction(unit, evacuee, passengers, snapshot, fromCell, paths, occupied);
 
-        if (assignedSectorTarget == Vector3Int.zero
-            && TryBuildRogueCourierLocalOpportunityDrop(
+        if (TryBuildRogueCourierLocalOpportunityDrop(
                 unit, passengers, snapshot, plan, fromCell, paths, occupied, out PlayerAction localOpportunity))
             return localOpportunity;
 
@@ -67,6 +66,7 @@ public partial class AIController
         }
 
         bool invasionDelivery = IsTransportInvasionDelivery(primaryPassenger, plan, snapshot, primaryTarget);
+        bool redirectedToInvasionRendezvous = false;
         if (invasionDelivery && !IsTransportInvasionCourierCellAllowed(unit, snapshot, moveTarget, primaryTarget))
         {
             Vector3Int rendezvousCell = FindTransportInvasionRendezvousCell(
@@ -75,6 +75,7 @@ public partial class AIController
             {
                 Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier invasao — bloqueia avanco {moveTarget}, rendezvous via {rendezvousCell} ({rendezvousReason})");
                 moveTarget = rendezvousCell;
+                redirectedToInvasionRendezvous = true;
             }
         }
 
@@ -153,6 +154,27 @@ public partial class AIController
         }
         else
         {
+            if (invasionDelivery && redirectedToInvasionRendezvous)
+            {
+                List<PodeDesembarcarOption> rendezvousOptions = moveTarget == fromCell
+                    ? CollectCurrentRogueCourierLocalDisembarkOptions(unit)
+                    : SimulateDisembarkFromCell(unit, moveTarget);
+                if (rendezvousOptions != null && rendezvousOptions.Count > 0
+                    && TryBuildRogueCourierContestedRendezvousDrop(
+                        unit,
+                        passengers,
+                        snapshot,
+                        plan,
+                        fromCell,
+                        moveTarget,
+                        rendezvousOptions,
+                        paths,
+                        out PlayerAction rendezvousDrop,
+                        allowAssignedPassengers: true,
+                        requireUnheldRallyPoint: true))
+                    return rendezvousDrop;
+            }
+
         // Priority 1b: move + disembark when moving brings the APC meaningfully closer
         // AND the simulated drop-off from moveTarget is within delivery range.
         if (moveTarget != fromCell && moveImprovement > 1f)
@@ -172,7 +194,9 @@ public partial class AIController
                         moveTarget,
                         optionsFromMove,
                         paths,
-                        out PlayerAction contestedDrop))
+                        out PlayerAction contestedDrop,
+                        allowAssignedPassengers: true,
+                        requireUnheldRallyPoint: true))
                     return contestedDrop;
 
                 List<PodeDesembarcarOption> selectedFromMove =

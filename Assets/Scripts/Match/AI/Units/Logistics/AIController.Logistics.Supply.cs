@@ -179,6 +179,48 @@ public partial class AIController
         }
     }
 
+    private bool CanLogisticsReceiveTransferAtCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int transferCell)
+    {
+        if (unit == null)
+            return false;
+
+        Vector3Int originalCell = unit.CurrentCellPosition;
+        originalCell.z = 0;
+        transferCell.z = 0;
+
+        unit.SetCurrentCellPosition(transferCell, enforceFinalOccupancyRule: false);
+        try
+        {
+            var options = new List<PodeTransferirOption>();
+            if (!PodeTransferirSensor.CollectOptions(unit, boardTilemap, options, out _) || options.Count <= 0)
+                return false;
+
+            for (int i = 0; i < options.Count; i++)
+            {
+                PodeTransferirOption option = options[i];
+                if (option == null || option.flowMode != TransferFlowMode.Recebedor)
+                    continue;
+
+                Vector3Int targetCell = option.targetCell;
+                targetCell.z = 0;
+                if (snapshot != null && CalculateThreatLevel(targetCell, snapshot.AITeam) > 0f)
+                    continue;
+
+                return true;
+            }
+
+            return false;
+        }
+        finally
+        {
+            unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
+        }
+    }
+
     private bool TryBuildLogisticsSupplyAction(
         UnitManager unit,
         AIWorldSnapshot snapshot,

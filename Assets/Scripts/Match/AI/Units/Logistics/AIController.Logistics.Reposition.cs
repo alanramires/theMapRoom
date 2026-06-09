@@ -55,6 +55,9 @@ public partial class AIController
                         - threat * 120f
                         - candidate.MoveCost * 8f;
 
+                    if (CanLogisticsReceiveTransferAtCell(unit, snapshot, fromCell, cell))
+                        score += 6500f;
+
                     if (cell == targetCell)
                         score += 4000f;
 
@@ -91,6 +94,9 @@ public partial class AIController
                 + dpq * 40f
                 - threat * 120f
                 - GetPathStepCount(paths, cell) * 8f;
+
+            if (CanLogisticsReceiveTransferAtCell(unit, snapshot, fromCell, cell))
+                score += 6500f;
 
             if (cell == targetCell)
                 score += 4000f;

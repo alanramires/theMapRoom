@@ -179,7 +179,8 @@ public partial class AIController
         UnitManager passenger,
         Vector3Int transporterCell)
     {
-        if (candidate == null || candidate == passenger || candidate.IsDead || candidate.IsEmbarked)
+        if (candidate == null || candidate == passenger
+            || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair)
             return false;
 
         Vector3Int candidateCell = candidate.CurrentCellPosition;

@@ -1,6 +1,9 @@
 using System.Collections;
 using UnityEngine;
 
+/*
+    Fase 1: Executa serviços automáticos de comando (CommandService) se estiverem habilitados para a equipe AI.
+*/
 public partial class AIController
 {
     private IEnumerator Phase1_CommandService(AIWorldSnapshot snapshot)

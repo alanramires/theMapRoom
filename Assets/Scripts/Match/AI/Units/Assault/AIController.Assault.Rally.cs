@@ -97,8 +97,14 @@ public partial class AIController
         int finalPressureRadius = Mathf.Max(5, GetEffectiveTransportThreshold(snapshot.AITeam));
         if (selfHqDist <= finalPressureRadius)
         {
-            reason = $"pressao final: selfHQ={selfHqDist:F0}<={finalPressureRadius}";
-            return true;
+            if (HasRallyReleaseIntel(snapshot, hqCell, finalPressureRadius, out string intelReason))
+            {
+                reason = $"pressao final: selfHQ={selfHqDist:F0}<={finalPressureRadius} {intelReason}";
+                return true;
+            }
+
+            reason = $"segura rally: selfHQ={selfHqDist:F0}<={finalPressureRadius}, sem alvo/FoW revelado {intelReason}";
+            return false;
         }
 
         int pressureUnits = 0;
@@ -123,10 +129,76 @@ public partial class AIController
 
         if (pressureUnits >= 2)
         {
-            reason = $"pressao final: aliadosHQ={pressureUnits}<= {finalPressureRadius} nearest={(nearest < float.MaxValue ? nearest.ToString("F0") : "?")}";
+            if (HasRallyReleaseIntel(snapshot, hqCell, finalPressureRadius, out string intelReason))
+            {
+                reason = $"pressao final: aliadosHQ={pressureUnits}<= {finalPressureRadius} nearest={(nearest < float.MaxValue ? nearest.ToString("F0") : "?")} {intelReason}";
+                return true;
+            }
+
+            reason = $"segura rally: aliadosHQ={pressureUnits}<= {finalPressureRadius} nearest={(nearest < float.MaxValue ? nearest.ToString("F0") : "?")}, sem alvo/FoW revelado {intelReason}";
+            return false;
+        }
+
+        return false;
+    }
+
+    private bool HasRallyReleaseIntel(
+        AIWorldSnapshot snapshot,
+        Vector3Int hqCell,
+        int finalPressureRadius,
+        out string reason)
+    {
+        reason = "";
+        if (snapshot == null)
+            return false;
+
+        if (snapshot.EnemyUnits != null)
+        {
+            for (int i = 0; i < snapshot.EnemyUnits.Count; i++)
+            {
+                UnitManager enemy = snapshot.EnemyUnits[i];
+                if (enemy == null || enemy.IsDead || enemy.IsEmbarked)
+                    continue;
+
+                Vector3Int enemyCell = enemy.CurrentCellPosition;
+                enemyCell.z = 0;
+                float dist = SectorManager.HexDistance(enemyCell, hqCell);
+                if (dist <= finalPressureRadius + 2)
+                {
+                    reason = $"intel=inimigoVisivel#{enemy.InstanceId}@{enemyCell} distHQ={dist:F0}";
+                    return true;
+                }
+            }
+        }
+
+        MatchController mc = GetMatchController();
+        if (mc == null)
+        {
+            reason = "intel=semMatchController";
+            return false;
+        }
+
+        hqCell.z = 0;
+        if (mc.IsCellVisibleForActiveTeam(hqCell))
+        {
+            reason = "intel=HQvisivel";
             return true;
         }
 
+        var neighbors = new List<Vector3Int>();
+        UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, hqCell, neighbors);
+        for (int i = 0; i < neighbors.Count; i++)
+        {
+            Vector3Int cell = neighbors[i];
+            cell.z = 0;
+            if (!mc.IsCellVisibleForActiveTeam(cell))
+                continue;
+
+            reason = $"intel=adjHQvisivel@{cell}";
+            return true;
+        }
+
+        reason = "intel=cego";
         return false;
     }
 

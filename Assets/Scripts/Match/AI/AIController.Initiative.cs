@@ -224,6 +224,58 @@ public partial class AIController
         return false;
     }
 
+    private bool TryGetFireSupportCurrentAttackInitiative(
+        UnitManager unit,
+        TeamId aiTeam,
+        out bool hasPrimaryTarget,
+        out int eliteLevel,
+        out BazookaTargetPriority bestPreference)
+    {
+        hasPrimaryTarget = false;
+        eliteLevel = 0;
+        bestPreference = BazookaTargetPriority.Tertiary;
+
+        if (!IsFireSupportUnit(unit))
+            return false;
+
+        if (unit.TryGetUnitData(out UnitData unitData) && unitData != null)
+            eliteLevel = unitData.eliteLevel;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+
+        var targets = new List<PodeMirarTargetOption>();
+        WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
+        if (!PodeMirarSensor.CollectTargets(
+                unit,
+                boardTilemap,
+                terrainDatabase,
+                SensorMovementMode.MoveuParado,
+                targets,
+                weaponPriorityData: weaponPriorityData,
+                dpqAirHeightConfig: turnStateManager != null ? turnStateManager.DpqAirHeightConfigRef : null,
+                fromCell: fromCell))
+            return false;
+
+        bool found = false;
+        foreach (PodeMirarTargetOption opt in targets)
+        {
+            UnitManager target = opt != null ? opt.targetUnit : null;
+            if (target == null || target.TeamId == aiTeam || target.IsDead || target.IsEmbarked)
+                continue;
+            if (!PassesAttackDecision(unit, target, fromCell, defensiveContext: false, out _))
+                continue;
+
+            found = true;
+            BazookaTargetPriority preference = ResolveFireSupportTargetPreference(unit, target);
+            if (preference > bestPreference)
+                bestPreference = preference;
+            if (preference == BazookaTargetPriority.Primary)
+                hasPrimaryTarget = true;
+        }
+
+        return found;
+    }
     private bool HasInitiativeCombatOpportunity(UnitManager unit, TeamId aiTeam)
     {
         return HasFireSupportAttackInCurrentPosition(unit, aiTeam)

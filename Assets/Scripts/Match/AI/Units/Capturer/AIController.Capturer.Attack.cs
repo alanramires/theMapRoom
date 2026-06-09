@@ -322,6 +322,106 @@ public partial class AIController
         return true;
     }
 
+    private bool TryDecideCapturerOwnedBuildingDefenseBeforeEmbark(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null)
+            return false;
+
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+        if (paths == null || paths.Count == 0)
+            return false;
+
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        MatchController mc = GetMatchController();
+        bool preferDpq = unit.TryGetUnitData(out UnitData unitData) && unitData != null && unitData.prioritizeDpqAtBattle;
+
+        UnitManager bestTarget = null;
+        Vector3Int bestAttackCell = fromCell;
+        float bestScore = float.MinValue;
+        float bestDpq = float.MinValue;
+        float bestTargetPrefScore = float.MinValue;
+        string bestReason = "";
+
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy == null || enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked)
+                continue;
+            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
+                continue;
+
+            Vector3Int enemyCell = enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            ConstructionManager threatenedBuilding = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell);
+            if (threatenedBuilding == null
+                || !threatenedBuilding.IsCapturable
+                || threatenedBuilding.TeamId != snapshot.AITeam)
+                continue;
+
+            bool contested = threatenedBuilding.CurrentCapturePoints < threatenedBuilding.CapturePointsMax;
+            float captureLoss = Mathf.Max(0, threatenedBuilding.CapturePointsMax - threatenedBuilding.CurrentCapturePoints);
+            BazookaTargetPriority targetPreference = ResolveCapturerTargetPreference(unit, enemy);
+            float targetPrefScore = GetCapturerTargetPreferenceScore(targetPreference);
+
+            foreach (Vector3Int rawCell in paths.Keys)
+            {
+                Vector3Int attackCell = rawCell;
+                attackCell.z = 0;
+                if (attackCell != fromCell && occupied != null && occupied.Contains(attackCell))
+                    continue;
+                if (!CanAttackTargetFrom(fromCell, attackCell, unit, enemy))
+                    continue;
+                if (!PassesAttackDecision(unit, enemy, attackCell, true, out string attackDecisionReason))
+                    continue;
+
+                float dpq = GetTerrainDpqPontos(attackCell);
+                float threat = CalculateThreatLevel(attackCell, snapshot.AITeam);
+                int pathCost = GetPathStepCount(paths, attackCell);
+                float score =
+                    45000f
+                    + (contested ? 15000f : 7000f)
+                    + captureLoss * 500f
+                    + targetPrefScore
+                    + Mathf.Max(0, 20 - enemy.CurrentHP) * 500f
+                    + dpq * 400f
+                    - threat * 80f
+                    - pathCost * 25f
+                    - SectorManager.HexDistance(attackCell, enemyCell) * 20f
+                    - enemy.InstanceId * 0.001f;
+
+                if (attackCell == fromCell)
+                    score += 650f;
+
+                if (IsBetterAttackCandidate(preferDpq, targetPrefScore, dpq, score, 0f, 0f,
+                        bestTargetPrefScore, bestDpq, bestScore, 0f, 0f))
+                {
+                    bestScore = score;
+                    bestDpq = dpq;
+                    bestTargetPrefScore = targetPrefScore;
+                    bestTarget = enemy;
+                    bestAttackCell = attackCell;
+                    bestReason = $"score={score:F0} predio={threatenedBuilding.Sector} contested={contested} capLoss={captureLoss:F0} pref={targetPreference} hp={enemy.CurrentHP} dpq={dpq:F1} threat={threat:F1} path={pathCost} preferDpq={preferDpq} {attackDecisionReason}";
+                }
+            }
+        }
+
+        if (bestTarget == null)
+            return false;
+
+        Vector3Int targetCell = bestTarget.CurrentCellPosition;
+        targetCell.z = 0;
+        Debug.Log($"{TL("Capturador")} {unit.InstanceId} defende predio aliado antes de embarcar: ataca {bestTarget.UnitDisplayName}#{bestTarget.InstanceId} via {bestAttackCell} ({bestReason})");
+        action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, bestAttackCell,
+            bestTarget.InstanceId.ToString(), targetCell, paths);
+        return true;
+    }
+
     private void AppendMissingDpqReachabilityDiagnostics(
         System.Text.StringBuilder log,
         UnitManager unit,

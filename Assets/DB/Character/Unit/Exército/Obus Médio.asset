@@ -39,6 +39,8 @@ MonoBehaviour:
     priority: 2
   - targetClass: 1
     priority: 1
+  - targetClass: 2
+    priority: 1
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
   playConservative: 1
@@ -59,6 +61,10 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
   aiConservativeSupplyAvoidEnemyRange: 2

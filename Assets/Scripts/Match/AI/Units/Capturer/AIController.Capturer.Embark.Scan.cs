@@ -198,7 +198,7 @@ public partial class AIController
         foreach (UnitManager t in UnitManager.AllActive)
         {
             if (t == capturer) continue;
-            if (t.TeamId != capturer.TeamId || t.IsDead || t.IsEmbarked) continue;
+            if (t.TeamId != capturer.TeamId || t.IsDead || t.IsEmbarked || t.IsUnderRepair) continue;
             if (!t.TryGetUnitData(out UnitData tData) || !tData.isTransporter) continue;
             SectorObjective tObj = plan != null ? ResolveAssignedTransportObjective(t, plan) : null;
             if (tObj != null) continue;

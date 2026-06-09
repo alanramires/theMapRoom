@@ -58,6 +58,15 @@ public partial class AIController
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
         Vector3Int anchor = ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell);
 
+        if (IsArtilleryModeOnly(unit)
+            && TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor,
+                assigned.Status == ObjectiveStatus.Defending, out PlayerAction stationaryAttackAction,
+                out string stationaryAttackReason, stationaryOnly: true))
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} apoia {assigned.Sector} (modo artilharia) - {stationaryAttackReason}");
+            return stationaryAttackAction;
+        }
+
         if (TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor, assigned.Status == ObjectiveStatus.Defending, out PlayerAction attackAction, out string attackReason))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} apoia {assigned.Sector} - {attackReason}");
@@ -134,37 +143,48 @@ public partial class AIController
         if (rendezvousTarget == null || bestDist <= 1f) return null;
 
         Vector3Int targetCell = rendezvousTarget.CurrentCellPosition; targetCell.z = 0;
-        Vector3Int moveCell = FindAssaultPressureMove(unit, snapshot, fromCell, targetCell, paths, occupied, out string moveReason);
-        if (moveCell == fromCell) return null;
         TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        float fromThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
+
+        // Try progression tool first — avoids backward movement toward rendezvous target.
+        if (TryFindBestToolProgressionCell(
+                unit,
+                snapshot,
+                fromCell,
+                targetCell,
+                paths,
+                occupied,
+                ToolProgressionIntent.FireSupportRendezvous,
+                out Vector3Int toolCell,
+                out ToolProgressionCandidate toolCandidate,
+                out string toolReason,
+                allowCell: cell => !IsCellACapturerTarget(cell, capPlan, snapshot.AITeam))
+            && toolCell != fromCell
+            && (toolCandidate.ToolScore > 0 || toolCandidate.FirstTurnProgress > 0f || toolCandidate.TwoTurnProgress > 0f)
+            && CalculateThreatLevel(toolCell, snapshot.AITeam) <= fromThreat + 0.1f)
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rendezvous {assigned.Sector} → #{rendezvousTarget.InstanceId} via {toolCell} (progressão {toolReason})");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, toolCell, paths);
+        }
+
+        // Fallback: pressure move (no tool progress available).
+        // Only accept if it actually closes distance to the rendezvous target.
+        Vector3Int moveCell = FindAssaultPressureMove(unit, snapshot, fromCell, targetCell, paths, occupied, out _);
+        if (moveCell == fromCell) return null;
+        if (SectorManager.HexDistance(moveCell, targetCell) >= SectorManager.HexDistance(fromCell, targetCell))
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rendezvous {assigned.Sector} fallback sem progresso via {moveCell}, fica parado");
+            return null;
+        }
         if (IsCellACapturerTarget(moveCell, capPlan, snapshot.AITeam))
         {
-            if (!TryFindBestToolProgressionCell(
-                    unit,
-                    snapshot,
-                    fromCell,
-                    targetCell,
-                    paths,
-                    occupied,
-                    ToolProgressionIntent.FireSupportRendezvous,
-                    out Vector3Int alternateCell,
-                    out ToolProgressionCandidate alternateCandidate,
-                    out string alternateReason,
-                    allowCell: cell => !IsCellACapturerTarget(cell, capPlan, snapshot.AITeam))
-                || alternateCell == fromCell
-                || alternateCandidate.ToolScore <= 0)
-            {
-                Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rendezvous {assigned.Sector} evita predio reservado {moveCell} - sem alternativa");
-                return null;
-            }
-
-            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rendezvous {assigned.Sector} evita predio reservado {moveCell}, usa {alternateCell} ({alternateReason})");
-            moveCell = alternateCell;
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rendezvous {assigned.Sector} evita predio reservado {moveCell} - sem alternativa");
+            return null;
         }
-        if (CalculateThreatLevel(moveCell, snapshot.AITeam) > CalculateThreatLevel(fromCell, snapshot.AITeam) + 0.1f)
+        if (CalculateThreatLevel(moveCell, snapshot.AITeam) > fromThreat + 0.1f)
             return null;
 
-        Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rendezvous {assigned.Sector} → #{rendezvousTarget.InstanceId} via {moveCell}");
+        Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rendezvous {assigned.Sector} → #{rendezvousTarget.InstanceId} via {moveCell} (fallback)");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
     }
 }

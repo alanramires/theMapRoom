@@ -220,6 +220,7 @@ public partial class AIShoppingPlanner
     private static int ComputeLogisticsDemand(AIWorldSnapshot snapshot, out int repairDemandCount, out int activeLogisticsCount)
     {
         repairDemandCount = CountGroundUnitsUnderRepair(snapshot);
+        int criticalPreventiveDemandCount = CountCriticalPreventiveGroundLogisticsDemand(snapshot);
         activeLogisticsCount = CountActiveGroundLogistics(snapshot);
         int activeLogisticsCapacity = CountActiveGroundLogisticsCapacity(snapshot);
 
@@ -230,14 +231,15 @@ public partial class AIShoppingPlanner
         }
 
         int repairsPerSupplier = Instance != null ? Mathf.Max(1, Instance.RepairsPerGroundSupplier) : 2;
-        int desiredLogistics = repairDemandCount > 0
-            ? Mathf.CeilToInt(repairDemandCount / (float)repairsPerSupplier)
+        int logisticsWorkload = repairDemandCount + criticalPreventiveDemandCount;
+        int desiredLogistics = logisticsWorkload > 0
+            ? Mathf.CeilToInt(logisticsWorkload / (float)repairsPerSupplier)
             : 0;
-        int logisticsCap = repairDemandCount >= 6 ? 3 : 2;
+        int logisticsCap = logisticsWorkload >= 6 ? 3 : 2;
         desiredLogistics = Mathf.Min(desiredLogistics, logisticsCap);
 
         int demand = Mathf.Max(0, desiredLogistics - activeLogisticsCount);
-        Debug.Log($"[AI Shopping] logistics_demand: demand={demand} groundRepairs={repairDemandCount} activeLog={activeLogisticsCount} activeCap={activeLogisticsCapacity} desired={desiredLogistics} repairsPerSupplier={repairsPerSupplier} cap={logisticsCap} units={snapshot?.MyUnits?.Count ?? 0}");
+        Debug.Log($"[AI Shopping] logistics_demand: demand={demand} groundRepairs={repairDemandCount} criticalPreventive={criticalPreventiveDemandCount} workload={logisticsWorkload} activeLog={activeLogisticsCount} activeCap={activeLogisticsCapacity} desired={desiredLogistics} repairsPerSupplier={repairsPerSupplier} cap={logisticsCap} units={snapshot?.MyUnits?.Count ?? 0}");
         return demand;
     }
 
@@ -468,6 +470,60 @@ public partial class AIShoppingPlanner
         }
 
         return count;
+    }
+
+    private static int CountCriticalPreventiveGroundLogisticsDemand(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null)
+                continue;
+            if (data.domain == Domain.Air)
+                continue;
+            if (data.roles != null && data.roles.Contains(UnitRole.Logistica))
+                continue;
+
+            bool fireSupport = data.roles != null && data.roles.Contains(UnitRole.FogoIndireto)
+                || data.unitClass == GameUnitClass.Artillery
+                || data.preferArtilleryModeBeforeCombatant
+                || data.longRangeStationary;
+            if (!fireSupport)
+                continue;
+
+            if (HasAnyShoppingWeaponAmmoAtOrBelow(unit, 0) || HasAnyShoppingWeaponAmmoAtOrBelow(unit, 1))
+                count++;
+        }
+
+        return count;
+    }
+
+    private static bool HasAnyShoppingWeaponAmmoAtOrBelow(UnitManager unit, int ammoThreshold)
+    {
+        if (ammoThreshold < 0 || unit == null || !unit.TryGetUnitData(out UnitData data) || data == null || data.embarkedWeapons == null)
+            return false;
+
+        IReadOnlyList<UnitEmbarkedWeapon> runtimeWeapons = unit.GetEmbarkedWeapons();
+        if (runtimeWeapons == null)
+            return false;
+
+        int count = Mathf.Min(runtimeWeapons.Count, data.embarkedWeapons.Count);
+        for (int i = 0; i < count; i++)
+        {
+            UnitEmbarkedWeapon runtime = runtimeWeapons[i];
+            UnitEmbarkedWeapon baseline = data.embarkedWeapons[i];
+            if (runtime == null || baseline == null)
+                continue;
+            if (baseline.squadAmmunition > 0 && runtime.squadAmmunition <= ammoThreshold)
+                return true;
+        }
+
+        return false;
     }
 
     private static int CountActiveGroundLogistics(AIWorldSnapshot snapshot)

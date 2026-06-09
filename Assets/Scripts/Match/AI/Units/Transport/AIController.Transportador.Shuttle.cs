@@ -608,6 +608,17 @@ public partial class AIController
     // Opportunistic attack (shuttle, empty) — max 1h deviation from pickup route
     // -------------------------------------------------------------------------
 
+    private static BazookaTargetPriority ResolveTransportTargetPreference(UnitManager attacker, UnitManager target)
+    {
+        if (attacker == null || target == null)
+            return BazookaTargetPriority.Tertiary;
+        if (!attacker.TryGetUnitData(out UnitData attackerData) || attackerData == null)
+            return BazookaTargetPriority.Tertiary;
+        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
+            return BazookaTargetPriority.Tertiary;
+
+        return attackerData.ResolveAiTargetPriorityForTargetClass(targetData.unitClass);
+    }
     private bool TryFindTransportBreakerAttack(
         UnitManager unit,
         AIWorldSnapshot snapshot,
@@ -647,6 +658,7 @@ public partial class AIController
             {
                 if (!CanAttackTargetFrom(fromCell, cell, unit, enemy)) continue;
                 if (!PassesAttackDecision(unit, enemy, cell, false, out _)) continue;
+                if (ResolveTransportTargetPreference(unit, enemy) != BazookaTargetPriority.Primary) continue;
 
                 float dpqBonus = preferNoMove ? GetTerrainDpqPontos(cell) * 200f : 0f;
                 float score = (20f - enemy.CurrentHP) * 100f

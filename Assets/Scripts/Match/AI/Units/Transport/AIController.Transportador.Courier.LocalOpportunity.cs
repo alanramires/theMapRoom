@@ -130,7 +130,9 @@ public partial class AIController
         Vector3Int transporterCell,
         List<PodeDesembarcarOption> options,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
-        out PlayerAction action)
+        out PlayerAction action,
+        bool allowAssignedPassengers = false,
+        bool requireUnheldRallyPoint = false)
     {
         action = null;
         if (transporter == null || passengers == null || passengers.Count == 0 || snapshot == null || options == null || options.Count == 0)
@@ -147,7 +149,7 @@ public partial class AIController
 
         foreach (UnitManager passenger in passengers)
         {
-            if (!IsRogueLocalOpportunityPassenger(passenger, plan))
+            if (!IsRogueLocalOpportunityPassenger(passenger, plan, allowAssignedPassengers))
             {
                 passengerRejected++;
                 continue;
@@ -165,6 +167,11 @@ public partial class AIController
                 dropCell.z = 0;
                 foreach (ConstructionManager target in ConstructionManager.AllActive)
                 {
+                    if (requireUnheldRallyPoint && !IsUnheldCourierRallyTarget(target, snapshot.AITeam))
+                    {
+                        targetRejected++;
+                        continue;
+                    }
                     if (!IsRogueCourierContestedRendezvousTarget(target, snapshot.AITeam))
                     {
                         targetRejected++;
@@ -195,7 +202,7 @@ public partial class AIController
 
         if (bestOption == null || bestPassenger == null || bestTarget == null)
         {
-            Debug.Log($"{TL("Transporte")} {transporter.InstanceId} courier invasao-rendezvous sem drop util: passageirosSkip={passengerRejected} optsSkip={optionRejected} targetsSkip={targetRejected} rangeSkip={rangeRejected} range={TransportDropOffRange}");
+            Debug.Log($"{TL("Transporte")} {transporter.InstanceId} courier invasao-rendezvous sem drop util: passageirosSkip={passengerRejected} optsSkip={optionRejected} targetsSkip={targetRejected} rangeSkip={rangeRejected} range={TransportDropOffRange} assignedOk={allowAssignedPassengers} rallyNaoControlado={requireUnheldRallyPoint}");
             return false;
         }
 
@@ -209,11 +216,11 @@ public partial class AIController
         return true;
     }
 
-    private bool IsRogueLocalOpportunityPassenger(UnitManager passenger, TeamObjectivePlan plan)
+    private bool IsRogueLocalOpportunityPassenger(UnitManager passenger, TeamObjectivePlan plan, bool allowAssignedPassengers = false)
     {
         if (passenger == null || passenger.IsDead || passenger.IsUnderRepair)
             return false;
-        if (plan != null && IsPassengerInPlanSlot(passenger, plan))
+        if (!allowAssignedPassengers && plan != null && IsPassengerInPlanSlot(passenger, plan))
             return false;
         if (!passenger.TryGetUnitData(out UnitData data) || data?.roles == null)
             return false;
@@ -229,7 +236,7 @@ public partial class AIController
     {
         if (target == null || !target.IsCapturable || target.CapturePointsMax <= 0)
             return false;
-        if (target.TeamId != TeamId.Neutral)
+        if (target.TeamId == aiTeam && target.CurrentCapturePoints >= target.CapturePointsMax)
             return false;
         if (target.Sector == ConstructionSector.None || ConstructionSectorHelper.IsBase(target.Sector))
             return false;
@@ -248,6 +255,19 @@ public partial class AIController
         if (target.Sector == ConstructionSector.None || ConstructionSectorHelper.IsBase(target.Sector) || target.IsPlayerHeadQuarter)
             return false;
         if (target.TeamId == aiTeam && target.CurrentCapturePoints >= target.CapturePointsMax)
+            return false;
+
+        return target.TeamId != aiTeam || target.CurrentCapturePoints < target.CapturePointsMax;
+    }
+
+    private bool IsUnheldCourierRallyTarget(ConstructionManager target, TeamId aiTeam)
+    {
+        if (target == null || !target.IsRallyPoint || target.Sector == ConstructionSector.None)
+            return false;
+        if (!target.IsCapturable || target.CapturePointsMax <= 0)
+            return false;
+        if (TryGetAnySectorInfo(target.Sector, out SectorManager.SectorInfo info)
+            && IsRallySectorHeldByTeam(info, aiTeam))
             return false;
 
         return target.TeamId != aiTeam || target.CurrentCapturePoints < target.CapturePointsMax;

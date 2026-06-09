@@ -41,6 +41,7 @@ public partial class AIController
         Vector3Int bestTransporterCell = fromCell;
         List<Vector3Int> bestTransporterPath = null;
         List<PodeDesembarcarOption> bestSelected = null;
+        string bestDropDetails = "";
 
         // Candidate transporter positions: current cell + all non-forward reachable cells.
         var candidateCells = new List<(Vector3Int cell, List<Vector3Int> path)> { (fromCell, null) };
@@ -67,20 +68,33 @@ public partial class AIController
             // Score using the conservative metric (allied building, cohesion, threat).
             // Forward disembark cells are skipped.
             float cellBestScore = float.MinValue;
+            PodeDesembarcarOption cellBestOption = null;
+            string cellBestDetails = "";
             foreach (PodeDesembarcarOption opt in opts)
             {
                 if (opt.passengerUnit != primaryPassenger) continue;
                 Vector3Int dc = opt.disembarkCell; dc.z = 0;
                 if (IsLogisticsForwardOfMainLine(unit, snapshot, dc, anchor)) continue;
-                float score = ScoreConservativeFireSupportDropOff(dc, snapshot);
-                if (score > cellBestScore) cellBestScore = score;
+                int supportCount = CountTowCourierFrontlineSupport(unit, primaryPassenger, snapshot, dc, deliveryTarget, out float nearestSupport);
+                if (supportCount <= 0) continue;
+                float score = ScoreConservativeFireSupportDropOff(dc, snapshot)
+                    + supportCount * 700f
+                    + Mathf.Max(0f, 3f - nearestSupport) * 220f;
+                if (score < 500f) continue;
+                if (score > cellBestScore)
+                {
+                    cellBestScore = score;
+                    cellBestOption = opt;
+                    cellBestDetails = $"allies3={supportCount} near={nearestSupport:F1}";
+                }
             }
-            if (cellBestScore <= float.MinValue || cellBestScore <= bestScore) continue;
+            if (cellBestOption == null || cellBestScore <= bestScore) continue;
 
             bestScore = cellBestScore;
             bestTransporterCell = tCell;
             bestTransporterPath = tPath;
-            bestSelected = SelectBestDisembarkPerPassenger(opts, passengers, plan, snapshot);
+            bestSelected = new List<PodeDesembarcarOption> { cellBestOption };
+            bestDropDetails = cellBestDetails;
         }
 
         if (bestSelected != null)
@@ -90,10 +104,10 @@ public partial class AIController
             dropCell.z = 0;
             if (bestTransporterCell == fromCell)
             {
-                Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier conservador — desembarca FS #{primaryPassenger.InstanceId} @ {dropCell} score={bestScore:F0}");
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier conservador — desembarca FS #{primaryPassenger.InstanceId} @ {dropCell} score={bestScore:F0} {bestDropDetails}");
                 return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, bestSelected);
             }
-            Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier conservador — move+desembarca FS #{primaryPassenger.InstanceId} via {bestTransporterCell} @ {dropCell} score={bestScore:F0}");
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier conservador — move+desembarca FS #{primaryPassenger.InstanceId} via {bestTransporterCell} @ {dropCell} score={bestScore:F0} {bestDropDetails}");
             return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, bestSelected, bestTransporterCell, bestTransporterPath);
         }
 
@@ -351,7 +365,14 @@ public partial class AIController
             Vector3Int dropCell = primaryOpt.disembarkCell;
             dropCell.z = 0;
             int pathCost = tCell == fromCell ? 0 : GetPathStepCount(paths, tCell);
-            float score = ScoreEmergencyFireSupportDrop(primaryPassenger, snapshot, fromCell, tCell, dropCell, target, pathCost, out _);
+            int supportCount = CountTowCourierFrontlineSupport(unit, primaryPassenger, snapshot, dropCell, target, out float nearestSupport);
+            if (supportCount <= 0)
+                continue;
+            float score = ScoreEmergencyFireSupportDrop(primaryPassenger, snapshot, fromCell, tCell, dropCell, target, pathCost, out _)
+                + supportCount * 500f
+                + Mathf.Max(0f, 3f - nearestSupport) * 160f;
+            if (score < 500f)
+                continue;
             if (score <= bestScore)
                 continue;
 

@@ -109,6 +109,9 @@ public partial class AIController
                         bool blockerA = IsBlockingCaptureTarget(a, activePlan, aiTeam);
                         bool blockerB = IsBlockingCaptureTarget(b, activePlan, aiTeam);
                         if (blockerA != blockerB) return blockerA ? -1 : 1;
+
+                        int fireCmp = CompareFireSupportAttackInitiative(a, b, aiTeam);
+                        if (fireCmp != 0) return fireCmp;
                     }
 
                     // Dentro do grupo 2: combate local real vem antes de apoio de posicionamento
@@ -118,6 +121,8 @@ public partial class AIController
                         bool fireSupportA = HasFireSupportAttackInCurrentPosition(a, aiTeam);
                         bool fireSupportB = HasFireSupportAttackInCurrentPosition(b, aiTeam);
                         if (fireSupportA != fireSupportB) return fireSupportA ? -1 : 1;
+                        int fireCmp = CompareFireSupportAttackInitiative(a, b, aiTeam);
+                        if (fireCmp != 0) return fireCmp;
 
                         bool combatA = HasInitiativeCombatOpportunity(a, aiTeam);
                         bool combatB = HasInitiativeCombatOpportunity(b, aiTeam);
@@ -250,6 +255,35 @@ public partial class AIController
         Vector3Int from = action.MoveFrom; from.z = 0;
         Vector3Int to = action.MoveTo; to.z = 0;
         return from == to;
+    }
+
+    private int CompareFireSupportAttackInitiative(UnitManager a, UnitManager b, TeamId aiTeam)
+    {
+        if (!IsFireSupportUnit(a) || !IsFireSupportUnit(b))
+            return 0;
+
+        bool hasA = TryGetFireSupportCurrentAttackInitiative(a, aiTeam,
+            out bool primaryA, out int eliteA, out BazookaTargetPriority prefA);
+        bool hasB = TryGetFireSupportCurrentAttackInitiative(b, aiTeam,
+            out bool primaryB, out int eliteB, out BazookaTargetPriority prefB);
+
+        if (hasA != hasB)
+            return hasA ? -1 : 1;
+        if (!hasA)
+            return 0;
+
+        if (primaryA != primaryB)
+            return primaryA ? -1 : 1;
+
+        if (!primaryA)
+        {
+            int eliteCmp = eliteB.CompareTo(eliteA);
+            if (eliteCmp != 0)
+                return eliteCmp;
+        }
+
+        int prefCmp = prefB.CompareTo(prefA);
+        return prefCmp != 0 ? prefCmp : 0;
     }
 
     private void SyncAIUnitCellsFromTransforms()

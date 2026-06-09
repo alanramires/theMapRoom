@@ -246,13 +246,12 @@ public partial class AIController
                 continue;
             if (conservative && progress > 0f && tacticalPressure <= 0f && rearLine < -350f)
                 continue;
+            if (!requireImmediateThreat && !preferMaxRange && progress < 0f && !advancesByRoute)
+                continue;
 
             float score = ScoreFireSupportRepositionCell(
                 unit, snapshot, cell, fromCell, anchor, fromDist, pathCost,
                 preferMaxRange, conservative, preferBestDpq, maxRange, weaponPriorityData, out _);
-
-            if (!preferMaxRange && progress < 0f)
-                score -= 500f;
             if (preferBestDpq && dpq <= GetTerrainDpqPontos(fromCell) && pathCost <= 1)
                 score -= 250f;
 

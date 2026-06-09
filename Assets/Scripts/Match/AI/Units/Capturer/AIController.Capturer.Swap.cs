@@ -71,7 +71,8 @@ public partial class AIController
         return best;
     }
 
-    // Move o ocupante para o melhor hex adjacente livre, cedendo o edificio.
+    // Libera o edificio e tenta continuar a agenda normal da unidade:
+    // primeiro combate util em qualquer hex alcancavel, depois movimento de agenda.
     private PlayerAction DecideSwapVacateAction(UnitManager occupant, UnitManager incoming, AIWorldSnapshot snapshot)
     {
         Vector3Int fromCell = occupant.CurrentCellPosition; fromCell.z = 0;
@@ -82,41 +83,170 @@ public partial class AIController
         if (paths == null || paths.Count == 0) return null;
 
         HashSet<Vector3Int> occupied = BuildOccupied(occupant);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        Vector3Int objectiveCell = ResolveUnitObjectiveCell(occupant, plan, snapshot);
+        if (objectiveCell == Vector3Int.zero)
+            objectiveCell = fromCell;
+        objectiveCell.z = 0;
 
-        // 1ª passagem: hex adjacente livre
-        var neighbors = new List<Vector3Int>(6);
-        UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, fromCell, neighbors);
+        if (TryBuildSwapVacateCombatAction(occupant, incoming, snapshot, fromCell, paths, occupied, plan, out PlayerAction combatAction))
+            return combatAction;
 
-        Vector3Int bestCell = Vector3Int.zero;
-        bool found = false;
+        if (!TryFindSwapAgendaVacateCell(occupant, snapshot, fromCell, objectiveCell, paths, occupied, plan, out Vector3Int bestCell, out string bestReason))
+            return null;
 
-        foreach (Vector3Int rawCell in neighbors)
+        plannedDestinations.Add(bestCell);
+        Debug.Log($"{TL("Swap")} {occupant.InstanceId} cede edificio para #{incoming.InstanceId} (HP {occupant.CurrentHP}->{incoming.CurrentHP}) e segue agenda -> {fromCell}->{bestCell} ({bestReason})");
+        return BuildMoveBatch(occupant, snapshot.AITeam, fromCell, bestCell, paths);
+    }
+
+    private bool TryBuildSwapVacateCombatAction(
+        UnitManager occupant,
+        UnitManager incoming,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        TeamObjectivePlan plan,
+        out PlayerAction action)
+    {
+        action = null;
+        List<UnitManager> enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
+        if (enemies == null || enemies.Count == 0)
+            return false;
+
+        bool preferDpq = occupant.TryGetUnitData(out UnitData attackerUd) && attackerUd != null && attackerUd.prioritizeDpqAtBattle;
+        float dpqWeight = preferDpq ? 2000f : 40f;
+        Vector3Int objectiveCell = ResolveUnitObjectiveCell(occupant, plan, snapshot);
+        if (objectiveCell == Vector3Int.zero)
+            objectiveCell = snapshot.EnemyHQ != null ? snapshot.EnemyHQ.CurrentCellPosition : fromCell;
+        objectiveCell.z = 0;
+
+        Vector3Int bestCell = fromCell;
+        UnitManager bestTarget = null;
+        string bestReason = "";
+        float bestScore = float.MinValue;
+
+        foreach (Vector3Int rawCell in paths.Keys)
         {
-            Vector3Int cell = rawCell; cell.z = 0;
-            if (!paths.ContainsKey(cell)) continue;
-            if (occupied.Contains(cell)) continue;
-            bestCell = cell;
-            found = true;
-            break;
-        }
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell)
+                continue;
+            if (occupied != null && occupied.Contains(cell))
+                continue;
+            if (IsOtherAssignedCapturerTarget(cell, occupant, null, plan, snapshot.AITeam))
+                continue;
 
-        // 2ª passagem: qualquer hex alcançável se nenhum adjacente estiver livre
-        if (!found)
-        {
-            int bestSteps = int.MaxValue;
-            foreach (Vector3Int cell in paths.Keys)
+            ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+            if (construction != null && construction.CanProduceUnitsForTeam(snapshot.AITeam))
+                continue;
+
+            foreach (UnitManager enemy in enemies)
             {
-                if (cell == fromCell) continue;
-                if (occupied.Contains(cell)) continue;
-                int steps = paths[cell].Count;
-                if (steps < bestSteps) { bestSteps = steps; bestCell = cell; found = true; }
+                if (!CanAttackTargetFrom(fromCell, cell, occupant, enemy))
+                    continue;
+                if (!PassesAttackDecision(occupant, enemy, cell, false, out string attackDecisionReason))
+                    continue;
+
+                Vector3Int enemyCell = enemy.CurrentCellPosition;
+                enemyCell.z = 0;
+                ConstructionManager enemyBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell);
+                bool inOwnConstruction = enemyBldg != null && enemyBldg.TeamId == snapshot.AITeam;
+                bool inConstruction = enemyBldg != null;
+                float constructionBonus = inOwnConstruction ? 20000f : inConstruction ? 5000f : 0f;
+                float progress = SectorManager.HexDistance(fromCell, objectiveCell) - SectorManager.HexDistance(cell, objectiveCell);
+                float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+                float dpq = GetTerrainDpqPontos(cell);
+                int pathCost = GetPathStepCount(paths, cell);
+                BazookaTargetPriority targetPreference = ResolveAssaultTargetPreference(occupant, enemy);
+                float targetPreferenceScore = GetAssaultTargetPreferenceScore(targetPreference);
+                float score =
+                    targetPreferenceScore
+                    + Mathf.Max(0, 20 - enemy.CurrentHP) * 900f
+                    + constructionBonus
+                    + progress * 120f
+                    + dpq * dpqWeight
+                    - threat * 70f
+                    - pathCost * 10f
+                    - SectorManager.HexDistance(fromCell, cell) * 8f
+                    - enemy.InstanceId * 0.001f;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestCell = cell;
+                    bestTarget = enemy;
+                    bestReason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} bldg={inConstruction} ownBldg={inOwnConstruction} progress={progress:F1} dpq={dpq:F1} dpqW={dpqWeight:F0} threat={threat:F1} preferDpq={preferDpq} {attackDecisionReason}";
+                }
             }
         }
 
-        if (!found) return null;
+        if (bestTarget == null)
+            return false;
 
-        Debug.Log($"{TL("Swap")} {occupant.InstanceId} cede edificio para #{incoming.InstanceId} (HP {occupant.CurrentHP}→{incoming.CurrentHP}) → {fromCell}→{bestCell}");
         plannedDestinations.Add(bestCell);
-        return BuildMoveBatch(occupant, snapshot.AITeam, fromCell, bestCell, paths);
+        Vector3Int targetCell = bestTarget.CurrentCellPosition;
+        targetCell.z = 0;
+        Debug.Log($"{TL("Swap")} {occupant.InstanceId} cede edificio para #{incoming.InstanceId} (HP {occupant.CurrentHP}->{incoming.CurrentHP}) e ataca via {bestCell} -> {bestTarget.UnitDisplayName}#{bestTarget.InstanceId} ({bestReason})");
+        action = BuildAttackBatch(occupant, snapshot.AITeam, fromCell, bestCell, bestTarget.InstanceId.ToString(), targetCell, paths);
+        return true;
+    }
+
+    private bool TryFindSwapAgendaVacateCell(
+        UnitManager occupant,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int objectiveCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        TeamObjectivePlan plan,
+        out Vector3Int bestCell,
+        out string bestReason)
+    {
+        bestCell = fromCell;
+        bestReason = "";
+        objectiveCell.z = 0;
+        bool preferDpq = occupant.TryGetUnitData(out UnitData attackerUd) && attackerUd != null && attackerUd.prioritizeDpqAtBattle;
+        float dpqWeight = preferDpq ? 180f : 70f;
+        float bestScore = float.MinValue;
+
+        float fromDist = SectorManager.HexDistance(fromCell, objectiveCell);
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell)
+                continue;
+            if (occupied != null && occupied.Contains(cell))
+                continue;
+            if (IsOtherAssignedCapturerTarget(cell, occupant, null, plan, snapshot.AITeam))
+                continue;
+
+            ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+            if (construction != null && construction.CanProduceUnitsForTeam(snapshot.AITeam))
+                continue;
+
+            float cellDist = SectorManager.HexDistance(cell, objectiveCell);
+            float progress = fromDist - cellDist;
+            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+            float dpq = GetTerrainDpqPontos(cell);
+            int pathCost = GetPathStepCount(paths, cell);
+            float score =
+                progress * 650f
+                + dpq * dpqWeight
+                - threat * 80f
+                - pathCost * 25f
+                - SectorManager.HexDistance(fromCell, cell) * 10f;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCell = cell;
+                bestReason = $"score={score:F0} progress={progress:F1} dpq={dpq:F1} dpqW={dpqWeight:F0} threat={threat:F1} path={pathCost} preferDpq={preferDpq}";
+            }
+        }
+
+        return bestCell != fromCell;
     }
 }

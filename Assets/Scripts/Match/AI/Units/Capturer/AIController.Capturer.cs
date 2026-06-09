@@ -51,6 +51,12 @@ public partial class AIController
                     return BuildCaptureBatch(unit, snapshot.AITeam, currentCell, currentCell);
                 }
             }
+
+            if (TryDecideNearbyRallyCaptureBeforeEmbark(unit, snapshot, plan, currentCell, out PlayerAction nearbyRallyAction))
+                return nearbyRallyAction;
+
+            if (TryDecideCapturerOwnedBuildingDefenseBeforeEmbark(unit, snapshot, currentCell, out PlayerAction ownedBuildingDefenseAction))
+                return ownedBuildingDefenseAction;
         }
 
         PlayerAction embarkAction = TryDecideCapturerEmbarkAction(unit, snapshot, plan);
@@ -66,6 +72,85 @@ public partial class AIController
         }
 
         return DecideAssignedCapturerAction(unit, snapshot, assigned);
+    }
+
+    private bool TryDecideNearbyRallyCaptureBeforeEmbark(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        Vector3Int fromCell,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null)
+            return false;
+
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+        if (paths == null || paths.Count == 0)
+            return false;
+
+        ConstructionManager best = null;
+        Vector3Int bestCell = fromCell;
+        float bestScore = float.MinValue;
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int captureCell = rawCell;
+            captureCell.z = 0;
+            if (captureCell != fromCell && occupied.Contains(captureCell))
+                continue;
+            float distance = SectorManager.HexDistance(fromCell, captureCell);
+            if (distance > 3f)
+                continue;
+
+            if (!SimulateCaptureSensor(unit, captureCell, out ConstructionManager captureTarget))
+                continue;
+            if (captureTarget == null || !captureTarget.IsCapturable || captureTarget.CapturePointsMax <= 0)
+                continue;
+            if (captureTarget.TeamId == snapshot.AITeam && captureTarget.CurrentCapturePoints >= captureTarget.CapturePointsMax)
+                continue;
+            if (ShouldReserveOpportunisticCaptureForCloserUnit(unit, snapshot.AITeam, captureCell, paths, out UnitManager reservedFor))
+            {
+                Debug.Log($"{TL("Oportunista")} {unit.InstanceId} cede captura local perto @ {captureCell} para {reservedFor.InstanceId}");
+                continue;
+            }
+
+            bool rallyLike = captureTarget.IsRallyPoint || IsPlannedRallyAssemblySector(captureTarget.Sector, plan);
+            float missingCapture = Mathf.Max(0, captureTarget.CapturePointsMax - captureTarget.CurrentCapturePoints);
+            float score = (3f - distance) * 1000f
+                + missingCapture * 80f
+                + (rallyLike ? 3000f : 0f)
+                - CalculateThreatLevel(captureCell, snapshot.AITeam) * 45f
+                - captureTarget.InstanceId * 0.001f;
+            if (score <= bestScore)
+                continue;
+
+            bestScore = score;
+            best = captureTarget;
+            bestCell = captureCell;
+        }
+
+        if (best == null)
+            return false;
+
+        Debug.Log($"{TL("Oportunista")} {unit.InstanceId} captura local perto {best.Sector} @ {bestCell} antes de embarcar score={bestScore:F0} rally={best.IsRallyPoint}");
+        action = BuildCaptureBatch(unit, snapshot.AITeam, fromCell, bestCell, paths);
+        return true;
+    }
+
+    private static bool IsPlannedRallyAssemblySector(ConstructionSector sector, TeamObjectivePlan plan)
+    {
+        if (plan == null || sector == ConstructionSector.None)
+            return false;
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj != null && obj.Sector == sector && obj.ObjectiveType == AIObjectiveType.RallyAssembly)
+                return true;
+        }
+        return false;
     }
 
 

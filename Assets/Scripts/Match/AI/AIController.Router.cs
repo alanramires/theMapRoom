@@ -144,11 +144,33 @@ public partial class AIController
 
         Vector3Int destCell = chosen.cell;
 
+        if (IsReservedCaptureCellForAnotherUnit(unit, snapshot.AITeam, destCell, paths, out UnitManager reservedFor))
+        {
+            Debug.Log($"[AI] {unit.InstanceId} evita mover para captura reservada @ {destCell} por {reservedFor.InstanceId}");
+            if (TrySelectFallbackHexEvaluation(unit, snapshot.AITeam, evaluations, paths, out HexEvaluation fallbackChosen))
+            {
+                chosen = fallbackChosen;
+                destCell = chosen.cell;
+            }
+            else
+            {
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+            }
+        }
+
         // 1. Captura: contexto aponta que devemos capturar neste hex
 
         bool isCaptureContext = chosen.type == CandidateType.CaptureNow
 
             || (chosen.type == CandidateType.CaptureAdvance && hasTarget && destCell == resolvedTarget);
+
+        if (!isCaptureContext
+            && chosen.type == CandidateType.CaptureAdvance
+            && SimulateCaptureSensor(unit, destCell, out _)
+            && !IsReservedCaptureCellForAnotherUnit(unit, snapshot.AITeam, destCell, paths, out _))
+        {
+            isCaptureContext = true;
+        }
 
         if (isCaptureContext)
 
@@ -223,6 +245,53 @@ public partial class AIController
 
     }
 
+    private bool IsReservedCaptureCellForAnotherUnit(
+        UnitManager unit,
+        TeamId aiTeam,
+        Vector3Int cell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        out UnitManager reservedFor)
+    {
+        reservedFor = null;
+        if (unit == null || paths == null)
+            return false;
+        cell.z = 0;
+        if (!paths.ContainsKey(cell))
+            return false;
+        if (!SimulateCaptureSensor(unit, cell, out _))
+            return false;
+        return ShouldReserveOpportunisticCaptureForCloserUnit(unit, aiTeam, cell, paths, out reservedFor);
+    }
+
+    private bool TrySelectFallbackHexEvaluation(
+        UnitManager unit,
+        TeamId aiTeam,
+        List<HexEvaluation> evaluations,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        out HexEvaluation fallback)
+    {
+        fallback = default;
+        if (evaluations == null)
+            return false;
+
+        bool found = false;
+        float bestTotal = float.MinValue;
+        foreach (HexEvaluation candidate in evaluations)
+        {
+            if (candidate.isChosen)
+                continue;
+            if (IsReservedCaptureCellForAnotherUnit(unit, aiTeam, candidate.cell, paths, out _))
+                continue;
+            if (!found || candidate.total > bestTotal)
+            {
+                fallback = candidate;
+                bestTotal = candidate.total;
+                found = true;
+            }
+        }
+
+        return found;
+    }
     private static bool PreferFireSupportBeforeAssault(UnitManager unit)
     {
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
