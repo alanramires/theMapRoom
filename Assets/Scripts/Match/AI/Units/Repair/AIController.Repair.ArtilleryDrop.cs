@@ -52,7 +52,7 @@ public partial class AIController
             if (t1 != null) return t1;
 
             // Tier 2: march toward safe construction
-            Vector3Int marchStep = FindRepairApproachStep(unit, aiTeam, fromCell, targetCell, dropTarget, paths, occupied);
+            Vector3Int marchStep = FindRepairApproachStep(unit, aiTeam, fromCell, targetCell, dropTarget, paths, occupied, null, out _);
             if (marchStep != fromCell)
             {
                 Debug.Log($"{TL("Repair")} {unit.InstanceId} T2 marcha → construção segura {targetCell} com art #{artPassenger.InstanceId} via {marchStep}");
@@ -77,7 +77,7 @@ public partial class AIController
             }
 
             // March toward home sector with cargo
-            Vector3Int marchHome = FindRepairApproachStep(unit, aiTeam, fromCell, homeCell, homeTarget, paths, occupied);
+            Vector3Int marchHome = FindRepairApproachStep(unit, aiTeam, fromCell, homeCell, homeTarget, paths, occupied, null, out _);
             if (marchHome != fromCell)
             {
                 Debug.Log($"{TL("Repair")} {unit.InstanceId} T3 marcha → setor home {homeCell} com art #{artPassenger.InstanceId} via {marchHome}");

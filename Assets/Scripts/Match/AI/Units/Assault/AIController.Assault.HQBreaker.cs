@@ -74,7 +74,6 @@ public partial class AIController
             return false;
 
         bool preferDpq = unit.TryGetUnitData(out UnitData attackerUd) && attackerUd != null && attackerUd.prioritizeDpqAtBattle;
-        float dpqWeight = preferDpq ? 2000f : 40f;
 
         Vector3Int enemyHqCell = snapshot.EnemyHQ != null
             ? snapshot.EnemyHQ.CurrentCellPosition
@@ -103,15 +102,39 @@ public partial class AIController
                 float dpq = GetTerrainDpqPontos(cell);
                 BazookaTargetPriority targetPreference = ResolveAssaultTargetPreference(unit, enemy);
                 float targetPreferenceScore = GetAssaultTargetPreferenceScore(targetPreference);
+                bool hasSim = TrySimulateAttackForAI(unit, enemy, cell, out AIAttackSimulationSummary simSummary);
+                if (hasSim && simSummary.targetDamage <= 0)
+                    continue;
+
+                float combatScore = 0f;
+                string simDetails = "sim=unavailable";
+                if (hasSim)
+                {
+                    combatScore =
+                        simSummary.targetDamagePct * 700f
+                        + simSummary.targetDamage * 130f
+                        - simSummary.attackerLossPct * 620f
+                        - simSummary.attackerLoss * 100f
+                        + (simSummary.result.killGuaranteed ? 22000f : 0f)
+                        + (simSummary.result.attackerSurvives ? 2500f : -10000f);
+
+                    if (simSummary.attackerLossPct >= 75 && !simSummary.result.killGuaranteed && !inOwnConstruction)
+                        combatScore -= 14000f;
+
+                    PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(unit, cell);
+                    PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(enemy, enemyCell);
+                    simDetails = $"sim dmg={simSummary.targetDamagePct}% loss={simSummary.attackerLossPct}% hp={simSummary.attackerHpBefore}->{simSummary.result.attackerHpAfter} target={simSummary.targetHpBefore}->{simSummary.result.defenderHpAfter} dpq={attackerDpq.points}/{defenderDpq.points} def={attackerDpq.defenseBonus}/{defenderDpq.defenseBonus} kill={simSummary.result.killGuaranteed} survive={simSummary.result.attackerSurvives}";
+                }
                 // enemyHqDist penalises enemies far from their HQ (advancing enemies).
                 // If they are on OUR building, distance to their HQ is irrelevant — skip the penalty.
                 float score =
-                    targetPreferenceScore
-                    + Mathf.Max(0, 20 - enemy.CurrentHP) * 900f
+                    combatScore
+                    + targetPreferenceScore * 0.25f
+                    + Mathf.Max(0, 20 - enemy.CurrentHP) * 95f
                     + constructionBonus
-                    - (inOwnConstruction ? 0f : enemyHqDist * 120f)
-                    - cellHqDist * 30f
-                    + dpq * dpqWeight
+                    - (inOwnConstruction ? 0f : enemyHqDist * 45f)
+                    - cellHqDist * 20f
+                    + dpq * (preferDpq ? 420f : 55f)
                     - GetPathStepCount(paths, cell) * 5f
                     - enemy.InstanceId * 0.001f;
 
@@ -120,7 +143,7 @@ public partial class AIController
                     bestScore = score;
                     bestCell = cell;
                     bestTarget = enemy;
-                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} bldg={inConstruction} ownBldg={inOwnConstruction} enemyHqDist={enemyHqDist:F1} dpq={dpq:F1} dpqW={dpqWeight:F0} preferDpq={preferDpq} {attackDecisionReason}";
+                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} bldg={inConstruction} ownBldg={inOwnConstruction} enemyHqDist={enemyHqDist:F1} dpqCell={dpq:F1} preferDpq={preferDpq} {simDetails} {attackDecisionReason}";
                 }
             }
         }

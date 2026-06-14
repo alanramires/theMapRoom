@@ -13,6 +13,7 @@ public partial class AIController
 
     private IEnumerator RunAITurn(TeamId aiTeam)
     {
+        float turnStart = Time.realtimeSinceStartup;
         Debug.Log($"[AI] RunAITurn iniciado para {aiTeam}.");
         if (ShouldStopAIForMatchEnd("turn_start"))
             yield break;
@@ -27,7 +28,9 @@ public partial class AIController
         if (emulateStage0 && resumeStage <= 0)
         {
             currentAIStage = 0;
+            float t0 = Time.realtimeSinceStartup;
             yield return Phase0_WaitForTurnReady();
+            Debug.Log($"[AI Perf] Stage0 (wait): {(Time.realtimeSinceStartup - t0) * 1000f:F0}ms");
             if (ShouldStopAIForMatchEnd("apos_stage0"))
                 yield break;
             yield return WaitIfDebugPaused();
@@ -39,9 +42,23 @@ public partial class AIController
             Debug.Log(resumeStage > 0
                 ? "[AI Stage] Stage 0 ja concluido pelo save."
                 : "[AI Stage] Stage 0 desativado por emulacao.");
+
+            // Resume path: Stage0 foi pulado mas coroutines do load ainda podem estar em voo.
+            // Aguarda as mesmas condições que Stage0 esperaria para que CommitAIWorldHeavy
+            // encontre o mundo assentado em vez de um frame sobrecarregado.
+            if (resumeStage > 0 && turnStateManager != null)
+            {
+                yield return WaitForResumeSettleTelemetry();
+                if (ShouldStopAIForMatchEnd("resume_apos_command_service"))
+                    yield break;
+                if (ShouldStopAIForMatchEnd("resume_apos_neutral"))
+                    yield break;
+            }
         }
 
+        float tCommit = Time.realtimeSinceStartup;
         yield return CommitAIWorldHeavy(aiTeam, "turn-start", rebuildPlan: false);
+        Debug.Log($"[AI Perf] CommitAIWorldHeavy: {(Time.realtimeSinceStartup - tCommit) * 1000f:F0}ms");
 
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
         aiTurnNumber = snapshot.TurnNumber;
@@ -54,19 +71,27 @@ public partial class AIController
         if (shouldReuseSavedPlan)
         {
             Debug.Log($"{TL("Stage")} Retomando stage {resumeStage} com plano salvo; BuildObjectivePlan ignorado.");
+            float tAnalyzerResume = Time.realtimeSinceStartup;
             AITacticalAnalyzer.Instance.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
+            Debug.Log($"[AI Perf] TacticalAnalyzer.Rebuild (resume): {(Time.realtimeSinceStartup - tAnalyzerResume) * 1000f:F0}ms");
         }
         else if (resumeStage <= 3 && (emulateStage1 || emulateStage2 || emulateStage3))
         {
             currentAIStage = Mathf.Max(1, resumeStage);
+            float tPlan = Time.realtimeSinceStartup;
             BuildObjectivePlan(snapshot);
+            Debug.Log($"[AI Perf] BuildObjectivePlan: {(Time.realtimeSinceStartup - tPlan) * 1000f:F0}ms");
+            float tAnalyzer = Time.realtimeSinceStartup;
             AITacticalAnalyzer.Instance.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
+            Debug.Log($"[AI Perf] TacticalAnalyzer.Rebuild: {(Time.realtimeSinceStartup - tAnalyzer) * 1000f:F0}ms");
         }
 
         if (emulateStage1 && resumeStage <= 1)
         {
             currentAIStage = 1;
+            float t1 = Time.realtimeSinceStartup;
             yield return Phase1_CommandService(snapshot);
+            Debug.Log($"[AI Perf] Stage1 (command): {(Time.realtimeSinceStartup - t1) * 1000f:F0}ms");
             if (ShouldStopAIForMatchEnd("apos_stage1"))
                 yield break;
             currentAIStage = 2;
@@ -82,7 +107,10 @@ public partial class AIController
         if (emulateStage2 && resumeStage <= 2)
         {
             currentAIStage = 2;
+            Debug.Log($"[AI Perf] PRE-Stage2 acumulado: {(Time.realtimeSinceStartup - turnStart) * 1000f:F0}ms");
+            float t2 = Time.realtimeSinceStartup;
             yield return Phase2_UnitActions(snapshot);
+            Debug.Log($"[AI Perf] Stage2 (actions): {(Time.realtimeSinceStartup - t2) * 1000f:F0}ms");
             if (ShouldStopAIForMatchEnd("apos_stage2"))
                 yield break;
             currentAIStage = 3;
@@ -104,7 +132,9 @@ public partial class AIController
             if (ShouldStopAIForMatchEnd("apos_pause_stage3_pre"))
                 yield break;
             currentAIStage = 3;
+            float t3 = Time.realtimeSinceStartup;
             yield return Phase3_Shopping(snapshot);
+            Debug.Log($"[AI Perf] Stage3 (shopping): {(Time.realtimeSinceStartup - t3) * 1000f:F0}ms");
             if (ShouldStopAIForMatchEnd("apos_stage3"))
                 yield break;
             currentAIStage = 4;
@@ -122,7 +152,9 @@ public partial class AIController
             if (ShouldStopAIForMatchEnd("antes_stage4"))
                 yield break;
             currentAIStage = 4;
+            float t4 = Time.realtimeSinceStartup;
             yield return Phase4_EndTurn();
+            Debug.Log($"[AI Perf] Stage4 (end turn): {(Time.realtimeSinceStartup - t4) * 1000f:F0}ms");
         }
         else
         {
@@ -130,6 +162,7 @@ public partial class AIController
             isActive = false;
         }
 
+        Debug.Log($"[AI Perf] TURNO TOTAL ({aiTeam}): {(Time.realtimeSinceStartup - turnStart) * 1000f:F0}ms");
         currentAIStage = 4;
         currentAITeam = aiTeam;
         aiCoroutine = null;
@@ -143,6 +176,85 @@ public partial class AIController
         bool hasObjectives = plan.Objectives != null && plan.Objectives.Count > 0;
         bool hasRogues = plan.RogueUnitIds != null && plan.RogueUnitIds.Count > 0;
         return hasObjectives || hasRogues;
+    }
+
+    private IEnumerator WaitForResumeSettleTelemetry()
+    {
+        float tSettle = Time.realtimeSinceStartup;
+        if (IsResumeSettleReady())
+        {
+            Debug.Log($"[AI Perf][ResumeSettle] ready immediately: 0ms | {BuildResumeSettleStateText()}");
+            Debug.Log("[AI Perf] Resume settle wait: 0ms");
+            yield break;
+        }
+
+        yield return null;
+
+        float afterFirstFrame = Time.realtimeSinceStartup;
+        Debug.Log($"[AI Perf][ResumeSettle] first frame: {(afterFirstFrame - tSettle) * 1000f:F0}ms | {BuildResumeSettleStateText()}");
+
+        float tCommandService = Time.realtimeSinceStartup;
+        float nextCommandServiceLog = tCommandService + 1f;
+        while (turnStateManager != null && turnStateManager.IsAutoCommandServiceBusy)
+        {
+            float now = Time.realtimeSinceStartup;
+            if (now >= nextCommandServiceLog)
+            {
+                Debug.Log($"[AI Perf][ResumeSettle] waiting command service: {(now - tCommandService) * 1000f:F0}ms | {BuildResumeSettleStateText()}");
+                nextCommandServiceLog = now + 1f;
+            }
+
+            yield return null;
+        }
+
+        Debug.Log($"[AI Perf][ResumeSettle] command service wait: {(Time.realtimeSinceStartup - tCommandService) * 1000f:F0}ms | {BuildResumeSettleStateText()}");
+
+        float tNeutral = Time.realtimeSinceStartup;
+        float nextNeutralLog = tNeutral + 1f;
+        bool loggedNeutralHalfSecond = false;
+        while (turnStateManager != null &&
+               turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+        {
+            float now = Time.realtimeSinceStartup;
+            float elapsed = now - tNeutral;
+            if (!loggedNeutralHalfSecond && elapsed >= 0.5f)
+            {
+                Debug.Log($"[AI Perf][ResumeSettle] waiting neutral >500ms: {elapsed * 1000f:F0}ms | {BuildResumeSettleStateText()}");
+                loggedNeutralHalfSecond = true;
+            }
+
+            if (now >= nextNeutralLog)
+            {
+                Debug.Log($"[AI Perf][ResumeSettle] waiting neutral: {elapsed * 1000f:F0}ms | {BuildResumeSettleStateText()}");
+                nextNeutralLog = now + 1f;
+            }
+
+            yield return null;
+        }
+
+        Debug.Log($"[AI Perf][ResumeSettle] neutral wait: {(Time.realtimeSinceStartup - tNeutral) * 1000f:F0}ms | {BuildResumeSettleStateText()}");
+        Debug.Log($"[AI Perf] Resume settle wait: {(Time.realtimeSinceStartup - tSettle) * 1000f:F0}ms");
+    }
+
+    private bool IsResumeSettleReady()
+    {
+        if (turnStateManager == null)
+            return true;
+
+        bool replayBusy = replayManager != null && replayManager.IsStepExecutionBusy;
+        return !turnStateManager.IsAutoCommandServiceBusy
+            && turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral
+            && !turnStateManager.IsScannerActionExecutionInProgress
+            && !replayBusy;
+    }
+
+    private string BuildResumeSettleStateText()
+    {
+        if (turnStateManager == null)
+            return "turnState=null";
+
+        bool replayBusy = replayManager != null && replayManager.IsStepExecutionBusy;
+        return $"state={turnStateManager.CurrentCursorState} stack={turnStateManager.CurrentCursorStateStackDebugText} autoCS={turnStateManager.IsAutoCommandServiceBusy} scanner={turnStateManager.IsScannerActionExecutionInProgress} replayBusy={replayBusy}";
     }
 
     private IEnumerator RunAIDebugStage(TeamId aiTeam, int stage, bool resetPlan = false)

@@ -643,7 +643,7 @@ public partial class AIController
         foreach (Vector3Int cell in paths.Keys)
         {
             if (cell != fromCell && occupied.Contains(cell)) continue;
-            if (SectorManager.HexDistance(cell, candidateCell) > fromDistToCandidate + 1f) continue;
+            if (!preferNoMove && SectorManager.HexDistance(cell, candidateCell) > fromDistToCandidate + 1f) continue;
 
             // Don't park on a capturable building that an assigned capturer can reach this turn.
             if (cell != fromCell && plan != null)
@@ -660,10 +660,10 @@ public partial class AIController
                 if (!PassesAttackDecision(unit, enemy, cell, false, out _)) continue;
                 if (ResolveTransportTargetPreference(unit, enemy) != BazookaTargetPriority.Primary) continue;
 
-                float dpqBonus = preferNoMove ? GetTerrainDpqPontos(cell) * 200f : 0f;
-                float score = (20f - enemy.CurrentHP) * 100f
-                    - SectorManager.HexDistance(cell, candidateCell) * 50f
-                    + dpqBonus;
+                float dpq = GetTerrainDpqPontos(cell);
+                float score = preferNoMove
+                    ? dpq * 2000f + (20f - enemy.CurrentHP) * 100f - SectorManager.HexDistance(cell, candidateCell) * 10f
+                    : (20f - enemy.CurrentHP) * 100f - SectorManager.HexDistance(cell, candidateCell) * 50f + dpq * 200f;
                 if (score > bestScore)
                 {
                     bestScore = score;

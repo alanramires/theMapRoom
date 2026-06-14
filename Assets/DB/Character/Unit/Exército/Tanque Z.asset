@@ -57,12 +57,16 @@ MonoBehaviour:
   attackMustSurvive: 1
   ignoreAttackDecisionWhenDefending: 1
   defensiveAttackExtraHpLossPercent: 20
-  repairTriggerHpBelow: 0
-  repairTriggerAutonomyPct: 0
-  repairTriggerAmmoEnabled: 0
+  repairTriggerHpBelow: 2
+  repairTriggerAutonomyPct: 50
+  repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 0
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
   aiConservativeSupplyAvoidEnemyRange: 2

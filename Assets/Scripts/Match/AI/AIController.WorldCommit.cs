@@ -116,16 +116,31 @@ public partial class AIController
         if (ShouldStopAIForMatchEnd($"ai_commit_start:{reason}"))
             yield break;
 
+        float tHeavy = Time.realtimeSinceStartup;
+
+        float tSync1 = Time.realtimeSinceStartup;
         SyncAIUnitCellsFromTransforms();
+        Debug.Log($"[AI Commit Heavy] Sync1: {(Time.realtimeSinceStartup - tSync1) * 1000f:F0}ms");
+
+        float tFoW = Time.realtimeSinceStartup;
         matchController?.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.DataOnly);
+        Debug.Log($"[AI Commit Heavy] RefreshFoW: {(Time.realtimeSinceStartup - tFoW) * 1000f:F0}ms");
+
         SectorManager.RequestRebuildFromActiveConstructions($"ai-commit:{reason}");
 
+        float tYield = Time.realtimeSinceStartup;
         // SectorManager rebuilds on the next frame in play mode. Wait for that
         // barrier so the next AI decision uses the same consolidated world a load does.
         yield return null;
+        Debug.Log($"[AI Commit Heavy] yield+SectorRebuild: {(Time.realtimeSinceStartup - tYield) * 1000f:F0}ms");
 
+        float tSync2 = Time.realtimeSinceStartup;
         SyncAIUnitCellsFromTransforms();
+        Debug.Log($"[AI Commit Heavy] Sync2: {(Time.realtimeSinceStartup - tSync2) * 1000f:F0}ms");
+
+        float tSnapshot = Time.realtimeSinceStartup;
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
+        Debug.Log($"[AI Commit Heavy] AIWorldSnapshot.Build: {(Time.realtimeSinceStartup - tSnapshot) * 1000f:F0}ms");
 
         if (rebuildPlan)
         {
@@ -133,6 +148,6 @@ public partial class AIController
             AITacticalAnalyzer.Instance?.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
         }
 
-        Debug.Log($"[AI Commit Heavy][T{snapshot.TurnNumber}][{TeamUtils.GetName(aiTeam)}] reason={reason} units={snapshot.MyUnits.Count} enemies={snapshot.EnemyUnits.Count}");
+        Debug.Log($"[AI Commit Heavy][T{snapshot.TurnNumber}][{TeamUtils.GetName(aiTeam)}] reason={reason} units={snapshot.MyUnits.Count} enemies={snapshot.EnemyUnits.Count} total={( Time.realtimeSinceStartup - tHeavy) * 1000f:F0}ms");
     }
 }

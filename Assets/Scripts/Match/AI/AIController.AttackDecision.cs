@@ -217,6 +217,9 @@ public partial class AIController
         int hpLossLimit = Mathf.Clamp(attackerData.attackAcceptHpLossPercent
             + (defensiveContext ? attackerData.defensiveAttackExtraHpLossPercent : 0), 0, 100);
         int eliminationMin = Mathf.Clamp(attackerData.attackEliminationMinPercent, 0, 100);
+        int attackerLossPctOfMax = attackerData.maxHP > 0
+            ? Mathf.RoundToInt(simSummary.attackerLoss * 100f / attackerData.maxHP)
+            : attackerLossPct;
 
         string summary = $"atkDecision hp={attackerHpBefore}->{sim.attackerHpAfter} loss={attackerLossPct}%/{hpLossLimit}% dmg={targetDamagePct}%/{eliminationMin}% target={targetHpBefore}->{sim.defenderHpAfter} dpq={attackerDpq.points}/{defenderDpq.points} def={attackerDpq.defenseBonus}/{defenderDpq.defenseBonus} kill={sim.killGuaranteed} survive={sim.attackerSurvives}";
 
@@ -248,6 +251,14 @@ public partial class AIController
         if (attackerLossPct <= hpLossLimit)
         {
             reason = summary + " OK hpLoss";
+            return true;
+        }
+
+        if (sim.attackerSurvives
+            && attackerLossPctOfMax <= hpLossLimit
+            && targetDamagePct >= eliminationMin)
+        {
+            reason = summary + " OK hpLossOfMax";
             return true;
         }
 

@@ -50,6 +50,9 @@ public partial class AIController
             Vector3Int c = kvp.Key; c.z = 0;
             if (c == fromCell || occupied.Contains(c)) continue;
             if (IsLogisticsForwardOfMainLine(unit, snapshot, c, anchor)) continue;
+            if (!IsTowCourierLoadedFireSupportTravelCellAllowed(
+                    unit, primaryPassenger, snapshot, fromCell, c, deliveryTarget, anchor, out _))
+                continue;
             candidateCells.Add((c, kvp.Value));
         }
 
@@ -127,6 +130,24 @@ public partial class AIController
             return emergencyDrop;
         }
 
+        if (TryBuildRearLineFireSupportDrop(
+                unit,
+                primaryPassenger,
+                passengers,
+                snapshot,
+                plan,
+                fromCell,
+                deliveryTarget,
+                anchor,
+                paths,
+                occupied,
+                out PlayerAction rearLineDrop,
+                out string rearLineReason))
+        {
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier conservador - larga FS #{primaryPassenger.InstanceId} na retaguarda ({rearLineReason})");
+            return rearLineDrop;
+        }
+
         if (TryFindConservativeTowCourierRendezvousCell(
                 unit,
                 primaryPassenger,
@@ -143,7 +164,7 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, rendezvousCell, paths);
         }
 
-        Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier conservador — sem drop-off seguro/rendezvous util, aguarda");
+        Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier conservador — sem drop-off seguro/rendezvous util, segura carga @ {fromCell}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
     }
 
@@ -178,6 +199,9 @@ public partial class AIController
                 Vector3Int cell = rawCell;
                 cell.z = 0;
                 if (cell == fromCell)
+                    continue;
+                if (!IsTowCourierLoadedFireSupportTravelCellAllowed(
+                        unit, primaryPassenger, snapshot, fromCell, cell, objectiveTarget, snapshot.EnemyHQ != null ? snapshot.EnemyHQ.CurrentCellPosition : objectiveTarget, out _))
                     continue;
                 candidates.Add(cell);
             }
@@ -296,6 +320,83 @@ public partial class AIController
         return true;
     }
 
+    private bool IsTowCourierLoadedFireSupportTravelCellAllowed(
+        UnitManager unit,
+        UnitManager primaryPassenger,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int cell,
+        Vector3Int target,
+        Vector3Int forwardAnchor,
+        out string reason)
+    {
+        reason = "";
+        if (unit == null || primaryPassenger == null || snapshot == null)
+        {
+            reason = "contexto invalido";
+            return false;
+        }
+
+        fromCell.z = 0;
+        cell.z = 0;
+        target.z = 0;
+        forwardAnchor.z = 0;
+        if (cell == fromCell)
+            return true;
+
+        float fromThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
+        float cellThreat = CalculateThreatLevel(cell, snapshot.AITeam);
+        if (cellThreat > fromThreat + 0.1f)
+        {
+            reason = $"threat {cellThreat:F1}>{fromThreat:F1}";
+            return false;
+        }
+
+        if (snapshot.MyHQ != null)
+        {
+            Vector3Int home = snapshot.MyHQ.CurrentCellPosition;
+            home.z = 0;
+            float fromHome = SectorManager.HexDistance(fromCell, home);
+            float cellHome = SectorManager.HexDistance(cell, home);
+            if (cellHome > fromHome + 0.1f)
+            {
+                reason = $"afastaHQ {cellHome:F1}>{fromHome:F1}";
+                return false;
+            }
+        }
+
+        if (snapshot.EnemyHQ != null)
+        {
+            Vector3Int enemyHome = snapshot.EnemyHQ.CurrentCellPosition;
+            enemyHome.z = 0;
+            float fromEnemyHome = SectorManager.HexDistance(fromCell, enemyHome);
+            float cellEnemyHome = SectorManager.HexDistance(cell, enemyHome);
+            if (cellEnemyHome < fromEnemyHome - 0.1f)
+            {
+                reason = $"aproximaEnemyHQ {cellEnemyHome:F1}<{fromEnemyHome:F1}";
+                return false;
+            }
+        }
+
+        float fromTarget = SectorManager.HexDistance(fromCell, target);
+        float cellTarget = SectorManager.HexDistance(cell, target);
+        if (cellTarget < fromTarget - 0.1f)
+        {
+            reason = $"aproximaAlvo {cellTarget:F1}<{fromTarget:F1}";
+            return false;
+        }
+
+        float fromAnchor = SectorManager.HexDistance(fromCell, forwardAnchor);
+        float cellAnchor = SectorManager.HexDistance(cell, forwardAnchor);
+        if (cellAnchor < fromAnchor - 0.1f)
+        {
+            reason = $"aproximaFrente {cellAnchor:F1}<{fromAnchor:F1}";
+            return false;
+        }
+
+        return true;
+    }
+
     private bool TryBuildEmergencyFireSupportDrop(
         UnitManager unit,
         UnitManager primaryPassenger,
@@ -332,6 +433,9 @@ public partial class AIController
                 Vector3Int cell = rawCell;
                 cell.z = 0;
                 if (cell == fromCell) continue;
+                if (!IsTowCourierLoadedFireSupportTravelCellAllowed(
+                        unit, primaryPassenger, snapshot, fromCell, cell, target, snapshot.EnemyHQ != null ? snapshot.EnemyHQ.CurrentCellPosition : target, out _))
+                    continue;
                 candidateCells.Add(cell);
             }
         }
@@ -456,6 +560,249 @@ public partial class AIController
         return count;
     }
 
+    private bool TryBuildRearLineFireSupportDrop(
+        UnitManager unit,
+        UnitManager primaryPassenger,
+        List<UnitManager> passengers,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        Vector3Int fromCell,
+        Vector3Int target,
+        Vector3Int mainLineAnchor,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out PlayerAction action,
+        out string reason)
+    {
+        action = null;
+        reason = "";
+        if (unit == null || primaryPassenger == null || snapshot == null || passengers == null || passengers.Count == 0)
+            return false;
+
+        fromCell.z = 0;
+        target.z = 0;
+        mainLineAnchor.z = 0;
+
+        float bestScore = float.MinValue;
+        Vector3Int bestTransporterCell = fromCell;
+        List<Vector3Int> bestPath = null;
+        PodeDesembarcarOption bestOption = null;
+        string bestDetails = "";
+
+        var candidateCells = new List<Vector3Int> { fromCell };
+        if (paths != null)
+        {
+            foreach (Vector3Int rawCell in paths.Keys)
+            {
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                if (cell == fromCell)
+                    continue;
+                if (occupied != null && occupied.Contains(cell))
+                    continue;
+                if (!IsRearLineTowDropTransportCellAllowed(unit, snapshot, fromCell, cell))
+                    continue;
+                candidateCells.Add(cell);
+            }
+        }
+
+        foreach (Vector3Int rawCell in candidateCells)
+        {
+            Vector3Int transporterCell = rawCell;
+            transporterCell.z = 0;
+            if (transporterCell != fromCell && IsNonTeamConstruction(transporterCell, snapshot.AITeam))
+                continue;
+
+            List<PodeDesembarcarOption> opts;
+            if (transporterCell == fromCell)
+            {
+                opts = new List<PodeDesembarcarOption>();
+                PodeDesembarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, opts);
+            }
+            else
+                opts = SimulateDisembarkFromCell(unit, transporterCell);
+
+            if (opts == null || opts.Count == 0)
+                continue;
+
+            for (int i = 0; i < opts.Count; i++)
+            {
+                PodeDesembarcarOption opt = opts[i];
+                if (opt == null || opt.passengerUnit != primaryPassenger)
+                    continue;
+
+                Vector3Int dropCell = opt.disembarkCell;
+                dropCell.z = 0;
+                if (!IsRearLineFireSupportDropCellAllowed(unit, primaryPassenger, snapshot, dropCell, mainLineAnchor))
+                    continue;
+
+                int pathCost = transporterCell == fromCell ? 0 : GetPathStepCount(paths, transporterCell);
+                float score = ScoreRearLineFireSupportDrop(
+                    primaryPassenger,
+                    snapshot,
+                    fromCell,
+                    transporterCell,
+                    dropCell,
+                    target,
+                    mainLineAnchor,
+                    pathCost,
+                    out string details);
+
+                if (score < 700f || score <= bestScore)
+                    continue;
+
+                bestScore = score;
+                bestTransporterCell = transporterCell;
+                bestOption = opt;
+                bestDetails = details;
+                if (paths != null)
+                    paths.TryGetValue(transporterCell, out bestPath);
+            }
+        }
+
+        if (bestOption == null)
+            return false;
+
+        Vector3Int bestDrop = bestOption.disembarkCell;
+        bestDrop.z = 0;
+        reason = $"via={bestTransporterCell} dc={bestDrop} score={bestScore:F0} {bestDetails}";
+
+        var selected = new List<PodeDesembarcarOption> { bestOption };
+        if (bestTransporterCell == fromCell)
+            action = BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selected);
+        else
+            action = BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selected, bestTransporterCell, bestPath);
+
+        return true;
+    }
+
+    private float ScoreRearLineFireSupportDrop(
+        UnitManager primaryPassenger,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int transporterCell,
+        Vector3Int dropCell,
+        Vector3Int target,
+        Vector3Int mainLineAnchor,
+        int pathCost,
+        out string details)
+    {
+        float threat = CalculateThreatLevel(dropCell, snapshot.AITeam);
+        float dpq = GetTerrainDpqPontos(dropCell);
+        float cohesion = CalculateFireSupportCohesionScore(primaryPassenger, snapshot, dropCell);
+        float rearLine = CalculateFireSupportRearLineScore(primaryPassenger, snapshot, dropCell, mainLineAnchor);
+        int alliesNear = CountEmergencyFireSupportAllies(primaryPassenger, snapshot, dropCell);
+        float fromDist = SectorManager.HexDistance(fromCell, target);
+        float dropDist = SectorManager.HexDistance(dropCell, target);
+        float progress = fromDist - dropDist;
+
+        ConstructionManager building = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, dropCell);
+        bool alliedBuilding = building != null && building.TeamId == snapshot.AITeam;
+
+        float score = 1800f
+            + dpq * 85f
+            + cohesion * 0.35f
+            + rearLine * 0.4f
+            + alliesNear * 420f
+            - threat * 150f
+            - pathCost * 18f
+            - Mathf.Max(0f, progress) * 260f;
+
+        if (alliedBuilding)
+            score += 1200f;
+        if (transporterCell != fromCell)
+            score += 250f;
+        if (alliesNear == 0 && !alliedBuilding)
+            score -= 900f;
+        if (threat > 0f && alliesNear == 0)
+            score -= 900f;
+
+        details = $"target={target} prog={progress:F1} dist={dropDist:F1} dpq={dpq:F1} threat={threat:F1} allies3={alliesNear} coh={cohesion:F0} rear={rearLine:F0} path={pathCost}";
+        return score;
+    }
+
+    private bool IsRearLineTowDropTransportCellAllowed(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int fromCell, Vector3Int cell)
+    {
+        if (unit == null || snapshot == null)
+            return false;
+
+        fromCell.z = 0;
+        cell.z = 0;
+        if (cell == fromCell)
+            return true;
+
+        float fromThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
+        float cellThreat = CalculateThreatLevel(cell, snapshot.AITeam);
+        if (cellThreat > fromThreat + 0.1f)
+            return false;
+
+        int avoidRange = 2;
+        if (unit.TryGetUnitData(out UnitData data) && data != null)
+            avoidRange = Mathf.Max(avoidRange, data.aiConservativeSupplyAvoidEnemyRange);
+        if (HasNearbyVisibleEnemy(cell, snapshot.AITeam, avoidRange))
+            return false;
+
+        return true;
+    }
+
+    private bool IsRearLineFireSupportDropCellAllowed(
+        UnitManager transporter,
+        UnitManager primaryPassenger,
+        AIWorldSnapshot snapshot,
+        Vector3Int dropCell,
+        Vector3Int mainLineAnchor)
+    {
+        if (primaryPassenger == null || snapshot == null)
+            return false;
+
+        dropCell.z = 0;
+        mainLineAnchor.z = 0;
+        if (!IsFireSupportConservativeCellAllowed(primaryPassenger, snapshot, dropCell))
+            return false;
+
+        ConstructionManager building = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, dropCell);
+        if (building != null && building.TeamId == snapshot.AITeam)
+            return true;
+
+        return HasAlliedCombatScreenAheadOfDrop(transporter, primaryPassenger, snapshot, dropCell, mainLineAnchor);
+    }
+
+    private bool HasAlliedCombatScreenAheadOfDrop(
+        UnitManager transporter,
+        UnitManager primaryPassenger,
+        AIWorldSnapshot snapshot,
+        Vector3Int dropCell,
+        Vector3Int mainLineAnchor)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return false;
+
+        dropCell.z = 0;
+        mainLineAnchor.z = 0;
+        float dropAnchorDist = SectorManager.HexDistance(dropCell, mainLineAnchor);
+
+        for (int i = 0; i < snapshot.MyUnits.Count; i++)
+        {
+            UnitManager ally = snapshot.MyUnits[i];
+            if (ally == null || ally == transporter || ally == primaryPassenger || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
+                continue;
+            if (IsPrimaryLogisticsUnit(ally) || IsFireSupportUnit(ally))
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            float allyDist = SectorManager.HexDistance(dropCell, allyCell);
+            if (allyDist > 4f)
+                continue;
+
+            float allyAnchorDist = SectorManager.HexDistance(allyCell, mainLineAnchor);
+            if (allyAnchorDist < dropAnchorDist - 0.1f)
+                return true;
+        }
+
+        return false;
+    }
+
     private bool TryFindConservativeTowCourierRendezvousCell(
         UnitManager unit,
         UnitManager primaryPassenger,
@@ -492,6 +839,9 @@ public partial class AIController
             if (cell == fromCell) continue;
             if (occupied != null && occupied.Contains(cell)) continue;
             if (IsLogisticsForwardOfMainLine(unit, snapshot, cell, mainLineAnchor)) continue;
+            if (!IsTowCourierLoadedFireSupportTravelCellAllowed(
+                    unit, primaryPassenger, snapshot, fromCell, cell, target, mainLineAnchor, out _))
+                continue;
             if (!IsFireSupportConservativeCellAllowed(primaryPassenger, snapshot, cell)) continue;
 
             ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);

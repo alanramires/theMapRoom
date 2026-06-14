@@ -1011,7 +1011,6 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         EnsureDebugSpawnRegisteredInAllActive(spawned);
-        RefreshFogOfWarAfterSpawn();
         message = $"Spawnado: {ResolveDebugUnitDataName(unitData)} em {FormatMapCellWithZ(cursorCell)} para team {TeamUtils.GetName(teamId)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
@@ -1046,7 +1045,6 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         EnsureDebugSpawnRegisteredInAllActive(spawned);
-        RefreshFogOfWarAfterSpawn();
         message = $"Spawnado: {unitToken} em {cell} para team {TeamUtils.GetName(resolvedTeam)}.";
         return true;
     }

@@ -11,8 +11,10 @@ public partial class AIController
         ConstructionManager repairDest,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
-        Vector3Int? altDestCell = null)
+        Vector3Int? altDestCell,
+        out bool usedEmergencyFlee)
     {
+        usedEmergencyFlee = false;
         if (paths == null || paths.Count == 0)
             return fromCell;
 
@@ -54,6 +56,7 @@ public partial class AIController
             if (fleeCell != fromCell)
             {
                 Debug.Log($"{TL("Repair")} {unit.InstanceId} fuga de emergência — todas âncoras bloqueadas; foge p/ {fleeCell} (threat={lowestThreat:F0})");
+                usedEmergencyFlee = true;
                 bestStep = fleeCell;
             }
         }
@@ -241,7 +244,7 @@ public partial class AIController
                 Debug.Log($"[Repair] skip {cc} setor inseguro sector={c.Sector} dist={dist:F1}");
                 continue;
             }
-            bool occupiedCell = occupied.Contains(cc);
+            bool occupiedCell = occupied.Contains(cc) && cc != fromCell;
             if (occupiedCell && !isHomeRepair)
             {
                 Debug.Log($"[Repair] skip {cc} ocupado dist={dist:F1}");

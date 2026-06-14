@@ -72,14 +72,6 @@ public partial class AIController
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
 
-        if (best != null && bestPriority == 0)
-        {
-            if (ShouldYieldEmbarkToNeedierCapturer(unit, best.transporterUnit, assigned, plan))
-                return null;
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca → {best.transporterUnit.InstanceId} slot {best.transporterSlotIndex}");
-            return BuildEmbarcarBatch(unit, snapshot.AITeam, fromCell, best.transporterUnit, best.transporterSlotIndex, paths);
-        }
-
         // Pass 2: simula PodeEmbarcarSensor em cada hex candidato (ficar parado + hexes alcançáveis).
         // Pass 2a: exige transporter formalmente pareado com este passageiro.
         // Pass 2b: exige transporter do mesmo setor do plano.
@@ -92,11 +84,22 @@ public partial class AIController
             return null;
         }
 
+        // Guards de rogue aplicados antes do embarque direto (priority 0) e do scan estendido.
+        // Evita que rogue próximo ao HQ inimigo ou com alvo/captura disponível engula slot
+        // de passageiro designado em transporter adjacente.
         if (assigned == null && ShouldSkipRogueTransportForFinalPressure(unit, snapshot, fromCell))
             return null;
 
         if (assigned == null && ShouldRogueCapturerFightBeforeTransport(unit, snapshot, fromCell, paths))
             return null;
+
+        if (best != null && bestPriority == 0)
+        {
+            if (ShouldYieldEmbarkToNeedierCapturer(unit, best.transporterUnit, assigned, plan))
+                return null;
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca → {best.transporterUnit.InstanceId} slot {best.transporterSlotIndex}");
+            return BuildEmbarcarBatch(unit, snapshot.AITeam, fromCell, best.transporterUnit, best.transporterSlotIndex, paths);
+        }
 
         PlayerAction formalExtendedEmbark =
             TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths, requireFormalPassenger: true);

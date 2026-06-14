@@ -173,7 +173,7 @@ public class BattleMapMenuRootController : MonoBehaviour
                 return true;
             }
 
-            if (!WasEscapePressedThisFrame())
+            if (!WasCancelShortcutPressedThisFrame())
                 return false;
 
             if (suppressMenuOpenFrame == Time.frameCount)
@@ -213,7 +213,7 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         if (exitConfirmOpen)
         {
-            if (WasEscapePressedThisFrame())
+            if (WasCancelShortcutPressedThisFrame())
             {
                 exitConfirmOpen = false;
                 PlayCancelSfx();
@@ -232,7 +232,7 @@ public class BattleMapMenuRootController : MonoBehaviour
             return true;
         }
 
-        if (WasEscapePressedThisFrame())
+        if (WasCancelShortcutPressedThisFrame())
         {
             HandleBackByEsc();
             PlayCancelSfx();
@@ -1421,13 +1421,16 @@ public class BattleMapMenuRootController : MonoBehaviour
         return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
     }
 
-    private static bool WasEscapePressedThisFrame()
+    private static bool WasCancelShortcutPressedThisFrame()
     {
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
-            return Keyboard.current.escapeKey.wasPressedThisFrame;
+        {
+            return Keyboard.current.escapeKey.wasPressedThisFrame ||
+                   Keyboard.current.backspaceKey.wasPressedThisFrame;
+        }
 #endif
-        return Input.GetKeyDown(KeyCode.Escape);
+        return Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Backspace);
     }
 
     private static bool WasLetterPressedThisFrame(char letter)

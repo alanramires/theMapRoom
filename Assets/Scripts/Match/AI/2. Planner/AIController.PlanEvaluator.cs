@@ -3,8 +3,8 @@ using UnityEngine;
 
 // --------------------------------------------------------------------------------------------
 // Top Tier do Comando de IA: Planejamento de Objetivos de Captura
-// Orquestra os 8 passos de BuildObjectivePlan — seleção, atribuição, defesa, handoff.
-// Implementações de suporte: PlanEvaluator.MacroContext / Defense / Handoff /
+// Orquestra os 8 passos de BuildObjectivePlan ï¿½ seleï¿½ï¿½o, atribuiï¿½ï¿½o, defesa, handoff.
+// Implementaï¿½ï¿½es de suporte: PlanEvaluator.MacroContext / Defense / Handoff /
 //                            SectorScoring / Helpers
 // --------------------------------------------------------------------------------------------
 
@@ -110,7 +110,7 @@ public partial class AIController
             }
         }
 
-        // Passo 2: adiciona objetivos para setores ainda não cobertos.
+        // Passo 2: adiciona objetivos para setores ainda nï¿½o cobertos.
         IReadOnlyList<SectorManager.SectorInfo> allSectors = SectorManager.GetAllSectorInfos();
         IReadOnlyList<SectorManager.SectorInfo> allBases = SectorManager.GetAllBaseInfos();
 
@@ -174,8 +174,8 @@ public partial class AIController
                 if (c.OwnerTeam != aiTeam) { hasCapturable = true; break; }
                 if (c.CapturePointsMax > 0 && c.CurrentCapturePoints < c.CapturePointsMax) { hasCapturable = true; break; }
             }
-            if (!hasCapturable && !isRallyAssemblySector) { Debug.Log($"{TL("Plan")} skip {info.Sector}: sem capturável"); continue; }
-            if (plan.GetObjectiveForSector(info.Sector) != null) { Debug.Log($"{TL("Plan")} skip {info.Sector}: já tem objetivo"); continue; }
+            if (!hasCapturable && !isRallyAssemblySector) { Debug.Log($"{TL("Plan")} skip {info.Sector}: sem capturï¿½vel"); continue; }
+            if (plan.GetObjectiveForSector(info.Sector) != null) { Debug.Log($"{TL("Plan")} skip {info.Sector}: jï¿½ tem objetivo"); continue; }
 
             bool rearBridgeAvailable = HasAvailableRearNeighborTowardHQ(info, plan, aiTeam, out ConstructionSector rearBridgeSector);
             if (ShouldDelayEnemyNaturalByFrontier(info, plan, aiTeam, out ConstructionSector requiredRearSector))
@@ -410,7 +410,7 @@ public partial class AIController
         EnsureCriticalHomeDefenseObjectives(plan, aiTeam, allBases);
         EnsureCriticalHomeDefenseObjectivesFromConstructions(plan, aiTeam);
 
-        // Edge case defensivo: se não sobrou nenhum objetivo
+        // Edge case defensivo: se nï¿½o sobrou nenhum objetivo
         if (snapshot.Stance == AIStance.Defensive && plan.Objectives.Count == 0)
         {
             SectorManager.SectorInfo closest = null;
@@ -442,7 +442,7 @@ public partial class AIController
                 };
                 fallback.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
                 plan.Objectives.Add(fallback);
-                Debug.Log($"{TL("Plan")} Defensive sem objetivos seguros — fallback para {closest.Sector} ({closestDist:F1}h do HQ)");
+                Debug.Log($"{TL("Plan")} Defensive sem objetivos seguros ï¿½ fallback para {closest.Sector} ({closestDist:F1}h do HQ)");
             }
         }
 
@@ -516,12 +516,12 @@ public partial class AIController
         // Passo 3e: suporte ofensivo sem capturador
         ReleaseOffensiveSupportWithoutCapturer(plan, aiTeam);
 
-        // Passo 3f: anchors abertos seguram capturadores antes de avanço/rally.
+        // Passo 3f: anchors abertos seguram capturadores antes de avanï¿½o/rally.
         ReleaseNonAnchorCapturersForAnchorNeed(plan, aiTeam, anchorContext, macro.Phase, snapshot.TurnNumber);
         bool anchorCapturerReserveActive = ShouldReserveCapturersForAnchors(anchorContext, macro.Phase)
             && HasOpenAnchorCapturerNeed(plan, anchorContext);
 
-        // Passo 4: coleta IDs já atribuídos
+        // Passo 4: coleta IDs jï¿½ atribuï¿½dos
         var assignedIds = new HashSet<int>();
         foreach (SectorObjective obj in plan.Objectives)
             foreach (SlotNeed slot in obj.Slots)
@@ -569,11 +569,11 @@ public partial class AIController
             if (obj.Status != ObjectiveStatus.Defending) obj.Status = ObjectiveStatus.Pursuing;
             ApplyPlanHUD(u, obj);
             immediateList.Add(u);
-            Debug.Log($"{TL("Plan")} {u.InstanceId} já está em {bldg.Sector} ? captura imediata");
+            Debug.Log($"{TL("Plan")} {u.InstanceId} jï¿½ estï¿½ em {bldg.Sector} ? captura imediata");
         }
         foreach (UnitManager u in immediateList) freeCapturers.Remove(u);
 
-        // 5b: atribuição ótima por backtracking
+        // 5b: atribuiï¿½ï¿½o ï¿½tima por backtracking
         int openOffensiveObjCount = 0;
         foreach (SectorObjective o in plan.Objectives)
             if (o.Status != ObjectiveStatus.Defending && o.HasOpenSlot(UnitRole.Capturador))
@@ -632,9 +632,9 @@ public partial class AIController
 
                     if (nearestFree == float.MaxValue || nearestFree > assignedDist + MaxCoArrivalGap)
                     {
-                        Debug.Log($"{TL("Plan")} {obj.Sector} 2º slot bloqueado: livre mais próximo " +
+                        Debug.Log($"{TL("Plan")} {obj.Sector} 2ï¿½ slot bloqueado: livre mais prï¿½ximo " +
                                   $"({(nearestFree == float.MaxValue ? "?" : nearestFree.ToString("F0"))}h) " +
-                                  $"fora de alcance do 1º ({assignedDist:F0}h)");
+                                  $"fora de alcance do 1ï¿½ ({assignedDist:F0}h)");
                         continue;
                     }
                 }
@@ -738,7 +738,7 @@ public partial class AIController
             freeCapturers.RemoveRange(0, nu);
         }
 
-        // Passo 5c: assaltos primários
+        // Passo 5c: assaltos primï¿½rios
         {
             var assignedAfterCapturers = new HashSet<int>();
             foreach (SectorObjective obj in plan.Objectives)
@@ -777,8 +777,8 @@ public partial class AIController
                 obj.TryFillSlot(UnitRole.Assalto, best.InstanceId);
                 ApplyPlanHUD(best, obj, UnitRole.Assalto);
                 freeAssaults.Remove(best);
-                Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} ? defesa crítica de {obj.Sector} " +
-                          $"(inimigo={enemyHp}HP aliado={allyHp}HP ratio={enemyHp / (float)allyHp:F1}× dist={bestDist:F0}h)");
+                Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} ? defesa crï¿½tica de {obj.Sector} " +
+                          $"(inimigo={enemyHp}HP aliado={allyHp}HP ratio={enemyHp / (float)allyHp:F1}ï¿½ dist={bestDist:F0}h)");
             }
 
             foreach (SectorObjective obj in plan.Objectives)
@@ -812,7 +812,7 @@ public partial class AIController
                 ApplyPlanHUD(best, obj, UnitRole.Assalto);
                 freeAssaults.Remove(best);
                 Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} ? SOS ofensivo {obj.Sector} " +
-                          $"(inimigo={enemyHp}HP aliado={allyHp}HP ratio={enemyHp / (float)allyHp:F1}× dist={bestDist:F0}h)");
+                          $"(inimigo={enemyHp}HP aliado={allyHp}HP ratio={enemyHp / (float)allyHp:F1}ï¿½ dist={bestDist:F0}h)");
             }
 
             const float DefenseEscortMaxPM = 8f;
@@ -841,7 +841,7 @@ public partial class AIController
                 obj.TryFillSlot(UnitRole.Assalto, best.InstanceId);
                 ApplyPlanHUD(best, obj, UnitRole.Assalto);
                 freeAssaults.Remove(best);
-                Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} ? defesa estável de {obj.Sector} (dist={bestDist:F0}h)");
+                Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} ? defesa estï¿½vel de {obj.Sector} (dist={bestDist:F0}h)");
             }
 
             foreach (SectorObjective obj in plan.Objectives)
@@ -932,7 +932,7 @@ public partial class AIController
             }
         }
 
-        // Passo 5d: rogues próximos reforçam defesa
+        // Passo 5d: rogues prï¿½ximos reforï¿½am defesa
         {
             int maxDefenders  = 3;
             int defReachRange = Mathf.Max(HomeDefenseThreatRange, defenseEnemyRange);
@@ -976,7 +976,7 @@ public partial class AIController
             foreach (UnitManager u in rogueAssigned) freeCapturers.Remove(u);
         }
 
-        // Passo 5e: rogues próximos reforçam captura em desvantagem
+        // Passo 5e: rogues prï¿½ximos reforï¿½am captura em desvantagem
         {
             const int MaxCaptureReinforcements = 2;
             float     SosRatio                 = alliesAgainstEnemiesHpRatio;
@@ -1023,7 +1023,7 @@ public partial class AIController
                     ApplyPlanHUD(u, obj);
                     captureReinforced.Add(u);
                     reinforcers++;
-                    Debug.Log($"{TL("Plan")} SOS {u.InstanceId} ? reforço de captura {obj.Sector} (inimigo={enemyHp}HP aliado={allyHp}HP ratio={enemyHp / (float)allyHp:F1}×)");
+                    Debug.Log($"{TL("Plan")} SOS {u.InstanceId} ? reforï¿½o de captura {obj.Sector} (inimigo={enemyHp}HP aliado={allyHp}HP ratio={enemyHp / (float)allyHp:F1}ï¿½)");
                 }
             }
             foreach (UnitManager u in captureReinforced) freeCapturers.Remove(u);
@@ -1033,6 +1033,51 @@ public partial class AIController
         {
             u.ClearAIAssignedPlan();
             plan.RogueUnitIds.Add(u.InstanceId);
+        }
+
+        // Passo 5h: endgame all-in â€” quando todos os setores regulares estÃ£o controlados,
+        // absorve rogues e assaltos livres no plano de invasÃ£o da base inimiga.
+        {
+            bool allRegularSectorsCaptured = allSectors != null && allSectors.Count > 0;
+            if (allRegularSectorsCaptured)
+                foreach (SectorManager.SectorInfo info in allSectors)
+                    if (!IsOwnedDefensibleSector(info, aiTeam)) { allRegularSectorsCaptured = false; break; }
+
+            if (allRegularSectorsCaptured)
+            {
+                SectorObjective baseObj = null;
+                foreach (SectorObjective obj in plan.Objectives)
+                {
+                    if (obj.Status == ObjectiveStatus.Complete || obj.Status == ObjectiveStatus.Abandoned) continue;
+                    if (ConstructionSectorHelper.IsBase(obj.Sector) && FindHQTeamInSector(obj.Sector) != aiTeam)
+                    { baseObj = obj; break; }
+                }
+
+                if (baseObj != null)
+                {
+                    int absorbed = 0;
+
+                    // Capturadores rogues jÃ¡ miram no HQ inimigo nativamente via DecideRogueCapturerAction
+                    // e tÃªm lÃ³gica de combate para abrir caminho. NÃ£o absorver â€” manter como rogues.
+
+                    var finalAssignedIds = new HashSet<int>();
+                    foreach (SectorObjective obj in plan.Objectives)
+                        foreach (SlotNeed slot in obj.Slots)
+                            if (slot.Filled) finalAssignedIds.Add(slot.AssignedUnitId);
+
+                    List<UnitManager> remainingAssaults = GetAvailablePrimaryAssaults(aiTeam);
+                    foreach (UnitManager u in remainingAssaults)
+                    {
+                        if (finalAssignedIds.Contains(u.InstanceId)) continue;
+                        baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto, Filled = true, AssignedUnitId = u.InstanceId });
+                        ApplyPlanHUD(u, baseObj, UnitRole.Assalto);
+                        absorbed++;
+                    }
+
+                    if (absorbed > 0)
+                        Debug.Log($"{TL("Plan")} endgame all-in: {absorbed} unidades absorvidas -> {baseObj.Sector}");
+                }
+            }
         }
 
         // Passo 5g: artilharia livre acompanha o front
@@ -1268,19 +1313,19 @@ public partial class AIController
             if (!slottedIds.Contains(u.InstanceId)) u.ClearAIAssignedPlan();
         }
 
-        // Passo 8: atualiza distâncias reais de cada slot até seu objetivo
+        // Passo 8: atualiza distï¿½ncias reais de cada slot atï¿½ seu objetivo
         RefreshSlotDistances(plan, aiTeam);
 
         int totalAssigned = 0;
         var planLog = new System.Text.StringBuilder();
-        planLog.AppendLine($"{TL("Plan")} {aiTeam} — {plan.Objectives.Count} objetivos:");
+        planLog.AppendLine($"{TL("Plan")} {aiTeam} ï¿½ {plan.Objectives.Count} objetivos:");
         foreach (SectorObjective obj in plan.Objectives)
         {
             foreach (SlotNeed slot in obj.Slots)
             {
                 if (!slot.Filled)
                 {
-                    planLog.AppendLine($"  pri={obj.Priority} {obj.Sector}: —");
+                    planLog.AppendLine($"  pri={obj.Priority} {obj.Sector}: ï¿½");
                     continue;
                 }
                 totalAssigned++;
@@ -1290,7 +1335,7 @@ public partial class AIController
                 planLog.AppendLine($"  pri={obj.Priority} {obj.Sector}: {slot.Role} Unit{slot.AssignedUnitId}{embarkedTag} @ {distStr}");
             }
         }
-        planLog.Append($"  ? {totalAssigned} atribuídos | {plan.RogueUnitIds.Count} rogues");
+        planLog.Append($"  ? {totalAssigned} atribuï¿½dos | {plan.RogueUnitIds.Count} rogues");
         Debug.Log(planLog.ToString());
 
         AISectorIntentAnalyzer.RebuildAndLog(aiTeam, snapshot, plan, intel, "Plan");
@@ -1406,8 +1451,8 @@ public partial class AIController
         }
     }
 
-    // Backtracking ótimo: minimiza a soma de passos reais de caminho unit?objetivo.
-    // Para N = 8 e M = 8 objetivos abertos, P(M,N) = 40 320 iterações — trivial.
+    // Backtracking ï¿½timo: minimiza a soma de passos reais de caminho unit?objetivo.
+    // Para N = 8 e M = 8 objetivos abertos, P(M,N) = 40 320 iteraï¿½ï¿½es ï¿½ trivial.
     private static void SolveAssignment(
         List<UnitManager> units,
         List<(SectorObjective obj, Vector3Int cell)> objs,

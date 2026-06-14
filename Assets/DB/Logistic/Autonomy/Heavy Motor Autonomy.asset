@@ -17,6 +17,6 @@ MonoBehaviour:
   isAircraft: 0
   description: "Perfil base de autonomia motorizada para grandes pe\xE7as militares,
     como a artilharia de campanha"
-  movementAutonomyMultiplier: 10
+  movementAutonomyMultiplier: 5
   turnStartUpkeep: 0
   upkeepStartLayerModes: []

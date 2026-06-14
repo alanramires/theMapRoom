@@ -129,7 +129,56 @@ public partial class AIController
             return true;
         }
 
+        if (HasSafeDropZoneOnRoute(transporter, fireSupport, snapshot, truckCell, deliveryTarget, mainLineAnchor))
+        {
+            reason = "destino hot, rota tem zona conservadora para desembarque";
+            return true;
+        }
+
         reason = $"destino hot {deliveryTarget} sem drop/rendezvous de retaguarda";
         return false;
+    }
+
+    private bool HasSafeDropZoneOnRoute(
+        UnitManager transporter,
+        UnitManager fireSupport,
+        AIWorldSnapshot snapshot,
+        Vector3Int truckCell,
+        Vector3Int deliveryTarget,
+        Vector3Int mainLineAnchor)
+    {
+        truckCell.z = 0;
+        deliveryTarget.z = 0;
+        mainLineAnchor.z = 0;
+
+        if (SectorManager.HexDistance(truckCell, deliveryTarget) < 3f)
+            return false;
+
+        Dictionary<Vector3Int, List<Vector3Int>> extendedPaths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, transporter, transporter.MaxMovementPoints * 3, terrainDatabase);
+        if (extendedPaths == null || extendedPaths.Count == 0)
+            return false;
+
+        HashSet<Vector3Int> occupied = BuildOccupied(transporter);
+
+        return TryFindBestToolProgressionCell(
+            transporter,
+            snapshot,
+            truckCell,
+            deliveryTarget,
+            extendedPaths,
+            occupied,
+            ToolProgressionIntent.TransportDelivery,
+            out _,
+            out _,
+            out _,
+            allowCell: cell =>
+            {
+                if (SectorManager.HexDistance(cell, deliveryTarget) < 2f) return false;
+                if (IsLogisticsForwardOfMainLine(transporter, snapshot, cell, mainLineAnchor)) return false;
+                if (!IsFireSupportConservativeCellAllowed(fireSupport, snapshot, cell)) return false;
+                return CountTowCourierFrontlineSupport(transporter, fireSupport, snapshot, cell, deliveryTarget, out _) > 0;
+            });
     }
 }

@@ -83,6 +83,8 @@ public partial class AIController
             return rogueRendezvous;
 
         if (TryRogueFireSupportKnownTargetRangeStep(unit, snapshot, fromCell, paths, occupied,
+                null,
+                fromCell,
                 out Vector3Int rangeStepCell, out string rangeStepReason))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rogue aproxima alvo conhecido via {rangeStepCell} ({rangeStepReason})");
@@ -136,6 +138,8 @@ public partial class AIController
         Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
+        SectorObjective assigned,
+        Vector3Int objectiveAnchor,
         out Vector3Int bestCell,
         out string reason)
     {
@@ -162,6 +166,11 @@ public partial class AIController
         int minRange = Mathf.Max(0, GetUnitIndirectWeaponMinRange(unit));
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
+        bool conservativeOffensiveObjective = IsFireSupportConservative(unit)
+            && assigned != null
+            && assigned.Status != ObjectiveStatus.Defending
+            && assigned.Status != ObjectiveStatus.Complete
+            && assigned.Status != ObjectiveStatus.Abandoned;
         float bestScore = float.MinValue;
         UnitManager bestTarget = null;
         float bestDist = 0f;
@@ -170,6 +179,7 @@ public partial class AIController
         int sensorTargetCount = 0;
         int geometricTargetCount = 0;
         int conservativeBlocked = 0;
+        int screenBlocked = 0;
         int occupiedBlocked = 0;
         int capturerTargetBlocked = 0;
         int highThreatCandidates = 0;
@@ -199,6 +209,11 @@ public partial class AIController
             if (!IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
             {
                 conservativeBlocked++;
+                continue;
+            }
+            if (conservativeOffensiveObjective && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, objectiveAnchor))
+            {
+                screenBlocked++;
                 continue;
             }
 
@@ -307,7 +322,7 @@ public partial class AIController
             string closestText = closestRangeEnemy != null
                 ? $" closest={closestRangeEnemy.UnitDisplayName}#{closestRangeEnemy.InstanceId}@{closestEnemyCell} via {closestRangeCell} dist={closestRangeDistance}"
                 : " closest=-";
-            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rogue range-step scan: sem célula cand={candidateCount} visibleEnemies={visibleEnemyCount} sensorTargets={sensorTargetCount} geomTargets={geometricTargetCount} tooClose={rangeTooClose} tooFar={rangeTooFar} blockedOcc={occupiedBlocked} blockedCapTarget={capturerTargetBlocked} blockedConservative={conservativeBlocked} highThreat={highThreatCandidates} range={minRange}-{maxRange}{closestText}");
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rogue range-step scan: sem célula cand={candidateCount} visibleEnemies={visibleEnemyCount} sensorTargets={sensorTargetCount} geomTargets={geometricTargetCount} tooClose={rangeTooClose} tooFar={rangeTooFar} blockedOcc={occupiedBlocked} blockedCapTarget={capturerTargetBlocked} blockedConservative={conservativeBlocked} blockedScreen={screenBlocked} highThreat={highThreatCandidates} range={minRange}-{maxRange}{closestText}");
             return false;
         }
 
@@ -625,7 +640,7 @@ public partial class AIController
             if (allyToAnchor + 0.5f >= cellToAnchor)
                 continue;
 
-            if (SectorManager.HexDistance(allyCell, cell) <= 6f)
+            if (SectorManager.HexDistance(allyCell, cell) <= 2f)
                 return true;
         }
 

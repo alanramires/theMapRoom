@@ -179,6 +179,12 @@ public partial class AIController
             if (TryBuildRepairLastStandAttack(unit, aiTeam, fromCell, currentBldg, paths, occupied, out PlayerAction noPathLastStand))
                 return noPathLastStand;
 
+            if (TryBuildStationaryLogisticsSupplyAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction noPathSupply, out string noPathSupplyReason))
+            {
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} parado em reparo atende logistica {noPathSupplyReason}");
+                return noPathSupply;
+            }
+
             return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
         }
 
@@ -249,6 +255,12 @@ public partial class AIController
                         return BuildAttackBatch(unit, aiTeam, fromCell, fromCell, defTarget.InstanceId.ToString(), dtc);
                     }
                 }
+                if (TryBuildStationaryLogisticsSupplyAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction holdSupply, out string holdSupplyReason))
+                {
+                    Debug.Log($"{TL("Repair")} {unit.InstanceId} segura {fromCell} sem substituto e atende logistica {holdSupplyReason}");
+                    return holdSupply;
+                }
+
                 Debug.Log($"{TL("Repair")} {unit.InstanceId} segura {fromCell} sem substituto");
                 return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
             }
@@ -450,6 +462,12 @@ public partial class AIController
             if (TryDecideRepairFallbackToHQ(unit, snapshot, fromCell, paths, occupied, out PlayerAction hqFallback))
                 return hqFallback;
 
+            if (TryBuildStationaryLogisticsSupplyAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction noDestSupply, out string noDestSupplyReason))
+            {
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} sem destino de reparo atende logistica parado {noDestSupplyReason}");
+                return noDestSupply;
+            }
+
             Debug.Log($"{TL("Repair")} {unit.InstanceId} sem destino de reparo e sem HQ válido — conservador");
             return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
         }
@@ -458,6 +476,12 @@ public partial class AIController
 
         if (fromCell == destCell)
         {
+            if (TryBuildStationaryLogisticsSupplyAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction repairSupply, out string repairSupplyReason))
+            {
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} aguarda reparo em {fromCell} e atende logistica {repairSupplyReason}");
+                return repairSupply;
+            }
+
             Debug.Log($"{TL("Repair")} {unit.InstanceId} aguarda reparo em {fromCell}");
             return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
         }
@@ -480,7 +504,21 @@ public partial class AIController
             if (hc != destCell) hqAlt = hc;
         }
         Vector3Int bestStep = FindRepairApproachStep(
-            unit, aiTeam, fromCell, destCell, repairDest, paths, occupied, hqAlt);
+            unit, aiTeam, fromCell, destCell, repairDest, paths, occupied, hqAlt, out bool usedEmergencyFlee);
+
+        if (usedEmergencyFlee
+            && TryBuildRepairBlockedAnchorsFightAction(
+                unit,
+                snapshot,
+                fromCell,
+                paths,
+                occupied,
+                out PlayerAction blockedAnchorsFight,
+                out string blockedAnchorsFightReason))
+        {
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} todas ancoras bloqueadas — luta ate o fim ({blockedAnchorsFightReason})");
+            return blockedAnchorsFight;
+        }
 
         Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
         return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, paths);

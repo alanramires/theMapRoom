@@ -90,7 +90,16 @@ public partial class AIController
             // objective — the truck will never reach the front. Instead, drop the artillery at the
             // best safe rear-area cell reachable this turn (allied building > allies nearby > low threat).
             if (unit.TryGetUnitData(out UnitData towData) && towData != null && towData.playConservative)
-                return TryDropFireSupportConservative(unit, primaryPassenger, passengers, snapshot, plan, fromCell, moveTarget, paths, occupied);
+        {
+            float towDist = SectorManager.HexDistance(fromCell, primaryTarget);
+            bool targetIsHot = CalculateThreatLevel(primaryTarget, snapshot.AITeam) > 0.1f
+                || HasNearbyVisibleEnemy(primaryTarget, snapshot.AITeam, 2);
+            if (targetIsHot)
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier conservador — destino quente ({primaryTarget}), ativa conservador dist={towDist:F0}h");
+            else
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier conservador — FS embarcado dist={towDist:F0}h, sem progressao carregado");
+            return TryDropFireSupportConservative(unit, primaryPassenger, passengers, snapshot, plan, fromCell, moveTarget, paths, occupied);
+        }
 
             SectorObjective fsObj = ResolveAssignedFireSupportObjective(primaryPassenger, plan);
             string fsSector = fsObj != null ? fsObj.Sector.ToString() : "?";

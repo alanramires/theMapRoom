@@ -331,6 +331,73 @@ public partial class AIController
         return true;
     }
 
+    private bool TryBuildStationaryLogisticsSupplyAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out PlayerAction action,
+        out string reason)
+    {
+        action = null;
+        reason = "";
+        if (!IsPrimaryLogisticsUnit(unit) || snapshot == null)
+            return false;
+
+        int limit = GetLogisticsServiceLimit(unit);
+        if (limit <= 0)
+            return false;
+
+        bool allowPreventiveMaintenance = IsPreventiveLogisticsAllowed(unit, snapshot, fromCell, paths, occupied);
+        var options = new List<PodeSuprirOption>();
+        var invalidOptions = new List<PodeSuprirInvalidOption>();
+        if (!PodeSuprirSensor.CollectOptions(unit, boardTilemap, terrainDatabase, matchController, options, out _, invalidOptions)
+            || options.Count <= 0)
+            return false;
+
+        List<UnitManager> targets = PickBestLogisticsSupplyTargets(
+            unit,
+            snapshot,
+            fromCell,
+            options,
+            limit,
+            allowPreventiveMaintenance);
+
+        if (targets.Count <= 0)
+        {
+            var seen = new HashSet<int>();
+            for (int i = 0; i < options.Count && targets.Count < limit; i++)
+            {
+                UnitManager target = options[i] != null ? options[i].targetUnit : null;
+                if (target == null
+                    || target == unit
+                    || target.IsDead
+                    || target.IsEmbarked
+                    || target.TeamId != unit.TeamId
+                    || target.ReceivedSuppliesThisTurn)
+                    continue;
+                if (!seen.Add(target.InstanceId))
+                    continue;
+
+                targets.Add(target);
+            }
+        }
+
+        if (targets.Count <= 0)
+            return false;
+
+        action = BuildSupplyBatch(unit, snapshot.AITeam, fromCell, fromCell, targets, paths);
+        bool hasCritical = HasCriticalLogisticsTarget(targets);
+        bool hasPreventive = HasPreventiveLogisticsTarget(unit, targets);
+        reason = hasCritical
+            ? $"critico parado count={targets.Count}"
+            : hasPreventive
+                ? $"preventivo parado count={targets.Count}"
+                : $"oportunista parado count={targets.Count}";
+        return true;
+    }
+
     private float ScoreLogisticsSupplyCell(
         UnitManager unit,
         AIWorldSnapshot snapshot,

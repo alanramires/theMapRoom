@@ -1868,7 +1868,7 @@ public partial class TurnStateManager
             if (!projectilesByWeapon.TryGetValue(embarked.weapon, out int totalProjectiles))
                 continue;
 
-            embarked.squadAmmunition = resultHp > 0 ? Mathf.Max(0, totalProjectiles / resultHp) : 0;
+            embarked.squadAmmunition = resultHp > 0 ? Mathf.CeilToInt((float)totalProjectiles / resultHp) : 0;
             projectilesByWeapon.Remove(embarked.weapon);
         }
 
@@ -1939,7 +1939,7 @@ public partial class TurnStateManager
             if (!supplyStepsByType.TryGetValue(embarked.supply, out int totalSteps))
                 continue;
 
-            embarked.amount = resultHp > 0 ? Mathf.Max(0, totalSteps / resultHp) : 0;
+            embarked.amount = resultHp > 0 ? Mathf.CeilToInt((float)totalSteps / resultHp) : 0;
             supplyStepsByType.Remove(embarked.supply);
         }
 

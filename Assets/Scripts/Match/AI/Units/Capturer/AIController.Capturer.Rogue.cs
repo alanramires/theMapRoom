@@ -61,7 +61,12 @@ public partial class AIController
             }
 
             // Sem captura disponível → abre caminho por combate
+            bool roguePreferDpq = unit.TryGetUnitData(out UnitData rogueEngageData)
+                && rogueEngageData != null && rogueEngageData.prioritizeDpqAtBattle;
             var engageBuffer = new List<PodeMirarTargetOption>();
+            UnitManager bestEngageTarget = null;
+            Vector3Int  bestEngageCell   = from;
+            float       bestEngageDpq    = float.MinValue;
             foreach (Vector3Int cell in engagePaths.Keys)
             {
                 if (engageOccupied.Contains(cell)) continue;
@@ -69,13 +74,28 @@ public partial class AIController
                 PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
                     SensorMovementMode.MoveuAndando, engageBuffer, fromCell: cell);
                 UnitManager candidate = PickBestRogueTarget(engageBuffer, snapshot.AITeam, unit, cell, false, out _);
-                if (candidate != null)
+                if (candidate == null) continue;
+                if (!roguePreferDpq)
                 {
-                    Vector3Int btCell = candidate.CurrentCellPosition; btCell.z = 0;
+                    Vector3Int btCell0 = candidate.CurrentCellPosition; btCell0.z = 0;
                     Debug.Log($"{TL("Rogue")} {unit.InstanceId} move+ataca {candidate.UnitDisplayName}#{candidate.InstanceId} via {cell}");
                     return BuildAttackBatch(unit, snapshot.AITeam, from, cell,
-                        candidate.InstanceId.ToString(), btCell, engagePaths);
+                        candidate.InstanceId.ToString(), btCell0, engagePaths);
                 }
+                float dpq = GetTerrainDpqPontos(cell);
+                if (bestEngageTarget == null || dpq > bestEngageDpq)
+                {
+                    bestEngageDpq    = dpq;
+                    bestEngageTarget = candidate;
+                    bestEngageCell   = cell;
+                }
+            }
+            if (bestEngageTarget != null)
+            {
+                Vector3Int btCell = bestEngageTarget.CurrentCellPosition; btCell.z = 0;
+                Debug.Log($"{TL("Rogue")} {unit.InstanceId} move+ataca DPQ {bestEngageTarget.UnitDisplayName}#{bestEngageTarget.InstanceId} via {bestEngageCell} (dpq={bestEngageDpq:F0})");
+                return BuildAttackBatch(unit, snapshot.AITeam, from, bestEngageCell,
+                    bestEngageTarget.InstanceId.ToString(), btCell, engagePaths);
             }
 
             return null; // inimigos próximos, sem captura nem ataque → HexEvaluator

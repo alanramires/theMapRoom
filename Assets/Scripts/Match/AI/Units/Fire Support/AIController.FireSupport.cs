@@ -49,6 +49,46 @@ public partial class AIController
         return DecideAssignedFireSupportAction(unit, snapshot, plan, assigned);
     }
 
+    private PlayerAction TryDecideFireSupportAttackOnlyAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
+    {
+        if (!IsFireSupportUnit(unit) || unit == null || snapshot == null)
+            return null;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        Dictionary<Vector3Int, List<Vector3Int>> paths = BuildFireSupportPaths(unit);
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+
+        SectorObjective assigned = ResolveAssignedFireSupportObjective(unit, plan);
+        if (assigned == null)
+            assigned = ResolveAssignedAssaultObjective(unit, plan);
+
+        Vector3Int anchor = assigned != null
+            ? ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell)
+            : ResolveRogueFireSupportAnchor(snapshot, fromCell);
+
+        if (IsArtilleryModeOnly(unit)
+            && TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor,
+                assigned != null && assigned.Status == ObjectiveStatus.Defending,
+                out PlayerAction indirectAction, out string indirectReason, indirectOnly: true))
+        {
+            string sector = assigned != null ? assigned.Sector.ToString() : "rogue";
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} hibrido prioriza tiro indireto {sector} - {indirectReason}");
+            return indirectAction;
+        }
+
+        if (TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor,
+            assigned != null && assigned.Status == ObjectiveStatus.Defending,
+            out PlayerAction attackAction, out string attackReason))
+        {
+            string sector = assigned != null ? assigned.Sector.ToString() : "rogue";
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} hibrido prioriza tiro {sector} - {attackReason}");
+            return attackAction;
+        }
+
+        return null;
+    }
+
     private PlayerAction DecideAssignedFireSupportAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan, SectorObjective assigned)
     {
         Vector3Int fromCell = unit.CurrentCellPosition;
@@ -91,6 +131,8 @@ public partial class AIController
         if (embarkAction != null) return embarkAction;
 
         if (TryRogueFireSupportKnownTargetRangeStep(unit, snapshot, fromCell, paths, occupied,
+                assigned,
+                anchor,
                 out Vector3Int assignedRangeStepCell, out string assignedRangeStepReason))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reposiciona para por alvo na mira {assigned.Sector} via {assignedRangeStepCell} ({assignedRangeStepReason})");
@@ -112,6 +154,9 @@ public partial class AIController
 
         PlayerAction rendezvousAction = TryFireSupportRendezvousAction(unit, snapshot, assigned, fromCell, paths, occupied);
         if (rendezvousAction != null) return rendezvousAction;
+
+        PlayerAction cohesionAction = TryFireSupportCohesionFallbackAction(unit, snapshot, assigned, fromCell, anchor, paths, occupied);
+        if (cohesionAction != null) return cohesionAction;
 
         Debug.Log($"{TL("FireSupport")} {unit.InstanceId} aguarda apoio {assigned.Sector}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
@@ -186,5 +231,108 @@ public partial class AIController
 
         Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rendezvous {assigned.Sector} → #{rendezvousTarget.InstanceId} via {moveCell} (fallback)");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+    }
+
+    private PlayerAction TryFireSupportCohesionFallbackAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        SectorObjective assigned,
+        Vector3Int fromCell,
+        Vector3Int anchor,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied)
+    {
+        if (unit == null || snapshot == null || assigned == null || paths == null || paths.Count == 0)
+            return null;
+        if (!IsFireSupportConservative(unit) && !PreferFireSupportWeaponMaxRange(unit))
+            return null;
+
+        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        float fromThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
+        float fromAnchorDist = SectorManager.HexDistance(fromCell, anchor);
+        float fromCohesion = CalculateFireSupportCohesionScore(unit, snapshot, fromCell);
+        float fromNearestAlly = FindNearestNonFireSupportAllyDistance(unit, snapshot, fromCell);
+        bool conservativeOffensiveObjective = IsFireSupportConservative(unit)
+            && assigned.Status != ObjectiveStatus.Defending
+            && assigned.Status != ObjectiveStatus.Complete
+            && assigned.Status != ObjectiveStatus.Abandoned;
+
+        Vector3Int bestCell = fromCell;
+        float bestScore = float.MinValue;
+        string bestReason = "";
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell) continue;
+            if (occupied != null && occupied.Contains(cell)) continue;
+            if (IsCellACapturerTarget(cell, capPlan, snapshot.AITeam)) continue;
+            if (!IsFireSupportConservativeCellAllowed(unit, snapshot, cell)) continue;
+
+            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+            if (threat > fromThreat + 0.1f)
+                continue;
+
+            float cellAnchorDist = SectorManager.HexDistance(cell, anchor);
+            bool advancesToObjective = cellAnchorDist < fromAnchorDist - 0.5f;
+            if (conservativeOffensiveObjective
+                && advancesToObjective
+                && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor))
+                continue;
+
+            float nearestAlly = FindNearestNonFireSupportAllyDistance(unit, snapshot, cell);
+            if (nearestAlly >= float.MaxValue)
+                continue;
+
+            float cohesion = CalculateFireSupportCohesionScore(unit, snapshot, cell);
+            float cohesionGain = cohesion - fromCohesion;
+            float allyGain = fromNearestAlly < float.MaxValue ? fromNearestAlly - nearestAlly : 0f;
+            float rearBias = Mathf.Max(0f, cellAnchorDist - fromAnchorDist) * 35f;
+            float pathCost = GetPathStepCount(paths, cell);
+            float score = cohesionGain
+                + allyGain * 180f
+                + rearBias
+                + GetTerrainDpqPontos(cell) * 18f
+                - threat * 120f
+                - pathCost * 8f;
+
+            if (allyGain <= 0.1f && cohesionGain < 45f)
+                continue;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCell = cell;
+                bestReason = $"allyGain={allyGain:F1} cohGain={cohesionGain:F0} threat={threat:F1}";
+            }
+        }
+
+        if (bestCell == fromCell || bestScore < 35f)
+            return null;
+
+        Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reagrupa/cohesion {assigned.Sector} via {bestCell} ({bestReason} score={bestScore:F0})");
+        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestCell, paths);
+    }
+
+    private static float FindNearestNonFireSupportAllyDistance(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return float.MaxValue;
+
+        float best = float.MaxValue;
+        foreach (UnitManager ally in snapshot.MyUnits)
+        {
+            if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
+                continue;
+            if (IsFireSupportUnit(ally))
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            best = Mathf.Min(best, SectorManager.HexDistance(cell, allyCell));
+        }
+
+        return best;
     }
 }

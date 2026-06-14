@@ -107,9 +107,11 @@ public partial class AIController
         bool conservative = IsFireSupportConservative(unit);
         bool preferBestDpq = PreferFireSupportBestDpq(unit);
         int maxRange = GetFireSupportMaxWeaponRange(unit);
-        bool conservativeInvasion = conservative
+        bool conservativeOffensiveObjective = conservative
             && assigned != null
-            && assigned.ObjectiveType == AIObjectiveType.InvasionAttack;
+            && assigned.Status != ObjectiveStatus.Defending
+            && assigned.Status != ObjectiveStatus.Complete
+            && assigned.Status != ObjectiveStatus.Abandoned;
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
         Dictionary<Vector3Int, int> routeCostToAnchor =
             UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, anchor, 160, terrainDatabase);
@@ -155,7 +157,7 @@ public partial class AIController
                         return false;
                     if (conservative && !IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
                         return false;
-                    if (conservativeInvasion && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor))
+                    if (conservativeOffensiveObjective && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor))
                         return false;
 
                     float tacticalPressure = CalculateFireSupportTacticalPressureScore(unit, snapshot, cell, weaponPriorityData);
@@ -228,7 +230,7 @@ public partial class AIController
             float threat = CalculateThreatLevel(cell, snapshot.AITeam);
             if (conservative && !IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
                 continue;
-            if (conservativeInvasion && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor))
+            if (conservativeOffensiveObjective && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor))
                 continue;
 
             float progress = fromDist - SectorManager.HexDistance(cell, anchor);

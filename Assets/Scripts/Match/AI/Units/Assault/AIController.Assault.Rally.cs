@@ -294,13 +294,7 @@ public partial class AIController
 
         if (bestRally == null)
         {
-            if (TryBuildNearbyRecentlyCapturedAssemblyObjective(aiTeam, fromCell, turnNumber, out objective, out string recentReason))
-            {
-                reason = $"{recentReason}; fallback sem construction-rally active={activeConstructions} seen={seen} planned={plannedRallySectors.Count}";
-                return true;
-            }
-
-            reason = $"sem rally elegivel perto active={activeConstructions} seen={seen} enemyHQSlots={FormatSlotSet(enemyHQSlots)} noTarget={skippedNoTarget} firstNoTarget={firstNoTarget} noInfo={skippedNoInfo} notHeld={skippedNotHeld} far>{RogueAssaultHeldRallySearchRadius}={skippedFar} planned={plannedRallySectors.Count}; {recentReason}";
+            reason = $"sem rally elegivel perto active={activeConstructions} seen={seen} enemyHQSlots={FormatSlotSet(enemyHQSlots)} noTarget={skippedNoTarget} firstNoTarget={firstNoTarget} noInfo={skippedNoInfo} notHeld={skippedNotHeld} far>{RogueAssaultHeldRallySearchRadius}={skippedFar} planned={plannedRallySectors.Count}";
             return false;
         }
 
@@ -347,79 +341,6 @@ public partial class AIController
         }
 
         return result;
-    }
-
-    private bool TryBuildNearbyRecentlyCapturedAssemblyObjective(
-        TeamId aiTeam,
-        Vector3Int fromCell,
-        int turnNumber,
-        out SectorObjective objective,
-        out string reason)
-    {
-        objective = null;
-        reason = "";
-
-        SectorManager.SectorInfo bestInfo = null;
-        float bestDist = float.MaxValue;
-        int recentSeen = 0;
-        int skippedBase = 0;
-        int skippedNotHeld = 0;
-        int skippedFar = 0;
-
-        IReadOnlyList<SectorManager.SectorInfo> infos = SectorManager.GetAllSectorInfos();
-        for (int i = 0; i < infos.Count; i++)
-        {
-            SectorManager.SectorInfo info = infos[i];
-            if (info == null || info.Sector == ConstructionSector.None)
-                continue;
-            if (!IsRecentlyCapturedSector(aiTeam, info.Sector, turnNumber))
-                continue;
-
-            recentSeen++;
-            if (ConstructionSectorHelper.IsBase(info.Sector))
-            {
-                skippedBase++;
-                continue;
-            }
-            if (!IsRallySectorHeldByTeam(info, aiTeam))
-            {
-                skippedNotHeld++;
-                continue;
-            }
-
-            Vector3Int repCell = info.RepresentativeCell;
-            repCell.z = 0;
-            float dist = SectorManager.HexDistance(fromCell, repCell);
-            if (dist > RogueAssaultHeldRallySearchRadius)
-            {
-                skippedFar++;
-                continue;
-            }
-
-            if (dist < bestDist)
-            {
-                bestDist = dist;
-                bestInfo = info;
-            }
-        }
-
-        if (bestInfo == null)
-        {
-            reason = $"sem setor recem-capturado perto recent={recentSeen} base={skippedBase} notHeld={skippedNotHeld} far>{RogueAssaultHeldRallySearchRadius}={skippedFar}";
-            return false;
-        }
-
-        objective = new SectorObjective
-        {
-            Sector = bestInfo.Sector,
-            AssignedTeam = aiTeam,
-            Status = ObjectiveStatus.Defending,
-            ObjectiveType = AIObjectiveType.RallyAssembly,
-            Priority = 1
-        };
-        objective.Slots.Add(new SlotNeed { Role = UnitRole.Assalto, Filled = true });
-        reason = $"setor recem-capturado segurado perto {bestInfo.Sector} dist={bestDist:F0}h";
-        return true;
     }
 
     private static HashSet<ConstructionSector> CollectPlannedRallyAssemblySectors(TeamObjectivePlan plan)
