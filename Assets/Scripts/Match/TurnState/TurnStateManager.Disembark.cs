@@ -430,6 +430,7 @@ public partial class TurnStateManager
         }
 
         bool transporterSortingRaised = false;
+        bool airTransporterForcedLandedForDisembark = false;
         if (transporter != null)
         {
             transporter.SetTemporarySortingOrder();
@@ -496,6 +497,8 @@ public partial class TurnStateManager
             float postLandingDelay = GetDisembarkAfterForcedLandingDelay();
             if (postLandingDelay > 0f)
                 yield return new WaitForSeconds(postLandingDelay);
+
+            airTransporterForcedLandedForDisembark = true;
         }
 
         // 2) Aguarda apos pouso antes de spawnar passageiros.
@@ -571,8 +574,11 @@ public partial class TurnStateManager
             if (passenger.TryGetUnitData(out UnitData passengerDataAtMove) && passengerDataAtMove != null && passengerDataAtMove.IsAircraft())
             {
                 // Decolagem curta de desembarque: sai para Air/Low antes do deslocamento.
+                bool wasAirborne = passenger.GetDomain() == Domain.Air && !passenger.IsAircraftGrounded;
                 if (!passenger.TrySetCurrentLayerMode(Domain.Air, HeightLevel.AirLow))
                     passenger.TrySetCurrentLayerMode(Domain.Air, passenger.GetPreferredAirHeight());
+                if (!wasAirborne)
+                    passenger.MarkTookOffRecently();
             }
 
             int beforeFuel = passenger.CurrentFuel;
@@ -656,6 +662,9 @@ public partial class TurnStateManager
             cursorController.SetCell(transporterCell, playMoveSfx: true);
         }
 
+        if (airTransporterForcedLandedForDisembark && transporter != null)
+            yield return ExecutePostDisembarkAirTransporterTakeoff(transporter, boardMap);
+
         if (transporter != null)
             transporter.MarkAsActed();
         cursorController?.PlayDoneSfx();
@@ -675,6 +684,50 @@ public partial class TurnStateManager
         {
             disembarkExecutionInProgress = false;
         }
+    }
+
+    private IEnumerator ExecutePostDisembarkAirTransporterTakeoff(UnitManager transporter, Tilemap boardMap)
+    {
+        if (transporter == null || boardMap == null)
+            yield break;
+        if (!transporter.TryGetUnitData(out UnitData data) || data == null || !data.IsAircraft())
+            yield break;
+        if (transporter.GetDomain() == Domain.Air && !transporter.IsAircraftGrounded)
+            yield break;
+
+        PodeDecolarReport report = PodeDecolarSensor.Evaluate(transporter, boardMap, terrainDatabase);
+        bool canTakeoffInPlace = report != null
+            && report.status
+            && report.takeoffMoveOptions != null
+            && (report.takeoffMoveOptions.Contains(0) || report.takeoffMoveOptions.Contains(9));
+        if (!canTakeoffInPlace)
+        {
+            RuntimeLog(report != null && !string.IsNullOrWhiteSpace(report.explicacao)
+                ? $"[Desembarque] Transportador permanece no solo apos desembarque: {report.explicacao}"
+                : "[Desembarque] Transportador permanece no solo apos desembarque: decolagem indisponivel.");
+            yield break;
+        }
+
+        if (!AircraftOperationRules.TryApplyOperation(
+                transporter,
+                boardMap,
+                terrainDatabase,
+                SensorMovementMode.MoveuParado,
+                out AircraftOperationDecision takeoffDecision))
+        {
+            RuntimeLog(string.IsNullOrWhiteSpace(takeoffDecision.reason)
+                ? "[Desembarque] Falha ao decolar transportador apos desembarque."
+                : $"[Desembarque] Transportador permanece no solo apos desembarque: {takeoffDecision.reason}");
+            yield break;
+        }
+
+        transporter.MarkTookOffRecently();
+        PlayMovementStartSfx(transporter);
+        RuntimeLog("[Desembarque] Transportador decolou apos concluir o desembarque.");
+
+        float takeoffFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(transporter) : 0f;
+        if (takeoffFxDuration > 0f)
+            yield return new WaitForSeconds(takeoffFxDuration);
     }
 
     private void ResetDisembarkRuntimeState()
@@ -1192,5 +1245,3 @@ public partial class TurnStateManager
         return true;
     }
 }
-
-

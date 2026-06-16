@@ -30,7 +30,8 @@ public partial class AIController
                 || ally.IsDead
                 || ally.IsEmbarked
                 || ally.TeamId != logistics.TeamId
-                || ally.ReceivedSuppliesThisTurn)
+                || ally.ReceivedSuppliesThisTurn
+                || ally.TookOffRecently)
                 continue;
 
             bool critical = ally.IsUnderRepair;
@@ -375,7 +376,8 @@ public partial class AIController
                     || target.IsDead
                     || target.IsEmbarked
                     || target.TeamId != unit.TeamId
-                    || target.ReceivedSuppliesThisTurn)
+                    || target.ReceivedSuppliesThisTurn
+                    || target.TookOffRecently)
                     continue;
                 if (!seen.Add(target.InstanceId))
                     continue;
@@ -563,7 +565,7 @@ public partial class AIController
                 if (valid.Length > 7)
                     valid += "; ";
                 bool eligible = IsLogisticsServiceTarget(logistics, target, allowPreventiveMaintenance);
-                valid += $"#{target.InstanceId}@{FormatCellForDebug(target.CurrentCellPosition)} hp={target.CurrentHP}/{target.GetMaxHP()} repair={target.IsUnderRepair} recv={target.ReceivedSuppliesThisTurn} aiEligible={eligible} selected={selectedIds.Contains(target.InstanceId)}";
+                valid += $"#{target.InstanceId}@{FormatCellForDebug(target.CurrentCellPosition)} hp={target.CurrentHP}/{target.GetMaxHP()} repair={target.IsUnderRepair} recv={target.ReceivedSuppliesThisTurn} tookOff={target.TookOffRecently} aiEligible={eligible} selected={selectedIds.Contains(target.InstanceId)}";
             }
         }
         valid += "]";
@@ -581,7 +583,7 @@ public partial class AIController
 
                 if (shown > 0)
                     invalid += "; ";
-                invalid += $"#{target.InstanceId}@{FormatCellForDebug(option.targetCell)} hp={target.CurrentHP}/{target.GetMaxHP()} repair={target.IsUnderRepair} recv={target.ReceivedSuppliesThisTurn} reason={option.reason}";
+                invalid += $"#{target.InstanceId}@{FormatCellForDebug(option.targetCell)} hp={target.CurrentHP}/{target.GetMaxHP()} repair={target.IsUnderRepair} recv={target.ReceivedSuppliesThisTurn} tookOff={target.TookOffRecently} reason={option.reason}";
                 shown++;
             }
         }
@@ -759,7 +761,8 @@ public partial class AIController
             || target.IsDead
             || target.IsEmbarked
             || target.TeamId != logistics.TeamId
-            || target.ReceivedSuppliesThisTurn)
+            || target.ReceivedSuppliesThisTurn
+            || target.TookOffRecently)
             return false;
 
         if (target.IsUnderRepair)
@@ -804,6 +807,7 @@ public partial class AIController
                 || ally.IsEmbarked
                 || ally.TeamId != logistics.TeamId
                 || ally.ReceivedSuppliesThisTurn
+                || ally.TookOffRecently
                 || !ally.IsUnderRepair)
                 continue;
 

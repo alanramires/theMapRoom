@@ -2356,6 +2356,9 @@ public partial class TurnStateManager
 
             cursorController?.PlayLoadSfx();
             RuntimeLog(resultMessage);
+            yield return ExecutePostEmbarkAirTransporterTakeoff(transporter, movementTilemap);
+            if (transporter != null)
+                transporter.MarkAsActed();
             ResetScannerPromptState();
         }
         finally
@@ -2479,14 +2482,56 @@ public partial class TurnStateManager
             return false;
         }
 
-        transporter.MarkAsActed();
-
         RecordEmbarkReplayCommand(passenger, transporter, option.transporterSlotIndex);
         OnUnitEmbarked?.Invoke(passenger, transporter);
 
         string label = !string.IsNullOrWhiteSpace(option.displayLabel) ? option.displayLabel : transporter.name;
         message = $"Embarque concluido em: {label} | custo={embarkCost} | autonomia {fuelBeforeEmbark}->{passenger.CurrentFuel}";
         return true;
+    }
+
+    private System.Collections.IEnumerator ExecutePostEmbarkAirTransporterTakeoff(UnitManager transporter, Tilemap boardMap)
+    {
+        if (transporter == null || boardMap == null)
+            yield break;
+        if (!transporter.TryGetUnitData(out UnitData data) || data == null || !data.IsAircraft())
+            yield break;
+        if (transporter.GetDomain() == Domain.Air && !transporter.IsAircraftGrounded)
+            yield break;
+
+        PodeDecolarReport report = PodeDecolarSensor.Evaluate(transporter, boardMap, terrainDatabase);
+        bool canTakeoffInPlace = report != null
+            && report.status
+            && report.takeoffMoveOptions != null
+            && (report.takeoffMoveOptions.Contains(0) || report.takeoffMoveOptions.Contains(9));
+        if (!canTakeoffInPlace)
+        {
+            RuntimeLog(report != null && !string.IsNullOrWhiteSpace(report.explicacao)
+                ? $"[Embarque] Transportador permanece no solo apos embarque: {report.explicacao}"
+                : "[Embarque] Transportador permanece no solo apos embarque: decolagem indisponivel.");
+            yield break;
+        }
+
+        if (!AircraftOperationRules.TryApplyOperation(
+                transporter,
+                boardMap,
+                terrainDatabase,
+                SensorMovementMode.MoveuParado,
+                out AircraftOperationDecision takeoffDecision))
+        {
+            RuntimeLog(string.IsNullOrWhiteSpace(takeoffDecision.reason)
+                ? "[Embarque] Falha ao decolar transportador apos embarque."
+                : $"[Embarque] Transportador permanece no solo apos embarque: {takeoffDecision.reason}");
+            yield break;
+        }
+
+        transporter.MarkTookOffRecently();
+        PlayMovementStartSfx(transporter);
+        RuntimeLog("[Embarque] Transportador decolou apos concluir o embarque.");
+
+        float takeoffFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(transporter) : 0f;
+        if (takeoffFxDuration > 0f)
+            yield return new WaitForSeconds(takeoffFxDuration);
     }
 
     private int GetEmbarkEntryCount()

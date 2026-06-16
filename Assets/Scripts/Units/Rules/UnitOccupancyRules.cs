@@ -184,7 +184,8 @@ public static class UnitOccupancyRules
         UnitManager unit,
         Domain targetDomain,
         HeightLevel targetHeight,
-        out UnitManager blocker)
+        out UnitManager blocker,
+        bool ignoreSameTeamAirBlocker = false)
     {
         blocker = null;
         if (unit == null)
@@ -193,6 +194,18 @@ public static class UnitOccupancyRules
             return true;
 
         List<UnitManager> occupants = GetUnitsAtCell(referenceTilemap, cell, unit);
+        if (ignoreSameTeamAirBlocker && OccupancyResolver.GetHeightBand(targetDomain, targetHeight) == HeightBand.Air)
+        {
+            for (int i = occupants.Count - 1; i >= 0; i--)
+            {
+                UnitManager occupant = occupants[i];
+                if (occupant == null)
+                    continue;
+                if (occupant.TeamId == unit.TeamId && OccupancyResolver.GetHeightBand(occupant) == HeightBand.Air)
+                    occupants.RemoveAt(i);
+            }
+        }
+
         if (OccupancyResolver.CanEndLayerTransition(unit, targetDomain, targetHeight, occupants))
             return true;
 
@@ -202,11 +215,13 @@ public static class UnitOccupancyRules
             UnitManager occupant = occupants[i];
             if (occupant == null)
                 continue;
-            if (OccupancyResolver.GetHeightBand(occupant) == targetBand)
-            {
-                blocker = occupant;
-                break;
-            }
+            if (OccupancyResolver.GetHeightBand(occupant) != targetBand)
+                continue;
+            // Em Air/Sub apenas o aliado bloqueia; em Blocking qualquer ocupante bloqueia.
+            if (targetBand != HeightBand.Blocking && occupant.TeamId != unit.TeamId)
+                continue;
+            blocker = occupant;
+            break;
         }
 
         return false;

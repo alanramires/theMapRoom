@@ -71,6 +71,103 @@ public partial class TurnStateManager
         return ActionSfx.None;
     }
 
+    // Page Up / Page Down em UnitSelected: alterna entre unidades aliadas prontas
+    // que dividem o mesmo hex (coabitacao aereo+terrestre), sem mover o cursor.
+    public ActionSfx HandleCycleSelectionWithinHex(int direction)
+    {
+        if (IsMovementAnimationRunning())
+            return ActionSfx.None;
+
+        return TryCycleSelectedUnitWithinHex(direction) ? ActionSfx.Confirm : ActionSfx.None;
+    }
+
+    private bool TryCycleSelectedUnitWithinHex(int direction)
+    {
+        if (direction == 0)
+            return false;
+        if (CurrentCursorState != CursorState.UnitSelected || selectedUnit == null)
+            return false;
+
+        Vector3Int cell = selectedUnit.CurrentCellPosition;
+        cell.z = 0;
+
+        List<UnitManager> candidates = CollectSelectableAlliesAtCell(cell);
+        if (candidates.Count <= 1)
+            return false;
+
+        int currentIndex = candidates.IndexOf(selectedUnit);
+        if (currentIndex < 0)
+            return false;
+
+        int step = direction >= 0 ? 1 : -1;
+        UnitManager next = candidates[(currentIndex + step + candidates.Count) % candidates.Count];
+        if (next == null || next == selectedUnit)
+            return false;
+
+        ReselectUnitInPlace(next, cell);
+        return true;
+    }
+
+    // Unidades aliadas do time ativo, prontas (nao agiram), visiveis e ancoradas no hex.
+    // Ordenadas por InstanceId para um ciclo estavel e previsivel.
+    private List<UnitManager> CollectSelectableAlliesAtCell(Vector3Int cell)
+    {
+        List<UnitManager> result = new List<UnitManager>();
+        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        if (activeTeam < 0)
+            return result;
+
+        Tilemap referenceTilemap = terrainTilemap != null
+            ? terrainTilemap
+            : (selectedUnit != null ? selectedUnit.BoardTilemap : null);
+        if (referenceTilemap == null)
+            return result;
+
+        cell.z = 0;
+        List<UnitManager> occupants = UnitOccupancyRules.GetUnitsAtCell(referenceTilemap, cell);
+        for (int i = 0; i < occupants.Count; i++)
+        {
+            UnitManager u = occupants[i];
+            if (u == null || u.IsEmbarked || u.IsDead)
+                continue;
+            if ((int)u.TeamId != activeTeam)
+                continue;
+            if (u.HasActed)
+                continue;
+            if (matchController != null && !matchController.IsUnitVisibleForActiveTeam(u))
+                continue;
+
+            result.Add(u);
+        }
+
+        result.Sort((a, b) => a.InstanceId.CompareTo(b.InstanceId));
+        return result;
+    }
+
+    // Troca a unidade ancorada permanecendo em UnitSelected, espelhando a sequencia
+    // de selecao do estado Neutral (desfaz o preparo da anterior antes de preparar a nova).
+    private void ReselectUnitInPlace(UnitManager unit, Vector3Int cell)
+    {
+        if (unit == null)
+            return;
+
+        RestoreTemporaryTakeoffSelectionStateIfAny();
+        RestorePreparedFuelCostIfAny();
+        RestorePreparedMovementCostIfAny();
+        ClearCommittedPathVisual();
+        ClearSensorResults();
+
+        double takeoffPerfStart = Time.realtimeSinceStartupAsDouble;
+        TryPrepareTemporaryTakeoffStateForSelection(unit, out string takeoffInfo);
+        RegisterPerfTakeoffPrepDuration((Time.realtimeSinceStartupAsDouble - takeoffPerfStart) * 1000d);
+        if (!string.IsNullOrWhiteSpace(takeoffInfo) && SensorLogGate.IsPodeDecolarEnabled())
+            SensorLogGate.Log("PodeDecolar", takeoffInfo);
+
+        replayManager?.EnsureCurrentUnitActionBuffer(unit, cell);
+        SetSelectedUnit(unit);
+        ClearInspectedHelper();
+    }
+
     public ActionSfx HandleCancel()
     {
         LogStateStep("HandleCancel", rollback: true);
@@ -455,7 +552,7 @@ public partial class TurnStateManager
 
         if (OccupancyResolver.IsLayerAwareRulesActive)
         {
-            if (!OccupancyResolver.CanEndMove(selectedUnit, cursorCell, GetOccupantsAtCellForConfirm(cursorCell, selectedUnit, occupancyMap)))
+            if (!CanSelectedUnitEndMoveAtCell(cursorCell, GetOccupantsAtCellForConfirm(cursorCell, selectedUnit, occupancyMap)))
             {
                 PushPanelUnitMessage("Hex ocupado", 2.4f);
                 Debug.Log("unidade selecionada, escolha um local valido para movimento");
@@ -495,7 +592,9 @@ public partial class TurnStateManager
         {
             if (!IsTakeoffMoveDistanceAllowed(0))
             {
-                Debug.Log("Decolagem neste contexto nao permite permanecer em 0 hex.");
+                string reason = "Decolagem nao autorizada: este hex exige corrida, nao da pra decolar parado.";
+                PushPanelUnitMessage(reason, 2.6f);
+                Debug.Log(reason);
                 return ActionSfx.Error;
             }
 
@@ -508,8 +607,10 @@ public partial class TurnStateManager
         {
             if (!TryPrepareAutomaticTakeoffForMovement(out string takeoffBlockReason))
             {
-                if (!string.IsNullOrWhiteSpace(takeoffBlockReason))
-                    Debug.Log(takeoffBlockReason);
+                if (string.IsNullOrWhiteSpace(takeoffBlockReason))
+                    takeoffBlockReason = "Decolagem nao autorizada neste hex.";
+                PushPanelUnitMessage(takeoffBlockReason, 2.6f);
+                Debug.Log(takeoffBlockReason);
                 return ActionSfx.Error;
             }
         }
@@ -521,7 +622,9 @@ public partial class TurnStateManager
             return ActionSfx.Error;
         if (!IsTakeoffMoveDistanceAllowed(path.Count - 1))
         {
-            Debug.Log("Distancia invalida para o modo de decolagem disponivel neste contexto.");
+            string reason = "Decolagem nao autorizada: distancia invalida para a decolagem neste hex.";
+            PushPanelUnitMessage(reason, 2.6f);
+            Debug.Log(reason);
             return ActionSfx.Error;
         }
 
@@ -553,6 +656,32 @@ public partial class TurnStateManager
         }
     }
 
+    private bool CanSelectedUnitEndMoveAtCell(Vector3Int cell, IEnumerable<UnitManager> occupants)
+    {
+        if (selectedUnit == null)
+            return false;
+
+        Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+        unitCell.z = 0;
+        cell.z = 0;
+
+        bool projectsToAir =
+            selectedUnit.GetDomain() == Domain.Air && !selectedUnit.IsAircraftGrounded;
+
+        if (!projectsToAir && selectedUnit.IsAircraftGrounded && cell != unitCell)
+            projectsToAir = true;
+
+        if (projectsToAir)
+        {
+            HeightLevel finalHeight = selectedUnit.GetDomain() == Domain.Air
+                ? selectedUnit.GetHeightLevel()
+                : HeightLevel.AirLow;
+            return OccupancyResolver.CanEndMoveAsLayer(selectedUnit, Domain.Air, finalHeight, occupants);
+        }
+
+        return OccupancyResolver.CanEndMove(selectedUnit, cell, occupants);
+    }
+
     private bool TryPrepareAutomaticTakeoffForMovement(out string blockReason)
     {
         blockReason = string.Empty;
@@ -572,7 +701,8 @@ public partial class TurnStateManager
             selectedUnit,
             boardMap,
             terrainDatabase,
-            SensorMovementMode.MoveuParado);
+            SensorMovementMode.MoveuParado,
+            allowSameTeamAirBlockerForMovementTakeoff: true);
         if (!decision.available || decision.action != AircraftOperationAction.Takeoff)
         {
             blockReason = string.IsNullOrWhiteSpace(decision.reason)
@@ -592,12 +722,15 @@ public partial class TurnStateManager
                 boardMap,
                 terrainDatabase,
                 SensorMovementMode.MoveuParado,
-                out _))
+                out _,
+                allowSameTeamAirBlockerForMovementTakeoff: true))
         {
             blockReason = "Falha ao preparar decolagem automatica.";
             return false;
         }
 
+        hasPendingTookOffRecentlyCommit = true;
+        pendingTookOffRecentlyUnit = selectedUnit;
         PaintSelectedUnitMovementRange();
         return true;
     }

@@ -95,6 +95,13 @@ public partial class AIController
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
+        if (TryBuildRogueCourierLocalOpportunityDrop(
+                unit, passengers, snapshot, plan, fromCell, paths, occupied,
+                out PlayerAction localOpportunityDropAction))
+        {
+            return localOpportunityDropAction;
+        }
+
         Vector3Int moveTarget = FindAirTransportMove(fromCell, primaryTarget, paths, occupied, snapshot.AITeam);
 
         // Helicopters can hover on construction cells — do NOT redirect away from the
@@ -358,10 +365,8 @@ public partial class AIController
         string reason)
     {
         Vector3Int waitTarget = FindTransportWaitTarget(snapshot.AITeam, fromCell);
-        Vector3Int moveTarget = waitTarget != fromCell
-            ? FindAirTransportMove(fromCell, waitTarget, paths, occupied, snapshot.AITeam)
-            : fromCell;
-        Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} {reason} - retorna espera/HQ {waitTarget} via {moveTarget}");
+        Vector3Int moveTarget = FindAirWaitMove(fromCell, waitTarget, paths, occupied, snapshot.AITeam);
+        Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} {reason} - aguarda fora da producao perto de {waitTarget} via {moveTarget}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
     }
 
@@ -418,10 +423,8 @@ public partial class AIController
         // releasing to HexEvaluator, which would leave the helicopter idle (it cannot
         // meaningfully capture or attack and HexEvaluator picks its current cell).
         Vector3Int hqTarget = FindTransportWaitTarget(snapshot.AITeam, fromCell);
-        Vector3Int hqMove = hqTarget != fromCell
-            ? FindAirTransportMove(fromCell, hqTarget, paths, occupied, snapshot.AITeam)
-            : fromCell;
-        Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} shuttle — sem candidato, retorna ao HQ {hqTarget} via {hqMove}");
+        Vector3Int hqMove = FindAirWaitMove(fromCell, hqTarget, paths, occupied, snapshot.AITeam);
+        Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} shuttle — sem candidato, aguarda fora da producao perto de {hqTarget} via {hqMove}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, hqMove, paths);
     }
 
@@ -577,8 +580,8 @@ public partial class AIController
             }
 
             Vector3Int waitCell = FindTransportWaitTarget(snapshot.AITeam, fromCell);
-            Vector3Int sectorMove = FindAirTransportMove(fromCell, waitCell, paths, occupied, snapshot.AITeam);
-            Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} assigned {assigned.Sector} sem passageiro util - retorna espera/HQ {waitCell} via {sectorMove}");
+            Vector3Int sectorMove = FindAirWaitMove(fromCell, waitCell, paths, occupied, snapshot.AITeam);
+            Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} assigned {assigned.Sector} sem passageiro util - aguarda fora da producao perto de {waitCell} via {sectorMove}");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, sectorMove, paths);
         }
 
@@ -608,7 +611,8 @@ public partial class AIController
         foreach (UnitManager u in UnitManager.AllActive)
         {
             if (u == excludeUnit || u.IsEmbarked || u.IsDead) continue;
-            if (!u.TryGetUnitData(out UnitData d) || d.domain != Domain.Air) continue;
+            if (excludeUnit != null && u.TeamId != excludeUnit.TeamId) continue;
+            if (u.GetDomain() != Domain.Air || u.IsAircraftGrounded) continue;
             Vector3Int p = u.CurrentCellPosition; p.z = 0;
             set.Add(p);
         }
@@ -667,6 +671,89 @@ public partial class AIController
                 bestIsNonTeamBldg = isNonTeamBldg;
                 bestIsLandable = isLandable;
                 bestThreat = threat;
+            }
+        }
+
+        return bestCell;
+    }
+
+    // Lowest-threat reachable hex away from the current cell — used to step off a blocked or
+    // contested position when no better destination exists.
+    private Vector3Int FindAirVacateMove(
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        TeamId aiTeam)
+    {
+        Vector3Int bestCell = fromCell;
+        float bestScore = float.MinValue;
+
+        if (paths == null)
+            return bestCell;
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell)
+                continue;
+            if (occupied != null && occupied.Contains(cell))
+                continue;
+
+            float threat = CalculateThreatLevel(cell, aiTeam);
+            int pathSteps = GetPathStepCount(paths, cell);
+            float score = -threat * 1000f - pathSteps;
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCell = cell;
+            }
+        }
+
+        return bestCell;
+    }
+
+    // Wait move for an idle (empty, no candidate) helicopter. It loiters as close to the
+    // production building / HQ as possible WITHOUT parking on it: a grounded helicopter on a
+    // friendly production cell blocks unit purchases there (see IsShoppingSpawnCellBlocked).
+    // The helicopter does not need to wait on the airport — an adjacent hex keeps the airport
+    // free while staying ready to ferry the next wave.
+    private Vector3Int FindAirWaitMove(
+        Vector3Int fromCell,
+        Vector3Int waitBuildingCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        TeamId aiTeam)
+    {
+        waitBuildingCell.z = 0;
+        Vector3Int bestCell = fromCell;
+        float bestScore = float.MinValue;
+        bool found = false;
+
+        if (paths == null)
+            return bestCell;
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+            // Never loiter on a friendly production building — it would block purchases there.
+            if (IsTeamProductionBuilding(cell, aiTeam))
+                continue;
+            // A blocking ground unit prevents the helicopter from landing on the cell.
+            if (HasBlockingGroundUnitAtCell(cell, aiTeam))
+                continue;
+
+            float distToBuilding = SectorManager.HexDistance(cell, waitBuildingCell);
+            float threat = CalculateThreatLevel(cell, aiTeam);
+            float score = -distToBuilding * 100f - threat * 10f;
+            if (!found || score > bestScore)
+            {
+                found = true;
+                bestScore = score;
+                bestCell = cell;
             }
         }
 

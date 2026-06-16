@@ -149,12 +149,15 @@ public class UnitSaveData
     public int remainingMovementPoints;
     public bool hasActed;
     public bool receivedSuppliesThisTurn;
+    public bool tookOffRecently;
     public bool isUnderRepair;
     public bool isEmbarked;
     public int transporterInstanceId;
     public int transporterSlotIndex;
     public int domain;
     public int heightLevel;
+    public bool isAircraftGrounded;
+    public int aircraftOperationLockTurns;
     public bool aiHasAssignedPlan;
     public string aiAssignedPlanKey;
     public string aiAssignedPlanName;

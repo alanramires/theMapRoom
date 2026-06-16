@@ -37,7 +37,8 @@ public static class AircraftOperationRules
         UnitManager unit,
         Tilemap referenceTilemap,
         TerrainDatabase terrainDatabase,
-        SensorMovementMode movementMode)
+        SensorMovementMode movementMode,
+        bool allowSameTeamAirBlockerForMovementTakeoff = false)
     {
         if (unit == null)
             return Unavailable("Unidade invalida.");
@@ -81,6 +82,24 @@ public static class AircraftOperationRules
             return EvaluateLanding(unit, movementMode, tileContext);
         }
 
+        // Decolagem: aeronave do mesmo time nao empilha na banda aerea
+        // (inimigo coexiste -> hex contestado/dogfight). Durante a preparacao
+        // de movimento, um aliado no ar nao bloqueia a decolagem em si; o hex
+        // final ainda sera validado por CanEndMoveAsLayer.
+        HeightLevel takeoffHeight = ResolvePreferredAirHeight(data);
+        if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(
+                referenceTilemap,
+                cell,
+                unit,
+                Domain.Air,
+                takeoffHeight,
+                out UnitManager airBlocker,
+                ignoreSameTeamAirBlocker: allowSameTeamAirBlockerForMovementTakeoff))
+        {
+            string blockerName = airBlocker != null && !string.IsNullOrWhiteSpace(airBlocker.UnitDisplayName) ? airBlocker.UnitDisplayName : "aliado";
+            return Unavailable($"Decolagem nao autorizada: espaco aereo ocupado por {blockerName}.");
+        }
+
         return EvaluateTakeoff(unit, movementMode, tileContext);
     }
 
@@ -89,9 +108,10 @@ public static class AircraftOperationRules
         Tilemap referenceTilemap,
         TerrainDatabase terrainDatabase,
         SensorMovementMode movementMode,
-        out AircraftOperationDecision decision)
+        out AircraftOperationDecision decision,
+        bool allowSameTeamAirBlockerForMovementTakeoff = false)
     {
-        decision = Evaluate(unit, referenceTilemap, terrainDatabase, movementMode);
+        decision = Evaluate(unit, referenceTilemap, terrainDatabase, movementMode, allowSameTeamAirBlockerForMovementTakeoff);
         if (!decision.available)
             return false;
 

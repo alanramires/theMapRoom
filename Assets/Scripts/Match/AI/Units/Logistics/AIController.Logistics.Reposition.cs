@@ -215,6 +215,7 @@ public partial class AIController
             serviceCell.z = 0;
         }
         bool currentBlocksProduction = IsLogisticsBlockingProduction(snapshot, fromCell);
+        bool avoidProductionParking = !hasServiceTarget && !baseDefense;
 
         float fromScore = ScoreLogisticsCell(
             unit, snapshot, fromCell, fromCell, anchor, serviceCell,
@@ -236,7 +237,14 @@ public partial class AIController
                 out Vector3Int toolCell,
                 out ToolProgressionCandidate toolCandidate,
                 out string toolReason,
-                allowCell: cell => !(currentBlocksProduction && cell == fromCell),
+                allowCell: cell =>
+                {
+                    if (currentBlocksProduction && cell == fromCell)
+                        return false;
+                    if (avoidProductionParking && IsLogisticsBlockingProduction(snapshot, cell))
+                        return false;
+                    return true;
+                },
                 tacticalScore: (cell, candidate) =>
                 {
                     int pathCost = cell == fromCell ? 0 : candidate.MoveCost;
@@ -275,6 +283,8 @@ public partial class AIController
             if (cell != fromCell && occupied != null && occupied.Contains(cell))
                 continue;
             if (currentBlocksProduction && cell == fromCell)
+                continue;
+            if (avoidProductionParking && IsLogisticsBlockingProduction(snapshot, cell))
                 continue;
 
             int pathCost = cell == fromCell ? 0 : GetPathStepCount(paths, cell);
@@ -387,7 +397,7 @@ public partial class AIController
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
         bool blocksProduction = construction != null && construction.CanProduceUnitsForTeam(snapshot.AITeam);
         if (blocksProduction)
-            score -= cell == fromCell ? 220f : 900f;
+            score -= hasServiceTarget || baseDefense ? (cell == fromCell ? 220f : 900f) : 6000f;
 
         string serviceDetails = hasServiceTarget && serviceTarget != null
             ? $" service={serviceTarget.UnitDisplayName}#{serviceTarget.InstanceId} serviceDist={serviceDist:F1} serviceNeed={serviceNeed:F0} serviceRange={serviceInRange}"

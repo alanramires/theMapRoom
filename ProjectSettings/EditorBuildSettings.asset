@@ -12,7 +12,7 @@ EditorBuildSettings:
     path: Assets/Scenes/Mapas/Team Island.unity
     guid: d195c2d48f08e5f4f842d2b940b90f57
   - enabled: 1
-    path: Assets/Scenes/Mapas/Battle Map.unity
+    path: Assets/Scenes/Mapas/Battle Map 1 - Groud.unity
     guid: 6f3c08b20d025f84baa7c6cf0eca3e72
   - enabled: 0
     path: Assets/Scenes/Mapas/Triple Trouble.unity

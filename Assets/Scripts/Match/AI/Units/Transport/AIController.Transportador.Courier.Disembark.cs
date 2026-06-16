@@ -113,15 +113,21 @@ public partial class AIController
             && immediate.TeamId != snapshot.AITeam)
             return true;
 
-        if (snapshot.EnemyBuildings != null)
+        foreach (ConstructionManager b in ConstructionManager.AllActive)
         {
-            foreach (ConstructionManager b in snapshot.EnemyBuildings)
-            {
-                if (b == null || !b.IsCapturable || b.TeamId == snapshot.AITeam) continue;
-                Vector3Int bc = b.CurrentCellPosition; bc.z = 0;
-                if (SectorManager.HexDistance(dropCell, bc) <= range)
-                    return true;
-            }
+            if (b == null || !b.IsCapturable || b.CapturePointsMax <= 0)
+                continue;
+            if (b.TeamId == snapshot.AITeam && b.CurrentCapturePoints >= b.CapturePointsMax)
+                continue;
+            if (b.Sector == ConstructionSector.None || ConstructionSectorHelper.IsBase(b.Sector) || b.IsPlayerHeadQuarter)
+                continue;
+            if (HasBlockingSurfaceUnitAtCell(b.CurrentCellPosition))
+                continue;
+
+            Vector3Int bc = b.CurrentCellPosition;
+            bc.z = 0;
+            if (SectorManager.HexDistance(dropCell, bc) <= range)
+                return true;
         }
 
         return false;

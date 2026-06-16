@@ -566,6 +566,9 @@ public partial class TurnStateManager
             if (hpGain <= 0 && fuelGain <= 0 && ammoGain <= 0)
                 continue;
 
+            if (!isEmbarkedPassenger && order.forceLandBeforeSupply)
+                yield return ExecutePostSupplyAircraftTakeoff(target, boardMap);
+
             NotifyUnitSupplied(supplier, target);
             servedTargets++;
             recoveredHp += hpGain;
@@ -628,6 +631,8 @@ public partial class TurnStateManager
     private static bool UnitNeedsServiceForSupplyExecution(UnitManager target, ServiceData service)
     {
         if (target == null || service == null)
+            return false;
+        if (target.TookOffRecently)
             return false;
         if (service.recuperaHp && target.CurrentHP < target.GetMaxHP())
             return true;
@@ -905,6 +910,7 @@ public partial class TurnStateManager
             yield break;
         if (!unit.SupportsLayerMode(domain, height))
             yield break;
+        bool takingOff = unit.GetDomain() != Domain.Air && domain == Domain.Air;
         Tilemap boardMap = unit.BoardTilemap != null ? unit.BoardTilemap : terrainTilemap;
         Vector3Int cell = unit.CurrentCellPosition;
         cell.z = 0;
@@ -928,6 +934,8 @@ public partial class TurnStateManager
             yield return new WaitForSeconds(transitionDuration);
 
         unit.TrySetCurrentLayerMode(domain, height);
+        if (takingOff)
+            unit.MarkTookOffRecently();
 
         float afterSettleDuration = 0f;
         if (landingToSurface)
@@ -942,6 +950,50 @@ public partial class TurnStateManager
         float postTransitionDelay = GetLayerOperationAfterTransitionDelay();
         if (postTransitionDelay > 0f)
             yield return new WaitForSeconds(postTransitionDelay);
+    }
+
+    private IEnumerator ExecutePostSupplyAircraftTakeoff(UnitManager target, Tilemap boardMap)
+    {
+        if (target == null || boardMap == null)
+            yield break;
+        if (!target.TryGetUnitData(out UnitData data) || data == null || !data.IsAircraft())
+            yield break;
+        if (target.GetDomain() == Domain.Air && !target.IsAircraftGrounded)
+            yield break;
+
+        PodeDecolarReport report = PodeDecolarSensor.Evaluate(target, boardMap, terrainDatabase);
+        bool canTakeoffInPlace = report != null
+            && report.status
+            && report.takeoffMoveOptions != null
+            && (report.takeoffMoveOptions.Contains(0) || report.takeoffMoveOptions.Contains(9));
+        if (!canTakeoffInPlace)
+        {
+            Debug.Log(report != null && !string.IsNullOrWhiteSpace(report.explicacao)
+                ? $"[Suprimento] {target.name} permanece no solo apos servico: {report.explicacao}"
+                : $"[Suprimento] {target.name} permanece no solo apos servico: decolagem indisponivel.");
+            yield break;
+        }
+
+        if (!AircraftOperationRules.TryApplyOperation(
+                target,
+                boardMap,
+                terrainDatabase,
+                SensorMovementMode.MoveuParado,
+                out AircraftOperationDecision takeoffDecision))
+        {
+            Debug.Log(string.IsNullOrWhiteSpace(takeoffDecision.reason)
+                ? $"[Suprimento] Falha ao decolar {target.name} apos servico."
+                : $"[Suprimento] {target.name} permanece no solo apos servico: {takeoffDecision.reason}");
+            yield break;
+        }
+
+        target.MarkTookOffRecently();
+        PlayMovementStartSfx(target);
+        Debug.Log($"[Suprimento] {target.name} decolou apos receber servico.");
+
+        float takeoffFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(target) : 0f;
+        if (takeoffFxDuration > 0f)
+            yield return new WaitForSeconds(takeoffFxDuration);
     }
 
     private void ResetSupplyRuntimeState()

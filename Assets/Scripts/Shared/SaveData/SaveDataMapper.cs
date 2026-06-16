@@ -167,12 +167,15 @@ public static class SaveDataMapper
             remainingMovementPoints = unit.RemainingMovementPoints,
             hasActed = unit.HasActed,
             receivedSuppliesThisTurn = unit.ReceivedSuppliesThisTurn,
+            tookOffRecently = unit.TookOffRecently,
             isUnderRepair = unit.IsUnderRepair,
             isEmbarked = unit.IsEmbarked,
             transporterInstanceId = unit.EmbarkedTransporter != null ? unit.EmbarkedTransporter.InstanceId : 0,
             transporterSlotIndex = unit.IsEmbarked ? unit.EmbarkedTransporterSlotIndex : -1,
             domain = (int)unit.GetDomain(),
             heightLevel = (int)unit.GetHeightLevel(),
+            isAircraftGrounded = unit.IsAircraftGrounded,
+            aircraftOperationLockTurns = unit.AircraftOperationLockTurns,
             aiHasAssignedPlan = unit.AIHasAssignedPlan,
             aiAssignedPlanKey = unit.AIAssignedPlanKey,
             aiAssignedPlanName = unit.AIAssignedPlanName,
@@ -230,6 +233,7 @@ public static class SaveDataMapper
         unit.SetCurrentAmmo(saved.currentAmmo);
         unit.SetCurrentFuel(saved.currentFuel);
         unit.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
+        unit.SetTookOffRecently(saved.tookOffRecently);
         RestoreUnitRepairState(unit, saved);
         if (saved.hasActed)
             unit.MarkAsActed();
@@ -240,6 +244,12 @@ public static class SaveDataMapper
         Domain domain = (Domain)saved.domain;
         HeightLevel heightLevel = (HeightLevel)saved.heightLevel;
         unit.TrySetCurrentLayerMode(domain, heightLevel);
+        if (unit.GetAircraftType() != AircraftType.None)
+        {
+            bool shouldRestoreGrounded = saved.isAircraftGrounded || domain != Domain.Air;
+            unit.SetAircraftGrounded(shouldRestoreGrounded);
+            unit.SetAircraftOperationLockTurns(saved.aircraftOperationLockTurns);
+        }
 
         IReadOnlyList<UnitEmbarkedWeapon> embarked = unit.GetEmbarkedWeapons();
         if (embarked != null && saved.embarkedWeaponAmmo != null)
@@ -273,6 +283,7 @@ public static class SaveDataMapper
 
         unit.SetRemainingMovementPoints(saved.remainingMovementPoints);
         unit.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
+        unit.SetTookOffRecently(saved.tookOffRecently);
         RestoreUnitRepairState(unit, saved);
     }
 

@@ -172,6 +172,13 @@ public partial class AITacticalAnalyzer : MonoBehaviour
             LastUpdatedTurn = turn,
         };
     }
+
+    private static int GetCaptureOperationPriority(SectorObjective objective)
+    {
+        int objectivePriority = objective != null ? Mathf.Max(1, objective.Priority) : 99;
+        return 3 + objectivePriority;
+    }
+
     private static Vector3Int Normalize(Vector3Int cell)
     {
         cell.z = 0;

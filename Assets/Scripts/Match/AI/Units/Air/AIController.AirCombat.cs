@@ -82,7 +82,11 @@ public partial class AIController
         reason = string.Empty;
 
         Tilemap boardMap = boardTilemap != null ? boardTilemap : unit != null ? unit.BoardTilemap : null;
-        PodeDecolarReport takeoff = PodeDecolarSensor.Evaluate(unit, boardMap, terrainDatabase);
+        PodeDecolarReport takeoff = PodeDecolarSensor.Evaluate(
+            unit,
+            boardMap,
+            terrainDatabase,
+            allowSameTeamAirBlockerForMovementTakeoff: true);
         reason = takeoff != null ? takeoff.explicacao : "sensor indisponivel";
 
         if (takeoff == null || takeoff.takeoffMoveOptions == null || takeoff.takeoffMoveOptions.Count == 0)
@@ -420,6 +424,9 @@ public partial class AIController
                 bestCell = cell;
             }
         }
+
+        if (bestCell == fromCell && occupied != null && occupied.Contains(fromCell))
+            return FindAirVacateMove(fromCell, paths, occupied, aiTeam);
 
         return bestCell;
     }

@@ -333,6 +333,12 @@ public static class ServicoDoComandoSensor
                     continue;
                 }
 
+                if (target.TookOffRecently)
+                {
+                    AppendInvalid(invalidOutput, construction, null, target, cell, "Unidade decolou recentemente e nao pode receber servico nesta rodada.");
+                    continue;
+                }
+
                 if (target.HasActed)
                 {
                     AppendInvalid(invalidOutput, construction, null, target, cell, "Unidade ja agiu nesta rodada.");
@@ -432,6 +438,12 @@ public static class ServicoDoComandoSensor
                 if (target.ReceivedSuppliesThisTurn)
                 {
                     AppendInvalid(invalidOutput, null, supplier, target, cell, "Unidade embarcada ja recebeu suprimentos nesta rodada.");
+                    continue;
+                }
+
+                if (target.TookOffRecently)
+                {
+                    AppendInvalid(invalidOutput, null, supplier, target, cell, "Unidade embarcada decolou recentemente e nao pode receber servico nesta rodada.");
                     continue;
                 }
 
@@ -551,6 +563,12 @@ public static class ServicoDoComandoSensor
                     if (target.ReceivedSuppliesThisTurn)
                     {
                         AppendInvalid(invalidOutput, construction, transporter, target, constructionCell, "Unidade embarcada ja recebeu suprimentos nesta rodada.");
+                        continue;
+                    }
+
+                    if (target.TookOffRecently)
+                    {
+                        AppendInvalid(invalidOutput, construction, transporter, target, constructionCell, "Unidade embarcada decolou recentemente e nao pode receber servico nesta rodada.");
                         continue;
                     }
 

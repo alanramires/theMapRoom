@@ -136,6 +136,8 @@ public partial class TurnStateManager : MonoBehaviour
     private bool temporaryTakeoffOriginalGrounded = true;
     private bool temporaryTakeoffOriginalEmbarkedInCarrier;
     private readonly List<int> temporaryTakeoffMoveOptions = new List<int>();
+    private bool hasPendingTookOffRecentlyCommit;
+    private UnitManager pendingTookOffRecentlyUnit;
     private bool hasAutoPromotionEntryLayer;
     private UnitManager autoPromotionUnit;
     private Domain autoPromotionEntryDomain = Domain.Land;
@@ -1213,7 +1215,7 @@ public partial class TurnStateManager : MonoBehaviour
             animationManager?.ClearSelectionVisual(selectedUnit);
 
         if (keepPreparedFuelCost)
-            CommitTemporaryTakeoffSelectionState();
+            CommitTemporaryTakeoffSelectionState(markTookOff: true);
         else
             RestoreTemporaryTakeoffSelectionStateIfAny();
 
@@ -1222,11 +1224,32 @@ public partial class TurnStateManager : MonoBehaviour
         ClearMovementRange();
         ClearCommittedMovement();
     }
-    private void CommitTemporaryTakeoffSelectionState()
+    private void CommitTemporaryTakeoffSelectionState(bool markTookOff = false)
     {
+        if (markTookOff
+            && hasTemporaryTakeoffSelectionState
+            && temporaryTakeoffUnit != null
+            && temporaryTakeoffOriginalGrounded
+            && temporaryTakeoffUnit.GetDomain() == Domain.Air
+            && !temporaryTakeoffUnit.IsAircraftGrounded)
+        {
+            temporaryTakeoffUnit.MarkTookOffRecently();
+        }
+
+        if (markTookOff
+            && hasPendingTookOffRecentlyCommit
+            && pendingTookOffRecentlyUnit != null
+            && pendingTookOffRecentlyUnit.GetDomain() == Domain.Air
+            && !pendingTookOffRecentlyUnit.IsAircraftGrounded)
+        {
+            pendingTookOffRecentlyUnit.MarkTookOffRecently();
+        }
+
         hasTemporaryTakeoffSelectionState = false;
         temporaryTakeoffUnit = null;
         temporaryTakeoffMoveOptions.Clear();
+        hasPendingTookOffRecentlyCommit = false;
+        pendingTookOffRecentlyUnit = null;
         hasAutoPromotionEntryLayer = false;
         autoPromotionUnit = null;
     }
@@ -1246,6 +1269,8 @@ public partial class TurnStateManager : MonoBehaviour
         hasTemporaryTakeoffSelectionState = false;
         temporaryTakeoffUnit = null;
         temporaryTakeoffMoveOptions.Clear();
+        hasPendingTookOffRecentlyCommit = false;
+        pendingTookOffRecentlyUnit = null;
         hasAutoPromotionEntryLayer = false;
         autoPromotionUnit = null;
     }
@@ -1259,7 +1284,11 @@ public partial class TurnStateManager : MonoBehaviour
             return false;
 
         Tilemap boardMap = terrainTilemap != null ? terrainTilemap : unit.BoardTilemap;
-        PodeDecolarReport takeoffReport = PodeDecolarSensor.Evaluate(unit, boardMap, terrainDatabase);
+        PodeDecolarReport takeoffReport = PodeDecolarSensor.Evaluate(
+            unit,
+            boardMap,
+            terrainDatabase,
+            allowSameTeamAirBlockerForMovementTakeoff: true);
         if (takeoffReport == null || takeoffReport.takeoffMoveOptions == null || takeoffReport.takeoffMoveOptions.Count == 0)
         {
             reason = takeoffReport != null ? takeoffReport.explicacao : string.Empty;

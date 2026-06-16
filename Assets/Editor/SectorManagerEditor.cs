@@ -231,6 +231,24 @@ public class SectorManagerEditor : Editor
                         SerializedProperty vehDist = entry.FindPropertyRelative("VehicleDistance");
                         SerializedProperty airDist = entry.FindPropertyRelative("AirDistance");
                         if (isHQ == null || !isHQ.boolValue || dist == null) continue;
+                        if (dist.floatValue >= float.MaxValue * 0.5f)
+                        {
+                            var reachableParts = new System.Collections.Generic.List<string>();
+                            float reachableSortDist = float.MaxValue;
+                            if (vehDist != null && vehDist.floatValue < float.MaxValue * 0.5f)
+                            {
+                                reachableParts.Add($"ðŸš—{vehDist.floatValue:F0}h");
+                                reachableSortDist = Mathf.Min(reachableSortDist, vehDist.floatValue);
+                            }
+                            if (airDist != null && airDist.floatValue < float.MaxValue * 0.5f)
+                            {
+                                reachableParts.Add($"âœˆ{airDist.floatValue:F0}h");
+                                reachableSortDist = Mathf.Min(reachableSortDist, airDist.floatValue);
+                            }
+                            if (reachableParts.Count > 0)
+                                distParts.Add((reachableSortDist, BuildSectorDistanceSummary(teamName, dist.floatValue, vehDist, airDist)));
+                            break;
+                        }
                         if (dist.floatValue >= float.MaxValue * 0.5f) continue;
 
                         var parts = new System.Collections.Generic.List<string>();
@@ -239,7 +257,7 @@ public class SectorManagerEditor : Editor
                             parts.Add($"🚗{vehDist.floatValue:F0}h");
                         if (airDist != null && airDist.floatValue < float.MaxValue * 0.5f)
                             parts.Add($"✈{airDist.floatValue:F0}h");
-                        distParts.Add((dist.floatValue, $"{teamName}: {string.Join(" ", parts)}"));
+                        distParts.Add((dist.floatValue, BuildSectorDistanceSummary(teamName, dist.floatValue, vehDist, airDist)));
                         break;
                     }
                 }
@@ -286,6 +304,23 @@ public class SectorManagerEditor : Editor
             }
         }
         EditorGUI.indentLevel--;
+    }
+
+    private static string BuildSectorDistanceSummary(
+        string teamName,
+        float footDistance,
+        SerializedProperty vehicleDistance,
+        SerializedProperty airDistance)
+    {
+        const float Unreachable = float.MaxValue * 0.5f;
+        float vehicle = vehicleDistance != null ? vehicleDistance.floatValue : float.MaxValue;
+        float air = airDistance != null ? airDistance.floatValue : float.MaxValue;
+
+        string footText = footDistance < Unreachable ? $"{footDistance:F0}h" : "--";
+        string vehicleText = vehicle < Unreachable ? $"{vehicle:F0}h" : "--";
+        string airText = air < Unreachable ? $"{air:F0}h" : "--";
+
+        return $"{teamName}: 👣 {footText} 🚗 {vehicleText} ✈ {airText}";
     }
 
     private static ConstructionSector ReadSector(SerializedProperty sectorProp)

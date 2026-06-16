@@ -25,6 +25,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private bool hasActed;
     [SerializeField, HideInInspector] private bool hasFiredThisTurn;
     [SerializeField] private bool receivedSuppliesThisTurn;
+    [SerializeField] private bool tookOffRecently;
     [SerializeField] private bool isUnderRepair;
     [SerializeField] private bool hasMerged;
     [SerializeField, HideInInspector] private bool aiForcedToRepair;
@@ -52,6 +53,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private bool flagIsEmbarked;
     [SerializeField] private string flagEmbarkedAtUnit = string.Empty;
     [SerializeField] private bool flagReceivedSupplies;
+    [SerializeField] private bool flagTookOffRecently;
     [SerializeField] private bool flagHasMerged;
     [SerializeField] private int flagMergedWhenTurn = -1;
     [SerializeField] private string flagMergedWithUnit = string.Empty;
@@ -166,6 +168,7 @@ public class UnitManager : MonoBehaviour
     public bool HasActed => hasActed;
     public bool HasFiredThisTurn => hasFiredThisTurn;
     public bool ReceivedSuppliesThisTurn => receivedSuppliesThisTurn;
+    public bool TookOffRecently => tookOffRecently;
     public bool IsUnderRepair => isUnderRepair;
     public bool IsEmbarked => isEmbarked;
     public bool IsEmbarkedVisualPreviewActive => embarkedVisualPreviewDepth > 0;
@@ -679,6 +682,13 @@ public class UnitManager : MonoBehaviour
         matchController?.NotifyUnitReachedHasAct(this);
     }
 
+    public void ResetForTeamTurnStart()
+    {
+        ResetActed();
+        ClearReceivedSuppliesThisTurn();
+        ClearTookOffRecently();
+    }
+
     public void SetRemainingMovementPoints(int value)
     {
         remainingMovementPoints = Mathf.Clamp(value, 0, GetMovementRange());
@@ -713,6 +723,16 @@ public class UnitManager : MonoBehaviour
     public void ClearReceivedSuppliesThisTurn()
     {
         SetReceivedSuppliesThisTurn(false);
+    }
+
+    public void MarkTookOffRecently()
+    {
+        SetTookOffRecently(true);
+    }
+
+    public void ClearTookOffRecently()
+    {
+        SetTookOffRecently(false);
     }
 
     public void RefreshRuntimeVisualState()
@@ -822,6 +842,15 @@ public class UnitManager : MonoBehaviour
             return;
 
         receivedSuppliesThisTurn = value;
+        UpdateDynamicName();
+    }
+
+    public void SetTookOffRecently(bool value)
+    {
+        if (tookOffRecently == value)
+            return;
+
+        tookOffRecently = value;
         UpdateDynamicName();
     }
 
@@ -1780,6 +1809,9 @@ public class UnitManager : MonoBehaviour
 
     private void SetCurrentLayerState(int modeIndex, UnitLayerMode mode)
     {
+        HeightBand previousBand = OccupancyResolver.GetHeightBand(currentDomain, currentHeightLevel);
+        bool wasInitialized = layerStateInitialized;
+
         currentLayerModeIndex = Mathf.Max(0, modeIndex);
         currentDomain = mode.domain;
         currentHeightLevel = mode.heightLevel;
@@ -1787,6 +1819,20 @@ public class UnitManager : MonoBehaviour
         SyncAircraftRuntimeStateWithCurrentLayer();
         RefreshSpriteForCurrentLayer();
         RefreshActedVisual();
+
+        // Mudanca de banda no mesmo hex (decolar/pousar/desfazer decolagem) precisa
+        // re-disparar a ocupacao para o visual de coabitacao e listeners atualizarem.
+        // Sem isso o "divide o hex ao meio" fica preso no estado anterior.
+        if (Application.isPlaying && wasInitialized)
+        {
+            HeightBand newBand = OccupancyResolver.GetHeightBand(currentDomain, currentHeightLevel);
+            if (newBand != previousBand)
+            {
+                Vector3Int cell = currentCellPosition;
+                cell.z = 0;
+                UnitOccupancyRules.NotifyUnitOccupancyChanged(this, cell, cell);
+            }
+        }
     }
 
     private UnitData TryGetUnitData()
@@ -2398,6 +2444,7 @@ public class UnitManager : MonoBehaviour
         flagIsEmbarked = isEmbarked;
         flagEmbarkedAtUnit = embarkedAtUnit;
         flagReceivedSupplies = receivedSuppliesThisTurn;
+        flagTookOffRecently = tookOffRecently;
         flagHasMerged = hasMerged;
         flagMergedWhenTurn = mergedWhenTurn;
         flagMergedWithUnit = mergedWithUnit;

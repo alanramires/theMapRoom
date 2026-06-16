@@ -523,23 +523,32 @@ public partial class AIShoppingPlanner : MonoBehaviour
 
         int cheapestTransportCost    = openTransportSlots    > 0 ? FindCheapestAvailableTransportCost(snapshot)    : 0;
         int cheapestAirTransportCost = openAirTransportSlots > 0 ? FindCheapestAirTransportCost(snapshot)         : 0;
+        int reserveForCapturerPassenger = 0;
+        if (openCapturerSlots > 0)
+        {
+            int cheapestCapturerCost = FindCheapestPrimaryRoleLandCost(snapshot, UnitRole.Capturador);
+            int capturerProductionSlots = CountAvailablePrimaryRoleLandProductionSlots(snapshot, UnitRole.Capturador, occupied);
+            int capturerPassengerBuys = Mathf.Min(openCapturerSlots, capturerProductionSlots);
+            reserveForCapturerPassenger = cheapestCapturerCost * capturerPassengerBuys;
+        }
         int reserveForAirTransport   = 0;
         if (cheapestAirTransportCost > 0 && openAirTransportSlots > 0)
         {
-            reserveForAirTransport = Mathf.Min(remaining, cheapestAirTransportCost * openAirTransportSlots);
-            Debug.Log($"[AI Shopping] reserva_ar: air_slots={openAirTransportSlots} custo={cheapestAirTransportCost} reserva={reserveForAirTransport}");
+            int airReserveBudget = Mathf.Max(0, remaining - reserveForCapturerPassenger);
+            reserveForAirTransport = Mathf.Min(airReserveBudget, cheapestAirTransportCost * openAirTransportSlots);
+            Debug.Log($"[AI Shopping] reserva_ar: air_slots={openAirTransportSlots} custo={cheapestAirTransportCost} reserva={reserveForAirTransport} cap_passageiro_reserva={reserveForCapturerPassenger}");
         }
         int anyAirCombatDemand    = openCacaBSlots + openCacaASlots + openApacheSlots + openBombaSlots;
         int cheapestAirCombatCost = anyAirCombatDemand > 0 ? FindCheapestAirCombatCost(snapshot) : 0;
         int reserveForAirCombat   = 0;
         if (cheapestAirCombatCost > 0 && anyAirCombatDemand > 0)
         {
-            int budgetAfterAirTransport = Mathf.Max(0, remaining - reserveForAirTransport);
+            int budgetAfterAirTransport = Mathf.Max(0, remaining - reserveForCapturerPassenger - reserveForAirTransport);
             reserveForAirCombat = Mathf.Min(budgetAfterAirTransport, cheapestAirCombatCost * Mathf.Min(anyAirCombatDemand, 2));
-            Debug.Log($"[AI Shopping] reserva_combate_ar: slots={anyAirCombatDemand} custo={cheapestAirCombatCost} reserva={reserveForAirCombat}");
+            Debug.Log($"[AI Shopping] reserva_combate_ar: slots={anyAirCombatDemand} custo={cheapestAirCombatCost} reserva={reserveForAirCombat} cap_passageiro_reserva={reserveForCapturerPassenger}");
         }
 
-        Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} air_trans_slots={openAirTransportSlots} air_tanker_slots={openAirTankerSlots} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cacaB_slots={openCacaBSlots} cacaA_slots={openCacaASlots} apache_slots={openApacheSlots} bomba_slots={openBombaSlots} cheapest_transport={cheapestTransportCost} cheapest_air={cheapestAirTransportCost} reserva_ar={reserveForAirTransport} intel={(intelReport != null ? $"inf={intelReport.enemyInfantryPressureScore:F1} air={intelReport.enemyAirThreatScore:F1} armor={intelReport.enemyArmorThreatScore:F1} num={intelReport.numericalPressure:F1}" : "off")} onlyCap={onlyCapturers} onlyAss={onlyAssault} onlyTrans={onlyTransporter} onlyLog={onlyLogistics} onlyFire={onlyFireSupport}");
+        Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} air_trans_slots={openAirTransportSlots} air_tanker_slots={openAirTankerSlots} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cacaB_slots={openCacaBSlots} cacaA_slots={openCacaASlots} apache_slots={openApacheSlots} bomba_slots={openBombaSlots} cheapest_transport={cheapestTransportCost} cheapest_air={cheapestAirTransportCost} reserva_ar={reserveForAirTransport} cap_passageiro_reserva={reserveForCapturerPassenger} intel={(intelReport != null ? $"inf={intelReport.enemyInfantryPressureScore:F1} air={intelReport.enemyAirThreatScore:F1} armor={intelReport.enemyArmorThreatScore:F1} num={intelReport.numericalPressure:F1}" : "off")} onlyCap={onlyCapturers} onlyAss={onlyAssault} onlyTrans={onlyTransporter} onlyLog={onlyLogistics} onlyFire={onlyFireSupport}");
 
         bool strategicEliteAssaultReserve = eliteAssaultTarget != null
             && !dreamTeamPivot
@@ -865,7 +874,12 @@ public partial class AIShoppingPlanner : MonoBehaviour
             }
             // Reserva para transporte aéreo + combate aéreo — suspensa em emergências e modo defensivo.
             if ((reserveForAirTransport > 0 || reserveForAirCombat > 0) && !defensiveBaseThreat && !forcedProduction)
-                spendBudget = Mathf.Min(spendBudget, Mathf.Max(0, remaining - reserveForAirTransport - reserveForAirCombat));
+            {
+                int spendAfterAirReserves = Mathf.Max(0, remaining - reserveForAirTransport - reserveForAirCombat);
+                if (reserveForCapturerPassenger > 0 && openCapturerSlots > 0)
+                    spendAfterAirReserves = Mathf.Max(spendAfterAirReserves, Mathf.Min(remaining, reserveForCapturerPassenger));
+                spendBudget = Mathf.Min(spendBudget, spendAfterAirReserves);
+            }
 
             // Log das opções deste edifício
             {

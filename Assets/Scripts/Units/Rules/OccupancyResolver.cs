@@ -3,7 +3,7 @@ using UnityEngine;
 
 public enum HeightBand
 {
-    Air,      // air/low, air/high
+    Air,      // qualquer Domain.Air; altitude nao cria slot separado
     Sub,      // naval/submerged
     Blocking  // land/surface, naval/surface
 }
@@ -80,10 +80,31 @@ public static class OccupancyResolver
         if (!IsLayerAwareRulesActive)
             return true;
 
-        HeightBand moverBand = GetHeightBand(mover);
-        if (moverBand != HeightBand.Blocking)
+        if (occupants == null)
             return true;
 
+        HeightBand moverBand = GetHeightBand(mover);
+        return CanEndMoveInBand(mover, moverBand, occupants);
+    }
+
+    public static bool CanEndMoveAsLayer(
+        UnitManager mover,
+        Domain targetDomain,
+        HeightLevel targetHeight,
+        IEnumerable<UnitManager> occupants)
+    {
+        if (mover == null)
+            return false;
+
+        if (!IsLayerAwareRulesActive)
+            return true;
+
+        HeightBand targetBand = GetHeightBand(targetDomain, targetHeight);
+        return CanEndMoveInBand(mover, targetBand, occupants);
+    }
+
+    private static bool CanEndMoveInBand(UnitManager mover, HeightBand moverBand, IEnumerable<UnitManager> occupants)
+    {
         if (occupants == null)
             return true;
 
@@ -94,9 +115,10 @@ public static class OccupancyResolver
             if (GetHeightBand(occupant) != moverBand)
                 continue;
 
-            // Em camada bloqueante:
-            // - aliado nunca pode compartilhar hex final;
-            // - inimigo segue regra Total War (aqui ativo por IsLayerAwareRulesActive).
+            // Vale para todas as bandas (Blocking, Air, Sub). Em Air,
+            // AirLow e AirHigh compartilham o mesmo slot por dominio/time.
+            // - aliado nunca compartilha o hex final na mesma banda;
+            // - inimigo coexiste (Blocking = Total War; Air/Sub = hex contestado/dogfight).
             if (occupant.TeamId == mover.TeamId)
                 return false;
         }
@@ -124,12 +146,10 @@ public static class OccupancyResolver
         if (!IsLayerAwareRulesActive)
             return true;
 
-        HeightBand targetBand = GetHeightBand(targetDomain, targetHeight);
-        if (targetBand != HeightBand.Blocking)
-            return true;
-
         if (occupants == null)
             return true;
+
+        HeightBand targetBand = GetHeightBand(targetDomain, targetHeight);
 
         foreach (UnitManager occupant in occupants)
         {
@@ -139,8 +159,14 @@ public static class OccupancyResolver
                 continue;
 
             // Transicao para camada bloqueante e mais restrita que movimento:
-            // se qualquer unidade ja ocupa a camada final, nao pousa/troca para ela.
-            return false;
+            // qualquer ocupante (aliado ou inimigo) impede pousar/trocar para ela.
+            if (targetBand == HeightBand.Blocking)
+                return false;
+
+            // Air/Sub: aliado bloqueia (sem empilhar mesmo time);
+            // inimigo coexiste -> decola/transiciona para hex contestado.
+            if (occupant.TeamId == unit.TeamId)
+                return false;
         }
 
         return true;

@@ -290,7 +290,7 @@ public partial class TurnStateManager
                 continue;
             }
 
-            if (target.ReceivedSuppliesThisTurn || WasUnitServedByCommandThisTurn(target))
+            if (target.ReceivedSuppliesThisTurn || target.TookOffRecently || WasUnitServedByCommandThisTurn(target))
             {
                 filteredAlreadyServedCount++;
                 filteredAlreadyServedNames ??= new List<string>();
@@ -377,7 +377,7 @@ public partial class TurnStateManager
             ServicoDoComandoOption order = commandServiceQueuedOrders[i];
             if (order == null || order.targetUnit == null)
                 continue;
-            if (order.targetUnit.ReceivedSuppliesThisTurn || WasUnitServedByCommandThisTurn(order.targetUnit))
+            if (order.targetUnit.ReceivedSuppliesThisTurn || order.targetUnit.TookOffRecently || WasUnitServedByCommandThisTurn(order.targetUnit))
                 continue;
 
             UnitManager target = order.targetUnit;
@@ -932,7 +932,7 @@ public partial class TurnStateManager
             ServicoDoComandoOption order = commandServiceQueuedOrders[i];
             if (order == null || order.targetUnit == null)
                 continue;
-            if (order.targetUnit.ReceivedSuppliesThisTurn || WasUnitServedByCommandThisTurn(order.targetUnit))
+            if (order.targetUnit.ReceivedSuppliesThisTurn || order.targetUnit.TookOffRecently || WasUnitServedByCommandThisTurn(order.targetUnit))
                 continue;
 
             UnitManager target = order.targetUnit;

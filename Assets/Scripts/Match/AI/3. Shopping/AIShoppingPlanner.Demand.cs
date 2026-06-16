@@ -599,6 +599,61 @@ public partial class AIShoppingPlanner
         return false;
     }
 
+    private static int FindCheapestPrimaryRoleLandCost(AIWorldSnapshot snapshot, UnitRole role)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null) return 0;
+
+        int cheapest = int.MaxValue;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building.OfferedUnits == null) continue;
+
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (unit == null || unit.domain != Domain.Land) continue;
+                if (!IsPrimaryRole(unit, role)) continue;
+                if (unit.cost < cheapest)
+                    cheapest = unit.cost;
+            }
+        }
+
+        return cheapest == int.MaxValue ? 0 : cheapest;
+    }
+
+    private static int CountAvailablePrimaryRoleLandProductionSlots(
+        AIWorldSnapshot snapshot,
+        UnitRole role,
+        HashSet<Vector3Int> occupied)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null) return 0;
+
+        int slots = 0;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building.OfferedUnits == null) continue;
+
+            Vector3Int cell = building.CurrentCellPosition;
+            cell.z = 0;
+            if (occupied != null && occupied.Contains(cell)) continue;
+
+            bool canProduceRole = false;
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (unit == null || unit.domain != Domain.Land) continue;
+                if (!IsPrimaryRole(unit, role)) continue;
+                canProduceRole = true;
+                break;
+            }
+
+            if (canProduceRole)
+                slots++;
+        }
+
+        return slots;
+    }
+
     private static int LimitCapturerDemandForProgression(
         AIWorldSnapshot snapshot,
         int openCapturerSlots,

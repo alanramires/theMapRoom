@@ -8,6 +8,9 @@ public static class HexCohabitationVisualManager
     public static Vector3 AirOffset = new Vector3(-0.1f, 0.2f, 0f);
     public static Vector3 SurfaceOffset = new Vector3(0f, -0.2f, 0f);
     public static Vector3 SharedScale = new Vector3(0.6f, 0.6f, 1f);
+    // Espalhamento horizontal entre unidades da MESMA banda dividindo o hex
+    // (ex.: dois caças de times diferentes em hex contestado).
+    public static float IntraLayerSpread = 0.18f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()
@@ -66,8 +69,8 @@ public static class HexCohabitationVisualManager
     {
         List<UnitManager> units = UnitOccupancyRules.GetUnitsAtCell(tilemap, cell);
 
-        UnitManager airUnit = null;
-        UnitManager surfaceUnit = null;
+        List<UnitManager> airUnits = new List<UnitManager>();
+        List<UnitManager> surfaceUnits = new List<UnitManager>();
 
         for (int i = 0; i < units.Count; i++)
         {
@@ -76,24 +79,46 @@ public static class HexCohabitationVisualManager
                 continue;
 
             HeightBand band = OccupancyResolver.GetHeightBand(u);
-            if (band == HeightBand.Air && airUnit == null)
-                airUnit = u;
-            else if (band == HeightBand.Blocking && surfaceUnit == null)
-                surfaceUnit = u;
+            if (band == HeightBand.Air)
+                airUnits.Add(u);
+            else if (band == HeightBand.Blocking)
+                surfaceUnits.Add(u);
         }
 
-        if (airUnit != null && surfaceUnit != null)
+        // Reset baseline: so re-aplicamos visual quando houver de fato divisao de hex.
+        for (int i = 0; i < units.Count; i++)
         {
-            airUnit.ApplyCohabitationVisual(AirOffset, SharedScale);
-            surfaceUnit.ApplyCohabitationVisual(SurfaceOffset, SharedScale);
+            if (units[i] != null)
+                units[i].ClearCohabitationVisual();
         }
-        else
+
+        // Divisao de hex so quando ha ao menos um aereo envolvido (ar+ar ou ar+chao).
+        // Solo+solo contestado nao recebe efeito visual.
+        if (airUnits.Count == 0 || airUnits.Count + surfaceUnits.Count < 2)
+            return;
+
+        ApplyLayerFan(airUnits, AirOffset);
+        ApplyLayerFan(surfaceUnits, SurfaceOffset);
+    }
+
+    // Distribui as unidades de uma mesma banda em leque horizontal ao redor do offset base.
+    // Com 1 unidade, mantem o offset base exatamente (sem regressao no caso ar+chao classico).
+    private static void ApplyLayerFan(List<UnitManager> layerUnits, Vector3 baseOffset)
+    {
+        int n = layerUnits.Count;
+        if (n == 0)
+            return;
+
+        float center = (n - 1) * 0.5f;
+        for (int i = 0; i < n; i++)
         {
-            for (int i = 0; i < units.Count; i++)
-            {
-                if (units[i] != null)
-                    units[i].ClearCohabitationVisual();
-            }
+            UnitManager u = layerUnits[i];
+            if (u == null)
+                continue;
+
+            float dx = (i - center) * IntraLayerSpread;
+            Vector3 offset = baseOffset + new Vector3(dx, 0f, 0f);
+            u.ApplyCohabitationVisual(offset, SharedScale);
         }
     }
 

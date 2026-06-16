@@ -277,16 +277,36 @@ public class CursorController : MonoBehaviour
         if (direction == 0)
             return;
 
-        if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
+        if (pendingEndTurnConfirmation || IsBattleMapMenuOpen())
+            return;
+
+        if (!CanCycleUnitsFromCurrentState())
             return;
 
         if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
-            return;
+            turnStateManager.ForceNeutral();
 
         if (!TryCycleToReadyUnit(direction))
         {
             PanelDialogController.TrySetTransientText("Sem unidades prontas", 2.2f);
             PlayUiSfx(errorSfx);
+        }
+    }
+
+    private bool CanCycleUnitsFromCurrentState()
+    {
+        if (turnStateManager == null)
+            return true;
+
+        switch (turnStateManager.CurrentCursorState)
+        {
+            case TurnStateManager.CursorState.Neutral:
+            case TurnStateManager.CursorState.InspectingUnit:
+            case TurnStateManager.CursorState.InspectingBuilding:
+            case TurnStateManager.CursorState.InspectingHotZone:
+                return true;
+            default:
+                return false;
         }
     }
 
@@ -894,6 +914,30 @@ public class CursorController : MonoBehaviour
                 : TurnStateManager.ActionSfx.Cancel;
             PlayActionFeedback(feedback);
         }
+
+        if (WasSelectionCyclePressedThisFrame(out int selectionCycleDirection) && turnStateManager != null)
+        {
+            TurnStateManager.ActionSfx feedback = turnStateManager.HandleCycleSelectionWithinHex(selectionCycleDirection);
+            PlayActionFeedback(feedback);
+        }
+    }
+
+    // Page Up / Page Down: "Tab local" do hex selecionado — alterna a unidade aliada
+    // ancorada quando varias dividem o mesmo hex (ex.: aereo + terrestre coabitando).
+    private bool WasSelectionCyclePressedThisFrame(out int direction)
+    {
+        direction = 0;
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current == null)
+            return false;
+        if (Keyboard.current.pageUpKey.wasPressedThisFrame) { direction = 1; return true; }
+        if (Keyboard.current.pageDownKey.wasPressedThisFrame) { direction = -1; return true; }
+        return false;
+#else
+        if (Input.GetKeyDown(KeyCode.PageUp)) { direction = 1; return true; }
+        if (Input.GetKeyDown(KeyCode.PageDown)) { direction = -1; return true; }
+        return false;
+#endif
     }
 
     public bool TryOpenEndTurnConfirmationFromMenu()

@@ -31,6 +31,7 @@ public class UnitManagerEditor : Editor
     private SerializedProperty isUnderRepairProp;
     private SerializedProperty hasFiredThisTurnProp;
     private SerializedProperty receivedSuppliesThisTurnProp;
+    private SerializedProperty tookOffRecentlyProp;
     private SerializedProperty hasMergedProp;
     private SerializedProperty mergedWhenTurnProp;
     private SerializedProperty mergedWithUnitProp;
@@ -84,6 +85,7 @@ public class UnitManagerEditor : Editor
         isUnderRepairProp = serializedObject.FindProperty("isUnderRepair");
         hasFiredThisTurnProp = serializedObject.FindProperty("hasFiredThisTurn");
         receivedSuppliesThisTurnProp = serializedObject.FindProperty("receivedSuppliesThisTurn");
+        tookOffRecentlyProp = serializedObject.FindProperty("tookOffRecently");
         hasMergedProp = serializedObject.FindProperty("hasMerged");
         mergedWhenTurnProp = serializedObject.FindProperty("mergedWhenTurn");
         mergedWithUnitProp = serializedObject.FindProperty("mergedWithUnit");
@@ -141,6 +143,8 @@ public class UnitManagerEditor : Editor
         }
         if (receivedSuppliesThisTurnProp != null)
             EditorGUILayout.PropertyField(receivedSuppliesThisTurnProp, new GUIContent("Received Supply This Turn"));
+        if (tookOffRecentlyProp != null)
+            EditorGUILayout.PropertyField(tookOffRecentlyProp, new GUIContent("Has Taken Off Recently"));
         using (new EditorGUI.DisabledScope(true))
         {
             EditorGUILayout.IntField("Movement Max", Mathf.Max(0, unit.MaxMovementPoints));

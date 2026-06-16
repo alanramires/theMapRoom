@@ -1975,8 +1975,7 @@ public class MatchController : MonoBehaviour
                 }
             }
 
-            unit.ResetActed();
-            unit.ClearReceivedSuppliesThisTurn();
+            unit.ResetForTeamTurnStart();
 
             IReadOnlyList<UnitTransportSeatRuntime> seats = unit.TransportedUnitSlots;
             if (seats != null)
@@ -1989,8 +1988,7 @@ public class MatchController : MonoBehaviour
                         continue;
                     if ((int)passenger.TeamId != activeTeamId)
                         continue;
-                    passenger.ResetActed();
-                    passenger.ClearReceivedSuppliesThisTurn();
+                    passenger.ResetForTeamTurnStart();
                 }
             }
         }

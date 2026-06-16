@@ -406,8 +406,10 @@ public sealed class SectorManager : MonoBehaviour
             var entry = new SectorNeighborDistanceDebugEntry
             {
                 Sector = other.Sector,
-                Distance = ComputeHexDistance(origin.RepresentativeCell, other.RepresentativeCell),
-                Reachable = true,
+                Distance = context.IsValid
+                    ? float.MaxValue
+                    : ComputeHexDistance(origin.RepresentativeCell, other.RepresentativeCell),
+                Reachable = !context.IsValid,
                 UsedTerrainCost = false,
             };
 
@@ -416,6 +418,7 @@ public sealed class SectorManager : MonoBehaviour
             {
                 entry.Distance = movementCost;
                 entry.UsedTerrainCost = true;
+                entry.Reachable = true;
             }
 
             entries.Add(entry);
@@ -904,8 +907,13 @@ public sealed class SectorManager : MonoBehaviour
 
     private static float ComputeSectorNeighborDistance(Vector3Int from, Vector3Int to, SectorNeighborDistanceContext context)
     {
-        if (context.IsValid && TryComputeLandMovementDistance(from, to, context, out int movementCost, null))
-            return movementCost;
+        if (context.IsValid)
+        {
+            if (TryComputeLandMovementDistance(from, to, context, out int movementCost, null))
+                return movementCost;
+
+            return float.MaxValue;
+        }
 
         return ComputeHexDistance(from, to);
     }

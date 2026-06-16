@@ -109,7 +109,7 @@ public partial class AITacticalAnalyzer
             bool hasBasicTaskForce = capturers > 0 && (assaults > 0 || fireSupport > 0);
             bool needsAssaultScreen = risky && !hasBasicTaskForce;
 
-            AITacticalNeed op = CreateOperation(team, AITacticalNeedType.GroundCapture, 4, snapshot, obj.Sector);
+            AITacticalNeed op = CreateOperation(team, AITacticalNeedType.GroundCapture, GetCaptureOperationPriority(obj), snapshot, obj.Sector);
             op.LinkedObjective = obj;
             op.AnchorCell = snapshot.MyHQ != null ? Normalize(snapshot.MyHQ.CurrentCellPosition) : Vector3Int.zero;
             op.TargetCell = Normalize(info.RepresentativeCell);
@@ -181,7 +181,7 @@ public partial class AITacticalAnalyzer
             int neededChinooks = Mathf.CeilToInt(desiredPassengers / 2f);
             int airDeficit = Mathf.Max(0, neededChinooks - assignedChinooks);
 
-            AITacticalNeed op = CreateOperation(team, AITacticalNeedType.AirliftCapture, 4, snapshot, obj.Sector);
+            AITacticalNeed op = CreateOperation(team, AITacticalNeedType.AirliftCapture, GetCaptureOperationPriority(obj), snapshot, obj.Sector);
             op.LinkedObjective = obj;
             op.AnchorCell = snapshot.MyHQ != null ? Normalize(snapshot.MyHQ.CurrentCellPosition) : Vector3Int.zero;
             op.TargetCell = Normalize(info.RepresentativeCell);

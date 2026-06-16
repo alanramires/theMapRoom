@@ -128,6 +128,12 @@ public static class PodeSuprirSensor
                 continue;
             }
 
+            if (target.TookOffRecently)
+            {
+                AppendInvalid(invalidOutput, supplier, target, cell, "Unidade decolou recentemente e nao pode receber suprimento nesta rodada.");
+                continue;
+            }
+
             if (!TryEvaluateSupplyCandidate(
                     supplier,
                     supplierData,
@@ -307,6 +313,12 @@ public static class PodeSuprirSensor
         if (target.ReceivedSuppliesThisTurn)
         {
             reason = "Unidade ja recebeu suprimentos nesta rodada.";
+            return false;
+        }
+
+        if (target.TookOffRecently)
+        {
+            reason = "Unidade decolou recentemente e nao pode receber suprimento nesta rodada.";
             return false;
         }
 
@@ -606,6 +618,8 @@ public static class PodeSuprirSensor
     public static bool UnitNeedsService(UnitManager target, ServiceData service)
     {
         if (target == null || service == null)
+            return false;
+        if (target.TookOffRecently)
             return false;
 
         if (service.recuperaHp && target.CurrentHP < target.GetMaxHP())

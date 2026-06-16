@@ -64,6 +64,9 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
     private readonly List<IneligibleSupplyEntry> ineligibleCandidates = new List<IneligibleSupplyEntry>();
     private readonly List<SupplyCandidateEntry> supplyQueue = new List<SupplyCandidateEntry>();
 
+    private const string AlreadySuppliedReason = "Unidade ja recebeu suprimentos nesta rodada.";
+    private const string TookOffRecentlyReason = "Unidade decolou recentemente e nao pode receber suprimento nesta rodada.";
+
     private string statusMessage = "Ready.";
     private string sensorReason = "Ready.";
     private string queueMessage = "Fila vazia.";
@@ -221,6 +224,7 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
             EditorGUILayout.LabelField("Modo", candidate.mode);
             EditorGUILayout.LabelField("Camada", $"{candidate.unit.GetDomain()}/{candidate.unit.GetHeightLevel()}");
             EditorGUILayout.LabelField("Hex", $"{candidate.cell.x},{candidate.cell.y}");
+            EditorGUILayout.LabelField("Flags", BuildRuntimeFlagsLabel(candidate.unit));
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Desenhar Linha"))
             {
@@ -261,6 +265,7 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
             }
             EditorGUILayout.LabelField("Camada", $"{entry.unit.GetDomain()}/{entry.unit.GetHeightLevel()}");
             EditorGUILayout.LabelField("Hex", $"{entry.cell.x},{entry.cell.y}");
+            EditorGUILayout.LabelField("Flags", BuildRuntimeFlagsLabel(entry.unit));
             EditorGUILayout.LabelField("Motivo", string.IsNullOrWhiteSpace(entry.reason) ? "-" : entry.reason);
             if (GUILayout.Button("Desenhar Linha Vermelha"))
             {
@@ -1381,6 +1386,20 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
         if (candidate == null || candidate.unit == null)
             return;
 
+        if (candidate.unit.ReceivedSuppliesThisTurn)
+        {
+            queueMessage = $"{candidate.unit.name}: {AlreadySuppliedReason}";
+            RebuildCandidateLists(ResolveTilemap());
+            return;
+        }
+
+        if (candidate.unit.TookOffRecently)
+        {
+            queueMessage = $"{candidate.unit.name}: {TookOffRecentlyReason}";
+            RebuildCandidateLists(ResolveTilemap());
+            return;
+        }
+
         if (IsCandidateAlreadyQueued(candidate.unit))
         {
             queueMessage = $"{candidate.unit.name} ja esta na fila.";
@@ -1560,6 +1579,18 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
                 continue;
             }
 
+            if (other.ReceivedSuppliesThisTurn)
+            {
+                AddInvalid(other, cell, AlreadySuppliedReason);
+                continue;
+            }
+
+            if (other.TookOffRecently)
+            {
+                AddInvalid(other, cell, TookOffRecentlyReason);
+                continue;
+            }
+
             if (!TryResolveServiceDemandMatch(selectedSupplier, supplierData, other, out string serviceDemandReason))
             {
                 AddInvalid(other, cell, serviceDemandReason);
@@ -1724,6 +1755,12 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
         {
             SupplyCandidateEntry queued = supplyQueue[i];
             if (queued == null || queued.unit == null)
+            {
+                supplyQueue.RemoveAt(i);
+                continue;
+            }
+
+            if (queued.unit.ReceivedSuppliesThisTurn || queued.unit.TookOffRecently)
             {
                 supplyQueue.RemoveAt(i);
                 continue;
@@ -1899,6 +1936,18 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
         if (target == null)
         {
             reason = "Unidade alvo invalida.";
+            return false;
+        }
+
+        if (target.ReceivedSuppliesThisTurn)
+        {
+            reason = AlreadySuppliedReason;
+            return false;
+        }
+
+        if (target.TookOffRecently)
+        {
+            reason = TookOffRecentlyReason;
             return false;
         }
 
@@ -2175,6 +2224,14 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
     private static bool CanEmergeToNavalSurface(UnitManager unit)
     {
         return unit != null && unit.SupportsLayerMode(Domain.Naval, HeightLevel.Surface);
+    }
+
+    private static string BuildRuntimeFlagsLabel(UnitManager unit)
+    {
+        if (unit == null)
+            return "-";
+
+        return $"receivedSupply={unit.ReceivedSuppliesThisTurn} | tookOffRecently={unit.TookOffRecently}";
     }
 }
 

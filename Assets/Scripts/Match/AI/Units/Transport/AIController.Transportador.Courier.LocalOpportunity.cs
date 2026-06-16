@@ -24,6 +24,7 @@ public partial class AIController
         ConstructionManager bestTarget = null;
         Vector3Int bestTransporterCell = fromCell;
         float bestScore = float.MinValue;
+        bool isAirTransporter = transporter.GetDomain() == Domain.Air || IsAirTransporter(transporter);
 
         var transporterCells = new List<Vector3Int> { fromCell };
         if (paths != null)
@@ -57,7 +58,7 @@ public partial class AIController
                     transporterCell.z = 0;
                     if (transporterCell != fromCell && occupied != null && occupied.Contains(transporterCell))
                         continue;
-                    if (transporterCell != fromCell && IsNonTeamConstruction(transporterCell, snapshot.AITeam))
+                    if (!isAirTransporter && transporterCell != fromCell && IsNonTeamConstruction(transporterCell, snapshot.AITeam))
                         continue;
 
                     List<PodeDesembarcarOption> options = transporterCell == fromCell

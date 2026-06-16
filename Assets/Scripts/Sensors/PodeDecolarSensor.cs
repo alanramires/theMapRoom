@@ -18,7 +18,8 @@ public static class PodeDecolarSensor
     public static PodeDecolarReport Evaluate(
         UnitManager selectedUnit,
         Tilemap map,
-        TerrainDatabase terrainDatabase)
+        TerrainDatabase terrainDatabase,
+        bool allowSameTeamAirBlockerForMovementTakeoff = false)
     {
         var report = new PodeDecolarReport
         {
@@ -91,7 +92,8 @@ public static class PodeDecolarSensor
             selectedUnit,
             map,
             terrainDatabase,
-            SensorMovementMode.MoveuParado);
+            SensorMovementMode.MoveuParado,
+            allowSameTeamAirBlockerForMovementTakeoff);
 
         bool canTakeoff = decision.available && decision.action == AircraftOperationAction.Takeoff;
         report.status = canTakeoff;
