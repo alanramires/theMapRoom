@@ -920,8 +920,7 @@ MonoBehaviour:
   matchController: {fileID: 0}
   isForwardObserverSpot: 0
   isRallyPoint: 0
-  rallyTargetSlotIndex: -1
-  rallyTargetSlotIndexes: 
+  rallyOwnerSlotIndex: -1
   isAnchorSector: 0
   anchorSectorSlotIndex: -1
   victoryBuildingOverlayRenderer: {fileID: 0}

@@ -670,6 +670,9 @@ public partial class TurnStateManager
                 if (fuelGain <= 0)
                     CommandServiceLog($"[ServicoComando][Fila] {target.name}: sem ganho de AUT no alvo (HP +{hpGain} | AUT +{fuelGain} | MUN +{ammoGain}).");
 
+                if (!isEmbarkedPassenger && order.forceLandBeforeSupply)
+                    yield return ExecutePostSupplyAircraftTakeoff(target, boardMap, "[ServicoComando]");
+
                 NotifyUnitSupplied(sourceSupplierUnit, target);
                 MarkUnitServedByCommandThisTurn(target);
 

@@ -6,7 +6,8 @@ public partial class AIShoppingPlanner
 {
     private static UnitData PickAirUnit(
         ConstructionManager building, int budget,
-        bool wantsTransport, bool wantsCacaB, bool wantsCacaA, bool wantsApache, bool wantsBomba, bool wantsAirTanker)
+        bool wantsTransport, bool wantsCacaB, bool wantsCacaA, bool wantsApache, bool wantsBomba, bool wantsAirTanker,
+        bool urgentCacaB)
     {
         if (building == null || building.OfferedUnits == null) return null;
 
@@ -22,14 +23,14 @@ public partial class AIShoppingPlanner
             bool elite = u.eliteLevel >= 1;
             int score;
             if      (primary == UnitRole.Transportador && wantsTransport)        score = 10000 + u.cost;
-            else if (primary == UnitRole.Interceptador && !elite && wantsCacaB)  score = 25000 + u.cost;
+            else if (primary == UnitRole.Interceptador && !elite && wantsCacaB)  score = (urgentCacaB ? 25000 : 18000) + u.cost;
             else if (primary == UnitRole.Interceptador &&  elite && wantsCacaA)  score = 30000 + u.cost;
             else if (primary == UnitRole.AtaqueAereo   && !elite && wantsApache) score = 20000 + u.cost;
             else if (primary == UnitRole.AtaqueAereo   &&  elite && wantsBomba)  score = 22000 + u.cost;
             else if (primary == UnitRole.Logistica && wantsAirTanker && IsAirTankerPurchase(u)) score = 24000 + u.cost;
             else continue;
 
-            Debug.Log($"[AI Shopping Air] candidato {u.displayName} ${u.cost} role={primary} elite={elite} score={score}");
+            Debug.Log($"[AI Shopping Air] candidato {u.displayName} ${u.cost} role={primary} elite={elite} urgentCacaB={urgentCacaB} score={score}");
             if (score > bestScore) { bestScore = score; best = u; }
         }
         return best;
@@ -125,6 +126,11 @@ public partial class AIShoppingPlanner
             bool isSAMType = isAntiAirOnly && IsPrimaryRole(u, UnitRole.FogoIndireto);
             bool isAAAType = isAntiAirOnly && IsPrimaryRole(u, UnitRole.Assalto);
             int samCap = Instance != null ? Instance.MaxProactiveAntiAirSAM : 3;
+            if (isSAMType && activeSAMs >= 1 && !aaaThreat)
+            {
+                Debug.Log($"[AI PickUnit] SKIP {u.displayName} — SAM proativo ja coberto ({activeSAMs}/1)");
+                continue;
+            }
             if (isSAMType && activeSAMs >= samCap)
             {
                 Debug.Log($"[AI PickUnit] SKIP {u.displayName} — SAM cap atingido ({activeSAMs}/{samCap})");
@@ -132,7 +138,7 @@ public partial class AIShoppingPlanner
             }
             if (isAAAType && aaaCap > 0 && activeAAAs >= aaaCap)
             {
-                Debug.Log($"[AI PickUnit] SKIP {u.displayName} — AAA cap atingido ({activeAAAs}/{aaaCap} aeronaves vis.)");
+                Debug.Log($"[AI PickUnit] SKIP {u.displayName} — AAA cap atingido ({activeAAAs}/{aaaCap} cobertura 1:2)");
                 continue;
             }
             if (isAntiAirOnly && !HasAnyAirThreat() && !proactiveAntiAir)
@@ -155,7 +161,7 @@ public partial class AIShoppingPlanner
             bool strategicArmorParityBypass = strategicArmorParity && IsDefensiveBaseAssaultTankPurchase(u);
 
             bool proactiveAntiAirSAMBypass = proactiveAntiAir && isSAMType;
-            bool proactiveAntiAirAAABypass = proactiveAntiAir && isAAAType && (aaaCap == 0 || activeAAAs < aaaCap);
+            bool proactiveAntiAirAAABypass = proactiveAntiAir && isAAAType && aaaCap > 0 && activeAAAs < aaaCap;
             bool proactiveDefBypass = (proactiveDefFireSupport || proactiveAntiAirSAMBypass) && isDefensiveOnlyUnit && isFireSupportCapable;
             if (!defensiveBaseThreat && isDefensiveOnlyUnit && !proactiveDefBypass && !proactiveAntiAirAAABypass && !strategicArmorParityBypass)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — Defensive-only, sem ameaça"); continue; }

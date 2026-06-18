@@ -10,7 +10,7 @@ A logística também faz parte da guerra. Combustível e munição não são abs
 
 O sistema de transporte permite projetar forças rapidamente através do mapa. Unidades podem embarcar em transportadores terrestres, navais ou aéreos e ser deslocadas para regiões distantes, mas cada etapa de embarque e desembarque consome tempo. O transporte acelera o movimento estratégico, mas cria momentos de vulnerabilidade que o adversário pode explorar.
 
-A guerra antissubmarino introduz um jogo de informação assimétrica dentro do conflito principal. Submarinos operam submersos e são invisíveis para a maioria das unidades, podendo ser detectados apenas por sensores específicos ou após revelar sua posição ao atacar. Fragatas com sonar, aeronaves de patrulha e cargas de profundidade tornam possível caçar essas unidades, criando um ciclo de ocultação, detecção e contra-ataque.
+A guerra antissubmarino introduz um jogo de informação assimétrica dentro do conflito principal. Subm![[2.4 Delta PQ]]arinos operam submersos e são invisíveis para a maioria das unidades, podendo ser detectados apenas por sensores específicos ou após revelar sua posição ao atacar. Fragatas com sonar, aeronaves de patrulha e cargas de profundidade tornam possível caçar essas unidades, criando um ciclo de ocultação, detecção e contra-ataque.
 
 A infantaria mantém um papel central no campo de batalha. Além de ser a única capaz de capturar construções estratégicas, ela se move com mais eficiência em terrenos difíceis como florestas e montanhas, onde veículos blindados pagam custos elevados de movimento. Em terreno elevado, pode atuar como observador avançado para artilharia, ampliando o alcance efetivo das unidades de apoio.
 

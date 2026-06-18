@@ -54,8 +54,7 @@ public partial class AIController
         }
         // Não embarcar em transporter ainda no aeroporto/fábrica — espera ele sair primeiro.
         Vector3Int transporterCell = transporter.CurrentCellPosition; transporterCell.z = 0;
-        if (IsTeamProductionBuilding(transporterCell, unit.TeamId)
-            && !IsAirTransporter(transporter)) return false;
+        if (IsTeamProductionBuilding(transporterCell, unit.TeamId)) return false;
 
         // Primary capturer: APC must be assigned to the same sector.
         // Secondary capturer: also accepts an APC with no formal passenger (shuttle mode).

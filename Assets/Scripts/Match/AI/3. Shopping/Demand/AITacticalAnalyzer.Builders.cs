@@ -34,7 +34,7 @@ public partial class AITacticalAnalyzer
                 op.AddSlots(AINeedKind.SAM, 1);
         }
 
-        if (homeThreat || armorNearBase > 0 || intelHomeThreat)
+        if (homeThreat || armorNearBase > 0)
         {
             if (captureActive || (homeIntel != null && homeIntel.capturePressure > 0f))
                 op.AddSlots(AINeedKind.Capturer, 2);
@@ -139,23 +139,34 @@ public partial class AITacticalAnalyzer
         op.AnchorCell = snapshot.MyHQ != null ? Normalize(snapshot.MyHQ.CurrentCellPosition) : Vector3Int.zero;
         op.TargetCell = Normalize(info.RepresentativeCell);
 
+        bool visibleGroundThreat = HasGroundEnemyNearCell(snapshot, info.RepresentativeCell, SectorDefenseRange);
+        bool visibleAirThreat = CountVisibleEnemyAircraftNearCell(snapshot, info.RepresentativeCell, 2) > 0;
+
         if (info.HasPartialCapture)
             op.AddSlots(AINeedKind.Capturer, 1);
-        if (sectorIntel != null && sectorIntel.capturePressure > 0f)
+        if (visibleGroundThreat && sectorIntel != null && sectorIntel.capturePressure > 0f)
             op.AddSlots(AINeedKind.Capturer, 1);
-        op.AddSlots(AINeedKind.Assault, 1);
-        if (sectorIntel != null && (sectorIntel.enemyPresence >= 2f || sectorIntel.landingPressure > 0f))
+        if (visibleGroundThreat)
             op.AddSlots(AINeedKind.Assault, 1);
-        if (info.GetDistanceToHQ(team) <= GetEffectiveTransportThreshold(team))
+        if (visibleGroundThreat && sectorIntel != null && (sectorIntel.enemyPresence >= 2f || sectorIntel.landingPressure > 0f))
+            op.AddSlots(AINeedKind.Assault, 1);
+        if (visibleGroundThreat && info.GetDistanceToHQ(team) <= GetEffectiveTransportThreshold(team))
             op.AddSlots(AINeedKind.Artillery, 1);
-        else if (sectorIntel != null && sectorIntel.damageTaken > 0f)
+        else if (visibleGroundThreat && sectorIntel != null && sectorIntel.damageTaken > 0f)
             op.AddSlots(AINeedKind.Artillery, 1);
-        if (CountVisibleEnemyAircraftNearCell(snapshot, info.RepresentativeCell, 2) > 0)
+        if (visibleAirThreat)
             op.AddSlots(AINeedKind.AAA, 1);
+
+        if (op.RequiredSlots.Count == 0)
+        {
+            built.Add(info.Sector);
+            Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] SectorDefense {info.Sector}: sem demanda atual visibleGround={visibleGroundThreat} visibleAir={visibleAirThreat} intelHot={(sectorIntel != null ? sectorIntel.hotScore.ToString("F1") : "-")}");
+            return;
+        }
 
         ops.Add(op);
         built.Add(info.Sector);
-        Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] SectorDefense {info.Sector}: partial={info.HasPartialCapture} intelHot={(sectorIntel != null ? sectorIntel.hotScore.ToString("F1") : "-")} slots={DescribeSlots(op)}");
+        Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] SectorDefense {info.Sector}: partial={info.HasPartialCapture} ground={visibleGroundThreat} air={visibleAirThreat} intelHot={(sectorIntel != null ? sectorIntel.hotScore.ToString("F1") : "-")} slots={DescribeSlots(op)}");
     }
 
     private void TryBuildAirliftCaptureOps(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, List<AITacticalNeed> ops, AIIntelReport intel)
@@ -219,10 +230,11 @@ public partial class AITacticalAnalyzer
         int activeArt = CountActiveNeed(snapshot, AINeedKind.Artillery) + CountActiveNeed(snapshot, AINeedKind.FireSupport);
         int activeAAA = CountActiveNeed(snapshot, AINeedKind.AAA);
         int activeSAM = CountActiveNeed(snapshot, AINeedKind.SAM);
+        int aircraftNearHQ = CountVisibleEnemyAircraftNearHQ(snapshot, InstanceSafeAntiAirCoverageRange());
 
         int artDeficit = Mathf.Max(0, InstanceMinBaseArtillery() - activeArt);
-        int aaaDeficit = Mathf.Max(0, InstanceMinBaseAAA() - activeAAA);
-        int samDeficit = activeAAA >= 1 && activeSAM < 1 ? 1 : 0;
+        int aaaDeficit = aircraftNearHQ > 0 ? Mathf.Max(0, InstanceMinBaseAAA() - activeAAA) : 0;
+        int samDeficit = aircraftNearHQ > 0 && activeAAA >= 1 && activeSAM < 1 ? 1 : 0;
         if (artDeficit <= 0 && aaaDeficit <= 0 && samDeficit <= 0)
             return;
 
@@ -235,7 +247,7 @@ public partial class AITacticalAnalyzer
         op.AddSlots(AINeedKind.SAM, samDeficit);
 
         ops.Add(op);
-        Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] PreventiveDefense: Artilleryx{artDeficit} AAAx{aaaDeficit} SAMx{samDeficit} activeArt={activeArt} activeAAA={activeAAA} activeSAM={activeSAM}");
+        Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] PreventiveDefense: Artilleryx{artDeficit} AAAx{aaaDeficit} SAMx{samDeficit} aircraftNearHQ={aircraftNearHQ} activeArt={activeArt} activeAAA={activeAAA} activeSAM={activeSAM}");
     }
 
     private void TryBuildAirRefuelSupportOp(TeamId team, AIWorldSnapshot snapshot, List<AITacticalNeed> ops)

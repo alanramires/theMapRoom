@@ -577,11 +577,16 @@ public class AIIntelAnalyzer : MonoBehaviour
             return score;
         }
 
-        // Fallback: pattern matching for unknown siglas
+        // Fallback: pattern matching for unknown siglas. Keep short abbreviations token-aware:
+        // "CA" is a fighter code, but it must not match words such as "CAPTURADOR".
         string s = (sigla ?? string.Empty).Trim().ToUpperInvariant();
-        elite     = s.Contains("MBT") || s.Contains("TP") || s.Contains("PESADO") || s.Contains("APACHE") ||
-                    s.Contains("BOMBAR") || s.Contains("CA") || s.Contains("SAM");
-        air       = s.Contains("APACHE") || s.Contains("CA") || s.Contains("BOMBAR") || s.Contains("CHINOOK");
+        bool fighter = HasSiglaToken(s, "CA") || s.Contains("CACA") || s.Contains("CAÇA") || s.Contains("FIGHTER");
+        bool apache  = s.Contains("APACHE");
+        bool bomber  = s.Contains("BOMBAR");
+        bool chinook = s.Contains("CHINOOK");
+        elite     = s.Contains("MBT") || s.Contains("TP") || s.Contains("PESADO") || apache ||
+                    bomber || fighter || s.Contains("SAM");
+        air       = apache || fighter || bomber || chinook;
         armor     = s.Contains("MBT") || s.Contains("TQ") || s.Contains("TANQ") || s.Contains("TP") ||
                     s.Contains("APC") || s.Contains("IFV");
         artillery = s.Contains("OBUS") || s.Contains("ART") || s.Contains("SAM") || s.Contains("AAA");
@@ -594,6 +599,36 @@ public class AIIntelAnalyzer : MonoBehaviour
         if (artillery) fallback += 1.5f;
         if (infantry)  fallback += 0.5f;
         return fallback;
+    }
+
+    private static bool HasSiglaToken(string value, string token)
+    {
+        if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(token))
+            return false;
+
+        int start = -1;
+        for (int i = 0; i <= value.Length; i++)
+        {
+            bool atEnd = i >= value.Length;
+            char c = atEnd ? '\0' : value[i];
+            bool separator = atEnd || !char.IsLetterOrDigit(c);
+            if (!separator)
+            {
+                if (start < 0) start = i;
+                continue;
+            }
+
+            if (start >= 0)
+            {
+                int length = i - start;
+                if (length == token.Length
+                    && string.Compare(value, start, token, 0, token.Length, StringComparison.OrdinalIgnoreCase) == 0)
+                    return true;
+                start = -1;
+            }
+        }
+
+        return false;
     }
 }
 

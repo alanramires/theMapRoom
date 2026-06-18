@@ -78,6 +78,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Range(0, 4)]    public int   MaxCacaA                         = 2;
     [Range(1, 12)]   public int   MinTurnForAtaqueAereo            = 5;
     [Range(1, 4)]    public int   ChinooksPorApache                = 2;
+    [Range(1, 6)]    public int   HelicopterosInimigosPorApache    = 3;
     [Range(1, 4)]    public int   ApachesParaBombardeiro           = 2;
     public bool                  ComprarApacheEmModoDefesa         = true;
     [Range(0, 4)]    public int   MinCacaBPresence                 = 1;
@@ -176,24 +177,28 @@ public partial class AIShoppingPlanner : MonoBehaviour
             Debug.Log($"[AI Shopping] base_defense: forçando AAA preventiva (proactiveAntiAir=true, assault_slot=1)");
         }
         int aaaCoverageRange = Instance != null ? Instance.AntiAirCoverageRange : 5;
-        int aaaCap = CountVisibleEnemyAircraftNearHQ(snapshot, aaaCoverageRange);
-        bool aaaThreat = aaaCap > 0;
+        int aircraftNearHQ = CountVisibleEnemyAircraftNearHQ(snapshot, aaaCoverageRange);
+        bool aaaThreat = aircraftNearHQ > 0;
+        bool emergencyAirBaseThreat = aircraftNearHQ > 0
+            && HasAnyVisibleEnemyNearOwnedBase(snapshot, DefensiveBaseThreatRange);
+        int aaaCap = Mathf.CeilToInt(aircraftNearHQ / 2f);
         if (forceBaseAAA)
-            aaaCap = Mathf.Max(aaaCap, Instance != null ? Instance.MinBaseAAA : 1);
+        {
+            int minBaseAAA = Instance != null ? Instance.MinBaseAAA : 1;
+            aaaCap = Mathf.Max(aaaCap, minBaseAAA + (emergencyAirBaseThreat ? 1 : 0));
+        }
         if (aaaCap > 0 && activeAAAs < aaaCap && openAssaultSlots <= 0)
         {
             openAssaultSlots = 1;
-            Debug.Log($"[AI Shopping] reactive_anti_air: {aaaCap} aeronave(s) visivel <= {aaaCoverageRange}h do HQ, activeAAAs={activeAAAs} → slot assault aberto para AAA");
+            Debug.Log($"[AI Shopping] reactive_anti_air: aircraft={aircraftNearHQ} <= {aaaCoverageRange}h HQ -> aaaCap={aaaCap} activeAAAs={activeAAAs} emergency={emergencyAirBaseThreat} → slot assault aberto para AAA");
         }
-        // Wider reactive AAA: any visible enemy aircraft (anywhere on map) opens one slot if none near HQ yet.
+        // Distant air contacts should pull fighter demand, not ground AAA. AAA is local base coverage.
         if (aaaCap == 0 && activeAAAs == 0 && openAssaultSlots <= 0)
         {
             int totalVisibleAir = CountTotalVisibleEnemyAircraft(snapshot);
             if (totalVisibleAir > 0)
             {
-                openAssaultSlots = 1;
-                proactiveAntiAir = true;
-                Debug.Log($"[AI Shopping] reactive_anti_air_wide: {totalVisibleAir} aeronave(s) inimiga(s) visivel (longe do HQ), sem AAA no campo → slot assault para AAA");
+                Debug.Log($"[AI Shopping] reactive_anti_air_wide: {totalVisibleAir} aeronave(s) inimiga(s) visivel longe do HQ -> sem AAA terrestre");
             }
         }
         ApplyJogadasIntelBias(snapshot, intelReport,
@@ -439,11 +444,19 @@ public partial class AIShoppingPlanner : MonoBehaviour
                     : 0.3f;
                 fillThreshold = Mathf.Min(fillThreshold, stalemateThreshold);
             }
+            bool offensiveElitePressure = remaining >= eliteAssaultTarget.cost
+                && (snapshot.Stance == AIStance.Offensive
+                    || snapshot.Stance == AIStance.Tactical
+                    || HasAnyOffensiveObjective(snapshot.AITeam))
+                && capFill >= 0.5f;
+            if (offensiveElitePressure)
+                fillThreshold = Mathf.Min(fillThreshold, 0.5f);
             int   minAssault    = Instance != null ? Instance.MinFilledAssaultSlots   : 1;
             bool  capOk         = capFill >= fillThreshold;
             bool  assOk         = filledAss >= minAssault;
             string stalemateText = stalemateCapturerReady ? $" stalemateCap={stalemateCapturerReason}" : "";
-            string status       = (capOk && assOk) ? $"ELITE LIBERADO{stalemateText}" : $"bloqueado ({(!capOk ? $"cap {filledCap}/{totalCap} {capFill:P0}<{fillThreshold:P0}" : "cap OK")} | {(!assOk ? $"ass {filledAss}<{minAssault}" : "ass OK")}){stalemateText}";
+            string offensiveText = offensiveElitePressure ? " offensivePressure=True" : "";
+            string status       = (capOk && assOk) ? $"ELITE LIBERADO{stalemateText}{offensiveText}" : $"bloqueado ({(!capOk ? $"cap {filledCap}/{totalCap} {capFill:P0}<{fillThreshold:P0}" : "cap OK")} | {(!assOk ? $"ass {filledAss}<{minAssault}" : "ass OK")}){stalemateText}{offensiveText}";
             Debug.Log($"[AI Shopping] composição: cap={filledCap}/{totalCap} ({capFill:P0}) ass={filledAss}/{totalAss} — {status}");
             if (!capOk || !assOk)
                 eliteAssaultTarget = null; // blocks purchase; eliteAssaultTargetForReserve still set
@@ -617,9 +630,32 @@ public partial class AIShoppingPlanner : MonoBehaviour
             Debug.Log($"[AI Shopping] paridade blindada: enemy={inferredEnemyArmor} visible={visibleEnemyArmor} own={activeArmorAssault} -> assault_slots={openAssaultSlots}");
         int defensiveInfantryThreatCount = !defensiveArmorThreat
             ? CountVisibleEnemyInfantryNearOwnedBase(snapshot, DefensiveArmorThreatRange) : 0;
+        int visibleEnemyCapturers = !defensiveArmorThreat
+            ? CountVisibleEnemyCapturers(snapshot) : 0;
+        float defensiveCapturePressure = intelReport != null
+            ? Mathf.Max(intelReport.capturePressure, intelReport.landingPressure, intelReport.damageTakenScore)
+            : 0f;
+        float defensiveInfantryPressure = intelReport != null
+            ? Mathf.Max(intelReport.enemyInfantryPressureScore, intelReport.enemyInfantryForce)
+            : 0f;
+        bool intelCaptureInfantryPressure = !defensiveArmorThreat
+            && snapshot.Stance == AIStance.Defensive
+            && Instance != null
+            && defensiveCapturePressure >= Instance.IntelCapturePressureDefenseThreshold
+            && defensiveInfantryPressure >= Instance.IntelInfantryPressureAssaultThreshold;
         bool intelInfantryNearHome = !defensiveArmorThreat
             && HasIntelInfantryThreatNearOwnBase(snapshot, intelReport);
-        bool defensiveInfantryThreat = defensiveInfantryThreatCount >= 2 || intelInfantryNearHome;
+        bool defensiveInfantryThreat = defensiveInfantryThreatCount >= 2
+            || visibleEnemyCapturers >= 3
+            || intelInfantryNearHome
+            || intelCaptureInfantryPressure;
+        if (defensiveInfantryThreat)
+        {
+            openFireSupportSlots = Mathf.Max(openFireSupportSlots, 1);
+            preferDefensiveFireSupport = true;
+            offensiveAntiInfantryFireSupport = true;
+            Debug.Log($"[AI Shopping] defesa anti-inf demand: nearBase={defensiveInfantryThreatCount} visibleCap={visibleEnemyCapturers} intelInf={defensiveInfantryPressure:F1} capture={defensiveCapturePressure:F1} criticalAir={criticalBaseAirThreat} -> fire={openFireSupportSlots}");
+        }
         UnitData eliteDefensiveTankTarget = defensiveArmorThreat ? FindEliteDefensiveTankReserveTarget(snapshot) : null;
         int reserveForEliteDefensiveTank = 0;
         if (eliteDefensiveTankTarget != null && remaining < eliteDefensiveTankTarget.cost)
@@ -872,8 +908,11 @@ public partial class AIShoppingPlanner : MonoBehaviour
                     spendBudget = Mathf.Min(spendBudget, Mathf.Max(0, remaining - reserveForEliteFireSupport));
                 }
             }
-            // Reserva para transporte aéreo + combate aéreo — suspensa em emergências e modo defensivo.
-            if ((reserveForAirTransport > 0 || reserveForAirCombat > 0) && !defensiveBaseThreat && !forcedProduction)
+            // Reserva para transporte aéreo + combate aéreo. Defesa de base terrestre nao deve
+            // drenar o caixa reservado quando ja existe demanda aerea e aerodromo disponivel.
+            if ((reserveForAirTransport > 0 || reserveForAirCombat > 0)
+                && !forcedProduction
+                && !emergencyProductionDefense)
             {
                 int spendAfterAirReserves = Mathf.Max(0, remaining - reserveForAirTransport - reserveForAirCombat);
                 if (reserveForCapturerPassenger > 0 && openCapturerSlots > 0)
@@ -983,6 +1022,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
             bool anyAirDemand      = wantsAirTransport || wantsCacaB || wantsCacaA || wantsApache || wantsBomba || wantsAirTanker;
             bool noLandOnlyFilter  = !onlyCapturers && !onlyAssault && !onlyTransporter && !onlyLogistics && !onlyFireSupport;
             bool airOnlyFilter     = onlyAirTransporter || onlyInterceptador || onlyAtaqueAereo || onlyLogistics;
+            bool urgentCacaB       = HasUrgentCacaBThreat(snapshot, intelReport);
 
             if (airBuildings.Count > 0 && anyAirDemand && (noLandOnlyFilter || airOnlyFilter))
             {
@@ -1001,7 +1041,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
                     }
 
                     UnitData airUnit = PickAirUnit(building, remaining,
-                        wantsAirTransport, wantsCacaB, wantsCacaA, wantsApache, wantsBomba, wantsAirTanker);
+                        wantsAirTransport, wantsCacaB, wantsCacaA, wantsApache, wantsBomba, wantsAirTanker,
+                        urgentCacaB);
                     if (airUnit == null)
                     {
                         Debug.Log($"[AI Shopping Air] {building.ConstructionDisplayName} @ {cell} — sem unidade aérea disponível ou sem budget");

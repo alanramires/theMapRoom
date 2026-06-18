@@ -108,13 +108,17 @@ public partial class AIShoppingPlanner
 
         if (airThreat >= Instance.IntelAirThreatAntiAirThreshold)
         {
+            bool localAirThreat = CountVisibleEnemyAircraftNearHQ(snapshot, Instance.AntiAirCoverageRange) > 0;
             int beforeAssault = openAssaultSlots;
             int beforeFire = openFireSupportSlots;
             int beforeCacaB = openCacaBSlots;
-            proactiveAntiAir = true;
-            openAssaultSlots = Mathf.Max(openAssaultSlots, 1);
+            if (localAirThreat)
+            {
+                proactiveAntiAir = true;
+                openAssaultSlots = Mathf.Max(openAssaultSlots, 1);
+            }
             openCacaBSlots = Mathf.Max(openCacaBSlots, 1);
-            if (activeAAAs >= 1 && activeSAMs < 1)
+            if (localAirThreat && activeAAAs >= 1 && activeSAMs < 1)
             {
                 openFireSupportSlots = Mathf.Max(openFireSupportSlots, 1);
                 preferDefensiveFireSupport = true;

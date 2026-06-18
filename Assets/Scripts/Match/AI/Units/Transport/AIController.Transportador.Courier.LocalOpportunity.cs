@@ -13,7 +13,8 @@ public partial class AIController
         Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
-        out PlayerAction action)
+        out PlayerAction action,
+        bool allowAssignedPassengers = false)
     {
         action = null;
         if (transporter == null || passengers == null || passengers.Count == 0 || snapshot == null)
@@ -41,12 +42,12 @@ public partial class AIController
 
         foreach (UnitManager passenger in passengers)
         {
-            if (!IsRogueLocalOpportunityPassenger(passenger, plan))
+            if (!IsRogueLocalOpportunityPassenger(passenger, plan, allowAssignedPassengers))
                 continue;
 
             foreach (ConstructionManager target in ConstructionManager.AllActive)
             {
-                if (!IsRogueLocalOpportunityTarget(target, snapshot.AITeam, plan))
+                if (!IsRogueLocalOpportunityTarget(target, snapshot.AITeam, plan, allowAssignedPassengers))
                     continue;
 
                 Vector3Int targetCell = target.CurrentCellPosition;
@@ -103,14 +104,16 @@ public partial class AIController
 
         if (bestTransporterCell == fromCell)
         {
-            Debug.Log($"{TL("Transporte")} {transporter.InstanceId} courier rogue libera #{bestPassenger.InstanceId} em {bestTarget.Sector} agora dc={bestOption.disembarkCell} alvo={targetPos} score={bestScore:F0}");
+            string mode = allowAssignedPassengers ? "assigned-op" : "rogue";
+            Debug.Log($"{TL("Transporte")} {transporter.InstanceId} courier {mode} libera #{bestPassenger.InstanceId} em {bestTarget.Sector} agora dc={bestOption.disembarkCell} alvo={targetPos} score={bestScore:F0}");
             action = BuildDesembarcarBatch(transporter, snapshot.AITeam, fromCell, selected);
             return true;
         }
 
         List<Vector3Int> movePath = null;
         paths?.TryGetValue(bestTransporterCell, out movePath);
-        Debug.Log($"{TL("Transporte")} {transporter.InstanceId} courier rogue libera #{bestPassenger.InstanceId} em {bestTarget.Sector} via {bestTransporterCell} dc={bestOption.disembarkCell} alvo={targetPos} score={bestScore:F0}");
+        string moveMode = allowAssignedPassengers ? "assigned-op" : "rogue";
+        Debug.Log($"{TL("Transporte")} {transporter.InstanceId} courier {moveMode} libera #{bestPassenger.InstanceId} em {bestTarget.Sector} via {bestTransporterCell} dc={bestOption.disembarkCell} alvo={targetPos} score={bestScore:F0}");
         action = BuildDesembarcarBatch(transporter, snapshot.AITeam, fromCell, selected, bestTransporterCell, movePath);
         return true;
     }
@@ -168,7 +171,7 @@ public partial class AIController
                 dropCell.z = 0;
                 foreach (ConstructionManager target in ConstructionManager.AllActive)
                 {
-                    if (requireUnheldRallyPoint && !IsUnheldCourierRallyTarget(target, snapshot.AITeam))
+                    if (requireUnheldRallyPoint && !IsUnheldCourierRallyOwnerPoint(target, snapshot.AITeam))
                     {
                         targetRejected++;
                         continue;
@@ -233,7 +236,8 @@ public partial class AIController
     private bool IsRogueLocalOpportunityTarget(
         ConstructionManager target,
         TeamId aiTeam,
-        TeamObjectivePlan plan)
+        TeamObjectivePlan plan,
+        bool allowAssignedPassengers = false)
     {
         if (target == null || !target.IsCapturable || target.CapturePointsMax <= 0)
             return false;
@@ -243,7 +247,7 @@ public partial class AIController
             return false;
         if (HasBlockingSurfaceUnitAtCell(target.CurrentCellPosition))
             return false;
-        if (HasPlanAllocationForSector(plan, target.Sector, aiTeam))
+        if (HasPlanAllocationForSector(plan, target, aiTeam, blockAnyReadyUnit: !allowAssignedPassengers))
             return false;
 
         return true;
@@ -261,11 +265,13 @@ public partial class AIController
         return target.TeamId != aiTeam || target.CurrentCapturePoints < target.CapturePointsMax;
     }
 
-    private bool IsUnheldCourierRallyTarget(ConstructionManager target, TeamId aiTeam)
+    private bool IsUnheldCourierRallyOwnerPoint(ConstructionManager target, TeamId aiTeam)
     {
         if (target == null || !target.IsRallyPoint || target.Sector == ConstructionSector.None)
             return false;
         if (!target.IsCapturable || target.CapturePointsMax <= 0)
+            return false;
+        if (!TryGetOwnedRallySlot(target, aiTeam, out _))
             return false;
         if (TryGetAnySectorInfo(target.Sector, out SectorManager.SectorInfo info)
             && IsRallySectorHeldByTeam(info, aiTeam))
@@ -274,10 +280,20 @@ public partial class AIController
         return target.TeamId != aiTeam || target.CurrentCapturePoints < target.CapturePointsMax;
     }
 
-    private bool HasPlanAllocationForSector(TeamObjectivePlan plan, ConstructionSector sector, TeamId aiTeam)
+    private bool HasPlanAllocationForSector(
+        TeamObjectivePlan plan,
+        ConstructionManager target,
+        TeamId aiTeam,
+        bool blockAnyReadyUnit = true)
     {
         if (plan == null || plan.Objectives == null)
             return false;
+        if (target == null)
+            return false;
+
+        ConstructionSector sector = target.Sector;
+        Vector3Int targetCell = target.CurrentCellPosition;
+        targetCell.z = 0;
 
         foreach (SectorObjective obj in plan.Objectives)
         {
@@ -289,12 +305,37 @@ public partial class AIController
                 if (slot == null || !slot.Filled)
                     continue;
                 UnitManager assigned = FindActiveUnit(slot.AssignedUnitId, aiTeam);
-                if (assigned != null && !assigned.IsEmbarked && !assigned.HasActed)
+                if (assigned == null || assigned.IsEmbarked || assigned.IsUnderRepair)
+                    continue;
+                if (blockAnyReadyUnit && !assigned.HasActed)
+                    return true;
+                if (slot.Role == UnitRole.Capturador && IsAssignedCapturerCloseToLocalOpportunity(assigned, targetCell, aiTeam))
                     return true;
             }
         }
 
         return false;
+    }
+
+    private bool IsAssignedCapturerCloseToLocalOpportunity(UnitManager assigned, Vector3Int targetCell, TeamId aiTeam)
+    {
+        if (assigned == null)
+            return false;
+        if (!assigned.TryGetUnitData(out UnitData data) || data?.roles == null || !data.roles.Contains(UnitRole.Capturador))
+            return false;
+
+        Vector3Int assignedCell = assigned.CurrentCellPosition;
+        assignedCell.z = 0;
+        targetCell.z = 0;
+
+        float distance = SectorManager.TryGetLandMovementDistance(assignedCell, targetCell, data, out int unitCost)
+            ? unitCost
+            : SectorManager.TryGetLandMovementDistance(assignedCell, targetCell, out int terrainCost)
+                ? terrainCost
+                : SectorManager.HexDistance(assignedCell, targetCell);
+
+        int threshold = Mathf.Max(4, GetEffectiveTransportThreshold(aiTeam) / 2 + 1);
+        return distance <= threshold;
     }
 
     private bool HasBlockingSurfaceUnitAtCell(Vector3Int cell)

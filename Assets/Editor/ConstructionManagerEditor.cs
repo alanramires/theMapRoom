@@ -34,7 +34,7 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty sectorProp;
     private SerializedProperty isForwardObserverSpotProp;
     private SerializedProperty isRallyPointProp;
-    private SerializedProperty rallyTargetSlotIndexesProp;
+    private SerializedProperty rallyOwnerSlotIndexProp;
     private SerializedProperty isAnchorSectorProp;
     private SerializedProperty anchorSectorSlotIndexProp;
     private ForceCopyFilter forceCopyFilter = ForceCopyFilter.Army;
@@ -88,7 +88,7 @@ public class ConstructionManagerEditor : Editor
         sectorProp = serializedObject.FindProperty("sector");
         isForwardObserverSpotProp = serializedObject.FindProperty("isForwardObserverSpot");
         isRallyPointProp = serializedObject.FindProperty("isRallyPoint");
-        rallyTargetSlotIndexesProp = serializedObject.FindProperty("rallyTargetSlotIndexes");
+        rallyOwnerSlotIndexProp = serializedObject.FindProperty("rallyOwnerSlotIndex");
         isAnchorSectorProp = serializedObject.FindProperty("isAnchorSector");
         anchorSectorSlotIndexProp = serializedObject.FindProperty("anchorSectorSlotIndex");
     }
@@ -176,7 +176,7 @@ public class ConstructionManagerEditor : Editor
             EditorGUILayout.PropertyField(isForwardObserverSpotProp, new GUIContent("Forward Observer Spot"));
         if (isRallyPointProp != null)
             EditorGUILayout.PropertyField(isRallyPointProp, new GUIContent("Rally Point"));
-        DrawRallyTargetSlotsList();
+        DrawRallyOwnerSlot();
         if (isAnchorSectorProp != null)
             EditorGUILayout.PropertyField(isAnchorSectorProp, new GUIContent("Anchor Sector"));
         DrawAnchorSectorSlot();
@@ -229,9 +229,9 @@ public class ConstructionManagerEditor : Editor
         }
     }
 
-    private void DrawRallyTargetSlotsList()
+    private void DrawRallyOwnerSlot()
     {
-        if (rallyTargetSlotIndexesProp == null)
+        if (rallyOwnerSlotIndexProp == null)
             return;
 
         using (new EditorGUI.DisabledScope(isRallyPointProp != null && !isRallyPointProp.boolValue))
@@ -240,83 +240,22 @@ public class ConstructionManagerEditor : Editor
             int slotCount = mc != null ? mc.SlotCount : 0;
             if (slotCount <= 0)
             {
-                EditorGUILayout.PropertyField(rallyTargetSlotIndexesProp, new GUIContent("Rally Target Slots"), includeChildren: true);
+                EditorGUILayout.PropertyField(rallyOwnerSlotIndexProp, new GUIContent("Rally Owner Slot"));
                 return;
             }
 
-            string[] labels = new string[slotCount];
+            string[] labels = new string[slotCount + 1];
+            labels[0] = "None";
             for (int i = 0; i < slotCount; i++)
             {
                 TeamId team = mc.GetTeamIdForSlot(i);
-                labels[i] = $"Slot {i} - {TeamUtils.GetName(team)}";
+                labels[i + 1] = $"Slot {i} - {TeamUtils.GetName(team)}";
             }
 
-            EditorGUILayout.LabelField("Rally Target Slots", EditorStyles.miniBoldLabel);
-            EditorGUI.indentLevel++;
-            for (int i = 0; i < rallyTargetSlotIndexesProp.arraySize; i++)
-            {
-                SerializedProperty item = rallyTargetSlotIndexesProp.GetArrayElementAtIndex(i);
-                if (item == null)
-                    continue;
-
-                EditorGUILayout.BeginHorizontal();
-                int currentSlot = Mathf.Clamp(item.intValue, 0, slotCount - 1);
-                int selectedSlot = EditorGUILayout.Popup($"Invasion Target {i + 1}", currentSlot, labels);
-                if (IsRallyTargetSlotUsed(selectedSlot, i))
-                    selectedSlot = FindFirstUnusedRallyTargetSlot(slotCount, currentSlot, i);
-                item.intValue = selectedSlot;
-                if (GUILayout.Button("-", GUILayout.Width(24f)))
-                {
-                    rallyTargetSlotIndexesProp.DeleteArrayElementAtIndex(i);
-                    i--;
-                }
-                EditorGUILayout.EndHorizontal();
-            }
-
-            using (new EditorGUI.DisabledScope(rallyTargetSlotIndexesProp.arraySize >= slotCount))
-            {
-                if (GUILayout.Button("Add Rally Target Slot"))
-                {
-                    int nextSlot = FindFirstUnusedRallyTargetSlot(slotCount, 0, exceptIndex: -1);
-
-                    int index = rallyTargetSlotIndexesProp.arraySize;
-                    rallyTargetSlotIndexesProp.InsertArrayElementAtIndex(index);
-                    SerializedProperty item = rallyTargetSlotIndexesProp.GetArrayElementAtIndex(index);
-                    if (item != null)
-                        item.intValue = Mathf.Clamp(nextSlot, 0, slotCount - 1);
-                }
-            }
-            EditorGUI.indentLevel--;
+            int currentOption = Mathf.Clamp(rallyOwnerSlotIndexProp.intValue + 1, 0, slotCount);
+            int selectedOption = EditorGUILayout.Popup("Rally Owner Slot", currentOption, labels);
+            rallyOwnerSlotIndexProp.intValue = selectedOption - 1;
         }
-    }
-
-    private bool IsRallyTargetSlotUsed(int slot, int exceptIndex)
-    {
-        if (rallyTargetSlotIndexesProp == null)
-            return false;
-
-        for (int i = 0; i < rallyTargetSlotIndexesProp.arraySize; i++)
-        {
-            if (i == exceptIndex)
-                continue;
-
-            SerializedProperty item = rallyTargetSlotIndexesProp.GetArrayElementAtIndex(i);
-            if (item != null && item.intValue == slot)
-                return true;
-        }
-
-        return false;
-    }
-
-    private int FindFirstUnusedRallyTargetSlot(int slotCount, int fallback, int exceptIndex)
-    {
-        for (int slot = 0; slot < slotCount; slot++)
-        {
-            if (!IsRallyTargetSlotUsed(slot, exceptIndex))
-                return slot;
-        }
-
-        return Mathf.Clamp(fallback, 0, Mathf.Max(0, slotCount - 1));
     }
 
     private void DrawSectorPopup()

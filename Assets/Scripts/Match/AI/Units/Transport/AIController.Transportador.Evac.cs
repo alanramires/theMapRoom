@@ -7,6 +7,8 @@ public partial class AIController
     private const int EvacPickupRange = 3;
     private const float RepairEvacRouteThreshold = 6f;
     private const float RepairEvacTurnThreshold = 2f;
+    private const int AirEvacPrepositionEnemyRange = 3;
+    private const int AirEvacPatientEnemyRange = 2;
 
     // -------------------------------------------------------------------------
     // EVAC Shuttle — empty APC positions next to a frontline unit-under-repair
@@ -29,6 +31,18 @@ public partial class AIController
         Vector3Int moveTarget = FindTransportShuttleMove(
             unit, fromCell, evacueeCell, paths, occupied, snapshot.AITeam,
             objective, passengerReachable, plan, null, paths);
+        bool airTransport = IsAirTransporter(unit);
+        bool immediatePickup = IsPassengerInPickupRange(moveTarget, evacueeCell, EvacPickupRange, passengerReachable);
+        if (airTransport
+            && moveTarget != fromCell
+            && !immediatePickup
+            && !IsAirEvacPrepositionSafe(moveTarget, evacueeCell, snapshot.AITeam, out string unsafeReason))
+        {
+            Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} EVAC aborta pre-pickup #{evacuee.InstanceId}@{evacueeCell} via {moveTarget}: {unsafeReason}");
+            return BuildAirTransportReturnToWaitTarget(unit, snapshot, fromCell, paths, occupied,
+                $"EVAC pre-pickup inseguro ({unsafeReason})");
+        }
+
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} EVAC shuttle — resgata #{evacuee.InstanceId}@{evacueeCell} via {moveTarget}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
     }
@@ -224,6 +238,67 @@ public partial class AIController
         cell.z = 0;
         return !HasEnemyUnitAnyLayerAtCell(cell, aiTeam)
             && !HasNearbyVisibleEnemy(cell, aiTeam, DefenseEnemyRange);
+    }
+
+    private bool IsAirEvacPrepositionSafe(
+        Vector3Int lzCell,
+        Vector3Int evacueeCell,
+        TeamId aiTeam,
+        out string reason)
+    {
+        lzCell.z = 0;
+        evacueeCell.z = 0;
+        reason = "";
+
+        if (HasEnemyUnitAnyLayerAtCell(lzCell, aiTeam))
+        {
+            reason = "LZ ocupada por inimigo";
+            return false;
+        }
+
+        int lzEnemies = CountVisibleEnemiesNearNoCache(lzCell, aiTeam, AirEvacPrepositionEnemyRange);
+        if (lzEnemies > 0)
+        {
+            reason = $"LZ quente inimigos={lzEnemies}<={AirEvacPrepositionEnemyRange}h";
+            return false;
+        }
+
+        int patientEnemies = CountVisibleEnemiesNearNoCache(evacueeCell, aiTeam, AirEvacPatientEnemyRange);
+        if (patientEnemies > 0)
+        {
+            reason = $"paciente sob pressao inimigos={patientEnemies}<={AirEvacPatientEnemyRange}h";
+            return false;
+        }
+
+        float lzThreat = CalculateThreatLevel(lzCell, aiTeam);
+        if (lzThreat > 0.1f)
+        {
+            reason = $"threat LZ={lzThreat:F1}";
+            return false;
+        }
+
+        return true;
+    }
+
+    private int CountVisibleEnemiesNearNoCache(Vector3Int cell, TeamId aiTeam, int range)
+    {
+        cell.z = 0;
+        int count = 0;
+        MatchController mc = GetMatchController();
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy == null || enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked)
+                continue;
+            if (mc != null && !mc.IsUnitVisibleForTeamNoCache(enemy, aiTeam))
+                continue;
+
+            Vector3Int ec = enemy.CurrentCellPosition;
+            ec.z = 0;
+            if (SectorManager.HexDistance(ec, cell) <= range)
+                count++;
+        }
+
+        return count;
     }
 
     // Picks the disembark cell for the evacuee closest to the repair destination.

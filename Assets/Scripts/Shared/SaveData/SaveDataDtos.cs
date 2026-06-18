@@ -202,8 +202,7 @@ public class ConstructionSaveData
     public int teamId;
     public int slotIndex = -1;
     public int sector;
-    public int rallyTargetSlotIndex = -1;
-    public List<int> rallyTargetSlotIndexes = new List<int>();
+    public int rallyOwnerSlotIndex = -1;
     public bool isAnchorSector;
     public int anchorSectorSlotIndex = -1;
     public int cellX;

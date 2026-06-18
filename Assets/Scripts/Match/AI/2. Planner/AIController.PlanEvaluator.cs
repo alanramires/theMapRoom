@@ -15,7 +15,7 @@ public partial class AIController
         TeamId aiTeam = snapshot.AITeam;
         TeamObjectivePlan plan = ObjectiveManager.GetOrCreatePlanForTeam(aiTeam);
         AIIntelReport intel = BuildPlanIntelReport(snapshot);
-        AIRallyPlanContext rallyContext = BuildRallyPlanContext(aiTeam, snapshot.TurnNumber);
+        AIRallyPlanContext rallyContext = BuildRallyPlanContext(aiTeam, snapshot.AISlotIndex, snapshot.TurnNumber);
         AIAnchorPlanContext anchorContext = BuildAnchorPlanContext(aiTeam, snapshot.TurnNumber);
 
         // Passo 1: valida objetivos existentes
@@ -1487,7 +1487,6 @@ public partial class AIController
         }
     }
 }
-
 
 
 

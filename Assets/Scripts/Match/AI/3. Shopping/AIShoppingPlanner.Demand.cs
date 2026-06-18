@@ -99,8 +99,12 @@ public partial class AIShoppingPlanner
     private static int ComputeApacheDemand(AIWorldSnapshot snapshot)
     {
         if (snapshot == null) return 0;
+
+        // The turn no longer hard-blocks the demand (mirrors ComputeCacaBDemand): it only drops the
+        // baseline presence floor. Real, self-regulating demand — escorting our own Chinooks and
+        // countering visible enemy helicopters — flows through even in the early game.
         int minTurn = Instance != null ? Instance.MinTurnForAtaqueAereo : 5;
-        if (snapshot.TurnNumber > 0 && snapshot.TurnNumber < minTurn) return 0;
+        bool tooEarly = snapshot.TurnNumber > 0 && snapshot.TurnNumber < minTurn;
 
         int activeChinooks = 0;
         if (snapshot.MyUnits != null)
@@ -111,13 +115,31 @@ public partial class AIShoppingPlanner
                 if (d.domain == Domain.Air && d.roles[0] == UnitRole.Transportador) activeChinooks++;
             }
 
+        // Apache as an alternative anti-helicopter: count visible enemy helicopters (same definition
+        // as ComputeCacaBDemand) and let them raise the desired count.
+        int enemyHelicos = 0;
+        if (snapshot.EnemyUnits != null)
+            foreach (UnitManager u in snapshot.EnemyUnits)
+            {
+                if (u == null || u.IsDead || u.IsEmbarked) continue;
+                if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
+                if (d.domain != Domain.Air) continue;
+                UnitRole r = d.roles[0];
+                if (r == UnitRole.Transportador || (r == UnitRole.AtaqueAereo && d.eliteLevel == 0))
+                    enemyHelicos++;
+            }
+
         int ratio       = Instance != null ? Instance.ChinooksPorApache : 2;
-        int minPresence = Instance != null ? Instance.MinApachePresence : 1;
-        int desired = Mathf.Max(minPresence, Mathf.CeilToInt(activeChinooks / (float)ratio));
+        int heliRatio   = Instance != null ? Instance.HelicopterosInimigosPorApache : 3;
+        int minPresence = tooEarly ? 0 : (Instance != null ? Instance.MinApachePresence : 1);
+
+        int escortDesired = Mathf.CeilToInt(activeChinooks / (float)ratio);
+        int threatDesired = Mathf.CeilToInt(enemyHelicos / (float)heliRatio);
+        int desired = Mathf.Max(minPresence, Mathf.Max(escortDesired, threatDesired));
 
         bool defenseBonus = snapshot.Stance == AIStance.Defensive
             && Instance != null && Instance.ComprarApacheEmModoDefesa;
-        if (defenseBonus) desired = Mathf.Max(desired, 1);
+        if (defenseBonus && !tooEarly) desired = Mathf.Max(desired, 1);
 
         int active = 0;
         if (snapshot.MyUnits != null)
@@ -129,15 +151,19 @@ public partial class AIShoppingPlanner
             }
 
         int demand = Mathf.Max(0, desired - active);
-        Debug.Log($"[AI Shopping] apache_demand: demand={demand} desired={desired} active={active} chinooks={activeChinooks} ratio=1:{ratio} defBonus={defenseBonus}");
+        Debug.Log($"[AI Shopping] apache_demand: demand={demand} desired={desired} active={active} chinooks={activeChinooks} escort={escortDesired} enemyHelicos={enemyHelicos} threat={threatDesired} ratio=1:{ratio} heliRatio=1:{heliRatio} tooEarly={tooEarly} defBonus={defenseBonus}");
         return demand;
     }
 
     private static int ComputeBombaDemand(AIWorldSnapshot snapshot)
     {
         if (snapshot == null) return 0;
+
+        // Bombardeiro e uma peca de ruptura ofensiva, nao apenas um upgrade depois de X Apaches.
+        // A regra por Apaches continua existindo, mas plano ofensivo com economia madura tambem
+        // abre demanda para botar pressao e preparar invasao.
         int minTurn = Instance != null ? Instance.MinTurnForAtaqueAereo : 5;
-        if (snapshot.TurnNumber > 0 && snapshot.TurnNumber < minTurn) return 0;
+        bool tooEarly = snapshot.TurnNumber > 0 && snapshot.TurnNumber < minTurn;
 
         int activeApaches = 0;
         if (snapshot.MyUnits != null)
@@ -148,9 +174,23 @@ public partial class AIShoppingPlanner
                 if (d.roles[0] == UnitRole.AtaqueAereo && d.eliteLevel == 0) activeApaches++;
             }
 
+        bool offensivePlan = snapshot.Stance == AIStance.Offensive
+            || snapshot.Stance == AIStance.Tactical
+            || HasAnyOffensiveObjective(snapshot.AITeam);
+        bool economyReady = snapshot.Budget >= Mathf.Max(20000, Mathf.Max(1, snapshot.IncomePerTurn) * 2);
+        int activeCapturers = CountActiveUnitsWithRole(snapshot, UnitRole.Capturador, requirePrimary: false);
+        int activeAssault = CountActiveUnitsWithRole(snapshot, UnitRole.Assalto, requirePrimary: true);
+        int minCap = Instance != null ? Instance.MinActiveCapturersForFireSupport : 2;
+        int minAss = Instance != null ? Instance.MinActiveAssaultForFireSupport : 1;
+        bool armyReady = activeCapturers >= minCap && activeAssault >= minAss;
+        bool turnAllowsOffensiveBomba = !tooEarly || HasPreventiveDefenseBudget(snapshot);
+        int offensiveDesired = offensivePlan && economyReady && armyReady && turnAllowsOffensiveBomba ? 1 : 0;
+        if (offensiveDesired > 0 && snapshot.Budget >= 45000 && activeApaches >= 2)
+            offensiveDesired = 2;
+
         int ratio       = Instance != null ? Instance.ApachesParaBombardeiro : 2;
-        int minPresence = Instance != null ? Instance.MinBombaPresence : 0;
-        int desired     = Mathf.Max(minPresence, Mathf.FloorToInt(activeApaches / (float)ratio));
+        int minPresence = tooEarly ? 0 : (Instance != null ? Instance.MinBombaPresence : 0);
+        int desired     = Mathf.Max(minPresence, Mathf.FloorToInt(activeApaches / (float)ratio), offensiveDesired);
 
         int active = 0;
         if (snapshot.MyUnits != null)
@@ -162,7 +202,7 @@ public partial class AIShoppingPlanner
             }
 
         int demand = Mathf.Max(0, desired - active);
-        Debug.Log($"[AI Shopping] bomba_demand: demand={demand} desired={desired} active={active} apaches={activeApaches} ratio=1:{ratio}");
+        Debug.Log($"[AI Shopping] bomba_demand: demand={demand} desired={desired} active={active} apaches={activeApaches} offensive={offensiveDesired} plan={offensivePlan} economy={economyReady} army={armyReady} cap={activeCapturers}/{minCap} ass={activeAssault}/{minAss} ratio=1:{ratio} tooEarly={tooEarly}");
         return demand;
     }
 

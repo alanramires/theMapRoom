@@ -61,6 +61,8 @@ public partial class AIShoppingPlanner
 
         int minArt = Instance != null ? Instance.MinBaseArtilharia : 1;
         int minAAA = Instance != null ? Instance.MinBaseAAA : 1;
+        int airCoverageRange = Instance != null ? Instance.AntiAirCoverageRange : 5;
+        int aircraftNearHQ = CountVisibleEnemyAircraftNearHQ(snapshot, airCoverageRange);
 
         int activeArt = 0, activeAntiAir = 0;
         if (snapshot.MyUnits != null)
@@ -73,8 +75,8 @@ public partial class AIShoppingPlanner
             }
 
         openArtSlots = Mathf.Max(0, minArt - activeArt);
-        forceBaseAAA = activeAntiAir < minAAA;
-        Debug.Log($"[AI Shopping] base_defense: activeArt={activeArt}/{minArt} activeAAA={activeAntiAir}/{minAAA} artSlots={openArtSlots} forceAAA={forceBaseAAA} richEarly={richEarly}");
+        forceBaseAAA = activeAntiAir < minAAA && aircraftNearHQ > 0;
+        Debug.Log($"[AI Shopping] base_defense: activeArt={activeArt}/{minArt} activeAAA={activeAntiAir}/{minAAA} aircraftNearHQ={aircraftNearHQ}<={airCoverageRange} artSlots={openArtSlots} forceAAA={forceBaseAAA} richEarly={richEarly}");
     }
 
     private static bool ComputeProactiveDefensiveFireSupportNeeded(AIWorldSnapshot snapshot)
@@ -124,6 +126,7 @@ public partial class AIShoppingPlanner
         foreach (UnitManager enemy in snapshot.EnemyUnits)
         {
             if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.GetHeightLevel() != HeightLevel.Surface) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(cell, ec) <= safeRange) return true;
         }
@@ -144,6 +147,7 @@ public partial class AIShoppingPlanner
         foreach (UnitManager enemy in snapshot.EnemyUnits)
         {
             if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.GetHeightLevel() != HeightLevel.Surface) continue;
             Vector3Int enemyCell = enemy.CurrentCellPosition;
             enemyCell.z = 0;
             if (SectorManager.HexDistance(baseCell, enemyCell) <= safeRange)
@@ -193,6 +197,19 @@ public partial class AIShoppingPlanner
         return count;
     }
 
+    private static bool HasUrgentCacaBThreat(AIWorldSnapshot snapshot, AIIntelReport intel)
+    {
+        int visibleAir = CountTotalVisibleEnemyAircraft(snapshot);
+        if (visibleAir > 0)
+            return true;
+
+        if (intel == null || Instance == null)
+            return false;
+
+        float threshold = Mathf.Max(3f, Instance.IntelAirThreatAntiAirThreshold * 2f);
+        return intel.enemyAirThreatScore >= threshold;
+    }
+
     private static int CountVisibleEnemyInfantryNearOwnedBase(AIWorldSnapshot snapshot, int range)
     {
         if (snapshot == null || snapshot.EnemyUnits == null || snapshot.MyBuildings == null)
@@ -215,6 +232,23 @@ public partial class AIShoppingPlanner
                 Vector3Int bc = building.CurrentCellPosition; bc.z = 0;
                 if (SectorManager.HexDistance(bc, ec) <= safeRange) { count++; break; }
             }
+        }
+        return count;
+    }
+
+    private static int CountVisibleEnemyCapturers(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.EnemyUnits == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (!enemy.TryGetUnitData(out UnitData d) || d == null) continue;
+            if (d.domain != Domain.Land) continue;
+            if (d.roles == null || !d.roles.Contains(UnitRole.Capturador)) continue;
+            count++;
         }
         return count;
     }

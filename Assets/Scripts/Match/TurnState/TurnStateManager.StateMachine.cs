@@ -78,33 +78,163 @@ public partial class TurnStateManager
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
 
-        return TryCycleSelectedUnitWithinHex(direction) ? ActionSfx.Confirm : ActionSfx.None;
+        return TryCycleSelectionWithinHex(direction) ? ActionSfx.Confirm : ActionSfx.None;
     }
 
-    private bool TryCycleSelectedUnitWithinHex(int direction)
+    // Page Up / Page Down anchored on a single hex. The cycle spans every selectable ally unit
+    // AND the hex's shoppable ally construction (appended at the end), so the player can rotate
+    // between, e.g., the helicopter in the air, the tank on the ground, and the factory's shop.
+    // Crossing onto the construction leaves UnitSelected for ShoppingAndServices and vice versa.
+    private bool TryCycleSelectionWithinHex(int direction)
     {
         if (direction == 0)
             return false;
-        if (CurrentCursorState != CursorState.UnitSelected || selectedUnit == null)
-            return false;
 
-        Vector3Int cell = selectedUnit.CurrentCellPosition;
+        Vector3Int cell;
+        bool currentIsConstruction;
+        if (CurrentCursorState == CursorState.UnitSelected && selectedUnit != null)
+        {
+            cell = selectedUnit.CurrentCellPosition;
+            currentIsConstruction = false;
+        }
+        else if (CurrentCursorState == CursorState.ShoppingAndServices && shoppingConstruction != null)
+        {
+            cell = shoppingConstruction.CurrentCellPosition;
+            currentIsConstruction = true;
+        }
+        else
+        {
+            return false;
+        }
         cell.z = 0;
 
-        List<UnitManager> candidates = CollectSelectableAlliesAtCell(cell);
-        if (candidates.Count <= 1)
+        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        List<UnitManager> units = CollectSelectableAlliesAtCell(cell);
+        // When already in the shop, the construction is definitionally part of the cycle (we got
+        // here); otherwise it joins only when reachable (ally, shoppable, cell not blocked).
+        ConstructionManager construction = currentIsConstruction
+            ? shoppingConstruction
+            : ResolveCyclableConstructionAtCell(cell, activeTeam);
+        bool hasConstruction = construction != null;
+
+        // Construction occupies the slot right after the units.
+        int total = units.Count + (hasConstruction ? 1 : 0);
+        if (total <= 1)
             return false;
 
-        int currentIndex = candidates.IndexOf(selectedUnit);
-        if (currentIndex < 0)
-            return false;
+        int currentIndex;
+        if (currentIsConstruction)
+            currentIndex = units.Count;
+        else
+        {
+            currentIndex = units.IndexOf(selectedUnit);
+            if (currentIndex < 0)
+                return false;
+        }
 
         int step = direction >= 0 ? 1 : -1;
-        UnitManager next = candidates[(currentIndex + step + candidates.Count) % candidates.Count];
-        if (next == null || next == selectedUnit)
+        int nextIndex = (currentIndex + step + total) % total;
+        if (nextIndex == currentIndex)
             return false;
 
-        ReselectUnitInPlace(next, cell);
+        bool nextIsConstruction = hasConstruction && nextIndex == units.Count;
+
+        if (!currentIsConstruction && !nextIsConstruction)
+        {
+            // Unit -> unit: swap in place, staying in UnitSelected.
+            UnitManager next = units[nextIndex];
+            if (next == null || next == selectedUnit)
+                return false;
+            ReselectUnitInPlace(next, cell);
+            return true;
+        }
+
+        if (!currentIsConstruction && nextIsConstruction)
+        {
+            // Unit -> construction: drop the unit selection and open the shop.
+            ClearSelectionAndReturnToNeutral();
+            return TryEnterConstructionShoppingState(construction, activeTeam);
+        }
+
+        // Construction -> unit: close the shop and select the unit.
+        UnitManager nextUnit = units[nextIndex];
+        if (nextUnit == null)
+            return false;
+        ExitConstructionShoppingStateToNeutral(rollback: false);
+        return SelectUnitFromNeutral(nextUnit, cell);
+    }
+
+    // The hex's ally construction is part of the cycle only when it can actually be shopped
+    // (mirrors the conditions in TryEnterConstructionShoppingState), matching the default ENTER.
+    private ConstructionManager ResolveCyclableConstructionAtCell(Vector3Int cell, int activeTeam)
+    {
+        if (activeTeam < 0)
+            return null;
+
+        ConstructionManager construction = FindConstructionAtCell(cell);
+        if (construction == null || (int)construction.TeamId != activeTeam)
+            return null;
+
+        // The shop is unreachable while a ground/surface (blocking-band) unit sits on the
+        // construction — a new unit cannot be produced onto an occupied cell. Mirror the default
+        // ENTER rule (TryEnterUnblockedConstructionShoppingBeforeUnit) and keep it out of the loop.
+        if (HasBlockingUnitOnConstructionCell(cell))
+            return null;
+
+        // A landed aircraft that only took off temporarily for selection is still really grounded
+        // here — it returns to the ground once the selection is dropped, so the cell stays
+        // occupied and the shop must not open. An aircraft that was already airborne does not set
+        // this state and can reach the shop.
+        if (IsTemporarySelectionTakeoffGroundedOnCell(cell))
+            return null;
+
+        if (!construction.CanProduceUnitsForTeam((TeamId)activeTeam))
+            return null;
+
+        IReadOnlyList<UnitData> offered = construction.OfferedUnits;
+        if (offered == null || offered.Count == 0)
+            return null;
+
+        return construction;
+    }
+
+    // True when the active selection-takeoff lifted an originally-grounded aircraft off this cell.
+    // Its airborne state is temporary, so for occupancy purposes it still blocks the cell.
+    private bool IsTemporarySelectionTakeoffGroundedOnCell(Vector3Int cell)
+    {
+        if (!hasTemporaryTakeoffSelectionState
+            || temporaryTakeoffUnit == null
+            || !temporaryTakeoffOriginalGrounded)
+            return false;
+
+        Vector3Int takeoffCell = temporaryTakeoffUnit.CurrentCellPosition;
+        takeoffCell.z = 0;
+        cell.z = 0;
+        return takeoffCell == cell;
+    }
+
+    // Selects an ally unit starting from Neutral, mirroring the selection branch of
+    // HandleConfirmFromNeutralLikeState (takeoff prep, action buffer, advance to UnitSelected).
+    private bool SelectUnitFromNeutral(UnitManager unit, Vector3Int cell)
+    {
+        if (unit == null)
+            return false;
+
+        cell.z = 0;
+        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+
+        double takeoffPerfStart = Time.realtimeSinceStartupAsDouble;
+        TryPrepareTemporaryTakeoffStateForSelection(unit, out string takeoffInfo);
+        RegisterPerfTakeoffPrepDuration((Time.realtimeSinceStartupAsDouble - takeoffPerfStart) * 1000d);
+        if (!string.IsNullOrWhiteSpace(takeoffInfo) && SensorLogGate.IsPodeDecolarEnabled())
+            SensorLogGate.Log("PodeDecolar", takeoffInfo);
+
+        replayManager?.EnsureCurrentUnitActionBuffer(unit, cell);
+        SetSelectedUnit(unit);
+        ClearInspectedHelper();
+        Advance(CursorState.UnitSelected, "SelectUnitFromNeutral: cycle to unit within hex");
+        if (activeTeam >= 0)
+            DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Act);
         return true;
     }
 
@@ -119,7 +249,9 @@ public partial class TurnStateManager
 
         Tilemap referenceTilemap = terrainTilemap != null
             ? terrainTilemap
-            : (selectedUnit != null ? selectedUnit.BoardTilemap : null);
+            : (selectedUnit != null
+                ? selectedUnit.BoardTilemap
+                : (cursorController != null ? cursorController.BoardTilemap : null));
         if (referenceTilemap == null)
             return result;
 

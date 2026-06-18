@@ -10,6 +10,7 @@ public enum AIStance { Tactical, Offensive, Defensive }
 public class AIWorldSnapshot
 {
     public TeamId AITeam;
+    public int AISlotIndex = -1;
     public int TurnNumber;
     public AIStance Stance;
 
@@ -29,6 +30,7 @@ public class AIWorldSnapshot
     {
         var snap = new AIWorldSnapshot();
         snap.AITeam       = aiTeam;
+        snap.AISlotIndex  = ResolveSlotIndex(aiTeam, match);
         snap.TurnNumber   = match != null ? match.CurrentTurn : 0;
         snap.Budget       = match != null ? match.GetActualMoney(aiTeam) : 0;
         snap.IncomePerTurn = match != null ? match.GetIncomePerTurn(aiTeam) : 0;
@@ -41,7 +43,7 @@ public class AIWorldSnapshot
             snap.OccupiedCells.Add(p);
 
             if (u.TeamId == aiTeam) snap.MyUnits.Add(u);
-            else if (!u.IsHiddenByFogOfWar) snap.EnemyUnits.Add(u);
+            else if (match == null || match.IsUnitVisibleForTeamNoCache(u, aiTeam)) snap.EnemyUnits.Add(u);
         }
 
         foreach (ConstructionManager c in ConstructionManager.AllActive)
@@ -75,6 +77,7 @@ public class AIWorldSnapshot
     {
         var snap = new AIWorldSnapshot();
         snap.AITeam     = aiTeam;
+        snap.AISlotIndex = ResolveSlotIndex(aiTeam, match);
         snap.TurnNumber = match != null ? match.CurrentTurn : 0;
         snap.Budget     = match != null ? match.GetActualMoney(aiTeam) : 0;
 
@@ -102,6 +105,17 @@ public class AIWorldSnapshot
         }
 
         return snap;
+    }
+
+    private static int ResolveSlotIndex(TeamId aiTeam, MatchController match)
+    {
+        if (match == null || aiTeam == TeamId.Neutral)
+            return -1;
+
+        if (match.ActiveTeam == aiTeam)
+            return match.ActivePlayerListIndex;
+
+        return match.GetSlotIndexForTeam(aiTeam);
     }
 
     private static AIStance CalculateStance(AIWorldSnapshot snap)

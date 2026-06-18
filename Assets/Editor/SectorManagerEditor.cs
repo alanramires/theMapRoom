@@ -392,45 +392,30 @@ public class SectorManagerEditor : Editor
         {
             Vector3Int rallyCell = rally.CurrentCellPosition; rallyCell.z = 0;
 
-            bool drewExplicitTarget = false;
-            System.Collections.Generic.IReadOnlyList<int> targetSlots = rally.RallyTargetSlotIndexes;
-            if (targetSlots != null && targetSlots.Count > 0)
-            {
-                for (int i = 0; i < targetSlots.Count; i++)
-                {
-                    int targetSlot = targetSlots[i];
-                    if (targetSlot < 0)
-                        continue;
-
-                    AddRallyTargetLine(rallyCell, hqs, targetSlot, explicitTarget: true);
-                    drewExplicitTarget = true;
-                }
-            }
-
-            if (!drewExplicitTarget)
-                AddRallyTargetLine(rallyCell, hqs, targetSlot: -1, explicitTarget: false);
+            int ownerSlot = rally.RallyOwnerSlotIndex;
+            AddRallyOwnerLine(rallyCell, hqs, ownerSlot, explicitOwner: ownerSlot >= 0);
         }
     }
 
-    private static void AddRallyTargetLine(
+    private static void AddRallyOwnerLine(
         Vector3Int rallyCell,
         System.Collections.Generic.List<ConstructionManager> hqs,
-        int targetSlot,
-        bool explicitTarget)
+        int ownerSlot,
+        bool explicitOwner)
     {
-        ConstructionManager targetHQ = null;
-        float targetDist = float.MaxValue;
+        ConstructionManager ownerHQ = null;
+        float ownerDist = float.MaxValue;
 
-        if (explicitTarget)
+        if (explicitOwner)
         {
             foreach (ConstructionManager hq in hqs)
             {
-                if (hq == null || hq.SlotIndex != targetSlot)
+                if (hq == null || hq.SlotIndex != ownerSlot)
                     continue;
 
                 Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
-                targetDist = SectorManager.HexDistance(rallyCell, hqCell);
-                targetHQ = hq;
+                ownerDist = SectorManager.HexDistance(rallyCell, hqCell);
+                ownerHQ = hq;
                 break;
             }
         }
@@ -443,32 +428,32 @@ public class SectorManagerEditor : Editor
 
                 Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
                 float d = SectorManager.HexDistance(rallyCell, hqCell);
-                if (d < targetDist) { targetDist = d; targetHQ = hq; }
+                if (d < ownerDist) { ownerDist = d; ownerHQ = hq; }
             }
         }
 
-        if (targetHQ == null)
+        if (ownerHQ == null)
         {
             drawnLines.Add(new SectorEdgeLine
             {
                 FromCell = rallyCell,
                 ToCell   = rallyCell,
-                Label    = $"Rally target slot {targetSlot} sem HQ",
+                Label    = $"Rally owner slot {ownerSlot} sem HQ",
                 Color    = new Color(1f, 0.1f, 0.8f, 1f),
             });
             return;
         }
 
-        Vector3Int targetHQCell = targetHQ.CurrentCellPosition; targetHQCell.z = 0;
-        Color lineColor = TeamUtils.GetColor(targetHQ.TeamId);
+        Vector3Int ownerHQCell = ownerHQ.CurrentCellPosition; ownerHQCell.z = 0;
+        Color lineColor = TeamUtils.GetColor(ownerHQ.TeamId);
         lineColor.a = 1f;
         drawnLines.Add(new SectorEdgeLine
         {
-            FromCell = targetHQCell,
+            FromCell = ownerHQCell,
             ToCell   = rallyCell,
-            Label    = explicitTarget
-                ? $"Rally -> HQ({targetHQ.TeamId}) slot {targetSlot} ({targetDist:F0}h)"
-                : $"Rally -> HQ({targetHQ.TeamId}) auto ({targetDist:F0}h)",
+            Label    = explicitOwner
+                ? $"HQ({ownerHQ.TeamId}) -> Rally owner slot {ownerSlot} ({ownerDist:F0}h)"
+                : $"HQ({ownerHQ.TeamId}) -> Rally auto ({ownerDist:F0}h)",
             Color    = lineColor,
         });
     }

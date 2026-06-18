@@ -395,8 +395,7 @@ public static class SaveDataMapper
             teamId = (int)construction.TeamId,
             slotIndex = construction.SlotIndex,
             sector = (int)construction.Sector,
-            rallyTargetSlotIndex = construction.RallyTargetSlotIndex,
-            rallyTargetSlotIndexes = new List<int>(construction.RallyTargetSlotIndexes),
+            rallyOwnerSlotIndex = construction.IsRallyPoint ? construction.RallyOwnerSlotIndex : -1,
             isAnchorSector = construction.IsAnchorSector,
             anchorSectorSlotIndex = construction.AnchorSectorSlotIndex,
             cellX = construction.CurrentCellPosition.x,
@@ -424,13 +423,11 @@ public static class SaveDataMapper
         manager.AssignSpawnInstanceId(saved.instanceId);
         manager.SetVisible(saved.isVisible);
         manager.SetForwardObserverSpot(saved.isForwardObserverSpot);
-        bool savedHasRallyTarget = saved.rallyTargetSlotIndex >= 0
-            || (saved.rallyTargetSlotIndexes != null && saved.rallyTargetSlotIndexes.Count > 0);
-        manager.SetRallyPoint(saved.isRallyPoint || savedHasRallyTarget);
-        if (saved.rallyTargetSlotIndexes != null && saved.rallyTargetSlotIndexes.Count > 0)
-            manager.SetRallyTargetSlotIndexes(saved.rallyTargetSlotIndexes);
+        manager.SetRallyPoint(saved.isRallyPoint);
+        if (!saved.isRallyPoint)
+            manager.SetRallyOwnerSlotIndex(-1);
         else
-            manager.SetRallyTargetSlotIndex(saved.rallyTargetSlotIndex);
+            manager.SetRallyOwnerSlotIndex(saved.rallyOwnerSlotIndex);
         manager.SetAnchorSector(saved.isAnchorSector);
         manager.SetAnchorSectorSlotIndex(saved.anchorSectorSlotIndex);
         if (saved.slotIndex >= 0)

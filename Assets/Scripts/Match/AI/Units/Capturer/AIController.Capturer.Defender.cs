@@ -19,7 +19,16 @@ public partial class AIController
 
         bool activeCriticalHomeDefense = IsCriticalHomeDefenseObjective(assigned, snapshot.AITeam);
         bool activeRecentGarrison = IsRecentlyCapturedSector(snapshot.AITeam, assigned.Sector, snapshot.TurnNumber);
-        bool activeRallyAssembly = IsRallyAssemblyObjective(assigned);
+        bool activeRallyAssembly = IsRallyAssemblyObjective(assigned)
+            && IsValidRallyAssemblySectorForSlot(assigned.Sector, snapshot.AITeam, snapshot.AISlotIndex);
+        if (IsRallyAssemblyObjective(assigned) && !activeRallyAssembly)
+        {
+            assigned.ObjectiveType = AIObjectiveType.CaptureSector;
+            assigned.Status = ObjectiveStatus.Pending;
+            Debug.Log($"{TL("Defensor")} {unit.InstanceId} libera {assigned.Sector}: rally pertence a outro slot");
+            return null;
+        }
+
         assigned.Status = activeRallyAssembly
             ? ObjectiveStatus.Pursuing
             : (activeCriticalHomeDefense || activeRecentGarrison) ? ObjectiveStatus.Defending : ObjectiveStatus.Complete;
@@ -28,23 +37,43 @@ public partial class AIController
         TryGetAnySectorInfo(assigned.Sector, out SectorManager.SectorInfo secInfo);
         Vector3Int repCell = secInfo != null ? secInfo.RepresentativeCell : fromCell; repCell.z = 0;
 
-        // No active SOS: release to HexEvaluator if no enemy is near the defended sector.
-        // The snapshot is rebuilt each iteration, so a tank destroyed earlier this turn
-        // will already be absent from EnemyUnits here.
+        // No active SOS: release to HexEvaluator only if neither the defended sector nor
+        // the unit's current area has visible pressure.
         if (!activeCriticalHomeDefense && !activeRecentGarrison && !activeRallyAssembly)
         {
-            bool enemyNearby = false;
-            foreach (UnitManager e in snapshot.EnemyUnits)
+            bool sectorEnemyNearby = false;
+            bool localEnemyNearby = false;
+            int sectorEnemyCount = 0;
+            int localEnemyCount = 0;
+            int localThreatRange = Mathf.Max(DefenseEnemyRange, Mathf.Max(0, unit.RemainingMovementPoints) + 1);
+            MatchController mcRelease = GetMatchController();
+            foreach (UnitManager e in UnitManager.AllActive)
             {
-                if (e.IsDead || e.IsEmbarked) continue;
+                if (e == null || e.TeamId == snapshot.AITeam || e.IsDead || e.IsEmbarked) continue;
                 Vector3Int ec = e.CurrentCellPosition; ec.z = 0;
-                if (SectorManager.HexDistance(ec, repCell) <= DefenseEnemyRange) { enemyNearby = true; break; }
+                if (mcRelease != null && !mcRelease.IsUnitVisibleForTeamNoCache(e, snapshot.AITeam))
+                    continue;
+
+                float sectorDist = SectorManager.HexDistance(ec, repCell);
+                float localDist = SectorManager.HexDistance(ec, fromCell);
+                if (sectorDist <= DefenseEnemyRange)
+                {
+                    sectorEnemyNearby = true;
+                    sectorEnemyCount++;
+                }
+                if (localDist <= localThreatRange)
+                {
+                    localEnemyNearby = true;
+                    localEnemyCount++;
+                }
             }
-            if (!enemyNearby)
+            if (!sectorEnemyNearby && !localEnemyNearby)
             {
-                Debug.Log($"{TL("Defensor")} {unit.InstanceId} libera {assigned.Sector}: setor seguro, sem inimigos");
+                Debug.Log($"{TL("Defensor")} {unit.InstanceId} libera {assigned.Sector}: setor e area local sem inimigos visiveis");
                 return null;
             }
+            if (!sectorEnemyNearby && localEnemyNearby)
+                Debug.Log($"{TL("Defensor")} {unit.InstanceId} mantem defesa local em {assigned.Sector}: inimigos locais={localEnemyCount} setor={sectorEnemyCount}");
         }
 
         // Captura oportunista mesmo em defesa: setor vazio é sempre preenchido
@@ -146,7 +175,7 @@ public partial class AIController
             foreach (UnitManager enemy in UnitManager.AllActive)
             {
                 if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
-                if (mcZone != null && !mcZone.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
+                if (mcZone != null && !mcZone.IsUnitVisibleForTeamNoCache(enemy, snapshot.AITeam)) continue;
                 Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
                 if (SectorManager.HexDistance(ec, repCell) <= DefenseEnemyRange) zoneEnemies.Add(enemy);
             }
@@ -156,7 +185,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mcLocal != null && !mcLocal.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
+            if (mcLocal != null && !mcLocal.IsUnitVisibleForTeamNoCache(enemy, snapshot.AITeam)) continue;
             if (zoneEnemies.Contains(enemy)) continue;
 
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
@@ -412,7 +441,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
+            if (mc != null && !mc.IsUnitVisibleForTeamNoCache(enemy, snapshot.AITeam)) continue;
 
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(ec, repCell) <= interceptRange)

@@ -42,8 +42,7 @@ public partial class AIController
         {
             if (opt?.transporterUnit == null) return false;
             Vector3Int tc = opt.transporterUnit.CurrentCellPosition; tc.z = 0;
-            return IsTeamProductionBuilding(tc, unit.TeamId)
-                && !IsAirTransporter(opt.transporterUnit);
+            return IsTeamProductionBuilding(tc, unit.TeamId);
         });
 
         PodeEmbarcarOption best = null;

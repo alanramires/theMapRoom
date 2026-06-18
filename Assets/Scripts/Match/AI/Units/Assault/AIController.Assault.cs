@@ -23,8 +23,10 @@ public partial class AIController
             || data.roles == null || data.roles.Count == 0
             || data.roles[0] != UnitRole.Assalto)
             return null;
-
         SectorObjective assigned = ResolveAssignedAssaultObjective(unit, plan);
+        if (IsGroundAntiAirOnlyAssault(data))
+            return DecideGroundAntiAirAssaultAction(unit, snapshot, plan, assigned);
+
         if (assigned == null)
         {
             if (TryFindCriticalHomeDefenseObjectiveForUnit(plan, snapshot.AITeam, unit, unit.CurrentCellPosition, "Assalto Rogue", out SectorObjective rogueCriticalHome))
@@ -186,6 +188,287 @@ public partial class AIController
 
         Debug.Log($"{TL("Assalto")} {unit.InstanceId} cede predio-alvo de capturador {fromCell} via {bestCell}");
         action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestCell, paths);
+        return true;
+    }
+
+    private PlayerAction DecideGroundAntiAirAssaultAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan, SectorObjective assigned)
+    {
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+
+        if (paths == null || paths.Count == 0)
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+
+        if (TryFindGroundAntiAirAttack(unit, snapshot, fromCell, paths, occupied,
+                out Vector3Int attackCell, out UnitManager target, out string attackReason))
+        {
+            Vector3Int targetCell = target.CurrentCellPosition;
+            targetCell.z = 0;
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} AAA intercepta via {attackCell} -> {target.UnitDisplayName}#{target.InstanceId} ({attackReason})");
+            return BuildAttackBatch(unit, snapshot.AITeam, fromCell, attackCell,
+                target.InstanceId.ToString(), targetCell, paths);
+        }
+
+        if (TryFindGroundAntiAirEscortGroupMove(unit, snapshot, assigned, fromCell, paths, occupied, out Vector3Int escortCell, out string escortReason))
+        {
+            if (escortCell != fromCell)
+            {
+                Debug.Log($"{TL("Assalto")} {unit.InstanceId} AAA escolta {assigned.Sector} via {escortCell} ({escortReason})");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, escortCell, paths);
+            }
+
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} AAA mantem escolta {assigned.Sector} ({escortReason})");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+        }
+
+        if (TryFindGroundAntiAirCohesionMove(unit, snapshot, fromCell, paths, occupied, out Vector3Int moveCell, out string moveReason)
+            && moveCell != fromCell)
+        {
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} AAA coesao base via {moveCell} ({moveReason})");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+        }
+
+        Debug.Log($"{TL("Assalto")} {unit.InstanceId} AAA sem alvo aereo - segura cobertura base");
+        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+    }
+
+    private bool TryFindGroundAntiAirAttack(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestCell,
+        out UnitManager bestTarget,
+        out string bestReason)
+    {
+        bestCell = fromCell;
+        bestTarget = null;
+        bestReason = "";
+        float bestScore = float.MinValue;
+        List<UnitManager> enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
+        if (enemies == null || enemies.Count == 0)
+            return false;
+
+        Vector3Int home = snapshot.MyHQ != null ? snapshot.MyHQ.CurrentCellPosition : fromCell;
+        home.z = 0;
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+
+            foreach (UnitManager enemy in enemies)
+            {
+                if (enemy == null || enemy.GetDomain() != Domain.Air)
+                    continue;
+                if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
+                    continue;
+                if (!PassesAttackDecision(unit, enemy, cell, false, out string attackDecisionReason))
+                    continue;
+
+                Vector3Int enemyCell = enemy.CurrentCellPosition;
+                enemyCell.z = 0;
+                float score =
+                    150000f
+                    + Mathf.Max(0, 20 - enemy.CurrentHP) * 1000f
+                    - SectorManager.HexDistance(cell, enemyCell) * 250f
+                    - SectorManager.HexDistance(cell, home) * 45f
+                    - CalculateThreatLevel(cell, snapshot.AITeam) * 80f
+                    - GetPathStepCount(paths, cell) * 20f;
+                if (score <= bestScore)
+                    continue;
+
+                bestScore = score;
+                bestCell = cell;
+                bestTarget = enemy;
+                bestReason = $"airOnly {attackDecisionReason}";
+            }
+        }
+
+        return bestTarget != null;
+    }
+
+    private bool TryFindGroundAntiAirEscortGroupMove(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        SectorObjective assigned,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestCell,
+        out string reason)
+    {
+        bestCell = fromCell;
+        reason = "";
+        if (unit == null || snapshot == null || assigned == null || assigned.Slots == null || paths == null || paths.Count == 0)
+            return false;
+        if (IsCriticalHomeDefenseObjective(assigned, snapshot.AITeam))
+            return false;
+
+        Vector3Int objectiveCell = ResolveAssaultEscortCell(assigned, snapshot.AITeam, fromCell);
+        UnitManager anchor = null;
+        Vector3Int anchorCell = fromCell;
+        float bestAnchorScore = float.MinValue;
+
+        foreach (SlotNeed slot in assigned.Slots)
+        {
+            if (!slot.Filled || slot.AssignedUnitId == unit.InstanceId)
+                continue;
+            if (slot.Role != UnitRole.Capturador && slot.Role != UnitRole.Assalto)
+                continue;
+
+            UnitManager ally = FindActiveUnit(slot.AssignedUnitId, snapshot.AITeam);
+            if (ally == null || ally.IsEmbarked || ally.GetDomain() == Domain.Air)
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            float score =
+                -SectorManager.HexDistance(allyCell, objectiveCell) * 220f
+                -SectorManager.HexDistance(allyCell, fromCell) * 90f
+                + (slot.Role == UnitRole.Capturador ? 650f : 300f);
+            if (slot.DistanceToObjective >= 0)
+                score -= slot.DistanceToObjective * 25f;
+
+            if (score <= bestAnchorScore)
+                continue;
+
+            bestAnchorScore = score;
+            anchor = ally;
+            anchorCell = allyCell;
+        }
+
+        if (anchor == null)
+            return false;
+
+        float currentAnchorDist = SectorManager.HexDistance(fromCell, anchorCell);
+        bool currentProducer = IsOwnProductionCell(fromCell, snapshot.AITeam);
+        if (!currentProducer && currentAnchorDist >= 1f && currentAnchorDist <= 2f)
+        {
+            reason = $"grupo={anchor.InstanceId} dist={currentAnchorDist:F0} objetivoDist={SectorManager.HexDistance(fromCell, objectiveCell):F0}";
+            return true;
+        }
+
+        float bestScore = float.MinValue;
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+            bool cellProducer = IsOwnProductionCell(cell, snapshot.AITeam);
+            if (cellProducer && cell != fromCell)
+                continue;
+
+            float anchorDist = SectorManager.HexDistance(cell, anchorCell);
+            if (anchorDist <= 0f)
+                continue;
+            float escortBandPenalty = anchorDist <= 2f ? 0f : anchorDist - 2f;
+            float objectiveDist = SectorManager.HexDistance(cell, objectiveCell);
+            float score =
+                -escortBandPenalty * 1200f
+                -Mathf.Abs(anchorDist - 1.5f) * 220f
+                -objectiveDist * 40f
+                -CalculateThreatLevel(cell, snapshot.AITeam) * 85f
+                -GetPathStepCount(paths, cell) * 35f
+                + GetTerrainDpqPontos(cell) * 30f
+                - (cellProducer ? 1800f : 0f);
+            if (anchorDist < currentAnchorDist)
+                score += 500f;
+            if (cell == fromCell && anchorDist <= 2f && !cellProducer)
+                score += 450f;
+
+            if (score <= bestScore)
+                continue;
+
+            bestScore = score;
+            bestCell = cell;
+            reason = $"grupo={anchor.InstanceId} dist={anchorDist:F0} objetivoDist={objectiveDist:F0}";
+        }
+
+        return !string.IsNullOrEmpty(reason);
+    }
+
+    private bool TryFindGroundAntiAirCohesionMove(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestCell,
+        out string reason)
+    {
+        bestCell = fromCell;
+        reason = "";
+        Vector3Int home = snapshot.MyHQ != null ? snapshot.MyHQ.CurrentCellPosition : fromCell;
+        home.z = 0;
+        float fromHomeDist = SectorManager.HexDistance(fromCell, home);
+        bool onProducer = IsOwnProductionCell(fromCell, snapshot.AITeam);
+        if (!onProducer && fromHomeDist <= 3f)
+            return false;
+
+        float bestScore = float.MinValue;
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+            bool cellProducer = IsOwnProductionCell(cell, snapshot.AITeam);
+            if (cellProducer && cell != fromCell)
+                continue;
+
+            float homeDist = SectorManager.HexDistance(cell, home);
+            float targetBand = homeDist <= 3f ? 0f : homeDist - 3f;
+            float score =
+                -targetBand * 900f
+                - (cellProducer ? 1500f : 0f)
+                - CalculateThreatLevel(cell, snapshot.AITeam) * 80f
+                - GetPathStepCount(paths, cell) * 30f
+                + GetTerrainDpqPontos(cell) * 35f;
+            if (homeDist < fromHomeDist)
+                score += 450f;
+            if (onProducer && !cellProducer)
+                score += 1200f;
+
+            if (score <= bestScore)
+                continue;
+            bestScore = score;
+            bestCell = cell;
+            reason = $"homeDist={homeDist:F0} producer={cellProducer}";
+        }
+
+        return bestCell != fromCell;
+    }
+
+    private bool IsOwnProductionCell(Vector3Int cell, TeamId aiTeam)
+    {
+        cell.z = 0;
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+        return construction != null && construction.CanProduceUnitsForTeam(aiTeam);
+    }
+
+    private static bool IsGroundAntiAirOnlyAssault(UnitData data)
+    {
+        if (data == null || data.domain != Domain.Land || data.roles == null || data.roles.Count == 0)
+            return false;
+        if (data.roles[0] != UnitRole.Assalto)
+            return false;
+        if (data.embarkedWeapons == null || data.embarkedWeapons.Count == 0)
+            return false;
+        foreach (UnitEmbarkedWeapon ew in data.embarkedWeapons)
+        {
+            if (ew?.weapon == null)
+                continue;
+            if (ew.weapon.WeaponCategory != WeaponCategory.AntiAerea)
+                return false;
+        }
         return true;
     }
 

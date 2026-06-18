@@ -13,6 +13,7 @@ public partial class AIController
     private struct AIRallyPlanContext
     {
         public HashSet<ConstructionSector> TargetingEnemyHQ;
+        public int AISlotIndex;
         public int RallyPointCount;
     }
 
@@ -26,16 +27,13 @@ public partial class AIController
         public string Status;
     }
 
-    private static AIRallyPlanContext BuildRallyPlanContext(TeamId aiTeam, int turnNumber)
+    private static AIRallyPlanContext BuildRallyPlanContext(TeamId aiTeam, int aiSlotIndex, int turnNumber)
     {
         AIRallyPlanContext context = new AIRallyPlanContext
         {
-            TargetingEnemyHQ = new HashSet<ConstructionSector>()
+            TargetingEnemyHQ = new HashSet<ConstructionSector>(),
+            AISlotIndex = aiSlotIndex
         };
-
-        HashSet<int> enemyHQSlots = CollectEnemyHQSlots(aiTeam);
-        if (enemyHQSlots.Count == 0)
-            return context;
 
         foreach (ConstructionManager rally in ConstructionManager.AllActive)
         {
@@ -48,58 +46,15 @@ public partial class AIController
                 continue;
             }
 
-            IReadOnlyList<int> targetSlots = rally.RallyTargetSlotIndexes;
-            if (targetSlots == null || targetSlots.Count == 0)
-                continue;
-
-            if (!TryGetFirstEnemyRallyTargetSlot(targetSlots, enemyHQSlots, out int targetSlot))
+            if (!IsRallyOwnedBySlot(rally, aiTeam, aiSlotIndex))
                 continue;
 
             context.TargetingEnemyHQ.Add(rally.Sector);
             context.RallyPointCount++;
-            LogRallyReadiness(rally, targetSlot, aiTeam, turnNumber);
+            LogRallyReadiness(rally, rally.RallyOwnerSlotIndex, aiTeam, turnNumber);
         }
 
         return context;
-    }
-
-    private static HashSet<int> CollectEnemyHQSlots(TeamId aiTeam)
-    {
-        HashSet<int> slots = new HashSet<int>();
-        int ownSlot = -1;
-
-        foreach (ConstructionManager construction in ConstructionManager.AllActive)
-        {
-            if (construction == null || !construction.IsPlayerHeadQuarter)
-                continue;
-            if (construction.TeamId == aiTeam && construction.SlotIndex >= 0)
-            {
-                ownSlot = construction.SlotIndex;
-                break;
-            }
-        }
-
-        foreach (ConstructionManager construction in ConstructionManager.AllActive)
-        {
-            if (construction == null || !construction.IsPlayerHeadQuarter)
-                continue;
-            if (construction.SlotIndex < 0)
-                continue;
-
-            if (ownSlot >= 0)
-            {
-                if (construction.SlotIndex != ownSlot)
-                    slots.Add(construction.SlotIndex);
-                continue;
-            }
-
-            if (construction.TeamId == aiTeam || construction.TeamId == TeamId.Neutral)
-                continue;
-
-            slots.Add(construction.SlotIndex);
-        }
-
-        return slots;
     }
 
     private static bool IsEnemyHQRallySector(AIRallyPlanContext context, ConstructionSector sector)
@@ -119,32 +74,72 @@ public partial class AIController
         return IsEnemyHQRallySector(context, sector) ? RallyPointSectorPriorityBonus : 0;
     }
 
-    private static bool TryGetFirstEnemyRallyTargetSlot(IReadOnlyList<int> targetSlots, HashSet<int> enemyHQSlots, out int targetSlot)
+    // RallyOwnerSlotIndex marks the slot that uses this sector as its invasion rally.
+    private static bool IsRallyOwnedBySlot(
+        ConstructionManager rally,
+        TeamId aiTeam,
+        int aiSlotIndex)
     {
-        targetSlot = -1;
-        if (targetSlots == null || enemyHQSlots == null || enemyHQSlots.Count == 0)
+        if (rally == null || !rally.IsRallyPoint)
             return false;
 
-        for (int i = 0; i < targetSlots.Count; i++)
+        MatchController mc = GetMatchController();
+        if (mc == null)
+            return false;
+
+        int aiSlot = aiSlotIndex >= 0 ? aiSlotIndex : ResolveAISlotIndex(aiTeam, mc);
+        if (aiSlot < 0)
+            return false;
+
+        return rally.RallyOwnerSlotIndex == aiSlot;
+    }
+
+    private static bool IsValidRallyAssemblySectorForSlot(ConstructionSector sector, TeamId aiTeam, int aiSlotIndex)
+    {
+        if (sector == ConstructionSector.None)
+            return false;
+
+        foreach (ConstructionManager rally in ConstructionManager.AllActive)
         {
-            if (!enemyHQSlots.Contains(targetSlots[i]))
+            if (rally == null || !rally.IsRallyPoint || rally.Sector != sector)
                 continue;
 
-            targetSlot = targetSlots[i];
-            return true;
+            if (IsRallyOwnedBySlot(rally, aiTeam, aiSlotIndex))
+                return true;
         }
 
         return false;
     }
 
-    private static void LogRallyReadiness(ConstructionManager rally, int targetSlot, TeamId aiTeam, int turnNumber)
+    private static bool TryGetOwnedRallySlot(ConstructionManager rally, TeamId aiTeam, out int ownerSlot)
+    {
+        ownerSlot = -1;
+        if (!IsRallyOwnedBySlot(rally, aiTeam, ResolveAISlotIndex(aiTeam, GetMatchController())))
+            return false;
+
+        ownerSlot = rally.RallyOwnerSlotIndex;
+        return true;
+    }
+
+    private static int ResolveAISlotIndex(TeamId aiTeam, MatchController mc)
+    {
+        if (mc == null || aiTeam == TeamId.Neutral)
+            return -1;
+
+        if (mc.ActiveTeam == aiTeam)
+            return mc.ActivePlayerListIndex;
+
+        return mc.GetSlotIndexForTeam(aiTeam);
+    }
+
+    private static void LogRallyReadiness(ConstructionManager rally, int ownerSlot, TeamId aiTeam, int turnNumber)
     {
         AIRallyReadiness readiness = EvaluateRallyReadiness(rally, aiTeam);
         string rallyName = rally != null ? rally.name : "(null)";
         ConstructionSector sector = rally != null ? rally.Sector : ConstructionSector.None;
 
         Debug.Log(
-            $"[AI Rally][T{turnNumber}][{aiTeam}] {sector} via {rallyName} target={targetSlot} " +
+            $"[AI Rally][T{turnNumber}][{aiTeam}] {sector} via {rallyName} owner={ownerSlot} " +
             $"held={readiness.Held} art={readiness.Artillery} cap={readiness.Capturers} " +
             $"armor={readiness.Armor} force={readiness.ForceScore} {readiness.Status}");
     }
@@ -314,18 +309,13 @@ public partial class AIController
         if (obj == null)
             return fallback;
 
-        HashSet<int> enemyHQSlots = CollectEnemyHQSlots(aiTeam);
         ConstructionManager bestRally = null;
         foreach (ConstructionManager rally in ConstructionManager.AllActive)
         {
             if (rally == null || !rally.IsRallyPoint || rally.Sector != obj.Sector)
                 continue;
 
-            IReadOnlyList<int> targetSlots = rally.RallyTargetSlotIndexes;
-            if (targetSlots == null || targetSlots.Count == 0)
-                continue;
-
-            if (!TryGetFirstEnemyRallyTargetSlot(targetSlots, enemyHQSlots, out _))
+            if (!IsRallyOwnedBySlot(rally, aiTeam, ResolveAISlotIndex(aiTeam, GetMatchController())))
                 continue;
 
             bestRally = rally;

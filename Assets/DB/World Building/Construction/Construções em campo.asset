@@ -13,9 +13,10 @@ MonoBehaviour:
   m_Name: "Constru\xE7\xF5es em campo"
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionFieldDatabase
   entries:
-  - id: Cidade_T0_C12
+  - id: Flag_T-1_C126
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 1, y: 0, z: 0}
     initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
@@ -31,9 +32,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: "F\xE1brica_T2_C35"
+  - id: "F\xE1brica_T-1_C35"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 28, y: 5, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -49,9 +51,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: "F\xE1brica_T3_C41"
+  - id: "F\xE1brica_T-1_C41"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 13, y: -10, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -67,9 +70,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Aeroporto_T3_C6
+  - id: Aeroporto_T-1_C6
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 13, y: -9, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -85,9 +89,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: "F\xE1brica_T0_C10"
+  - id: Flag_T-1_C153
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -1, y: 1, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -105,7 +110,8 @@ MonoBehaviour:
       offeredServices: []
   - id: PortoNaval_T-1_C247
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 9, y: -8, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -121,9 +127,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Aeroporto_T2_C18
+  - id: Aeroporto_T-1_C18
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 30, y: 2, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -141,7 +148,8 @@ MonoBehaviour:
       offeredServices: []
   - id: Cidade_T-1_C7
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 12, y: -11, z: 0}
     initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
@@ -157,9 +165,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Aeroporto_T1_C32
+  - id: Aeroporto_T-1_C32
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 29, y: -2, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -175,9 +184,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: PortoNaval_T1_C33
+  - id: PortoNaval_T-1_C33
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 24, y: -4, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -195,7 +205,8 @@ MonoBehaviour:
       offeredServices: []
   - id: Cidade_T-1_C22
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 7, y: -3, z: 0}
     initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
@@ -211,9 +222,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: "F\xE1brica_T0_C9"
+  - id: Flag_T-1_C125
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 0, y: 1, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -229,9 +241,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: "F\xE1brica_T2_C34"
+  - id: "F\xE1brica_T-1_C34"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 30, y: 5, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -247,9 +260,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: PortoNaval_T0_C24
+  - id: PortoNaval_T-1_C24
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 24, y: -7, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -265,9 +279,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: HQ_T2_C23
+  - id: HQ_T-1_C23
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 29, y: 5, z: 0}
     initialCapturePoints: 40
     useConstructionConfigurationOverride: 0
@@ -283,9 +298,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: HQ_T1_C29
+  - id: HQ_T-1_C29
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 29, y: -3, z: 0}
     initialCapturePoints: 40
     useConstructionConfigurationOverride: 0
@@ -301,9 +317,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Aeroporto_T0_C28
+  - id: Aeroporto_T-1_C28
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 20, y: 10, z: 0}
     initialCapturePoints: 0
     useConstructionConfigurationOverride: 0
@@ -319,9 +336,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: PortoNaval_T2_C36
+  - id: PortoNaval_T-1_C36
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 26, y: 3, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -337,9 +355,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: "F\xE1brica_T1_C30"
+  - id: "F\xE1brica_T-1_C30"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 28, y: -3, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -355,9 +374,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Aeroporto_T2_C19
+  - id: Aeroporto_T-1_C19
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 30, y: 3, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -375,7 +395,8 @@ MonoBehaviour:
       offeredServices: []
   - id: Cidade_T-1_C39
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 36, y: 8, z: 0}
     initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
@@ -391,9 +412,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: PortoNaval_T3_C42
+  - id: PortoNaval_T-1_C42
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 15, y: -12, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -409,9 +431,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Cidade_T0_C3
+  - id: Cidade_T-1_C3
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: 2, z: 0}
     initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
@@ -429,7 +452,8 @@ MonoBehaviour:
       offeredServices: []
   - id: Cidade_T-1_C38
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 35, y: 9, z: 0}
     initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
@@ -445,9 +469,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: PortoNaval_T0_C5
+  - id: PortoNaval_T-1_C5
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 5, y: -8, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -463,9 +488,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: "F\xE1brica_T1_C31"
+  - id: "F\xE1brica_T-1_C31"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 30, y: -3, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -483,7 +509,8 @@ MonoBehaviour:
       offeredServices: []
   - id: "F\xE1brica_T-1_C14"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -6, y: 7, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -499,9 +526,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: HQ_T3_C17
+  - id: HQ_T-1_C17
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 14, y: -11, z: 0}
     initialCapturePoints: 40
     useConstructionConfigurationOverride: 0
@@ -517,9 +545,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: "F\xE1brica_T3_C40"
+  - id: "F\xE1brica_T-1_C40"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 14, y: -10, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -535,9 +564,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: "F\xE1brica_T0_C8"
+  - id: "F\xE1brica_T-1_C8"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 4, y: 4, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -555,7 +585,8 @@ MonoBehaviour:
       offeredServices: []
   - id: Cidade_T-1_C37
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 36, y: 10, z: 0}
     initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
@@ -573,7 +604,8 @@ MonoBehaviour:
       offeredServices: []
   - id: Aeroporto_T-1_C13
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -11, y: 5, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -589,9 +621,10 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Cidade_T2_C16
+  - id: Cidade_T-1_C16
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -11, y: -6, z: 0}
     initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
@@ -619,7 +652,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: HQ_T-1_C48
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -11, y: -5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -649,7 +683,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - id: "F\xE1brica_T-1_C49"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -10, y: -5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -669,7 +704,8 @@ MonoBehaviour:
       offeredServices: []
   - id: PortoNaval_T-1_C50
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -12, y: -5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -690,7 +726,8 @@ MonoBehaviour:
       offeredServices: []
   - id: Aeroporto_T-1_C51
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -10, y: -6, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -725,9 +762,10 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-  - id: Cidade_T0_C45
+  - id: Cidade_T-1_C45
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 22, y: 9, z: 0}
     initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
@@ -753,9 +791,10 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-  - id: Aeroporto_T0_C28
+  - id: Aeroporto_T-1_C28
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 18, y: 10, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -781,9 +820,10 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-  - id: PortoNaval_T0_C47
+  - id: PortoNaval_T-1_C47
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 10, y: 7, z: 0}
     initialCapturePoints: 30
     useConstructionConfigurationOverride: 0
@@ -811,9 +851,10 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-  - id: Barracks_T0_C48
+  - id: Barracks_T-1_C48
     construction: {fileID: 11400000, guid: 5572b2429e4e3fb43a7e49289c1fac2e, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 8, y: 5, z: 0}
     initialCapturePoints: 20
     useConstructionConfigurationOverride: 0
@@ -839,9 +880,10 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-  - id: Cidade_T0_C49
+  - id: Cidade_T-1_C49
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 7, y: 2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -867,9 +909,10 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-  - id: Cidade_T0_C50
+  - id: Cidade_T-1_C50
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 18, y: 11, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -895,9 +938,10 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-  - id: Cidade_T0_C51
+  - id: Cidade_T-1_C51
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 23, y: 10, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -923,9 +967,10 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-  - id: HQ_T0_C350
+  - id: HQ_T-1_C350
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 0, y: 0, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -953,9 +998,10 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-  - id: Aeroporto_T0_C53
+  - id: Cidade_T-1_C130
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -1, y: 0, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0

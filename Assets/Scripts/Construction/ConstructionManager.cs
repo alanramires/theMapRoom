@@ -53,9 +53,8 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private bool isForwardObserverSpot;
     [Tooltip("Este prédio serve como ponto de reunião (Rally Point) para unidades recém-compradas.")]
     [SerializeField] private bool isRallyPoint;
-    [HideInInspector, SerializeField] private int rallyTargetSlotIndex = -1;
-    [Tooltip("Slots dos HQs alvo deste Rally Point. Vazio = nenhum alvo configurado.")]
-    [SerializeField] private List<int> rallyTargetSlotIndexes = new List<int>();
+    [Tooltip("Slot que usa este Rally Point como ponto de invasão. -1 = nenhum slot.")]
+    [SerializeField] private int rallyOwnerSlotIndex = -1;
     [Tooltip("Este prédio marca o setor como fundação econômica/territorial para a AI de um slot.")]
     [SerializeField] private bool isAnchorSector;
     [Tooltip("Slot da AI para o qual este setor funciona como Anchor Sector. -1 = nenhum slot.")]
@@ -83,8 +82,7 @@ public class ConstructionManager : MonoBehaviour
     public ConstructionSector Sector => sector;
     public bool IsForwardObserverSpot => isForwardObserverSpot;
     public bool IsRallyPoint => isRallyPoint;
-    public int RallyTargetSlotIndex => rallyTargetSlotIndexes != null && rallyTargetSlotIndexes.Count > 0 ? rallyTargetSlotIndexes[0] : rallyTargetSlotIndex;
-    public IReadOnlyList<int> RallyTargetSlotIndexes => rallyTargetSlotIndexes != null ? rallyTargetSlotIndexes : System.Array.Empty<int>();
+    public int RallyOwnerSlotIndex => rallyOwnerSlotIndex;
     public bool IsAnchorSector => isAnchorSector;
     public int AnchorSectorSlotIndex => anchorSectorSlotIndex;
 
@@ -377,37 +375,9 @@ public class ConstructionManager : MonoBehaviour
         isRallyPoint = value;
     }
 
-    public void SetRallyTargetSlotIndex(int value)
+    public void SetRallyOwnerSlotIndex(int value)
     {
-        rallyTargetSlotIndex = Mathf.Max(-1, value);
-        if (rallyTargetSlotIndexes == null)
-            rallyTargetSlotIndexes = new List<int>();
-        rallyTargetSlotIndexes.Clear();
-        if (rallyTargetSlotIndex >= 0)
-            rallyTargetSlotIndexes.Add(rallyTargetSlotIndex);
-    }
-
-    public void SetRallyTargetSlotIndexes(IEnumerable<int> values)
-    {
-        List<int> sanitizedSlots = new List<int>();
-
-        if (values != null)
-        {
-            foreach (int value in values)
-            {
-                int slot = Mathf.Max(-1, value);
-                if (slot < 0 || sanitizedSlots.Contains(slot))
-                    continue;
-
-                sanitizedSlots.Add(slot);
-            }
-        }
-
-        if (rallyTargetSlotIndexes == null)
-            rallyTargetSlotIndexes = new List<int>();
-        rallyTargetSlotIndexes.Clear();
-        rallyTargetSlotIndexes.AddRange(sanitizedSlots);
-        rallyTargetSlotIndex = rallyTargetSlotIndexes.Count > 0 ? rallyTargetSlotIndexes[0] : -1;
+        rallyOwnerSlotIndex = Mathf.Max(-1, value);
     }
 
     public void SetAnchorSectorSlotIndex(int value)
@@ -685,7 +655,7 @@ public class ConstructionManager : MonoBehaviour
         if (siteRuntime == null)
             siteRuntime = new ConstructionSiteRuntime();
         siteRuntime.Sanitize();
-        SanitizeRallyTargetSlots();
+        SanitizeRallyOwnerSlot();
         SanitizeAnchorSectorSlot();
         if (spriteRenderer == null)
             spriteRenderer = ResolvePrimarySpriteRenderer();
@@ -747,22 +717,9 @@ public class ConstructionManager : MonoBehaviour
         EnsureCapturePointsInitialized();
     }
 
-    private void SanitizeRallyTargetSlots()
+    private void SanitizeRallyOwnerSlot()
     {
-        if (rallyTargetSlotIndexes == null)
-            rallyTargetSlotIndexes = new List<int>();
-
-        for (int i = rallyTargetSlotIndexes.Count - 1; i >= 0; i--)
-        {
-            int slot = rallyTargetSlotIndexes[i];
-            if (slot < 0 || rallyTargetSlotIndexes.IndexOf(slot) != i)
-                rallyTargetSlotIndexes.RemoveAt(i);
-        }
-
-        if (rallyTargetSlotIndexes.Count == 0 && rallyTargetSlotIndex >= 0)
-            rallyTargetSlotIndexes.Add(rallyTargetSlotIndex);
-
-        rallyTargetSlotIndex = rallyTargetSlotIndexes.Count > 0 ? rallyTargetSlotIndexes[0] : -1;
+        rallyOwnerSlotIndex = Mathf.Max(-1, rallyOwnerSlotIndex);
     }
 
     private void SanitizeAnchorSectorSlot()

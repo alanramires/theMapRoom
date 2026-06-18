@@ -11,6 +11,14 @@ public partial class AIController
     {
         action = null;
 
+        TeamObjectivePlan activePlanDef = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        bool mustVacate = activePlanDef != null && IsBlockingCaptureTarget(unit, activePlanDef, snapshot.AITeam);
+        // Hold any owned building under immediate pressure. Even if the capturer was reassigned
+        // elsewhere, vacating a controlled construction can let the enemy start capturing it.
+        if (!mustVacate
+            && TryDecideCapturerHoldBuildingAttack(unit, snapshot, assigned, fromCell, targetCell, out action))
+            return true;
+
         // Prioridade: mover+atacar sempre supera ficar+atacar.
         // Verifica se o scoring loop (hasAttackHex) terá algum inimigo visível atacável
         // a partir de uma célula que avance (ou, para dpqPref, que fique à mesma distância).
@@ -70,9 +78,6 @@ public partial class AIController
         }
         if (bestStayTarget == null) return false;
 
-        TeamObjectivePlan activePlanDef = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
-        bool mustVacate = activePlanDef != null && IsBlockingCaptureTarget(unit, activePlanDef, snapshot.AITeam);
-
         if (mustVacate || dpqPref)
         {
             Vector3Int ec = bestStayTarget.CurrentCellPosition; ec.z = 0;
@@ -91,6 +96,67 @@ public partial class AIController
         Debug.Log($"{TL("Perseguidor")} {unit.InstanceId} elimina bloqueador de {assigned.Sector} — ataca {bestStayTarget.UnitDisplayName}#{bestStayTarget.InstanceId} @ {stCell}");
         action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, fromCell,
             bestStayTarget.InstanceId.ToString(), stCell);
+        return true;
+    }
+
+    private bool TryDecideCapturerHoldBuildingAttack(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        SectorObjective assigned,
+        Vector3Int fromCell,
+        Vector3Int targetCell,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null || assigned == null)
+            return false;
+
+        ConstructionManager currentBuilding =
+            ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
+        if (currentBuilding == null
+            || currentBuilding.TeamId != snapshot.AITeam
+            || !currentBuilding.IsCapturable)
+            return false;
+
+        var stayTargets = new List<PodeMirarTargetOption>();
+        if (!PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                SensorMovementMode.MoveuParado, stayTargets)
+            || stayTargets.Count <= 0)
+            return false;
+
+        UnitManager bestTarget = null;
+        float bestPriority = float.MinValue;
+        foreach (PodeMirarTargetOption opt in stayTargets)
+        {
+            if (opt?.targetUnit == null) continue;
+            if (!PassesAttackDecision(unit, opt.targetUnit, fromCell, assigned.Status == ObjectiveStatus.Defending, out _)) continue;
+
+            Vector3Int targetUnitCell = opt.targetUnit.CurrentCellPosition;
+            targetUnitCell.z = 0;
+            if (SectorManager.HexDistance(targetUnitCell, targetCell) > SectorManager.HexDistance(fromCell, targetCell)
+                && SectorManager.HexDistance(targetUnitCell, fromCell) > DefenseEnemyRange)
+                continue;
+
+            BazookaTargetPriority targetPreference = ResolveCapturerTargetPreference(unit, opt.targetUnit);
+            float priority = AttackTargetPriorityPursuer(targetUnitCell, targetCell)
+                + GetCapturerTargetPreferenceTie(targetPreference);
+            if (priority <= bestPriority) continue;
+
+            bestPriority = priority;
+            bestTarget = opt.targetUnit;
+        }
+
+        if (bestTarget == null)
+            return false;
+
+        Vector3Int bestTargetCell = bestTarget.CurrentCellPosition;
+        bestTargetCell.z = 0;
+        string sectorText = currentBuilding.Sector == assigned.Sector
+            ? assigned.Sector.ToString()
+            : $"{currentBuilding.Sector} (alocado {assigned.Sector})";
+        Debug.Log($"{TL("Perseguidor")} {unit.InstanceId} segura {sectorText} em construção própria — ataca {bestTarget.UnitDisplayName}#{bestTarget.InstanceId} @ {bestTargetCell}");
+        action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, fromCell,
+            bestTarget.InstanceId.ToString(), bestTargetCell);
         return true;
     }
 }

@@ -952,7 +952,7 @@ public partial class TurnStateManager
             yield return new WaitForSeconds(postTransitionDelay);
     }
 
-    private IEnumerator ExecutePostSupplyAircraftTakeoff(UnitManager target, Tilemap boardMap)
+    private IEnumerator ExecutePostSupplyAircraftTakeoff(UnitManager target, Tilemap boardMap, string logPrefix = "[Suprimento]")
     {
         if (target == null || boardMap == null)
             yield break;
@@ -969,8 +969,8 @@ public partial class TurnStateManager
         if (!canTakeoffInPlace)
         {
             Debug.Log(report != null && !string.IsNullOrWhiteSpace(report.explicacao)
-                ? $"[Suprimento] {target.name} permanece no solo apos servico: {report.explicacao}"
-                : $"[Suprimento] {target.name} permanece no solo apos servico: decolagem indisponivel.");
+                ? $"{logPrefix} {target.name} permanece no solo apos servico: {report.explicacao}"
+                : $"{logPrefix} {target.name} permanece no solo apos servico: decolagem indisponivel.");
             yield break;
         }
 
@@ -982,14 +982,14 @@ public partial class TurnStateManager
                 out AircraftOperationDecision takeoffDecision))
         {
             Debug.Log(string.IsNullOrWhiteSpace(takeoffDecision.reason)
-                ? $"[Suprimento] Falha ao decolar {target.name} apos servico."
-                : $"[Suprimento] {target.name} permanece no solo apos servico: {takeoffDecision.reason}");
+                ? $"{logPrefix} Falha ao decolar {target.name} apos servico."
+                : $"{logPrefix} {target.name} permanece no solo apos servico: {takeoffDecision.reason}");
             yield break;
         }
 
         target.MarkTookOffRecently();
         PlayMovementStartSfx(target);
-        Debug.Log($"[Suprimento] {target.name} decolou apos receber servico.");
+        Debug.Log($"{logPrefix} {target.name} decolou apos receber servico.");
 
         float takeoffFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(target) : 0f;
         if (takeoffFxDuration > 0f)

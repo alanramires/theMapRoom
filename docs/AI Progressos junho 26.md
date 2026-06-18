@@ -139,6 +139,16 @@ Isso e calibracao de comando, nao fundacao.
 
 ## Proximos passos com maior retorno
 
+## Atualizacao v3.0.4 - AI Bombardeiro
+
+Esta rodada ajustou a leitura estrategica das compras aereas e de elite. O bombardeiro deixou de ser tratado apenas como uma consequencia de ja existir uma frota de Apaches, e passou a ser uma peca ofensiva de ruptura: se a AI esta em plano ofensivo/tatico, tem economia madura e um exercito minimo pronto, ela pode abrir demanda para bombardeiro mesmo sem esperar a proporcao antiga de Apaches.
+
+Tambem foi corrigido um desvio no seletor aereo: caca B preventivo nao deve passar por cima de bombardeiro quando nao existe ameaca aerea real. Agora o caca B so mantem prioridade alta com aeronave inimiga visivel ou intel aerea forte; caso contrario, o bombardeiro ganha espaco quando a demanda ofensiva existe.
+
+No mesmo pacote, a leitura de Jogadas ficou mais precisa: o fallback de siglas nao classifica qualquer texto contendo `CA` como aeronave. `CA` agora precisa ser token de caca, evitando falso positivo em nomes como capturador.
+
+Por fim, o tanque elite recebeu um afrouxamento ofensivo: em ofensiva ativa, com dinheiro para comprar e pelo menos metade dos capturadores preenchidos, ele nao fica preso ao threshold padrao de 60%. A ideia e tratar tanque elite e bombardeiro como pecas de pressao, nao apenas luxos de fim de composicao.
+
 ### 1. Criar um scorer unico de ataque para AI
 
 Extrair um helper publico interno tipo `ScoreAIAttackCandidate`, usando `TrySimulateAttackForAI` como base. Ele poderia retornar:

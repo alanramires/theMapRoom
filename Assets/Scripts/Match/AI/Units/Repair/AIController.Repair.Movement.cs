@@ -223,12 +223,18 @@ public partial class AIController
         ConstructionManager best = null;
         float bestScore = float.MinValue;
         bool preferAircraftFacility = unit != null && unit.GetAircraftType() != AircraftType.None;
+        bool restrictToPreferredAircraftFacility = preferAircraftFacility
+            && HasUsablePreferredAircraftRepairConstruction(unit, fromCell, aiTeam, occupied);
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
             Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
             float dist = SectorManager.HexDistance(fromCell, cc);
             bool isHomeRepair = IsRepairHomeConstruction(c, aiTeam);
             bool isAircraftFacility = IsAircraftRepairConstruction(c);
+            bool isPreferredAircraftFacility = IsPreferredAircraftRepairConstruction(c, aiTeam);
+            if (restrictToPreferredAircraftFacility && !isPreferredAircraftFacility)
+                continue;
+
             if (c.TeamId != aiTeam)
             {
                 Debug.Log($"[Repair] skip {cc} team={c.TeamId} (need {aiTeam}) dist={dist:F1}");
@@ -259,6 +265,16 @@ public partial class AIController
                 Debug.Log($"[Repair] skip {cc} unsafe (não-home) dist={dist:F1}");
                 continue;
             }
+            float aircraftTakeoffScore = 0f;
+            if (preferAircraftFacility && isAircraftFacility)
+            {
+                if (!TryScoreRepairCandidateTakeoff(unit, cc, out aircraftTakeoffScore, out _, out string takeoffReason))
+                {
+                    Debug.Log($"[Repair] skip {cc} aircraftTakeoff=blocked ({takeoffReason}) dist={dist:F1}");
+                    continue;
+                }
+            }
+
             float score = -dist * 100f;
             if (safe) score += 500f;
             if (isHomeRepair) score += 25f;
@@ -266,10 +282,12 @@ public partial class AIController
             if (preferAircraftFacility)
             {
                 aircraftCohesion = CalculateAircraftRepairCohesionScore(unit, cc, aiTeam);
-                if (isAircraftFacility) score += 20000f + aircraftCohesion;
+                if (isPreferredAircraftFacility) score += 70000f + aircraftCohesion + aircraftTakeoffScore;
+                else if (isAircraftFacility) score += 20000f + aircraftCohesion + aircraftTakeoffScore;
                 else if (isHomeRepair) score -= 1000f;
             }
             if (occupiedCell && isHomeRepair) score -= 10000f;
+            if (preferAircraftFacility && occupiedCell && isPreferredAircraftFacility) score -= 45000f;
 
             if (score > bestScore)
             {
@@ -281,14 +299,122 @@ public partial class AIController
         {
             Vector3Int bc = best.CurrentCellPosition; bc.z = 0;
             string home = IsRepairHomeConstruction(best, aiTeam) ? " home" : string.Empty;
-            string aircraft = IsAircraftRepairConstruction(best) ? " airport" : string.Empty;
+            string aircraft = IsAirportConstruction(best)
+                ? " airport"
+                : IsAircraftRepairConstruction(best) ? " air-capable" : string.Empty;
+            string preferredAircraft = IsPreferredAircraftRepairConstruction(best, aiTeam) ? " preferredAir" : string.Empty;
             string safe = !HasNearbyVisibleEnemy(bc, aiTeam, DefenseEnemyRange) ? " safe" : string.Empty;
+            string takeoff = TryScoreRepairCandidateTakeoff(unit, bc, out _, out string takeoffLabel, out _)
+                ? $" takeoff={takeoffLabel}"
+                : string.Empty;
             string cohesion = unit != null && unit.GetAircraftType() != AircraftType.None
                 ? $" coh={CalculateAircraftRepairCohesionScore(unit, bc, aiTeam):F0}"
                 : string.Empty;
-            Debug.Log($"[Repair] destino{home}{aircraft}{safe} selecionado {bc} dist={SectorManager.HexDistance(fromCell, bc):F1}{cohesion} score={bestScore:F0}");
+            Debug.Log($"[Repair] destino{home}{aircraft}{preferredAircraft}{safe}{takeoff} selecionado {bc} dist={SectorManager.HexDistance(fromCell, bc):F1}{cohesion} score={bestScore:F0}");
         }
         return best;
+    }
+
+
+    private bool HasUsablePreferredAircraftRepairConstruction(
+        UnitManager unit,
+        Vector3Int fromCell,
+        TeamId aiTeam,
+        HashSet<Vector3Int> occupied)
+    {
+        foreach (ConstructionManager c in ConstructionManager.AllActive)
+        {
+            if (!IsPreferredAircraftRepairConstruction(c, aiTeam))
+                continue;
+            if (c.TeamId != aiTeam)
+                continue;
+            if (c.CurrentCapturePoints < c.CapturePointsMax)
+                continue;
+
+            Vector3Int cc = c.CurrentCellPosition;
+            cc.z = 0;
+            bool occupiedCell = occupied != null && occupied.Contains(cc) && cc != fromCell;
+            if (occupiedCell)
+                continue;
+            if (!TryScoreRepairCandidateTakeoff(unit, cc, out _, out _, out _))
+                continue;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryScoreRepairCandidateTakeoff(
+        UnitManager unit,
+        Vector3Int cell,
+        out float score,
+        out string label,
+        out string reason)
+    {
+        score = 0f;
+        label = string.Empty;
+        reason = string.Empty;
+
+        if (unit == null || unit.GetAircraftType() == AircraftType.None)
+            return true;
+
+        Vector3Int originalCell = unit.CurrentCellPosition;
+        originalCell.z = 0;
+        Domain originalDomain = unit.GetDomain();
+        HeightLevel originalHeight = unit.GetHeightLevel();
+        int originalFuel = unit.CurrentFuel;
+
+        try
+        {
+            cell.z = 0;
+            unit.SetCurrentCellPosition(cell, enforceFinalOccupancyRule: false);
+            unit.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface);
+            unit.SetCurrentFuel(unit.GetMaxFuel());
+
+            PodeDecolarReport report = PodeDecolarSensor.Evaluate(
+                unit,
+                boardTilemap != null ? boardTilemap : unit.BoardTilemap,
+                terrainDatabase,
+                allowSameTeamAirBlockerForMovementTakeoff: true);
+
+            reason = report != null ? report.explicacao : "PodeDecolar indisponivel";
+            if (report == null || !report.status || report.takeoffMoveOptions == null || report.takeoffMoveOptions.Count == 0)
+                return false;
+
+            bool fullMove = report.takeoffMoveOptions.Contains(9);
+            bool oneHex = report.takeoffMoveOptions.Contains(1);
+            bool zeroHex = report.takeoffMoveOptions.Contains(0);
+
+            if (fullMove) score += 9000f;
+            if (oneHex) score += 2200f;
+            if (zeroHex) score += 450f;
+
+            label = FormatTakeoffMoveOptions(report.takeoffMoveOptions);
+            return true;
+        }
+        finally
+        {
+            unit.SetCurrentFuel(originalFuel);
+            unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
+            unit.TrySetCurrentLayerMode(originalDomain, originalHeight);
+        }
+    }
+
+    private static string FormatTakeoffMoveOptions(List<int> options)
+    {
+        if (options == null || options.Count == 0)
+            return "-";
+
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        for (int i = 0; i < options.Count; i++)
+        {
+            if (i > 0)
+                sb.Append('/');
+            sb.Append(options[i]);
+        }
+
+        return sb.ToString();
     }
 
 
@@ -345,6 +471,22 @@ public partial class AIController
             && construction.TryResolveConstructionData(out ConstructionData data)
             && data != null
             && data.allowAircraftTakeoffAndLanding;
+    }
+
+    private static bool IsAirportConstruction(ConstructionManager construction)
+    {
+        return construction != null
+            && construction.TryResolveConstructionData(out ConstructionData data)
+            && data != null
+            && data.isAirport;
+    }
+
+    private static bool IsPreferredAircraftRepairConstruction(ConstructionManager construction, TeamId aiTeam)
+    {
+        return construction != null
+            && construction.TeamId == aiTeam
+            && IsAirportConstruction(construction)
+            && IsAircraftRepairConstruction(construction);
     }
 
 

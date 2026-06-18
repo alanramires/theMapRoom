@@ -230,16 +230,13 @@ public partial class AIController
         objective = null;
         reason = "";
 
-        HashSet<int> enemyHQSlots = CollectEnemyHQSlots(aiTeam);
         HashSet<ConstructionSector> plannedRallySectors = CollectPlannedRallyAssemblySectors(plan);
-        if (enemyHQSlots.Count == 0)
-            reason = "sem HQ inimigo com slot para validar target";
 
         ConstructionManager bestRally = null;
         float bestDist = float.MaxValue;
         int activeConstructions = ConstructionManager.AllActive != null ? ConstructionManager.AllActive.Count : 0;
         int seen = 0;
-        int skippedNoTarget = 0;
+        int skippedNoOwner = 0;
         int skippedNoInfo = 0;
         int skippedNotHeld = 0;
         int skippedFar = 0;
@@ -250,17 +247,13 @@ public partial class AIController
                 continue;
 
             seen++;
-            IReadOnlyList<int> targetSlots = rally.RallyTargetSlotIndexes;
-            bool targetsEnemyHQ = enemyHQSlots.Count > 0
-                && targetSlots != null
-                && targetSlots.Count > 0
-                && TryGetFirstEnemyRallyTargetSlot(targetSlots, enemyHQSlots, out _);
-            bool plannedRally = plannedRallySectors.Contains(rally.Sector);
-            if (!targetsEnemyHQ && !plannedRally)
+            bool ownedByAI = TryGetOwnedRallySlot(rally, aiTeam, out int ownerSlot);
+            bool plannedRally = ownedByAI && plannedRallySectors.Contains(rally.Sector);
+            if (!ownedByAI && !plannedRally)
             {
-                skippedNoTarget++;
+                skippedNoOwner++;
                 if (string.IsNullOrEmpty(firstNoTarget))
-                    firstNoTarget = $"{rally.Sector}/{rally.name} slots={FormatSlotList(targetSlots)}";
+                    firstNoTarget = $"{rally.Sector}/{rally.name} owner={ownerSlot}";
                 continue;
             }
             if (!TryGetAnySectorInfo(rally.Sector, out SectorManager.SectorInfo info))
@@ -294,7 +287,7 @@ public partial class AIController
 
         if (bestRally == null)
         {
-            reason = $"sem rally elegivel perto active={activeConstructions} seen={seen} enemyHQSlots={FormatSlotSet(enemyHQSlots)} noTarget={skippedNoTarget} firstNoTarget={firstNoTarget} noInfo={skippedNoInfo} notHeld={skippedNotHeld} far>{RogueAssaultHeldRallySearchRadius}={skippedFar} planned={plannedRallySectors.Count}";
+            reason = $"sem rally elegivel perto active={activeConstructions} seen={seen} noOwner={skippedNoOwner} firstNoOwner={firstNoTarget} noInfo={skippedNoInfo} notHeld={skippedNotHeld} far>{RogueAssaultHeldRallySearchRadius}={skippedFar} planned={plannedRallySectors.Count}";
             return false;
         }
 
@@ -309,22 +302,6 @@ public partial class AIController
         objective.Slots.Add(new SlotNeed { Role = UnitRole.Assalto, Filled = true });
         reason = $"rally conquistado perto dist={bestDist:F0}h";
         return true;
-    }
-
-    private static string FormatSlotSet(HashSet<int> slots)
-    {
-        if (slots == null || slots.Count == 0)
-            return "-";
-
-        string result = "";
-        foreach (int slot in slots)
-        {
-            if (!string.IsNullOrEmpty(result))
-                result += ",";
-            result += slot.ToString();
-        }
-
-        return result;
     }
 
     private static string FormatSlotList(IReadOnlyList<int> slots)

@@ -15,6 +15,8 @@ MonoBehaviour:
   id: porto
   displayName: Porto Naval
   description: 
+  isAirport: 0
+  isHarbor: 1
   spriteDefault: {fileID: 21300000, guid: f1bc5d6faae2ff144a2013c87abaa197, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

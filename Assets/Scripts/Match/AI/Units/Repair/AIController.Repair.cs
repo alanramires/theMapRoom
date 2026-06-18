@@ -201,7 +201,9 @@ public partial class AIController
         {
             bool safe = IsRepairConstructionSectorSafe(currentBldg, aiTeam)
                 && !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);
-            if (safe && !isBlockingCapTarget)
+            bool aircraftShouldSeekPreferredRepair = aircraftRepair
+                && !IsPreferredAircraftRepairConstruction(currentBldg, aiTeam);
+            if (safe && !isBlockingCapTarget && !aircraftShouldSeekPreferredRepair)
             {
                 if (IsFireSupportUnit(unit)
                     && TryBuildRepairFireSupportHoldAttack(unit, snapshot, fromCell, occupied,

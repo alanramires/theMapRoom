@@ -375,8 +375,36 @@ public partial class AIController
 
                 Vector3Int targetCell = opt.targetUnit.CurrentCellPosition;
                 targetCell.z = 0;
+                BazookaTargetPriority targetPreference = ResolveAssaultTargetPreference(unit, opt.targetUnit);
+                float targetPreferenceScore = GetAssaultTargetPreferenceScore(targetPreference) * 2f;
+                bool hasSim = TrySimulateAttackForAI(unit, opt.targetUnit, cell, out AIAttackSimulationSummary simSummary);
+                if (hasSim && simSummary.targetDamage <= 0)
+                    continue;
+
+                float combatScore = 0f;
+                string simDetails = "sim=unavailable";
+                if (hasSim)
+                {
+                    combatScore =
+                        (simSummary.result.killGuaranteed ? 24000f : 0f)
+                        + simSummary.targetDamagePct * 650f
+                        + simSummary.targetDamage * 140f
+                        - simSummary.attackerLossPct * 520f
+                        - simSummary.attackerLoss * 180f
+                        + (simSummary.result.attackerSurvives ? 2500f : -10000f);
+
+                    if (simSummary.attackerLossPct >= 75 && !simSummary.result.killGuaranteed)
+                        combatScore -= 14000f;
+
+                    PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(unit, cell);
+                    PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(opt.targetUnit, targetCell);
+                    simDetails = $"sim dmg={simSummary.targetDamage}/{simSummary.targetDamagePct}% loss={simSummary.attackerLoss}/{simSummary.attackerLossPct}% hp={simSummary.attackerHpBefore}->{simSummary.result.attackerHpAfter} target={simSummary.targetHpBefore}->{simSummary.result.defenderHpAfter} dpq={attackerDpq.points}/{defenderDpq.points} def={attackerDpq.defenseBonus}/{defenderDpq.defenseBonus} kill={simSummary.result.killGuaranteed} survive={simSummary.result.attackerSurvives}";
+                }
+
                 float score =
-                    AttackTargetPriority(targetCell, fromCell) * 10000f
+                    targetPreferenceScore
+                    + combatScore
+                    + AttackTargetPriority(targetCell, fromCell) * 10000f
                     + Mathf.Max(0, 20 - opt.targetUnit.CurrentHP) * 100f
                     + GetTerrainDpqPontos(cell) * 25f
                     - SectorManager.HexDistance(cell, targetCell) * 20f
@@ -387,7 +415,7 @@ public partial class AIController
                     bestScore = score;
                     bestCell = cell;
                     bestTarget = opt.targetUnit;
-                    bestReason = $"score={score:F0} hp={opt.targetUnit.CurrentHP} dpq={GetTerrainDpqPontos(cell):F1} {decisionReason}";
+                    bestReason = $"score={score:F0} pref={targetPreference} prefScore={targetPreferenceScore:F0} combat={combatScore:F0} hp={opt.targetUnit.CurrentHP} dpq={GetTerrainDpqPontos(cell):F1} {simDetails} {decisionReason}";
                 }
             }
         }

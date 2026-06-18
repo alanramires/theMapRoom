@@ -44,6 +44,13 @@ public partial class AIController
                 unit, passengers, snapshot, plan, fromCell, paths, occupied, out PlayerAction localOpportunity))
             return localOpportunity;
 
+        if (!IsFireSupportUnit(primaryPassenger)
+            && TryBuildRogueCourierLocalOpportunityDrop(
+                unit, passengers, snapshot, plan, fromCell, paths, occupied,
+                out PlayerAction assignedLocalOpportunity,
+                allowAssignedPassengers: true))
+            return assignedLocalOpportunity;
+
         Vector3Int moveTarget = FindTransportMove(unit, fromCell, primaryTarget, paths, occupied, snapshot.AITeam);
 
         // If FindTransportMove landed on the objective building itself, redirect to an adjacent

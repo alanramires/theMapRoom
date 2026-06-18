@@ -11,10 +11,14 @@
             "id": "9582886bfd86933b",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "The Map Room 2027 - Pitch.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "Nova aba"
+              "title": "The Map Room 2027 - Pitch"
             }
           }
         ]
@@ -152,12 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
+                "file": "The Map Room 2027 - Pitch.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Sumário"
+              "title": "Sumário de The Map Room 2027 - Pitch"
             }
           }
         ],
@@ -178,8 +183,9 @@
       "bases:Criar nova base": false
     }
   },
-  "active": "9582886bfd86933b",
+  "active": "115f49453a826bd4",
   "lastOpenFiles": [
+    "2.4 Delta PQ.md",
     "The Map Room.md",
     "Unidades.md",
     "The Map Room 2027 - Pitch.md",

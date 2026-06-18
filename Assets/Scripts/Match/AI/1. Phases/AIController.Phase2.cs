@@ -95,11 +95,32 @@ public partial class AIController
             UnitManager unit = units[cursor];
             PlayerAction action = DecideUnitAction(unit, current);
 
+            if (!secondPass
+                && ShouldDeferCapturerForAirTransportVacate(unit, action, activePlan, aiTeam,
+                    out UnitManager airTransporter))
+            {
+                deferredUnitIds.Add(unit.InstanceId);
+                Debug.Log($"{TL()} Fase2 — capturador {unit.InstanceId} cede vez para heli {airTransporter.InstanceId} sair da producao antes do embarque");
+                cursor++;
+                yield return null;
+                continue;
+            }
+
             if (ShouldDeferAttackForFireSupportPrep(unit, action, aiTeam,
                     out UnitManager prepFireSupport, out UnitManager prepTarget, out Vector3Int prepCell))
             {
                 deferredUnitIds.Add(unit.InstanceId);
                 Debug.Log($"{TL()} Fase2 — {FormatInitiativeUnitName(unit)} cede ataque em {prepTarget.InstanceId} para artilharia {prepFireSupport.InstanceId} amaciar via {prepCell}");
+                cursor++;
+                yield return null;
+                continue;
+            }
+
+            if (ShouldDeferAttackForAirCombatPrep(unit, action, aiTeam,
+                    out UnitManager prepAirCombat, out UnitManager prepAirTarget, out Vector3Int prepAirCell))
+            {
+                deferredUnitIds.Add(unit.InstanceId);
+                Debug.Log($"{TL()} Fase2 — {FormatInitiativeUnitName(unit)} cede ataque aereo em {prepAirTarget.InstanceId} para {FormatInitiativeUnitName(prepAirCombat)} atacar primeiro via {prepAirCell}");
                 cursor++;
                 yield return null;
                 continue;
@@ -307,6 +328,50 @@ public partial class AIController
         return false;
     }
 
+    private bool ShouldDeferAttackForAirCombatPrep(
+        UnitManager attacker,
+        PlayerAction action,
+        TeamId aiTeam,
+        out UnitManager airCombat,
+        out UnitManager target,
+        out Vector3Int attackCell)
+    {
+        airCombat = null;
+        target = null;
+        attackCell = Vector3Int.zero;
+
+        if (attacker == null || action == null)
+            return false;
+        if (action.SensorAction != SensorActionType.Attack || string.IsNullOrEmpty(action.TargetInstanceId))
+            return false;
+        if (IsAirCombatUnit(attacker))
+            return false;
+        if (!int.TryParse(action.TargetInstanceId, out int targetId))
+            return false;
+
+        target = FindAttackPrepTarget(targetId, aiTeam);
+        if (target == null || !target.TryGetUnitData(out UnitData targetData) || targetData == null || targetData.domain != Domain.Air)
+            return false;
+
+        foreach (UnitManager candidate in UnitManager.AllActive)
+        {
+            if (candidate == null || candidate == attacker)
+                continue;
+            if (candidate.TeamId != aiTeam || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked)
+                continue;
+            if (!IsAirCombatUnit(candidate))
+                continue;
+            if (TryFindAirCombatPrepShot(candidate, target, aiTeam, out Vector3Int candidateCell))
+            {
+                airCombat = candidate;
+                attackCell = candidateCell;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private UnitManager FindAttackPrepTarget(int targetId, TeamId aiTeam)
     {
         MatchController mc = GetMatchController();
@@ -377,6 +442,130 @@ public partial class AIController
                 fireCell = cell;
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    private bool TryFindAirCombatPrepShot(
+        UnitManager airCombat,
+        UnitManager target,
+        TeamId aiTeam,
+        out Vector3Int attackCell)
+    {
+        attackCell = Vector3Int.zero;
+        if (airCombat == null || target == null)
+            return false;
+
+        bool wasGrounded = airCombat.IsAircraftGrounded;
+        List<int> takeoffMoveOptions = null;
+        if (wasGrounded && !TryGetAITakeoffMoveOptions(airCombat, out takeoffMoveOptions, out _))
+            return false;
+
+        if (wasGrounded)
+            airCombat.SetAircraftGrounded(false);
+
+        try
+        {
+            Vector3Int fromCell = airCombat.CurrentCellPosition;
+            fromCell.z = 0;
+            Dictionary<Vector3Int, List<Vector3Int>> paths =
+                UnitMovementPathRules.CalcularCaminhosValidos(
+                    boardTilemap, airCombat, Mathf.Max(0, airCombat.RemainingMovementPoints), terrainDatabase);
+            HashSet<Vector3Int> occupied = BuildAirOccupied(airCombat);
+            if (paths == null || paths.Count == 0)
+                return false;
+
+            foreach (Vector3Int rawCell in paths.Keys)
+            {
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                    continue;
+                if (!IsAITakeoffDestinationAllowed(paths, cell, takeoffMoveOptions))
+                    continue;
+                if (!CanAttackTargetFrom(fromCell, cell, airCombat, target))
+                    continue;
+                if (!TryFindAttackDecisionOption(airCombat, target, cell, out _))
+                    continue;
+
+                attackCell = cell;
+                return true;
+            }
+        }
+        finally
+        {
+            if (wasGrounded)
+                airCombat.SetAircraftGrounded(true);
+        }
+
+        return false;
+    }
+
+    private bool ShouldDeferCapturerForAirTransportVacate(
+        UnitManager unit,
+        PlayerAction action,
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        out UnitManager airTransporter)
+    {
+        airTransporter = null;
+
+        if (unit == null || unit.HasActed || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair)
+            return false;
+
+        if (!unit.TryGetUnitData(out UnitData unitData) || unitData == null
+            || unitData.roles == null || !unitData.roles.Contains(UnitRole.Capturador))
+            return false;
+
+        if (action != null
+            && (!string.IsNullOrEmpty(action.TargetInstanceId)
+                || !string.IsNullOrEmpty(action.TargetConstructionId)
+                || action.SensorAction == SensorActionType.Attack))
+            return false;
+
+        SectorObjective assigned = plan != null ? ResolveAssignedObjective(unit, plan) : null;
+        Vector3Int unitCell = unit.CurrentCellPosition;
+        unitCell.z = 0;
+
+        foreach (UnitManager transporter in UnitManager.AllActive)
+        {
+            if (transporter == null || transporter == unit)
+                continue;
+            if (transporter.TeamId != aiTeam || transporter.HasActed || transporter.IsDead
+                || transporter.IsEmbarked || transporter.IsUnderRepair)
+                continue;
+            if (!IsAirTransporter(transporter) || HasTransportCargo(transporter))
+                continue;
+            if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null
+                || !transporterData.isTransporter)
+                continue;
+            if (FindFittingSlotIndex(transporter, transporterData, unit, unitData) < 0)
+                continue;
+
+            Vector3Int transporterCell = transporter.CurrentCellPosition;
+            transporterCell.z = 0;
+            if (!IsTeamProductionBuilding(transporterCell, aiTeam))
+                continue;
+
+            float pickupReach = Mathf.Max(8f,
+                unit.RemainingMovementPoints + transporter.RemainingMovementPoints + ShuttlePickupRange + 1f);
+            if (SectorManager.HexDistance(unitCell, transporterCell) > pickupReach)
+                continue;
+
+            SectorObjective transporterObjective = plan != null
+                ? ResolveAssignedTransportObjective(transporter, plan)
+                : null;
+            if (assigned != null && transporterObjective != null
+                && assigned.Sector != transporterObjective.Sector
+                && !AreEmbarkSectorsCompatible(assigned.Sector, transporterObjective.Sector))
+                continue;
+            if (assigned == null && transporterObjective != null
+                && !CanRogueUseAssignedTransporter(unit, transporter, transporterObjective, aiTeam))
+                continue;
+
+            airTransporter = transporter;
+            return true;
         }
 
         return false;

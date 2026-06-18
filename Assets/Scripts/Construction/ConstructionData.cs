@@ -27,6 +27,12 @@ public class ConstructionData : ScriptableObject
     [TextArea]
     public string description;
 
+    [Header("Facility Type")]
+    [Tooltip("Marca esta construcao como aeroporto real para prioridades de IA e regras aereas.")]
+    public bool isAirport = false;
+    [Tooltip("Marca esta construcao como porto real para prioridades de IA e regras navais.")]
+    public bool isHarbor = false;
+
     [Header("Visuals")]
     [FormerlySerializedAs("sprite")]
     public Sprite spriteDefault;
