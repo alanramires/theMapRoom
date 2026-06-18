@@ -54,6 +54,10 @@ public partial class AIController
 
         }
 
+        PlayerAction intelAction = TryDecideIntelAction(unit, snapshot, plan);
+
+        if (intelAction != null) return intelAction;
+
         PlayerAction airCombatAction = TryDecideAirCombatAction(unit, snapshot);
 
         if (airCombatAction != null) return airCombatAction;
@@ -454,3 +458,4 @@ public partial class AIController
 
     }
 }
+

@@ -156,6 +156,7 @@ public class MatchController : MonoBehaviour
     [SerializeField] private TerrainDatabase fogOfWarTerrainDatabase;
     [SerializeField] private DPQAirHeightConfig fogOfWarDpqAirHeightConfig;
     [SerializeField] [Range(0f, 1f)] private float fogOfWarAlpha = 0.65f;
+    [SerializeField] private FogOfWarVisionMode fogOfWarVisionMode = FogOfWarVisionMode.All;
     [Header("Victory Overlay")]
     [SerializeField] private bool showVictoryOverlay = true;
     [SerializeField] private Tilemap victoryOverlayTilemap;
@@ -176,10 +177,12 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private readonly List<UnitManager> turnStartUnitsMarkedForFuelDepletionDeath = new List<UnitManager>();
     [System.NonSerialized] private readonly List<Vector3Int> fogBoardCellsBuffer = new List<Vector3Int>(1024);
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogVisibleCellsBuffer = new HashSet<Vector3Int>();
+    [System.NonSerialized] private readonly HashSet<Vector3Int> fogDisplayVisibleCellsBuffer = new HashSet<Vector3Int>();
     [System.NonSerialized] private readonly Dictionary<int, FogOfWarUnitCacheEntry> fogVisibleCellsByUnit = new Dictionary<int, FogOfWarUnitCacheEntry>();
     [System.NonSerialized] private readonly Dictionary<Vector3Int, int> fogVisibleContributorsByCell = new Dictionary<Vector3Int, int>();
     [System.NonSerialized] private readonly Dictionary<int, bool> fogUnitVisibilityByCacheIndex = new Dictionary<int, bool>();
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogUnitVisibleScratchBuffer = new HashSet<Vector3Int>();
+    [System.NonSerialized] private PanelRemainingController fogVisionPanelRemaining;
     [System.NonSerialized] private bool fogSortingLayerValidated;
     [System.NonSerialized] private int fogCachedTeamId = int.MinValue;
     [System.NonSerialized] private bool fogOverlayInitialized;
@@ -349,6 +352,7 @@ public class MatchController : MonoBehaviour
     public bool IsTutorialMode => activeTutorial != null;
     public TerrainDatabase TerrainDatabaseRef => ResolveFogTerrainDatabase();
     public bool IsFogOfWarDebugEnabled => debugFogOfWarEnabled;
+    public FogOfWarVisionMode FogOfWarVisionMode => fogOfWarVisionMode;
     public int MaxUnitsPerTeam => Mathf.Max(1, maxUnitsPerTeam);
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;
     public int ActivePlayerListIndex => activePlayerListIndex;
@@ -870,12 +874,131 @@ public class MatchController : MonoBehaviour
         TryAutoAssignTurnTransitionReferences();
         if (enableTotalWar)
             TryAutoAssignFogOfWarReferences();
+        HandleFogOfWarVisionModeHotkey();
         ApplyActiveTeamIfChanged(force: false);
     }
 
     public void SetCurrentTurn(int turn)
     {
         currentTurn = Mathf.Max(0, turn);
+    }
+
+    public void CycleFogOfWarVisionMode()
+    {
+        SetFogOfWarVisionMode(GetNextAvailableFogOfWarVisionMode(fogOfWarVisionMode));
+    }
+
+    public void SetFogOfWarVisionMode(FogOfWarVisionMode mode)
+    {
+        if (!IsFogOfWarVisionModeAvailable(mode))
+            mode = FogOfWarVisionMode.All;
+        UpdateFogOfWarVisionModePanel(mode);
+        if (fogOfWarVisionMode == mode)
+            return;
+
+        fogOfWarVisionMode = mode;
+        if (Application.isPlaying && debugFogOfWarEnabled && enableTotalWar)
+            RefreshFogOfWarForActiveTeam();
+        Debug.Log($"[FogOfWar] VisionMode={fogOfWarVisionMode}");
+    }
+
+    private void HandleFogOfWarVisionModeHotkey()
+    {
+        if (!debugFogOfWarEnabled || !enableTotalWar)
+            return;
+        if (UiInputBlocker.IsTextInputFocused())
+            return;
+        if (Input.GetKeyDown(KeyCode.L))
+            CycleFogOfWarVisionMode();
+    }
+
+    private FogOfWarVisionMode GetNextAvailableFogOfWarVisionMode(FogOfWarVisionMode current)
+    {
+        FogOfWarVisionMode candidate = current;
+        for (int i = 0; i < 4; i++)
+        {
+            candidate = GetNextFogOfWarVisionMode(candidate);
+            if (IsFogOfWarVisionModeAvailable(candidate))
+                return candidate;
+        }
+
+        return FogOfWarVisionMode.All;
+    }
+
+    private static FogOfWarVisionMode GetNextFogOfWarVisionMode(FogOfWarVisionMode mode)
+    {
+        return mode switch
+        {
+            FogOfWarVisionMode.All => FogOfWarVisionMode.Air,
+            FogOfWarVisionMode.Air => FogOfWarVisionMode.Surface,
+            FogOfWarVisionMode.Surface => FogOfWarVisionMode.Sub,
+            _ => FogOfWarVisionMode.All
+        };
+    }
+
+    private bool IsFogOfWarVisionModeAvailable(FogOfWarVisionMode mode)
+    {
+        if (mode == FogOfWarVisionMode.All)
+            return true;
+
+        bool hasAirport = MapHasConstructionFacility(requireAirport: true);
+        bool hasHarbor = MapHasConstructionFacility(requireAirport: false);
+        return mode switch
+        {
+            FogOfWarVisionMode.Air => hasAirport,
+            FogOfWarVisionMode.Surface => hasAirport || hasHarbor,
+            FogOfWarVisionMode.Sub => hasHarbor,
+            _ => true
+        };
+    }
+
+    private bool MapHasConstructionFacility(bool requireAirport)
+    {
+        List<ConstructionManager> constructions = ConstructionManager.AllActive;
+        for (int i = constructions.Count - 1; i >= 0; i--)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null)
+            {
+                constructions.RemoveAt(i);
+                continue;
+            }
+
+            if (!construction.gameObject.activeInHierarchy)
+                continue;
+            if (construction.gameObject.scene != gameObject.scene)
+                continue;
+            if (!construction.TryResolveConstructionData(out ConstructionData data) || data == null)
+                continue;
+
+            if (requireAirport ? data.isAirport : data.isHarbor)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void UpdateFogOfWarVisionModePanel(FogOfWarVisionMode mode)
+    {
+        PanelRemainingController panel = FindPanelRemainingController();
+        if (panel != null)
+            panel.SetFogOfWarVisionMode(mode);
+    }
+
+    private PanelRemainingController FindPanelRemainingController()
+    {
+        if (fogVisionPanelRemaining != null && fogVisionPanelRemaining.gameObject.activeInHierarchy)
+            return fogVisionPanelRemaining;
+
+        GameObject panelObject = GameObject.Find("Panel_remaining");
+        if (panelObject != null)
+            fogVisionPanelRemaining = panelObject.GetComponent<PanelRemainingController>()
+                ?? panelObject.GetComponentInChildren<PanelRemainingController>(true);
+
+        if (fogVisionPanelRemaining == null)
+            fogVisionPanelRemaining = FindAnyObjectByType<PanelRemainingController>();
+
+        return fogVisionPanelRemaining;
     }
 
     public void SetGameSetupPreset(GameSetupPreset preset)
@@ -3175,11 +3298,6 @@ public class MatchController : MonoBehaviour
         if (!enableTotalWar)
             return true;
 
-        Vector3Int cell = unit.CurrentCellPosition;
-        cell.z = 0;
-        if (!IsCellVisibleForActiveTeam(cell))
-            return false;
-
         Tilemap boardMap = ResolveFogBoardTilemap();
         if (boardMap == null)
             return false;
@@ -3574,6 +3692,7 @@ public class MatchController : MonoBehaviour
     {
         fogBoardCellsBuffer.Clear();
         fogVisibleCellsBuffer.Clear();
+        fogDisplayVisibleCellsBuffer.Clear();
         fogVisibleCellsByUnit.Clear();
         fogVisibleContributorsByCell.Clear();
         fogUnitVisibilityByCacheIndex.Clear();
@@ -3632,17 +3751,130 @@ public class MatchController : MonoBehaviour
     // Deve ser chamado apenas após todos os UpdateFogVisibilityForUnit do turno terem rodado.
     private void RenderFogOverlayFromRuntimeCache(Tilemap boardMap)
     {
+        bool useDisplayFilter = fogOfWarVisionMode != FogOfWarVisionMode.All;
+        if (useDisplayFilter)
+            BuildFogDisplayVisibleCellsForMode(boardMap, fogOfWarVisionMode, fogDisplayVisibleCellsBuffer);
+
         fogOfWarTilemap.ClearAllTiles();
         Color fogColor = new Color(0f, 0f, 0f, Mathf.Clamp01(fogOfWarAlpha));
         for (int i = 0; i < fogBoardCellsBuffer.Count; i++)
         {
             Vector3Int cell = fogBoardCellsBuffer[i];
-            if (fogVisibleContributorsByCell.ContainsKey(cell)) continue;
+            bool visible = useDisplayFilter
+                ? fogDisplayVisibleCellsBuffer.Contains(cell)
+                : fogVisibleContributorsByCell.ContainsKey(cell);
+            if (visible) continue;
             TileBase tile = ResolveFogTileForCell(boardMap, cell);
             if (tile == null) continue;
             fogOfWarTilemap.SetTile(cell, tile);
             fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
             fogOfWarTilemap.SetColor(cell, fogColor);
+        }
+    }
+
+    private void BuildFogDisplayVisibleCellsForMode(
+        Tilemap boardMap,
+        FogOfWarVisionMode mode,
+        HashSet<Vector3Int> output)
+    {
+        if (output == null)
+            return;
+
+        output.Clear();
+        if (boardMap == null || mode == FogOfWarVisionMode.All)
+            return;
+
+        TerrainDatabase terrainDatabase = ResolveFogTerrainDatabase();
+        DPQAirHeightConfig dpqConfig = ResolveFogDpqAirHeightConfig();
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+            if ((int)unit.TeamId != activeTeamId)
+                continue;
+            if (!IsUnitOnBoard(unit, boardMap))
+                continue;
+
+            switch (mode)
+            {
+                case FogOfWarVisionMode.Air:
+                    AddFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig, Domain.Air, HeightLevel.AirLow, output);
+                    AddFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig, Domain.Air, HeightLevel.AirHigh, output);
+                    break;
+                case FogOfWarVisionMode.Surface:
+                    AddFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig, Domain.Land, HeightLevel.Surface, output);
+                    AddFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig, Domain.Naval, HeightLevel.Surface, output);
+                    break;
+                case FogOfWarVisionMode.Sub:
+                    AddFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig, Domain.Submarine, HeightLevel.Submerged, output);
+                    break;
+            }
+        }
+
+        if (mode == FogOfWarVisionMode.Surface)
+            AddFriendlyConstructionDisplayCells(boardMap, output);
+    }
+
+    private void AddFogLayerVisibleCellsForUnit(
+        UnitManager unit,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        DPQAirHeightConfig dpqConfig,
+        Domain targetDomain,
+        HeightLevel targetHeight,
+        HashSet<Vector3Int> output)
+    {
+        PodeDetectarSensor.CollectVisibleCells(
+            unit,
+            boardMap,
+            terrainDatabase,
+            output,
+            dpqConfig,
+            enableLosValidation,
+            enableSpotter: false,
+            useOccupantLayerForTarget: false,
+            preserveObserverLayerRangeForHexVisibility: false,
+            forceVirtualTargetLayer: true,
+            forcedVirtualTargetDomain: targetDomain,
+            forcedVirtualTargetHeight: targetHeight,
+            useRangeOnlyForAirHighWhenConfigured: true);
+    }
+
+    private void AddFriendlyConstructionDisplayCells(Tilemap boardMap, HashSet<Vector3Int> output)
+    {
+        if (boardMap == null || output == null || activeTeamId < 0)
+            return;
+
+        List<ConstructionManager> constructions = ConstructionManager.AllActive;
+        for (int i = constructions.Count - 1; i >= 0; i--)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null)
+            {
+                constructions.RemoveAt(i);
+                continue;
+            }
+            if (!construction.gameObject.activeInHierarchy)
+                continue;
+            if ((int)construction.TeamId != activeTeamId)
+                continue;
+
+            Tilemap constructionMap = construction.BoardTilemap;
+            if (constructionMap == null && construction.gameObject.scene == boardMap.gameObject.scene)
+            {
+                construction.SetBoardTilemap(boardMap);
+                constructionMap = construction.BoardTilemap;
+            }
+
+            if (constructionMap != boardMap || construction.gameObject.scene != boardMap.gameObject.scene)
+                continue;
+
+            Vector3Int cell = construction.CurrentCellPosition;
+            cell.z = 0;
+            if (boardMap.GetTile(cell) != null)
+                output.Add(cell);
         }
     }
 
@@ -3710,6 +3942,8 @@ public class MatchController : MonoBehaviour
         }
 
         cacheEntry.key = nextKey;
+        if (updateVisual && fogOfWarVisionMode != FogOfWarVisionMode.All)
+            RenderFogOverlayFromRuntimeCache(boardMap);
     }
 
     public void NotifyUnitWillBeDisabledForFog(UnitManager unit)
@@ -3738,6 +3972,8 @@ public class MatchController : MonoBehaviour
 
         fogUnitVisibilityByCacheIndex[cacheIndex] = false;
         RefreshRuntimeUnitFogVisibility();
+        if (fogOfWarVisionMode != FogOfWarVisionMode.All)
+            RenderFogOverlayFromRuntimeCache(boardMap);
         OnFogOfWarUpdated?.Invoke();
     }
 

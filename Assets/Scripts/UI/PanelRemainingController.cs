@@ -9,29 +9,37 @@ public class PanelRemainingController : MonoBehaviour
     [SerializeField] private TMP_Text textMax;
     [SerializeField] private TMP_Text textUnidade;
     [SerializeField] private TMP_Text textCap;
+    [SerializeField] private TMP_Text textCamada;
 
     private string lastActual = string.Empty;
     private string lastMax = string.Empty;
     private string lastCap = string.Empty;
+    private string lastCamada = string.Empty;
     private Color lastColor = new Color(float.NaN, float.NaN, float.NaN, float.NaN);
 
     private void Awake()
     {
         TryAutoAssignReferences();
         Refresh(force: true);
+        RefreshCamada(force: true);
     }
 
     private void Update()
     {
         TryAutoAssignReferences();
         Refresh(force: false);
+        RefreshCamada(force: false);
     }
 
 #if UNITY_EDITOR
     private void OnValidate()
     {
+        if (!Application.isPlaying)
+            return;
+
         TryAutoAssignReferences();
         Refresh(force: true);
+        RefreshCamada(force: true);
     }
 #endif
 
@@ -51,6 +59,18 @@ public class PanelRemainingController : MonoBehaviour
 
         if (textCap == null)
             textCap = FindNamedTmpText("text_cap");
+
+        if (textCamada == null)
+            textCamada = FindNamedTmpText("text_camada");
+    }
+
+    public void SetFogOfWarVisionMode(FogOfWarVisionMode mode)
+    {
+        TryAutoAssignReferences();
+        string label = GetFogOfWarVisionModeLabel(mode);
+        if (textCamada != null)
+            textCamada.text = label;
+        lastCamada = label;
     }
 
     private void Refresh(bool force)
@@ -100,6 +120,31 @@ public class PanelRemainingController : MonoBehaviour
         lastMax = nextMax;
         lastCap = nextCap;
         lastColor = teamColor;
+    }
+
+    private void RefreshCamada(bool force)
+    {
+        FogOfWarVisionMode mode = matchController != null
+            ? matchController.FogOfWarVisionMode
+            : FogOfWarVisionMode.All;
+        string label = GetFogOfWarVisionModeLabel(mode);
+        if (!force && label == lastCamada)
+            return;
+
+        if (textCamada != null)
+            textCamada.text = label;
+        lastCamada = label;
+    }
+
+    private static string GetFogOfWarVisionModeLabel(FogOfWarVisionMode mode)
+    {
+        return mode switch
+        {
+            FogOfWarVisionMode.Air => "Aérea",
+            FogOfWarVisionMode.Surface => "Superfície",
+            FogOfWarVisionMode.Sub => "Submarina",
+            _ => "Todas"
+        };
     }
 
     private TMP_Text FindNamedTmpText(string name)

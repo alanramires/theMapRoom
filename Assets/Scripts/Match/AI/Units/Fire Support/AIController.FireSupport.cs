@@ -179,7 +179,7 @@ public partial class AIController
             if (!slot.Filled || slot.AssignedUnitId == unit.InstanceId) continue;
             UnitManager ally = FindActiveUnit(slot.AssignedUnitId, snapshot.AITeam);
             if (ally == null || ally.IsDead || ally.IsEmbarked) continue;
-            if (IsFireSupportUnit(ally)) continue;
+            if (IsBacklineSupportUnit(ally)) continue;
             Vector3Int allyCell = ally.CurrentCellPosition; allyCell.z = 0;
             float dist = SectorManager.HexDistance(fromCell, allyCell);
             if (dist < bestDist) { bestDist = dist; rendezvousTarget = ally; }
@@ -325,7 +325,7 @@ public partial class AIController
         {
             if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
                 continue;
-            if (IsFireSupportUnit(ally))
+            if (IsBacklineSupportUnit(ally))
                 continue;
 
             Vector3Int allyCell = ally.CurrentCellPosition;

@@ -26,7 +26,7 @@ MonoBehaviour:
   defense: 12
   armorClass: 1
   movement: 6
-  visao: 5
+  visao: 4
   visionSpecializations:
   - domain: 2
     allHeights: 0
@@ -39,7 +39,7 @@ MonoBehaviour:
   militaryForce: 1
   unitClass: 4
   combatClassification: 0
-  roles: 06000000
+  roles: 02000000
   aiInitiative: 2
   aiPurchaseMode: 0
   aiTargetPreferenceByClass:
@@ -69,6 +69,10 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
   aiConservativeSupplyAvoidEnemyRange: 2

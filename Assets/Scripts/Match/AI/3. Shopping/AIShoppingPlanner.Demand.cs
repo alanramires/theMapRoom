@@ -206,6 +206,64 @@ public partial class AIShoppingPlanner
         return demand;
     }
 
+    private static void ComputeIntelDemand(
+        AIWorldSnapshot snapshot,
+        AIIntelReport intel,
+        out int openAirIntelSlots,
+        out int openGroundIntelSlots)
+    {
+        openAirIntelSlots = 0;
+        openGroundIntelSlots = 0;
+        if (snapshot == null)
+            return;
+
+        int minTurn = Instance != null ? Instance.MinTurnForIntel : 4;
+        bool tooEarly = snapshot.TurnNumber > 0 && snapshot.TurnNumber < minTurn;
+        int visibleAir = CountTotalVisibleEnemyAircraft(snapshot);
+        float inferredAir = intel != null ? intel.enemyAirThreatScore : 0f;
+        float airThreshold = Instance != null ? Instance.IntelAirThreatAntiAirThreshold : 2f;
+
+        int activeAirIntel = CountActiveDedicatedIntel(snapshot, Domain.Air);
+        int activeGroundIntel = CountActiveDedicatedIntel(snapshot, Domain.Land);
+        int activeAirCombat = CountActiveAirCombatUnits(snapshot);
+        bool enemyAirProduction = HasEnemyAirportProductionCapacity(snapshot);
+        bool ownAirIntelProduction = HasDedicatedIntelProduction(snapshot, Domain.Air);
+        int cheapestAirIntel = ownAirIntelProduction ? FindCheapestDedicatedIntelCost(snapshot, Domain.Air) : 0;
+        bool offensivePlan = snapshot.Stance == AIStance.Offensive
+            || snapshot.Stance == AIStance.Tactical
+            || HasAnyOffensiveObjective(snapshot.AITeam);
+        bool needsAirPicture = visibleAir > 0
+            || inferredAir >= airThreshold
+            || enemyAirProduction
+            || (offensivePlan && activeAirCombat > 0)
+            || (offensivePlan && snapshot.Budget >= Mathf.Max(16000, Mathf.Max(1, snapshot.IncomePerTurn) * 2));
+
+        if (tooEarly && visibleAir == 0 && inferredAir < airThreshold)
+        {
+            Debug.Log($"[AI Shopping] intel_demand: 0 turn={snapshot.TurnNumber}<{minTurn} visibleAir={visibleAir} inferredAir={inferredAir:F1}");
+            return;
+        }
+
+        int maxAir = Instance != null ? Instance.MaxAirIntel : 1;
+        int maxGround = Instance != null ? Instance.MaxGroundIntel : 1;
+        int desiredAirIntel = needsAirPicture ? 1 : 0;
+        openAirIntelSlots = ownAirIntelProduction
+            ? Mathf.Max(0, Mathf.Min(maxAir, desiredAirIntel) - activeAirIntel)
+            : 0;
+
+        bool canBuyAirIntel = ownAirIntelProduction
+            && cheapestAirIntel > 0
+            && snapshot.Budget >= cheapestAirIntel;
+        bool needsGroundFallback = desiredAirIntel > 0
+            && activeAirIntel <= 0
+            && activeGroundIntel <= 0
+            && (!ownAirIntelProduction || !canBuyAirIntel || snapshot.Budget < Mathf.Max(12000, Mathf.Max(1, snapshot.IncomePerTurn)));
+        int desiredGroundIntel = needsGroundFallback ? 1 : 0;
+        openGroundIntelSlots = Mathf.Max(0, Mathf.Min(maxGround, desiredGroundIntel) - activeGroundIntel);
+
+        Debug.Log($"[AI Shopping] intel_demand: air={openAirIntelSlots} ground={openGroundIntelSlots} desiredAir={desiredAirIntel} fallbackGround={needsGroundFallback} activeAir={activeAirIntel} activeGround={activeGroundIntel} enemyAirProd={enemyAirProduction} ownAirIntelProd={ownAirIntelProduction} visibleAir={visibleAir} inferredAir={inferredAir:F1} airCombat={activeAirCombat} offensive={offensivePlan} budget={snapshot.Budget}");
+    }
+
     private static int ComputeFireSupportDemand(
         AIWorldSnapshot snapshot,
         int openCapturerSlots,
@@ -415,6 +473,100 @@ public partial class AIShoppingPlanner
             }
         }
         return count;
+    }
+
+    private static int CountActiveDedicatedIntel(AIWorldSnapshot snapshot, Domain domain)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null || data.domain != domain)
+                continue;
+            if (IsDedicatedIntelPurchase(data))
+                count++;
+        }
+        return count;
+    }
+
+    private static int CountActiveAirCombatUnits(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null || data.domain != Domain.Air)
+                continue;
+            if (IsPrimaryRole(data, UnitRole.Interceptador) || IsPrimaryRole(data, UnitRole.AtaqueAereo))
+                count++;
+        }
+        return count;
+    }
+
+    private static bool HasDedicatedIntelProduction(AIWorldSnapshot snapshot, Domain domain)
+    {
+        return FindCheapestDedicatedIntelCost(snapshot, domain) > 0;
+    }
+
+    private static bool HasEnemyAirportProductionCapacity(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.EnemyBuildings == null)
+            return false;
+
+        foreach (ConstructionManager building in snapshot.EnemyBuildings)
+        {
+            if (building == null)
+                continue;
+            if (!building.TryResolveConstructionData(out ConstructionData data) || data == null || !data.isAirport)
+                continue;
+            if (!building.CanProduceUnitsForTeam(building.TeamId))
+                continue;
+            if (building.OfferedUnits == null)
+                continue;
+
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (unit != null && unit.domain == Domain.Air)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static int FindCheapestDedicatedIntelCost(AIWorldSnapshot snapshot, Domain domain)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null)
+            return 0;
+
+        int cheapest = int.MaxValue;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam))
+                continue;
+            if (building.OfferedUnits == null)
+                continue;
+
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (unit == null || unit.domain != domain)
+                    continue;
+                if (!IsDedicatedIntelPurchase(unit))
+                    continue;
+                if (unit.cost > 0 && unit.cost < cheapest)
+                    cheapest = unit.cost;
+            }
+        }
+
+        return cheapest == int.MaxValue ? 0 : cheapest;
     }
 
     private static int CountActiveCombatFireSupport(AIWorldSnapshot snapshot)

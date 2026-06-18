@@ -486,7 +486,7 @@ public partial class AIController
         foreach (UnitManager ally in snapshot.MyUnits)
         {
             if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked) continue;
-            if (IsFireSupportUnit(ally)) continue;
+            if (IsBacklineSupportUnit(ally)) continue;
 
             Vector3Int allyCell = ally.CurrentCellPosition;
             allyCell.z = 0;
@@ -515,7 +515,7 @@ public partial class AIController
         foreach (UnitManager ally in snapshot.MyUnits)
         {
             if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked) continue;
-            if (IsFireSupportUnit(ally)) continue;
+            if (IsBacklineSupportUnit(ally)) continue;
 
             Vector3Int allyCell = ally.CurrentCellPosition;
             allyCell.z = 0;

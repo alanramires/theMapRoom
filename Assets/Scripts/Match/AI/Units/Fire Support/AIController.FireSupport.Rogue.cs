@@ -551,7 +551,7 @@ public partial class AIController
                     if (slot == null || !slot.Filled || slot.AssignedUnitId < 0) continue;
                     UnitManager ally = FindActiveUnit(slot.AssignedUnitId, snapshot.AITeam);
                     if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked) continue;
-                    if (IsFireSupportUnit(ally)) continue;
+                    if (IsBacklineSupportUnit(ally)) continue;
 
                     Vector3Int allyCell = ally.CurrentCellPosition; allyCell.z = 0;
                     screenCount++;
@@ -593,7 +593,7 @@ public partial class AIController
         {
             if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
                 continue;
-            if (IsFireSupportUnit(ally))
+            if (IsBacklineSupportUnit(ally))
                 continue;
 
             Vector3Int allyCell = ally.CurrentCellPosition; allyCell.z = 0;
@@ -632,7 +632,7 @@ public partial class AIController
         {
             if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
                 continue;
-            if (IsFireSupportUnit(ally))
+            if (IsBacklineSupportUnit(ally))
                 continue;
 
             Vector3Int allyCell = ally.CurrentCellPosition; allyCell.z = 0;
