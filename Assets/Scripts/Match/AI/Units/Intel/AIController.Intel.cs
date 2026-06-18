@@ -227,7 +227,12 @@ public partial class AIController
         float threat = CalculateThreatLevel(cell, snapshot.AITeam);
         float dpq = GetTerrainDpqPontos(cell);
         float cohesion = CalculateFireSupportCohesionScore(unit, snapshot, cell);
-        float rearLine = offensiveAnchor ? CalculateFireSupportRearLineScore(unit, snapshot, cell, anchor) : 0f;
+        float lineGap = 0f;
+        float rearLine = offensiveAnchor ? CalculateIntelFrontlineRearScore(unit, snapshot, cell, anchor, out lineGap) : 0f;
+        float nearestAlly = DistanceToNearestNonSupportAlly(unit, snapshot, cell);
+        float isolationPenalty = nearestAlly < float.MaxValue
+            ? Mathf.Max(0f, nearestAlly - 3f) * (offensiveAnchor ? 180f : 95f)
+            : 0f;
         int airVision = ResolveIntelAirVision(unit);
         int generalVision = ResolveIntelGeneralVision(unit);
         float airEnvelope = airVision > 0
@@ -237,6 +242,13 @@ public partial class AIController
             ? Mathf.Max(0f, 180f - Mathf.Abs(anchorDist - Mathf.Min(generalVision, 4)) * 55f)
             : 0f;
         float holdBias = cell == fromCell ? 60f : 0f;
+        float alliedConstructionPenalty = 0f;
+        if (unit != null
+            && unit.GetDomain() == Domain.Air
+            && IsAlliedConstructionAtCell(cell, snapshot.AITeam))
+        {
+            alliedConstructionPenalty = cell == fromCell ? 420f : 180f;
+        }
         float homeBias = 0f;
         if (!offensiveAnchor && snapshot.MyHQ != null)
         {
@@ -248,18 +260,114 @@ public partial class AIController
         float score = airEnvelope
             + generalEnvelope
             + dpq * 70f
-            + cohesion
+            + cohesion * (offensiveAnchor ? 2.25f : 1f)
             + rearLine
             + homeBias
             + holdBias
             - threat * 240f
+            - alliedConstructionPenalty
+            - isolationPenalty
             - pathCost * 22f;
 
         if (offensiveAnchor && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor))
             score -= 360f;
 
-        reason = $"dist={anchorDist:F1} airVis={airVision} vis={generalVision} dpq={dpq:F1} coh={cohesion:F0} rear={rearLine:F0} threat={threat:F1} path={pathCost}";
+        reason = $"dist={anchorDist:F1} airVis={airVision} vis={generalVision} dpq={dpq:F1} coh={cohesion:F0} rear={rearLine:F0} gap={lineGap:F1} ally={nearestAlly:F1} iso={isolationPenalty:F0} threat={threat:F1} buildPenalty={alliedConstructionPenalty:F0} path={pathCost}";
         return score;
+    }
+
+    private static float CalculateIntelFrontlineRearScore(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell, Vector3Int anchor, out float gap)
+    {
+        gap = 0f;
+        if (snapshot == null || snapshot.MyUnits == null)
+            return 0f;
+
+        float frontDist = float.MaxValue;
+        foreach (UnitManager ally in snapshot.MyUnits)
+        {
+            if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
+                continue;
+            if (IsBacklineSupportUnit(ally))
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            frontDist = Mathf.Min(frontDist, SectorManager.HexDistance(allyCell, anchor));
+        }
+
+        if (frontDist == float.MaxValue)
+            return 0f;
+
+        float frontBandSum = 0f;
+        float nearestFrontAlly = float.MaxValue;
+        int frontBandCount = 0;
+        foreach (UnitManager ally in snapshot.MyUnits)
+        {
+            if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
+                continue;
+            if (IsBacklineSupportUnit(ally))
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            float allyDistToAnchor = SectorManager.HexDistance(allyCell, anchor);
+            if (allyDistToAnchor > frontDist + 3f)
+                continue;
+
+            frontBandSum += allyDistToAnchor;
+            nearestFrontAlly = Mathf.Min(nearestFrontAlly, SectorManager.HexDistance(cell, allyCell));
+            frontBandCount++;
+        }
+
+        if (frontBandCount == 0)
+            return 0f;
+
+        float frontBandDist = frontBandSum / frontBandCount;
+        float cellDist = SectorManager.HexDistance(cell, anchor);
+        gap = cellDist - frontBandDist;
+
+        float desiredGap = 2f;
+        float rearScore;
+        if (gap < 0f)
+            rearScore = gap * 420f;
+        else if (gap <= desiredGap)
+            rearScore = 340f - Mathf.Abs(desiredGap - gap) * 80f;
+        else
+            rearScore = 340f - Mathf.Min(620f, (gap - desiredGap) * 190f);
+
+        float frontAllyScore = nearestFrontAlly < float.MaxValue
+            ? Mathf.Max(-280f, 180f - Mathf.Abs(nearestFrontAlly - 3f) * 90f)
+            : 0f;
+
+        return rearScore + frontAllyScore;
+    }
+
+    private static float DistanceToNearestNonSupportAlly(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return float.MaxValue;
+
+        float best = float.MaxValue;
+        foreach (UnitManager ally in snapshot.MyUnits)
+        {
+            if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
+                continue;
+            if (IsBacklineSupportUnit(ally))
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            best = Mathf.Min(best, SectorManager.HexDistance(cell, allyCell));
+        }
+
+        return best;
+    }
+
+    private bool IsAlliedConstructionAtCell(Vector3Int cell, TeamId aiTeam)
+    {
+        cell.z = 0;
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+        return construction != null && construction.TeamId == aiTeam;
     }
 
     private static int ResolveIntelAirVision(UnitManager unit)

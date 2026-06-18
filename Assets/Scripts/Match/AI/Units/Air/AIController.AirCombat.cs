@@ -43,6 +43,16 @@ public partial class AIController
             || data.roles[0] == UnitRole.Interceptador;
     }
 
+    private static bool IsOffensiveAirCombatUnit(UnitManager unit)
+    {
+        if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
+            return false;
+
+        return data.roles != null
+            && data.roles.Count > 0
+            && data.roles[0] == UnitRole.AtaqueAereo;
+    }
+
     private PlayerAction DecideRogueAirCombatAction(UnitManager unit, AIWorldSnapshot snapshot, List<int> takeoffMoveOptions = null)
     {
         Vector3Int fromCell = unit.CurrentCellPosition;
@@ -210,14 +220,14 @@ public partial class AIController
                 BazookaTargetPriority targetPreference = ResolveAirCombatTargetPreference(unit, enemy);
                 bool attacksFromCurrentCell = cell == fromCell;
                 float targetValueScore = ScoreAirCombatTargetValue(enemy, attackOption, unit);
+                float postureScore = ScoreAirCombatAttackPosture(unit, snapshot, fromCell, cell, enemyCell, anchor, isAirEnemy);
                 float score =
                     GetAirCombatTargetPreferenceScore(targetPreference)
                     + targetValueScore
                     + combatScore
                     + Mathf.Max(0, 20 - enemy.CurrentHP) * 700f
                     + (attacksFromCurrentCell ? 5000f : 0f)
-                    - SectorManager.HexDistance(enemyCell, anchor) * 350f
-                    - SectorManager.HexDistance(cell, anchor) * 40f
+                    + postureScore
                     - GetPathStepCount(paths, cell) * 8f
                     - enemy.InstanceId * 0.001f;
 
@@ -227,12 +237,49 @@ public partial class AIController
                     bestCell = cell;
                     bestTarget = enemy;
                     string weaponName = attackOption.weapon != null ? ResolveWeaponName(attackOption.weapon) : "semArma";
-                    reason = $"score={score:F0} pref={targetPreference} value={targetValueScore:F0} weapon={weaponName} hp={enemy.CurrentHP} noMove={attacksFromCurrentCell}{combatScoreReason} {attackDecisionReason}";
+                    reason = $"score={score:F0} pref={targetPreference} value={targetValueScore:F0} posture={postureScore:F0} weapon={weaponName} hp={enemy.CurrentHP} noMove={attacksFromCurrentCell}{combatScoreReason} {attackDecisionReason}";
                 }
             }
         }
 
         return bestTarget != null;
+    }
+
+    private float ScoreAirCombatAttackPosture(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int attackCell,
+        Vector3Int enemyCell,
+        Vector3Int enemyAnchor,
+        bool targetIsAircraft)
+    {
+        if (!targetIsAircraft)
+        {
+            return
+                - SectorManager.HexDistance(enemyCell, enemyAnchor) * 350f
+                - SectorManager.HexDistance(attackCell, enemyAnchor) * 40f;
+        }
+
+        float threat = CalculateThreatLevel(attackCell, snapshot.AITeam);
+        float moveDistance = SectorManager.HexDistance(fromCell, attackCell);
+        float targetDistance = SectorManager.HexDistance(attackCell, enemyCell);
+        float score =
+            - threat * 900f
+            - moveDistance * 110f
+            - targetDistance * 45f;
+
+        if (snapshot.MyHQ != null)
+        {
+            Vector3Int hq = snapshot.MyHQ.CurrentCellPosition;
+            hq.z = 0;
+            score -= SectorManager.HexDistance(attackCell, hq) * 35f;
+        }
+
+        if (snapshot.Stance == AIStance.Offensive && IsOffensiveAirCombatUnit(unit))
+            score -= SectorManager.HexDistance(attackCell, enemyAnchor) * 12f;
+
+        return score;
     }
 
     private bool HasAttackableAirCombatTarget(

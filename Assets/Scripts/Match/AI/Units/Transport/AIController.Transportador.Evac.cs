@@ -360,6 +360,7 @@ public partial class AIController
         if (TryBuildRepairEvacExtendedEmbarkAction(unit, snapshot, plan, aiTeam, fromCell, transporter, paths, out PlayerAction extendedEmbark))
             return extendedEmbark;
 
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
         Vector3Int transporterCell = transporter.CurrentCellPosition;
         transporterCell.z = 0;
 
@@ -368,6 +369,9 @@ public partial class AIController
         float bestScore = float.MinValue;
         foreach (Vector3Int cell in paths.Keys)
         {
+            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+
             float dist = SectorManager.HexDistance(cell, transporterCell);
             float progress = fromDist - dist;
             float threat = CalculateThreatLevel(cell, aiTeam);
@@ -409,6 +413,7 @@ public partial class AIController
 
         var stopCandidates = new List<Vector3Int>();
         var seen = new HashSet<Vector3Int>();
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
         if (seen.Add(fromCell))
             stopCandidates.Add(fromCell);
 
@@ -449,6 +454,9 @@ public partial class AIController
 
         foreach (Vector3Int stopCell in stopCandidates)
         {
+            if (stopCell != fromCell && occupied != null && occupied.Contains(stopCell))
+                continue;
+
             if (stopCell == fromCell)
             {
                 float directPickupDist = SectorManager.HexDistance(fromCell, transporterCell);

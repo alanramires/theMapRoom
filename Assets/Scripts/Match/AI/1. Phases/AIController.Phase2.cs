@@ -106,7 +106,8 @@ public partial class AIController
                 continue;
             }
 
-            if (ShouldDeferAttackForFireSupportPrep(unit, action, aiTeam,
+            if (!secondPass
+                && ShouldDeferAttackForFireSupportPrep(unit, action, aiTeam,
                     out UnitManager prepFireSupport, out UnitManager prepTarget, out Vector3Int prepCell))
             {
                 deferredUnitIds.Add(unit.InstanceId);
@@ -116,7 +117,8 @@ public partial class AIController
                 continue;
             }
 
-            if (ShouldDeferAttackForAirCombatPrep(unit, action, aiTeam,
+            if (!secondPass
+                && ShouldDeferAttackForAirCombatPrep(unit, action, aiTeam,
                     out UnitManager prepAirCombat, out UnitManager prepAirTarget, out Vector3Int prepAirCell))
             {
                 deferredUnitIds.Add(unit.InstanceId);
@@ -126,7 +128,8 @@ public partial class AIController
                 continue;
             }
 
-            if ((action == null || IsNoOpUnitAction(action))
+            if (!secondPass
+                && (action == null || IsNoOpUnitAction(action))
                 && ShouldDeferCapturerForRogueEmbarkBlocker(unit, activePlan, aiTeam,
                     out UnitManager embarkBlocker, out UnitManager blockedTransporter))
             {
@@ -137,7 +140,7 @@ public partial class AIController
                 continue;
             }
 
-            if (IsNoOpUnitAction(action) && ShouldDeferIdleAssaultForSectorCapturer(unit, activePlan, aiTeam))
+            if (!secondPass && IsNoOpUnitAction(action) && ShouldDeferIdleAssaultForSectorCapturer(unit, activePlan, aiTeam))
             {
                 SectorObjective obj = ResolveAssignedAssaultObjective(unit, activePlan);
                 deferredUnitIds.Add(unit.InstanceId);
@@ -187,7 +190,22 @@ public partial class AIController
             cursor++;
         }
 
-        Debug.Log($"{TL()} Fase2 concluída.");
+        _initLogBuilder.Clear();
+        int idleCount = 0;
+        foreach (UnitManager u in units)
+        {
+            if (u == null || u.IsDead || u.IsEmbarked || u.HasActed)
+                continue;
+            idleCount++;
+            Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+            _initLogBuilder.AppendLine($"  {FormatInitiativeUnitName(u)} @ {uc} (HasActed=false)");
+        }
+
+        if (idleCount > 0)
+            Debug.LogWarning($"{TL()} Fase2 concluída — {idleCount} unidade(s) NÃO agiram:\n{_initLogBuilder}");
+        else
+            Debug.Log($"{TL()} Fase2 concluída — todas as {units.Count} unidades agiram.");
+        _initLogBuilder.Clear();
     }
 
     private static bool IsNoOpUnitAction(PlayerAction action)
@@ -309,21 +327,45 @@ public partial class AIController
         if (target == null)
             return false;
 
+        int firesupportConsidered = 0;
+        _initLogBuilder.Clear();
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
             if (candidate == null || candidate == attacker)
                 continue;
-            if (candidate.TeamId != aiTeam || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked)
-                continue;
             if (!IsFireSupportUnit(candidate))
                 continue;
-            if (TryFindFireSupportPrepShot(candidate, target, aiTeam, out Vector3Int candidateCell))
+            if (candidate.TeamId != aiTeam)
+                continue;
+
+            // Diagnóstico: por que esta artilharia não cedeu o amaciamento do alvo do atacante.
+            if (candidate.HasActed || candidate.IsDead || candidate.IsEmbarked)
+            {
+                firesupportConsidered++;
+                _initLogBuilder.AppendLine($"  {FormatInitiativeUnitName(candidate)}: indisponivel (acted={candidate.HasActed} dead={candidate.IsDead} embarked={candidate.IsEmbarked})");
+                continue;
+            }
+
+            firesupportConsidered++;
+            if (TryFindFireSupportPrepShot(candidate, target, aiTeam, out Vector3Int candidateCell, out string failReason))
             {
                 fireSupport = candidate;
                 fireCell = candidateCell;
+                _initLogBuilder.Clear();
                 return true;
             }
+
+            _initLogBuilder.AppendLine($"  {FormatInitiativeUnitName(candidate)}: {failReason}");
         }
+
+        // Atacante quer bater num alvo válido, existia artilharia no time, mas ninguém cedeu:
+        // expõe o motivo (antes era um false silencioso).
+        if (firesupportConsidered > 0)
+        {
+            Debug.Log($"{TL()} Fase2 — {FormatInitiativeUnitName(attacker)} NAO cedeu ataque em " +
+                      $"{target.UnitDisplayName}#{target.InstanceId} (nenhum amaciamento de artilharia):\n{_initLogBuilder}");
+        }
+        _initLogBuilder.Clear();
 
         return false;
     }
@@ -345,6 +387,11 @@ public partial class AIController
         if (action.SensorAction != SensorActionType.Attack || string.IsNullOrEmpty(action.TargetInstanceId))
             return false;
         if (IsAirCombatUnit(attacker))
+            return false;
+        // Fire support amacia primeiro — nunca cede o tiro de prep a um combatente.
+        // Sem esta guarda, uma AA (fire support, terrestre) cede ao air combat enquanto
+        // o air combat cede a ela (ShouldDeferAttackForFireSupportPrep), gerando cessão mútua.
+        if (IsFireSupportUnit(attacker))
             return false;
         if (!int.TryParse(action.TargetInstanceId, out int targetId))
             return false;
@@ -393,9 +440,11 @@ public partial class AIController
         UnitManager fireSupport,
         UnitManager target,
         TeamId aiTeam,
-        out Vector3Int fireCell)
+        out Vector3Int fireCell,
+        out string failReason)
     {
         fireCell = Vector3Int.zero;
+        failReason = "sem-fire-support";
         if (fireSupport == null || target == null)
             return false;
 
@@ -406,6 +455,9 @@ public partial class AIController
         bool stationary = IsLongRangeStationary(fireSupport);
         TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
+
+        bool sensorListedTarget = false;       // o sensor chegou a mirar o alvo de alguma célula?
+        string lastDecisionReason = null;       // último motivo de PassesAttackDecision reprovar
 
         foreach (Vector3Int rawCell in EnumerateFireSupportCandidateCells(fromCell, paths, stationary))
         {
@@ -436,14 +488,22 @@ public partial class AIController
             {
                 if (opt == null || opt.targetUnit != target)
                     continue;
-                if (!PassesAttackDecision(fireSupport, target, cell, defensiveContext: false, out _))
+                sensorListedTarget = true;
+                if (!PassesAttackDecision(fireSupport, target, cell, defensiveContext: false, out string decisionReason))
+                {
+                    lastDecisionReason = decisionReason;
                     continue;
+                }
 
                 fireCell = cell;
+                failReason = null;
                 return true;
             }
         }
 
+        failReason = sensorListedTarget
+            ? $"prep-reprovado-PassesAttackDecision ({lastDecisionReason})"
+            : "sensor-nao-mira-alvo-de-nenhuma-celula";
         return false;
     }
 

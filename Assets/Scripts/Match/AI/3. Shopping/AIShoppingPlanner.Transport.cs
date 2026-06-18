@@ -610,4 +610,22 @@ public partial class AIShoppingPlanner
         }
         return cheapest;
     }
+
+    private static int FindCheapestAirCombatCost(AIWorldSnapshot snapshot, UnitRole role, bool elite)
+    {
+        int cheapest = 0;
+        if (snapshot == null || snapshot.MyBuildings == null) return cheapest;
+        foreach (ConstructionManager b in snapshot.MyBuildings)
+        {
+            if (b == null || !b.CanProduceUnitsForTeam(snapshot.AITeam) || b.OfferedUnits == null) continue;
+            foreach (UnitData u in b.OfferedUnits)
+            {
+                if (u == null || u.domain != Domain.Air) continue;
+                if (!IsPrimaryRole(u, role)) continue;
+                if ((u.eliteLevel >= 1) != elite) continue;
+                if (cheapest == 0 || u.cost < cheapest) cheapest = u.cost;
+            }
+        }
+        return cheapest;
+    }
 }

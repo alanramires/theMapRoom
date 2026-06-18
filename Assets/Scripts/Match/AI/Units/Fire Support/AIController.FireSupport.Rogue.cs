@@ -322,7 +322,8 @@ public partial class AIController
             string closestText = closestRangeEnemy != null
                 ? $" closest={closestRangeEnemy.UnitDisplayName}#{closestRangeEnemy.InstanceId}@{closestEnemyCell} via {closestRangeCell} dist={closestRangeDistance}"
                 : " closest=-";
-            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rogue range-step scan: sem célula cand={candidateCount} visibleEnemies={visibleEnemyCount} sensorTargets={sensorTargetCount} geomTargets={geometricTargetCount} tooClose={rangeTooClose} tooFar={rangeTooFar} blockedOcc={occupiedBlocked} blockedCapTarget={capturerTargetBlocked} blockedConservative={conservativeBlocked} blockedScreen={screenBlocked} highThreat={highThreatCandidates} range={minRange}-{maxRange}{closestText}");
+            string context = assigned != null ? assigned.Sector.ToString() : "rogue";
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} {context} range-step scan: sem célula cand={candidateCount} visibleEnemies={visibleEnemyCount} sensorTargets={sensorTargetCount} geomTargets={geometricTargetCount} tooClose={rangeTooClose} tooFar={rangeTooFar} blockedOcc={occupiedBlocked} blockedCapTarget={capturerTargetBlocked} blockedConservative={conservativeBlocked} blockedScreen={screenBlocked} highThreat={highThreatCandidates} range={minRange}-{maxRange}{closestText}");
             return false;
         }
 

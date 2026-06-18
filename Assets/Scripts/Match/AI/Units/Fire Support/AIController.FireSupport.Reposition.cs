@@ -204,9 +204,15 @@ public partial class AIController
                         + rearLine * 0.15f;
                 }))
         {
-            bool toolHasProgress = toolCandidate.ToolScore > 0
-                || toolCandidate.FirstTurnProgress > 0f
-                || toolCandidate.TwoTurnProgress > 0f;
+            float toolHexProgress = fromDist - SectorManager.HexDistance(toolCell, anchor);
+            bool offensiveAssignedReposition = assigned != null
+                && assigned.Status != ObjectiveStatus.Defending
+                && !requireImmediateThreat;
+            bool toolHasDistanceProgress = toolHexProgress > 0.1f
+                || toolCandidate.FirstTurnProgress > 0.1f
+                || (!offensiveAssignedReposition && toolCandidate.TwoTurnProgress > 0.1f);
+            bool toolHasProgress = toolHasDistanceProgress
+                || (requireImmediateThreat && toolCandidate.ToolScore > 0);
             bool toolBeatsHold = toolCandidate.TacticalScore >= fromScore + moveMargin;
             bool toolPressureMove = requireImmediateThreat && toolCandidate.TacticalScore > fromScore;
 
@@ -245,6 +251,13 @@ public partial class AIController
             bool recoversMissingRoute = !fromRouteFound && cellRouteFound;
             bool advancesByRoute = recoversMissingRoute || routeProgress > 0f;
             if (requireImmediateThreat && tacticalPressure <= 0f)
+                continue;
+            if (!requireImmediateThreat
+                && assigned != null
+                && assigned.Status != ObjectiveStatus.Defending
+                && progress <= 0.1f
+                && routeProgress <= 0.1f
+                && !recoversMissingRoute)
                 continue;
             if (conservative && progress > 0f && tacticalPressure <= 0f && rearLine < -350f)
                 continue;

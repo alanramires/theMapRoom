@@ -331,6 +331,8 @@ public partial class AIController
         action = null;
         if (unit == null || snapshot == null)
             return false;
+        if (HasTransportCargo(unit))
+            return false;
 
         Dictionary<Vector3Int, List<Vector3Int>> paths =
             UnitMovementPathRules.CalcularCaminhosValidos(

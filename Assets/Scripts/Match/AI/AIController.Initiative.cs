@@ -33,8 +33,8 @@ public partial class AIController
         float db = GetDistanceToAssignedTarget(b, _sortAiTeam, _sortActivePlan);
         int cmp = da.CompareTo(db);
         if (cmp != 0) return cmp;
-        int ia = a.TryGetUnitData(out UnitData ua) ? (int)ua.aiInitiative : (int)AiInitiative.Medium;
-        int ib = b.TryGetUnitData(out UnitData ub) ? (int)ub.aiInitiative : (int)AiInitiative.Medium;
+        int ia = GetEffectiveAiInitiative(a);
+        int ib = GetEffectiveAiInitiative(b);
         cmp = ia.CompareTo(ib);
         return cmp != 0 ? cmp : b.CurrentHP.CompareTo(a.CurrentHP);
     }
@@ -156,6 +156,10 @@ public partial class AIController
         // Manutencao nao preempta a fila. Se estiver em cima de alvo de captura,
         // IsBlockingCaptureTarget ja colocou no grupo 0 acima.
         if (unit.IsUnderRepair) return 5;
+
+        // Intel dedicada (EWACS/radar movel) age cedo para iluminar alvos
+        // antes da artilharia, aviação e assalto consumirem suas ações.
+        if (IsIntelUnit(unit)) return 1;
 
         if (IsHelicopterInitiativeUnit(unit)) return 1;
 
@@ -900,14 +904,20 @@ public partial class AIController
 
     private static int CompareUnitInitiative(UnitManager a, UnitManager b)
     {
-        int ia = a != null && a.TryGetUnitData(out UnitData ua)
-            ? (int)ua.aiInitiative
-            : (int)AiInitiative.Medium;
-        int ib = b != null && b.TryGetUnitData(out UnitData ub)
-            ? (int)ub.aiInitiative
-            : (int)AiInitiative.Medium;
+        int ia = GetEffectiveAiInitiative(a);
+        int ib = GetEffectiveAiInitiative(b);
 
         return ia.CompareTo(ib);
+    }
+
+    private static int GetEffectiveAiInitiative(UnitManager unit)
+    {
+        if (IsIntelUnit(unit))
+            return (int)AiInitiative.High;
+
+        return unit != null && unit.TryGetUnitData(out UnitData data)
+            ? (int)data.aiInitiative
+            : (int)AiInitiative.Medium;
     }
 
     // Distância ao transporter mais próximo que tem slot compatível livre para esta unidade.

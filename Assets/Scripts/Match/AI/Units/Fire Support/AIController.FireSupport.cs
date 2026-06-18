@@ -139,10 +139,19 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, assignedRangeStepCell, paths);
         }
 
-        if (TryFindFireSupportRepositionCell(unit, snapshot, fromCell, anchor, paths, occupied,
+        Vector3Int supportAnchor = anchor;
+        string supportAnchorReason = null;
+        if (assigned.Status != ObjectiveStatus.Defending
+            && TryResolveFireSupportLiveSupportAnchor(unit, snapshot, assigned, anchor, out Vector3Int liveAnchor, out supportAnchorReason))
+        {
+            supportAnchor = liveAnchor;
+        }
+
+        if (TryFindFireSupportRepositionCell(unit, snapshot, fromCell, supportAnchor, paths, occupied,
             out Vector3Int moveCell, out string moveReason, assigned: assigned))
         {
-            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reposiciona para apoiar {assigned.Sector} via {moveCell} ({moveReason})");
+            string anchorText = supportAnchorReason != null ? $" anchor={supportAnchor} {supportAnchorReason}; " : "";
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reposiciona para apoiar {assigned.Sector} via {moveCell} ({anchorText}{moveReason})");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
         }
 
@@ -155,7 +164,7 @@ public partial class AIController
         PlayerAction rendezvousAction = TryFireSupportRendezvousAction(unit, snapshot, assigned, fromCell, paths, occupied);
         if (rendezvousAction != null) return rendezvousAction;
 
-        PlayerAction cohesionAction = TryFireSupportCohesionFallbackAction(unit, snapshot, assigned, fromCell, anchor, paths, occupied);
+        PlayerAction cohesionAction = TryFireSupportCohesionFallbackAction(unit, snapshot, assigned, fromCell, supportAnchor, paths, occupied);
         if (cohesionAction != null) return cohesionAction;
 
         Debug.Log($"{TL("FireSupport")} {unit.InstanceId} aguarda apoio {assigned.Sector}");
@@ -288,7 +297,12 @@ public partial class AIController
             float cohesion = CalculateFireSupportCohesionScore(unit, snapshot, cell);
             float cohesionGain = cohesion - fromCohesion;
             float allyGain = fromNearestAlly < float.MaxValue ? fromNearestAlly - nearestAlly : 0f;
-            float rearBias = Mathf.Max(0f, cellAnchorDist - fromAnchorDist) * 35f;
+            if (conservativeOffensiveObjective && cellAnchorDist > fromAnchorDist + 0.1f)
+                continue;
+
+            float rearBias = conservativeOffensiveObjective
+                ? 0f
+                : Mathf.Max(0f, cellAnchorDist - fromAnchorDist) * 35f;
             float pathCost = GetPathStepCount(paths, cell);
             float score = cohesionGain
                 + allyGain * 180f
@@ -311,7 +325,7 @@ public partial class AIController
         if (bestCell == fromCell || bestScore < 35f)
             return null;
 
-        Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reagrupa/cohesion {assigned.Sector} via {bestCell} ({bestReason} score={bestScore:F0})");
+        Debug.Log($"{TL("FireSupport")} {unit.InstanceId} reagrupa/cohesion {assigned.Sector} via {bestCell} anchor={anchor} ({bestReason} score={bestScore:F0})");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestCell, paths);
     }
 

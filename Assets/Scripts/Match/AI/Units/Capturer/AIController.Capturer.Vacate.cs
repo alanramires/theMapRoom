@@ -29,7 +29,39 @@ public partial class AIController
         if (!IsActiveUnitBlockingThreatenedHomeProduction(unit, snapshot, aiTeam, fromCell, out string threatReason))
             return false;
 
-        if (TryFindHomeProductionVacateAttack(unit, snapshot, fromCell, paths, occupied,
+        bool conservativeBackline = IsBacklineSupportUnit(unit) && IsFireSupportConservative(unit);
+        if (conservativeBackline
+            && TryBuildBestFireSupportAttack(
+                unit,
+                snapshot,
+                fromCell,
+                paths,
+                occupied,
+                fromCell,
+                defensiveContext: true,
+                out action,
+                out string fireReason))
+        {
+            Debug.Log($"{TL("Base")} {unit.InstanceId} libera producao ({threatReason}) - {fireReason}");
+            return true;
+        }
+
+        if (conservativeBackline
+            && TryBuildFireSupportBlockedShotRepositionAction(
+                unit,
+                snapshot,
+                fromCell,
+                paths,
+                occupied,
+                defensiveContext: true,
+                out action,
+                out string blockedReason))
+        {
+            Debug.Log($"{TL("Base")} {unit.InstanceId} libera producao ({threatReason}) - {blockedReason}");
+            return true;
+        }
+
+        if (!conservativeBackline && TryFindHomeProductionVacateAttack(unit, snapshot, fromCell, paths, occupied,
                 out Vector3Int attackCell, out UnitManager target, out string reason))
         {
             Vector3Int targetCell = target.CurrentCellPosition;
@@ -40,9 +72,9 @@ public partial class AIController
             return true;
         }
 
-        if (TryFindHomeProductionVacateMove(unit, aiTeam, fromCell, paths, occupied, out Vector3Int moveCell))
+        if (TryFindHomeProductionVacateMove(unit, snapshot, aiTeam, fromCell, paths, occupied, out Vector3Int moveCell, out string moveReason))
         {
-            Debug.Log($"{TL("Base")} {unit.InstanceId} libera producao ({threatReason}) - reposiciona via {moveCell}");
+            Debug.Log($"{TL("Base")} {unit.InstanceId} libera producao ({threatReason}) - reposiciona via {moveCell} ({moveReason})");
             action = BuildMoveBatch(unit, aiTeam, fromCell, moveCell, paths);
             return true;
         }
@@ -425,32 +457,93 @@ public partial class AIController
 
     private bool TryFindHomeProductionVacateMove(
         UnitManager unit,
+        AIWorldSnapshot snapshot,
         TeamId aiTeam,
         Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
-        out Vector3Int bestCell)
+        out Vector3Int bestCell,
+        out string reason)
     {
         bestCell = fromCell;
+        reason = "";
         float bestScore = float.MinValue;
-        foreach (Vector3Int cell in paths.Keys)
+        bool conservativeBackline = IsBacklineSupportUnit(unit) && IsFireSupportConservative(unit);
+
+        foreach (Vector3Int rawCell in paths.Keys)
         {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
             if (cell == fromCell) continue;
             if (occupied != null && occupied.Contains(cell)) continue;
 
             ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
             bool blocksProduction = bldg != null && bldg.CanProduceUnitsForTeam(aiTeam);
             float enemyDist = DistanceToNearestVisibleEnemy(cell, aiTeam);
-            float score =
-                (blocksProduction ? -10000f : 0f)
-                - enemyDist * 50f
-                + GetTerrainDpqPontos(cell) * 20f
-                - GetPathStepCount(paths, cell) * 2f;
+            float dpq = GetTerrainDpqPontos(cell);
+            int pathCost = GetPathStepCount(paths, cell);
+            float score;
+            string localReason;
+
+            if (conservativeBackline)
+            {
+                if (blocksProduction)
+                    continue;
+                if (!IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
+                    continue;
+
+                float threat = CalculateThreatLevel(cell, aiTeam);
+                float cohesion = CalculateFireSupportCohesionScore(unit, snapshot, cell);
+                bool hasRearAnchor = TryFindNearestVisibleEnemyCell(fromCell, aiTeam, out Vector3Int rearAnchor);
+                float rearLine = hasRearAnchor
+                    ? CalculateFireSupportRearLineScore(unit, snapshot, cell, rearAnchor)
+                    : 0f;
+                float alliedConstructionPenalty = unit.GetDomain() == Domain.Air
+                    && bldg != null
+                    && bldg.TeamId == aiTeam
+                        ? 180f
+                        : 0f;
+                float currentAlliedConstructionBonus = unit.GetDomain() == Domain.Air
+                    && ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell) is ConstructionManager currentBldg
+                    && currentBldg.TeamId == aiTeam
+                        ? 240f
+                        : 0f;
+                float homeBias = 0f;
+                if (snapshot != null && snapshot.MyHQ != null)
+                {
+                    Vector3Int hq = snapshot.MyHQ.CurrentCellPosition;
+                    hq.z = 0;
+                    homeBias = -SectorManager.HexDistance(cell, hq) * 25f;
+                }
+
+                float cappedEnemyDist = Mathf.Min(enemyDist, 8f);
+                score =
+                    cappedEnemyDist * 130f
+                    + dpq * 55f
+                    + cohesion * 1.05f
+                    + rearLine * 1.25f
+                    + currentAlliedConstructionBonus
+                    + homeBias
+                    - threat * 180f
+                    - alliedConstructionPenalty
+                    - pathCost * 28f;
+                localReason = $"conservador score={score:F0} enemyDist={enemyDist:F1} threat={threat:F1} dpq={dpq:F1} coh={cohesion:F0} rear={rearLine:F0} buildPenalty={alliedConstructionPenalty:F0} leaveBuildBonus={currentAlliedConstructionBonus:F0} path={pathCost}";
+            }
+            else
+            {
+                score =
+                    (blocksProduction ? -10000f : 0f)
+                    - enemyDist * 50f
+                    + dpq * 20f
+                    - pathCost * 2f;
+                localReason = $"score={score:F0} enemyDist={enemyDist:F1} dpq={dpq:F1} path={pathCost}";
+            }
 
             if (score > bestScore)
             {
                 bestScore = score;
                 bestCell = cell;
+                reason = localReason;
             }
         }
 
@@ -472,5 +565,29 @@ public partial class AIController
         }
 
         return best < float.MaxValue ? best : 99f;
+    }
+
+    private static bool TryFindNearestVisibleEnemyCell(Vector3Int fromCell, TeamId aiTeam, out Vector3Int enemyCell)
+    {
+        enemyCell = fromCell;
+        enemyCell.z = 0;
+        float best = float.MaxValue;
+        MatchController mc = GetMatchController();
+
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy == null || enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+
+            Vector3Int cell = enemy.CurrentCellPosition;
+            cell.z = 0;
+            float dist = SectorManager.HexDistance(fromCell, cell);
+            if (dist >= best) continue;
+
+            best = dist;
+            enemyCell = cell;
+        }
+
+        return best < float.MaxValue;
     }
 }

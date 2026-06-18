@@ -159,6 +159,58 @@ public partial class AIController
         return fallback;
     }
 
+    private bool TryResolveFireSupportLiveSupportAnchor(
+        UnitManager fireSupport,
+        AIWorldSnapshot snapshot,
+        SectorObjective assigned,
+        Vector3Int objectiveAnchor,
+        out Vector3Int anchor,
+        out string reason)
+    {
+        anchor = objectiveAnchor;
+        reason = null;
+        if (fireSupport == null || snapshot == null || assigned == null || assigned.Slots == null)
+            return false;
+
+        UnitManager best = null;
+        float bestScore = float.MinValue;
+        foreach (SlotNeed slot in assigned.Slots)
+        {
+            if (!slot.Filled || slot.AssignedUnitId == fireSupport.InstanceId)
+                continue;
+
+            UnitManager ally = FindActiveUnit(slot.AssignedUnitId, snapshot.AITeam);
+            if (ally == null || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
+                continue;
+            if (IsBacklineSupportUnit(ally))
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            float distToObjective = SectorManager.HexDistance(allyCell, objectiveAnchor);
+            float distToSupport = SectorManager.HexDistance(allyCell, fireSupport.CurrentCellPosition);
+            float roleBonus = slot.Role == UnitRole.Capturador ? 900f
+                : slot.Role == UnitRole.Assalto ? 450f
+                : 0f;
+            float score = roleBonus
+                - distToObjective * 120f
+                - distToSupport * 8f;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = ally;
+                anchor = allyCell;
+            }
+        }
+
+        if (best == null)
+            return false;
+
+        reason = $"liveSupport=#{best.InstanceId}";
+        return true;
+    }
+
     private Vector3Int ResolveRogueFireSupportAnchor(AIWorldSnapshot snapshot, Vector3Int fallback)
     {
         if (snapshot != null && snapshot.EnemyHQ != null)
@@ -198,18 +250,65 @@ public partial class AIController
 
     private bool IsCellACapturerTarget(Vector3Int cell, TeamObjectivePlan plan, TeamId aiTeam)
     {
-        if (plan == null) return false;
-        foreach (SectorObjective obj in plan.Objectives)
+        cell.z = 0;
+        if (plan != null)
         {
-            bool hasCapturerSlot = false;
-            foreach (SlotNeed slot in obj.Slots)
-                if (slot.Role == UnitRole.Capturador && slot.Filled) { hasCapturerSlot = true; break; }
-            if (!hasCapturerSlot) continue;
-            ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
-            if (tgt == null) continue;
-            Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
-            if (tc == cell) return true;
+            foreach (SectorObjective obj in plan.Objectives)
+            {
+                bool hasCapturerSlot = false;
+                foreach (SlotNeed slot in obj.Slots)
+                    if (slot.Role == UnitRole.Capturador && slot.Filled) { hasCapturerSlot = true; break; }
+                if (!hasCapturerSlot) continue;
+                ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
+                if (tgt == null) continue;
+                Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0;
+                if (tc == cell) return true;
+            }
         }
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+        if (construction == null
+            || !construction.IsCapturable
+            || construction.CapturePointsMax <= 0
+            || (construction.TeamId == aiTeam && construction.CurrentCapturePoints >= construction.CapturePointsMax))
+        {
+            return false;
+        }
+
+        return HasAvailableCapturerReachableForCaptureCell(cell, construction, aiTeam);
+    }
+
+    private bool HasAvailableCapturerReachableForCaptureCell(
+        Vector3Int captureCell,
+        ConstructionManager construction,
+        TeamId aiTeam)
+    {
+        if (construction == null)
+            return false;
+
+        foreach (UnitManager candidate in UnitManager.AllActive)
+        {
+            if (candidate == null || candidate.TeamId != aiTeam)
+                continue;
+            if (candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair)
+                continue;
+            if (!SimulateCaptureSensor(candidate, captureCell, out ConstructionManager target)
+                || target != construction)
+            {
+                continue;
+            }
+
+            Dictionary<Vector3Int, List<Vector3Int>> candidatePaths =
+                UnitMovementPathRules.CalcularCaminhosValidos(
+                    boardTilemap,
+                    candidate,
+                    Mathf.Max(0, candidate.RemainingMovementPoints),
+                    terrainDatabase);
+
+            if (candidatePaths != null && candidatePaths.ContainsKey(captureCell))
+                return true;
+        }
+
         return false;
     }
 

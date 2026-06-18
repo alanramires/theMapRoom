@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 // --------------------------------------------------------------------------------------------
 // Planejamento de Compras da IA: Decis�o de Unidades a Comprar
 // O AIShoppingPlanner � respons�vel por decidir quais unidades a IA deve comprar a cada turno,
@@ -86,7 +87,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Range(0, 2)]    public int   MinBombaPresence                 = 0;
     [Range(1, 12)]   public int   MinTurnForIntel                  = 4;
     [Range(0, 3)]    public int   MaxAirIntel                      = 1;
-    [Range(0, 3)]    public int   MaxGroundIntel                   = 1;
+    [FormerlySerializedAs("MaxGroundIntel")]
+    [Range(0, 3)]    public int   MaxMobileAirIntel                = 1;
 
     private static AIShoppingPlanner instance;
     public static AIShoppingPlanner Instance => EnsureInstance();
@@ -141,7 +143,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
         int openBombaSlots  = ComputeBombaDemand(snapshot);
         int openAirTankerSlots = 0;
         AIIntelReport intelReport = BuildShoppingIntelReport(snapshot);
-        ComputeIntelDemand(snapshot, intelReport, out int openAirIntelSlots, out int openGroundIntelSlots);
+        ComputeIntelDemand(snapshot, intelReport, out int openAirIntelSlots, out int openMobileAirIntelSlots);
         bool intelArmorThreat = false;
         bool offensiveAntiInfantryFireSupport = false;
         bool proactiveDefFireSupport = !preferDefensiveFireSupport
@@ -446,6 +448,11 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 float stalemateThreshold = Instance != null
                     ? Mathf.Clamp01(Instance.StalemateEliteCapturerFillRatio)
                     : 0.3f;
+                bool heavyStalematePressure = intelReport != null
+                    && Instance != null
+                    && intelReport.stalemateElitePressure >= Instance.IntelStalemateFireSupportThreshold;
+                if (heavyStalematePressure)
+                    stalemateThreshold = Mathf.Min(stalemateThreshold, 0.25f);
                 fillThreshold = Mathf.Min(fillThreshold, stalemateThreshold);
             }
             bool offensiveElitePressure = remaining >= eliteAssaultTarget.cost
@@ -565,15 +572,28 @@ public partial class AIShoppingPlanner : MonoBehaviour
         }
         int anyAirCombatDemand    = openCacaBSlots + openCacaASlots + openApacheSlots + openBombaSlots;
         int cheapestAirCombatCost = anyAirCombatDemand > 0 ? FindCheapestAirCombatCost(snapshot) : 0;
+        int cacaBReserveCost      = openCacaBSlots  > 0 ? FindCheapestAirCombatCost(snapshot, UnitRole.Interceptador, elite: false) : 0;
+        int cacaAReserveCost      = openCacaASlots  > 0 ? FindCheapestAirCombatCost(snapshot, UnitRole.Interceptador, elite: true)  : 0;
+        int apacheReserveCost     = openApacheSlots > 0 ? FindCheapestAirCombatCost(snapshot, UnitRole.AtaqueAereo,   elite: false) : 0;
+        int bomberReserveCost     = openBombaSlots > 0 ? FindCheapestAirCombatCost(snapshot, UnitRole.AtaqueAereo, elite: true) : 0;
         int reserveForAirCombat   = 0;
         if (cheapestAirCombatCost > 0 && anyAirCombatDemand > 0)
         {
             int budgetAfterAirTransport = Mathf.Max(0, remaining - reserveForCapturerPassenger - reserveForAirTransport);
-            reserveForAirCombat = Mathf.Min(budgetAfterAirTransport, cheapestAirCombatCost * Mathf.Min(anyAirCombatDemand, 2));
-            Debug.Log($"[AI Shopping] reserva_combate_ar: slots={anyAirCombatDemand} custo={cheapestAirCombatCost} reserva={reserveForAirCombat} cap_passageiro_reserva={reserveForCapturerPassenger}");
+            int minimumReserve = cheapestAirCombatCost * Mathf.Min(anyAirCombatDemand, 2);
+            if (cacaBReserveCost > 0)
+                minimumReserve = Mathf.Max(minimumReserve, cacaBReserveCost);
+            if (cacaAReserveCost > 0)
+                minimumReserve = Mathf.Max(minimumReserve, cacaAReserveCost);
+            if (apacheReserveCost > 0)
+                minimumReserve = Mathf.Max(minimumReserve, apacheReserveCost);
+            if (bomberReserveCost > 0)
+                minimumReserve = Mathf.Max(minimumReserve, bomberReserveCost);
+            reserveForAirCombat = Mathf.Min(budgetAfterAirTransport, minimumReserve);
+            Debug.Log($"[AI Shopping] reserva_combate_ar: slots={anyAirCombatDemand} custo={cheapestAirCombatCost} cacaB_custo={cacaBReserveCost} cacaA_custo={cacaAReserveCost} apache_custo={apacheReserveCost} bomber_custo={bomberReserveCost} reserva={reserveForAirCombat} cap_passageiro_reserva={reserveForCapturerPassenger}");
         }
 
-        Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} air_trans_slots={openAirTransportSlots} air_tanker_slots={openAirTankerSlots} intel_air_slots={openAirIntelSlots} intel_ground_slots={openGroundIntelSlots} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cacaB_slots={openCacaBSlots} cacaA_slots={openCacaASlots} apache_slots={openApacheSlots} bomba_slots={openBombaSlots} cheapest_transport={cheapestTransportCost} cheapest_air={cheapestAirTransportCost} cheapest_air_intel={cheapestAirIntelCost} reserva_ar={reserveForAirTransport} reserva_intel_ar={reserveForAirIntel} cap_passageiro_reserva={reserveForCapturerPassenger} intel={(intelReport != null ? $"inf={intelReport.enemyInfantryPressureScore:F1} air={intelReport.enemyAirThreatScore:F1} armor={intelReport.enemyArmorThreatScore:F1} num={intelReport.numericalPressure:F1}" : "off")} onlyCap={onlyCapturers} onlyAss={onlyAssault} onlyTrans={onlyTransporter} onlyLog={onlyLogistics} onlyFire={onlyFireSupport}");
+        Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} air_trans_slots={openAirTransportSlots} air_tanker_slots={openAirTankerSlots} intel_air_slots={openAirIntelSlots} intel_mobile_air_slots={openMobileAirIntelSlots} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cacaB_slots={openCacaBSlots} cacaA_slots={openCacaASlots} apache_slots={openApacheSlots} bomba_slots={openBombaSlots} cheapest_transport={cheapestTransportCost} cheapest_air={cheapestAirTransportCost} cheapest_air_intel={cheapestAirIntelCost} reserva_ar={reserveForAirTransport} reserva_intel_ar={reserveForAirIntel} cap_passageiro_reserva={reserveForCapturerPassenger} intel={(intelReport != null ? $"inf={intelReport.enemyInfantryPressureScore:F1} air={intelReport.enemyAirThreatScore:F1} armor={intelReport.enemyArmorThreatScore:F1} num={intelReport.numericalPressure:F1}" : "off")} onlyCap={onlyCapturers} onlyAss={onlyAssault} onlyTrans={onlyTransporter} onlyLog={onlyLogistics} onlyFire={onlyFireSupport}");
 
         bool strategicEliteAssaultReserve = eliteAssaultTarget != null
             && !dreamTeamPivot
@@ -944,7 +964,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
 
             int effectiveOpenCapturerSlots = openCapturerSlots + apcPassengerFollowupDemand;
             UnitData unit = PickUnit(building, snapshot, spendBudget, onlyCapturers, onlyAssault, onlyTransporter, onlyLogistics, onlyFireSupport, onlyAirTransporter,
-                effectiveOpenCapturerSlots, openAssaultSlots, openTransportSlots, urgentTransportDemand, openLogisticsSlots, openFireSupportSlots, openGroundIntelSlots, preferDefensiveFireSupport,
+                effectiveOpenCapturerSlots, openAssaultSlots, openTransportSlots, urgentTransportDemand, openLogisticsSlots, openFireSupportSlots, openMobileAirIntelSlots, preferDefensiveFireSupport,
                 eliteAssaultTarget, eliteFireSupportTarget, defensiveBaseThreat,
                 allowDefensiveEliteAssault, defensiveTankReserveCost,
                 defensiveBaseManpowerShortage, defensiveMassReserveCost, defensiveBaseTankBought,
@@ -1009,8 +1029,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 openLogisticsSlots--;
             else if (IsFireSupportPurchase(unit) && openFireSupportSlots > 0)
                 openFireSupportSlots--;
-            else if (IsDedicatedIntelPurchase(unit) && openGroundIntelSlots > 0)
-                openGroundIntelSlots--;
+            else if (IsDedicatedIntelPurchase(unit) && openMobileAirIntelSlots > 0)
+                openMobileAirIntelSlots--;
             if (unit == eliteAssaultTarget)
                 eliteAssaultBought = true;
             if (unit == eliteFireSupportTarget)
@@ -1057,7 +1077,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
 
                     UnitData airUnit = PickAirUnit(building, remaining,
                         wantsAirTransport, wantsCacaB, wantsCacaA, wantsApache, wantsBomba, wantsAirTanker, wantsAirIntel,
-                        urgentCacaB);
+                        urgentCacaB,
+                        snapshot.AITeam);
                     if (airUnit == null)
                     {
                         Debug.Log($"[AI Shopping Air] {building.ConstructionDisplayName} @ {cell} — sem unidade aérea disponível ou sem budget");

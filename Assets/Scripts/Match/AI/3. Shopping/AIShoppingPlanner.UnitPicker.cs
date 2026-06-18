@@ -7,7 +7,8 @@ public partial class AIShoppingPlanner
     private static UnitData PickAirUnit(
         ConstructionManager building, int budget,
         bool wantsTransport, bool wantsCacaB, bool wantsCacaA, bool wantsApache, bool wantsBomba, bool wantsAirTanker, bool wantsIntel,
-        bool urgentCacaB)
+        bool urgentCacaB,
+        TeamId aiTeam)
     {
         if (building == null || building.OfferedUnits == null) return null;
 
@@ -16,7 +17,13 @@ public partial class AIShoppingPlanner
 
         foreach (UnitData u in building.OfferedUnits)
         {
-            if (u == null || u.cost > budget || u.domain != Domain.Air) continue;
+            if (u == null) continue;
+            if (u.domain != Domain.Air) continue;
+            if (u.cost > budget)
+            {
+                Debug.Log($"[AI Shopping Air] SKIP {u.displayName} ${u.cost} — custo>{budget}");
+                continue;
+            }
             if (u.roles == null || u.roles.Count == 0) continue;
 
             UnitRole primary = u.roles[0];
@@ -28,10 +35,22 @@ public partial class AIShoppingPlanner
             else if (primary == UnitRole.AtaqueAereo   && !elite && wantsApache) score = 20000 + u.cost;
             else if (primary == UnitRole.AtaqueAereo   &&  elite && wantsBomba)  score = 22000 + u.cost;
             else if (primary == UnitRole.Logistica && wantsAirTanker && IsAirTankerPurchase(u)) score = 24000 + u.cost;
-            else if (wantsIntel && IsDedicatedIntelPurchase(u)) score = 26000 + GetIntelPurchaseVisionScore(u) + u.cost;
-            else continue;
+            else if (wantsIntel && IsDedicatedIntelPurchase(u))
+            {
+                if (CountExistingDedicatedIntel(aiTeam, Domain.Air) >= 1)
+                {
+                    Debug.Log($"[AI Shopping Air] SKIP {u.displayName} — EWACS/intel aérea já existente");
+                    continue;
+                }
+                score = 26000 + GetIntelPurchaseVisionScore(u) + u.cost;
+            }
+            else
+            {
+                Debug.Log($"[AI Shopping Air] SKIP {u.displayName} — sem demanda role={primary} elite={elite} trans={wantsTransport} cacaB={wantsCacaB} cacaA={wantsCacaA} apache={wantsApache} bomba={wantsBomba} tanker={wantsAirTanker} intel={wantsIntel}");
+                continue;
+            }
 
-            Debug.Log($"[AI Shopping Air] candidato {u.displayName} ${u.cost} role={primary} elite={elite} urgentCacaB={urgentCacaB} intel={wantsIntel && IsDedicatedIntelPurchase(u)} score={score}");
+            Debug.Log($"[AI Shopping Air] candidato {u.displayName} ${u.cost} role={primary} elite={elite} urgentCacaB={urgentCacaB} bomba={wantsBomba} intel={wantsIntel && IsDedicatedIntelPurchase(u)} score={score}");
             if (score > bestScore) { bestScore = score; best = u; }
         }
         return best;
@@ -79,7 +98,7 @@ public partial class AIShoppingPlanner
         bool urgentTransportDemand = false,
         int openLogisticsSlots = 0,
         int openFireSupportSlots = 0,
-        int openGroundIntelSlots = 0,
+        int openMobileAirIntelSlots = 0,
         bool preferDefensiveFireSupport = false,
         UnitData eliteAssaultTarget = null,
         UnitData eliteFireSupportTarget = null,
@@ -177,8 +196,8 @@ public partial class AIShoppingPlanner
             if (isPrimaryLogistics && openLogisticsSlots <= 0)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda logistics"); continue; }
 
-            if (isPrimaryIntel && openGroundIntelSlots <= 0)
-            { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda intel"); continue; }
+            if (isPrimaryIntel && openMobileAirIntelSlots <= 0)
+            { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda intel aérea móvel"); continue; }
 
             if (isPrimaryAssault && !isHybridCapturer && openAssaultSlots <= 0 && !defensiveBaseThreat && !proactiveAntiAirAAABypass && !strategicArmorParityBypass)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda assault"); continue; }
@@ -260,7 +279,7 @@ public partial class AIShoppingPlanner
                 score += openLogisticsSlots >= 2 ? 220000 : 185000;
                 if (defensiveBaseThreat) score -= 25000;
             }
-            if (openGroundIntelSlots > 0 && isPrimaryIntel)
+            if (openMobileAirIntelSlots > 0 && isPrimaryIntel)
                 score += 132000 + GetIntelPurchaseVisionScore(u);
             if (openFireSupportSlots > 0 && isFireSupportCapable)
             {
@@ -298,7 +317,7 @@ public partial class AIShoppingPlanner
             }
             if (openAssaultSlots > 0)
             {
-                if (u == eliteAssaultTarget) score += 200000;
+                if (u == eliteAssaultTarget) score += 500000;
                 if (isPrimaryAssault && !isHybridCapturer) score += 90000;
                 else if (isPrimaryAssault && defensiveStance) score += 10000;
                 else if (isPrimaryAssault) score -= 90000;
@@ -310,7 +329,7 @@ public partial class AIShoppingPlanner
             if (!defensiveStance && u.movement < 3) score -= (3 - u.movement) * 1500;
 
             string roleStr = isPrimaryIntel ? "INTEL" : isFireSupportCapable && !isPrimaryFireSupport ? "ASS/FIRE" : isPrimaryFireSupport ? "FIRE" : isPrimaryLogistics ? "LOG" : isPrimaryTransporter ? "TRANS" : isPrimaryCapturer ? "CAP" : isPrimaryAssault ? $"ASS(hybrid={isHybridCapturer})" : "other";
-            Debug.Log($"[AI PickUnit] {u.displayName} ${u.cost} role={roleStr} score={score} mov={u.movement} | trans={openTransportSlots} transUrg={urgentTransportDemand} log={openLogisticsSlots} intelG={openGroundIntelSlots} cap={openCapturerSlots} ass={openAssaultSlots} fire={openFireSupportSlots} fireDef={preferDefensiveFireSupport} defThreat={defensiveBaseThreat}");
+            Debug.Log($"[AI PickUnit] {u.displayName} ${u.cost} role={roleStr} score={score} mov={u.movement} | trans={openTransportSlots} transUrg={urgentTransportDemand} log={openLogisticsSlots} intelMobileAir={openMobileAirIntelSlots} cap={openCapturerSlots} ass={openAssaultSlots} fire={openFireSupportSlots} fireDef={preferDefensiveFireSupport} defThreat={defensiveBaseThreat}");
             if (score > bestScore) { bestScore = score; best = u; }
         }
 

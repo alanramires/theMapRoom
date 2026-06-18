@@ -149,6 +149,18 @@ No mesmo pacote, a leitura de Jogadas ficou mais precisa: o fallback de siglas n
 
 Por fim, o tanque elite recebeu um afrouxamento ofensivo: em ofensiva ativa, com dinheiro para comprar e pelo menos metade dos capturadores preenchidos, ele nao fica preso ao threshold padrao de 60%. A ideia e tratar tanque elite e bombardeiro como pecas de pressao, nao apenas luxos de fim de composicao.
 
+## Atualizacao v3.0.6 - AI Intel parte 2
+
+Esta rodada consolidou a Intel aerea depois dos primeiros testes com EWACS e Radar Movel. O ponto principal foi separar "ficar atras" de "ficar bem posicionado": o EWACS agora calcula uma faixa de vanguarda formada pelos combatentes aliados mais proximos do objetivo e tenta ficar cerca de 2 hexes atras dela. Isso evita o caso em que uma celula isolada, geometricamente segura, vence uma celula melhor por estar colada na linha aliada.
+
+O log de Intel ganhou os campos `gap`, `ally` e `iso`, facilitando enxergar se a unidade esta atras da vanguarda, perto de aliados e livre de isolamento. Aeronaves de Intel tambem evitam pousar visualmente em cima de construcao aliada quando existe alternativa boa sobre terreno.
+
+O libera-producao tambem foi revisado. Unidades conservadoras, como SAM e EWACS, nao devem simplesmente abandonar a base para qualquer celula livre: antes do fallback generico, elas tentam cumprir o proprio papel, atacando ou reposicionando de forma util quando isso existe. A retaguarda conservadora agora usa coesao e linha aliada, seguindo o mesmo raciocinio tatico da Intel.
+
+No shopping, a demanda de EWACS foi contida para evitar duplicidade desnecessaria em mapas pequenos, enquanto o Radar Movel continua como parte de Air Intel quando faz sentido economico. A reserva de combate aereo passou a considerar custos por papel, abrindo melhor espaco para bombardeiro, Apache e cacas conforme a demanda real. O tanque elite tambem recebeu incentivo maior em situacoes ofensivas ou de stalemate.
+
+Como apoio de debug, foi criada a ferramenta `Tools/Utils/Retaguarda`, que desenha a faixa de vanguarda e a area de retaguarda esperada. A ferramenta ajuda a comparar a decisao da AI com a leitura visual do mapa, especialmente nos casos em que o jogador desenharia uma linha de frente manualmente.
+
 ### 1. Criar um scorer unico de ataque para AI
 
 Extrair um helper publico interno tipo `ScoreAIAttackCandidate`, usando `TrySimulateAttackForAI` como base. Ele poderia retornar:
