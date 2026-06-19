@@ -38,6 +38,9 @@ public partial class AIController
         SectorObjective assigned = ResolveAssignedFireSupportObjective(unit, plan);
         if (assigned == null)
         {
+            if (TryDecideRallyAssemblyFireSupportAction(unit, snapshot, plan, fromCell, vacatePaths, vacateOccupied, out PlayerAction rallyAction))
+                return rallyAction;
+
             PlayerAction embarkAction = TryDecideFireSupportEmbarkAction(unit, snapshot, plan);
             if (embarkAction != null) return embarkAction;
             return DecideRogueFireSupportAction(unit, snapshot);
@@ -348,5 +351,49 @@ public partial class AIController
         }
 
         return best;
+    }
+
+    private bool TryDecideRallyAssemblyFireSupportAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out PlayerAction action)
+    {
+        action = null;
+        if (!TryResolveRallyInfluence(plan, snapshot.AITeam, fromCell, includeGoGreen: false, out AIRallyInfluence rally)
+            || !rally.Active
+            || !IsRallyAssemblingState(rally.State))
+            return false;
+
+        if (paths == null || paths.Count == 0)
+            return false;
+
+        if (TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, rally.Anchor,
+                defensiveContext: true, out PlayerAction attackAction, out string attackReason))
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rally {rally.Sector} cobre montagem - {attackReason}");
+            action = attackAction;
+            return true;
+        }
+
+        if (TryFindFireSupportRepositionCell(unit, snapshot, fromCell, rally.Anchor, paths, occupied,
+                out Vector3Int moveCell, out string moveReason, assigned: null, moveMarginOverride: 45f))
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rally {rally.Sector} monta retaguarda via {moveCell} ({rally.Reason}; {moveReason})");
+            action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+            return true;
+        }
+
+        if (SectorManager.HexDistance(fromCell, rally.Anchor) <= rally.SupportRadius + 1f)
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rally {rally.Sector} segura cobertura @ {fromCell} ({rally.Reason})");
+            action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+            return true;
+        }
+
+        return false;
     }
 }

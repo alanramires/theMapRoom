@@ -33,7 +33,7 @@ public partial class AIShoppingPlanner
             else if (primary == UnitRole.Interceptador && !elite && wantsCacaB)  score = (urgentCacaB ? 25000 : 18000) + u.cost;
             else if (primary == UnitRole.Interceptador &&  elite && wantsCacaA)  score = 30000 + u.cost;
             else if (primary == UnitRole.AtaqueAereo   && !elite && wantsApache) score = 20000 + u.cost;
-            else if (primary == UnitRole.AtaqueAereo   &&  elite && wantsBomba)  score = 22000 + u.cost;
+            else if (primary == UnitRole.AtaqueAereo   &&  elite && wantsBomba)  score = 36000 + u.cost;
             else if (primary == UnitRole.Logistica && wantsAirTanker && IsAirTankerPurchase(u)) score = 24000 + u.cost;
             else if (wantsIntel && IsDedicatedIntelPurchase(u))
             {

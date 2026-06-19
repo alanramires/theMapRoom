@@ -345,6 +345,37 @@ public partial class AIController
         return false;
     }
 
+    private bool HasUsableAircraftRepairConstruction(
+        UnitManager unit,
+        Vector3Int fromCell,
+        TeamId aiTeam,
+        HashSet<Vector3Int> occupied)
+    {
+        foreach (ConstructionManager c in ConstructionManager.AllActive)
+        {
+            if (!IsAircraftRepairConstruction(c))
+                continue;
+            if (c.TeamId != aiTeam)
+                continue;
+            if (c.CurrentCapturePoints < c.CapturePointsMax)
+                continue;
+            if (!IsRepairHomeConstruction(c, aiTeam) && !IsRepairConstructionSectorSafe(c, aiTeam))
+                continue;
+
+            Vector3Int cc = c.CurrentCellPosition;
+            cc.z = 0;
+            bool occupiedCell = occupied != null && occupied.Contains(cc) && cc != fromCell;
+            if (occupiedCell)
+                continue;
+            if (!TryScoreRepairCandidateTakeoff(unit, cc, out _, out _, out _))
+                continue;
+
+            return true;
+        }
+
+        return false;
+    }
+
     private bool TryScoreRepairCandidateTakeoff(
         UnitManager unit,
         Vector3Int cell,

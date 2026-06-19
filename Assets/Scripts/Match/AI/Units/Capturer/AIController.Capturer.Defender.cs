@@ -19,7 +19,7 @@ public partial class AIController
 
         bool activeCriticalHomeDefense = IsCriticalHomeDefenseObjective(assigned, snapshot.AITeam);
         bool activeRecentGarrison = IsRecentlyCapturedSector(snapshot.AITeam, assigned.Sector, snapshot.TurnNumber);
-        bool activeRallyAssembly = IsRallyAssemblyObjective(assigned)
+        bool activeRallyAssembly = IsActiveRallyAssemblyObjective(assigned)
             && IsValidRallyAssemblySectorForSlot(assigned.Sector, snapshot.AITeam, snapshot.AISlotIndex);
         if (IsRallyAssemblyObjective(assigned) && !activeRallyAssembly)
         {
@@ -36,6 +36,8 @@ public partial class AIController
 
         TryGetAnySectorInfo(assigned.Sector, out SectorManager.SectorInfo secInfo);
         Vector3Int repCell = secInfo != null ? secInfo.RepresentativeCell : fromCell; repCell.z = 0;
+        if (activeRallyAssembly)
+            repCell = ResolveRallyAssemblyAnchor(assigned, snapshot.AITeam, repCell);
 
         // No active SOS: release to HexEvaluator only if neither the defended sector nor
         // the unit's current area has visible pressure.

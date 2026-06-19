@@ -458,6 +458,13 @@ public partial class AIController
                 occupiedForRepair.Add(rc);
             }
 
+        if (aircraftRepair
+            && !HasUsableAircraftRepairConstruction(unit, fromCell, aiTeam, occupiedForRepair)
+            && TryDecideAircraftRoadRecoveryFallback(unit, snapshot, fromCell, paths, occupied, out PlayerAction roadRecovery))
+        {
+            return roadRecovery;
+        }
+
         ConstructionManager repairDest = FindRepairConstruction(unit, fromCell, aiTeam, occupiedForRepair);
         if (repairDest == null)
         {

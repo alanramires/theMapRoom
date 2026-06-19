@@ -118,7 +118,7 @@ public partial class AIController
             }
 
             if (!secondPass
-                && ShouldDeferAttackForAirCombatPrep(unit, action, aiTeam,
+                && ShouldDeferAttackForAirCombatPrep(unit, action, current, aiTeam,
                     out UnitManager prepAirCombat, out UnitManager prepAirTarget, out Vector3Int prepAirCell))
             {
                 deferredUnitIds.Add(unit.InstanceId);
@@ -373,6 +373,7 @@ public partial class AIController
     private bool ShouldDeferAttackForAirCombatPrep(
         UnitManager attacker,
         PlayerAction action,
+        AIWorldSnapshot snapshot,
         TeamId aiTeam,
         out UnitManager airCombat,
         out UnitManager target,
@@ -397,26 +398,53 @@ public partial class AIController
             return false;
 
         target = FindAttackPrepTarget(targetId, aiTeam);
-        if (target == null || !target.TryGetUnitData(out UnitData targetData) || targetData == null || targetData.domain != Domain.Air)
+        if (target == null || !target.TryGetUnitData(out UnitData targetData) || targetData == null)
+            return false;
+        bool targetIsAir = targetData.domain == Domain.Air;
+        if (!targetIsAir && !IsGroundFrontlineEligibleToDeferToAirAttack(attacker))
             return false;
 
+        _initLogBuilder.Clear();
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
             if (candidate == null || candidate == attacker)
                 continue;
-            if (candidate.TeamId != aiTeam || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked)
+            if (candidate.TeamId != aiTeam || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair)
                 continue;
             if (!IsAirCombatUnit(candidate))
                 continue;
-            if (TryFindAirCombatPrepShot(candidate, target, aiTeam, out Vector3Int candidateCell))
+            if (!targetIsAir && !IsOffensiveAirCombatUnit(candidate))
+                continue;
+            if (TryFindAirCombatPrepShot(candidate, target, snapshot, aiTeam, applyAirCombatTargetGates: !targetIsAir, out Vector3Int candidateCell, out string failReason))
             {
                 airCombat = candidate;
                 attackCell = candidateCell;
+                _initLogBuilder.Clear();
                 return true;
             }
+
+            _initLogBuilder.AppendLine($"  {FormatInitiativeUnitName(candidate)}: {failReason}");
+        }
+
+        if (_initLogBuilder.Length > 0)
+        {
+            Debug.Log($"{TL()} Fase2 — {FormatInitiativeUnitName(attacker)} NAO cedeu ataque aereo em " +
+                      $"{target.UnitDisplayName}#{target.InstanceId}:\n{_initLogBuilder}");
+            _initLogBuilder.Clear();
         }
 
         return false;
+    }
+
+    private static bool IsGroundFrontlineEligibleToDeferToAirAttack(UnitManager attacker)
+    {
+        if (attacker == null || !attacker.TryGetUnitData(out UnitData data) || data == null)
+            return false;
+
+        return data.domain == Domain.Land
+            && data.roles != null
+            && data.roles.Count > 0
+            && (data.roles[0] == UnitRole.Assalto || data.roles[0] == UnitRole.Capturador);
     }
 
     private UnitManager FindAttackPrepTarget(int targetId, TeamId aiTeam)
@@ -510,17 +538,24 @@ public partial class AIController
     private bool TryFindAirCombatPrepShot(
         UnitManager airCombat,
         UnitManager target,
+        AIWorldSnapshot snapshot,
         TeamId aiTeam,
-        out Vector3Int attackCell)
+        bool applyAirCombatTargetGates,
+        out Vector3Int attackCell,
+        out string failReason)
     {
         attackCell = Vector3Int.zero;
+        failReason = "sem-air-combat";
         if (airCombat == null || target == null)
             return false;
 
         bool wasGrounded = airCombat.IsAircraftGrounded;
         List<int> takeoffMoveOptions = null;
         if (wasGrounded && !TryGetAITakeoffMoveOptions(airCombat, out takeoffMoveOptions, out _))
+        {
+            failReason = "decolagem-indisponivel";
             return false;
+        }
 
         if (wasGrounded)
             airCombat.SetAircraftGrounded(false);
@@ -534,7 +569,34 @@ public partial class AIController
                     boardTilemap, airCombat, Mathf.Max(0, airCombat.RemainingMovementPoints), terrainDatabase);
             HashSet<Vector3Int> occupied = BuildAirOccupied(airCombat);
             if (paths == null || paths.Count == 0)
+            {
+                failReason = "sem-caminho";
                 return false;
+            }
+
+            AIWorldSnapshot airSnapshot = snapshot ?? AIWorldSnapshot.BuildLight(aiTeam, matchController);
+            MatchController mc = GetMatchController();
+            bool hasAttackableAircraft = applyAirCombatTargetGates && HasAttackableAirCombatTarget(
+                airCombat,
+                airSnapshot,
+                fromCell,
+                paths,
+                occupied,
+                takeoffMoveOptions,
+                mc,
+                preferredOnly: false);
+            bool hasPreferredAttackableAircraft = applyAirCombatTargetGates && HasAttackableAirCombatTarget(
+                airCombat,
+                airSnapshot,
+                fromCell,
+                paths,
+                occupied,
+                takeoffMoveOptions,
+                mc,
+                preferredOnly: true);
+            bool targetBlockedByAirPriority = false;
+            bool targetReachedBySensor = false;
+            string lastAttackDecisionReason = null;
 
             foreach (Vector3Int rawCell in paths.Keys)
             {
@@ -548,10 +610,28 @@ public partial class AIController
                     continue;
                 if (!TryFindAttackDecisionOption(airCombat, target, cell, out _))
                     continue;
+                targetReachedBySensor = true;
+                if (applyAirCombatTargetGates
+                    && !ShouldConsiderAirCombatTarget(airCombat, target, hasAttackableAircraft, hasPreferredAttackableAircraft))
+                {
+                    targetBlockedByAirPriority = true;
+                    continue;
+                }
+                if (applyAirCombatTargetGates
+                    && !PassesAttackDecision(airCombat, target, cell, false, out lastAttackDecisionReason))
+                    continue;
 
                 attackCell = cell;
+                failReason = null;
                 return true;
             }
+
+            if (targetBlockedByAirPriority)
+                failReason = "prioridade-aerea-bloqueia-alvo-terrestre";
+            else if (targetReachedBySensor)
+                failReason = $"reprovado-PassesAttackDecision ({lastAttackDecisionReason})";
+            else
+                failReason = "nao-mira-alvo-de-nenhuma-celula";
         }
         finally
         {

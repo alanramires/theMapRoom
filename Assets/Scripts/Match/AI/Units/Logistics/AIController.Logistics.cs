@@ -29,6 +29,15 @@ public partial class AIController
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
         bool baseDefense = IsLogisticsBaseDefenseEmergency(snapshot);
         Vector3Int anchor = ResolveLogisticsAnchor(snapshot, fromCell);
+        string anchorReason = "home";
+        if (!baseDefense
+            && TryResolveRallyInfluence(plan, snapshot.AITeam, fromCell, includeGoGreen: false, out AIRallyInfluence rally)
+            && rally.Active
+            && IsRallyAssemblingState(rally.State))
+        {
+            anchor = rally.Anchor;
+            anchorReason = $"rally {rally.Sector} {rally.State}";
+        }
         bool needsReload = ShouldRestockLogisticsUnit(unit, out string restockReason);
         Debug.Log($"{TL("Logistics")} {unit.InstanceId} restockCheck {(needsReload ? "SIM" : "nao")} {restockReason}");
 
@@ -89,19 +98,29 @@ public partial class AIController
                 out Vector3Int moveCell,
                 out string reason))
         {
-            Debug.Log($"{TL("Logistics")} {unit.InstanceId} move retaguarda via {moveCell} {reason}");
+            Debug.Log($"{TL("Logistics")} {unit.InstanceId} move retaguarda via {moveCell} anchor={anchorReason} {reason}");
 
             // If repositioning already lands in a valid service cell, do the service in the same action.
             if (moveCell != fromCell)
             {
                 bool allowPreventive = IsPreventiveLogisticsAllowed(unit, snapshot, fromCell, paths, occupied);
                 int limit = GetLogisticsServiceLimit(unit);
-                List<UnitManager> moveSupply = CollectLogisticsTargetsInServiceRange(unit, snapshot, moveCell, limit, allowPreventive);
+                List<UnitManager> moveSupply = CollectLogisticsTargetsBySupplySensorAtCell(
+                    unit,
+                    snapshot,
+                    moveCell,
+                    limit,
+                    allowPreventive,
+                    out int validCount,
+                    out int invalidCount,
+                    out string sensorDebug);
                 if (moveSupply.Count > 0 && IsLogisticsServiceCellAllowed(unit, snapshot, moveCell))
                 {
                     Debug.Log($"{TL("Logistics")} {unit.InstanceId} move retaguarda + supre {moveSupply.Count} unidade(s) via {moveCell}");
                     return BuildSupplyBatch(unit, snapshot.AITeam, fromCell, moveCell, moveSupply, paths);
                 }
+                if (invalidCount > 0)
+                    Debug.Log($"{TL("Logistics")} {unit.InstanceId} move retaguarda nao supre via {moveCell}: PodeSuprir valid={validCount} invalid={invalidCount} {sensorDebug}");
             }
 
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);

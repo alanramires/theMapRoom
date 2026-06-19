@@ -20,8 +20,11 @@ public partial class AIController
             // Pass the sector building as an override so the courier doesn't fall back to
             // enemy HQ when the passenger was picked up informally (no plan slot).
             ConstructionManager assignedBldg = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
-            Vector3Int assignedTarget = assignedBldg != null
-                ? (Vector3Int)(assignedBldg.CurrentCellPosition) : Vector3Int.zero;
+            Vector3Int assignedTarget = IsActiveRallyAssemblyObjective(assigned)
+                ? ResolveRallyAssemblyAnchor(assigned, snapshot.AITeam, unit.CurrentCellPosition)
+                : assignedBldg != null
+                    ? (Vector3Int)(assignedBldg.CurrentCellPosition)
+                    : Vector3Int.zero;
             if (assignedTarget != Vector3Int.zero) assignedTarget.z = 0;
             return DecideTransportadorCourierAction(unit, snapshot, assignedTarget);
         }
@@ -62,8 +65,10 @@ public partial class AIController
             // (e.g. a freshly-purchased capturer at the base waiting for a ride).
             // If found, act as shuttle toward them instead of rushing into combat.
             ConstructionManager sectorTarget = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
-            Vector3Int sectorCell = fromCell;
-            if (sectorTarget != null) { sectorCell = sectorTarget.CurrentCellPosition; sectorCell.z = 0; }
+            Vector3Int sectorCell = IsActiveRallyAssemblyObjective(assigned)
+                ? ResolveRallyAssemblyAnchor(assigned, snapshot.AITeam, fromCell)
+                : fromCell;
+            if (!IsActiveRallyAssemblyObjective(assigned) && sectorTarget != null) { sectorCell = sectorTarget.CurrentCellPosition; sectorCell.z = 0; }
 
             UnitManager nearbyCandidate = FindBestShuttleCandidate(unit, snapshot, plan, fromCell, out Vector3Int nearbyCell, assigned);
             if (nearbyCandidate != null)

@@ -33,6 +33,13 @@ public class ConstructionHudController : MonoBehaviour
     [Header("Sector Badge")]
     [SerializeField] private TMP_Text sectorBadge;
 
+    [Header("Rally")]
+    [SerializeField] private Image rallyTrafficImage;
+    [SerializeField] private Sprite rallyOffSprite;
+    [SerializeField] private Sprite rallyRedSprite;
+    [SerializeField] private Sprite rallyYellowSprite;
+    [SerializeField] private Sprite rallyGreenSprite;
+
     [Header("Sorting")]
     [SerializeField] private bool applyHudSorting = true;
     [SerializeField] private string hudSortingLayerName = "SFX";
@@ -70,7 +77,16 @@ public class ConstructionHudController : MonoBehaviour
         ApplySorting();
     }
 
-    public void Apply(int currentCapture, int maxCapture, bool isCapturable, TeamId ownerTeam, bool hideCaptureBarBecauseOccupied, bool showFlagThreatOutline = false)
+    public void Apply(
+        int currentCapture,
+        int maxCapture,
+        bool isCapturable,
+        TeamId ownerTeam,
+        bool hideCaptureBarBecauseOccupied,
+        bool showFlagThreatOutline = false,
+        bool isRallyPoint = false,
+        bool rallyOwnedByRallyOwner = false,
+        AIRallyAssemblyState rallyState = AIRallyAssemblyState.None)
     {
         AutoAssignReferences();
         EnsureFlagThreatOutline();
@@ -146,6 +162,8 @@ public class ConstructionHudController : MonoBehaviour
                 flagText.gameObject.SetActive(showFlagText);
             flagText.enabled = showFlagText;
         }
+
+        ApplyRallyTrafficLight(isRallyPoint, rallyOwnedByRallyOwner, rallyState);
     }
 
     public void ApplySectorBadge(bool showAIHUD, bool isOccupied, ConstructionSector sector, bool isFakeBuilding)
@@ -168,6 +186,25 @@ public class ConstructionHudController : MonoBehaviour
             string name = sector.ToString();
             sectorBadge.text = name.Length > 0 ? name[0].ToString().ToUpper() : string.Empty;
         }
+    }
+
+    public void ApplyRallyTrafficLight(bool isRallyPoint, bool ownedByRallyOwner, AIRallyAssemblyState rallyState)
+    {
+        if (rallyTrafficImage == null)
+            AutoAssignReferences();
+        if (rallyTrafficImage == null)
+            return;
+
+        bool show = isRallyPoint;
+        if (rallyTrafficImage.gameObject.activeSelf != show)
+            rallyTrafficImage.gameObject.SetActive(show);
+        rallyTrafficImage.enabled = show;
+        if (!show)
+            return;
+
+        Sprite target = ResolveRallyTrafficSprite(ownedByRallyOwner, rallyState);
+        if (target != null)
+            rallyTrafficImage.sprite = target;
     }
 
     private void OnDisable()
@@ -265,6 +302,60 @@ public class ConstructionHudController : MonoBehaviour
         }
         if (sectorBadge == null && Application.isPlaying)
             sectorBadge = CreateRuntimeSectorBadge();
+
+        if (!IsChildOfThisHud(rallyTrafficImage != null ? rallyTrafficImage.transform : null))
+        {
+            Transform rallyTransform = FindChildRecursive(transform, "rally");
+            if (rallyTransform != null)
+                rallyTrafficImage = rallyTransform.GetComponent<Image>();
+        }
+
+        if (rallyTrafficImage == null && Application.isPlaying)
+            rallyTrafficImage = CreateRuntimeRallyTrafficImage();
+
+        if (rallyTrafficImage != null && rallyOffSprite == null)
+            rallyOffSprite = rallyTrafficImage.sprite;
+    }
+
+    private Sprite ResolveRallyTrafficSprite(bool ownedByRallyOwner, AIRallyAssemblyState rallyState)
+    {
+        if (!ownedByRallyOwner)
+            return rallyOffSprite != null ? rallyOffSprite : (rallyTrafficImage != null ? rallyTrafficImage.sprite : null);
+
+        switch (rallyState)
+        {
+            case AIRallyAssemblyState.GoGreen:
+                return rallyGreenSprite != null ? rallyGreenSprite : rallyOffSprite;
+            case AIRallyAssemblyState.Assembling:
+            case AIRallyAssemblyState.Ready:
+                return rallyYellowSprite != null ? rallyYellowSprite : rallyOffSprite;
+            case AIRallyAssemblyState.WaitHold:
+                return rallyRedSprite != null ? rallyRedSprite : rallyOffSprite;
+            default:
+                return rallyRedSprite != null ? rallyRedSprite : rallyOffSprite;
+        }
+    }
+
+    private Image CreateRuntimeRallyTrafficImage()
+    {
+        Transform parent = FindChildRecursive(transform, "Canvas") ?? transform;
+        GameObject rallyGo = new GameObject("rally", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        rallyGo.transform.SetParent(parent, false);
+
+        RectTransform rect = rallyGo.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(36.2f, 17.3f);
+        rect.sizeDelta = new Vector2(12f, 24f);
+        rect.localRotation = Quaternion.identity;
+        rect.localScale = new Vector3(1f, 1f, 10f);
+
+        Image image = rallyGo.GetComponent<Image>();
+        image.sprite = rallyOffSprite;
+        image.raycastTarget = false;
+        image.enabled = false;
+        rallyGo.SetActive(false);
+        return image;
     }
 
     private TMP_Text CreateRuntimeSectorBadge()

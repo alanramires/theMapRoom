@@ -217,6 +217,20 @@ public partial class AIShoppingPlanner : MonoBehaviour
             ref intelArmorThreat,
             activeAAAs,
             activeSAMs);
+
+        int visibleEnemyFireSupport = CountVisibleEnemyCombatFireSupport(snapshot);
+        bool artilleryWallBreakthrough = ShouldApplyArtilleryWallBreakthrough(snapshot, intelReport, visibleEnemyFireSupport);
+        if (artilleryWallBreakthrough)
+        {
+            int beforeAssault = openAssaultSlots;
+            int beforeBomba = openBombaSlots;
+            int ownedBombers = CountOwnedBombers(snapshot, includeUnderRepair: true);
+            openAssaultSlots = Mathf.Max(openAssaultSlots, 1);
+            if (ownedBombers <= 0)
+                openBombaSlots = Mathf.Max(openBombaSlots, 1);
+            Debug.Log($"[AI Shopping] ruptura_artilharia: enemyFire={visibleEnemyFireSupport} stalemate={intelReport?.stalemateElitePressure:F1} enemyArt={intelReport?.enemyArtilleryThreatScore:F1} units={snapshot.MyUnits?.Count ?? 0} bombers={ownedBombers} budget={remaining} -> ass={beforeAssault}->{openAssaultSlots} bomba={beforeBomba}->{openBombaSlots}");
+        }
+
         int urgentCapturerFloor = 0;
         List<TacticalDeficit> opDeficits = AITacticalAnalyzer.Instance?.GetDeficits(snapshot.AITeam);
         if (opDeficits != null)
@@ -463,10 +477,12 @@ public partial class AIShoppingPlanner : MonoBehaviour
             if (offensiveElitePressure)
                 fillThreshold = Mathf.Min(fillThreshold, 0.5f);
             int   minAssault    = Instance != null ? Instance.MinFilledAssaultSlots   : 1;
+            if (artilleryWallBreakthrough && remaining >= eliteAssaultTarget.cost)
+                minAssault = 0;
             bool  capOk         = capFill >= fillThreshold;
             bool  assOk         = filledAss >= minAssault;
             string stalemateText = stalemateCapturerReady ? $" stalemateCap={stalemateCapturerReason}" : "";
-            string offensiveText = offensiveElitePressure ? " offensivePressure=True" : "";
+            string offensiveText = offensiveElitePressure ? " offensivePressure=True" : artilleryWallBreakthrough ? " artilleryWall=True" : "";
             string status       = (capOk && assOk) ? $"ELITE LIBERADO{stalemateText}{offensiveText}" : $"bloqueado ({(!capOk ? $"cap {filledCap}/{totalCap} {capFill:P0}<{fillThreshold:P0}" : "cap OK")} | {(!assOk ? $"ass {filledAss}<{minAssault}" : "ass OK")}){stalemateText}{offensiveText}";
             Debug.Log($"[AI Shopping] composição: cap={filledCap}/{totalCap} ({capFill:P0}) ass={filledAss}/{totalAss} — {status}");
             if (!capOk || !assOk)
@@ -580,8 +596,15 @@ public partial class AIShoppingPlanner : MonoBehaviour
         if (cheapestAirCombatCost > 0 && anyAirCombatDemand > 0)
         {
             int budgetAfterAirTransport = Mathf.Max(0, remaining - reserveForCapturerPassenger - reserveForAirTransport);
+            int breakthroughArmorReserve = artilleryWallBreakthrough
+                ? FindBreakthroughArmorCost(snapshot, budgetAfterAirTransport)
+                : 0;
+            if (breakthroughArmorReserve > 0)
+                budgetAfterAirTransport = Mathf.Max(0, budgetAfterAirTransport - breakthroughArmorReserve);
             int minimumReserve = cheapestAirCombatCost * Mathf.Min(anyAirCombatDemand, 2);
-            if (cacaBReserveCost > 0)
+            if (artilleryWallBreakthrough && bomberReserveCost > 0)
+                minimumReserve = bomberReserveCost;
+            else if (cacaBReserveCost > 0)
                 minimumReserve = Mathf.Max(minimumReserve, cacaBReserveCost);
             if (cacaAReserveCost > 0)
                 minimumReserve = Mathf.Max(minimumReserve, cacaAReserveCost);
@@ -590,7 +613,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
             if (bomberReserveCost > 0)
                 minimumReserve = Mathf.Max(minimumReserve, bomberReserveCost);
             reserveForAirCombat = Mathf.Min(budgetAfterAirTransport, minimumReserve);
-            Debug.Log($"[AI Shopping] reserva_combate_ar: slots={anyAirCombatDemand} custo={cheapestAirCombatCost} cacaB_custo={cacaBReserveCost} cacaA_custo={cacaAReserveCost} apache_custo={apacheReserveCost} bomber_custo={bomberReserveCost} reserva={reserveForAirCombat} cap_passageiro_reserva={reserveForCapturerPassenger}");
+            Debug.Log($"[AI Shopping] reserva_combate_ar: slots={anyAirCombatDemand} custo={cheapestAirCombatCost} cacaB_custo={cacaBReserveCost} cacaA_custo={cacaAReserveCost} apache_custo={apacheReserveCost} bomber_custo={bomberReserveCost} ruptura={artilleryWallBreakthrough} armor_reserva={breakthroughArmorReserve} reserva={reserveForAirCombat} cap_passageiro_reserva={reserveForCapturerPassenger}");
         }
 
         Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} air_trans_slots={openAirTransportSlots} air_tanker_slots={openAirTankerSlots} intel_air_slots={openAirIntelSlots} intel_mobile_air_slots={openMobileAirIntelSlots} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cacaB_slots={openCacaBSlots} cacaA_slots={openCacaASlots} apache_slots={openApacheSlots} bomba_slots={openBombaSlots} cheapest_transport={cheapestTransportCost} cheapest_air={cheapestAirTransportCost} cheapest_air_intel={cheapestAirIntelCost} reserva_ar={reserveForAirTransport} reserva_intel_ar={reserveForAirIntel} cap_passageiro_reserva={reserveForCapturerPassenger} intel={(intelReport != null ? $"inf={intelReport.enemyInfantryPressureScore:F1} air={intelReport.enemyAirThreatScore:F1} armor={intelReport.enemyArmorThreatScore:F1} num={intelReport.numericalPressure:F1}" : "off")} onlyCap={onlyCapturers} onlyAss={onlyAssault} onlyTrans={onlyTransporter} onlyLog={onlyLogistics} onlyFire={onlyFireSupport}");

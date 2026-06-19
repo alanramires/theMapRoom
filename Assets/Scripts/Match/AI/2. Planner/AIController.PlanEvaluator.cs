@@ -23,10 +23,26 @@ public partial class AIController
         {
             SectorObjective obj = plan.Objectives[i];
             bool objectiveIsRallySector = IsEnemyHQRallySectorHeld(rallyContext, obj.Sector, aiTeam);
+            if (objectiveIsRallySector && IsRallyGoGreenSuppressed(aiTeam, obj.Sector, snapshot.TurnNumber))
+                objectiveIsRallySector = false;
             if (objectiveIsRallySector && obj.ObjectiveType == AIObjectiveType.CaptureSector)
                 obj.ObjectiveType = AIObjectiveType.RallyAssembly;
             else if (!objectiveIsRallySector && obj.ObjectiveType == AIObjectiveType.RallyAssembly)
                 obj.ObjectiveType = AIObjectiveType.CaptureSector;
+
+            if (IsRallyAssemblyObjective(obj)
+                && TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager existingRally))
+            {
+                UpdateRallyObjectiveState(obj, existingRally, aiTeam, snapshot.TurnNumber);
+                Debug.Log($"{TL("Plan")} rally {obj.Sector}: rallyState={obj.RallyState} {obj.RallyReadinessReason}");
+                if (IsRallyGoGreenObjective(obj))
+                {
+                    Debug.Log($"{TL("Plan")} rally {obj.Sector}: GO_GREEN libera montagem e retorna ao plano ofensivo");
+                    ClearObjectiveHUD(obj);
+                    plan.Objectives.RemoveAt(i);
+                    continue;
+                }
+            }
 
             if (obj.Status == ObjectiveStatus.Defending
                 && TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo ownedCheckInfo)
@@ -166,7 +182,8 @@ public partial class AIController
         var sectorCandidates = new List<SectorObjective>();
         foreach (SectorManager.SectorInfo info in allSectors)
         {
-            bool isRallyAssemblySector = IsEnemyHQRallySectorHeld(rallyContext, info.Sector, aiTeam);
+            bool isRallyAssemblySector = IsEnemyHQRallySectorHeld(rallyContext, info.Sector, aiTeam)
+                && !IsRallyGoGreenSuppressed(aiTeam, info.Sector, snapshot.TurnNumber);
             if (IsOwnedDefensibleSector(info, aiTeam) && !isRallyAssemblySector) continue;
             bool hasCapturable = false;
             foreach (SectorManager.SectorConstructionInfo c in info.Constructions)
@@ -244,6 +261,18 @@ public partial class AIController
                         ? 0
                         : GetRallySectorPriorityBonus(rallyContext, info.Sector, aiTeam)),
             };
+            if (isRallyAssemblySector)
+            {
+                obj.RallyState = AIRallyAssemblyState.WaitHold;
+                obj.RallyAssemblyStartedTurn = snapshot.TurnNumber;
+                if (TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager newRally))
+                    UpdateRallyObjectiveState(obj, newRally, aiTeam, snapshot.TurnNumber);
+                if (IsRallyGoGreenObjective(obj))
+                {
+                    Debug.Log($"{TL("Plan")} rally {obj.Sector}: GO_GREEN imediato, nao cria montagem");
+                    continue;
+                }
+            }
             int slots = Mathf.Clamp(Mathf.CeilToInt(info.ConstructionCount / 2f), 1, 4);
             bool highRisk = info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High;
             if (isRallyAssemblySector) slots = Mathf.Max(slots, 2);
@@ -1487,10 +1516,6 @@ public partial class AIController
         }
     }
 }
-
-
-
-
 
 
 

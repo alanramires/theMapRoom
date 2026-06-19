@@ -965,7 +965,9 @@ public partial class TurnStateManager
         bool canTakeoffInPlace = report != null
             && report.status
             && report.takeoffMoveOptions != null
-            && (report.takeoffMoveOptions.Contains(0) || report.takeoffMoveOptions.Contains(9));
+            && (report.takeoffMoveOptions.Contains(0)
+                || report.takeoffMoveOptions.Contains(1)
+                || report.takeoffMoveOptions.Contains(9));
         if (!canTakeoffInPlace)
         {
             Debug.Log(report != null && !string.IsNullOrWhiteSpace(report.explicacao)

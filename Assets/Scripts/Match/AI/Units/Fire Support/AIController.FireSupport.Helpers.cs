@@ -141,6 +141,9 @@ public partial class AIController
     {
         if (assigned == null) return fallback;
 
+        if (IsRallyAssemblyObjective(assigned))
+            return ResolveRallyAssemblyAnchor(assigned, aiTeam, fallback);
+
         ConstructionManager target = FindCapturableInSector(assigned.Sector, aiTeam, fallback);
         if (target != null)
         {
@@ -606,33 +609,9 @@ public partial class AIController
 
     private float CalculateFireSupportRearLineScore(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell, Vector3Int anchor)
     {
-        if (snapshot == null || snapshot.MyUnits == null)
+        if (!TryScoreBacklineCell(unit, snapshot, cell, anchor, out AIBacklineScore backline))
             return 0f;
 
-        float allyDistSum = 0f;
-        int allyCount = 0;
-        foreach (UnitManager ally in snapshot.MyUnits)
-        {
-            if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked) continue;
-            if (IsBacklineSupportUnit(ally)) continue;
-
-            Vector3Int allyCell = ally.CurrentCellPosition;
-            allyCell.z = 0;
-            allyDistSum += SectorManager.HexDistance(allyCell, anchor);
-            allyCount++;
-        }
-
-        if (allyCount == 0)
-            return 0f;
-
-        float allyAverageDist = allyDistSum / allyCount;
-        float cellDist = SectorManager.HexDistance(cell, anchor);
-        float desiredRearGap = 2f;
-        float gap = cellDist - allyAverageDist;
-
-        if (gap >= desiredRearGap)
-            return 300f - Mathf.Min(200f, (gap - desiredRearGap) * 35f);
-
-        return -Mathf.Abs(desiredRearGap - gap) * 180f;
+        return backline.Score;
     }
 }

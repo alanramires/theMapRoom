@@ -23,6 +23,16 @@ public enum AIObjectiveType
     InvasionAttack
 }
 
+public enum AIRallyAssemblyState
+{
+    None,
+    WaitHold,
+    Assembling,
+    Ready,
+    GoGreen,
+    Expired
+}
+
 // UnitRole está em Assets/Scripts/Units/UnitRole.cs
 // valores: None, Capturador, Assalto, Transportador, Logistica, FogoIndireto
 
@@ -46,6 +56,12 @@ public class SectorObjective
     public ObjectiveStatus    Status;
     public AIObjectiveType    ObjectiveType;
     public int                Priority;
+
+    [Header("Rally")]
+    public AIRallyAssemblyState RallyState = AIRallyAssemblyState.None;
+    public int                 RallyAssemblyStartedTurn = -1;
+    public int                 RallyGoGreenTurn = -1;
+    public string              RallyReadinessReason;
 
     [Header("Slots de unidade")]
     public List<SlotNeed> Slots = new List<SlotNeed>();
@@ -311,3 +327,5 @@ public class ObjectiveManager : MonoBehaviour
         }
     }
 }
+
+

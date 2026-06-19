@@ -192,14 +192,7 @@ public partial class AIShoppingPlanner
         int minPresence = tooEarly ? 0 : (Instance != null ? Instance.MinBombaPresence : 0);
         int desired     = Mathf.Max(minPresence, Mathf.FloorToInt(activeApaches / (float)ratio), offensiveDesired);
 
-        int active = 0;
-        if (snapshot.MyUnits != null)
-            foreach (UnitManager u in snapshot.MyUnits)
-            {
-                if (u == null || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
-                if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
-                if (d.roles[0] == UnitRole.AtaqueAereo && d.eliteLevel >= 1) active++;
-            }
+        int active = CountOwnedBombers(snapshot, includeUnderRepair: true);
 
         int demand = Mathf.Max(0, desired - active);
         Debug.Log($"[AI Shopping] bomba_demand: demand={demand} desired={desired} active={active} apaches={activeApaches} offensive={offensiveDesired} plan={offensivePlan} economy={economyReady} army={armyReady} cap={activeCapturers}/{minCap} ass={activeAssault}/{minAss} ratio=1:{ratio} tooEarly={tooEarly}");
@@ -1048,5 +1041,110 @@ public partial class AIShoppingPlanner
         int activeFireSupport = CountActiveCombatFireSupport(snapshot);
         int saturationLimit = GetFireSupportSaturationLimit(snapshot);
         return activeFireSupport >= saturationLimit;
+    }
+
+    private static int CountVisibleEnemyCombatFireSupport(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.EnemyUnits == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager unit in snapshot.EnemyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null)
+                continue;
+            if (IsAntiAirOnlyUnit(data))
+                continue;
+
+            bool fireSupport = data.roles != null && data.roles.Contains(UnitRole.FogoIndireto)
+                || data.unitClass == GameUnitClass.Artillery
+                || data.preferArtilleryModeBeforeCombatant
+                || data.longRangeStationary;
+            if (fireSupport)
+                count++;
+        }
+
+        return count;
+    }
+
+    private static int CountOwnedBombers(AIWorldSnapshot snapshot, bool includeUnderRepair)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+            if (!includeUnderRepair && unit.IsUnderRepair)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null)
+                continue;
+            if (data.domain == Domain.Air && IsPrimaryRole(data, UnitRole.AtaqueAereo) && data.eliteLevel >= 1)
+                count++;
+        }
+
+        return count;
+    }
+
+    private static int FindBreakthroughArmorCost(AIWorldSnapshot snapshot, int budget)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null)
+            return 0;
+
+        UnitData best = null;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam))
+                continue;
+            if (building.OfferedUnits == null)
+                continue;
+
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (!IsDefensiveBaseAssaultTankPurchase(unit))
+                    continue;
+                if (unit.cost <= 0 || unit.cost > budget)
+                    continue;
+                if (best == null
+                    || unit.eliteLevel > best.eliteLevel
+                    || (unit.eliteLevel == best.eliteLevel && unit.cost > best.cost))
+                    best = unit;
+            }
+        }
+
+        return best != null ? best.cost : 0;
+    }
+
+    private static bool ShouldApplyArtilleryWallBreakthrough(
+        AIWorldSnapshot snapshot,
+        AIIntelReport intel,
+        int visibleEnemyFireSupport)
+    {
+        if (snapshot == null)
+            return false;
+
+        bool offensivePlan = snapshot.Stance == AIStance.Offensive
+            || snapshot.Stance == AIStance.Tactical
+            || HasAnyOffensiveObjective(snapshot.AITeam);
+        if (!offensivePlan)
+            return false;
+
+        int myUnits = snapshot.MyUnits != null ? snapshot.MyUnits.Count : 0;
+        bool armyMassed = myUnits >= 18;
+        bool economyReady = snapshot.Budget >= Mathf.Max(18000, Mathf.Max(1, snapshot.IncomePerTurn));
+        bool visibleWall = visibleEnemyFireSupport >= 3
+            || (visibleEnemyFireSupport >= 2 && armyMassed);
+
+        float stalematePressure = intel != null ? intel.stalemateElitePressure : 0f;
+        float artilleryIntel = intel != null ? intel.enemyArtilleryThreatScore : 0f;
+        float heavyThreshold = Instance != null ? Instance.IntelStalemateFireSupportThreshold : 6f;
+        bool intelWall = artilleryIntel >= 2f
+            || (stalematePressure >= heavyThreshold && artilleryIntel > 0f);
+
+        return economyReady && (visibleWall || intelWall);
     }
 }

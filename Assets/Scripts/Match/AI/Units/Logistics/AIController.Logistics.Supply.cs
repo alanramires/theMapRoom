@@ -296,9 +296,21 @@ public partial class AIController
             if (!IsLogisticsServiceCellAllowed(unit, snapshot, cell))
                 continue;
 
-            List<UnitManager> targets = CollectLogisticsTargetsInServiceRange(unit, snapshot, cell, limit, allowPreventiveMaintenance);
+            List<UnitManager> targets = CollectLogisticsTargetsBySupplySensorAtCell(
+                unit,
+                snapshot,
+                cell,
+                limit,
+                allowPreventiveMaintenance,
+                out int validCount,
+                out int invalidCount,
+                out string sensorDebug);
             if (targets.Count <= 0)
+            {
+                if (invalidCount > 0)
+                    Debug.Log($"{TL("Logistics")} {unit.InstanceId} ignora supply via {cell}: PodeSuprir valid={validCount} invalid={invalidCount} {sensorDebug}");
                 continue;
+            }
             bool hasCriticalTarget = HasCriticalLogisticsTarget(targets);
             if (hasReachableCritical && !hasCriticalTarget)
                 continue;
@@ -646,10 +658,15 @@ public partial class AIController
                     continue;
                 if (!IsLogisticsServiceCellAllowed(unit, snapshot, cell))
                     continue;
-                if (!IsInLogisticsServiceRange(unit, cell, candidateTarget))
-                    continue;
-
-                List<UnitManager> targets = CollectLogisticsTargetsInServiceRange(unit, snapshot, cell, limit, allowPreventiveMaintenance);
+                List<UnitManager> targets = CollectLogisticsTargetsBySupplySensorAtCell(
+                    unit,
+                    snapshot,
+                    cell,
+                    limit,
+                    allowPreventiveMaintenance,
+                    out _,
+                    out _,
+                    out _);
                 bool containsTarget = false;
                 for (int i = 0; i < targets.Count; i++)
                 {
@@ -711,8 +728,9 @@ public partial class AIController
 
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
+        TeamId aiTeam = snapshot != null ? snapshot.AITeam : target.TeamId;
         return ScoreLogisticsTargetNeed(snapshot, serviceCell, target)
-            + CalculateThreatLevel(targetCell, snapshot.AITeam) * 35f
+            + CalculateThreatLevel(targetCell, aiTeam) * 35f
             - SectorManager.HexDistance(serviceCell, targetCell) * 10f
             - target.InstanceId * 0.001f;
     }
@@ -751,6 +769,65 @@ public partial class AIController
         if (result.Count > limit)
             result.RemoveRange(limit, result.Count - limit);
         return result;
+    }
+
+    private List<UnitManager> CollectLogisticsTargetsBySupplySensorAtCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int serviceCell,
+        int limit,
+        bool allowPreventiveMaintenance,
+        out int validCount,
+        out int invalidCount,
+        out string debug)
+    {
+        validCount = 0;
+        invalidCount = 0;
+        debug = string.Empty;
+        var empty = new List<UnitManager>();
+        if (unit == null || limit <= 0)
+            return empty;
+
+        Vector3Int originalCell = unit.CurrentCellPosition;
+        originalCell.z = 0;
+        serviceCell.z = 0;
+
+        unit.SetCurrentCellPosition(serviceCell, enforceFinalOccupancyRule: false);
+        try
+        {
+            var options = new List<PodeSuprirOption>();
+            var invalidOptions = new List<PodeSuprirInvalidOption>();
+            bool hasAny = PodeSuprirSensor.CollectOptions(
+                unit,
+                boardTilemap,
+                terrainDatabase,
+                matchController,
+                options,
+                out string sensorReason,
+                invalidOptions);
+
+            validCount = options.Count;
+            invalidCount = invalidOptions.Count;
+            List<UnitManager> targets = PickBestLogisticsSupplyTargets(
+                unit,
+                snapshot,
+                serviceCell,
+                options,
+                limit,
+                allowPreventiveMaintenance);
+
+            if (!hasAny || targets.Count <= 0)
+                debug = BuildLogisticsSupplyDebug(unit, options, targets, invalidOptions, allowPreventiveMaintenance);
+
+            if (!hasAny && string.IsNullOrWhiteSpace(debug))
+                debug = sensorReason;
+
+            return targets;
+        }
+        finally
+        {
+            unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
+        }
     }
 
     private static bool IsLogisticsServiceTarget(UnitManager logistics, UnitManager target, bool allowPreventiveMaintenance)
@@ -825,8 +902,14 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied)
     {
-        if (IsInLogisticsServiceRange(logistics, fromCell, target))
-            return IsLogisticsServiceCellAllowed(logistics, null, fromCell);
+        bool allowPreventive = IsPreventiveLogisticsTarget(logistics, target);
+        int limit = GetLogisticsServiceLimit(logistics);
+        if (IsInLogisticsServiceRange(logistics, fromCell, target)
+            && IsLogisticsServiceCellAllowed(logistics, null, fromCell)
+            && SupplySensorAtCellContainsTarget(logistics, target, fromCell, limit, allowPreventive))
+        {
+            return true;
+        }
         if (paths == null || paths.Count == 0)
             return false;
 
@@ -838,9 +921,37 @@ public partial class AIController
                 continue;
             if (!IsLogisticsServiceCellAllowed(logistics, null, cell))
                 continue;
-            if (IsInLogisticsServiceRange(logistics, cell, target))
+            if (IsInLogisticsServiceRange(logistics, cell, target)
+                && SupplySensorAtCellContainsTarget(logistics, target, cell, limit, allowPreventive))
                 return true;
         }
+
+        return false;
+    }
+
+    private bool SupplySensorAtCellContainsTarget(
+        UnitManager logistics,
+        UnitManager target,
+        Vector3Int serviceCell,
+        int limit,
+        bool allowPreventiveMaintenance)
+    {
+        if (logistics == null || target == null || limit <= 0)
+            return false;
+
+        List<UnitManager> targets = CollectLogisticsTargetsBySupplySensorAtCell(
+            logistics,
+            null,
+            serviceCell,
+            limit,
+            allowPreventiveMaintenance,
+            out _,
+            out _,
+            out _);
+
+        for (int i = 0; i < targets.Count; i++)
+            if (targets[i] != null && targets[i].InstanceId == target.InstanceId)
+                return true;
 
         return false;
     }

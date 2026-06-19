@@ -9,6 +9,12 @@ public partial class AIController
     private const int RallyHoldRadius = 2;
     private const int RallyAssemblyForceRadius = 3;
     private const int RallyArtilleryRadius = 4;
+    private const int RallyIntelRadius = 6;
+    private const int RallyLogisticsRadius = 5;
+    private const int RallyAssemblyTimeoutTurns = 4;
+    private const int RallyGoGreenSuppressTurns = 8;
+    private static readonly Dictionary<string, int> rallyGoGreenTurns = new Dictionary<string, int>();
+    private static readonly Dictionary<string, AIRallyHudSnapshot> rallyHudStates = new Dictionary<string, AIRallyHudSnapshot>();
 
     private struct AIRallyPlanContext
     {
@@ -23,8 +29,34 @@ public partial class AIController
         public int Capturers;
         public int Armor;
         public int Artillery;
+        public int Intel;
+        public int Logistics;
+        public int VisibleThreats;
         public int ForceScore;
+        public bool Timeout;
+        public bool GoGreen;
+        public AIRallyAssemblyState State;
         public string Status;
+        public string Missing;
+    }
+
+    private struct AIRallyInfluence
+    {
+        public bool Active;
+        public ConstructionSector Sector;
+        public Vector3Int Anchor;
+        public AIRallyAssemblyState State;
+        public AIRallyReadiness Readiness;
+        public int AssemblyRadius;
+        public int SupportRadius;
+        public string Reason;
+    }
+
+    private struct AIRallyHudSnapshot
+    {
+        public AIRallyAssemblyState State;
+        public string Reason;
+        public int TurnNumber;
     }
 
     private static AIRallyPlanContext BuildRallyPlanContext(TeamId aiTeam, int aiSlotIndex, int turnNumber)
@@ -134,19 +166,33 @@ public partial class AIController
 
     private static void LogRallyReadiness(ConstructionManager rally, int ownerSlot, TeamId aiTeam, int turnNumber)
     {
-        AIRallyReadiness readiness = EvaluateRallyReadiness(rally, aiTeam);
+        AIRallyReadiness readiness = EvaluateRallyReadiness(rally, aiTeam, turnNumber, -1);
         string rallyName = rally != null ? rally.name : "(null)";
         ConstructionSector sector = rally != null ? rally.Sector : ConstructionSector.None;
+        PublishRallyHudState(rally, readiness.State, readiness.Status, turnNumber);
 
         Debug.Log(
             $"[AI Rally][T{turnNumber}][{aiTeam}] {sector} via {rallyName} owner={ownerSlot} " +
             $"held={readiness.Held} art={readiness.Artillery} cap={readiness.Capturers} " +
-            $"armor={readiness.Armor} force={readiness.ForceScore} {readiness.Status}");
+            $"armor={readiness.Armor} intel={readiness.Intel} log={readiness.Logistics} " +
+            $"threat={readiness.VisibleThreats} force={readiness.ForceScore} " +
+            $"rallyState={readiness.State} goGreen={readiness.GoGreen} timeout={readiness.Timeout} " +
+            $"missing={readiness.Missing} {readiness.Status}");
     }
 
     private static AIRallyReadiness EvaluateRallyReadiness(ConstructionManager rally, TeamId aiTeam)
     {
-        AIRallyReadiness readiness = new AIRallyReadiness { Status = "WAIT_HOLD" };
+        return EvaluateRallyReadiness(rally, aiTeam, -1, -1);
+    }
+
+    private static AIRallyReadiness EvaluateRallyReadiness(ConstructionManager rally, TeamId aiTeam, int turnNumber, int startedTurn)
+    {
+        AIRallyReadiness readiness = new AIRallyReadiness
+        {
+            Status = "WAIT_HOLD",
+            State = AIRallyAssemblyState.WaitHold,
+            Missing = "hold"
+        };
         if (rally == null)
             return readiness;
 
@@ -171,6 +217,8 @@ public partial class AIController
             bool capturer = HasRole(data, UnitRole.Capturador);
             bool armor = IsRallyArmorOrAssaultUnit(data);
             bool artillery = IsRealRallyArtilleryUnit(data);
+            bool intel = HasRole(data, UnitRole.Intel);
+            bool logistics = HasRole(data, UnitRole.Logistica);
 
             if (dist <= RallyHoldRadius && (capturer || armor))
                 localHold = true;
@@ -185,19 +233,172 @@ public partial class AIController
 
             if (dist <= RallyArtilleryRadius && artillery)
                 readiness.Artillery++;
+            if (dist <= RallyIntelRadius && intel)
+                readiness.Intel++;
+            if (dist <= RallyLogisticsRadius && logistics)
+                readiness.Logistics++;
         }
 
         readiness.Held = sectorHeld || localHold;
+        readiness.VisibleThreats = CountVisibleEnemyThreatsNearRally(anchor, aiTeam, RallyAssemblyForceRadius + 1);
         readiness.ForceScore = readiness.Capturers + (readiness.Armor * 2) + (readiness.Artillery * 2);
+        readiness.Timeout = startedTurn >= 0 && turnNumber >= 0
+            && turnNumber - startedTurn >= RallyAssemblyTimeoutTurns;
+
+        bool hasHoldPackage = readiness.Held && readiness.Capturers > 0 && readiness.Armor > 0;
+        bool hasSupport = readiness.Artillery > 0 || readiness.Intel > 0 || readiness.Logistics > 0;
+        bool ready = hasHoldPackage && readiness.ForceScore >= 3 && (hasSupport || readiness.Timeout);
+        readiness.GoGreen = readiness.Held && (ready || readiness.Timeout);
 
         if (!readiness.Held)
+        {
+            readiness.State = AIRallyAssemblyState.WaitHold;
             readiness.Status = "WAIT_HOLD";
-        else if (readiness.Artillery <= 0)
-            readiness.Status = "WAIT_ART";
-        else
+            readiness.Missing = "hold";
+        }
+        else if (readiness.GoGreen)
+        {
+            readiness.State = AIRallyAssemblyState.GoGreen;
+            readiness.Status = readiness.Timeout && !ready ? "GO_GREEN_TIMEOUT" : "GO_GREEN";
+            readiness.Missing = "-";
+        }
+        else if (hasHoldPackage && hasSupport)
+        {
+            readiness.State = AIRallyAssemblyState.Ready;
             readiness.Status = "READY";
+            readiness.Missing = "-";
+        }
+        else
+        {
+            readiness.State = AIRallyAssemblyState.Assembling;
+            readiness.Status = readiness.Artillery <= 0 ? "ASSEMBLING_WAIT_ART" : "ASSEMBLING";
+            readiness.Missing = BuildRallyMissingText(readiness, hasHoldPackage, hasSupport);
+        }
 
         return readiness;
+    }
+
+    private static int CountVisibleEnemyThreatsNearRally(Vector3Int anchor, TeamId aiTeam, float radius)
+    {
+        MatchController mc = GetMatchController();
+        int count = 0;
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy == null || enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked)
+                continue;
+            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
+                continue;
+
+            Vector3Int enemyCell = enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            if (SectorManager.HexDistance(anchor, enemyCell) <= radius)
+                count++;
+        }
+
+        return count;
+    }
+
+    private static string BuildRallyMissingText(AIRallyReadiness readiness, bool hasHoldPackage, bool hasSupport)
+    {
+        string missing = "";
+        if (!hasHoldPackage)
+        {
+            if (readiness.Capturers <= 0) missing += "cap";
+            if (readiness.Armor <= 0) missing += string.IsNullOrEmpty(missing) ? "assalto" : "+assalto";
+        }
+        if (!hasSupport)
+            missing += string.IsNullOrEmpty(missing) ? "support" : "+support";
+        return string.IsNullOrEmpty(missing) ? "-" : missing;
+    }
+
+    private static void UpdateRallyObjectiveState(SectorObjective obj, ConstructionManager rally, TeamId aiTeam, int turnNumber)
+    {
+        if (obj == null || rally == null)
+            return;
+
+        if (obj.RallyAssemblyStartedTurn < 0)
+            obj.RallyAssemblyStartedTurn = turnNumber;
+
+        AIRallyReadiness readiness = EvaluateRallyReadiness(rally, aiTeam, turnNumber, obj.RallyAssemblyStartedTurn);
+        obj.RallyState = readiness.State;
+        obj.RallyReadinessReason =
+            $"{readiness.Status} ready={readiness.ForceScore} cap={readiness.Capturers} armor={readiness.Armor} " +
+            $"art={readiness.Artillery} intel={readiness.Intel} log={readiness.Logistics} " +
+            $"threat={readiness.VisibleThreats} missing={readiness.Missing}";
+        PublishRallyHudState(rally, readiness.State, obj.RallyReadinessReason, turnNumber);
+
+        if (readiness.GoGreen && obj.RallyGoGreenTurn < 0)
+        {
+            obj.RallyGoGreenTurn = turnNumber;
+            RememberRallyGoGreen(aiTeam, obj.Sector, turnNumber);
+        }
+    }
+
+    public static bool TryGetRallyHudState(
+        int rallyOwnerSlotIndex,
+        ConstructionSector sector,
+        out AIRallyAssemblyState state,
+        out string reason)
+    {
+        state = AIRallyAssemblyState.None;
+        reason = string.Empty;
+
+        if (rallyOwnerSlotIndex < 0 || sector == ConstructionSector.None)
+            return false;
+
+        string key = BuildRallyHudKey(rallyOwnerSlotIndex, sector);
+        if (!rallyHudStates.TryGetValue(key, out AIRallyHudSnapshot snapshot))
+            return false;
+
+        state = snapshot.State;
+        reason = snapshot.Reason;
+        return true;
+    }
+
+    private static void PublishRallyHudState(
+        ConstructionManager rally,
+        AIRallyAssemblyState state,
+        string reason,
+        int turnNumber)
+    {
+        if (rally == null || !rally.IsRallyPoint || rally.RallyOwnerSlotIndex < 0 || rally.Sector == ConstructionSector.None)
+            return;
+
+        string key = BuildRallyHudKey(rally.RallyOwnerSlotIndex, rally.Sector);
+        bool changed = !rallyHudStates.TryGetValue(key, out AIRallyHudSnapshot previous)
+            || previous.State != state
+            || previous.Reason != reason;
+
+        rallyHudStates[key] = new AIRallyHudSnapshot
+        {
+            State = state,
+            Reason = reason,
+            TurnNumber = turnNumber
+        };
+
+        if (changed)
+            ConstructionManager.RefreshRallyHudVisuals(rally.Sector, rally.RallyOwnerSlotIndex);
+    }
+
+    private static string BuildRallyHudKey(int rallyOwnerSlotIndex, ConstructionSector sector)
+    {
+        return $"{rallyOwnerSlotIndex}:{sector}";
+    }
+
+    private static void RememberRallyGoGreen(TeamId aiTeam, ConstructionSector sector, int turnNumber)
+    {
+        if (sector == ConstructionSector.None || turnNumber < 0)
+            return;
+        rallyGoGreenTurns[$"{(int)aiTeam}:{sector}"] = turnNumber;
+    }
+
+    private static bool IsRallyGoGreenSuppressed(TeamId aiTeam, ConstructionSector sector, int turnNumber)
+    {
+        if (sector == ConstructionSector.None || turnNumber < 0)
+            return false;
+        string key = $"{(int)aiTeam}:{sector}";
+        return rallyGoGreenTurns.TryGetValue(key, out int goTurn)
+            && turnNumber - goTurn <= RallyGoGreenSuppressTurns;
     }
 
     private static bool IsRallySectorHeldByTeam(SectorManager.SectorInfo info, TeamId aiTeam)
@@ -304,25 +505,129 @@ public partial class AIController
         return obj != null && obj.ObjectiveType == AIObjectiveType.RallyAssembly;
     }
 
+    private static bool IsActiveRallyAssemblyObjective(SectorObjective obj)
+    {
+        return IsRallyAssemblyObjective(obj)
+            && obj.RallyState != AIRallyAssemblyState.GoGreen
+            && obj.RallyState != AIRallyAssemblyState.Expired;
+    }
+
+    private static bool IsRallyGoGreenObjective(SectorObjective obj)
+    {
+        return IsRallyAssemblyObjective(obj)
+            && obj.RallyState == AIRallyAssemblyState.GoGreen;
+    }
+
+    private static bool TryFindOwnedRallyForSector(
+        ConstructionSector sector,
+        TeamId aiTeam,
+        out ConstructionManager bestRally)
+    {
+        bestRally = null;
+        if (sector == ConstructionSector.None)
+            return false;
+
+        int slot = ResolveAISlotIndex(aiTeam, GetMatchController());
+        foreach (ConstructionManager rally in ConstructionManager.AllActive)
+        {
+            if (rally == null || !rally.IsRallyPoint || rally.Sector != sector)
+                continue;
+            if (!IsRallyOwnedBySlot(rally, aiTeam, slot))
+                continue;
+
+            bestRally = rally;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveRallyInfluence(
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        Vector3Int fromCell,
+        bool includeGoGreen,
+        out AIRallyInfluence influence)
+    {
+        influence = new AIRallyInfluence
+        {
+            Active = false,
+            Anchor = fromCell,
+            AssemblyRadius = RallyAssemblyForceRadius,
+            SupportRadius = RallyArtilleryRadius,
+            State = AIRallyAssemblyState.None,
+            Reason = "sem rally"
+        };
+
+        if (plan == null || plan.Objectives == null)
+            return false;
+
+        SectorObjective bestObj = null;
+        ConstructionManager bestRally = null;
+        float bestScore = float.MinValue;
+        for (int i = 0; i < plan.Objectives.Count; i++)
+        {
+            SectorObjective obj = plan.Objectives[i];
+            if (!IsRallyAssemblyObjective(obj))
+                continue;
+            if (!includeGoGreen && !IsActiveRallyAssemblyObjective(obj))
+                continue;
+            if (obj.RallyState == AIRallyAssemblyState.Expired)
+                continue;
+            if (!TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager rally))
+                continue;
+
+            Vector3Int rallyCell = rally.CurrentCellPosition;
+            rallyCell.z = 0;
+            float score = Mathf.Max(0f, 20f - obj.Priority) * 100f
+                - SectorManager.HexDistance(fromCell, rallyCell) * 25f
+                + (obj.RallyState == AIRallyAssemblyState.GoGreen ? 150f : 350f);
+            if (score <= bestScore)
+                continue;
+
+            bestScore = score;
+            bestObj = obj;
+            bestRally = rally;
+        }
+
+        if (bestObj == null || bestRally == null)
+            return false;
+
+        Vector3Int anchor = bestRally.CurrentCellPosition;
+        anchor.z = 0;
+        AIRallyReadiness readiness = EvaluateRallyReadiness(
+            bestRally,
+            aiTeam,
+            -1,
+            bestObj.RallyAssemblyStartedTurn);
+
+        influence = new AIRallyInfluence
+        {
+            Active = true,
+            Sector = bestObj.Sector,
+            Anchor = anchor,
+            State = bestObj.RallyState,
+            Readiness = readiness,
+            AssemblyRadius = RallyAssemblyForceRadius,
+            SupportRadius = RallyArtilleryRadius,
+            Reason = bestObj.RallyReadinessReason
+        };
+        return true;
+    }
+
+    private static bool IsRallyAssemblingState(AIRallyAssemblyState state)
+    {
+        return state == AIRallyAssemblyState.WaitHold
+            || state == AIRallyAssemblyState.Assembling
+            || state == AIRallyAssemblyState.Ready;
+    }
+
     private static Vector3Int ResolveRallyAssemblyAnchor(SectorObjective obj, TeamId aiTeam, Vector3Int fallback)
     {
         if (obj == null)
             return fallback;
 
-        ConstructionManager bestRally = null;
-        foreach (ConstructionManager rally in ConstructionManager.AllActive)
-        {
-            if (rally == null || !rally.IsRallyPoint || rally.Sector != obj.Sector)
-                continue;
-
-            if (!IsRallyOwnedBySlot(rally, aiTeam, ResolveAISlotIndex(aiTeam, GetMatchController())))
-                continue;
-
-            bestRally = rally;
-            break;
-        }
-
-        if (bestRally != null)
+        if (TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager bestRally))
         {
             Vector3Int rallyCell = bestRally.CurrentCellPosition;
             rallyCell.z = 0;

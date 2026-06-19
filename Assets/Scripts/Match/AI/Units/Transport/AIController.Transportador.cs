@@ -366,6 +366,9 @@ public partial class AIController
                 foreach (SlotNeed slot in obj.Slots)
                     if (slot.Filled && slot.AssignedUnitId == unit.InstanceId)
                     {
+                        if (IsActiveRallyAssemblyObjective(obj))
+                            return ResolveRallyAssemblyAnchor(obj, snapshot.AITeam, unit.CurrentCellPosition);
+
                         ConstructionManager tgt = FindCapturableInSector(obj.Sector, snapshot.AITeam);
                         if (tgt != null) { Vector3Int tc = tgt.CurrentCellPosition; tc.z = 0; return tc; }
                         // No capturable (e.g. FireSupport assigned to a support sector already controlled):

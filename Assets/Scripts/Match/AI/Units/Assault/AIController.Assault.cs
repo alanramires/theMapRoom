@@ -47,7 +47,7 @@ public partial class AIController
             assigned = criticalHome;
         }
 
-        if (IsRallyAssemblyObjective(assigned))
+        if (IsActiveRallyAssemblyObjective(assigned))
             return DecideRallyAssemblyAssaultAction(unit, snapshot, assigned);
 
         return DecideAssignedAssaultEscortAction(unit, snapshot, assigned);

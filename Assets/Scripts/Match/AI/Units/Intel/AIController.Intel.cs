@@ -70,6 +70,16 @@ public partial class AIController
         offensiveAnchor = false;
         reason = "fallback";
 
+        if (TryResolveRallyInfluence(plan, snapshot.AITeam, fromCell, includeGoGreen: false, out AIRallyInfluence rally)
+            && rally.Active
+            && IsRallyAssemblingState(rally.State))
+        {
+            anchor = rally.Anchor;
+            offensiveAnchor = true;
+            reason = $"rally {rally.Sector} {rally.State} {rally.Reason}";
+            return true;
+        }
+
         SectorObjective bestObjective = null;
         float bestScore = float.MinValue;
         if (plan != null && plan.Objectives != null)
@@ -204,11 +214,12 @@ public partial class AIController
         if (!offensiveAnchor)
             return true;
 
-        float fromDist = SectorManager.HexDistance(fromCell, anchor);
-        float cellDist = SectorManager.HexDistance(cell, anchor);
-        bool advances = cellDist < fromDist - 0.1f;
-        if (!advances)
-            return true;
+        if (!TryScoreBacklineCell(unit, snapshot, cell, anchor, out AIBacklineScore backline)
+            || !backline.InRearSlice
+            || backline.Score <= 0f)
+        {
+            return false;
+        }
 
         return HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor);
     }
@@ -276,70 +287,14 @@ public partial class AIController
         return score;
     }
 
-    private static float CalculateIntelFrontlineRearScore(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell, Vector3Int anchor, out float gap)
+    private float CalculateIntelFrontlineRearScore(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell, Vector3Int anchor, out float gap)
     {
         gap = 0f;
-        if (snapshot == null || snapshot.MyUnits == null)
+        if (!TryScoreBacklineCell(unit, snapshot, cell, anchor, out AIBacklineScore score))
             return 0f;
 
-        float frontDist = float.MaxValue;
-        foreach (UnitManager ally in snapshot.MyUnits)
-        {
-            if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
-                continue;
-            if (IsBacklineSupportUnit(ally))
-                continue;
-
-            Vector3Int allyCell = ally.CurrentCellPosition;
-            allyCell.z = 0;
-            frontDist = Mathf.Min(frontDist, SectorManager.HexDistance(allyCell, anchor));
-        }
-
-        if (frontDist == float.MaxValue)
-            return 0f;
-
-        float frontBandSum = 0f;
-        float nearestFrontAlly = float.MaxValue;
-        int frontBandCount = 0;
-        foreach (UnitManager ally in snapshot.MyUnits)
-        {
-            if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
-                continue;
-            if (IsBacklineSupportUnit(ally))
-                continue;
-
-            Vector3Int allyCell = ally.CurrentCellPosition;
-            allyCell.z = 0;
-            float allyDistToAnchor = SectorManager.HexDistance(allyCell, anchor);
-            if (allyDistToAnchor > frontDist + 3f)
-                continue;
-
-            frontBandSum += allyDistToAnchor;
-            nearestFrontAlly = Mathf.Min(nearestFrontAlly, SectorManager.HexDistance(cell, allyCell));
-            frontBandCount++;
-        }
-
-        if (frontBandCount == 0)
-            return 0f;
-
-        float frontBandDist = frontBandSum / frontBandCount;
-        float cellDist = SectorManager.HexDistance(cell, anchor);
-        gap = cellDist - frontBandDist;
-
-        float desiredGap = 2f;
-        float rearScore;
-        if (gap < 0f)
-            rearScore = gap * 420f;
-        else if (gap <= desiredGap)
-            rearScore = 340f - Mathf.Abs(desiredGap - gap) * 80f;
-        else
-            rearScore = 340f - Mathf.Min(620f, (gap - desiredGap) * 190f);
-
-        float frontAllyScore = nearestFrontAlly < float.MaxValue
-            ? Mathf.Max(-280f, 180f - Mathf.Abs(nearestFrontAlly - 3f) * 90f)
-            : 0f;
-
-        return rearScore + frontAllyScore;
+        gap = score.Gap;
+        return score.Score;
     }
 
     private static float DistanceToNearestNonSupportAlly(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell)

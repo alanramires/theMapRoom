@@ -73,6 +73,11 @@ public class ConstructionManager : MonoBehaviour
     [System.NonSerialized] private bool cachedOccupantVisible;
     [System.NonSerialized] private bool cachedOccupantShouldDarken;
     [System.NonSerialized] private bool cachedShowFlagThreatOutline;
+    [System.NonSerialized] private bool cachedRallyHudIsRally;
+    [System.NonSerialized] private int cachedRallyHudOwnerSlot = int.MinValue;
+    [System.NonSerialized] private TeamId cachedRallyHudTeam = (TeamId)int.MinValue;
+    [System.NonSerialized] private ConstructionSector cachedRallyHudSector = (ConstructionSector)int.MinValue;
+    [System.NonSerialized] private AIRallyAssemblyState cachedRallyHudState = (AIRallyAssemblyState)int.MinValue;
 #if UNITY_EDITOR
     [System.NonSerialized] private bool editorTickRegistered;
 #endif
@@ -248,6 +253,11 @@ public class ConstructionManager : MonoBehaviour
         RefreshRuntimeVisualState(force: true);
     }
 
+    private void Update()
+    {
+        RefreshRallyHudIfDirty();
+    }
+
     private void OnEnable()
     {
         if (!AllActive.Contains(this))
@@ -373,11 +383,13 @@ public class ConstructionManager : MonoBehaviour
     public void SetRallyPoint(bool value)
     {
         isRallyPoint = value;
+        RefreshRuntimeVisualState(force: true);
     }
 
     public void SetRallyOwnerSlotIndex(int value)
     {
         rallyOwnerSlotIndex = Mathf.Max(-1, value);
+        RefreshRuntimeVisualState(force: true);
     }
 
     public void SetAnchorSectorSlotIndex(int value)
@@ -682,6 +694,7 @@ public class ConstructionManager : MonoBehaviour
             hudController = CreateRuntimeHudController();
         if (hudController != null)
             hudController.RefreshBindings();
+        RefreshRallyHudOnly();
         EnsureCapturePointsInitialized();
     }
 
@@ -999,6 +1012,8 @@ public class ConstructionManager : MonoBehaviour
         if (hudController == null)
             return;
 
+        hudController.RefreshBindings();
+
         bool effectiveVisible = IsRuntimeVisible();
         if (hudController.gameObject.activeSelf != effectiveVisible)
             hudController.gameObject.SetActive(effectiveVisible);
@@ -1018,9 +1033,90 @@ public class ConstructionManager : MonoBehaviour
             IsCapturable,
             teamId,
             hasUnitOnTop,
-            showFlagThreatOutline);
+            showFlagThreatOutline,
+            isRallyPoint,
+            IsOwnedByRallyOwnerSlot(),
+            ResolveRallyHudState());
 
         hudController.ApplySectorBadge(AIController.ShowAIHUD, hasUnitOnTop, sector, IsFakeBuilding);
+    }
+
+    private void RefreshRallyHudOnly()
+    {
+        if (hudController == null)
+            hudController = GetComponentInChildren<ConstructionHudController>(true);
+        if (hudController == null)
+            return;
+
+        hudController.RefreshBindings();
+        bool effectiveVisible = IsRuntimeVisible();
+        if (hudController.gameObject.activeSelf != effectiveVisible)
+            hudController.gameObject.SetActive(effectiveVisible);
+        if (!effectiveVisible)
+            return;
+
+        hudController.ApplyRallyTrafficLight(
+            isRallyPoint,
+            IsOwnedByRallyOwnerSlot(),
+            ResolveRallyHudState());
+    }
+
+    private void RefreshRallyHudIfDirty()
+    {
+        AIRallyAssemblyState state = ResolveRallyHudState();
+        if (cachedRallyHudIsRally == isRallyPoint
+            && cachedRallyHudOwnerSlot == rallyOwnerSlotIndex
+            && cachedRallyHudTeam == teamId
+            && cachedRallyHudSector == sector
+            && cachedRallyHudState == state)
+            return;
+
+        cachedRallyHudIsRally = isRallyPoint;
+        cachedRallyHudOwnerSlot = rallyOwnerSlotIndex;
+        cachedRallyHudTeam = teamId;
+        cachedRallyHudSector = sector;
+        cachedRallyHudState = state;
+        RefreshRallyHudOnly();
+    }
+
+    public static void RefreshRallyHudVisuals(ConstructionSector sector, int rallyOwnerSlotIndex)
+    {
+        if (AllActive == null)
+            return;
+
+        for (int i = 0; i < AllActive.Count; i++)
+        {
+            ConstructionManager construction = AllActive[i];
+            if (construction == null || !construction.IsRallyPoint)
+                continue;
+            if (construction.Sector != sector || construction.RallyOwnerSlotIndex != rallyOwnerSlotIndex)
+                continue;
+
+            construction.RefreshRuntimeVisualState(force: true);
+        }
+    }
+
+    private bool IsOwnedByRallyOwnerSlot()
+    {
+        if (!isRallyPoint || rallyOwnerSlotIndex < 0)
+            return false;
+
+        TryAutoAssignMatchController();
+        if (matchController != null)
+            return teamId == matchController.GetTeamIdForSlot(rallyOwnerSlotIndex);
+
+        return slotIndex == rallyOwnerSlotIndex;
+    }
+
+    private AIRallyAssemblyState ResolveRallyHudState()
+    {
+        if (!isRallyPoint || !IsOwnedByRallyOwnerSlot())
+            return AIRallyAssemblyState.None;
+
+        if (AIController.TryGetRallyHudState(rallyOwnerSlotIndex, sector, out AIRallyAssemblyState state, out _))
+            return state;
+
+        return AIRallyAssemblyState.WaitHold;
     }
 
     public void RefreshRuntimeVisualState(bool force = true)
@@ -1043,6 +1139,7 @@ public class ConstructionManager : MonoBehaviour
             && cachedOccupantShouldDarken == shouldDarken
             && cachedShowFlagThreatOutline == showFlagThreatOutline)
         {
+            RefreshRallyHudOnly();
             return;
         }
 

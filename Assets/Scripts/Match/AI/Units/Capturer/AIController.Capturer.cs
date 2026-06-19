@@ -147,7 +147,7 @@ public partial class AIController
             return false;
         foreach (SectorObjective obj in plan.Objectives)
         {
-            if (obj != null && obj.Sector == sector && obj.ObjectiveType == AIObjectiveType.RallyAssembly)
+            if (obj != null && obj.Sector == sector && IsActiveRallyAssemblyObjective(obj))
                 return true;
         }
         return false;
