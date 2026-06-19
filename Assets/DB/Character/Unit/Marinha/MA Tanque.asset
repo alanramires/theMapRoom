@@ -20,10 +20,7 @@ MonoBehaviour:
     e abastece posi\xE7\xF5es avan\xE7adas. N\xE3o possui capacidade ofensiva relevante
     e deve operar protegido, pois sua perda compromete a cadeia de suprimentos."
   spriteDefault: {fileID: 21300000, guid: 3538d62717fccc644b7e50d2cd9df3ef, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 12
   armorClass: 1
@@ -34,9 +31,42 @@ MonoBehaviour:
   militaryForce: 2
   unitClass: 8
   combatClassification: 3
-  aiUnitProfile: {fileID: 11400000, guid: 626e71f53bedacc409de7c3bae53de83, type: 2}
+  roles: 10000000
+  aiInitiative: 2
+  aiPurchaseMode: 0
   aiTargetPreferenceByClass: []
+  aiSensorPriority: 0000000002000000
+  prioritizeDpqAtBattle: 0
+  playConservative: 0
+  preferMoveOnBestDPQ: 0
+  preferMaxDisplacement: 0
+  longRangeStationary: 0
+  preferRepositionAtWeaponMaxRange: 0
+  preferArtilleryModeBeforeCombatant: 0
+  useAttackDecision: 1
+  attackAcceptHpLossPercent: 50
+  attackEliminationMinPercent: 10
+  attackMustSurvive: 1
+  ignoreAttackDecisionWhenDefending: 0
+  defensiveAttackExtraHpLossPercent: 20
+  repairTriggerHpBelow: 0
+  repairTriggerAutonomyPct: 0
+  repairTriggerAmmoEnabled: 0
+  repairTriggerAmmoPct: 0
+  repairRecoverHpAbove: 8
+  fuseWhileInRepair: 0
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
+  aiPreventiveMaintenanceEnabled: 1
+  aiPreventiveSupplyCanRunWithUnderRepair: 0
+  aiConservativeSupplyAvoidEnemyRange: 2
+  aiPreventiveSupplyHpBelowPct: 70
+  aiPreventiveSupplyAutonomyBelowPct: 60
+  aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
   eliteLevel: 0
+  eliteFrom: {fileID: 0}
   combatModifiers: []
   domain: 1
   heightLevel: 3

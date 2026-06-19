@@ -331,6 +331,9 @@ public partial class AIController
         action = null;
         if (unit == null || snapshot == null)
             return false;
+        if (!unit.TryGetUnitData(out UnitData capturerData)
+            || !UnitRoleCompatibility.CanSatisfy(capturerData, UnitRole.Capturador))
+            return false;
         if (HasTransportCargo(unit))
             return false;
 
@@ -342,7 +345,7 @@ public partial class AIController
 
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
         MatchController mc = GetMatchController();
-        bool preferDpq = unit.TryGetUnitData(out UnitData unitData) && unitData != null && unitData.prioritizeDpqAtBattle;
+        bool preferDpq = capturerData.prioritizeDpqAtBattle;
 
         UnitManager bestTarget = null;
         Vector3Int bestAttackCell = fromCell;

@@ -33,7 +33,7 @@ MonoBehaviour:
   combatClassification: 0
   roles: 02000000
   aiInitiative: 1
-  aiPurchaseMode: 0
+  aiPurchaseMode: 1
   aiTargetPreferenceByClass:
   - targetClass: 2
     priority: 2
@@ -63,6 +63,10 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
   aiConservativeSupplyAvoidEnemyRange: 2

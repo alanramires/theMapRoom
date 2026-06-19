@@ -21,6 +21,10 @@ public partial class AIController : MonoBehaviour
     [Header("AI HUD")]
     [SerializeField] private bool showAIUnitHUD;
 
+    [Header("AI Debug")]
+    [Tooltip("Inicia a partida com a IA pausada, equivalente a pressionar F10.")]
+    [SerializeField] private bool startOnPause;
+
     [Header("AI Stage Emulation")]
     [SerializeField] private bool emulateStage0 = true;
     [SerializeField] private bool emulateStage1 = true;

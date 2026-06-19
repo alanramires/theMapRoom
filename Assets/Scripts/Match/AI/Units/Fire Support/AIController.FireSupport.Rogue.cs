@@ -17,10 +17,15 @@ public partial class AIController
         Vector3Int anchor = ResolveRogueFireSupportAnchor(snapshot, fromCell);
         bool artilleryOnly = IsArtilleryModeOnly(unit);
 
+        if (TryDecideCombatantFireSupportTacticalAction(
+                unit, snapshot, null, fromCell, anchor, paths, occupied,
+                defensiveContext: false, out PlayerAction combatantAction))
+            return combatantAction;
+
         // Artillery mode: prefer max-range fire, then close-range (combatant), then reposition.
         // "preferArtilleryModeBeforeCombatant" means the order of preference, not exclusivity.
         // Normal mode: attack immediately if any target is available.
-        if (artilleryOnly)
+        if (!IsCombatantFireSupport(unit) && artilleryOnly)
         {
             if (TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor,
                     defensiveContext: false, out PlayerAction indirectAction, out string indirectReason, indirectOnly: true))
@@ -36,7 +41,7 @@ public partial class AIController
                 return combatAction;
             }
         }
-        else
+        else if (!IsCombatantFireSupport(unit))
         {
             if (TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor,
                     defensiveContext: false, out PlayerAction attackAction, out string attackReason))
@@ -122,7 +127,8 @@ public partial class AIController
         }
 
         // Artillery mode truly stuck — allow direct fire as absolute last resort.
-        if (artilleryOnly && TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor,
+        if (!IsCombatantFireSupport(unit)
+            && artilleryOnly && TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor,
                 defensiveContext: false, out PlayerAction fallbackAction, out string fallbackReason))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rogue (direto fallback) - {fallbackReason}");

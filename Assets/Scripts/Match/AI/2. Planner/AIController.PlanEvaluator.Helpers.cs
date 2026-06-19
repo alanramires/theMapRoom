@@ -138,7 +138,7 @@ public partial class AIController
         {
             if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
             if (!u.TryGetUnitData(out UnitData data)) continue;
-            if (data.roles != null && data.roles.Count > 0 && data.roles[0] == UnitRole.Assalto)
+            if (UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Assalto)
                 list.Add(u);
         }
         return list;
@@ -151,7 +151,7 @@ public partial class AIController
         {
             if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
             if (!u.TryGetUnitData(out UnitData data)) continue;
-            if (data.roles != null && data.roles.Count > 0 && data.roles[0] == UnitRole.FogoIndireto)
+            if (UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.FogoIndireto)
                 list.Add(u);
         }
         return list;

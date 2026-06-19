@@ -40,7 +40,8 @@ public partial class AIController
             return false;
 
         return data.roles[0] == UnitRole.AtaqueAereo
-            || data.roles[0] == UnitRole.Interceptador;
+            || data.roles[0] == UnitRole.Interceptador
+            || data.roles[0] == UnitRole.RaidAntiSub;
     }
 
     private static bool IsOffensiveAirCombatUnit(UnitManager unit)
@@ -50,7 +51,8 @@ public partial class AIController
 
         return data.roles != null
             && data.roles.Count > 0
-            && data.roles[0] == UnitRole.AtaqueAereo;
+            && (data.roles[0] == UnitRole.AtaqueAereo
+                || data.roles[0] == UnitRole.RaidAntiSub);
     }
 
     private PlayerAction DecideRogueAirCombatAction(UnitManager unit, AIWorldSnapshot snapshot, List<int> takeoffMoveOptions = null)

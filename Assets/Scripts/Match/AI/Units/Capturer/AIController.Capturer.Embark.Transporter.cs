@@ -60,8 +60,7 @@ public partial class AIController
         // Secondary capturer: also accepts an APC with no formal passenger (shuttle mode).
         // Rogue capturer (no assigned sector): accepts any APC with no formal passenger.
         SectorObjective tObj = ResolveAssignedTransportObjective(transporter, plan);
-        bool isPrimary = unitData.roles != null && unitData.roles.Count > 0
-            && unitData.roles[0] == UnitRole.Capturador;
+        bool isPrimary = UnitRoleCompatibility.ResolveCompositionRole(unitData) == UnitRole.Capturador;
         bool sameSector = assigned != null && tObj != null && tObj.Sector == assigned.Sector;
         bool compatibleSector = assigned != null && tObj != null
             && AreEmbarkSectorsCompatible(assigned.Sector, tObj.Sector);

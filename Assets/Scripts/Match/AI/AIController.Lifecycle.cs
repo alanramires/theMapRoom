@@ -79,6 +79,12 @@ public partial class AIController
 
         Debug.Log($"[AI] Start — matchController={matchController != null} replayManager={replayManager != null} turnStateManager={turnStateManager != null}");
 
+        if (startOnPause)
+        {
+            SetDebugPaused(true);
+            Debug.Log("[AI] Start on Pause ativo - estado inicial equivalente ao F10.");
+        }
+
         RefreshConstructionHudAfterAIHudReady();
 
         // OnActiveTeamChanged pode ter disparado antes do Awake (raro mas possível).

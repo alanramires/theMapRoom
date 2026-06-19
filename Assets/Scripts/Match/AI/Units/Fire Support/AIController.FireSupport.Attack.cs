@@ -19,7 +19,8 @@ public partial class AIController
         out PlayerAction action,
         out string reason,
         bool indirectOnly = false,
-        bool stationaryOnly = false)
+        bool stationaryOnly = false,
+        System.Func<PodeMirarTargetOption, bool> optionFilter = null)
     {
         action = null;
         reason = "";
@@ -63,6 +64,7 @@ public partial class AIController
             foreach (PodeMirarTargetOption opt in targets)
             {
                 if (opt?.targetUnit == null || opt.targetUnit.TeamId == snapshot.AITeam || opt.targetUnit.IsDead) continue;
+                if (optionFilter != null && !optionFilter(opt)) continue;
                 if (artilleryMaxRange > 0 && opt.distance < artilleryMaxRange) continue;
                 if (!PassesAttackDecision(unit, opt.targetUnit, cell, defensiveContext, out string attackDecisionReason))
                     continue;

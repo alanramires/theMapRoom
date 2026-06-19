@@ -88,7 +88,7 @@ public partial class AIController
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null || data.roles == null)
             return false;
 
-        return data.roles.Contains(UnitRole.Capturador)
-            || data.roles.Contains(UnitRole.Assalto);
+        UnitRole role = UnitRoleCompatibility.ResolveCompositionRole(data);
+        return role == UnitRole.Capturador || role == UnitRole.Assalto;
     }
 }

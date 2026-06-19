@@ -214,6 +214,17 @@ public partial class AIController
             return DecideCapturerOpportunistAction(unit, snapshot, assigned, fromCell, opCell, paths);
         }
 
+        if (TryDecideAggressiveCapturerAction(
+            unit,
+            snapshot,
+            assigned,
+            fromCell,
+            targetCell,
+            paths,
+            occupied,
+            out PlayerAction aggressiveAction))
+            return aggressiveAction;
+
         bool hasRecommendedAdvanceCell = TryFindRecommendedCapturerAdvanceCell(
             unit,
             snapshot,

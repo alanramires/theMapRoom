@@ -403,7 +403,7 @@ public partial class AIController
         if (unit == null || plan == null || unit.HasActed || unit.IsDead || unit.IsEmbarked)
             return false;
         if (!unit.TryGetUnitData(out UnitData data) || data == null
-            || data.roles == null || !data.roles.Contains(UnitRole.Capturador)
+            || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador)
             || data.unitClass != GameUnitClass.Infantry)
             return false;
 

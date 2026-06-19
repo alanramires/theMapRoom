@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 // --------------------------------------------------------------------------------------------
-// Necessidades T·ticas da IA: DefiniÁ„o de Requisitos de Unidades para OperaÁıes EspecÌficas
-// O AITacticalNeed representa uma necessidade t·tica especÌfica para uma operaÁ„o, como defesa de base,
-// captura de setor ou apoio aÈreo. Ele inclui o tipo de necessidade, a fase atual da operaÁ„o, 
-//os setores envolvidos, a equipe respons·vel, a prioridade, os slots de unidade necess·rios 
-// e outras informaÁıes relevantes. O AITacticalNeed È usado para guiar a alocaÁ„o de unidades, 
-// atribuiÁ„o de tarefas e a tomada de decisıes t·ticas da IA, garantindo que as operaÁıes
+// Necessidades T√°ticas da IA: Defini√ß√£o de Requisitos de Unidades para Opera√ß√µes Espec√≠ficas
+// O AITacticalNeed representa uma necessidade t√°tica espec√≠fica para uma opera√ß√£o, como defesa de base,
+// captura de setor ou apoio a√©reo. Ele inclui o tipo de necessidade, a fase atual da opera√ß√£o,
+//os setores envolvidos, a equipe respons√°vel, a prioridade, os slots de unidade necess√°rios
+// e outras informa√ß√µes relevantes. O AITacticalNeed √© usado para guiar a aloca√ß√£o de unidades,
+// atribui√ß√£o de tarefas e a tomada de decis√µes t√°ticas da IA, garantindo que as opera√ß√µes
 // sejam apoiadas por recursos adequados e coordenados de forma eficaz.
 // --------------------------------------------------------------------------------------------
 public enum AINeedKind
@@ -110,4 +110,19 @@ public struct TacticalDeficit
     public AITacticalNeed Operation;
     public AINeedKind Kind;
     public int Count;
+}
+
+public class AIShoppingDemand
+{
+    public UnitRole Role;
+    public UnitRole ExactRole = UnitRole.None;
+    public Domain? Domain;
+    public GameUnitClass? TargetClass;
+    public int Count;
+    public int Priority;
+    public bool Urgent;
+    public int MinEliteLevel;
+    public int MaxEliteLevel = int.MaxValue;
+    public string Origin;
+    public string Reason;
 }

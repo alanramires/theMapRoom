@@ -441,10 +441,9 @@ public partial class AIController
         if (attacker == null || !attacker.TryGetUnitData(out UnitData data) || data == null)
             return false;
 
+        UnitRole role = UnitRoleCompatibility.ResolveCompositionRole(data);
         return data.domain == Domain.Land
-            && data.roles != null
-            && data.roles.Count > 0
-            && (data.roles[0] == UnitRole.Assalto || data.roles[0] == UnitRole.Capturador);
+            && (role == UnitRole.Assalto || role == UnitRole.Capturador);
     }
 
     private UnitManager FindAttackPrepTarget(int targetId, TeamId aiTeam)

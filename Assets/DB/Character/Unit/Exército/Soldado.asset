@@ -32,8 +32,9 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 0
   combatClassification: 0
-  roles: 0100000002000000
+  roles: 01000000
   aiInitiative: 3
+  aiPurchaseMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 0
     priority: 2
@@ -57,6 +58,10 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
   aiConservativeSupplyAvoidEnemyRange: 2
@@ -64,6 +69,7 @@ MonoBehaviour:
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
   eliteLevel: 0
+  eliteFrom: {fileID: 0}
   combatModifiers: []
   domain: 0
   heightLevel: 3

@@ -217,7 +217,7 @@ public partial class AIController
         {
             if (unitData.longRangeStationary)
                 return false;
-            if (unitData.roles != null && unitData.roles.Contains(UnitRole.FogoIndireto))
+            if (UnitRoleCompatibility.CanSatisfy(unitData, UnitRole.FogoIndireto))
             {
                 if (HasNonFireSupportUnitOnProductionBuilding(unit, aiTeam, snapshot))
                     return false;
@@ -273,7 +273,7 @@ public partial class AIController
             if (other.IsDead || other.IsEmbarked || other.HasActed) continue;
             if (!other.TryGetUnitData(out UnitData otherData) || otherData == null) continue;
             if (otherData.longRangeStationary) continue;
-            if (otherData.roles != null && otherData.roles.Contains(UnitRole.FogoIndireto)) continue;
+            if (UnitRoleCompatibility.CanSatisfy(otherData, UnitRole.FogoIndireto)) continue;
             Vector3Int otherCell = other.CurrentCellPosition; otherCell.z = 0;
             ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, otherCell);
             if (bldg != null && bldg.CanProduceUnitsForTeam(aiTeam))
@@ -293,7 +293,7 @@ public partial class AIController
             if (other.IsDead || other.IsEmbarked || other.HasActed) continue;
             if (!other.TryGetUnitData(out UnitData otherData) || otherData == null) continue;
             if (otherData.longRangeStationary) continue;
-            if (otherData.roles == null || !otherData.roles.Contains(UnitRole.FogoIndireto)) continue;
+            if (!UnitRoleCompatibility.CanSatisfy(otherData, UnitRole.FogoIndireto)) continue;
             Vector3Int otherCell = other.CurrentCellPosition; otherCell.z = 0;
             ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, otherCell);
             if (bldg == null || !bldg.CanProduceUnitsForTeam(aiTeam)) continue;
@@ -352,9 +352,9 @@ public partial class AIController
             if (unit == null || unit.cost > budget || unit.domain != Domain.Land)
                 continue;
 
-            bool fireSupport = unit.roles != null && unit.roles.Contains(UnitRole.FogoIndireto);
+            bool fireSupport = UnitRoleCompatibility.CanSatisfy(unit, UnitRole.FogoIndireto);
             bool assaultArmor = unit.unitClass == GameUnitClass.Armored
-                && unit.roles != null && unit.roles.Count > 0 && unit.roles[0] == UnitRole.Assalto;
+                && UnitRoleCompatibility.ResolveCompositionRole(unit) == UnitRole.Assalto;
             if (!fireSupport && !assaultArmor)
                 continue;
 

@@ -31,7 +31,7 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 2
   combatClassification: 2
-  roles: 0500000002000000
+  roles: 0d000000
   aiInitiative: 2
   aiPurchaseMode: 2
   aiTargetPreferenceByClass:

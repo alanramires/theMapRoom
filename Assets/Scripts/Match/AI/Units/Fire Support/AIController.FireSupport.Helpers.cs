@@ -12,7 +12,7 @@ public partial class AIController
     {
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return false;
-        return data.roles != null && data.roles.Contains(UnitRole.FogoIndireto);
+        return UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto);
     }
 
     private static bool IsLongRangeStationary(UnitManager unit)
@@ -28,7 +28,10 @@ public partial class AIController
         return unit != null
             && unit.TryGetUnitData(out UnitData data)
             && data != null
-            && (data.preferRepositionAtWeaponMaxRange || data.preferArtilleryModeBeforeCombatant);
+            && (data.preferRepositionAtWeaponMaxRange
+                || data.preferArtilleryModeBeforeCombatant
+                || IsCombatantFireSupport(unit)
+                || IsRangedAntiAirFireSupport(unit));
     }
 
     private static bool IsArtilleryModeOnly(UnitManager unit)

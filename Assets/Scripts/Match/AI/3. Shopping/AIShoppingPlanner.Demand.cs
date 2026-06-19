@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Cálculo de demanda por role e progressão de compra de capturadores.
+// CÃ¡lculo de demanda por role e progressÃ£o de compra de capturadores.
 public partial class AIShoppingPlanner
 {
     private static int ComputeCacaBDemand(AIWorldSnapshot snapshot)
@@ -101,8 +101,8 @@ public partial class AIShoppingPlanner
         if (snapshot == null) return 0;
 
         // The turn no longer hard-blocks the demand (mirrors ComputeCacaBDemand): it only drops the
-        // baseline presence floor. Real, self-regulating demand — escorting our own Chinooks and
-        // countering visible enemy helicopters — flows through even in the early game.
+        // baseline presence floor. Real, self-regulating demand â€” escorting our own Chinooks and
+        // countering visible enemy helicopters â€” flows through even in the early game.
         int minTurn = Instance != null ? Instance.MinTurnForAtaqueAereo : 5;
         bool tooEarly = snapshot.TurnNumber > 0 && snapshot.TurnNumber < minTurn;
 
@@ -1151,5 +1151,502 @@ public partial class AIShoppingPlanner
             || (stalematePressure >= heavyThreshold && artilleryIntel > 0f);
 
         return economyReady && (visibleWall || intelWall);
+    }
+
+    private sealed class RoleShoppingCandidate
+    {
+        public ConstructionManager Building;
+        public UnitData Unit;
+        public AIShoppingDemand Demand;
+        public int Score;
+    }
+
+    private static List<ShoppingOrder> DecideRoleBased(AIWorldSnapshot snapshot)
+    {
+        var orders = new List<ShoppingOrder>();
+        if (snapshot == null)
+            return orders;
+
+        List<AIShoppingDemand> demands = BuildRoleShoppingDemands(snapshot);
+        var occupied = BuildProductionOccupiedCells();
+        var usedBuildings = new HashSet<ConstructionManager>();
+        int remaining = snapshot.Budget;
+
+        LogRoleShoppingQueue(snapshot, demands, remaining);
+        while (remaining > 0)
+        {
+            RoleShoppingCandidate best = null;
+            foreach (ConstructionManager building in snapshot.MyBuildings)
+            {
+                if (building == null || usedBuildings.Contains(building)
+                    || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+                    || building.OfferedUnits == null)
+                    continue;
+
+                Vector3Int cell = building.CurrentCellPosition;
+                cell.z = 0;
+                if (occupied.Contains(cell))
+                    continue;
+
+                foreach (UnitData unit in building.OfferedUnits)
+                {
+                    if (unit == null || unit.cost <= 0 || unit.cost > remaining
+                        || unit.militaryForce == MilitaryForce.Navy
+                        || !IsRolePurchaseAllowedByStance(unit, snapshot.Stance)
+                        || !IsEliteChainAvailable(unit, snapshot))
+                        continue;
+
+                    foreach (AIShoppingDemand demand in demands)
+                    {
+                        if (demand.Count <= 0 || !DoesUnitMeetShoppingDemand(unit, demand))
+                            continue;
+
+                        int score = ScoreRoleShoppingCandidate(snapshot, unit, demand, remaining);
+                        if (best == null || score > best.Score
+                            || (score == best.Score && unit.cost > best.Unit.cost)
+                            || (score == best.Score && unit.cost == best.Unit.cost
+                                && string.CompareOrdinal(unit.id, best.Unit.id) < 0))
+                        {
+                            best = new RoleShoppingCandidate
+                            {
+                                Building = building,
+                                Unit = unit,
+                                Demand = demand,
+                                Score = score,
+                            };
+                        }
+                    }
+                }
+            }
+
+            if (best == null)
+                break;
+
+            int index = IndexOf(best.Building.OfferedUnits, best.Unit);
+            orders.Add(new ShoppingOrder
+            {
+                Building = best.Building,
+                UnitToBuy = best.Unit,
+                SelectedIndex = index,
+            });
+            best.Demand.Count--;
+            remaining -= best.Unit.cost;
+            usedBuildings.Add(best.Building);
+            Vector3Int productionCell = best.Building.CurrentCellPosition;
+            productionCell.z = 0;
+            occupied.Add(productionCell);
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                + $"{best.Building.ConstructionDisplayName} compra {best.Unit.displayName} ${best.Unit.cost} "
+                + $"para {best.Demand.Role}/{best.Demand.ExactRole} origem={best.Demand.Origin} "
+                + $"pri={best.Demand.Priority} score={best.Score} restante={remaining}");
+        }
+
+        foreach (AIShoppingDemand demand in demands)
+            if (demand.Count > 0)
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] pendente "
+                    + $"{demand.Role}/{demand.ExactRole} x{demand.Count} pri={demand.Priority} "
+                    + $"origem={demand.Origin} motivo={demand.Reason}");
+        return orders;
+    }
+
+    private static List<AIShoppingDemand> BuildRoleShoppingDemands(AIWorldSnapshot snapshot)
+    {
+        var demands = new List<AIShoppingDemand>();
+        List<TacticalDeficit> deficits = AITacticalAnalyzer.Instance.GetDeficits(snapshot.AITeam);
+        foreach (TacticalDeficit deficit in deficits)
+        {
+            if (deficit.Count <= 0 || !TryMapNeedToShoppingDemand(deficit, out AIShoppingDemand demand))
+                continue;
+            MergeRoleDemand(demands, demand, addCounts: true);
+        }
+
+        int capturers = CountCompositionRole(snapshot, UnitRole.Capturador);
+        int assaults = CountCompositionRole(snapshot, UnitRole.Assalto);
+        int fireSupport = CountCompositionRole(snapshot, UnitRole.FogoIndireto);
+        int core = capturers + assaults + fireSupport;
+        int packages = Mathf.Max(1, Mathf.CeilToInt(core / 5f));
+        EnsureRoleDemand(demands, UnitRole.Capturador, Mathf.Max(0, packages * 2 - capturers), 30,
+            "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}");
+        EnsureRoleDemand(demands, UnitRole.Assalto, Mathf.Max(0, packages * 2 - assaults), 31,
+            "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}");
+        EnsureRoleDemand(demands, UnitRole.FogoIndireto, Mathf.Max(0, packages - fireSupport), 32,
+            "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}");
+
+        int visibleAir = CountEnemyDomain(snapshot, Domain.Air);
+        if (visibleAir > 0)
+        {
+            int activeAA = CountAtomicRole(snapshot, UnitRole.AntiaereoCombatente)
+                + CountAtomicRole(snapshot, UnitRole.Antiaereo);
+            int desiredAA = Mathf.Max(1, Mathf.CeilToInt(visibleAir / 2f));
+            if (activeAA < desiredAA)
+            {
+                UnitRole exact = CountAtomicRole(snapshot, UnitRole.AntiaereoCombatente)
+                    <= CountAtomicRole(snapshot, UnitRole.Antiaereo)
+                    ? UnitRole.AntiaereoCombatente : UnitRole.Antiaereo;
+                MergeRoleDemand(demands, NewRoleDemand(UnitRole.Antiaereo, desiredAA - activeAA, 8,
+                    "threat", $"aeronaves visiveis={visibleAir}", true, exact), false);
+            }
+        }
+
+        int enemyArtillery = CountEnemyCombatRole(snapshot, UnitRole.FogoIndireto);
+        if (enemyArtillery >= 3 && CountOwnedAirAttack(snapshot, eliteOnly: true) == 0)
+        {
+            AIShoppingDemand bomber = NewRoleDemand(UnitRole.AtaqueAereo, 1, 12,
+                "breakthrough", $"parede de artilharia={enemyArtillery}", false);
+            bomber.Domain = Domain.Air;
+            bomber.MinEliteLevel = 1;
+            MergeRoleDemand(demands, bomber, false);
+        }
+
+        if (HasEnemyAirProduction(snapshot) && CountCompositionRole(snapshot, UnitRole.Intel) == 0)
+        {
+            AIShoppingDemand intel = NewRoleDemand(UnitRole.Intel, 1, 20,
+                "intel", "oponente possui capacidade aeroportuaria", false);
+            MergeRoleDemand(demands, intel, false);
+        }
+
+        if (HasEnemySubmarineCapability(snapshot) && CountCompositionRole(snapshot, UnitRole.RaidAntiSub) == 0)
+        {
+            MergeRoleDemand(demands, NewRoleDemand(UnitRole.RaidAntiSub, 1, 18,
+                "anti-sub", "submarino visivel ou porto inimigo", false), false);
+        }
+
+        int repairWork = CountUnitsUnderRepair(snapshot);
+        int logistics = CountCompositionRole(snapshot, UnitRole.Logistica);
+        int wantedLogistics = repairWork > 0 ? Mathf.Max(1, Mathf.CeilToInt(repairWork / 2f)) : 0;
+        if (wantedLogistics > logistics)
+            EnsureRoleDemand(demands, UnitRole.Logistica, wantedLogistics - logistics, 22,
+                "service", $"unidades em reparo={repairWork}");
+
+        AddEliteProgressionDemand(snapshot, demands, UnitRole.Assalto, assaults, 24);
+        AddEliteProgressionDemand(snapshot, demands, UnitRole.FogoIndireto, fireSupport, 25);
+        ApplyRoleShoppingDebugFilter(snapshot, demands);
+
+        demands.Sort((a, b) =>
+        {
+            int urgent = b.Urgent.CompareTo(a.Urgent);
+            if (urgent != 0) return urgent;
+            int priority = a.Priority.CompareTo(b.Priority);
+            if (priority != 0) return priority;
+            return ((int)a.Role).CompareTo((int)b.Role);
+        });
+        return demands;
+    }
+
+    private static void ApplyRoleShoppingDebugFilter(AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
+    {
+        if (Instance == null)
+            return;
+
+        UnitRole role = UnitRole.None;
+        Domain? domain = null;
+        if (Instance.onlyCapturers) role = UnitRole.Capturador;
+        else if (Instance.onlyAssault) role = UnitRole.Assalto;
+        else if (Instance.onlyTransporter) { role = UnitRole.Transportador; domain = Domain.Land; }
+        else if (Instance.onlyLogistics) role = UnitRole.Logistica;
+        else if (Instance.onlyFireSupport) role = UnitRole.FogoIndireto;
+        else if (Instance.onlyAirTransporter) { role = UnitRole.Transportador; domain = Domain.Air; }
+        else if (Instance.onlyInterceptador) { role = UnitRole.Interceptador; domain = Domain.Air; }
+        else if (Instance.onlyAtaqueAereo) { role = UnitRole.AtaqueAereo; domain = Domain.Air; }
+        if (role == UnitRole.None)
+            return;
+
+        demands.Clear();
+        AIShoppingDemand forced = NewRoleDemand(role,
+            Mathf.Max(1, snapshot.MyBuildings != null ? snapshot.MyBuildings.Count : 1),
+            0, "debug", $"only {role}", true);
+        forced.Domain = domain;
+        demands.Add(forced);
+    }
+
+    private static AIShoppingDemand NewRoleDemand(UnitRole role, int count, int priority,
+        string origin, string reason, bool urgent, UnitRole exactRole = UnitRole.None)
+    {
+        return new AIShoppingDemand
+        {
+            Role = role,
+            ExactRole = exactRole,
+            Count = count,
+            Priority = priority,
+            Origin = origin,
+            Reason = reason,
+            Urgent = urgent,
+        };
+    }
+
+    private static bool TryMapNeedToShoppingDemand(TacticalDeficit deficit, out AIShoppingDemand demand)
+    {
+        demand = null;
+        int priority = deficit.Operation != null ? Mathf.Max(1, deficit.Operation.Priority) : 40;
+        bool urgent = deficit.Operation != null && deficit.Operation.IsUrgent;
+        string reason = deficit.Operation != null
+            ? $"{deficit.Operation.Type} {deficit.Operation.Sector}" : deficit.Kind.ToString();
+        UnitRole role;
+        UnitRole exact = UnitRole.None;
+        Domain? domain = null;
+        int minElite = 0;
+        int maxElite = int.MaxValue;
+        switch (deficit.Kind)
+        {
+            case AINeedKind.Capturer: role = UnitRole.Capturador; break;
+            case AINeedKind.Assault: role = UnitRole.Assalto; break;
+            case AINeedKind.FireSupport:
+            case AINeedKind.Artillery: role = UnitRole.FogoIndireto; break;
+            case AINeedKind.AAA: role = UnitRole.Antiaereo; exact = UnitRole.AntiaereoCombatente; break;
+            case AINeedKind.SAM: role = UnitRole.Antiaereo; exact = UnitRole.Antiaereo; break;
+            case AINeedKind.GroundTransport: role = UnitRole.Transportador; domain = Domain.Land; break;
+            case AINeedKind.AirTransport: role = UnitRole.Transportador; domain = Domain.Air; break;
+            case AINeedKind.FighterB: role = UnitRole.Interceptador; domain = Domain.Air; maxElite = 0; break;
+            case AINeedKind.FighterA: role = UnitRole.Interceptador; domain = Domain.Air; minElite = 1; break;
+            case AINeedKind.Apache: role = UnitRole.AtaqueAereo; domain = Domain.Air; maxElite = 0; break;
+            case AINeedKind.AirTanker: role = UnitRole.Logistica; domain = Domain.Air; break;
+            default: return false;
+        }
+
+        demand = NewRoleDemand(role, deficit.Count, urgent ? priority : priority + 10,
+            "operation", reason, urgent, exact);
+        demand.Domain = domain;
+        demand.MinEliteLevel = minElite;
+        demand.MaxEliteLevel = maxElite;
+        return true;
+    }
+
+    private static void EnsureRoleDemand(List<AIShoppingDemand> demands, UnitRole role,
+        int count, int priority, string origin, string reason)
+    {
+        if (count <= 0) return;
+        MergeRoleDemand(demands, NewRoleDemand(role, count, priority, origin, reason, false), false);
+    }
+
+    private static void MergeRoleDemand(List<AIShoppingDemand> demands, AIShoppingDemand incoming, bool addCounts)
+    {
+        if (incoming == null || incoming.Count <= 0) return;
+        foreach (AIShoppingDemand current in demands)
+        {
+            if (current.Role != incoming.Role || current.ExactRole != incoming.ExactRole
+                || current.Domain != incoming.Domain || current.MinEliteLevel != incoming.MinEliteLevel
+                || current.MaxEliteLevel != incoming.MaxEliteLevel)
+                continue;
+            current.Count = addCounts ? current.Count + incoming.Count : Mathf.Max(current.Count, incoming.Count);
+            current.Priority = Mathf.Min(current.Priority, incoming.Priority);
+            current.Urgent |= incoming.Urgent;
+            if (!current.Origin.Contains(incoming.Origin)) current.Origin += "+" + incoming.Origin;
+            if (!current.Reason.Contains(incoming.Reason)) current.Reason += "; " + incoming.Reason;
+            return;
+        }
+        demands.Add(incoming);
+    }
+
+    private static bool DoesUnitMeetShoppingDemand(UnitData unit, AIShoppingDemand demand)
+    {
+        if (unit == null || demand == null || unit.roles == null || unit.roles.Count == 0)
+            return false;
+        if (demand.Domain.HasValue && unit.domain != demand.Domain.Value)
+            return false;
+        if (unit.eliteLevel < demand.MinEliteLevel || unit.eliteLevel > demand.MaxEliteLevel)
+            return false;
+        if (demand.ExactRole != UnitRole.None && unit.roles[0] != demand.ExactRole)
+            return false;
+
+        switch (demand.Role)
+        {
+            case UnitRole.Capturador:
+            case UnitRole.Assalto:
+            case UnitRole.FogoIndireto:
+                return UnitRoleCompatibility.ResolveCompositionRole(unit) == demand.Role;
+            default:
+                return UnitRoleCompatibility.CanSatisfy(unit, demand.Role);
+        }
+    }
+
+    private static int ScoreRoleShoppingCandidate(AIWorldSnapshot snapshot, UnitData unit,
+        AIShoppingDemand demand, int remaining)
+    {
+        int score = 200000 - demand.Priority * 3000;
+        if (demand.Urgent) score += 250000;
+        if (demand.TargetClass.HasValue)
+            score += (int)unit.ResolveAiTargetPriorityForTargetClass(demand.TargetClass.Value) * 18000;
+        GameUnitClass dominantEnemy = ResolveDominantVisibleEnemyClass(snapshot);
+        score += (int)unit.ResolveAiTargetPriorityForTargetClass(dominantEnemy) * 7000;
+
+        bool eliteReady = IsEliteEconomyReady(snapshot, unit, remaining);
+        if (unit.eliteLevel > 0)
+            score += eliteReady ? 65000 + unit.eliteLevel * 18000 : -120000;
+        else if (eliteReady && (demand.Role == UnitRole.Assalto
+            || demand.Role == UnitRole.FogoIndireto || demand.Role == UnitRole.AtaqueAereo))
+            score -= 25000;
+
+        if (snapshot.Stance == AIStance.Defensive && unit.aiPurchaseMode == AIPurchaseMode.Defensive)
+            score += 24000;
+        if (snapshot.Stance != AIStance.Defensive && unit.aiPurchaseMode == AIPurchaseMode.Offensive)
+            score += 12000;
+        score += Mathf.Min(25000, unit.cost / 2);
+        return score;
+    }
+
+    private static bool IsRolePurchaseAllowedByStance(UnitData unit, AIStance stance)
+    {
+        if (unit.aiPurchaseMode == AIPurchaseMode.Either) return true;
+        if (stance == AIStance.Defensive) return unit.aiPurchaseMode == AIPurchaseMode.Defensive;
+        return unit.aiPurchaseMode == AIPurchaseMode.Offensive;
+    }
+
+    private static bool IsEliteEconomyReady(AIWorldSnapshot snapshot, UnitData unit, int remaining)
+    {
+        int minimumArmy = Instance != null ? Instance.MinArmySizeForElitePivot : 12;
+        int armySize = snapshot.MyUnits != null ? snapshot.MyUnits.Count : 0;
+        int cashFloor = Mathf.Max(unit.cost, Mathf.Max(1, snapshot.IncomePerTurn));
+        return armySize >= minimumArmy && remaining >= cashFloor;
+    }
+
+    private static bool IsEliteChainAvailable(UnitData unit, AIWorldSnapshot snapshot)
+    {
+        if (unit == null || unit.eliteLevel <= 0 || unit.eliteFrom == null) return true;
+        foreach (UnitManager owned in snapshot.MyUnits)
+            if (owned != null && owned.TryGetUnitData(out UnitData data) && data == unit.eliteFrom)
+                return true;
+        return false;
+    }
+
+    private static void AddEliteProgressionDemand(AIWorldSnapshot snapshot,
+        List<AIShoppingDemand> demands, UnitRole role, int activeRoleCount, int priority)
+    {
+        int minimumArmy = Instance != null ? Instance.MinArmySizeForElitePivot : 12;
+        if (activeRoleCount <= 0 || snapshot.MyUnits.Count < minimumArmy
+            || snapshot.Budget < Mathf.Max(12000, snapshot.IncomePerTurn))
+            return;
+        int currentElite = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && unit.TryGetUnitData(out UnitData data)
+                && UnitRoleCompatibility.ResolveCompositionRole(data) == role)
+                currentElite = Mathf.Max(currentElite, data.eliteLevel);
+
+        int nextElite = int.MaxValue;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || building.OfferedUnits == null) continue;
+            foreach (UnitData offered in building.OfferedUnits)
+            {
+                if (offered == null || offered.eliteLevel <= currentElite
+                    || UnitRoleCompatibility.ResolveCompositionRole(offered) != role
+                    || !IsEliteChainAvailable(offered, snapshot))
+                    continue;
+                nextElite = Mathf.Min(nextElite, offered.eliteLevel);
+            }
+        }
+        if (nextElite == int.MaxValue)
+            return;
+
+        AIShoppingDemand elite = NewRoleDemand(role, 1, priority, "elite",
+            $"massa={snapshot.MyUnits.Count} caixa={snapshot.Budget} nivel={currentElite}->{nextElite}", false);
+        elite.MinEliteLevel = nextElite;
+        elite.MaxEliteLevel = nextElite;
+        MergeRoleDemand(demands, elite, false);
+    }
+
+    private static int CountCompositionRole(AIWorldSnapshot snapshot, UnitRole role)
+    {
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
+                && (role == UnitRole.Logistica || role == UnitRole.Intel || role == UnitRole.RaidAntiSub
+                    ? UnitRoleCompatibility.CanSatisfy(data, role)
+                    : UnitRoleCompatibility.ResolveCompositionRole(data) == role))
+                count++;
+        return count;
+    }
+
+    private static int CountAtomicRole(AIWorldSnapshot snapshot, UnitRole role)
+    {
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
+                && data.roles != null && data.roles.Count > 0 && data.roles[0] == role)
+                count++;
+        return count;
+    }
+
+    private static int CountEnemyDomain(AIWorldSnapshot snapshot, Domain domain)
+    {
+        int count = 0;
+        foreach (UnitManager unit in snapshot.EnemyUnits)
+            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data) && data.domain == domain)
+                count++;
+        return count;
+    }
+
+    private static int CountEnemyCombatRole(AIWorldSnapshot snapshot, UnitRole role)
+    {
+        int count = 0;
+        foreach (UnitManager unit in snapshot.EnemyUnits)
+            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
+                && UnitRoleCompatibility.CanSatisfy(data, role))
+                count++;
+        return count;
+    }
+
+    private static int CountOwnedAirAttack(AIWorldSnapshot snapshot, bool eliteOnly)
+    {
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
+                && data.domain == Domain.Air && UnitRoleCompatibility.CanSatisfy(data, UnitRole.AtaqueAereo)
+                && (!eliteOnly || data.eliteLevel > 0))
+                count++;
+        return count;
+    }
+
+    private static int CountUnitsUnderRepair(AIWorldSnapshot snapshot)
+    {
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && !unit.IsDead && unit.IsUnderRepair) count++;
+        return count;
+    }
+
+    private static bool HasEnemyAirProduction(AIWorldSnapshot snapshot)
+    {
+        foreach (ConstructionManager building in snapshot.EnemyBuildings)
+            if (building != null && building.TryResolveConstructionData(out ConstructionData data)
+                && data != null && data.isAirport) return true;
+        return false;
+    }
+
+    private static bool HasEnemySubmarineCapability(AIWorldSnapshot snapshot)
+    {
+        if (CountEnemyDomain(snapshot, Domain.Submarine) > 0) return true;
+        foreach (ConstructionManager building in snapshot.EnemyBuildings)
+            if (building != null && building.TryResolveConstructionData(out ConstructionData data)
+                && data != null && data.isHarbor) return true;
+        return false;
+    }
+
+    private static GameUnitClass ResolveDominantVisibleEnemyClass(AIWorldSnapshot snapshot)
+    {
+        var counts = new Dictionary<GameUnitClass, int>();
+        GameUnitClass best = GameUnitClass.Infantry;
+        int bestCount = 0;
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+        {
+            if (enemy == null || enemy.IsDead || !enemy.TryGetUnitData(out UnitData data)) continue;
+            counts.TryGetValue(data.unitClass, out int count);
+            count++;
+            counts[data.unitClass] = count;
+            if (count > bestCount) { bestCount = count; best = data.unitClass; }
+        }
+        return best;
+    }
+
+    private static void LogRoleShoppingQueue(AIWorldSnapshot snapshot,
+        List<AIShoppingDemand> demands, int budget)
+    {
+        var log = new System.Text.StringBuilder();
+        log.Append($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+            + $"fila unica budget={budget} stance={snapshot.Stance}");
+        foreach (AIShoppingDemand demand in demands)
+            log.Append($"\n  pri={demand.Priority} urgent={demand.Urgent} {demand.Role}"
+                + $"/{demand.ExactRole} x{demand.Count} elite={demand.MinEliteLevel}-{demand.MaxEliteLevel}"
+                + $" origem={demand.Origin} motivo={demand.Reason}");
+        Debug.Log(log.ToString());
     }
 }

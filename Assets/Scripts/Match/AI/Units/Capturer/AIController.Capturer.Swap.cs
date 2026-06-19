@@ -26,8 +26,7 @@ public partial class AIController
     {
         if (occupant == null || plan == null) return null;
         if (!occupant.TryGetUnitData(out UnitData data) || data == null
-            || data.roles == null || data.roles.Count == 0
-            || data.roles[0] != UnitRole.Capturador) return null;
+            || UnitRoleCompatibility.ResolveCompositionRole(data) != UnitRole.Capturador) return null;
 
         SectorObjective objective = ResolveAssignedObjective(occupant, plan);
         if (objective == null) return null;

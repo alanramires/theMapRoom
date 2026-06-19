@@ -16,7 +16,13 @@ public partial class AIController
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
         Vector3Int anchor = ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell);
 
-        if (TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor, defensiveContext: true, out PlayerAction attackAction, out string attackReason))
+        if (TryDecideCombatantFireSupportTacticalAction(
+                unit, snapshot, assigned, fromCell, anchor, paths, occupied,
+                defensiveContext: true, out PlayerAction combatantAction))
+            return combatantAction;
+
+        if (!IsCombatantFireSupport(unit)
+            && TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor, defensiveContext: true, out PlayerAction attackAction, out string attackReason))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} defesa {assigned.Sector} - {attackReason}");
             return attackAction;

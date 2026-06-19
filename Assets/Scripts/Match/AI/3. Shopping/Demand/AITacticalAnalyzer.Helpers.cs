@@ -12,20 +12,22 @@ public partial class AITacticalAnalyzer
         switch (kind)
         {
             case AINeedKind.Capturer:
-                return IsPrimaryRole(data, UnitRole.Capturador);
+                return UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Capturador;
             case AINeedKind.Assault:
-                return IsPrimaryRole(data, UnitRole.Assalto) && !IsAntiAirOnlyUnit(data);
+                return UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Assalto && !IsAntiAirOnlyUnit(data);
             case AINeedKind.AAA:
-                return IsAntiAirOnlyUnit(data) && IsPrimaryRole(data, UnitRole.Assalto);
+                return data.roles != null && data.roles.Count > 0
+                    && data.roles[0] == UnitRole.AntiaereoCombatente;
             case AINeedKind.SAM:
-                return IsAntiAirOnlyUnit(data) && IsPrimaryRole(data, UnitRole.FogoIndireto);
+                return data.roles != null && data.roles.Count > 0
+                    && data.roles[0] == UnitRole.Antiaereo;
             case AINeedKind.Artillery:
             case AINeedKind.FireSupport:
-                return IsPrimaryRole(data, UnitRole.FogoIndireto) && !IsAntiAirOnlyUnit(data);
+                return UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.FogoIndireto && !IsAntiAirOnlyUnit(data);
             case AINeedKind.AirTransport:
-                return IsPrimaryRole(data, UnitRole.Transportador) && data.domain == Domain.Air;
+                return UnitRoleCompatibility.CanSatisfy(data, UnitRole.Transportador) && data.domain == Domain.Air;
             case AINeedKind.GroundTransport:
-                return IsPrimaryRole(data, UnitRole.Transportador) && data.domain == Domain.Land;
+                return UnitRoleCompatibility.CanSatisfy(data, UnitRole.Transportador) && data.domain == Domain.Land;
             case AINeedKind.FighterB:
                 return IsPrimaryRole(data, UnitRole.Interceptador) && data.eliteLevel == 0;
             case AINeedKind.FighterA:

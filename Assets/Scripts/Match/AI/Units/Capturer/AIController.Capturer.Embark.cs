@@ -9,13 +9,13 @@ public partial class AIController
 
     private PlayerAction TryDecideCapturerEmbarkAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
-        if (!unit.TryGetUnitData(out UnitData data) || data?.roles == null || data.roles.Count == 0
-            || !data.roles.Contains(UnitRole.Capturador)) return null;
+        if (!unit.TryGetUnitData(out UnitData data)
+            || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador)) return null;
 
         // Primary capturer: strict sector alignment (don't board a wrong-direction APC).
         // Secondary capturer (e.g. Assalto+Capturador): can board any APC that has no formal
         // passenger — it is acting as shuttle and will reorient to the passenger's objective.
-        bool isPrimaryCapturador = data.roles[0] == UnitRole.Capturador;
+        bool isPrimaryCapturador = UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Capturador;
 
         // Pass 1: sensor padrão — encontra transporters adjacentes (1h)
         var options = new List<PodeEmbarcarOption>();

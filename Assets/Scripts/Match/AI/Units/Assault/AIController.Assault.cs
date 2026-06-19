@@ -20,8 +20,10 @@ public partial class AIController
         if (unit == null || snapshot == null || plan == null)
             return null;
         if (!unit.TryGetUnitData(out UnitData data) || data == null
-            || data.roles == null || data.roles.Count == 0
-            || data.roles[0] != UnitRole.Assalto)
+            || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Assalto))
+            return null;
+        if (data.roles != null && data.roles.Count > 0
+            && data.roles[0] == UnitRole.AntiaereoCombatente)
             return null;
         SectorObjective assigned = ResolveAssignedAssaultObjective(unit, plan);
         if (IsGroundAntiAirOnlyAssault(data))

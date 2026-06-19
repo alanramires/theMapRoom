@@ -53,8 +53,8 @@ public partial class AITacticalAnalyzer
     private static bool CanUseGlobalUnitFill(AITacticalNeed op)
     {
         return op != null
-            && (op.Type == AITacticalNeedType.BaseDefense
-                || op.Type == AITacticalNeedType.PreventiveDefense);
+            && op.Phase != AITacticalNeedPhase.Complete
+            && op.Phase != AITacticalNeedPhase.Aborted;
     }
 
     private UnitManager FindLinkedObjectiveUnit(SectorObjective obj, AINeedKind kind, HashSet<int> used)

@@ -20,10 +20,7 @@ MonoBehaviour:
     reabastecimento limitado. Possui armamento leve e deve operar protegido. Essencial
     para controle de informa\xE7\xE3o e apoio naval."
   spriteDefault: {fileID: 21300000, guid: 5324b658b32ed07459481f31620710f1, type: 3}
-  spriteGreen: {fileID: 0}
-  spriteRed: {fileID: 0}
-  spriteBlue: {fileID: 0}
-  spriteYellow: {fileID: 0}
+  teamVariantSprites: []
   maxHP: 10
   defense: 15
   armorClass: 2
@@ -31,6 +28,7 @@ MonoBehaviour:
   visao: 3
   visionSpecializations:
   - domain: 2
+    allHeights: 0
     heightLevel: 2
     vision: 6
     detectUnitsWithFollowingSkills:
@@ -40,13 +38,46 @@ MonoBehaviour:
   militaryForce: 2
   unitClass: 8
   combatClassification: 2
-  aiUnitProfile: {fileID: 11400000, guid: ac91d7b2d6b1747438b7f2210c28d5b2, type: 2}
+  roles: 0b000000
+  aiInitiative: 2
+  aiPurchaseMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 7
     priority: 2
   - targetClass: 5
     priority: 1
+  aiSensorPriority: 0000000002000000
+  prioritizeDpqAtBattle: 0
+  playConservative: 0
+  preferMoveOnBestDPQ: 0
+  preferMaxDisplacement: 0
+  longRangeStationary: 0
+  preferRepositionAtWeaponMaxRange: 0
+  preferArtilleryModeBeforeCombatant: 0
+  useAttackDecision: 1
+  attackAcceptHpLossPercent: 50
+  attackEliminationMinPercent: 10
+  attackMustSurvive: 1
+  ignoreAttackDecisionWhenDefending: 0
+  defensiveAttackExtraHpLossPercent: 20
+  repairTriggerHpBelow: 0
+  repairTriggerAutonomyPct: 0
+  repairTriggerAmmoEnabled: 0
+  repairTriggerAmmoPct: 0
+  repairRecoverHpAbove: 8
+  fuseWhileInRepair: 0
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
+  aiPreventiveMaintenanceEnabled: 1
+  aiPreventiveSupplyCanRunWithUnderRepair: 0
+  aiConservativeSupplyAvoidEnemyRange: 2
+  aiPreventiveSupplyHpBelowPct: 70
+  aiPreventiveSupplyAutonomyBelowPct: 60
+  aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
   eliteLevel: 0
+  eliteFrom: {fileID: 0}
   combatModifiers: []
   domain: 1
   heightLevel: 3

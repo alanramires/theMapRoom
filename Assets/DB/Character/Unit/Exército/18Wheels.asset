@@ -32,7 +32,7 @@ MonoBehaviour:
   militaryForce: 0
   unitClass: 1
   combatClassification: 3
-  roles: 07000000
+  roles: 10000000
   aiInitiative: 2
   aiTargetPreferenceByClass: []
   aiSensorPriority: 0000000002000000

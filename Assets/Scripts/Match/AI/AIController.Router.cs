@@ -303,18 +303,15 @@ public partial class AIController
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return false;
         return data.preferArtilleryModeBeforeCombatant
-            && data.roles != null
-            && data.roles.Contains(UnitRole.FogoIndireto);
+            && UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto);
     }
 
     private static bool IsPrimaryAssaultFireSupportHybrid(UnitManager unit)
     {
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return false;
-        return data.roles != null
-            && data.roles.Count > 0
-            && data.roles[0] == UnitRole.Assalto
-            && data.roles.Contains(UnitRole.FogoIndireto);
+        return UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Assalto
+            && UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto);
     }
 
     private bool TryBuildFallbackAttackFromEvaluations(

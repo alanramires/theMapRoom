@@ -16,8 +16,7 @@ public partial class AIController
     {
         if (unit == null || snapshot == null) return null;
         if (!unit.TryGetUnitData(out UnitData data) || data == null
-            || data.roles == null || data.roles.Count == 0
-            || data.roles[0] != UnitRole.Transportador) return null;
+            || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Transportador)) return null;
 
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
@@ -351,7 +350,7 @@ public partial class AIController
         {
             if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
             if (!u.TryGetUnitData(out UnitData data)) continue;
-            if (data.roles != null && data.roles.Count > 0 && data.roles[0] == UnitRole.Transportador)
+            if (UnitRoleCompatibility.CanSatisfy(data, UnitRole.Transportador))
                 list.Add(u);
         }
         return list;

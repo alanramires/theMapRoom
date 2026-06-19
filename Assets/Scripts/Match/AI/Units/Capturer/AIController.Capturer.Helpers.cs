@@ -219,7 +219,7 @@ public partial class AIController
     {
         targetConstruction = null;
         if (!unit.TryGetUnitData(out UnitData data)) return false;
-        if (data.roles == null || !data.roles.Contains(UnitRole.Capturador)) return false;
+        if (!UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador)) return false;
         if (unit.TeamId == TeamId.Neutral) return false;
 
         ConstructionManager c = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, simulatedCell);
@@ -257,7 +257,7 @@ public partial class AIController
         {
             if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
             if (!u.TryGetUnitData(out UnitData data)) continue;
-            if (data.roles != null && data.roles.Contains(UnitRole.Capturador))
+            if (UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador))
                 list.Add(u);
         }
         return list;

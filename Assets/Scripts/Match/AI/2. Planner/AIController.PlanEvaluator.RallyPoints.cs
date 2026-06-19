@@ -661,10 +661,7 @@ public partial class AIController
 
     private static bool IsRallyPrimaryAssaultUnit(UnitData data)
     {
-        return data != null
-            && data.roles != null
-            && data.roles.Count > 0
-            && data.roles[0] == UnitRole.Assalto;
+        return UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Assalto;
     }
 
     private static bool IsOperationalRallyAirAttackUnit(UnitManager unit, UnitData data)

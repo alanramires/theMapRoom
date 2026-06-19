@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 // --------------------------------------------------------------------------------------------
@@ -24,6 +24,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
     }
 
     [Header("Debug")]
+    [Tooltip("Usa a fila global por papeis. Desative apenas para comparar com o shopping legado.")]
+    public bool UseRoleBasedShopping = true;
     public bool onlyCapturers;
     public bool onlyAssault;
     public bool onlyTransporter;
@@ -119,6 +121,9 @@ public partial class AIShoppingPlanner : MonoBehaviour
 
     public static List<ShoppingOrder> Decide(AIWorldSnapshot snapshot)
     {
+        if (Instance != null && Instance.UseRoleBasedShopping)
+            return DecideRoleBased(snapshot);
+
         bool onlyCapturers       = Instance != null && Instance.onlyCapturers;
         bool onlyAssault         = Instance != null && Instance.onlyAssault;
         bool onlyTransporter     = Instance != null && Instance.onlyTransporter;

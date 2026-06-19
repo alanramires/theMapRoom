@@ -35,6 +35,9 @@ public partial class AIController
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
 
+        PlayerAction antiAirAction = TryDecideAntiAirFireSupportAction(unit, snapshot, plan);
+        if (antiAirAction != null) return antiAirAction;
+
         SectorObjective assigned = ResolveAssignedFireSupportObjective(unit, plan);
         if (assigned == null)
         {
@@ -101,7 +104,13 @@ public partial class AIController
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
         Vector3Int anchor = ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell);
 
-        if (IsArtilleryModeOnly(unit)
+        if (TryDecideCombatantFireSupportTacticalAction(
+                unit, snapshot, assigned, fromCell, anchor, paths, occupied,
+                assigned.Status == ObjectiveStatus.Defending, out PlayerAction combatantAction))
+            return combatantAction;
+
+        if (!IsCombatantFireSupport(unit)
+            && IsArtilleryModeOnly(unit)
             && TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor,
                 assigned.Status == ObjectiveStatus.Defending, out PlayerAction stationaryAttackAction,
                 out string stationaryAttackReason, stationaryOnly: true))
@@ -110,7 +119,8 @@ public partial class AIController
             return stationaryAttackAction;
         }
 
-        if (TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor, assigned.Status == ObjectiveStatus.Defending, out PlayerAction attackAction, out string attackReason))
+        if (!IsCombatantFireSupport(unit)
+            && TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor, assigned.Status == ObjectiveStatus.Defending, out PlayerAction attackAction, out string attackReason))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} apoia {assigned.Sector} - {attackReason}");
             return attackAction;

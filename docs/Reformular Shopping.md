@@ -16,21 +16,21 @@ Raid Anti-sub: Foco em alvos navais
 
 Exército     | Papel                     | Elite | Stance    | Combate (Foco)
 Soldado      | Capturador                |       | Qualquer  | Anti-Infantaria
-Bazooka      | Assalto/Capturador        |       | Defesa    | Anti-Tank (Veículos)
+Bazooka      | Capturador Agressivo      |       | Defesa    | Anti-Tank (Veículos)
 Tank B       | Assalto                   |       | Qualquer  | Anti-infantaria 
 Tank A       | Assalto                   |  1    | Ofensivo  | Anti-Tank (Artilharia)
-Tank Z       | Assalto/Fogo Indireto     |  2    | Ofensivo  | Anti-Tank (Blindados)
+Tank Z       | Artilheiro Combatente     |  2    | Ofensivo  | Anti-Tank (Blindados)
 APC          | Transportador             |       | Qualquer  | Anti-Infantaria
 Astros II    | Fogo Indireto             |       | Qualquer  | Anti-Infantaria
-Obus Leve    | Fogo Indireto             |       | Defesa    | Anti-Tank (Veículos)
+Obus Leve    | Artilheiro Combatente     |       | Defesa    | Anti-Tank (Veículos)
 Obus Médio   | Fogo Indireto             |  1    | Qualquer  | Anti-Tank (Blindados)
 Art. Camp.   | Fogo Indireto             |  2    | Defesa    | Anti-Tank (Blindados)
-AAA          | Antiaéreo/Assalto         |       | Qualquer  | Anti-aerea (Aviões)
-SAM          | Antiáereo/Fogo Indireto   |  1    | Qualquer  | Anti-aerea (Aviões)
-Suprimentos  | Logística/Transportador   |       | Qualquer  | 
+AAA          | Antiaéreo Combatente      |       | Qualquer  | Anti-aerea (Aviões)
+SAM          | Antiáereo                 |  1    | Qualquer  | Anti-aerea (Aviões)
+Suprimentos  | Logística Móvel           |       | Qualquer  | 
 Radar Móvel  | Intel                     |       | Qualquer  | 
 18 Wheels    | Suprimentos               |       | Qualquer  | 
-Trem Carga   | Suprimentos/Transportador |       | Qualquer  | 
+Trem Carga   | Logística de Estoque      |       | Qualquer  | 
 
 Aeronáutica  | Papel                     | Elite | Stance    | Combate (Foco)
 Chinook      | Transportador             |       | Qualquer  | Anti-Infantaria

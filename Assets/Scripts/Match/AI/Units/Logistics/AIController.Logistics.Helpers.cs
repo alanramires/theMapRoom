@@ -13,9 +13,7 @@ public partial class AIController
         return unit != null
             && unit.TryGetUnitData(out UnitData data)
             && data != null
-            && data.roles != null
-            && data.roles.Count > 0
-            && data.roles.Contains(UnitRole.Logistica);
+            && UnitRoleCompatibility.CanSatisfy(data, UnitRole.Logistica);
     }
 
     private static bool PreferLogisticsBestDpq(UnitManager unit)

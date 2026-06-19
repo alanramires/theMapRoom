@@ -443,8 +443,7 @@ public partial class AIController
             return false;
         if (!target.TryGetUnitData(out UnitData targetData)
             || targetData == null
-            || targetData.roles == null
-            || !targetData.roles.Contains(UnitRole.Capturador))
+            || !UnitRoleCompatibility.CanSatisfy(targetData, UnitRole.Capturador))
             return false;
 
         Vector3Int targetCell = target.CurrentCellPosition;
@@ -459,8 +458,7 @@ public partial class AIController
     private bool IsTransporterWithValidPickupCandidate(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
     {
         if (!unit.TryGetUnitData(out UnitData data) || data == null
-            || data.roles == null || data.roles.Count == 0
-            || data.roles[0] != UnitRole.Transportador) return false;
+            || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Transportador)) return false;
 
         if (HasTransportCargo(unit)) return false;
 
@@ -486,8 +484,7 @@ public partial class AIController
     private bool IsCapturerWithAvailableAssignedTransporter(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
     {
         if (!unit.TryGetUnitData(out UnitData data) || data == null
-            || data.roles == null || data.roles.Count == 0
-            || data.roles[0] != UnitRole.Capturador) return false;
+            || UnitRoleCompatibility.ResolveCompositionRole(data) != UnitRole.Capturador) return false;
 
         SectorObjective obj = ResolveAssignedObjective(unit, plan);
         if (obj == null) return false;
@@ -508,8 +505,7 @@ public partial class AIController
     private bool IsAssignedTransporterWithUnactedPassenger(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
     {
         if (!unit.TryGetUnitData(out UnitData data) || data == null
-            || data.roles == null || data.roles.Count == 0
-            || data.roles[0] != UnitRole.Transportador) return false;
+            || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Transportador)) return false;
 
         if (HasTransportCargo(unit)) return false;
 
@@ -526,7 +522,7 @@ public partial class AIController
             return false;
 
         if (!unit.TryGetUnitData(out UnitData data) || data == null
-            || data.roles == null || !data.roles.Contains(UnitRole.Capturador))
+            || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador))
             return false;
 
         Vector3Int rogueCell = unit.CurrentCellPosition; rogueCell.z = 0;
