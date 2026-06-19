@@ -1888,10 +1888,21 @@ public class UnitManager : MonoBehaviour
 
     private bool HasAnyEmbarkedPassenger(UnitData data)
     {
+        return CountEmbarkedPassengers(data) > 0;
+    }
+
+    public int GetEmbarkedPassengerCount()
+    {
+        return CountEmbarkedPassengers(TryGetUnitData());
+    }
+
+    private int CountEmbarkedPassengers(UnitData data)
+    {
         if (data == null || !data.isTransporter)
-            return false;
+            return 0;
 
         SyncTransportRuntimeSlotsWithData(data, preserveSeatPassengers: !Application.isPlaying);
+        int count = 0;
         for (int i = 0; i < transportedUnitSlots.Count; i++)
         {
             UnitTransportSeatRuntime seat = transportedUnitSlots[i];
@@ -1899,13 +1910,16 @@ public class UnitManager : MonoBehaviour
                 continue;
 
             if (seat.embarkedUnit.IsEmbarked)
-                return true;
+            {
+                count++;
+                continue;
+            }
 
             if (Application.isPlaying)
                 seat.embarkedUnit = null;
         }
 
-        return false;
+        return count;
     }
 
     public void SetCurrentPosition(Vector3 position)

@@ -618,6 +618,7 @@ public partial class AIShoppingPlanner
             if (unit == null || unit.IsDead || unit.IsEmbarked) continue;
             if (!unit.TryGetUnitData(out UnitData data) || data == null) continue;
             if (data.roles == null || !data.roles.Contains(UnitRole.FogoIndireto)) continue;
+            if (IsAntiAirOnlyUnit(data)) continue;
             if (data.eliteLevel >= 1) count++;
         }
         return count;
@@ -631,7 +632,11 @@ public partial class AIShoppingPlanner
         {
             if (unit == null || unit.IsDead || unit.IsEmbarked) continue;
             if (!unit.TryGetUnitData(out UnitData data) || data == null) continue;
-            if (!IsPurePrimaryAssault(data) || data.eliteLevel < 1) continue;
+            if (data.domain != Domain.Land
+                || data.unitClass != GameUnitClass.Armored
+                || !IsPurePrimaryAssault(data)
+                || data.eliteLevel < 1)
+                continue;
             count++;
         }
         return count;

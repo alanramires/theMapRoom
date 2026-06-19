@@ -830,6 +830,9 @@ MonoBehaviour:
   altitudeLowSprite: {fileID: 21300000, guid: 3505315c0b82f4a468bca8a040429274, type: 3}
   altitudeSubmergedSprite: {fileID: 21300000, guid: 8b13116408a07fa468aabc08c23c5f85, type: 3}
   transportIndicatorRoot: {fileID: 5439601904325997685}
+  transportIndicatorImage: {fileID: 5740209844412876780}
+  transportSingleSprite: {fileID: 21300000, guid: 7edc777644d881c439117179e7c7a51c, type: 3}
+  transportMultiSprite: {fileID: 21300000, guid: 0b20aa3c29e3037409eb0c4b98c3695b, type: 3}
   detectedIndicatorRoot: {fileID: 3877593226262197472}
   stanceIconImage: {fileID: 4690470201390622121}
   maintenanceIconImage: {fileID: 4063941078895837918}

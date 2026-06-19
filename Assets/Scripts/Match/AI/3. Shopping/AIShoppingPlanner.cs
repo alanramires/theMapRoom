@@ -37,6 +37,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Range(0f, 20f)] public float SavingPercentualForElite = 15f;
     [Range(0f, 1f)]  public float EliteCapturerFillRatio   = 0.6f;
     [Range(0, 5)]    public int   MinFilledAssaultSlots     = 1;
+    [Range(6, 30)]   public int   MinArmySizeForElitePivot  = 12;
     [Range(1, 12)]   public int   MinTurnForFireSupport     = 3;
     [Range(0, 8)]    public int   MinActiveCapturersForFireSupport = 2;
     [Range(0, 5)]    public int   MinActiveAssaultForFireSupport   = 1;
@@ -437,10 +438,19 @@ public partial class AIShoppingPlanner : MonoBehaviour
         // Escalada via cadeia eliteFrom: level 2 só fica disponível quando level 1 já está em campo
         // (chain gate em FindEliteAssaultReserveTarget). Não há mais necessidade de branch por contagem.
         int activeEliteAssaultCount = CountActiveEliteAssaultUnits(snapshot);
-        const int DreamTeamEliteAssaultThreshold = 2;  // 2 elites → pivot para fire support
+        const int DreamTeamEliteAssaultThreshold = 2;
         UnitData eliteLevel2Candidate = FindEliteAssaultReserveTarget(snapshot, 2);
         UnitData eliteLevel1Candidate = FindEliteAssaultReserveTarget(snapshot, 1);
-        UnitData eliteAssaultTarget = eliteLevel2Candidate ?? eliteLevel1Candidate;
+        UnitData eliteAssaultTarget = eliteLevel2Candidate != null
+            && remaining >= eliteLevel2Candidate.cost
+                ? eliteLevel2Candidate
+                : eliteLevel1Candidate;
+        int activeArmySize = snapshot.MyUnits != null ? snapshot.MyUnits.Count : 0;
+        int elitePivotArmyFloor = Instance != null ? Instance.MinArmySizeForElitePivot : 12;
+        bool matureEconomyEliteAssaultPivot = eliteAssaultTarget != null
+            && activeEliteAssaultCount == 0
+            && activeArmySize >= elitePivotArmyFloor
+            && remaining >= eliteAssaultTarget.cost;
 
         // Save the target for reserve purposes BEFORE the composition check may null it.
         // Reserve (saving money) applies even when composition isn't ready yet;
@@ -481,8 +491,16 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 minAssault = 0;
             bool  capOk         = capFill >= fillThreshold;
             bool  assOk         = filledAss >= minAssault;
+            if (matureEconomyEliteAssaultPivot)
+            {
+                capOk = true;
+                assOk = true;
+                openAssaultSlots = Mathf.Max(openAssaultSlots, 1);
+            }
             string stalemateText = stalemateCapturerReady ? $" stalemateCap={stalemateCapturerReason}" : "";
-            string offensiveText = offensiveElitePressure ? " offensivePressure=True" : artilleryWallBreakthrough ? " artilleryWall=True" : "";
+            string offensiveText = matureEconomyEliteAssaultPivot
+                ? $" qualityPivot=True army={activeArmySize}/{elitePivotArmyFloor} cash={remaining}"
+                : offensiveElitePressure ? " offensivePressure=True" : artilleryWallBreakthrough ? " artilleryWall=True" : "";
             string status       = (capOk && assOk) ? $"ELITE LIBERADO{stalemateText}{offensiveText}" : $"bloqueado ({(!capOk ? $"cap {filledCap}/{totalCap} {capFill:P0}<{fillThreshold:P0}" : "cap OK")} | {(!assOk ? $"ass {filledAss}<{minAssault}" : "ass OK")}){stalemateText}{offensiveText}";
             Debug.Log($"[AI Shopping] composição: cap={filledCap}/{totalCap} ({capFill:P0}) ass={filledAss}/{totalAss} — {status}");
             if (!capOk || !assOk)
@@ -499,7 +517,12 @@ public partial class AIShoppingPlanner : MonoBehaviour
         // Proactive SAM: AAA in field satisfies chain gate — find SAM as elite fire support target.
         if (proactiveSAM)
         {
-            UnitData samTarget = FindEliteFireSupportReserveTarget(snapshot, true, remaining, requireChain: true);
+            UnitData samTarget = FindEliteFireSupportReserveTarget(
+                snapshot,
+                true,
+                remaining,
+                requireChain: true,
+                antiAirOnly: true);
             if (samTarget != null && IsAntiAirOnlyUnit(samTarget)
                 && (eliteFireSupportTarget == null || !IsAntiAirOnlyUnit(eliteFireSupportTarget)))
             {
@@ -963,16 +986,38 @@ public partial class AIShoppingPlanner : MonoBehaviour
                     spendBudget = Mathf.Min(spendBudget, Mathf.Max(0, remaining - reserveForEliteFireSupport));
                 }
             }
+            bool canBuyEliteBreakthroughHere = wantsEliteAssault
+                && !eliteAssaultBought
+                && eliteAssaultTarget != null
+                && openAssaultSlots > 0
+                && remaining >= eliteAssaultTarget.cost
+                && CanOfferUnit(building, eliteAssaultTarget);
+            bool canBuyEliteFireSupportHere = wantsEliteFireSupport
+                && !eliteFireSupportBought
+                && eliteFireSupportTarget != null
+                && remaining >= eliteFireSupportTarget.cost
+                && CanOfferUnit(building, eliteFireSupportTarget);
             // Reserva para transporte aéreo + combate aéreo. Defesa de base terrestre nao deve
             // drenar o caixa reservado quando ja existe demanda aerea e aerodromo disponivel.
             if ((reserveForAirTransport > 0 || reserveForAirCombat > 0 || reserveForAirIntel > 0)
                 && !forcedProduction
-                && !emergencyProductionDefense)
+                && !emergencyProductionDefense
+                && !canBuyEliteBreakthroughHere
+                && !canBuyEliteFireSupportHere)
             {
                 int spendAfterAirReserves = Mathf.Max(0, remaining - reserveForAirTransport - reserveForAirCombat - reserveForAirIntel);
                 if (reserveForCapturerPassenger > 0 && openCapturerSlots > 0)
                     spendAfterAirReserves = Mathf.Max(spendAfterAirReserves, Mathf.Min(remaining, reserveForCapturerPassenger));
                 spendBudget = Mathf.Min(spendBudget, spendAfterAirReserves);
+            }
+            else if (canBuyEliteBreakthroughHere || canBuyEliteFireSupportHere)
+            {
+                spendBudget = remaining;
+                UnitData elitePriority = canBuyEliteBreakthroughHere
+                    ? eliteAssaultTarget
+                    : eliteFireSupportTarget;
+                Debug.Log($"[AI Shopping] prioridade elite: {elitePriority.displayName} " +
+                          $"libera reservas aereas neste produtor cash={remaining} ass_slots={openAssaultSlots}");
             }
 
             // Log das opções deste edifício
@@ -993,7 +1038,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 defensiveBaseManpowerShortage, defensiveMassReserveCost, defensiveBaseTankBought,
                 defensiveArmorThreat, strategicArmorParity, wantsEliteFireSupport, activeFireSupportCount,
                 proactiveDefFireSupport, proactiveAntiAir, activeSAMs, activeAAAs, aaaCap, aaaThreat,
-                defensiveInfantryThreat, offensiveAntiInfantryFireSupport);
+                defensiveInfantryThreat, offensiveAntiInfantryFireSupport,
+                matureEconomyEliteAssaultPivot);
             if (unit == null && forcedProduction)
             {
                 unit = FindCheapestAffordableLandUnit(building, remaining);

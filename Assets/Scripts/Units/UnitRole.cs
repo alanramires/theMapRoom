@@ -9,5 +9,12 @@ public enum UnitRole
     Intel = 6,
     Suprimentos = 7,
     Interceptador = 8,
-    AtaqueAereo = 9
+    AtaqueAereo = 9,
+    Antiaereo = 10,
+    RaidAntiSub = 11,
+    CapturadorAgressivo = 12,
+    ArtilheiroCombatente = 13,
+    AntiaereoCombatente = 14,
+    LogisticaMovel = 15,
+    LogisticaEstoque = 16
 }

@@ -63,6 +63,9 @@ public class UnitHudController : MonoBehaviour
     [SerializeField] private Sprite altitudeLowSprite;
     [SerializeField] private Sprite altitudeSubmergedSprite;
     [SerializeField] private Transform transportIndicatorRoot;
+    [SerializeField] private Image transportIndicatorImage;
+    [SerializeField] private Sprite transportSingleSprite;
+    [SerializeField] private Sprite transportMultiSprite;
     [SerializeField] private Transform detectedIndicatorRoot;
 
     [Header("AI Stance")]
@@ -452,6 +455,13 @@ public class UnitHudController : MonoBehaviour
                 transportIndicatorRoot = FindChildRecursive(transform, "transport");
         }
 
+        if (transportIndicatorImage == null && transportIndicatorRoot != null)
+            transportIndicatorImage = transportIndicatorRoot.GetComponent<Image>();
+        if (transportSingleSprite == null)
+            transportSingleSprite = FindSpriteByName("transportando_0");
+        if (transportMultiSprite == null)
+            transportMultiSprite = FindSpriteByName("transportando2_0");
+
         if (detectedIndicatorRoot == null)
             detectedIndicatorRoot = FindChildRecursive(transform, "detected");
 
@@ -636,8 +646,25 @@ public class UnitHudController : MonoBehaviour
         if (transportIndicatorRoot == null)
             return;
 
+        if (show)
+        {
+            UnitManager owner = ResolveOwnerUnit();
+            int passengerCount = owner != null ? owner.GetEmbarkedPassengerCount() : 0;
+            ApplyTransportIndicatorSprite(passengerCount);
+        }
+
         if (transportIndicatorRoot.gameObject.activeSelf != show)
             transportIndicatorRoot.gameObject.SetActive(show);
+    }
+
+    private void ApplyTransportIndicatorSprite(int passengerCount)
+    {
+        if (transportIndicatorImage == null)
+            return;
+
+        Sprite target = passengerCount >= 2 ? transportMultiSprite : transportSingleSprite;
+        if (target != null && transportIndicatorImage.sprite != target)
+            transportIndicatorImage.sprite = target;
     }
 
     private void RefreshDetectedIndicator(bool show)

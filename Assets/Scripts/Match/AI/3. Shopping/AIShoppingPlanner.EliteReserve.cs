@@ -56,7 +56,12 @@ public partial class AIShoppingPlanner
         return Mathf.CeilToInt(Mathf.Max(0, eliteAssault.cost) * (percent / 100f));
     }
 
-    private static UnitData FindEliteFireSupportReserveTarget(AIWorldSnapshot snapshot, bool preferDefensiveFireSupport, int budget = int.MaxValue, bool requireChain = true)
+    private static UnitData FindEliteFireSupportReserveTarget(
+        AIWorldSnapshot snapshot,
+        bool preferDefensiveFireSupport,
+        int budget = int.MaxValue,
+        bool requireChain = true,
+        bool antiAirOnly = false)
     {
         if (snapshot == null || snapshot.MyBuildings == null) return null;
 
@@ -75,6 +80,7 @@ public partial class AIShoppingPlanner
                 if (!IsFireSupportPurchase(unit)) continue;
                 if (unit.eliteLevel < 1) continue;
                 if (IsPrimaryRole(unit, UnitRole.Assalto)) continue;
+                if (IsAntiAirOnlyUnit(unit) != antiAirOnly) continue;
                 if (requireChain && unit.eliteFrom != null && !inField.Contains(unit.eliteFrom)) continue;
 
                 bool preferredProfile = preferDefensiveFireSupport

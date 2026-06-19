@@ -169,6 +169,16 @@ public partial class AIController
         HashSet<Vector3Int> repairDestinationOccupied = aircraftRepair ? BuildOccupied(unit) : occupied;
         ConstructionManager currentBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
 
+        if (TryReleaseAirTransportRepairPassengers(
+                unit,
+                snapshot,
+                fromCell,
+                currentBldg,
+                out PlayerAction repairPassengerRelease))
+        {
+            return repairPassengerRelease;
+        }
+
         TeamObjectivePlan capBlockPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
         bool isBlockingCapTarget = capBlockPlan != null && IsBlockingCaptureTarget(unit, capBlockPlan, aiTeam);
         if (isBlockingCapTarget)
@@ -515,6 +525,18 @@ public partial class AIController
         Vector3Int bestStep = FindRepairApproachStep(
             unit, aiTeam, fromCell, destCell, repairDest, paths, occupied, hqAlt, out bool usedEmergencyFlee);
 
+        if (bestStep == destCell
+            && TryBuildAirTransportRepairArrivalRelease(
+                unit,
+                snapshot,
+                fromCell,
+                destCell,
+                paths,
+                out PlayerAction arrivalRelease))
+        {
+            return arrivalRelease;
+        }
+
         if (usedEmergencyFlee
             && TryBuildRepairBlockedAnchorsFightAction(
                 unit,
@@ -531,6 +553,87 @@ public partial class AIController
 
         Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
         return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, paths);
+    }
+
+    private bool TryReleaseAirTransportRepairPassengers(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        ConstructionManager currentBuilding,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null || !IsAirTransporter(unit) || !HasTransportCargo(unit))
+            return false;
+        if (currentBuilding == null
+            || currentBuilding.TeamId != snapshot.AITeam
+            || !IsAircraftRepairConstruction(currentBuilding))
+            return false;
+        if (!IsRepairConstructionSectorSafe(currentBuilding, snapshot.AITeam)
+            || HasNearbyVisibleEnemy(fromCell, snapshot.AITeam, DefenseEnemyRange))
+        {
+            return false;
+        }
+
+        List<UnitManager> passengers = CollectPassengers(unit);
+        if (passengers.Count == 0)
+            return false;
+
+        var options = new List<PodeDesembarcarOption>();
+        if (!PodeDesembarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, options)
+            || options.Count == 0)
+        {
+            Debug.Log($"{TL("Repair")} heli {unit.InstanceId} chegou ao reparo em {fromCell}, " +
+                      $"mas PodeDesembarcar nao liberou celula para {passengers.Count} passageiro(s)");
+            return false;
+        }
+
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        List<PodeDesembarcarOption> selected = SelectBestDisembarkPerPassenger(options, passengers, plan, snapshot);
+        if (selected.Count == 0)
+            return false;
+
+        Debug.Log($"{TL("Repair")} heli {unit.InstanceId} chegou ao reparo em {fromCell} e libera " +
+                  $"{selected.Count}/{passengers.Count} passageiro(s) antes da manutencao");
+        action = BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selected);
+        return true;
+    }
+
+    private bool TryBuildAirTransportRepairArrivalRelease(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int destinationCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null || !IsAirTransporter(unit) || !HasTransportCargo(unit))
+            return false;
+
+        destinationCell.z = 0;
+        List<PodeDesembarcarOption> options = SimulateDisembarkFromCell(unit, destinationCell);
+        if (options == null || options.Count == 0)
+            return false;
+
+        List<UnitManager> passengers = CollectPassengers(unit);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        List<PodeDesembarcarOption> selected = SelectBestDisembarkPerPassenger(options, passengers, plan, snapshot);
+        if (selected.Count == 0)
+            return false;
+        if (paths == null || !paths.TryGetValue(destinationCell, out List<Vector3Int> movementPath))
+            return false;
+
+        Debug.Log($"{TL("Repair")} heli {unit.InstanceId} chega ao reparo em {destinationCell} e libera " +
+                  $"{selected.Count}/{passengers.Count} passageiro(s) no mesmo batch");
+        action = BuildDesembarcarBatch(
+            unit,
+            snapshot.AITeam,
+            fromCell,
+            selected,
+            destinationCell,
+            movementPath);
+        return true;
     }
 
 }

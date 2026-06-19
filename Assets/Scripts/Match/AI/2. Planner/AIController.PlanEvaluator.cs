@@ -15,7 +15,11 @@ public partial class AIController
         TeamId aiTeam = snapshot.AITeam;
         TeamObjectivePlan plan = ObjectiveManager.GetOrCreatePlanForTeam(aiTeam);
         AIIntelReport intel = BuildPlanIntelReport(snapshot);
-        AIRallyPlanContext rallyContext = BuildRallyPlanContext(aiTeam, snapshot.AISlotIndex, snapshot.TurnNumber);
+        AIRallyPlanContext rallyContext = BuildRallyPlanContext(
+            aiTeam,
+            snapshot.AISlotIndex,
+            snapshot.TurnNumber,
+            intel);
         AIAnchorPlanContext anchorContext = BuildAnchorPlanContext(aiTeam, snapshot.TurnNumber);
 
         // Passo 1: valida objetivos existentes
@@ -28,12 +32,17 @@ public partial class AIController
             if (objectiveIsRallySector && obj.ObjectiveType == AIObjectiveType.CaptureSector)
                 obj.ObjectiveType = AIObjectiveType.RallyAssembly;
             else if (!objectiveIsRallySector && obj.ObjectiveType == AIObjectiveType.RallyAssembly)
+            {
                 obj.ObjectiveType = AIObjectiveType.CaptureSector;
+            }
+
+            if (!IsRallyAssemblyObjective(obj))
+                NormalizeStandardObjectiveFireSupportSlots(obj, aiTeam);
 
             if (IsRallyAssemblyObjective(obj)
                 && TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager existingRally))
             {
-                UpdateRallyObjectiveState(obj, existingRally, aiTeam, snapshot.TurnNumber);
+                UpdateRallyObjectiveState(obj, existingRally, aiTeam, snapshot.TurnNumber, intel);
                 Debug.Log($"{TL("Plan")} rally {obj.Sector}: rallyState={obj.RallyState} {obj.RallyReadinessReason}");
                 if (IsRallyGoGreenObjective(obj))
                 {
@@ -266,7 +275,7 @@ public partial class AIController
                 obj.RallyState = AIRallyAssemblyState.WaitHold;
                 obj.RallyAssemblyStartedTurn = snapshot.TurnNumber;
                 if (TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager newRally))
-                    UpdateRallyObjectiveState(obj, newRally, aiTeam, snapshot.TurnNumber);
+                    UpdateRallyObjectiveState(obj, newRally, aiTeam, snapshot.TurnNumber, intel);
                 if (IsRallyGoGreenObjective(obj))
                 {
                     Debug.Log($"{TL("Plan")} rally {obj.Sector}: GO_GREEN imediato, nao cria montagem");
@@ -275,14 +284,14 @@ public partial class AIController
             }
             int slots = Mathf.Clamp(Mathf.CeilToInt(info.ConstructionCount / 2f), 1, 4);
             bool highRisk = info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High;
-            if (isRallyAssemblySector) slots = Mathf.Max(slots, 2);
             if (highRisk) slots = Mathf.Max(slots, 2);
-            for (int s = 0; s < slots; s++)
-                obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
-            if (highRisk || isRallyAssemblySector)
-                obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
-            if (isRallyAssemblySector)
-                obj.Slots.Add(new SlotNeed { Role = UnitRole.FogoIndireto });
+            if (!isRallyAssemblySector)
+            {
+                for (int s = 0; s < slots; s++)
+                    obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
+                if (highRisk)
+                    obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
+            }
             float distHQ = info.GetDistanceToHQ(aiTeam);
             int   transThreshold = GetEffectiveTransportThreshold(aiTeam);
             bool  addTrans = distHQ >= transThreshold;
@@ -1133,8 +1142,14 @@ public partial class AIController
                     {
                         if (!isRealRallyArtillery)
                             continue;
-                        if (HasFilledRealRallyArtillerySlot(obj, aiTeam))
+                        if (!obj.HasOpenSlot(UnitRole.FogoIndireto))
                             continue;
+                    }
+                    else if (HasFilledSlot(obj, UnitRole.FogoIndireto))
+                    {
+                        // Um objetivo comum recebe uma escolta de fogo. Rallys criam
+                        // explicitamente as tres vagas de montagem que precisam preencher.
+                        continue;
                     }
 
                     ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
@@ -1516,9 +1531,6 @@ public partial class AIController
         }
     }
 }
-
-
-
 
 
 

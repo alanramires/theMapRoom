@@ -78,6 +78,7 @@ public class ConstructionManager : MonoBehaviour
     [System.NonSerialized] private TeamId cachedRallyHudTeam = (TeamId)int.MinValue;
     [System.NonSerialized] private ConstructionSector cachedRallyHudSector = (ConstructionSector)int.MinValue;
     [System.NonSerialized] private AIRallyAssemblyState cachedRallyHudState = (AIRallyAssemblyState)int.MinValue;
+    [System.NonSerialized] private bool cachedRallyHudShowAI;
 #if UNITY_EDITOR
     [System.NonSerialized] private bool editorTickRegistered;
 #endif
@@ -1034,7 +1035,7 @@ public class ConstructionManager : MonoBehaviour
             teamId,
             hasUnitOnTop,
             showFlagThreatOutline,
-            isRallyPoint,
+            AIController.ShowAIHUD && isRallyPoint,
             IsOwnedByRallyOwnerSlot(),
             ResolveRallyHudState());
 
@@ -1056,7 +1057,7 @@ public class ConstructionManager : MonoBehaviour
             return;
 
         hudController.ApplyRallyTrafficLight(
-            isRallyPoint,
+            AIController.ShowAIHUD && isRallyPoint,
             IsOwnedByRallyOwnerSlot(),
             ResolveRallyHudState());
     }
@@ -1064,11 +1065,13 @@ public class ConstructionManager : MonoBehaviour
     private void RefreshRallyHudIfDirty()
     {
         AIRallyAssemblyState state = ResolveRallyHudState();
+        bool showAIHud = AIController.ShowAIHUD;
         if (cachedRallyHudIsRally == isRallyPoint
             && cachedRallyHudOwnerSlot == rallyOwnerSlotIndex
             && cachedRallyHudTeam == teamId
             && cachedRallyHudSector == sector
-            && cachedRallyHudState == state)
+            && cachedRallyHudState == state
+            && cachedRallyHudShowAI == showAIHud)
             return;
 
         cachedRallyHudIsRally = isRallyPoint;
@@ -1076,6 +1079,7 @@ public class ConstructionManager : MonoBehaviour
         cachedRallyHudTeam = teamId;
         cachedRallyHudSector = sector;
         cachedRallyHudState = state;
+        cachedRallyHudShowAI = showAIHud;
         RefreshRallyHudOnly();
     }
 

@@ -217,10 +217,10 @@ MonoBehaviour:
   flagThreatOutlineDistance: {x: 1, y: -1}
   sectorBadge: {fileID: 4249370453444453604}
   rallyTrafficImage: {fileID: 2696321316141372281}
-  rallyOffSprite: {fileID: 4494004740133461946, guid: e9360fe9bb307004ab0a32f815b31d78, type: 3}
-  rallyRedSprite: {fileID: 8166710274925509176, guid: d785fd6b42bb58b41b6cc7a9c6c24d12, type: 3}
-  rallyYellowSprite: {fileID: -8425141836431729757, guid: 87b2050326bf64c4ba2db20e56939408, type: 3}
-  rallyGreenSprite: {fileID: -6099873399732076034, guid: dfc200ac23e98394bb4665893f9e31fc, type: 3}
+  rallyOffSprite: {fileID: 21300000, guid: e9360fe9bb307004ab0a32f815b31d78, type: 3}
+  rallyRedSprite: {fileID: 21300000, guid: d785fd6b42bb58b41b6cc7a9c6c24d12, type: 3}
+  rallyYellowSprite: {fileID: 21300000, guid: 87b2050326bf64c4ba2db20e56939408, type: 3}
+  rallyGreenSprite: {fileID: 21300000, guid: dfc200ac23e98394bb4665893f9e31fc, type: 3}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -954,7 +954,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &5441053326700649436
 RectTransform:
   m_ObjectHideFlags: 0
@@ -989,7 +989,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7179969182237358924}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 

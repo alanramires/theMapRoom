@@ -223,6 +223,8 @@ public partial class AIController
         ConstructionManager best = null;
         float bestScore = float.MinValue;
         bool preferAircraftFacility = unit != null && unit.GetAircraftType() != AircraftType.None;
+        bool needsPassengerRelease = IsAirTransporter(unit) && HasTransportCargo(unit);
+        int passengerCount = needsPassengerRelease ? CollectPassengers(unit).Count : 0;
         bool restrictToPreferredAircraftFacility = preferAircraftFacility
             && HasUsablePreferredAircraftRepairConstruction(unit, fromCell, aiTeam, occupied);
         foreach (ConstructionManager c in ConstructionManager.AllActive)
@@ -275,6 +277,17 @@ public partial class AIController
                 }
             }
 
+            int disembarkablePassengers = 0;
+            if (needsPassengerRelease)
+            {
+                disembarkablePassengers = CountRepairPassengerDisembarkOptions(unit, fromCell, cc);
+                if (disembarkablePassengers <= 0)
+                {
+                    Debug.Log($"[Repair] skip {cc} carga presa: PodeDesembarcar=0/{passengerCount} dist={dist:F1}");
+                    continue;
+                }
+            }
+
             float score = -dist * 100f;
             if (safe) score += 500f;
             if (isHomeRepair) score += 25f;
@@ -288,6 +301,12 @@ public partial class AIController
             }
             if (occupiedCell && isHomeRepair) score -= 10000f;
             if (preferAircraftFacility && occupiedCell && isPreferredAircraftFacility) score -= 45000f;
+            if (needsPassengerRelease)
+            {
+                score += disembarkablePassengers * 2500f;
+                if (disembarkablePassengers >= passengerCount)
+                    score += 7500f;
+            }
 
             if (score > bestScore)
             {
@@ -338,11 +357,52 @@ public partial class AIController
                 continue;
             if (!TryScoreRepairCandidateTakeoff(unit, cc, out _, out _, out _))
                 continue;
+            if (IsAirTransporter(unit)
+                && HasTransportCargo(unit)
+                && CountRepairPassengerDisembarkOptions(unit, fromCell, cc) <= 0)
+            {
+                continue;
+            }
 
             return true;
         }
 
         return false;
+    }
+
+    private int CountRepairPassengerDisembarkOptions(
+        UnitManager transporter,
+        Vector3Int fromCell,
+        Vector3Int candidateCell)
+    {
+        if (transporter == null || !HasTransportCargo(transporter))
+            return 0;
+
+        fromCell.z = 0;
+        candidateCell.z = 0;
+        List<PodeDesembarcarOption> options;
+        if (candidateCell == fromCell)
+        {
+            options = new List<PodeDesembarcarOption>();
+            PodeDesembarcarSensor.CollectOptions(transporter, boardTilemap, terrainDatabase, options);
+        }
+        else
+        {
+            options = SimulateDisembarkFromCell(transporter, candidateCell);
+        }
+
+        if (options == null || options.Count == 0)
+            return 0;
+
+        var passengers = new HashSet<int>();
+        for (int i = 0; i < options.Count; i++)
+        {
+            UnitManager passenger = options[i]?.passengerUnit;
+            if (passenger != null)
+                passengers.Add(passenger.InstanceId);
+        }
+
+        return passengers.Count;
     }
 
     private bool HasUsableAircraftRepairConstruction(

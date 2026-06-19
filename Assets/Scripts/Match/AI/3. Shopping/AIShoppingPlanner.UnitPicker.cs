@@ -119,7 +119,8 @@ public partial class AIShoppingPlanner
         int aaaCap = 0,
         bool aaaThreat = false,
         bool defensiveInfantryThreat = false,
-        bool offensiveAntiInfantryFireSupport = false)
+        bool offensiveAntiInfantryFireSupport = false,
+        bool matureEconomyEliteAssaultPivot = false)
     {
         if (building.OfferedUnits == null || building.OfferedUnits.Count == 0) return null;
 
@@ -146,6 +147,16 @@ public partial class AIShoppingPlanner
             bool isAntiAirOnly = IsAntiAirOnlyUnit(u);
             bool isSAMType = isAntiAirOnly && IsPrimaryRole(u, UnitRole.FogoIndireto);
             bool isAAAType = isAntiAirOnly && IsPrimaryRole(u, UnitRole.Assalto);
+            if (matureEconomyEliteAssaultPivot
+                && IsFireSupportPurchase(u)
+                && u.eliteLevel < 1
+                && IsFireSupportSaturated(snapshot)
+                && !defensiveBaseThreat
+                && !isAntiAirOnly)
+            {
+                Debug.Log($"[AI PickUnit] SKIP {u.displayName} - quality pivot: fogo comum saturado, preservando compra elite");
+                continue;
+            }
             int samCap = Instance != null ? Instance.MaxProactiveAntiAirSAM : 3;
             if (isSAMType && activeSAMs >= 1 && !aaaThreat)
             {
@@ -295,7 +306,7 @@ public partial class AIShoppingPlanner
                 score += Mathf.Max(0, u.eliteLevel) * 1500;
                 if (activeFireSupportCount == 0 && u.eliteLevel >= 1)
                     score -= 120000;
-                if (wantsEliteFireSupport && u == eliteFireSupportTarget) score += 200000;
+                if (wantsEliteFireSupport && u == eliteFireSupportTarget) score += 500000;
                 if (defensiveBaseThreat)
                 {
                     score += 150000;
