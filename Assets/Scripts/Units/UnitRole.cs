@@ -16,9 +16,7 @@ public enum UnitRole
     RaidAntiSub = 11,
     CapturadorAgressivo = 12,
     ArtilheiroCombatente = 13,
-    AntiaereoCombatente = 14,
-    LogisticaMovel = 15,
-    LogisticaEstoque = 16
+    AntiaereoCombatente = 14
 }
 
 public static class UnitRoleCompatibility
@@ -42,12 +40,6 @@ public static class UnitRoleCompatibility
                 return requestedRole == UnitRole.Antiaereo
                     || requestedRole == UnitRole.Assalto
                     || requestedRole == UnitRole.FogoIndireto;
-            case UnitRole.LogisticaMovel:
-                return requestedRole == UnitRole.Logistica
-                    || requestedRole == UnitRole.Transportador;
-            case UnitRole.LogisticaEstoque:
-                return requestedRole == UnitRole.Logistica
-                    || requestedRole == UnitRole.Suprimentos;
             default:
                 return false;
         }
@@ -61,6 +53,13 @@ public static class UnitRoleCompatibility
         for (int i = 0; i < data.roles.Count; i++)
             if (CanSatisfy(data.roles[i], requestedRole))
                 return true;
+
+        // Capacidade mecânica é a fonte de verdade: quem carrega satisfaz Transportador e quem
+        // supre satisfaz Logística — sem precisar de papel híbrido (ex.: Logística Móvel).
+        if (requestedRole == UnitRole.Transportador && data.isTransporter)
+            return true;
+        if (requestedRole == UnitRole.Logistica && data.isSupplier)
+            return true;
 
         return false;
     }

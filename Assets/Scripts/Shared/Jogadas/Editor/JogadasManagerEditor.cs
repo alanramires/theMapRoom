@@ -24,6 +24,19 @@ public class JogadasManagerEditor : Editor
             EditorStyles.miniLabel);
         EditorGUILayout.Space(4);
 
+        // ---- export de TUDO (ignora os filtros) — sempre visível, desabilitado se vazio ----
+        using (new EditorGUI.DisabledScope(all.Count == 0))
+        {
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField($"Exportar tudo ({all.Count}):", GUILayout.Width(130));
+            if (GUILayout.Button("CSV", GUILayout.Width(70)))
+                ExportarArquivo(all, JogadasManager.JogadasExportFormat.Csv);
+            if (GUILayout.Button("Texto", GUILayout.Width(70)))
+                ExportarArquivo(all, JogadasManager.JogadasExportFormat.Texto);
+            EditorGUILayout.EndHorizontal();
+        }
+        EditorGUILayout.Space(4);
+
         // ---- filtros ----
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Team:", GUILayout.Width(40));
@@ -48,6 +61,16 @@ public class JogadasManagerEditor : Editor
             EditorGUILayout.HelpBox("Nenhuma jogada registrada.", MessageType.None);
             return;
         }
+
+        // ---- export FILTRADO (respeita os filtros acima) ----
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField($"Exportar filtradas ({lista.Count}):", GUILayout.Width(150));
+        if (GUILayout.Button("CSV", GUILayout.Width(70)))
+            ExportarArquivo(lista, JogadasManager.JogadasExportFormat.Csv);
+        if (GUILayout.Button("Texto", GUILayout.Width(70)))
+            ExportarArquivo(lista, JogadasManager.JogadasExportFormat.Texto);
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.Space(4);
 
         // ---- cabeçalho da tabela ----
         DrawTableHeader();
@@ -83,8 +106,9 @@ public class JogadasManagerEditor : Editor
         Col("Sigla",  42);
         Col("UID",    36);
         Col("UID2",   36);
-        Col("Coord",  70);
-        Col("Destino",70);
+        Col("Coord",  120);
+        Col("Destino",120);
+        Col("Obs",    80);
         EditorGUILayout.EndHorizontal();
     }
 
@@ -104,12 +128,32 @@ public class JogadasManagerEditor : Editor
         Col(j.unidadeSigla ?? "-", 42);
         Col(j.uid  > 0 ? j.uid.ToString()  : "-", 36);
         Col(j.uid2 > 0 ? j.uid2.ToString() : "-", 36);
-        Col(j.TemCoordenada ? $"{j.cx},{j.cy}" : "-", 70);
-        Col(j.TemDestino   ? $"{j.dx},{j.dy}" : "-",  70);
+        Col(j.TemCoordenada ? $"{j.cx},{j.cy}{Paren(JogadasManager.TipoConstrucaoNaCelula(j.cx, j.cy))}" : "-", 120);
+        Col(j.TemDestino   ? $"{j.dx},{j.dy}{Paren(JogadasManager.DestinoLabel(j.dx, j.dy))}" : "-",  120);
+        Col(string.IsNullOrEmpty(j.obs) ? "-" : j.obs, 80);
 
         EditorGUILayout.EndHorizontal();
     }
 
     private static void Col(string text, float width)
         => EditorGUILayout.LabelField(text, EditorStyles.miniLabel, GUILayout.Width(width));
+
+    // Envolve o rótulo (resolvido pelo JogadasManager) em " (...)" para a tabela.
+    private static string Paren(string s) => string.IsNullOrEmpty(s) ? "" : $" ({s})";
+
+    private static void ExportarArquivo(List<Jogada> jogadas, JogadasManager.JogadasExportFormat format)
+    {
+        string ext = format == JogadasManager.JogadasExportFormat.Csv ? "csv" : "txt";
+        string nome = $"jogadas_{System.DateTime.Now:yyyyMMdd_HHmmss}";
+        string path = EditorUtility.SaveFilePanel("Exportar Jogadas", "", nome, ext);
+        if (string.IsNullOrEmpty(path)) return;
+
+        string content = format == JogadasManager.JogadasExportFormat.Csv
+            ? JogadasManager.BuildCsv(jogadas)
+            : JogadasManager.BuildTexto(jogadas);
+
+        System.IO.File.WriteAllText(path, content, new System.Text.UTF8Encoding(true));
+        Debug.Log($"[Jogadas] exportado ({format}) {jogadas.Count} jogada(s) em: {path}");
+        EditorUtility.RevealInFinder(path);
+    }
 }

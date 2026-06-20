@@ -489,9 +489,13 @@ public partial class AIController
                 SlotNeed slot = obj.Slots[i];
                 if (slot.Role == UnitRole.Capturador)
                     continue;
+                // Transporte é aposta de futuro: a alocação acontece no turno seguinte, então o
+                // slot permanece como demanda mesmo sem capturador agora (espelha o AirTransport,
+                // que mede demanda pelos slots de capturador, não pelos preenchidos).
+                if (slot.Role == UnitRole.Transportador)
+                    continue;
                 if (slot.Role != UnitRole.Assalto
-                    && slot.Role != UnitRole.FogoIndireto
-                    && slot.Role != UnitRole.Transportador)
+                    && slot.Role != UnitRole.FogoIndireto)
                     continue;
 
                 if (slot.Filled)

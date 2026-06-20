@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: "Constru\xE7\xF5es em campo"
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionFieldDatabase
   entries:
-  - id: Flag_T-1_C126
+  - id: Flag_T-1_C124
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
     initialSlotIndex: -1
     sector: 0
@@ -89,7 +89,7 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Flag_T-1_C153
+  - id: "F\xE1brica_T-1_C153"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialSlotIndex: -1
     sector: 0
@@ -222,7 +222,7 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: Flag_T-1_C125
+  - id: "F\xE1brica_T-1_C125"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialSlotIndex: -1
     sector: 0
@@ -998,7 +998,7 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-  - id: Cidade_T-1_C130
+  - id: Aeroporto_T-1_C130
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
     initialSlotIndex: -1
     sector: 0

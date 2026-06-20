@@ -24,6 +24,9 @@ public class ConstructionData : ScriptableObject
     [Tooltip("Nome mostrado na UI.")]
     public string displayName;
 
+    [Tooltip("Sigla curta do tipo (ex.: HQ, Fáb, Aero, Porto). Usada em logs/depuração como o painel de Jogadas.")]
+    public string sufixo;
+
     [TextArea]
     public string description;
 

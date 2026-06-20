@@ -163,6 +163,10 @@ public partial class AIController
         }
     }
 
+    // Alcance máximo (hexes entre setores) para a cascata suprimir o vizinho. Equivale à
+    // "ponte" de mover ~3 hexes e capturar; acima disso o vizinho precisa da própria unidade.
+    private const float MaxCascadeBridgeDistance = 3f;
+
     private void MarkCascadeNeighbor1(ConstructionSector sector, HashSet<ConstructionSector> covered, TeamId aiTeam, HashSet<ConstructionSector> vacaterProtected = null, AIRallyPlanContext rallyContext = default)
     {
         if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return;
@@ -188,6 +192,16 @@ public partial class AIController
         }
 
         if (candidate == ConstructionSector.None) return;
+
+        // A cascata só pode cobrir o vizinho se ele estiver dentro do alcance de "ponte"
+        // (a unidade captura o setor atual e no(s) turno(s) seguinte(s) faz a ponte de
+        // ~3 hexes até o vizinho). Acima disso o vizinho precisa da própria unidade —
+        // suprimi-lo deixa capturadores ociosos virando rogue.
+        if (candidateDist > MaxCascadeBridgeDistance)
+        {
+            Debug.Log($"{TL("Plan")} cascata: {sector} → {candidate} ({candidateDist:F1}h) fora do alcance de ponte (>{MaxCascadeBridgeDistance:F0}h), não cobre");
+            return;
+        }
 
         if (vacaterProtected != null && vacaterProtected.Contains(candidate))
         {

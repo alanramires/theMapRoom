@@ -97,13 +97,20 @@ public partial class AITacticalAnalyzer
                 continue;
             if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info))
                 continue;
+            SectorManager.SectorInfo.TransportPreference transportPref = info.GetTransportPreference(team);
             if (HasAnySlot(obj, UnitRole.Transportador)
-                && info.GetTransportPreference(team) == SectorManager.SectorInfo.TransportPreference.Air)
+                && transportPref == SectorManager.SectorInfo.TransportPreference.Air)
                 continue;
 
             int capturers = CountSlots(obj, UnitRole.Capturador);
             int assaults = CountSlots(obj, UnitRole.Assalto);
             int fireSupport = CountSlots(obj, UnitRole.FogoIndireto);
+            // Transporte terrestre só quando o setor prefere veículo; "Either" e "Air" ficam
+            // com o airlift (helicóptero). A demanda é por NECESSIDADE DE CARONA, não por
+            // distância do setor — ver ComputeGroundTransportNeed.
+            int groundTransports = transportPref == SectorManager.SectorInfo.TransportPreference.Vehicle
+                ? ComputeGroundTransportNeed(team, snapshot, obj)
+                : 0;
             AISectorIntel sectorIntel = FindIntelForSector(intel, obj.Sector);
             bool risky = info.GetRiskLevelFor(team) >= SectorManager.SectorRiskLevel.Medium || IsHotIntelSector(sectorIntel);
             bool hasBasicTaskForce = capturers > 0 && (assaults > 0 || fireSupport > 0);
@@ -116,13 +123,71 @@ public partial class AITacticalAnalyzer
             op.AddSlots(AINeedKind.Capturer, Mathf.Max(0, capturers));
             op.AddSlots(AINeedKind.Assault, Mathf.Max(assaults, needsAssaultScreen ? 1 : 0));
             op.AddSlots(AINeedKind.FireSupport, Mathf.Max(0, fireSupport));
+            op.AddSlots(AINeedKind.GroundTransport, Mathf.Max(0, groundTransports));
 
             if (op.RequiredSlots.Count == 0)
                 continue;
 
             ops.Add(op);
-            Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] GroundCapture {obj.Sector}: cap={capturers} ass={assaults} fire={fireSupport} risky={risky} slots={DescribeSlots(op)}");
+            Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] GroundCapture {obj.Sector}: cap={capturers} ass={assaults} fire={fireSupport} trans={groundTransports} pref={transportPref} risky={risky} slots={DescribeSlots(op)}");
         }
+    }
+
+    // Distância de embarque = 2 turnos (~7 hexes) por caminhos válidos. A massa mínima de
+    // capturadores antes de liberar suporte vem do knob compartilhado AIShoppingPlanner.
+    private const int GroundTransportEmbarkDistance = 7;
+
+    // Demanda de APC por NECESSIDADE DE CARONA, não por distância do setor:
+    //  - capturador já em campo cujo caminho real até o objetivo é >= limiar de embarque e
+    //    que não está embarcado (carona concreta);
+    //  - aposta futura: vaga de capturador vazia conta só quando a frente está comprometida
+    //    (já tem capturador indo, ou status Pursuing/Capturing) — o capturador que vier nasce
+    //    no HQ, longe, e vai precisar de carona. Frente vazia/parada não pré-compra APC.
+    // Gateada por massa mínima de capturadores e descontando APCs já alocados ao objetivo.
+    private int ComputeGroundTransportNeed(TeamId team, AIWorldSnapshot snapshot, SectorObjective obj)
+    {
+        if (obj == null || obj.Slots == null)
+            return 0;
+        int massGate = AIShoppingPlanner.Instance != null ? AIShoppingPlanner.Instance.MinCapturerMassForSupport : 4;
+        if (CountActiveNeed(snapshot, AINeedKind.Capturer) < massGate)
+            return 0;
+
+        bool committed = obj.Status == ObjectiveStatus.Pursuing
+            || obj.Status == ObjectiveStatus.Capturing
+            || ObjectiveHasFilledCapturer(obj);
+
+        int rideNeeding = 0;
+        foreach (SlotNeed slot in obj.Slots)
+        {
+            if (slot.Role != UnitRole.Capturador)
+                continue;
+            if (slot.Filled)
+            {
+                UnitManager unit = FindActiveUnit(slot.AssignedUnitId);
+                if (unit == null || unit.IsEmbarked)
+                    continue;
+                if (slot.DistanceToObjective >= GroundTransportEmbarkDistance)
+                    rideNeeding++;
+            }
+            else if (committed)
+            {
+                rideNeeding++; // aposta futura: capturador novo nascerá no HQ, longe
+            }
+        }
+        if (rideNeeding <= 0)
+            return 0;
+
+        // 1 APC por frente (faz shuttle entre os capturadores); desconta os já alocados.
+        int assigned = CountFilledCompatibleSlots(obj, AINeedKind.GroundTransport);
+        return Mathf.Max(0, 1 - assigned);
+    }
+
+    private static bool ObjectiveHasFilledCapturer(SectorObjective obj)
+    {
+        foreach (SlotNeed slot in obj.Slots)
+            if (slot.Role == UnitRole.Capturador && slot.Filled)
+                return true;
+        return false;
     }
 
     private void BuildSectorDefenseOp(
@@ -183,6 +248,10 @@ public partial class AITacticalAnalyzer
                 continue;
             if (!HasAnySlot(obj, UnitRole.Transportador)) continue;
             if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info)) continue;
+            // Setores que preferem veículo recebem APC pelo GroundCapture; evita demanda dupla
+            // (APC terrestre + helicóptero) para o mesmo objetivo.
+            if (info.GetTransportPreference(team) == SectorManager.SectorInfo.TransportPreference.Vehicle)
+                continue;
 
             int desiredPassengers = CountSlots(obj, UnitRole.Capturador);
             int qualifiedCapturers = CountFilledCompatibleSlots(obj, AINeedKind.Capturer);

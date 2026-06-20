@@ -594,6 +594,15 @@ public partial class AIController
         }
         foreach (UnitManager u in localGarrisonList) freeCapturers.Remove(u);
 
+        // A reserva de âncora só deve bloquear os demais objetivos quando os capturadores são
+        // escassos (não sobram além do que as âncoras precisam). Havendo excedente, ele é livre
+        // para os outros setores — senão capturadores ficam ociosos como rogue.
+        int anchorOpenCapturerSlots = CountOpenAnchorCapturerSlots(plan, anchorContext);
+        bool anchorReserveBlocksOthers = anchorCapturerReserveActive
+            && freeCapturers.Count <= anchorOpenCapturerSlots;
+        if (anchorCapturerReserveActive && !anchorReserveBlocksOthers)
+            Debug.Log($"{TL("Plan")} reserva âncora: {freeCapturers.Count} capturadores livres > {anchorOpenCapturerSlots} vaga(s) âncora — excedente liberado para outros objetivos");
+
         // 5a: captura imediata
         var immediateList = new List<UnitManager>();
         foreach (UnitManager u in freeCapturers)
@@ -602,7 +611,7 @@ public partial class AIController
             if (!SimulateCaptureSensor(u, uCell, out ConstructionManager bldg)) continue;
             SectorObjective obj = plan.GetObjectiveForSector(bldg.Sector);
             if (obj == null || !obj.HasOpenSlot(UnitRole.Capturador)) continue;
-            if (anchorCapturerReserveActive && !IsOwnAnchorSector(anchorContext, obj.Sector)) continue;
+            if (anchorReserveBlocksOthers && !IsOwnAnchorSector(anchorContext, obj.Sector)) continue;
             obj.TryFillSlot(UnitRole.Capturador, u.InstanceId);
             if (obj.Status != ObjectiveStatus.Defending) obj.Status = ObjectiveStatus.Pursuing;
             ApplyPlanHUD(u, obj);
@@ -626,7 +635,7 @@ public partial class AIController
             if (!obj.HasOpenSlot(UnitRole.Capturador)) continue;
             if (obj.Status == ObjectiveStatus.Defending)
                 continue;
-            if (anchorCapturerReserveActive && !IsOwnAnchorSector(anchorContext, obj.Sector))
+            if (anchorReserveBlocksOthers && !IsOwnAnchorSector(anchorContext, obj.Sector))
                 continue;
             bool isDefensive = false;
             ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);

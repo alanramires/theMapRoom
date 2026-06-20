@@ -124,7 +124,7 @@ public partial class AITacticalAnalyzer : MonoBehaviour
         return screened;
     }
 
-    public List<TacticalDeficit> GetDeficits(TeamId team)
+    public List<TacticalDeficit> GetDeficits(TeamId team, bool log = true)
     {
         var deficits = new List<TacticalDeficit>();
         if (!operationsByTeam.TryGetValue(team, out List<AITacticalNeed> ops))
@@ -150,7 +150,8 @@ public partial class AITacticalAnalyzer : MonoBehaviour
                     Kind = kv.Key,
                     Count = kv.Value,
                 });
-                Debug.Log($"[AI Ops][T{op.LastUpdatedTurn}][{team}] deficit {op.Type} {op.Sector}: {kv.Key}x{kv.Value}");
+                if (log)
+                    Debug.Log($"[AI Ops][T{op.LastUpdatedTurn}][{team}] deficit {op.Type} {op.Sector}: {kv.Key}x{kv.Value}");
             }
         }
 

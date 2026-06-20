@@ -99,9 +99,17 @@ public partial class AIController
 
     private static bool HasOpenAnchorCapturerNeed(TeamObjectivePlan plan, AIAnchorPlanContext context)
     {
-        if (plan == null || context.OwnAnchorSectors == null || context.OwnAnchorSectors.Count == 0)
-            return false;
+        return CountOpenAnchorCapturerSlots(plan, context) > 0;
+    }
 
+    // Quantas vagas de capturador as âncoras ainda precisam preencher. A reserva deve segurar
+    // só esse tanto de capturadores; o excedente fica livre para os demais objetivos.
+    private static int CountOpenAnchorCapturerSlots(TeamObjectivePlan plan, AIAnchorPlanContext context)
+    {
+        if (plan == null || context.OwnAnchorSectors == null || context.OwnAnchorSectors.Count == 0)
+            return 0;
+
+        int count = 0;
         foreach (SectorObjective obj in plan.Objectives)
         {
             if (obj == null || !IsOwnAnchorSector(context, obj.Sector))
@@ -111,10 +119,10 @@ public partial class AIController
 
             foreach (SlotNeed slot in obj.Slots)
                 if (slot.Role == UnitRole.Capturador && !slot.Filled)
-                    return true;
+                    count++;
         }
 
-        return false;
+        return count;
     }
 
     private void ReleaseNonAnchorCapturersForAnchorNeed(TeamObjectivePlan plan, TeamId aiTeam, AIAnchorPlanContext context, AIMacroTerritoryPhase phase, int turnNumber)

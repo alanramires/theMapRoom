@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using UnityEngine;
 
 // Attach to the "Jogadas" GameObject in the scene.
@@ -154,13 +157,13 @@ public class JogadasManager : MonoBehaviour
         });
     }
 
-    public void RegistrarCapturar(int turno, int team, int cx, int cy, int dx, int dy, string sigla, int uid)
+    public void RegistrarCapturar(int turno, int team, int cx, int cy, int dx, int dy, string sigla, int uid, string obs = null)
     {
         log.Registrar(new Jogada
         {
             turno = turno, team = team, acao = "Capturar",
             cx = cx, cy = cy, dx = dx, dy = dy,
-            unidadeSigla = sigla, uid = uid
+            unidadeSigla = sigla, uid = uid, obs = obs
         });
     }
 
@@ -169,6 +172,208 @@ public class JogadasManager : MonoBehaviour
         if (log.jogadas == null || log.jogadas.Count == 0) return new List<Jogada>();
         int turnoAtual = log.jogadas.Max(j => j.turno);
         return log.jogadas.Where(j => j.turno > turnoAtual - n).ToList();
+    }
+
+    // -----------------------------------------------------------------------
+    // Export das jogadas
+    // -----------------------------------------------------------------------
+    public enum JogadasExportFormat { Csv, Texto }
+
+    // Escreve todas as jogadas registradas em um arquivo. Retorna o caminho gerado.
+    // Sem path → salva em Application.persistentDataPath com timestamp.
+    public string ExportToFile(JogadasExportFormat format = JogadasExportFormat.Csv, string path = null)
+    {
+        string ext = format == JogadasExportFormat.Csv ? "csv" : "txt";
+        if (string.IsNullOrEmpty(path))
+            path = Path.Combine(Application.persistentDataPath, $"jogadas_{DateTime.Now:yyyyMMdd_HHmmss}.{ext}");
+
+        string content = format == JogadasExportFormat.Csv
+            ? BuildCsv(log?.jogadas)
+            : BuildTexto(log?.jogadas);
+
+        File.WriteAllText(path, content, new UTF8Encoding(true));
+        Debug.Log($"[Jogadas] exportado ({format}) {log?.jogadas?.Count ?? 0} jogada(s) em: {path}");
+        return path;
+    }
+
+    public static string BuildCsv(IEnumerable<Jogada> jogadas)
+    {
+        var sb = new StringBuilder();
+        sb.Append("jogadaId,turno,team,timeNome,acao,sigla,uid,uid2,cx,cy,coordTipo,dx,dy,destinoTipo,obs\n");
+        if (jogadas != null)
+            foreach (Jogada j in jogadas.OrderBy(j => j.jogadaId))
+            {
+                sb.Append(j.jogadaId).Append(',')
+                  .Append(j.turno).Append(',')
+                  .Append(j.team).Append(',')
+                  .Append(CsvCampo(NomeTime(j.team))).Append(',')
+                  .Append(CsvCampo(j.acao)).Append(',')
+                  .Append(CsvCampo(j.unidadeSigla)).Append(',')
+                  .Append(j.uid).Append(',')
+                  .Append(j.uid2).Append(',')
+                  .Append(j.cx).Append(',')
+                  .Append(j.cy).Append(',')
+                  .Append(CsvCampo(j.TemCoordenada ? TipoConstrucaoNaCelula(j.cx, j.cy) : "")).Append(',')
+                  .Append(j.dx).Append(',')
+                  .Append(j.dy).Append(',')
+                  .Append(CsvCampo(j.TemDestino ? DestinoLabel(j.dx, j.dy) : "")).Append(',')
+                  .Append(CsvCampo(j.obs)).Append('\n');
+            }
+        return sb.ToString();
+    }
+
+    public static string BuildTexto(IEnumerable<Jogada> jogadas)
+    {
+        var list = (jogadas ?? Enumerable.Empty<Jogada>()).OrderBy(j => j.jogadaId).ToList();
+        var sb = new StringBuilder();
+        sb.Append("# Jogadas da Partida\n");
+        sb.Append($"# Exportado em {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n");
+        sb.Append($"# Total: {list.Count} jogada(s)\n\n");
+
+        foreach (int turno in list.Select(j => j.turno).Distinct().OrderBy(t => t))
+        {
+            sb.Append($"== Turno {turno} ==\n");
+            foreach (Jogada j in list.Where(j => j.turno == turno))
+                sb.Append("  ").Append(DescreverJogada(j)).Append('\n');
+            sb.Append('\n');
+        }
+        return sb.ToString();
+    }
+
+    private static string DescreverJogada(Jogada j)
+    {
+        string sigla = string.IsNullOrEmpty(j.unidadeSigla) ? "-" : j.unidadeSigla;
+        string ator  = j.uid > 0 ? $"{sigla}#{j.uid}" : sigla;
+        string ct    = j.TemCoordenada ? TipoConstrucaoNaCelula(j.cx, j.cy) : "";
+        string dt    = j.TemDestino ? DestinoLabel(j.dx, j.dy) : "";
+        string coord = j.TemCoordenada ? $"({j.cx},{j.cy}{(string.IsNullOrEmpty(ct) ? "" : " " + ct)})" : "";
+        string dest  = j.TemDestino ? $" → ({j.dx},{j.dy}{(string.IsNullOrEmpty(dt) ? "" : " " + dt)})" : "";
+        string alvo  = j.uid2 > 0 ? $" alvo#{j.uid2}" : "";
+        string obs   = string.IsNullOrEmpty(j.obs) ? "" : $" [{j.obs}]";
+        return $"#{j.jogadaId,-4} [{NomeTime(j.team)}] {j.acao,-14} {ator} {coord}{dest}{alvo}{obs}".TrimEnd();
+    }
+
+    private static string NomeTime(int team)
+        => Enum.IsDefined(typeof(TeamId), team) ? ((TeamId)team).ToString() : team.ToString();
+
+    private static string CsvCampo(string s)
+    {
+        s ??= "";
+        return s.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0
+            ? "\"" + s.Replace("\"", "\"\"") + "\""
+            : s;
+    }
+
+    // -----------------------------------------------------------------------
+    // Resolução da construção numa célula (compartilhada por tabela e export).
+    // Só resolve em Play mode, quando ConstructionManager.AllActive está populado.
+    // -----------------------------------------------------------------------
+
+    // Rótulo da construção na célula de origem (ex.: "HQ B", "Fáb B", "City D"). Vazio se não houver.
+    public static string TipoConstrucaoNaCelula(int cx, int cy)
+    {
+        ConstructionManager c = ConstrucaoNaCelula(cx, cy);
+        return c != null ? LabelComBadge(c) : "";
+    }
+
+    // Rótulo do destino: só para alvos capturáveis (cidades/HQ), com badge do setor
+    // (ex.: "City A"). Terreno e estruturas não-capturáveis retornam vazio.
+    public static string DestinoLabel(int dx, int dy)
+    {
+        ConstructionManager c = ConstrucaoNaCelula(dx, dy);
+        if (c == null || (!c.IsCapturable && !c.IsVictoryBuilding))
+            return "";
+        return LabelComBadge(c);
+    }
+
+    private static string LabelComBadge(ConstructionManager c)
+        => $"{TipoCurto(c)} {SectorBadge(c.Sector)}".Trim();
+
+    // Obs preciso vindo da execução da captura (TurnStateManager.Capture sabe o tipo de operação).
+    // Pendurado por unidade até o registro central da jogada consumir.
+    private static readonly Dictionary<int, string> _captureObsPorUnidade = new Dictionary<int, string>();
+
+    public static void SetUltimaCapturaObs(int capturerUid, string obs)
+    {
+        if (capturerUid > 0 && !string.IsNullOrEmpty(obs))
+            _captureObsPorUnidade[capturerUid] = obs;
+    }
+
+    private static string ConsumirCapturaObs(int capturerUid)
+    {
+        if (capturerUid > 0 && _captureObsPorUnidade.TryGetValue(capturerUid, out string obs))
+        {
+            _captureObsPorUnidade.Remove(capturerUid);
+            return obs;
+        }
+        return null;
+    }
+
+    // Fallback heurístico (estado pós-ação) quando a execução não forneceu o obs preciso:
+    //  - inimigo/neutro parcial → "cur/max" (ex.: "10/20");
+    //  - captura concluída (agora é nosso, cheio) → "capturado";
+    //  - recuperando construção própria → "reparado".
+    public static string ObsCaptura(int dx, int dy, int actingTeam)
+    {
+        ConstructionManager c = ConstrucaoNaCelula(dx, dy);
+        if (c == null) return "";
+        int max = c.CapturePointsMax;
+        if (max <= 0) return "";
+
+        int cur = Mathf.Clamp(c.CurrentCapturePoints, 0, max);
+        bool dono = (int)c.TeamId == actingTeam;
+        if (!dono) return $"{cur}/{max}";   // captura parcial de inimigo/neutro
+        return cur >= max ? "capturado"     // concluiu a captura → nosso e cheio
+                          : "reparado";      // recuperando construção própria
+    }
+
+    private static ConstructionManager ConstrucaoNaCelula(int x, int y)
+    {
+        List<ConstructionManager> all = ConstructionManager.AllActive;
+        if (all == null) return null;
+
+        var cell = new Vector3Int(x, y, 0);
+        foreach (ConstructionManager c in all)
+        {
+            if (c == null) continue;
+            Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
+            if (cc == cell) return c;
+        }
+        return null;
+    }
+
+    private static string TipoCurto(ConstructionManager c)
+    {
+        string tipo = "";
+        if (c.TryResolveConstructionData(out ConstructionData d) && d != null)
+        {
+            if (!string.IsNullOrEmpty(d.sufixo)) tipo = d.sufixo; // preenchido manualmente
+            else if (d.isAirport) tipo = "Aero";
+            else if (d.isHarbor)  tipo = "Porto";
+        }
+        if (string.IsNullOrEmpty(tipo))
+        {
+            if (c.IsVictoryBuilding) tipo = "HQ";
+            else if (c.OfferedUnits != null && c.OfferedUnits.Count > 0) tipo = "Fáb";
+            else if (c.IsCapturable) tipo = "Cidade";
+        }
+
+        // Flag: refina pelo papel runtime da construção.
+        if (string.Equals(tipo, "Flag", StringComparison.OrdinalIgnoreCase))
+        {
+            if (c.IsForwardObserverSpot) return "Spot";
+            if (c.IsAnchorSector)        return "Anchor";
+            if (c.IsRallyPoint)          return "Rally";
+        }
+        return tipo;
+    }
+
+    private static string SectorBadge(ConstructionSector sector)
+    {
+        if (sector == ConstructionSector.None || ConstructionSectorHelper.IsBase(sector))
+            return "";
+        string name = sector.ToString();
+        return name.Length > 0 ? name[0].ToString().ToUpper() : "";
     }
 
     // Registra qualquer PlayerAction (AI ou humano) no Jogadas log.
@@ -289,7 +494,8 @@ public class JogadasManager : MonoBehaviour
 
         Vector3Int to = action.MoveTo; to.z = 0;
         if (isCaptura)
-            manager.RegistrarCapturar(turno, team, from.x, from.y, to.x, to.y, sigla, uid);
+            manager.RegistrarCapturar(turno, team, from.x, from.y, to.x, to.y, sigla, uid,
+                ConsumirCapturaObs(uid) ?? ObsCaptura(to.x, to.y, team));
         else
             manager.RegistrarMover(turno, team, from.x, from.y, to.x, to.y, sigla, uid);
     }

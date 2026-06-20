@@ -14,13 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
   id: cidade
   displayName: Cidade
+  sufixo: City
   description: Cidades que fornecem dinheiro por turno
+  isAirport: 0
+  isHarbor: 0
   spriteDefault: {fileID: 21300000, guid: 5ca4a449521141e49a72d100a0c798b4, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   baseMovementCost: 1
+  isFakeBuilding: 0
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
   requiredSkillsToEnter: []
   blockedSkills: []
@@ -65,6 +69,7 @@ MonoBehaviour:
     maxCapacity: 30
   constructionConfiguration:
     isPlayerHeadQuarter: 0
+    isVictoryBuilding: 0
     isCapturable: 1
     capturePointsMax: 20
     capturedIncoming: 1000

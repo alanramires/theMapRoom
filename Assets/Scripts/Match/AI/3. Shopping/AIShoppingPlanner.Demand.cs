@@ -1172,9 +1172,15 @@ public partial class AIShoppingPlanner
         var usedBuildings = new HashSet<ConstructionManager>();
         int remaining = snapshot.Budget;
 
+        // Reserva de elite: segura caixa entre turnos para um alvo elite que ainda não cabe
+        // no orçamento mas é alcançável em poucos turnos. Sem isso o loop guloso gastaria
+        // tudo e nunca acumularia para unidades caras.
+        int reserve = ComputeEliteSavingReserve(snapshot, demands, remaining);
+
         LogRoleShoppingQueue(snapshot, demands, remaining);
-        while (remaining > 0)
+        while (remaining - reserve > 0)
         {
+            int spendable = remaining - reserve;
             RoleShoppingCandidate best = null;
             foreach (ConstructionManager building in snapshot.MyBuildings)
             {
@@ -1190,7 +1196,7 @@ public partial class AIShoppingPlanner
 
                 foreach (UnitData unit in building.OfferedUnits)
                 {
-                    if (unit == null || unit.cost <= 0 || unit.cost > remaining
+                    if (unit == null || unit.cost <= 0 || unit.cost > spendable
                         || unit.militaryForce == MilitaryForce.Navy
                         || !IsRolePurchaseAllowedByStance(unit, snapshot.Stance)
                         || !IsEliteChainAvailable(unit, snapshot))
@@ -1249,10 +1255,89 @@ public partial class AIShoppingPlanner
         return orders;
     }
 
-    private static List<AIShoppingDemand> BuildRoleShoppingDemands(AIWorldSnapshot snapshot)
+    // Decide quanto de caixa segurar este turno para um alvo elite alcançável em poucos turnos.
+    // Retorna 0 quando não há nada para poupar (guloso normal).
+    private static int ComputeEliteSavingReserve(AIWorldSnapshot snapshot, List<AIShoppingDemand> demands, int remaining)
+    {
+        if (Instance == null || demands == null || remaining <= 0)
+            return 0;
+        int maxTurns = Instance.EliteSaveMaxTurns;
+        if (maxTurns <= 0)
+            return 0;
+
+        int income = Mathf.Max(0, snapshot.IncomePerTurn);
+        int reach = remaining + income * maxTurns;
+
+        AIShoppingDemand target = null;
+        int targetCost = 0;
+        foreach (AIShoppingDemand d in demands)
+        {
+            if (d.Count <= 0 || d.MinEliteLevel <= 0)
+                continue;
+            int cost = FindCheapestBuildableCost(snapshot, d);
+            if (cost <= 0 || cost <= remaining || cost > reach)
+                continue; // já cabe agora, ou está fora do horizonte de poupança
+            if (target == null || d.Priority < target.Priority
+                || (d.Priority == target.Priority && cost > targetCost))
+            {
+                target = d;
+                targetCost = cost;
+            }
+        }
+        if (target == null)
+            return 0;
+
+        int reserve = Mathf.Clamp(targetCost - income, 0, remaining);
+        Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] poupando p/ elite "
+            + $"{target.Role}/{target.ExactRole} custo={targetCost} renda={income} maxTurnos={maxTurns} "
+            + $"reserva={reserve} budget={remaining} gastoLivre={remaining - reserve}");
+        return reserve;
+    }
+
+    private static int FindCheapestBuildableCost(AIWorldSnapshot snapshot, AIShoppingDemand demand)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null)
+            return 0;
+        int cheapest = int.MaxValue;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+                || building.OfferedUnits == null)
+                continue;
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (unit == null || unit.cost <= 0 || unit.militaryForce == MilitaryForce.Navy)
+                    continue;
+                if (!IsRolePurchaseAllowedByStance(unit, snapshot.Stance)
+                    || !IsEliteChainAvailable(unit, snapshot)
+                    || !DoesUnitMeetShoppingDemand(unit, demand))
+                    continue;
+                if (unit.cost < cheapest)
+                    cheapest = unit.cost;
+            }
+        }
+        return cheapest == int.MaxValue ? 0 : cheapest;
+    }
+
+#if UNITY_EDITOR
+    // Acesso somente-editor para a janela Tools > Utils > Shopping Pressure.
+    // Reconstrói a fila de demandas exatamente como o shopping a veria agora.
+    public static List<AIShoppingDemand> InspectRoleDemands(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || AITacticalAnalyzer.Instance == null)
+            return new List<AIShoppingDemand>();
+        return BuildRoleShoppingDemands(snapshot, log: false);
+    }
+
+    // Match real (mesma regra do shopping) para a janela montar o catálogo "à venda x demanda".
+    public static bool UnitMeetsDemandForInspection(UnitData unit, AIShoppingDemand demand)
+        => DoesUnitMeetShoppingDemand(unit, demand);
+#endif
+
+    private static List<AIShoppingDemand> BuildRoleShoppingDemands(AIWorldSnapshot snapshot, bool log = true)
     {
         var demands = new List<AIShoppingDemand>();
-        List<TacticalDeficit> deficits = AITacticalAnalyzer.Instance.GetDeficits(snapshot.AITeam);
+        List<TacticalDeficit> deficits = AITacticalAnalyzer.Instance.GetDeficits(snapshot.AITeam, log);
         foreach (TacticalDeficit deficit in deficits)
         {
             if (deficit.Count <= 0 || !TryMapNeedToShoppingDemand(deficit, out AIShoppingDemand demand))
@@ -1269,7 +1354,14 @@ public partial class AIShoppingPlanner
             "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}");
         EnsureRoleDemand(demands, UnitRole.Assalto, Mathf.Max(0, packages * 2 - assaults), 31,
             "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}");
-        EnsureRoleDemand(demands, UnitRole.FogoIndireto, Mathf.Max(0, packages - fireSupport), 32,
+        // Fire support de composição espera a massa inicial de capturadores se formar (igual ao
+        // transporte). Assalto continua liberado. A artilharia defensiva (PreventiveDefense) não
+        // passa por aqui e não é gateada.
+        int massGate = Instance != null ? Instance.MinCapturerMassForSupport : 4;
+        int compositionFire = capturers >= massGate
+            ? Mathf.Max(0, packages - fireSupport)
+            : 0;
+        EnsureRoleDemand(demands, UnitRole.FogoIndireto, compositionFire, 32,
             "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}");
 
         int visibleAir = CountEnemyDomain(snapshot, Domain.Air);
@@ -1320,7 +1412,6 @@ public partial class AIShoppingPlanner
 
         AddEliteProgressionDemand(snapshot, demands, UnitRole.Assalto, assaults, 24);
         AddEliteProgressionDemand(snapshot, demands, UnitRole.FogoIndireto, fireSupport, 25);
-        ApplyRoleShoppingDebugFilter(snapshot, demands);
 
         demands.Sort((a, b) =>
         {
@@ -1331,32 +1422,6 @@ public partial class AIShoppingPlanner
             return ((int)a.Role).CompareTo((int)b.Role);
         });
         return demands;
-    }
-
-    private static void ApplyRoleShoppingDebugFilter(AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
-    {
-        if (Instance == null)
-            return;
-
-        UnitRole role = UnitRole.None;
-        Domain? domain = null;
-        if (Instance.onlyCapturers) role = UnitRole.Capturador;
-        else if (Instance.onlyAssault) role = UnitRole.Assalto;
-        else if (Instance.onlyTransporter) { role = UnitRole.Transportador; domain = Domain.Land; }
-        else if (Instance.onlyLogistics) role = UnitRole.Logistica;
-        else if (Instance.onlyFireSupport) role = UnitRole.FogoIndireto;
-        else if (Instance.onlyAirTransporter) { role = UnitRole.Transportador; domain = Domain.Air; }
-        else if (Instance.onlyInterceptador) { role = UnitRole.Interceptador; domain = Domain.Air; }
-        else if (Instance.onlyAtaqueAereo) { role = UnitRole.AtaqueAereo; domain = Domain.Air; }
-        if (role == UnitRole.None)
-            return;
-
-        demands.Clear();
-        AIShoppingDemand forced = NewRoleDemand(role,
-            Mathf.Max(1, snapshot.MyBuildings != null ? snapshot.MyBuildings.Count : 1),
-            0, "debug", $"only {role}", true);
-        forced.Domain = domain;
-        demands.Add(forced);
     }
 
     private static AIShoppingDemand NewRoleDemand(UnitRole role, int count, int priority,
@@ -1512,8 +1577,7 @@ public partial class AIShoppingPlanner
         List<AIShoppingDemand> demands, UnitRole role, int activeRoleCount, int priority)
     {
         int minimumArmy = Instance != null ? Instance.MinArmySizeForElitePivot : 12;
-        if (activeRoleCount <= 0 || snapshot.MyUnits.Count < minimumArmy
-            || snapshot.Budget < Mathf.Max(12000, snapshot.IncomePerTurn))
+        if (activeRoleCount <= 0 || snapshot.MyUnits.Count < minimumArmy)
             return;
         int currentElite = 0;
         foreach (UnitManager unit in snapshot.MyUnits)
@@ -1541,6 +1605,17 @@ public partial class AIShoppingPlanner
             $"massa={snapshot.MyUnits.Count} caixa={snapshot.Budget} nivel={currentElite}->{nextElite}", false);
         elite.MinEliteLevel = nextElite;
         elite.MaxEliteLevel = nextElite;
+
+        // Só persegue o elite se ele cabe agora ou é alcançável dentro do horizonte de poupança.
+        // (Substitui o antigo piso fixo de caixa, que com renda baixa nunca deixava o alvo aparecer.)
+        int saveTurns = Instance != null ? Instance.EliteSaveMaxTurns : 0;
+        int reach = saveTurns > 0
+            ? snapshot.Budget + Mathf.Max(0, snapshot.IncomePerTurn) * saveTurns
+            : snapshot.Budget;
+        int eliteCost = FindCheapestBuildableCost(snapshot, elite);
+        if (eliteCost <= 0 || eliteCost > reach)
+            return;
+
         MergeRoleDemand(demands, elite, false);
     }
 

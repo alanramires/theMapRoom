@@ -35,7 +35,12 @@
       "Bash(python3 -c ' *)",
       "Bash(powershell -Command \"Select-String -Path 'Assets\\\\Scripts\\\\UI\\\\MainMenuStateController.cs' -Pattern 'IsAnyTextInputFocusedInUi' -Context 2\")",
       "Bash(awk '/^--- !u!1 &1076725313$/{f=1} f&&/m_Name:/{print; exit}' \"Assets/Scenes/Em dev/Battle Map Air Force.unity\")",
-      "Bash(git --no-pager diff --stat HEAD)"
+      "Bash(git --no-pager diff --stat HEAD)",
+      "Read(//dev/**)",
+      "Bash(timeout 300 dotnet build Assembly-CSharp.csproj -nologo)",
+      "Bash(xargs -I{} grep -n \"enum TeamId\" -A 12 {})",
+      "Bash(timeout 300 dotnet build Assembly-CSharp-Editor.csproj -nologo)",
+      "Bash(git commit -q -m ' *)"
     ]
   }
 }

@@ -86,12 +86,6 @@ public partial class AIShoppingPlanner
         ConstructionManager building,
         AIWorldSnapshot snapshot,
         int budget,
-        bool onlyCapturers,
-        bool onlyAssault,
-        bool onlyTransporter,
-        bool onlyLogistics,
-        bool onlyFireSupport,
-        bool onlyAirTransporter,
         int openCapturerSlots,
         int openAssaultSlots,
         int openTransportSlots = 0,
@@ -243,8 +237,6 @@ public partial class AIShoppingPlanner
                 && !canBuyBasicMass
                 && !isAAADefense) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — defThreat filter (notThreat={!IsDefensiveBaseThreatPurchase(u)} notElite={!isAllowedDefensiveElite} notTank={!canAffordDefensiveTank} notMass={!canBuyBasicMass} notAAA={!isAAADefense})"); continue; }
             if (!defensiveBaseThreat && isHybridCapturer && !hasOpenDefensiveSlot) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — hybrid sem slot defensivo"); continue; }
-            if ((onlyCapturers || onlyAssault || onlyTransporter || onlyLogistics || onlyFireSupport || onlyAirTransporter)
-                && !((onlyCapturers && isPrimaryCapturer) || (onlyAssault && isPrimaryAssault) || (onlyTransporter && isPrimaryTransporter) || (onlyLogistics && isPrimaryLogistics) || (onlyFireSupport && isPrimaryFireSupport))) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — onlyFilter"); continue; }
 
             int score = u.cost;
             if (defensiveBaseThreat && isDefensiveOnlyUnit && isFireSupportCapable)

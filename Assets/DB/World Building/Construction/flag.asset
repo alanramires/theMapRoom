@@ -14,7 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
   id: flag
   displayName: Flag
+  sufixo: Flag
   description: Bandeira
+  isAirport: 0
+  isHarbor: 0
   spriteDefault: {fileID: 21300000, guid: 78ce03294baece64981d4fe73df1856f, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

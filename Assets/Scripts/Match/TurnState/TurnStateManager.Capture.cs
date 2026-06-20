@@ -106,6 +106,13 @@ public partial class TurnStateManager
                     $"({before} -> {after}).");
             }
 
+            // Obs preciso para o log de Jogadas (aqui sabemos o tipo de operação):
+            //  RecoverAlly → "reparado"; CaptureEnemy concluído → "capturado"; parcial → "after/max".
+            string jogadaObs = operationType == PodeCapturarSensor.CaptureOperationType.RecoverAlly
+                ? "reparado"
+                : (concluded ? "capturado" : $"{after}/{safeMax}");
+            JogadasManager.SetUltimaCapturaObs(capturer.InstanceId, jogadaObs);
+
             if (concluded)
             {
                 cursorController?.PlayCapturedSfx(1f, 1f);

@@ -58,6 +58,10 @@ public class Jogada
     public int    uid;          // instanceId da unidade atuante (0 se não aplicável)
     public int    uid2;         // instanceId da unidade alvo (transporter em Embarque, alvo em Ataque)
 
+    // Observação contextual gravada no momento da jogada (ex.: progresso de captura "10/20",
+    // "capturado", "reparado"). Preenchida hoje só para Capturar.
+    public string obs;
+
     public bool TemCoordenada => cx != 0 || cy != 0;
     public bool TemDestino    => dx != 0 || dy != 0;
     public Vector3Int Coord   => new Vector3Int(cx, cy, 0);

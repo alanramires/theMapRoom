@@ -14,13 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
   id: hq
   displayName: HQ
+  sufixo: HQ
   description: Quartel General, se capturado vc perde.
+  isAirport: 0
+  isHarbor: 0
   spriteDefault: {fileID: 21300000, guid: c090fb273a5237f4b9aef7fb2304a715, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   baseMovementCost: 1
+  isFakeBuilding: 0
   dpqData: {fileID: 11400000, guid: 8ccccc2f87fd0d64f941b0b356de2a68, type: 2}
   requiredSkillsToEnter: []
   blockedSkills: []
@@ -65,6 +69,7 @@ MonoBehaviour:
     maxCapacity: 0
   constructionConfiguration:
     isPlayerHeadQuarter: 1
+    isVictoryBuilding: 0
     isCapturable: 1
     capturePointsMax: 40
     capturedIncoming: 3000

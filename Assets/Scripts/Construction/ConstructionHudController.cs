@@ -315,6 +315,13 @@ public class ConstructionHudController : MonoBehaviour
 
         if (rallyTrafficImage != null && rallyOffSprite == null)
             rallyOffSprite = rallyTrafficImage.sprite;
+
+        // Auto-cura referências baked quebradas: instâncias antigas (e o próprio prefab,
+        // antes da textura virar Single mode) guardam um sub-sprite que não existe mais,
+        // que o Unity resolve como null e renderiza como um quadrado branco. Se o sprite
+        // serializado de "off" é válido, restaura-o na Image.
+        if (rallyTrafficImage != null && rallyTrafficImage.sprite == null && rallyOffSprite != null)
+            rallyTrafficImage.sprite = rallyOffSprite;
     }
 
     private Sprite ResolveRallyTrafficSprite(bool ownedByRallyOwner, AIRallyAssemblyState rallyState)

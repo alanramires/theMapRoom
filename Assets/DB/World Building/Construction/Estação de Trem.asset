@@ -14,13 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
   id: estacao
   displayName: "Esta\xE7\xE3o de Trem"
+  sufixo: Station
   description: "Esta\xE7\xE3o de Trem para transporte de carga e unidades"
+  isAirport: 0
+  isHarbor: 0
   spriteDefault: {fileID: 21300000, guid: a7b162bc180581b428ddac3618f1dd33, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   baseMovementCost: 1
+  isFakeBuilding: 0
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
   requiredSkillsToEnter: []
   blockedSkills: []
@@ -65,6 +69,7 @@ MonoBehaviour:
     maxCapacity: 0
   constructionConfiguration:
     isPlayerHeadQuarter: 0
+    isVictoryBuilding: 0
     isCapturable: 1
     capturePointsMax: 30
     capturedIncoming: 1500

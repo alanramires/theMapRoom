@@ -14,13 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
   id: barracks
   displayName: Barracks
+  sufixo: Barrack
   description: Barracks
+  isAirport: 0
+  isHarbor: 0
   spriteDefault: {fileID: 21300000, guid: 29fb5ac47cd265c43bb29c283df76ba8, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   baseMovementCost: 1
+  isFakeBuilding: 0
   dpqData: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
   requiredSkillsToEnter: []
   blockedSkills: []

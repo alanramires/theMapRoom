@@ -26,23 +26,19 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Header("Debug")]
     [Tooltip("Usa a fila global por papeis. Desative apenas para comparar com o shopping legado.")]
     public bool UseRoleBasedShopping = true;
-    public bool onlyCapturers;
-    public bool onlyAssault;
-    public bool onlyTransporter;
-    public bool onlyLogistics;
-    public bool onlyFireSupport;
-    public bool onlyAirTransporter;
-    public bool onlyInterceptador;
-    public bool onlyAtaqueAereo;
 
     [Header("Economia Exército")]
     [Range(0f, 20f)] public float SavingPercentualForElite = 15f;
     [Range(0f, 1f)]  public float EliteCapturerFillRatio   = 0.6f;
     [Range(0, 5)]    public int   MinFilledAssaultSlots     = 1;
     [Range(6, 30)]   public int   MinArmySizeForElitePivot  = 12;
+    [Tooltip("Quantos turnos a IA aceita poupar para comprar um elite que ainda não cabe no caixa. 0 = nunca poupa (guloso puro).")]
+    [Range(0, 4)]    public int   EliteSaveMaxTurns         = 1;
     [Range(1, 12)]   public int   MinTurnForFireSupport     = 3;
     [Range(0, 8)]    public int   MinActiveCapturersForFireSupport = 2;
     [Range(0, 5)]    public int   MinActiveAssaultForFireSupport   = 1;
+    [Tooltip("Massa mínima de capturadores ativos antes de liberar demanda de suporte (transporte terrestre e fire support de composição). Forma a base primeiro.")]
+    [Range(0, 8)]    public int   MinCapturerMassForSupport        = 4;
     [Range(2, 8)]    public int   CapturersPerPreventiveTransport = 4;
     [Range(1, 4)]    public int   ProgressiveCapturerBatchSize = 2;
     [Range(1, 4)]    public int   AssaultPerFireSupportRatio = 2;
@@ -123,15 +119,6 @@ public partial class AIShoppingPlanner : MonoBehaviour
     {
         if (Instance != null && Instance.UseRoleBasedShopping)
             return DecideRoleBased(snapshot);
-
-        bool onlyCapturers       = Instance != null && Instance.onlyCapturers;
-        bool onlyAssault         = Instance != null && Instance.onlyAssault;
-        bool onlyTransporter     = Instance != null && Instance.onlyTransporter;
-        bool onlyLogistics       = Instance != null && Instance.onlyLogistics;
-        bool onlyFireSupport     = Instance != null && Instance.onlyFireSupport;
-        bool onlyAirTransporter  = Instance != null && Instance.onlyAirTransporter;
-        bool onlyInterceptador   = Instance != null && Instance.onlyInterceptador;
-        bool onlyAtaqueAereo     = Instance != null && Instance.onlyAtaqueAereo;
 
         var orders = new List<ShoppingOrder>();
         if (snapshot == null) return orders;
@@ -644,7 +631,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
             Debug.Log($"[AI Shopping] reserva_combate_ar: slots={anyAirCombatDemand} custo={cheapestAirCombatCost} cacaB_custo={cacaBReserveCost} cacaA_custo={cacaAReserveCost} apache_custo={apacheReserveCost} bomber_custo={bomberReserveCost} ruptura={artilleryWallBreakthrough} armor_reserva={breakthroughArmorReserve} reserva={reserveForAirCombat} cap_passageiro_reserva={reserveForCapturerPassenger}");
         }
 
-        Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} air_trans_slots={openAirTransportSlots} air_tanker_slots={openAirTankerSlots} intel_air_slots={openAirIntelSlots} intel_mobile_air_slots={openMobileAirIntelSlots} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cacaB_slots={openCacaBSlots} cacaA_slots={openCacaASlots} apache_slots={openApacheSlots} bomba_slots={openBombaSlots} cheapest_transport={cheapestTransportCost} cheapest_air={cheapestAirTransportCost} cheapest_air_intel={cheapestAirIntelCost} reserva_ar={reserveForAirTransport} reserva_intel_ar={reserveForAirIntel} cap_passageiro_reserva={reserveForCapturerPassenger} intel={(intelReport != null ? $"inf={intelReport.enemyInfantryPressureScore:F1} air={intelReport.enemyAirThreatScore:F1} armor={intelReport.enemyArmorThreatScore:F1} num={intelReport.numericalPressure:F1}" : "off")} onlyCap={onlyCapturers} onlyAss={onlyAssault} onlyTrans={onlyTransporter} onlyLog={onlyLogistics} onlyFire={onlyFireSupport}");
+        Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} air_trans_slots={openAirTransportSlots} air_tanker_slots={openAirTankerSlots} intel_air_slots={openAirIntelSlots} intel_mobile_air_slots={openMobileAirIntelSlots} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cacaB_slots={openCacaBSlots} cacaA_slots={openCacaASlots} apache_slots={openApacheSlots} bomba_slots={openBombaSlots} cheapest_transport={cheapestTransportCost} cheapest_air={cheapestAirTransportCost} cheapest_air_intel={cheapestAirIntelCost} reserva_ar={reserveForAirTransport} reserva_intel_ar={reserveForAirIntel} cap_passageiro_reserva={reserveForCapturerPassenger} intel={(intelReport != null ? $"inf={intelReport.enemyInfantryPressureScore:F1} air={intelReport.enemyAirThreatScore:F1} armor={intelReport.enemyArmorThreatScore:F1} num={intelReport.numericalPressure:F1}" : "off")}");
 
         bool strategicEliteAssaultReserve = eliteAssaultTarget != null
             && !dreamTeamPivot
@@ -1036,7 +1023,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
             }
 
             int effectiveOpenCapturerSlots = openCapturerSlots + apcPassengerFollowupDemand;
-            UnitData unit = PickUnit(building, snapshot, spendBudget, onlyCapturers, onlyAssault, onlyTransporter, onlyLogistics, onlyFireSupport, onlyAirTransporter,
+            UnitData unit = PickUnit(building, snapshot, spendBudget,
                 effectiveOpenCapturerSlots, openAssaultSlots, openTransportSlots, urgentTransportDemand, openLogisticsSlots, openFireSupportSlots, openMobileAirIntelSlots, preferDefensiveFireSupport,
                 eliteAssaultTarget, eliteFireSupportTarget, defensiveBaseThreat,
                 allowDefensiveEliteAssault, defensiveTankReserveCost,
@@ -1129,11 +1116,9 @@ public partial class AIShoppingPlanner : MonoBehaviour
             bool wantsAirTanker    = openAirTankerSlots > 0;
             bool wantsAirIntel     = openAirIntelSlots > 0;
             bool anyAirDemand      = wantsAirTransport || wantsCacaB || wantsCacaA || wantsApache || wantsBomba || wantsAirTanker || wantsAirIntel;
-            bool noLandOnlyFilter  = !onlyCapturers && !onlyAssault && !onlyTransporter && !onlyLogistics && !onlyFireSupport;
-            bool airOnlyFilter     = onlyAirTransporter || onlyInterceptador || onlyAtaqueAereo || onlyLogistics;
             bool urgentCacaB       = HasUrgentCacaBThreat(snapshot, intelReport);
 
-            if (airBuildings.Count > 0 && anyAirDemand && (noLandOnlyFilter || airOnlyFilter))
+            if (airBuildings.Count > 0 && anyAirDemand)
             {
                 foreach (ConstructionManager building in airBuildings)
                 {
