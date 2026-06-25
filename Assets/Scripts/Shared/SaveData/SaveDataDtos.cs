@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 5;
+    public int version = 8;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
@@ -32,6 +32,7 @@ public class SaveGameData
     public int aiRuntimeTeamId = (int)TeamId.Neutral;
     public int aiRuntimeTurnNumber;
     public int aiRuntimeStage;
+    public List<AIIntelLedgerSaveData> aiIntelLedgers = new List<AIIntelLedgerSaveData>();
 }
 
 [Serializable]

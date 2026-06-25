@@ -92,20 +92,32 @@ public class SaveGameManager : MonoBehaviour
     }
 
     [Serializable]
-    private sealed class SaveSlotMetadataFile
+    private sealed class SaveContainerManifest
     {
+        public int containerVersion = 1;
+        public int saveVersion;
         public string sceneName;
         public long savedAtUtcTicks;
+        public bool hasReplay;
+        public bool hasJogadas;
     }
 
     private sealed class LoadPreprocessResult
     {
+        public string manifestJson;
         public string json;
-        public bool wasCompressed;
-        public int compressedBytes;
+        public string replayJson;
+        public string jogadasJson;
+        public int containerBytes;
         public int uncompressedBytes;
         public string error;
     }
+
+    private const string SaveContainerExtension = ".tmrsave";
+    private const string SaveContainerManifestEntry = "manifest.json";
+    private const string SaveContainerGameEntry = "game.json";
+    private const string SaveContainerReplayEntry = "replay.json";
+    private const string SaveContainerJogadasEntry = "jogadas.json";
 
     private bool loadInProgress;
     private bool promptUsingPersistenceState;
@@ -129,6 +141,7 @@ public class SaveGameManager : MonoBehaviour
 
     private void Awake()
     {
+        AIIntelLedger.Clear();
         EnsureDefaultSaveDirectoryConfigured();
         TryAutoAssignReferences();
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -643,14 +656,12 @@ public class SaveGameManager : MonoBehaviour
 
             SaveGameData data = BuildSaveData();
             string json = JsonUtility.ToJson(data, false);
-            byte[] compressedBytes = CompressJsonToGzipBytes(json);
+            string replayJson = BuildReplayJsonForSave();
+            string jogadasJson = BuildJogadasJsonForSave();
             string path = ResolveWritableSlotPath(normalizedSlot);
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ResolveSaveDirectory());
-            File.WriteAllBytes(path, compressedBytes);
-            WriteSlotMetadataFile(path, data);
-            WriteOrDeleteReplaySidecar(path);
-            WriteJogadasSidecar(path);
-            LogSaveDiagnostics(normalizedSlot, json, compressedBytes);
+            WriteSaveContainerAtomic(path, data, json, replayJson, jogadasJson);
+            LogSaveDiagnostics(normalizedSlot, json, new FileInfo(path).Length);
 #if UNITY_WEBGL && !UNITY_EDITOR
             string syncingText = ResolveDialog(
                 "dialog.save_status.webgl_syncing",
@@ -1025,8 +1036,8 @@ public class SaveGameManager : MonoBehaviour
             if (verboseLogs)
             {
                 Debug.Log(
-                    $"[SaveGame] Load slot {normalizedSlot}: compressed={preprocess.wasCompressed} " +
-                    $"compressedBytes={preprocess.compressedBytes} uncompressedBytes={preprocess.uncompressedBytes}");
+                    $"[SaveGame] Load slot {normalizedSlot}: containerBytes={preprocess.containerBytes} " +
+                    $"gameJsonBytes={preprocess.uncompressedBytes}");
             }
 
             SaveGameData data = null;
@@ -1034,6 +1045,10 @@ public class SaveGameManager : MonoBehaviour
             LogLoadPerf(normalizedSlot, "deserialize_json.begin", deserializeStartMs, deserializeStartMs - asyncStartMs);
             try
             {
+                SaveContainerManifest manifest = JsonUtility.FromJson<SaveContainerManifest>(preprocess.manifestJson);
+                if (manifest == null || manifest.containerVersion != 1)
+                    throw new InvalidDataException("Versao de container ausente ou nao suportada.");
+
                 data = JsonUtility.FromJson<SaveGameData>(preprocess.json);
             }
             catch (Exception ex)
@@ -1074,7 +1089,8 @@ public class SaveGameManager : MonoBehaviour
 
             // LoadRoutine controla loadInProgress e encerra o indicador no fim.
             yield return StartCoroutine(LoadRoutine(data, normalizedSlot));
-            RestoreJogadasSidecar(path);
+            RestoreReplayFromContainer(preprocess.replayJson);
+            RestoreJogadasFromContainer(preprocess.jogadasJson);
             LogLoadPerf(normalizedSlot, "load_async.end", asyncStartMs, PerfNowMs() - asyncStartMs);
         }
         finally
@@ -1090,15 +1106,25 @@ public class SaveGameManager : MonoBehaviour
         LoadPreprocessResult result = new LoadPreprocessResult();
         try
         {
-            if (!TryReadSaveJson(path, out string json, out bool wasCompressed, out int compressedBytes, out int uncompressedBytes, out string readError))
+            if (!TryReadSaveContainer(
+                    path,
+                    out string manifestJson,
+                    out string json,
+                    out string replayJson,
+                    out string jogadasJson,
+                    out int containerBytes,
+                    out int uncompressedBytes,
+                    out string readError))
             {
                 result.error = readError;
                 return result;
             }
 
+            result.manifestJson = manifestJson;
             result.json = json;
-            result.wasCompressed = wasCompressed;
-            result.compressedBytes = compressedBytes;
+            result.replayJson = replayJson;
+            result.jogadasJson = jogadasJson;
+            result.containerBytes = containerBytes;
             result.uncompressedBytes = uncompressedBytes;
             if (string.IsNullOrWhiteSpace(json))
                 result.error = "JSON do save vazio apos leitura/decompress.";
@@ -1137,15 +1163,8 @@ public class SaveGameManager : MonoBehaviour
         }
 
         File.Delete(path);
-        string metaPath = ResolveMetaPathForSavePath(path);
-        if (File.Exists(metaPath))
-            File.Delete(metaPath);
-        string replayPath = ResolveReplayPathForSavePath(path);
-        if (File.Exists(replayPath))
-            File.Delete(replayPath);
-        string jogadasPath = ResolveJogadasPathForSavePath(path);
-        if (File.Exists(jogadasPath))
-            File.Delete(jogadasPath);
+        DeleteIfExists(path + ".tmp");
+        DeleteIfExists(path + ".bak");
         Debug.Log($"[SaveGame] Slot {normalizedSlot} limpo: {path}");
     }
 
@@ -1164,72 +1183,50 @@ public class SaveGameManager : MonoBehaviour
         cursorController?.ClearRuntimeInputLocksAfterLoad();
     }
 
-    private static void LogSaveDiagnostics(int slotIndex, string json, byte[] compressedBytes)
+    private static void LogSaveDiagnostics(int slotIndex, string json, long containerSizeBytes)
     {
         int uncompressedBytes = string.IsNullOrEmpty(json) ? 0 : Encoding.UTF8.GetByteCount(json);
         float uncompressedKb = uncompressedBytes / 1024f;
-        int compressedSizeBytes = compressedBytes != null ? compressedBytes.Length : 0;
-        float compressedKb = compressedSizeBytes / 1024f;
-        float compressionRatio = uncompressedBytes > 0 ? (float)compressedSizeBytes / uncompressedBytes : 0f;
+        float containerKb = containerSizeBytes / 1024f;
+        float compressionRatio = uncompressedBytes > 0 ? (float)containerSizeBytes / uncompressedBytes : 0f;
 
         Debug.Log(
             $"[SaveGame][Diagnostics] slot={slotIndex} " +
             $"jsonBytes={uncompressedBytes} jsonKB={uncompressedKb:F2} " +
-            $"compressedBytes={compressedSizeBytes} compressedKB={compressedKb:F2} compressionRatio={compressionRatio:F3}");
+            $"containerBytes={containerSizeBytes} containerKB={containerKb:F2} compressionRatio={compressionRatio:F3}");
     }
 
-    private static byte[] CompressJsonToGzipBytes(string json)
-    {
-        string safeJson = json ?? string.Empty;
-        byte[] utf8 = Encoding.UTF8.GetBytes(safeJson);
-        using (MemoryStream output = new MemoryStream())
-        {
-            using (GZipStream gzip = new GZipStream(output, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
-            {
-                gzip.Write(utf8, 0, utf8.Length);
-            }
-
-            return output.ToArray();
-        }
-    }
-
-    private static bool TryReadSaveJson(
+    private static bool TryReadSaveContainer(
         string path,
-        out string json,
-        out bool wasCompressed,
-        out int compressedBytes,
+        out string manifestJson,
+        out string gameJson,
+        out string replayJson,
+        out string jogadasJson,
+        out int containerBytes,
         out int uncompressedBytes,
         out string error)
     {
-        json = string.Empty;
-        wasCompressed = false;
-        compressedBytes = 0;
+        manifestJson = string.Empty;
+        gameJson = string.Empty;
+        replayJson = string.Empty;
+        jogadasJson = string.Empty;
+        containerBytes = 0;
         uncompressedBytes = 0;
         error = string.Empty;
 
         try
         {
-            byte[] raw = File.ReadAllBytes(path);
-            compressedBytes = raw != null ? raw.Length : 0;
-            bool isGzip = raw != null && raw.Length >= 2 && raw[0] == 0x1F && raw[1] == 0x8B;
-
-            if (isGzip)
+            containerBytes = checked((int)new FileInfo(path).Length);
+            using (FileStream stream = File.OpenRead(path))
+            using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false))
             {
-                wasCompressed = true;
-                using (MemoryStream input = new MemoryStream(raw))
-                using (GZipStream gzip = new GZipStream(input, CompressionMode.Decompress))
-                using (MemoryStream output = new MemoryStream())
-                {
-                    gzip.CopyTo(output);
-                    byte[] decompressed = output.ToArray();
-                    uncompressedBytes = decompressed.Length;
-                    json = Encoding.UTF8.GetString(decompressed);
-                    return true;
-                }
+                manifestJson = ReadRequiredContainerEntry(archive, SaveContainerManifestEntry);
+                gameJson = ReadRequiredContainerEntry(archive, SaveContainerGameEntry);
+                replayJson = ReadOptionalContainerEntry(archive, SaveContainerReplayEntry);
+                jogadasJson = ReadOptionalContainerEntry(archive, SaveContainerJogadasEntry);
             }
 
-            json = raw != null ? Encoding.UTF8.GetString(raw) : string.Empty;
-            uncompressedBytes = string.IsNullOrEmpty(json) ? 0 : Encoding.UTF8.GetByteCount(json);
+            uncompressedBytes = string.IsNullOrEmpty(gameJson) ? 0 : Encoding.UTF8.GetByteCount(gameJson);
             return true;
         }
         catch (Exception ex)
@@ -1444,6 +1441,7 @@ public class SaveGameManager : MonoBehaviour
             RestoreSavedUnitActiveStates(data, unitsById);
 
             stage = "restore-ai-objective-plans";
+            AIIntelLedger.Restore(data.aiIntelLedgers);
             if (data.aiObjectivePlans != null && data.aiObjectivePlans.Count > 0)
             {
                 ObjectiveManager.RestoreSaveData(data.aiObjectivePlans);
@@ -1635,7 +1633,8 @@ public class SaveGameManager : MonoBehaviour
             aiRuntimeActive = aiController != null && aiController.IsAIRuntimeActive,
             aiRuntimeTeamId = aiController != null ? (int)aiController.CurrentAITeam : (int)TeamId.Neutral,
             aiRuntimeTurnNumber = aiController != null ? aiController.CurrentAITurnNumber : 0,
-            aiRuntimeStage = aiController != null ? aiController.CurrentAIStage : 0
+            aiRuntimeStage = aiController != null ? aiController.CurrentAIStage : 0,
+            aiIntelLedgers = AIIntelLedger.BuildSaveData()
         };
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
@@ -1830,7 +1829,7 @@ public class SaveGameManager : MonoBehaviour
             safeSlot = $"{safeSlot}_{sceneName}_{sceneHash}";
         }
 
-        string fileName = SanitizeFileName(safeSlot) + ".json";
+        string fileName = SanitizeFileName(safeSlot) + SaveContainerExtension;
         return Path.Combine(ResolveSaveDirectory(), fileName);
     }
 
@@ -1847,7 +1846,7 @@ public class SaveGameManager : MonoBehaviour
     {
         int normalizedSlot = NormalizeSlot(slotIndex);
         string primaryPath = GetSlotPathFromTemplate(normalizedSlot);
-        if (File.Exists(primaryPath) && !IsMetadataSidecarPath(primaryPath) && !IsReplaySidecarPath(primaryPath) && !IsJogadasSidecarPath(primaryPath))
+        if (File.Exists(primaryPath))
             return primaryPath;
 
         string saveDir = ResolveSaveDirectory();
@@ -1855,7 +1854,7 @@ public class SaveGameManager : MonoBehaviour
         {
             if (Directory.Exists(saveDir))
             {
-                string[] candidates = Directory.GetFiles(saveDir, $"*_slot{normalizedSlot}*.json", SearchOption.TopDirectoryOnly);
+                string[] candidates = Directory.GetFiles(saveDir, $"*_slot{normalizedSlot}*{SaveContainerExtension}", SearchOption.TopDirectoryOnly);
                 if (candidates != null && candidates.Length > 0)
                 {
                     string latest = null;
@@ -1863,9 +1862,6 @@ public class SaveGameManager : MonoBehaviour
                     for (int i = 0; i < candidates.Length; i++)
                     {
                         string current = candidates[i];
-                        if (IsMetadataSidecarPath(current) || IsReplaySidecarPath(current) || IsJogadasSidecarPath(current))
-                            continue;
-
                         DateTime currentWrite = File.GetLastWriteTimeUtc(current);
                         if (latest == null || currentWrite > latestWrite)
                         {
@@ -1884,13 +1880,6 @@ public class SaveGameManager : MonoBehaviour
             if (verboseLogs)
                 Debug.LogWarning($"[SaveGame] Falha ao listar saves do slot {normalizedSlot}: {ex.Message}");
         }
-
-        // Compatibilidade com arquivos antigos em persistentDataPath.
-        string legacyStem = string.IsNullOrWhiteSpace(fileNameDefault) ? "quicksave" : fileNameDefault.Trim();
-        string legacyName = $"{legacyStem}_slot{normalizedSlot}.json";
-        string legacyPath = Path.Combine(Application.persistentDataPath, SanitizeFileName(legacyName));
-        if (File.Exists(legacyPath))
-            return legacyPath;
 
         return primaryPath;
     }
@@ -2042,13 +2031,12 @@ public class SaveGameManager : MonoBehaviour
         metadata.exists = true;
 
         DateTime fallbackLocalTime = File.GetLastWriteTime(metadata.path);
-        string metaPath = ResolveMetaPathForSavePath(metadata.path);
-        if (TryReadSlotMetadataFile(metaPath, out SaveSlotMetadataFile metaFile))
+        if (TryReadContainerManifest(metadata.path, out SaveContainerManifest manifest, out string manifestError))
         {
-            metadata.sceneName = metaFile.sceneName ?? string.Empty;
-            if (metaFile.savedAtUtcTicks > 0L)
+            metadata.sceneName = manifest.sceneName ?? string.Empty;
+            if (manifest.savedAtUtcTicks > 0L)
             {
-                DateTime utc = new DateTime(metaFile.savedAtUtcTicks, DateTimeKind.Utc);
+                DateTime utc = new DateTime(manifest.savedAtUtcTicks, DateTimeKind.Utc);
                 metadata.savedAtLocal = utc.ToLocalTime();
             }
             else
@@ -2061,46 +2049,9 @@ public class SaveGameManager : MonoBehaviour
             return metadata;
         }
 
-        try
-        {
-            if (!TryReadSaveJson(metadata.path, out string json, out _, out _, out _, out string readError))
-            {
-                if (verboseLogs)
-                    Debug.LogWarning($"[SaveGame] Nao foi possivel ler metadados do slot {normalizedSlot}: {readError}");
-                metadata.savedAtLocal = fallbackLocalTime;
-                if (string.IsNullOrWhiteSpace(metadata.sceneName))
-                    metadata.sceneName = "Mapa desconhecido";
-                return metadata;
-            }
-
-            SaveGameData data = JsonUtility.FromJson<SaveGameData>(json);
-            if (data != null)
-            {
-                metadata.sceneName = data.sceneName ?? string.Empty;
-                if (data.savedAtUtcTicks > 0L)
-                {
-                    DateTime utc = new DateTime(data.savedAtUtcTicks, DateTimeKind.Utc);
-                    metadata.savedAtLocal = utc.ToLocalTime();
-                }
-                else
-                {
-                    metadata.savedAtLocal = fallbackLocalTime;
-                }
-
-                // Compatibilidade: sidecar para evitar desserializacao completa no prompt.
-                WriteSlotMetadataFileAtPath(metaPath, data);
-            }
-            else
-            {
-                metadata.savedAtLocal = fallbackLocalTime;
-            }
-        }
-        catch (Exception ex)
-        {
-            metadata.savedAtLocal = fallbackLocalTime;
-            if (verboseLogs)
-                Debug.LogWarning($"[SaveGame] Nao foi possivel ler metadados do slot {normalizedSlot}: {ex.Message}");
-        }
+        metadata.savedAtLocal = fallbackLocalTime;
+        if (verboseLogs)
+            Debug.LogWarning($"[SaveGame] Nao foi possivel ler manifesto do slot {normalizedSlot}: {manifestError}");
 
         if (string.IsNullOrWhiteSpace(metadata.sceneName))
             metadata.sceneName = "Mapa desconhecido";
@@ -2108,188 +2059,206 @@ public class SaveGameManager : MonoBehaviour
         return metadata;
     }
 
-    private void WriteSlotMetadataFile(string savePath, SaveGameData data)
+    private string BuildReplayJsonForSave()
     {
-        if (string.IsNullOrWhiteSpace(savePath) || data == null)
-            return;
-
-        string metaPath = ResolveMetaPathForSavePath(savePath);
-        WriteSlotMetadataFileAtPath(metaPath, data);
-    }
-
-    private void WriteSlotMetadataFileAtPath(string metaPath, SaveGameData data)
-    {
-        if (string.IsNullOrWhiteSpace(metaPath) || data == null)
-            return;
-
-        try
-        {
-            SaveSlotMetadataFile metaFile = new SaveSlotMetadataFile
-            {
-                sceneName = data.sceneName ?? string.Empty,
-                savedAtUtcTicks = data.savedAtUtcTicks
-            };
-
-            string json = JsonUtility.ToJson(metaFile, false);
-            Directory.CreateDirectory(Path.GetDirectoryName(metaPath) ?? ResolveSaveDirectory());
-            File.WriteAllText(metaPath, json, Encoding.UTF8);
-        }
-        catch (Exception ex)
-        {
-            if (verboseLogs)
-                Debug.LogWarning($"[SaveGame] Falha ao escrever metadata sidecar '{metaPath}': {ex.Message}");
-        }
-    }
-
-    private bool TryReadSlotMetadataFile(string metaPath, out SaveSlotMetadataFile metaFile)
-    {
-        metaFile = null;
-        if (string.IsNullOrWhiteSpace(metaPath) || !File.Exists(metaPath))
-            return false;
-
-        try
-        {
-            string json = File.ReadAllText(metaPath, Encoding.UTF8);
-            if (string.IsNullOrWhiteSpace(json))
-                return false;
-
-            metaFile = JsonUtility.FromJson<SaveSlotMetadataFile>(json);
-            return metaFile != null;
-        }
-        catch (Exception ex)
-        {
-            if (verboseLogs)
-                Debug.LogWarning($"[SaveGame] Falha ao ler metadata sidecar '{metaPath}': {ex.Message}");
-            return false;
-        }
-    }
-
-    private void WriteOrDeleteReplaySidecar(string savePath)
-    {
-        if (string.IsNullOrWhiteSpace(savePath))
-            return;
-
-        string replayPath = ResolveReplayPathForSavePath(savePath);
         bool shouldPersistReplay =
             saveReplayData &&
             replayManager != null &&
             replayManager.IsRecording;
-
         if (!shouldPersistReplay)
-        {
-            if (File.Exists(replayPath))
-                File.Delete(replayPath);
-            return;
-        }
+            return string.Empty;
 
-        try
-        {
-            ReplaySaveData replayData = replayManager.ExportReplaySaveData();
-            string replayJson = JsonUtility.ToJson(replayData, false);
-            Directory.CreateDirectory(Path.GetDirectoryName(replayPath) ?? ResolveSaveDirectory());
-            File.WriteAllText(replayPath, replayJson, Encoding.UTF8);
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[SaveGame] Falha ao salvar replay sidecar '{replayPath}': {ex.Message}");
-        }
+        ReplaySaveData replayData = replayManager.ExportReplaySaveData();
+        return replayData != null ? JsonUtility.ToJson(replayData, false) : string.Empty;
     }
 
-    private static bool IsReplaySidecarPath(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-            return false;
-
-        return path.EndsWith(".replay", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsMetadataSidecarPath(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-            return false;
-
-        return path.EndsWith(".meta.json", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private string ResolveMetaPathForSavePath(string savePath)
-    {
-        if (string.IsNullOrWhiteSpace(savePath))
-            return Path.Combine(ResolveSaveDirectory(), "slot.meta.json");
-
-        string directory = Path.GetDirectoryName(savePath) ?? ResolveSaveDirectory();
-        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(savePath);
-        return Path.Combine(directory, $"{fileNameWithoutExtension}.meta.json");
-    }
-
-    private string ResolveReplayPathForSavePath(string savePath)
-    {
-        if (string.IsNullOrWhiteSpace(savePath))
-            return Path.Combine(ResolveSaveDirectory(), "slot.replay");
-
-        string directory = Path.GetDirectoryName(savePath) ?? ResolveSaveDirectory();
-        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(savePath);
-        return Path.Combine(directory, $"{fileNameWithoutExtension}.replay");
-    }
-
-    private string ResolveJogadasPathForSavePath(string savePath)
-    {
-        if (string.IsNullOrWhiteSpace(savePath))
-            return Path.Combine(ResolveSaveDirectory(), "slot.jogadas.json");
-
-        string directory = Path.GetDirectoryName(savePath) ?? ResolveSaveDirectory();
-        string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(savePath);
-        return Path.Combine(directory, $"{fileNameWithoutExtension}.jogadas.json");
-    }
-
-    private static bool IsJogadasSidecarPath(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-            return false;
-
-        return path.EndsWith(".jogadas.json", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private void WriteJogadasSidecar(string savePath)
-    {
-        if (string.IsNullOrWhiteSpace(savePath))
-            return;
-
-        string jogadasPath = ResolveJogadasPathForSavePath(savePath);
-        try
-        {
-            JogadasManager manager = JogadasManager.EnsureInstance();
-            string json = JsonUtility.ToJson(manager.log, false);
-            Directory.CreateDirectory(Path.GetDirectoryName(jogadasPath) ?? ResolveSaveDirectory());
-            File.WriteAllText(jogadasPath, json, Encoding.UTF8);
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[SaveGame] Falha ao salvar jogadas sidecar '{jogadasPath}': {ex.Message}");
-        }
-    }
-
-    private void RestoreJogadasSidecar(string savePath)
+    private static string BuildJogadasJsonForSave()
     {
         JogadasManager manager = JogadasManager.EnsureInstance();
+        return JsonUtility.ToJson(manager.log ?? new JogadasLog(), false);
+    }
 
-        string jogadasPath = ResolveJogadasPathForSavePath(savePath);
-        if (!File.Exists(jogadasPath))
+    private static void WriteSaveContainerAtomic(
+        string savePath,
+        SaveGameData data,
+        string gameJson,
+        string replayJson,
+        string jogadasJson)
+    {
+        string tempPath = savePath + ".tmp";
+        string backupPath = savePath + ".bak";
+        DeleteIfExists(tempPath);
+        DeleteIfExists(backupPath);
+        try
         {
-            manager.log = new JogadasLog();
+            SaveContainerManifest manifest = new SaveContainerManifest
+            {
+                saveVersion = data != null ? data.version : 0,
+                sceneName = data?.sceneName ?? string.Empty,
+                savedAtUtcTicks = data?.savedAtUtcTicks ?? 0L,
+                hasReplay = !string.IsNullOrWhiteSpace(replayJson),
+                hasJogadas = !string.IsNullOrWhiteSpace(jogadasJson)
+            };
+
+            using (FileStream stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None))
+            using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: false))
+            {
+                WriteContainerEntry(archive, SaveContainerManifestEntry, JsonUtility.ToJson(manifest, false));
+                WriteContainerEntry(archive, SaveContainerGameEntry, gameJson);
+                if (manifest.hasReplay)
+                    WriteContainerEntry(archive, SaveContainerReplayEntry, replayJson);
+                if (manifest.hasJogadas)
+                    WriteContainerEntry(archive, SaveContainerJogadasEntry, jogadasJson);
+            }
+
+            if (!TryReadContainerManifest(tempPath, out _, out string manifestError))
+                throw new InvalidDataException($"Container temporario invalido: {manifestError}");
+
+            using (FileStream validationStream = File.OpenRead(tempPath))
+            using (ZipArchive validationArchive = new ZipArchive(validationStream, ZipArchiveMode.Read, leaveOpen: false))
+                ReadRequiredContainerEntry(validationArchive, SaveContainerGameEntry);
+
+            ReplaceFileTransactional(tempPath, savePath, backupPath);
+        }
+        finally
+        {
+            DeleteIfExists(tempPath);
+            DeleteIfExists(backupPath);
+        }
+    }
+
+    private static void ReplaceFileTransactional(string tempPath, string savePath, string backupPath)
+    {
+        if (!File.Exists(savePath))
+        {
+            File.Move(tempPath, savePath);
             return;
         }
 
         try
         {
-            string json = File.ReadAllText(jogadasPath, Encoding.UTF8);
-            JogadasLog restored = JsonUtility.FromJson<JogadasLog>(json);
+            File.Replace(tempPath, savePath, backupPath);
+        }
+        catch (Exception ex) when (ex is PlatformNotSupportedException || ex is IOException)
+        {
+            File.Move(savePath, backupPath);
+            try
+            {
+                File.Move(tempPath, savePath);
+                File.Delete(backupPath);
+            }
+            catch
+            {
+                if (!File.Exists(savePath) && File.Exists(backupPath))
+                    File.Move(backupPath, savePath);
+                throw;
+            }
+        }
+    }
+
+    private static void WriteContainerEntry(ZipArchive archive, string entryName, string content)
+    {
+        ZipArchiveEntry entry = archive.CreateEntry(entryName, System.IO.Compression.CompressionLevel.Optimal);
+        using (Stream stream = entry.Open())
+        using (StreamWriter writer = new StreamWriter(stream, new UTF8Encoding(false)))
+            writer.Write(content ?? string.Empty);
+    }
+
+    private static string ReadRequiredContainerEntry(ZipArchive archive, string entryName)
+    {
+        ZipArchiveEntry entry = archive.GetEntry(entryName);
+        if (entry == null)
+            throw new InvalidDataException($"Entrada obrigatoria ausente: {entryName}");
+
+        string content = ReadContainerEntry(entry);
+        if (string.IsNullOrWhiteSpace(content))
+            throw new InvalidDataException($"Entrada obrigatoria vazia: {entryName}");
+        return content;
+    }
+
+    private static string ReadOptionalContainerEntry(ZipArchive archive, string entryName)
+    {
+        ZipArchiveEntry entry = archive.GetEntry(entryName);
+        return entry != null ? ReadContainerEntry(entry) : string.Empty;
+    }
+
+    private static string ReadContainerEntry(ZipArchiveEntry entry)
+    {
+        using (Stream stream = entry.Open())
+        using (StreamReader reader = new StreamReader(stream, Encoding.UTF8, true))
+            return reader.ReadToEnd();
+    }
+
+    private static bool TryReadContainerManifest(
+        string savePath,
+        out SaveContainerManifest manifest,
+        out string error)
+    {
+        manifest = null;
+        error = string.Empty;
+        try
+        {
+            using (FileStream stream = File.OpenRead(savePath))
+            using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false))
+            {
+                string json = ReadRequiredContainerEntry(archive, SaveContainerManifestEntry);
+                manifest = JsonUtility.FromJson<SaveContainerManifest>(json);
+            }
+
+            if (manifest == null || manifest.containerVersion != 1)
+                throw new InvalidDataException("Versao de container ausente ou nao suportada.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            manifest = null;
+            return false;
+        }
+    }
+
+    private void RestoreReplayFromContainer(string replayJson)
+    {
+        if (replayManager == null)
+            return;
+
+        try
+        {
+            ReplaySaveData restored = string.IsNullOrWhiteSpace(replayJson)
+                ? null
+                : JsonUtility.FromJson<ReplaySaveData>(replayJson);
+            replayManager.ImportReplaySaveData(restored);
+            replayManager.BeginTurnRecording();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[SaveGame] Falha ao restaurar replay do container: {ex.Message}");
+            replayManager.ImportReplaySaveData(null);
+            replayManager.BeginTurnRecording();
+        }
+    }
+
+    private static void RestoreJogadasFromContainer(string jogadasJson)
+    {
+        JogadasManager manager = JogadasManager.EnsureInstance();
+        try
+        {
+            JogadasLog restored = string.IsNullOrWhiteSpace(jogadasJson)
+                ? null
+                : JsonUtility.FromJson<JogadasLog>(jogadasJson);
             manager.log = restored ?? new JogadasLog();
         }
         catch (Exception ex)
         {
-            Debug.LogWarning($"[SaveGame] Falha ao restaurar jogadas sidecar '{jogadasPath}': {ex.Message}");
+            Debug.LogWarning($"[SaveGame] Falha ao restaurar jogadas do container: {ex.Message}");
             manager.log = new JogadasLog();
         }
+    }
+
+    private static void DeleteIfExists(string path)
+    {
+        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            File.Delete(path);
     }
 
     private static string SanitizeFileName(string raw)

@@ -10,11 +10,146 @@ public partial class AIShoppingPlanner
             return null;
 
         JogadasManager jogadas = JogadasManager.EnsureInstance();
-        if (jogadas == null || jogadas.log == null || jogadas.log.jogadas == null || jogadas.log.jogadas.Count == 0)
-            return null;
+        IReadOnlyCollection<AIIntelContact> contacts =
+            AIIntelLedger.UpdateAndGetContacts(snapshot);
+        var observableLog = new JogadasLog();
+        if (jogadas?.log?.jogadas != null)
+        foreach (Jogada play in jogadas.log.jogadas)
+        {
+            if (play == null)
+                continue;
+            bool ownAction = play.team == (int)snapshot.AITeam;
+            bool enemyCombatAgainstUs = play.hasCombatResult
+                && play.team2 == (int)snapshot.AITeam;
+            if (ownAction)
+                observableLog.jogadas.Add(play);
+            else if (enemyCombatAgainstUs)
+                observableLog.jogadas.Add(play.attackerVisibleToDefender
+                    ? play
+                    : BuildSanitizedHiddenAttack(play));
+        }
 
         int lookback = Mathf.Max(1, Instance.IntelShoppingLookbackTurns);
-        return AIIntelAnalyzer.BuildReport(jogadas.log, snapshot.AITeam, lookback, 5, snapshot.TurnNumber);
+        AIIntelReport report = AIIntelAnalyzer.BuildReport(
+            observableLog, snapshot.AITeam, lookback, 5, snapshot.TurnNumber);
+        ApplySubjectiveLedgerComposition(report, contacts, snapshot.TurnNumber, lookback);
+        return report;
+    }
+
+    private static Jogada BuildSanitizedHiddenAttack(Jogada source)
+    {
+        return new Jogada
+        {
+            jogadaId = source.jogadaId,
+            turno = source.turno,
+            team = source.team,
+            team2 = source.team2,
+            acao = source.acao,
+            cx = source.dx,
+            cy = source.dy,
+            dx = source.dx,
+            dy = source.dy,
+            unidadeSigla = "?",
+            uid = 0,
+            unidadeSigla2 = source.unidadeSigla2,
+            uid2 = source.uid2,
+            hasCombatResult = source.hasCombatResult,
+            hpAntes = source.hpAntes,
+            hpDepois = source.hpDepois,
+            hp2Antes = source.hp2Antes,
+            hp2Depois = source.hp2Depois,
+            hasAttackIntel = source.hasAttackIntel,
+            attackWeaponCategory = source.attackWeaponCategory,
+            attackTrajectory = source.attackTrajectory,
+            attackerVisibleToDefender = false,
+            defenderCost = source.defenderCost,
+            defenderEliteLevel = source.defenderEliteLevel,
+            combatCargo = source.combatCargo,
+            obs = "ataque de origem desconhecida",
+        };
+    }
+
+    private static void ApplySubjectiveLedgerComposition(
+        AIIntelReport report,
+        IReadOnlyCollection<AIIntelContact> contacts,
+        int currentTurn,
+        int lookback)
+    {
+        if (report == null)
+            return;
+
+        report.enemyPurchases.Clear();
+        report.enemyPurchasesRecent = 0;
+        report.enemyElitePurchaseScore = 0f;
+        report.enemyAirThreatScore = 0f;
+        report.enemyArmorThreatScore = 0f;
+        report.enemyArtilleryThreatScore = 0f;
+        report.enemyInfantryPressureScore = 0f;
+        report.enemyInfantryForce = 0f;
+        report.enemyArmorForce = 0f;
+        report.enemyAirForce = 0f;
+        report.enemyNavalForce = 0f;
+        report.enemyLastKnownUnits.Clear();
+
+        if (contacts == null)
+            return;
+        foreach (AIIntelContact contact in contacts)
+        {
+            if (contact == null || contact.destroyed)
+                continue;
+            int age = Mathf.Max(0, currentTurn - contact.lastSeenTurn);
+            if (age >= lookback)
+                continue;
+            UnitData data = ResolveUnitDataBySigla(contact.sigla);
+            if (data == null)
+                continue;
+            float recency = Mathf.Lerp(0.35f, 1f, 1f - age / (float)lookback);
+            float weight = recency * Mathf.Clamp01(contact.confidence)
+                * (1f + Mathf.Max(0, data.eliteLevel) * 0.5f);
+
+            report.enemyLastKnownUnits.Add(new AIUnitIntel
+            {
+                uid = contact.uid,
+                team = contact.enemyTeam,
+                sigla = contact.sigla,
+                lastAction = contact.source,
+                lastSeenTurn = contact.lastSeenTurn,
+                lastKnownCell = contact.lastKnownCell,
+                confidence = contact.confidence,
+                destroyed = contact.destroyed,
+                recentDamageDealt = contact.recentDamageDealt,
+                recentKills = contact.recentKills,
+                recentDestroyedValue = contact.recentDestroyedValue,
+            });
+
+            switch (data.unitClass)
+            {
+                case GameUnitClass.Infantry:
+                    report.enemyInfantryForce += weight;
+                    report.enemyInfantryPressureScore += weight;
+                    break;
+                case GameUnitClass.Vehicle:
+                case GameUnitClass.Armored:
+                    report.enemyArmorForce += weight;
+                    report.enemyArmorThreatScore += weight;
+                    break;
+                case GameUnitClass.Artillery:
+                    report.enemyArmorForce += weight;
+                    report.enemyArtilleryThreatScore += weight;
+                    break;
+                case GameUnitClass.Jet:
+                case GameUnitClass.Helicopter:
+                case GameUnitClass.Plane:
+                    report.enemyAirForce += weight;
+                    report.enemyAirThreatScore += weight;
+                    break;
+                case GameUnitClass.Ship:
+                case GameUnitClass.Submarine:
+                    report.enemyNavalForce += weight;
+                    break;
+            }
+        }
+        report.enemyKnownUnits = report.enemyLastKnownUnits.Count;
     }
 
     private static void ApplyJogadasIntelBias(

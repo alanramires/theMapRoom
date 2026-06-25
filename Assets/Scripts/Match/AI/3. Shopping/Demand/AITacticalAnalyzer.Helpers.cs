@@ -25,9 +25,9 @@ public partial class AITacticalAnalyzer
             case AINeedKind.FireSupport:
                 return UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.FogoIndireto && !IsAntiAirOnlyUnit(data);
             case AINeedKind.AirTransport:
-                return UnitRoleCompatibility.CanSatisfy(data, UnitRole.Transportador) && data.domain == Domain.Air;
+                return UnitRoleCompatibility.IsOperationalTransporter(data) && data.domain == Domain.Air;
             case AINeedKind.GroundTransport:
-                return UnitRoleCompatibility.CanSatisfy(data, UnitRole.Transportador) && data.domain == Domain.Land;
+                return UnitRoleCompatibility.IsOperationalTransporter(data) && data.domain == Domain.Land;
             case AINeedKind.FighterB:
                 return IsPrimaryRole(data, UnitRole.Interceptador) && data.eliteLevel == 0;
             case AINeedKind.FighterA:

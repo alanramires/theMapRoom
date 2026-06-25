@@ -297,7 +297,7 @@ public static class SaveDataMapper
             return;
 
         bool shouldRepair = saved.isUnderRepair || ShouldEnterRepairFromLoadedState(unit);
-        unit.SetIsUnderRepair(shouldRepair);
+        unit.SetIsUnderRepair(shouldRepair, recordTransition: false);
         unit.SetAIMaintenanceActive(shouldRepair);
     }
 

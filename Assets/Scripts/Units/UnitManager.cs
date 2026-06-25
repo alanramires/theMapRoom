@@ -214,7 +214,15 @@ public class UnitManager : MonoBehaviour
     }
 
     public void SetAIForcedToRepair(bool value) => aiForcedToRepair = value;
-    public void SetIsUnderRepair(bool value) => isUnderRepair = value;
+    public void SetIsUnderRepair(bool value, bool recordTransition = true)
+    {
+        if (isUnderRepair == value)
+            return;
+        bool before = isUnderRepair;
+        isUnderRepair = value;
+        if (recordTransition)
+            JogadasManager.RegistrarEstadoReparo(this, before, value);
+    }
     public void SetAIAssignedPlan(string planKey, string planName, string badge, int role, bool badgeVisible)
     {
         aiHasAssignedPlan = !string.IsNullOrWhiteSpace(planKey) || !string.IsNullOrWhiteSpace(planName);

@@ -32,8 +32,10 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Range(0f, 1f)]  public float EliteCapturerFillRatio   = 0.6f;
     [Range(0, 5)]    public int   MinFilledAssaultSlots     = 1;
     [Range(6, 30)]   public int   MinArmySizeForElitePivot  = 12;
-    [Tooltip("Quantos turnos a IA aceita poupar para comprar um elite que ainda não cabe no caixa. 0 = nunca poupa (guloso puro).")]
+    [Tooltip("Quantos turnos a IA aceita poupar para comprar um elite ou uma capacidade crítica prioritária que ainda não cabe no caixa. 0 = nunca poupa (guloso puro).")]
     [Range(0, 4)]    public int   EliteSaveMaxTurns         = 1;
+    [Tooltip("Percentual MÁXIMO do saldo projetado após uma compra elite que permanece protegido para serviços/manutenção. Escala de 0% com até 5 unidades até este valor com exército maduro.")]
+    [Range(0f, 50f)] public float CriticalCapabilityMaintenanceReservePercent = 20f;
     [Range(1, 12)]   public int   MinTurnForFireSupport     = 3;
     [Range(0, 8)]    public int   MinActiveCapturersForFireSupport = 2;
     [Range(0, 5)]    public int   MinActiveAssaultForFireSupport   = 1;

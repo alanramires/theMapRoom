@@ -25,6 +25,9 @@ public partial class AIShoppingPlanner
         public float AntiShip;
         public int VisibleUnits;
         public int RememberedUnits;
+        public int SensorContacts;
+        public int CombatContacts;
+        public int AnonymousThreatSignals;
 
         public float Get(WeaponCategory category)
         {
@@ -66,12 +69,48 @@ public partial class AIShoppingPlanner
 
         var byClass = new Dictionary<GameUnitClass, EnemyClassPressureInspection>();
         var visibleIds = new HashSet<int>();
-        AIIntelReport intel = BuildShoppingIntelReport(snapshot);
-        var memoryByUid = new Dictionary<int, AIUnitIntel>();
-        if (intel?.enemyLastKnownUnits != null)
-            foreach (AIUnitIntel memory in intel.enemyLastKnownUnits)
-                if (memory != null && memory.uid > 0)
-                    memoryByUid[memory.uid] = memory;
+        IReadOnlyCollection<AIIntelContact> contacts =
+            AIIntelLedger.UpdateAndGetContacts(snapshot);
+        var contactsByUid = new Dictionary<int, AIIntelContact>();
+        if (contacts != null)
+            foreach (AIIntelContact contact in contacts)
+                if (contact != null && contact.uid > 0)
+                {
+                    contactsByUid[contact.uid] = contact;
+                    if (!contact.destroyed)
+                    {
+                        if (string.Equals(contact.source, "combate", StringComparison.OrdinalIgnoreCase))
+                            result.CombatContacts++;
+                        else
+                            result.SensorContacts++;
+                    }
+                }
+
+        IReadOnlyList<AIIntelThreatSignal> threatSignals =
+            AIIntelLedger.GetThreatSignals(snapshot.AITeam);
+        if (threatSignals != null)
+        {
+            int lookback = Instance != null
+                ? Mathf.Max(1, Instance.IntelShoppingLookbackTurns)
+                : 4;
+            foreach (AIIntelThreatSignal signal in threatSignals)
+            {
+                if (signal == null)
+                    continue;
+                int age = Mathf.Max(0, snapshot.TurnNumber - signal.turn);
+                if (age >= lookback)
+                    continue;
+
+                float recency = Mathf.Lerp(0.35f, 1f, 1f - age / (float)lookback);
+                float score = (0.7f
+                    + signal.damage * 0.16f
+                    + signal.kills * 1.4f
+                    + Mathf.Clamp(signal.destroyedValue / 12000f, 0f, 2.5f))
+                    * recency;
+                AddAnonymousWeaponPressure(result, signal.weaponCategory, score);
+                result.AnonymousThreatSignals++;
+            }
+        }
 
         if (snapshot.EnemyUnits != null)
         foreach (UnitManager enemy in snapshot.EnemyUnits)
@@ -81,15 +120,17 @@ public partial class AIShoppingPlanner
 
             visibleIds.Add(enemy.InstanceId);
             float score = ComputeEnemyCounterWeight(enemy, data);
-            if (memoryByUid.TryGetValue(enemy.InstanceId, out AIUnitIntel visibleMemory))
+            if (contactsByUid.TryGetValue(enemy.InstanceId, out AIIntelContact visibleMemory))
                 score += ComputeCombatImpactScore(visibleMemory);
             AddPressure(result, byClass, data, score, visible: true);
         }
 
-        if (intel?.enemyLastKnownUnits != null)
+        if (contacts != null)
         {
-            int lookback = Mathf.Max(1, intel.lookbackTurns);
-            foreach (AIUnitIntel memory in intel.enemyLastKnownUnits)
+            int lookback = Instance != null
+                ? Mathf.Max(1, Instance.IntelShoppingLookbackTurns)
+                : 4;
+            foreach (AIIntelContact memory in contacts)
             {
                 if (memory == null || memory.destroyed || visibleIds.Contains(memory.uid))
                     continue;
@@ -111,6 +152,20 @@ public partial class AIShoppingPlanner
 
         result.Classes.Sort((a, b) => b.Score.CompareTo(a.Score));
         return result;
+    }
+
+    private static void AddAnonymousWeaponPressure(
+        CounterPressureInspection result,
+        WeaponCategory category,
+        float score)
+    {
+        switch (category)
+        {
+            case WeaponCategory.AntiInfantaria: result.AntiInfantry += score; break;
+            case WeaponCategory.AntiTanque: result.AntiTank += score; break;
+            case WeaponCategory.AntiAerea: result.AntiAir += score; break;
+            case WeaponCategory.AntiNavio: result.AntiShip += score; break;
+        }
     }
 
     private static void AddPressure(
@@ -198,6 +253,15 @@ public partial class AIShoppingPlanner
             + Mathf.Max(0f, memory.recentDestroyedValue) / 5000f;
     }
 
+    private static float ComputeCombatImpactScore(AIIntelContact memory)
+    {
+        if (memory == null)
+            return 0f;
+        return Mathf.Max(0f, memory.recentDamageDealt) * 0.35f
+            + Mathf.Max(0f, memory.recentKills) * 3f
+            + Mathf.Max(0f, memory.recentDestroyedValue) / 5000f;
+    }
+
     private static Dictionary<string, UnitData> counterUnitDataBySigla;
 
     private static UnitData ResolveUnitDataBySigla(string sigla)
@@ -254,20 +318,20 @@ public partial class AIShoppingPlanner
         int desiredAntiTank = Mathf.Clamp(Mathf.CeilToInt(pressure.AntiTank / 4f), 0, 4);
         int ownAntiTankFire = CountOwnCounters(
             snapshot, WeaponCategory.AntiTanque, UnitRole.FogoIndireto);
-        int ownAntiTankAssault = CountOwnCounters(
-            snapshot, WeaponCategory.AntiTanque, UnitRole.Assalto);
-        int counterGap = Mathf.Max(0, desiredAntiTank - ownAntiTankFire - ownAntiTankAssault);
+        int counterGap = Mathf.Max(0, desiredAntiTank - ownAntiTankFire);
         if (counterGap <= 0)
             return;
 
         int fireGap = Mathf.Min(2, counterGap);
-        EnsureRoleDemand(
-            demands,
+        AIShoppingDemand antiTankFireSupport = NewRoleDemand(
             UnitRole.FogoIndireto,
             fireGap,
             pressure.RememberedUnits > 0 ? 11 : 15,
             "counter-pressure",
-            $"anti-tank={pressure.AntiTank:F1} vis={pressure.VisibleUnits} memoria={pressure.RememberedUnits} cobertura={ownAntiTankFire + ownAntiTankAssault}/{desiredAntiTank}");
+            $"anti-tank={pressure.AntiTank:F1} vis={pressure.VisibleUnits} memoria={pressure.RememberedUnits} cobertura fogo AT={ownAntiTankFire}/{desiredAntiTank}",
+            false);
+        antiTankFireSupport.RequiredWeaponCategory = WeaponCategory.AntiTanque;
+        MergeRoleDemand(demands, antiTankFireSupport, false);
     }
 
     private static float ScoreCounterFit(UnitData unit, CounterPressureInspection pressure)

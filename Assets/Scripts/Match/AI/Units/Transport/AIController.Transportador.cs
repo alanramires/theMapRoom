@@ -374,7 +374,7 @@ public partial class AIController
         {
             if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
             if (!u.TryGetUnitData(out UnitData data)) continue;
-            if (UnitRoleCompatibility.CanSatisfy(data, UnitRole.Transportador))
+            if (UnitRoleCompatibility.IsOperationalTransporter(data))
                 list.Add(u);
         }
         return list;

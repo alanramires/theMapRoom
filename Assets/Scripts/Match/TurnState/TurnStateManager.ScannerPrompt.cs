@@ -3051,6 +3051,12 @@ public partial class TurnStateManager
         SetMirandoSpotterPreviewsVisible(false);
         UnitManager attacker = option != null ? option.attackerUnit : null;
         UnitManager defender = option != null ? option.targetUnit : null;
+        bool attackerVisibleToDefender = attacker != null && defender != null
+            && (matchController == null
+                || matchController.IsUnitVisibleForTeamNoCache(attacker, defender.TeamId));
+        if (defender != null && matchController != null)
+            AIIntelLedger.RecordVisibleContactsForTeam(
+                defender.TeamId, matchController.CurrentTurn, matchController);
 
         float audioDuration = PlayCombatAttackSfx(attackerTrajectory, defender);
         float waitDuration = audioDuration;
@@ -3079,6 +3085,11 @@ public partial class TurnStateManager
             defender,
             attackerHpBeforeResolution,
             defenderHpBeforeResolution,
+            option != null && option.weapon != null
+                ? option.weapon.WeaponCategory
+                : WeaponCategory.AntiInfantaria,
+            attackerTrajectory,
+            attackerVisibleToDefender,
             combatCargoSnapshot);
         planningManager?.NotifyUnitInvolvedInCombat(attacker);
         planningManager?.NotifyUnitInvolvedInCombat(defender);

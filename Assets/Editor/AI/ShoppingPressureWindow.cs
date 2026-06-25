@@ -38,6 +38,7 @@ public class ShoppingPressureWindow : EditorWindow
     private GUIStyle _subtle;
     private bool _stylesReady;
     private bool _showCounterPressure = true;
+    private bool _showOperationalPressure = true;
 
     [MenuItem("Tools/Utils/Shopping Pressure")]
     public static void OpenWindow()
@@ -108,6 +109,7 @@ public class ShoppingPressureWindow : EditorWindow
 
         DrawHeader(_snapshot, plan, _demands);
         DrawCounterPressure(_snapshot, _demands);
+        DrawOperationalPressure(_snapshot);
 
         EditorGUILayout.BeginHorizontal();
         DrawObjectivesColumn(plan);
@@ -199,7 +201,11 @@ public class ShoppingPressureWindow : EditorWindow
             $"maior pressão: {pressure.DominantCategory}  ·  score pondera quantidade, elite, custo e HP atual",
             _subtle);
         EditorGUILayout.LabelField(
-            $"fontes: {pressure.VisibleUnits} visíveis + {pressure.RememberedUnits} lembradas pelo JogadasManager",
+            $"fontes: {pressure.VisibleUnits} visíveis + {pressure.RememberedUnits} lembradas pelo ledger",
+            _subtle);
+        EditorGUILayout.LabelField(
+            $"ledger subjetivo: sensor={pressure.SensorContacts} combate={pressure.CombatContacts} " +
+            $"ameaças anônimas={pressure.AnonymousThreatSignals} (compras ocultas não entram)",
             _subtle);
 
         foreach (AIShoppingPlanner.EnemyClassPressureInspection entry in pressure.Classes)
@@ -214,7 +220,8 @@ public class ShoppingPressureWindow : EditorWindow
             {
                 if (building?.OfferedUnits == null) continue;
                 foreach (UnitData unit in building.OfferedUnits)
-                    if (unit != null && !offered.Contains(unit) && IsRelevantOffer(unit, demands))
+                    if (unit != null && !offered.Contains(unit)
+                        && AIShoppingPlanner.InspectCounterFit(unit, pressure) > 0f)
                         offered.Add(unit);
             }
 
@@ -225,29 +232,83 @@ public class ShoppingPressureWindow : EditorWindow
         if (offered.Count > 0)
         {
             EditorGUILayout.Space(2f);
-            EditorGUILayout.LabelField("melhores counters entre ofertas que atendem à fila:", _subtle);
-            int count = Mathf.Min(5, offered.Count);
+            EditorGUILayout.LabelField("melhores counters disponíveis:", _subtle);
+            int count = Mathf.Min(8, offered.Count);
             for (int i = 0; i < count; i++)
             {
                 UnitData unit = offered[i];
                 float fit = AIShoppingPlanner.InspectCounterFit(unit, pressure);
+                bool eligible = AIShoppingPlanner.InspectPurchaseEligibility(
+                    snapshot, unit, demands, out string reason);
                 EditorGUILayout.LabelField(
-                    $"  {i + 1}. {unit.displayName}  fit={fit:F1}  elite={unit.eliteLevel}  ${unit.cost}",
+                    $"  {i + 1}. {unit.displayName}  fit={fit:F1}  elite={unit.eliteLevel}  ${unit.cost}" +
+                    (eligible ? "  [elegível]" : $"  — {reason}"),
                     _subtle);
             }
+
+            var eligibleOffers = new List<UnitData>();
+            foreach (UnitData unit in offered)
+                if (AIShoppingPlanner.InspectPurchaseEligibility(
+                    snapshot, unit, demands, out _))
+                    eligibleOffers.Add(unit);
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("elegíveis para a fila agora:", _subtle);
+            if (eligibleOffers.Count == 0)
+                EditorGUILayout.LabelField("  — nenhum counter elegível —", _subtle);
+            else
+                for (int i = 0; i < Mathf.Min(5, eligibleOffers.Count); i++)
+                {
+                    UnitData unit = eligibleOffers[i];
+                    float fit = AIShoppingPlanner.InspectCounterFit(unit, pressure);
+                    EditorGUILayout.LabelField(
+                        $"  {i + 1}. {unit.displayName}  fit={fit:F1}  elite={unit.eliteLevel}  ${unit.cost}",
+                        _subtle);
+                }
         }
         EditorGUILayout.EndVertical();
     }
 
-    private static bool IsRelevantOffer(UnitData unit, List<AIShoppingDemand> demands)
+    private void DrawOperationalPressure(AIWorldSnapshot snapshot)
     {
-        if (demands == null)
-            return false;
-        foreach (AIShoppingDemand demand in demands)
-            if (demand != null && demand.Count > 0
-                && AIShoppingPlanner.UnitMeetsDemandForInspection(unit, demand))
-                return true;
-        return false;
+        if (snapshot == null)
+            return;
+
+        _showOperationalPressure = EditorGUILayout.Foldout(
+            _showOperationalPressure,
+            "Operational pressure  (eixos, transporte e desgaste logístico)",
+            true);
+        if (!_showOperationalPressure)
+            return;
+
+        AIShoppingPlanner.OperationalPressureInspection pressure =
+            AIShoppingPlanner.InspectOperationalPressure(snapshot);
+
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        EditorGUILayout.LabelField(
+            $"transporte {pressure.Transport:F1}  ·  logística {pressure.Logistics:F1}",
+            EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            $"transportes: cobertura {pressure.ActiveTransports}/{pressure.DesiredTransports}  gap={pressure.TransportGap}",
+            _subtle);
+
+        foreach (AIShoppingPlanner.AxisTransportPressureInspection axis in pressure.Axes)
+            EditorGUILayout.LabelField(
+                $"  eixo {axis.Eixo}: frente={axis.Front} rally={axis.Rally} " +
+                $"avanço={axis.Advance:F1}/{axis.Total} ({axis.Progress:P0}) " +
+                $"prof={axis.Depth:F1} trans={axis.AssignedTransports}/{axis.DesiredTransports} " +
+                $"score={axis.Score:F1}",
+                _subtle);
+
+        EditorGUILayout.LabelField(
+            $"logística: repair atual={pressure.CurrentRepairUnits} score={pressure.CurrentRepair:F1}  " +
+            $"memória={pressure.RememberedRepairUnits} score={pressure.RememberedRepair:F1}  " +
+            $"preventivo={pressure.Preventive:F1}",
+            _subtle);
+        EditorGUILayout.LabelField(
+            $"logísticos: cobertura {pressure.ActiveLogistics}/{pressure.DesiredLogistics}  gap={pressure.LogisticsGap}",
+            _subtle);
+        EditorGUILayout.EndVertical();
     }
 
     // ----------------------------------------------------------------------------
@@ -516,10 +577,15 @@ public class ShoppingPressureWindow : EditorWindow
             ? $"  elite={d.MinEliteLevel}-{(d.MaxEliteLevel == int.MaxValue ? "∞" : d.MaxEliteLevel.ToString())}"
             : "";
         string domain = d.Domain.HasValue ? $"  [{d.Domain.Value}]" : "";
+        string weapon = d.RequiredWeaponCategory.HasValue
+            ? $"  arma={d.RequiredWeaponCategory.Value}"
+            : "";
 
         Color prev = GUI.color;
         if (d.Urgent) GUI.color = new Color(1f, 0.55f, 0.55f);
-        EditorGUILayout.LabelField($"pri={d.Priority}  {(d.Urgent ? "‼ " : "")}{roleLabel} x{d.Count}{domain}{elite}", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            $"pri={d.Priority}  {(d.Urgent ? "‼ " : "")}{roleLabel} x{d.Count}{domain}{elite}{weapon}",
+            EditorStyles.boldLabel);
         GUI.color = prev;
 
         if (!string.IsNullOrEmpty(d.Origin))

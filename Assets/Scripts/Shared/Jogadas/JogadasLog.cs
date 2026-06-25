@@ -31,6 +31,16 @@ public class JogadasLog
 
     public void Registrar(Jogada j)
     {
+        if (j != null && !j.hasRepairState && j.uid > 0)
+        {
+            UnitManager unit = UnitManager.AllActive.Find(u => u != null && u.InstanceId == j.uid);
+            if (unit != null)
+            {
+                j.hasRepairState = true;
+                j.repairBefore = unit.IsUnderRepair;
+                j.repairAfter = unit.IsUnderRepair;
+            }
+        }
         j.jogadaId = proximoId++;
         jogadas.Add(j);
         Debug.Log($"[Jogadas] #{j.jogadaId} T{j.turno} team={j.team} {j.acao} uid={j.uid} ({j.unidadeSigla}) de ({j.cx},{j.cy}) para ({j.dx},{j.dy})");
@@ -60,13 +70,24 @@ public class Jogada
 
     // Resultado estruturado de combate. O bool preserva compatibilidade com logs antigos.
     public bool   hasCombatResult;
+    public bool   hasHpState;
     public string unidadeSigla2;
     public int    team2;
     public int    hpAntes;
     public int    hpDepois;
     public int    hp2Antes;
     public int    hp2Depois;
+    public bool   hasAttackIntel;
+    public WeaponCategory attackWeaponCategory;
+    public WeaponTrajectoryType attackTrajectory;
+    public bool   attackerVisibleToDefender;
+    public int    defenderCost;
+    public int    defenderEliteLevel;
     public List<CombatCargoResult> combatCargo = new List<CombatCargoResult>();
+
+    public bool   hasRepairState;
+    public bool   repairBefore;
+    public bool   repairAfter;
 
     // Observação contextual gravada no momento da jogada (ex.: progresso de captura "10/20",
     // "capturado", "reparado"). Preenchida hoje só para Capturar.

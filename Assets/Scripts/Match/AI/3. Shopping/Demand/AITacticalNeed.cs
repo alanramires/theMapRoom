@@ -118,6 +118,7 @@ public class AIShoppingDemand
     public UnitRole ExactRole = UnitRole.None;
     public Domain? Domain;
     public GameUnitClass? TargetClass;
+    public WeaponCategory? RequiredWeaponCategory;
     public int Count;
     public int Priority;
     public bool Urgent;

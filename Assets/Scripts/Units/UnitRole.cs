@@ -90,4 +90,14 @@ public static class UnitRoleCompatibility
                 : UnitRole.FogoIndireto;
         return primary;
     }
+
+    // Transporte operacional (APC, Chinook, navio de desembarque etc.) é diferente da
+    // capacidade mecânica auxiliar de carregar/rebocar. Um supridor pode ter isTransporter
+    // para rebocar artilharia sem virar transporte de tropas no plano ou no shopping.
+    public static bool IsOperationalTransporter(UnitData data)
+    {
+        return data != null
+            && data.isTransporter
+            && ResolveCompositionRole(data) == UnitRole.Transportador;
+    }
 }

@@ -40,12 +40,44 @@ public class JogadasManager : MonoBehaviour
         log.Registrar(new Jogada { turno = turno, team = team, acao = "ServicoComando" });
     }
 
+    public static void RegistrarEstadoReparo(UnitManager unit, bool before, bool after)
+    {
+        if (!Application.isPlaying || unit == null || before == after)
+            return;
+        JogadasManager manager = EnsureInstance();
+        MatchController match = FindFirstObjectByType<MatchController>();
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+        string sigla = unit.TryGetUnitData(out UnitData data) && data != null ? data.apelido : "-";
+        manager.log.Registrar(new Jogada
+        {
+            turno = match != null ? match.CurrentTurn : 0,
+            team = (int)unit.TeamId,
+            acao = "Reparo",
+            cx = cell.x,
+            cy = cell.y,
+            unidadeSigla = sigla,
+            uid = unit.InstanceId,
+            hasRepairState = true,
+            repairBefore = before,
+            repairAfter = after,
+            obs = !before && after ? "entrou em reparo" : "recebeu alta",
+        });
+    }
+
     public void RegistrarCompra(int turno, int team, int cx, int cy, string sigla, int uid)
     {
+        UnitManager purchased = uid > 0
+            ? UnitManager.AllActive.Find(u => u != null && u.InstanceId == uid)
+            : null;
+        int hp = purchased != null ? Mathf.Max(0, purchased.CurrentHP) : 0;
         log.Registrar(new Jogada
         {
             turno = turno, team = team, acao = "Compra",
-            cx = cx, cy = cy, unidadeSigla = sigla, uid = uid
+            cx = cx, cy = cy, unidadeSigla = sigla, uid = uid,
+            hasHpState = purchased != null,
+            hpAntes = hp,
+            hpDepois = hp,
         });
     }
 
@@ -140,6 +172,7 @@ public class JogadasManager : MonoBehaviour
         if (combatResult != null)
         {
             jogada.hasCombatResult = true;
+            jogada.hasHpState = true;
             jogada.unidadeSigla = combatResult.AttackerSigla;
             jogada.unidadeSigla2 = combatResult.DefenderSigla;
             jogada.team = combatResult.AttackerTeam;
@@ -148,6 +181,12 @@ public class JogadasManager : MonoBehaviour
             jogada.hpDepois = combatResult.AttackerHpAfter;
             jogada.hp2Antes = combatResult.DefenderHpBefore;
             jogada.hp2Depois = combatResult.DefenderHpAfter;
+            jogada.hasAttackIntel = combatResult.HasAttackIntel;
+            jogada.attackWeaponCategory = combatResult.AttackWeaponCategory;
+            jogada.attackTrajectory = combatResult.AttackTrajectory;
+            jogada.attackerVisibleToDefender = combatResult.AttackerVisibleToDefender;
+            jogada.defenderCost = combatResult.DefenderCost;
+            jogada.defenderEliteLevel = combatResult.DefenderEliteLevel;
             jogada.combatCargo = combatResult.CargoResults ?? new List<CombatCargoResult>();
             jogada.obs = combatResult.ToString();
         }
@@ -216,7 +255,7 @@ public class JogadasManager : MonoBehaviour
     public static string BuildCsv(IEnumerable<Jogada> jogadas)
     {
         var sb = new StringBuilder();
-        sb.Append("jogadaId,turno,team,timeNome,acao,sigla,uid,hpAntes,hpDepois,team2,time2Nome,sigla2,uid2,hp2Antes,hp2Depois,cx,cy,coordTipo,dx,dy,destinoTipo,carga,obs\n");
+        sb.Append("jogadaId,turno,slot,slotNome,acao,sigla,uid,hpAntes,hpDepois,slot2,slot2Nome,sigla2,uid2,hp2Antes,hp2Depois,repairBefore,repairAfter,cx,cy,coordTipo,dx,dy,destinoTipo,carga,obs\n");
         if (jogadas != null)
             foreach (Jogada j in jogadas.OrderBy(j => j.jogadaId))
             {
@@ -226,15 +265,17 @@ public class JogadasManager : MonoBehaviour
                   .Append(CsvCampo(NomeTime(j.team))).Append(',')
                   .Append(CsvCampo(j.acao)).Append(',')
                   .Append(CsvCampo(j.unidadeSigla)).Append(',')
-                  .Append(j.uid).Append(',')
-                  .Append(j.hasCombatResult ? j.hpAntes : -1).Append(',')
-                  .Append(j.hasCombatResult ? j.hpDepois : -1).Append(',')
-                  .Append(j.hasCombatResult ? j.team2 : -1).Append(',')
+                  .Append(j.uid > 0 ? j.uid.ToString() : "").Append(',')
+                  .Append(j.hasHpState ? j.hpAntes.ToString() : "").Append(',')
+                  .Append(j.hasHpState ? j.hpDepois.ToString() : "").Append(',')
+                  .Append(j.hasCombatResult ? j.team2.ToString() : "").Append(',')
                   .Append(CsvCampo(j.hasCombatResult ? NomeTime(j.team2) : "")).Append(',')
-                  .Append(CsvCampo(j.unidadeSigla2)).Append(',')
-                  .Append(j.uid2).Append(',')
-                  .Append(j.hasCombatResult ? j.hp2Antes : -1).Append(',')
-                  .Append(j.hasCombatResult ? j.hp2Depois : -1).Append(',')
+                  .Append(CsvCampo(j.hasCombatResult ? j.unidadeSigla2 : "")).Append(',')
+                  .Append(j.uid2 > 0 ? j.uid2.ToString() : "").Append(',')
+                  .Append(j.hasCombatResult ? j.hp2Antes.ToString() : "").Append(',')
+                  .Append(j.hasCombatResult ? j.hp2Depois.ToString() : "").Append(',')
+                  .Append(j.hasRepairState && j.repairBefore ? 1 : 0).Append(',')
+                  .Append(j.hasRepairState && j.repairAfter ? 1 : 0).Append(',')
                   .Append(j.cx).Append(',')
                   .Append(j.cy).Append(',')
                   .Append(CsvCampo(j.TemCoordenada ? TipoConstrucaoNaCelula(j.cx, j.cy) : "")).Append(',')
@@ -242,7 +283,7 @@ public class JogadasManager : MonoBehaviour
                   .Append(j.dy).Append(',')
                   .Append(CsvCampo(j.TemDestino ? DestinoLabel(j.dx, j.dy) : "")).Append(',')
                   .Append(CsvCampo(FormatCargoResults(j.combatCargo))).Append(',')
-                  .Append(CsvCampo(j.obs)).Append('\n');
+                  .Append(CsvCampo(FormatCaptureObs(j))).Append('\n');
             }
         return sb.ToString();
     }
@@ -288,7 +329,12 @@ public class JogadasManager : MonoBehaviour
         string obs = !j.hasCombatResult && !string.IsNullOrEmpty(j.obs)
             ? $" [{j.obs}]"
             : "";
-        return $"#{j.jogadaId,-4} [{NomeTime(j.team)}] {j.acao,-14} {ator}{hp} {coord}{dest}{alvo}{details}{obs}".TrimEnd();
+        string repair = j.hasRepairState
+            ? j.repairBefore == j.repairAfter
+                ? (j.repairAfter ? " [repair]" : "")
+                : (!j.repairBefore && j.repairAfter ? " [repair: entrou]" : " [repair: alta]")
+            : "";
+        return $"#{j.jogadaId,-4} [{NomeTime(j.team)}] {j.acao,-14} {ator}{hp} {coord}{dest}{alvo}{details}{repair}{obs}".TrimEnd();
     }
 
     private static string NomeTime(int team)
@@ -343,6 +389,12 @@ public class JogadasManager : MonoBehaviour
         public int DefenderTeam;
         public int DefenderHpBefore;
         public int DefenderHpAfter;
+        public bool HasAttackIntel;
+        public WeaponCategory AttackWeaponCategory;
+        public WeaponTrajectoryType AttackTrajectory;
+        public bool AttackerVisibleToDefender;
+        public int DefenderCost;
+        public int DefenderEliteLevel;
         public List<CombatCargoResult> CargoResults = new List<CombatCargoResult>();
 
         public override string ToString()
@@ -417,10 +469,14 @@ public class JogadasManager : MonoBehaviour
         UnitManager defender,
         int attackerHpBefore,
         int defenderHpBefore,
+        WeaponCategory attackWeaponCategory,
+        WeaponTrajectoryType attackTrajectory,
+        bool attackerVisibleToDefender,
         List<RuntimeCargoSnapshot> cargoSnapshot = null)
     {
         if (attacker == null || defender == null || attacker.InstanceId <= 0)
             return;
+        defender.TryGetUnitData(out UnitData defenderData);
         _combatResultPorAtacante[attacker.InstanceId] = new CombatLogResult
         {
             AttackerSigla = ResolveUnitSigla(attacker),
@@ -431,6 +487,12 @@ public class JogadasManager : MonoBehaviour
             DefenderTeam = (int)defender.TeamId,
             DefenderHpBefore = Mathf.Max(0, defenderHpBefore),
             DefenderHpAfter = Mathf.Max(0, defender.CurrentHP),
+            HasAttackIntel = true,
+            AttackWeaponCategory = attackWeaponCategory,
+            AttackTrajectory = attackTrajectory,
+            AttackerVisibleToDefender = attackerVisibleToDefender,
+            DefenderCost = defenderData != null ? Mathf.Max(0, defenderData.cost) : 0,
+            DefenderEliteLevel = defenderData != null ? Mathf.Max(0, defenderData.eliteLevel) : 0,
         };
         if (cargoSnapshot != null)
         {
@@ -481,7 +543,7 @@ public class JogadasManager : MonoBehaviour
     public static void SetUltimaCapturaObs(int capturerUid, string obs)
     {
         if (capturerUid > 0 && !string.IsNullOrEmpty(obs))
-            _captureObsPorUnidade[capturerUid] = obs;
+            _captureObsPorUnidade[capturerUid] = PrefixCaptureProgress(obs);
     }
 
     private static string ConsumirCapturaObs(int capturerUid)
@@ -507,9 +569,31 @@ public class JogadasManager : MonoBehaviour
 
         int cur = Mathf.Clamp(c.CurrentCapturePoints, 0, max);
         bool dono = (int)c.TeamId == actingTeam;
-        if (!dono) return $"{cur}/{max}";   // captura parcial de inimigo/neutro
+        if (!dono) return $"cap {cur}/{max}";   // captura parcial de inimigo/neutro
         return cur >= max ? "capturado"     // concluiu a captura → nosso e cheio
                           : "reparado";      // recuperando construção própria
+    }
+
+    private static string FormatCaptureObs(Jogada jogada)
+    {
+        if (jogada == null || string.IsNullOrWhiteSpace(jogada.obs))
+            return string.Empty;
+        return string.Equals(jogada.acao, "Capturar", StringComparison.OrdinalIgnoreCase)
+            ? PrefixCaptureProgress(jogada.obs)
+            : jogada.obs;
+    }
+
+    private static string PrefixCaptureProgress(string obs)
+    {
+        string value = string.IsNullOrWhiteSpace(obs) ? string.Empty : obs.Trim();
+        if (value.StartsWith("cap ", StringComparison.OrdinalIgnoreCase))
+            return value;
+        string[] parts = value.Split('/');
+        return parts.Length == 2
+            && int.TryParse(parts[0], out _)
+            && int.TryParse(parts[1], out _)
+                ? "cap " + value
+                : value;
     }
 
     private static ConstructionManager ConstrucaoNaCelula(int x, int y)

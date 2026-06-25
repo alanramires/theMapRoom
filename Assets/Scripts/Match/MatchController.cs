@@ -2579,6 +2579,10 @@ public class MatchController : MonoBehaviour
             ? (Time.realtimeSinceStartupAsDouble - constructionVisionStartMs) * 1000d
             : 0d;
         RefreshRuntimeUnitFogVisibility();
+        if (Application.isPlaying && activeTeamId >= 0
+            && Enum.IsDefined(typeof(TeamId), activeTeamId))
+            AIIntelLedger.RecordVisibleContactsForTeam(
+                (TeamId)activeTeamId, currentTurn, this);
         if (mode == FogOfWarRefreshMode.FullVisual)
         {
             RenderFogOverlayFromRuntimeCache(boardMap);
@@ -2675,6 +2679,7 @@ public class MatchController : MonoBehaviour
 
         UpdateFogVisibilityForUnit(unit, boardMap, out _, out _, out _);
         RefreshRuntimeUnitFogVisibility();
+        AIIntelLedger.RecordVisibleContactsForTeam(ActiveTeam, currentTurn, this);
         TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
         TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
         OnFogOfWarUpdated?.Invoke();

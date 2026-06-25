@@ -106,6 +106,7 @@ public class JogadasManagerEditor : Editor
         Col("Sigla",  42);
         Col("UID",    36);
         Col("UID2",   36);
+        Col("Repair", 58);
         Col("Coord",  120);
         Col("Destino",120);
         Col("Resultado", 180);
@@ -128,6 +129,11 @@ public class JogadasManagerEditor : Editor
         Col(j.unidadeSigla ?? "-", 42);
         Col(j.uid  > 0 ? j.uid.ToString()  : "-", 36);
         Col(j.uid2 > 0 ? j.uid2.ToString() : "-", 36);
+        string repair = !j.hasRepairState ? "-"
+            : j.repairBefore == j.repairAfter
+                ? (j.repairAfter ? "ativo" : "não")
+                : (!j.repairBefore && j.repairAfter ? "entrou" : "alta");
+        Col(repair, 58);
         Col(j.TemCoordenada ? $"{j.cx},{j.cy}{Paren(JogadasManager.TipoConstrucaoNaCelula(j.cx, j.cy))}" : "-", 120);
         Col(j.TemDestino   ? $"{j.dx},{j.dy}{Paren(JogadasManager.DestinoLabel(j.dx, j.dy))}" : "-",  120);
         string result = j.hasCombatResult
