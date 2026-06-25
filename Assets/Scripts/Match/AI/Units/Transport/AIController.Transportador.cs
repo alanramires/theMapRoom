@@ -91,12 +91,113 @@ public partial class AIController
                 idleAttackTarget.InstanceId.ToString(), idleTargetCell, paths);
         }
 
+        if (TryFindIdleTransportCombatAdvance(
+                unit, snapshot, fromCell, paths, occupied,
+                out Vector3Int combatMove, out UnitManager pressureTarget, out string combatReason))
+        {
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} vazio - avanca contra {pressureTarget.UnitDisplayName}#{pressureTarget.InstanceId} via {combatMove} ({combatReason})");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, combatMove, paths);
+        }
+
         Vector3Int waitTarget = FindTransportWaitTarget(snapshot.AITeam, fromCell);
         waitTarget.z = 0;
-        Vector3Int moveTarget = FindTransportMove(unit, fromCell, waitTarget, paths, occupied, snapshot.AITeam);
+        Vector3Int moveTarget = FindIdleTransportStagingCell(
+            snapshot, fromCell, waitTarget, paths, occupied, out string stagingReason);
 
-        Debug.Log($"{TL("Transporte")} {unit.InstanceId} vazio sem passageiro/TOW — retorna pickup/base alvo={waitTarget} via {moveTarget}");
+        Debug.Log($"{TL("Transporte")} {unit.InstanceId} vazio sem passageiro/TOW — estaciona fora da produtora alvo={waitTarget} via {moveTarget} ({stagingReason})");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
+    }
+
+    private bool TryFindIdleTransportCombatAdvance(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int moveCell,
+        out UnitManager pressureTarget,
+        out string reason)
+    {
+        moveCell = fromCell;
+        pressureTarget = null;
+        reason = "";
+
+        List<UnitManager> enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
+        float bestTargetScore = float.MinValue;
+        foreach (UnitManager enemy in enemies)
+        {
+            BazookaTargetPriority preference = ResolveTransportTargetPreference(unit, enemy);
+            if (preference == BazookaTargetPriority.Tertiary)
+                continue;
+
+            Vector3Int enemyCell = enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            float score =
+                (preference == BazookaTargetPriority.Primary ? 100000f : 50000f)
+                - SectorManager.HexDistance(fromCell, enemyCell) * 100f
+                + Mathf.Max(0, 20 - enemy.CurrentHP) * 10f
+                - enemy.InstanceId * 0.001f;
+            if (score <= bestTargetScore)
+                continue;
+
+            bestTargetScore = score;
+            pressureTarget = enemy;
+        }
+
+        if (pressureTarget == null)
+            return false;
+
+        Vector3Int targetCell = pressureTarget.CurrentCellPosition;
+        targetCell.z = 0;
+        Vector3Int candidate = FindAssaultPressureMove(
+            unit, snapshot, fromCell, targetCell, paths, occupied, out reason);
+        if (candidate == fromCell || IsTeamProductionBuilding(candidate, snapshot.AITeam))
+            return false;
+
+        moveCell = candidate;
+        return true;
+    }
+
+    private Vector3Int FindIdleTransportStagingCell(
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int waitTarget,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out string reason)
+    {
+        Vector3Int bestCell = fromCell;
+        float bestScore = float.MinValue;
+        reason = "sem celula livre";
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied.Contains(cell))
+                continue;
+            if (IsTeamProductionBuilding(cell, snapshot.AITeam))
+                continue;
+
+            float distance = SectorManager.HexDistance(cell, waitTarget);
+            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+            float dpq = GetTerrainDpqPontos(cell);
+            int pathCost = GetPathStepCount(paths, cell);
+            float score =
+                -distance * 1000f
+                - threat * 80f
+                + dpq * 100f
+                + pathCost * 0.1f;
+
+            if (score <= bestScore)
+                continue;
+
+            bestScore = score;
+            bestCell = cell;
+            reason = $"dist={distance:F1} threat={threat:F1} dpq={dpq:F1} path={pathCost}";
+        }
+
+        return bestCell;
     }
 
     private static SectorObjective ResolveAssignedTransportObjective(UnitManager unit, TeamObjectivePlan plan)

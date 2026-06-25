@@ -1169,6 +1169,10 @@ public partial class AIShoppingPlanner
         public bool[] CoveredDemand;
         public int RemainingBudget;
         public int UrgentFulfilled;
+        public int CommittedEliteFulfilled;
+        public string CommittedEliteUnitId;
+        public int ExpansionCapturerFulfilled;
+        public int ExpansionCapturerTarget;
         public int CoveragePriorityScore;
         public int DistinctCovered;
         public int FulfillmentPriorityScore;
@@ -1184,6 +1188,10 @@ public partial class AIShoppingPlanner
                 CoveredDemand = (bool[])CoveredDemand.Clone(),
                 RemainingBudget = RemainingBudget,
                 UrgentFulfilled = UrgentFulfilled,
+                CommittedEliteFulfilled = CommittedEliteFulfilled,
+                CommittedEliteUnitId = CommittedEliteUnitId,
+                ExpansionCapturerFulfilled = ExpansionCapturerFulfilled,
+                ExpansionCapturerTarget = ExpansionCapturerTarget,
                 CoveragePriorityScore = CoveragePriorityScore,
                 DistinctCovered = DistinctCovered,
                 FulfillmentPriorityScore = FulfillmentPriorityScore,
@@ -1205,6 +1213,8 @@ public partial class AIShoppingPlanner
             return orders;
 
         List<AIShoppingDemand> demands = BuildRoleShoppingDemands(snapshot);
+        AIElitePurchaseCommitment eliteCommitment =
+            ResolveElitePurchaseCommitment(snapshot, demands);
         CounterPressureInspection counterPressure = BuildCounterPressure(snapshot);
         var occupied = BuildProductionOccupiedCells();
         var usedBuildings = new HashSet<ConstructionManager>();
@@ -1213,13 +1223,15 @@ public partial class AIShoppingPlanner
         // Reserva estratégica existe apenas para alvo ELITE com o core já formado.
         // Compras regulares permanecem gulosas para montar o exército rapidamente.
         int reserve = ComputeStrategicSavingReserve(
-            snapshot, demands, remaining, out AIShoppingDemand reserveTarget);
+            snapshot, demands, remaining, eliteCommitment,
+            out AIShoppingDemand reserveTarget);
         bool hasStrategicReserve = reserve > 0 && reserveTarget != null;
 
         // Alavanca macro->shopping: se o time esta PERDENDO o mapa (macro phase Collapsing,
         // <=35% de controle), a compra fica mais agressiva pra defesa. Sobrevivencia > poupanca:
         // nao segura caixa pra elite, e combate/defesa ganham peso no score (ver ScoreRole...).
         bool macroLosing = AIController.GetMacroTerritoryForInspection(snapshot.AITeam).Losing;
+        int expansionCapturerTarget = ComputeExpansionCapturerCartTarget(snapshot, demands);
         if (macroLosing && reserve > 0)
         {
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] perdendo o mapa: "
@@ -1260,15 +1272,25 @@ public partial class AIShoppingPlanner
         }
 
         LogRoleShoppingQueue(snapshot, demands, remaining);
+        if (expansionCapturerTarget > 0)
+        {
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                + $"expansão econômica: prioriza até {expansionCapturerTarget} capturador(es) "
+                + $"no carrinho antes de diversificar");
+        }
         RoleShoppingCart cart = BuildBestRoleShoppingCart(
             snapshot, demands, counterPressure, occupied, remaining - reserve,
-            macroLosing, concentrateSpend, concentrateEmergency);
+            macroLosing, concentrateSpend, concentrateEmergency, expansionCapturerTarget,
+            macroLosing ? null : eliteCommitment?.unitId);
         if (cart != null)
         {
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] carrinho "
                 + $"itens={cart.Items.Count} demandas={cart.DistinctCovered} "
                 + $"atendimentos={cart.FulfilledCount} gasto={cart.Spent} "
-                + $"saldo livre={cart.RemainingBudget}");
+                + $"saldo livre={cart.RemainingBudget}"
+                + (cart.ExpansionCapturerTarget > 0
+                    ? $" expansãoCap={cart.ExpansionCapturerFulfilled}/{cart.ExpansionCapturerTarget}"
+                    : ""));
             foreach (RoleShoppingCandidate item in cart.Items)
             {
                 int index = IndexOf(item.Building.OfferedUnits, item.Unit);
@@ -1288,6 +1310,14 @@ public partial class AIShoppingPlanner
                     + $"{item.Building.ConstructionDisplayName} compra {item.Unit.displayName} ${item.Unit.cost} "
                     + $"para {FormatDemandCapability(item.Demand)} origem={item.Demand.Origin} "
                     + $"pri={item.Demand.Priority} score={item.Score} restante={remaining}");
+                if (eliteCommitment != null
+                    && string.Equals(item.Unit.id, eliteCommitment.unitId,
+                        System.StringComparison.Ordinal))
+                {
+                    AIIntelLedger.ClearElitePurchaseCommitment(snapshot.AITeam);
+                    Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                        + $"compromisso elite concluído: {item.Unit.displayName}");
+                }
             }
         }
         else
@@ -1323,7 +1353,9 @@ public partial class AIShoppingPlanner
         int spendableBudget,
         bool macroLosing,
         bool concentrateSpend,
-        bool concentrateEmergency)
+        bool concentrateEmergency,
+        int expansionCapturerTarget,
+        string committedEliteUnitId)
     {
         if (snapshot?.MyBuildings == null || demands == null || demands.Count == 0
             || spendableBudget <= 0)
@@ -1360,6 +1392,8 @@ public partial class AIShoppingPlanner
             RemainingDemand = new int[demands.Count],
             CoveredDemand = new bool[demands.Count],
             RemainingBudget = spendableBudget,
+            ExpansionCapturerTarget = expansionCapturerTarget,
+            CommittedEliteUnitId = committedEliteUnitId,
         };
         for (int i = 0; i < demands.Count; i++)
             initial.RemainingDemand[i] = Mathf.Max(0, demands[i].Count);
@@ -1430,6 +1464,13 @@ public partial class AIShoppingPlanner
         cart.FulfillmentPriorityScore += priorityValue;
         if (candidate.Demand.Urgent)
             cart.UrgentFulfilled++;
+        if (!string.IsNullOrEmpty(cart.CommittedEliteUnitId)
+            && string.Equals(candidate.Unit.id, cart.CommittedEliteUnitId,
+                System.StringComparison.Ordinal))
+            cart.CommittedEliteFulfilled = 1;
+        if (candidate.Demand.Role == UnitRole.Capturador
+            && cart.ExpansionCapturerFulfilled < cart.ExpansionCapturerTarget)
+            cart.ExpansionCapturerFulfilled++;
         if (firstCoverage)
         {
             cart.CoveredDemand[demandIndex] = true;
@@ -1442,6 +1483,12 @@ public partial class AIShoppingPlanner
     private static int CompareRoleShoppingCarts(RoleShoppingCart a, RoleShoppingCart b)
     {
         int compare = b.UrgentFulfilled.CompareTo(a.UrgentFulfilled);
+        if (compare != 0) return compare;
+        compare = b.CommittedEliteFulfilled.CompareTo(a.CommittedEliteFulfilled);
+        if (compare != 0) return compare;
+        // Opening econômico: enquanto existem muitos neutros e falta massa de captura,
+        // repetir capturador gera renda mais cedo e vale mais que diversificar combate.
+        compare = b.ExpansionCapturerFulfilled.CompareTo(a.ExpansionCapturerFulfilled);
         if (compare != 0) return compare;
         compare = b.CoveragePriorityScore.CompareTo(a.CoveragePriorityScore);
         if (compare != 0) return compare;
@@ -1471,6 +1518,231 @@ public partial class AIShoppingPlanner
         return a.Items.Count.CompareTo(b.Items.Count);
     }
 
+    private static int ComputeExpansionCapturerCartTarget(
+        AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
+    {
+        if (snapshot == null || demands == null)
+            return 0;
+
+        AIController.MacroTerritoryInspection macro =
+            AIController.GetMacroTerritoryForInspection(snapshot.AITeam);
+        if (!string.Equals(macro.PhaseRaw, "EarlyExpansion", System.StringComparison.Ordinal)
+            || macro.NeutralSectors <= 0)
+            return 0;
+
+        int activeCapturers = CountCompositionRole(snapshot, UnitRole.Capturador);
+        int massTarget = Instance != null ? Instance.MinCapturerMassForSupport : 4;
+        int missingMass = Mathf.Max(0, massTarget - activeCapturers);
+        if (missingMass <= 0)
+            return 0;
+
+        int demandedCapturers = 0;
+        foreach (AIShoppingDemand demand in demands)
+            if (demand != null && demand.Count > 0 && demand.Role == UnitRole.Capturador)
+                demandedCapturers += demand.Count;
+
+        return Mathf.Min(missingMass, demandedCapturers);
+    }
+
+    private static AIElitePurchaseCommitment ResolveElitePurchaseCommitment(
+        AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
+    {
+        AIElitePurchaseCommitment existing =
+            AIIntelLedger.GetElitePurchaseCommitment(snapshot.AITeam);
+        if (existing != null)
+        {
+            UnitData unit = FindOfferedUnitById(snapshot, existing.unitId, out _);
+            bool valid = unit != null
+                && unit.eliteLevel == existing.eliteLevel
+                && UnitRoleCompatibility.ResolveCompositionRole(unit) == existing.role
+                && IsEliteChainAvailable(unit, snapshot);
+            if (!valid)
+            {
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                    + $"cancela compromisso elite {existing.unitId}: oferta ou cadeia indisponível");
+                AIIntelLedger.ClearElitePurchaseCommitment(snapshot.AITeam);
+                existing = null;
+            }
+            else
+            {
+                EnsureEliteCommitmentDemand(demands, existing);
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                    + $"mantém compromisso elite: {unit.displayName} ${unit.cost} "
+                    + $"desde T{existing.committedTurn}");
+                return existing;
+            }
+        }
+
+        if (!IsOperationalCoreReadyForElite(snapshot, demands))
+            return null;
+
+        AIShoppingDemand bestDemand = null;
+        UnitData bestUnit = null;
+        foreach (AIShoppingDemand demand in demands)
+        {
+            if (demand == null || demand.Count <= 0 || demand.MinEliteLevel <= 0)
+                continue;
+            UnitData candidate = FindBestOfferedUnitForDemand(snapshot, demand);
+            if (candidate == null)
+                continue;
+            if (bestDemand == null || candidate.eliteLevel < bestUnit.eliteLevel
+                || (candidate.eliteLevel == bestUnit.eliteLevel
+                    && demand.Priority < bestDemand.Priority)
+                || (candidate.eliteLevel == bestUnit.eliteLevel
+                    && demand.Priority == bestDemand.Priority && candidate.cost > bestUnit.cost))
+            {
+                bestDemand = demand;
+                bestUnit = candidate;
+            }
+        }
+        if (bestDemand == null || bestUnit == null)
+            return null;
+
+        var commitment = new AIElitePurchaseCommitment
+        {
+            unitId = bestUnit.id,
+            role = UnitRoleCompatibility.ResolveCompositionRole(bestUnit),
+            eliteLevel = bestUnit.eliteLevel,
+            targetCost = bestUnit.cost,
+            committedTurn = snapshot.TurnNumber,
+        };
+        AIIntelLedger.SetElitePurchaseCommitment(snapshot.AITeam, commitment);
+        Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+            + $"novo compromisso elite: {bestUnit.displayName} ${bestUnit.cost} "
+            + $"papel={commitment.role} elite={commitment.eliteLevel}");
+        return commitment;
+    }
+
+    private static void EnsureEliteCommitmentDemand(
+        List<AIShoppingDemand> demands, AIElitePurchaseCommitment commitment)
+    {
+        if (FindDemandForEliteCommitment(demands, commitment) != null)
+            return;
+        AIShoppingDemand demand = NewRoleDemand(
+            commitment.role, 1, 23, "elite-commitment",
+            $"compromisso desde T{commitment.committedTurn}", false);
+        demand.MinEliteLevel = commitment.eliteLevel;
+        demand.MaxEliteLevel = commitment.eliteLevel;
+        demands.Add(demand);
+        demands.Sort((a, b) =>
+        {
+            int urgent = b.Urgent.CompareTo(a.Urgent);
+            if (urgent != 0) return urgent;
+            int priority = a.Priority.CompareTo(b.Priority);
+            if (priority != 0) return priority;
+            return ((int)a.Role).CompareTo((int)b.Role);
+        });
+    }
+
+    private static AIShoppingDemand FindDemandForEliteCommitment(
+        List<AIShoppingDemand> demands, AIElitePurchaseCommitment commitment)
+    {
+        if (demands == null || commitment == null)
+            return null;
+        foreach (AIShoppingDemand demand in demands)
+            if (demand != null && demand.Count > 0
+                && demand.Role == commitment.role
+                && demand.MinEliteLevel <= commitment.eliteLevel
+                && demand.MaxEliteLevel >= commitment.eliteLevel)
+                return demand;
+        return null;
+    }
+
+    private static UnitData FindOfferedUnitById(
+        AIWorldSnapshot snapshot, string unitId, out bool availableNow)
+    {
+        availableNow = false;
+        if (snapshot?.MyBuildings == null || string.IsNullOrEmpty(unitId))
+            return null;
+        HashSet<Vector3Int> occupied = BuildProductionOccupiedCells();
+        UnitData found = null;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+                || building.OfferedUnits == null)
+                continue;
+            Vector3Int cell = building.CurrentCellPosition;
+            cell.z = 0;
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (unit == null || !string.Equals(unit.id, unitId, System.StringComparison.Ordinal))
+                    continue;
+                found = unit;
+                if (!occupied.Contains(cell)
+                    && IsRolePurchaseAllowedByStance(unit, snapshot.Stance))
+                    availableNow = true;
+            }
+        }
+        return found;
+    }
+
+    private static UnitData FindBestOfferedUnitForDemand(
+        AIWorldSnapshot snapshot, AIShoppingDemand demand)
+    {
+        UnitData best = null;
+        if (snapshot?.MyBuildings == null || demand == null)
+            return null;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+                || building.OfferedUnits == null)
+                continue;
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (unit == null || unit.eliteLevel <= 0
+                    || !IsEliteChainAvailable(unit, snapshot)
+                    || !IsRolePurchaseAllowedByStance(unit, snapshot.Stance)
+                    || !DoesUnitMeetShoppingDemand(unit, demand))
+                    continue;
+                if (best == null || unit.cost < best.cost)
+                    best = unit;
+            }
+        }
+        return best;
+    }
+
+    private static bool IsOperationalCoreReadyForElite(
+        AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
+    {
+        if (snapshot == null || snapshot.IncomePerTurn <= 0)
+            return false;
+        foreach (AIShoppingDemand demand in demands)
+            if (demand != null && demand.Count > 0
+                && (demand.Urgent
+                    || (demand.Role == UnitRole.Capturador && demand.Priority <= 16)))
+                return false;
+        return HasOperationalCore(snapshot);
+    }
+
+    private static bool HasOperationalCore(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null)
+            return false;
+        int capturerTarget = Instance != null ? Instance.MinCapturerMassForSupport : 4;
+        capturerTarget = Mathf.Max(2, capturerTarget);
+        int assaultTarget = Instance != null ? Instance.MinFilledAssaultSlots : 1;
+        assaultTarget = Mathf.Max(2, assaultTarget);
+        return CountCompositionRole(snapshot, UnitRole.Capturador) >= capturerTarget
+            && CountCompositionRole(snapshot, UnitRole.Assalto) >= assaultTarget
+            && CountCompositionRole(snapshot, UnitRole.FogoIndireto) >= 1;
+    }
+
+    private static float ComputeOperationalCoreMaturity(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null)
+            return 0f;
+        int capturerTarget = Mathf.Max(2,
+            Instance != null ? Instance.MinCapturerMassForSupport : 4);
+        int assaultTarget = Mathf.Max(2,
+            Instance != null ? Instance.MinFilledAssaultSlots : 1);
+        float capturer = Mathf.Clamp01(
+            CountCompositionRole(snapshot, UnitRole.Capturador) / (float)capturerTarget);
+        float assault = Mathf.Clamp01(
+            CountCompositionRole(snapshot, UnitRole.Assalto) / (float)assaultTarget);
+        float fire = Mathf.Clamp01(CountCompositionRole(snapshot, UnitRole.FogoIndireto));
+        return (capturer + assault + fire) / 3f;
+    }
+
     // Decide quanto de caixa segurar para um elite ou uma capacidade crítica prioritária
     // alcançável em poucos turnos. O excedente continua disponível para compras menores.
     // Retorna 0 quando não há nada para poupar (guloso normal).
@@ -1478,6 +1750,7 @@ public partial class AIShoppingPlanner
         AIWorldSnapshot snapshot,
         List<AIShoppingDemand> demands,
         int remaining,
+        AIElitePurchaseCommitment commitment,
         out AIShoppingDemand target)
     {
         target = null;
@@ -1490,14 +1763,28 @@ public partial class AIShoppingPlanner
         int income = Mathf.Max(0, snapshot.IncomePerTurn);
         int reach = remaining + income * maxTurns;
         int armySize = snapshot.MyUnits != null ? snapshot.MyUnits.Count : 0;
-        int coreFloor = Instance != null ? Instance.MinArmySizeForElitePivot : 12;
-        bool coreReady = armySize >= coreFloor;
-        if (!coreReady)
+        bool coreReady = IsOperationalCoreReadyForElite(snapshot, demands);
+        if (!coreReady && commitment == null)
             return 0;
 
         int targetCost = 0;
+        if (commitment != null)
+        {
+            target = FindDemandForEliteCommitment(demands, commitment);
+            UnitData committedUnit = FindOfferedUnitById(snapshot, commitment.unitId,
+                out bool availableNow);
+            if (target != null && committedUnit != null)
+            {
+                targetCost = committedUnit.cost;
+                if (targetCost <= remaining && availableNow)
+                    return 0;
+            }
+        }
+
         foreach (AIShoppingDemand d in demands)
         {
+            if (target != null)
+                break;
             if (d.Count <= 0)
                 continue;
             bool availableNow = true;
@@ -1534,7 +1821,7 @@ public partial class AIShoppingPlanner
         // Ex.: caixa 13113 + renda 14000 - alvo 14500 = 12613; com margem 20%, gasto livre
         // = 10090 e caixa mínimo preservado = 3023.
         int reserve;
-        float maturity = Mathf.InverseLerp(5f, Mathf.Max(6, coreFloor + 8), armySize);
+        float maturity = ComputeOperationalCoreMaturity(snapshot);
         float maintenancePct = Instance != null
             ? Mathf.Clamp01(Instance.CriticalCapabilityMaintenanceReservePercent / 100f) * maturity
             : 0.2f * maturity;
@@ -1544,7 +1831,8 @@ public partial class AIShoppingPlanner
         reserve = Mathf.Clamp(remaining - spendableNow, 0, remaining);
         Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] poupando p/ "
             + $"{FormatDemandCapability(target)} custo={targetCost} renda={income} maxTurnos={maxTurns} "
-            + $"core={armySize}/{coreFloor} maturidade={maturity:P0} margem={maintenancePct:P0} "
+            + $"coreOperacional={(coreReady ? "pronto" : "comprometido")} unidades={armySize} "
+            + $"maturidade={maturity:P0} margem={maintenancePct:P0} "
             + $"saldoPosAlvo={projectedAfterTarget} manutencao={maintenanceReserve} "
             + $"reserva={reserve} budget={remaining} gastoLivre={remaining - reserve}");
         return reserve;
@@ -2061,32 +2349,13 @@ public partial class AIShoppingPlanner
         // Unidade ELITE: pode liberar abaixo do piso de massa se o caixa banca o elite E os corpos
         // que faltam pra fechar a massa (ver IsEliteArmyFloorOrBudgetReady). Unidade COMUM (usada no
         // nudge anti-cheap, -25000): mantém o piso de massa ESTRITO — não solta o nudge cedo demais.
-        if (unit.eliteLevel > 0)
-            return IsEliteArmyFloorOrBudgetReady(snapshot, unit.cost, remaining, concentrate);
-        int minimumArmy = Instance != null ? Instance.MinArmySizeForElitePivot : 12;
-        int armySize = snapshot.MyUnits != null ? snapshot.MyUnits.Count : 0;
-        return armySize >= minimumArmy;
+        return concentrate || HasOperationalCore(snapshot);
     }
 
     // Elite liberado quando há MASSA (>= piso) OU CAIXA pra bancar o elite + os soldados baratos que
     // ainda faltam pra fechar a massa. Com caixa gordo não é "elite OU tropa": cabe os dois.
     // concentrate=true (poucos slots de produção): libera direto — não dá pra comprar massa mesmo,
     // então o slot único deve levar a peça mais forte (qualidade já que não dá quantidade).
-    private static bool IsEliteArmyFloorOrBudgetReady(AIWorldSnapshot snapshot, int eliteCost, int remaining, bool concentrate = false)
-    {
-        if (concentrate)
-            return true;
-        int minimumArmy = Instance != null ? Instance.MinArmySizeForElitePivot : 12;
-        int armySize = snapshot.MyUnits != null ? snapshot.MyUnits.Count : 0;
-        if (armySize >= minimumArmy)
-            return true;
-        if (eliteCost <= 0)
-            return false;
-        int massGap = minimumArmy - armySize;
-        int bodyCost = EstimateCheapBodyCost(snapshot);
-        return remaining >= eliteCost + massGap * bodyCost;
-    }
-
     // Custo do corpo barato (capturador/assalto não-elite mais barato à venda) — base pra estimar
     // quanto o caixa precisa reservar pra fechar a massa junto com o elite. Fallback 4000.
     private static int EstimateCheapBodyCost(AIWorldSnapshot snapshot)
@@ -2161,7 +2430,7 @@ public partial class AIShoppingPlanner
         // Gate massa-ou-orçamento: abaixo do piso de massa, só cria a demanda elite se o caixa ATUAL
         // banca o elite + os corpos que faltam pra fechar a massa — aí compra elite E tropa no mesmo
         // turno (caixa gordo). Com massa >= piso, segue como antes (a reach/poupança já gateia).
-        if (!IsEliteArmyFloorOrBudgetReady(snapshot, eliteCost, snapshot.Budget))
+        if (!IsOperationalCoreReadyForElite(snapshot, demands))
             return;
 
         MergeRoleDemand(demands, elite, false);

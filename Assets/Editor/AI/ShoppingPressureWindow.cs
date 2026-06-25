@@ -172,6 +172,14 @@ public class ShoppingPressureWindow : EditorWindow
         EditorGUILayout.LabelField(
             $"setores: {macro.OwnedSectors} seus / {macro.EnemySectors} inimigos / {macro.NeutralSectors} neutros  (total {macro.TotalSectors})",
             _subtle);
+        if (macro.DisputedControlPoints > 0)
+        {
+            EditorGUILayout.LabelField(
+                $"capture points: {macro.OwnedControlPoints} seus / "
+                + $"{macro.EnemyControlPoints} inimigos / "
+                + $"{macro.DisputedControlPoints} em disputa",
+                _subtle);
+        }
         EditorGUILayout.LabelField(
             $"força: {macro.OwnForce} suas / {macro.EnemyForce} inimigas conhecidas  ({macro.ForceRatio:P0})",
             _subtle);

@@ -31,7 +31,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Range(0f, 20f)] public float SavingPercentualForElite = 15f;
     [Range(0f, 1f)]  public float EliteCapturerFillRatio   = 0.6f;
     [Range(0, 5)]    public int   MinFilledAssaultSlots     = 1;
-    [Range(6, 30)]   public int   MinArmySizeForElitePivot  = 12;
+    [HideInInspector] public int  MinArmySizeForElitePivot  = 12; // legado de serialização; não usado
     [Tooltip("Quantos turnos a IA aceita poupar para comprar um elite ou uma capacidade crítica prioritária que ainda não cabe no caixa. 0 = nunca poupa (guloso puro).")]
     [Range(0, 4)]    public int   EliteSaveMaxTurns         = 1;
     [Tooltip("Percentual MÁXIMO do saldo projetado após uma compra elite que permanece protegido para serviços/manutenção. Escala de 0% com até 5 unidades até este valor com exército maduro.")]
@@ -439,11 +439,9 @@ public partial class AIShoppingPlanner : MonoBehaviour
             && remaining >= eliteLevel2Candidate.cost
                 ? eliteLevel2Candidate
                 : eliteLevel1Candidate;
-        int activeArmySize = snapshot.MyUnits != null ? snapshot.MyUnits.Count : 0;
-        int elitePivotArmyFloor = Instance != null ? Instance.MinArmySizeForElitePivot : 12;
         bool matureEconomyEliteAssaultPivot = eliteAssaultTarget != null
             && activeEliteAssaultCount == 0
-            && activeArmySize >= elitePivotArmyFloor
+            && HasOperationalCore(snapshot)
             && remaining >= eliteAssaultTarget.cost;
 
         // Save the target for reserve purposes BEFORE the composition check may null it.
@@ -493,7 +491,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
             }
             string stalemateText = stalemateCapturerReady ? $" stalemateCap={stalemateCapturerReason}" : "";
             string offensiveText = matureEconomyEliteAssaultPivot
-                ? $" qualityPivot=True army={activeArmySize}/{elitePivotArmyFloor} cash={remaining}"
+                ? $" qualityPivot=True coreOperacional=True cash={remaining}"
                 : offensiveElitePressure ? " offensivePressure=True" : artilleryWallBreakthrough ? " artilleryWall=True" : "";
             string status       = (capOk && assOk) ? $"ELITE LIBERADO{stalemateText}{offensiveText}" : $"bloqueado ({(!capOk ? $"cap {filledCap}/{totalCap} {capFill:P0}<{fillThreshold:P0}" : "cap OK")} | {(!assOk ? $"ass {filledAss}<{minAssault}" : "ass OK")}){stalemateText}{offensiveText}";
             Debug.Log($"[AI Shopping] composição: cap={filledCap}/{totalCap} ({capFill:P0}) ass={filledAss}/{totalAss} — {status}");

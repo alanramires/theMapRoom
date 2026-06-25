@@ -23,6 +23,9 @@ public partial class AIController
         public int EnemySectors;
         public int NeutralSectors;
         public int TotalSectors;
+        public int OwnedControlPoints;
+        public int EnemyControlPoints;
+        public int DisputedControlPoints;
         public float OwnedRatio;
         public int OwnForce;       // minhas unidades
         public int EnemyForce;     // unidades inimigas conhecidas (intel/jogadas)
@@ -73,10 +76,19 @@ public partial class AIController
                 ctx.NeutralSectors++;
             else
                 ctx.EnemySectors++;
+
+            AccumulateCapturePointControl(
+                info, aiTeam,
+                ref ctx.OwnedControlPoints,
+                ref ctx.EnemyControlPoints,
+                ref ctx.DisputedControlPoints);
         }
 
         int controlled = ctx.OwnedSectors + ctx.EnemySectors;
-        ctx.OwnedRatio = controlled > 0 ? ctx.OwnedSectors / (float)controlled : 0.5f;
+        int effectiveControlled = ctx.OwnedControlPoints + ctx.EnemyControlPoints;
+        ctx.OwnedRatio = effectiveControlled > 0
+            ? ctx.OwnedControlPoints / (float)effectiveControlled
+            : 0.5f;
 
         int earlyControlledThreshold = Mathf.Max(2, Mathf.CeilToInt(ctx.TotalSectors * 0.35f));
         float neutralRatio = ctx.TotalSectors > 0 ? ctx.NeutralSectors / (float)ctx.TotalSectors : 1f;
@@ -116,6 +128,32 @@ public partial class AIController
         return ctx;
     }
 
+    private static void AccumulateCapturePointControl(
+        SectorManager.SectorInfo info,
+        TeamId aiTeam,
+        ref int ownedPoints,
+        ref int enemyPoints,
+        ref int disputedPoints)
+    {
+        if (info?.Constructions == null || info.Constructions.Count == 0)
+            return;
+
+        foreach (SectorManager.SectorConstructionInfo construction in info.Constructions)
+        {
+            if (construction == null || construction.CapturePointsMax <= 0
+                || construction.OwnerTeam == TeamId.Neutral)
+                continue;
+
+            int max = construction.CapturePointsMax;
+            int current = Mathf.Clamp(construction.CurrentCapturePoints, 0, max);
+            if (construction.OwnerTeam == aiTeam)
+                ownedPoints += current;
+            else
+                enemyPoints += current;
+            disputedPoints += max - current;
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Inspeção (ShoppingPressureWindow): expõe a visão macro-territorial da AI —
     // setores seus/inimigos/neutros e como ela classifica a partida (perdendo/
@@ -127,6 +165,9 @@ public partial class AIController
         public int EnemySectors;
         public int NeutralSectors;
         public int TotalSectors;
+        public int OwnedControlPoints;
+        public int EnemyControlPoints;
+        public int DisputedControlPoints;
         public float OwnedRatio;
         public int OwnForce;       // minhas unidades
         public int EnemyForce;     // unidades inimigas conhecidas
@@ -159,6 +200,9 @@ public partial class AIController
             EnemySectors   = ctx.EnemySectors,
             NeutralSectors = ctx.NeutralSectors,
             TotalSectors   = ctx.TotalSectors,
+            OwnedControlPoints = ctx.OwnedControlPoints,
+            EnemyControlPoints = ctx.EnemyControlPoints,
+            DisputedControlPoints = ctx.DisputedControlPoints,
             OwnedRatio     = ctx.OwnedRatio,
             OwnForce       = ctx.OwnForce,
             EnemyForce     = ctx.EnemyForce,

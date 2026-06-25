@@ -25,6 +25,17 @@ public class AIIntelLedgerSaveData
     public int lastProcessedJogadaId;
     public List<AIIntelContact> contacts = new List<AIIntelContact>();
     public List<AIIntelThreatSignal> threatSignals = new List<AIIntelThreatSignal>();
+    public AIElitePurchaseCommitment elitePurchaseCommitment;
+}
+
+[Serializable]
+public class AIElitePurchaseCommitment
+{
+    public string unitId;
+    public UnitRole role;
+    public int eliteLevel;
+    public int targetCost;
+    public int committedTurn;
 }
 
 [Serializable]
@@ -49,6 +60,7 @@ public static class AIIntelLedger
             new Dictionary<int, AIIntelContact>();
         public readonly List<AIIntelThreatSignal> ThreatSignals =
             new List<AIIntelThreatSignal>();
+        public AIElitePurchaseCommitment ElitePurchaseCommitment;
     }
 
     private static readonly Dictionary<TeamId, TeamLedger> ledgers =
@@ -98,6 +110,7 @@ public static class AIIntelLedger
             {
                 observerTeam = (int)ledger.Observer,
                 lastProcessedJogadaId = ledger.LastProcessedJogadaId,
+                elitePurchaseCommitment = Clone(ledger.ElitePurchaseCommitment),
             };
             foreach (AIIntelContact contact in ledger.Contacts.Values)
                 saved.contacts.Add(Clone(contact));
@@ -119,11 +132,11 @@ public static class AIIntelLedger
                 continue;
             TeamLedger ledger = GetOrCreate((TeamId)saved.observerTeam);
             ledger.LastProcessedJogadaId = Mathf.Max(0, saved.lastProcessedJogadaId);
-            if (saved.contacts == null)
-                continue;
-            foreach (AIIntelContact contact in saved.contacts)
-                if (contact != null && contact.uid > 0)
-                    ledger.Contacts[contact.uid] = Clone(contact);
+            ledger.ElitePurchaseCommitment = Clone(saved.elitePurchaseCommitment);
+            if (saved.contacts != null)
+                foreach (AIIntelContact contact in saved.contacts)
+                    if (contact != null && contact.uid > 0)
+                        ledger.Contacts[contact.uid] = Clone(contact);
             if (saved.threatSignals != null)
                 foreach (AIIntelThreatSignal signal in saved.threatSignals)
                     if (signal != null)
@@ -132,6 +145,20 @@ public static class AIIntelLedger
     }
 
     public static void Clear() => ledgers.Clear();
+
+    public static AIElitePurchaseCommitment GetElitePurchaseCommitment(TeamId observer)
+        => Clone(GetOrCreate(observer).ElitePurchaseCommitment);
+
+    public static void SetElitePurchaseCommitment(
+        TeamId observer, AIElitePurchaseCommitment commitment)
+    {
+        GetOrCreate(observer).ElitePurchaseCommitment = Clone(commitment);
+    }
+
+    public static void ClearElitePurchaseCommitment(TeamId observer)
+    {
+        GetOrCreate(observer).ElitePurchaseCommitment = null;
+    }
 
     private static TeamLedger GetOrCreate(TeamId observer)
     {
@@ -322,6 +349,20 @@ public static class AIIntelLedger
             damage = source.damage,
             kills = source.kills,
             destroyedValue = source.destroyedValue,
+        };
+    }
+
+    private static AIElitePurchaseCommitment Clone(AIElitePurchaseCommitment source)
+    {
+        if (source == null)
+            return null;
+        return new AIElitePurchaseCommitment
+        {
+            unitId = source.unitId,
+            role = source.role,
+            eliteLevel = source.eliteLevel,
+            targetCost = source.targetCost,
+            committedTurn = source.committedTurn,
         };
     }
 }

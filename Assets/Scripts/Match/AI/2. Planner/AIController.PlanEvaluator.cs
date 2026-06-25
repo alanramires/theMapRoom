@@ -221,11 +221,11 @@ public partial class AIController
         {
             int beforeMacroCap = maxObj;
             maxObj = Mathf.Clamp(Mathf.Min(maxObj, macro.OffensiveCap), 1, 8);
-            Debug.Log($"[AI Macro][T{snapshot.TurnNumber}][{aiTeam}] phase={macro.Phase} setores={macro.OwnedSectors}/{macro.EnemySectors}/{macro.NeutralSectors} ratio={macro.OwnedRatio:P0} {macroForceTxt} offensiveCap={beforeMacroCap}->{maxObj}");
+            Debug.Log($"[AI Macro][T{snapshot.TurnNumber}][{aiTeam}] phase={macro.Phase} setores={macro.OwnedSectors}/{macro.EnemySectors}/{macro.NeutralSectors} pontos={macro.OwnedControlPoints}/{macro.EnemyControlPoints} disputa={macro.DisputedControlPoints} ratio={macro.OwnedRatio:P0} {macroForceTxt} offensiveCap={beforeMacroCap}->{maxObj}");
         }
         else
         {
-            Debug.Log($"[AI Macro][T{snapshot.TurnNumber}][{aiTeam}] phase={macro.Phase} setores={macro.OwnedSectors}/{macro.EnemySectors}/{macro.NeutralSectors} ratio={macro.OwnedRatio:P0} {macroForceTxt} offensiveCap={maxObj}");
+            Debug.Log($"[AI Macro][T{snapshot.TurnNumber}][{aiTeam}] phase={macro.Phase} setores={macro.OwnedSectors}/{macro.EnemySectors}/{macro.NeutralSectors} pontos={macro.OwnedControlPoints}/{macro.EnemyControlPoints} disputa={macro.DisputedControlPoints} ratio={macro.OwnedRatio:P0} {macroForceTxt} offensiveCap={maxObj}");
         }
 
         if (macro.AppliesCap)
@@ -1720,8 +1720,6 @@ public partial class AIController
         }
     }
 }
-
-
 
 
 
