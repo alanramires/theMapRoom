@@ -164,8 +164,45 @@ public class AIIntelAnalyzer : MonoBehaviour
                 unit.lastSeenTurn = jogada.turno;
                 unit.lastKnownCell = ResolveRelevantCell(jogada);
                 unit.lastKnownSector = ResolveSectorName(unit.lastKnownCell, maxSectorSnapDistance);
-                unit.destroyed = string.Equals(jogada.acao, "Destruir", StringComparison.OrdinalIgnoreCase);
+                unit.destroyed |= string.Equals(jogada.acao, "Destruir", StringComparison.OrdinalIgnoreCase)
+                    || (jogada.hasCombatResult && jogada.hpDepois <= 0);
                 unit.confidence = recent ? 1f : 0.35f;
+            }
+
+            if (jogada.hasCombatResult && jogada.uid2 > 0)
+            {
+                AIUnitIntel target = GetOrCreateUnit(unitsByUid, jogada.uid2);
+                target.uid = jogada.uid2;
+                target.team = jogada.team2;
+                target.sigla = CleanSigla(jogada.unidadeSigla2);
+                target.lastAction = "AlvoAtaque";
+                target.lastSeenTurn = jogada.turno;
+                target.lastKnownCell = new Vector3Int(jogada.dx, jogada.dy, 0);
+                target.lastKnownSector = ResolveSectorName(target.lastKnownCell, maxSectorSnapDistance);
+                target.destroyed |= jogada.hp2Depois <= 0;
+                target.confidence = recent ? 1f : 0.35f;
+            }
+
+            if (jogada.hasCombatResult && jogada.combatCargo != null)
+            {
+                foreach (CombatCargoResult cargo in jogada.combatCargo)
+                {
+                    if (cargo == null || cargo.uid <= 0)
+                        continue;
+                    AIUnitIntel cargoIntel = GetOrCreateUnit(unitsByUid, cargo.uid);
+                    cargoIntel.uid = cargo.uid;
+                    cargoIntel.team = cargo.team;
+                    cargoIntel.sigla = CleanSigla(cargo.sigla);
+                    cargoIntel.lastAction = cargo.hpDepois <= 0
+                        ? "CargaDestruida"
+                        : "CargaDanificada";
+                    cargoIntel.lastSeenTurn = jogada.turno;
+                    cargoIntel.lastKnownCell = new Vector3Int(jogada.dx, jogada.dy, 0);
+                    cargoIntel.lastKnownSector = ResolveSectorName(
+                        cargoIntel.lastKnownCell, maxSectorSnapDistance);
+                    cargoIntel.destroyed |= cargo.hpDepois <= 0;
+                    cargoIntel.confidence = recent ? 1f : 0.35f;
+                }
             }
 
             if (!recent)
@@ -248,6 +285,75 @@ public class AIIntelAnalyzer : MonoBehaviour
             {
                 sector.damageTaken += 3f * weight;
                 result.damageTakenScore += 3f * weight;
+            }
+
+            if (jogada.hasCombatResult)
+            {
+                int defenderDamage = Mathf.Max(0, jogada.hp2Antes - jogada.hp2Depois);
+                int attackerDamage = Mathf.Max(0, jogada.hpAntes - jogada.hpDepois);
+                if (unitsByUid.TryGetValue(jogada.uid, out AIUnitIntel attackerIntel))
+                {
+                    attackerIntel.recentDamageDealt += defenderDamage * weight;
+                    if (jogada.hp2Antes > 0 && jogada.hp2Depois <= 0)
+                        attackerIntel.recentKills += weight;
+                }
+                if (unitsByUid.TryGetValue(jogada.uid2, out AIUnitIntel defenderIntel))
+                {
+                    defenderIntel.recentDamageDealt += attackerDamage * weight;
+                    if (jogada.hpAntes > 0 && jogada.hpDepois <= 0)
+                        defenderIntel.recentKills += weight;
+                }
+
+                bool attackerEnemy = IsEnemyTeam(jogada.team, aiTeam);
+                bool defenderEnemy = IsEnemyTeam(jogada.team2, aiTeam);
+                if (attackerEnemy && jogada.team2 == (int)aiTeam)
+                {
+                    result.enemyCombatDamageScore += defenderDamage * weight;
+                    if (jogada.hp2Antes > 0 && jogada.hp2Depois <= 0)
+                        result.enemyCombatKillScore += weight;
+                }
+                if (defenderEnemy && jogada.team == (int)aiTeam)
+                {
+                    result.enemyCombatDamageScore += attackerDamage * weight;
+                    if (jogada.hpAntes > 0 && jogada.hpDepois <= 0)
+                        result.enemyCombatKillScore += weight;
+                }
+
+                if (jogada.combatCargo != null)
+                {
+                    foreach (CombatCargoResult cargo in jogada.combatCargo)
+                    {
+                        if (cargo == null)
+                            continue;
+                        int cargoDamage = Mathf.Max(0, cargo.hpAntes - cargo.hpDepois);
+                        bool cargoKilled = cargo.hpAntes > 0 && cargo.hpDepois <= 0;
+                        bool rootedAtDefender = cargo.rootUid == jogada.uid2;
+                        int dealerUid = rootedAtDefender ? jogada.uid : jogada.uid2;
+                        int dealerTeam = rootedAtDefender ? jogada.team : jogada.team2;
+
+                        if (unitsByUid.TryGetValue(dealerUid, out AIUnitIntel dealerIntel))
+                        {
+                            dealerIntel.recentDamageDealt += cargoDamage * weight;
+                            if (cargoKilled)
+                            {
+                                dealerIntel.recentKills += weight;
+                                dealerIntel.recentDestroyedValue +=
+                                    ComputeCargoStrategicValue(cargo) * weight;
+                            }
+                        }
+
+                        if (IsEnemyTeam(dealerTeam, aiTeam) && cargo.team == (int)aiTeam)
+                        {
+                            result.enemyCombatDamageScore += cargoDamage * weight;
+                            if (cargoKilled)
+                            {
+                                result.enemyCombatKillScore += weight;
+                                result.enemyCargoDestroyedValue +=
+                                    ComputeCargoStrategicValue(cargo) * weight;
+                            }
+                        }
+                    }
+                }
             }
         }
         else if (string.Equals(action, "Capturar", StringComparison.OrdinalIgnoreCase))
@@ -403,8 +509,8 @@ public class AIIntelAnalyzer : MonoBehaviour
         switch (unitClass)
         {
             case GameUnitClass.Infantry:
-            case GameUnitClass.Vehicle:
                 result.enemyInfantryForce += weight; break;
+            case GameUnitClass.Vehicle:
             case GameUnitClass.Armored:
             case GameUnitClass.Artillery:
                 result.enemyArmorForce += weight; break;
@@ -528,6 +634,14 @@ public class AIIntelAnalyzer : MonoBehaviour
         if (string.Equals(action, "Estacionario", StringComparison.OrdinalIgnoreCase)) return 0.75f;
         if (string.Equals(action, "Suprir", StringComparison.OrdinalIgnoreCase)) return 0.75f;
         return 0.25f;
+    }
+
+    private static float ComputeCargoStrategicValue(CombatCargoResult cargo)
+    {
+        if (cargo == null)
+            return 0f;
+        return Mathf.Max(0, cargo.cost)
+            * (1f + Mathf.Max(0, cargo.eliteLevel) * 0.5f);
     }
 
     private static string CleanSigla(string sigla)
@@ -676,6 +790,9 @@ public class AIIntelReport
     public float enemyArmorThreatScore;
     public float enemyArtilleryThreatScore;
     public float enemyInfantryPressureScore;
+    public float enemyCombatDamageScore;
+    public float enemyCombatKillScore;
+    public float enemyCargoDestroyedValue;
 
     [Header("Enemy Force Families")]
     public float enemyInfantryForce;
@@ -703,6 +820,7 @@ public class AIIntelReport
         sb.AppendLine($"Pressao operacional: danoTomado={damageTakenScore:0.0} danoCausado={damageDealtScore:0.0} capturaInimiga={capturePressure:0.0} desembarqueInimigo={landingPressure:0.0}");
         sb.AppendLine($"Stalemate: score={stalemateScore:0.0} elitePressure={stalemateElitePressure:0.0} setores={stalemateSectorCount} top={(!string.IsNullOrWhiteSpace(topStalemateSector) ? topStalemateSector : "-")}");
         sb.AppendLine($"Compras inimigas: elite={enemyElitePurchaseScore:0.0} ar={enemyAirThreatScore:0.0} blindado={enemyArmorThreatScore:0.0} artilharia={enemyArtilleryThreatScore:0.0} infantaria={enemyInfantryPressureScore:0.0}");
+        sb.AppendLine($"Impacto de combate inimigo: dano={enemyCombatDamageScore:0.0} baixas={enemyCombatKillScore:0.0} valorCarga={enemyCargoDestroyedValue:0}");
         sb.AppendLine($"Forca inimiga: inf={enemyInfantryForce:0.0} arm={enemyArmorForce:0.0} ar={enemyAirForce:0.0} nav={enemyNavalForce:0.0}");
 
         if (sectors != null && sectors.Count > 0)
@@ -785,6 +903,9 @@ public class AIUnitIntel
     public string lastKnownSector;
     public float confidence;
     public bool destroyed;
+    public float recentDamageDealt;
+    public float recentKills;
+    public float recentDestroyedValue;
 }
 
 [Serializable]

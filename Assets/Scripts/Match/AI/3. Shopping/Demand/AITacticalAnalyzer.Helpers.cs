@@ -390,6 +390,17 @@ public partial class AITacticalAnalyzer
         return AIController.Instance != null ? AIController.Instance.GetEffectiveTransportThreshold(team) : 7;
     }
 
+    // Mapa de eixos para a fase de shopping. Reusa o currentAxisMap do planner (construido
+    // no mesmo turno, mesmo time, antes do shopping) e so reconstroi se nao houver mapa do
+    // time pedido — evita 1 build/turno no caso comum.
+    private static InvasionAxisMap GetShoppingAxisMap(TeamId team)
+    {
+        InvasionAxisMap map = AIController.Instance != null ? AIController.Instance.CurrentAxisMap : null;
+        if (map != null && map.Team == team)
+            return map;
+        return InvasionAxisMap.Build(team);
+    }
+
     private static bool HasPreventiveDefenseBudget(AIWorldSnapshot snapshot)
     {
         if (snapshot == null) return false;

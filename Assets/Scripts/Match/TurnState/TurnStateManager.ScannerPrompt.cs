@@ -3068,10 +3068,18 @@ public partial class TurnStateManager
         int defenderHpBeforeResolution = defender != null ? Mathf.Max(0, defender.CurrentHP) : 0;
         int attackerHpBeforeResolution = attacker != null ? Mathf.Max(0, attacker.CurrentHP) : 0;
         Dictionary<int, int> embarkedHpBeforeById = CaptureEmbarkedHpSnapshot(attacker, defender);
+        List<JogadasManager.RuntimeCargoSnapshot> combatCargoSnapshot =
+            JogadasManager.CaptureCombatCargoSnapshot(attacker, defender);
 
         yield return ExecuteCombatProjectileExchange(option, attackerTrajectory, combat.counterExecuted);
         ApplyPostHitForcedLayerEffects(option, combat, attackerHpBeforeResolution, defenderHpBeforeResolution);
         ApplyPendingCombatHp(combat);
+        JogadasManager.SetUltimoAtaqueResultado(
+            attacker,
+            defender,
+            attackerHpBeforeResolution,
+            defenderHpBeforeResolution,
+            combatCargoSnapshot);
         planningManager?.NotifyUnitInvolvedInCombat(attacker);
         planningManager?.NotifyUnitInvolvedInCombat(defender);
         RecordAttackReplayCommand(

@@ -10,10 +10,40 @@ using UnityEngine;
 
 public partial class AIController
 {
+    // Mapa de eixos de invasao do turno corrente (setor -> eixo 1..N). Descritivo:
+    // alimenta o aiEixo das unidades via ApplyPlanHUD. Reconstruido a cada BuildObjectivePlan.
+    private InvasionAxisMap currentAxisMap;
+
+    // Exposto para a fase de shopping (AITacticalAnalyzer) reusar o mapa do turno corrente
+    // em vez de reconstruir. Pode ser null antes do primeiro BuildObjectivePlan; o consumidor
+    // confere o Team e cai para InvasionAxisMap.Build se nao bater.
+    public InvasionAxisMap CurrentAxisMap => currentAxisMap;
+
+    // R1 (a ponta avanca): bonus de prioridade no setor-frente de cada eixo, para empurrar
+    // o corredor como linha conectada em vez de pegar setores espalhados. Abaixo do rally (+55).
+    private const int AxisFrontPriorityBonus = 30;
+    // Estabilidade de eixo: custo extra para uma unidade trocar do seu eixo atual para outro
+    // que ja esta igual/mais coberto. Acima do bonus de vizinho (-6); distancia/handoff grande
+    // ainda pode vencer. Rogue (aiEixo<=0) e alvo-fora-de-eixo nao pagam. Dial de ajuste.
+    private const float AxisStabilitySwitchCost = 10f;
+    // Recompensa (custo negativo) para uma unidade trocar para um eixo FAMINTO (>=2 a menos que
+    // o atual): rebalanceia, puxando alguem para cobrir um eixo vazio em vez de lotar o cheio.
+    private const float AxisStarvedCoverReward = 10f;
+    // Diferenca minima de presenca (atual - alvo) para considerar o eixo-alvo faminto.
+    private const int AxisStarvedPresenceGap = 2;
+
+    // Presenca por eixo (eixo 1..N -> nº de unidades do time com aquele aiEixo). Snapshot do
+    // campo no inicio do BuildObjectivePlan, usado para decidir rebalanceamento de eixo.
+    private Dictionary<int, int> currentEixoPresence;
+
     private void BuildObjectivePlan(AIWorldSnapshot snapshot)
     {
         TeamId aiTeam = snapshot.AITeam;
         TeamObjectivePlan plan = ObjectiveManager.GetOrCreatePlanForTeam(aiTeam);
+        currentAxisMap = InvasionAxisMap.Build(aiTeam);
+        // Presenca por eixo (quantas unidades em cada eixo AGORA, incluindo as que vao dar
+        // handoff). Construido antes dos releases para a contagem refletir o campo atual.
+        BuildEixoPresence(aiTeam);
         AIIntelReport intel = BuildPlanIntelReport(snapshot);
         AIRallyPlanContext rallyContext = BuildRallyPlanContext(
             aiTeam,
@@ -22,10 +52,30 @@ public partial class AIController
             intel);
         AIAnchorPlanContext anchorContext = BuildAnchorPlanContext(aiTeam, snapshot.TurnNumber);
 
+        // A invasao (base inimiga ">>") so persiste enquanto a AI GOVERNA algum rally. Sem rally
+        // held, o objetivo de invasao e dissolvido no Passo 1 e suas unidades voltam ao pool.
+        bool anyRallyHeld = AnyOwnedRallyHeld(aiTeam, rallyContext);
+
         // Passo 1: valida objetivos existentes
         for (int i = plan.Objectives.Count - 1; i >= 0; i--)
         {
             SectorObjective obj = plan.Objectives[i];
+
+            // Invasao (base inimiga ">>") sem rally governado: dissolve e LIBERA as unidades para
+            // outros planos que precisem delas (em vez de marcharem sozinhas ate o QG inimigo).
+            if (!anyRallyHeld
+                && ConstructionSectorHelper.IsBase(obj.Sector)
+                && FindHQTeamInSector(obj.Sector) != aiTeam)
+            {
+                Debug.Log($"{TL("Plan")} invasao {obj.Sector} dissolvida: AI nao governa nenhum rally; libera unidades");
+                foreach (SlotNeed freed in obj.Slots)
+                    if (freed.Filled)
+                        FindActiveUnit(freed.AssignedUnitId, aiTeam)?.ClearAIAssignedPlan();
+                ClearObjectiveHUD(obj);
+                plan.Objectives.RemoveAt(i);
+                continue;
+            }
+
             bool objectiveIsRallySector = IsEnemyHQRallySectorHeld(rallyContext, obj.Sector, aiTeam);
             if (objectiveIsRallySector && IsRallyGoGreenSuppressed(aiTeam, obj.Sector, snapshot.TurnNumber))
                 objectiveIsRallySector = false;
@@ -163,16 +213,19 @@ public partial class AIController
             Debug.Log($"{TL("Plan")} cap inicial por produtores: unidades=0 produtores={producerCap} cap={beforeProducerCap}->{maxObj}");
         }
 
-        AIMacroTerritoryContext macro = BuildMacroTerritoryContext(aiTeam, allSectors, maxObj);
+        int macroOwnForce = snapshot.MyUnits != null ? snapshot.MyUnits.Count : 0;
+        int macroEnemyForce = CountLiveEnemyUnits(aiTeam);
+        AIMacroTerritoryContext macro = BuildMacroTerritoryContext(aiTeam, allSectors, maxObj, macroOwnForce, macroEnemyForce);
+        string macroForceTxt = $"força={macro.OwnForce}v{macro.EnemyForce} fr={macro.ForceRatio:P0}";
         if (macro.AppliesCap)
         {
             int beforeMacroCap = maxObj;
             maxObj = Mathf.Clamp(Mathf.Min(maxObj, macro.OffensiveCap), 1, 8);
-            Debug.Log($"[AI Macro][T{snapshot.TurnNumber}][{aiTeam}] phase={macro.Phase} setores={macro.OwnedSectors}/{macro.EnemySectors}/{macro.NeutralSectors} ratio={macro.OwnedRatio:P0} offensiveCap={beforeMacroCap}->{maxObj}");
+            Debug.Log($"[AI Macro][T{snapshot.TurnNumber}][{aiTeam}] phase={macro.Phase} setores={macro.OwnedSectors}/{macro.EnemySectors}/{macro.NeutralSectors} ratio={macro.OwnedRatio:P0} {macroForceTxt} offensiveCap={beforeMacroCap}->{maxObj}");
         }
         else
         {
-            Debug.Log($"[AI Macro][T{snapshot.TurnNumber}][{aiTeam}] phase={macro.Phase} setores={macro.OwnedSectors}/{macro.EnemySectors}/{macro.NeutralSectors} ratio={macro.OwnedRatio:P0} offensiveCap={maxObj}");
+            Debug.Log($"[AI Macro][T{snapshot.TurnNumber}][{aiTeam}] phase={macro.Phase} setores={macro.OwnedSectors}/{macro.EnemySectors}/{macro.NeutralSectors} ratio={macro.OwnedRatio:P0} {macroForceTxt} offensiveCap={maxObj}");
         }
 
         if (macro.AppliesCap)
@@ -202,6 +255,17 @@ public partial class AIController
             }
             if (!hasCapturable && !isRallyAssemblySector) { Debug.Log($"{TL("Plan")} skip {info.Sector}: sem captur�vel"); continue; }
             if (plan.GetObjectiveForSector(info.Sector) != null) { Debug.Log($"{TL("Plan")} skip {info.Sector}: j� tem objetivo"); continue; }
+
+            // 2a trava (escopada): captura OFENSIVA fora do eixo (jardim inimigo, GetEixo==0) nao
+            // recebe unidades ENQUANTO algum rally ainda monta massa e NENHUM atingiu GoGreen —
+            // pre-GoGreen tudo afunila pro rally (mesma filosofia do gate de invasao ">>"). GoGreen,
+            // ou ausencia de eixo de rally, destrava (sobra força pra oportunismo no quintal inimigo).
+            if (!isRallyAssemblySector
+                && IsOffAxisCaptureGatedByRally(info.Sector, aiTeam, rallyContext, snapshot.TurnNumber, intel))
+            {
+                Debug.Log($"{TL("Plan")} skip {info.Sector}: fora do eixo, rally ainda montando massa (sem GoGreen)");
+                continue;
+            }
 
             bool rearBridgeAvailable = HasAvailableRearNeighborTowardHQ(info, plan, aiTeam, out ConstructionSector rearBridgeSector);
             if (ShouldDelayEnemyNaturalByFrontier(info, plan, aiTeam, out ConstructionSector requiredRearSector))
@@ -266,6 +330,7 @@ public partial class AIController
                     + GetIntelSectorPriorityBonus(intel, info.Sector)
                     + GetCampaignAdvancePriorityBonus(info.Sector, plan, aiTeam)
                     + GetAnchorSectorPriorityBonus(anchorContext, info.Sector, macro.Phase)
+                    + GetAxisFrontPriorityBonus(info.Sector)
                     + (macro.Phase == AIMacroTerritoryPhase.Collapsing
                         ? 0
                         : GetRallySectorPriorityBonus(rallyContext, info.Sector, aiTeam)),
@@ -294,7 +359,14 @@ public partial class AIController
             }
             float distHQ = info.GetDistanceToHQ(aiTeam);
             int   transThreshold = GetEffectiveTransportThreshold(aiTeam);
-            bool  addTrans = distHQ >= transThreshold;
+            // Transporte e antecipatorio/posicional (R4): o slot so nasce quando o eixo de fato
+            // vai precisar de carona — no ALVO DE TRANSPORTE PROFUNDO do eixo (a frente, ou o
+            // proximo no se a frente ja esta sob captura: pipelining) ou num RALLY SEGURADO.
+            // O gate de profundidade (>= limiar) e medido no proprio alvo (distHQ deste setor):
+            // se a frente sob captura ainda esta perto (dentro dos ~7h), o proximo no tambem esta
+            // raso e a pe resolve — nao carimba transporte.
+            bool axisTargetDeep = IsAxisTransportTarget(obj.Sector) && distHQ >= transThreshold;
+            bool addTrans = axisTargetDeep || isRallyAssemblySector;
             if (addTrans) obj.Slots.Add(new SlotNeed { Role = UnitRole.Transportador });
             sectorCandidates.Add(obj);
         }
@@ -357,7 +429,18 @@ public partial class AIController
             addedSectors++;
         }
 
-        // Passo 2c: base inimiga
+        // Passo 2c: base inimiga (invasao ">>")
+        // A invasao SO e alocada quando um rally ja juntou massa (GoGreen) — nao porque a AI quer.
+        // Sem isso, unidades soltas marcham 11-12h sozinhas ate a base inimiga (suicidas). O rally
+        // verde e a chave que destrava o ">>"; a montagem do rally segue intacta (nao mexo nela).
+        // Invasao destrava por (a) rally que juntou massa (GoGreen) OU (b) DOMINIO macro (Ganhando:
+        // >=60% territorio E forca). No dominio, voce ja venceu o jogo de massa globalmente — exigir
+        // um rally local formal so trava o fechamento; com forca dominante o push nao e suicida.
+        bool macroDominating = macro.Phase == AIMacroTerritoryPhase.Dominating;
+        bool rallyGoGreen = AnyOwnedRallyAtGoGreen(aiTeam, rallyContext, snapshot.TurnNumber, intel);
+        bool invasionUnlocked = rallyGoGreen || macroDominating;
+        if (invasionUnlocked && !rallyGoGreen)
+            Debug.Log($"{TL("Plan")} invasão liberada por DOMÍNIO (Ganhando), sem rally GoGreen");
         foreach (SectorManager.SectorInfo baseInfo in allBases)
         {
             if (FindHQTeamInSector(baseInfo.Sector) == aiTeam) continue;
@@ -367,6 +450,11 @@ public partial class AIController
                 continue;
             }
             if (plan.GetObjectiveForSector(baseInfo.Sector) != null) continue;
+            if (!invasionUnlocked)
+            {
+                Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector} travada: nenhum rally juntou massa (GoGreen) ainda");
+                continue;
+            }
 
             bool hasCapturable = false;
             foreach (SectorManager.SectorConstructionInfo c in baseInfo.Constructions)
@@ -1429,13 +1517,16 @@ public partial class AIController
         if (unit == null || targetSector == ConstructionSector.None)
             return 0f;
 
+        // Estabilidade de eixo: soma-se a qualquer custo base de continuidade.
+        float axisCost = CalculateAxisStabilityCost(unit, targetSector);
+
         ConstructionSector originSector = ResolveUnitSectorForPlan(unit);
         if (originSector == ConstructionSector.None)
-            return 0f;
+            return axisCost;
         if (originSector == targetSector)
-            return -8f;
+            return -8f + axisCost;
         if (IsSectorContinuityNeighbor(originSector, targetSector, aiTeam))
-            return -6f;
+            return -6f + axisCost;
 
         if (TryGetAnySectorInfo(originSector, out SectorManager.SectorInfo originInfo)
             && TryGetAnySectorInfo(targetSector, out SectorManager.SectorInfo targetInfo))
@@ -1443,10 +1534,99 @@ public partial class AIController
             float originHqDist = originInfo.GetDistanceToHQ(aiTeam);
             float targetHqDist = targetInfo.GetDistanceToHQ(aiTeam);
             if (targetHqDist > originHqDist)
-                return 12f;
+                return 12f + axisCost;
         }
 
-        return 0f;
+        return axisCost;
+    }
+
+    // Custo de estabilidade/rebalanceamento de eixo, com sinal:
+    //  - mesmo eixo / rogue / alvo-fora-de-eixo: 0 (neutro).
+    //  - eixo-alvo FAMINTO (presenca >= AxisStarvedPresenceGap menor que a do atual): recompensa
+    //    (custo negativo) — puxa a unidade para cobrir o eixo vazio em vez de lotar o cheio.
+    //  - eixo-alvo igual/mais coberto: penalidade — mantem "os caras do eixo 1 no eixo 1".
+    // Distancia/handoff grande ainda pode vencer qualquer dos dois.
+    private float CalculateAxisStabilityCost(UnitManager unit, ConstructionSector targetSector)
+    {
+        if (currentAxisMap == null || unit == null)
+            return 0f;
+        int unitEixo = unit.AIEixo;
+        if (unitEixo <= 0)
+            return 0f;
+        int targetEixo = currentAxisMap.GetEixo(targetSector);
+        if (targetEixo <= 0 || targetEixo == unitEixo)
+            return 0f;
+
+        int curPresence = GetEixoPresence(unitEixo);
+        int tgtPresence = GetEixoPresence(targetEixo);
+        if (curPresence - tgtPresence >= AxisStarvedPresenceGap)
+            return -AxisStarvedCoverReward; // eixo-alvo faminto: rebalanceia
+        return AxisStabilitySwitchCost;      // eixo-alvo coberto: gruda na faixa
+    }
+
+    private void BuildEixoPresence(TeamId aiTeam)
+    {
+        var presence = new Dictionary<int, int>();
+        foreach (UnitManager u in UnitManager.AllActive)
+        {
+            if (u == null || u.TeamId != aiTeam || u.IsDead)
+                continue;
+            int e = u.AIEixo;
+            if (e <= 0)
+                continue;
+            presence.TryGetValue(e, out int c);
+            presence[e] = c + 1;
+        }
+        currentEixoPresence = presence;
+    }
+
+    private int GetEixoPresence(int eixo)
+        => currentEixoPresence != null && currentEixoPresence.TryGetValue(eixo, out int c) ? c : 0;
+
+    private int GetAxisFrontPriorityBonus(ConstructionSector sector)
+    {
+        if (currentAxisMap == null)
+            return 0;
+        int eixo = currentAxisMap.GetEixo(sector);
+        if (eixo <= 0)
+            return 0;
+        return currentAxisMap.TryGetAxis(eixo, out InvasionAxisMap.Axis axis) && axis.FrontSector == sector
+            ? AxisFrontPriorityBonus
+            : 0;
+    }
+
+    // Verdadeiro se o setor e o ALVO DE TRANSPORTE do seu eixo: normalmente a frente, mas o
+    // proximo no do corredor se a frente ja esta sob captura (pipelining — ver
+    // InvasionAxisMap.GetTransportTargetSector). Usado para gatear intencao antecipatoria de
+    // transporte; o gate de PROFUNDIDADE (>= limiar) e aplicado pelo chamador sobre este setor.
+    private bool IsAxisTransportTarget(ConstructionSector sector)
+    {
+        if (currentAxisMap == null)
+            return false;
+        int eixo = currentAxisMap.GetEixo(sector);
+        if (eixo <= 0)
+            return false;
+        return currentAxisMap.GetTransportTargetSector(eixo) == sector;
+    }
+
+    // 2a trava: captura ofensiva de setor FORA do eixo (GetEixo==0 — jardim inimigo, alem do rally
+    // ou sem eixo naquela direcao) fica travada enquanto ha eixo de rally montando massa e NENHUM
+    // GoGreen. Pre-GoGreen tudo deve afunilar pro rally; peelar uma unidade pro quintal inimigo
+    // atrasa o GoGreen e a manda sozinha (suicida). Destrava com GoGreen ou sem eixo de rally.
+    private bool IsOffAxisCaptureGatedByRally(
+        ConstructionSector sector, TeamId aiTeam, AIRallyPlanContext rallyContext, int turnNumber, AIIntelReport intel)
+    {
+        if (currentAxisMap == null)
+            return false;
+        if (currentAxisMap.GetEixo(sector) > 0)
+            return false; // setor coberto por um eixo — e o avanco principal, nao trava
+        if (rallyContext.RallyPointCount <= 0)
+            return false; // sem eixo de rally definido — nada pra proteger, captura normal
+        if (AnyOwnedRallyAtGoGreen(aiTeam, rallyContext, turnNumber, intel))
+            return false; // massa pronta em algum rally — libera oportunismo off-axis
+        if (GetMacroTerritoryForInspection(aiTeam).Winning)
+            return false; // DOMÍNIO macro (Ganhando) — libera oportunismo off-axis igual ao GoGreen
+        return true; // off-axis + rally montando + sem GoGreen + não dominando => trava
     }
 
     private static bool IsSectorContinuityNeighbor(ConstructionSector originSector, ConstructionSector targetSector, TeamId aiTeam)

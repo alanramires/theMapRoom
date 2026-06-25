@@ -127,14 +127,31 @@ public class JogadasManager : MonoBehaviour
         });
     }
 
-    public void RegistrarAtaque(int turno, int team, int cx, int cy, int dx, int dy, string sigla, int uid, int uidAlvo)
+    public void RegistrarAtaque(
+        int turno, int team, int cx, int cy, int dx, int dy, string sigla, int uid, int uidAlvo,
+        CombatLogResult combatResult = null)
     {
-        log.Registrar(new Jogada
+        var jogada = new Jogada
         {
             turno = turno, team = team, acao = "Ataque",
             cx = cx, cy = cy, dx = dx, dy = dy,
             unidadeSigla = sigla, uid = uid, uid2 = uidAlvo
-        });
+        };
+        if (combatResult != null)
+        {
+            jogada.hasCombatResult = true;
+            jogada.unidadeSigla = combatResult.AttackerSigla;
+            jogada.unidadeSigla2 = combatResult.DefenderSigla;
+            jogada.team = combatResult.AttackerTeam;
+            jogada.team2 = combatResult.DefenderTeam;
+            jogada.hpAntes = combatResult.AttackerHpBefore;
+            jogada.hpDepois = combatResult.AttackerHpAfter;
+            jogada.hp2Antes = combatResult.DefenderHpBefore;
+            jogada.hp2Depois = combatResult.DefenderHpAfter;
+            jogada.combatCargo = combatResult.CargoResults ?? new List<CombatCargoResult>();
+            jogada.obs = combatResult.ToString();
+        }
+        log.Registrar(jogada);
     }
 
     public void RegistrarEmbarque(int turno, int team, int cx, int cy, int dx, int dy, string sigla, int uid, int uidTransporte)
@@ -199,7 +216,7 @@ public class JogadasManager : MonoBehaviour
     public static string BuildCsv(IEnumerable<Jogada> jogadas)
     {
         var sb = new StringBuilder();
-        sb.Append("jogadaId,turno,team,timeNome,acao,sigla,uid,uid2,cx,cy,coordTipo,dx,dy,destinoTipo,obs\n");
+        sb.Append("jogadaId,turno,team,timeNome,acao,sigla,uid,hpAntes,hpDepois,team2,time2Nome,sigla2,uid2,hp2Antes,hp2Depois,cx,cy,coordTipo,dx,dy,destinoTipo,carga,obs\n");
         if (jogadas != null)
             foreach (Jogada j in jogadas.OrderBy(j => j.jogadaId))
             {
@@ -210,13 +227,21 @@ public class JogadasManager : MonoBehaviour
                   .Append(CsvCampo(j.acao)).Append(',')
                   .Append(CsvCampo(j.unidadeSigla)).Append(',')
                   .Append(j.uid).Append(',')
+                  .Append(j.hasCombatResult ? j.hpAntes : -1).Append(',')
+                  .Append(j.hasCombatResult ? j.hpDepois : -1).Append(',')
+                  .Append(j.hasCombatResult ? j.team2 : -1).Append(',')
+                  .Append(CsvCampo(j.hasCombatResult ? NomeTime(j.team2) : "")).Append(',')
+                  .Append(CsvCampo(j.unidadeSigla2)).Append(',')
                   .Append(j.uid2).Append(',')
+                  .Append(j.hasCombatResult ? j.hp2Antes : -1).Append(',')
+                  .Append(j.hasCombatResult ? j.hp2Depois : -1).Append(',')
                   .Append(j.cx).Append(',')
                   .Append(j.cy).Append(',')
                   .Append(CsvCampo(j.TemCoordenada ? TipoConstrucaoNaCelula(j.cx, j.cy) : "")).Append(',')
                   .Append(j.dx).Append(',')
                   .Append(j.dy).Append(',')
                   .Append(CsvCampo(j.TemDestino ? DestinoLabel(j.dx, j.dy) : "")).Append(',')
+                  .Append(CsvCampo(FormatCargoResults(j.combatCargo))).Append(',')
                   .Append(CsvCampo(j.obs)).Append('\n');
             }
         return sb.ToString();
@@ -248,9 +273,22 @@ public class JogadasManager : MonoBehaviour
         string dt    = j.TemDestino ? DestinoLabel(j.dx, j.dy) : "";
         string coord = j.TemCoordenada ? $"({j.cx},{j.cy}{(string.IsNullOrEmpty(ct) ? "" : " " + ct)})" : "";
         string dest  = j.TemDestino ? $" → ({j.dx},{j.dy}{(string.IsNullOrEmpty(dt) ? "" : " " + dt)})" : "";
-        string alvo  = j.uid2 > 0 ? $" alvo#{j.uid2}" : "";
-        string obs   = string.IsNullOrEmpty(j.obs) ? "" : $" [{j.obs}]";
-        return $"#{j.jogadaId,-4} [{NomeTime(j.team)}] {j.acao,-14} {ator} {coord}{dest}{alvo}{obs}".TrimEnd();
+        string alvo = j.uid2 > 0
+            ? j.hasCombatResult
+                ? $" vs {(string.IsNullOrEmpty(j.unidadeSigla2) ? "-" : j.unidadeSigla2)}#{j.uid2}"
+                : $" alvo#{j.uid2}"
+            : "";
+        string hp = j.hasCombatResult
+            ? $" {j.hpAntes}→{j.hpDepois} vs {j.hp2Antes}→{j.hp2Depois}"
+            : "";
+        string cargo = FormatCargoResults(j.combatCargo);
+        string details = string.IsNullOrEmpty(cargo)
+            ? ""
+            : $" [{cargo}]";
+        string obs = !j.hasCombatResult && !string.IsNullOrEmpty(j.obs)
+            ? $" [{j.obs}]"
+            : "";
+        return $"#{j.jogadaId,-4} [{NomeTime(j.team)}] {j.acao,-14} {ator}{hp} {coord}{dest}{alvo}{details}{obs}".TrimEnd();
     }
 
     private static string NomeTime(int team)
@@ -292,6 +330,153 @@ public class JogadasManager : MonoBehaviour
     // Obs preciso vindo da execução da captura (TurnStateManager.Capture sabe o tipo de operação).
     // Pendurado por unidade até o registro central da jogada consumir.
     private static readonly Dictionary<int, string> _captureObsPorUnidade = new Dictionary<int, string>();
+    private static readonly Dictionary<int, CombatLogResult> _combatResultPorAtacante =
+        new Dictionary<int, CombatLogResult>();
+
+    public sealed class CombatLogResult
+    {
+        public string AttackerSigla;
+        public int AttackerTeam;
+        public int AttackerHpBefore;
+        public int AttackerHpAfter;
+        public string DefenderSigla;
+        public int DefenderTeam;
+        public int DefenderHpBefore;
+        public int DefenderHpAfter;
+        public List<CombatCargoResult> CargoResults = new List<CombatCargoResult>();
+
+        public override string ToString()
+        {
+            string cargo = FormatCargoResults(CargoResults);
+            return $"{AttackerSigla} {AttackerHpBefore}→{AttackerHpAfter} vs " +
+                   $"{DefenderSigla} {DefenderHpBefore}→{DefenderHpAfter}" +
+                   (string.IsNullOrEmpty(cargo) ? "" : $" [{cargo}]");
+        }
+    }
+
+    public sealed class RuntimeCargoSnapshot
+    {
+        public UnitManager Unit;
+        public CombatCargoResult Result;
+    }
+
+    public static List<RuntimeCargoSnapshot> CaptureCombatCargoSnapshot(
+        UnitManager attacker,
+        UnitManager defender)
+    {
+        var result = new List<RuntimeCargoSnapshot>();
+        CollectCargoSnapshotRecursive(attacker, attacker != null ? attacker.InstanceId : 0, 0, 1, result);
+        if (defender != null && defender != attacker)
+            CollectCargoSnapshotRecursive(defender, defender.InstanceId, 0, 1, result);
+        return result;
+    }
+
+    private static void CollectCargoSnapshotRecursive(
+        UnitManager transporter,
+        int rootUid,
+        int parentUid,
+        int depth,
+        List<RuntimeCargoSnapshot> result)
+    {
+        if (transporter == null || result == null)
+            return;
+        IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
+        if (seats == null)
+            return;
+
+        var processed = new HashSet<int>();
+        foreach (UnitTransportSeatRuntime seat in seats)
+        {
+            UnitManager child = seat != null ? seat.embarkedUnit : null;
+            if (child == null || child.InstanceId <= 0 || !processed.Add(child.InstanceId))
+                continue;
+            child.TryGetUnitData(out UnitData data);
+            result.Add(new RuntimeCargoSnapshot
+            {
+                Unit = child,
+                Result = new CombatCargoResult
+                {
+                    rootUid = rootUid,
+                    parentUid = parentUid > 0 ? parentUid : transporter.InstanceId,
+                    depth = depth,
+                    uid = child.InstanceId,
+                    team = (int)child.TeamId,
+                    sigla = ResolveUnitSigla(child),
+                    hpAntes = Mathf.Max(0, child.CurrentHP),
+                    cost = data != null ? data.cost : 0,
+                    eliteLevel = data != null ? data.eliteLevel : 0,
+                    unitClass = data != null ? data.unitClass : GameUnitClass.Infantry,
+                }
+            });
+            CollectCargoSnapshotRecursive(child, rootUid, child.InstanceId, depth + 1, result);
+        }
+    }
+
+    public static void SetUltimoAtaqueResultado(
+        UnitManager attacker,
+        UnitManager defender,
+        int attackerHpBefore,
+        int defenderHpBefore,
+        List<RuntimeCargoSnapshot> cargoSnapshot = null)
+    {
+        if (attacker == null || defender == null || attacker.InstanceId <= 0)
+            return;
+        _combatResultPorAtacante[attacker.InstanceId] = new CombatLogResult
+        {
+            AttackerSigla = ResolveUnitSigla(attacker),
+            AttackerTeam = (int)attacker.TeamId,
+            AttackerHpBefore = Mathf.Max(0, attackerHpBefore),
+            AttackerHpAfter = Mathf.Max(0, attacker.CurrentHP),
+            DefenderSigla = ResolveUnitSigla(defender),
+            DefenderTeam = (int)defender.TeamId,
+            DefenderHpBefore = Mathf.Max(0, defenderHpBefore),
+            DefenderHpAfter = Mathf.Max(0, defender.CurrentHP),
+        };
+        if (cargoSnapshot != null)
+        {
+            foreach (RuntimeCargoSnapshot snapshot in cargoSnapshot)
+            {
+                if (snapshot?.Result == null)
+                    continue;
+                snapshot.Result.hpDepois = snapshot.Unit != null
+                    ? Mathf.Max(0, snapshot.Unit.CurrentHP)
+                    : 0;
+                if (snapshot.Result.hpDepois == snapshot.Result.hpAntes)
+                    continue;
+                snapshot.Result.cause = snapshot.Result.hpDepois <= 0
+                    ? "TransportDestroyed"
+                    : "TransportDamage";
+                _combatResultPorAtacante[attacker.InstanceId].CargoResults.Add(snapshot.Result);
+            }
+        }
+    }
+
+    private static string FormatCargoResults(List<CombatCargoResult> cargo)
+    {
+        if (cargo == null || cargo.Count == 0)
+            return "";
+        var parts = new List<string>();
+        foreach (CombatCargoResult item in cargo)
+            parts.Add($"{new string('>', Mathf.Max(1, item.depth))}{item.sigla}#{item.uid} " +
+                      $"{item.hpAntes}→{item.hpDepois}");
+        return string.Join("; ", parts);
+    }
+
+    private static CombatLogResult ConsumirAtaqueResultado(int attackerUid)
+    {
+        if (attackerUid > 0
+            && _combatResultPorAtacante.TryGetValue(attackerUid, out CombatLogResult result))
+        {
+            _combatResultPorAtacante.Remove(attackerUid);
+            return result;
+        }
+        return null;
+    }
+
+    private static string ResolveUnitSigla(UnitManager unit)
+        => unit != null && unit.TryGetUnitData(out UnitData data) && data != null
+            ? data.apelido
+            : "-";
 
     public static void SetUltimaCapturaObs(int capturerUid, string obs)
     {
@@ -428,7 +613,9 @@ public class JogadasManager : MonoBehaviour
         {
             Vector3Int tCell = action.TargetHex; tCell.z = 0;
             int.TryParse(action.TargetInstanceId, out int uidAlvo);
-            manager.RegistrarAtaque(turno, team, from.x, from.y, tCell.x, tCell.y, sigla, uid, uidAlvo);
+            CombatLogResult combatResult = ConsumirAtaqueResultado(uid);
+            manager.RegistrarAtaque(
+                turno, team, from.x, from.y, tCell.x, tCell.y, sigla, uid, uidAlvo, combatResult);
             return;
         }
 

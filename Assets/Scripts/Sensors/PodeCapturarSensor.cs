@@ -66,9 +66,12 @@ public static class PodeCapturarSensor
             return false;
         }
 
-        if (unitData.roles == null || !unitData.roles.Contains(UnitRole.Capturador))
+        // Aceita qualquer papel que SATISFAÇA Capturador (Capturador e CapturadorAgressivo) — o check
+        // canônico de compatibilidade, mesmo que a AI usa. O Contains estrito anterior rejeitava o
+        // CapturadorAgressivo (ex.: Bazooka) e fazia o batch de captura falhar mesmo com slots ok.
+        if (!UnitRoleCompatibility.CanSatisfy(unitData, UnitRole.Capturador))
         {
-            reason = "Apenas unidades com o papel de Capturador podem capturar.";
+            reason = "Apenas unidades com papel de Capturador (ou Capturador Agressivo) podem capturar.";
             return false;
         }
 

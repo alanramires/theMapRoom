@@ -40,7 +40,16 @@
       "Bash(timeout 300 dotnet build Assembly-CSharp.csproj -nologo)",
       "Bash(xargs -I{} grep -n \"enum TeamId\" -A 12 {})",
       "Bash(timeout 300 dotnet build Assembly-CSharp-Editor.csproj -nologo)",
-      "Bash(git commit -q -m ' *)"
+      "Bash(git commit -q -m ' *)",
+      "Bash(dotnet build *)",
+      "Bash(rm -f \"C:/Users/Alan/.claude/projects/d--Unity-Projects-The-Map-Room/memory/project_mass_attack_state.md\")",
+      "Bash(rm -f \"/c/Users/Alan/.claude/projects/d--Unity-Projects-The-Map-Room/memory/project_mass_attack_state.md\")",
+      "Bash(cd \"d:/Unity Projects/The Map Room\" && ls \"/c/Users/Alan/.claude/projects/d--Unity-Projects-The-Map-Room/memory/\" | grep -i mass || echo \"mass_attack memory removido OK\")",
+      "Read(//c/Users/Alan/.claude/projects/d--Unity-Projects-The-Map-Room/memory//**)",
+      "Bash(cd \"d:/Unity Projects/The Map Room\" && sed -n '/Vector3Int ResolveAssaultPressureTarget/,/^    }/p' \"Assets/Scripts/Match/AI/Units/Assault/\"*.cs 2>/dev/null | head -45)"
+    ],
+    "additionalDirectories": [
+      "d:\\Unity Projects\\The Map Room\\Assets\\Scripts\\Match\\AI\\Units\\Assault"
     ]
   }
 }

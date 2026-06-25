@@ -299,6 +299,14 @@ public class DebugManager : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
+        else if (TryParseSetSellingRulesCommand(command, out string sellingRuleToken, out int sellingOwnerSlot))
+        {
+            executed = turnStateManager.TrySetSellingRulesUnderCursorFromDebug(sellingRuleToken, sellingOwnerSlot, out string message);
+            if (executed)
+                cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
         else if (command == "REARM UNIT")
         {
             executed = turnStateManager.TryReplenishUnitEmbarkedAmmoUnderCursorFromDebug(out string message);
@@ -843,6 +851,30 @@ public class DebugManager : MonoBehaviour
         return int.TryParse(valueToken, out remainingMovementValue);
     }
 
+    // "SET SELLING RULES <free|original|first|disabled> [slot]" — muda a regra de venda do prédio sob
+    // o cursor. free/disabled ignoram o slot; original/first usam o slot como owner slot.
+    private static bool TryParseSetSellingRulesCommand(string normalizedCommand, out string ruleToken, out int ownerSlot)
+    {
+        ruleToken = string.Empty;
+        ownerSlot = -1;
+        if (string.IsNullOrWhiteSpace(normalizedCommand))
+            return false;
+
+        const string prefix = "SET SELLING RULES ";
+        if (!normalizedCommand.StartsWith(prefix))
+            return false;
+
+        string remainder = normalizedCommand.Substring(prefix.Length).Trim();
+        if (string.IsNullOrWhiteSpace(remainder))
+            return false;
+
+        string[] parts = remainder.Split(' ');
+        ruleToken = parts[0]; // já em maiúsculas (NormalizeCommand): FREE/ORIGINAL/FIRST/DISABLED
+        if (parts.Length >= 2 && int.TryParse(parts[1], out int slot))
+            ownerSlot = slot;
+        return true;
+    }
+
     private static bool TryParseSetConstructionTeamCommand(string normalizedCommand, out int teamValue)
     {
         teamValue = 0;
@@ -913,6 +945,7 @@ public class DebugManager : MonoBehaviour
             "set owner <x> (alias, -1 neutro, 0 verde, 1 azul, 2 vermelho, 3 amarelo)\n" +
             "set active team <x> (troca time ativo sem avancar turno)\n" +
             "set capture points <v>\n" +
+            "set selling rules <free|original [slot]|first [slot]|disabled> (prédio no cursor)\n" +
             "spawn <unit> | ai spawn <unit>\n" +
             "spawn:<team> <unit>\n" +
             "set money <v> | set money +<v> | set money:<team> <v>\n" +

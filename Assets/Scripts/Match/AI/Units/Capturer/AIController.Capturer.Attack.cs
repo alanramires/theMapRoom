@@ -354,6 +354,12 @@ public partial class AIController
         float bestTargetPrefScore = float.MinValue;
         string bestReason = "";
 
+        // O capturador esta EM CIMA de um capturavel NOSSO? Entao ele defende o predio pela
+        // presenca — e um inimigo ADJACENTE a ele tambem ameaca o predio (nao so inimigo em cima).
+        ConstructionManager buildingUnderMe = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
+        bool defendingHere = buildingUnderMe != null && buildingUnderMe.IsCapturable && buildingUnderMe.TeamId == snapshot.AITeam;
+        bool adjacentThreat = false;
+
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy == null || enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked)
@@ -363,11 +369,19 @@ public partial class AIController
 
             Vector3Int enemyCell = enemy.CurrentCellPosition;
             enemyCell.z = 0;
-            ConstructionManager threatenedBuilding = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell);
-            if (threatenedBuilding == null
-                || !threatenedBuilding.IsCapturable
-                || threatenedBuilding.TeamId != snapshot.AITeam)
+            ConstructionManager enemyOnBuilding = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell);
+            bool enemyOnOurBuilding = enemyOnBuilding != null
+                && enemyOnBuilding.IsCapturable
+                && enemyOnBuilding.TeamId == snapshot.AITeam;
+            // Inimigo adjacente ao predio que ESTOU defendendo tambem conta (defende-se atacando-o).
+            bool enemyAdjacentToMyBuilding = defendingHere
+                && SectorManager.HexDistance(fromCell, enemyCell) <= 1.5f;
+            if (!enemyOnOurBuilding && !enemyAdjacentToMyBuilding)
                 continue;
+            if (enemyAdjacentToMyBuilding)
+                adjacentThreat = true;
+
+            ConstructionManager threatenedBuilding = enemyOnOurBuilding ? enemyOnBuilding : buildingUnderMe;
 
             bool contested = threatenedBuilding.CurrentCapturePoints < threatenedBuilding.CapturePointsMax;
             float captureLoss = Mathf.Max(0, threatenedBuilding.CapturePointsMax - threatenedBuilding.CurrentCapturePoints);
@@ -417,7 +431,17 @@ public partial class AIController
         }
 
         if (bestTarget == null)
+        {
+            // Estou em cima do nosso predio com inimigo adjacente, mas sem ataque vantajoso:
+            // SEGURO a posicao (defendo pela presenca) em vez de embarcar e abandonar o predio.
+            if (defendingHere && adjacentThreat)
+            {
+                Debug.Log($"{TL("Capturador")} {unit.InstanceId} segura {buildingUnderMe.Sector} contra inimigo adjacente (sem ataque vantajoso) — nao embarca");
+                action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+                return true;
+            }
             return false;
+        }
 
         Vector3Int targetCell = bestTarget.CurrentCellPosition;
         targetCell.z = 0;

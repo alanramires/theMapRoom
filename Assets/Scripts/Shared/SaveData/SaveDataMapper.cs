@@ -181,7 +181,8 @@ public static class SaveDataMapper
             aiAssignedPlanName = unit.AIAssignedPlanName,
             aiAssignedPlanBadge = unit.AIAssignedPlanBadge,
             aiAssignedPlanRole = unit.AIAssignedPlanRole,
-            aiAssignedPlanBadgeVisible = unit.AIAssignedPlanBadgeVisible
+            aiAssignedPlanBadgeVisible = unit.AIAssignedPlanBadgeVisible,
+            aiEixo = unit.AIEixo
         };
 
         IReadOnlyList<UnitEmbarkedWeapon> embarkedWeapons = unit.GetEmbarkedWeapons();
@@ -269,6 +270,9 @@ public static class SaveDataMapper
             unit.SetAIAssignedPlan(saved.aiAssignedPlanKey, saved.aiAssignedPlanName, saved.aiAssignedPlanBadge, saved.aiAssignedPlanRole, saved.aiAssignedPlanBadgeVisible);
         else
             unit.ClearAIAssignedPlan();
+
+        // aiEixo e independente do plano (persiste como memoria entre handoffs); restaura sempre.
+        unit.SetAIEixo(saved.aiEixo);
     }
 
     public static void ApplyUnitTurnFlagsFromSaveData(UnitManager unit, UnitSaveData saved)

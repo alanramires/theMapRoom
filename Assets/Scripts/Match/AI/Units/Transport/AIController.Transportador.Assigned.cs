@@ -41,20 +41,13 @@ public partial class AIController
         // Find the capturer unit this transport is supposed to ferry.
         // Discard the passenger if they're already close enough to walk — same threshold as
         // TryDecideCapturerEmbarkAction, so both sides agree on when transport is no longer needed.
-        UnitManager targetPassenger = ResolveAssignedPassengerUnit(assigned, snapshot.AITeam);
+        // Resolve o passageiro DESTE transportador distribuindo os capturadores needy do objetivo
+        // entre TODOS os APCs designados a ele (1:1). Evita que 2 APCs do mesmo Bravo fixem o mesmo
+        // capturador e ignorem o segundo. null = este APC nao recebe passageiro (mais APCs que
+        // passageiros, ou todos perto/dispensados) -> cai no ramo "sem passageiro".
+        UnitManager targetPassenger = ResolveAssignedPassengerForTransporter(unit, snapshot, plan, assigned);
         if (targetPassenger != null)
-        {
-            ConstructionManager objCheck = FindCapturableInSector(assigned.Sector, snapshot.AITeam);
-            if (objCheck != null)
-            {
-                Vector3Int objCheckCell = objCheck.CurrentCellPosition; objCheckCell.z = 0;
-                Vector3Int passCell = targetPassenger.CurrentCellPosition; passCell.z = 0;
-                int transportThreshold = GetEffectiveTransportThreshold(snapshot.AITeam);
-                int passTerrainCost = TerrainCostToCell(targetPassenger, passCell, objCheckCell, transportThreshold);
-                if (passTerrainCost < transportThreshold)
-                    targetPassenger = null;
-            }
-        }
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — pareado com passageiro {targetPassenger.InstanceId}");
 
         bool preferNoMove = unit.TryGetUnitData(out UnitData assignedData) && assignedData.prioritizeDpqAtBattle;
 
@@ -81,6 +74,19 @@ public partial class AIController
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, shuttleMove, paths);
             }
 
+            // Sem candidato perto (2h) e sem passageiro needy (todos walkable): em vez de pressionar
+            // o objetivo vazio, VAI BUSCAR o capturador mais proximo do proprio plano — mesmo que
+            // ele consiga ir a pe, a carona acelera. Util > marchar sozinho pro objetivo.
+            UnitManager softPassenger = FindNearestPlanCapturer(assigned, snapshot.AITeam, fromCell);
+            if (softPassenger != null)
+            {
+                Vector3Int softCell = softPassenger.CurrentCellPosition; softCell.z = 0;
+                Vector3Int softObj = ResolveUnitObjectiveCell(softPassenger, plan, snapshot);
+                Vector3Int softMove = FindTransportShuttleMove(unit, fromCell, softCell, paths, occupied, snapshot.AITeam, softObj);
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — vai buscar capturador {softPassenger.InstanceId}@{softCell} (sem needy; carona antecipada) via {softMove}");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, softMove, paths);
+            }
+
             Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — sem passageiro, pressiona {sectorCell}");
             Vector3Int sectorMove = FindTransportMove(unit, fromCell, sectorCell, paths, occupied, snapshot.AITeam);
 
@@ -93,6 +99,17 @@ public partial class AIController
                     attackTarget.InstanceId.ToString(), targetCell, paths);
             }
 
+            // APC VAZIO nao avanca sozinho pra dentro de mais perigo (revelar fog / suicidar). Se
+            // o passo escolhido aumenta a ameaca vs a posicao atual, segura a posicao em vez de
+            // pressionar o objetivo sem carga e sem escolta.
+            float curThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
+            float moveThreat = CalculateThreatLevel(sectorMove, snapshot.AITeam);
+            if (sectorMove != fromCell && moveThreat > curThreat + 0.01f)
+            {
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — vazio NAO avanca pra ameaca (threat {moveThreat:F0} > atual {curThreat:F0}); segura posicao");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+            }
+
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, sectorMove, paths);
         }
 
@@ -102,15 +119,6 @@ public partial class AIController
         // sector capturable is gone (e.g. already taken by another AI unit this turn).
         Vector3Int passengerCell = targetPassenger.CurrentCellPosition; passengerCell.z = 0;
         Vector3Int objCell = ResolveUnitObjectiveCell(targetPassenger, plan, snapshot);
-        if (ShouldLeaveAssignedPassengerOnLocalRallyPressure(targetPassenger, snapshot, plan, passengerCell, objCell, out string leaveReason))
-        {
-            Vector3Int waitTarget = FindTransportWaitTarget(snapshot.AITeam, fromCell);
-            waitTarget.z = 0;
-            Vector3Int waitMove = FindTransportMove(unit, fromCell, waitTarget, paths, occupied, snapshot.AITeam);
-            Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — deixa passageiro {targetPassenger.InstanceId} entregue ({leaveReason}); retorna pickup/base alvo={waitTarget} via {waitMove}");
-            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, waitMove, paths);
-        }
-
         Vector3Int moveTarget = FindTransportShuttleMove(unit, fromCell, passengerCell, paths, occupied, snapshot.AITeam, objCell);
 
         if (TryFindTransportBreakerAttack(unit, snapshot, fromCell, paths, occupied, passengerCell,
@@ -294,6 +302,106 @@ public partial class AIController
         }
 
         return false;
+    }
+
+    // Distribui os capturadores que REALMENTE precisam de carona entre os transportadores
+    // designados ao MESMO objetivo (1:1) e devolve o passageiro DESTE transportador. Determinístico
+    // (independe da ordem da Phase 2): transportadores em ordem de InstanceId pegam o passageiro
+    // needy nao reivindicado mais proximo. Evita 2 APCs do mesmo Bravo brigando pelo mesmo
+    // capturador e ignorando o segundo. Retorna null se este APC nao recebe passageiro.
+    private UnitManager ResolveAssignedPassengerForTransporter(
+        UnitManager transporter, AIWorldSnapshot snapshot, TeamObjectivePlan plan, SectorObjective assigned)
+    {
+        if (assigned?.Slots == null || transporter == null) return null;
+        TeamId aiTeam = snapshot.AITeam;
+
+        ConstructionManager objBldg = FindCapturableInSector(assigned.Sector, aiTeam);
+        Vector3Int objCell = Vector3Int.zero;
+        if (objBldg != null) { objCell = objBldg.CurrentCellPosition; objCell.z = 0; }
+        int transportThreshold = GetEffectiveTransportThreshold(aiTeam);
+
+        // Passageiros needy: capturadores do objetivo vivos, fora, sem ter agido e LONGE A PE
+        // (alem da distancia de embarque) — quem chega a pe nao precisa de carona. NAO usar o
+        // ShouldLeaveAssignedPassengerOnLocalRallyPressure aqui: ele e liberal demais (acha rally
+        // ate ATRAS do capturador) e zerava o needy, deixando os APCs vazios.
+        var passengers = new List<UnitManager>();
+        var diag = new System.Text.StringBuilder();
+        foreach (SlotNeed slot in assigned.Slots)
+        {
+            if (slot.Role != UnitRole.Capturador) continue;
+            if (!slot.Filled) { diag.Append($" cap[vazio]"); continue; }
+            UnitManager cap = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            if (cap == null) { diag.Append($" cap#{slot.AssignedUnitId}[null]"); continue; }
+            if (cap.IsEmbarked) { diag.Append($" cap#{cap.InstanceId}[embarcado]"); continue; }
+            if (cap.HasActed) { diag.Append($" cap#{cap.InstanceId}[jaAgiu]"); continue; }
+            Vector3Int capCell = cap.CurrentCellPosition; capCell.z = 0;
+            int cost = objBldg != null ? TerrainCostToCell(cap, capCell, objCell, transportThreshold) : 999;
+            if (objBldg != null && cost < transportThreshold)
+            {
+                diag.Append($" cap#{cap.InstanceId}[perto cost={cost}<{transportThreshold}]");
+                continue; // perto o bastante pra ir a pe
+            }
+            diag.Append($" cap#{cap.InstanceId}[NEEDY cost={cost}]");
+            passengers.Add(cap);
+        }
+        Debug.Log($"{TL("Transporte")} matching {assigned.Sector} APC {transporter.InstanceId}: needy={passengers.Count} thr={transportThreshold} obj={(objBldg != null ? objCell.ToString() : "null")} caps:{diag}");
+        if (passengers.Count == 0) return null;
+
+        // Reserva PERSISTENTE entre os APCs nesta passada da Phase 2 (assignedTransportClaims):
+        // se este APC ja reservou um passageiro ainda needy, mantem (estavel mesmo depois de
+        // outro APC se mover). Senao, pega o needy mais proximo que NAO esteja reservado por
+        // outro APC, e registra a reserva — assim o proximo APC nao realoca o mesmo cara.
+        if (assignedTransportClaims.TryGetValue(transporter.InstanceId, out int prevPid))
+        {
+            foreach (UnitManager p in passengers)
+                if (p.InstanceId == prevPid) return p;
+            assignedTransportClaims.Remove(transporter.InstanceId); // reserva anterior nao e mais needy
+        }
+
+        Vector3Int tc = transporter.CurrentCellPosition; tc.z = 0;
+        UnitManager best = null;
+        float bestD = float.MaxValue;
+        foreach (UnitManager p in passengers)
+        {
+            bool claimedByOther = false;
+            foreach (KeyValuePair<int, int> kv in assignedTransportClaims)
+                if (kv.Value == p.InstanceId && kv.Key != transporter.InstanceId) { claimedByOther = true; break; }
+            if (claimedByOther) continue;
+            Vector3Int pc = p.CurrentCellPosition; pc.z = 0;
+            float d = SectorManager.HexDistance(tc, pc);
+            if (d < bestD) { bestD = d; best = p; }
+        }
+
+        if (best == null)
+        {
+            Debug.Log($"{TL("Transporte")} matching {assigned.Sector}: APC {transporter.InstanceId} sem passageiro (needy={passengers.Count}, todos ja reservados por outros APCs)");
+            return null;
+        }
+
+        assignedTransportClaims[transporter.InstanceId] = best.InstanceId;
+        Debug.Log($"{TL("Transporte")} matching {assigned.Sector}: APC {transporter.InstanceId}@{tc} reserva passageiro {best.InstanceId} dist={bestD:F0} (needy={passengers.Count})");
+        return best;
+    }
+
+    // Capturador VIVO mais proximo do APC dentre os slots do objetivo (sem filtro de distancia/needy).
+    // Usado quando nao ha passageiro needy: o APC vazio vai buscar o mais perto em vez de pressionar
+    // o objetivo sozinho. So conta quem ainda pode embarcar (vivo, fora, sem ter agido).
+    private static UnitManager FindNearestPlanCapturer(SectorObjective assigned, TeamId aiTeam, Vector3Int fromCell)
+    {
+        if (assigned?.Slots == null) return null;
+        fromCell.z = 0;
+        UnitManager best = null;
+        float bestD = float.MaxValue;
+        foreach (SlotNeed slot in assigned.Slots)
+        {
+            if (slot.Role != UnitRole.Capturador || !slot.Filled) continue;
+            UnitManager cap = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            if (cap == null || cap.IsEmbarked || cap.HasActed) continue;
+            Vector3Int cc = cap.CurrentCellPosition; cc.z = 0;
+            float d = SectorManager.HexDistance(fromCell, cc);
+            if (d < bestD) { bestD = d; best = cap; }
+        }
+        return best;
     }
 
     // Returns the first live, unacted capturer assigned to this objective's slots.

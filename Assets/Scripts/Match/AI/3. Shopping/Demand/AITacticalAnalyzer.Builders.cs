@@ -137,13 +137,18 @@ public partial class AITacticalAnalyzer
     // capturadores antes de liberar suporte vem do knob compartilhado AIShoppingPlanner.
     private const int GroundTransportEmbarkDistance = 7;
 
-    // Demanda de APC por NECESSIDADE DE CARONA, não por distância do setor:
-    //  - capturador já em campo cujo caminho real até o objetivo é >= limiar de embarque e
-    //    que não está embarcado (carona concreta);
-    //  - aposta futura: vaga de capturador vazia conta só quando a frente está comprometida
-    //    (já tem capturador indo, ou status Pursuing/Capturing) — o capturador que vier nasce
-    //    no HQ, longe, e vai precisar de carona. Frente vazia/parada não pré-compra APC.
-    // Gateada por massa mínima de capturadores e descontando APCs já alocados ao objetivo.
+    // Demanda de APC POR EIXO, escalada pela PROFUNDIDADE DA FRENTE (R4). Paradigma:
+    // o transporte é o único papel antecipatório/posicional — prepara o terreno que ainda
+    // vai ser tomado, não reage a um capturador específico já longe. Intuição-norte:
+    //   frente rasa (eixo recém-saído do HQ) → a pé resolve, pressão ZERO;
+    //   frente profunda (vários setores segurados atrás) → o próximo capturador nasce no HQ
+    //     e tem de cruzar tudo → 1 APC.
+    // Estrutura:
+    //  - a demanda nasce SÓ no ALVO DE TRANSPORTE do eixo (a frente, ou o próximo nó se a
+    //    frente já está sob captura: pipelining do corredor) → teto 1/eixo natural;
+    //  - gateada por massa mínima de capturadores e por profundidade DO ALVO >= limiar de
+    //    embarque (frente perta sob captura → próximo nó também raso → a pé resolve);
+    //  - desconta APCs terrestres já alocados ao eixo (presença por aiEixo).
     private int ComputeGroundTransportNeed(TeamId team, AIWorldSnapshot snapshot, SectorObjective obj)
     {
         if (obj == null || obj.Slots == null)
@@ -152,42 +157,59 @@ public partial class AITacticalAnalyzer
         if (CountActiveNeed(snapshot, AINeedKind.Capturer) < massGate)
             return 0;
 
-        bool committed = obj.Status == ObjectiveStatus.Pursuing
-            || obj.Status == ObjectiveStatus.Capturing
-            || ObjectiveHasFilledCapturer(obj);
-
-        int rideNeeding = 0;
-        foreach (SlotNeed slot in obj.Slots)
-        {
-            if (slot.Role != UnitRole.Capturador)
-                continue;
-            if (slot.Filled)
-            {
-                UnitManager unit = FindActiveUnit(slot.AssignedUnitId);
-                if (unit == null || unit.IsEmbarked)
-                    continue;
-                if (slot.DistanceToObjective >= GroundTransportEmbarkDistance)
-                    rideNeeding++;
-            }
-            else if (committed)
-            {
-                rideNeeding++; // aposta futura: capturador novo nascerá no HQ, longe
-            }
-        }
-        if (rideNeeding <= 0)
+        InvasionAxisMap axisMap = GetShoppingAxisMap(team);
+        int eixo = axisMap != null ? axisMap.GetEixo(obj.Sector) : 0;
+        // Fora de qualquer eixo (rogue/base/fora de alcance): sem pressão antecipatória.
+        if (eixo <= 0 || axisMap == null)
+            return 0;
+        // Teto 1/eixo: só o ALVO DE TRANSPORTE do eixo gera demanda — a frente, ou o próximo
+        // nó se a frente já está sob captura (pipelining). Eixo completo não tem alvo.
+        ConstructionSector target = axisMap.GetTransportTargetSector(eixo);
+        if (target == ConstructionSector.None || obj.Sector != target)
             return 0;
 
-        // 1 APC por frente (faz shuttle entre os capturadores); desconta os já alocados.
-        int assigned = CountFilledCompatibleSlots(obj, AINeedKind.GroundTransport);
+        // Profundidade do ALVO = quão longe o próximo capturador (nascido no HQ) terá de
+        // cruzar. Alvo raso → a pé resolve (pressão zero). Alvo profundo → 1 APC. Medir no
+        // alvo garante que pipelinar uma frente perto (dentro dos ~7h) não gere demanda.
+        if (!SectorManager.TryGetSectorInfo(target, out SectorManager.SectorInfo frontInfo))
+            return 0;
+        float depth = frontInfo.GetDistanceToHQ(team);
+        if (depth < GroundTransportEmbarkDistance)
+            return 0;
+
+        // Teto 1/eixo: desconta APCs terrestres já alocados a este eixo.
+        int assigned = CountGroundTransportsOnEixo(snapshot, obj, eixo);
         return Mathf.Max(0, 1 - assigned);
     }
 
-    private static bool ObjectiveHasFilledCapturer(SectorObjective obj)
+    // Conta APCs terrestres já comprometidos com o eixo: presença por aiEixo (memória que
+    // persiste entre objetivos) + os recém-atribuídos ao objetivo da frente (que podem ainda
+    // não ter o aiEixo deste turno). Dedupe por InstanceId.
+    private int CountGroundTransportsOnEixo(AIWorldSnapshot snapshot, SectorObjective obj, int eixo)
     {
-        foreach (SlotNeed slot in obj.Slots)
-            if (slot.Role == UnitRole.Capturador && slot.Filled)
-                return true;
-        return false;
+        var counted = new HashSet<int>();
+        if (snapshot?.MyUnits != null)
+        {
+            foreach (UnitManager u in snapshot.MyUnits)
+            {
+                if (!UnitSatisfiesNeed(u, AINeedKind.GroundTransport))
+                    continue;
+                if (u.AIEixo == eixo)
+                    counted.Add(u.InstanceId);
+            }
+        }
+        if (obj?.Slots != null)
+        {
+            foreach (SlotNeed slot in obj.Slots)
+            {
+                if (!slot.Filled)
+                    continue;
+                UnitManager u = FindActiveUnit(slot.AssignedUnitId);
+                if (UnitSatisfiesNeed(u, AINeedKind.GroundTransport))
+                    counted.Add(u.InstanceId);
+            }
+        }
+        return counted.Count;
     }
 
     private void BuildSectorDefenseOp(

@@ -6,12 +6,12 @@ public partial class AIController
 {
     // -------------------------------------------------------------------------
 
-    // Definição parcial da classe AIController, organizada em múltiplos arquivos para melhor legibilidade 
-    // e manutenção. Cada arquivo foca em um aspecto específico do comportamento da IA, como ciclo de vida,
-    // tomada de decisões, avaliação de hexágonos e interação com o sistema de objetivos.
-    // A classe é responsável por controlar a IA inimiga, incluindo a execução de suas ações, 
-    // planejamento de objetivos e tomada de decisões, utilizando uma abordagem baseada
-    //  em estágios para organizar seu comportamento.    
+    // Definiï¿½ï¿½o parcial da classe AIController, organizada em mï¿½ltiplos arquivos para melhor legibilidade 
+    // e manutenï¿½ï¿½o. Cada arquivo foca em um aspecto especï¿½fico do comportamento da IA, como ciclo de vida,
+    // tomada de decisï¿½es, avaliaï¿½ï¿½o de hexï¿½gonos e interaï¿½ï¿½o com o sistema de objetivos.
+    // A classe ï¿½ responsï¿½vel por controlar a IA inimiga, incluindo a execuï¿½ï¿½o de suas aï¿½ï¿½es, 
+    // planejamento de objetivos e tomada de decisï¿½es, utilizando uma abordagem baseada
+    //  em estï¿½gios para organizar seu comportamento.    
 
     // -------------------------------------------------------------------------
 
@@ -186,7 +186,11 @@ public partial class AIController
                 && hexUnitData.roles != null && hexUnitData.roles.Count > 0
                 && hexUnitData.roles.Contains(UnitRole.Capturador);
 
-            if (canCapture)
+            // O tipo CaptureNow vem do PAPEL, nao do hex escolhido. Um fallback (apos ceder a captura
+            // reservada a outra unidade) pode cair num hex de ATAQUE/movimento SEM capturavel â€”
+            // montar BuildCaptureBatch la gera batch invalido e a unidade "trava". So captura se o
+            // sensor confirmar capturavel no destino; senao cai pro ataque/movimento abaixo.
+            if (canCapture && SimulateCaptureSensor(unit, destCell, out _))
             {
 
             Debug.Log($"[AI] {unit.InstanceId} â†’ captura @ {destCell}");

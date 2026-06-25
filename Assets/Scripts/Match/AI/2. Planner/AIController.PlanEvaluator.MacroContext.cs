@@ -24,24 +24,41 @@ public partial class AIController
         public int NeutralSectors;
         public int TotalSectors;
         public float OwnedRatio;
+        public int OwnForce;       // minhas unidades
+        public int EnemyForce;     // unidades inimigas conhecidas (intel/jogadas)
+        public float ForceRatio;   // minhas / (minhas + inimigas conhecidas)
         public int OffensiveCap;
         public bool AppliesCap;
     }
 
+    // Último macro context calculado por time (com força). O painel de inspeção lê DAQUI pra mostrar
+    // exatamente o que a AI decidiu (a inspeção não tem intel pra recomputar a força sozinha).
+    private static readonly Dictionary<TeamId, AIMacroTerritoryContext> s_lastMacroByTeam
+        = new Dictionary<TeamId, AIMacroTerritoryContext>();
+
     private static AIMacroTerritoryContext BuildMacroTerritoryContext(
         TeamId aiTeam,
         IReadOnlyList<SectorManager.SectorInfo> sectors,
-        int defaultOffensiveCap)
+        int defaultOffensiveCap,
+        int ownForce,
+        int enemyForce)
     {
         AIMacroTerritoryContext ctx = new AIMacroTerritoryContext
         {
             Phase = AIMacroTerritoryPhase.EarlyExpansion,
             OffensiveCap = Mathf.Max(1, defaultOffensiveCap),
-            OwnedRatio = 0.5f
+            OwnedRatio = 0.5f,
+            OwnForce = ownForce,
+            EnemyForce = enemyForce,
+            // Sem inimigo conhecido => 1.0 (não arrasta nada pra baixo); senão minhas/(minhas+deles).
+            ForceRatio = (ownForce + enemyForce) > 0 ? ownForce / (float)(ownForce + enemyForce) : 0.5f
         };
 
         if (sectors == null || sectors.Count == 0)
+        {
+            s_lastMacroByTeam[aiTeam] = ctx;
             return ctx;
+        }
 
         foreach (SectorManager.SectorInfo info in sectors)
         {
@@ -68,16 +85,22 @@ public partial class AIController
         {
             ctx.Phase = AIMacroTerritoryPhase.EarlyExpansion;
             ctx.AppliesCap = false;
+            s_lastMacroByTeam[aiTeam] = ctx;
             return ctx;
         }
 
-        if (ctx.OwnedRatio <= 0.35f)
+        // Decisão por território E força: usa o PIOR dos dois (min). PERDENDO se território OU força
+        // <= 40% (defesa sensível ao perigo: basta uma das duas estar ruim); GANHANDO só quando AMBOS
+        // >= 60%. Faixa 40-60% = Empatado. Ex.: 38% setores -> Perdendo; 63% setores + 79% força -> 0.63 -> Ganhando.
+        float decisionRatio = Mathf.Min(ctx.OwnedRatio, ctx.ForceRatio);
+
+        if (decisionRatio <= 0.40f)
         {
             ctx.Phase = AIMacroTerritoryPhase.Collapsing;
             ctx.OffensiveCap = Mathf.Clamp(defaultOffensiveCap, 2, 3);
             ctx.AppliesCap = true;
         }
-        else if (ctx.OwnedRatio >= 0.65f)
+        else if (decisionRatio >= 0.60f)
         {
             ctx.Phase = AIMacroTerritoryPhase.Dominating;
             ctx.OffensiveCap = 2;
@@ -89,7 +112,62 @@ public partial class AIController
             ctx.AppliesCap = false;
         }
 
+        s_lastMacroByTeam[aiTeam] = ctx;
         return ctx;
+    }
+
+    // -------------------------------------------------------------------------
+    // Inspeção (ShoppingPressureWindow): expõe a visão macro-territorial da AI —
+    // setores seus/inimigos/neutros e como ela classifica a partida (perdendo/
+    // empatado/ganhando/início). Leitura viva e silenciosa (sem log).
+    // -------------------------------------------------------------------------
+    public struct MacroTerritoryInspection
+    {
+        public int OwnedSectors;
+        public int EnemySectors;
+        public int NeutralSectors;
+        public int TotalSectors;
+        public float OwnedRatio;
+        public int OwnForce;       // minhas unidades
+        public int EnemyForce;     // unidades inimigas conhecidas
+        public float ForceRatio;   // minhas / (minhas + conhecidas)
+        public string PhaseLabel;  // "Perdendo" / "Empatado" / "Ganhando" / "Início"
+        public string PhaseRaw;    // nome cru do enum (referência)
+        public bool Losing;
+        public bool Winning;
+    }
+
+    public static MacroTerritoryInspection GetMacroTerritoryForInspection(TeamId team)
+    {
+        // Prefere o último valor REAL calculado no plano (com força). Só recomputa sector-only se a
+        // AI ainda não rodou o plano pra esse time (cache vazio) — aí sem dados de força (0/0).
+        if (!s_lastMacroByTeam.TryGetValue(team, out AIMacroTerritoryContext ctx))
+            ctx = BuildMacroTerritoryContext(team, SectorManager.GetAllSectorInfos(), 6, 0, 0);
+
+        string label;
+        switch (ctx.Phase)
+        {
+            case AIMacroTerritoryPhase.Collapsing: label = "Perdendo"; break;
+            case AIMacroTerritoryPhase.Dominating: label = "Ganhando"; break;
+            case AIMacroTerritoryPhase.Balanced:   label = "Empatado"; break;
+            default:                               label = "Início/Expansão"; break;
+        }
+
+        return new MacroTerritoryInspection
+        {
+            OwnedSectors   = ctx.OwnedSectors,
+            EnemySectors   = ctx.EnemySectors,
+            NeutralSectors = ctx.NeutralSectors,
+            TotalSectors   = ctx.TotalSectors,
+            OwnedRatio     = ctx.OwnedRatio,
+            OwnForce       = ctx.OwnForce,
+            EnemyForce     = ctx.EnemyForce,
+            ForceRatio     = ctx.ForceRatio,
+            PhaseLabel     = label,
+            PhaseRaw       = ctx.Phase.ToString(),
+            Losing         = ctx.Phase == AIMacroTerritoryPhase.Collapsing,
+            Winning        = ctx.Phase == AIMacroTerritoryPhase.Dominating,
+        };
     }
 
     private void ApplyMacroExistingOffensiveCap(

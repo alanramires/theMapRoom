@@ -1101,6 +1101,39 @@ public partial class TurnStateManager : MonoBehaviour
         return true;
     }
 
+    public bool TrySetSellingRulesUnderCursorFromDebug(string ruleToken, int ownerSlot, out string message)
+    {
+        message = string.Empty;
+        if (!TryGetConstructionUnderCursorForDebug(out ConstructionManager target, out Vector3Int cursorCell, out message))
+            return false;
+
+        ConstructionUnitMarketRule rule;
+        switch (ruleToken)
+        {
+            case "FREE":     rule = ConstructionUnitMarketRule.FreeMarket;    break;
+            case "ORIGINAL": rule = ConstructionUnitMarketRule.OriginalOwner; break;
+            case "FIRST":    rule = ConstructionUnitMarketRule.FirstOwner;    break;
+            case "DISABLED": rule = ConstructionUnitMarketRule.Disabled;      break;
+            default:
+                message = $"Selling rule invalida: '{ruleToken}'. Use free | original [slot] | first [slot] | disabled.";
+                return false;
+        }
+
+        bool needsSlot = rule == ConstructionUnitMarketRule.OriginalOwner || rule == ConstructionUnitMarketRule.FirstOwner;
+        if (needsSlot && ownerSlot < 0)
+        {
+            message = $"A regra {rule} precisa de um slot dono. Ex.: 'set selling rules {ruleToken.ToLowerInvariant()} 1'.";
+            return false;
+        }
+
+        ConstructionUnitMarketRule before = target.SellingRule;
+        target.DebugSetSellingRule(rule, ownerSlot);
+        string slotTxt = needsSlot ? $" (owner slot {ownerSlot})" : string.Empty;
+        message = $"Selling rule atualizada: {target.name} {before} -> {rule}{slotTxt} em {FormatMapCellWithZ(cursorCell)}.";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
     public bool TrySetConstructionCapturePointsUnderCursorFromDebug(int capturePointsValue, out string message)
     {
         message = string.Empty;

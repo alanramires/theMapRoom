@@ -1168,6 +1168,7 @@ public partial class AIShoppingPlanner
             return orders;
 
         List<AIShoppingDemand> demands = BuildRoleShoppingDemands(snapshot);
+        CounterPressureInspection counterPressure = BuildCounterPressure(snapshot);
         var occupied = BuildProductionOccupiedCells();
         var usedBuildings = new HashSet<ConstructionManager>();
         int remaining = snapshot.Budget;
@@ -1176,6 +1177,48 @@ public partial class AIShoppingPlanner
         // no orçamento mas é alcançável em poucos turnos. Sem isso o loop guloso gastaria
         // tudo e nunca acumularia para unidades caras.
         int reserve = ComputeEliteSavingReserve(snapshot, demands, remaining);
+
+        // Alavanca macro->shopping: se o time esta PERDENDO o mapa (macro phase Collapsing,
+        // <=35% de controle), a compra fica mais agressiva pra defesa. Sobrevivencia > poupanca:
+        // nao segura caixa pra elite, e combate/defesa ganham peso no score (ver ScoreRole...).
+        bool macroLosing = AIController.GetMacroTerritoryForInspection(snapshot.AITeam).Losing;
+        if (macroLosing && reserve > 0)
+        {
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] perdendo o mapa: "
+                + $"zera reserva elite ({reserve}) — gasta tudo na defesa");
+            reserve = 0;
+        }
+
+        // CONCENTRAÇÃO: conta quantos prédios podem PRODUZIR de fato neste turno (podem produzir e a
+        // célula de spawn não está ocupada — unidade amiga/inimiga em cima bloqueia). Se sobrou pouco
+        // (1-2 slots) com caixa, NÃO dá pra comprar massa — então concentra o gasto: cada slot deve
+        // levar a unidade mais FORTE que couber (libera o gate de elite). Sem isso a AI compra 1 peça
+        // barata e deixa o resto do caixa parado (não há outro prédio pra gastar).
+        int availableProductionSlots = 0;
+        foreach (ConstructionManager b in snapshot.MyBuildings)
+        {
+            if (b == null || !b.CanProduceUnitsForTeam(snapshot.AITeam) || b.OfferedUnits == null)
+                continue;
+            Vector3Int bc = b.CurrentCellPosition; bc.z = 0;
+            if (!occupied.Contains(bc))
+                availableProductionSlots++;
+        }
+        // Só concentra quando há caixa SOBRANDO que não vira massa: poucos slots E orçamento daria
+        // pra 3+ corpos baratos (que não há onde produzir). Senão (early game, caixa baixo) segue
+        // normal — expande, não despeja num elite cedo.
+        bool concentrateSpend = availableProductionSlots > 0 && availableProductionSlots <= 2
+            && remaining >= EstimateCheapBodyCost(snapshot) * 3;
+        // Emergência = concentrando E perdendo o mapa. Aí ignora ATÉ a cadeia de elite (compra a peça
+        // forte "a frio", sem possuir o tier anterior) — desespero defensivo, qualidade já que não há
+        // como fazer quantidade. Concentração SEM perder mantém a cadeia (não fura a progressão à toa).
+        bool concentrateEmergency = concentrateSpend && macroLosing;
+        if (concentrateSpend)
+        {
+            reserve = 0; // não segura caixa: com poucos slots o resto idle não compra nada mesmo
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] concentra gasto: "
+                + $"só {availableProductionSlots} prédio(s) disponível(is) — cada slot leva a peça mais forte"
+                + (concentrateEmergency ? " (EMERGÊNCIA: cadeia de elite ignorada)" : ""));
+        }
 
         LogRoleShoppingQueue(snapshot, demands, remaining);
         while (remaining - reserve > 0)
@@ -1198,8 +1241,8 @@ public partial class AIShoppingPlanner
                 {
                     if (unit == null || unit.cost <= 0 || unit.cost > spendable
                         || unit.militaryForce == MilitaryForce.Navy
-                        || !IsRolePurchaseAllowedByStance(unit, snapshot.Stance)
-                        || !IsEliteChainAvailable(unit, snapshot))
+                        || !IsRolePurchaseAllowed(unit, snapshot.Stance, macroLosing)
+                        || (!concentrateEmergency && !IsEliteChainAvailable(unit, snapshot)))
                         continue;
 
                     foreach (AIShoppingDemand demand in demands)
@@ -1207,7 +1250,8 @@ public partial class AIShoppingPlanner
                         if (demand.Count <= 0 || !DoesUnitMeetShoppingDemand(unit, demand))
                             continue;
 
-                        int score = ScoreRoleShoppingCandidate(snapshot, unit, demand, remaining);
+                        int score = ScoreRoleShoppingCandidate(
+                            snapshot, unit, demand, remaining, counterPressure, macroLosing, concentrateSpend);
                         if (best == null || score > best.Score
                             || (score == best.Score && unit.cost > best.Unit.cost)
                             || (score == best.Score && unit.cost == best.Unit.cost
@@ -1246,6 +1290,14 @@ public partial class AIShoppingPlanner
                 + $"para {best.Demand.Role}/{best.Demand.ExactRole} origem={best.Demand.Origin} "
                 + $"pri={best.Demand.Priority} score={best.Score} restante={remaining}");
         }
+
+        // DEFESA: não deixar prédio de produção VAZIO — cada casa aberta é captura fácil pro oponente
+        // oportunista. Quando perdendo (Collapsing) ou em stance Defensiva, depois das compras por
+        // demanda preenche cada prédio livre/não-ocupado com o defensor mais barato que couber
+        // (prefere Assalto/Capturador). Gasta o caixa pra negar a captura em vez de deixar parado.
+        bool defendFillBuildings = macroLosing || snapshot.Stance == AIStance.Defensive;
+        if (defendFillBuildings)
+            FillIdleProductionBuildings(snapshot, orders, usedBuildings, occupied, ref remaining);
 
         foreach (AIShoppingDemand demand in demands)
             if (demand.Count > 0)
@@ -1407,11 +1459,19 @@ public partial class AIShoppingPlanner
         int logistics = CountCompositionRole(snapshot, UnitRole.Logistica);
         int wantedLogistics = repairWork > 0 ? Mathf.Max(1, Mathf.CeilToInt(repairWork / 2f)) : 0;
         if (wantedLogistics > logistics)
-            EnsureRoleDemand(demands, UnitRole.Logistica, wantedLogistics - logistics, 22,
+        {
+            // Prioridade ESCALA com os feridos acumulados, pra logistica nao morrer de fome atras
+            // do combate/elite eternamente. Poucos feridos -> fica embaixo (elite ganha, normal);
+            // muitos -> sobe na fila (a hemorragia de forca virou urgente). Pacote assalto/fogo=12,
+            // capturador=16, logistica base=22.
+            int logisticsPriority = repairWork >= 6 ? 10 : repairWork >= 4 ? 14 : 22;
+            EnsureRoleDemand(demands, UnitRole.Logistica, wantedLogistics - logistics, logisticsPriority,
                 "service", $"unidades em reparo={repairWork}");
+        }
 
         AddEliteProgressionDemand(snapshot, demands, UnitRole.Assalto, assaults, 24);
         AddEliteProgressionDemand(snapshot, demands, UnitRole.FogoIndireto, fireSupport, 25);
+        AddCounterPressureDemands(snapshot, demands, BuildCounterPressure(snapshot));
 
         demands.Sort((a, b) =>
         {
@@ -1525,28 +1585,112 @@ public partial class AIShoppingPlanner
     }
 
     private static int ScoreRoleShoppingCandidate(AIWorldSnapshot snapshot, UnitData unit,
-        AIShoppingDemand demand, int remaining)
+        AIShoppingDemand demand, int remaining, CounterPressureInspection counterPressure,
+        bool macroLosing = false, bool concentrate = false)
     {
         int score = 200000 - demand.Priority * 3000;
         if (demand.Urgent) score += 250000;
         if (demand.TargetClass.HasValue)
             score += (int)unit.ResolveAiTargetPriorityForTargetClass(demand.TargetClass.Value) * 18000;
-        GameUnitClass dominantEnemy = ResolveDominantVisibleEnemyClass(snapshot);
-        score += (int)unit.ResolveAiTargetPriorityForTargetClass(dominantEnemy) * 7000;
+        float counterFit = ScoreCounterFit(unit, counterPressure);
+        score += Mathf.RoundToInt(counterFit * 18000f);
 
-        bool eliteReady = IsEliteEconomyReady(snapshot, unit, remaining);
+        bool eliteReady = IsEliteEconomyReady(snapshot, unit, remaining, concentrate);
         if (unit.eliteLevel > 0)
             score += eliteReady ? 65000 + unit.eliteLevel * 18000 : -120000;
         else if (eliteReady && (demand.Role == UnitRole.Assalto
             || demand.Role == UnitRole.FogoIndireto || demand.Role == UnitRole.AtaqueAereo))
             score -= 25000;
 
-        if (snapshot.Stance == AIStance.Defensive && unit.aiPurchaseMode == AIPurchaseMode.Defensive)
+        // Perdendo (Collapsing) conta como emergência defensiva: unidade de modo Defensivo ganha o
+        // bônus pesado mesmo que a stance "oficial" ainda esteja Tactical — é o que faz a artilharia
+        // anti-blindado (obus/campanha) ganhar do anti-infantaria quando há tanque no QG.
+        if ((snapshot.Stance == AIStance.Defensive || macroLosing) && unit.aiPurchaseMode == AIPurchaseMode.Defensive)
             score += 24000;
         if (snapshot.Stance != AIStance.Defensive && unit.aiPurchaseMode == AIPurchaseMode.Offensive)
             score += 12000;
-        score += Mathf.Min(25000, unit.cost / 2);
+        // Concentrando (poucos slots): NÃO limita o bônus de custo — a peça mais cara/forte que cabe
+        // é preferida, pra usar o caixa que de outro modo ficaria parado.
+        score += concentrate ? unit.cost / 2 : Mathf.Min(25000, unit.cost / 2);
+
+        // Time PERDENDO o mapa (Collapsing): empurra combate pra cima — segurar o que resta vem antes
+        // de expandir. Defensores (assalto/fogo/AA) ganham peso; capturador (expansao) NAO. Sem RNG.
+        if (macroLosing
+            && (demand.Role == UnitRole.Assalto || demand.Role == UnitRole.FogoIndireto
+                || demand.Role == UnitRole.Antiaereo))
+            score += 16000;
+
         return score;
+    }
+
+    // Preenche prédios de produção ociosos (não usados nesta passada, podem produzir, célula livre)
+    // com o defensor mais barato disponível — nega captura oportunista de "casa vazia" quando perdendo
+    // ou defendendo. Respeita orçamento e o filtro de stance.
+    private static void FillIdleProductionBuildings(
+        AIWorldSnapshot snapshot, List<ShoppingOrder> orders,
+        HashSet<ConstructionManager> usedBuildings, HashSet<Vector3Int> occupied, ref int remaining)
+    {
+        if (snapshot.MyBuildings == null) return;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || usedBuildings.Contains(building)
+                || !building.CanProduceUnitsForTeam(snapshot.AITeam) || building.OfferedUnits == null)
+                continue;
+            Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
+            if (occupied.Contains(cell))
+                continue;
+
+            UnitData pick = null;
+            foreach (UnitData u in building.OfferedUnits)
+            {
+                if (u == null || u.cost <= 0 || u.cost > remaining
+                    || u.militaryForce == MilitaryForce.Navy
+                    || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true))
+                    continue;
+                if (pick == null || IsBetterEmptyBuildingFiller(u, pick))
+                    pick = u;
+            }
+            if (pick == null)
+                continue;
+
+            int idx = IndexOf(building.OfferedUnits, pick);
+            orders.Add(new ShoppingOrder { Building = building, UnitToBuy = pick, SelectedIndex = idx });
+            remaining -= pick.cost;
+            usedBuildings.Add(building);
+            occupied.Add(cell);
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] defesa: preenche "
+                + $"prédio vazio {building.ConstructionDisplayName} com {pick.displayName} ${pick.cost} "
+                + $"(nega captura) restante={remaining}");
+        }
+    }
+
+    // Melhor defensor pra encher prédio vazio: prefere Assalto/Capturador (corpo de defesa), depois
+    // Fogo/AA, depois qualquer; dentro do mesmo rank, o mais barato (massa).
+    private static bool IsBetterEmptyBuildingFiller(UnitData candidate, UnitData current)
+    {
+        int c = EmptyFillerRoleRank(candidate);
+        int cur = EmptyFillerRoleRank(current);
+        if (c != cur) return c < cur;
+        return candidate.cost < current.cost;
+    }
+
+    private static int EmptyFillerRoleRank(UnitData u)
+    {
+        UnitRole r = UnitRoleCompatibility.ResolveCompositionRole(u);
+        if (r == UnitRole.Assalto || r == UnitRole.Capturador) return 0;
+        if (r == UnitRole.FogoIndireto || r == UnitRole.Antiaereo) return 1;
+        return 2;
+    }
+
+    // Filtro de compra por stance, com escape de EMERGÊNCIA: quando perdendo/defendendo, libera
+    // unidade de QUALQUER modo (ofensivo E defensivo) — sobrevivência primeiro. Sem o escape, a
+    // stance Tactical trancava as peças de modo Defensivo (obus/artilharia de campanha anti-blindado)
+    // justamente quando mais precisava delas (tanque no QG).
+    private static bool IsRolePurchaseAllowed(UnitData unit, AIStance stance, bool emergency)
+    {
+        if (emergency)
+            return true;
+        return IsRolePurchaseAllowedByStance(unit, stance);
     }
 
     private static bool IsRolePurchaseAllowedByStance(UnitData unit, AIStance stance)
@@ -1556,12 +1700,58 @@ public partial class AIShoppingPlanner
         return unit.aiPurchaseMode == AIPurchaseMode.Offensive;
     }
 
-    private static bool IsEliteEconomyReady(AIWorldSnapshot snapshot, UnitData unit, int remaining)
+    private static bool IsEliteEconomyReady(AIWorldSnapshot snapshot, UnitData unit, int remaining, bool concentrate = false)
     {
+        int cashFloor = Mathf.Max(unit.cost, Mathf.Max(1, snapshot.IncomePerTurn));
+        if (remaining < cashFloor)
+            return false;
+        // Unidade ELITE: pode liberar abaixo do piso de massa se o caixa banca o elite E os corpos
+        // que faltam pra fechar a massa (ver IsEliteArmyFloorOrBudgetReady). Unidade COMUM (usada no
+        // nudge anti-cheap, -25000): mantém o piso de massa ESTRITO — não solta o nudge cedo demais.
+        if (unit.eliteLevel > 0)
+            return IsEliteArmyFloorOrBudgetReady(snapshot, unit.cost, remaining, concentrate);
         int minimumArmy = Instance != null ? Instance.MinArmySizeForElitePivot : 12;
         int armySize = snapshot.MyUnits != null ? snapshot.MyUnits.Count : 0;
-        int cashFloor = Mathf.Max(unit.cost, Mathf.Max(1, snapshot.IncomePerTurn));
-        return armySize >= minimumArmy && remaining >= cashFloor;
+        return armySize >= minimumArmy;
+    }
+
+    // Elite liberado quando há MASSA (>= piso) OU CAIXA pra bancar o elite + os soldados baratos que
+    // ainda faltam pra fechar a massa. Com caixa gordo não é "elite OU tropa": cabe os dois.
+    // concentrate=true (poucos slots de produção): libera direto — não dá pra comprar massa mesmo,
+    // então o slot único deve levar a peça mais forte (qualidade já que não dá quantidade).
+    private static bool IsEliteArmyFloorOrBudgetReady(AIWorldSnapshot snapshot, int eliteCost, int remaining, bool concentrate = false)
+    {
+        if (concentrate)
+            return true;
+        int minimumArmy = Instance != null ? Instance.MinArmySizeForElitePivot : 12;
+        int armySize = snapshot.MyUnits != null ? snapshot.MyUnits.Count : 0;
+        if (armySize >= minimumArmy)
+            return true;
+        if (eliteCost <= 0)
+            return false;
+        int massGap = minimumArmy - armySize;
+        int bodyCost = EstimateCheapBodyCost(snapshot);
+        return remaining >= eliteCost + massGap * bodyCost;
+    }
+
+    // Custo do corpo barato (capturador/assalto não-elite mais barato à venda) — base pra estimar
+    // quanto o caixa precisa reservar pra fechar a massa junto com o elite. Fallback 4000.
+    private static int EstimateCheapBodyCost(AIWorldSnapshot snapshot)
+    {
+        int cheapest = int.MaxValue;
+        if (snapshot.MyBuildings != null)
+            foreach (ConstructionManager b in snapshot.MyBuildings)
+            {
+                if (b == null || b.OfferedUnits == null) continue;
+                foreach (UnitData u in b.OfferedUnits)
+                {
+                    if (u == null || u.cost <= 0 || u.eliteLevel > 0) continue;
+                    UnitRole role = UnitRoleCompatibility.ResolveCompositionRole(u);
+                    if (role != UnitRole.Capturador && role != UnitRole.Assalto) continue;
+                    if (u.cost < cheapest) cheapest = u.cost;
+                }
+            }
+        return cheapest == int.MaxValue ? 4000 : cheapest;
     }
 
     private static bool IsEliteChainAvailable(UnitData unit, AIWorldSnapshot snapshot)
@@ -1576,8 +1766,7 @@ public partial class AIShoppingPlanner
     private static void AddEliteProgressionDemand(AIWorldSnapshot snapshot,
         List<AIShoppingDemand> demands, UnitRole role, int activeRoleCount, int priority)
     {
-        int minimumArmy = Instance != null ? Instance.MinArmySizeForElitePivot : 12;
-        if (activeRoleCount <= 0 || snapshot.MyUnits.Count < minimumArmy)
+        if (activeRoleCount <= 0)
             return;
         int currentElite = 0;
         foreach (UnitManager unit in snapshot.MyUnits)
@@ -1614,6 +1803,12 @@ public partial class AIShoppingPlanner
             : snapshot.Budget;
         int eliteCost = FindCheapestBuildableCost(snapshot, elite);
         if (eliteCost <= 0 || eliteCost > reach)
+            return;
+
+        // Gate massa-ou-orçamento: abaixo do piso de massa, só cria a demanda elite se o caixa ATUAL
+        // banca o elite + os corpos que faltam pra fechar a massa — aí compra elite E tropa no mesmo
+        // turno (caixa gordo). Com massa >= piso, segue como antes (a reach/poupança já gateia).
+        if (!IsEliteArmyFloorOrBudgetReady(snapshot, eliteCost, snapshot.Budget))
             return;
 
         MergeRoleDemand(demands, elite, false);

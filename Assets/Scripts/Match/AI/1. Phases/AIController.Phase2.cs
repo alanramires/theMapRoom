@@ -26,6 +26,7 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase2 — iniciando ações.");
         plannedDestinations.Clear();
+        assignedTransportClaims.Clear();
 
         // ---- Setup: executado uma única vez por fase ----
         SyncAIUnitCellsFromTransforms();
@@ -166,8 +167,8 @@ public partial class AIController
 
             bool unitMoved    = action.HasMoveTo && action.MoveTo != action.MoveFrom;
             bool unitAttacked = !string.IsNullOrEmpty(action.TargetInstanceId);
-            JogadasManager.RegistrarPlayerAction(action);
             yield return ExecuteAIBatchWithDebugStep(action);
+            JogadasManager.RegistrarPlayerAction(action);
             if (ShouldStopAIForMatchEnd("phase2_apos_batch"))
                 yield break;
             yield return WaitIfDebugPaused();

@@ -13,6 +13,47 @@ public partial class AIController
         public int AnchorCount;
     }
 
+    // Entrada de inspeção (HUD/editor): setor-âncora do time, sua célula e se está seguro.
+    public struct AnchorInspection
+    {
+        public ConstructionSector Sector;
+        public Vector3Int Cell;
+        public bool Held;
+    }
+
+    // Fonte única dos anchors do time: percorre ConstructionManager.IsAnchorSector filtrando
+    // pelos slots de HQ do time. Usado pelo planner (BuildAnchorPlanContext) e pela inspeção.
+    private static IEnumerable<(ConstructionManager anchor, ConstructionSector sector, Vector3Int cell, int slot, bool held)>
+        EnumerateOwnAnchors(TeamId aiTeam)
+    {
+        HashSet<int> ownSlots = CollectOwnHQSlots(aiTeam);
+        if (ownSlots.Count == 0)
+            yield break;
+
+        foreach (ConstructionManager anchor in ConstructionManager.AllActive)
+        {
+            if (anchor == null || !anchor.IsAnchorSector || anchor.Sector == ConstructionSector.None)
+                continue;
+            if (!ownSlots.Contains(anchor.AnchorSectorSlotIndex))
+                continue;
+
+            Vector3Int cell = anchor.CurrentCellPosition; cell.z = 0;
+            bool held = TryGetAnySectorInfo(anchor.Sector, out SectorManager.SectorInfo info)
+                && info.IsFullyControlled
+                && info.ControllingTeam == aiTeam;
+            yield return (anchor, anchor.Sector, cell, anchor.AnchorSectorSlotIndex, held);
+        }
+    }
+
+    // Para a janela Shopping Pressure (seção "# Base guard / âncora").
+    public static List<AnchorInspection> GetOwnAnchorsForInspection(TeamId aiTeam)
+    {
+        var list = new List<AnchorInspection>();
+        foreach (var a in EnumerateOwnAnchors(aiTeam))
+            list.Add(new AnchorInspection { Sector = a.sector, Cell = a.cell, Held = a.held });
+        return list;
+    }
+
     private static AIAnchorPlanContext BuildAnchorPlanContext(TeamId aiTeam, int turnNumber)
     {
         AIAnchorPlanContext context = new AIAnchorPlanContext
@@ -20,32 +61,11 @@ public partial class AIController
             OwnAnchorSectors = new HashSet<ConstructionSector>()
         };
 
-        HashSet<int> ownSlots = CollectOwnHQSlots(aiTeam);
-        if (ownSlots.Count == 0)
-            return context;
-
-        foreach (ConstructionManager anchor in ConstructionManager.AllActive)
+        foreach (var a in EnumerateOwnAnchors(aiTeam))
         {
-            if (anchor == null || !anchor.IsAnchorSector)
-                continue;
-
-            if (anchor.Sector == ConstructionSector.None)
-            {
-                Debug.Log($"[AI Anchor][T{turnNumber}][{aiTeam}] ignorado {anchor.name}: anchor sem setor");
-                continue;
-            }
-
-            int anchorSlot = anchor.AnchorSectorSlotIndex;
-            if (!ownSlots.Contains(anchorSlot))
-                continue;
-
-            context.OwnAnchorSectors.Add(anchor.Sector);
+            context.OwnAnchorSectors.Add(a.sector);
             context.AnchorCount++;
-
-            bool held = TryGetAnySectorInfo(anchor.Sector, out SectorManager.SectorInfo info)
-                && info.IsFullyControlled
-                && info.ControllingTeam == aiTeam;
-            Debug.Log($"[AI Anchor][T{turnNumber}][{aiTeam}] {anchor.Sector} via {anchor.name} slot={anchorSlot} held={held}");
+            Debug.Log($"[AI Anchor][T{turnNumber}][{aiTeam}] {a.sector} via {a.anchor.name} slot={a.slot} held={a.held}");
         }
 
         return context;

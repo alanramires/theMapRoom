@@ -8,6 +8,7 @@ public partial class AIController
     private const int RallyPointSectorPriorityBonus = 55;
     private const int RallyHoldRadius = 2;
     private const int RallyAssemblyForceRadius = 3;
+    private const int RallyAirAttackRadius = 5;
     private const int RallyArtilleryRadius = 4;
     private const int RallyMinimumArtillery = 3;
     private const int RallyIntelRadius = 6;
@@ -105,9 +106,21 @@ public partial class AIController
 
     private static bool IsEnemyHQRallySectorHeld(AIRallyPlanContext context, ConstructionSector sector, TeamId aiTeam)
     {
+        // Conquistado = o DONO ATUAL do ponto de rally e a AI, nao maioria/setor (ma leitura).
         return IsEnemyHQRallySector(context, sector)
-            && TryGetAnySectorInfo(sector, out SectorManager.SectorInfo info)
-            && IsRallySectorHeldByTeam(info, aiTeam);
+            && IsRallyPointHeldByTeam(sector, aiTeam);
+    }
+
+    // O ponto de rally do setor esta sob controle ATUAL da AI? (rally.TeamId == aiTeam — o "Slot ID"
+    // atual do ponto, nao o "Rally Owner Slot" que e so a intencao de dono quando conquistado.)
+    private static bool IsRallyPointHeldByTeam(ConstructionSector sector, TeamId aiTeam)
+    {
+        if (sector == ConstructionSector.None || ConstructionManager.AllActive == null)
+            return false;
+        foreach (ConstructionManager rally in ConstructionManager.AllActive)
+            if (rally != null && rally.IsRallyPoint && rally.Sector == sector)
+                return rally.TeamId == aiTeam;
+        return false;
     }
 
     private static int GetRallySectorPriorityBonus(AIRallyPlanContext context, ConstructionSector sector, TeamId aiTeam)
@@ -219,10 +232,6 @@ public partial class AIController
         Vector3Int anchor = rally.CurrentCellPosition;
         anchor.z = 0;
 
-        bool sectorHeld = TryGetAnySectorInfo(rally.Sector, out SectorManager.SectorInfo info)
-            && IsRallySectorHeldByTeam(info, aiTeam);
-        bool localHold = false;
-
         foreach (UnitManager unit in UnitManager.AllActive)
         {
             if (unit == null || unit.TeamId != aiTeam || unit.IsDead || unit.IsEmbarked || !unit.gameObject.activeInHierarchy)
@@ -241,9 +250,6 @@ public partial class AIController
             bool intelUnit = HasRole(data, UnitRole.Intel);
             bool logistics = HasRole(data, UnitRole.Logistica);
 
-            if (dist <= RallyHoldRadius && (capturer || assault))
-                localHold = true;
-
             if (dist <= RallyAssemblyForceRadius)
             {
                 if (capturer)
@@ -252,7 +258,9 @@ public partial class AIController
                     readiness.Assault++;
             }
 
-            if (airAttack)
+            // Ataque aéreo conta num raio maior (5h — aviões reposicionam rápido), mas ainda por
+            // PRESENÇA: um avião disperso longe do rally não infla o GoGreen.
+            if (dist <= RallyAirAttackRadius && airAttack)
                 readiness.AirAttack++;
 
             if (dist <= RallyArtilleryRadius && artillery)
@@ -263,9 +271,13 @@ public partial class AIController
                 readiness.Logistics++;
         }
 
-        readiness.Held = sectorHeld || localHold;
+        // HELD/conquistado = o DONO ATUAL do ponto de rally e a AI (rally.TeamId == aiTeam).
+        // NAO basta ter unidade amiga perto nem maioria de predios laterais — o slot atual do
+        // ponto tem que ser o da AI (== rally owner slot quando conquistado). Ex.: Hotel com
+        // Slot ID=0(verde) e Rally Owner=1(vermelho) NAO esta held pelo vermelho.
+        readiness.Held = rally.TeamId == aiTeam;
         readiness.VisibleThreats = CountVisibleEnemyThreatsNearRally(anchor, aiTeam, RallyAssemblyForceRadius + 1);
-        readiness.KnownEnemyForce = CountKnownEnemyRallyForce(intel);
+        readiness.KnownEnemyForce = CountLiveEnemyUnits(aiTeam);
         readiness.RequiredPackages = Mathf.Clamp(
             Mathf.Max(
                 1,
@@ -288,10 +300,16 @@ public partial class AIController
             && breakthrough >= readiness.RequiredPackages;
         bool hasArtillery = readiness.Artillery >= RallyMinimumArtillery;
         bool hasRequiredForce = readiness.ForceScore >= readiness.RequiredForce;
+        // DOMÍNIO macro (Ganhando) GREENA o rally held mesmo sem a composição completa: se você já
+        // domina território E força, segurar a montagem só atrasa o fechamento. Assim o HUD fica
+        // verde E a massa montada é LIBERADA pra invadir (a lógica de assembly para de segurar).
+        // Calculado FRESCO aqui (não pelo cache) porque o rally é avaliado ANTES do macro no fluxo
+        // do plano — o cache teria o macro do turno anterior (semáforo ficava amarelo 1 turno atrás).
+        bool macroDominating = BuildMacroTerritoryContext(
+            aiTeam, SectorManager.GetAllSectorInfos(), 6,
+            CountLiveUnitsOfTeam(aiTeam), CountLiveEnemyUnits(aiTeam)).Phase == AIMacroTerritoryPhase.Dominating;
         readiness.GoGreen = readiness.Held
-            && hasHoldPackage
-            && hasRequiredForce
-            && hasArtillery;
+            && ((hasHoldPackage && hasRequiredForce && hasArtillery) || macroDominating);
 
         if (!readiness.Held)
         {
@@ -341,22 +359,41 @@ public partial class AIController
         return count;
     }
 
-    private static int CountKnownEnemyRallyForce(AIIntelReport intel)
+    // Nº de unidades inimigas VIVAS de fato (ground truth via UnitManager.AllActive). NÃO usa o intel
+    // histórico (`enemyLastKnownUnits`): ele acumula fantasmas — unidades mortas fora da visão ou que
+    // FUNDIRAM continuam na lista (e até com confiança 1.0 quando a morte/fusão foi recente, porque o
+    // `destroyed` nem sempre é marcado). O número real é o de unidades inimigas vivas no tabuleiro
+    // (ex.: 6), simétrico ao próprio MyUnits.Count. Ignora fog-of-war de propósito: é um termômetro
+    // estratégico (ganhando/perdendo), não decisão tática.
+    private static int CountLiveEnemyUnits(TeamId aiTeam)
     {
-        if (intel == null || intel.enemyLastKnownUnits == null)
-            return 0;
-
-        float known = 0f;
-        for (int i = 0; i < intel.enemyLastKnownUnits.Count; i++)
+        List<UnitManager> all = UnitManager.AllActive;
+        if (all == null) return 0;
+        int n = 0;
+        for (int i = 0; i < all.Count; i++)
         {
-            AIUnitIntel enemy = intel.enemyLastKnownUnits[i];
-            if (enemy == null || enemy.destroyed)
-                continue;
-
-            known += Mathf.Clamp(enemy.confidence, 0.25f, 1f);
+            UnitManager u = all[i];
+            if (u == null || u.IsDead) continue;
+            if (u.TeamId == aiTeam || u.TeamId == TeamId.Neutral) continue;
+            n++;
         }
+        return n;
+    }
 
-        return Mathf.CeilToInt(known);
+    // Unidades vivas do próprio time (ground truth). Simétrico ao CountLiveEnemyUnits — usado pra
+    // calcular o macro fresco no rally sem depender do snapshot.
+    private static int CountLiveUnitsOfTeam(TeamId team)
+    {
+        List<UnitManager> all = UnitManager.AllActive;
+        if (all == null) return 0;
+        int n = 0;
+        for (int i = 0; i < all.Count; i++)
+        {
+            UnitManager u = all[i];
+            if (u != null && !u.IsDead && u.TeamId == team)
+                n++;
+        }
+        return n;
     }
 
     private static string BuildRallyMissingText(
@@ -636,8 +673,12 @@ public partial class AIController
             return false;
         if (info.ControllingTeam == aiTeam)
             return true;
-        if (info.IsFullyControlled && info.ControllingTeam == aiTeam)
-            return true;
+        // Se um time INIMIGO (nao-neutro, nao a AI) controla o setor, o rally NAO esta held pela
+        // AI — mesmo que a AI possua a maioria das construcoes laterais. Controlar o setor/rally
+        // e do inimigo; a AI precisa RECUPERAR o controle pra "conquistar". (Antes: o fallback de
+        // maioria abaixo dizia "conquistado" com o inimigo ainda no controle — ma leitura.)
+        if (info.ControllingTeam != TeamId.Neutral && info.ControllingTeam != aiTeam)
+            return false;
 
         int owned = 0;
         int total = 0;
@@ -754,6 +795,33 @@ public partial class AIController
     {
         return IsRallyAssemblyObjective(obj)
             && obj.RallyState == AIRallyAssemblyState.GoGreen;
+    }
+
+    // TRUE se algum rally do time que mira o QG inimigo esta held E ja juntou massa (GoGreen,
+    // por presenca). E a chave que destrava a invasao da base inimiga (">>"). Checagem momentanea:
+    // o objetivo da base, uma vez criado, persiste (tem capturavel) — entao nao ha flip.
+    private bool AnyOwnedRallyAtGoGreen(TeamId aiTeam, AIRallyPlanContext rallyContext, int turnNumber, AIIntelReport intel)
+    {
+        foreach (ConstructionManager rally in ConstructionManager.AllActive)
+        {
+            if (rally == null || !rally.IsRallyPoint) continue;
+            if (!IsRallyOwnedBySlot(rally, aiTeam, rallyContext.AISlotIndex)) continue;
+            if (!IsEnemyHQRallySectorHeld(rallyContext, rally.Sector, aiTeam)) continue;
+            AIRallyReadiness r = EvaluateRallyReadiness(rally, aiTeam, turnNumber, -1, intel);
+            if (r.GoGreen) return true;
+        }
+        return false;
+    }
+
+    // TRUE se a AI GOVERNA (held) algum rally que mira o QG inimigo. Enquanto governar um rally,
+    // a invasao (base inimiga ">>") persiste; se nao governa nenhum, a invasao e dissolvida e as
+    // unidades sao liberadas para outros planos.
+    private bool AnyOwnedRallyHeld(TeamId aiTeam, AIRallyPlanContext rallyContext)
+    {
+        if (rallyContext.TargetingEnemyHQ == null) return false;
+        foreach (ConstructionSector sector in rallyContext.TargetingEnemyHQ)
+            if (IsEnemyHQRallySectorHeld(rallyContext, sector, aiTeam)) return true;
+        return false;
     }
 
     private static bool TryFindOwnedRallyForSector(

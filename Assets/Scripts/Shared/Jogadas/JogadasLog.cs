@@ -58,6 +58,16 @@ public class Jogada
     public int    uid;          // instanceId da unidade atuante (0 se não aplicável)
     public int    uid2;         // instanceId da unidade alvo (transporter em Embarque, alvo em Ataque)
 
+    // Resultado estruturado de combate. O bool preserva compatibilidade com logs antigos.
+    public bool   hasCombatResult;
+    public string unidadeSigla2;
+    public int    team2;
+    public int    hpAntes;
+    public int    hpDepois;
+    public int    hp2Antes;
+    public int    hp2Depois;
+    public List<CombatCargoResult> combatCargo = new List<CombatCargoResult>();
+
     // Observação contextual gravada no momento da jogada (ex.: progresso de captura "10/20",
     // "capturado", "reparado"). Preenchida hoje só para Capturar.
     public string obs;
@@ -66,4 +76,21 @@ public class Jogada
     public bool TemDestino    => dx != 0 || dy != 0;
     public Vector3Int Coord   => new Vector3Int(cx, cy, 0);
     public Vector3Int Destino => new Vector3Int(dx, dy, 0);
+}
+
+[Serializable]
+public class CombatCargoResult
+{
+    public int rootUid;
+    public int parentUid;
+    public int depth;
+    public int uid;
+    public int team;
+    public string sigla;
+    public int hpAntes;
+    public int hpDepois;
+    public int cost;
+    public int eliteLevel;
+    public GameUnitClass unitClass;
+    public string cause;
 }

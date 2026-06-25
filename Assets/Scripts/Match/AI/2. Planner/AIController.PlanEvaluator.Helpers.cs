@@ -40,6 +40,8 @@ public partial class AIController
             badge = sectorName.Length > 0 ? sectorName[0].ToString().ToUpper() : "?";
         }
         unit.SetAIAssignedPlan(sectorName, sectorName, badge, (int)role, showAIUnitHUD);
+        // A unidade herda o eixo do setor do seu objetivo (0 = fora de eixo).
+        unit.SetAIEixo(currentAxisMap != null ? currentAxisMap.GetEixo(obj.Sector) : 0);
     }
 
     private static TeamId FindHQTeamInSector(ConstructionSector sector)

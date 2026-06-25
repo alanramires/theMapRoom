@@ -7,6 +7,35 @@ public partial class AIController
     // Intercepção de embarque — capturador embarca em transporte no alcance
     // -------------------------------------------------------------------------
 
+    // True se a unidade esta atribuida a um rally assembly ainda ativo (montando massa, nao GoGreen)
+    // E ja esta dentro do raio de montagem do ponto de rally — nesse caso deve SEGURAR, nao embarcar.
+    private bool ShouldHoldRallyAssemblyInsteadOfEmbark(UnitManager unit, SectorObjective assigned)
+    {
+        if (!IsActiveRallyAssemblyObjective(assigned))
+            return false;
+        if (!TryGetRallyAnchorCell(assigned.Sector, out Vector3Int anchor))
+            return false;
+        Vector3Int cell = unit.CurrentCellPosition; cell.z = 0;
+        return SectorManager.HexDistance(anchor, cell) <= RallyAssemblyForceRadius;
+    }
+
+    // Celula do ponto de rally do setor (anchor usado na contagem de presenca do GoGreen).
+    private bool TryGetRallyAnchorCell(ConstructionSector sector, out Vector3Int anchor)
+    {
+        anchor = default;
+        if (sector == ConstructionSector.None || ConstructionManager.AllActive == null)
+            return false;
+        foreach (ConstructionManager rally in ConstructionManager.AllActive)
+        {
+            if (rally != null && rally.IsRallyPoint && rally.Sector == sector)
+            {
+                anchor = rally.CurrentCellPosition; anchor.z = 0;
+                return true;
+            }
+        }
+        return false;
+    }
+
     private PlayerAction TryDecideCapturerEmbarkAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
         if (!unit.TryGetUnitData(out UnitData data)
@@ -36,6 +65,17 @@ public partial class AIController
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
         if (ShouldSkipCapturerEmbarkForShortWalk(unit, capturerAssigned, fromCell, "origem"))
             return null;
+
+        // Capturador montando massa num rally assembly AINDA ativo (nao GoGreen/Expired) e ja
+        // DENTRO do raio de montagem NAO deve embarcar — sair leva a massa embora e adia o GoGreen
+        // (presenca conta, ver EvaluateRallyReadiness). Se estiver LONGE do rally, carona pra chegar
+        // continua valendo. (Caso: 63 segurando Foxtrot em Assembling pegou carona no APC 19.)
+        if (ShouldHoldRallyAssemblyInsteadOfEmbark(unit, assigned))
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} NAO embarca: montando massa no rally "
+                + $"{assigned.Sector} (state={assigned.RallyState}) dentro do raio {RallyAssemblyForceRadius}h");
+            return null;
+        }
 
         // Não embarcar em transporters ainda no aeroporto/fábrica — espera sair primeiro.
         options.RemoveAll(opt =>

@@ -123,6 +123,10 @@ public class UnitManager : MonoBehaviour
     [Tooltip("Role da unidade dentro do plano. Usa os valores de UnitRole.")]
     [SerializeField] private int aiAssignedPlanRole = 0;
     [SerializeField] private bool aiAssignedPlanBadgeVisible;
+    [Header("AI Eixo Runtime")]
+    [Tooltip("Eixo de invasão ao qual a unidade pertence: 1, 2 ou 3. 0 = nenhum (rogue / fora de eixo).")]
+    [Range(0, 3)]
+    [SerializeField] private int aiEixo = 0;
     [Header("AI Stance Runtime")]
     [SerializeField] private bool aiHasStance;
     [SerializeField] private int aiStance = 0;
@@ -193,6 +197,12 @@ public class UnitManager : MonoBehaviour
     public string AIAssignedPlanBadge => aiAssignedPlanBadge ?? string.Empty;
     public int AIAssignedPlanRole => aiAssignedPlanRole;
     public bool AIAssignedPlanBadgeVisible => aiAssignedPlanBadgeVisible;
+    public int AIEixo => aiEixo;
+    public void SetAIEixo(int eixo)
+    {
+        aiEixo = Mathf.Clamp(eixo, 0, 3);
+        RefreshAIAssignedPlanBadge();
+    }
     public UnitCombatClassification CombatClassification
         => TryGetUnitData(out UnitData data) && data != null
             ? data.CombatClassification
@@ -224,6 +234,9 @@ public class UnitManager : MonoBehaviour
         aiAssignedPlanBadge = string.Empty;
         aiAssignedPlanRole = 0;
         aiAssignedPlanBadgeVisible = false;
+        // NAO zera aiEixo: ele persiste como memoria de eixo entre o handoff e a proxima
+        // atribuicao, para a unidade ser tentada a voltar ao MESMO eixo (estabilidade).
+        // O HUD ja esconde o badge pelo gate (aiAssignedPlanBadgeVisible=false).
         RefreshAIAssignedPlanBadge();
     }
 
@@ -2789,6 +2802,12 @@ public class UnitManager : MonoBehaviour
         bool hasPlan = aiHasAssignedPlan && aiAssignedPlanBadgeVisible
             && !string.IsNullOrWhiteSpace(aiAssignedPlanBadge);
         unitHud.SetPlanDebugBadge(hasPlan, hasPlan ? aiAssignedPlanBadge : string.Empty);
+
+        // Eixo badge: o eixo PERSISTE como memoria entre objetivos (nao depende de ter plano
+        // ativo), entao a bandeirola fica visivel enquanto a unidade tiver eixo, for da AI e o
+        // flag global "Show AI Unit HUD" estiver ligado.
+        bool showEixo = aiEixo >= 1 && aiEixo <= 3 && isAIUnit && AIController.ShowAIHUD;
+        unitHud.SetEixoBadge(showEixo ? aiEixo : 0, showEixo);
     }
 
     private void HandleActiveTeamChanged(int newTeamId)

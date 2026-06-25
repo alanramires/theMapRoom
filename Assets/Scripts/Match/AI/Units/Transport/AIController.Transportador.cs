@@ -8,6 +8,11 @@ public partial class AIController
     // before DPQ decides the exact landing hex.
     private const int FireSupportDropOffRange = 3;
 
+    // Reserva de passageiro por APC dentro de UMA passada da Phase 2 (transporterId -> passengerId).
+    // Persiste entre as decisoes dos APCs para que, depois que um APC se move, o recalculo do
+    // proximo NAO realoque o mesmo passageiro (evita 2 APCs no mesmo cara). Limpo a cada Phase 2.
+    private readonly Dictionary<int, int> assignedTransportClaims = new Dictionary<int, int>();
+
     // -------------------------------------------------------------------------
     // Entry point
     // -------------------------------------------------------------------------
@@ -73,6 +78,19 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
+
+        // APC vazio e combatente: sem ninguem pra buscar, em vez de andar de volta pra base a toa,
+        // ataca um alvo proximo onde tem vantagem (TryFindTransportBreakerAttack so mira Primary,
+        // nao se suicida contra blindado). So volta pra base se nao houver alvo bom.
+        if (TryFindTransportBreakerAttack(unit, snapshot, fromCell, paths, occupied, fromCell,
+                out Vector3Int idleAttackCell, out UnitManager idleAttackTarget, preferNoMove: false, plan: null))
+        {
+            Vector3Int idleTargetCell = idleAttackTarget.CurrentCellPosition; idleTargetCell.z = 0;
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} vazio — ataca {idleAttackTarget.InstanceId} via {idleAttackCell} (em vez de voltar a base sem pickup)");
+            return BuildAttackBatch(unit, snapshot.AITeam, fromCell, idleAttackCell,
+                idleAttackTarget.InstanceId.ToString(), idleTargetCell, paths);
+        }
+
         Vector3Int waitTarget = FindTransportWaitTarget(snapshot.AITeam, fromCell);
         waitTarget.z = 0;
         Vector3Int moveTarget = FindTransportMove(unit, fromCell, waitTarget, paths, occupied, snapshot.AITeam);
@@ -268,6 +286,12 @@ public partial class AIController
             Debug.Log($"{TL("Progressao2")} transporte {unit.InstanceId} alvo={pressureTarget} via {bestCell} (heuristica dist={bestDist:F0})");
             return bestCell;
         }
+
+        // Rota alcancavel mas ja estamos no melhor lugar (ex.: em cima do alvo de espera): FICA.
+        // A exploracao premia andar o maximo (pathSteps), entao so deve rodar quando NAO ha rota
+        // (bloqueio real) — senao um APC parado no ponto certo sairia vagando a esmo.
+        if (foundReachableRoute)
+            return fromCell;
 
         return FindTransportExplorationMove(unit, fromCell, pressureTarget, paths, occupied, aiTeam);
     }

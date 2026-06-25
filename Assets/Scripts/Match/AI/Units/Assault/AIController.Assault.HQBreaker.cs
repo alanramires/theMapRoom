@@ -43,7 +43,20 @@ public partial class AIController
         if (!string.IsNullOrEmpty(rallyReason))
             Debug.Log($"{TL("Assalto")} {unit.InstanceId} rogue rally scan: {rallyReason}");
 
-        Vector3Int pressureTarget = ResolveAssaultPressureTarget(snapshot, enemies, fromCell);
+        // Alvo do rogue: SEM invasao ativa no plano, ele nao marcha sozinho pro QG inimigo (burro,
+        // suicida). Em vez disso reforca o rally do PROPRIO eixo (fallback: eixo mais faminto),
+        // concentrando massa numa das frentes. So pressiona o QG quando a invasao ja foi alocada
+        // (aí faz sentido juntar-se ao ataque).
+        Vector3Int pressureTarget;
+        if (TryResolveRogueAssaultRallyTarget(unit, plan, snapshot, out Vector3Int rogueRallyCell, out string rogueRallyReason))
+        {
+            pressureTarget = rogueRallyCell;
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} rogue -> rally ({rogueRallyReason})");
+        }
+        else
+        {
+            pressureTarget = ResolveAssaultPressureTarget(snapshot, enemies, fromCell);
+        }
         Vector3Int bestMove = FindAssaultPressureMove(unit, snapshot, fromCell, pressureTarget, paths, occupied, out string pressureReason);
         if (bestMove != fromCell)
         {
@@ -53,6 +66,57 @@ public partial class AIController
 
         Debug.Log($"{TL("Assalto")} {unit.InstanceId} breaker — mantém posição");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+    }
+
+    // Alvo de "reforco" do rogue assault quando nao ha invasao ativa: o rally do PROPRIO eixo
+    // (esprit de corps — fica na sua faixa), com fallback no eixo mais FAMINTO (menos presenca).
+    // Deterministico (sem RNG) para nao quebrar a reprodutibilidade do save/load. Retorna false
+    // quando a invasao ja esta no plano (aí o rogue pode pressionar o QG e juntar-se ao ataque).
+    private bool TryResolveRogueAssaultRallyTarget(UnitManager unit, TeamObjectivePlan plan, AIWorldSnapshot snapshot,
+        out Vector3Int rallyCell, out string reason)
+    {
+        rallyCell = Vector3Int.zero;
+        reason = "";
+        if (currentAxisMap == null || currentAxisMap.AxisCount == 0)
+            return false;
+        if (PlanHasActiveEnemyBaseObjective(plan, snapshot.AITeam))
+            return false; // invasao ativa: deixa pressionar o QG
+
+        int eixo = unit.AIEixo;
+        if (eixo > 0 && currentAxisMap.TryGetAxis(eixo, out InvasionAxisMap.Axis own))
+        {
+            rallyCell = own.RallyCell; rallyCell.z = 0;
+            reason = $"reforca rally do eixo {eixo}";
+            return true;
+        }
+
+        InvasionAxisMap.Axis hungriest = null;
+        int bestPresence = int.MaxValue;
+        foreach (InvasionAxisMap.Axis a in currentAxisMap.Axes)
+        {
+            int p = GetEixoPresence(a.EixoIndex);
+            if (p < bestPresence) { bestPresence = p; hungriest = a; }
+        }
+        if (hungriest != null)
+        {
+            rallyCell = hungriest.RallyCell; rallyCell.z = 0;
+            reason = $"reforca rally do eixo faminto {hungriest.EixoIndex} (presenca={bestPresence})";
+            return true;
+        }
+        return false;
+    }
+
+    private bool PlanHasActiveEnemyBaseObjective(TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (plan?.Objectives == null) return false;
+        foreach (SectorObjective o in plan.Objectives)
+            if (o != null
+                && ConstructionSectorHelper.IsBase(o.Sector)
+                && FindHQTeamInSector(o.Sector) != aiTeam
+                && o.Status != ObjectiveStatus.Complete
+                && o.Status != ObjectiveStatus.Abandoned)
+                return true;
+        return false;
     }
 
 

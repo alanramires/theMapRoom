@@ -256,14 +256,10 @@ public partial class AIController
                     firstNoTarget = $"{rally.Sector}/{rally.name} owner={ownerSlot}";
                 continue;
             }
-            if (!TryGetAnySectorInfo(rally.Sector, out SectorManager.SectorInfo info))
-            {
-                skippedNoInfo++;
-                continue;
-            }
-            bool held = IsRallySectorHeldByTeam(info, aiTeam)
-                || EvaluateRallyReadiness(rally, aiTeam).Held;
-            if (!held)
+            // Conquistado = o DONO ATUAL do ponto de rally e a AI (rally.TeamId == aiTeam). NAO
+            // basta unidade amiga perto nem maioria de predios laterais. Ex.: Hotel com Slot ID=
+            // verde e Rally Owner=vermelho NAO esta held pelo vermelho.
+            if (rally.TeamId != aiTeam)
             {
                 skippedNotHeld++;
                 continue;

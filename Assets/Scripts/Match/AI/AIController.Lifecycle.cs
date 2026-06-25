@@ -159,6 +159,18 @@ public partial class AIController
 
         {
 
+            // Durante um load, NAO iniciar o turno: o estado da AI (stage/plano) ainda esta sendo
+            // restaurado pelo LoadRoutine. Iniciar agora leria estado default -> resumeStage=0 ->
+            // BuildObjectivePlan do zero (ignora o plano salvo). O load reinicia o turno no fim
+            // (ForceReapplyActiveTeamWithTurnStart), ja com IsAnyLoadInProgress=false e o estado
+            // restaurado -> resume correto. Paramos qualquer corrotina previa pra nao correr stale.
+            if (SaveGameManager.IsAnyLoadInProgress)
+            {
+                if (aiCoroutine != null) { StopCoroutine(aiCoroutine); aiCoroutine = null; }
+                Debug.Log("[AI] HandleTeamChanged adiado: load em andamento; turno (re)inicia pos-restauracao.");
+                return;
+            }
+
             isActive = true;
 
             if (aiCoroutine != null) StopCoroutine(aiCoroutine);

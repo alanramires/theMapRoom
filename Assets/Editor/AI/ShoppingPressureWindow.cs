@@ -37,6 +37,7 @@ public class ShoppingPressureWindow : EditorWindow
     private GUIStyle _demandTitle;
     private GUIStyle _subtle;
     private bool _stylesReady;
+    private bool _showCounterPressure = true;
 
     [MenuItem("Tools/Utils/Shopping Pressure")]
     public static void OpenWindow()
@@ -106,6 +107,7 @@ public class ShoppingPressureWindow : EditorWindow
         RebuildPressureIfStale(force: false);
 
         DrawHeader(_snapshot, plan, _demands);
+        DrawCounterPressure(_snapshot, _demands);
 
         EditorGUILayout.BeginHorizontal();
         DrawObjectivesColumn(plan);
@@ -154,12 +156,139 @@ public class ShoppingPressureWindow : EditorWindow
             $"[{team}] T{snapshot.TurnNumber}  •  stance={snapshot.Stance}  •  budget={snapshot.Budget}  •  renda={snapshot.IncomePerTurn}",
             _header);
         EditorGUILayout.LabelField($"objetivos={objCount}  •  demandas na fila={demands.Count}  •  unidades pedidas={totalDemand}", _subtle);
+
+        // Visão macro-territorial da AI: setores seus/inimigos/neutros + como ela classifica a
+        // partida (perdendo/empate/ganhando). Mesma fonte do log [AI Macro] (BuildMacroTerritoryContext).
+        AIController.MacroTerritoryInspection macro = AIController.GetMacroTerritoryForInspection(team);
+        Color prevColor = GUI.color;
+        GUI.color = macro.Losing
+            ? new Color(1f, 0.55f, 0.55f)
+            : macro.Winning ? new Color(0.55f, 0.9f, 0.55f) : new Color(0.85f, 0.82f, 0.55f);
+        EditorGUILayout.LabelField(
+            $"visão da AI: {macro.PhaseLabel}  ·  controle {macro.OwnedRatio:P0}", EditorStyles.boldLabel);
+        GUI.color = prevColor;
+        EditorGUILayout.LabelField(
+            $"setores: {macro.OwnedSectors} seus / {macro.EnemySectors} inimigos / {macro.NeutralSectors} neutros  (total {macro.TotalSectors})",
+            _subtle);
+        EditorGUILayout.LabelField(
+            $"força: {macro.OwnForce} suas / {macro.EnemyForce} inimigas conhecidas  ({macro.ForceRatio:P0})",
+            _subtle);
+
         EditorGUILayout.EndVertical();
+    }
+
+    private void DrawCounterPressure(AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
+    {
+        if (snapshot == null)
+            return;
+
+        _showCounterPressure = EditorGUILayout.Foldout(
+            _showCounterPressure, "Counter pressure  (composição inimiga → arma adequada)", true);
+        if (!_showCounterPressure)
+            return;
+
+        AIShoppingPlanner.CounterPressureInspection pressure =
+            AIShoppingPlanner.InspectCounterPressure(snapshot);
+
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        EditorGUILayout.LabelField(
+            $"anti-infantaria {pressure.AntiInfantry:F1}  ·  anti-tank {pressure.AntiTank:F1}  ·  " +
+            $"anti-aérea {pressure.AntiAir:F1}  ·  anti-navio {pressure.AntiShip:F1}",
+            EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            $"maior pressão: {pressure.DominantCategory}  ·  score pondera quantidade, elite, custo e HP atual",
+            _subtle);
+        EditorGUILayout.LabelField(
+            $"fontes: {pressure.VisibleUnits} visíveis + {pressure.RememberedUnits} lembradas pelo JogadasManager",
+            _subtle);
+
+        foreach (AIShoppingPlanner.EnemyClassPressureInspection entry in pressure.Classes)
+            EditorGUILayout.LabelField(
+                $"  {entry.UnitClass,-11} x{entry.Count} (vis {entry.VisibleCount} + mem {entry.RememberedCount})  " +
+                $"score={entry.Score:F1} [{entry.VisibleScore:F1}+{entry.RememberedScore:F1}]  → {entry.CounterCategory}",
+                _subtle);
+
+        var offered = new List<UnitData>();
+        if (snapshot.MyBuildings != null)
+            foreach (ConstructionManager building in snapshot.MyBuildings)
+            {
+                if (building?.OfferedUnits == null) continue;
+                foreach (UnitData unit in building.OfferedUnits)
+                    if (unit != null && !offered.Contains(unit) && IsRelevantOffer(unit, demands))
+                        offered.Add(unit);
+            }
+
+        offered.Sort((a, b) =>
+            AIShoppingPlanner.InspectCounterFit(b, pressure)
+                .CompareTo(AIShoppingPlanner.InspectCounterFit(a, pressure)));
+
+        if (offered.Count > 0)
+        {
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("melhores counters entre ofertas que atendem à fila:", _subtle);
+            int count = Mathf.Min(5, offered.Count);
+            for (int i = 0; i < count; i++)
+            {
+                UnitData unit = offered[i];
+                float fit = AIShoppingPlanner.InspectCounterFit(unit, pressure);
+                EditorGUILayout.LabelField(
+                    $"  {i + 1}. {unit.displayName}  fit={fit:F1}  elite={unit.eliteLevel}  ${unit.cost}",
+                    _subtle);
+            }
+        }
+        EditorGUILayout.EndVertical();
+    }
+
+    private static bool IsRelevantOffer(UnitData unit, List<AIShoppingDemand> demands)
+    {
+        if (demands == null)
+            return false;
+        foreach (AIShoppingDemand demand in demands)
+            if (demand != null && demand.Count > 0
+                && AIShoppingPlanner.UnitMeetsDemandForInspection(unit, demand))
+                return true;
+        return false;
     }
 
     // ----------------------------------------------------------------------------
     // Coluna 1: objetivos e slots demandados vs preenchidos
     // ----------------------------------------------------------------------------
+    // Classifica o objetivo no "plano especial" a que pertence, pra agrupar e badge.
+    private enum PlanKind { Invasion, Rally, Defend, Capture }
+
+    private static PlanKind ClassifyObjective(SectorObjective obj)
+    {
+        if (obj.ObjectiveType == AIObjectiveType.InvasionAttack) return PlanKind.Invasion;
+        if (obj.ObjectiveType == AIObjectiveType.RallyAssembly) return PlanKind.Rally;
+        if (obj.Status == ObjectiveStatus.Defending) return PlanKind.Defend;
+        return PlanKind.Capture;
+    }
+
+    private static string KindSymbol(PlanKind k)
+    {
+        switch (k)
+        {
+            case PlanKind.Invasion: return ">>";
+            case PlanKind.Rally:    return "+";
+            case PlanKind.Defend:   return "!";
+            default:                return "•";
+        }
+    }
+
+    private static string KindLabel(PlanKind k)
+    {
+        switch (k)
+        {
+            case PlanKind.Invasion: return ">>  Invasão";
+            case PlanKind.Rally:    return "+  Rally";
+            case PlanKind.Defend:   return "!  Defesa";
+            default:                return "•  Captura";
+        }
+    }
+
+    private static readonly PlanKind[] KindOrder =
+        { PlanKind.Invasion, PlanKind.Rally, PlanKind.Defend, PlanKind.Capture };
+
     private void DrawObjectivesColumn(TeamObjectivePlan plan)
     {
         EditorGUILayout.BeginVertical(GUILayout.Width(position.width * 0.5f - 8f));
@@ -174,23 +303,77 @@ public class ShoppingPressureWindow : EditorWindow
         {
             var sorted = new List<SectorObjective>(plan.Objectives);
             sorted.Sort((a, b) => a.Priority.CompareTo(b.Priority));
-            foreach (SectorObjective obj in sorted)
-                DrawObjectiveCard(obj);
+
+            // Agrupa por tipo de plano (ordem fixa), com cabeçalho por seção.
+            foreach (PlanKind kind in KindOrder)
+            {
+                var inKind = sorted.FindAll(o => o != null && ClassifyObjective(o) == kind);
+                if (inKind.Count == 0) continue;
+                EditorGUILayout.Space(3f);
+                EditorGUILayout.LabelField($"{KindLabel(kind)}  ({inKind.Count})", _objTitle);
+                foreach (SectorObjective obj in inKind)
+                    DrawObjectiveCard(obj, KindSymbol(kind));
+            }
 
             if (plan.RogueUnitIds != null && plan.RogueUnitIds.Count > 0)
                 EditorGUILayout.LabelField($"rogues: {plan.RogueUnitIds.Count}", _subtle);
         }
 
+        DrawAnchorSection();
+
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
     }
 
-    private void DrawObjectiveCard(SectorObjective obj)
+    // Seção "# Base guard / âncora": vem do AIController (EnumerateOwnAnchors), não do plano de
+    // objetivos — por isso não aparece nas seções acima. Lista cada âncora, se está segura, e os
+    // guardas (unidades amigas em cima/adjacentes ao anchor, HexDistance <= 1).
+    private void DrawAnchorSection()
+    {
+        List<AIController.AnchorInspection> anchors = AIController.GetOwnAnchorsForInspection(team);
+        EditorGUILayout.Space(3f);
+        EditorGUILayout.LabelField($"#  Base guard / âncora  ({(anchors != null ? anchors.Count : 0)})", _objTitle);
+        if (anchors == null || anchors.Count == 0)
+        {
+            EditorGUILayout.LabelField("— sem âncora —", _subtle);
+            return;
+        }
+
+        foreach (AIController.AnchorInspection a in anchors)
+        {
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            Color prev = GUI.color;
+            GUI.color = a.Held ? new Color(0.55f, 0.9f, 0.55f) : new Color(1f, 0.75f, 0.35f);
+            EditorGUILayout.LabelField($"#  {a.Sector}  {(a.Held ? "seguro ✓" : "EXPOSTO")}", EditorStyles.boldLabel);
+            GUI.color = prev;
+
+            var guards = new List<int>();
+            if (_snapshot != null && _snapshot.MyUnits != null)
+            {
+                foreach (UnitManager u in _snapshot.MyUnits)
+                {
+                    if (u == null || u.IsDead) continue;
+                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                    if (SectorManager.HexDistance(uc, a.Cell) <= 1f) guards.Add(u.InstanceId);
+                }
+            }
+            EditorGUILayout.LabelField(guards.Count > 0
+                ? $"  guardas: {string.Join(", ", guards.ConvertAll(id => "#" + id))}"
+                : "  guardas: nenhum", _subtle);
+            EditorGUILayout.EndVertical();
+        }
+    }
+
+    private void DrawObjectiveCard(SectorObjective obj, string symbol)
     {
         if (obj == null) return;
 
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-        EditorGUILayout.LabelField($"pri={obj.Priority}  {obj.Sector}  [{obj.Status}]", EditorStyles.boldLabel);
+        string rally = obj.ObjectiveType == AIObjectiveType.RallyAssembly
+            && obj.RallyState != AIRallyAssemblyState.None
+                ? $"  · {obj.RallyState}"
+                : "";
+        EditorGUILayout.LabelField($"{symbol} pri={obj.Priority}  {obj.Sector}  [{obj.Status}]{rally}", EditorStyles.boldLabel);
 
         if (obj.Slots == null || obj.Slots.Count == 0)
         {

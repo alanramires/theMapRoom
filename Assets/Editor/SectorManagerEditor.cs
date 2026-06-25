@@ -91,6 +91,7 @@ public class SectorManagerEditor : Editor
     private static readonly Color singleSectorLineColor = new Color(0.15f, 0.9f, 1f, 1f);
     private static readonly Color allSectorLineColor = new Color(1f, 0.82f, 0.2f, 1f);
     private static readonly Color pathMarkerColor = new Color(1f, 0.25f, 0.15f, 1f);
+    private static readonly Color axisFrontMarkerColor = new Color(1f, 0.35f, 0.05f, 1f);
 
     // Filtro de time para os eixos. 0 = Todos; senão (TeamId)(idx-1).
     private static readonly string[] AxisTeamOptions = { "Todos", "Green", "Red", "Blue", "Yellow" };
@@ -486,126 +487,78 @@ public class SectorManagerEditor : Editor
         Tilemap map = ResolveDrawTilemap();
         if (map == null) { SceneView.RepaintAll(); return; }
 
-        ConstructionManager[] all = Object.FindObjectsByType<ConstructionManager>(FindObjectsSortMode.None);
-        var hqs = new List<ConstructionManager>();
-        var rallyPoints = new List<ConstructionManager>();
-        foreach (ConstructionManager c in all)
-        {
-            if (c == null) continue;
-            if (c.IsPlayerHeadQuarter) hqs.Add(c);
-            if (c.IsRallyPoint) rallyPoints.Add(c);
-        }
-
         TeamId? filter = AxisTeamFilter();
 
-        // Um eixo por rally. Agrupa por HQ-dono (apex do leque) e aplica o filtro de time.
-        var porHQ = new Dictionary<ConstructionManager, List<(ConstructionManager rally, int slot)>>();
-        foreach (ConstructionManager rally in rallyPoints)
+        // Times a desenhar: o filtrado, ou todos os times que têm HQ.
+        var teams = new List<TeamId>();
+        if (filter.HasValue)
+            teams.Add(filter.Value);
+        else
         {
-            int slot = rally.RallyOwnerSlotIndex;
-            ConstructionManager hq = FindAxisHQ(hqs, rally, slot);
-            if (hq == null) continue;
-            if (filter.HasValue && hq.TeamId != filter.Value) continue;
-            if (!porHQ.TryGetValue(hq, out var lista)) { lista = new(); porHQ[hq] = lista; }
-            lista.Add((rally, slot));
+            var seen = new HashSet<TeamId>();
+            ConstructionManager[] all = Object.FindObjectsByType<ConstructionManager>(FindObjectsSortMode.None);
+            foreach (ConstructionManager c in all)
+                if (c != null && c.IsPlayerHeadQuarter && seen.Add(c.TeamId))
+                    teams.Add(c.TeamId);
         }
 
-        // Setores candidatos: todos os de campo (exclui base).
-        var setores = new List<SectorManager.SectorInfo>();
-        foreach (SectorManager.SectorInfo info in SectorManager.GetAllSectorInfos())
-            if (info != null && !ConstructionSectorHelper.IsBase(info.Sector))
-                setores.Add(info);
-
-        foreach (var kv in porHQ)
-            DrawAxisFan(map, kv.Key, kv.Value, setores);
+        // Fonte única de verdade: o classificador runtime InvasionAxisMap.
+        foreach (TeamId team in teams)
+        {
+            InvasionAxisMap axisMap = InvasionAxisMap.Build(team, map);
+            foreach (InvasionAxisMap.Axis axis in axisMap.Axes)
+                DrawAxisLines(axis);
+        }
 
         SceneView.RepaintAll();
     }
 
-    private static ConstructionManager FindAxisHQ(List<ConstructionManager> hqs, ConstructionManager rally, int slot)
+    private static void DrawAxisLines(InvasionAxisMap.Axis axis)
     {
-        Vector3Int rallyCell = rally.CurrentCellPosition; rallyCell.z = 0;
-        ConstructionManager best = null; float bestD = float.MaxValue;
-        foreach (ConstructionManager hq in hqs)
+        if (axis == null) return;
+
+        var points = new List<Vector3Int> { axis.HqCell };
+        foreach (ConstructionSector sec in axis.Corridor)
         {
-            if (hq == null) continue;
-            if (slot >= 0 && hq.SlotIndex == slot) return hq;   // dono explícito
-            Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
-            float d = SectorManager.HexDistance(rallyCell, hqCell);
-            if (d < bestD) { bestD = d; best = hq; }
-        }
-        return best;
-    }
-
-    // Leque angular (fatias por direção do rally): cada setor vai pro rally cuja direção (HQ→rally)
-    // é a mais próxima em ângulo da direção HQ→setor. Cada fatia é disjunta ⇒ não cruza. World space.
-    private static void DrawAxisFan(Tilemap map, ConstructionManager hq, List<(ConstructionManager rally, int slot)> rallies, List<SectorManager.SectorInfo> setores)
-    {
-        if (rallies.Count == 0) return;
-        Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
-        Vector3 hqW = map.GetCellCenterWorld(hqCell);
-
-        int n = rallies.Count;
-        var rallyAng = new float[n];
-        var rallyDist = new float[n];
-        for (int i = 0; i < n; i++)
-        {
-            Vector3 rw = map.GetCellCenterWorld(rallies[i].rally.CurrentCellPosition);
-            rallyAng[i] = AngleDeg(hqW, rw);
-            rallyDist[i] = Vector2.Distance(hqW, rw);
-        }
-
-        var byRally = new List<(SectorManager.SectorInfo info, float dist)>[n];
-        for (int i = 0; i < n; i++) byRally[i] = new();
-
-        foreach (SectorManager.SectorInfo info in setores)
-        {
-            Vector3 repW = map.GetCellCenterWorld(info.RepresentativeCell);
-            float sd = Vector2.Distance(hqW, repW);
-            if (sd < 0.01f) continue;
-            float sa = AngleDeg(hqW, repW);
-
-            int best = 0; float bestDiff = float.MaxValue;
-            for (int i = 0; i < n; i++)
-            {
-                float diff = Mathf.Abs(Mathf.DeltaAngle(sa, rallyAng[i]));
-                if (diff < bestDiff) { bestDiff = diff; best = i; }
-            }
-            if (sd > rallyDist[best] + 1f) continue;
-            if (info.Sector == rallies[best].rally.Sector) continue;
-            byRally[best].Add((info, sd));
-        }
-
-        for (int i = 0; i < n; i++)
-        {
-            byRally[i].Sort((a, b) => a.dist.CompareTo(b.dist));
-            var points = new List<Vector3Int> { hqCell };
-            foreach (var (info, _) in byRally[i])
+            if (SectorManager.TryGetSectorInfo(sec, out SectorManager.SectorInfo info) && info != null)
             {
                 Vector3Int rep = info.RepresentativeCell; rep.z = 0;
                 points.Add(rep);
             }
-            Vector3Int rallyCell = rallies[i].rally.CurrentCellPosition; rallyCell.z = 0;
-            points.Add(rallyCell);
+        }
+        points.Add(axis.RallyCell);
 
-            Color color = AxisColorForSlot(rallies[i].slot);
-            for (int p = 0; p + 1 < points.Count; p++)
+        ConstructionSector firstSec = axis.Corridor.Count > 0 ? axis.Corridor[0] : axis.RallySector;
+        string nome = $"E{axis.EixoIndex} {firstSec}→{axis.RallySector}";
+
+        Color color = AxisColorForSlot(axis.RallyOwnerSlotIndex);
+        for (int p = 0; p + 1 < points.Count; p++)
+        {
+            string label = p == 0 ? nome
+                : (p + 2 == points.Count ? $"▶ {axis.RallySector}" : "");
+            drawnLines.Add(new SectorEdgeLine
             {
-                string label = p == 0 ? $"Eixo slot {rallies[i].slot} ◀ HQ"
-                    : (p + 2 == points.Count ? $"▶ Rally slot {rallies[i].slot}" : "");
-                drawnLines.Add(new SectorEdgeLine
-                {
-                    FromCell = points[p],
-                    ToCell   = points[p + 1],
-                    Label    = label,
-                    Color    = color,
-                });
-            }
+                FromCell = points[p],
+                ToCell   = points[p + 1],
+                Label    = label,
+                Color    = color,
+            });
+        }
+
+        // Frente do eixo (leading edge): marcador no proximo setor a conquistar.
+        if (axis.FrontSector != ConstructionSector.None
+            && SectorManager.TryGetSectorInfo(axis.FrontSector, out SectorManager.SectorInfo frontInfo)
+            && frontInfo != null)
+        {
+            Vector3Int frontCell = frontInfo.RepresentativeCell; frontCell.z = 0;
+            drawnPathMarkers.Add(new SectorPathMarker
+            {
+                Cell  = frontCell,
+                Label = $"▶ FRENTE E{axis.EixoIndex} ({axis.FrontSector})",
+                Color = axisFrontMarkerColor,
+            });
         }
     }
-
-    private static float AngleDeg(Vector3 from, Vector3 to)
-        => Mathf.Atan2(to.y - from.y, to.x - from.x) * Mathf.Rad2Deg;
 
     private static Color AxisColorForSlot(int slot)
     {

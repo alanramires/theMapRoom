@@ -464,7 +464,7 @@ public partial class AIController
 
             bool roadBonus = UnitMovementPathRules.DidUseRoadFullMoveBonus(boardTilemap, unit, paths[cell], terrainDatabase);
 
-            ScoreFireSupportRepositionCell(
+            float repositionScore = ScoreFireSupportRepositionCell(
                 unit,
                 snapshot,
                 cell,
@@ -481,19 +481,21 @@ public partial class AIController
 
             bool inWeaponRange = dist >= minRange && dist <= maxRange;
 
-            float score = toolProgress * 1000f;
+            // A artilharia JAMAIS troca seguranca por avanco (nunca vanguarda). O score de
+            // reposicao (modo conservador: RETAGUARDA + ameaca + coesao + alcance) LIDERA a decisao;
+            // o avanco pela rota (toolProgress) so empurra de leve; e a ameaca leva um peso forte
+            // por cima — entao ela nunca escolhe uma celula exposta so para "progredir".
+            // (Antes: score = toolProgress*1000 dominava e descartava o repositionScore -> vanguarda.)
+            float score = repositionScore + toolProgress * 60f;
             if (inWeaponRange)
-                score += 25000f;
+                score += 4000f;
             else if (dist > maxRange)
                 score -= (dist - maxRange) * 5000f;
-
             if (roadBonus)
-                score += 500f;
+                score += 300f;
             if (!hasScreenAhead)
-                score -= inWeaponRange ? 250f : 1200f;
-
-            score -= threat * 250f;
-            score += GetTerrainDpqPontos(cell) * 20f;
+                score -= 6000f;
+            score -= threat * 1200f;
 
             if (score > bestScore)
             {

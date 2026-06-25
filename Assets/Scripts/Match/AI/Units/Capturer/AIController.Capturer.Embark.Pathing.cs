@@ -173,6 +173,14 @@ public partial class AIController
     {
         if (assigned == null || plan == null) return false;
 
+        // Respeita a reserva 1:1 do transportador (matching em assignedTransportClaims): cada APC
+        // tem um passageiro reservado. Se este APC e a MINHA carona, NAO cedo (embarco). Se e
+        // reservado para OUTRO capturador, pulo (cedo) — nao e minha. So sem reserva e que entra
+        // a logica de "ceder ao mais distante" abaixo. (Antes: 49 cedia ao 48 em TODOS os APCs,
+        // inclusive no 19 reservado pra ele, e nunca embarcava.)
+        if (assignedTransportClaims.TryGetValue(transporter.InstanceId, out int reservedPassengerId))
+            return reservedPassengerId != unit.InstanceId;
+
         ConstructionManager objBuilding = FindCapturableInSector(assigned.Sector, unit.TeamId);
         if (objBuilding == null) return false;
         Vector3Int objCell = objBuilding.CurrentCellPosition; objCell.z = 0;

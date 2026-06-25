@@ -120,14 +120,29 @@ public class AIWorldSnapshot
 
     private static AIStance CalculateStance(AIWorldSnapshot snap)
     {
-        // Defensiva: inimigo a ≤4 células do nosso QG
+        // Defensiva: ameaça REAL ao QG — inimigo a ≤4 células cuja força (HP) supera a defesa
+        // local. Só a presença de um inimigo próximo não basta: se há defensores cobrindo, a
+        // base está segura e a stance segue pela vantagem global (não trava em Defensiva por um
+        // batedor passando perto enquanto a AI domina o mapa).
         if (snap.MyHQ != null && snap.EnemyUnits.Count > 0)
         {
             Vector3Int hq = snap.MyHQ.CurrentCellPosition; hq.z = 0;
+            int enemyHpNearHQ = 0;
             foreach (UnitManager enemy in snap.EnemyUnits)
             {
                 Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
-                if (ChebyshevDistance(hq, ec) <= 4)
+                if (ChebyshevDistance(hq, ec) <= 4) enemyHpNearHQ += enemy.CurrentHP;
+            }
+            if (enemyHpNearHQ > 0)
+            {
+                int friendlyHpNearHQ = 0;
+                foreach (UnitManager u in snap.MyUnits)
+                {
+                    Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
+                    if (ChebyshevDistance(hq, uc) <= 4) friendlyHpNearHQ += u.CurrentHP;
+                }
+                // Só Defensiva se a ameaça próxima supera a defesa local (base insegura).
+                if (enemyHpNearHQ > friendlyHpNearHQ)
                     return AIStance.Defensive;
             }
         }

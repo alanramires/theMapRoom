@@ -108,7 +108,7 @@ public class JogadasManagerEditor : Editor
         Col("UID2",   36);
         Col("Coord",  120);
         Col("Destino",120);
-        Col("Obs",    80);
+        Col("Resultado", 180);
         EditorGUILayout.EndHorizontal();
     }
 
@@ -130,7 +130,10 @@ public class JogadasManagerEditor : Editor
         Col(j.uid2 > 0 ? j.uid2.ToString() : "-", 36);
         Col(j.TemCoordenada ? $"{j.cx},{j.cy}{Paren(JogadasManager.TipoConstrucaoNaCelula(j.cx, j.cy))}" : "-", 120);
         Col(j.TemDestino   ? $"{j.dx},{j.dy}{Paren(JogadasManager.DestinoLabel(j.dx, j.dy))}" : "-",  120);
-        Col(string.IsNullOrEmpty(j.obs) ? "-" : j.obs, 80);
+        string result = j.hasCombatResult
+            ? j.obs
+            : string.IsNullOrEmpty(j.obs) ? "-" : j.obs;
+        Col(result, 180);
 
         EditorGUILayout.EndHorizontal();
     }

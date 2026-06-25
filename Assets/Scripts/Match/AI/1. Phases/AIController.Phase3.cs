@@ -23,10 +23,11 @@ public partial class AIController
             yield break;
 
         List<AIShoppingPlanner.ShoppingOrder> orders = AIShoppingPlanner.Decide(freshSnap);
-        // A partir daqui a fase de compras fica comprometida: se salvar/carregar
-        // durante um batch de compra, o load deve seguir para o fim do turno em vez
-        // de recalcular compras sobre um estado parcialmente comprado.
-        currentAIStage = 4;
+        // A Phase3 NAO mexe em currentAIStage: ele fica em 3 durante todo o shopping e só vira 4
+        // quando a fase termina (em RunAITurn, apos Phase3_Shopping). Assim um save/load no meio
+        // das compras RETOMA a Phase3 e compra o que falta — Decide e deficit-aware (unidades ja
+        // compradas contam e reduzem a demanda; o orcamento ja vem reduzido), entao nao recompra
+        // por cima nem estoura caixa.
 
         foreach (AIShoppingPlanner.ShoppingOrder order in orders)
         {

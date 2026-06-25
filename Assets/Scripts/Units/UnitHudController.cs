@@ -77,6 +77,12 @@ public class UnitHudController : MonoBehaviour
     [SerializeField] private TMP_Text planDebugText;
     [SerializeField] private Text planDebugLegacyText;
 
+    [Header("AI Eixo")]
+    [SerializeField] private Transform eixoRoot;
+    [SerializeField] private Image eixoImage;
+    [Tooltip("Sprites por eixo: [0] = eixo 1, [1] = eixo 2, [2] = eixo 3.")]
+    [SerializeField] private Sprite[] eixoSprites = new Sprite[3];
+
     [Header("Sorting")]
     [SerializeField] private bool applyHudSorting = true;
     [SerializeField] private string hudSortingLayerName = "SFX";
@@ -98,6 +104,7 @@ public class UnitHudController : MonoBehaviour
         AutoAssignCommonReferences();
         DisableLegacyLockVisuals();
         SetPlanDebugBadge(false, string.Empty);
+        SetEixoBadge(0, false);
         ApplySorting();
     }
 
@@ -147,6 +154,27 @@ public class UnitHudController : MonoBehaviour
 
         if (planDebugRoot != null && planDebugRoot.gameObject.activeSelf != visible)
             planDebugRoot.gameObject.SetActive(visible);
+    }
+
+    public void SetEixoBadge(int eixo, bool visible)
+    {
+        if (eixoRoot == null && eixoImage == null)
+            AutoAssignCommonReferences();
+
+        Sprite target = null;
+        if (visible && eixo >= 1 && eixo <= 3 && eixoSprites != null && eixo - 1 < eixoSprites.Length)
+            target = eixoSprites[eixo - 1];
+
+        bool show = visible && eixo >= 1 && target != null;
+
+        if (eixoImage != null)
+        {
+            eixoImage.sprite = target;
+            eixoImage.enabled = show;
+        }
+
+        if (eixoRoot != null && eixoRoot.gameObject.activeSelf != show)
+            eixoRoot.gameObject.SetActive(show);
     }
 
     public void SetStanceIcon(Sprite sprite)
@@ -473,6 +501,7 @@ public class UnitHudController : MonoBehaviour
             altitudeSubmergedSprite = FindSpriteByName("submerged");
 
         TryAutoAssignPlanDebugReferences();
+        TryAutoAssignEixoReferences();
     }
 
     private void RefreshWeaponAmmoVisuals()
@@ -763,6 +792,36 @@ public class UnitHudController : MonoBehaviour
 
         if (planDebugLegacyText == null && planDebugRoot != null)
             planDebugLegacyText = planDebugRoot.GetComponent<Text>() ?? planDebugRoot.GetComponentInChildren<Text>(true);
+    }
+
+    private void TryAutoAssignEixoReferences()
+    {
+        if (eixoRoot == null)
+        {
+            Transform candidate = FindChildRecursive(transform, "eixo");
+            if (candidate != null)
+                eixoRoot = candidate;
+        }
+
+        if (eixoImage == null && eixoRoot != null)
+            eixoImage = eixoRoot.GetComponent<Image>() ?? eixoRoot.GetComponentInChildren<Image>(true);
+
+        if (eixoSprites == null || eixoSprites.Length < 3)
+        {
+            Sprite[] resized = new Sprite[3];
+            if (eixoSprites != null)
+            {
+                for (int i = 0; i < eixoSprites.Length && i < 3; i++)
+                    resized[i] = eixoSprites[i];
+            }
+            eixoSprites = resized;
+        }
+
+        for (int i = 0; i < 3; i++)
+        {
+            if (eixoSprites[i] == null)
+                eixoSprites[i] = FindSpriteByName("eixo" + (i + 1));
+        }
     }
 
     private static void ApplySortingToRenderer(SpriteRenderer renderer, int sortingLayerId, int sortingOrder)

@@ -542,6 +542,29 @@ public class ConstructionManager : MonoBehaviour
         RefreshRuntimeVisualState(force: true);
     }
 
+    // Debug/runtime: troca a regra de venda do prédio. Para OriginalOwner/FirstOwner, ownerSlot >= 0
+    // define (e marca como inicializado) o slot dono correspondente, que é quem `CanProduceUnitsForTeam`
+    // usa pra liberar a produção. Para FreeMarket/Disabled o ownerSlot é ignorado.
+    public void DebugSetSellingRule(ConstructionUnitMarketRule rule, int ownerSlot)
+    {
+        if (siteRuntime == null)
+            return;
+
+        siteRuntime.sellingRule = rule;
+        if (rule == ConstructionUnitMarketRule.OriginalOwner && ownerSlot >= 0)
+        {
+            originalOwnerSlotIndex = ownerSlot;
+            originalOwnerInitialized = true;
+        }
+        else if (rule == ConstructionUnitMarketRule.FirstOwner && ownerSlot >= 0)
+        {
+            firstOwnerSlotIndex = ownerSlot;
+            firstOwnerInitialized = true;
+        }
+
+        RefreshRuntimeVisualState(force: true);
+    }
+
     public void SetInfiniteSuppliesOverride(bool value)
     {
         hasInfiniteSuppliesOverride = value;
