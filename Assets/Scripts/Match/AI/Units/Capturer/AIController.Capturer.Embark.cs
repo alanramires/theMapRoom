@@ -63,7 +63,10 @@ public partial class AIController
             assigned = ResolveAnyAssignedObjective(unit, plan);
 
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
-        if (ShouldSkipCapturerEmbarkForShortWalk(unit, capturerAssigned, fromCell, "origem"))
+        // Usa o objetivo efetivo, inclusive quando a unidade satisfaz Capturador mas ocupa
+        // outro papel no plano. Passar apenas capturerAssigned fazia esses híbridos parecerem
+        // rogue aqui e, logo depois, embarcarem pelo fallback usando assigned.
+        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromCell, "origem"))
             return null;
 
         // Capturador montando massa num rally assembly AINDA ativo (nao GoGreen/Expired) e ja

@@ -110,6 +110,48 @@ public class JogadasManager : MonoBehaviour
         });
     }
 
+    public void RegistrarServicoLogistico(
+        int turno,
+        int team,
+        int cx,
+        int cy,
+        string sigla,
+        int uid,
+        int uidFonte,
+        string source,
+        string serviceId,
+        int cost,
+        int hpGain,
+        int fuelGain,
+        int ammoGain)
+    {
+        string safeSource = string.IsNullOrWhiteSpace(source) ? "Logistica" : source.Trim();
+        string safeService = string.IsNullOrWhiteSpace(serviceId) ? "-" : serviceId.Trim();
+        int safeCost = Mathf.Max(0, cost);
+        int safeHp = Mathf.Max(0, hpGain);
+        int safeFuel = Mathf.Max(0, fuelGain);
+        int safeAmmo = Mathf.Max(0, ammoGain);
+        log.Registrar(new Jogada
+        {
+            turno = turno,
+            team = team,
+            acao = "ServicoLogistico",
+            cx = cx,
+            cy = cy,
+            unidadeSigla = sigla,
+            uid = uid,
+            uid2 = uidFonte,
+            hasServiceResult = true,
+            serviceSource = safeSource,
+            serviceId = safeService,
+            serviceCost = safeCost,
+            serviceHpGain = safeHp,
+            serviceFuelGain = safeFuel,
+            serviceAmmoGain = safeAmmo,
+            obs = $"{safeSource} {safeService}: ${safeCost} HP+{safeHp} AUT+{safeFuel} MUN+{safeAmmo}",
+        });
+    }
+
     public void RegistrarTransferir(int turno, int team, int cx, int cy, string sigla, int uid)
     {
         log.Registrar(new Jogada

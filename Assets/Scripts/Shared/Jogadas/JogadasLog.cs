@@ -26,6 +26,8 @@ using UnityEngine;
 [Serializable]
 public class JogadasLog
 {
+    public static event Action<Jogada> OnJogadaRegistrada;
+
     public List<Jogada> jogadas = new List<Jogada>();
     public int proximoId = 1;
 
@@ -43,6 +45,7 @@ public class JogadasLog
         }
         j.jogadaId = proximoId++;
         jogadas.Add(j);
+        OnJogadaRegistrada?.Invoke(j);
         Debug.Log($"[Jogadas] #{j.jogadaId} T{j.turno} team={j.team} {j.acao} uid={j.uid} ({j.unidadeSigla}) de ({j.cx},{j.cy}) para ({j.dx},{j.dy})");
     }
 }
@@ -88,6 +91,14 @@ public class Jogada
     public bool   hasRepairState;
     public bool   repairBefore;
     public bool   repairAfter;
+
+    public bool   hasServiceResult;
+    public string serviceSource;
+    public string serviceId;
+    public int    serviceCost;
+    public int    serviceHpGain;
+    public int    serviceFuelGain;
+    public int    serviceAmmoGain;
 
     // Observação contextual gravada no momento da jogada (ex.: progresso de captura "10/20",
     // "capturado", "reparado"). Preenchida hoje só para Capturar.

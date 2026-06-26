@@ -119,7 +119,11 @@ public partial class AIController
             int candidateMP = candidate.MaxMovementPoints;
             if (candidateMP < 3) candidateThreshold += (3 - candidateMP) * 2;
             candidateThreshold = Mathf.Max(2, candidateThreshold - thresholdReduction);
-            if (objectiveDist < candidateThreshold) continue;
+            int walkThreshold = Mathf.Max(CapturerShortWalkEmbarkCost, candidateThreshold);
+            int objectiveTerrainCost = TerrainCostToCell(
+                candidate, candidateCell, objectiveCell, walkThreshold);
+            if (objectiveTerrainCost <= walkThreshold)
+                continue;
 
             float transportDist = SectorManager.HexDistance(transporterCell, candidateCell);
             int rolePriority = candidateData.roles != null && candidateData.roles.Count > 0

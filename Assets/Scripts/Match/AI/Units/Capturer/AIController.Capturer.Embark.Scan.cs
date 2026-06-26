@@ -3,6 +3,8 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private const int CapturerShortWalkEmbarkCost = 4;
+
     private string BuildCapturerEmbarkScanDebug(
         UnitManager unit,
         UnitData unitData,
@@ -149,22 +151,48 @@ public partial class AIController
 
         candidateCell.z = 0;
 
-        ConstructionManager objBuilding = FindCapturableInSector(assigned.Sector, unit.TeamId);
+        ConstructionManager objBuilding = FindCapturableInSector(
+            assigned.Sector, unit.TeamId, candidateCell);
 
         if (objBuilding == null)
+        {
+            float nearestSectorDistance = float.MaxValue;
+            foreach (ConstructionManager construction in ConstructionManager.AllActive)
+            {
+                if (construction == null || construction.Sector != assigned.Sector)
+                    continue;
+
+                Vector3Int constructionCell = construction.CurrentCellPosition;
+                constructionCell.z = 0;
+                float distance = SectorManager.HexDistance(candidateCell, constructionCell);
+                if (distance >= nearestSectorDistance)
+                    continue;
+
+                nearestSectorDistance = distance;
+                objBuilding = construction;
+            }
+        }
+
+        if (objBuilding == null)
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarque sem referencia de setor: assigned={assigned.Sector}");
             return false;
+        }
 
         Vector3Int objCell = objBuilding.CurrentCellPosition; objCell.z = 0;
-        int effectiveThreshold = GetEffectiveTransportThreshold(unit.TeamId);
-        // Slow units benefit from transport from farther away (+2h per MP below 3).
-        int baseMP = unit.MaxMovementPoints;
-        if (baseMP < 3) effectiveThreshold += (3 - baseMP) * 2;
-        int terrainCost = TerrainCostToCell(unit, candidateCell, objCell, effectiveThreshold);
-        if (terrainCost >= effectiveThreshold)
+        float hexDistance = SectorManager.HexDistance(candidateCell, objCell);
+        // Decisao local, separada do threshold estrategico que cria demanda de transporte.
+        // Proximidade geometrica evita que uma barreira local superestime uma viagem que ja
+        // esta praticamente concluida; custo de terreno cobre rotas curtas menos obvias.
+        int terrainCost = TerrainCostToCell(
+            unit, candidateCell, objCell, CapturerShortWalkEmbarkCost);
+        bool physicallyNear = hexDistance <= CapturerShortWalkEmbarkCost;
+        bool shortTerrainWalk = terrainCost <= CapturerShortWalkEmbarkCost;
+        if (!physicallyNear && !shortTerrainWalk)
             return false;
 
         string sectorLabel = assigned != null ? assigned.Sector.ToString() : objBuilding.Sector.ToString();
-        Debug.Log($"{TL("Capturador")} {unit.InstanceId} ignora embarque ({context} terreno={terrainCost}<{effectiveThreshold}h de {sectorLabel})");
+        Debug.Log($"{TL("Capturador")} {unit.InstanceId} ignora embarque ({context} hex={hexDistance:F0} terreno={terrainCost} limite={CapturerShortWalkEmbarkCost} de {sectorLabel})");
         return true;
     }
 

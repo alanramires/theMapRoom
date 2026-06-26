@@ -79,13 +79,15 @@ public partial class AIController
 
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
 
-        // APC vazio e combatente: sem ninguem pra buscar, em vez de andar de volta pra base a toa,
-        // ataca um alvo proximo onde tem vantagem (TryFindTransportBreakerAttack so mira Primary,
-        // nao se suicida contra blindado). So volta pra base se nao houver alvo bom.
-        if (TryFindTransportBreakerAttack(unit, snapshot, fromCell, paths, occupied, fromCell,
-                out Vector3Int idleAttackCell, out UnitManager idleAttackTarget, preferNoMove: false, plan: null))
+        // Sem passageiro, usa a busca do assault rogue: considera todo o movimento
+        // disponivel e pode executar movimento + ataque no mesmo batch.
+        List<UnitManager> visibleEnemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
+        if (TryFindAssaultBreakerAttack(
+                unit, snapshot, fromCell, paths, occupied, visibleEnemies,
+                out Vector3Int idleAttackCell, out UnitManager idleAttackTarget, out string idleAttackReason))
         {
             Vector3Int idleTargetCell = idleAttackTarget.CurrentCellPosition; idleTargetCell.z = 0;
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} vazio - combate como assault rogue: {idleAttackReason}");
             Debug.Log($"{TL("Transporte")} {unit.InstanceId} vazio — ataca {idleAttackTarget.InstanceId} via {idleAttackCell} (em vez de voltar a base sem pickup)");
             return BuildAttackBatch(unit, snapshot.AITeam, fromCell, idleAttackCell,
                 idleAttackTarget.InstanceId.ToString(), idleTargetCell, paths);

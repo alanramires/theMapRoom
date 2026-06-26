@@ -124,6 +124,7 @@ public class ConstructionManager : MonoBehaviour
     public bool HasFirstOwner => firstOwnerInitialized;
     public TeamId OriginalOwnerTeamId => ResolveTeamForSlot(originalOwnerSlotIndex);
     public TeamId FirstOwnerTeamId => ResolveTeamForSlot(firstOwnerSlotIndex);
+    public UnitManager CurrentOccupantOnTop => TryGetOccupantOnTop();
 
     public static void ResetActiveTeamChangedPerfCounters()
     {

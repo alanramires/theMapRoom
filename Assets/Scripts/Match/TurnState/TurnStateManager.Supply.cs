@@ -493,6 +493,19 @@ public partial class TurnStateManager
             ammoGainByWeapon);
     }
 
+    private static string ResolveServiceStatsId(ServiceData service)
+    {
+        if (service == null)
+            return "-";
+        if (!string.IsNullOrWhiteSpace(service.apelido))
+            return service.apelido.Trim();
+        if (!string.IsNullOrWhiteSpace(service.id))
+            return service.id.Trim();
+        if (!string.IsNullOrWhiteSpace(service.displayName))
+            return service.displayName.Trim();
+        return service.name;
+    }
+
     private static void EstimateServiceGainsFromSupplier(
         UnitManager supplier,
         UnitManager target,

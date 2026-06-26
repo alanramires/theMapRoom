@@ -654,6 +654,24 @@ public partial class TurnStateManager
                     fuelGain += actualFuelGain;
                     ammoGain += Mathf.Max(0, ammoStep);
 
+                    int sourceUid = sourceSupplierUnit != null
+                        ? sourceSupplierUnit.InstanceId
+                        : (sourceConstruction != null ? sourceConstruction.InstanceId : 0);
+                    JogadasManager.EnsureInstance()?.RegistrarServicoLogistico(
+                        matchController != null ? matchController.CurrentTurn : 0,
+                        (int)target.TeamId,
+                        target.CurrentCellPosition.x,
+                        target.CurrentCellPosition.y,
+                        target.TryGetUnitData(out UnitData targetData) && targetData != null ? targetData.apelido : "-",
+                        target.InstanceId,
+                        sourceUid,
+                        "ServicoComando",
+                        ResolveServiceStatsId(service),
+                        serviceMoneySpent,
+                        actualHpGain,
+                        actualFuelGain,
+                        Mathf.Max(0, ammoStep));
+
                     string serviceName = ResolveServiceLabel(service);
                     string line = $"{serviceName}: HP +{actualHpGain} | AUT +{actualFuelGain} | MUN +{ammoStep}";
                     targetReport.serviceLines.Add(line);

@@ -491,7 +491,7 @@ public partial class TurnStateManager
                         ammoPlannedGain,
                         ammoPlannedByWeapon,
                         "Suprimento",
-                        out _))
+                        out int serviceMoneySpent))
                 {
                     continue;
                 }
@@ -561,6 +561,21 @@ public partial class TurnStateManager
                 hpGain += actualHpGain;
                 fuelGain += actualFuelGain;
                 ammoGain += Mathf.Max(0, ammoStep);
+
+                JogadasManager.EnsureInstance()?.RegistrarServicoLogistico(
+                    matchController != null ? matchController.CurrentTurn : 0,
+                    (int)supplier.TeamId,
+                    target.CurrentCellPosition.x,
+                    target.CurrentCellPosition.y,
+                    target.TryGetUnitData(out UnitData targetData) && targetData != null ? targetData.apelido : "-",
+                    target.InstanceId,
+                    supplier.InstanceId,
+                    "Logistica",
+                    ResolveServiceStatsId(service),
+                    serviceMoneySpent,
+                    actualHpGain,
+                    actualFuelGain,
+                    Mathf.Max(0, ammoStep));
             }
 
             if (hpGain <= 0 && fuelGain <= 0 && ammoGain <= 0)

@@ -107,13 +107,25 @@ public class ShoppingPressureWindow : EditorWindow
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(team);   // leitura viva, silenciosa
         RebuildPressureIfStale(force: false);
 
+        EditorGUILayout.BeginHorizontal();
+
+        // Coluna esquerda: visão tática do time + pressões de counter e operacional.
+        EditorGUILayout.BeginVertical(GUILayout.Width(position.width * 0.5f - 8f));
+        _leftScroll = EditorGUILayout.BeginScrollView(_leftScroll);
         DrawHeader(_snapshot, plan, _demands);
         DrawCounterPressure(_snapshot, _demands);
         DrawOperationalPressure(_snapshot);
+        EditorGUILayout.EndScrollView();
+        EditorGUILayout.EndVertical();
 
-        EditorGUILayout.BeginHorizontal();
+        // Coluna direita: objetivos do plano + fila de pressão no shopping.
+        EditorGUILayout.BeginVertical(GUILayout.Width(position.width * 0.5f - 8f));
+        _rightScroll = EditorGUILayout.BeginScrollView(_rightScroll);
         DrawObjectivesColumn(plan);
         DrawPressureColumn(_snapshot, _demands);
+        EditorGUILayout.EndScrollView();
+        EditorGUILayout.EndVertical();
+
         EditorGUILayout.EndHorizontal();
     }
 
@@ -360,9 +372,7 @@ public class ShoppingPressureWindow : EditorWindow
 
     private void DrawObjectivesColumn(TeamObjectivePlan plan)
     {
-        EditorGUILayout.BeginVertical(GUILayout.Width(position.width * 0.5f - 8f));
         EditorGUILayout.LabelField("Objetivos  (preenchido / demandado)", _objTitle);
-        _leftScroll = EditorGUILayout.BeginScrollView(_leftScroll);
 
         if (plan == null || plan.Objectives.Count == 0)
         {
@@ -389,9 +399,6 @@ public class ShoppingPressureWindow : EditorWindow
         }
 
         DrawAnchorSection();
-
-        EditorGUILayout.EndScrollView();
-        EditorGUILayout.EndVertical();
     }
 
     // Seção "# Base guard / âncora": vem do AIController (EnumerateOwnAnchors), não do plano de
@@ -481,9 +488,8 @@ public class ShoppingPressureWindow : EditorWindow
     // ----------------------------------------------------------------------------
     private void DrawPressureColumn(AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
     {
-        EditorGUILayout.BeginVertical(GUILayout.Width(position.width * 0.5f - 8f));
+        EditorGUILayout.Space(6f);
         EditorGUILayout.LabelField("Pressão no Shopping  (fila por papel)", _demandTitle);
-        _rightScroll = EditorGUILayout.BeginScrollView(_rightScroll);
 
         if (demands == null || demands.Count == 0)
             EditorGUILayout.LabelField("— fila vazia —", _subtle);
@@ -492,9 +498,6 @@ public class ShoppingPressureWindow : EditorWindow
                 DrawDemandCard(d);
 
         DrawOfferCatalog(snapshot, demands);
-
-        EditorGUILayout.EndScrollView();
-        EditorGUILayout.EndVertical();
     }
 
     // ----------------------------------------------------------------------------
