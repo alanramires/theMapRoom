@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // -------------------------------------------------------------------------
-// Controla a IA inimiga, incluindo a execução de suas ações, planejamento de objetivos e tomada de decisões.
-// Implementa uma abordagem baseada em estágios para organizar o comportamento da IA,
-// desde a avaliação do estado do jogo até a execução de ações específicas.
+// Controla a IA inimiga, incluindo a execuï¿½ï¿½o de suas aï¿½ï¿½es, planejamento de objetivos e tomada de decisï¿½es.
+// Implementa uma abordagem baseada em estï¿½gios para organizar o comportamento da IA,
+// desde a avaliaï¿½ï¿½o do estado do jogo atï¿½ a execuï¿½ï¿½o de aï¿½ï¿½es especï¿½ficas.
 // -------------------------------------------------------------------------    
 public partial class AIController
 {
@@ -34,8 +34,8 @@ public partial class AIController
         Vector3Int originalCell = unit.CurrentCellPosition;
         originalCell.z = 0;
 
-        float originDistance = SectorManager.HexDistance(origin, target);
-        float firstStopDistance = SectorManager.HexDistance(firstStop, target);
+        float originDistance = CalculateRouteDistanceOrHex(unit, origin, target);
+        float firstStopDistance = CalculateRouteDistanceOrHex(unit, firstStop, target);
         bestDistanceAfterNextMove = firstStopDistance;
 
         try
@@ -55,7 +55,7 @@ public partial class AIController
                 if (occupied != null && occupied.Contains(nextStop))
                     continue;
 
-                float nextDistance = SectorManager.HexDistance(nextStop, target);
+                float nextDistance = CalculateRouteDistanceOrHex(unit, nextStop, target);
                 if (nextDistance < bestDistanceAfterNextMove)
                     bestDistanceAfterNextMove = nextDistance;
             }
@@ -112,8 +112,8 @@ public partial class AIController
         Vector3Int originalCell = unit.CurrentCellPosition;
         originalCell.z = 0;
 
-        float originDistance = SectorManager.HexDistance(origin, target);
-        bestDistanceAfterNextMove = SectorManager.HexDistance(firstStop, target);
+        float originDistance = CalculateRouteDistanceOrHex(unit, origin, target);
+        bestDistanceAfterNextMove = CalculateRouteDistanceOrHex(unit, firstStop, target);
 
         int movementPoints = Mathf.Max(0, unit.RemainingMovementPoints);
         Dictionary<Vector3Int, int> costMap =
@@ -147,7 +147,7 @@ public partial class AIController
                     if (!CanUseAsToolProgressStopCell(unit, nextStop, firstStop))
                         continue;
 
-                    float nextDistance = SectorManager.HexDistance(nextStop, target);
+                    float nextDistance = CalculateRouteDistanceOrHex(unit, nextStop, target);
                     if (nextDistance < bestDistanceAfterNextMove)
                         bestDistanceAfterNextMove = nextDistance;
                 }
@@ -159,14 +159,16 @@ public partial class AIController
         }
 
         float twoTurnProgress = originDistance - bestDistanceAfterNextMove;
-        float firstTurnProgress = originDistance - SectorManager.HexDistance(firstStop, target);
+        float firstTurnProgress = originDistance - CalculateRouteDistanceOrHex(unit, firstStop, target);
         float lineDeviation = DistanceFromHexLine(firstStop, origin, target);
 
+        // ProgressÃ£o = aproximar do alvo. 1T (avanÃ§o jÃ¡ no turno 1) Ã© termo principal; 2T mantÃ©m a
+        // viabilidade de chegar em 2 turnos; line entra suave; firstMoveCost NÃƒO penaliza (gastar
+        // movimento avanÃ§ando Ã© o objetivo). Espelha CaminhosValidosWindow.CalculateTwoTurnProgressScore.
         float rawScore =
             twoTurnProgress * 10f
-            + firstTurnProgress * 2f
-            - lineDeviation * 2f
-            - firstMoveCost * 0.5f;
+            + firstTurnProgress * 6f
+            - lineDeviation * 1f;
 
         score = Mathf.RoundToInt(rawScore);
         return true;

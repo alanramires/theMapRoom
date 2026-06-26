@@ -29,10 +29,23 @@ public class CaminhosValidosWindow : EditorWindow
         public bool RoadBonus;
         public float FirstTurnProgress;
         public float TwoTurnProgress;
+        public bool RouteFound;
+        public float RouteDistance;
+        public float RouteProgress;
         public float LineDeviation;
         public float Threat;
         public float Dpq;
         public float FinalScore;
+        // Contribuição ponderada de cada termo no toolScore bruto (para o breakdown da janela).
+        public float RawTwoTurnTerm;
+        public float RawFirstTurnTerm;
+        public float RawLineTerm;
+        public float RawMoveTerm;
+        // Rotas para destaque interativo no mapa.
+        public List<Vector3Int> FirstTurnPath;   // origem → célula (turno 1)
+        public Vector3Int SecondTurnStop;         // melhor parada do turno 2
+        public List<Vector3Int> SecondTurnPath;   // célula → melhor parada (turno 2)
+        public bool HasSecondTurn;
     }
 
     [SerializeField] private UnitData unitData;
@@ -48,6 +61,7 @@ public class CaminhosValidosWindow : EditorWindow
     [SerializeField] private int progressHorizonTurns = 2;
     [SerializeField] private ProgressDebugIntent progressIntent = ProgressDebugIntent.TransportDelivery;
     [SerializeField] private bool progressIntentInitialized;
+    [SerializeField] private bool apcEmptyIgnoresThreat;
 
     [SerializeField] private TeamId simulationTeam = TeamId.Green;
 
@@ -77,6 +91,11 @@ public class CaminhosValidosWindow : EditorWindow
     // Progressão de Rota
     private Dictionary<Vector3Int, int> progressMap;
     private Dictionary<Vector3Int, ProgressDebugCandidate> progressCandidateMap;
+    private List<KeyValuePair<Vector3Int, ProgressDebugCandidate>> progressRanking;
+    private Vector2 routesScroll;
+    private Vector3Int selectedProgressCell;
+    private bool hasSelectedProgressCell;
+    private const float LeftColumnWidth = 380f;
     private bool hasProgressResult;
     private Vector3Int lastProgressOrigin;
     private Vector3Int lastProgressDest;
@@ -180,7 +199,8 @@ public class CaminhosValidosWindow : EditorWindow
 
     private void OnGUI()
     {
-        scroll = EditorGUILayout.BeginScrollView(scroll);
+        EditorGUILayout.BeginHorizontal();
+        scroll = EditorGUILayout.BeginScrollView(scroll, GUILayout.Width(LeftColumnWidth));
 
         // ── Unidade ──
         EditorGUILayout.LabelField("Unidade", EditorStyles.boldLabel);
@@ -286,6 +306,8 @@ public class CaminhosValidosWindow : EditorWindow
         EditorGUILayout.LabelField(progressIntent == ProgressDebugIntent.Bruto
             ? "  Exibe toolScore bruto da progressao em dois turnos."
             : "  Exibe FinalScore/1000 com a formula runtime do intent selecionado.", EditorStyles.miniLabel);
+        apcEmptyIgnoresThreat = EditorGUILayout.Toggle("APC vazio (ignora prudência)", apcEmptyIgnoresThreat);
+        EditorGUILayout.LabelField("  Zera o termo threat (APC vazio que vira assalto). Logística mantém prudência.", EditorStyles.miniLabel);
 
         EditorGUI.BeginDisabledGroup(!HasValidUnit());
         if (GUILayout.Button("Calcular Progressão", GUILayout.Height(26)))
@@ -350,6 +372,69 @@ public class CaminhosValidosWindow : EditorWindow
             EditorGUILayout.HelpBox("UnitData (ou unidade selecionada) e Tilemap são obrigatórios.", MessageType.Warning);
 
         EditorGUILayout.EndScrollView();
+
+        // ── Coluna direita: rotas interativas ──
+        routesScroll = EditorGUILayout.BeginScrollView(routesScroll);
+        DrawProgressRoutesColumn();
+        EditorGUILayout.EndScrollView();
+
+        EditorGUILayout.EndHorizontal();
+    }
+
+    private void DrawProgressRoutesColumn()
+    {
+        EditorGUILayout.LabelField("Rotas Calculadas", EditorStyles.boldLabel);
+
+        if (!hasProgressResult || progressRanking == null || progressRanking.Count == 0)
+        {
+            EditorGUILayout.HelpBox("Calcule a Progressão (coluna à esquerda) para listar as rotas de cada célula alcançável.", MessageType.Info);
+            return;
+        }
+
+        EditorGUILayout.LabelField("Clique numa rota para destacá-la no mapa:", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField("Verde = turno 1   •   Azul = turno 2 provável", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField("RAW = toolScore bruto (×10/×2/…)   •   FIN = fórmula do intent (×1000/×220/…)", EditorStyles.miniLabel);
+        EditorGUILayout.Space(2f);
+
+        if (hasSelectedProgressCell && GUILayout.Button("Limpar seleção", EditorStyles.miniButton))
+        {
+            hasSelectedProgressCell = false;
+            SceneView.RepaintAll();
+        }
+
+        int limit = Mathf.Min(40, progressRanking.Count);
+        for (int i = 0; i < limit; i++)
+        {
+            KeyValuePair<Vector3Int, ProgressDebugCandidate> kv = progressRanking[i];
+            Vector3Int cell = kv.Key;
+            ProgressDebugCandidate cand = kv.Value;
+            bool selected = hasSelectedProgressCell && selectedProgressCell == cell;
+
+            string turn2 = cand.HasSecondTurn ? $" → ({cand.SecondTurnStop.x},{cand.SecondTurnStop.y})" : "";
+            string rowLabel = $"#{i + 1}  ({cell.x},{cell.y}){turn2}   nota {FormatCandidateNota(cand)}   tool {cand.ToolScore}";
+
+            GUI.backgroundColor = selected ? new Color(0.4f, 1f, 0.45f) : Color.white;
+            if (GUILayout.Button(rowLabel, EditorStyles.miniButton))
+            {
+                if (selected)
+                {
+                    hasSelectedProgressCell = false;
+                }
+                else
+                {
+                    selectedProgressCell = cell;
+                    hasSelectedProgressCell = true;
+                }
+                SceneView.RepaintAll();
+            }
+            GUI.backgroundColor = Color.white;
+
+            if (selected)
+                EditorGUILayout.HelpBox(BuildBreakdownLine(cell, cand), MessageType.None);
+        }
+
+        if (progressRanking.Count > limit)
+            EditorGUILayout.LabelField($"  … +{progressRanking.Count - limit} células omitidas.", EditorStyles.miniLabel);
     }
 
     private void DrawHexField(string label, ref Vector3Int hex,
@@ -378,6 +463,8 @@ public class CaminhosValidosWindow : EditorWindow
         hasProgressResult = false;
         progressMap = null;
         progressCandidateMap = null;
+        progressRanking = null;
+        hasSelectedProgressCell = false;
         hasWaypointResult = false;
         statusMessage = string.Empty;
 
@@ -405,6 +492,8 @@ public class CaminhosValidosWindow : EditorWindow
         hasProgressResult = false;
         progressMap = null;
         progressCandidateMap = null;
+        progressRanking = null;
+        hasSelectedProgressCell = false;
         hasWaypointResult = false;
         statusMessage = string.Empty;
 
@@ -429,6 +518,8 @@ public class CaminhosValidosWindow : EditorWindow
         hasProgressResult = false;
         progressMap = null;
         progressCandidateMap = null;
+        progressRanking = null;
+        hasSelectedProgressCell = false;
         reachableCells = null;
         hasDistResult = false;
         distanceCostMap = null;
@@ -453,7 +544,7 @@ public class CaminhosValidosWindow : EditorWindow
             var paths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, unit, movementPoints, terrainDatabase);
             // costMap dá o custo real em PM para cada célula, considerando bônus de estrada.
             var costMap = UnitMovementPathRules.CalculateMovementCostMap(tilemap, unit, origin, movementPoints, terrainDatabase);
-            progressOriginCost = Mathf.CeilToInt(SectorManager.HexDistance(origin, dest));
+            progressOriginCost = Mathf.CeilToInt(RouteDistanceOrHexDebug(unit, origin, dest));
             lastProgressOrigin = origin;
             lastProgressDest   = dest;
 
@@ -469,7 +560,7 @@ public class CaminhosValidosWindow : EditorWindow
                 int rawScore;
                 if (horizon <= 1)
                 {
-                    rawScore = CalculateReachableProgressScore(origin, dest, cell, paths[cell]);
+                    rawScore = CalculateReachableProgressScore(unit, origin, dest, cell, paths[cell]);
                     candidate = BuildOneTurnProgressCandidate(unit, origin, dest, cell, paths[cell], costMap);
                 }
                 else
@@ -479,7 +570,7 @@ public class CaminhosValidosWindow : EditorWindow
 
                 candidate.FinalScore = progressIntent == ProgressDebugIntent.Bruto
                     ? rawScore
-                    : ScoreProgressIntent(progressIntent, candidate);
+                    : ScoreProgressIntent(progressIntent, candidate, apcEmptyIgnoresThreat ? 0f : 1f);
 
                 progressCandidateMap[cell] = candidate;
                 progressMap[cell] = progressIntent == ProgressDebugIntent.Bruto
@@ -490,8 +581,21 @@ public class CaminhosValidosWindow : EditorWindow
             hasProgressResult = true;
         });
 
+        BuildProgressRanking();
+
         SceneView.RepaintAll();
         Repaint();
+    }
+
+    private void BuildProgressRanking()
+    {
+        progressRanking = null;
+        if (progressCandidateMap == null || progressCandidateMap.Count == 0)
+            return;
+
+        var list = new List<KeyValuePair<Vector3Int, ProgressDebugCandidate>>(progressCandidateMap);
+        list.Sort((a, b) => b.Value.FinalScore.CompareTo(a.Value.FinalScore));
+        progressRanking = list;
     }
 
     private void RunWaypointCalculation()
@@ -503,6 +607,8 @@ public class CaminhosValidosWindow : EditorWindow
         hasProgressResult = false;
         progressMap = null;
         progressCandidateMap = null;
+        progressRanking = null;
+        hasSelectedProgressCell = false;
         statusMessage = string.Empty;
 
         Vector3Int origin  = originHex;      origin.z = 0;
@@ -546,6 +652,8 @@ public class CaminhosValidosWindow : EditorWindow
         hasProgressResult = false;
         progressMap = null;
         progressCandidateMap = null;
+        progressRanking = null;
+        hasSelectedProgressCell = false;
         hasWaypointResult = false;
         waypointCostFromDest = null;
         waypointReachable = null;
@@ -772,13 +880,15 @@ public class CaminhosValidosWindow : EditorWindow
         Dictionary<Vector3Int, int> costMap,
         out ProgressDebugCandidate candidate)
     {
-        float originDistance = SectorManager.HexDistance(origin, dest);
-        float bestDistanceAfterNextMove = SectorManager.HexDistance(firstStop, dest);
+        float originDistance = RouteDistanceOrHexDebug(tempUnit, origin, dest);
+        float bestDistanceAfterNextMove = RouteDistanceOrHexDebug(tempUnit, firstStop, dest);
         // Real MP cost (road-bonus aware); fall back to path waypoint count if costMap absent.
         int firstMoveCost = costMap != null && costMap.TryGetValue(firstStop, out int c)
             ? c
             : (firstPath != null ? Mathf.Max(0, firstPath.Count - 1) : 0);
 
+        Vector3Int bestNextStop = firstStop;
+        List<Vector3Int> bestNextPath = null;
         Vector3Int originalCell = tempUnit.CurrentCellPosition;
         originalCell.z = 0;
         try
@@ -790,9 +900,13 @@ public class CaminhosValidosWindow : EditorWindow
                 if (!CanUseAsDebugStopCell(tempUnit, nextStop, firstStop))
                     continue;
 
-                float nextDistance = SectorManager.HexDistance(nextStop, dest);
+                float nextDistance = RouteDistanceOrHexDebug(tempUnit, nextStop, dest);
                 if (nextDistance < bestDistanceAfterNextMove)
+                {
                     bestDistanceAfterNextMove = nextDistance;
+                    bestNextStop = nextStop; bestNextStop.z = 0;
+                    bestNextPath = nextPaths.TryGetValue(nextStop, out List<Vector3Int> np) ? np : null;
+                }
             }
         }
         finally
@@ -802,15 +916,17 @@ public class CaminhosValidosWindow : EditorWindow
 
         float twoTurnProgress = originDistance - bestDistanceAfterNextMove;
         // Tiebreaker: how close firstStop itself is to dest — credits road cells that cost the
-        // same MP as a shorter non-road path but land geometrically closer to the objective.
-        float firstTurnProgress = originDistance - SectorManager.HexDistance(firstStop, dest);
+        // same MP as a shorter non-road path but land closer to the objective by real route cost.
+        float firstTurnProgress = originDistance - RouteDistanceOrHexDebug(tempUnit, firstStop, dest);
         float lineDeviation = DistanceFromHexLine(firstStop, origin, dest);
 
+        // Progressão = aproximar do alvo. 1T (avanço já no turno 1) é termo principal;
+        // 2T mantém a viabilidade de chegar em 2 turnos; line entra suave; mv NÃO penaliza
+        // (gastar movimento avançando é o objetivo, não defeito).
         float score =
             twoTurnProgress * 10f
-            + firstTurnProgress * 2f
-            - lineDeviation * 2f
-            - firstMoveCost * 0.5f;
+            + firstTurnProgress * 6f
+            - lineDeviation * 1f;
 
         candidate = BuildProgressCandidate(
             tempUnit,
@@ -824,26 +940,32 @@ public class CaminhosValidosWindow : EditorWindow
             firstTurnProgress,
             twoTurnProgress,
             lineDeviation);
+        candidate.RawTwoTurnTerm = twoTurnProgress * 10f;
+        candidate.RawFirstTurnTerm = firstTurnProgress * 6f;
+        candidate.RawLineTerm = -lineDeviation * 1f;
+        candidate.RawMoveTerm = 0f;
+        candidate.SecondTurnStop = bestNextStop;
+        candidate.SecondTurnPath = bestNextPath;
+        candidate.HasSecondTurn = bestNextPath != null && bestNextStop != firstStop;
 
         return Mathf.RoundToInt(score);
     }
 
     private static int CalculateReachableProgressScore(
+        UnitManager tempUnit,
         Vector3Int origin,
         Vector3Int dest,
         Vector3Int cell,
         IReadOnlyList<Vector3Int> validPath)
     {
-        float originDistance = SectorManager.HexDistance(origin, dest);
-        float cellDistance = SectorManager.HexDistance(cell, dest);
+        float originDistance = RouteDistanceOrHexDebug(tempUnit, origin, dest);
+        float cellDistance = RouteDistanceOrHexDebug(tempUnit, cell, dest);
         float hexProgress = originDistance - cellDistance;
         float lineDeviation = DistanceFromHexLine(cell, origin, dest);
-        int pathSteps = validPath != null ? Mathf.Max(0, validPath.Count - 1) : 0;
 
         float score =
             hexProgress * 10f
-            - lineDeviation * 3f
-            - pathSteps * 0.5f;
+            - lineDeviation * 1f;
 
         return Mathf.RoundToInt(score);
     }
@@ -856,26 +978,31 @@ public class CaminhosValidosWindow : EditorWindow
         IReadOnlyList<Vector3Int> path,
         Dictionary<Vector3Int, int> costMap)
     {
-        float originDistance = SectorManager.HexDistance(origin, dest);
-        float firstTurnProgress = originDistance - SectorManager.HexDistance(cell, dest);
+        float originDistance = RouteDistanceOrHexDebug(tempUnit, origin, dest);
+        float firstTurnProgress = originDistance - RouteDistanceOrHexDebug(tempUnit, cell, dest);
         float lineDeviation = DistanceFromHexLine(cell, origin, dest);
         int moveCost = costMap != null && costMap.TryGetValue(cell, out int c)
             ? c
             : (path != null ? Mathf.Max(0, path.Count - 1) : 0);
-        float rawScore = firstTurnProgress * 10f - lineDeviation * 3f - moveCost * 0.5f;
+        float rawScore = firstTurnProgress * 10f - lineDeviation * 1f;
 
-        return BuildProgressCandidate(
+        ProgressDebugCandidate candidate = BuildProgressCandidate(
             tempUnit,
             origin,
             dest,
             cell,
             path,
             Mathf.RoundToInt(rawScore),
-            SectorManager.HexDistance(cell, dest),
+            RouteDistanceOrHexDebug(tempUnit, cell, dest),
             moveCost,
             firstTurnProgress,
             firstTurnProgress,
             lineDeviation);
+        candidate.RawTwoTurnTerm = 0f;
+        candidate.RawFirstTurnTerm = firstTurnProgress * 10f;
+        candidate.RawLineTerm = -lineDeviation * 1f;
+        candidate.RawMoveTerm = 0f;
+        return candidate;
     }
 
     private ProgressDebugCandidate BuildProgressCandidate(
@@ -894,6 +1021,12 @@ public class CaminhosValidosWindow : EditorWindow
         bool roadBonus = path != null
             && UnitMovementPathRules.DidUseRoadFullMoveBonus(tilemap, tempUnit, path, terrainDatabase);
 
+        // Route-aware progress (mirrors AIController.ProgressionSelector): origin→dest minus cell→dest,
+        // measured by the unit's real movement template (HexDistance only for air / no route).
+        bool originRouteFound = TryCalculateRouteDistanceDebug(tempUnit, origin, dest, out float originRouteDistance);
+        bool cellRouteFound = TryCalculateRouteDistanceDebug(tempUnit, cell, dest, out float cellRouteDistance);
+        float routeProgress = originRouteFound && cellRouteFound ? originRouteDistance - cellRouteDistance : 0f;
+
         return new ProgressDebugCandidate
         {
             ToolScore = toolScore,
@@ -902,53 +1035,141 @@ public class CaminhosValidosWindow : EditorWindow
             RoadBonus = roadBonus,
             FirstTurnProgress = firstTurnProgress,
             TwoTurnProgress = twoTurnProgress,
+            RouteFound = cellRouteFound,
+            RouteDistance = cellRouteFound ? cellRouteDistance : float.MaxValue,
+            RouteProgress = routeProgress,
             LineDeviation = lineDeviation,
             Threat = CalculateDebugThreatLevel(cell, ActiveTeam()),
-            Dpq = GetDebugTerrainDpqPontos(cell)
+            Dpq = GetDebugTerrainDpqPontos(cell),
+            FirstTurnPath = path != null ? new List<Vector3Int>(path) : null
         };
     }
 
-    private static float ScoreProgressIntent(ProgressDebugIntent intent, ProgressDebugCandidate candidate)
+    // Mirror of AIController.TryCalculateRouteDistance / CalculateRouteDistanceOrHex.
+    // Keeps the tool's progression score on the same metric the runtime AI uses:
+    // real movement cost via the unit's UnitData template, HexDistance only for air / no route.
+    private static bool TryCalculateRouteDistanceDebug(
+        UnitManager unit, Vector3Int fromCell, Vector3Int targetCell, out float distance)
     {
-        float score = candidate.ToolScore * 1000f
-            + candidate.TwoTurnProgress * 220f
-            + Mathf.Max(0f, candidate.FirstTurnProgress) * 90f
-            - candidate.LineDeviation * 80f
-            - candidate.MoveCost * 18f
-            + (candidate.RoadBonus ? 650f : 0f);
+        distance = 0f;
+        fromCell.z = 0;
+        targetCell.z = 0;
 
+        if (unit != null && unit.GetDomain() == Domain.Air)
+        {
+            distance = SectorManager.HexDistance(fromCell, targetCell);
+            return true;
+        }
+
+        if (unit != null
+            && unit.TryGetUnitData(out UnitData unitData)
+            && unitData != null
+            && SectorManager.TryGetLandMovementDistance(fromCell, targetCell, unitData, out int unitCost))
+        {
+            distance = unitCost;
+            return true;
+        }
+
+        if (SectorManager.TryGetLandMovementDistance(fromCell, targetCell, out int fallbackCost))
+        {
+            distance = fallbackCost;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static float RouteDistanceOrHexDebug(UnitManager unit, Vector3Int fromCell, Vector3Int targetCell)
+    {
+        return TryCalculateRouteDistanceDebug(unit, fromCell, targetCell, out float routeDistance)
+            ? routeDistance
+            : SectorManager.HexDistance(fromCell, targetCell);
+    }
+
+    private static float ScoreProgressIntent(ProgressDebugIntent intent, ProgressDebugCandidate candidate, float threatScale)
+        => ScoreProgressIntent(intent, candidate, threatScale, out _);
+
+    private static float ScoreProgressIntent(ProgressDebugIntent intent, ProgressDebugCandidate candidate, float threatScale, out string breakdown)
+    {
+        // base = toolScore (já contém 2T/1T/line) amplificado. Os termos de progresso NÃO são
+        // re-somados aqui (eram contagem dupla); mv foi removido. Só road/dpq/threat/route entram à parte.
+        float baseTerm = candidate.ToolScore * 1000f;
+        float roadTerm = candidate.RoadBonus ? 650f : 0f;
+
+        float dpqWeight = 0f;
+        float threatWeight = 0f;
+        float routeProgTerm = 0f;
+        float routeDistTerm = 0f;
         switch (intent)
         {
             case ProgressDebugIntent.FireSupportReposition:
             case ProgressDebugIntent.FireSupportRendezvous:
-                score += candidate.Dpq * 35f;
-                score -= candidate.Threat * 80f;
+                dpqWeight = 35f; threatWeight = 80f;
                 break;
             case ProgressDebugIntent.LogisticsService:
             case ProgressDebugIntent.LogisticsReload:
-                score += candidate.Dpq * 30f;
-                score -= candidate.Threat * 120f;
+                dpqWeight = 30f; threatWeight = 120f;
                 break;
             case ProgressDebugIntent.RepairReturn:
-                score -= candidate.Threat * 60f;
+                threatWeight = 60f;
                 break;
             case ProgressDebugIntent.TransportDelivery:
             case ProgressDebugIntent.TransportRendezvous:
-                score -= candidate.Threat * 50f;
+                threatWeight = 50f;
                 break;
             case ProgressDebugIntent.ObserverSpot:
-                score += candidate.Dpq * 45f;
-                score -= candidate.Threat * 90f;
+                dpqWeight = 45f; threatWeight = 90f;
                 break;
             case ProgressDebugIntent.AssaultPressure:
+                if (candidate.RouteFound)
+                {
+                    routeProgTerm = candidate.RouteProgress * 2500f;
+                    routeDistTerm = -candidate.RouteDistance * 80f;
+                }
+                dpqWeight = 20f; threatWeight = 35f;
+                break;
             case ProgressDebugIntent.CaptureAdvance:
             default:
-                score += candidate.Dpq * 20f;
-                score -= candidate.Threat * 35f;
+                dpqWeight = 20f; threatWeight = 35f;
                 break;
         }
 
+        float dpqTerm = candidate.Dpq * dpqWeight;
+        float threatTerm = -candidate.Threat * threatWeight * threatScale;
+        float score = baseTerm + roadTerm + dpqTerm + threatTerm + routeProgTerm + routeDistTerm;
+
+        string assaultPart = intent == ProgressDebugIntent.AssaultPressure && candidate.RouteFound
+            ? $" routeP {Sg(routeProgTerm)} routeD {Sg(routeDistTerm)}"
+            : "";
+        breakdown =
+            $"FIN[base {baseTerm:F0} road {Sg(roadTerm)} dpq {Sg(dpqTerm)} " +
+            $"threat {Sg(threatTerm)}{assaultPart} = {score:F0}]";
+
         return score;
+    }
+
+    private static string Sg(float value) => value.ToString("+0.#;-0.#;0");
+
+    private string FormatCandidateNota(ProgressDebugCandidate c)
+    {
+        int mapVal = progressIntent == ProgressDebugIntent.Bruto
+            ? Mathf.RoundToInt(c.FinalScore)
+            : Mathf.RoundToInt(c.FinalScore / 1000f);
+        return (mapVal >= 0 ? "+" : "") + FormatRouteScore(mapVal);
+    }
+
+    private string BuildBreakdownLine(Vector3Int cell, ProgressDebugCandidate c)
+    {
+        string disp = FormatCandidateNota(c);
+        string raw =
+            $"RAW[2T {Sg(c.RawTwoTurnTerm)} 1T {Sg(c.RawFirstTurnTerm)} line {Sg(c.RawLineTerm)} " +
+            $"= tool {c.ToolScore}]  next={c.NextDistance:F1} moveCost={c.MoveCost} road={c.RoadBonus}";
+
+        if (progressIntent == ProgressDebugIntent.Bruto)
+            return $"({cell.x},{cell.y}) {disp}   {raw}";
+
+        ScoreProgressIntent(progressIntent, c, apcEmptyIgnoresThreat ? 0f : 1f, out string fin);
+        return $"({cell.x},{cell.y}) {disp}   {raw}   {fin}";
     }
 
     private float CalculateDebugThreatLevel(Vector3Int cell, TeamId aiTeam)
@@ -1154,6 +1375,14 @@ public class CaminhosValidosWindow : EditorWindow
             Handles.DrawSolidDisc(dw, Vector3.back, 0.30f);
             Handles.Label(dw + Vector3.up * 0.38f, "B",
                 new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = Color.black } });
+
+            // Rota selecionada: verde = turno 1, azul = turno 2 provável.
+            if (hasSelectedProgressCell
+                && progressCandidateMap != null
+                && progressCandidateMap.TryGetValue(selectedProgressCell, out ProgressDebugCandidate selected))
+            {
+                DrawSelectedRouteHighlight(selected);
+            }
         }
 
         // Passando Por
@@ -1223,6 +1452,46 @@ public class CaminhosValidosWindow : EditorWindow
                 pickerName + " " + hoverCell,
                 new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = col } });
         }
+    }
+
+    private void DrawSelectedRouteHighlight(ProgressDebugCandidate candidate)
+    {
+        // Turno 2 primeiro (azul, por baixo), depois turno 1 (verde, por cima).
+        if (candidate.HasSecondTurn)
+        {
+            DrawPathHighlight(candidate.SecondTurnPath, new Color(0.15f, 0.55f, 1f, 0.95f), 0.16f, 5f);
+            Vector3 sw = tilemap.GetCellCenterWorld(candidate.SecondTurnStop);
+            Handles.color = new Color(0.15f, 0.55f, 1f, 0.95f);
+            Handles.DrawWireDisc(sw, Vector3.back, 0.34f);
+            Handles.Label(sw + Vector3.up * 0.40f, "2",
+                new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = new Color(0.1f, 0.4f, 1f) } });
+        }
+
+        DrawPathHighlight(candidate.FirstTurnPath, new Color(0.2f, 0.95f, 0.25f, 0.95f), 0.2f, 6f);
+        Vector3 fw = tilemap.GetCellCenterWorld(selectedProgressCell);
+        Handles.color = new Color(0.2f, 0.95f, 0.25f, 0.95f);
+        Handles.DrawWireDisc(fw, Vector3.back, 0.36f);
+        Handles.Label(fw + Vector3.up * 0.40f, "1",
+            new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = new Color(0.1f, 0.6f, 0.1f) } });
+    }
+
+    private void DrawPathHighlight(IReadOnlyList<Vector3Int> path, Color color, float discRadius, float lineWidth)
+    {
+        if (path == null || path.Count == 0 || tilemap == null)
+            return;
+
+        var points = new Vector3[path.Count];
+        for (int i = 0; i < path.Count; i++)
+        {
+            Vector3Int cell = path[i]; cell.z = 0;
+            points[i] = tilemap.GetCellCenterWorld(cell);
+        }
+
+        Handles.color = color;
+        if (points.Length >= 2)
+            Handles.DrawAAPolyLine(lineWidth, points);
+        foreach (Vector3 p in points)
+            Handles.DrawSolidDisc(p, Vector3.back, discRadius);
     }
 
     private void HandlePickingInput()
