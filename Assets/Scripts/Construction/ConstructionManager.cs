@@ -78,6 +78,7 @@ public class ConstructionManager : MonoBehaviour
     [System.NonSerialized] private TeamId cachedRallyHudTeam = (TeamId)int.MinValue;
     [System.NonSerialized] private ConstructionSector cachedRallyHudSector = (ConstructionSector)int.MinValue;
     [System.NonSerialized] private AIRallyAssemblyState cachedRallyHudState = (AIRallyAssemblyState)int.MinValue;
+    [System.NonSerialized] private bool cachedRallyHudIsMain;
     [System.NonSerialized] private bool cachedRallyHudShowAI;
 #if UNITY_EDITOR
     [System.NonSerialized] private bool editorTickRegistered;
@@ -1052,6 +1053,7 @@ public class ConstructionManager : MonoBehaviour
             && occupant.TeamId != teamId
             && currentCapturePoints <= Mathf.Max(0, occupant.CurrentHP);
 
+        AIRallyAssemblyState applyRallyState = ResolveRallyHudState(out bool applyRallyIsMain);
         hudController.Apply(
             currentCapturePoints,
             CapturePointsMax,
@@ -1061,7 +1063,8 @@ public class ConstructionManager : MonoBehaviour
             showFlagThreatOutline,
             AIController.ShowAIHUD && isRallyPoint,
             IsOwnedByRallyOwnerSlot(),
-            ResolveRallyHudState());
+            applyRallyState,
+            applyRallyIsMain);
 
         hudController.ApplySectorBadge(AIController.ShowAIHUD, hasUnitOnTop, sector, IsFakeBuilding);
     }
@@ -1080,21 +1083,24 @@ public class ConstructionManager : MonoBehaviour
         if (!effectiveVisible)
             return;
 
+        AIRallyAssemblyState rallyState = ResolveRallyHudState(out bool rallyIsMain);
         hudController.ApplyRallyTrafficLight(
             AIController.ShowAIHUD && isRallyPoint,
             IsOwnedByRallyOwnerSlot(),
-            ResolveRallyHudState());
+            rallyState,
+            rallyIsMain);
     }
 
     private void RefreshRallyHudIfDirty()
     {
-        AIRallyAssemblyState state = ResolveRallyHudState();
+        AIRallyAssemblyState state = ResolveRallyHudState(out bool isMain);
         bool showAIHud = AIController.ShowAIHUD;
         if (cachedRallyHudIsRally == isRallyPoint
             && cachedRallyHudOwnerSlot == rallyOwnerSlotIndex
             && cachedRallyHudTeam == teamId
             && cachedRallyHudSector == sector
             && cachedRallyHudState == state
+            && cachedRallyHudIsMain == isMain
             && cachedRallyHudShowAI == showAIHud)
             return;
 
@@ -1103,6 +1109,7 @@ public class ConstructionManager : MonoBehaviour
         cachedRallyHudTeam = teamId;
         cachedRallyHudSector = sector;
         cachedRallyHudState = state;
+        cachedRallyHudIsMain = isMain;
         cachedRallyHudShowAI = showAIHud;
         RefreshRallyHudOnly();
     }
@@ -1136,12 +1143,15 @@ public class ConstructionManager : MonoBehaviour
         return slotIndex == rallyOwnerSlotIndex;
     }
 
-    private AIRallyAssemblyState ResolveRallyHudState()
+    private AIRallyAssemblyState ResolveRallyHudState() => ResolveRallyHudState(out _);
+
+    private AIRallyAssemblyState ResolveRallyHudState(out bool isMain)
     {
+        isMain = false;
         if (!isRallyPoint || !IsOwnedByRallyOwnerSlot())
             return AIRallyAssemblyState.None;
 
-        if (AIController.TryGetRallyHudState(rallyOwnerSlotIndex, sector, out AIRallyAssemblyState state, out _))
+        if (AIController.TryGetRallyHudState(rallyOwnerSlotIndex, sector, out AIRallyAssemblyState state, out _, out isMain))
             return state;
 
         return AIRallyAssemblyState.WaitHold;

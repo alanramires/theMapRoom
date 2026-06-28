@@ -108,9 +108,11 @@ public partial class AITacticalAnalyzer
             // Transporte terrestre só quando o setor prefere veículo; "Either" e "Air" ficam
             // com o airlift (helicóptero). A demanda é por NECESSIDADE DE CARONA, não por
             // distância do setor — ver ComputeGroundTransportNeed.
-            int groundTransports = transportPref == SectorManager.SectorInfo.TransportPreference.Vehicle
-                ? ComputeGroundTransportNeed(team, snapshot, obj)
-                : 0;
+            int groundTransports = obj.ObjectiveType == AIObjectiveType.RallyAssembly
+                ? CountSlots(obj, UnitRole.Transportador)
+                : transportPref == SectorManager.SectorInfo.TransportPreference.Vehicle
+                    ? ComputeGroundTransportNeed(team, snapshot, obj)
+                    : 0;
             AISectorIntel sectorIntel = FindIntelForSector(intel, obj.Sector);
             bool risky = info.GetRiskLevelFor(team) >= SectorManager.SectorRiskLevel.Medium || IsHotIntelSector(sectorIntel);
             bool hasBasicTaskForce = capturers > 0 && (assaults > 0 || fireSupport > 0);
@@ -264,6 +266,9 @@ public partial class AITacticalAnalyzer
         foreach (SectorObjective obj in plan.Objectives)
         {
             if (obj == null) continue;
+            // Rally usa APC terrestre como shuttle da infantaria open-bar. Nao converte essa
+            // necessidade em Chinook so porque o setor tambem aceita transporte aereo.
+            if (obj.ObjectiveType == AIObjectiveType.RallyAssembly) continue;
             if (obj.Status != ObjectiveStatus.Pending
                 && obj.Status != ObjectiveStatus.Pursuing
                 && obj.Status != ObjectiveStatus.Capturing)

@@ -150,7 +150,8 @@ public partial class AIController
             bool otherTransporterAssigned = false;
             foreach (SlotNeed slot in obj.Slots)
             {
-                if (slot.Role == UnitRole.Capturador && slot.Filled && slot.AssignedUnitId == candidate.InstanceId)
+                if (IsGroundTransportPassengerSlot(obj, slot, candidate.TeamId)
+                    && slot.AssignedUnitId == candidate.InstanceId)
                     candidateIsPassenger = true;
                 if (slot.Role == UnitRole.Transportador && slot.Filled && slot.AssignedUnitId != thisTransporter.InstanceId)
                     otherTransporterAssigned = true;

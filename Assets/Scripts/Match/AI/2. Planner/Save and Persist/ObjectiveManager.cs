@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 // --------------------------------------------------------------------------------------------
-// Gerencia os objetivos de captura para cada equipe, incluindo status, slots de unidade e orÁamento reservado.
-// O ObjectiveManager È um singleton acessÌvel globalmente, permitindo que os sistemas 
-// de IA consultem e atualizem os planos de objetivos de equipe conforme necess·rio.
+// Gerencia os objetivos de captura para cada equipe, incluindo status, slots de unidade e or√ßamento reservado.
+// O ObjectiveManager √© um singleton acess√≠vel globalmente, permitindo que os sistemas
+// de IA consultem e atualizem os planos de objetivos de equipe conforme necess√°rio.
 // -------------------------------------------------------------------------------------------- 
 public enum ObjectiveStatus
 {
@@ -224,6 +224,10 @@ public class ObjectiveManager : MonoBehaviour
                         status = (int)obj.Status,
                         objectiveType = (int)obj.ObjectiveType,
                         priority = obj.Priority,
+                        rallyState = (int)obj.RallyState,
+                        rallyAssemblyStartedTurn = obj.RallyAssemblyStartedTurn,
+                        rallyGoGreenTurn = obj.RallyGoGreenTurn,
+                        rallyReadinessReason = obj.RallyReadinessReason,
                         budgetReserved = obj.BudgetReserved,
                         handoffEligible = obj.HandoffEligible,
                         preferredHandoffFromUnitId = obj.PreferredHandoffFromUnitId
@@ -298,6 +302,12 @@ public class ObjectiveManager : MonoBehaviour
                             ? (AIObjectiveType)savedObj.objectiveType
                             : AIObjectiveType.CaptureSector,
                         Priority = savedObj.priority,
+                        RallyState = System.Enum.IsDefined(typeof(AIRallyAssemblyState), savedObj.rallyState)
+                            ? (AIRallyAssemblyState)savedObj.rallyState
+                            : AIRallyAssemblyState.None,
+                        RallyAssemblyStartedTurn = savedObj.rallyAssemblyStartedTurn,
+                        RallyGoGreenTurn = savedObj.rallyGoGreenTurn,
+                        RallyReadinessReason = savedObj.rallyReadinessReason,
                         BudgetReserved = savedObj.budgetReserved,
                         HandoffEligible = savedObj.handoffEligible,
                         PreferredHandoffFromUnitId = savedObj.preferredHandoffFromUnitId
@@ -327,5 +337,3 @@ public class ObjectiveManager : MonoBehaviour
         }
     }
 }
-
-

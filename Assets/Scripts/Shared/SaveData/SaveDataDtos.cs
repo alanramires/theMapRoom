@@ -112,6 +112,10 @@ public class AIObjectiveSaveData
     public int status;
     public int objectiveType;
     public int priority;
+    public int rallyState;
+    public int rallyAssemblyStartedTurn = -1;
+    public int rallyGoGreenTurn = -1;
+    public string rallyReadinessReason;
     public int budgetReserved;
     public bool handoffEligible;
     public int preferredHandoffFromUnitId = -1;

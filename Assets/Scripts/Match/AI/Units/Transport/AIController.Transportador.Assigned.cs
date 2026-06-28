@@ -461,7 +461,7 @@ public partial class AIController
         var diag = new System.Text.StringBuilder();
         foreach (SlotNeed slot in assigned.Slots)
         {
-            if (slot.Role != UnitRole.Capturador) continue;
+            if (!IsGroundTransportPassengerSlot(assigned, slot, aiTeam)) continue;
             if (!slot.Filled) { diag.Append($" cap[vazio]"); continue; }
             UnitManager cap = FindActiveUnit(slot.AssignedUnitId, aiTeam);
             if (cap == null) { diag.Append($" cap#{slot.AssignedUnitId}[null]"); continue; }
@@ -527,7 +527,7 @@ public partial class AIController
         float bestD = float.MaxValue;
         foreach (SlotNeed slot in assigned.Slots)
         {
-            if (slot.Role != UnitRole.Capturador || !slot.Filled) continue;
+            if (!IsGroundTransportPassengerSlot(assigned, slot, aiTeam)) continue;
             UnitManager cap = FindActiveUnit(slot.AssignedUnitId, aiTeam);
             if (cap == null || cap.IsEmbarked || cap.HasActed) continue;
             Vector3Int cc = cap.CurrentCellPosition; cc.z = 0;
@@ -542,7 +542,7 @@ public partial class AIController
     {
         foreach (SlotNeed slot in assigned.Slots)
         {
-            if (!slot.Filled || slot.Role != UnitRole.Capturador) continue;
+            if (!IsGroundTransportPassengerSlot(assigned, slot, aiTeam)) continue;
             UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
             if (capturer != null && !capturer.IsEmbarked && !capturer.HasActed)
                 return capturer;
@@ -555,7 +555,7 @@ public partial class AIController
         if (assigned == null || assigned.Slots == null) return null;
         foreach (SlotNeed slot in assigned.Slots)
         {
-            if (!slot.Filled || slot.Role != UnitRole.Capturador) continue;
+            if (!IsGroundTransportPassengerSlot(assigned, slot, aiTeam)) continue;
             UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
             if (capturer != null && !capturer.IsDead)
                 return capturer;

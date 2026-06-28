@@ -481,6 +481,11 @@ public partial class AIController
         {
             if (obj == null || obj.Slots == null)
                 continue;
+            // Assembly e uma massa de invasao, nao uma escolta de captura convencional.
+            // Infantaria, artilharia e APC permanecem concentrados mesmo se o slot de
+            // capturador estiver temporariamente aberto.
+            if (IsActiveRallyAssemblyObjective(obj))
+                continue;
             if (HasFilledSlot(obj, UnitRole.Capturador))
                 continue;
 

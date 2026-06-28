@@ -39,6 +39,10 @@ public class ConstructionHudController : MonoBehaviour
     [SerializeField] private Sprite rallyRedSprite;
     [SerializeField] private Sprite rallyYellowSprite;
     [SerializeField] private Sprite rallyGreenSprite;
+    [Header("Rally Main (rally principal / foco da operação)")]
+    [SerializeField] private Sprite rallyMainRedSprite;
+    [SerializeField] private Sprite rallyMainYellowSprite;
+    [SerializeField] private Sprite rallyMainGreenSprite;
 
     [Header("Sorting")]
     [SerializeField] private bool applyHudSorting = true;
@@ -86,7 +90,8 @@ public class ConstructionHudController : MonoBehaviour
         bool showFlagThreatOutline = false,
         bool isRallyPoint = false,
         bool rallyOwnedByRallyOwner = false,
-        AIRallyAssemblyState rallyState = AIRallyAssemblyState.None)
+        AIRallyAssemblyState rallyState = AIRallyAssemblyState.None,
+        bool isMainRally = false)
     {
         AutoAssignReferences();
         EnsureFlagThreatOutline();
@@ -163,7 +168,7 @@ public class ConstructionHudController : MonoBehaviour
             flagText.enabled = showFlagText;
         }
 
-        ApplyRallyTrafficLight(isRallyPoint, rallyOwnedByRallyOwner, rallyState);
+        ApplyRallyTrafficLight(isRallyPoint, rallyOwnedByRallyOwner, rallyState, isMainRally);
     }
 
     public void ApplySectorBadge(bool showAIHUD, bool isOccupied, ConstructionSector sector, bool isFakeBuilding)
@@ -188,7 +193,7 @@ public class ConstructionHudController : MonoBehaviour
         }
     }
 
-    public void ApplyRallyTrafficLight(bool isRallyPoint, bool ownedByRallyOwner, AIRallyAssemblyState rallyState)
+    public void ApplyRallyTrafficLight(bool isRallyPoint, bool ownedByRallyOwner, AIRallyAssemblyState rallyState, bool isMainRally = false)
     {
         if (rallyTrafficImage == null)
             AutoAssignReferences();
@@ -202,7 +207,7 @@ public class ConstructionHudController : MonoBehaviour
         if (!show)
             return;
 
-        Sprite target = ResolveRallyTrafficSprite(ownedByRallyOwner, rallyState);
+        Sprite target = ResolveRallyTrafficSprite(ownedByRallyOwner, rallyState, isMainRally);
         if (target != null)
             rallyTrafficImage.sprite = target;
     }
@@ -324,7 +329,7 @@ public class ConstructionHudController : MonoBehaviour
             rallyTrafficImage.sprite = rallyOffSprite;
     }
 
-    private Sprite ResolveRallyTrafficSprite(bool ownedByRallyOwner, AIRallyAssemblyState rallyState)
+    private Sprite ResolveRallyTrafficSprite(bool ownedByRallyOwner, AIRallyAssemblyState rallyState, bool isMainRally)
     {
         if (!ownedByRallyOwner)
             return rallyOffSprite != null ? rallyOffSprite : (rallyTrafficImage != null ? rallyTrafficImage.sprite : null);
@@ -332,15 +337,24 @@ public class ConstructionHudController : MonoBehaviour
         switch (rallyState)
         {
             case AIRallyAssemblyState.GoGreen:
-                return rallyGreenSprite != null ? rallyGreenSprite : rallyOffSprite;
+                return PickRallySprite(isMainRally, rallyMainGreenSprite, rallyGreenSprite);
             case AIRallyAssemblyState.Assembling:
             case AIRallyAssemblyState.Ready:
-                return rallyYellowSprite != null ? rallyYellowSprite : rallyOffSprite;
+                return PickRallySprite(isMainRally, rallyMainYellowSprite, rallyYellowSprite);
             case AIRallyAssemblyState.WaitHold:
-                return rallyRedSprite != null ? rallyRedSprite : rallyOffSprite;
+                return PickRallySprite(isMainRally, rallyMainRedSprite, rallyRedSprite);
             default:
-                return rallyRedSprite != null ? rallyRedSprite : rallyOffSprite;
+                return PickRallySprite(isMainRally, rallyMainRedSprite, rallyRedSprite);
         }
+    }
+
+    // O rally principal (foco da operação) usa o sprite "Main"; os feeders usam o normal.
+    // Fallback em cascata: Main -> normal -> off, para nunca quebrar se um sprite faltar.
+    private Sprite PickRallySprite(bool isMainRally, Sprite mainSprite, Sprite normalSprite)
+    {
+        if (isMainRally && mainSprite != null)
+            return mainSprite;
+        return normalSprite != null ? normalSprite : rallyOffSprite;
     }
 
     private Image CreateRuntimeRallyTrafficImage()

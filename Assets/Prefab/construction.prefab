@@ -221,6 +221,9 @@ MonoBehaviour:
   rallyRedSprite: {fileID: 21300000, guid: d785fd6b42bb58b41b6cc7a9c6c24d12, type: 3}
   rallyYellowSprite: {fileID: 21300000, guid: 87b2050326bf64c4ba2db20e56939408, type: 3}
   rallyGreenSprite: {fileID: 21300000, guid: dfc200ac23e98394bb4665893f9e31fc, type: 3}
+  rallyMainRedSprite: {fileID: 21300000, guid: 2b94df8f0bb9ede42a3be61b0c2aa9dc, type: 3}
+  rallyMainYellowSprite: {fileID: 21300000, guid: cfcd9499d6cd1e844b36cfc83055d87a, type: 3}
+  rallyMainGreenSprite: {fileID: 21300000, guid: 84b026dad6935814e849bcb8fa247f39, type: 3}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60

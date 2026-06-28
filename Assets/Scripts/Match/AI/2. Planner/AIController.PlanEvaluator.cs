@@ -647,6 +647,10 @@ public partial class AIController
         bool anchorCapturerReserveActive = ShouldReserveCapturersForAnchors(anchorContext, macro.Phase)
             && HasOpenAnchorCapturerNeed(plan, anchorContext);
 
+        // Todos os rallies assegurados pertencem a uma unica operacao. Os secundarios viram
+        // feeders e suas atribuicoes convergem para o ponto de lancamento com maior massa local.
+        ConsolidateRallyAssemblyAssignments(plan, aiTeam);
+
         // Passo 4: coleta IDs j� atribu�dos
         var assignedIds = new HashSet<int>();
         foreach (SectorObjective obj in plan.Objectives)
@@ -1205,6 +1209,7 @@ public partial class AIController
                     {
                         if (finalAssignedIds.Contains(u.InstanceId)) continue;
                         baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto, Filled = true, AssignedUnitId = u.InstanceId });
+                        assignedIds.Add(u.InstanceId);
                         ApplyPlanHUD(u, baseObj, UnitRole.Assalto);
                         absorbed++;
                     }
@@ -1219,6 +1224,9 @@ public partial class AIController
         {
             // Antes da distribuição genérica, concentra rogues próximos no melhor rally
             // ainda incompleto. Um único assembly completo já libera massa de invasão.
+            // Rally assegurado inicia a concentracao final: toda infantaria realmente livre
+            // entra sem teto de slots e gera backlog de APC quando estiver distante.
+            RecruitRogueInfantryForRally(plan, aiTeam, assignedIds);
             RecruitNearbyRogueArtilleryForRally(plan, aiTeam, assignedIds);
 
             List<UnitManager> freeFireSupports = GetAvailablePrimaryFireSupports(aiTeam);
@@ -1335,7 +1343,7 @@ public partial class AIController
                     if (sInfo != null) sectorRisk = sInfo.GetRiskRatioFor(aiTeam);
                     foreach (SlotNeed slot in obj.Slots)
                     {
-                        if (slot.Role != UnitRole.Capturador || !slot.Filled) continue;
+                        if (!IsGroundTransportPassengerSlot(obj, slot, aiTeam)) continue;
                         UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
                         if (capturer == null || capturer.IsEmbarked) continue;
                         if (!capturer.TryGetUnitData(out UnitData capData) || FindFittingSlotIndex(u, uData, capturer, capData) < 0) continue;
@@ -1355,7 +1363,7 @@ public partial class AIController
                     {
                         foreach (SlotNeed slot in obj.Slots)
                         {
-                            if (slot.Role != UnitRole.Capturador || !slot.Filled) continue;
+                            if (!IsGroundTransportPassengerSlot(obj, slot, aiTeam)) continue;
                             UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
                             if (capturer == null || capturer.IsEmbarked) continue;
                             if (!capturer.TryGetUnitData(out UnitData capData) || FindFittingSlotIndex(u, uData, capturer, capData) < 0) continue;
@@ -1376,7 +1384,7 @@ public partial class AIController
                     List<UnitManager> activeCapturers = new List<UnitManager>();
                     foreach (SlotNeed ts in obj.Slots)
                     {
-                        if (ts.Role != UnitRole.Capturador || !ts.Filled) continue;
+                        if (!IsGroundTransportPassengerSlot(obj, ts, aiTeam)) continue;
                         UnitManager cap = FindActiveUnit(ts.AssignedUnitId, aiTeam);
                         if (cap != null && !cap.IsEmbarked) activeCapturers.Add(cap);
                     }
@@ -1724,5 +1732,3 @@ public partial class AIController
         }
     }
 }
-
-

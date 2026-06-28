@@ -72,7 +72,9 @@ public partial class AIController
         {
             Debug.Log($"{TL("Stage")} Retomando stage {resumeStage} com plano salvo; BuildObjectivePlan ignorado.");
             float tAnalyzerResume = Time.realtimeSinceStartup;
-            AITacticalAnalyzer.Instance.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
+            TeamObjectivePlan savedPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+            RefreshRestoredRallyObjectiveStates(savedPlan, snapshot);
+            AITacticalAnalyzer.Instance.Rebuild(aiTeam, snapshot, savedPlan);
             Debug.Log($"[AI Perf] TacticalAnalyzer.Rebuild (resume): {(Time.realtimeSinceStartup - tAnalyzerResume) * 1000f:F0}ms");
         }
         else if (resumeStage <= 3 && (emulateStage1 || emulateStage2 || emulateStage3))
