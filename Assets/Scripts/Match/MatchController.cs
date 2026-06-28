@@ -876,6 +876,21 @@ public class MatchController : MonoBehaviour
             TryAutoAssignFogOfWarReferences();
         HandleFogOfWarVisionModeHotkey();
         ApplyActiveTeamIfChanged(force: false);
+        EnsureFogOfWarRuntimeInitialized();
+    }
+
+    private void EnsureFogOfWarRuntimeInitialized()
+    {
+        if (!debugFogOfWarEnabled || !enableTotalWar || fogOfWarTilemap == null)
+            return;
+        if (activeTeamId < 0 && !includeNeutralTeam)
+            return;
+        if (fogCachedTeamId == activeTeamId && fogOverlayInitialized)
+            return;
+
+        // Domain reloads durante o Play Mode limpam o cache nao serializado, mas o
+        // tilemap visual sobrevive. Reconstrua-o mesmo sem troca de time.
+        RefreshFogOfWarForActiveTeam();
     }
 
     public void SetCurrentTurn(int turn)
@@ -3280,6 +3295,9 @@ public class MatchController : MonoBehaviour
         if (boardMap == null)
             return false;
 
+        if (IsUnitOnFriendlyConstruction(unit, observerTeam, boardMap))
+            return true;
+
         bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn;
         return PodeDetectarSensor.IsTargetObservedByTeamWithoutForwardObserver(
             unit,
@@ -3307,6 +3325,12 @@ public class MatchController : MonoBehaviour
         if (boardMap == null)
             return false;
 
+        if (Enum.IsDefined(typeof(TeamId), activeTeamId)
+            && IsUnitOnFriendlyConstruction(unit, (TeamId)activeTeamId, boardMap))
+        {
+            return true;
+        }
+
         bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn;
         return PodeDetectarSensor.IsTargetObservedByTeamWithoutForwardObserver(
             unit,
@@ -3316,6 +3340,58 @@ public class MatchController : MonoBehaviour
             ResolveFogDpqAirHeightConfig(),
             enableLosValidation,
             enforceStealthValidation);
+    }
+
+    private bool IsUnitOnFriendlyConstruction(UnitManager unit, TeamId observerTeam, Tilemap boardMap)
+    {
+        if (unit == null || boardMap == null || observerTeam == TeamId.Neutral)
+            return false;
+        if (!IsUnitOnBoard(unit, boardMap))
+            return false;
+
+        Vector3Int unitCell = unit.CurrentCellPosition;
+        unitCell.z = 0;
+
+        List<ConstructionManager> constructions = ConstructionManager.AllActive;
+        for (int i = constructions.Count - 1; i >= 0; i--)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if (!IsConstructionOwnedByTeam(construction, observerTeam))
+                continue;
+            if (construction.BoardTilemap != boardMap)
+                continue;
+            if (construction.gameObject.scene != boardMap.gameObject.scene)
+                continue;
+
+            Vector3Int constructionCell = construction.CurrentCellPosition;
+            constructionCell.z = 0;
+            if (constructionCell == unitCell)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsConstructionOwnedByActivePlayer(ConstructionManager construction)
+    {
+        if (construction == null)
+            return false;
+        if (activePlayerListIndex >= 0 && construction.SlotIndex >= 0)
+            return construction.SlotIndex == activePlayerListIndex;
+        return (int)construction.TeamId == activeTeamId;
+    }
+
+    private bool IsConstructionOwnedByTeam(ConstructionManager construction, TeamId observerTeam)
+    {
+        if (construction == null || observerTeam == TeamId.Neutral)
+            return false;
+
+        int observerSlot = GetSlotIndexForTeam(observerTeam);
+        if (observerSlot >= 0 && construction.SlotIndex >= 0)
+            return construction.SlotIndex == observerSlot;
+        return construction.TeamId == observerTeam;
     }
 
     public bool IsCellVisibleForActiveTeam(Vector3Int cell)
@@ -3818,8 +3894,9 @@ public class MatchController : MonoBehaviour
             }
         }
 
-        if (mode == FogOfWarVisionMode.Surface)
-            AddFriendlyConstructionDisplayCells(boardMap, output);
+        // Construcoes aliadas fornecem vigilancia local em todas as camadas:
+        // somente o proprio hex, sem ampliar alcance nem atuar como spotter.
+        AddFriendlyConstructionDisplayCells(boardMap, output);
     }
 
     private void AddFogLayerVisibleCellsForUnit(
@@ -3863,7 +3940,7 @@ public class MatchController : MonoBehaviour
             }
             if (!construction.gameObject.activeInHierarchy)
                 continue;
-            if ((int)construction.TeamId != activeTeamId)
+            if (!IsConstructionOwnedByActivePlayer(construction))
                 continue;
 
             Tilemap constructionMap = construction.BoardTilemap;
@@ -4047,7 +4124,7 @@ public class MatchController : MonoBehaviour
             }
             if (construction == null || !construction.gameObject.activeInHierarchy)
                 continue;
-            if ((int)construction.TeamId != activeTeamId)
+            if (!IsConstructionOwnedByActivePlayer(construction))
             {
                 if (ShouldLogPodeEnxergarRuntime)
                     Debug.Log($"[FoW][Construction][Skip] {construction?.name} reason=other_team team={(int)construction.TeamId}");

@@ -196,7 +196,89 @@ public class ShoppingPressureWindow : EditorWindow
             $"força: {macro.OwnForce} suas / {macro.EnemyForce} inimigas conhecidas  ({macro.ForceRatio:P0})",
             _subtle);
 
+        DrawGoGreenHeader(plan);
+
         EditorGUILayout.EndVertical();
+    }
+
+    private void DrawGoGreenHeader(TeamObjectivePlan plan)
+    {
+        var rallies = new List<SectorObjective>();
+        if (plan?.Objectives != null)
+            foreach (SectorObjective objective in plan.Objectives)
+                if (objective != null
+                    && objective.ObjectiveType == AIObjectiveType.RallyAssembly
+                    && objective.RallyState != AIRallyAssemblyState.Expired)
+                    rallies.Add(objective);
+
+        EditorGUILayout.Space(3f);
+        EditorGUILayout.LabelField("GO GREEN", EditorStyles.boldLabel);
+        if (rallies.Count == 0)
+        {
+            EditorGUILayout.LabelField("  sem rally de invasão ativo", _subtle);
+            return;
+        }
+
+        rallies.Sort((a, b) =>
+        {
+            int state = RallyStateRank(b.RallyState).CompareTo(RallyStateRank(a.RallyState));
+            if (state != 0) return state;
+            return a.Priority.CompareTo(b.Priority);
+        });
+
+        foreach (SectorObjective rally in rallies)
+        {
+            if (rally.RallyState == AIRallyAssemblyState.GoGreen)
+            {
+                EditorGUILayout.LabelField(
+                    $"  ✓ {rally.Sector}: LIBERADO"
+                        + (rally.RallyGoGreenTurn >= 0
+                            ? $" desde T{rally.RallyGoGreenTurn}"
+                            : ""),
+                    _subtle);
+                continue;
+            }
+
+            string missing = ExtractRallyReadinessValue(
+                rally.RallyReadinessReason, "missing=");
+            string force = ExtractRallyReadinessValue(
+                rally.RallyReadinessReason, "force=");
+            string detail = !string.IsNullOrEmpty(missing) && missing != "-"
+                ? $"falta {missing}"
+                : "requisitos de força completos";
+            if (!string.IsNullOrEmpty(force))
+                detail += $"  ·  força {force}";
+
+            EditorGUILayout.LabelField(
+                $"  {rally.Sector}: {rally.RallyState}  ·  {detail}",
+                _subtle);
+        }
+    }
+
+    private static int RallyStateRank(AIRallyAssemblyState state)
+    {
+        switch (state)
+        {
+            case AIRallyAssemblyState.GoGreen: return 4;
+            case AIRallyAssemblyState.Ready: return 3;
+            case AIRallyAssemblyState.Assembling: return 2;
+            case AIRallyAssemblyState.WaitHold: return 1;
+            default: return 0;
+        }
+    }
+
+    private static string ExtractRallyReadinessValue(string reason, string marker)
+    {
+        if (string.IsNullOrEmpty(reason) || string.IsNullOrEmpty(marker))
+            return null;
+        int start = reason.IndexOf(marker, System.StringComparison.Ordinal);
+        if (start < 0)
+            return null;
+        start += marker.Length;
+        int end = reason.IndexOf(' ', start);
+        return end < 0
+            ? reason.Substring(start)
+            : reason.Substring(start, end - start);
     }
 
     private void DrawCounterPressure(AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
@@ -214,11 +296,22 @@ public class ShoppingPressureWindow : EditorWindow
 
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
         EditorGUILayout.LabelField(
-            $"anti-infantaria {pressure.AntiInfantry:F1}  ·  anti-tank {pressure.AntiTank:F1}  ·  " +
+            $"saldo: anti-infantaria {pressure.AntiInfantry:F1}  ·  anti-tank {pressure.AntiTank:F1}  ·  " +
             $"anti-aérea {pressure.AntiAir:F1}  ·  anti-navio {pressure.AntiShip:F1}",
             EditorStyles.boldLabel);
         EditorGUILayout.LabelField(
-            $"maior pressão: {pressure.DominantCategory}  ·  score pondera quantidade, elite, custo e HP atual",
+            $"bruto/cobertura: anti-inf {pressure.RawAntiInfantry:F1}/{pressure.AntiInfantryCoverage:F1}  ·  " +
+            $"anti-tank {pressure.RawAntiTank:F1}/{pressure.AntiTankCoverage:F1}  ·  " +
+            $"AA {pressure.RawAntiAir:F1}/{pressure.AntiAirCoverage:F1}  ·  " +
+            $"navio {pressure.RawAntiShip:F1}/{pressure.AntiShipCoverage:F1}",
+            _subtle);
+        float dominantScore = Mathf.Max(
+            pressure.AntiInfantry, pressure.AntiTank, pressure.AntiAir, pressure.AntiShip);
+        string dominantLabel = dominantScore > 0f
+            ? pressure.DominantCategory.ToString()
+            : "nenhuma";
+        EditorGUILayout.LabelField(
+            $"maior pressão: {dominantLabel}  ·  score pondera quantidade, elite, custo e HP atual",
             _subtle);
         EditorGUILayout.LabelField(
             $"fontes: {pressure.VisibleUnits} visíveis + {pressure.RememberedUnits} lembradas pelo ledger",
@@ -228,11 +321,21 @@ public class ShoppingPressureWindow : EditorWindow
             $"ameaças anônimas={pressure.AnonymousThreatSignals} (compras ocultas não entram)",
             _subtle);
 
-        foreach (AIShoppingPlanner.EnemyClassPressureInspection entry in pressure.Classes)
-            EditorGUILayout.LabelField(
-                $"  {entry.UnitClass,-11} x{entry.Count} (vis {entry.VisibleCount} + mem {entry.RememberedCount})  " +
-                $"score={entry.Score:F1} [{entry.VisibleScore:F1}+{entry.RememberedScore:F1}]  → {entry.CounterCategory}",
-                _subtle);
+        DrawActiveEliteCommitment(snapshot);
+
+        bool hasBreakdown = false;
+        hasBreakdown |= DrawCounterCategoryBreakdown(
+            "anti-infantaria", WeaponCategory.AntiInfantaria, pressure, demands);
+        hasBreakdown |= DrawCounterCategoryBreakdown(
+            "anti-tank", WeaponCategory.AntiTanque, pressure, demands);
+        hasBreakdown |= DrawCounterCategoryBreakdown(
+            "anti-aérea", WeaponCategory.AntiAerea, pressure, demands);
+        hasBreakdown |= DrawCounterCategoryBreakdown(
+            "anti-navio", WeaponCategory.AntiNavio, pressure, demands);
+        if (!hasBreakdown)
+            EditorGUILayout.LabelField("  — nenhuma pressão conhecida para detalhar —", _subtle);
+
+        DrawEliteQualityStatus(snapshot, pressure, demands);
 
         var offered = new List<UnitData>();
         if (snapshot.MyBuildings != null)
@@ -287,6 +390,238 @@ public class ShoppingPressureWindow : EditorWindow
                 }
         }
         EditorGUILayout.EndVertical();
+    }
+
+    private void DrawEliteQualityStatus(
+        AIWorldSnapshot snapshot,
+        AIShoppingPlanner.CounterPressureInspection pressure,
+        List<AIShoppingDemand> demands)
+    {
+        bool covered = pressure.AntiTank <= 0.05f
+            && pressure.AntiInfantry <= 0.05f;
+        float normalRatio = AIShoppingPlanner.Instance != null
+            ? Mathf.Clamp01(AIShoppingPlanner.Instance.EliteQualityTargetRatio)
+            : 0.33f;
+        float coveredRatio = AIShoppingPlanner.Instance != null
+            ? Mathf.Clamp01(AIShoppingPlanner.Instance.CoveredEliteQualityTargetRatio)
+            : 0.5f;
+        float ratio = covered ? Mathf.Max(normalRatio, coveredRatio) : normalRatio;
+
+        EditorGUILayout.Space(5f);
+        EditorGUILayout.LabelField(
+            $"Superioridade qualitativa  ·  meta elite={ratio:P0}  ·  "
+                + (covered ? "pressões terrestres cobertas" : "pressão terrestre aberta"),
+            EditorStyles.boldLabel);
+        DrawEliteQualityRole(snapshot, demands, UnitRole.Assalto, ratio);
+        DrawEliteQualityRole(snapshot, demands, UnitRole.FogoIndireto, ratio);
+    }
+
+    private void DrawEliteQualityRole(
+        AIWorldSnapshot snapshot,
+        List<AIShoppingDemand> demands,
+        UnitRole role,
+        float ratio)
+    {
+        int total = 0;
+        int elites = 0;
+        if (snapshot?.MyUnits != null)
+            foreach (UnitManager unit in snapshot.MyUnits)
+                if (unit != null && !unit.IsDead
+                    && unit.TryGetUnitData(out UnitData data) && data != null
+                    && UnitRoleCompatibility.ResolveCompositionRole(data) == role)
+                {
+                    total++;
+                    if (data.eliteLevel > 0) elites++;
+                }
+        int target = Mathf.CeilToInt(total * ratio);
+
+        AIShoppingDemand queued = null;
+        if (demands != null)
+            foreach (AIShoppingDemand demand in demands)
+                if (demand != null && demand.Count > 0 && demand.Role == role
+                    && demand.MinEliteLevel > 0)
+                {
+                    queued = demand;
+                    if (demand.Origin != null && demand.Origin.Contains("elite-quality"))
+                        break;
+                }
+
+        string state;
+        if (elites >= target)
+            state = "meta satisfeita";
+        else if (queued != null)
+            state = $"fila={queued.Origin} x{queued.Count} tier≥{queued.MinEliteLevel}";
+        else
+            state = "sem demanda agora (core/economia/cadeia)";
+
+        EditorGUILayout.LabelField(
+            $"  {role}: elites={elites}/{target}  força do papel={total}  {state}",
+            _subtle);
+    }
+
+    private bool DrawCounterCategoryBreakdown(
+        string label,
+        WeaponCategory category,
+        AIShoppingPlanner.CounterPressureInspection pressure,
+        List<AIShoppingDemand> demands)
+    {
+        float raw = GetRawCounterPressure(pressure, category);
+        float coverage = GetCounterCoverage(pressure, category);
+        bool hasClass = false;
+        foreach (AIShoppingPlanner.EnemyClassPressureInspection entry in pressure.Classes)
+            if (entry.CounterCategory == category)
+            {
+                hasClass = true;
+                break;
+            }
+        if (!hasClass && raw <= 0f && coverage <= 0f)
+            return false;
+
+        EditorGUILayout.Space(3f);
+        EditorGUILayout.LabelField(
+            $"▸ {label}: bruto={raw:F1}  cobertura={coverage:F1}  saldo={Mathf.Max(0f, raw - coverage):F1}",
+            EditorStyles.boldLabel);
+
+        foreach (AIShoppingPlanner.EnemyClassPressureInspection entry in pressure.Classes)
+        {
+            if (entry.CounterCategory != category)
+                continue;
+            float share = raw > 0f ? entry.Score / raw : 0f;
+            EditorGUILayout.LabelField(
+                $"    {entry.UnitClass}: x{entry.Count} (vis {entry.VisibleCount} + mem {entry.RememberedCount})  " +
+                $"peso={entry.Score:F1} ({share:P0})  coberto={entry.Coverage:F1}  saldo={entry.Unmet:F1}",
+                _subtle);
+
+            bool contributorFound = false;
+            foreach (AIShoppingPlanner.OwnCounterContributionInspection own in pressure.OwnContributions)
+            {
+                if (own.Category != category || own.TargetClass != entry.UnitClass)
+                    continue;
+                contributorFound = true;
+                EditorGUILayout.LabelField(
+                    $"        ↳ cobre: {own.UnitName}#{own.UnitInstanceId}  elite={own.EliteLevel}  contribuição={own.Coverage:F1}",
+                    _subtle);
+            }
+            if (!contributorFound && entry.Unmet > 0f)
+                EditorGUILayout.LabelField("        ↳ cobertura própria: nenhuma", _subtle);
+
+            AIShoppingDemand response = FindCounterDemand(demands, category, entry.UnitClass);
+            if (response != null)
+            {
+                string escalation = response.StrategicEscalation
+                    ? "ESCALADA ELITE SOLICITADA"
+                    : response.Origin != null && response.Origin.Contains("prerequisite")
+                        ? "PRÉ-REQUISITO ELITE"
+                        : "resposta comum";
+                EditorGUILayout.LabelField(
+                    $"        ↳ fila: {escalation} x{response.Count}" +
+                    (!string.IsNullOrEmpty(response.RequiredUnitId)
+                        ? $"  alvo={response.RequiredUnitId}"
+                        : ""),
+                    _subtle);
+            }
+            else if (entry.Unmet <= 0f)
+                EditorGUILayout.LabelField("        ↳ fila: satisfeita", _subtle);
+        }
+        return true;
+    }
+
+    private void DrawActiveEliteCommitment(AIWorldSnapshot snapshot)
+    {
+        AIElitePurchaseCommitment commitment =
+            AIIntelLedger.GetElitePurchaseCommitment(snapshot.AITeam);
+        if (commitment == null || string.IsNullOrEmpty(commitment.unitId))
+        {
+            EditorGUILayout.LabelField("compromisso persistente: nenhum", _subtle);
+            return;
+        }
+
+        UnitData target = FindUnitData(snapshot, commitment.unitId);
+        string targetName = target != null && !string.IsNullOrEmpty(target.displayName)
+            ? target.displayName
+            : commitment.unitId;
+        string counter = commitment.counterEscalation
+            ? $"  ·  counter={commitment.counterCategory}"
+                + (commitment.counterHasTargetClass
+                    ? $"→{commitment.counterTargetClass}"
+                    : "")
+            : "";
+
+        EditorGUILayout.LabelField(
+            $"COMPROMISSO PERSISTENTE ATIVO: {targetName} [{commitment.unitId}]  "
+                + $"elite={commitment.eliteLevel}  custo=${commitment.targetCost}  "
+                + $"desde T{commitment.committedTurn}{counter}",
+            EditorStyles.boldLabel);
+    }
+
+    private static UnitData FindUnitData(AIWorldSnapshot snapshot, string unitId)
+    {
+        if (snapshot == null || string.IsNullOrEmpty(unitId))
+            return null;
+
+        if (snapshot.MyBuildings != null)
+            foreach (ConstructionManager building in snapshot.MyBuildings)
+            {
+                if (building?.OfferedUnits == null) continue;
+                foreach (UnitData data in building.OfferedUnits)
+                    if (data != null && string.Equals(
+                        data.id, unitId, System.StringComparison.Ordinal))
+                        return data;
+            }
+
+        if (snapshot.MyUnits != null)
+            foreach (UnitManager unit in snapshot.MyUnits)
+                if (unit != null && unit.TryGetUnitData(out UnitData data)
+                    && data != null && string.Equals(
+                        data.id, unitId, System.StringComparison.Ordinal))
+                    return data;
+
+        return null;
+    }
+
+    private static AIShoppingDemand FindCounterDemand(
+        List<AIShoppingDemand> demands,
+        WeaponCategory category,
+        GameUnitClass targetClass)
+    {
+        if (demands == null)
+            return null;
+        foreach (AIShoppingDemand demand in demands)
+            if (demand != null && demand.Count > 0
+                && demand.RequiredWeaponCategory == category
+                && demand.TargetClass == targetClass
+                && demand.Origin != null
+                && demand.Origin.Contains("counter-pressure"))
+                return demand;
+        return null;
+    }
+
+    private static float GetRawCounterPressure(
+        AIShoppingPlanner.CounterPressureInspection pressure,
+        WeaponCategory category)
+    {
+        switch (category)
+        {
+            case WeaponCategory.AntiInfantaria: return pressure.RawAntiInfantry;
+            case WeaponCategory.AntiTanque: return pressure.RawAntiTank;
+            case WeaponCategory.AntiAerea: return pressure.RawAntiAir;
+            case WeaponCategory.AntiNavio: return pressure.RawAntiShip;
+            default: return 0f;
+        }
+    }
+
+    private static float GetCounterCoverage(
+        AIShoppingPlanner.CounterPressureInspection pressure,
+        WeaponCategory category)
+    {
+        switch (category)
+        {
+            case WeaponCategory.AntiInfantaria: return pressure.AntiInfantryCoverage;
+            case WeaponCategory.AntiTanque: return pressure.AntiTankCoverage;
+            case WeaponCategory.AntiAerea: return pressure.AntiAirCoverage;
+            case WeaponCategory.AntiNavio: return pressure.AntiShipCoverage;
+            default: return 0f;
+        }
     }
 
     private void DrawOperationalPressure(AIWorldSnapshot snapshot)
@@ -583,7 +918,15 @@ public class ShoppingPressureWindow : EditorWindow
 
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
-        string roleLabel = d.ExactRole != UnitRole.None ? $"{d.Role}/{d.ExactRole}" : d.Role.ToString();
+        string roleLabel;
+        if (d.Role == UnitRole.None && d.RequiredWeaponCategory.HasValue)
+            roleLabel = d.TargetClass.HasValue
+                ? $"Counter {d.TargetClass.Value}"
+                : "Counter desconhecido";
+        else
+            roleLabel = d.ExactRole != UnitRole.None
+                ? $"{d.Role}/{d.ExactRole}"
+                : d.Role.ToString();
         string elite = (d.MinEliteLevel > 0 || d.MaxEliteLevel != int.MaxValue)
             ? $"  elite={d.MinEliteLevel}-{(d.MaxEliteLevel == int.MaxValue ? "∞" : d.MaxEliteLevel.ToString())}"
             : "";
@@ -601,6 +944,12 @@ public class ShoppingPressureWindow : EditorWindow
 
         if (!string.IsNullOrEmpty(d.Origin))
             EditorGUILayout.LabelField($"origem: {d.Origin}", _subtle);
+        if (d.StrategicEscalation)
+            EditorGUILayout.LabelField(
+                "tipo: ESCALADA ELITE SOLICITADA (ainda não é o compromisso persistente)",
+                _subtle);
+        else if (d.Origin != null && d.Origin.Contains("elite-commitment"))
+            EditorGUILayout.LabelField("tipo: COMPROMISSO PERSISTENTE ATIVO", _subtle);
         if (!string.IsNullOrEmpty(d.Reason))
             EditorGUILayout.LabelField($"motivo: {d.Reason}", _subtle);
 

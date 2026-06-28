@@ -1217,12 +1217,16 @@ public partial class AIController
 
         // Passo 5g: artilharia livre acompanha o front
         {
+            // Antes da distribuição genérica, concentra rogues próximos no melhor rally
+            // ainda incompleto. Um único assembly completo já libera massa de invasão.
+            RecruitNearbyRogueArtilleryForRally(plan, aiTeam, assignedIds);
+
             List<UnitManager> freeFireSupports = GetAvailablePrimaryFireSupports(aiTeam);
             foreach (UnitManager u in freeFireSupports)
             {
                 if (assignedIds.Contains(u.InstanceId)) continue;
-                bool isRealRallyArtillery = u.TryGetUnitData(out UnitData fireSupportData)
-                    && IsRealRallyArtilleryUnit(fireSupportData);
+                bool isRallyArtillery = u.TryGetUnitData(out UnitData fireSupportData)
+                    && GetRallyArtilleryWeight(fireSupportData) > 0f;
 
                 SectorObjective bestObj = null;
                 float bestScore = float.MinValue;
@@ -1237,7 +1241,7 @@ public partial class AIController
                         continue;
                     if (IsRallyAssemblyObjective(obj))
                     {
-                        if (!isRealRallyArtillery)
+                        if (!isRallyArtillery)
                             continue;
                         if (!obj.HasOpenSlot(UnitRole.FogoIndireto))
                             continue;
@@ -1720,6 +1724,5 @@ public partial class AIController
         }
     }
 }
-
 
 

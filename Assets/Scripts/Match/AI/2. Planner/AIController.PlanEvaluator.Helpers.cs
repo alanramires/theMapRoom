@@ -26,7 +26,13 @@ public partial class AIController
         string badge;
         if (IsRallyAssemblyObjective(obj))
         {
-            badge = "+";
+            // Identifica qual massa de invasão a unidade está montando. O antigo "+"
+            // escondia o destino quando havia mais de um rally ativo (C+ = Charlie,
+            // H+ = Hotel etc.). O planKey continua guardando o nome completo do setor.
+            string sectorInitial = sectorName.Length > 0
+                ? sectorName[0].ToString().ToUpper()
+                : "?";
+            badge = sectorInitial + "+";
         }
         else if (ConstructionSectorHelper.IsBase(obj.Sector))
         {

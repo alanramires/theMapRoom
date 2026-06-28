@@ -14,15 +14,27 @@ public partial class AIShoppingPlanner
         public float Score;
         public float VisibleScore;
         public float RememberedScore;
+        public float Coverage;
+        public float Unmet;
     }
 
     public sealed class CounterPressureInspection
     {
         public readonly List<EnemyClassPressureInspection> Classes = new List<EnemyClassPressureInspection>();
+        public readonly List<OwnCounterContributionInspection> OwnContributions =
+            new List<OwnCounterContributionInspection>();
         public float AntiInfantry;
         public float AntiTank;
         public float AntiAir;
         public float AntiShip;
+        public float RawAntiInfantry;
+        public float RawAntiTank;
+        public float RawAntiAir;
+        public float RawAntiShip;
+        public float AntiInfantryCoverage;
+        public float AntiTankCoverage;
+        public float AntiAirCoverage;
+        public float AntiShipCoverage;
         public int VisibleUnits;
         public int RememberedUnits;
         public int SensorContacts;
@@ -53,6 +65,22 @@ public partial class AIShoppingPlanner
                 return best;
             }
         }
+    }
+
+    public sealed class OwnCounterContributionInspection
+    {
+        public int UnitInstanceId;
+        public string UnitName;
+        public int EliteLevel;
+        public GameUnitClass TargetClass;
+        public WeaponCategory Category;
+        public float Coverage;
+    }
+
+    private sealed class OwnCounterCandidate
+    {
+        public UnitManager Manager;
+        public UnitData Data;
     }
 
     public static CounterPressureInspection InspectCounterPressure(AIWorldSnapshot snapshot)
@@ -151,7 +179,117 @@ public partial class AIShoppingPlanner
         }
 
         result.Classes.Sort((a, b) => b.Score.CompareTo(a.Score));
+        ApplyOwnedCounterCoverage(snapshot, result);
         return result;
+    }
+
+    private static void ApplyOwnedCounterCoverage(
+        AIWorldSnapshot snapshot, CounterPressureInspection pressure)
+    {
+        pressure.RawAntiInfantry = pressure.AntiInfantry;
+        pressure.RawAntiTank = pressure.AntiTank;
+        pressure.RawAntiAir = pressure.AntiAir;
+        pressure.RawAntiShip = pressure.AntiShip;
+
+        var ownCounters = new List<OwnCounterCandidate>();
+        if (snapshot?.MyUnits != null)
+        foreach (UnitManager own in snapshot.MyUnits)
+        {
+            if (own == null || own.IsDead || !own.TryGetUnitData(out UnitData data) || data == null)
+                continue;
+            ownCounters.Add(new OwnCounterCandidate { Manager = own, Data = data });
+        }
+
+        // As pecas mais decisivas alocam cobertura primeiro. Cada unidade cobre uma classe
+        // favorita por snapshot; Tanque A contra artilharia nao e contado de novo contra veiculo.
+        ownCounters.Sort((a, b) => ComputeCounterPowerBase(b.Data)
+            .CompareTo(ComputeCounterPowerBase(a.Data)));
+        foreach (OwnCounterCandidate candidate in ownCounters)
+        {
+            UnitData data = candidate.Data;
+            EnemyClassPressureInspection best = null;
+            float bestNeed = 0f;
+            foreach (EnemyClassPressureInspection enemyClass in pressure.Classes)
+            {
+                if (!HasWeaponCategory(data, enemyClass.CounterCategory))
+                    continue;
+                BazookaTargetPriority preference =
+                    data.ResolveAiTargetPriorityForTargetClass(enemyClass.UnitClass);
+                if (preference == BazookaTargetPriority.Tertiary)
+                    continue;
+                float unmet = Mathf.Max(0f, enemyClass.Score - enemyClass.Coverage);
+                float need = unmet * (preference == BazookaTargetPriority.Primary ? 1.25f : 0.8f);
+                if (need > bestNeed)
+                {
+                    best = enemyClass;
+                    bestNeed = need;
+                }
+            }
+            if (best == null)
+                continue;
+            float available = Mathf.Max(0f, best.Score - best.Coverage);
+            float contribution = Mathf.Min(available,
+                ComputeCounterCoverage(data, best.UnitClass));
+            best.Coverage += contribution;
+            if (contribution > 0f)
+                pressure.OwnContributions.Add(new OwnCounterContributionInspection
+                {
+                    UnitInstanceId = candidate.Manager != null
+                        ? candidate.Manager.InstanceId
+                        : 0,
+                    UnitName = data.displayName,
+                    EliteLevel = data.eliteLevel,
+                    TargetClass = best.UnitClass,
+                    Category = best.CounterCategory,
+                    Coverage = contribution,
+                });
+        }
+
+        foreach (EnemyClassPressureInspection enemyClass in pressure.Classes)
+        {
+            enemyClass.Unmet = Mathf.Max(0f, enemyClass.Score - enemyClass.Coverage);
+            switch (enemyClass.CounterCategory)
+            {
+                case WeaponCategory.AntiInfantaria:
+                    pressure.AntiInfantryCoverage += enemyClass.Coverage; break;
+                case WeaponCategory.AntiTanque:
+                    pressure.AntiTankCoverage += enemyClass.Coverage; break;
+                case WeaponCategory.AntiAerea:
+                    pressure.AntiAirCoverage += enemyClass.Coverage; break;
+                case WeaponCategory.AntiNavio:
+                    pressure.AntiShipCoverage += enemyClass.Coverage; break;
+            }
+        }
+
+        pressure.AntiInfantry = Mathf.Max(0f,
+            pressure.RawAntiInfantry - pressure.AntiInfantryCoverage);
+        pressure.AntiTank = Mathf.Max(0f,
+            pressure.RawAntiTank - pressure.AntiTankCoverage);
+        pressure.AntiAir = Mathf.Max(0f,
+            pressure.RawAntiAir - pressure.AntiAirCoverage);
+        pressure.AntiShip = Mathf.Max(0f,
+            pressure.RawAntiShip - pressure.AntiShipCoverage);
+    }
+
+    private static float ComputeCounterPowerBase(UnitData unit)
+    {
+        float basicCoverage = Instance != null
+            ? Mathf.Max(1f, Instance.BasicCounterPressureCoverage)
+            : 4f;
+        float eliteMultiplier = 1f + Mathf.Max(0, unit.eliteLevel) * 0.9f;
+        float valueMultiplier = Mathf.Lerp(0.85f, 1.35f,
+            Mathf.Clamp01(unit.cost / 15000f));
+        return basicCoverage * eliteMultiplier * valueMultiplier;
+    }
+
+    private static float ComputeCounterCoverage(UnitData unit, GameUnitClass targetClass)
+    {
+        BazookaTargetPriority preference =
+            unit.ResolveAiTargetPriorityForTargetClass(targetClass);
+        float specialization = preference == BazookaTargetPriority.Primary
+            ? 1.15f
+            : preference == BazookaTargetPriority.Secondary ? 0.8f : 0f;
+        return ComputeCounterPowerBase(unit) * specialization;
     }
 
     private static void AddAnonymousWeaponPressure(
@@ -291,22 +429,6 @@ public partial class AIShoppingPlanner
         return false;
     }
 
-    private static int CountOwnCounters(
-        AIWorldSnapshot snapshot,
-        WeaponCategory category,
-        UnitRole compositionRole)
-    {
-        int count = 0;
-        if (snapshot?.MyUnits == null)
-            return count;
-        foreach (UnitManager unit in snapshot.MyUnits)
-            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
-                && UnitRoleCompatibility.ResolveCompositionRole(data) == compositionRole
-                && HasWeaponCategory(data, category))
-                count++;
-        return count;
-    }
-
     private static void AddCounterPressureDemands(
         AIWorldSnapshot snapshot,
         List<AIShoppingDemand> demands,
@@ -315,23 +437,202 @@ public partial class AIShoppingPlanner
         if (snapshot == null || demands == null || pressure == null)
             return;
 
-        int desiredAntiTank = Mathf.Clamp(Mathf.CeilToInt(pressure.AntiTank / 4f), 0, 4);
-        int ownAntiTankFire = CountOwnCounters(
-            snapshot, WeaponCategory.AntiTanque, UnitRole.FogoIndireto);
-        int counterGap = Mathf.Max(0, desiredAntiTank - ownAntiTankFire);
-        if (counterGap <= 0)
+        AddCounterCategoryDemands(snapshot, demands, pressure,
+            WeaponCategory.AntiTanque, pressure.RawAntiTank,
+            pressure.AntiTankCoverage, pressure.AntiTank, 11, 13);
+        AddCounterCategoryDemands(snapshot, demands, pressure,
+            WeaponCategory.AntiInfantaria, pressure.RawAntiInfantry,
+            pressure.AntiInfantryCoverage, pressure.AntiInfantry, 12, 14);
+    }
+
+    private static void AddCounterCategoryDemands(
+        AIWorldSnapshot snapshot,
+        List<AIShoppingDemand> demands,
+        CounterPressureInspection pressure,
+        WeaponCategory category,
+        float rawPressure,
+        float coverage,
+        float aggregateUnmet,
+        int classPriority,
+        int anonymousPriority)
+    {
+        float escalationThreshold = Instance != null
+            ? Mathf.Max(1f, Instance.CounterEliteEscalationPressure)
+            : 8f;
+
+        // A decisao de parar de comprar pecas baratas pertence a categoria inteira.
+        // Sem isso, uma pressao anti-tank alta fragmentada entre Armored, Artillery,
+        // Vehicle e sinais anonimos nunca alcança o limiar elite em ramo algum.
+        if (aggregateUnmet >= escalationThreshold)
+        {
+            GameUnitClass? targetClass = FindAggregateEliteCounterTarget(
+                snapshot, pressure, category);
+            AddCounterPressureDemand(snapshot, demands, pressure,
+                category, targetClass, rawPressure, coverage, aggregateUnmet,
+                classPriority, forceEliteEscalation: true);
+            return;
+        }
+
+        float classifiedUnmet = 0f;
+        foreach (EnemyClassPressureInspection enemyClass in pressure.Classes)
+        {
+            if (enemyClass.CounterCategory != category)
+                continue;
+            classifiedUnmet += enemyClass.Unmet;
+            AddCounterPressureDemand(snapshot, demands, pressure,
+                category, enemyClass.UnitClass, enemyClass.Score,
+                enemyClass.Coverage, enemyClass.Unmet, classPriority);
+        }
+
+        // Sinais anonimos pequenos ainda podem pedir resposta comum, mas nunca criam
+        // uma compra barata paralela quando a categoria agregada já escalou para elite.
+        AddCounterPressureDemand(snapshot, demands, pressure,
+            category, null, rawPressure, coverage,
+            Mathf.Max(0f, aggregateUnmet - classifiedUnmet), anonymousPriority);
+    }
+
+    private static GameUnitClass? FindAggregateEliteCounterTarget(
+        AIWorldSnapshot snapshot,
+        CounterPressureInspection pressure,
+        WeaponCategory category)
+    {
+        EnemyClassPressureInspection bestWithElite = null;
+        EnemyClassPressureInspection bestKnown = null;
+        foreach (EnemyClassPressureInspection enemyClass in pressure.Classes)
+        {
+            if (enemyClass.CounterCategory != category || enemyClass.Unmet <= 0.05f)
+                continue;
+            if (bestKnown == null || enemyClass.Unmet > bestKnown.Unmet)
+                bestKnown = enemyClass;
+            if (FindBestEliteCounter(snapshot, category, enemyClass.UnitClass,
+                    requireAvailableChain: false) != null
+                && (bestWithElite == null || enemyClass.Unmet > bestWithElite.Unmet))
+                bestWithElite = enemyClass;
+        }
+
+        // Prefere a maior subameaça que possua counter elite favorito. Se a inteligência
+        // só tem sinais anônimos (ou nenhuma classe tem elite dedicado), deixa o alvo
+        // aberto e escolhe a melhor unidade elite da categoria.
+        if (bestWithElite != null)
+            return bestWithElite.UnitClass;
+        return bestKnown != null
+            && FindBestEliteCounter(snapshot, category, bestKnown.UnitClass,
+                requireAvailableChain: false) != null
+            ? bestKnown.UnitClass
+            : (GameUnitClass?)null;
+    }
+
+    private static void AddCounterPressureDemand(
+        AIWorldSnapshot snapshot,
+        List<AIShoppingDemand> demands,
+        CounterPressureInspection pressure,
+        WeaponCategory category,
+        GameUnitClass? targetClass,
+        float rawPressure,
+        float coverage,
+        float unmetPressure,
+        int rememberedPriority,
+        bool forceEliteEscalation = false)
+    {
+        // Evita transformar residuo de ponto flutuante (exibido como 0,0) em compra real.
+        if (unmetPressure <= 0.05f)
             return;
 
-        int fireGap = Mathf.Min(2, counterGap);
-        AIShoppingDemand antiTankFireSupport = NewRoleDemand(
-            UnitRole.FogoIndireto,
-            fireGap,
-            pressure.RememberedUnits > 0 ? 11 : 15,
-            "counter-pressure",
-            $"anti-tank={pressure.AntiTank:F1} vis={pressure.VisibleUnits} memoria={pressure.RememberedUnits} cobertura fogo AT={ownAntiTankFire}/{desiredAntiTank}",
+        float escalationThreshold = Instance != null
+            ? Mathf.Max(1f, Instance.CounterEliteEscalationPressure)
+            : 8f;
+        bool highPressure = forceEliteEscalation
+            || unmetPressure >= escalationThreshold;
+        UnitData potentialElite = highPressure
+            ? FindBestEliteCounter(snapshot, category, targetClass,
+                requireAvailableChain: false)
+            : null;
+        UnitData availableElite = highPressure
+            ? FindBestEliteCounter(snapshot, category, targetClass,
+                requireAvailableChain: true)
+            : null;
+        bool eliteCounterExists = potentialElite != null;
+        bool escalate = availableElite != null;
+        int priority = pressure.RememberedUnits > 0
+            ? rememberedPriority
+            : rememberedPriority + 4;
+
+        AIShoppingDemand counterDemand = NewRoleDemand(
+            UnitRole.None,
+            escalate || eliteCounterExists
+                ? 1
+                : Mathf.Min(2, Mathf.CeilToInt(unmetPressure /
+                    (Instance != null ? Mathf.Max(1f, Instance.BasicCounterPressureCoverage) : 4f))),
+            escalate ? Mathf.Max(1, priority - 3) : priority,
+            escalate ? "counter-pressure-elite"
+                : eliteCounterExists ? "counter-pressure-prerequisite" : "counter-pressure",
+            $"{category}/{(targetClass.HasValue ? targetClass.Value.ToString() : "desconhecido")}"
+                + $" bruto={rawPressure:F1} cobertura={coverage:F1} saldo={unmetPressure:F1}"
+                + $" vis={pressure.VisibleUnits} memoria={pressure.RememberedUnits}",
             false);
-        antiTankFireSupport.RequiredWeaponCategory = WeaponCategory.AntiTanque;
-        MergeRoleDemand(demands, antiTankFireSupport, false);
+        counterDemand.RequiredWeaponCategory = category;
+        counterDemand.TargetClass = targetClass;
+        if (targetClass.HasValue)
+            counterDemand.MinTargetPriority = BazookaTargetPriority.Primary;
+        if (escalate)
+        {
+            counterDemand.MinEliteLevel = availableElite.eliteLevel;
+            counterDemand.MaxEliteLevel = availableElite.eliteLevel;
+            counterDemand.RequiredUnitId = availableElite.id;
+            counterDemand.StrategicEscalation = true;
+        }
+        else if (eliteCounterExists && potentialElite.eliteFrom != null)
+        {
+            // Compra exatamente o elo que libera o counter elite, nao duas pecas baratas
+            // quaisquer que apenas compartilham a categoria da arma.
+            counterDemand.RequiredUnitId = potentialElite.eliteFrom.id;
+            counterDemand.MinTargetPriority = BazookaTargetPriority.Tertiary;
+        }
+        MergeRoleDemand(demands, counterDemand, false);
+    }
+
+    private static UnitData FindBestEliteCounter(
+        AIWorldSnapshot snapshot,
+        WeaponCategory category,
+        GameUnitClass? targetClass,
+        bool requireAvailableChain)
+    {
+        if (snapshot?.MyBuildings == null)
+            return null;
+        UnitData best = null;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+                || building.OfferedUnits == null)
+                continue;
+            foreach (UnitData unit in building.OfferedUnits)
+                if (unit != null && unit.eliteLevel > 0
+                    && HasWeaponCategory(unit, category)
+                    && (!targetClass.HasValue
+                        || unit.ResolveAiTargetPriorityForTargetClass(targetClass.Value)
+                            == BazookaTargetPriority.Primary)
+                    && (!requireAvailableChain || IsEliteChainAvailable(unit, snapshot))
+                    && IsRolePurchaseAllowed(unit, snapshot.Stance, emergency: true))
+                {
+                    bool better = best == null;
+                    if (!better && requireAvailableChain)
+                    {
+                        // Com a cadeia aberta, sobe para a resposta mais poderosa: Medio ->
+                        // Campanha, em vez de repetir o primeiro tier elite para sempre.
+                        better = ComputeCounterPowerBase(unit) > ComputeCounterPowerBase(best);
+                    }
+                    else if (!better)
+                    {
+                        // Sem cadeia aberta, persegue primeiro o degrau mais proximo.
+                        better = unit.eliteLevel < best.eliteLevel
+                            || (unit.eliteLevel == best.eliteLevel
+                                && ComputeCounterPowerBase(unit) > ComputeCounterPowerBase(best));
+                    }
+                    if (better)
+                        best = unit;
+                }
+        }
+        return best;
     }
 
     private static float ScoreCounterFit(UnitData unit, CounterPressureInspection pressure)
@@ -355,7 +656,10 @@ public partial class AIShoppingPlanner
             float preference = priority == BazookaTargetPriority.Primary
                 ? 1f
                 : priority == BazookaTargetPriority.Secondary ? 0.75f : 0.45f;
-            score += enemyClass.Score * preference;
+            // O carrinho reage apenas ao saldo ainda descoberto. Depois que um counter
+            // poderoso cobre Armored, esse matchup deixa de inflar novas compras e outra
+            // classe passa a disputar o carrinho.
+            score += enemyClass.Unmet * preference;
         }
         return score;
     }

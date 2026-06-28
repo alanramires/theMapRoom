@@ -33,12 +33,19 @@ public partial class AIController
         UnitManager bestTarget = null;
         float bestScore = float.MinValue;
         string bestDecision = "";
+        int candidateCells = 0;
+        int enemyOptions = 0;
+        int optionFiltered = 0;
+        int rangeFiltered = 0;
+        int attackDecisionBlocked = 0;
+        string lastAttackDecisionBlock = "";
 
         int artilleryMaxRange = indirectOnly ? GetFireSupportMaxWeaponRange(unit) : 0;
         TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
 
         foreach (Vector3Int rawCell in EnumerateFireSupportCandidateCells(fromCell, paths, stationary || stationaryOnly))
         {
+            candidateCells++;
             Vector3Int cell = rawCell;
             cell.z = 0;
             if (cell != fromCell && occupied != null && occupied.Contains(cell)) continue;
@@ -64,10 +71,23 @@ public partial class AIController
             foreach (PodeMirarTargetOption opt in targets)
             {
                 if (opt?.targetUnit == null || opt.targetUnit.TeamId == snapshot.AITeam || opt.targetUnit.IsDead) continue;
-                if (optionFilter != null && !optionFilter(opt)) continue;
-                if (artilleryMaxRange > 0 && opt.distance < artilleryMaxRange) continue;
-                if (!PassesAttackDecision(unit, opt.targetUnit, cell, defensiveContext, out string attackDecisionReason))
+                enemyOptions++;
+                if (optionFilter != null && !optionFilter(opt))
+                {
+                    optionFiltered++;
                     continue;
+                }
+                if (artilleryMaxRange > 0 && opt.distance < artilleryMaxRange)
+                {
+                    rangeFiltered++;
+                    continue;
+                }
+                if (!PassesAttackDecision(unit, opt.targetUnit, cell, defensiveContext, out string attackDecisionReason))
+                {
+                    attackDecisionBlocked++;
+                    lastAttackDecisionBlock = $"{opt.targetUnit.UnitDisplayName}#{opt.targetUnit.InstanceId} via {cell}: {attackDecisionReason}";
+                    continue;
+                }
 
                 Vector3Int targetCell = opt.targetUnit.CurrentCellPosition;
                 targetCell.z = 0;
@@ -88,7 +108,14 @@ public partial class AIController
         }
 
         if (bestTarget == null)
+        {
+            reason = $"nenhum tiro: cells={candidateCells} opcoes={enemyOptions} filtro={optionFiltered}"
+                + $" range={rangeFiltered} attackDecision={attackDecisionBlocked}"
+                + (string.IsNullOrEmpty(lastAttackDecisionBlock)
+                    ? ""
+                    : $" ultimo=[{lastAttackDecisionBlock}]");
             return false;
+        }
 
         Vector3Int bestTargetCell = bestTarget.CurrentCellPosition;
         bestTargetCell.z = 0;

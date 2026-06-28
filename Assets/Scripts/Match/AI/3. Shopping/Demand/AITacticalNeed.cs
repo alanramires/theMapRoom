@@ -118,10 +118,15 @@ public class AIShoppingDemand
     public UnitRole ExactRole = UnitRole.None;
     public Domain? Domain;
     public GameUnitClass? TargetClass;
+    public BazookaTargetPriority MinTargetPriority = BazookaTargetPriority.Tertiary;
     public WeaponCategory? RequiredWeaponCategory;
+    public string RequiredUnitId;
     public int Count;
     public int Priority;
     public bool Urgent;
+    // Pressao de counter que ja ultrapassou a resposta barata e deve gerar
+    // compromisso/poupanca para uma unidade elite da categoria exigida.
+    public bool StrategicEscalation;
     public int MinEliteLevel;
     public int MaxEliteLevel = int.MaxValue;
     public string Origin;

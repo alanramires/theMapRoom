@@ -36,6 +36,14 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Range(0, 4)]    public int   EliteSaveMaxTurns         = 1;
     [Tooltip("Percentual MÁXIMO do saldo projetado após uma compra elite que permanece protegido para serviços/manutenção. Escala de 0% com até 5 unidades até este valor com exército maduro.")]
     [Range(0f, 50f)] public float CriticalCapabilityMaintenanceReservePercent = 20f;
+    [Tooltip("Pressao liquida anti-tank/anti-infantaria a partir da qual a IA deixa de repetir counters baratos e passa a poupar para um counter elite.")]
+    [Range(1f, 30f)] public float CounterEliteEscalationPressure = 8f;
+    [Tooltip("Quanto de pressao inimiga um counter comum especializado consegue cobrir. Elite, custo e preferencia de alvo multiplicam esta base.")]
+    [Range(1f, 10f)] public float BasicCounterPressureCoverage = 4f;
+    [Tooltip("Proporcao normal desejada de elites entre unidades de Assalto e Fogo Indireto quando o core operacional ja existe.")]
+    [Range(0f, 1f)] public float EliteQualityTargetRatio = 0.33f;
+    [Tooltip("Proporcao desejada de elites quando as pressoes anti-tank e anti-infantaria ja estao cobertas; transforma folga defensiva em superioridade qualitativa.")]
+    [Range(0f, 1f)] public float CoveredEliteQualityTargetRatio = 0.5f;
     [Range(1, 12)]   public int   MinTurnForFireSupport     = 3;
     [Range(0, 8)]    public int   MinActiveCapturersForFireSupport = 2;
     [Range(0, 5)]    public int   MinActiveAssaultForFireSupport   = 1;

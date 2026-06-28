@@ -79,7 +79,8 @@ public partial class AIController
                 out Vector3Int maxRangeCell, out string maxRangeReason))
         {
             Debug.Log($"{TL("ArtilheiroCombatente")} {unit.InstanceId} sem ataque, posiciona max-range"
-                + $"{FormatCombatantSector(assigned)} via {maxRangeCell} ({maxRangeReason})");
+                + $"{FormatCombatantSector(assigned)} via {maxRangeCell}"
+                + $" (tiroDistante=[{longRangeReason}] assalto=[{assaultReason}] repos=[{maxRangeReason}])");
             action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, maxRangeCell, paths);
             return true;
         }

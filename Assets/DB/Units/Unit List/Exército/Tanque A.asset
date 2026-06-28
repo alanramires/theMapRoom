@@ -38,7 +38,7 @@ MonoBehaviour:
   - targetClass: 2
     priority: 2
   - targetClass: 1
-    priority: 2
+    priority: 1
   - targetClass: 3
     priority: 1
   - targetClass: 0

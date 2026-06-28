@@ -63,6 +63,11 @@ public partial class AIController
                 : fromCell;
             if (!IsActiveRallyAssemblyObjective(assigned) && sectorTarget != null) { sectorCell = sectorTarget.CurrentCellPosition; sectorCell.z = 0; }
 
+            if (TryDecideAssignedTransportLocalDefense(
+                    unit, snapshot, plan, assigned, fromCell, paths, occupied, preferNoMove,
+                    out PlayerAction localDefenseAction))
+                return localDefenseAction;
+
             UnitManager nearbyCandidate = FindBestShuttleCandidate(unit, snapshot, plan, fromCell, out Vector3Int nearbyCell, assigned);
             if (nearbyCandidate != null)
             {
@@ -134,6 +139,134 @@ public partial class AIController
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
     }
 
+    private bool TryDecideAssignedTransportLocalDefense(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        SectorObjective assigned,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        bool preferNoMove,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null || paths == null || paths.Count == 0)
+            return false;
+
+        if (!TryFindLocalTransportDefenseAnchor(unit, snapshot.AITeam, fromCell,
+                out ConstructionManager defenseTarget, out UnitManager pressureEnemy, out string defenseReason))
+            return false;
+
+        Vector3Int defenseCell = defenseTarget.CurrentCellPosition;
+        defenseCell.z = 0;
+
+        if (TryFindTransportBreakerAttack(unit, snapshot, fromCell, paths, occupied, defenseCell,
+                out Vector3Int attackCell, out UnitManager attackTarget, preferNoMove, plan))
+        {
+            Vector3Int targetCell = attackTarget.CurrentCellPosition;
+            targetCell.z = 0;
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} - suspende carona antecipada: defende {defenseTarget.Sector} ({defenseReason}) atacando {attackTarget.InstanceId} via {attackCell}");
+            action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, attackCell,
+                attackTarget.InstanceId.ToString(), targetCell, paths);
+            return true;
+        }
+
+        if (pressureEnemy != null)
+        {
+            Vector3Int enemyCell = pressureEnemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            Vector3Int moveCell = FindAssaultPressureMove(unit, snapshot, fromCell, enemyCell, paths, occupied, out string pressureReason);
+            if (moveCell != fromCell && !IsTeamProductionBuilding(moveCell, snapshot.AITeam))
+            {
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} - suspende carona antecipada: reforca {defenseTarget.Sector} ({defenseReason}) contra {pressureEnemy.InstanceId} via {moveCell} ({pressureReason})");
+                action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryFindLocalTransportDefenseAnchor(
+        UnitManager unit,
+        TeamId aiTeam,
+        Vector3Int fromCell,
+        out ConstructionManager bestTarget,
+        out UnitManager bestEnemy,
+        out string reason)
+    {
+        bestTarget = null;
+        bestEnemy = null;
+        reason = "";
+        fromCell.z = 0;
+
+        List<UnitManager> enemies = CollectVisibleAssaultEnemies(aiTeam);
+        if (enemies == null || enemies.Count == 0)
+            return false;
+
+        float bestScore = float.MinValue;
+        foreach (ConstructionManager building in ConstructionManager.AllActive)
+        {
+            if (building == null || !building.IsCapturable || building.TeamId != aiTeam)
+                continue;
+
+            Vector3Int buildingCell = building.CurrentCellPosition;
+            buildingCell.z = 0;
+
+            float transportDist = CalculateRouteDistanceOrHex(unit, fromCell, buildingCell);
+            if (transportDist > 7f)
+                continue;
+
+            UnitManager nearestEnemy = null;
+            float nearestEnemyDist = float.MaxValue;
+            int localEnemies = 0;
+            float enemyHpPressure = 0f;
+
+            foreach (UnitManager enemy in enemies)
+            {
+                if (enemy == null || enemy.IsDead || enemy.IsEmbarked || enemy.TeamId == aiTeam)
+                    continue;
+
+                Vector3Int enemyCell = enemy.CurrentCellPosition;
+                enemyCell.z = 0;
+                float enemyDist = SectorManager.HexDistance(enemyCell, buildingCell);
+                if (enemyDist > 4f)
+                    continue;
+
+                localEnemies++;
+                enemyHpPressure += Mathf.Max(1, enemy.CurrentHP);
+                if (enemyDist < nearestEnemyDist)
+                {
+                    nearestEnemyDist = enemyDist;
+                    nearestEnemy = enemy;
+                }
+            }
+
+            if (localEnemies <= 0)
+                continue;
+
+            float captureLoss = Mathf.Max(0, building.CapturePointsMax - building.CurrentCapturePoints);
+            float score =
+                localEnemies * 3000f
+                + enemyHpPressure * 80f
+                + captureLoss * 120f
+                + (building.IsRallyPoint ? 700f : 0f)
+                - transportDist * 260f
+                - nearestEnemyDist * 120f
+                - building.InstanceId * 0.001f;
+
+            if (score <= bestScore)
+                continue;
+
+            bestScore = score;
+            bestTarget = building;
+            bestEnemy = nearestEnemy;
+            reason = $"inimigos={localEnemies} dist={transportDist:F1} capLoss={captureLoss:F0} enemyDist={nearestEnemyDist:F1}";
+        }
+
+        return bestTarget != null;
+    }
     private bool ShouldLeaveAssignedPassengerOnLocalRallyPressure(
         UnitManager passenger,
         AIWorldSnapshot snapshot,

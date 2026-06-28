@@ -102,20 +102,44 @@ public partial class AIController
         if (threats == null || threats.Count == 0)
             return false;
 
-        bool preferDpq = unit.TryGetUnitData(out UnitData escortUd) && escortUd != null && escortUd.prioritizeDpqAtBattle;
+        bool preferDpq = IsCombatantFireSupport(unit)
+            || (unit.TryGetUnitData(out UnitData escortUd) && escortUd != null && escortUd.prioritizeDpqAtBattle);
         float dpqWeight = preferDpq ? 2000f : 50f;
 
         float bestScore = float.MinValue;
+        int candidateCells = 0;
+        int reservedBlocked = 0;
+        int occupiedBlocked = 0;
+        int geometryBlocked = 0;
+        int attackDecisionBlocked = 0;
+        string lastAttackDecisionBlock = "";
         foreach (Vector3Int cell in paths.Keys)
         {
-            if (IsReservedAssaultEscortCaptureCell(cell, snapshot.AITeam)) continue;
-            if (cell != fromCell && occupied.Contains(cell)) continue;
+            candidateCells++;
+            if (IsReservedAssaultEscortCaptureCell(cell, snapshot.AITeam))
+            {
+                reservedBlocked++;
+                continue;
+            }
+            if (cell != fromCell && occupied.Contains(cell))
+            {
+                occupiedBlocked++;
+                continue;
+            }
 
             foreach (UnitManager enemy in threats)
             {
-                if (!CanAttackTargetFrom(fromCell, cell, unit, enemy)) continue;
-                if (!PassesAttackDecision(unit, enemy, cell, defensiveContext, out string attackDecisionReason))
+                if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
+                {
+                    geometryBlocked++;
                     continue;
+                }
+                if (!PassesAttackDecision(unit, enemy, cell, defensiveContext, out string attackDecisionReason))
+                {
+                    attackDecisionBlocked++;
+                    lastAttackDecisionBlock = $"{enemy.UnitDisplayName}#{enemy.InstanceId} via {cell}: {attackDecisionReason}";
+                    continue;
+                }
 
                 Vector3Int enemyCell = enemy.CurrentCellPosition; enemyCell.z = 0;
                 float targetDist = SectorManager.HexDistance(enemyCell, escortCell);
@@ -142,11 +166,18 @@ public partial class AIController
                     bestScore = score;
                     bestCell = cell;
                     bestTarget = enemy;
-                    reason = $"score={score:F0} pref={targetPreference} elite={targetElite} hp={enemy.CurrentHP} threatDist={targetDist:F1} coverDist={coverDist:F1} dpq={dpq:F1} dpqW={dpqWeight:F0} {attackDecisionReason}";
+                    reason = $"score={score:F0} pref={targetPreference} elite={targetElite} hp={enemy.CurrentHP} threatDist={targetDist:F1} coverDist={coverDist:F1} dpq={dpq:F1} dpqW={dpqWeight:F0} preferDpq={preferDpq} {attackDecisionReason}";
                 }
             }
         }
 
+        if (bestTarget == null)
+            reason = $"nenhum assalto: threats={threats.Count} cells={candidateCells}"
+                + $" reservado={reservedBlocked} ocupado={occupiedBlocked} geometria={geometryBlocked}"
+                + $" attackDecision={attackDecisionBlocked}"
+                + (string.IsNullOrEmpty(lastAttackDecisionBlock)
+                    ? ""
+                    : $" ultimo=[{lastAttackDecisionBlock}]");
         return bestTarget != null;
     }
 

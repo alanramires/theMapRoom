@@ -36,6 +36,10 @@ public class AIElitePurchaseCommitment
     public int eliteLevel;
     public int targetCost;
     public int committedTurn;
+    public bool counterEscalation;
+    public WeaponCategory counterCategory;
+    public bool counterHasTargetClass;
+    public GameUnitClass counterTargetClass;
 }
 
 [Serializable]
@@ -363,6 +367,10 @@ public static class AIIntelLedger
             eliteLevel = source.eliteLevel,
             targetCost = source.targetCost,
             committedTurn = source.committedTurn,
+            counterEscalation = source.counterEscalation,
+            counterCategory = source.counterCategory,
+            counterHasTargetClass = source.counterHasTargetClass,
+            counterTargetClass = source.counterTargetClass,
         };
     }
 }

@@ -11,6 +11,8 @@ public partial class AIController
     private const int RallyAirAttackRadius = 5;
     private const int RallyArtilleryRadius = 4;
     private const int RallyMinimumArtillery = 3;
+    private const int RallyArtilleryRecruitRange = 8;
+    private const int RallyMaximumArtilleryUnits = 6;
     private const int RallyIntelRadius = 6;
     private const int RallyLogisticsRadius = 5;
     private const int RallyAssemblyTimeoutTurns = 4;
@@ -31,7 +33,7 @@ public partial class AIController
         public int Capturers;
         public int Assault;
         public int AirAttack;
-        public int Artillery;
+        public float Artillery;
         public int Intel;
         public int Logistics;
         public int VisibleThreats;
@@ -246,7 +248,7 @@ public partial class AIController
             bool capturer = HasRole(data, UnitRole.Capturador);
             bool assault = IsRallyPrimaryAssaultUnit(data);
             bool airAttack = IsOperationalRallyAirAttackUnit(unit, data);
-            bool artillery = IsRealRallyArtilleryUnit(data);
+            float artillery = GetRallyArtilleryWeight(data);
             bool intelUnit = HasRole(data, UnitRole.Intel);
             bool logistics = HasRole(data, UnitRole.Logistica);
 
@@ -263,8 +265,8 @@ public partial class AIController
             if (dist <= RallyAirAttackRadius && airAttack)
                 readiness.AirAttack++;
 
-            if (dist <= RallyArtilleryRadius && artillery)
-                readiness.Artillery++;
+            if (dist <= RallyArtilleryRadius && artillery > 0f)
+                readiness.Artillery += artillery;
             if (dist <= RallyIntelRadius && intelUnit)
                 readiness.Intel++;
             if (dist <= RallyLogisticsRadius && logistics)
@@ -290,8 +292,9 @@ public partial class AIController
             + (RallyMinimumArtillery * 2);
 
         int breakthrough = readiness.Assault + readiness.AirAttack;
-        int usefulArtillery = Mathf.Min(readiness.Artillery, RallyMinimumArtillery);
-        readiness.ForceScore = readiness.Capturers + (breakthrough * 3) + (usefulArtillery * 2);
+        float usefulArtillery = Mathf.Min(readiness.Artillery, RallyMinimumArtillery);
+        readiness.ForceScore = readiness.Capturers + (breakthrough * 3)
+            + Mathf.RoundToInt(usefulArtillery * 2f);
         readiness.Timeout = startedTurn >= 0 && turnNumber >= 0
             && turnNumber - startedTurn >= RallyAssemblyTimeoutTurns;
 
@@ -332,7 +335,7 @@ public partial class AIController
         else
         {
             readiness.State = AIRallyAssemblyState.Assembling;
-            readiness.Status = readiness.Artillery <= 0 ? "ASSEMBLING_WAIT_ART" : "ASSEMBLING";
+            readiness.Status = readiness.Artillery <= 0f ? "ASSEMBLING_WAIT_ART" : "ASSEMBLING";
             readiness.Missing = BuildRallyMissingText(readiness, hasHoldPackage, hasArtillery, hasRequiredForce);
         }
 
@@ -415,8 +418,8 @@ public partial class AIController
         }
         if (!hasArtillery)
             missing += string.IsNullOrEmpty(missing)
-                ? $"art({readiness.Artillery}/{RallyMinimumArtillery})"
-                : $"+art({readiness.Artillery}/{RallyMinimumArtillery})";
+                ? $"art({readiness.Artillery:0.#}/{RallyMinimumArtillery})"
+                : $"+art({readiness.Artillery:0.#}/{RallyMinimumArtillery})";
         if (!hasRequiredForce)
             missing += string.IsNullOrEmpty(missing)
                 ? $"forca({readiness.ForceScore}/{readiness.RequiredForce})"
@@ -455,7 +458,7 @@ public partial class AIController
         obj.RallyReadinessReason =
             $"{readiness.Status} ready={readiness.ForceScore} cap={readiness.Capturers} " +
             $"ass={readiness.Assault} airAtk={readiness.AirAttack} " +
-            $"art={readiness.Artillery} intel={readiness.Intel} log={readiness.Logistics} " +
+            $"art={readiness.Artillery:0.#} intel={readiness.Intel} log={readiness.Logistics} " +
             $"threat={readiness.VisibleThreats} knownEnemy={readiness.KnownEnemyForce} " +
             $"packages={readiness.RequiredPackages} force={readiness.ForceScore}/{readiness.RequiredForce} " +
             $"missing={readiness.Missing}";
@@ -485,7 +488,50 @@ public partial class AIController
             Mathf.Max(0, requiredPackages - operationalAirAttack),
             aiTeam,
             rallyAnchor);
-        EnsureRallyRoleSlots(obj, UnitRole.FogoIndireto, RallyMinimumArtillery, aiTeam, rallyAnchor);
+        EnsureRallyArtillerySlots(obj, aiTeam);
+    }
+
+    private static void EnsureRallyArtillerySlots(SectorObjective obj, TeamId aiTeam)
+    {
+        int totalSlots = 0;
+        int filledSlots = 0;
+        float assignedPower = 0f;
+        for (int i = 0; i < obj.Slots.Count; i++)
+        {
+            SlotNeed slot = obj.Slots[i];
+            if (slot.Role != UnitRole.FogoIndireto)
+                continue;
+            totalSlots++;
+            if (!slot.Filled)
+                continue;
+            filledSlots++;
+            UnitManager unit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            if (unit != null && unit.TryGetUnitData(out UnitData data))
+                assignedPower += GetRallyArtilleryWeight(data);
+        }
+
+        int missingStandardPieces = Mathf.CeilToInt(
+            Mathf.Max(0f, RallyMinimumArtillery - assignedPower));
+        int desiredSlots = Mathf.Clamp(
+            filledSlots + missingStandardPieces,
+            Mathf.Min(filledSlots, RallyMinimumArtillery),
+            RallyMaximumArtilleryUnits);
+
+        // Nunca expulsa uma peça já recrutada só porque outra mais pesada elevou o poder.
+        // Remove apenas vagas abertas excedentes.
+        for (int i = obj.Slots.Count - 1; totalSlots > desiredSlots && i >= 0; i--)
+        {
+            SlotNeed slot = obj.Slots[i];
+            if (slot.Role != UnitRole.FogoIndireto || slot.Filled)
+                continue;
+            obj.Slots.RemoveAt(i);
+            totalSlots--;
+        }
+        while (totalSlots < desiredSlots)
+        {
+            obj.Slots.Add(new SlotNeed { Role = UnitRole.FogoIndireto });
+            totalSlots++;
+        }
     }
 
     private static void EnsureRallyRoleSlots(
@@ -721,18 +767,136 @@ public partial class AIController
 
     private static bool IsRealRallyArtilleryUnit(UnitData data)
     {
+        return GetRallyArtilleryWeight(data) >= 1f;
+    }
+
+    private static float GetRallyArtilleryWeight(UnitData data)
+    {
         if (data == null)
-            return false;
+            return 0f;
         if (!HasRole(data, UnitRole.FogoIndireto) && data.unitClass != GameUnitClass.Artillery)
-            return false;
+            return 0f;
 
         string key = NormalizeRallyUnitKey($"{data.id} {data.displayName} {data.apelido}");
         if (key.Contains("obus") && key.Contains("leve"))
-            return false;
+            return 0.5f;
+        if (key.Contains("art") && key.Contains("campanha"))
+            return 1.5f;
+        if (key.Contains("astros") || (key.Contains("obus") && key.Contains("medio")))
+            return 1f;
 
-        return key.Contains("astros")
-            || (key.Contains("art") && key.Contains("campanha"))
-            || (key.Contains("obus") && key.Contains("medio"));
+        // Nova artilharia ainda não cadastrada nominalmente participa como apoio leve,
+        // sem equivaler automaticamente às peças pesadas conhecidas.
+        return 0.5f;
+    }
+
+    private void RecruitNearbyRogueArtilleryForRally(
+        TeamObjectivePlan plan,
+        TeamId aiTeam,
+        HashSet<int> assignedIds)
+    {
+        if (plan?.Objectives == null || assignedIds == null)
+            return;
+
+        SectorObjective focus = null;
+        ConstructionManager focusRally = null;
+        float bestFocusScore = float.MinValue;
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (!IsActiveRallyAssemblyObjective(obj)
+                || !TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager rally))
+                continue;
+            int stateScore = obj.RallyState == AIRallyAssemblyState.Ready ? 3
+                : obj.RallyState == AIRallyAssemblyState.Assembling ? 2 : 1;
+            float score = stateScore * 1000f - obj.Priority * 10f;
+            if (score > bestFocusScore)
+            {
+                bestFocusScore = score;
+                focus = obj;
+                focusRally = rally;
+            }
+        }
+        if (focus == null || focusRally == null)
+            return;
+
+        Vector3Int anchor = focusRally.CurrentCellPosition;
+        anchor.z = 0;
+        float assignedPower = GetAssignedRallyArtilleryPower(focus, aiTeam);
+        if (assignedPower >= RallyMinimumArtillery)
+            return;
+
+        var candidates = new List<UnitManager>();
+        foreach (UnitManager unit in GetAvailablePrimaryFireSupports(aiTeam))
+        {
+            if (unit == null || assignedIds.Contains(unit.InstanceId)
+                || !unit.TryGetUnitData(out UnitData data)
+                || GetRallyArtilleryWeight(data) <= 0f)
+                continue;
+            Vector3Int cell = unit.CurrentCellPosition;
+            cell.z = 0;
+            float distance = SectorManager.TryGetLandMovementDistance(cell, anchor, out int terrain)
+                ? terrain : SectorManager.HexDistance(cell, anchor);
+            if (distance <= RallyArtilleryRecruitRange)
+                candidates.Add(unit);
+        }
+
+        candidates.Sort((a, b) =>
+        {
+            Vector3Int ac = a.CurrentCellPosition; ac.z = 0;
+            Vector3Int bc = b.CurrentCellPosition; bc.z = 0;
+            float ad = SectorManager.TryGetLandMovementDistance(ac, anchor, out int at)
+                ? at : SectorManager.HexDistance(ac, anchor);
+            float bd = SectorManager.TryGetLandMovementDistance(bc, anchor, out int bt)
+                ? bt : SectorManager.HexDistance(bc, anchor);
+            int distance = ad.CompareTo(bd);
+            if (distance != 0) return distance;
+            a.TryGetUnitData(out UnitData aData);
+            b.TryGetUnitData(out UnitData bData);
+            return GetRallyArtilleryWeight(bData).CompareTo(GetRallyArtilleryWeight(aData));
+        });
+
+        foreach (UnitManager unit in candidates)
+        {
+            if (assignedPower >= RallyMinimumArtillery)
+                break;
+            if (!focus.HasOpenSlot(UnitRole.FogoIndireto))
+            {
+                int fireSlots = 0;
+                foreach (SlotNeed slot in focus.Slots)
+                    if (slot.Role == UnitRole.FogoIndireto) fireSlots++;
+                if (fireSlots >= RallyMaximumArtilleryUnits)
+                    break;
+                focus.Slots.Add(new SlotNeed { Role = UnitRole.FogoIndireto });
+            }
+            if (!focus.TryFillSlot(UnitRole.FogoIndireto, unit.InstanceId))
+                continue;
+            unit.TryGetUnitData(out UnitData data);
+            float weight = GetRallyArtilleryWeight(data);
+            assignedPower += weight;
+            assignedIds.Add(unit.InstanceId);
+            ApplyPlanHUD(unit, focus, UnitRole.FogoIndireto);
+            Vector3Int cell = unit.CurrentCellPosition; cell.z = 0;
+            Debug.Log($"{TL("Plan")} Rally {focus.Sector} pesca FireSupport rogue "
+                + $"{unit.InstanceId} pesoArt={weight:0.#} "
+                + $"dist={SectorManager.HexDistance(cell, anchor)}h "
+                + $"poderAtribuido={assignedPower:0.#}/{RallyMinimumArtillery}");
+        }
+    }
+
+    private static float GetAssignedRallyArtilleryPower(SectorObjective obj, TeamId aiTeam)
+    {
+        float power = 0f;
+        if (obj?.Slots == null)
+            return power;
+        foreach (SlotNeed slot in obj.Slots)
+        {
+            if (slot.Role != UnitRole.FogoIndireto || !slot.Filled)
+                continue;
+            UnitManager unit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            if (unit != null && unit.TryGetUnitData(out UnitData data))
+                power += GetRallyArtilleryWeight(data);
+        }
+        return power;
     }
 
     private static bool HasRole(UnitData data, UnitRole role)

@@ -1331,7 +1331,11 @@ public partial class AIShoppingPlanner
         // oportunista. Quando perdendo (Collapsing) ou em stance Defensiva, depois das compras por
         // demanda preenche cada prédio livre/não-ocupado com o defensor mais barato que couber
         // (prefere Assalto/Capturador). Gasta o caixa pra negar a captura em vez de deixar parado.
-        bool defendFillBuildings = macroLosing || snapshot.Stance == AIStance.Defensive;
+        // Perder o mapa nao torna toda fabrica uma torre defensiva. O preenchimento barato
+        // so existe quando ha ameaca local visivel a uma base; longe dela a stance e as
+        // demandas operacionais continuam decidindo a composicao.
+        bool defendFillBuildings = HasAnyVisibleEnemyNearOwnedBase(
+            snapshot, DefensiveBaseThreatRange);
         if (defendFillBuildings)
             FillIdleProductionBuildings(
                 snapshot, orders, usedBuildings, occupied, ref remaining,
@@ -1410,14 +1414,15 @@ public partial class AIShoppingPlanner
                 {
                     if (unit == null || unit.cost <= 0 || unit.cost > state.RemainingBudget
                         || unit.militaryForce == MilitaryForce.Navy
-                        || (!concentrateEmergency && !IsEliteChainAvailable(unit, snapshot))
-                        || !IsRolePurchaseAllowed(unit, snapshot.Stance, macroLosing))
+                        || (!concentrateEmergency && !IsEliteChainAvailable(unit, snapshot)))
                         continue;
 
                     for (int demandIndex = 0; demandIndex < demands.Count; demandIndex++)
                     {
                         AIShoppingDemand demand = demands[demandIndex];
                         if (state.RemainingDemand[demandIndex] <= 0
+                            || !IsRolePurchaseAllowed(unit, snapshot.Stance,
+                                IsEmergencyShoppingDemand(demand))
                             || !DoesUnitMeetShoppingDemand(unit, demand))
                             continue;
 
@@ -1551,15 +1556,23 @@ public partial class AIShoppingPlanner
             AIIntelLedger.GetElitePurchaseCommitment(snapshot.AITeam);
         if (existing != null)
         {
-            UnitData unit = FindOfferedUnitById(snapshot, existing.unitId, out _);
-            bool valid = unit != null
-                && unit.eliteLevel == existing.eliteLevel
-                && UnitRoleCompatibility.ResolveCompositionRole(unit) == existing.role
-                && IsEliteChainAvailable(unit, snapshot);
+            UnitData unit = FindOfferedUnitById(snapshot, existing.unitId, out _,
+                existing.counterEscalation);
+            bool counterPressureStillPresent = !existing.counterEscalation
+                || HasCounterPressureDemand(demands, existing.counterCategory);
+            string invalidReason = null;
+            if (unit == null)
+                invalidReason = "unidade não está mais ofertada";
+            else if (unit.eliteLevel != existing.eliteLevel
+                || UnitRoleCompatibility.ResolveCompositionRole(unit) != existing.role)
+                invalidReason = "dados da unidade mudaram";
+            else if (!counterPressureStillPresent)
+                invalidReason = "pressão da categoria foi coberta";
+            bool valid = invalidReason == null;
             if (!valid)
             {
                 Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
-                    + $"cancela compromisso elite {existing.unitId}: oferta ou cadeia indisponível");
+                    + $"cancela compromisso elite {existing.unitId}: {invalidReason}");
                 AIIntelLedger.ClearElitePurchaseCommitment(snapshot.AITeam);
                 existing = null;
             }
@@ -1568,12 +1581,17 @@ public partial class AIShoppingPlanner
                 EnsureEliteCommitmentDemand(demands, existing);
                 Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
                     + $"mantém compromisso elite: {unit.displayName} ${unit.cost} "
-                    + $"desde T{existing.committedTurn}");
+                    + $"desde T{existing.committedTurn}"
+                    + (!IsEliteChainAvailable(unit, snapshot)
+                        ? " (aguardando pré-requisito da cadeia)"
+                        : ""));
                 return existing;
             }
         }
 
-        if (!IsOperationalCoreReadyForElite(snapshot, demands))
+        bool strategicCounterEscalation = HasStrategicCounterEscalationDemand(demands);
+        if (!IsOperationalCoreReadyForElite(snapshot, demands)
+            && !strategicCounterEscalation)
             return null;
 
         AIShoppingDemand bestDemand = null;
@@ -1605,6 +1623,11 @@ public partial class AIShoppingPlanner
             eliteLevel = bestUnit.eliteLevel,
             targetCost = bestUnit.cost,
             committedTurn = snapshot.TurnNumber,
+            counterEscalation = bestDemand.StrategicEscalation,
+            counterCategory = bestDemand.RequiredWeaponCategory
+                ?? WeaponCategory.AntiTanque,
+            counterHasTargetClass = bestDemand.TargetClass.HasValue,
+            counterTargetClass = bestDemand.TargetClass ?? GameUnitClass.Armored,
         };
         AIIntelLedger.SetElitePurchaseCommitment(snapshot.AITeam, commitment);
         Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
@@ -1623,6 +1646,17 @@ public partial class AIShoppingPlanner
             $"compromisso desde T{commitment.committedTurn}", false);
         demand.MinEliteLevel = commitment.eliteLevel;
         demand.MaxEliteLevel = commitment.eliteLevel;
+        demand.StrategicEscalation = commitment.counterEscalation;
+        if (commitment.counterEscalation)
+        {
+            demand.RequiredWeaponCategory = commitment.counterCategory;
+            if (commitment.counterHasTargetClass)
+            {
+                demand.TargetClass = commitment.counterTargetClass;
+                demand.MinTargetPriority = BazookaTargetPriority.Primary;
+            }
+            demand.RequiredUnitId = commitment.unitId;
+        }
         demands.Add(demand);
         demands.Sort((a, b) =>
         {
@@ -1641,15 +1675,52 @@ public partial class AIShoppingPlanner
             return null;
         foreach (AIShoppingDemand demand in demands)
             if (demand != null && demand.Count > 0
-                && demand.Role == commitment.role
+                && (demand.Role == commitment.role || demand.Role == UnitRole.None)
                 && demand.MinEliteLevel <= commitment.eliteLevel
-                && demand.MaxEliteLevel >= commitment.eliteLevel)
+                && demand.MaxEliteLevel >= commitment.eliteLevel
+                && (!commitment.counterEscalation
+                    || (demand.RequiredWeaponCategory == commitment.counterCategory
+                        && (!commitment.counterHasTargetClass
+                            || demand.TargetClass == commitment.counterTargetClass))))
                 return demand;
         return null;
     }
 
+    private static bool HasStrategicCounterEscalationDemand(
+        List<AIShoppingDemand> demands,
+        WeaponCategory? category = null,
+        GameUnitClass? targetClass = null)
+    {
+        if (demands == null)
+            return false;
+        foreach (AIShoppingDemand demand in demands)
+            if (demand != null && demand.Count > 0 && demand.StrategicEscalation
+                && demand.RequiredWeaponCategory.HasValue
+                && (!category.HasValue
+                    || demand.RequiredWeaponCategory.Value == category.Value)
+                && (!targetClass.HasValue || demand.TargetClass == targetClass.Value))
+                return true;
+        return false;
+    }
+
+    private static bool HasCounterPressureDemand(
+        List<AIShoppingDemand> demands,
+        WeaponCategory category)
+    {
+        if (demands == null)
+            return false;
+        foreach (AIShoppingDemand demand in demands)
+            if (demand != null && demand.Count > 0
+                && demand.RequiredWeaponCategory == category
+                && demand.Origin != null
+                && demand.Origin.Contains("counter-pressure"))
+                return true;
+        return false;
+    }
+
     private static UnitData FindOfferedUnitById(
-        AIWorldSnapshot snapshot, string unitId, out bool availableNow)
+        AIWorldSnapshot snapshot, string unitId, out bool availableNow,
+        bool allowStanceBypass = false)
     {
         availableNow = false;
         if (snapshot?.MyBuildings == null || string.IsNullOrEmpty(unitId))
@@ -1669,7 +1740,7 @@ public partial class AIShoppingPlanner
                     continue;
                 found = unit;
                 if (!occupied.Contains(cell)
-                    && IsRolePurchaseAllowedByStance(unit, snapshot.Stance))
+                    && IsRolePurchaseAllowed(unit, snapshot.Stance, allowStanceBypass))
                     availableNow = true;
             }
         }
@@ -1691,7 +1762,8 @@ public partial class AIShoppingPlanner
             {
                 if (unit == null || unit.eliteLevel <= 0
                     || !IsEliteChainAvailable(unit, snapshot)
-                    || !IsRolePurchaseAllowedByStance(unit, snapshot.Stance)
+                    || !IsRolePurchaseAllowed(unit, snapshot.Stance,
+                        IsEmergencyShoppingDemand(demand))
                     || !DoesUnitMeetShoppingDemand(unit, demand))
                     continue;
                 if (best == null || unit.cost < best.cost)
@@ -1772,7 +1844,7 @@ public partial class AIShoppingPlanner
         {
             target = FindDemandForEliteCommitment(demands, commitment);
             UnitData committedUnit = FindOfferedUnitById(snapshot, commitment.unitId,
-                out bool availableNow);
+                out bool availableNow, commitment.counterEscalation);
             if (target != null && committedUnit != null)
             {
                 targetCost = committedUnit.cost;
@@ -1868,7 +1940,8 @@ public partial class AIShoppingPlanner
             {
                 if (unit == null || unit.cost <= 0 || unit.eliteLevel <= 0
                     || unit.militaryForce == MilitaryForce.Navy
-                    || !IsRolePurchaseAllowedByStance(unit, snapshot.Stance)
+                    || !IsRolePurchaseAllowed(unit, snapshot.Stance,
+                        IsEmergencyShoppingDemand(demand))
                     || !IsEliteChainAvailable(unit, snapshot)
                     || !DoesUnitMeetShoppingDemand(unit, demand))
                     continue;
@@ -1930,7 +2003,8 @@ public partial class AIShoppingPlanner
             {
                 if (unit == null || unit.cost <= 0 || unit.militaryForce == MilitaryForce.Navy)
                     continue;
-                if (!IsRolePurchaseAllowedByStance(unit, snapshot.Stance)
+                if (!IsRolePurchaseAllowed(unit, snapshot.Stance,
+                        IsEmergencyShoppingDemand(demand))
                     || !IsEliteChainAvailable(unit, snapshot)
                     || !DoesUnitMeetShoppingDemand(unit, demand))
                     continue;
@@ -1985,12 +2059,6 @@ public partial class AIShoppingPlanner
             return false;
         }
 
-        bool macroLosing = AIController.GetMacroTerritoryForInspection(snapshot.AITeam).Losing;
-        if (!IsRolePurchaseAllowed(unit, snapshot.Stance, macroLosing))
-        {
-            reason = $"postura {snapshot.Stance} bloqueia {unit.aiPurchaseMode}";
-            return false;
-        }
         if (!IsEliteChainAvailable(unit, snapshot))
         {
             string prerequisite = unit.eliteFrom != null ? unit.eliteFrom.displayName : "elite anterior";
@@ -2000,8 +2068,14 @@ public partial class AIShoppingPlanner
 
         if (demands != null)
             foreach (AIShoppingDemand demand in demands)
-                if (demand != null && demand.Count > 0 && DoesUnitMeetShoppingDemand(unit, demand))
-                    return true;
+                if (demand != null && demand.Count > 0
+                    && DoesUnitMeetShoppingDemand(unit, demand))
+                {
+                    if (IsRolePurchaseAllowed(unit, snapshot.Stance,
+                            IsEmergencyShoppingDemand(demand)))
+                        return true;
+                    reason = $"postura {snapshot.Stance} bloqueia {unit.aiPurchaseMode} para {demand.Origin}";
+                }
 
         reason = $"sem demanda {UnitRoleCompatibility.ResolveCompositionRole(unit)}";
         return false;
@@ -2012,10 +2086,23 @@ public partial class AIShoppingPlanner
     {
         var demands = new List<AIShoppingDemand>();
         List<TacticalDeficit> deficits = AITacticalAnalyzer.Instance.GetDeficits(snapshot.AITeam, log);
+        SectorObjective rallyFireSupportFocus = FindRallyShoppingFocus(deficits);
         foreach (TacticalDeficit deficit in deficits)
         {
+            bool rallyFireSupport = IsRallyFireSupportDeficit(deficit);
+            if (rallyFireSupport
+                && deficit.Operation.LinkedObjective != rallyFireSupportFocus)
+                continue;
             if (deficit.Count <= 0 || !TryMapNeedToShoppingDemand(deficit, out AIShoppingDemand demand))
                 continue;
+            if (rallyFireSupport)
+            {
+                demand.Priority = 10;
+                demand.Origin = "rally-assembly";
+                demand.Reason = $"GoGreen {rallyFireSupportFocus.Sector}: "
+                    + $"fogo indireto faltando x{deficit.Count}";
+                demand.Urgent = false;
+            }
             MergeRoleDemand(demands, demand, addCounts: true);
         }
 
@@ -2093,7 +2180,14 @@ public partial class AIShoppingPlanner
 
         AddEliteProgressionDemand(snapshot, demands, UnitRole.Assalto, assaults, 24);
         AddEliteProgressionDemand(snapshot, demands, UnitRole.FogoIndireto, fireSupport, 25);
-        AddCounterPressureDemands(snapshot, demands, BuildCounterPressure(snapshot));
+        CounterPressureInspection counterPressure = BuildCounterPressure(snapshot);
+        AddCounterPressureDemands(snapshot, demands, counterPressure);
+        bool groundCounterPressureCovered = counterPressure.AntiTank <= 0.05f
+            && counterPressure.AntiInfantry <= 0.05f;
+        AddEliteQualityDemand(snapshot, demands, UnitRole.Assalto, assaults, 26,
+            groundCounterPressureCovered);
+        AddEliteQualityDemand(snapshot, demands, UnitRole.FogoIndireto, fireSupport, 27,
+            groundCounterPressureCovered);
         AddOperationalPressureDemands(snapshot, demands, BuildOperationalPressure(snapshot));
 
         demands.Sort((a, b) =>
@@ -2105,6 +2199,39 @@ public partial class AIShoppingPlanner
             return ((int)a.Role).CompareTo((int)b.Role);
         });
         return demands;
+    }
+
+    private static SectorObjective FindRallyShoppingFocus(List<TacticalDeficit> deficits)
+    {
+        SectorObjective best = null;
+        float bestScore = float.MinValue;
+        if (deficits == null)
+            return null;
+
+        foreach (TacticalDeficit deficit in deficits)
+        {
+            if (!IsRallyFireSupportDeficit(deficit) || deficit.Count <= 0)
+                continue;
+            SectorObjective obj = deficit.Operation.LinkedObjective;
+            int stateScore = obj.RallyState == AIRallyAssemblyState.Ready ? 3
+                : obj.RallyState == AIRallyAssemblyState.Assembling ? 2 : 1;
+            float score = stateScore * 1000f - obj.Priority * 10f;
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = obj;
+            }
+        }
+        return best;
+    }
+
+    private static bool IsRallyFireSupportDeficit(TacticalDeficit deficit)
+    {
+        return deficit.Operation != null
+            && deficit.Operation.LinkedObjective != null
+            && deficit.Operation.LinkedObjective.ObjectiveType == AIObjectiveType.RallyAssembly
+            && (deficit.Kind == AINeedKind.FireSupport
+                || deficit.Kind == AINeedKind.Artillery);
     }
 
     private static AIShoppingDemand NewRoleDemand(UnitRole role, int count, int priority,
@@ -2171,14 +2298,25 @@ public partial class AIShoppingPlanner
         if (incoming == null || incoming.Count <= 0) return;
         foreach (AIShoppingDemand current in demands)
         {
+            bool currentRally = current.Origin != null
+                && current.Origin.Contains("rally-assembly");
+            bool incomingRally = incoming.Origin != null
+                && incoming.Origin.Contains("rally-assembly");
+            if (currentRally != incomingRally)
+                continue;
             if (current.Role != incoming.Role || current.ExactRole != incoming.ExactRole
                 || current.Domain != incoming.Domain || current.MinEliteLevel != incoming.MinEliteLevel
                 || current.MaxEliteLevel != incoming.MaxEliteLevel
-                || current.RequiredWeaponCategory != incoming.RequiredWeaponCategory)
+                || current.RequiredWeaponCategory != incoming.RequiredWeaponCategory
+                || current.TargetClass != incoming.TargetClass
+                || current.MinTargetPriority != incoming.MinTargetPriority
+                || !string.Equals(current.RequiredUnitId, incoming.RequiredUnitId,
+                    System.StringComparison.Ordinal))
                 continue;
             current.Count = addCounts ? current.Count + incoming.Count : Mathf.Max(current.Count, incoming.Count);
             current.Priority = Mathf.Min(current.Priority, incoming.Priority);
             current.Urgent |= incoming.Urgent;
+            current.StrategicEscalation |= incoming.StrategicEscalation;
             if (!current.Origin.Contains(incoming.Origin)) current.Origin += "+" + incoming.Origin;
             if (!current.Reason.Contains(incoming.Reason)) current.Reason += "; " + incoming.Reason;
             return;
@@ -2190,6 +2328,10 @@ public partial class AIShoppingPlanner
     {
         if (unit == null || demand == null || unit.roles == null || unit.roles.Count == 0)
             return false;
+        if (!string.IsNullOrEmpty(demand.RequiredUnitId)
+            && !string.Equals(unit.id, demand.RequiredUnitId,
+                System.StringComparison.Ordinal))
+            return false;
         if (demand.Domain.HasValue && unit.domain != demand.Domain.Value)
             return false;
         if (unit.eliteLevel < demand.MinEliteLevel || unit.eliteLevel > demand.MaxEliteLevel)
@@ -2199,6 +2341,12 @@ public partial class AIShoppingPlanner
         if (demand.RequiredWeaponCategory.HasValue
             && !HasWeaponCategory(unit, demand.RequiredWeaponCategory.Value))
             return false;
+        if (demand.TargetClass.HasValue
+            && (int)unit.ResolveAiTargetPriorityForTargetClass(demand.TargetClass.Value)
+                < (int)demand.MinTargetPriority)
+            return false;
+        if (demand.Role == UnitRole.None)
+            return true;
 
         switch (demand.Role)
         {
@@ -2217,9 +2365,18 @@ public partial class AIShoppingPlanner
     {
         if (demand == null)
             return "demanda";
-        string label = $"{demand.Role}/{demand.ExactRole}";
+        string label = demand.Role == UnitRole.None
+            && demand.RequiredWeaponCategory.HasValue
+                ? demand.TargetClass.HasValue
+                    ? $"Counter/{demand.TargetClass.Value}"
+                    : "Counter/desconhecido"
+                : $"{demand.Role}/{demand.ExactRole}";
         if (demand.RequiredWeaponCategory.HasValue)
             label += $"+{demand.RequiredWeaponCategory.Value}";
+        if (demand.TargetClass.HasValue)
+            label += $"→{demand.TargetClass.Value}";
+        if (!string.IsNullOrEmpty(demand.RequiredUnitId))
+            label += $"[{demand.RequiredUnitId}]";
         return label;
     }
 
@@ -2334,6 +2491,17 @@ public partial class AIShoppingPlanner
         return IsRolePurchaseAllowedByStance(unit, stance);
     }
 
+    private static bool IsEmergencyShoppingDemand(AIShoppingDemand demand)
+    {
+        if (demand == null)
+            return false;
+        if (demand.Urgent || demand.StrategicEscalation
+            || demand.RequiredWeaponCategory.HasValue)
+            return true;
+        return demand.Reason != null
+            && demand.Reason.Contains("SectorDefense");
+    }
+
     private static bool IsRolePurchaseAllowedByStance(UnitData unit, AIStance stance)
     {
         if (unit.aiPurchaseMode == AIPurchaseMode.Either) return true;
@@ -2434,6 +2602,67 @@ public partial class AIShoppingPlanner
             return;
 
         MergeRoleDemand(demands, elite, false);
+    }
+
+    private static void AddEliteQualityDemand(
+        AIWorldSnapshot snapshot,
+        List<AIShoppingDemand> demands,
+        UnitRole role,
+        int activeRoleCount,
+        int priority,
+        bool groundCounterPressureCovered)
+    {
+        if (snapshot == null || activeRoleCount <= 0
+            || !IsOperationalCoreReadyForElite(snapshot, demands))
+            return;
+
+        float normalRatio = Instance != null
+            ? Mathf.Clamp01(Instance.EliteQualityTargetRatio)
+            : 0.33f;
+        float coveredRatio = Instance != null
+            ? Mathf.Clamp01(Instance.CoveredEliteQualityTargetRatio)
+            : 0.5f;
+        float targetRatio = groundCounterPressureCovered
+            ? Mathf.Max(normalRatio, coveredRatio)
+            : normalRatio;
+        int desiredElite = Mathf.CeilToInt(activeRoleCount * targetRatio);
+
+        int currentElite = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && !unit.IsDead
+                && unit.TryGetUnitData(out UnitData data) && data != null
+                && data.eliteLevel > 0
+                && UnitRoleCompatibility.ResolveCompositionRole(data) == role)
+                currentElite++;
+
+        int alreadyDemanded = 0;
+        foreach (AIShoppingDemand demand in demands)
+            if (demand != null && demand.Count > 0 && demand.Role == role
+                && demand.MinEliteLevel > 0)
+                alreadyDemanded += demand.Count;
+
+        int missing = Mathf.Max(0, desiredElite - currentElite - alreadyDemanded);
+        if (missing <= 0)
+            return;
+
+        AIShoppingDemand quality = NewRoleDemand(
+            role,
+            missing,
+            priority,
+            "elite-quality",
+            $"qualidade elite={currentElite}/{desiredElite} role={activeRoleCount}"
+                + $" ratio={targetRatio:P0} countersCobertos={groundCounterPressureCovered}",
+            false);
+        quality.MinEliteLevel = 1;
+
+        int saveTurns = Instance != null ? Instance.EliteSaveMaxTurns : 0;
+        int reach = snapshot.Budget
+            + Mathf.Max(0, snapshot.IncomePerTurn) * Mathf.Max(0, saveTurns);
+        int eliteCost = FindCheapestBuildableCost(snapshot, quality);
+        if (eliteCost <= 0 || eliteCost > reach)
+            return;
+
+        MergeRoleDemand(demands, quality, false);
     }
 
     private static int CountCompositionRole(AIWorldSnapshot snapshot, UnitRole role)
