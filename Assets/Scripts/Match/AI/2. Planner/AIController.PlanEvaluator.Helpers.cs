@@ -296,6 +296,33 @@ public partial class AIController
             || intel.enemyPresence >= 2f;
     }
 
+    // Pisos de intel para justificar uma DEFESA (só nesta conversão). Sem eles, sinais inferidos
+    // ínfimos ou de turnos passados (memória decaída) criavam defesa-fantasma que roubava massa do
+    // rally e era invalidada mid-turn. Expostos para o HUD (Shopping Pressure).
+    public const float DefenseIntelCapturePressureThreshold = 2f;  // captura inferida precisa de massa
+    public const float DefenseIntelDamageThreshold = 1f;           // dano tomado precisa ser real, não resíduo
+    public const float DefenseIntelHotPresenceFloor = 1f;          // hotScore (memória) só vale com presença atual
+
+    // Versão da checagem de intel usada SÓ para conversão em defesa, com pisos. Devolve o motivo
+    // para log/HUD. hotScore é memória decaída de atividade passada: só conta se houver presença
+    // inferida atual junto — não defender por puro resíduo de turnos anteriores.
+    private static bool IsHotPlanIntelDefenseSector(AISectorIntel intel, out string reason)
+    {
+        reason = string.Empty;
+        if (intel == null)
+            return false;
+
+        if (intel.hotScore >= 2f && intel.enemyPresence >= DefenseIntelHotPresenceFloor)
+            { reason = $"hot {intel.hotScore:F1}>=2 +presença {intel.enemyPresence:F1}"; return true; }
+        if (intel.capturePressure >= DefenseIntelCapturePressureThreshold)
+            { reason = $"cap {intel.capturePressure:F1}>={DefenseIntelCapturePressureThreshold:F0}"; return true; }
+        if (intel.landingPressure > 0f) { reason = $"landing {intel.landingPressure:F1}"; return true; }
+        if (intel.damageTaken > DefenseIntelDamageThreshold)
+            { reason = $"dano {intel.damageTaken:F1}>{DefenseIntelDamageThreshold:F0}"; return true; }
+        if (intel.enemyPresence >= 2f) { reason = $"presença {intel.enemyPresence:F1}>=2"; return true; }
+        return false;
+    }
+
     private static int GetEscortFallbackRiskRank(SectorManager.SectorRiskLevel risk)
     {
         switch (risk)

@@ -20,8 +20,12 @@ public partial class AIController
     private const int RallyLogisticsRadius = 5;
     private const int RallyAssemblyTimeoutTurns = 4;
     private const int RallyGoGreenSuppressTurns = 8;
+    // Foco pegajoso: o foco da operação só troca se outro rally bater o atual por esta margem.
+    private const float RallyFocusSwitchMargin = 1.5f;
     private static readonly Dictionary<string, int> rallyGoGreenTurns = new Dictionary<string, int>();
     private static readonly Dictionary<string, AIRallyHudSnapshot> rallyHudStates = new Dictionary<string, AIRallyHudSnapshot>();
+    // Memória do FocusSector por time, para hysteresis (não drenar um rally que já monta massa).
+    private static readonly Dictionary<TeamId, ConstructionSector> rallyFocusMemory = new Dictionary<TeamId, ConstructionSector>();
 
     private struct AIRallyPlanContext
     {
@@ -353,9 +357,13 @@ public partial class AIController
         bool macroDominating = BuildMacroTerritoryContext(
             aiTeam, SectorManager.GetAllSectorInfos(), 6,
             CountLiveUnitsOfTeam(aiTeam), CountLiveEnemyUnits(aiTeam)).Phase == AIMacroTerritoryPhase.Dominating;
+        // Modelo multi-centro: o assalto é liberado pela PRONTIDÃO COMBINADA (todos os rallies held
+        // somam, overlap conta 1x) — NÃO por um "foco". Todo rally held vira GoGreen junto quando a
+        // massa combinada satisfaz os mínimos, OU domínio macro, OU vantagem numérica >= 2:1.
+        int friendlyForce = CountLiveUnitsOfTeam(aiTeam);
+        bool numericalDominance = friendlyForce >= 2 * Mathf.Max(1, readiness.KnownEnemyForce);
         readiness.GoGreen = readiness.Held
-            && readiness.IsFocus
-            && ((hasHoldPackage && hasRequiredForce && hasArtillery && hasLocalLaunchArtillery) || macroDominating);
+            && ((hasHoldPackage && hasRequiredForce && hasArtillery) || macroDominating || numericalDominance);
 
         if (!readiness.Held)
         {
@@ -366,14 +374,10 @@ public partial class AIController
         else if (readiness.GoGreen)
         {
             readiness.State = AIRallyAssemblyState.GoGreen;
-            readiness.Status = "GO_GREEN";
+            readiness.Status = numericalDominance && !(hasHoldPackage && hasRequiredForce && hasArtillery)
+                ? $"GO_GREEN(2:1 {friendlyForce}v{readiness.KnownEnemyForce})"
+                : "GO_GREEN";
             readiness.Missing = "-";
-        }
-        else if (!readiness.IsFocus && readiness.FocusSector != ConstructionSector.None)
-        {
-            readiness.State = AIRallyAssemblyState.Assembling;
-            readiness.Status = $"FEEDER->{readiness.FocusSector}";
-            readiness.Missing = $"concentrar={readiness.FocusSector}";
         }
         else if (hasHoldPackage && hasArtillery)
         {
@@ -415,18 +419,39 @@ public partial class AIController
             return aggregate;
 
         float bestFocusScore = float.MinValue;
+        ConstructionSector bestFocusSector = ConstructionSector.None;
         foreach (ConstructionManager rally in held)
         {
             float score = ScoreRallyLaunchFocus(rally, aiTeam);
             if (score > bestFocusScore
                 || (Mathf.Approximately(score, bestFocusScore)
-                    && (aggregate.FocusSector == ConstructionSector.None
-                        || (int)rally.Sector < (int)aggregate.FocusSector)))
+                    && (bestFocusSector == ConstructionSector.None
+                        || (int)rally.Sector < (int)bestFocusSector)))
             {
                 bestFocusScore = score;
-                aggregate.FocusSector = rally.Sector;
+                bestFocusSector = rally.Sector;
             }
         }
+
+        // Foco pegajoso (hysteresis): mantém o foco do turno anterior enquanto ele continuar held,
+        // a não ser que outro rally o bata por margem folgada (>= RallyFocusSwitchMargin x). Sem isso,
+        // a oscilação de massa local fazia o foco pular entre rallies e DRENAR o que já montava massa.
+        ConstructionSector chosenFocus = bestFocusSector;
+        if (rallyFocusMemory.TryGetValue(aiTeam, out ConstructionSector prevFocus)
+            && prevFocus != ConstructionSector.None
+            && prevFocus != bestFocusSector)
+        {
+            ConstructionManager prevRally = held.Find(r => r != null && r.Sector == prevFocus);
+            if (prevRally != null)
+            {
+                float prevScore = ScoreRallyLaunchFocus(prevRally, aiTeam);
+                if (bestFocusScore < prevScore * RallyFocusSwitchMargin)
+                    chosenFocus = prevFocus;
+            }
+        }
+
+        aggregate.FocusSector = chosenFocus;
+        rallyFocusMemory[aiTeam] = chosenFocus;
 
         foreach (UnitManager unit in UnitManager.AllActive)
         {
@@ -624,20 +649,12 @@ public partial class AIController
             intel);
         Vector3Int rallyAnchor = rally.CurrentCellPosition;
         rallyAnchor.z = 0;
-        if (readiness.IsFocus)
-        {
-            EnsureRallyAssemblySlots(
-                obj,
-                readiness.RequiredPackages,
-                readiness.AirAttack,
-                readiness.RequiredArtillery,
-                aiTeam,
-                rallyAnchor);
-        }
-        else
-        {
-            RemoveOpenRallySlots(obj);
-        }
+        // Multi-centro: TODO rally held mantém seu próprio arco com uma FATIA do requisito combinado
+        // (distribuída entre os centros), em vez de um foco provisionar tudo. Capturador: 1 por centro.
+        int heldRallies = Mathf.Max(1, readiness.HeldRallies);
+        int sharePackages = Mathf.CeilToInt(readiness.RequiredPackages / (float)heldRallies);
+        int shareArtillery = Mathf.CeilToInt(readiness.RequiredArtillery / (float)heldRallies);
+        EnsureRallyAssemblySlots(obj, sharePackages, 0, shareArtillery, aiTeam, rallyAnchor);
         obj.RallyState = readiness.State;
         obj.RallyReadinessReason =
             $"{readiness.Status} ready={readiness.ForceScore} cap={readiness.Capturers} " +
@@ -703,14 +720,14 @@ public partial class AIController
             Debug.Log($"[AI Rally][T{snapshot.TurnNumber}][{snapshot.AITeam}] resume: " +
                       $"estado restaurado={refreshed} rally ausente={missing}");
 
-        ConsolidateRallyAssemblyAssignments(plan, snapshot.AITeam);
+        // Multi-centro: sem consolidação/dreno no resume também.
         var assignedIds = new HashSet<int>();
         foreach (SectorObjective obj in plan.Objectives)
             if (obj?.Slots != null)
                 foreach (SlotNeed slot in obj.Slots)
                     if (slot != null && slot.Filled)
                         assignedIds.Add(slot.AssignedUnitId);
-        RecruitRogueInfantryForRally(plan, snapshot.AITeam, assignedIds);
+        RecruitFreeUnitsForRally(plan, snapshot.AITeam, assignedIds);
         RecruitNearbyRogueArtilleryForRally(plan, snapshot.AITeam, assignedIds);
         ReconcileRestoredPlanAssignments(plan, snapshot.AITeam, snapshot.TurnNumber);
     }
@@ -910,13 +927,11 @@ public partial class AIController
             if (assigned == null)
                 return i;
 
-            // Infantaria no rally e open-bar: os requisitos de capturador/assalto sao piso,
-            // nao teto. Vagas abertas excedentes somem, mas tropa ja acolhida nao e expulsa.
+            // No rally os requisitos de capturador/assalto sao piso, nao teto. Vagas abertas
+            // excedentes somem, mas nenhuma unidade ja acolhida e expulsa da massa de invasao.
             if (IsRallyAssemblyObjective(obj)
                 && (role == UnitRole.Capturador || role == UnitRole.Assalto)
-                && assigned.TryGetUnitData(out UnitData assignedData)
-                && assignedData != null
-                && assignedData.unitClass == GameUnitClass.Infantry)
+                && assigned != null)
                 continue;
 
             Vector3Int cell = assigned.CurrentCellPosition;
@@ -1168,14 +1183,30 @@ public partial class AIController
             Debug.Log($"{TL("Plan")} Rally operation concentra {moved} unidades em {focus.Sector}");
     }
 
-    private void RecruitRogueInfantryForRally(
+    // Multi-centro open-bar: cada unidade livre é atraída pelo rally held MAIS PRÓXIMO (montagem
+    // local — não atravessa o mapa pra um foco). Cada centro forma seu próprio arco.
+    private void RecruitFreeUnitsForRally(
         TeamObjectivePlan plan,
         TeamId aiTeam,
         HashSet<int> assignedIds)
     {
-        SectorObjective focus = FindPrimaryRallyObjective(plan, aiTeam);
-        if (focus == null || assignedIds == null
-            || !TryFindOwnedRallyForSector(focus.Sector, aiTeam, out ConstructionManager rally))
+        if (plan?.Objectives == null || assignedIds == null)
+            return;
+
+        // Centros = rallies held ativos (não GoGreen/Expired) com âncora resolvida.
+        var centerObjs = new List<SectorObjective>();
+        var centerAnchors = new List<Vector3Int>();
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (!IsActiveRallyAssemblyObjective(obj))
+                continue;
+            if (!TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager rally))
+                continue;
+            Vector3Int a = rally.CurrentCellPosition; a.z = 0;
+            centerObjs.Add(obj);
+            centerAnchors.Add(a);
+        }
+        if (centerObjs.Count == 0)
             return;
 
         int recruited = 0;
@@ -1183,35 +1214,57 @@ public partial class AIController
         {
             if (unit == null || unit.TeamId != aiTeam || unit.IsDead || unit.IsUnderRepair
                 || assignedIds.Contains(unit.InstanceId)
-                || !unit.TryGetUnitData(out UnitData data) || data == null
-                || data.unitClass != GameUnitClass.Infantry)
+                || !unit.TryGetUnitData(out UnitData data) || data == null)
                 continue;
 
+            Vector3Int cell = unit.CurrentCellPosition; cell.z = 0;
+            int nearest = -1;
+            float bestDist = float.MaxValue;
+            for (int i = 0; i < centerObjs.Count; i++)
+            {
+                float d = SectorManager.HexDistance(cell, centerAnchors[i]);
+                if (d < bestDist) { bestDist = d; nearest = i; }
+            }
+            if (nearest < 0)
+                continue;
+
+            SectorObjective target = centerObjs[nearest];
             UnitRole role = UnitRoleCompatibility.ResolveCompositionRole(data);
             if (role == UnitRole.None)
                 role = data.roles != null && data.roles.Count > 0 ? data.roles[0] : UnitRole.Capturador;
-            focus.Slots.Add(new SlotNeed
-            {
-                Role = role,
-                Filled = true,
-                AssignedUnitId = unit.InstanceId
-            });
+            target.Slots.Add(new SlotNeed { Role = role, Filled = true, AssignedUnitId = unit.InstanceId });
             assignedIds.Add(unit.InstanceId);
             plan.RogueUnitIds?.Remove(unit.InstanceId);
-            ApplyPlanHUD(unit, focus, role);
+            ApplyPlanHUD(unit, target, role);
             recruited++;
         }
 
-        Vector3Int anchor = rally.CurrentCellPosition;
-        anchor.z = 0;
-        int distantInfantry = CountDistantRallyInfantry(focus, aiTeam, anchor);
-        int desiredApcs = Mathf.Max(
-            Mathf.CeilToInt(distantInfantry / (float)RallyUsefulApcCapacity),
-            CountLoadedRallyTransporters(focus, aiTeam));
-        EnsureRallyRoleSlots(focus, UnitRole.Transportador, desiredApcs, aiTeam, anchor);
+        // APC mínimo por centro (infantaria distante daquele centro).
+        for (int i = 0; i < centerObjs.Count; i++)
+        {
+            int distantInfantry = CountDistantRallyInfantry(centerObjs[i], aiTeam, centerAnchors[i]);
+            int desiredApcs = Mathf.Max(
+                Mathf.CeilToInt(distantInfantry / (float)RallyUsefulApcCapacity),
+                CountLoadedRallyTransporters(centerObjs[i], aiTeam));
+            EnsureRallyTransportMinimumSlots(centerObjs[i], desiredApcs);
+        }
 
-        Debug.Log($"{TL("Plan")} Rally {focus.Sector} infantaria open-bar: " +
-                  $"recrutada={recruited} distante={distantInfantry} APC={desiredApcs}");
+        Debug.Log($"{TL("Plan")} Rally multi-centro open-bar: centros={centerObjs.Count} recrutadas={recruited}");
+    }
+
+    private static void EnsureRallyTransportMinimumSlots(SectorObjective focus, int required)
+    {
+        if (focus?.Slots == null)
+            return;
+        int current = 0;
+        foreach (SlotNeed slot in focus.Slots)
+            if (slot != null && slot.Role == UnitRole.Transportador)
+                current++;
+        while (current < required)
+        {
+            focus.Slots.Add(new SlotNeed { Role = UnitRole.Transportador });
+            current++;
+        }
     }
 
     private static int CountDistantRallyInfantry(

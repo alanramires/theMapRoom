@@ -32,6 +32,11 @@ public partial class AIController
     // Diferenca minima de presenca (atual - alvo) para considerar o eixo-alvo faminto.
     private const int AxisStarvedPresenceGap = 2;
 
+    // Hard Mode dobra a demanda de capturadores por setor, mas com teto proprio para
+    // aumentar pressao territorial sem explodir setores grandes em demanda absurda de
+    // infantaria (cap normal 4 -> teto hard 6).
+    private const int HardModeCapturerSlotCap = 6;
+
     // Presenca por eixo (eixo 1..N -> nº de unidades do time com aquele aiEixo). Snapshot do
     // campo no inicio do BuildObjectivePlan, usado para decidir rebalanceamento de eixo.
     private Dictionary<int, int> currentEixoPresence;
@@ -76,14 +81,15 @@ public partial class AIController
                 continue;
             }
 
-            bool objectiveIsRallySector = IsEnemyHQRallySectorHeld(rallyContext, obj.Sector, aiTeam);
-            if (objectiveIsRallySector && IsRallyGoGreenSuppressed(aiTeam, obj.Sector, snapshot.TurnNumber))
-                objectiveIsRallySector = false;
+            bool ownedRallyHeld = IsEnemyHQRallySectorHeld(rallyContext, obj.Sector, aiTeam);
+            bool goGreenSuppressed = ownedRallyHeld && IsRallyGoGreenSuppressed(aiTeam, obj.Sector, snapshot.TurnNumber);
+            bool objectiveIsRallySector = ownedRallyHeld && !goGreenSuppressed;
             if (objectiveIsRallySector && obj.ObjectiveType == AIObjectiveType.CaptureSector)
                 obj.ObjectiveType = AIObjectiveType.RallyAssembly;
             else if (!objectiveIsRallySector && obj.ObjectiveType == AIObjectiveType.RallyAssembly)
             {
                 obj.ObjectiveType = AIObjectiveType.CaptureSector;
+                Debug.Log($"{TL("Plan")} rally {obj.Sector} REBAIXADO p/ captura: ownedHeld={ownedRallyHeld} goGreenSuppressed={goGreenSuppressed}");
             }
 
             if (!IsRallyAssemblyObjective(obj))
@@ -350,6 +356,7 @@ public partial class AIController
             int slots = Mathf.Clamp(Mathf.CeilToInt(info.ConstructionCount / 2f), 1, 4);
             bool highRisk = info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High;
             if (highRisk) slots = Mathf.Max(slots, 2);
+            if (hardMode) slots = Mathf.Min(slots * 2, HardModeCapturerSlotCap); // Hard Mode: dobra a demanda de capturadores por setor (com teto)
             if (!isRallyAssemblySector)
             {
                 for (int s = 0; s < slots; s++)
@@ -512,6 +519,7 @@ public partial class AIController
             }
 
             int capturerSlots = Mathf.Clamp(Mathf.CeilToInt(baseInfo.ConstructionCount / 2f), 2, 4);
+            if (hardMode) capturerSlots = Mathf.Min(capturerSlots * 2, HardModeCapturerSlotCap); // Hard Mode: dobra a demanda de capturadores na base inimiga (com teto)
             var baseObj = new SectorObjective
             {
                 Sector       = baseInfo.Sector,
@@ -596,23 +604,41 @@ public partial class AIController
                 bool criticalHomeThreat = IsCriticalHomeDefenseSector(info, aiTeam)
                     && IsHomeDefenseThreatened(info, aiTeam, HomeDefenseThreatRange);
                 AISectorIntel sectorIntel = FindIntelForSector(intel, info.Sector);
-                bool intelDefenseThreat = IsHotPlanIntelSector(sectorIntel);
+                bool intelDefenseThreat = IsHotPlanIntelDefenseSector(sectorIntel, out string intelDefenseReason);
+                bool visibleEnemy = HasNearbyVisibleEnemy(rc, aiTeam, DefenseEnemyRange);
                 bool sectorDefenseThreat = criticalHomeThreat
                     || info.IsDisputed
                     || info.HasPartialCapture
-                    || HasNearbyVisibleEnemy(rc, aiTeam, DefenseEnemyRange)
+                    || visibleEnemy
                     || intelDefenseThreat;
                 if (!sectorDefenseThreat) continue;
+
+                string defenseReason = criticalHomeThreat ? "QG ameaçado"
+                    : info.IsDisputed ? "disputado"
+                    : info.HasPartialCapture ? "captura parcial"
+                    : visibleEnemy ? $"inimigo visível <= {DefenseEnemyRange}h"
+                    : $"intel ({intelDefenseReason})";
 
                 SectorObjective existingDefense = plan.GetObjectiveForSector(info.Sector);
                 if (existingDefense != null)
                 {
                     if (existingDefense.Status != ObjectiveStatus.Defending)
                     {
+                        // Não sequestrar um rally em montagem: a massa que ele já está juntando
+                        // É a defesa do setor, e NormalizeDefenseObjectiveSlots destruiria a
+                        // atribuição do rally (slots reescritos → tropa volta a rogue/guarnição).
+                        // Quando o rally dispara GoGreen/Expira, deixa de ser ativo e a conversão volta.
+                        if (IsActiveRallyAssemblyObjective(existingDefense))
+                        {
+                            Debug.Log($"{TL("Plan")} {info.Sector} sob ameaça mas é rally em montagem ({existingDefense.RallyState}); mantém montagem, não converte para defesa");
+                            continue;
+                        }
+
                         existingDefense.Status = ObjectiveStatus.Defending;
                         existingDefense.Priority = defPriority++;
+                        existingDefense.DefenseReason = defenseReason;
                         NormalizeDefenseObjectiveSlots(existingDefense, info.HasPartialCapture || criticalHomeThreat || (sectorIntel != null && sectorIntel.capturePressure > 0f), !criticalHomeThreat || intelDefenseThreat, aiTeam);
-                        Debug.Log($"{TL("Plan")} Objetivo convertido para defesa: {info.Sector} (pri {existingDefense.Priority}, disputed={info.IsDisputed}, partialCapture={info.HasPartialCapture})");
+                        Debug.Log($"{TL("Plan")} Objetivo convertido para defesa: {info.Sector} (pri {existingDefense.Priority}, motivo={defenseReason})");
                     }
                     continue;
                 }
@@ -621,10 +647,11 @@ public partial class AIController
                 {
                     Sector = info.Sector, AssignedTeam = aiTeam,
                     Status = ObjectiveStatus.Defending, Priority = defPriority++,
+                    DefenseReason = defenseReason,
                 };
                 NormalizeDefenseObjectiveSlots(defObj, info.HasPartialCapture || criticalHomeThreat || (sectorIntel != null && sectorIntel.capturePressure > 0f), !criticalHomeThreat || intelDefenseThreat, aiTeam);
                 plan.Objectives.Add(defObj);
-                Debug.Log($"{TL("Plan")} Objetivo defensivo: {info.Sector} (pri {defPriority - 1}, inimigo ={DefenseEnemyRange}h, partialCapture={info.HasPartialCapture})");
+                Debug.Log($"{TL("Plan")} Objetivo defensivo: {info.Sector} (pri {defPriority - 1}, motivo={defenseReason})");
             }
         }
 
@@ -647,9 +674,8 @@ public partial class AIController
         bool anchorCapturerReserveActive = ShouldReserveCapturersForAnchors(anchorContext, macro.Phase)
             && HasOpenAnchorCapturerNeed(plan, anchorContext);
 
-        // Todos os rallies assegurados pertencem a uma unica operacao. Os secundarios viram
-        // feeders e suas atribuicoes convergem para o ponto de lancamento com maior massa local.
-        ConsolidateRallyAssemblyAssignments(plan, aiTeam);
+        // Modelo multi-centro: cada rally held é um centro próprio (sem foco/feeder/dreno).
+        // NÃO consolidar — unidades montam no rally mais próximo, e a prontidão é combinada.
 
         // Passo 4: coleta IDs j� atribu�dos
         var assignedIds = new HashSet<int>();
@@ -722,6 +748,27 @@ public partial class AIController
         const float MaxCoArrivalGap = 5f;
         var cascadeCovered = new HashSet<ConstructionSector>();
         var assignableObjs = new List<(SectorObjective obj, Vector3Int cell)>();
+
+        // Hard Mode — distribuição em largura ENTRE turnos: as vagas dobradas (2ª+) de um setor só
+        // abrem quando NENHUM outro objetivo ofensivo ainda está sem o 1º capturador. Assim os
+        // capturadores novos vão ABRIR/AVANÇAR frentes novas (Hotel/Echo/Foxtrot) em vez de encher
+        // o 2º slot de setores já iniciados (que costumam estar mais perto da base). As 2ªs vagas
+        // enchem depois, com o excedente. Mantém o "feel" do normal mode mesmo com capacidade dobrada.
+        bool anyFirstCapturerPending = false;
+        if (hardMode)
+        {
+            foreach (SectorObjective o in plan.Objectives)
+            {
+                if (o.Status == ObjectiveStatus.Defending) continue;
+                if (!o.HasOpenSlot(UnitRole.Capturador)) continue;
+                if (!o.Slots.Exists(s => s.Role == UnitRole.Capturador && s.Filled))
+                {
+                    anyFirstCapturerPending = true;
+                    break;
+                }
+            }
+        }
+
         foreach (SectorObjective obj in plan.Objectives)
         {
             if (!obj.HasOpenSlot(UnitRole.Capturador)) continue;
@@ -780,7 +827,21 @@ public partial class AIController
             }
 
             int openCapturerSlots = CountOpenSlots(obj, UnitRole.Capturador);
-            for (int slotIndex = 0; slotIndex < openCapturerSlots; slotIndex++)
+            int exposedCapturerSlots;
+            if (!hardMode)
+            {
+                exposedCapturerSlots = openCapturerSlots;
+            }
+            else
+            {
+                bool hasFirstCapturer = obj.Slots.Exists(s => s.Role == UnitRole.Capturador && s.Filled);
+                // 1ª vaga sempre exposta (abrir a frente). 2ª+ só quando ninguém mais precisa do 1º
+                // capturador — e ainda assim 1 por passada (gradual, conforme novos vão chegando).
+                exposedCapturerSlots = !hasFirstCapturer
+                    ? 1
+                    : (anyFirstCapturerPending ? 0 : 1);
+            }
+            for (int slotIndex = 0; slotIndex < exposedCapturerSlots; slotIndex++)
                 assignableObjs.Add((obj, tc));
 
             if (isInitialDistribution && !isDefensive)
@@ -1224,9 +1285,9 @@ public partial class AIController
         {
             // Antes da distribuição genérica, concentra rogues próximos no melhor rally
             // ainda incompleto. Um único assembly completo já libera massa de invasão.
-            // Rally assegurado inicia a concentracao final: toda infantaria realmente livre
-            // entra sem teto de slots e gera backlog de APC quando estiver distante.
-            RecruitRogueInfantryForRally(plan, aiTeam, assignedIds);
+            // Rally assegurado inicia a concentracao final: toda unidade operacional realmente
+            // livre entra sem teto; infantaria distante ainda gera backlog minimo de APC.
+            RecruitFreeUnitsForRally(plan, aiTeam, assignedIds);
             RecruitNearbyRogueArtilleryForRally(plan, aiTeam, assignedIds);
 
             List<UnitManager> freeFireSupports = GetAvailablePrimaryFireSupports(aiTeam);

@@ -79,6 +79,18 @@ public partial class AIController
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, shuttleMove, paths);
             }
 
+            // APC vazio designado a um RALLY, sem candidato fresco por perto (2h): em vez de campar
+            // o anchor (empatando a artilharia de se posicionar atrás da linha) ou buscar capturador
+            // já montado, volta pra perto da fábrica/HQ pra pegar a PRÓXIMA leva comprada. Os
+            // capturadores já presentes montam a pé; o papel do APC aqui é trazer reforço da retaguarda.
+            if (IsActiveRallyAssemblyObjective(assigned))
+            {
+                Vector3Int waitTarget = FindTransportWaitTarget(snapshot.AITeam, fromCell);
+                Vector3Int waitMove = FindTransportShuttleMove(unit, fromCell, waitTarget, paths, occupied, snapshot.AITeam, waitTarget);
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — rally vazio sem leva nova; aguarda reforço perto da produção {waitTarget} via {waitMove}");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, waitMove, paths);
+            }
+
             // Sem candidato perto (2h) e sem passageiro needy (todos walkable): em vez de pressionar
             // o objetivo vazio, VAI BUSCAR o capturador mais proximo do proprio plano — mesmo que
             // ele consiga ir a pe, a carona acelera. Util > marchar sozinho pro objetivo.
@@ -451,6 +463,16 @@ public partial class AIController
         ConstructionManager objBldg = FindCapturableInSector(assigned.Sector, aiTeam);
         Vector3Int objCell = Vector3Int.zero;
         if (objBldg != null) { objCell = objBldg.CurrentCellPosition; objCell.z = 0; }
+        else if (IsActiveRallyAssemblyObjective(assigned))
+        {
+            // Rally não tem capturável: o destino dos capturadores é o ANCHOR do rally. Sem isto,
+            // objCell ficava zero, cost=999 e TODO capturador virava needy — fazendo o APC campar o
+            // rally esperando quem já está coladinho (e monta a pé) em vez de buscar leva nova.
+            Vector3Int anchorHint = transporter.CurrentCellPosition; anchorHint.z = 0;
+            objCell = ResolveRallyAssemblyAnchor(assigned, aiTeam, anchorHint);
+            objCell.z = 0;
+        }
+        bool hasObjCell = objCell != Vector3Int.zero;
         int transportThreshold = GetEffectiveTransportThreshold(aiTeam);
 
         // Passageiros needy: capturadores do objetivo vivos, fora, sem ter agido e LONGE A PE
@@ -468,8 +490,8 @@ public partial class AIController
             if (cap.IsEmbarked) { diag.Append($" cap#{cap.InstanceId}[embarcado]"); continue; }
             if (cap.HasActed) { diag.Append($" cap#{cap.InstanceId}[jaAgiu]"); continue; }
             Vector3Int capCell = cap.CurrentCellPosition; capCell.z = 0;
-            int cost = objBldg != null ? TerrainCostToCell(cap, capCell, objCell, transportThreshold) : 999;
-            if (objBldg != null && cost < transportThreshold)
+            int cost = hasObjCell ? TerrainCostToCell(cap, capCell, objCell, transportThreshold) : 999;
+            if (hasObjCell && cost < transportThreshold)
             {
                 diag.Append($" cap#{cap.InstanceId}[perto cost={cost}<{transportThreshold}]");
                 continue; // perto o bastante pra ir a pe

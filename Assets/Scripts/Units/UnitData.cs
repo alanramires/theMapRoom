@@ -125,6 +125,8 @@ public class UnitData : ScriptableObject
     public AiInitiative aiInitiative = AiInitiative.Medium;
     [Tooltip("Contexto de compra pela IA. Defensive = só comprada quando há ameaça à base; Offensive = nunca em modo defensivo; Either = sem restrição.")]
     public AIPurchaseMode aiPurchaseMode = AIPurchaseMode.Either;
+    [Tooltip("Se ativo, esta unidade não aparece na lista de compras da IA quando o Hard Mode está ligado.")]
+    public bool bannedOnHardMode = false;
     [Tooltip("Preferencia de alvo por classe (usada pelo gate de Target Preference no AI Unit Profile).")]
     public List<AITargetPreferenceByClassRule> aiTargetPreferenceByClass = new List<AITargetPreferenceByClassRule>();
 

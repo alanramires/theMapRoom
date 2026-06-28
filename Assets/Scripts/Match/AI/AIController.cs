@@ -25,6 +25,11 @@ public partial class AIController : MonoBehaviour
     [Tooltip("Inicia a partida com a IA pausada, equivalente a pressionar F10.")]
     [SerializeField] private bool startOnPause;
 
+    [Header("Hard Mode")]
+    [Tooltip("Modo difícil. Por enquanto: dobra os slots de capturador por setor e habilita os limites/banimentos específicos de hard mode (logística e unidades banidas).")]
+    [SerializeField] private bool hardMode = false;
+    public bool HardMode => hardMode;
+
     [Header("AI Stage Emulation")]
     [SerializeField] private bool emulateStage0 = true;
     [SerializeField] private bool emulateStage1 = true;
@@ -61,6 +66,52 @@ public partial class AIController : MonoBehaviour
     [Tooltip("Distância mínima em hexes do HQ para que um setor gere slot de transportador no plano e no shopping")]
     [SerializeField, Range(1, 30)] private int minDistanceForTransportSlot = 7;
     public int MinDistanceForTransportSlot => minDistanceForTransportSlot;
+
+    [Header("Logistics")]
+    [Tooltip("Hard Mode: número máximo de unidades de logística que a IA mantém em campo enquanto o Hard Mode estiver ligado.")]
+    [SerializeField, Range(0, 10)] private int maxLogisticUnitsOnHardMode = 1;
+    public int MaxLogisticUnitsOnHardMode => maxLogisticUnitsOnHardMode;
+
+    [Header("Elite Demand")]
+    [Tooltip("Fração-alvo de elites (entre Assalto e Fogo Indireto) quando ainda há pressão terrestre aberta. Modo normal.")]
+    [SerializeField, Range(0f, 1f)] private float eliteRatioNormalPressure = 0.33f;
+    [Tooltip("Fração-alvo de elites quando as pressões anti-tank E anti-infantaria já estão cobertas (folga vira superioridade qualitativa). Modo normal.")]
+    [SerializeField, Range(0f, 1f)] private float eliteRatioNormalSafe = 0.50f;
+    [Tooltip("Fração-alvo de elites com pressão terrestre aberta. Hard Mode.")]
+    [SerializeField, Range(0f, 1f)] private float eliteRatioHardPressure = 0.15f;
+    [Tooltip("Fração-alvo de elites com pressões terrestres cobertas. Hard Mode.")]
+    [SerializeField, Range(0f, 1f)] private float eliteRatioHardSafe = 0.33f;
+    [Tooltip("Quantos turnos de renda a IA topa POUPAR mirando um elite/capacidade crítica. 0 = nunca poupa (guloso). Modo normal.")]
+    [SerializeField, Range(0, 4)] private int eliteSaveTurnsNormal = 1;
+    [Tooltip("Turnos de poupança rumo a um elite. Hard Mode (subir ajuda a alcançar elites mais caros).")]
+    [SerializeField, Range(0, 4)] private int eliteSaveTurnsHard = 1;
+    [Tooltip("Margem de caixa (%) mantida como troco ENQUANTO poupa pra elite, pra ainda comprar coisas baratas. Escalada pela maturidade do exército. Modo normal.")]
+    [SerializeField, Range(0f, 50f)] private float eliteMaintenanceReserveNormal = 20f;
+    [Tooltip("Margem de troco (%) durante a poupança de elite. Hard Mode.")]
+    [SerializeField, Range(0f, 50f)] private float eliteMaintenanceReserveHard = 20f;
+    // Resolve conforme o modo atual.
+    public float EliteRatioPressure => hardMode ? eliteRatioHardPressure : eliteRatioNormalPressure;
+    public float EliteRatioSafe     => hardMode ? eliteRatioHardSafe     : eliteRatioNormalSafe;
+    public int   EliteSaveTurns      => hardMode ? eliteSaveTurnsHard      : eliteSaveTurnsNormal;
+    public float EliteMaintenanceReservePercent => hardMode ? eliteMaintenanceReserveHard : eliteMaintenanceReserveNormal;
+
+    [Header("Minimum Army Composition (Elite Gate)")]
+    [Tooltip("Núcleo operacional que libera compra de elite — capturadores (infantaria) exigidos. Modo normal.")]
+    [SerializeField, Range(0, 12)] private int minInfantryNormal = 2;
+    [Tooltip("Núcleo operacional — unidades de Assalto exigidas. Modo normal.")]
+    [SerializeField, Range(0, 12)] private int minAssaultNormal = 2;
+    [Tooltip("Núcleo operacional — unidades de Artilharia/Fogo Indireto exigidas. Modo normal.")]
+    [SerializeField, Range(0, 12)] private int minArtilleryNormal = 1;
+    [Tooltip("Núcleo operacional — capturadores (infantaria) exigidos. Hard Mode.")]
+    [SerializeField, Range(0, 12)] private int minInfantryHard = 4;
+    [Tooltip("Núcleo operacional — Assalto exigido. Hard Mode (0 = não exige; tank básico costuma estar banido).")]
+    [SerializeField, Range(0, 12)] private int minAssaultHard = 0;
+    [Tooltip("Núcleo operacional — Artilharia exigida. Hard Mode (0 = não exige; artilharia básica costuma estar banida).")]
+    [SerializeField, Range(0, 12)] private int minArtilleryHard = 0;
+    // Resolve a composição mínima do núcleo conforme o modo atual.
+    public int CoreMinInfantry  => hardMode ? minInfantryHard  : minInfantryNormal;
+    public int CoreMinAssault   => hardMode ? minAssaultHard   : minAssaultNormal;
+    public int CoreMinArtillery => hardMode ? minArtilleryHard : minArtilleryNormal;
 
     [Header("Plano de Objetivos")]
     [Tooltip("Máximo de objetivos ofensivos simultâneos (Pending/Pursuing/Capturing). Limita demand de capturadores em mapas grandes.")]

@@ -63,6 +63,10 @@ public class SectorObjective
     public int                 RallyGoGreenTurn = -1;
     public string              RallyReadinessReason;
 
+    [Header("Defesa")]
+    // Por que este setor virou Defending (ex.: "intel (cap 2,3>=2)"). Runtime/HUD; não persistido.
+    public string DefenseReason;
+
     [Header("Slots de unidade")]
     public List<SlotNeed> Slots = new List<SlotNeed>();
 

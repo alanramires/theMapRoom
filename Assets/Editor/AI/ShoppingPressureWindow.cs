@@ -399,13 +399,14 @@ public class ShoppingPressureWindow : EditorWindow
     {
         bool covered = pressure.AntiTank <= 0.05f
             && pressure.AntiInfantry <= 0.05f;
-        float normalRatio = AIShoppingPlanner.Instance != null
-            ? Mathf.Clamp01(AIShoppingPlanner.Instance.EliteQualityTargetRatio)
+        // Razões agora vêm do AI Manager (AIController), com par próprio por modo (normal/hard).
+        float pressureRatio = AIController.Instance != null
+            ? Mathf.Clamp01(AIController.Instance.EliteRatioPressure)
             : 0.33f;
-        float coveredRatio = AIShoppingPlanner.Instance != null
-            ? Mathf.Clamp01(AIShoppingPlanner.Instance.CoveredEliteQualityTargetRatio)
+        float safeRatio = AIController.Instance != null
+            ? Mathf.Clamp01(AIController.Instance.EliteRatioSafe)
             : 0.5f;
-        float ratio = covered ? Mathf.Max(normalRatio, coveredRatio) : normalRatio;
+        float ratio = covered ? Mathf.Max(pressureRatio, safeRatio) : pressureRatio;
 
         EditorGUILayout.Space(5f);
         EditorGUILayout.LabelField(
@@ -785,6 +786,9 @@ public class ShoppingPressureWindow : EditorWindow
                 ? $"  · {obj.RallyState}"
                 : "";
         EditorGUILayout.LabelField($"{symbol} pri={obj.Priority}  {obj.Sector}  [{obj.Status}]{rally}", EditorStyles.boldLabel);
+
+        if (obj.Status == ObjectiveStatus.Defending && !string.IsNullOrEmpty(obj.DefenseReason))
+            EditorGUILayout.LabelField($"  defende: {obj.DefenseReason}", _subtle);
 
         if (obj.Slots == null || obj.Slots.Count == 0)
         {

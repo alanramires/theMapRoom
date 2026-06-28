@@ -335,6 +335,10 @@ public partial class AIShoppingPlanner
         int logisticsCap = logisticsWorkload >= 6 ? 3 : 2;
         desiredLogistics = Mathf.Min(desiredLogistics, logisticsCap);
 
+        // Hard Mode: limita o total de unidades de logística mantidas em campo.
+        if (AIController.Instance != null && AIController.Instance.HardMode)
+            desiredLogistics = Mathf.Min(desiredLogistics, AIController.Instance.MaxLogisticUnitsOnHardMode);
+
         int demand = Mathf.Max(0, desiredLogistics - activeLogisticsCount);
         Debug.Log($"[AI Shopping] logistics_demand: demand={demand} groundRepairs={repairDemandCount} criticalPreventive={criticalPreventiveDemandCount} workload={logisticsWorkload} activeLog={activeLogisticsCount} activeCap={activeLogisticsCapacity} desired={desiredLogistics} repairsPerSupplier={repairsPerSupplier} cap={logisticsCap} units={snapshot?.MyUnits?.Count ?? 0}");
         return demand;
@@ -1790,28 +1794,29 @@ public partial class AIShoppingPlanner
     {
         if (snapshot == null)
             return false;
-        int capturerTarget = Instance != null ? Instance.MinCapturerMassForSupport : 4;
-        capturerTarget = Mathf.Max(2, capturerTarget);
-        int assaultTarget = Instance != null ? Instance.MinFilledAssaultSlots : 1;
-        assaultTarget = Mathf.Max(2, assaultTarget);
+        // Composição mínima do núcleo (gate de elite) vem do AI Manager, com par por modo (normal/hard).
+        int capturerTarget  = AIController.Instance != null ? AIController.Instance.CoreMinInfantry  : 2;
+        int assaultTarget   = AIController.Instance != null ? AIController.Instance.CoreMinAssault   : 2;
+        int artilleryTarget = AIController.Instance != null ? AIController.Instance.CoreMinArtillery : 1;
         return CountCompositionRole(snapshot, UnitRole.Capturador) >= capturerTarget
             && CountCompositionRole(snapshot, UnitRole.Assalto) >= assaultTarget
-            && CountCompositionRole(snapshot, UnitRole.FogoIndireto) >= 1;
+            && CountCompositionRole(snapshot, UnitRole.FogoIndireto) >= artilleryTarget;
     }
 
     private static float ComputeOperationalCoreMaturity(AIWorldSnapshot snapshot)
     {
         if (snapshot == null)
             return 0f;
-        int capturerTarget = Mathf.Max(2,
-            Instance != null ? Instance.MinCapturerMassForSupport : 4);
-        int assaultTarget = Mathf.Max(2,
-            Instance != null ? Instance.MinFilledAssaultSlots : 1);
-        float capturer = Mathf.Clamp01(
+        // Mesma composição-alvo do gate de elite (AI Manager, par por modo). Alvo 0 = componente já satisfeito.
+        int capturerTarget  = AIController.Instance != null ? AIController.Instance.CoreMinInfantry  : 2;
+        int assaultTarget   = AIController.Instance != null ? AIController.Instance.CoreMinAssault   : 2;
+        int artilleryTarget = AIController.Instance != null ? AIController.Instance.CoreMinArtillery : 1;
+        float capturer = capturerTarget <= 0 ? 1f : Mathf.Clamp01(
             CountCompositionRole(snapshot, UnitRole.Capturador) / (float)capturerTarget);
-        float assault = Mathf.Clamp01(
+        float assault = assaultTarget <= 0 ? 1f : Mathf.Clamp01(
             CountCompositionRole(snapshot, UnitRole.Assalto) / (float)assaultTarget);
-        float fire = Mathf.Clamp01(CountCompositionRole(snapshot, UnitRole.FogoIndireto));
+        float fire = artilleryTarget <= 0 ? 1f : Mathf.Clamp01(
+            CountCompositionRole(snapshot, UnitRole.FogoIndireto) / (float)artilleryTarget);
         return (capturer + assault + fire) / 3f;
     }
 
@@ -1828,7 +1833,7 @@ public partial class AIShoppingPlanner
         target = null;
         if (Instance == null || demands == null || remaining <= 0)
             return 0;
-        int maxTurns = Instance.EliteSaveMaxTurns;
+        int maxTurns = AIController.Instance != null ? AIController.Instance.EliteSaveTurns : 1;
         if (maxTurns <= 0)
             return 0;
 
@@ -1894,8 +1899,8 @@ public partial class AIShoppingPlanner
         // = 10090 e caixa mínimo preservado = 3023.
         int reserve;
         float maturity = ComputeOperationalCoreMaturity(snapshot);
-        float maintenancePct = Instance != null
-            ? Mathf.Clamp01(Instance.CriticalCapabilityMaintenanceReservePercent / 100f) * maturity
+        float maintenancePct = AIController.Instance != null
+            ? Mathf.Clamp01(AIController.Instance.EliteMaintenanceReservePercent / 100f) * maturity
             : 0.2f * maturity;
         int projectedAfterTarget = Mathf.Max(0, remaining + income - targetCost);
         int maintenanceReserve = Mathf.CeilToInt(projectedAfterTarget * maintenancePct);
@@ -2486,6 +2491,9 @@ public partial class AIShoppingPlanner
     // justamente quando mais precisava delas (tanque no QG).
     private static bool IsRolePurchaseAllowed(UnitData unit, AIStance stance, bool emergency)
     {
+        // Hard Mode: unidade banida nunca entra na compra da IA — antes até do bypass de emergência.
+        if (IsHardModeBannedForAI(unit))
+            return false;
         if (emergency)
             return true;
         return IsRolePurchaseAllowedByStance(unit, stance);
@@ -2587,7 +2595,7 @@ public partial class AIShoppingPlanner
 
         // Só persegue o elite se ele cabe agora ou é alcançável dentro do horizonte de poupança.
         // (Substitui o antigo piso fixo de caixa, que com renda baixa nunca deixava o alvo aparecer.)
-        int saveTurns = Instance != null ? Instance.EliteSaveMaxTurns : 0;
+        int saveTurns = AIController.Instance != null ? AIController.Instance.EliteSaveTurns : 0;
         int reach = saveTurns > 0
             ? snapshot.Budget + Mathf.Max(0, snapshot.IncomePerTurn) * saveTurns
             : snapshot.Budget;
@@ -2616,15 +2624,16 @@ public partial class AIShoppingPlanner
             || !IsOperationalCoreReadyForElite(snapshot, demands))
             return;
 
-        float normalRatio = Instance != null
-            ? Mathf.Clamp01(Instance.EliteQualityTargetRatio)
+        // Razões de elite agora vêm do AI Manager (AIController), com par próprio por modo (normal/hard).
+        float pressureRatio = AIController.Instance != null
+            ? Mathf.Clamp01(AIController.Instance.EliteRatioPressure)
             : 0.33f;
-        float coveredRatio = Instance != null
-            ? Mathf.Clamp01(Instance.CoveredEliteQualityTargetRatio)
+        float safeRatio = AIController.Instance != null
+            ? Mathf.Clamp01(AIController.Instance.EliteRatioSafe)
             : 0.5f;
         float targetRatio = groundCounterPressureCovered
-            ? Mathf.Max(normalRatio, coveredRatio)
-            : normalRatio;
+            ? Mathf.Max(pressureRatio, safeRatio)
+            : pressureRatio;
         int desiredElite = Mathf.CeilToInt(activeRoleCount * targetRatio);
 
         int currentElite = 0;
@@ -2655,7 +2664,7 @@ public partial class AIShoppingPlanner
             false);
         quality.MinEliteLevel = 1;
 
-        int saveTurns = Instance != null ? Instance.EliteSaveMaxTurns : 0;
+        int saveTurns = AIController.Instance != null ? AIController.Instance.EliteSaveTurns : 0;
         int reach = snapshot.Budget
             + Mathf.Max(0, snapshot.IncomePerTurn) * Mathf.Max(0, saveTurns);
         int eliteCost = FindCheapestBuildableCost(snapshot, quality);

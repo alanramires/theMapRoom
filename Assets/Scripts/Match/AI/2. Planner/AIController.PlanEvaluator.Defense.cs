@@ -25,6 +25,9 @@ public partial class AIController
         {
             SectorObjective obj = plan.Objectives[i];
             if (obj.Status != ObjectiveStatus.Defending) continue;
+            // Rally é guardado com Status=Defending mas NÃO é defesa-stale: sua massa monta pra
+            // invasão. Sem este guard, a "ameaça eliminada" dissolvia o rally e soltava a massa.
+            if (obj.ObjectiveType == AIObjectiveType.RallyAssembly) continue;
 
             bool stillThreatened;
             if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo info))

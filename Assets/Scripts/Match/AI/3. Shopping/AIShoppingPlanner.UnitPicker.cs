@@ -18,6 +18,7 @@ public partial class AIShoppingPlanner
         foreach (UnitData u in building.OfferedUnits)
         {
             if (u == null) continue;
+            if (IsHardModeBannedForAI(u)) { Debug.Log($"[AI Shopping Air] SKIP {u.displayName} — banida no Hard Mode"); continue; }
             if (u.domain != Domain.Air) continue;
             if (u.cost > budget)
             {
@@ -137,6 +138,7 @@ public partial class AIShoppingPlanner
         foreach (UnitData u in building.OfferedUnits)
         {
             if (u == null || u.cost > budget) { if (u != null) Debug.Log($"[AI PickUnit] SKIP {u.displayName} ${u.cost} — custo>{budget}"); continue; }
+            if (IsHardModeBannedForAI(u)) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — banida no Hard Mode"); continue; }
             if (u.domain != Domain.Land) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — domain={u.domain} (não Land)"); continue; }
             bool isAntiAirOnly = IsAntiAirOnlyUnit(u);
             bool isSAMType = isAntiAirOnly && IsPrimaryRole(u, UnitRole.FogoIndireto);
@@ -342,6 +344,15 @@ public partial class AIShoppingPlanner
     private static bool IsPrimaryRole(UnitData unit, UnitRole role)
     {
         return unit != null && unit.roles != null && unit.roles.Count > 0 && unit.roles[0] == role;
+    }
+
+    // Hard Mode: unidades marcadas como banidas não entram na lista de compras da IA.
+    private static bool IsHardModeBannedForAI(UnitData unit)
+    {
+        return unit != null
+            && unit.bannedOnHardMode
+            && AIController.Instance != null
+            && AIController.Instance.HardMode;
     }
 
     private static bool IsAirTankerPurchase(UnitData unit)
@@ -617,6 +628,7 @@ public partial class AIShoppingPlanner
         foreach (UnitData u in building.OfferedUnits)
         {
             if (u == null || u.domain != Domain.Land || u.cost > budget || u.cost <= 0) continue;
+            if (IsHardModeBannedForAI(u)) continue;
             if (cheapest == null || u.cost < cheapest.cost) cheapest = u;
         }
         return cheapest;
