@@ -2555,6 +2555,12 @@ public partial class AIShoppingPlanner
     private static bool IsEliteChainAvailable(UnitData unit, AIWorldSnapshot snapshot)
     {
         if (unit == null || unit.eliteLevel <= 0 || unit.eliteFrom == null) return true;
+        // Hard Mode: se o tier-base (eliteFrom) está banido pra compra da IA, o pré-requisito é
+        // inobtenível de propósito — libera a cadeia pra a AI comprar o elite direto (senão o ban
+        // do básico travaria também o elite, e a AI cairia em counters baratos).
+        if (unit.eliteFrom.bannedOnHardMode
+            && AIController.Instance != null && AIController.Instance.HardMode)
+            return true;
         foreach (UnitManager owned in snapshot.MyUnits)
             if (owned != null && owned.TryGetUnitData(out UnitData data) && data == unit.eliteFrom)
                 return true;

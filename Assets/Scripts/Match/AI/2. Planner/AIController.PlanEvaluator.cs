@@ -57,6 +57,11 @@ public partial class AIController
             intel);
         AIAnchorPlanContext anchorContext = BuildAnchorPlanContext(aiTeam, snapshot.TurnNumber);
 
+        // Monitora a invasão em voo (sobre o plano do turno anterior) ANTES do Passo 1 ler a
+        // supressão: se a operação fracassou (colapso/estagnação), limpa o GoGreen aqui pra que o
+        // Passo 1 já reabra a montagem da 2ª onda neste mesmo turno.
+        UpdateInvasionMonitor(plan, aiTeam, snapshot);
+
         // A invasao (base inimiga ">>") so persiste enquanto a AI GOVERNA algum rally. Sem rally
         // held, o objetivo de invasao e dissolvido no Passo 1 e suas unidades voltam ao pool.
         bool anyRallyHeld = AnyOwnedRallyHeld(aiTeam, rallyContext);

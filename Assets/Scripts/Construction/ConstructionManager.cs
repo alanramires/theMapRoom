@@ -1151,10 +1151,19 @@ public class ConstructionManager : MonoBehaviour
         if (!isRallyPoint || !IsOwnedByRallyOwnerSlot())
             return AIRallyAssemblyState.None;
 
-        if (AIController.TryGetRallyHudState(rallyOwnerSlotIndex, sector, out AIRallyAssemblyState state, out _, out isMain))
-            return state;
+        bool hasState = AIController.TryGetRallyHudState(
+            rallyOwnerSlotIndex, sector, out AIRallyAssemblyState state, out _, out isMain);
 
-        return AIRallyAssemblyState.WaitHold;
+        // A luz segue a OPERAÇÃO, não a massa parada no ancoradouro: enquanto a invasão lançada
+        // está em voo (supressão ativa), mostra verde — mesmo sem rally objective ativo e mesmo
+        // após um load (a supressão é persistida). Quando a operação falha, o monitor limpa o
+        // GoGreen, a supressão solta e a luz volta ao estado real da re-montagem (amarelo).
+        TryAutoAssignMatchController();
+        int turn = matchController != null ? matchController.CurrentTurn : -1;
+        if (turn >= 0 && AIController.IsRallyGoGreenSuppressedForHud(teamId, sector, turn))
+            return AIRallyAssemblyState.GoGreen;
+
+        return hasState ? state : AIRallyAssemblyState.WaitHold;
     }
 
     public void RefreshRuntimeVisualState(bool force = true)

@@ -15,6 +15,24 @@ public partial class AIController
         return UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto);
     }
 
+    // Skill "Precisa de Reboque" (id "precisaReboque"): a unidade só embarca em slots dedicados de
+    // reboque (ex.: Artilharia de Campanha rebocada pelo Suprimentos). Cercamos o embarque no
+    // supridor por ESTA skill — não por papel/nome — então só quem de fato é rebocado é afetado.
+    private const string TowRequiredSkillId = "precisaReboque";
+
+    private static bool UnitNeedsTow(UnitManager unit)
+    {
+        if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null || data.skills == null)
+            return false;
+        for (int i = 0; i < data.skills.Count; i++)
+        {
+            SkillData skill = data.skills[i];
+            if (skill != null && skill.id == TowRequiredSkillId)
+                return true;
+        }
+        return false;
+    }
+
     private static bool IsLongRangeStationary(UnitManager unit)
     {
         return unit != null

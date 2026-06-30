@@ -40,6 +40,7 @@ public partial class AIController
                 UpdateRepairState(u, activePlan);
         }
 
+        _sortIsInvading = snapshot.IsInvading;
         _groupCache.Clear();
         foreach (UnitManager u in units)
             _groupCache[u.InstanceId] = GetInitiativeGroup(u, activePlan, aiTeam);

@@ -13,6 +13,11 @@ public class AIWorldSnapshot
     public int AISlotIndex = -1;
     public int TurnNumber;
     public AIStance Stance;
+    // Macro-estado ORTOGONAL à postura: a IA pode estar Offensive E invadindo ao mesmo tempo.
+    // Por isso é uma flag, não um valor de AIStance — invasão não substitui a postura ofensiva
+    // (substituí-la quebraria os gates "== Offensive"). True enquanto uma operação GoGreen estiver
+    // em andamento (janela de supressão). Persiste no save via rallyGoGreenTurns.
+    public bool IsInvading;
 
     public List<UnitManager> MyUnits          = new List<UnitManager>();
     public List<UnitManager> EnemyUnits       = new List<UnitManager>();
@@ -65,6 +70,7 @@ public class AIWorldSnapshot
         }
 
         snap.Stance = CalculateStance(snap);
+        snap.IsInvading = AIController.GetGoGreenInvasionForInspection(aiTeam, snap.TurnNumber).Active;
         return snap;
     }
 
@@ -104,6 +110,9 @@ public class AIWorldSnapshot
             }
         }
 
+        // IsInvading é barato (lookup no rallyGoGreenTurns) e é consumido por handlers da Fase 2
+        // (ex.: gate de embarque de artilharia). Diferente de Stance, vale popular no Light.
+        snap.IsInvading = AIController.GetGoGreenInvasionForInspection(aiTeam, snap.TurnNumber).Active;
         return snap;
     }
 

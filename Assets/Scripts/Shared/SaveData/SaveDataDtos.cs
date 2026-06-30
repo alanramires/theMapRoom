@@ -102,6 +102,20 @@ public class AIObjectivePlanSaveData
     public List<int> rogueUnitIds = new List<int>();
     public List<int> handoffVacaterIds = new List<int>();
     public List<int> vacaterForwardSectors = new List<int>();
+    // Estado da operação GoGreen/Invasão. Após o GoGreen o objetivo RallyAssembly é removido do
+    // plano (a massa marcha para a base inimiga), então a invasão "em andamento" não vive em
+    // nenhum SectorObjective — precisa ser persistida à parte para sobreviver ao save/load.
+    public List<AIGoGreenTurnSaveData> goGreenTurns = new List<AIGoGreenTurnSaveData>();
+    // Monitor de desfecho da invasão (re-montagem por fracasso). -1 = sem medição.
+    public int invasionBestDistance = -1;
+    public int invasionStallCounter = 0;
+}
+
+[Serializable]
+public class AIGoGreenTurnSaveData
+{
+    public int sector;
+    public int turn;
 }
 
 [Serializable]

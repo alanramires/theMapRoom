@@ -165,9 +165,16 @@ public class ShoppingPressureWindow : EditorWindow
         foreach (AIShoppingDemand d in demands) totalDemand += Mathf.Max(0, d.Count);
         int objCount = plan != null ? plan.Objectives.Count : 0;
 
+        // Invasão é um macro-estado sobreposto à postura ofensiva (não um valor de AIStance — isso
+        // quebraria as dezenas de gates "== Offensive" que dirigem ar/fogo/compra). A flag vem do
+        // snapshot (snapshot.IsInvading); os setores/turno vêm da inspeção para detalhar o bloco.
+        AIController.GoGreenInvasionInspection invasion =
+            AIController.GetGoGreenInvasionForInspection(team, snapshot.TurnNumber);
+        string stanceLabel = snapshot.IsInvading ? "Invasão" : snapshot.Stance.ToString();
+
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
         EditorGUILayout.LabelField(
-            $"[{team}] T{snapshot.TurnNumber}  •  stance={snapshot.Stance}  •  budget={snapshot.Budget}  •  renda={snapshot.IncomePerTurn}",
+            $"[{team}] T{snapshot.TurnNumber}  •  stance={stanceLabel}  •  budget={snapshot.Budget}  •  renda={snapshot.IncomePerTurn}",
             _header);
         EditorGUILayout.LabelField($"objetivos={objCount}  •  demandas na fila={demands.Count}  •  unidades pedidas={totalDemand}", _subtle);
 
@@ -196,12 +203,12 @@ public class ShoppingPressureWindow : EditorWindow
             $"força: {macro.OwnForce} suas / {macro.EnemyForce} inimigas conhecidas  ({macro.ForceRatio:P0})",
             _subtle);
 
-        DrawGoGreenHeader(plan);
+        DrawGoGreenHeader(plan, invasion);
 
         EditorGUILayout.EndVertical();
     }
 
-    private void DrawGoGreenHeader(TeamObjectivePlan plan)
+    private void DrawGoGreenHeader(TeamObjectivePlan plan, AIController.GoGreenInvasionInspection invasion)
     {
         var rallies = new List<SectorObjective>();
         if (plan?.Objectives != null)
@@ -215,6 +222,19 @@ public class ShoppingPressureWindow : EditorWindow
         EditorGUILayout.LabelField("GO GREEN", EditorStyles.boldLabel);
         if (rallies.Count == 0)
         {
+            // Após o GoGreen o objetivo RallyAssembly é removido do plano (a massa marcha para a
+            // base inimiga), então não há rally ativo — mas a invasão segue em andamento dentro da
+            // janela de supressão. Reflete isso em vez de dizer "sem rally".
+            if (invasion.Active)
+            {
+                string sectors = string.Join(", ", invasion.Sectors);
+                EditorGUILayout.LabelField(
+                    $"  ⚑ Invasão em Andamento: {sectors}"
+                        + (invasion.SinceTurn >= 0 ? $"  ·  desde T{invasion.SinceTurn}" : ""),
+                    _subtle);
+                return;
+            }
+
             EditorGUILayout.LabelField("  sem rally de invasão ativo", _subtle);
             return;
         }

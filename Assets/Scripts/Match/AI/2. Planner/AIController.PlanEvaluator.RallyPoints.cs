@@ -19,13 +19,29 @@ public partial class AIController
     private const int RallyIntelRadius = 6;
     private const int RallyLogisticsRadius = 5;
     private const int RallyAssemblyTimeoutTurns = 4;
-    private const int RallyGoGreenSuppressTurns = 8;
+    // Após o GoGreen a supressão NÃO solta mais no relógio: o release é por DESFECHO (a invasão
+    // fracassou — colapso ou estagnação — via UpdateInvasionMonitor). Este valor é só um TETO de
+    // segurança pra um sensor bugado não suprimir pra sempre.
+    private const int RallyGoGreenSuppressTurns = 12;
+    // Invasão pós-GoGreen: monitor de desfecho (re-montagem da 2ª onda quando a operação falha).
+    private const int InvasionGraceTurns = 2;          // não julga antes da onda formar/avançar
+    private const int InvasionStallTurns = 3;          // turnos sem progresso => estagnou
+    private const int InvasionAssaultGateRange = 2;    // <=2h do alvo = assaltando, não travado
     // Foco pegajoso: o foco da operação só troca se outro rally bater o atual por esta margem.
     private const float RallyFocusSwitchMargin = 1.5f;
     private static readonly Dictionary<string, int> rallyGoGreenTurns = new Dictionary<string, int>();
     private static readonly Dictionary<string, AIRallyHudSnapshot> rallyHudStates = new Dictionary<string, AIRallyHudSnapshot>();
+    // Monitor da operação de invasão POR TIME (a força de invasão é team-global — união das
+    // unidades nos objetivos de base inimiga, não atrelada a um rally específico).
+    private static readonly Dictionary<TeamId, InvasionMonitor> invasionMonitors = new Dictionary<TeamId, InvasionMonitor>();
     // Memória do FocusSector por time, para hysteresis (não drenar um rally que já monta massa).
     private static readonly Dictionary<TeamId, ConstructionSector> rallyFocusMemory = new Dictionary<TeamId, ConstructionSector>();
+
+    private struct InvasionMonitor
+    {
+        public int BestDistance;   // menor distância-terrestre já alcançada da força -> alvo (MaxValue = sem medição)
+        public int StallCounter;   // turnos seguidos sem melhorar BestDistance (fora de hold legítimo)
+    }
 
     private struct AIRallyPlanContext
     {
@@ -1059,6 +1075,266 @@ public partial class AIController
         string key = $"{(int)aiTeam}:{sector}";
         return rallyGoGreenTurns.TryGetValue(key, out int goTurn)
             && turnNumber - goTurn <= RallyGoGreenSuppressTurns;
+    }
+
+    // Inspeção (HUD/Shopping Pressure): há uma invasão GoGreen em andamento para o time? Após o
+    // GoGreen, o objetivo RallyAssembly é REMOVIDO do plano (a massa volta ao plano ofensivo e
+    // marcha para a base inimiga), então o painel não vê mais nenhum rally — mas a operação segue.
+    // Considera "em andamento" enquanto o GoGreen estiver dentro da janela de supressão.
+    public struct GoGreenInvasionInspection
+    {
+        public bool Active;
+        public List<ConstructionSector> Sectors;  // setores que viraram GoGreen na operação
+        public int SinceTurn;                      // turno do GoGreen mais antigo ainda ativo
+    }
+
+    public static GoGreenInvasionInspection GetGoGreenInvasionForInspection(TeamId aiTeam, int turnNumber)
+    {
+        var result = new GoGreenInvasionInspection
+        {
+            Sectors = new List<ConstructionSector>(),
+            SinceTurn = -1
+        };
+        if (turnNumber < 0)
+            return result;
+
+        string prefix = $"{(int)aiTeam}:";
+        foreach (KeyValuePair<string, int> entry in rallyGoGreenTurns)
+        {
+            if (!entry.Key.StartsWith(prefix, System.StringComparison.Ordinal))
+                continue;
+            if (turnNumber - entry.Value > RallyGoGreenSuppressTurns)
+                continue;
+
+            string sectorName = entry.Key.Substring(prefix.Length);
+            if (!System.Enum.TryParse(sectorName, out ConstructionSector sector)
+                || sector == ConstructionSector.None)
+                continue;
+
+            result.Sectors.Add(sector);
+            if (result.SinceTurn < 0 || entry.Value < result.SinceTurn)
+                result.SinceTurn = entry.Value;
+        }
+
+        result.Active = result.Sectors.Count > 0;
+        return result;
+    }
+
+    // --- Persistência do estado GoGreen/Invasão (save/load) -------------------------------------
+    // rallyGoGreenTurns é estático e não vive em nenhum SectorObjective depois que o objetivo de
+    // rally é removido no GoGreen. Os helpers abaixo deixam o ObjectiveManager exportar/importar
+    // essas entradas junto do plano para que a invasão "em andamento" sobreviva ao save/load.
+
+    public static void CollectGoGreenTurnsForTeam(
+        TeamId aiTeam,
+        List<ConstructionSector> sectorsOut,
+        List<int> turnsOut)
+    {
+        if (sectorsOut == null || turnsOut == null)
+            return;
+
+        string prefix = $"{(int)aiTeam}:";
+        foreach (KeyValuePair<string, int> entry in rallyGoGreenTurns)
+        {
+            if (!entry.Key.StartsWith(prefix, System.StringComparison.Ordinal))
+                continue;
+            string sectorName = entry.Key.Substring(prefix.Length);
+            if (!System.Enum.TryParse(sectorName, out ConstructionSector sector)
+                || sector == ConstructionSector.None)
+                continue;
+            sectorsOut.Add(sector);
+            turnsOut.Add(entry.Value);
+        }
+    }
+
+    public static void ClearGoGreenTurnsForTeam(TeamId aiTeam)
+    {
+        string prefix = $"{(int)aiTeam}:";
+        var toRemove = new List<string>();
+        foreach (string key in rallyGoGreenTurns.Keys)
+            if (key.StartsWith(prefix, System.StringComparison.Ordinal))
+                toRemove.Add(key);
+        foreach (string key in toRemove)
+            rallyGoGreenTurns.Remove(key);
+    }
+
+    public static void RestoreGoGreenTurn(TeamId aiTeam, ConstructionSector sector, int turnNumber)
+    {
+        RememberRallyGoGreen(aiTeam, sector, turnNumber);
+    }
+
+    // Acesso público pro semáforo (ConstructionManager): enquanto a operação está em voo (supressa),
+    // o ponto de rally mostra verde — a luz segue a OPERAÇÃO, não a massa parada no ancoradouro.
+    public static bool IsRallyGoGreenSuppressedForHud(TeamId aiTeam, ConstructionSector sector, int turnNumber)
+    {
+        return IsRallyGoGreenSuppressed(aiTeam, sector, turnNumber);
+    }
+
+    public static void GetInvasionMonitorForSave(TeamId aiTeam, out int bestDistance, out int stallCounter)
+    {
+        if (invasionMonitors.TryGetValue(aiTeam, out InvasionMonitor m))
+        {
+            bestDistance = m.BestDistance == int.MaxValue ? -1 : m.BestDistance;
+            stallCounter = m.StallCounter;
+        }
+        else
+        {
+            bestDistance = -1;
+            stallCounter = 0;
+        }
+    }
+
+    public static void RestoreInvasionMonitor(TeamId aiTeam, int bestDistance, int stallCounter)
+    {
+        if (bestDistance < 0 && stallCounter <= 0)
+        {
+            invasionMonitors.Remove(aiTeam);
+            return;
+        }
+        invasionMonitors[aiTeam] = new InvasionMonitor
+        {
+            BestDistance = bestDistance < 0 ? int.MaxValue : bestDistance,
+            StallCounter = Mathf.Max(0, stallCounter)
+        };
+    }
+
+    // --- Monitor de desfecho da invasão (re-montagem da 2ª onda) --------------------------------
+    // Roda no topo do BuildObjectivePlan, sobre o plano do turno anterior (a onda em voo). Detecta
+    // fracasso por OR(colapso, estagnação) e, quando falha, LIMPA o registro GoGreen do time — o
+    // que solta a supressão e faz os rallies reabrirem montagem (2ª onda pelo portão normal). A
+    // frente sobrevivente NÃO recua: continua nos slots do objetivo de base.
+    private void UpdateInvasionMonitor(TeamObjectivePlan plan, TeamId aiTeam, AIWorldSnapshot snapshot)
+    {
+        if (plan == null || snapshot == null)
+            return;
+
+        int turn = snapshot.TurnNumber;
+
+        // Operação em voo? (algum rally GoGreen registrado). Sem isso, não há o que monitorar.
+        var ggSectors = new List<ConstructionSector>();
+        var ggTurns = new List<int>();
+        CollectGoGreenTurnsForTeam(aiTeam, ggSectors, ggTurns);
+        if (ggTurns.Count == 0)
+        {
+            invasionMonitors.Remove(aiTeam);
+            return;
+        }
+        int earliestGoGreen = int.MaxValue;
+        foreach (int t in ggTurns)
+            if (t < earliestGoGreen) earliestGoGreen = t;
+
+        // Força de invasão = unidades vivas atribuídas aos objetivos de base inimiga.
+        SectorObjective baseObj = null;
+        var force = new List<UnitManager>();
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj == null || !ConstructionSectorHelper.IsBase(obj.Sector)) continue;
+            if (FindHQTeamInSector(obj.Sector) == aiTeam) continue;
+            baseObj = obj;
+            if (obj.Slots == null) continue;
+            foreach (SlotNeed slot in obj.Slots)
+            {
+                if (slot == null || !slot.Filled) continue;
+                UnitManager u = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                if (u != null && !u.IsDead) force.Add(u);
+            }
+        }
+
+        // Sem objetivo de base = operação encerrada (sucesso/dissolvida): limpa silenciosamente.
+        if (baseObj == null)
+        {
+            ClearGoGreenTurnsForTeam(aiTeam);
+            invasionMonitors.Remove(aiTeam);
+            return;
+        }
+
+        Vector3Int target = ResolveInvasionTargetCell(baseObj, snapshot, aiTeam);
+        int cur = int.MaxValue;
+        int liveAssault = 0;
+        bool inContact = false;
+        foreach (UnitManager u in force)
+        {
+            if (u.TryGetUnitData(out UnitData d) && d != null
+                && UnitRoleCompatibility.CanSatisfy(d, UnitRole.Assalto))
+                liveAssault++;
+
+            Vector3Int c = u.CurrentCellPosition; c.z = 0;
+            int dist = SectorManager.TryGetLandMovementDistance(c, target, out int td)
+                ? td
+                : Mathf.RoundToInt(SectorManager.HexDistance(c, target));
+            if (dist < cur) cur = dist;
+            if (!inContact) inContact = IsAdjacentToVisibleEnemy(c, snapshot);
+        }
+
+        InvasionMonitor mon = invasionMonitors.TryGetValue(aiTeam, out InvasionMonitor prev)
+            ? prev
+            : new InvasionMonitor { BestDistance = int.MaxValue, StallCounter = 0 };
+
+        if (cur != int.MaxValue)
+        {
+            bool atGate = cur <= InvasionAssaultGateRange;
+            if (cur < mon.BestDistance)
+            {
+                mon.BestDistance = cur;     // progrediu -> zera estagnação
+                mon.StallCounter = 0;
+            }
+            else if (!atGate && !inContact)
+            {
+                mon.StallCounter++;         // parado e fora de hold legítimo
+            }
+            // atGate (assaltando) ou inContact (lutando): hold legítimo, não conta estagnação.
+        }
+
+        bool graceOver = turn - earliestGoGreen >= InvasionGraceTurns;
+        bool collapse = graceOver && liveAssault == 0;
+        bool stall = graceOver && mon.StallCounter >= InvasionStallTurns;
+
+        if (collapse || stall)
+        {
+            Debug.Log($"{TL("Plan")} invasão FRACASSOU (" +
+                (collapse ? "colapso: 0 assalto vivo na força" : $"estagnação: {mon.StallCounter}T sem progresso, best={mon.BestDistance}h") +
+                ") -> libera re-montagem (2ª onda); frente mantém posição");
+            ClearGoGreenTurnsForTeam(aiTeam);   // solta supressão -> rallies reabrem montagem
+            invasionMonitors.Remove(aiTeam);
+            // Zera o marcador de GoGreen dos objetivos pra que a 2ª onda registre um GoGreen LIMPO
+            // (re-estabelecendo a supressão) em vez de ser bloqueada pelo marcador da onda falha.
+            foreach (SectorObjective obj in plan.Objectives)
+                if (obj != null && obj.RallyGoGreenTurn >= 0)
+                    obj.RallyGoGreenTurn = -1;
+            return;
+        }
+
+        invasionMonitors[aiTeam] = mon;
+    }
+
+    private Vector3Int ResolveInvasionTargetCell(SectorObjective baseObj, AIWorldSnapshot snapshot, TeamId aiTeam)
+    {
+        ConstructionManager tgt = FindCapturableInSector(baseObj.Sector, aiTeam);
+        if (tgt != null)
+        {
+            Vector3Int c = tgt.CurrentCellPosition; c.z = 0;
+            return c;
+        }
+        if (snapshot.EnemyHQ != null)
+        {
+            Vector3Int hq = snapshot.EnemyHQ.CurrentCellPosition; hq.z = 0;
+            return hq;
+        }
+        return Vector3Int.zero;
+    }
+
+    private static bool IsAdjacentToVisibleEnemy(Vector3Int cell, AIWorldSnapshot snapshot)
+    {
+        if (snapshot?.EnemyUnits == null)
+            return false;
+        foreach (UnitManager e in snapshot.EnemyUnits)
+        {
+            if (e == null || e.IsDead) continue;
+            Vector3Int ec = e.CurrentCellPosition; ec.z = 0;
+            if (SectorManager.HexDistance(cell, ec) <= 1f)
+                return true;
+        }
+        return false;
     }
 
     private static bool IsRallySectorHeldByTeam(SectorManager.SectorInfo info, TeamId aiTeam)

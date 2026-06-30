@@ -73,6 +73,10 @@ public partial class AIController
             if (candidateData.roles != null && candidateData.roles.Count > 0
                 && candidateData.roles[0] == UnitRole.Capturador) continue;
 
+            // Fora da invasão a unidade de reboque não embarca (TryDecideFireSupportEmbarkAction
+            // bloqueia), então sair para rebocá-la só desperdiça movimento do supridor — ignora-a.
+            if (!snapshot.IsInvading && UnitNeedsTow(candidate)) continue;
+
             // Slot compatibility check — reboque skill requirement verified here via PodeEmbarcarSensor.
             if (FindFittingSlotIndex(transporter, transporterData, candidate, candidateData) < 0) continue;
 

@@ -326,6 +326,26 @@ public partial class AIController
                         continue;
                     }
                     Vector3Int cc = opt.candidateUnit.CurrentCellPosition; cc.z = 0;
+
+                    // Segurança da fusão, duas camadas:
+                    // (1) SEMPRE — nunca fundir na cara do inimigo. Mesma noção de segurança do evac
+                    //     (IsEvacDropCellSafe): sem inimigo no hex e sem inimigo visível por perto.
+                    //     Direction-agnostic, vale em qualquer orientação.
+                    if (!IsEvacDropCellSafe(cc, aiTeam))
+                    {
+                        Debug.Log($"[Repair] skip fusão {opt.candidateUnit.InstanceId}: {cc} sob ameaça inimiga");
+                        continue;
+                    }
+                    // (2) NA INVASÃO — além disso, só na RETAGUARDA SEGURA (atrás da linha): as
+                    //     unidades de reparo empurradas pra frente pela iniciativa acabavam se
+                    //     fundindo no raio do HQ inimigo. A geometria de retaguarda só é confiável
+                    //     na invasão (a âncora é o HQ inimigo), por isso fica gated aqui.
+                    if (snapshot.IsInvading && !IsCellInSafeRear(unit, snapshot, cc))
+                    {
+                        Debug.Log($"[Repair] skip fusão {opt.candidateUnit.InstanceId}: {cc} fora da retaguarda segura (vanguarda/HQ inimigo)");
+                        continue;
+                    }
+
                     float score = 0f;
                     if (defensiveRepCells.Contains(cc)) score += 20f;
                     else

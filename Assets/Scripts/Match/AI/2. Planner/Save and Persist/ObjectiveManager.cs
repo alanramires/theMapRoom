@@ -214,6 +214,21 @@ public class ObjectiveManager : MonoBehaviour
                     savedPlan.vacaterForwardSectors.Add((int)sector);
             }
 
+            // Estado GoGreen/Invasão vive num dicionário estático (não num SectorObjective depois
+            // que o rally é removido no GoGreen): exporta para persistir a invasão em andamento.
+            var goGreenSectors = new List<ConstructionSector>();
+            var goGreenTurns = new List<int>();
+            AIController.CollectGoGreenTurnsForTeam(plan.Team, goGreenSectors, goGreenTurns);
+            for (int i = 0; i < goGreenSectors.Count; i++)
+                savedPlan.goGreenTurns.Add(new AIGoGreenTurnSaveData
+                {
+                    sector = (int)goGreenSectors[i],
+                    turn = goGreenTurns[i]
+                });
+            AIController.GetInvasionMonitorForSave(plan.Team, out int invBest, out int invStall);
+            savedPlan.invasionBestDistance = invBest;
+            savedPlan.invasionStallCounter = invStall;
+
             if (plan.Objectives != null)
             {
                 foreach (SectorObjective obj in plan.Objectives)
@@ -289,6 +304,20 @@ public class ObjectiveManager : MonoBehaviour
                 foreach (int sector in savedPlan.vacaterForwardSectors)
                     plan.VacaterForwardSectors.Add((ConstructionSector)sector);
             }
+
+            // Repõe o estado GoGreen/Invasão estático. Limpa as entradas do time antes para o load
+            // não acumular sobre uma partida anterior em memória.
+            AIController.ClearGoGreenTurnsForTeam(plan.Team);
+            if (savedPlan.goGreenTurns != null)
+            {
+                foreach (AIGoGreenTurnSaveData gg in savedPlan.goGreenTurns)
+                {
+                    if (gg == null)
+                        continue;
+                    AIController.RestoreGoGreenTurn(plan.Team, (ConstructionSector)gg.sector, gg.turn);
+                }
+            }
+            AIController.RestoreInvasionMonitor(plan.Team, savedPlan.invasionBestDistance, savedPlan.invasionStallCounter);
 
             if (savedPlan.objectives != null)
             {

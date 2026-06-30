@@ -155,7 +155,12 @@ public partial class AIController
 
         // Manutencao nao preempta a fila. Se estiver em cima de alvo de captura,
         // IsBlockingCaptureTarget ja colocou no grupo 0 acima.
-        if (unit.IsUnderRepair) return 5;
+        // EXCEÇÃO — durante a INVASÃO (IsInvading): a unidade FERIDA (em reparo) sai na frente
+        // (grupo 1) em vez de por último (grupo 5), pra liberar o corredor de avanço antes da
+        // coluna pathear pelo hex dela. "Ferida" é o estado IsUnderRepair (definido pelo repair
+        // decision no unit data) — não fração de HP. Aqui só antecipamos a ORDEM da ação dela;
+        // recuar/curar/seguir continua sendo decidido pelo handler dela.
+        if (unit.IsUnderRepair) return _sortIsInvading ? 1 : 5;
 
         // Intel dedicada (EWACS/radar movel) age cedo para iluminar alvos
         // antes da artilharia, aviação e assalto consumirem suas ações.

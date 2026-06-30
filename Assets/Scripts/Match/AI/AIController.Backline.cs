@@ -91,4 +91,21 @@ public partial class AIController
         UnitRole role = UnitRoleCompatibility.ResolveCompositionRole(data);
         return role == UnitRole.Capturador || role == UnitRole.Assalto;
     }
+
+    // A célula está na RETAGUARDA SEGURA (atrás da linha de combate, não na vanguarda / raio do HQ
+    // inimigo)? Usa a ferramenta de retaguarda com o HQ inimigo como referência de "frente". Sem
+    // linha de combatentes ou sem HQ inimigo conhecido, não restringe (retorna true) — o chamador
+    // mantém o comportamento anterior. Complementa decisões como a fusão de unidades em reparo.
+    private bool IsCellInSafeRear(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell)
+    {
+        if (snapshot == null || snapshot.EnemyHQ == null)
+            return true;
+
+        Vector3Int anchor = snapshot.EnemyHQ.CurrentCellPosition;
+        anchor.z = 0;
+        if (!TryScoreBacklineCell(unit, snapshot, cell, anchor, out AIBacklineScore score))
+            return true;
+
+        return score.InRearSlice && !score.IsVanguard;
+    }
 }
