@@ -76,6 +76,7 @@ public class BattleMapMenuRootController : MonoBehaviour
     private SaveGameManager saveGameManager;
     private CameraController cameraController;
     private MatchController matchController;
+    private ReplayManager replayManager;
     private RectTransform menuRootRect;
     private Vector2 originalAnchorMin;
     private Vector2 originalAnchorMax;
@@ -194,6 +195,10 @@ public class BattleMapMenuRootController : MonoBehaviour
                     return false;
 
                 pendingOpenOnNextNeutral = true;
+                // Pausa a IA imediatamente (ponto seguro, igual ao F10): ela termina o batch atual e
+                // para antes do proximo. Sem isso a IA continuaria iniciando batches e o menu so abriria
+                // numa janela curta entre eles. O resume acontece ao fechar o menu (TryExitPlayerMenuStateToNeutral).
+                AIController.Instance?.SetPlayerPaused(true);
                 PanelDialogController.TrySetTransientText("Pausa da simulacao solicitada. Abrindo menu no proximo Neutral.", 2.4f);
                 cursorController?.PlayBeepSfx();
                 return true;
@@ -396,6 +401,16 @@ public class BattleMapMenuRootController : MonoBehaviour
         RefreshButtonInteractability();
         SetPanel(MenuPanel.Menu, resetIndex: true);
         PanelDialogController.ClearExternalText();
+        ApplyPlayerMenuAiPauseIfNeeded();
+    }
+
+    // Pause de JOGADOR: enquanto o menu in-game do jogador está aberto durante o turno da IA, segura
+    // o loop da IA (limpo, sem AI STEP do F10). Retomado em TryExitPlayerMenuStateToNeutral. Só pausa
+    // no turno da IA — durante o turno do jogador a IA nem está rodando.
+    private void ApplyPlayerMenuAiPauseIfNeeded()
+    {
+        if (matchController != null && matchController.IsPlayerInputLockedByActiveAI())
+            AIController.Instance?.SetPlayerPaused(true);
     }
 
     private bool RestoreMenuFromStateStack(TurnStateManager.CursorState exitedState)
@@ -426,6 +441,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         ScheduleRestoreSelectionNextFrame();
         PanelDialogController.ClearExternalText();
         restoredFromStateStackFrame = Time.frameCount;
+        // Menu reaberto (ex.: voltando de save/load) durante o turno da IA → mantém a IA pausada.
+        ApplyPlayerMenuAiPauseIfNeeded();
         return true;
     }
 
@@ -1088,6 +1105,12 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (turnStateManager.IsScannerActionExecutionInProgress)
             return false;
 
+        // Espera o batch da IA terminar de verdade (animacao de movimento, step routines e scanner),
+        // mesmo guarda usado pelo F10 em ExecuteAIBatchWithDebugStep. Sem isso o menu abriria no meio
+        // de um batch de movimento simples, quando o cursor volta a Neutral mas a animacao ainda roda.
+        if (replayManager != null && replayManager.IsStepExecutionBusy)
+            return false;
+
         return true;
     }
 
@@ -1177,6 +1200,7 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (saveGameManager == null) saveGameManager = FindInActiveScene<SaveGameManager>();
         if (cameraController == null) cameraController = FindInActiveScene<CameraController>();
         if (matchController == null) matchController = FindInActiveScene<MatchController>();
+        if (replayManager == null) replayManager = FindInActiveScene<ReplayManager>();
     }
 
     private void CacheOriginalDockLayoutIfNeeded()

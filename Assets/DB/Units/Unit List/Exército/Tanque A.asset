@@ -34,6 +34,7 @@ MonoBehaviour:
   roles: 02000000
   aiInitiative: 1
   aiPurchaseMode: 1
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 2
     priority: 2
@@ -101,7 +102,7 @@ MonoBehaviour:
     canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: c2c0a4bea373d0149a3157223b14f3dd, type: 2}
   - weapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
-    squadAmmunition: 9
+    squadAmmunition: 6
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0

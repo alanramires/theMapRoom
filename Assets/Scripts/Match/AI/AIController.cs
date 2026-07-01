@@ -143,6 +143,9 @@ public partial class AIController : MonoBehaviour
     // Estado da IA
     private bool   isActive;
     private bool   isDebugPaused;
+    // Pause de JOGADOR (menu in-game aberto durante o turno da IA). Separado do isDebugPaused (F10):
+    // sem maquinaria de AI STEP/RESUME — só segura o loop enquanto o menu do jogador está aberto.
+    private bool   isPlayerPaused;
     private bool   isDebugShoppingPaused;
     private Coroutine aiCoroutine;
     private int    aiTurnNumber;

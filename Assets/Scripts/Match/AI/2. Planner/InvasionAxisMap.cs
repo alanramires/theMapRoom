@@ -35,6 +35,7 @@ public class InvasionAxisMap
         public int FrontIndex = -1;                            // indice em Corridor da frente; == Corridor.Count se a frente ja e o rally; -1 indefinido.
         public ConstructionSector FrontSector = ConstructionSector.None; // setor da frente (None se eixo completo).
         public bool Complete;                                  // corredor inteiro + rally ja sao do time.
+        public bool IsInvasionAxis;                            // 4o eixo sintetico HQ->QG inimigo (captura final).
     }
 
     private readonly Dictionary<ConstructionSector, int> sectorToEixo = new Dictionary<ConstructionSector, int>();
@@ -117,7 +118,7 @@ public class InvasionAxisMap
             if (c.IsPlayerHeadQuarter) allHqs.Add(c);
             if (c.IsRallyPoint) rallies.Add(c);
         }
-        if (allHqs.Count == 0 || rallies.Count == 0)
+        if (allHqs.Count == 0)
             return map;
 
         // Agrupa rallys pelo HQ-apex (dono). Espelha DrawInvasionAxes do editor:
@@ -131,9 +132,6 @@ public class InvasionAxisMap
             if (!porHQ.TryGetValue(hq, out List<ConstructionManager> lista)) { lista = new List<ConstructionManager>(); porHQ[hq] = lista; }
             lista.Add(rally);
         }
-        if (porHQ.Count == 0)
-            return map;
-
         // Setores de campo (exclui base).
         var setores = new List<SectorManager.SectorInfo>();
         foreach (SectorManager.SectorInfo info in SectorManager.GetAllSectorInfos())
@@ -156,7 +154,94 @@ public class InvasionAxisMap
             ComputeFront(axis, team);
         }
 
+        // 4o eixo: INVASAO (HQ -> QG inimigo). Append depois da numeracao (rally = 1..N, invasao = N+1).
+        map.AppendInvasionAxis(board, team, allHqs);
+
         return map;
+    }
+
+    // Eixo sintetico da captura final: existe desde o inicio como geometria HQ -> QG inimigo.
+    // A base e excluida dos eixos rally e recebe este eixo descritivo dedicado.
+    // fica "fora de eixo" (GetEixo==0) e o builder de transporte nao gera demanda — entao a leva do
+    // A demanda de APC permanece separada e so abre durante GoGreen/IsInvading.
+    private void AppendInvasionAxis(Tilemap board, TeamId team, List<ConstructionManager> allHqs)
+    {
+        if (board == null || allHqs == null)
+            return;
+
+        ConstructionManager hq = null;
+        foreach (ConstructionManager h in allHqs)
+            if (h != null && h.TeamId == team) { hq = h; break; }
+        if (hq == null)
+            return;
+
+        Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
+
+        ConstructionSector plannedBase = ConstructionSector.None;
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(team);
+        if (plan != null && plan.Objectives != null)
+            foreach (SectorObjective obj in plan.Objectives)
+                if (obj != null && obj.ObjectiveType == AIObjectiveType.InvasionAttack)
+                {
+                    plannedBase = obj.Sector;
+                    break;
+                }
+
+        ConstructionManager enemyHq = FindNearestEnemyHq(allHqs, team, hqCell, plannedBase);
+        if (enemyHq == null && plannedBase != ConstructionSector.None)
+            enemyHq = FindNearestEnemyHq(allHqs, team, hqCell, ConstructionSector.None);
+        if (enemyHq == null || sectorToEixo.ContainsKey(enemyHq.Sector))
+            return;
+
+        ConstructionSector baseSector = enemyHq.Sector;
+        Vector3Int baseCell = enemyHq.CurrentCellPosition; baseCell.z = 0;
+
+        Vector3 hqW = board.GetCellCenterWorld(hqCell);
+        Vector3 baseW = board.GetCellCenterWorld(baseCell);
+
+        int idx = axes.Count + 1;
+        var axis = new Axis
+        {
+            EixoIndex = idx,
+            RallyOwnerSlotIndex = hq.SlotIndex,
+            Team = team,
+            RallySector = baseSector,
+            HqCell = hqCell,
+            RallyCell = baseCell,
+            RallyAngleDeg = AngleDeg(hqW, baseW),
+            FrontIndex = 0,
+            FrontSector = baseSector,   // alvo de transporte = a base inimiga
+            Complete = false,
+            IsInvasionAxis = true,
+        };
+        axes.Add(axis);
+        sectorToEixo[baseSector] = idx;
+    }
+
+    private static ConstructionManager FindNearestEnemyHq(
+        List<ConstructionManager> allHqs,
+        TeamId team,
+        Vector3Int hqCell,
+        ConstructionSector requiredSector)
+    {
+        ConstructionManager best = null;
+        float bestDistance = float.MaxValue;
+        foreach (ConstructionManager candidate in allHqs)
+        {
+            if (candidate == null || candidate.TeamId == team)
+                continue;
+            if (requiredSector != ConstructionSector.None && candidate.Sector != requiredSector)
+                continue;
+
+            Vector3Int candidateCell = candidate.CurrentCellPosition;
+            candidateCell.z = 0;
+            float distance = SectorManager.HexDistance(hqCell, candidateCell);
+            if (distance >= bestDistance)
+                continue;
+            bestDistance = distance;
+            best = candidate;
+        }
+        return best;
     }
 
     // Leque angular para um grupo de rallys que compartilham o mesmo HQ-apex.

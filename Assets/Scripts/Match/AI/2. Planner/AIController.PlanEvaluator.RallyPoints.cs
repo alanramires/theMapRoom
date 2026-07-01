@@ -756,6 +756,9 @@ public partial class AIController
         TeamId aiTeam,
         int turnNumber)
     {
+        // Resume pula o BuildObjectivePlan, então re-marca a base inimiga aqui também — senão o 4º
+        // eixo (invasão) não apareceria após o load para um objetivo restaurado como CaptureSector.
+        MarkEnemyBaseObjectivesAsInvasion(plan, aiTeam);
         currentAxisMap = InvasionAxisMap.Build(aiTeam);
         var slottedIds = new HashSet<int>();
         int restored = 0;
@@ -968,6 +971,12 @@ public partial class AIController
         if (obj == null || obj.Slots == null)
             return;
 
+        // Plano de invasão da base inimiga (">>"): a captura final tem peças fortes de fogo indireto,
+        // então o teto é BaseInvasionEliteFireSupportSlots em vez de 1 (setor comum segue 1).
+        int maxFireSupport = (ConstructionSectorHelper.IsBase(obj.Sector) && FindHQTeamInSector(obj.Sector) != aiTeam)
+            ? BaseInvasionEliteFireSupportSlots
+            : 1;
+
         Vector3Int anchor = Vector3Int.zero;
         if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo info))
         {
@@ -980,7 +989,7 @@ public partial class AIController
             if (obj.Slots[i].Role == UnitRole.FogoIndireto)
                 current++;
 
-        while (current > 1)
+        while (current > maxFireSupport)
         {
             int removeIndex = FindRallyExcessSlotIndex(
                 obj,

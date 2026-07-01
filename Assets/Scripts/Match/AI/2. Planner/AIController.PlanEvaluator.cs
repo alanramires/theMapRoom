@@ -37,14 +37,43 @@ public partial class AIController
     // infantaria (cap normal 4 -> teto hard 6).
     private const int HardModeCapturerSlotCap = 6;
 
+    // Plano de invasão da base inimiga (">>") — captura FINAL: precisa das PEÇAS FORTES (assalto +
+    // fogo indireto, atendidos pelo reserve de elite do shopping) E de MASSA barata com suporte. O
+    // modelo de gasto é: as elites são atendidas primeiro; o que sobra do orçamento inunda
+    // capturador (massa, SEM teto — escala com a base), transporte (leva a massa) e logística
+    // (sustenta). Por isso assalto/fogo são demanda MODESTA (não 1:1 com o capturador).
+    private const int BaseInvasionEliteAssaultSlots = 2;        // peça forte: ruptura
+    private const int BaseInvasionEliteFireSupportSlots = 2;    // peça forte: amaciamento
+    private const int BaseInvasionLogisticsSlots = 1;          // sustenta a invasão na frente
+    private const int BaseInvasionTransportCapacity = 2;       // capturadores por APC (ferry da massa)
+
     // Presenca por eixo (eixo 1..N -> nº de unidades do time com aquele aiEixo). Snapshot do
     // campo no inicio do BuildObjectivePlan, usado para decidir rebalanceamento de eixo.
     private Dictionary<int, int> currentEixoPresence;
+
+    // Garante que TODO objetivo de base inimiga no plano esteja marcado InvasionAttack — inclusive
+    // os já existentes (criados antes desta marcação ou restaurados de save antigo), que o Passo 2c
+    // não re-marca (ele só cria objetivos novos). Roda antes de construir o mapa de eixos para o 4º
+    // eixo (invasão) aparecer imediatamente, no fluxo normal e no resume. Critério canônico de base
+    // inimiga, igual ao monitor de invasão e à normalização de fogo.
+    private static void MarkEnemyBaseObjectivesAsInvasion(TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (plan?.Objectives == null)
+            return;
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj == null || obj.ObjectiveType == AIObjectiveType.InvasionAttack)
+                continue;
+            if (ConstructionSectorHelper.IsBase(obj.Sector) && FindHQTeamInSector(obj.Sector) != aiTeam)
+                obj.ObjectiveType = AIObjectiveType.InvasionAttack;
+        }
+    }
 
     private void BuildObjectivePlan(AIWorldSnapshot snapshot)
     {
         TeamId aiTeam = snapshot.AITeam;
         TeamObjectivePlan plan = ObjectiveManager.GetOrCreatePlanForTeam(aiTeam);
+        MarkEnemyBaseObjectivesAsInvasion(plan, aiTeam);
         currentAxisMap = InvasionAxisMap.Build(aiTeam);
         // Presenca por eixo (quantas unidades em cada eixo AGORA, incluindo as que vao dar
         // handoff). Construido antes dos releases para a contagem refletir o campo atual.
@@ -523,26 +552,46 @@ public partial class AIController
                 continue;
             }
 
-            int capturerSlots = Mathf.Clamp(Mathf.CeilToInt(baseInfo.ConstructionCount / 2f), 2, 4);
-            if (hardMode) capturerSlots = Mathf.Min(capturerSlots * 2, HardModeCapturerSlotCap); // Hard Mode: dobra a demanda de capturadores na base inimiga (com teto)
+            // Captura final = PEÇAS FORTES + MASSA. Assalto/fogo são demanda MODESTA de elite (o
+            // reserve de compra prioriza essas peças fortes). Capturador é a MASSA, SEM teto (escala
+            // com a base; Hard Mode dobra): o que sobra do orçamento depois das elites inunda
+            // capturador, transporte e logística. Slot vazio não custa nada.
+            int massCapturerSlots = Mathf.Max(2, baseInfo.ConstructionCount);
+            if (hardMode) massCapturerSlots *= 2;
             var baseObj = new SectorObjective
             {
                 Sector       = baseInfo.Sector,
                 AssignedTeam = aiTeam,
                 Status       = ObjectiveStatus.Pending,
+                // Marca como InvasionAttack: o HUD/Shopping Pressure passa a exibir ">> Invasão" (e
+                // não "Captura"), e a unidade ganha o tratamento de invasão (entrega/fogo) coerente.
+                ObjectiveType = AIObjectiveType.InvasionAttack,
                 Priority     = CalculateSectorPriority(baseInfo, aiTeam, snapshot.Stance)
                     + GetIntelSectorPriorityBonus(intel, baseInfo.Sector)
                     + GetAnchorSectorPriorityBonus(anchorContext, baseInfo.Sector, macro.Phase)
                     + GetRallySectorPriorityBonus(rallyContext, baseInfo.Sector, aiTeam),
             };
-            for (int s = 0; s < capturerSlots; s++)
+            for (int s = 0; s < massCapturerSlots; s++)
                 baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
-            baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
+            for (int s = 0; s < BaseInvasionEliteAssaultSlots; s++)
+                baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
+            for (int s = 0; s < BaseInvasionEliteFireSupportSlots; s++)
+                baseObj.Slots.Add(new SlotNeed { Role = UnitRole.FogoIndireto });
+            // Transportador: leva a massa ao campo. Quando a base é longe, escala com a leva de
+            // capturadores (capacidade por APC) para reposicionar rápido o que foi comprado no QG.
             if (baseInfo.GetDistanceToHQ(aiTeam) >= GetEffectiveTransportThreshold(aiTeam))
-                baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Transportador });
+            {
+                int transportSlots = Mathf.Max(1,
+                    Mathf.CeilToInt(baseInfo.ConstructionCount / (float)BaseInvasionTransportCapacity));
+                for (int s = 0; s < transportSlots; s++)
+                    baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Transportador });
+            }
+            // Logística: sustenta a invasão na frente (reparo/reabastecimento), parte da massa de apoio.
+            for (int s = 0; s < BaseInvasionLogisticsSlots; s++)
+                baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Logistica });
             plan.Objectives.Add(baseObj);
             addedSectors++;
-            Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector}: {capturerSlots}xCap + Assalto construcoes={baseInfo.ConstructionCount} dist={baseInfo.GetDistanceToHQ(aiTeam):F0}h");
+            Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector}: {massCapturerSlots}xCap(massa) + {BaseInvasionEliteAssaultSlots}xAssalto + {BaseInvasionEliteFireSupportSlots}xFogo + {BaseInvasionLogisticsSlots}xLog construcoes={baseInfo.ConstructionCount} dist={baseInfo.GetDistanceToHQ(aiTeam):F0}h");
         }
 
         ClearResolvedCriticalHomeDefenseObjectives(plan, aiTeam);

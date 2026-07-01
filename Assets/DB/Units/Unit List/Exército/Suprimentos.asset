@@ -35,6 +35,7 @@ MonoBehaviour:
   roles: 04000000
   aiInitiative: 2
   aiPurchaseMode: 0
+  bannedOnHardMode: 1
   aiTargetPreferenceByClass: []
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0

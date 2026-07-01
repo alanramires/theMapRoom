@@ -34,6 +34,7 @@ MonoBehaviour:
   roles: 0d000000
   aiInitiative: 1
   aiPurchaseMode: 1
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 3
     priority: 2
@@ -96,14 +97,14 @@ MonoBehaviour:
   autonomyData: {fileID: 0}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: a8f1b8deb50f0a04596f31c015730045, type: 2}
-    squadAmmunition: 9
+    squadAmmunition: 6
     operationRangeMin: 1
     operationRangeMax: 2
     selectedTrajectory: 0
     canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: a8f1b8deb50f0a04596f31c015730045, type: 2}
   - weapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
-    squadAmmunition: 9
+    squadAmmunition: 6
     operationRangeMin: 1
     operationRangeMax: 2
     selectedTrajectory: 0

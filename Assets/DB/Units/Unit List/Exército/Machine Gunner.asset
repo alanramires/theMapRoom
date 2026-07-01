@@ -1,0 +1,115 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
+  m_Name: Machine Gunner
+  m_EditorClassIdentifier: Assembly-CSharp::UnitData
+  id: machinegun
+  displayName: Machine Gunner
+  apelido: MG
+  description: Unidade counter de infantaria
+  spriteDefault: {fileID: 21300000, guid: 7a907eaea1ab79841900f85802c76f8b, type: 3}
+  teamVariantSprites: []
+  maxHP: 10
+  defense: 10
+  armorClass: 0
+  movement: 2
+  visao: 3
+  visionSpecializations: []
+  movementCategory: 4
+  militaryForce: 0
+  unitClass: 0
+  combatClassification: 2
+  roles: 0c000000
+  aiInitiative: 3
+  aiPurchaseMode: 0
+  bannedOnHardMode: 0
+  aiTargetPreferenceByClass:
+  - targetClass: 0
+    priority: 2
+  aiSensorPriority: 010000000000000002000000
+  prioritizeDpqAtBattle: 1
+  playConservative: 0
+  preferMoveOnBestDPQ: 0
+  preferMaxDisplacement: 1
+  longRangeStationary: 0
+  preferRepositionAtWeaponMaxRange: 1
+  preferArtilleryModeBeforeCombatant: 1
+  useAttackDecision: 1
+  attackAcceptHpLossPercent: 50
+  attackEliminationMinPercent: 10
+  attackMustSurvive: 1
+  ignoreAttackDecisionWhenDefending: 0
+  defensiveAttackExtraHpLossPercent: 20
+  repairTriggerHpBelow: 3
+  repairTriggerAutonomyPct: 25
+  repairTriggerAmmoEnabled: 1
+  repairTriggerAmmoPct: 0
+  repairRecoverHpAbove: 8
+  fuseWhileInRepair: 1
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
+  aiPreventiveMaintenanceEnabled: 1
+  aiPreventiveSupplyCanRunWithUnderRepair: 0
+  aiConservativeSupplyAvoidEnemyRange: 2
+  aiPreventiveSupplyHpBelowPct: 70
+  aiPreventiveSupplyAutonomyBelowPct: 60
+  aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
+  eliteLevel: 1
+  eliteFrom: {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+  combatModifiers: []
+  domain: 0
+  heightLevel: 3
+  aditionalDomainsAllowed: []
+  useExplicitPreferredAirHeight: 0
+  preferredAirHeight: 4
+  useExplicitPreferredNavalHeight: 0
+  preferredNavalHeight: 2
+  skills:
+  - {fileID: 11400000, guid: 9c22b855a2e730f4faced0e069dc2a8d, type: 2}
+  - {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
+  - {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
+  stealthSkills: []
+  stealthSkillRules: []
+  autonomyData: {fileID: 0}
+  embarkedWeapons:
+  - weapon: {fileID: 11400000, guid: 4d8e9d2a3dbc4a64f82d3c67c8ff0bb7, type: 2}
+    squadAmmunition: 6
+    operationRangeMin: 1
+    operationRangeMax: 2
+    selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
+    lastSyncedWeapon: {fileID: 11400000, guid: 4d8e9d2a3dbc4a64f82d3c67c8ff0bb7, type: 2}
+  cantUseWeaponsOnTheFollowDomain: []
+  isSupplier: 0
+  supplierTier: 0
+  maxUnitsServedPerTurn: 0
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains: []
+  supplierServicesProvided: []
+  supplierResources: []
+  isTransporter: 0
+  spriteTransport: {fileID: 0}
+  allowedEmbarkWhenTransporterAtTerrains: []
+  allowedEmbarkWhenTransporterAtTerrainStructures: []
+  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtTerrains: []
+  allowedDisembarkWhenTransporterAtTerrainStructures: []
+  allowedDisembarkWhenTransporterAtConstructions: []
+  passengersCanDisembarkAndGoesToTerrains: []
+  passengersCanDisembarkAndGoesToTerrainStructures: []
+  passengersCanDisembarkAndGoesToConstructions: []
+  transportSlots: []
+  autonomia: 30
+  cost: 1500

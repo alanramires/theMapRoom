@@ -115,7 +115,9 @@ public partial class AIShoppingPlanner
         bool aaaThreat = false,
         bool defensiveInfantryThreat = false,
         bool offensiveAntiInfantryFireSupport = false,
-        bool matureEconomyEliteAssaultPivot = false)
+        bool matureEconomyEliteAssaultPivot = false,
+        float enemyInfantryPressure = 0f,
+        float enemyArmorPressure = 0f)
     {
         if (building.OfferedUnits == null || building.OfferedUnits.Count == 0) return null;
 
@@ -177,6 +179,7 @@ public partial class AIShoppingPlanner
 
             bool isPrimaryCapturer   = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Capturador;
             bool isPrimaryAssault    = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Assalto;
+            bool isAggressiveCapturer = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.CapturadorAgressivo;
             bool isPrimaryTransporter = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Transportador;
             bool isPrimaryLogistics = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Logistica;
             bool isPrimaryFireSupport = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.FogoIndireto;
@@ -196,6 +199,9 @@ public partial class AIShoppingPlanner
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — Defensive-only, sem ameaça"); continue; }
             if (defensiveBaseThreat && isOffensiveOnlyUnit)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — Offensive-only, modo defensivo"); continue; }
+
+            if (isAggressiveCapturer && openCapturerSlots <= 0 && openAssaultSlots <= 0)
+            { Debug.Log($"[AI PickUnit] SKIP {u.displayName} - sem demanda capturador/assalto para capturador agressivo"); continue; }
 
             if (isPrimaryCapturer && openCapturerSlots <= 0)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda capturador"); continue; }
@@ -317,6 +323,7 @@ public partial class AIShoppingPlanner
             if (openCapturerSlots > 0)
             {
                 if (isPrimaryCapturer)              score += 100000;
+                else if (isAggressiveCapturer)      score +=  85000;
                 else if (isSecondary && defensiveStance) score +=  10000;
                 else if (openAssaultSlots <= 0 && !(openTransportSlots > 0 && isPrimaryTransporter)) score -= 100000;
             }
@@ -324,21 +331,55 @@ public partial class AIShoppingPlanner
             {
                 if (u == eliteAssaultTarget) score += 500000;
                 if (isPrimaryAssault && !isHybridCapturer) score += 90000;
+                else if (isAggressiveCapturer && openCapturerSlots <= 0) score += 85000;
                 else if (isPrimaryAssault && defensiveStance) score += 10000;
                 else if (isPrimaryAssault) score -= 90000;
                 else if (openCapturerSlots <= 0 && !isPrimaryTransporter) score -= 90000;
+            }
+
+            if (isAggressiveCapturer)
+            {
+                bool antiInfantry = u.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Infantry)
+                    == BazookaTargetPriority.Primary;
+                bool antiArmor = u.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Armored)
+                    == BazookaTargetPriority.Primary;
+                if (antiInfantry)
+                    score += Mathf.RoundToInt(Mathf.Clamp(enemyInfantryPressure, 0f, 6f) * 25000f);
+                if (antiArmor)
+                    score += Mathf.RoundToInt(Mathf.Clamp(enemyArmorPressure, 0f, 6f) * 25000f);
+
+                int sameSpecialists = CountActiveAggressiveCounterSpecialists(snapshot.AITeam,
+                    antiInfantry ? GameUnitClass.Infantry : GameUnitClass.Armored);
+                score -= sameSpecialists * 12000;
             }
 
             if (isAAADefense) score += 320000;
             if (proactiveAntiAir && isSAMType && openFireSupportSlots > 0) score += 420000;
             if (!defensiveStance && u.movement < 3) score -= (3 - u.movement) * 1500;
 
-            string roleStr = isPrimaryIntel ? "INTEL" : isFireSupportCapable && !isPrimaryFireSupport ? "ASS/FIRE" : isPrimaryFireSupport ? "FIRE" : isPrimaryLogistics ? "LOG" : isPrimaryTransporter ? "TRANS" : isPrimaryCapturer ? "CAP" : isPrimaryAssault ? $"ASS(hybrid={isHybridCapturer})" : "other";
+            string roleStr = isPrimaryIntel ? "INTEL" : isFireSupportCapable && !isPrimaryFireSupport ? "ASS/FIRE" : isPrimaryFireSupport ? "FIRE" : isPrimaryLogistics ? "LOG" : isPrimaryTransporter ? "TRANS" : isPrimaryCapturer ? "CAP" : isAggressiveCapturer ? "CAP-AGG" : isPrimaryAssault ? $"ASS(hybrid={isHybridCapturer})" : "other";
             Debug.Log($"[AI PickUnit] {u.displayName} ${u.cost} role={roleStr} score={score} mov={u.movement} | trans={openTransportSlots} transUrg={urgentTransportDemand} log={openLogisticsSlots} intelMobileAir={openMobileAirIntelSlots} cap={openCapturerSlots} ass={openAssaultSlots} fire={openFireSupportSlots} fireDef={preferDefensiveFireSupport} defThreat={defensiveBaseThreat}");
             if (score > bestScore) { bestScore = score; best = u; }
         }
 
         return best;
+    }
+
+    private static int CountActiveAggressiveCounterSpecialists(TeamId aiTeam, GameUnitClass targetClass)
+    {
+        int count = 0;
+        foreach (UnitManager manager in UnitManager.AllActive)
+        {
+            if (manager == null || manager.TeamId != aiTeam || manager.IsDead)
+                continue;
+            if (!manager.TryGetUnitData(out UnitData data) || data == null
+                || data.roles == null || data.roles.Count == 0
+                || data.roles[0] != UnitRole.CapturadorAgressivo)
+                continue;
+            if (data.ResolveAiTargetPriorityForTargetClass(targetClass) == BazookaTargetPriority.Primary)
+                count++;
+        }
+        return count;
     }
 
     private static bool IsPrimaryRole(UnitData unit, UnitRole role)

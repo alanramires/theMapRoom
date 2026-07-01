@@ -1278,6 +1278,9 @@ public partial class TurnStateManager
             return;
 
         Retreat("TryExitPlayerMenuStateToNeutral");
+        // Saída canônica do menu do jogador para Neutral → retoma a IA pausada pelo menu (pause de
+        // jogador). Idempotente: se a IA não estava em pause de jogador, é no-op.
+        AIController.Instance?.SetPlayerPaused(false);
     }
 
     public bool TryEnterReplayState()

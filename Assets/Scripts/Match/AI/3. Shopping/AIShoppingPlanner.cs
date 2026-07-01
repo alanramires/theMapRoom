@@ -485,6 +485,14 @@ public partial class AIShoppingPlanner : MonoBehaviour
             int   minAssault    = Instance != null ? Instance.MinFilledAssaultSlots   : 1;
             if (artilleryWallBreakthrough && remaining >= eliteAssaultTarget.cost)
                 minAssault = 0;
+            // Invasão: a peça forte (elite assalto) é prioridade. A massa de capturador já foi
+            // montada (GoGreen) e agora é o LEFTOVER do orçamento, não o pré-requisito — então não
+            // gateia a elite atrás do preenchimento de capturador.
+            if (snapshot.IsInvading && remaining >= eliteAssaultTarget.cost)
+            {
+                fillThreshold = 0f;
+                minAssault = 0;
+            }
             bool  capOk         = capFill >= fillThreshold;
             bool  assOk         = filledAss >= minAssault;
             if (matureEconomyEliteAssaultPivot)
@@ -549,7 +557,11 @@ public partial class AIShoppingPlanner : MonoBehaviour
         float eliteFireFillThreshold = Instance != null ? Instance.EliteCapturerFillRatio : 0.6f;
         bool wantsEliteFireSupport = eliteFireSupportTarget != null
             && (eliteFireSupportReserveReady || eliteFireSupportNowAffordable)
-            && (dreamTeamPivot || (activeFireSupportCount > 0 && eliteFireCapFill >= eliteFireFillThreshold));
+            && (dreamTeamPivot
+                // Invasão: a peça forte (elite fogo) é prioridade junto com o assalto; a massa é o
+                // leftover, não o pré-requisito — não gateia atrás do preenchimento de capturador.
+                || (snapshot.IsInvading && eliteFireSupportNowAffordable)
+                || (activeFireSupportCount > 0 && eliteFireCapFill >= eliteFireFillThreshold));
         // Proactive SAM bypasses the composition gate — buy immediately if affordable.
         if (proactiveSAM && eliteFireSupportTarget != null
             && IsAntiAirOnlyUnit(eliteFireSupportTarget) && eliteFireSupportNowAffordable)
@@ -1035,7 +1047,9 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 defensiveArmorThreat, strategicArmorParity, wantsEliteFireSupport, activeFireSupportCount,
                 proactiveDefFireSupport, proactiveAntiAir, activeSAMs, activeAAAs, aaaCap, aaaThreat,
                 defensiveInfantryThreat, offensiveAntiInfantryFireSupport,
-                matureEconomyEliteAssaultPivot);
+                matureEconomyEliteAssaultPivot,
+                intelReport != null ? Mathf.Max(intelReport.enemyInfantryPressureScore, intelReport.enemyInfantryForce) : 0f,
+                intelReport != null ? Mathf.Max(intelReport.enemyArmorThreatScore, intelReport.enemyArmorForce) : 0f);
             if (unit == null && forcedProduction)
             {
                 unit = FindCheapestAffordableLandUnit(building, remaining);
@@ -1068,7 +1082,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
 
             remaining -= unit.cost;
             occupied.Add(cell);
-            if (IsPrimaryRole(unit, UnitRole.Capturador) && openCapturerSlots > 0)
+            bool boughtAggressiveCapturer = IsPrimaryRole(unit, UnitRole.CapturadorAgressivo);
+            if ((IsPrimaryRole(unit, UnitRole.Capturador) || boughtAggressiveCapturer) && openCapturerSlots > 0)
             {
                 openCapturerSlots--;
                 pendingGroundCapturerBuys++;
@@ -1079,7 +1094,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 pendingGroundCapturerBuys++;
                 Debug.Log($"[AI Shopping] APC followup: passageiro comprado para transporte terrestre -> {unit.displayName}");
             }
-            else if (IsPrimaryRole(unit, UnitRole.Assalto) && openAssaultSlots > 0)
+            else if ((IsPrimaryRole(unit, UnitRole.Assalto) || boughtAggressiveCapturer) && openAssaultSlots > 0)
                 openAssaultSlots--;
             else if (IsPrimaryRole(unit, UnitRole.Transportador) && openTransportSlots > 0)
             {

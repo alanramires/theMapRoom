@@ -46,7 +46,8 @@
       "Bash(rm -f \"/c/Users/Alan/.claude/projects/d--Unity-Projects-The-Map-Room/memory/project_mass_attack_state.md\")",
       "Bash(cd \"d:/Unity Projects/The Map Room\" && ls \"/c/Users/Alan/.claude/projects/d--Unity-Projects-The-Map-Room/memory/\" | grep -i mass || echo \"mass_attack memory removido OK\")",
       "Read(//c/Users/Alan/.claude/projects/d--Unity-Projects-The-Map-Room/memory//**)",
-      "Bash(cd \"d:/Unity Projects/The Map Room\" && sed -n '/Vector3Int ResolveAssaultPressureTarget/,/^    }/p' \"Assets/Scripts/Match/AI/Units/Assault/\"*.cs 2>/dev/null | head -45)"
+      "Bash(cd \"d:/Unity Projects/The Map Room\" && sed -n '/Vector3Int ResolveAssaultPressureTarget/,/^    }/p' \"Assets/Scripts/Match/AI/Units/Assault/\"*.cs 2>/dev/null | head -45)",
+      "Bash(git commit *)"
     ],
     "additionalDirectories": [
       "d:\\Unity Projects\\The Map Room\\Assets\\Scripts\\Match\\AI\\Units\\Assault"

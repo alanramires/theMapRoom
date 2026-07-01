@@ -95,10 +95,16 @@ public partial class AITacticalAnalyzer
                 && obj.Status != ObjectiveStatus.Capturing
                 && obj.Status != ObjectiveStatus.PartialReadyForHandoff)
                 continue;
-            if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info))
+            // Base-inclusive: a base inimiga (objetivo de invasão) NÃO está em TryGetSectorInfo —
+            // vive em GetAllBaseInfos. Sem isto o objetivo ">>" era pulado aqui e nunca gerava
+            // demanda de transporte operacional (o eixo 4 ficava trans=0).
+            if (!TryGetOpsSectorInfo(obj.Sector, out SectorManager.SectorInfo info))
                 continue;
+            bool isInvasion = obj.ObjectiveType == AIObjectiveType.InvasionAttack;
             SectorManager.SectorInfo.TransportPreference transportPref = info.GetTransportPreference(team);
-            if (HasAnySlot(obj, UnitRole.Transportador)
+            // Invasão cruza o mapa por terra até o QG inimigo: não cede o transporte ao airlift.
+            if (!isInvasion
+                && HasAnySlot(obj, UnitRole.Transportador)
                 && transportPref == SectorManager.SectorInfo.TransportPreference.Air)
                 continue;
 
@@ -107,12 +113,15 @@ public partial class AITacticalAnalyzer
             int fireSupport = CountSlots(obj, UnitRole.FogoIndireto);
             // Transporte terrestre só quando o setor prefere veículo; "Either" e "Air" ficam
             // com o airlift (helicóptero). A demanda é por NECESSIDADE DE CARONA, não por
-            // distância do setor — ver ComputeGroundTransportNeed.
+            // distância do setor — ver ComputeGroundTransportNeed. Invasão tem via própria
+            // (profundidade pela geometria do eixo), pois a base não tem dist-de-HQ confiável.
             int groundTransports = obj.ObjectiveType == AIObjectiveType.RallyAssembly
                 ? CountSlots(obj, UnitRole.Transportador)
-                : transportPref == SectorManager.SectorInfo.TransportPreference.Vehicle
-                    ? ComputeGroundTransportNeed(team, snapshot, obj)
-                    : 0;
+                : isInvasion
+                    ? ComputeInvasionGroundTransportNeed(team, snapshot, obj)
+                    : transportPref == SectorManager.SectorInfo.TransportPreference.Vehicle
+                        ? ComputeGroundTransportNeed(team, snapshot, obj)
+                        : 0;
             AISectorIntel sectorIntel = FindIntelForSector(intel, obj.Sector);
             bool risky = info.GetRiskLevelFor(team) >= SectorManager.SectorRiskLevel.Medium || IsHotIntelSector(sectorIntel);
             bool hasBasicTaskForce = capturers > 0 && (assaults > 0 || fireSupport > 0);
@@ -138,6 +147,22 @@ public partial class AITacticalAnalyzer
     // Distância de embarque = 2 turnos (~7 hexes) por caminhos válidos. A massa mínima de
     // capturadores antes de liberar suporte vem do knob compartilhado AIShoppingPlanner.
     private const int GroundTransportEmbarkDistance = 7;
+
+    // Eixo de invasão (HQ -> QG inimigo): a massa final cruza o mapa todo, então não usa o teto
+    // 1/eixo dos eixos rally. Demanda escalada com a profundidade (APCs no pipeline), com piso/teto.
+    // Mantém em sincronia com a inspeção em AIShoppingPlanner.OperationalPressure.
+    internal const float InvasionTransportDepthPerApc = 6f;
+    internal const int InvasionMinTransports = 2;
+    internal const int InvasionMaxTransports = 4;
+
+    internal static int ComputeInvasionTransportDesired(float depth)
+    {
+        if (depth < GroundTransportEmbarkDistance)
+            return 0;
+        return Mathf.Clamp(
+            Mathf.CeilToInt(depth / InvasionTransportDepthPerApc),
+            InvasionMinTransports, InvasionMaxTransports);
+    }
 
     // Demanda de APC POR EIXO, escalada pela PROFUNDIDADE DA FRENTE (R4). Paradigma:
     // o transporte é o único papel antecipatório/posicional — prepara o terreno que ainda
@@ -182,6 +207,36 @@ public partial class AITacticalAnalyzer
         // Teto 1/eixo: desconta APCs terrestres já alocados a este eixo.
         int assigned = CountGroundTransportsOnEixo(snapshot, obj, eixo);
         return Mathf.Max(0, 1 - assigned);
+    }
+
+    // Demanda de transporte do EIXO DE INVASÃO (">>"). A base inimiga NÃO está em TryGetSectorInfo
+    // (vive em GetAllBaseInfos) e não tem distância-de-HQ confiável, então: profundidade pela
+    // GEOMETRIA do eixo (HQ -> célula da base, sempre disponível). Escala com a profundidade (não
+    // é teto 1/eixo) e desconta APCs já no eixo.
+    private int ComputeInvasionGroundTransportNeed(TeamId team, AIWorldSnapshot snapshot, SectorObjective obj)
+    {
+        // O eixo 4 pode existir antes para persistencia/inspecao, mas a frota so nasce
+        // quando a operacao GoGreen esta realmente em andamento.
+        if (obj == null || snapshot == null || !snapshot.IsInvading)
+            return 0;
+
+        InvasionAxisMap axisMap = GetShoppingAxisMap(team);
+        int eixo = axisMap != null ? axisMap.GetEixo(obj.Sector) : 0;
+        if (eixo <= 0 || axisMap == null || !axisMap.TryGetAxis(eixo, out InvasionAxisMap.Axis axis))
+            return 0;
+
+        float depth = SectorManager.HexDistance(axis.HqCell, axis.RallyCell);
+        int assigned = CountGroundTransportsOnEixo(snapshot, obj, eixo);
+        return Mathf.Max(0, ComputeInvasionTransportDesired(depth) - assigned);
+    }
+
+    // Info do setor incluindo BASES. TryGetSectorInfo cobre só os setores de campo; a base inimiga
+    // (alvo de invasão) vive em GetAllBaseInfos e precisa do fallback TryGetBaseInfo.
+    private static bool TryGetOpsSectorInfo(ConstructionSector sector, out SectorManager.SectorInfo info)
+    {
+        if (SectorManager.TryGetSectorInfo(sector, out info))
+            return true;
+        return SectorManager.TryGetBaseInfo(sector, out info);
     }
 
     // Conta APCs terrestres já comprometidos com o eixo: presença por aiEixo (memória que

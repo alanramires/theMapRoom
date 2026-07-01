@@ -30,10 +30,11 @@ MonoBehaviour:
   movementCategory: 4
   militaryForce: 0
   unitClass: 0
-  combatClassification: 0
+  combatClassification: 2
   roles: 0c000000
   aiInitiative: 3
   aiPurchaseMode: 2
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 1
     priority: 2
@@ -49,8 +50,8 @@ MonoBehaviour:
   preferMoveOnBestDPQ: 0
   preferMaxDisplacement: 0
   longRangeStationary: 0
-  preferRepositionAtWeaponMaxRange: 0
-  preferArtilleryModeBeforeCombatant: 0
+  preferRepositionAtWeaponMaxRange: 1
+  preferArtilleryModeBeforeCombatant: 1
   useAttackDecision: 1
   attackAcceptHpLossPercent: 80
   attackEliminationMinPercent: 10
@@ -63,6 +64,10 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
   aiConservativeSupplyAvoidEnemyRange: 2
@@ -91,7 +96,7 @@ MonoBehaviour:
   - weapon: {fileID: 11400000, guid: 49972c9c2056f40489317be1412c41db, type: 2}
     squadAmmunition: 3
     operationRangeMin: 1
-    operationRangeMax: 1
+    operationRangeMax: 2
     selectedTrajectory: 0
     canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: 49972c9c2056f40489317be1412c41db, type: 2}

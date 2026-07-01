@@ -828,14 +828,18 @@ public class ShoppingPressureWindow : EditorWindow
             if (slot.Filled) filled[slot.Role]++;
         }
 
+        // No plano de invasão (">>"), o capturador é a MASSA ilimitada (preenchimento final): exibe
+        // ∞ em vez de um teto e nunca marca "completo" — sempre quer mais corpos baratos.
+        bool invasionPlan = obj.ObjectiveType == AIObjectiveType.InvasionAttack;
         foreach (UnitRole role in order)
         {
             int f = filled[role];
             int t = total[role];
-            bool complete = f >= t;
+            bool unlimited = invasionPlan && role == UnitRole.Capturador;
+            bool complete = !unlimited && f >= t;
             Color prev = GUI.color;
             GUI.color = complete ? new Color(0.55f, 0.9f, 0.55f) : new Color(1f, 0.75f, 0.35f);
-            EditorGUILayout.LabelField($"  {role,-14} {f}/{t}{(complete ? "  ✓" : "")}");
+            EditorGUILayout.LabelField($"  {role,-14} {f}/{(unlimited ? "∞" : t.ToString())}{(complete ? "  ✓" : "")}");
             GUI.color = prev;
         }
 

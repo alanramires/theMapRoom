@@ -76,21 +76,41 @@ public partial class AIShoppingPlanner
             float progress = total > 0 ? advance / total : 0f;
             ConstructionSector target = map.GetTransportTargetSector(axis.EixoIndex);
             float depth = 0f;
-            if (target != ConstructionSector.None
+            if (axis.IsInvasionAxis)
+                // A base inimiga não está em TryGetSectorInfo e não tem dist-de-HQ confiável:
+                // profundidade pela GEOMETRIA do eixo (HQ -> célula da base). Mesma base do builder.
+                depth = SectorManager.HexDistance(axis.HqCell, axis.RallyCell);
+            else if (target != ConstructionSector.None
                 && SectorManager.TryGetSectorInfo(target, out SectorManager.SectorInfo info))
                 depth = info.GetDistanceToHQ(snapshot.AITeam);
 
             int assigned = CountAxisGroundTransports(snapshot, axis.EixoIndex);
-            bool activeFront = !axis.Complete && target != ConstructionSector.None;
-            // Eixo apenas aberto no mapa ainda nao cria demanda. Transporte operacional
-            // aparece quando a frente realmente avancou pelo corredor; caso contrario,
-            // tres eixos potenciais geravam artificialmente Transportador x3 no inicio.
-            bool hasRealAdvance = advance > 0.001f;
-            int desired = activeFront && hasRealAdvance && depth >= 7f ? 1 : 0;
-            float depthPressure = Mathf.Clamp01((depth - 4f) / 8f);
-            float score = activeFront && hasRealAdvance
-                ? progress * 1.5f + depthPressure * 1.5f
-                : 0f;
+            int desired;
+            float score;
+            if (axis.IsInvasionAxis)
+            {
+                // Eixo de invasão: demanda escalada com a profundidade até o QG inimigo, NÃO gated
+                // por advance — o transporte é o que ENABLES o assalto (leva a massa do HQ). Mesma
+                // fórmula do builder real de demanda (AITacticalAnalyzer).
+                desired = snapshot.IsInvading
+                    ? AITacticalAnalyzer.ComputeInvasionTransportDesired(depth)
+                    : 0;
+                float depthPressureInv = Mathf.Clamp01((depth - 4f) / 8f);
+                score = desired > 0 ? 1.5f + depthPressureInv * 1.5f : 0f;
+            }
+            else
+            {
+                bool activeFront = !axis.Complete && target != ConstructionSector.None;
+                // Eixo apenas aberto no mapa ainda nao cria demanda. Transporte operacional
+                // aparece quando a frente realmente avancou pelo corredor; caso contrario,
+                // tres eixos potenciais geravam artificialmente Transportador x3 no inicio.
+                bool hasRealAdvance = advance > 0.001f;
+                desired = activeFront && hasRealAdvance && depth >= 7f ? 1 : 0;
+                float depthPressure = Mathf.Clamp01((depth - 4f) / 8f);
+                score = activeFront && hasRealAdvance
+                    ? progress * 1.5f + depthPressure * 1.5f
+                    : 0f;
+            }
 
             result.Axes.Add(new AxisTransportPressureInspection
             {
@@ -119,8 +139,11 @@ public partial class AIShoppingPlanner
         ConstructionSector front,
         TeamId team)
     {
+        // Base-inclusive: a base inimiga (frente do eixo de invasão) vive em GetAllBaseInfos, não
+        // em TryGetSectorInfo — senão o avanço da captura da base (HQ + fábricas) ficava sempre 0%.
         if (front == ConstructionSector.None
-            || !SectorManager.TryGetSectorInfo(front, out SectorManager.SectorInfo info)
+            || !(SectorManager.TryGetSectorInfo(front, out SectorManager.SectorInfo info)
+                 || SectorManager.TryGetBaseInfo(front, out info))
             || info == null || info.Constructions == null)
             return 0f;
 

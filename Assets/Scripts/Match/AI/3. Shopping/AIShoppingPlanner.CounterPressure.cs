@@ -4,6 +4,10 @@ using UnityEngine;
 
 public partial class AIShoppingPlanner
 {
+    private static readonly Dictionary<(UnitData attacker, UnitData defender), UnitCounterEvaluator.Evaluation>
+        counterEvaluationCache =
+            new Dictionary<(UnitData attacker, UnitData defender), UnitCounterEvaluator.Evaluation>();
+
     public sealed class EnemyClassPressureInspection
     {
         public GameUnitClass UnitClass;
@@ -16,6 +20,8 @@ public partial class AIShoppingPlanner
         public float RememberedScore;
         public float Coverage;
         public float Unmet;
+        internal readonly Dictionary<UnitData, float> UnitTypeScores =
+            new Dictionary<UnitData, float>();
     }
 
     public sealed class CounterPressureInspection
@@ -94,6 +100,7 @@ public partial class AIShoppingPlanner
         var result = new CounterPressureInspection();
         if (snapshot == null)
             return result;
+        counterEvaluationCache.Clear();
 
         var byClass = new Dictionary<GameUnitClass, EnemyClassPressureInspection>();
         var visibleIds = new HashSet<int>();
@@ -211,14 +218,11 @@ public partial class AIShoppingPlanner
             float bestNeed = 0f;
             foreach (EnemyClassPressureInspection enemyClass in pressure.Classes)
             {
-                if (!HasWeaponCategory(data, enemyClass.CounterCategory))
-                    continue;
-                BazookaTargetPriority preference =
-                    data.ResolveAiTargetPriorityForTargetClass(enemyClass.UnitClass);
-                if (preference == BazookaTargetPriority.Tertiary)
+                float fit = ComputeCounterCoverageFit(data, enemyClass);
+                if (fit <= 0f)
                     continue;
                 float unmet = Mathf.Max(0f, enemyClass.Score - enemyClass.Coverage);
-                float need = unmet * (preference == BazookaTargetPriority.Primary ? 1.25f : 0.8f);
+                float need = unmet * fit;
                 if (need > bestNeed)
                 {
                     best = enemyClass;
@@ -229,7 +233,7 @@ public partial class AIShoppingPlanner
                 continue;
             float available = Mathf.Max(0f, best.Score - best.Coverage);
             float contribution = Mathf.Min(available,
-                ComputeCounterCoverage(data, best.UnitClass));
+                ComputeCounterPowerBase(data) * ComputeCounterCoverageFit(data, best));
             best.Coverage += contribution;
             if (contribution > 0f)
                 pressure.OwnContributions.Add(new OwnCounterContributionInspection
@@ -282,14 +286,45 @@ public partial class AIShoppingPlanner
         return basicCoverage * eliteMultiplier * valueMultiplier;
     }
 
-    private static float ComputeCounterCoverage(UnitData unit, GameUnitClass targetClass)
+    private static float ComputeCounterCoverageFit(UnitData unit, EnemyClassPressureInspection enemyClass)
     {
-        BazookaTargetPriority preference =
-            unit.ResolveAiTargetPriorityForTargetClass(targetClass);
-        float specialization = preference == BazookaTargetPriority.Primary
-            ? 1.15f
-            : preference == BazookaTargetPriority.Secondary ? 0.8f : 0f;
-        return ComputeCounterPowerBase(unit) * specialization;
+        if (unit == null || enemyClass == null || enemyClass.UnitTypeScores.Count == 0)
+            return 0f;
+
+        ResolveCounterCombatDatabases(out RPSDatabase rps, out DPQMatchupDatabase dpq,
+            out WeaponPriorityData priorities);
+        float weightedFit = 0f;
+        float totalWeight = 0f;
+        foreach (KeyValuePair<UnitData, float> pair in enemyClass.UnitTypeScores)
+        {
+            if (pair.Key == null || pair.Value <= 0f)
+                continue;
+            var cacheKey = (unit, pair.Key);
+            if (!counterEvaluationCache.TryGetValue(cacheKey, out UnitCounterEvaluator.Evaluation evaluation))
+            {
+                evaluation = UnitCounterEvaluator.EvaluateBestAuto(
+                    unit, pair.Key, rps, dpq, priorities);
+                counterEvaluationCache[cacheKey] = evaluation;
+            }
+            float fit = evaluation.IsValid && evaluation.WeaponCategory == enemyClass.CounterCategory
+                ? evaluation.Coverage
+                : 0f;
+            weightedFit += fit * pair.Value;
+            totalWeight += pair.Value;
+        }
+        return totalWeight > 0f ? Mathf.Clamp01(weightedFit / totalWeight) : 0f;
+    }
+
+    private static TurnStateManager counterTurnStateManager;
+
+    private static void ResolveCounterCombatDatabases(out RPSDatabase rps,
+        out DPQMatchupDatabase dpq, out WeaponPriorityData priorities)
+    {
+        if (counterTurnStateManager == null)
+            counterTurnStateManager = UnityEngine.Object.FindAnyObjectByType<TurnStateManager>();
+        rps = counterTurnStateManager != null ? counterTurnStateManager.RpsDatabaseRef : null;
+        dpq = counterTurnStateManager != null ? counterTurnStateManager.DpqMatchupDatabaseRef : null;
+        priorities = counterTurnStateManager != null ? counterTurnStateManager.WeaponPriorityDataRef : null;
     }
 
     private static void AddAnonymousWeaponPressure(
@@ -327,6 +362,8 @@ public partial class AIShoppingPlanner
 
         entry.Count++;
         entry.Score += score;
+        entry.UnitTypeScores.TryGetValue(data, out float typeScore);
+        entry.UnitTypeScores[data] = typeScore + score;
         if (visible)
         {
             entry.VisibleCount++;
@@ -651,15 +688,10 @@ public partial class AIShoppingPlanner
             if (!categories.Contains(enemyClass.CounterCategory))
                 continue;
 
-            BazookaTargetPriority priority =
-                unit.ResolveAiTargetPriorityForTargetClass(enemyClass.UnitClass);
-            float preference = priority == BazookaTargetPriority.Primary
-                ? 1f
-                : priority == BazookaTargetPriority.Secondary ? 0.75f : 0.45f;
             // O carrinho reage apenas ao saldo ainda descoberto. Depois que um counter
             // poderoso cobre Armored, esse matchup deixa de inflar novas compras e outra
             // classe passa a disputar o carrinho.
-            score += enemyClass.Unmet * preference;
+            score += enemyClass.Unmet * ComputeCounterCoverageFit(unit, enemyClass);
         }
         return score;
     }
