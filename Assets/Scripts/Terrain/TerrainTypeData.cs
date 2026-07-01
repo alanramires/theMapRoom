@@ -94,10 +94,15 @@ public class TerrainTypeData : ScriptableObject
 
     [Header("Vision")]
     [Tooltip("EV (elevacao de visada) base deste terreno.")]
-    public int ev = 0;
+    [Min(0f)]
+    public float ev = 0f;
 
     [Tooltip("Se true, unidades atiradoras neste terreno herdam o EV do terreno como EV inicial da LoS.")]
     public bool shooterInheritsTerrainEv = false;
+
+    [InspectorName("Override EV To")]
+    [Tooltip("EV herdado pelo atirador. Valor negativo usa a EV do terreno.")]
+    public float shooterInheritedEvOverride = -1f;
 
     [Tooltip("Se true, este terreno bloqueia linha de visada por padrao.")]
     public bool blockLoS = true;
@@ -158,6 +163,12 @@ public class TerrainTypeData : ScriptableObject
         }
 
         return false;
+    }
+
+    public float ResolveShooterInheritedEv()
+    {
+        float resolvedEv = shooterInheritedEvOverride >= 0f ? shooterInheritedEvOverride : ev;
+        return Mathf.Max(0f, resolvedEv);
     }
 
     private void OnValidate()

@@ -216,6 +216,7 @@ public partial class AIController
         }
         bool currentBlocksProduction = IsLogisticsBlockingProduction(snapshot, fromCell);
         bool avoidProductionParking = !hasServiceTarget && !baseDefense;
+        float fromThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
 
         float fromScore = ScoreLogisticsCell(
             unit, snapshot, fromCell, fromCell, anchor, serviceCell,
@@ -243,6 +244,10 @@ public partial class AIController
                         return false;
                     if (avoidProductionParking && IsLogisticsBlockingProduction(snapshot, cell))
                         return false;
+                    if (!baseDefense && !hasServiceTarget
+                        && (!IsCellInSafeRear(unit, snapshot, cell)
+                            || CalculateThreatLevel(cell, snapshot.AITeam) > fromThreat + 0.1f))
+                        return false;
                     return true;
                 },
                 tacticalScore: (cell, candidate) =>
@@ -264,7 +269,7 @@ public partial class AIController
                 }))
         {
             float toolHoldMargin = preferBestDpq ? 35f : 80f;
-            if (currentBlocksProduction || toolCandidate.TacticalScore >= fromScore + toolHoldMargin)
+            if (currentBlocksProduction || toolCandidate.FinalScore >= fromScore + toolHoldMargin)
             {
                 bestCell = toolCell;
                 reason = currentBlocksProduction
@@ -285,6 +290,10 @@ public partial class AIController
             if (currentBlocksProduction && cell == fromCell)
                 continue;
             if (avoidProductionParking && IsLogisticsBlockingProduction(snapshot, cell))
+                continue;
+            if (!baseDefense && !hasServiceTarget
+                && (!IsCellInSafeRear(unit, snapshot, cell)
+                    || CalculateThreatLevel(cell, snapshot.AITeam) > fromThreat + 0.1f))
                 continue;
 
             int pathCost = cell == fromCell ? 0 : GetPathStepCount(paths, cell);

@@ -65,8 +65,8 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
-  eliteLevel: 1
-  eliteFrom: {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+  eliteLevel: 0
+  eliteFrom: {fileID: 0}
   combatModifiers: []
   domain: 0
   heightLevel: 3
@@ -112,4 +112,4 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
   autonomia: 30
-  cost: 1500
+  cost: 2500

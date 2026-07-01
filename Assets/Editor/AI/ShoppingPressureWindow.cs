@@ -203,9 +203,63 @@ public class ShoppingPressureWindow : EditorWindow
             $"força: {macro.OwnForce} suas / {macro.EnemyForce} inimigas conhecidas  ({macro.ForceRatio:P0})",
             _subtle);
 
+        EditorGUILayout.Space(5f);
+        EditorGUILayout.LabelField("ORDENS GERAIS", EditorStyles.boldLabel);
+        DrawEliteReserveOverride(snapshot, demands, macro.Losing);
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("ELITE", EditorStyles.boldLabel);
+        DrawEliteQualityStatus(
+            snapshot,
+            AIShoppingPlanner.InspectCounterPressure(snapshot),
+            demands);
+        DrawActiveEliteCommitment(snapshot);
+
         DrawGoGreenHeader(plan, invasion);
 
         EditorGUILayout.EndVertical();
+    }
+
+    private void DrawEliteReserveOverride(
+        AIWorldSnapshot snapshot,
+        List<AIShoppingDemand> demands,
+        bool macroLosing)
+    {
+        AIElitePurchaseCommitment commitment = snapshot != null
+            ? AIIntelLedger.GetElitePurchaseCommitment(snapshot.AITeam)
+            : null;
+        if (commitment == null || string.IsNullOrEmpty(commitment.unitId))
+        {
+            EditorGUILayout.LabelField("reserva elite: sem compromisso persistente", _subtle);
+            return;
+        }
+
+        AIShoppingDemand emergency =
+            AIShoppingPlanner.FindReserveBreakingEmergencyForInspection(demands);
+        Color previous = GUI.color;
+        if (macroLosing && emergency != null)
+        {
+            GUI.color = new Color(1f, 0.55f, 0.55f);
+            EditorGUILayout.LabelField(
+                $"RESERVA ELITE ROMPIDA: URGENTE pri={emergency.Priority} "
+                    + $"{emergency.Role} x{emergency.Count} · origem={emergency.Origin}",
+                EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"motivo: {emergency.Reason}", _subtle);
+        }
+        else
+        {
+            GUI.color = new Color(0.55f, 0.9f, 0.55f);
+            EditorGUILayout.LabelField(
+                $"RESERVA ELITE PRESERVADA: compromisso={commitment.unitId}"
+                    + (emergency != null
+                        ? " · urgente aberta, mas fora de Collapsing"
+                        : " · nenhuma demanda Urgent"),
+                EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "critical/counter/escalada não rompem a reserva sem flag Urgent",
+                _subtle);
+        }
+        GUI.color = previous;
     }
 
     private void DrawGoGreenHeader(TeamObjectivePlan plan, AIController.GoGreenInvasionInspection invasion)
@@ -341,8 +395,6 @@ public class ShoppingPressureWindow : EditorWindow
             $"ameaças anônimas={pressure.AnonymousThreatSignals} (compras ocultas não entram)",
             _subtle);
 
-        DrawActiveEliteCommitment(snapshot);
-
         bool hasBreakdown = false;
         hasBreakdown |= DrawCounterCategoryBreakdown(
             "anti-infantaria", WeaponCategory.AntiInfantaria, pressure, demands);
@@ -354,8 +406,6 @@ public class ShoppingPressureWindow : EditorWindow
             "anti-navio", WeaponCategory.AntiNavio, pressure, demands);
         if (!hasBreakdown)
             EditorGUILayout.LabelField("  — nenhuma pressão conhecida para detalhar —", _subtle);
-
-        DrawEliteQualityStatus(snapshot, pressure, demands);
 
         var offered = new List<UnitData>();
         if (snapshot.MyBuildings != null)
@@ -426,12 +476,17 @@ public class ShoppingPressureWindow : EditorWindow
         float safeRatio = AIController.Instance != null
             ? Mathf.Clamp01(AIController.Instance.EliteRatioSafe)
             : 0.5f;
-        float ratio = covered ? Mathf.Max(pressureRatio, safeRatio) : pressureRatio;
+        bool rallyAssemblyActive = snapshot != null
+            && AIShoppingPlanner.HasActiveRallyAssembly(snapshot.AITeam);
+        float ratio = covered || rallyAssemblyActive
+            ? Mathf.Max(pressureRatio, safeRatio)
+            : pressureRatio;
 
         EditorGUILayout.Space(5f);
         EditorGUILayout.LabelField(
             $"Superioridade qualitativa  ·  meta elite={ratio:P0}  ·  "
-                + (covered ? "pressões terrestres cobertas" : "pressão terrestre aberta"),
+                + (rallyAssemblyActive ? "rally em montagem"
+                    : covered ? "pressões terrestres cobertas" : "pressão terrestre aberta"),
             EditorStyles.boldLabel);
         DrawEliteQualityRole(snapshot, demands, UnitRole.Assalto, ratio);
         DrawEliteQualityRole(snapshot, demands, UnitRole.FogoIndireto, ratio);
@@ -962,11 +1017,14 @@ public class ShoppingPressureWindow : EditorWindow
         string weapon = d.RequiredWeaponCategory.HasValue
             ? $"  arma={d.RequiredWeaponCategory.Value}"
             : "";
+        string rallyArt = d.MinRallyArtilleryWeight > 0f
+            ? $"  rallyArt>={d.MinRallyArtilleryWeight:0.#}"
+            : "";
 
         Color prev = GUI.color;
         if (d.Urgent) GUI.color = new Color(1f, 0.55f, 0.55f);
         EditorGUILayout.LabelField(
-            $"pri={d.Priority}  {(d.Urgent ? "‼ " : "")}{roleLabel} x{d.Count}{domain}{elite}{weapon}",
+            $"pri={d.Priority}  {(d.Urgent ? "‼ " : "")}{roleLabel} x{d.Count}{domain}{elite}{weapon}{rallyArt}",
             EditorStyles.boldLabel);
         GUI.color = prev;
 
@@ -978,6 +1036,8 @@ public class ShoppingPressureWindow : EditorWindow
                 _subtle);
         else if (d.Origin != null && d.Origin.Contains("elite-commitment"))
             EditorGUILayout.LabelField("tipo: COMPROMISSO PERSISTENTE ATIVO", _subtle);
+        if (d.RequireRallyBreakthrough)
+            EditorGUILayout.LabelField("filtro: ruptura blindada de rally", _subtle);
         if (!string.IsNullOrEmpty(d.Reason))
             EditorGUILayout.LabelField($"motivo: {d.Reason}", _subtle);
 

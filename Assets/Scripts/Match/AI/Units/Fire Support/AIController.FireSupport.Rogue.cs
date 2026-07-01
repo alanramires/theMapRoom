@@ -154,7 +154,13 @@ public partial class AIController
 
         if (unit == null || snapshot == null || paths == null || paths.Count == 0)
             return false;
-        if (!PreferFireSupportWeaponMaxRange(unit) && !IsFireSupportConservative(unit))
+        bool assignedBacklineRequired = assigned != null
+            && assigned.Status != ObjectiveStatus.Defending
+            && assigned.Status != ObjectiveStatus.Complete
+            && assigned.Status != ObjectiveStatus.Abandoned
+            && !IsCombatantFireSupport(unit);
+        bool rearLinePosture = IsFireSupportConservative(unit) || assignedBacklineRequired;
+        if (!PreferFireSupportWeaponMaxRange(unit) && !rearLinePosture)
             return false;
 
         int maxRange = GetFireSupportMaxWeaponRange(unit);
@@ -172,11 +178,11 @@ public partial class AIController
         int minRange = Mathf.Max(0, GetUnitIndirectWeaponMinRange(unit));
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
-        bool conservativeOffensiveObjective = IsFireSupportConservative(unit)
-            && assigned != null
-            && assigned.Status != ObjectiveStatus.Defending
-            && assigned.Status != ObjectiveStatus.Complete
-            && assigned.Status != ObjectiveStatus.Abandoned;
+        bool conservativeOffensiveObjective = rearLinePosture && assignedBacklineRequired;
+        Vector3Int rearAnchor = snapshot.EnemyHQ != null
+            ? snapshot.EnemyHQ.CurrentCellPosition
+            : objectiveAnchor;
+        rearAnchor.z = 0;
         float bestScore = float.MinValue;
         UnitManager bestTarget = null;
         float bestDist = 0f;
@@ -217,9 +223,16 @@ public partial class AIController
                 conservativeBlocked++;
                 continue;
             }
-            if (conservativeOffensiveObjective && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, objectiveAnchor))
+            if (conservativeOffensiveObjective && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, rearAnchor))
             {
                 screenBlocked++;
+                continue;
+            }
+            if (assignedBacklineRequired
+                && TryScoreBacklineCell(unit, snapshot, cell, rearAnchor, out AIBacklineScore backline)
+                && (!backline.InRearSlice || backline.IsVanguard))
+            {
+                conservativeBlocked++;
                 continue;
             }
 
@@ -231,7 +244,7 @@ public partial class AIController
 
             int pathCost = ResolveFireSupportMovementCost(cell, paths, movementCostMap, movementPoints);
             float dpq = GetTerrainDpqPontos(cell);
-            float cohesion = IsFireSupportConservative(unit) ? CalculateFireSupportCohesionScore(unit, snapshot, cell) : 0f;
+            float cohesion = rearLinePosture ? CalculateFireSupportCohesionScore(unit, snapshot, cell) : 0f;
 
             var sensorTargets = new List<PodeMirarTargetOption>();
             if (PodeMirarSensor.CollectTargets(

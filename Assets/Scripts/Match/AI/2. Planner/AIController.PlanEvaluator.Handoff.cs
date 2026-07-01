@@ -60,10 +60,11 @@ public partial class AIController
                         Mathf.Max(0, candidate.RemainingMovementPoints), terrainDatabase);
                 if (candidatePaths == null || !candidatePaths.ContainsKey(targetCell)) continue;
 
-                bool completesCapture = pts + candidate.CurrentHP >= max;
+                int capturePower = PodeCapturarSensor.GetCapturePower(candidate);
+                bool completesCapture = pts + capturePower >= max;
                 Vector3Int cc = candidate.CurrentCellPosition; cc.z = 0;
                 float dist  = SectorManager.HexDistance(cc, targetCell);
-                float score = candidate.CurrentHP * 100f - dist * 20f;
+                float score = capturePower * 100f - dist * 20f;
                 if (completesCapture) score += 500f;
 
                 if (score > bestSubScore) { bestSubScore = score; substitute = candidate; }
@@ -132,7 +133,7 @@ public partial class AIController
                 obj.PreferredHandoffFromUnitId = assignedUnit.InstanceId;
                 ApplyPlanHUD(swapCandidate, obj);
 
-                bool swapCompletes = pts + swapCandidate.CurrentHP >= max;
+                bool swapCompletes = pts + PodeCapturarSensor.GetCapturePower(swapCandidate) >= max;
                 Debug.Log($"{TL("Handoff")}[Swap] Unit{swapCandidate.InstanceId} " +
                           $"({swapFromObj.Sector} pri={swapFromObj.Priority}→{obj.Sector} pri={obj.Priority}) " +
                           $"já no prédio; Unit{assignedUnit.InstanceId} livre (era {assignedDist:F0}h)" +
@@ -140,7 +141,7 @@ public partial class AIController
                 continue;
             }
 
-            bool subCompletes = pts + substitute.CurrentHP >= max;
+            bool subCompletes = pts + PodeCapturarSensor.GetCapturePower(substitute) >= max;
             Debug.Log($"{TL("Handoff")} Unit{assignedUnit.InstanceId} hp={assignedUnit.CurrentHP} avança; " +
                       $"Unit{substitute.InstanceId} hp={substitute.CurrentHP} herda {obj.Sector} " +
                       $"({pts}/{max}){(subCompletes ? " → completa" : "")}");

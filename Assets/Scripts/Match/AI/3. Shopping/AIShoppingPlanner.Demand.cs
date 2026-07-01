@@ -1231,15 +1231,18 @@ public partial class AIShoppingPlanner
             out AIShoppingDemand reserveTarget);
         bool hasStrategicReserve = reserve > 0 && reserveTarget != null;
 
-        // Alavanca macro->shopping: se o time esta PERDENDO o mapa (macro phase Collapsing,
-        // <=35% de controle), a compra fica mais agressiva pra defesa. Sobrevivencia > poupanca:
-        // nao segura caixa pra elite, e combate/defesa ganham peso no score (ver ScoreRole...).
+        // Collapsing aumenta o peso defensivo, mas nao invalida sozinho um compromisso
+        // persistente. Apenas uma demanda urgente pode romper a reserva estrategica.
         bool macroLosing = AIController.GetMacroTerritoryForInspection(snapshot.AITeam).Losing;
         int expansionCapturerTarget = ComputeExpansionCapturerCartTarget(snapshot, demands);
-        if (macroLosing && reserve > 0)
+        AIShoppingDemand reserveBreakingEmergency = FindReserveBreakingEmergency(demands);
+        bool breakStrategicReserve = macroLosing && reserve > 0
+            && reserveBreakingEmergency != null;
+        if (breakStrategicReserve)
         {
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] perdendo o mapa: "
-                + $"zera reserva estratégica ({reserve}) — gasta tudo na defesa");
+                + $"emergencia {FormatDemandCapability(reserveBreakingEmergency)} "
+                + $"origem={reserveBreakingEmergency.Origin} rompe reserva estrategica ({reserve})");
             reserve = 0;
             hasStrategicReserve = false;
         }
@@ -1285,7 +1288,7 @@ public partial class AIShoppingPlanner
         RoleShoppingCart cart = BuildBestRoleShoppingCart(
             snapshot, demands, counterPressure, occupied, remaining - reserve,
             macroLosing, concentrateSpend, concentrateEmergency, expansionCapturerTarget,
-            macroLosing ? null : eliteCommitment?.unitId);
+            breakStrategicReserve ? null : eliteCommitment?.unitId);
         if (cart != null)
         {
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] carrinho "
@@ -1352,6 +1355,23 @@ public partial class AIShoppingPlanner
                     + $"origem={demand.Origin} motivo={demand.Reason}");
         return orders;
     }
+
+    private static AIShoppingDemand FindReserveBreakingEmergency(
+        List<AIShoppingDemand> demands)
+    {
+        if (demands == null)
+            return null;
+        AIShoppingDemand best = null;
+        foreach (AIShoppingDemand demand in demands)
+            if (demand != null && demand.Count > 0 && demand.Urgent
+                && (best == null || demand.Priority < best.Priority))
+                best = demand;
+        return best;
+    }
+
+    public static AIShoppingDemand FindReserveBreakingEmergencyForInspection(
+        List<AIShoppingDemand> demands)
+        => FindReserveBreakingEmergency(demands);
 
     private static RoleShoppingCart BuildBestRoleShoppingCart(
         AIWorldSnapshot snapshot,
@@ -1570,8 +1590,6 @@ public partial class AIShoppingPlanner
             else if (unit.eliteLevel != existing.eliteLevel
                 || UnitRoleCompatibility.ResolveCompositionRole(unit) != existing.role)
                 invalidReason = "dados da unidade mudaram";
-            else if (!counterPressureStillPresent)
-                invalidReason = "pressão da categoria foi coberta";
             bool valid = invalidReason == null;
             if (!valid)
             {
@@ -1586,6 +1604,9 @@ public partial class AIShoppingPlanner
                 Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
                     + $"mantém compromisso elite: {unit.displayName} ${unit.cost} "
                     + $"desde T{existing.committedTurn}"
+                    + (!counterPressureStillPresent
+                        ? " (pressão original coberta; compromisso persiste até a compra)"
+                        : "")
                     + (!IsEliteChainAvailable(unit, snapshot)
                         ? " (aguardando pré-requisito da cadeia)"
                         : ""));
@@ -1782,12 +1803,28 @@ public partial class AIShoppingPlanner
     {
         if (snapshot == null || snapshot.IncomePerTurn <= 0)
             return false;
+        bool rallyAssemblyActive = HasActiveRallyAssembly(snapshot.AITeam);
         foreach (AIShoppingDemand demand in demands)
             if (demand != null && demand.Count > 0
                 && (demand.Urgent
-                    || (demand.Role == UnitRole.Capturador && demand.Priority <= 16)))
+                    || (!rallyAssemblyActive
+                        && demand.Role == UnitRole.Capturador && demand.Priority <= 16)))
                 return false;
         return HasOperationalCore(snapshot);
+    }
+
+    public static bool HasActiveRallyAssembly(TeamId team)
+    {
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(team);
+        if (plan?.Objectives == null)
+            return false;
+        foreach (SectorObjective objective in plan.Objectives)
+            if (objective != null
+                && objective.ObjectiveType == AIObjectiveType.RallyAssembly
+                && (objective.RallyState == AIRallyAssemblyState.Assembling
+                    || objective.RallyState == AIRallyAssemblyState.Ready))
+                return true;
+        return false;
     }
 
     private static bool HasOperationalCore(AIWorldSnapshot snapshot)
@@ -2095,6 +2132,7 @@ public partial class AIShoppingPlanner
         foreach (TacticalDeficit deficit in deficits)
         {
             bool rallyFireSupport = IsRallyFireSupportDeficit(deficit);
+            bool rallyBreakthrough = IsRallyBreakthroughDeficit(deficit);
             if (rallyFireSupport
                 && deficit.Operation.LinkedObjective != rallyFireSupportFocus)
                 continue;
@@ -2104,8 +2142,19 @@ public partial class AIShoppingPlanner
             {
                 demand.Priority = 10;
                 demand.Origin = "rally-assembly";
+                demand.MinRallyArtilleryWeight = 1f;
                 demand.Reason = $"GoGreen {rallyFireSupportFocus.Sector}: "
-                    + $"fogo indireto faltando x{deficit.Count}";
+                    + $"fogo indireto pesado faltando x{deficit.Count}";
+                demand.Urgent = false;
+            }
+            else if (rallyBreakthrough)
+            {
+                demand.Priority = 9;
+                demand.Origin = "rally-assembly";
+                demand.RequireRallyBreakthrough = true;
+                demand.Domain = Domain.Land;
+                demand.Reason = $"GoGreen {deficit.Operation.LinkedObjective.Sector}: "
+                    + $"ruptura blindada faltando x{deficit.Count}";
                 demand.Urgent = false;
             }
             MergeRoleDemand(demands, demand, addCounts: true);
@@ -2189,10 +2238,11 @@ public partial class AIShoppingPlanner
         AddCounterPressureDemands(snapshot, demands, counterPressure);
         bool groundCounterPressureCovered = counterPressure.AntiTank <= 0.05f
             && counterPressure.AntiInfantry <= 0.05f;
+        bool rallyAssemblyActive = HasActiveRallyAssembly(snapshot.AITeam);
         AddEliteQualityDemand(snapshot, demands, UnitRole.Assalto, assaults, 26,
-            groundCounterPressureCovered);
+            groundCounterPressureCovered, rallyAssemblyActive);
         AddEliteQualityDemand(snapshot, demands, UnitRole.FogoIndireto, fireSupport, 27,
-            groundCounterPressureCovered);
+            groundCounterPressureCovered, rallyAssemblyActive);
         AddOperationalPressureDemands(snapshot, demands, BuildOperationalPressure(snapshot));
 
         demands.Sort((a, b) =>
@@ -2237,6 +2287,14 @@ public partial class AIShoppingPlanner
             && deficit.Operation.LinkedObjective.ObjectiveType == AIObjectiveType.RallyAssembly
             && (deficit.Kind == AINeedKind.FireSupport
                 || deficit.Kind == AINeedKind.Artillery);
+    }
+
+    private static bool IsRallyBreakthroughDeficit(TacticalDeficit deficit)
+    {
+        return deficit.Operation != null
+            && deficit.Operation.LinkedObjective != null
+            && deficit.Operation.LinkedObjective.ObjectiveType == AIObjectiveType.RallyAssembly
+            && deficit.Kind == AINeedKind.Assault;
     }
 
     private static AIShoppingDemand NewRoleDemand(UnitRole role, int count, int priority,
@@ -2312,6 +2370,9 @@ public partial class AIShoppingPlanner
             if (current.Role != incoming.Role || current.ExactRole != incoming.ExactRole
                 || current.Domain != incoming.Domain || current.MinEliteLevel != incoming.MinEliteLevel
                 || current.MaxEliteLevel != incoming.MaxEliteLevel
+                || !Mathf.Approximately(current.MinRallyArtilleryWeight,
+                    incoming.MinRallyArtilleryWeight)
+                || current.RequireRallyBreakthrough != incoming.RequireRallyBreakthrough
                 || current.RequiredWeaponCategory != incoming.RequiredWeaponCategory
                 || current.TargetClass != incoming.TargetClass
                 || current.MinTargetPriority != incoming.MinTargetPriority
@@ -2346,6 +2407,12 @@ public partial class AIShoppingPlanner
         if (demand.RequiredWeaponCategory.HasValue
             && !HasWeaponCategory(unit, demand.RequiredWeaponCategory.Value))
             return false;
+        if (demand.MinRallyArtilleryWeight > 0f
+            && GetShoppingRallyArtilleryWeight(unit) < demand.MinRallyArtilleryWeight)
+            return false;
+        if (demand.RequireRallyBreakthrough
+            && !IsShoppingRallyBreakthroughUnit(unit))
+            return false;
         if (demand.TargetClass.HasValue
             && (int)unit.ResolveAiTargetPriorityForTargetClass(demand.TargetClass.Value)
                 < (int)demand.MinTargetPriority)
@@ -2378,8 +2445,12 @@ public partial class AIShoppingPlanner
                 : $"{demand.Role}/{demand.ExactRole}";
         if (demand.RequiredWeaponCategory.HasValue)
             label += $"+{demand.RequiredWeaponCategory.Value}";
+        if (demand.MinRallyArtilleryWeight > 0f)
+            label += $"+rallyArt>={demand.MinRallyArtilleryWeight:0.#}";
         if (demand.TargetClass.HasValue)
             label += $"→{demand.TargetClass.Value}";
+        if (demand.RequireRallyBreakthrough)
+            label += "+rallyBreak";
         if (!string.IsNullOrEmpty(demand.RequiredUnitId))
             label += $"[{demand.RequiredUnitId}]";
         return label;
@@ -2395,6 +2466,10 @@ public partial class AIShoppingPlanner
             score += (int)unit.ResolveAiTargetPriorityForTargetClass(demand.TargetClass.Value) * 18000;
         float counterFit = ScoreCounterFit(unit, counterPressure);
         score += Mathf.RoundToInt(counterFit * 18000f);
+        if (demand.MinRallyArtilleryWeight > 0f)
+            score += Mathf.RoundToInt(GetShoppingRallyArtilleryWeight(unit) * 35000f);
+        if (demand.RequireRallyBreakthrough)
+            score += IsShoppingRallyBreakthroughUnit(unit) ? 90000 : -300000;
 
         bool eliteReady = IsEliteEconomyReady(snapshot, unit, remaining, concentrate);
         if (unit.eliteLevel > 0)
@@ -2424,9 +2499,39 @@ public partial class AIShoppingPlanner
         return score;
     }
 
+    private static float GetShoppingRallyArtilleryWeight(UnitData data)
+    {
+        if (data == null)
+            return 0f;
+        if ((data.roles == null || !data.roles.Contains(UnitRole.FogoIndireto))
+            && data.unitClass != GameUnitClass.Artillery)
+            return 0f;
+
+        string key = $"{data.id} {data.displayName} {data.apelido}".ToLowerInvariant();
+        if (key.Contains("obus") && key.Contains("leve"))
+            return 0.5f;
+        if (key.Contains("art") && key.Contains("campanha"))
+            return 1.5f;
+        if (key.Contains("astros")
+            || (key.Contains("obus") && (key.Contains("medio")
+                || key.Contains("médio") || key.Contains("mÃ©dio"))))
+            return 1f;
+
+        return 0.5f;
+    }
+
     // Preenche prédios de produção ociosos (não usados nesta passada, podem produzir, célula livre)
     // com o defensor mais barato disponível — nega captura oportunista de "casa vazia" quando perdendo
     // ou defendendo. Respeita orçamento e o filtro de stance.
+    private static bool IsShoppingRallyBreakthroughUnit(UnitData data)
+    {
+        return data != null
+            && data.domain == Domain.Land
+            && data.unitClass == GameUnitClass.Armored
+            && UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Assalto
+            && (data.roles == null || !data.roles.Contains(UnitRole.FogoIndireto));
+    }
+
     private static void FillIdleProductionBuildings(
         AIWorldSnapshot snapshot, List<ShoppingOrder> orders,
         HashSet<ConstructionManager> usedBuildings, HashSet<Vector3Int> occupied, ref int remaining,
@@ -2624,7 +2729,8 @@ public partial class AIShoppingPlanner
         UnitRole role,
         int activeRoleCount,
         int priority,
-        bool groundCounterPressureCovered)
+        bool groundCounterPressureCovered,
+        bool rallyAssemblyActive)
     {
         if (snapshot == null || activeRoleCount <= 0
             || !IsOperationalCoreReadyForElite(snapshot, demands))
@@ -2637,7 +2743,7 @@ public partial class AIShoppingPlanner
         float safeRatio = AIController.Instance != null
             ? Mathf.Clamp01(AIController.Instance.EliteRatioSafe)
             : 0.5f;
-        float targetRatio = groundCounterPressureCovered
+        float targetRatio = groundCounterPressureCovered || rallyAssemblyActive
             ? Mathf.Max(pressureRatio, safeRatio)
             : pressureRatio;
         int desiredElite = Mathf.CeilToInt(activeRoleCount * targetRatio);
@@ -2666,7 +2772,8 @@ public partial class AIShoppingPlanner
             priority,
             "elite-quality",
             $"qualidade elite={currentElite}/{desiredElite} role={activeRoleCount}"
-                + $" ratio={targetRatio:P0} countersCobertos={groundCounterPressureCovered}",
+                + $" ratio={targetRatio:P0} countersCobertos={groundCounterPressureCovered}"
+                + $" rallyAtivo={rallyAssemblyActive}",
             false);
         quality.MinEliteLevel = 1;
 

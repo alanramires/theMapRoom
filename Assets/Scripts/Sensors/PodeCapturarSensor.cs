@@ -10,6 +10,32 @@ public static class PodeCapturarSensor
         RecoverAlly = 2
     }
 
+    /// <summary>
+    /// Retorna quantos pontos esta unidade aplica ao capturar ou recuperar uma construcao.
+    /// Capturadores agressivos trocam eficiencia de captura pelo alcance: 2 HP por ponto,
+    /// arredondando para cima e com minimo de 1 enquanto estiverem vivos.
+    /// </summary>
+    public static int GetCapturePower(UnitManager unit)
+    {
+        if (unit == null || unit.IsDead)
+            return 0;
+
+        int hp = Mathf.Max(0, unit.CurrentHP);
+        if (hp <= 0)
+            return 0;
+
+        if (unit.TryGetUnitData(out UnitData unitData)
+            && unitData != null
+            && unitData.roles != null
+            && unitData.roles.Count > 0
+            && unitData.roles[0] == UnitRole.CapturadorAgressivo)
+        {
+            return Mathf.Max(1, Mathf.CeilToInt(hp / 2f));
+        }
+
+        return hp;
+    }
+
     public static bool TryGetCaptureTarget(
         UnitManager selectedUnit,
         Tilemap boardTilemap,

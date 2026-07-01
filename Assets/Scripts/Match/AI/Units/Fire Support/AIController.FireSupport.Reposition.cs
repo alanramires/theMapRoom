@@ -105,9 +105,17 @@ public partial class AIController
         bool found = false;
         bool preferMaxRange = PreferFireSupportWeaponMaxRange(unit);
         bool conservative = IsFireSupportConservative(unit);
+        bool rallyBacklineRequired = assigned != null
+            && assigned.ObjectiveType == AIObjectiveType.RallyAssembly
+            && !IsCombatantFireSupport(unit);
+        bool backlinePosture = conservative || rallyBacklineRequired;
+        Vector3Int rearAnchor = snapshot.EnemyHQ != null
+            ? snapshot.EnemyHQ.CurrentCellPosition
+            : anchor;
+        rearAnchor.z = 0;
         bool preferBestDpq = PreferFireSupportBestDpq(unit);
         int maxRange = GetFireSupportMaxWeaponRange(unit);
-        bool conservativeOffensiveObjective = conservative
+        bool conservativeOffensiveObjective = backlinePosture
             && assigned != null
             && assigned.Status != ObjectiveStatus.Defending
             && assigned.Status != ObjectiveStatus.Complete
@@ -127,7 +135,7 @@ public partial class AIController
         float fromEffectiveDist = fromRouteFound ? fromRouteDist : fromDist;
         float fromScore = ScoreFireSupportRepositionCell(
             unit, snapshot, fromCell, fromCell, anchor, fromDist, 0,
-            preferMaxRange, conservative, preferBestDpq, maxRange, weaponPriorityData, out _);
+            preferMaxRange, backlinePosture, preferBestDpq, maxRange, weaponPriorityData, out _);
         Vector3Int bestAdvanceCell = fromCell;
         bool bestAdvanceRouteFound = false;
         float bestAdvanceProgress = 0f;
@@ -155,9 +163,13 @@ public partial class AIController
                 {
                     if (IsCellACapturerTarget(cell, repositionCapPlan, snapshot.AITeam))
                         return false;
-                    if (conservative && !IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
+                    if (backlinePosture && !IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
                         return false;
-                    if (conservativeOffensiveObjective && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor))
+                    if (conservativeOffensiveObjective && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, rearAnchor))
+                        return false;
+                    if (rallyBacklineRequired
+                        && TryScoreBacklineCell(unit, snapshot, cell, rearAnchor, out AIBacklineScore rallyBackline)
+                        && (!rallyBackline.InRearSlice || rallyBackline.IsVanguard))
                         return false;
 
                     float tacticalPressure = CalculateFireSupportTacticalPressureScore(unit, snapshot, cell, weaponPriorityData);
@@ -165,8 +177,8 @@ public partial class AIController
                         return false;
 
                     float progress = fromDist - SectorManager.HexDistance(cell, anchor);
-                    float rearLine = conservative ? CalculateFireSupportRearLineScore(unit, snapshot, cell, anchor) : 0f;
-                    if (conservative && progress > 0f && tacticalPressure <= 0f && rearLine < -350f)
+                    float rearLine = backlinePosture ? CalculateFireSupportRearLineScore(unit, snapshot, cell, rearAnchor) : 0f;
+                    if (backlinePosture && progress > 0f && tacticalPressure <= 0f && rearLine < -350f)
                         return false;
 
                     return true;
@@ -183,7 +195,7 @@ public partial class AIController
                         fromDist,
                         pathCost,
                         preferMaxRange,
-                        conservative,
+                        backlinePosture,
                         preferBestDpq,
                         maxRange,
                         weaponPriorityData,
@@ -191,7 +203,7 @@ public partial class AIController
 
                     float progress = fromDist - SectorManager.HexDistance(cell, anchor);
                     float tacticalPressure = CalculateFireSupportTacticalPressureScore(unit, snapshot, cell, weaponPriorityData);
-                    float rearLine = conservative ? CalculateFireSupportRearLineScore(unit, snapshot, cell, anchor) : 0f;
+                    float rearLine = backlinePosture ? CalculateFireSupportRearLineScore(unit, snapshot, cell, rearAnchor) : 0f;
                     float dpq = GetTerrainDpqPontos(cell);
 
                     if (!preferMaxRange && progress < 0f)
@@ -234,16 +246,20 @@ public partial class AIController
             if (occupied != null && occupied.Contains(cell)) continue;
             if (IsCellACapturerTarget(cell, repositionCapPlan, snapshot.AITeam)) continue;
             float threat = CalculateThreatLevel(cell, snapshot.AITeam);
-            if (conservative && !IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
+            if (backlinePosture && !IsFireSupportConservativeCellAllowed(unit, snapshot, cell))
                 continue;
-            if (conservativeOffensiveObjective && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor))
+            if (conservativeOffensiveObjective && !HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, rearAnchor))
+                continue;
+            if (rallyBacklineRequired
+                && TryScoreBacklineCell(unit, snapshot, cell, rearAnchor, out AIBacklineScore rallyBackline)
+                && (!rallyBackline.InRearSlice || rallyBackline.IsVanguard))
                 continue;
 
             float progress = fromDist - SectorManager.HexDistance(cell, anchor);
             float dpq = GetTerrainDpqPontos(cell);
             int pathCost = GetPathStepCount(paths, cell);
             float tacticalPressure = CalculateFireSupportTacticalPressureScore(unit, snapshot, cell, weaponPriorityData);
-            float rearLine = conservative ? CalculateFireSupportRearLineScore(unit, snapshot, cell, anchor) : 0f;
+            float rearLine = backlinePosture ? CalculateFireSupportRearLineScore(unit, snapshot, cell, rearAnchor) : 0f;
             float cellRouteDist = GetAnchorRouteCost(cell);
             bool cellRouteFound = cellRouteDist < float.MaxValue
                 || TryCalculateFireSupportRouteDistance(unit, cell, anchor, out cellRouteDist);
@@ -259,14 +275,14 @@ public partial class AIController
                 && routeProgress <= 0.1f
                 && !recoversMissingRoute)
                 continue;
-            if (conservative && progress > 0f && tacticalPressure <= 0f && rearLine < -350f)
+            if (backlinePosture && progress > 0f && tacticalPressure <= 0f && rearLine < -350f)
                 continue;
             if (!requireImmediateThreat && !preferMaxRange && progress < 0f && !advancesByRoute)
                 continue;
 
             float score = ScoreFireSupportRepositionCell(
                 unit, snapshot, cell, fromCell, anchor, fromDist, pathCost,
-                preferMaxRange, conservative, preferBestDpq, maxRange, weaponPriorityData, out _);
+                preferMaxRange, backlinePosture, preferBestDpq, maxRange, weaponPriorityData, out _);
             if (preferBestDpq && dpq <= GetTerrainDpqPontos(fromCell) && pathCost <= 1)
                 score -= 250f;
 
@@ -301,7 +317,7 @@ public partial class AIController
 
         bool enemyNearAnchor = HasNearbyVisibleEnemy(anchor, snapshot.AITeam, defenseEnemyRange + maxRange);
         bool shouldAdvanceToAssigned = fromEffectiveDist > Mathf.Max(1, maxRange + 1);
-        bool canUseAdvanceFallback = !conservative;
+        bool canUseAdvanceFallback = !backlinePosture;
         if (!requireImmediateThreat
             && canUseAdvanceFallback
             && shouldAdvanceToAssigned
@@ -339,7 +355,7 @@ public partial class AIController
 
         ScoreFireSupportRepositionCell(
             unit, snapshot, bestCell, fromCell, anchor, fromDist,
-            GetPathStepCount(paths, bestCell), preferMaxRange, conservative,
+            GetPathStepCount(paths, bestCell), preferMaxRange, backlinePosture,
             preferBestDpq, maxRange, weaponPriorityData, out string scoreDetails);
         reason = $"score={bestScore:F0} hold={fromScore:F0} {scoreDetails}";
         return true;

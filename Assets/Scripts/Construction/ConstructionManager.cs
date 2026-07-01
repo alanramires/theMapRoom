@@ -1051,7 +1051,7 @@ public class ConstructionManager : MonoBehaviour
         bool showFlagThreatOutline = occupant != null
             && occupantVisible
             && occupant.TeamId != teamId
-            && currentCapturePoints <= Mathf.Max(0, occupant.CurrentHP);
+            && currentCapturePoints <= PodeCapturarSensor.GetCapturePower(occupant);
 
         AIRallyAssemblyState applyRallyState = ResolveRallyHudState(out bool applyRallyIsMain);
         hudController.Apply(
@@ -1178,7 +1178,7 @@ public class ConstructionManager : MonoBehaviour
         bool showFlagThreatOutline = occupant != null
             && occupantVisible
             && occupant.TeamId != teamId
-            && currentCapturePoints <= Mathf.Max(0, occupant.CurrentHP);
+            && currentCapturePoints <= PodeCapturarSensor.GetCapturePower(occupant);
 
         if (!force
             && cachedOccupantInstanceId == occupantId

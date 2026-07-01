@@ -35,9 +35,12 @@ public partial class AIController
         switch (priority)
         {
             case BazookaTargetPriority.Primary:
-                return 30000f;
+                // Primary is a doctrinal target, not a small tie-break. It must beat
+                // objective occupancy bonuses so anti-artillery tanks remove the gun
+                // that would otherwise fire on them after the current engagement.
+                return 150000f;
             case BazookaTargetPriority.Secondary:
-                return 15000f;
+                return 40000f;
             default:
                 return 0f;
         }

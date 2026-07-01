@@ -17,11 +17,11 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         public bool hasDirectLos;
         public float finalReachedEv;
         public float losHeightAtBlockedCell;
-        public int blockedCellEv;
+        public float blockedCellEv;
         public Vector3Int blockedCell;
         public string blockedLayerLabel;
         public float losHeightAtPassedCell;
-        public int passedCellEv;
+        public float passedCellEv;
         public Vector3Int passedCell;
         public string passedLayerLabel;
         public string lineRiseTrace;
@@ -660,10 +660,10 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             forcedTargetHeight,
             out float finalReachedEv,
             out float losHeightAtBlockedCell,
-            out int blockedCellEv,
+            out float blockedCellEv,
             out Vector3Int blockedCell,
             out float losHeightAtPassedCell,
-            out int passedCellEv,
+            out float passedCellEv,
             out Vector3Int passedCell,
             out List<float> lineRiseHeights);
 
@@ -696,7 +696,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         return sb.ToString();
     }
 
-    private static string ResolveBlockedLayerLabel(Tilemap map, TerrainDatabase db, Vector3Int blockedCell, int blockedEv)
+    private static string ResolveBlockedLayerLabel(Tilemap map, TerrainDatabase db, Vector3Int blockedCell, float blockedEv)
     {
         if (blockedCell == Vector3Int.zero)
             return string.Empty;
@@ -716,7 +716,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
                     constructionData != null)
                 {
                     string constructionName = ResolveEntityLabel(constructionData.displayName, constructionData.id, constructionData.name);
-                    int displayEv = hasTerrain &&
+                    float displayEv = hasTerrain &&
                         terrain.TryGetConstructionVisionOverride(constructionData, out int overrideEv, out _)
                         ? Mathf.Max(0, overrideEv)
                         : (hasTerrain ? Mathf.Max(0, terrain.ev) : Mathf.Max(0, blockedEv));
@@ -728,7 +728,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             if (structure != null)
             {
                 string structureName = ResolveEntityLabel(structure.displayName, structure.id, structure.name);
-                int displayEv = hasTerrain &&
+                    float displayEv = hasTerrain &&
                     terrain.TryGetStructureVisionOverride(structure, out int overrideEv, out _)
                     ? Mathf.Max(0, overrideEv)
                     : (hasTerrain ? Mathf.Max(0, terrain.ev) : Mathf.Max(0, blockedEv));

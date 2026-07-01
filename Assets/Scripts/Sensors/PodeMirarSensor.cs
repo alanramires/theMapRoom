@@ -1335,7 +1335,7 @@ public static class PodeMirarSensor
                 originCell,
                 attacker,
                 dpqAirHeightConfig,
-                out int originEv,
+                out float originEv,
                 out _))
         {
             originEv = 0;
@@ -1348,7 +1348,7 @@ public static class PodeMirarSensor
                 targetCell,
                 defender,
                 dpqAirHeightConfig,
-                out int targetEv,
+                out float targetEv,
                 out _))
         {
             targetEv = 0;
@@ -1382,7 +1382,7 @@ public static class PodeMirarSensor
                     cell,
                     null,
                     dpqAirHeightConfig,
-                    out int cellEv,
+                    out float cellEv,
                     out bool cellBlocksLoS))
             {
                 continue;
@@ -1430,7 +1430,7 @@ public static class PodeMirarSensor
                 originCell,
                 observer,
                 dpqAirHeightConfig,
-                out int originEv,
+                out float originEv,
                 out _))
         {
             originEv = 0;
@@ -1443,7 +1443,7 @@ public static class PodeMirarSensor
                 targetCell,
                 target,
                 dpqAirHeightConfig,
-                out int targetEv,
+                out float targetEv,
                 out _))
         {
             targetEv = 0;
@@ -1468,7 +1468,7 @@ public static class PodeMirarSensor
                     cell,
                     null,
                     dpqAirHeightConfig,
-                    out int cellEv,
+                    out float cellEv,
                     out bool cellBlocksLoS))
             {
                 continue;
@@ -1488,16 +1488,16 @@ public static class PodeMirarSensor
         return true;
     }
 
-    private static int ResolveOriginEvForLos(
+    private static float ResolveOriginEvForLos(
         Tilemap tilemap,
         TerrainDatabase terrainDatabase,
         Vector3Int originCell,
         UnitManager attacker,
         DPQAirHeightConfig dpqAirHeightConfig,
-        int fallbackEv)
+        float fallbackEv)
     {
         if (attacker == null)
-            return Mathf.Max(0, fallbackEv);
+            return Mathf.Max(0f, fallbackEv);
 
         Domain domain = attacker.GetDomain();
         HeightLevel height = attacker.GetHeightLevel();
@@ -1506,10 +1506,10 @@ public static class PodeMirarSensor
             if (dpqAirHeightConfig != null &&
                 dpqAirHeightConfig.TryGetVisionFor(domain, height, out int airEv, out _))
             {
-                return Mathf.Max(0, airEv);
+                return Mathf.Max(0f, airEv);
             }
 
-            return Mathf.Max(0, fallbackEv);
+            return Mathf.Max(0f, fallbackEv);
         }
 
         // Regra de origem da LoS: unidades no chao partem do EV de sua camada (Surface = 0),
@@ -1521,7 +1521,7 @@ public static class PodeMirarSensor
             originTerrain != null &&
             originTerrain.shooterInheritsTerrainEv)
         {
-            return Mathf.Max(0, originTerrain.ev);
+            return originTerrain.ResolveShooterInheritedEv();
         }
 
         return 0;
@@ -1809,10 +1809,10 @@ public static class PodeMirarSensor
         Vector3Int cell,
         UnitManager occupantUnit,
         DPQAirHeightConfig dpqAirHeightConfig,
-        out int ev,
+        out float ev,
         out bool blockLoS)
     {
-        ev = 0;
+        ev = 0f;
         blockLoS = true;
         if (!TryResolveTerrainAtCell(tilemap, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
             return false;
@@ -2055,5 +2055,4 @@ public static class PodeMirarSensor
         return embarked.CanFireAtLayer(domain, heightLevel);
     }
 }
-
 

@@ -1121,19 +1121,19 @@ public static class PodeDetectarSensor
         HeightLevel? forcedTargetHeightLevel,
         out float finalReachedEv,
         out float losHeightAtBlockedCell,
-        out int blockedCellEv,
+        out float blockedCellEv,
         out Vector3Int blockedCell,
         out float losHeightAtStrongestPassedCell,
-        out int strongestPassedCellEv,
+        out float strongestPassedCellEv,
         out Vector3Int strongestPassedCell,
         out List<float> lineRiseHeights)
     {
         finalReachedEv = 0f;
         losHeightAtBlockedCell = 0f;
-        blockedCellEv = 0;
+        blockedCellEv = 0f;
         blockedCell = Vector3Int.zero;
         losHeightAtStrongestPassedCell = 0f;
-        strongestPassedCellEv = 0;
+        strongestPassedCellEv = 0f;
         strongestPassedCell = Vector3Int.zero;
         lineRiseHeights = new List<float>();
 
@@ -1186,7 +1186,7 @@ public static class PodeDetectarSensor
                     blockedCell,
                     null,
                     dpqAirHeightConfig,
-                    out int resolvedBlockedEv,
+                    out float resolvedBlockedEv,
                     out _,
                     forcedDomain: forcedTargetDomain,
                     forcedHeightLevel: forcedTargetHeightLevel))
@@ -1210,7 +1210,7 @@ public static class PodeDetectarSensor
                         cell,
                         null,
                         dpqAirHeightConfig,
-                        out int cellEv,
+                        out float cellEv,
                         out bool cellBlocksLoS,
                         forcedDomain: forcedTargetDomain,
                         forcedHeightLevel: forcedTargetHeightLevel))
@@ -1886,7 +1886,7 @@ public static class PodeDetectarSensor
                 originCell,
                 observer,
                 dpqAirHeightConfig,
-                out int originEv,
+                out float originEv,
                 out _))
         {
             originEv = 0;
@@ -1914,7 +1914,7 @@ public static class PodeDetectarSensor
                 targetCell,
                 target,
                 dpqAirHeightConfig,
-                out int targetEv,
+                out float targetEv,
                 out _,
                 forcedDomain: forcedTargetDomain,
                 forcedHeightLevel: forcedTargetHeightLevel))
@@ -1941,7 +1941,7 @@ public static class PodeDetectarSensor
                     cell,
                     null,
                     dpqAirHeightConfig,
-                    out int cellEv,
+                    out float cellEv,
                     out bool cellBlocksLoS,
                     forcedDomain: forcedTargetDomain,
                     forcedHeightLevel: forcedTargetHeightLevel))
@@ -1963,16 +1963,16 @@ public static class PodeDetectarSensor
         return true;
     }
 
-    private static int ResolveOriginEvForLos(
+    private static float ResolveOriginEvForLos(
         Tilemap tilemap,
         TerrainDatabase terrainDatabase,
         Vector3Int originCell,
         UnitManager observer,
         DPQAirHeightConfig dpqAirHeightConfig,
-        int fallbackEv)
+        float fallbackEv)
     {
         if (observer == null)
-            return Mathf.Max(0, fallbackEv);
+            return Mathf.Max(0f, fallbackEv);
 
         Domain domain = observer.GetDomain();
         HeightLevel height = observer.GetHeightLevel();
@@ -1981,10 +1981,10 @@ public static class PodeDetectarSensor
             if (dpqAirHeightConfig != null &&
                 dpqAirHeightConfig.TryGetVisionFor(domain, height, out int airEv, out _))
             {
-                return Mathf.Max(0, airEv);
+                return Mathf.Max(0f, airEv);
             }
 
-            return Mathf.Max(0, fallbackEv);
+            return Mathf.Max(0f, fallbackEv);
         }
 
         originCell.z = 0;
@@ -1994,7 +1994,7 @@ public static class PodeDetectarSensor
             originTerrain != null &&
             originTerrain.shooterInheritsTerrainEv)
         {
-            return Mathf.Max(0, originTerrain.ev);
+            return originTerrain.ResolveShooterInheritedEv();
         }
 
         return 0;
@@ -2006,12 +2006,12 @@ public static class PodeDetectarSensor
         Vector3Int cell,
         UnitManager occupantUnit,
         DPQAirHeightConfig dpqAirHeightConfig,
-        out int ev,
+        out float ev,
         out bool blockLoS,
         Domain? forcedDomain = null,
         HeightLevel? forcedHeightLevel = null)
     {
-        ev = 0;
+        ev = 0f;
         blockLoS = true;
         if (!TryResolveTerrainAtCell(tilemap, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
             return false;
@@ -2590,4 +2590,3 @@ public static class PodeDetectarSensor
         return observer.name.IndexOf("fragata", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
-

@@ -79,9 +79,9 @@ public partial class AIController : MonoBehaviour
     [Tooltip("quando as press�es anti-tank E anti-infantaria j� est�o cobertas (folga vira superioridade qualitativa). Modo normal.")]
     [SerializeField, Range(0f, 1f)] private float eliteRatioNormalSafe = 0.50f;
     [Tooltip("entre Assalto e Fogo Indireto quando ainda h� press�o terrestre aberta. Hard Mode.")]
-    [SerializeField, Range(0f, 1f)] private float eliteRatioHardPressure = 0.15f;
+    [SerializeField, Range(0f, 1f)] private float eliteRatioHardPressure = 0.60f;
     [Tooltip("quando as press�es anti-tank E anti-infantaria j� est�o cobertas . Hard Mode.")]
-    [SerializeField, Range(0f, 1f)] private float eliteRatioHardSafe = 0.33f;
+    [SerializeField, Range(0f, 1f)] private float eliteRatioHardSafe = 0.80f;
     [Tooltip("Quantos turnos de renda a IA topa POUPAR mirando um elite/capacidade. 0 = nunca poupa (guloso). Modo normal.")]
     [SerializeField, Range(0, 4)] private int eliteSaveTurnsNormal = 1;
     [Tooltip("TQuantos turnos de renda a IA topa POUPAR mirando um elite/capacidade. Hard Mode (subir ajuda a alcançar elites mais caros).")]

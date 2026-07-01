@@ -389,8 +389,19 @@ public partial class AIController
             return true;
         }
 
+        SectorObjective rallyObjective = null;
+        if (plan?.Objectives != null)
+            foreach (SectorObjective objective in plan.Objectives)
+                if (objective != null
+                    && objective.ObjectiveType == AIObjectiveType.RallyAssembly
+                    && objective.Sector == rally.Sector)
+                {
+                    rallyObjective = objective;
+                    break;
+                }
+
         if (TryFindFireSupportRepositionCell(unit, snapshot, fromCell, rally.Anchor, paths, occupied,
-                out Vector3Int moveCell, out string moveReason, assigned: null, moveMarginOverride: 45f))
+                out Vector3Int moveCell, out string moveReason, assigned: rallyObjective, moveMarginOverride: 45f))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rally {rally.Sector} monta retaguarda via {moveCell} ({rally.Reason}; {moveReason})");
             action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);

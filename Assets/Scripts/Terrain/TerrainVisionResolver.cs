@@ -9,10 +9,10 @@ public static class TerrainVisionResolver
         DPQAirHeightConfig dpqAirHeightConfig,
         ConstructionData constructionData,
         StructureData structureData,
-        out int ev,
+        out float ev,
         out bool blockLoS)
     {
-        int terrainEv = terrain != null ? Mathf.Max(0, terrain.ev) : 0;
+        float terrainEv = terrain != null ? Mathf.Max(0f, terrain.ev) : 0f;
         bool terrainBlocks = terrain == null || terrain.blockLoS;
 
         int constructionEv = 0;
@@ -41,7 +41,7 @@ public static class TerrainVisionResolver
             }
         }
 
-        int composedEv = terrainEv;
+        float composedEv = terrainEv;
         bool composedBlocks = terrainBlocks;
         if (hasConstructionOverride)
         {

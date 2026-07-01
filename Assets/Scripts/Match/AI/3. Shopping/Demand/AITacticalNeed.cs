@@ -129,6 +129,8 @@ public class AIShoppingDemand
     public bool StrategicEscalation;
     public int MinEliteLevel;
     public int MaxEliteLevel = int.MaxValue;
+    public float MinRallyArtilleryWeight;
+    public bool RequireRallyBreakthrough;
     public string Origin;
     public string Reason;
 }

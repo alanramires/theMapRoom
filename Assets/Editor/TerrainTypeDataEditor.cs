@@ -14,7 +14,25 @@ public class TerrainTypeDataEditor : Editor
             "allowAircraftTakeoffAndLanding",
             "requiredLandingSkills",
             "requireAtLeastOneLandingSkill",
-            "forceEndMovementOnTerrainDomainForDomains");
+            "forceEndMovementOnTerrainDomainForDomains",
+            "ev",
+            "shooterInheritsTerrainEv",
+            "shooterInheritedEvOverride",
+            "blockLoS");
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Vision", EditorStyles.boldLabel);
+        DrawIfExists(serializedObject.FindProperty("ev"), "EV");
+
+        SerializedProperty inheritsTerrainEv = serializedObject.FindProperty("shooterInheritsTerrainEv");
+        DrawIfExists(inheritsTerrainEv, "Shooter Inherits Terrain EV");
+
+        using (new EditorGUI.DisabledScope(inheritsTerrainEv == null || !inheritsTerrainEv.boolValue))
+        {
+            DrawIfExists(serializedObject.FindProperty("shooterInheritedEvOverride"), "Override EV To");
+        }
+
+        DrawIfExists(serializedObject.FindProperty("blockLoS"), "Block LoS");
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Aircraft Ops", EditorStyles.boldLabel);

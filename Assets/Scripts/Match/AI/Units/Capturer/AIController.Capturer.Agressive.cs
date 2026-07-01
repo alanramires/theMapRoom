@@ -26,6 +26,39 @@ public partial class AIController
         List<UnitManager> threats = CollectAssaultEscortThreats(
             snapshot.AITeam, targetCell, AggressiveCapturerEngagementRadius);
         AddAssaultEscortTravelThreats(snapshot.AITeam, fromCell, paths, threats);
+
+        // Ranged aggressive capturers (Bazooka) fire from their current cell whenever
+        // possible. The legacy melee search used to evaluate movement first and could
+        // walk a ranged unit into counterattack range despite already having a shot.
+        var stationaryPath = new Dictionary<Vector3Int, List<Vector3Int>>
+        {
+            [fromCell] = paths.TryGetValue(fromCell, out List<Vector3Int> stayPath)
+                ? stayPath
+                : new List<Vector3Int> { fromCell }
+        };
+        if (TryFindAssaultEscortAttack(
+                unit,
+                snapshot,
+                fromCell,
+                targetCell,
+                AggressiveCapturerEngagementRadius,
+                assigned.Status == ObjectiveStatus.Defending,
+                stationaryPath,
+                occupied,
+                threats,
+                out _,
+                out UnitManager rangedTarget,
+                out string rangedReason))
+        {
+            Vector3Int rangedTargetCell = rangedTarget.CurrentCellPosition;
+            rangedTargetCell.z = 0;
+            Debug.Log($"{TL("CapturadorAgressivo")} {unit.InstanceId} atira parado para {assigned.Sector} "
+                + $"de {fromCell} -> {rangedTarget.UnitDisplayName}#{rangedTarget.InstanceId} ({rangedReason})");
+            action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, fromCell,
+                rangedTarget.InstanceId.ToString(), rangedTargetCell, paths);
+            return true;
+        }
+
         if (!TryFindAssaultEscortAttack(
                 unit,
                 snapshot,

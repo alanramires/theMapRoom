@@ -608,6 +608,7 @@ public class DebugManager : MonoBehaviour
 
         if (f12)
         {
+            ForceNeutralBeforeAIControlRelease("F12 AI Resume");
             if (ai != null) ai.SetDebugPaused(false);
             else Debug.Log("[AI Shortcuts] AIController não encontrado.");
             Debug.Log("[AI Shortcuts] F12 — AI Resume");
@@ -620,10 +621,30 @@ public class DebugManager : MonoBehaviour
         }
         if (f11)
         {
+            ForceNeutralBeforeAIControlRelease("F11 AI Step");
             if (ai != null) ai.RequestDebugStep();
             else Debug.Log("[AI Shortcuts] AIController nao encontrado.");
             Debug.Log("[AI Shortcuts] F11 — AI Step");
         }
+    }
+
+    private static void ForceNeutralBeforeAIControlRelease(string reason)
+    {
+        if (!AIController.IsDebugPaused)
+            return;
+
+        TurnStateManager turnState = FindAnyObjectByType<TurnStateManager>();
+        if (turnState == null)
+        {
+            Debug.LogWarning($"[AI Shortcuts] {reason}: TurnStateManager nao encontrado; comando continua sem normalizacao.");
+            return;
+        }
+
+        TurnStateManager.CursorState previous = turnState.CurrentCursorState;
+        bool hadSelection = turnState.SelectedUnit != null;
+        turnState.ForceNeutral();
+        Debug.Log($"[AI Shortcuts] {reason}: cursor {previous}->Neutral "
+            + $"selection={(hadSelection ? "cancelada" : "nenhuma")} antes de liberar a IA.");
     }
 
     private System.Collections.IEnumerator FocusCommandInputNextFrame()
