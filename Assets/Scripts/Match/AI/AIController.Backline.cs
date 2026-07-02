@@ -21,6 +21,7 @@ public partial class AIController
         if (!TryBuildBacklineContext(unit, snapshot, out List<Vector3Int> combatants, out List<Vector3Int> enemies))
             return false;
 
+        anchor = ResolveBacklineAnchor(enemies, anchor);
         result = AIBacklineAnalyzer.Analyze(combatants, enemies, anchor, BuildBacklineSettings());
         return result != null && result.Success;
     }
@@ -36,8 +37,32 @@ public partial class AIController
         if (!TryBuildBacklineContext(unit, snapshot, out List<Vector3Int> combatants, out List<Vector3Int> enemies))
             return false;
 
+        anchor = ResolveBacklineAnchor(enemies, anchor);
         score = AIBacklineAnalyzer.ScoreCell(combatants, enemies, cell, anchor, BuildBacklineSettings());
         return true;
+    }
+
+    private static Vector3Int ResolveBacklineAnchor(
+        IReadOnlyList<Vector3Int> enemies,
+        Vector3Int fallback)
+    {
+        fallback.z = 0;
+        if (enemies == null || enemies.Count == 0)
+            return fallback;
+
+        Vector3 sum = Vector3.zero;
+        foreach (Vector3Int raw in enemies)
+        {
+            Vector3Int cell = raw;
+            cell.z = 0;
+            sum += new Vector3(cell.x, cell.y, 0f);
+        }
+
+        Vector3 average = sum / enemies.Count;
+        return new Vector3Int(
+            Mathf.RoundToInt(average.x),
+            Mathf.RoundToInt(average.y),
+            0);
     }
 
     private bool TryBuildBacklineContext(
@@ -98,10 +123,26 @@ public partial class AIController
     // mantém o comportamento anterior. Complementa decisões como a fusão de unidades em reparo.
     private bool IsCellInSafeRear(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell)
     {
-        if (snapshot == null || snapshot.EnemyHQ == null)
+        if (snapshot == null)
             return true;
 
-        Vector3Int anchor = snapshot.EnemyHQ.CurrentCellPosition;
+        bool hasKnownEnemy = false;
+        if (snapshot.EnemyUnits != null)
+        {
+            foreach (UnitManager enemy in snapshot.EnemyUnits)
+            {
+                if (enemy == null || enemy.IsDead || enemy.IsEmbarked)
+                    continue;
+                hasKnownEnemy = true;
+                break;
+            }
+        }
+        if (!hasKnownEnemy && snapshot.EnemyHQ == null)
+            return true;
+
+        Vector3Int anchor = snapshot.EnemyHQ != null
+            ? snapshot.EnemyHQ.CurrentCellPosition
+            : cell;
         anchor.z = 0;
         if (!TryScoreBacklineCell(unit, snapshot, cell, anchor, out AIBacklineScore score))
             return true;

@@ -6,9 +6,25 @@ using UnityEngine.Tilemaps;
 public class RetaguardaWindow : EditorWindow
 {
     [SerializeField] private Tilemap tilemap;
+    [SerializeField] private TerrainDatabase terrainDatabase;
+    [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
     [SerializeField] private bool useSelectionTeam = true;
     [SerializeField] private TeamId team = TeamId.Green;
     [SerializeField] private bool includeOtherRoles = false;
+    [SerializeField] private bool dynamicEnemyMassAnchor = true;
+    [SerializeField] private ConstructionManager selectedSpot;
+
+    [Header("Camadas")]
+    [SerializeField] private bool showRear = true;
+    [SerializeField] private bool showVanguard;
+    [SerializeField] private bool showNeutralBand;
+    [SerializeField] private bool showFrontBand;
+    [SerializeField] private bool showFrontlineUnits;
+    [SerializeField] private bool showEnemies;
+    [SerializeField] private bool showSpottingPoints;
+    [SerializeField] private bool showSpottingCone;
+    [SerializeField] private bool showSpotReleaseFront = true;
+    [SerializeField] private bool showObjective;
 
     [SerializeField] private Vector3Int anchorHex;
     [SerializeField] private int frontBandWidth = 3;
@@ -19,16 +35,28 @@ public class RetaguardaWindow : EditorWindow
     [SerializeField] private float enemyThreatWeight = 120f;
     [SerializeField] private int enemyAvoidRange = 1;
     [SerializeField] private float allyScreenStrength = 0.6f;
+    [SerializeField] private float frontlineDepthTolerance = 1.25f;
+    [SerializeField] private int spottingRadius = 3;
+    [SerializeField] private float spottingConeSpread = 1f;
 
     private bool pickingAnchor;
+    private bool pickingSpot;
     private Vector3Int hoverCell;
     private bool hasResult;
     private readonly List<Vector3Int> combatantCells = new List<Vector3Int>();
     private readonly List<Vector3Int> frontBandCells = new List<Vector3Int>();
+    private readonly List<Vector3Int> lineHeadCells = new List<Vector3Int>();
+    private readonly HashSet<Vector3Int> isolatedAdvanceCells = new HashSet<Vector3Int>();
     private readonly List<Vector3Int> enemyCells = new List<Vector3Int>();
     private float frontBandDist;
     private Dictionary<Vector3Int, float> rearScoreMap;
     private HashSet<Vector3Int> vanguardCells;
+    private readonly HashSet<Vector3Int> neutralBandCells = new HashSet<Vector3Int>();
+    private readonly HashSet<Vector3Int> spottingCells = new HashSet<Vector3Int>();
+    private readonly HashSet<Vector3Int> spottingConeCells = new HashSet<Vector3Int>();
+    private readonly HashSet<Vector3Int> spotReleaseFrontCells = new HashSet<Vector3Int>();
+    private readonly HashSet<Vector3Int> spotReleaseCoveredCells = new HashSet<Vector3Int>();
+    private bool selectedSpotCanBeReleased;
     private float maxRearScore = 1f;
     private Vector3Int bestRearCell;
     private bool hasBestRear;
@@ -42,13 +70,18 @@ public class RetaguardaWindow : EditorWindow
     {
         SceneView.duringSceneGui += OnSceneGUI;
         if (tilemap == null)
-            tilemap = FindFirstObjectByType<Tilemap>();
+            tilemap = ResolveBoardTilemap();
+        if (terrainDatabase == null)
+            terrainDatabase = FindFirstAsset<TerrainDatabase>();
+        if (dpqAirHeightConfig == null)
+            dpqAirHeightConfig = FindFirstAsset<DPQAirHeightConfig>();
     }
 
     private void OnDisable()
     {
         SceneView.duringSceneGui -= OnSceneGUI;
         pickingAnchor = false;
+        pickingSpot = false;
     }
 
     private void OnSelectionChange()
@@ -61,8 +94,19 @@ public class RetaguardaWindow : EditorWindow
     {
         scroll = EditorGUILayout.BeginScrollView(scroll);
 
+        EditorGUILayout.HelpBox(
+            "Retaguarda: posicione pelo menos 3 unidades em campo para simular uma boa triangulacao.",
+            MessageType.Info);
+
         EditorGUILayout.LabelField("Contexto", EditorStyles.boldLabel);
         tilemap = (Tilemap)EditorGUILayout.ObjectField("Tilemap", tilemap, typeof(Tilemap), true);
+        terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField(
+            "Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
+        if (GUILayout.Button("Detectar Tilemap do tabuleiro"))
+        {
+            tilemap = ResolveBoardTilemap();
+            ClearResult();
+        }
 
         useSelectionTeam = EditorGUILayout.Toggle("Time da selecao", useSelectionTeam);
         if (useSelectionTeam)
@@ -79,19 +123,40 @@ public class RetaguardaWindow : EditorWindow
         includeOtherRoles = EditorGUILayout.Toggle("Incluir transporte/log/apoio na linha", includeOtherRoles);
 
         EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("Objetivo", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Camadas", EditorStyles.boldLabel);
+        EditorGUI.BeginChangeCheck();
+        showRear = EditorGUILayout.ToggleLeft("Retaguarda", showRear);
+        showVanguard = EditorGUILayout.ToggleLeft("Vanguarda", showVanguard);
+        showNeutralBand = EditorGUILayout.ToggleLeft("Flancos", showNeutralBand);
+        showFrontBand = EditorGUILayout.ToggleLeft("Linha de combate", showFrontBand);
+        showFrontlineUnits = EditorGUILayout.ToggleLeft("Unidades da linha", showFrontlineUnits);
+        showEnemies = EditorGUILayout.ToggleLeft("Inimigos", showEnemies);
+        showSpottingPoints = EditorGUILayout.ToggleLeft("Pontos de spotting", showSpottingPoints);
+        showSpottingCone = EditorGUILayout.ToggleLeft("Cone de spotting", showSpottingCone);
+        showSpotReleaseFront = EditorGUILayout.ToggleLeft("Linha de liberacao do spot", showSpotReleaseFront);
+        showObjective = EditorGUILayout.ToggleLeft("Referencia/direcao", showObjective);
+        if (EditorGUI.EndChangeCheck())
+            SceneView.RepaintAll();
+
+        EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField("Direcao da frente", EditorStyles.boldLabel);
+        dynamicEnemyMassAnchor = EditorGUILayout.Toggle(
+            "Usar massa inimiga dinamica", dynamicEnemyMassAnchor);
         EditorGUILayout.BeginHorizontal();
-        anchorHex = EditorGUILayout.Vector3IntField("Hex", anchorHex);
+        EditorGUI.BeginDisabledGroup(dynamicEnemyMassAnchor);
+        anchorHex = EditorGUILayout.Vector3IntField("Hex de referencia", anchorHex);
+        EditorGUI.EndDisabledGroup();
         GUI.backgroundColor = pickingAnchor ? Color.red : Color.white;
         if (GUILayout.Button(pickingAnchor ? "X" : "<", GUILayout.Width(28)))
         {
             pickingAnchor = !pickingAnchor;
+            pickingSpot = false;
             SceneView.RepaintAll();
         }
         GUI.backgroundColor = Color.white;
         EditorGUILayout.EndHorizontal();
 
-        if (GUILayout.Button("Usar centro dos inimigos"))
+        if (GUILayout.Button("Atualizar pela massa inimiga"))
             SetAnchorFromEnemies();
 
         EditorGUILayout.Space(8f);
@@ -100,6 +165,8 @@ public class RetaguardaWindow : EditorWindow
         desiredRearGap = EditorGUILayout.Slider("Hexes de retaguarda", desiredRearGap, 1f, 4f);
         paintRadius = EditorGUILayout.IntSlider("Raio de pintura", paintRadius, 3, 12);
         coneSpread = EditorGUILayout.Slider("Abertura da fatia", coneSpread, 0f, 2f);
+        frontlineDepthTolerance = EditorGUILayout.Slider(
+            "Coesao da cabeca", frontlineDepthTolerance, 0.5f, 2.5f);
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Ameaca inimiga", EditorStyles.miniLabel);
@@ -108,9 +175,33 @@ public class RetaguardaWindow : EditorWindow
         enemyAvoidRange = EditorGUILayout.IntSlider("Descartar ate", enemyAvoidRange, 0, 4);
         allyScreenStrength = EditorGUILayout.Slider("Escudo aliado", allyScreenStrength, 0f, 1f);
 
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Spotting", EditorStyles.miniLabel);
+        spottingRadius = EditorGUILayout.IntSlider("Raio do cone", spottingRadius, 1, 6);
+        spottingConeSpread = EditorGUILayout.Slider("Abertura do cone", spottingConeSpread, 0.25f, 2f);
+        EditorGUILayout.BeginHorizontal();
+        selectedSpot = (ConstructionManager)EditorGUILayout.ObjectField(
+            "Spot selecionado", selectedSpot, typeof(ConstructionManager), true);
+        GUI.backgroundColor = pickingSpot ? Color.cyan : Color.white;
+        if (GUILayout.Button(pickingSpot ? "X" : "<", GUILayout.Width(28)))
+        {
+            pickingSpot = !pickingSpot;
+            pickingAnchor = false;
+            SceneView.RepaintAll();
+        }
+        GUI.backgroundColor = Color.white;
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.LabelField(
+            "O cone pertence ao spot selecionado e independe da linha/vanguarda.",
+            EditorStyles.miniLabel);
+
         EditorGUILayout.Space(6f);
         EditorGUI.BeginDisabledGroup(tilemap == null);
-        if (GUILayout.Button("Calcular Retaguarda", GUILayout.Height(28)))
+        if (GUILayout.Button(
+                new GUIContent(
+                    "Calcular mapa tatico",
+                    "Posicione pelo menos 3 unidades em campo para simular uma boa triangulacao."),
+                GUILayout.Height(28)))
             Recalculate();
         EditorGUI.EndDisabledGroup();
         if (GUILayout.Button("Limpar"))
@@ -120,13 +211,27 @@ public class RetaguardaWindow : EditorWindow
         {
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField($"Combatentes: {combatantCells.Count} | Faixa: {frontBandCells.Count}", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField(
+                $"Cabeca da linha: {lineHeadCells.Count} | Avancados isolados: {isolatedAdvanceCells.Count}",
+                EditorStyles.miniLabel);
+            EditorGUILayout.LabelField(
+                $"Spots: {spottingCells.Count} | Hexes nos cones: {spottingConeCells.Count}",
+                EditorStyles.miniLabel);
+            if (selectedSpot != null)
+                EditorGUILayout.LabelField(
+                    selectedSpotCanBeReleased
+                        ? "Spot selecionado: LIBERAVEL (vanguarda coberta)"
+                        : "Spot selecionado: MANTER OBSERVADOR",
+                    selectedSpotCanBeReleased ? EditorStyles.boldLabel : EditorStyles.miniLabel);
             EditorGUILayout.LabelField($"Distancia media da faixa ao objetivo: {frontBandDist:F1}", EditorStyles.miniLabel);
             if (hasBestRear)
                 EditorGUILayout.LabelField($"Melhor retaguarda: {bestRearCell} (score {maxRearScore:F0})", EditorStyles.boldLabel);
         }
 
         EditorGUILayout.Space(6f);
-        EditorGUILayout.LabelField("Vermelho = vanguarda | Verde = retaguarda", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField(
+            "Verde=retaguarda | Vermelho=vanguarda | Amarelo=flancos | Ciano=spotting",
+            EditorStyles.miniLabel);
 
         if (!string.IsNullOrEmpty(statusMessage))
             EditorGUILayout.HelpBox(statusMessage, MessageType.Warning);
@@ -145,18 +250,29 @@ public class RetaguardaWindow : EditorWindow
         }
 
         TeamId activeTeam = useSelectionTeam ? ResolveSelectionTeam(out _) : team;
+        if (dynamicEnemyMassAnchor)
+            SetAnchorFromEnemies(activeTeam, repaint: false);
         CollectSceneCells(activeTeam);
+        Vector3Int anchor = anchorHex;
+        anchor.z = 0;
+        BuildSpottingGeometry(anchor);
 
         if (combatantCells.Count == 0)
         {
             statusMessage = "Nenhum combatente aliado em campo.";
+            hasResult = spottingCells.Count > 0;
+            SceneView.RepaintAll();
+            Repaint();
             return;
         }
 
         AIBacklineSettings settings = BuildSettings();
-        Vector3Int anchor = anchorHex;
-        anchor.z = 0;
-        AIBacklineResult result = AIBacklineAnalyzer.Analyze(combatantCells, enemyCells, anchor, settings);
+        BuildFrontlineHead(anchor);
+        IReadOnlyList<Vector3Int> geometryCombatants = lineHeadCells.Count > 0
+            ? lineHeadCells
+            : combatantCells;
+        AIBacklineResult result = AIBacklineAnalyzer.Analyze(
+            geometryCombatants, enemyCells, anchor, settings);
         if (!result.Success)
         {
             statusMessage = result.Error;
@@ -170,6 +286,8 @@ public class RetaguardaWindow : EditorWindow
         maxRearScore = result.MaxRearScore;
         bestRearCell = result.BestRearCell;
         hasBestRear = result.HasBestRear;
+        BuildIsolatedAdvanceCells(result, settings, anchor, geometryCombatants);
+        BuildNeutralBand(result, settings, anchor, geometryCombatants);
 
         hasResult = true;
         SceneView.RepaintAll();
@@ -199,8 +317,7 @@ public class RetaguardaWindow : EditorWindow
             if (u == null || u.IsDead || u.IsEmbarked)
                 continue;
 
-            Vector3Int cell = u.CurrentCellPosition;
-            cell.z = 0;
+            Vector3Int cell = ResolveSceneCell(u.transform, u.CurrentCellPosition);
             if (u.TeamId != activeTeam)
             {
                 enemyCells.Add(cell);
@@ -236,29 +353,60 @@ public class RetaguardaWindow : EditorWindow
     private void SetAnchorFromEnemies()
     {
         TeamId activeTeam = useSelectionTeam ? ResolveSelectionTeam(out _) : team;
-        UnitManager[] all = FindObjectsByType<UnitManager>(FindObjectsSortMode.None);
+        SetAnchorFromEnemies(activeTeam, repaint: true);
+    }
+
+    private void SetAnchorFromEnemies(TeamId activeTeam, bool repaint)
+    {
+        UnitManager[] all = FindObjectsByType<UnitManager>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
         Vector3 acc = Vector3.zero;
         int n = 0;
-        foreach (UnitManager u in all)
+        foreach (UnitManager unit in all)
         {
-            if (u == null || u.TeamId == activeTeam || u.IsDead || u.IsEmbarked)
+            if (unit == null || unit.TeamId == activeTeam || unit.TeamId == TeamId.Neutral
+                || unit.IsDead || unit.IsEmbarked)
                 continue;
 
-            Vector3Int cell = u.CurrentCellPosition;
+            Vector3Int cell = ResolveSceneCell(unit.transform, unit.CurrentCellPosition);
             acc += new Vector3(cell.x, cell.y, 0);
             n++;
         }
 
-        if (n == 0)
+        if (n > 0)
         {
-            statusMessage = "Nenhum inimigo na cena para inferir o objetivo.";
+            acc /= n;
+            anchorHex = new Vector3Int(Mathf.RoundToInt(acc.x), Mathf.RoundToInt(acc.y), 0);
+            statusMessage = string.Empty;
+            if (repaint)
+                Repaint();
             return;
         }
 
-        acc /= n;
-        anchorHex = new Vector3Int(Mathf.RoundToInt(acc.x), Mathf.RoundToInt(acc.y), 0);
-        statusMessage = string.Empty;
-        Repaint();
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        ConstructionManager enemyHq = null;
+        foreach (ConstructionManager construction in constructions)
+        {
+            if (construction == null || !construction.IsPlayerHeadQuarter
+                || construction.TeamId == activeTeam || construction.TeamId == TeamId.Neutral)
+                continue;
+            enemyHq = construction;
+            break;
+        }
+
+        if (enemyHq != null)
+        {
+            anchorHex = ResolveSceneCell(enemyHq.transform, enemyHq.CurrentCellPosition);
+            statusMessage = string.Empty;
+            if (repaint)
+                Repaint();
+            return;
+        }
+
+        statusMessage = "Nenhuma unidade ou HQ inimigo na cena para inferir a frente.";
+        if (repaint)
+            Repaint();
     }
 
     private void ClearResult()
@@ -266,7 +414,15 @@ public class RetaguardaWindow : EditorWindow
         hasResult = false;
         combatantCells.Clear();
         frontBandCells.Clear();
+        lineHeadCells.Clear();
+        isolatedAdvanceCells.Clear();
         enemyCells.Clear();
+        neutralBandCells.Clear();
+        spottingCells.Clear();
+        spottingConeCells.Clear();
+        spotReleaseFrontCells.Clear();
+        spotReleaseCoveredCells.Clear();
+        selectedSpotCanBeReleased = false;
         rearScoreMap = null;
         vanguardCells = null;
         hasBestRear = false;
@@ -285,10 +441,303 @@ public class RetaguardaWindow : EditorWindow
                 label = $"{u.name} -> {u.TeamId}";
                 return u.TeamId;
             }
+
+
+            ConstructionManager construction =
+                Selection.activeGameObject.GetComponent<ConstructionManager>();
+            if (construction != null && construction.TeamId != TeamId.Neutral)
+            {
+                label = $"{construction.name} -> {construction.TeamId}";
+                return construction.TeamId;
+            }
         }
 
         label = $"(nenhuma unidade selecionada) -> {team}";
         return team;
+    }
+
+    private Tilemap ResolveBoardTilemap()
+    {
+        if (Selection.activeGameObject != null)
+        {
+            UnitManager selectedUnit = Selection.activeGameObject.GetComponent<UnitManager>();
+            if (selectedUnit != null && selectedUnit.BoardTilemap != null)
+                return selectedUnit.BoardTilemap;
+
+            ConstructionManager selectedConstruction =
+                Selection.activeGameObject.GetComponent<ConstructionManager>();
+            if (selectedConstruction != null && selectedConstruction.BoardTilemap != null)
+                return selectedConstruction.BoardTilemap;
+        }
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (UnitManager unit in units)
+            if (unit != null && unit.BoardTilemap != null)
+                return unit.BoardTilemap;
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (ConstructionManager construction in constructions)
+            if (construction != null && construction.BoardTilemap != null)
+                return construction.BoardTilemap;
+
+        Tilemap[] tilemaps = FindObjectsByType<Tilemap>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (Tilemap candidate in tilemaps)
+            if (candidate != null
+                && candidate.name.IndexOf("ameaca", System.StringComparison.OrdinalIgnoreCase) < 0
+                && candidate.name.IndexOf("threat", System.StringComparison.OrdinalIgnoreCase) < 0)
+                return candidate;
+
+        return null;
+    }
+
+    private void BuildFrontlineHead(Vector3Int anchor)
+    {
+        lineHeadCells.Clear();
+        if (combatantCells.Count == 0 || tilemap == null)
+            return;
+
+        Vector2 centroid = Vector2.zero;
+        foreach (Vector3Int cell in combatantCells)
+            centroid += (Vector2)tilemap.GetCellCenterWorld(cell);
+        centroid /= combatantCells.Count;
+
+        Vector2 forward = (Vector2)tilemap.GetCellCenterWorld(anchor) - centroid;
+        if (forward.sqrMagnitude <= 0.0001f)
+            forward = Vector2.up;
+        else
+            forward.Normalize();
+        Vector2 lateral = new Vector2(-forward.y, forward.x);
+
+        float hexStep = Vector2.Distance(
+            tilemap.GetCellCenterWorld(combatantCells[0]),
+            tilemap.GetCellCenterWorld(combatantCells[0] + Vector3Int.right));
+        if (hexStep <= 0.0001f)
+            hexStep = 1f;
+
+        var ordered = new List<Vector3Int>(combatantCells);
+        ordered.Sort((a, b) => GetFrontProjection(b, forward, hexStep)
+            .CompareTo(GetFrontProjection(a, forward, hexStep)));
+
+        foreach (Vector3Int leader in ordered)
+        {
+            float leaderDepth = GetFrontProjection(leader, forward, hexStep);
+            var band = new List<Vector3Int>();
+            foreach (Vector3Int candidate in combatantCells)
+            {
+                float depth = GetFrontProjection(candidate, forward, hexStep);
+                if (depth <= leaderDepth + 0.05f
+                    && depth >= leaderDepth - frontlineDepthTolerance)
+                    band.Add(candidate);
+            }
+
+            if (band.Count < 2)
+                continue;
+            lineHeadCells.AddRange(band);
+            break;
+        }
+
+        if (lineHeadCells.Count == 0)
+            lineHeadCells.Add(ordered[0]);
+
+        lineHeadCells.Sort((a, b) => GetLateralProjection(a, lateral, hexStep)
+            .CompareTo(GetLateralProjection(b, lateral, hexStep)));
+    }
+
+    private float GetFrontProjection(Vector3Int cell, Vector2 forward, float hexStep)
+    {
+        return Vector2.Dot((Vector2)tilemap.GetCellCenterWorld(cell), forward) / hexStep;
+    }
+
+    private float GetLateralProjection(Vector3Int cell, Vector2 lateral, float hexStep)
+    {
+        return Vector2.Dot((Vector2)tilemap.GetCellCenterWorld(cell), lateral) / hexStep;
+    }
+
+    private void BuildIsolatedAdvanceCells(
+        AIBacklineResult result,
+        AIBacklineSettings settings,
+        Vector3Int anchor,
+        IReadOnlyList<Vector3Int> geometryCombatants)
+    {
+        isolatedAdvanceCells.Clear();
+        if (result == null || geometryCombatants == null)
+            return;
+
+        var lineSet = new HashSet<Vector3Int>(lineHeadCells);
+        foreach (Vector3Int cell in combatantCells)
+        {
+            if (lineSet.Contains(cell))
+                continue;
+            AIBacklineScore score = AIBacklineAnalyzer.ScoreCell(
+                geometryCombatants, enemyCells, cell, anchor, settings, result);
+            if (score.IsVanguard)
+                isolatedAdvanceCells.Add(cell);
+        }
+    }
+
+    private void BuildNeutralBand(
+        AIBacklineResult result,
+        AIBacklineSettings settings,
+        Vector3Int anchor,
+        IReadOnlyList<Vector3Int> geometryCombatants)
+    {
+        neutralBandCells.Clear();
+        if (result == null || !result.Success)
+            return;
+
+        var occupied = new HashSet<Vector3Int>(combatantCells);
+        for (int dx = -settings.PaintRadius; dx <= settings.PaintRadius; dx++)
+        for (int dy = -settings.PaintRadius; dy <= settings.PaintRadius; dy++)
+        {
+            Vector3Int cell = new Vector3Int(result.Centroid.x + dx, result.Centroid.y + dy, 0);
+            if (SectorManager.HexDistance(cell, result.Centroid) > settings.PaintRadius
+                || cell == anchor || occupied.Contains(cell))
+                continue;
+
+            AIBacklineScore score = AIBacklineAnalyzer.ScoreCell(
+                geometryCombatants, enemyCells, cell, anchor, settings, result);
+            if (!score.IsVanguard && !score.InRearSlice)
+                neutralBandCells.Add(cell);
+        }
+    }
+
+    private void BuildSpottingGeometry(Vector3Int anchor)
+    {
+        spottingCells.Clear();
+        spottingConeCells.Clear();
+        spotReleaseFrontCells.Clear();
+        spotReleaseCoveredCells.Clear();
+        selectedSpotCanBeReleased = false;
+        if (tilemap == null)
+            return;
+
+        ConstructionManager[] constructions =
+            FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (ConstructionManager construction in constructions)
+        {
+            if (construction == null || !construction.IsForwardObserverSpot)
+                continue;
+
+            Vector3Int spot = ResolveSceneCell(construction.transform, construction.CurrentCellPosition);
+            spottingCells.Add(spot);
+            if (construction != selectedSpot)
+                continue;
+
+            UnitManager observer = FindUnitAtCell(spot);
+            if (observer == null)
+            {
+                statusMessage = "Coloque uma unidade no spot selecionado para calcular a visao real.";
+                continue;
+            }
+
+            Vector3Int spottingAnchor = ResolveEnemyHqAnchor(observer.TeamId, anchor);
+            PodeDetectarSensor.CollectVisibleCellsForFogOfWar(
+                observer,
+                tilemap,
+                terrainDatabase,
+                spottingConeCells,
+                dpqAirHeightConfig,
+                enableLosValidation: true);
+
+            Vector2 spotWorld = tilemap.GetCellCenterWorld(spot);
+            Vector2 anchorWorld = tilemap.GetCellCenterWorld(spottingAnchor);
+            Vector2 forward = anchorWorld - spotWorld;
+            if (forward.sqrMagnitude <= 0.0001f)
+                continue;
+            forward.Normalize();
+
+            foreach (Vector3Int cell in spottingConeCells)
+            {
+                Vector2 relative = (Vector2)tilemap.GetCellCenterWorld(cell) - spotWorld;
+                if (Vector2.Dot(relative, forward) <= 0.05f)
+                    continue;
+
+                bool hasUnseenCellAhead = false;
+                for (int dx = -1; dx <= 1 && !hasUnseenCellAhead; dx++)
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    Vector3Int neighbour = cell + new Vector3Int(dx, dy, 0);
+                    if (SectorManager.HexDistance(cell, neighbour) != 1
+                        || spottingConeCells.Contains(neighbour))
+                        continue;
+
+                    Vector2 step = (Vector2)tilemap.GetCellCenterWorld(neighbour)
+                        - (Vector2)tilemap.GetCellCenterWorld(cell);
+                    if (Vector2.Dot(step, forward) > 0.05f)
+                    {
+                        hasUnseenCellAhead = true;
+                        break;
+                    }
+                }
+
+                if (hasUnseenCellAhead)
+                    spotReleaseFrontCells.Add(cell);
+            }
+
+            MarkCoveredSpotReleaseCells(observer.TeamId, observer);
+        }
+    }
+
+    private UnitManager FindUnitAtCell(Vector3Int cell)
+    {
+        UnitManager[] units = FindObjectsByType<UnitManager>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (UnitManager unit in units)
+            if (unit != null && !unit.IsDead && !unit.IsEmbarked
+                && ResolveSceneCell(unit.transform, unit.CurrentCellPosition) == cell)
+                return unit;
+        return null;
+    }
+
+    private Vector3Int ResolveEnemyHqAnchor(TeamId observerTeam, Vector3Int fallback)
+    {
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (ConstructionManager construction in constructions)
+        {
+            if (construction == null || !construction.IsPlayerHeadQuarter
+                || construction.TeamId == TeamId.Neutral || construction.TeamId == observerTeam)
+                continue;
+            return ResolveSceneCell(construction.transform, construction.CurrentCellPosition);
+        }
+
+        fallback.z = 0;
+        return fallback;
+    }
+
+    private void MarkCoveredSpotReleaseCells(TeamId observerTeam, UnitManager observer)
+    {
+        UnitManager[] units = FindObjectsByType<UnitManager>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (UnitManager unit in units)
+        {
+            if (unit == null || unit == observer || unit.TeamId != observerTeam
+                || unit.IsDead || unit.IsEmbarked || unit.GetDomain() != Domain.Land
+                || !IsFrontlineCombatant(unit))
+                continue;
+
+            Vector3Int cell = ResolveSceneCell(unit.transform, unit.CurrentCellPosition);
+            if (spotReleaseFrontCells.Contains(cell))
+                spotReleaseCoveredCells.Add(cell);
+        }
+
+        selectedSpotCanBeReleased = spotReleaseCoveredCells.Count > 0;
+    }
+
+    private Vector3Int ResolveSceneCell(Transform source, Vector3Int fallback)
+    {
+        if (!Application.isPlaying && tilemap != null && source != null)
+        {
+            Vector3Int sceneCell = tilemap.WorldToCell(source.position);
+            sceneCell.z = 0;
+            return sceneCell;
+        }
+
+        fallback.z = 0;
+        return fallback;
     }
 
     private void OnSceneGUI(SceneView _)
@@ -309,13 +758,13 @@ public class RetaguardaWindow : EditorWindow
         if (hasResult)
             DrawResult(labelStyle);
 
-        if (pickingAnchor)
+        if (pickingAnchor || pickingSpot)
             DrawPicker();
     }
 
     private void DrawResult(GUIStyle labelStyle)
     {
-        if (rearScoreMap != null)
+        if (showRear && rearScoreMap != null)
         {
             foreach (KeyValuePair<Vector3Int, float> kv in rearScoreMap)
             {
@@ -325,23 +774,74 @@ public class RetaguardaWindow : EditorWindow
             }
         }
 
-        if (vanguardCells != null)
+        if (showVanguard && vanguardCells != null)
         {
             Handles.color = new Color(0.9f, 0.15f, 0.1f, 0.45f);
             foreach (Vector3Int cell in vanguardCells)
                 Handles.DrawSolidDisc(tilemap.GetCellCenterWorld(cell), Vector3.back, 0.20f);
         }
 
-        Handles.color = new Color(1f, 0.1f, 0.1f, 0.95f);
-        foreach (Vector3Int cell in frontBandCells)
-            Handles.DrawSolidDisc(tilemap.GetCellCenterWorld(cell), Vector3.back, 0.30f);
+        if (showNeutralBand)
+        {
+            Handles.color = new Color(1f, 0.75f, 0.05f, 0.45f);
+            foreach (Vector3Int cell in neutralBandCells)
+                Handles.DrawSolidDisc(tilemap.GetCellCenterWorld(cell), Vector3.back, 0.20f);
+        }
 
-        Handles.color = new Color(0.7f, 0.25f, 0.25f, 0.7f);
-        foreach (Vector3Int cell in combatantCells)
-            if (!frontBandCells.Contains(cell))
+        if (showSpottingCone)
+        {
+            Handles.color = new Color(0f, 0.85f, 1f, 0.34f);
+            foreach (Vector3Int cell in spottingConeCells)
+                Handles.DrawSolidDisc(tilemap.GetCellCenterWorld(cell), Vector3.back, 0.21f);
+        }
+
+        if (showSpotReleaseFront)
+        {
+            Handles.color = new Color(0.45f, 1f, 0f, 0.95f);
+            foreach (Vector3Int cell in spotReleaseFrontCells)
+                Handles.DrawWireDisc(tilemap.GetCellCenterWorld(cell), Vector3.back, 0.29f);
+
+            Handles.color = new Color(1f, 0.85f, 0f, 1f);
+            foreach (Vector3Int cell in spotReleaseCoveredCells)
+            {
+                Vector3 world = tilemap.GetCellCenterWorld(cell);
+                Handles.DrawSolidDisc(world, Vector3.back, 0.27f);
+                Handles.Label(world + Vector3.up * 0.4f, "COBERTO", labelStyle);
+            }
+        }
+
+        if (showFrontBand)
+        {
+            Handles.color = new Color(1f, 0.1f, 0.1f, 0.95f);
+            foreach (Vector3Int cell in frontBandCells)
+                Handles.DrawSolidDisc(tilemap.GetCellCenterWorld(cell), Vector3.back, 0.30f);
+        }
+
+        if (showFrontlineUnits)
+        {
+            Handles.color = new Color(0.7f, 0.25f, 0.25f, 0.7f);
+            foreach (Vector3Int cell in combatantCells)
                 Handles.DrawSolidDisc(tilemap.GetCellCenterWorld(cell), Vector3.back, 0.26f);
 
-        if (hasBestRear)
+            Handles.color = new Color(1f, 0.1f, 0.1f, 0.95f);
+            if (lineHeadCells.Count >= 2)
+            {
+                var linePoints = new Vector3[lineHeadCells.Count];
+                for (int i = 0; i < lineHeadCells.Count; i++)
+                    linePoints[i] = tilemap.GetCellCenterWorld(lineHeadCells[i]);
+                Handles.DrawAAPolyLine(6f, linePoints);
+            }
+
+            Handles.color = new Color(1f, 0.45f, 0f, 1f);
+            foreach (Vector3Int cell in isolatedAdvanceCells)
+            {
+                Vector3 world = tilemap.GetCellCenterWorld(cell);
+                Handles.DrawWireDisc(world, Vector3.back, 0.37f);
+                Handles.Label(world + Vector3.up * 0.45f, "AVANCO ISOLADO", labelStyle);
+            }
+        }
+
+        if (showRear && hasBestRear)
         {
             Handles.color = new Color(0.1f, 1f, 0.2f, 1f);
             Vector3 bestWorld = tilemap.GetCellCenterWorld(bestRearCell);
@@ -350,28 +850,50 @@ public class RetaguardaWindow : EditorWindow
             Handles.Label(bestWorld + Vector3.up * 0.42f, "RET", labelStyle);
         }
 
-        Handles.color = new Color(0.55f, 0f, 0.55f, 0.95f);
-        foreach (Vector3Int cell in enemyCells)
-            Handles.DrawSolidDisc(tilemap.GetCellCenterWorld(cell), Vector3.back, 0.24f);
+        if (showSpottingPoints)
+        {
+            Handles.color = new Color(0f, 1f, 1f, 1f);
+            foreach (Vector3Int cell in spottingCells)
+            {
+                Vector3 world = tilemap.GetCellCenterWorld(cell);
+                Handles.DrawWireDisc(world, Vector3.back, 0.34f);
+                Handles.Label(world + Vector3.up * 0.42f, "SPOT", labelStyle);
+            }
+        }
 
-        Handles.color = new Color(1f, 0.85f, 0f, 0.95f);
-        Vector3 anchorWorld = tilemap.GetCellCenterWorld(anchorHex);
-        Handles.DrawSolidDisc(anchorWorld, Vector3.back, 0.32f);
-        Handles.Label(anchorWorld + Vector3.up * 0.42f, "OBJ", labelStyle);
+        if (showEnemies)
+        {
+            Handles.color = new Color(0.55f, 0f, 0.55f, 0.95f);
+            foreach (Vector3Int cell in enemyCells)
+                Handles.DrawSolidDisc(tilemap.GetCellCenterWorld(cell), Vector3.back, 0.24f);
+        }
+
+        if (showObjective)
+        {
+            Handles.color = new Color(1f, 0.85f, 0f, 0.95f);
+            Vector3 anchorWorld = tilemap.GetCellCenterWorld(anchorHex);
+            Handles.DrawSolidDisc(anchorWorld, Vector3.back, 0.32f);
+            Handles.Label(anchorWorld + Vector3.up * 0.42f,
+                dynamicEnemyMassAnchor ? "MASSA" : "REF", labelStyle);
+        }
     }
 
     private void DrawPicker()
     {
-        Handles.color = Color.red;
+        Handles.color = pickingSpot ? Color.cyan : Color.red;
         Vector3 hoverWorld = tilemap.GetCellCenterWorld(hoverCell);
         Handles.DrawWireDisc(hoverWorld, Vector3.back, 0.35f);
-        Handles.Label(hoverWorld + Vector3.up * 0.42f, "Objetivo " + hoverCell,
-            new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = Color.red } });
+        Handles.Label(hoverWorld + Vector3.up * 0.42f,
+            (pickingSpot ? "Spot " : "Referencia ") + hoverCell,
+            new GUIStyle(EditorStyles.boldLabel)
+            {
+                normal = { textColor = pickingSpot ? Color.cyan : Color.red }
+            });
     }
 
     private void HandlePickingInput()
     {
-        if (!pickingAnchor)
+        if (!pickingAnchor && !pickingSpot)
             return;
 
         Event e = Event.current;
@@ -385,8 +907,12 @@ public class RetaguardaWindow : EditorWindow
         {
             Vector3Int picked = ScreenToCell(e.mousePosition);
             picked.z = 0;
-            anchorHex = picked;
+            if (pickingSpot)
+                selectedSpot = FindSpotAtCell(picked);
+            else
+                anchorHex = picked;
             pickingAnchor = false;
+            pickingSpot = false;
             e.Use();
             Repaint();
         }
@@ -395,12 +921,36 @@ public class RetaguardaWindow : EditorWindow
             || (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape))
         {
             pickingAnchor = false;
+            pickingSpot = false;
             e.Use();
             Repaint();
         }
 
         if (e.type == EventType.Layout)
             HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
+    }
+
+    private ConstructionManager FindSpotAtCell(Vector3Int cell)
+    {
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (ConstructionManager construction in constructions)
+        {
+            if (construction != null && construction.IsForwardObserverSpot
+                && ResolveSceneCell(construction.transform, construction.CurrentCellPosition) == cell)
+                return construction;
+        }
+
+        statusMessage = $"O hex {cell} nao possui um Forward Observer Spot.";
+        return null;
+    }
+
+    private static T FindFirstAsset<T>() where T : Object
+    {
+        string[] guids = AssetDatabase.FindAssets($"t:{typeof(T).Name}");
+        if (guids == null || guids.Length == 0)
+            return null;
+        return AssetDatabase.LoadAssetAtPath<T>(AssetDatabase.GUIDToAssetPath(guids[0]));
     }
 
     private Vector3Int ScreenToCell(Vector2 mousePos)

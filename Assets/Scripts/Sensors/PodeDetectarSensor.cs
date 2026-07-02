@@ -7,6 +7,13 @@ public static class PodeDetectarSensor
 {
     private const int MaxCollectVisibleCellsCacheEntries = 1024;
 
+    // Margem de rasante da LoS: um obstaculo so bloqueia se seu topo sobe ACIMA
+    // da linha de visao por mais que essa folga. Sem isso, um obstaculo cujo topo
+    // fica praticamente no nivel da linha (empate de float/geometria) bloqueia ou
+    // nao de forma imprevisivel dependendo da direcao. Ex.: floresta EV 1 com a
+    // linha a ~1.0 deve ser enxergada por cima.
+    private const float LosGrazeEpsilon = 0.05f;
+
     private readonly struct CollectVisibleCellsCacheKey : IEquatable<CollectVisibleCellsCacheKey>
     {
         public readonly int observerInstanceId;
@@ -1222,7 +1229,7 @@ public static class PodeDetectarSensor
                     continue;
 
                 float losHeightAtCell = evPath[evPathIndex];
-                if (cellEv > losHeightAtCell)
+                if (cellEv > losHeightAtCell + LosGrazeEpsilon)
                     continue;
 
                 if (cellEv > strongestPassedCellEv)
@@ -1925,10 +1932,22 @@ public static class PodeDetectarSensor
         evPath.Add(originEv);
         List<Vector3Int> crossedCells = GetIntermediateCellsByCellLerp(tilemap, originCell, targetCell);
         intermediateCells.AddRange(crossedCells);
+
+        // A altura da linha em cada hex cruzado usa a distancia REAL projetada do
+        // centro do hex sobre a reta origem->alvo, nao o indice na lista. Sem isso,
+        // a duplicacao de hexes na fronteira entre dois hexagonos distorce o "t":
+        // dois hexes empatados na mesma distancia ganhariam limiares diferentes.
+        Vector2 losOriginWorld2 = ToWorld2(tilemap.GetCellCenterWorld(originCell));
+        Vector2 losTargetWorld2 = ToWorld2(tilemap.GetCellCenterWorld(targetCell));
+        Vector2 losDir = losTargetWorld2 - losOriginWorld2;
+        float losLenSq = Vector2.Dot(losDir, losDir);
+
         for (int i = 0; i < crossedCells.Count; i++)
         {
             Vector3Int cell = crossedCells[i];
-            float t = (i + 1f) / (crossedCells.Count + 1f);
+            float t = losLenSq > 0.0001f
+                ? Mathf.Clamp01(Vector2.Dot(ToWorld2(tilemap.GetCellCenterWorld(cell)) - losOriginWorld2, losDir) / losLenSq)
+                : (i + 1f) / (crossedCells.Count + 1f);
             float losHeightAtCell = Mathf.Lerp(originEv, targetEv, t);
             evPath.Add(losHeightAtCell);
 
@@ -1952,7 +1971,7 @@ public static class PodeDetectarSensor
             if (!cellBlocksLoS || cellEv <= 0)
                 continue;
 
-            if (cellEv > losHeightAtCell)
+            if (cellEv > losHeightAtCell + LosGrazeEpsilon)
             {
                 blockedCell = cell;
                 return false;
