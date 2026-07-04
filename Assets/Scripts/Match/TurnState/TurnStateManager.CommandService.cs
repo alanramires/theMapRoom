@@ -16,6 +16,19 @@ public partial class TurnStateManager
         public int ammoRecovered;
     }
 
+    // Linha de plano do Servico do Comando: uma decisao ja comprometida (servico + ganhos + custo)
+    // produzida UMA vez pelo planner. O preview desenha o plano e a execucao reproduz exatamente
+    // estas linhas, garantindo que "o que foi prometido e o que e executado".
+    private sealed class CommandServicePlanLine
+    {
+        public ServiceData service;
+        public int hpGain;
+        public int fuelGain;
+        public int ammoGain;
+        public List<int> ammoByWeapon;
+        public int cost;
+    }
+
     // classe auxiliar para compilar informacoes de estimativa do Servico do Comando durante a fase de confirmacao, para alimentar a UI de resumo e preview.
     private sealed class CommandServiceEstimateSummary
     {
@@ -185,11 +198,48 @@ public partial class TurnStateManager
         return true;
     }
 
+    // Foco de teclado no preview do Servico do Comando: 0 = EXECUTAR, 1 = CANCELAR.
+    private const int CommandServicePreviewExecuteIndex = 0;
+    private const int CommandServicePreviewCancelIndex = 1;
+    private int commandServicePreviewFocusIndex = CommandServicePreviewExecuteIndex;
+
+    public int CommandServicePreviewFocusIndex => commandServicePreviewFocusIndex;
+
+    // Navega o foco entre os dois botoes do preview (cima/baixo), com wrap: de EXECUTAR pra cima vai
+    // pro CANCELAR e vice-versa (mesma flexibilidade da lista de compra). So vale no estado CommandService.
+    public bool NavigateCommandServicePreviewFocus(int delta)
+    {
+        if (CurrentCursorState != CursorState.CommandService || delta == 0)
+            return false;
+
+        int total = CommandServicePreviewCancelIndex - CommandServicePreviewExecuteIndex + 1;
+        int next = (commandServicePreviewFocusIndex + (delta > 0 ? 1 : -1) + total) % total;
+        if (next == commandServicePreviewFocusIndex)
+            return false;
+
+        commandServicePreviewFocusIndex = next;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    // Fixa o foco (usado pelo clique: clicar num botao passa o foco pra ele antes de agir, pra o
+    // Enter subsequente nao herdar um foco antigo e disparar a acao errada).
+    public void SetCommandServicePreviewFocus(int index)
+    {
+        if (CurrentCursorState != CursorState.CommandService)
+            return;
+        commandServicePreviewFocusIndex = Mathf.Clamp(
+            index, CommandServicePreviewExecuteIndex, CommandServicePreviewCancelIndex);
+    }
+
     // logica para cancelar a ordem do Servico do Comando durante a fase de preview/confirmacao, com mensagens de feedback mais especificas para o contexto de uso via menu.
     private bool TryPreviewCommandServiceOrder(out string message, bool emitLogs)
     {
         if (!TryPrepareCommandServiceOrders(out message, emitLogs))
             return false;
+
+        // Todo preview comeca com o foco em EXECUTAR (comportamento antigo do Enter preservado).
+        commandServicePreviewFocusIndex = CommandServicePreviewExecuteIndex;
 
         CommandServiceEstimateSummary estimate = EstimateCommandServiceQueuedOrders();
         ShowCommandServiceHelperEstimate(
@@ -362,13 +412,21 @@ public partial class TurnStateManager
                 CommandServiceLog($"[ServicoComando][Fila] {q + 1}/{commandServiceQueuedOrders.Count} alvo={targetName} | {sourceName}");
             }
 
+        // Planeja UMA vez, a partir do estado real atual (mesmo metodo do preview). A execucao apenas
+        // reproduz este plano linha a linha: cobra o custo ja calculado e aplica o servico. Sem
+        // recalcular ganho/saldo aqui, o que foi prometido no preview e exatamente o que roda.
+        var planByOrder = new Dictionary<ServicoDoComandoOption, List<CommandServicePlanLine>>();
+        CommandServiceEstimateSummary plan = EstimateCommandServiceQueuedOrders(planByOrder);
+
         int servedTargets = 0;
         int recoveredHp = 0;
         int recoveredFuel = 0;
         int recoveredAmmo = 0;
         int totalMoneySpent = 0;
         List<CommandServiceTargetReport> detailedReport = new List<CommandServiceTargetReport>();
-        bool stopByEconomy = false;
+        // Unica situacao de "saldo insuficiente" na execucao: o plano nao conseguiu servir NENHUM alvo
+        // e o saldo foi o motivo. Nao ha mais aborto de fila no meio — o plano ja decide tudo antes.
+        bool stopByEconomy = plan != null && plan.servedTargets <= 0 && plan.hasSkippedServices;
 
         for (int i = 0; i < commandServiceQueuedOrders.Count; i++)
         {
@@ -382,6 +440,12 @@ public partial class TurnStateManager
                 continue;
 
             UnitManager target = order.targetUnit;
+
+            // Alvo fora do plano (sem necessidade real ou nao coberto pelo saldo) nem entra na
+            // animacao: nao foca o cursor, nao mexe em HUD. So processa quem o plano decidiu servir.
+            if (!planByOrder.TryGetValue(order, out List<CommandServicePlanLine> plannedLines) || plannedLines.Count == 0)
+                continue;
+
             ConstructionManager sourceConstruction = order.sourceConstruction;
             UnitManager sourceSupplierUnit = order.sourceSupplierUnit;
             bool fromConstruction = sourceConstruction != null;
@@ -455,69 +519,6 @@ public partial class TurnStateManager
                     yield return ApplySupplyLayerTransitionIfNeeded(target, Domain.Naval, HeightLevel.Surface);
                 }
 
-                IReadOnlyList<ServiceData> offered = fromConstruction
-                    ? sourceConstruction.OfferedServices
-                    : sourceSupplierUnit.GetEmbarkedServices();
-                List<ServiceData> services = BuildDistinctServiceList(offered);
-                if (matchController != null)
-                {
-                    int availableMoney = matchController.GetActualMoney(target.TeamId);
-                    bool canAffordAnyServiceForTarget = false;
-                    Dictionary<SupplyData, int> sourceStockSnapshot = fromConstruction
-                        ? BuildConstructionStockSnapshot(sourceConstruction)
-                        : BuildSupplierStockSnapshot(sourceSupplierUnit);
-                    int simulatedHpForPrecheck = Mathf.Clamp(target.CurrentHP, 0, target.GetMaxHP());
-                    int simulatedFuelForPrecheck = Mathf.Clamp(target.CurrentFuel, 0, target.GetMaxFuel());
-                    List<int> simulatedAmmoForPrecheck = BuildRuntimeAmmoSnapshot(target);
-
-                    for (int s = 0; s < services.Count; s++)
-                    {
-                        ServiceData service = services[s];
-                        if (service == null || !service.isService)
-                            continue;
-                        if (service.apenasEntreSupridores && !IsSupplier(target))
-                            continue;
-                        if (!UnitNeedsServiceForSupplyExecution(target, service))
-                            continue;
-
-                        Dictionary<SupplyData, int> candidateStock = CloneSupplySnapshot(sourceStockSnapshot);
-                        List<int> candidateSimulatedAmmo = CloneAmmoSnapshot(simulatedAmmoForPrecheck);
-                        List<int> ammoPlannedByWeapon = new List<int>();
-                        EstimatePotentialServiceGains(
-                            target,
-                            service,
-                            candidateStock,
-                            out int hpPlannedGain,
-                            out int fuelPlannedGain,
-                            out int ammoPlannedGain,
-                            ammoByWeapon: ammoPlannedByWeapon,
-                            simulatedHp: simulatedHpForPrecheck,
-                            simulatedFuel: simulatedFuelForPrecheck,
-                            simulatedAmmoByWeapon: candidateSimulatedAmmo);
-
-                        if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
-                            continue;
-
-                        int projectedCost = matchController.ResolveEconomyCost(
-                            ComputeServiceMoneyCost(target, service, hpPlannedGain, fuelPlannedGain, ammoPlannedGain, ammoPlannedByWeapon));
-                        if (projectedCost <= availableMoney)
-                        {
-                            canAffordAnyServiceForTarget = true;
-                            break;
-                        }
-                    }
-
-                    if (!canAffordAnyServiceForTarget)
-                    {
-                        stopByEconomy = true;
-                        commandServiceQueuedOrders.Clear();
-                        commandServiceInvalidOrders.Clear();
-                        cursorController?.PlayErrorSfx();
-                        CommandServiceLog($"[ServicoComando] Interrompido: saldo insuficiente para continuar no alvo {target.name} (saldo atual=${Mathf.Max(0, availableMoney)}).");
-                        break;
-                    }
-                }
-
                 int hpGain = 0;
                 int fuelGain = 0;
                 int ammoGain = 0;
@@ -526,51 +527,28 @@ public partial class TurnStateManager
                     target = target
                 };
 
-                for (int s = 0; s < services.Count; s++)
+                for (int s = 0; s < plannedLines.Count; s++)
                 {
-                    ServiceData service = services[s];
+                    CommandServicePlanLine plannedLine = plannedLines[s];
+                    ServiceData service = plannedLine != null ? plannedLine.service : null;
                     if (service == null || !service.isService)
                         continue;
-                    if (service.apenasEntreSupridores && !IsSupplier(target))
-                        continue;
-                    if (!UnitNeedsServiceForSupplyExecution(target, service))
-                        continue;
-                    bool hasServiceStock = fromConstruction
-                        ? ServiceHasAvailableSuppliesNow(sourceConstruction, service)
-                        : ServiceHasAvailableSuppliesNow(sourceSupplierUnit, service);
-                    if (!hasServiceStock)
-                        continue;
-                    bool willActuallyApply = fromConstruction
-                        ? CanServiceApplyNow(sourceConstruction, target, service)
-                        : CanServiceApplyNow(sourceSupplierUnit, target, service);
-                    if (!willActuallyApply)
-                        continue;
 
-                    int hpPlannedGain;
-                    int fuelPlannedGain;
-                    int ammoPlannedGain;
-                    List<int> ammoPlannedByWeapon;
-                    if (fromConstruction)
-                        EstimateServiceGainsFromConstruction(sourceConstruction, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain, out ammoPlannedByWeapon);
-                    else
-                        EstimateServiceGainsFromSupplier(sourceSupplierUnit, target, service, out hpPlannedGain, out fuelPlannedGain, out ammoPlannedGain, out ammoPlannedByWeapon);
-
-                    if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
-                        continue;
+                    // Cobra o custo JA calculado pelo plano. O planner reservou o saldo em ordem, entao
+                    // este pagamento e garantido; nao ha recalculo de custo/ganho nem aborto de fila aqui.
                     int economyBefore = matchController != null ? matchController.GetActualMoney(target.TeamId) : 0;
-                    if (!TryPayServiceCostForExecution(
-                            target.TeamId,
-                            target,
-                            service,
-                            hpPlannedGain,
-                            fuelPlannedGain,
-                            ammoPlannedGain,
-                            ammoPlannedByWeapon,
-                            "ServicoComando",
-                            out int serviceMoneySpent))
+                    int serviceMoneySpent = 0;
+                    if (matchController != null && plannedLine.cost > 0)
                     {
-                        CommandServiceLog($"[ServicoComando] Servico ignorado por saldo insuficiente: {ResolveServiceLabel(service)}.");
-                        continue;
+                        if (!matchController.TrySpendActualMoney(target.TeamId, plannedLine.cost, out int remainingAfterCharge))
+                        {
+                            // Nao deveria ocorrer (o plano garante que cabe). Se ocorrer, pula a linha
+                            // em vez de abortar a fila, preservando o resto do plano prometido.
+                            CommandServiceLog($"[ServicoComando] Linha planejada ignorada por saldo inesperado: {ResolveServiceLabel(service)} (custo=${plannedLine.cost}).");
+                            continue;
+                        }
+                        serviceMoneySpent = plannedLine.cost;
+                        PanelMoneyController.PushContextualUpdate(target.TeamId, remainingAfterCharge, ResolveServiceUpdateLabel(service), -plannedLine.cost);
                     }
                     totalMoneySpent += Mathf.Max(0, serviceMoneySpent);
                     int economyAfter = matchController != null ? matchController.GetActualMoney(target.TeamId) : economyBefore;
@@ -938,7 +916,12 @@ public partial class TurnStateManager
             unit.MarkReceivedSuppliesThisTurn();
     }
 
-    private CommandServiceEstimateSummary EstimateCommandServiceQueuedOrders()
+    // Planner unico do Servico do Comando. Percorre a fila em ordem, deplecionando UM snapshot de
+    // estoque por fonte e reservando o saldo sequencialmente (pula servico individualmente inviavel e
+    // CONTINUA — nunca aborta a fila). Quando `planByOrder` != null, emite as linhas comprometidas que
+    // a execucao vai reproduzir. Preview e execucao chamam este mesmo metodo, entao nao podem divergir.
+    private CommandServiceEstimateSummary EstimateCommandServiceQueuedOrders(
+        Dictionary<ServicoDoComandoOption, List<CommandServicePlanLine>> planByOrder = null)
     {
         CommandServiceEstimateSummary summary = new CommandServiceEstimateSummary();
         int remainingMoney = matchController != null && matchController.ActiveTeamId >= 0
@@ -1033,6 +1016,25 @@ public partial class TurnStateManager
                 OverwriteSupplySnapshot(sourceStock, candidateStock);
                 remainingMoney -= Mathf.Max(0, finalCost);
                 summary.totalCost += Mathf.Max(0, finalCost);
+                if (planByOrder != null)
+                {
+                    if (!planByOrder.TryGetValue(order, out List<CommandServicePlanLine> plannedLines))
+                    {
+                        plannedLines = new List<CommandServicePlanLine>();
+                        planByOrder.Add(order, plannedLines);
+                    }
+                    plannedLines.Add(new CommandServicePlanLine
+                    {
+                        service = service,
+                        hpGain = hpGain,
+                        fuelGain = fuelGain,
+                        ammoGain = ammoGain,
+                        ammoByWeapon = candidateAmmoByWeaponGain != null && candidateAmmoByWeaponGain.Count > 0
+                            ? new List<int>(candidateAmmoByWeaponGain)
+                            : null,
+                        cost = Mathf.Max(0, finalCost)
+                    });
+                }
                 targetHp += hpGain;
                 targetFuel += fuelGain;
                 targetAmmo += ammoGain;

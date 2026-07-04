@@ -19,6 +19,8 @@ public partial class TurnStateManager
         scannerSelectedTargetIndex = -1;
         scannerSelectedEmbarkIndex = -1;
         scannerSelectedLandingIndex = -1;
+        // Cada novo painel OPÇÕES começa na primeira ação disponível.
+        sensorOptionFocusCode = '\0';
         RefreshSensorsForCurrentState();
     }
 
@@ -510,7 +512,6 @@ public partial class TurnStateManager
         cursorController.PlayUnitMovementSfx(unit.GetMovementCategory());
     }
 }
-
 
 
 

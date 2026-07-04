@@ -232,6 +232,64 @@ public class CursorController : MonoBehaviour
         HandleCycleUnitInput();
         HandleActionInput();
 
+        // Durante o preview do Servico do Comando, cima/baixo navegam entre EXECUTAR e CANCELAR
+        // (nao movem o cursor). Enter respeita o botao em foco via HandleConfirm.
+        if (turnStateManager != null &&
+            turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandService)
+        {
+            if (WasMenuUpPressedThisFrame())
+                turnStateManager.NavigateCommandServicePreviewFocus(-1);
+            else if (WasMenuDownPressedThisFrame())
+                turnStateManager.NavigateCommandServicePreviewFocus(+1);
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
+        // Preview de remocao: cima/baixo alternam CONFIRMAR e CANCELAR.
+        if (turnStateManager != null &&
+            turnStateManager.CurrentCursorState == TurnStateManager.CursorState.RemovingUnit)
+        {
+            if (WasMenuUpPressedThisFrame())
+                turnStateManager.NavigateRemovingUnitFocus(-1);
+            else if (WasMenuDownPressedThisFrame())
+                turnStateManager.NavigateRemovingUnitFocus(+1);
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
+        // No passo de CONFIRMAR ataque, cima/baixo alternam CONFIRMAR/CANCELAR (nao movem o cursor).
+        // No passo de ESCOLHER ALVO as setas passam pelo fluxo normal do cursor
+        // (TryResolveMirandoCursorMove, que ja inclui o slot virtual CANCELAR), identico ao shopping:
+        // uma unica fonte, todas as 4 setas, sem pulo duplo.
+        if (turnStateManager != null &&
+            turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Mirando &&
+            turnStateManager.IsMirandoConfirmStep)
+        {
+            if (WasMenuUpPressedThisFrame())
+                turnStateManager.NavigateMirandoHelperFocus(-1);
+            else if (WasMenuDownPressedThisFrame())
+                turnStateManager.NavigateMirandoHelperFocus(+1);
+            HandleNeutralLeftClickTeleport();
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
+        if (turnStateManager != null &&
+            (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.MoveuAndando ||
+             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.MoveuParado))
+        {
+            bool navigated = false;
+            if (WasMenuUpPressedThisFrame())
+                navigated = turnStateManager.NavigateSensorOptionFocus(-1);
+            else if (WasMenuDownPressedThisFrame())
+                navigated = turnStateManager.NavigateSensorOptionFocus(+1);
+            if (navigated)
+            {
+                heldDirection = Vector3Int.zero;
+                return;
+            }
+        }
+
         if (IsBattleMapMenuOpen())
         {
             heldDirection = Vector3Int.zero;
@@ -430,10 +488,12 @@ public class CursorController : MonoBehaviour
         bool isMovementActionChoice = state == TurnStateManager.CursorState.MoveuAndando ||
                                       state == TurnStateManager.CursorState.MoveuParado;
         bool isShopping = state == TurnStateManager.CursorState.ShoppingAndServices;
+        bool isAiming = state == TurnStateManager.CursorState.Mirando;
         if (state != TurnStateManager.CursorState.Neutral &&
             state != TurnStateManager.CursorState.UnitSelected &&
             !isMovementActionChoice &&
-            !isShopping)
+            !isShopping &&
+            !isAiming)
             return;
 
         Camera cam = cameraController != null ? cameraController.GetComponent<Camera>() : Camera.main;
@@ -455,7 +515,7 @@ public class CursorController : MonoBehaviour
             return;
         }
 
-        if (isMovementActionChoice)
+        if (isMovementActionChoice || isAiming)
         {
             turnStateManager.TryInvokeInferredSensorActionByClickingSelectedUnit(targetCell);
             return;
@@ -1127,6 +1187,26 @@ public class CursorController : MonoBehaviour
         return Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
 #else
         return Input.GetKeyDown(KeyCode.Escape);
+#endif
+    }
+
+    // Cima/baixo discretos (uma vez por toque) para navegar botoes de UI, sem repeticao.
+    // Apenas setas: W/S sao atalhos de acao (S = Suprir), nao podem virar navegacao.
+    private bool WasMenuUpPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.upArrowKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.UpArrow);
+#endif
+    }
+
+    private bool WasMenuDownPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.downArrowKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.DownArrow);
 #endif
     }
 

@@ -72,20 +72,77 @@ public class PanelHelperController : MonoBehaviour
     private bool helperScrollActive;
     private GameObject cancelControlRoot;
     private Button cancelActionButton;
+    private Image cancelActionImage;
+    private TMP_Text cancelActionLabel;
     private const float CancelControlHeight = 52f;
     private GameObject executeCommandServiceControlRoot;
     private Button executeCommandServiceButton;
+    private Image executeCommandServiceImage;
+    private TMP_Text executeCommandServiceLabel;
     private const float ExecuteCommandServiceControlHeight = 52f;
+    // Cor de fallback dos botoes gerados via script (usada so na criacao; o tint por time
+    // sobrescreve todo frame). Os botoes seguem a cor do time ativo (virou tudo slot de jogador).
+    private static readonly Color FooterButtonIdleColor = new Color(0.04f, 0.12f, 0.06f, 0.92f);
+    private static readonly Color FooterLabelIdleColor = new Color(0.65f, 1f, 0.65f, 1f);
+    // Cor do time ativo neste frame, resolvida no refresh e aplicada a todos os botoes de script.
+    private Color currentTeamColor = Color.white;
+
+    // Fundo do botao = tint escuro da cor do time; foco = tint mais claro. Rotulo = cor do time;
+    // foco = clareada rumo ao branco (destaque legivel em qualquer cor de time).
+    private static Color TeamButtonBackground(Color team, bool focused)
+    {
+        float k = focused ? 0.42f : 0.16f;
+        return new Color(team.r * k, team.g * k, team.b * k, focused ? 0.98f : 0.92f);
+    }
+
+    private static Color TeamButtonLabel(Color team, bool focused)
+    {
+        return focused ? Color.Lerp(team, Color.white, 0.55f) : team;
+    }
+
+    private void TintScriptButtonToTeamIdle(Button button)
+    {
+        TintScriptButtonToTeam(button, focused: false);
+    }
+
+    private void TintScriptButtonToTeam(Button button, bool focused)
+    {
+        if (button == null)
+            return;
+        Image image = button.GetComponent<Image>();
+        if (image != null)
+            image.color = TeamButtonBackground(currentTeamColor, focused);
+        TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+            label.color = TeamButtonLabel(currentTeamColor, focused);
+    }
+
     private GameObject sensorActionsRoot;
     private readonly List<Button> sensorActionButtons = new List<Button>();
+    private readonly List<char> sensorActionButtonCodes = new List<char>();
     private string sensorActionsSignature = string.Empty;
     private const float SensorActionButtonHeight = 42f;
+    private GameObject aimTargetsRoot;
+    private readonly List<Button> aimTargetButtons = new List<Button>();
+    private string aimTargetsSignature = string.Empty;
+    // Alvo mostra 2 linhas (nome+HP / terreno), entao precisa de mais altura que os demais botoes.
+    private const float AimTargetButtonHeight = 58f;
+    // Seccao de detalhes do passo CONFIRMAR ATAQUE: HP + LOCAL (icone do hex + nome do terreno).
+    private GameObject aimConfirmDetailsRoot;
+    private Image aimConfirmTargetIcon;
+    private TMP_Text aimConfirmTargetText;
+    private TMP_Text aimConfirmHpText;
+    private Image aimConfirmLocalIcon;
+    private TMP_Text aimConfirmLocalText;
+    private const float AimConfirmDetailsHeight = 172f;
     private GameObject shoppingActionsRoot;
     private readonly List<Button> shoppingActionButtons = new List<Button>();
     private string shoppingActionsSignature = string.Empty;
     private const float ShoppingActionButtonHeight = 42f;
     private GameObject persistenceActionsRoot;
     private readonly List<Button> persistenceActionButtons = new List<Button>();
+    private readonly List<Image> persistenceActionImages = new List<Image>();
+    private readonly List<TMP_Text> persistenceActionLabels = new List<TMP_Text>();
     private string persistenceActionsSignature = string.Empty;
     private const float PersistenceActionButtonHeight = 42f;
     [SerializeField] [Range(1f, 80f)] private float helperScrollStep = 24f;
@@ -283,6 +340,21 @@ public class PanelHelperController : MonoBehaviour
                             : data.ShoppingConstructionName
                     });
                 body = BuildShoppingBody(data);
+                return;
+
+            case TurnStateManager.HelperPanelKind.RemovingUnit:
+                title = "REMOVER UNIDADE";
+                body = $"A unidade {data.RemovingUnitName} vai ser removida.";
+                return;
+
+            case TurnStateManager.HelperPanelKind.AimTargets:
+                title = "ESCOLHER ALVO";
+                body = string.Empty;
+                return;
+
+            case TurnStateManager.HelperPanelKind.AimConfirm:
+                title = "CONFIRMAR ATAQUE";
+                body = string.Empty;
                 return;
 
             case TurnStateManager.HelperPanelKind.Sensors:
@@ -1318,9 +1390,15 @@ public class PanelHelperController : MonoBehaviour
             helperTxt.enabled = panelVisible;
         }
 
+        // Cor do time ativo deste frame — aplicada a todos os botoes gerados via script abaixo.
+        currentTeamColor = ResolveActiveTeamColor(data);
         RefreshCancelControl(panelVisible);
         RefreshExecuteCommandServiceControl(panelVisible);
+        RefreshCommandServicePreviewFocusHighlight(panelVisible);
         RefreshSensorActionControls(panelVisible, data);
+        RefreshAimTargetControls(panelVisible, data);
+        RefreshAimFooterFocus(panelVisible, data);
+        RefreshAimConfirmDetails(panelVisible, data);
         RefreshShoppingActionControls(panelVisible, data);
         RefreshPersistenceActionControls(panelVisible);
         RefreshDynamicPanelHeight(panelVisible, textChanged);
@@ -1363,11 +1441,21 @@ public class PanelHelperController : MonoBehaviour
 
         float bodyHeight = 0f;
         bool sensorButtonsActive = sensorActionsRoot != null && sensorActionsRoot.activeSelf;
+        bool aimButtonsActive = aimTargetsRoot != null && aimTargetsRoot.activeSelf;
+        bool aimConfirmActive = aimConfirmDetailsRoot != null && aimConfirmDetailsRoot.activeSelf;
         bool shoppingButtonsActive = shoppingActionsRoot != null && shoppingActionsRoot.activeSelf;
         bool persistenceButtonsActive = persistenceActionsRoot != null && persistenceActionsRoot.activeSelf;
         if (sensorButtonsActive)
         {
             bodyHeight = sensorActionButtons.Count * (SensorActionButtonHeight + 4f);
+        }
+        else if (aimButtonsActive)
+        {
+            bodyHeight = aimTargetButtons.Count * (AimTargetButtonHeight + 4f);
+        }
+        else if (aimConfirmActive)
+        {
+            bodyHeight = AimConfirmDetailsHeight;
         }
         else if (shoppingButtonsActive)
         {
@@ -1419,6 +1507,14 @@ public class PanelHelperController : MonoBehaviour
         }
 
         sensorActionsRoot.SetActive(true);
+        for (int i = 0; i < sensorActionButtons.Count; i++)
+        {
+            bool focused = turnStateManager != null && i < sensorActionButtonCodes.Count &&
+                           sensorActionButtonCodes[i] == turnStateManager.SensorOptionFocusCode;
+            TintScriptButtonToTeam(sensorActionButtons[i], focused);
+        }
+        ApplyFooterButtonFocus(cancelActionImage, cancelActionLabel,
+            turnStateManager != null && turnStateManager.SensorOptionCancelFocused);
         if (helperTxt != null)
             helperTxt.enabled = false;
 
@@ -1454,6 +1550,223 @@ public class PanelHelperController : MonoBehaviour
         sensorActionsRoot.SetActive(false);
     }
 
+    private void RefreshAimTargetControls(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        bool active = panelVisible && data != null && data.Kind == TurnStateManager.HelperPanelKind.AimTargets &&
+                      data.AimTargetLines != null && data.AimTargetLines.Count > 0;
+        if (!active)
+        {
+            if (aimTargetsRoot != null) aimTargetsRoot.SetActive(false);
+            aimTargetsSignature = string.Empty;
+            return;
+        }
+        EnsureAimTargetsRoot();
+        StringBuilder signatureBuilder = new StringBuilder();
+        for (int i = 0; i < data.AimTargetLines.Count; i++)
+            signatureBuilder.Append(data.AimTargetLines[i].unitName).Append(data.AimTargetLines[i].isValid);
+        string signature = signatureBuilder.ToString();
+        if (signature != aimTargetsSignature)
+        {
+            RebuildAimTargetButtons(data.AimTargetLines);
+            aimTargetsSignature = signature;
+        }
+        aimTargetsRoot.SetActive(true);
+        for (int i = 0; i < aimTargetButtons.Count && i < data.AimTargetLines.Count; i++)
+        {
+            Button button = aimTargetButtons[i];
+            if (!data.AimTargetLines[i].isValid)
+            {
+                button.GetComponent<Image>().color = new Color(0.12f, 0.12f, 0.12f, 0.92f);
+                button.GetComponentInChildren<TMP_Text>(true).color = Color.gray;
+            }
+            else
+                TintScriptButtonToTeam(button, data.AimTargetLines[i].isFocused);
+        }
+        if (helperTxt != null) helperTxt.enabled = false;
+        // O CANCELAR agora e o ultimo item da lista (destacado no loop acima), nao mais o botao de rodape.
+        if (panelHelper == gameObject && selfPanelCanvasGroup != null)
+        {
+            selfPanelCanvasGroup.interactable = true;
+            selfPanelCanvasGroup.blocksRaycasts = true;
+        }
+    }
+
+    private void RefreshAimFooterFocus(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        if (!panelVisible || data == null || data.Kind != TurnStateManager.HelperPanelKind.AimConfirm || turnStateManager == null)
+            return;
+        int focus = turnStateManager.MirandoConfirmButtonFocus;
+        ApplyFooterButtonFocus(executeCommandServiceImage, executeCommandServiceLabel, focus == 0);
+        ApplyFooterButtonFocus(cancelActionImage, cancelActionLabel, focus == 1);
+    }
+
+    // Detalhes do CONFIRMAR ATAQUE: sprite + nome do alvo, HP e LOCAL.
+    private void RefreshAimConfirmDetails(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        bool active = panelVisible && data != null && data.Kind == TurnStateManager.HelperPanelKind.AimConfirm;
+        if (!active)
+        {
+            if (aimConfirmDetailsRoot != null) aimConfirmDetailsRoot.SetActive(false);
+            return;
+        }
+
+        EnsureAimConfirmDetailsRoot();
+        if (aimConfirmDetailsRoot == null) return;
+
+        aimConfirmTargetText.text = data.AimConfirmTargetName;
+        aimConfirmTargetIcon.sprite = data.AimConfirmTargetSprite;
+        aimConfirmTargetIcon.enabled = data.AimConfirmTargetSprite != null;
+        aimConfirmTargetIcon.color = data.AimConfirmTargetColor;
+        aimConfirmHpText.text = $"HP: {data.AimConfirmHp}";
+        aimConfirmLocalText.text = string.IsNullOrWhiteSpace(data.AimConfirmTerrainLabel)
+            ? "LOCAL:" : $"LOCAL: {data.AimConfirmTerrainLabel}";
+        aimConfirmLocalIcon.sprite = data.AimConfirmLocalSprite;
+        aimConfirmLocalIcon.enabled = data.AimConfirmLocalSprite != null;
+        aimConfirmLocalIcon.color = data.AimConfirmLocalColor;
+
+        aimConfirmTargetText.color = currentTeamColor;
+        aimConfirmHpText.color = currentTeamColor;
+        aimConfirmLocalText.color = currentTeamColor;
+
+        aimConfirmDetailsRoot.SetActive(true);
+        if (helperTxt != null) helperTxt.enabled = false;
+    }
+
+    private void EnsureAimConfirmDetailsRoot()
+    {
+        if (!Application.isPlaying || aimConfirmDetailsRoot != null || helperRect == null) return;
+        aimConfirmDetailsRoot = new GameObject("helper_aim_confirm_details", typeof(RectTransform), typeof(VerticalLayoutGroup));
+        RectTransform rect = aimConfirmDetailsRoot.GetComponent<RectTransform>();
+        rect.SetParent(helperRect, false);
+        rect.anchorMin = new Vector2(0.06f, 1f); rect.anchorMax = new Vector2(0.94f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f); rect.anchoredPosition = new Vector2(0f, -48f);
+        rect.sizeDelta = new Vector2(0f, AimConfirmDetailsHeight);
+        VerticalLayoutGroup layout = aimConfirmDetailsRoot.GetComponent<VerticalLayoutGroup>();
+        layout.spacing = 6f; layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true; layout.childControlHeight = true;
+        layout.childForceExpandWidth = true; layout.childForceExpandHeight = false;
+
+        GameObject targetRow = new GameObject("aim_confirm_target", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+        targetRow.transform.SetParent(aimConfirmDetailsRoot.transform, false);
+        LayoutElement targetRowLE = targetRow.GetComponent<LayoutElement>();
+        targetRowLE.minHeight = 68f; targetRowLE.preferredHeight = 68f;
+        HorizontalLayoutGroup targetLayout = targetRow.GetComponent<HorizontalLayoutGroup>();
+        targetLayout.spacing = 10f; targetLayout.childAlignment = TextAnchor.MiddleCenter;
+        targetLayout.childControlWidth = true; targetLayout.childControlHeight = true;
+        targetLayout.childForceExpandWidth = false; targetLayout.childForceExpandHeight = false;
+
+        GameObject targetIconObj = new GameObject("target_icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement));
+        targetIconObj.transform.SetParent(targetRow.transform, false);
+        LayoutElement targetIconLE = targetIconObj.GetComponent<LayoutElement>();
+        targetIconLE.minWidth = 68f; targetIconLE.preferredWidth = 68f;
+        targetIconLE.minHeight = 68f; targetIconLE.preferredHeight = 68f;
+        aimConfirmTargetIcon = targetIconObj.GetComponent<Image>();
+        aimConfirmTargetIcon.preserveAspect = true; aimConfirmTargetIcon.raycastTarget = false;
+
+        GameObject targetNameObj = new GameObject("target_name", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI), typeof(LayoutElement));
+        targetNameObj.transform.SetParent(targetRow.transform, false);
+        LayoutElement targetNameLE = targetNameObj.GetComponent<LayoutElement>();
+        targetNameLE.minWidth = 80f; targetNameLE.preferredWidth = 160f;
+        aimConfirmTargetText = targetNameObj.GetComponent<TMP_Text>();
+        aimConfirmTargetText.fontSize = 22f; aimConfirmTargetText.fontStyle = FontStyles.Bold;
+        aimConfirmTargetText.alignment = TextAlignmentOptions.MidlineLeft; aimConfirmTargetText.raycastTarget = false;
+        aimConfirmTargetText.enableAutoSizing = true; aimConfirmTargetText.fontSizeMin = 13f; aimConfirmTargetText.fontSizeMax = 22f;
+
+        aimConfirmHpText = CreateAimConfirmText("aim_confirm_hp", 22f, 28f);
+
+        // Linha LOCAL: nome (label + terreno) a esquerda e o icone do hex a direita.
+        GameObject row = new GameObject("aim_confirm_local", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+        row.transform.SetParent(aimConfirmDetailsRoot.transform, false);
+        LayoutElement rowLE = row.GetComponent<LayoutElement>(); rowLE.minHeight = 48f; rowLE.preferredHeight = 48f;
+        HorizontalLayoutGroup hlg = row.GetComponent<HorizontalLayoutGroup>();
+        hlg.spacing = 8f; hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childControlWidth = true; hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+
+        GameObject nameObj = new GameObject("local_text", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI), typeof(LayoutElement));
+        nameObj.transform.SetParent(row.transform, false);
+        LayoutElement nameLE = nameObj.GetComponent<LayoutElement>(); nameLE.minWidth = 60f; nameLE.preferredWidth = 150f;
+        aimConfirmLocalText = nameObj.GetComponent<TMP_Text>();
+        aimConfirmLocalText.fontSize = 18f; aimConfirmLocalText.fontStyle = FontStyles.Bold;
+        aimConfirmLocalText.alignment = TextAlignmentOptions.MidlineRight; aimConfirmLocalText.raycastTarget = false;
+        aimConfirmLocalText.enableAutoSizing = true; aimConfirmLocalText.fontSizeMin = 12f; aimConfirmLocalText.fontSizeMax = 18f;
+
+        GameObject iconObj = new GameObject("local_icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement));
+        iconObj.transform.SetParent(row.transform, false);
+        RectTransform iconRect = iconObj.GetComponent<RectTransform>(); iconRect.sizeDelta = new Vector2(44f, 44f);
+        LayoutElement iconLE = iconObj.GetComponent<LayoutElement>(); iconLE.minWidth = 44f; iconLE.preferredWidth = 44f; iconLE.minHeight = 44f; iconLE.preferredHeight = 44f;
+        aimConfirmLocalIcon = iconObj.GetComponent<Image>();
+        aimConfirmLocalIcon.preserveAspect = true; aimConfirmLocalIcon.raycastTarget = false;
+
+        aimConfirmDetailsRoot.SetActive(false);
+    }
+
+    private TMP_Text CreateAimConfirmText(string objectName, float fontSize, float height)
+    {
+        GameObject obj = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI), typeof(LayoutElement));
+        obj.transform.SetParent(aimConfirmDetailsRoot.transform, false);
+        LayoutElement le = obj.GetComponent<LayoutElement>(); le.minHeight = height; le.preferredHeight = height;
+        TMP_Text text = obj.GetComponent<TMP_Text>();
+        text.fontSize = fontSize; text.fontStyle = FontStyles.Bold;
+        text.alignment = TextAlignmentOptions.Center; text.raycastTarget = false;
+        text.enableAutoSizing = true; text.fontSizeMin = 12f; text.fontSizeMax = fontSize;
+        return text;
+    }
+
+    private void EnsureAimTargetsRoot()
+    {
+        if (!Application.isPlaying || aimTargetsRoot != null || helperRect == null) return;
+        aimTargetsRoot = new GameObject("helper_aim_targets", typeof(RectTransform), typeof(VerticalLayoutGroup));
+        RectTransform rect = aimTargetsRoot.GetComponent<RectTransform>();
+        rect.SetParent(helperRect, false);
+        rect.anchorMin = new Vector2(0.06f, 1f); rect.anchorMax = new Vector2(0.94f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f); rect.anchoredPosition = new Vector2(0f, -48f);
+        VerticalLayoutGroup layout = aimTargetsRoot.GetComponent<VerticalLayoutGroup>();
+        layout.spacing = 4f; layout.childControlWidth = true; layout.childControlHeight = true;
+        layout.childForceExpandWidth = true; layout.childForceExpandHeight = false;
+        aimTargetsRoot.SetActive(false);
+    }
+
+    private void RebuildAimTargetButtons(List<TurnStateManager.HelperAimTargetLine> lines)
+    {
+        for (int i = aimTargetButtons.Count - 1; i >= 0; i--)
+            if (aimTargetButtons[i] != null) Destroy(aimTargetButtons[i].gameObject);
+        aimTargetButtons.Clear();
+        for (int i = 0; i < lines.Count; i++)
+        {
+            TurnStateManager.HelperAimTargetLine line = lines[i];
+            bool isCancel = line.isCancel;
+            int targetIndex = line.index;
+            string objSuffix = isCancel ? "cancel" : i.ToString();
+            GameObject obj = new GameObject($"button_aim_target_{objSuffix}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
+            obj.transform.SetParent(aimTargetsRoot.transform, false);
+            obj.GetComponent<Image>().color = FooterButtonIdleColor;
+            LayoutElement element = obj.GetComponent<LayoutElement>(); element.minHeight = AimTargetButtonHeight; element.preferredHeight = AimTargetButtonHeight;
+            Button button = obj.GetComponent<Button>();
+            if (isCancel)
+                button.onClick.AddListener(() => cursorController?.TryCancelCurrentActionFromPointer());
+            else
+                button.onClick.AddListener(() => turnStateManager?.TrySelectMirandoTargetFromPointer(targetIndex));
+            GameObject labelObj = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            RectTransform labelRect = labelObj.GetComponent<RectTransform>(); labelRect.SetParent(obj.transform, false);
+            labelRect.anchorMin = Vector2.zero; labelRect.anchorMax = Vector2.one; labelRect.offsetMin = Vector2.zero; labelRect.offsetMax = Vector2.zero;
+            TMP_Text label = labelObj.GetComponent<TMP_Text>();
+            if (isCancel)
+                label.text = line.unitName;
+            else
+            {
+                // Linha 1: "N - Nome (Hp: X)". Linha 2: terreno (Cidade / Estrada na Floresta / Floresta).
+                string head = $"{i + 1} - {line.unitName} (Hp: {line.hp})";
+                label.text = string.IsNullOrWhiteSpace(line.terrainLabel) ? head : $"{head}\n{line.terrainLabel}";
+            }
+            label.fontStyle = FontStyles.Bold; label.color = FooterLabelIdleColor; label.alignment = TextAlignmentOptions.Center; label.raycastTarget = false;
+            // Auto-encolhe se o nome for grande, pra nao estourar a largura do botao.
+            label.enableAutoSizing = true; label.fontSizeMin = 12f; label.fontSizeMax = 20f;
+            aimTargetButtons.Add(button);
+        }
+        aimTargetsRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, aimTargetButtons.Count * (AimTargetButtonHeight + 4f));
+    }
+
     private void RefreshShoppingActionControls(bool panelVisible, TurnStateManager.HelperPanelData data)
     {
         bool active = panelVisible && data != null &&
@@ -1480,6 +1793,20 @@ public class PanelHelperController : MonoBehaviour
         }
 
         shoppingActionsRoot.SetActive(true);
+        // Reflete a navegacao: destaca o item selecionado (ou o CANCELAR, o ultimo botao da lista).
+        int focusedShoppingIndex = turnStateManager.ShoppingCancelFocused
+            ? shoppingActionButtons.Count - 1
+            : turnStateManager.ShoppingSelectedOptionIndex;
+        for (int i = 0; i < shoppingActionButtons.Count; i++)
+        {
+            Button shoppingButton = shoppingActionButtons[i];
+            if (shoppingButton == null)
+                continue;
+            ApplyFooterButtonFocus(
+                shoppingButton.GetComponent<Image>(),
+                shoppingButton.GetComponentInChildren<TMP_Text>(true),
+                i == focusedShoppingIndex);
+        }
         if (helperTxt != null)
             helperTxt.enabled = false;
 
@@ -1540,6 +1867,7 @@ public class PanelHelperController : MonoBehaviour
         }
 
         persistenceActionsRoot.SetActive(true);
+        RefreshPersistencePromptFocusHighlight();
         if (helperTxt != null)
             helperTxt.enabled = false;
         if (panelHelper == gameObject && selfPanelCanvasGroup != null)
@@ -1578,6 +1906,8 @@ public class PanelHelperController : MonoBehaviour
             if (persistenceActionButtons[i] != null)
                 Destroy(persistenceActionButtons[i].gameObject);
         persistenceActionButtons.Clear();
+        persistenceActionImages.Clear();
+        persistenceActionLabels.Clear();
 
         if (saveGameManager.IsPersistenceOverwriteConfirmationActive)
         {
@@ -1599,11 +1929,24 @@ public class PanelHelperController : MonoBehaviour
             new Vector2(0f, persistenceActionButtons.Count * (PersistenceActionButtonHeight + 4f));
     }
 
+    // Destaca o botao de save/load em foco (mesmo visual do preview do Servico do Comando).
+    private void RefreshPersistencePromptFocusHighlight()
+    {
+        int focus = saveGameManager != null ? saveGameManager.PersistencePromptFocusIndex : -1;
+        for (int i = 0; i < persistenceActionButtons.Count; i++)
+        {
+            Image image = i < persistenceActionImages.Count ? persistenceActionImages[i] : null;
+            TMP_Text label = i < persistenceActionLabels.Count ? persistenceActionLabels[i] : null;
+            ApplyFooterButtonFocus(image, label, i == focus);
+        }
+    }
+
     private void CreatePersistenceButton(string text, UnityEngine.Events.UnityAction action)
     {
         GameObject buttonObject = new GameObject("button_persistence", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
         buttonObject.transform.SetParent(persistenceActionsRoot.transform, false);
-        buttonObject.GetComponent<Image>().color = new Color(0.04f, 0.12f, 0.06f, 0.92f);
+        Image buttonImage = buttonObject.GetComponent<Image>();
+        buttonImage.color = FooterButtonIdleColor;
         LayoutElement element = buttonObject.GetComponent<LayoutElement>();
         element.minHeight = PersistenceActionButtonHeight;
         element.preferredHeight = PersistenceActionButtonHeight;
@@ -1624,10 +1967,12 @@ public class PanelHelperController : MonoBehaviour
         label.text = text;
         label.fontSize = 18f;
         label.fontStyle = FontStyles.Bold;
-        label.color = new Color(0.65f, 1f, 0.65f, 1f);
+        label.color = FooterLabelIdleColor;
         label.alignment = TextAlignmentOptions.Center;
         label.raycastTarget = false;
         persistenceActionButtons.Add(button);
+        persistenceActionImages.Add(buttonImage);
+        persistenceActionLabels.Add(label);
     }
 
     private static string BuildShoppingActionsSignature(List<TurnStateManager.HelperShoppingLine> lines)
@@ -1655,10 +2000,12 @@ public class PanelHelperController : MonoBehaviour
             if (line == null)
                 continue;
 
+            bool isCancel = line.isCancel;
             int optionIndex = line.index - 1;
-            GameObject buttonObject = new GameObject($"button_shopping_{line.index}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
+            string objectSuffix = isCancel ? "cancel" : line.index.ToString();
+            GameObject buttonObject = new GameObject($"button_shopping_{objectSuffix}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
             buttonObject.transform.SetParent(shoppingActionsRoot.transform, false);
-            buttonObject.GetComponent<Image>().color = new Color(0.04f, 0.12f, 0.06f, 0.92f);
+            buttonObject.GetComponent<Image>().color = FooterButtonIdleColor;
             LayoutElement element = buttonObject.GetComponent<LayoutElement>();
             element.minHeight = ShoppingActionButtonHeight;
             element.preferredHeight = ShoppingActionButtonHeight;
@@ -1667,7 +2014,10 @@ public class PanelHelperController : MonoBehaviour
             Navigation navigation = button.navigation;
             navigation.mode = Navigation.Mode.None;
             button.navigation = navigation;
-            button.onClick.AddListener(() => turnStateManager?.TryPurchaseShoppingOptionFromPointer(optionIndex));
+            if (isCancel)
+                button.onClick.AddListener(() => turnStateManager?.TryCancelShoppingFromPointer());
+            else
+                button.onClick.AddListener(() => turnStateManager?.TryPurchaseShoppingOptionFromPointer(optionIndex));
 
             GameObject labelObject = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             RectTransform labelRect = labelObject.GetComponent<RectTransform>();
@@ -1677,11 +2027,18 @@ public class PanelHelperController : MonoBehaviour
             labelRect.offsetMin = Vector2.zero;
             labelRect.offsetMax = Vector2.zero;
             TMP_Text label = labelObject.GetComponent<TMP_Text>();
-            string cost = line.cost.HasValue ? $" (${line.cost.Value})" : string.Empty;
-            label.text = $"{line.index} - {line.unitName}{cost}";
+            if (isCancel)
+            {
+                label.text = line.unitName;
+            }
+            else
+            {
+                string cost = line.cost.HasValue ? $" (${line.cost.Value})" : string.Empty;
+                label.text = $"{line.index} - {line.unitName}{cost}";
+            }
             label.fontSize = 20f;
             label.fontStyle = FontStyles.Bold;
-            label.color = new Color(0.65f, 1f, 0.65f, 1f);
+            label.color = FooterLabelIdleColor;
             label.alignment = TextAlignmentOptions.Center;
             label.raycastTarget = false;
             shoppingActionButtons.Add(button);
@@ -1709,6 +2066,7 @@ public class PanelHelperController : MonoBehaviour
             if (sensorActionButtons[i] != null)
                 Destroy(sensorActionButtons[i].gameObject);
         sensorActionButtons.Clear();
+        sensorActionButtonCodes.Clear();
 
         for (int i = 0; i < lines.Count; i++)
         {
@@ -1728,7 +2086,11 @@ public class PanelHelperController : MonoBehaviour
             Navigation navigation = button.navigation;
             navigation.mode = Navigation.Mode.None;
             button.navigation = navigation;
-            button.onClick.AddListener(() => turnStateManager?.TryInvokeSensorActionFromPointer(actionCode));
+            button.onClick.AddListener(() =>
+            {
+                turnStateManager?.SetSensorOptionFocus(actionCode);
+                turnStateManager?.TryInvokeSensorActionFromPointer(actionCode);
+            });
 
             GameObject labelObject = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             RectTransform labelRect = labelObject.GetComponent<RectTransform>();
@@ -1745,6 +2107,7 @@ public class PanelHelperController : MonoBehaviour
             label.alignment = TextAlignmentOptions.Center;
             label.raycastTarget = false;
             sensorActionButtons.Add(button);
+            sensorActionButtonCodes.Add(actionCode);
         }
 
         RectTransform rootRect = sensorActionsRoot.GetComponent<RectTransform>();
@@ -1775,7 +2138,8 @@ public class PanelHelperController : MonoBehaviour
         buttonRect.offsetMax = new Vector2(-4f, -5f);
 
         Image image = buttonObject.GetComponent<Image>();
-        image.color = new Color(0.04f, 0.12f, 0.06f, 0.92f);
+        image.color = FooterButtonIdleColor;
+        cancelActionImage = image;
         cancelActionButton = buttonObject.GetComponent<Button>();
         Navigation navigation = cancelActionButton.navigation;
         navigation.mode = Navigation.Mode.None;
@@ -1789,14 +2153,23 @@ public class PanelHelperController : MonoBehaviour
         labelRect.offsetMin = Vector2.zero;
         labelRect.offsetMax = Vector2.zero;
         TMP_Text label = labelObject.GetComponent<TMP_Text>();
-        label.text = "CANCELAR / DESFAZER";
+        label.text = "CANCELAR";
         label.fontSize = 20f;
         label.fontStyle = FontStyles.Bold;
-        label.color = new Color(0.65f, 1f, 0.65f, 1f);
+        label.color = FooterLabelIdleColor;
         label.alignment = TextAlignmentOptions.Center;
         label.raycastTarget = false;
+        cancelActionLabel = label;
 
-        cancelActionButton.onClick.AddListener(() => cursorController?.TryCancelCurrentActionFromPointer());
+        cancelActionButton.onClick.AddListener(() =>
+        {
+            if (turnStateManager != null)
+            {
+                turnStateManager.SetCommandServicePreviewFocus(1);
+                turnStateManager.SetRemovingUnitFocus(1);
+            }
+            cursorController?.TryCancelCurrentActionFromPointer();
+        });
         cancelControlRoot.SetActive(false);
     }
 
@@ -1823,7 +2196,8 @@ public class PanelHelperController : MonoBehaviour
         buttonRect.offsetMin = new Vector2(4f, 5f);
         buttonRect.offsetMax = new Vector2(-4f, -5f);
 
-        buttonObject.GetComponent<Image>().color = new Color(0.04f, 0.12f, 0.06f, 0.92f);
+        executeCommandServiceImage = buttonObject.GetComponent<Image>();
+        executeCommandServiceImage.color = FooterButtonIdleColor;
         executeCommandServiceButton = buttonObject.GetComponent<Button>();
         Navigation navigation = executeCommandServiceButton.navigation;
         navigation.mode = Navigation.Mode.None;
@@ -1840,12 +2214,47 @@ public class PanelHelperController : MonoBehaviour
         label.text = "EXECUTAR";
         label.fontSize = 20f;
         label.fontStyle = FontStyles.Bold;
-        label.color = new Color(0.65f, 1f, 0.65f, 1f);
+        label.color = FooterLabelIdleColor;
         label.alignment = TextAlignmentOptions.Center;
         label.raycastTarget = false;
+        executeCommandServiceLabel = label;
 
-        executeCommandServiceButton.onClick.AddListener(() => turnStateManager?.HandleConfirmWithFeedback());
+        executeCommandServiceButton.onClick.AddListener(() =>
+        {
+            if (turnStateManager != null &&
+                turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandService)
+                turnStateManager.SetCommandServicePreviewFocus(0);
+            else if (turnStateManager != null &&
+                     turnStateManager.CurrentCursorState == TurnStateManager.CursorState.RemovingUnit)
+                turnStateManager.SetRemovingUnitFocus(0);
+            turnStateManager?.HandleConfirmWithFeedback();
+        });
         executeCommandServiceControlRoot.SetActive(false);
+    }
+
+    // Destaca o botao em foco durante o preview do Servico do Comando (EXECUTAR x CANCELAR).
+    // Fora desse estado, ambos voltam ao visual neutro (o botao Cancelar aparece sozinho em varios
+    // outros estados e nao deve ficar destacado).
+    private void RefreshCommandServicePreviewFocusHighlight(bool panelVisible)
+    {
+        bool commandService = panelVisible && turnStateManager != null &&
+                              turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandService;
+        bool removingUnit = panelVisible && turnStateManager != null &&
+                            turnStateManager.CurrentCursorState == TurnStateManager.CursorState.RemovingUnit;
+        int focus = commandService
+            ? turnStateManager.CommandServicePreviewFocusIndex
+            : removingUnit ? turnStateManager.RemovingUnitFocusIndex : -1;
+
+        ApplyFooterButtonFocus(executeCommandServiceImage, executeCommandServiceLabel, focus == 0);
+        ApplyFooterButtonFocus(cancelActionImage, cancelActionLabel, focus == 1);
+    }
+
+    private void ApplyFooterButtonFocus(Image image, TMP_Text label, bool focused)
+    {
+        if (image != null)
+            image.color = TeamButtonBackground(currentTeamColor, focused);
+        if (label != null)
+            label.color = TeamButtonLabel(currentTeamColor, focused);
     }
 
     private void RefreshExecuteCommandServiceControl(bool panelVisible)
@@ -1853,13 +2262,20 @@ public class PanelHelperController : MonoBehaviour
         if (executeCommandServiceControlRoot == null)
             return;
 
-        bool active = panelVisible && turnStateManager != null &&
-                      turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandService;
+        bool commandService = turnStateManager != null &&
+                              turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandService;
+        bool removingUnit = turnStateManager != null &&
+                            turnStateManager.CurrentCursorState == TurnStateManager.CursorState.RemovingUnit;
+        bool aiming = turnStateManager != null &&
+                      turnStateManager.IsMirandoConfirmStep;
+        bool active = panelVisible && (commandService || removingUnit || aiming);
         if (executeCommandServiceControlRoot.activeSelf != active)
             executeCommandServiceControlRoot.SetActive(active);
 
         if (executeCommandServiceButton != null)
             executeCommandServiceButton.interactable = active;
+        if (executeCommandServiceLabel != null)
+            executeCommandServiceLabel.text = (removingUnit || aiming) ? "CONFIRMAR" : "EXECUTAR";
 
         if (active && panelHelper == gameObject && selfPanelCanvasGroup != null)
         {
@@ -1913,6 +2329,10 @@ public class PanelHelperController : MonoBehaviour
             case TurnStateManager.CursorState.AircraftFuelDepletionQueue:
             case TurnStateManager.CursorState.TurnStartRallyQueue:
                 return false;
+            case TurnStateManager.CursorState.Mirando:
+                // No passo de escolher alvo o CANCELAR fica na propria lista (como no shopping);
+                // o rodape so aparece no passo de confirmar o ataque (CONFIRMAR/CANCELAR).
+                return turnStateManager.IsMirandoConfirmStep;
             default:
                 return true;
         }

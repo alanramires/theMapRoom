@@ -36,6 +36,7 @@ public class PanelDialogController : MonoBehaviour
     private Color externalPreviewColor = Color.white;
     private RectTransform panelRect;
     private float basePanelHeight = -1f;
+    private float basePanelWidth = -1f;
     private bool cachedPanelDockDefaults;
     private Vector2 basePanelAnchorMin;
     private Vector2 basePanelAnchorMax;
@@ -110,6 +111,8 @@ public class PanelDialogController : MonoBehaviour
             panelRect = panelUnit.GetComponent<RectTransform>();
         if (basePanelHeight <= 0f && panelRect != null)
             basePanelHeight = Mathf.Max(0f, panelRect.rect.height);
+        if (basePanelWidth <= 0f && panelRect != null)
+            basePanelWidth = Mathf.Max(0f, panelRect.rect.width);
         if (!cachedPanelDockDefaults && panelRect != null)
         {
             basePanelAnchorMin = panelRect.anchorMin;
@@ -524,9 +527,17 @@ public class PanelDialogController : MonoBehaviour
         }
 
         float targetHeight = basePanelHeight;
+        float targetWidth = basePanelWidth > 0f ? basePanelWidth : panelRect.rect.width;
         if (hasExternalOverrideText && shoppingPreviewMode)
+        {
             targetHeight = Mathf.Max(430f, shoppingPreviewPanelHeight);
+            float availableWidth = panelRect.parent is RectTransform parentRect
+                ? Mathf.Max(100f, parentRect.rect.width - 16f)
+                : 760f;
+            targetWidth = Mathf.Max(targetWidth, Mathf.Min(760f, availableWidth));
+        }
 
+        panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, targetWidth);
         panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
         RefreshDockByHelperState(targetHeight);
         RefreshShoppingTextLayout();
@@ -574,6 +585,18 @@ public class PanelDialogController : MonoBehaviour
         shoppingBuyButton.onClick.AddListener(() => turnStateManager?.TryConfirmShoppingFromPointer());
         shoppingExitButton.onClick.AddListener(() => turnStateManager?.TryCancelShoppingFromPointer());
         shoppingControlsRoot.SetActive(false);
+    }
+
+    private static void TintShoppingButton(Button button, Color background, Color labelColor)
+    {
+        if (button == null)
+            return;
+        Image image = button.GetComponent<Image>();
+        if (image != null)
+            image.color = background;
+        TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+            label.color = labelColor;
     }
 
     private static Button CreateShoppingButton(
@@ -659,6 +682,16 @@ public class PanelDialogController : MonoBehaviour
         shoppingCounterText.text = count > 0 ? $"{index + 1} / {count}" : string.Empty;
         shoppingBuyText.text = $"COMPRAR  $ {cost.ToString("N0", CultureInfo.GetCultureInfo("pt-BR"))}";
 
+        // Botoes seguem a cor do time ativo (virou tudo slot de jogador).
+        Color teamColor = ResolveActiveTeamColor();
+        Color buttonBg = new Color(teamColor.r * 0.16f, teamColor.g * 0.16f, teamColor.b * 0.16f, 0.88f);
+        TintShoppingButton(shoppingPreviousButton, buttonBg, teamColor);
+        TintShoppingButton(shoppingNextButton, buttonBg, teamColor);
+        TintShoppingButton(shoppingBuyButton, buttonBg, teamColor);
+        TintShoppingButton(shoppingExitButton, buttonBg, teamColor);
+        if (shoppingCounterText != null)
+            shoppingCounterText.color = teamColor;
+
         bool canNavigate = count > 1;
         shoppingPreviousButton.gameObject.SetActive(canNavigate);
         shoppingNextButton.gameObject.SetActive(canNavigate);
@@ -724,7 +757,6 @@ public class PanelDialogController : MonoBehaviour
         bool shoppingActive = hasExternalOverrideText && shoppingPreviewMode;
         if (shoppingActive)
         {
-            const float navigationColumnWidth = 64f;
             textUnit.enableAutoSizing = false;
             textUnit.fontSize = Mathf.Max(10f, shoppingPreviewFontSize);
             textUnit.textWrappingMode = TextWrappingModes.Normal;
@@ -733,6 +765,9 @@ public class PanelDialogController : MonoBehaviour
             textUnit.alignment = TextAlignmentOptions.TopLeft;
             if (textRect != null && panelRect != null)
             {
+                // Os botoes laterais usam 15% da largura do painel. A reserva do
+                // conteudo precisa usar a mesma medida, nao um valor fixo em pixels.
+                float navigationColumnWidth = Mathf.Max(64f, panelRect.rect.width * 0.15f);
                 bool previewVisible = unitPreviewImage != null &&
                                       unitPreviewImage.gameObject.activeSelf &&
                                       unitPreviewImage.enabled;
@@ -751,8 +786,12 @@ public class PanelDialogController : MonoBehaviour
                 textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, targetWidth);
                 textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
             }
-            if (cachedPreviewRectDefaults && unitPreviewImage != null)
-                unitPreviewImage.rectTransform.anchoredPosition = basePreviewAnchoredPosition + new Vector2(navigationColumnWidth, 0f);
+            if (cachedPreviewRectDefaults && unitPreviewImage != null && panelRect != null)
+            {
+                float navigationColumnWidth = Mathf.Max(64f, panelRect.rect.width * 0.15f);
+                unitPreviewImage.rectTransform.anchoredPosition =
+                    basePreviewAnchoredPosition + new Vector2(navigationColumnWidth + 12f, 0f);
+            }
             return;
         }
 
@@ -966,5 +1005,3 @@ public class PanelDialogController : MonoBehaviour
         return null;
     }
 }
-
-

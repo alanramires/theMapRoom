@@ -27,7 +27,10 @@ public partial class TurnStateManager
         Supply = 8,
         TurnStartAutonomy = 9,
         Transfer = 10,
-        ConstructionStats = 11
+        ConstructionStats = 11,
+        RemovingUnit = 12,
+        AimTargets = 13,
+        AimConfirm = 14
     }
 
     public sealed class HelperPanelData
@@ -53,6 +56,15 @@ public partial class TurnStateManager
         public readonly List<string> UnitStatsLines = new List<string>();
         public string ConstructionStatsName;
         public readonly List<string> ConstructionStatsLines = new List<string>();
+        public string RemovingUnitName;
+        public readonly List<HelperAimTargetLine> AimTargetLines = new List<HelperAimTargetLine>();
+        public string AimConfirmTargetName;
+        public Sprite AimConfirmTargetSprite;
+        public Color AimConfirmTargetColor = Color.white;
+        public int AimConfirmHp;
+        public string AimConfirmTerrainLabel;
+        public Sprite AimConfirmLocalSprite;
+        public Color AimConfirmLocalColor = Color.white;
         public int SupplyServedTargets;
         public int SupplyRecoveredHp;
         public int SupplyRecoveredFuel;
@@ -185,6 +197,7 @@ public partial class TurnStateManager
         public string unitName;
         public int? cost;
         public bool isFocused;
+        public bool isCancel;
     }
 
     public sealed class HelperSensorLine
@@ -374,6 +387,12 @@ public partial class TurnStateManager
         if (CurrentCursorState == CursorState.ShoppingAndServices)
             return TryBuildShoppingHelperPanelData(data);
 
+        if (CurrentCursorState == CursorState.RemovingUnit)
+            return TryBuildRemovingUnitHelperPanelData(data);
+
+        if (CurrentCursorState == CursorState.Mirando)
+            return TryBuildAimTargetsHelperPanelData(data);
+
         if (CurrentCursorState == CursorState.Desembarcando)
             return TryBuildDisembarkHelperPanelData(data);
 
@@ -394,6 +413,156 @@ public partial class TurnStateManager
             return TryBuildMergeHelperPanelData(data);
 
         return false;
+    }
+
+    public sealed class HelperAimTargetLine
+    {
+        public int index;
+        public string unitName;
+        public bool isValid;
+        public bool isFocused;
+        public bool isCancel;
+        public int hp;
+        public string terrainLabel;
+    }
+
+    private bool TryBuildAimTargetsHelperPanelData(HelperPanelData data)
+    {
+        if (data == null || cachedMirandoSelectionEntries.Count <= 0)
+            return false;
+        if (scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget)
+        {
+            data.Kind = HelperPanelKind.AimConfirm;
+            if (scannerSelectedTargetIndex >= 0 && scannerSelectedTargetIndex < cachedMirandoSelectionEntries.Count)
+            {
+                UnitManager target = cachedMirandoSelectionEntries[scannerSelectedTargetIndex].TargetUnit;
+                data.AimConfirmTargetName = target != null ? ResolveDebugUnitName(target) : "Alvo";
+                if (target != null)
+                {
+                    Vector3Int targetCell = target.CurrentCellPosition;
+                    SpriteRenderer targetRenderer = target.GetMainSpriteRenderer();
+                    data.AimConfirmTargetSprite = targetRenderer != null ? targetRenderer.sprite : null;
+                    data.AimConfirmTargetColor = targetRenderer != null ? targetRenderer.color : Color.white;
+                    data.AimConfirmHp = Mathf.Max(0, target.CurrentHP);
+                    data.AimConfirmTerrainLabel = ResolveCellTerrainLabel(targetCell);
+                    ResolveCellLocalVisual(targetCell,
+                        out data.AimConfirmLocalSprite,
+                        out data.AimConfirmLocalColor);
+                }
+            }
+            return true;
+        }
+        data.Kind = HelperPanelKind.AimTargets;
+        for (int i = 0; i < cachedMirandoSelectionEntries.Count; i++)
+        {
+            MirandoSelectionEntry entry = cachedMirandoSelectionEntries[i];
+            UnitManager target = entry.TargetUnit;
+            data.AimTargetLines.Add(new HelperAimTargetLine
+            {
+                index = i,
+                unitName = target != null ? ResolveDebugUnitName(target) : "Alvo invalido",
+                isValid = entry.isValid,
+                isFocused = !mirandoCancelFocused && scannerSelectedTargetIndex == i,
+                hp = target != null ? Mathf.Max(0, target.CurrentHP) : 0,
+                terrainLabel = target != null ? ResolveCellTerrainLabel(target.CurrentCellPosition) : string.Empty
+            });
+        }
+
+        // Slot CANCELAR ao final da lista (igual ao shopping): da pra chegar nele com as setas e sair
+        // do modo de ataque sem mouse/Esc. O cancel de rodape fica escondido no passo de escolher alvo.
+        data.AimTargetLines.Add(new HelperAimTargetLine
+        {
+            index = -1,
+            unitName = "CANCELAR",
+            isValid = true,
+            isFocused = mirandoCancelFocused,
+            isCancel = true
+        });
+        return true;
+    }
+
+    private RoadNetworkManager[] cachedRoadNetworks;
+
+    // Descreve o hex do alvo: construcao (Cidade) tem prioridade; senao estrutura sobre terreno
+    // (Estrada na Floresta); senao so o terreno (Floresta). Tudo resolvido dos mesmos bancos/tilemap.
+    private string ResolveCellTerrainLabel(Vector3Int cell)
+    {
+        cell.z = 0;
+        Tilemap board = terrainTilemap;
+        if (board == null)
+            return string.Empty;
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(board, cell);
+        if (construction != null && !string.IsNullOrWhiteSpace(construction.ConstructionDisplayName))
+            return construction.ConstructionDisplayName;
+
+        string terrainName = null;
+        if (terrainDatabase != null &&
+            terrainDatabase.TryGetByPaletteTile(board.GetTile(cell), out TerrainTypeData terrain) && terrain != null)
+            terrainName = terrain.displayName;
+
+        StructureData structure = ResolveStructureAtCell(cell);
+        if (structure != null && !string.IsNullOrWhiteSpace(structure.displayName))
+            return string.IsNullOrWhiteSpace(terrainName)
+                ? structure.displayName
+                : $"{structure.displayName} na {terrainName}";
+
+        return terrainName ?? string.Empty;
+    }
+
+    // Visual do LOCAL: a construcao ocupa o hex visualmente e tem prioridade sobre o terreno.
+    // O sprite do tilemap fica como fallback quando nao existe ConstructionManager na celula.
+    private void ResolveCellLocalVisual(Vector3Int cell, out Sprite sprite, out Color color)
+    {
+        cell.z = 0;
+        sprite = null;
+        color = Color.white;
+
+        Tilemap board = terrainTilemap;
+        if (board == null)
+            return;
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(board, cell);
+        SpriteRenderer constructionRenderer = construction != null
+            ? construction.GetMainSpriteRenderer()
+            : null;
+        if (constructionRenderer != null && constructionRenderer.sprite != null)
+        {
+            sprite = constructionRenderer.sprite;
+            color = constructionRenderer.color;
+            return;
+        }
+
+        sprite = board.GetSprite(cell);
+    }
+
+    private StructureData ResolveStructureAtCell(Vector3Int cell)
+    {
+        if (cachedRoadNetworks == null)
+            cachedRoadNetworks = FindObjectsByType<RoadNetworkManager>(FindObjectsSortMode.None);
+
+        for (int i = 0; i < cachedRoadNetworks.Length; i++)
+        {
+            RoadNetworkManager road = cachedRoadNetworks[i];
+            if (road != null && road.TryGetStructureAtCell(cell, out StructureData structure) && structure != null)
+                return structure;
+        }
+        return null;
+    }
+
+    private bool TryBuildRemovingUnitHelperPanelData(HelperPanelData data)
+    {
+        if (data == null || cursorController == null)
+            return false;
+
+        UnitManager target = FindUnitAtCell(cursorController.CurrentCell);
+        if (target == null)
+            return false;
+
+        data.Kind = HelperPanelKind.RemovingUnit;
+        data.RemovingUnitName = ResolveDebugUnitName(target);
+        data.SubjectTeamId = (int)target.TeamId;
+        return true;
     }
 
     public void ShowTurnStartAutonomyUpkeepHelper(IReadOnlyList<TurnStartAutonomyUpkeepEntry> entries)
@@ -1905,9 +2074,19 @@ public partial class TurnStateManager
                 index = i + 1,
                 unitName = ResolveUnitName(unit),
                 cost = resolvedCost,
-                isFocused = shoppingSelectedIndex == i
+                isFocused = !shoppingCancelFocused && shoppingSelectedIndex == i
             });
         }
+
+        // Slot CANCELAR ao final da lista: da pra chegar nele com as setas e sair da loja sem mouse/Esc.
+        data.ShoppingLines.Add(new HelperShoppingLine
+        {
+            index = -1,
+            unitName = "CANCELAR",
+            cost = null,
+            isFocused = shoppingCancelFocused,
+            isCancel = true
+        });
 
         return data.ShoppingLines.Count > 0;
     }

@@ -47,6 +47,7 @@ public partial class TurnStateManager
 
         shoppingConstruction = construction;
         shoppingSelectedIndex = 0;
+        shoppingCancelFocused = false;
         Advance(CursorState.ShoppingAndServices, "TryEnterConstructionShoppingState: ally construction with units for sale");
         RefreshShoppingSelectionPresentation(logOptions: false);
         LogConstructionShoppingPanel();
@@ -74,6 +75,7 @@ public partial class TurnStateManager
         shoppingConstruction = null;
         shoppingUnitsForSale.Clear();
         shoppingSelectedIndex = -1;
+        shoppingCancelFocused = false;
         PanelDialogController.ClearExternalText();
         if (rollback)
             Retreat("ExitConstructionShoppingStateToNeutral");
@@ -105,6 +107,7 @@ public partial class TurnStateManager
         }
 
         shoppingSelectedIndex = index;
+        shoppingCancelFocused = false;
         RefreshShoppingSelectionPresentation(logOptions: false);
         TryPurchaseShoppingUnitByIndex(index);
     }
@@ -126,6 +129,12 @@ public partial class TurnStateManager
     public int ShoppingOptionCount => shoppingUnitsForSale != null ? shoppingUnitsForSale.Count : 0;
 
     public int ShoppingSelectedOptionIndex => ClampShoppingSelectedIndex();
+
+    // Foco no botao CANCELAR da lista de compra: um slot virtual logo apos o ultimo item. Permite
+    // sair da loja navegando ate ele com as setas e confirmando — sem mouse e sem Esc.
+    private bool shoppingCancelFocused;
+    public bool ShoppingCancelFocused =>
+        shoppingCancelFocused && CurrentCursorState == CursorState.ShoppingAndServices;
 
     public int ShoppingSelectedOptionCost
     {
@@ -150,6 +159,7 @@ public partial class TurnStateManager
         int count = shoppingUnitsForSale.Count;
         int currentIndex = ClampShoppingSelectedIndex();
         shoppingSelectedIndex = (currentIndex + (direction > 0 ? 1 : -1) + count) % count;
+        shoppingCancelFocused = false;
         cursorController?.PlayCursorMoveSfx();
         RefreshShoppingSelectionPresentation(logOptions: true);
         return true;
@@ -170,6 +180,7 @@ public partial class TurnStateManager
             return false;
 
         shoppingSelectedIndex = index;
+        shoppingCancelFocused = false;
         RefreshShoppingSelectionPresentation(logOptions: false);
         return TryPurchaseShoppingUnitByIndex(index);
     }
@@ -544,15 +555,26 @@ public partial class TurnStateManager
             return false;
 
         int count = shoppingUnitsForSale.Count;
-        if (count <= 1)
+        if (count <= 0)
             return false;
 
-        int currentIndex = ClampShoppingSelectedIndex();
-        int nextIndex = (currentIndex + step + count) % count;
-        if (nextIndex == currentIndex)
+        // Slot virtual CANCELAR logo apos o ultimo item: total de posicoes = count + 1.
+        // Navegar para baixo passando do ultimo item chega no CANCELAR; para cima, volta.
+        int total = count + 1;
+        int current = shoppingCancelFocused ? count : ClampShoppingSelectedIndex();
+        int next = (current + step + total) % total;
+        if (next == current)
             return false;
 
-        shoppingSelectedIndex = nextIndex;
+        if (next == count)
+        {
+            shoppingCancelFocused = true;
+        }
+        else
+        {
+            shoppingCancelFocused = false;
+            shoppingSelectedIndex = next;
+        }
         cursorController?.PlayCursorMoveSfx();
         RefreshShoppingSelectionPresentation(logOptions: true);
         return true;

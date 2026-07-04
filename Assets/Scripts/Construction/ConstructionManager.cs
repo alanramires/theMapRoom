@@ -116,6 +116,12 @@ public class ConstructionManager : MonoBehaviour
     public int InstanceId => instanceId;
     public Vector3 CurrentPosition => currentPosition;
     public string ConstructionDisplayName => constructionDisplayName;
+    public SpriteRenderer GetMainSpriteRenderer()
+    {
+        if (spriteRenderer == null)
+            spriteRenderer = ResolvePrimarySpriteRenderer();
+        return spriteRenderer;
+    }
     public bool IsVisible => isVisible;
     public ConstructionDatabase ConstructionDatabase => constructionDatabase;
     public bool IsCapturable => siteRuntime != null && siteRuntime.isCapturable;

@@ -351,6 +351,7 @@ public class SaveGameManager : MonoBehaviour
         promptState = SlotPromptState.SaveSelectSlot;
         promptOpenedFrame = Time.frameCount;
         overwritePendingSlot = 0;
+        ResetPersistencePromptFocus();
         cursorController?.PlayConfirmSfx();
         PanelDialogController.ClearExternalText();
         RefreshPromptHelper();
@@ -388,6 +389,7 @@ public class SaveGameManager : MonoBehaviour
         promptState = SlotPromptState.LoadSelectSlot;
         promptOpenedFrame = Time.frameCount;
         overwritePendingSlot = 0;
+        ResetPersistencePromptFocus();
         cursorController?.PlayConfirmSfx();
         PanelDialogController.ClearExternalText();
         RefreshPromptHelper();
@@ -399,17 +401,29 @@ public class SaveGameManager : MonoBehaviour
         if (Time.frameCount <= promptOpenedFrame)
             return;
 
+        if (WasKeyPressedThisFrame(KeyCode.UpArrow))
+        {
+            NavigatePersistencePromptFocus(-1);
+            return;
+        }
+
+        if (WasKeyPressedThisFrame(KeyCode.DownArrow))
+        {
+            NavigatePersistencePromptFocus(+1);
+            return;
+        }
+
+        // Numeros continuam escolhendo o slot direto (atalho), independente do foco.
         if (WasAnySlotNumberPressedThisFrame(out int slotPressed))
         {
             HandleSlotChosen(slotPressed);
             return;
         }
 
-        if (promptState == SlotPromptState.SaveConfirmOverwrite &&
-            (WasKeyPressedThisFrame(KeyCode.Return) || WasKeyPressedThisFrame(KeyCode.KeypadEnter)))
+        // Enter aciona o botao em foco (slot destacado, CANCELAR, CONFIRMAR ou VOLTAR).
+        if (WasKeyPressedThisFrame(KeyCode.Return) || WasKeyPressedThisFrame(KeyCode.KeypadEnter))
         {
-            SaveSlot(overwritePendingSlot);
-            CompletePromptAfterConfirmedPersistence();
+            ConfirmPersistencePromptFocused();
             return;
         }
 
@@ -419,6 +433,7 @@ public class SaveGameManager : MonoBehaviour
             {
                 promptState = SlotPromptState.SaveSelectSlot;
                 overwritePendingSlot = 0;
+                ResetPersistencePromptFocus();
                 PanelDialogController.ClearExternalText();
                 RefreshPromptHelper();
                 cursorController?.PlayBeepSfx();
@@ -458,6 +473,7 @@ public class SaveGameManager : MonoBehaviour
         {
             promptState = SlotPromptState.SaveConfirmOverwrite;
             overwritePendingSlot = normalizedSlot;
+            ResetPersistencePromptFocus();
             PanelDialogController.TrySetExternalText(BuildOverwriteDialogText(metadata));
             RefreshPromptHelper();
             cursorController?.PlayBeepSfx();
@@ -473,6 +489,75 @@ public class SaveGameManager : MonoBehaviour
 
     public bool IsPersistenceOverwriteConfirmationActive =>
         promptState == SlotPromptState.SaveConfirmOverwrite;
+
+    // Foco de teclado no prompt de save/load, na MESMA ordem dos botoes do PanelHelper:
+    // selecao de slot = [slot1, slot2, slot3, CANCELAR]; sobrescrita = [CONFIRMAR, VOLTAR].
+    private int persistencePromptFocusIndex;
+
+    public int PersistencePromptFocusIndex => persistencePromptFocusIndex;
+
+    private int GetPersistencePromptButtonCount()
+    {
+        if (IsPersistenceOverwriteConfirmationActive)
+            return 2;
+        if (IsPersistenceSlotSelectionActive)
+            return 4;
+        return 0;
+    }
+
+    private void ResetPersistencePromptFocus()
+    {
+        persistencePromptFocusIndex = 0;
+    }
+
+    private void NavigatePersistencePromptFocus(int delta)
+    {
+        int count = GetPersistencePromptButtonCount();
+        if (count <= 0 || delta == 0)
+            return;
+
+        // Wrap: do primeiro item pra cima vai pro ultimo (CANCELAR) e vice-versa.
+        int next = (persistencePromptFocusIndex + (delta > 0 ? 1 : -1) + count) % count;
+        if (next == persistencePromptFocusIndex)
+            return;
+
+        persistencePromptFocusIndex = next;
+        cursorController?.PlayCursorMoveSfx();
+    }
+
+    // Enter no prompt aciona o botao em foco, casando com o onClick de cada botao do PanelHelper.
+    private void ConfirmPersistencePromptFocused()
+    {
+        if (IsPersistenceOverwriteConfirmationActive)
+        {
+            if (persistencePromptFocusIndex == 0)
+                SaveSlot(overwritePendingSlot);
+            else
+            {
+                promptState = SlotPromptState.SaveSelectSlot;
+                overwritePendingSlot = 0;
+                ResetPersistencePromptFocus();
+                PanelDialogController.ClearExternalText();
+                RefreshPromptHelper();
+                cursorController?.PlayBeepSfx();
+                return;
+            }
+            CompletePromptAfterConfirmedPersistence();
+            return;
+        }
+
+        if (!IsPersistenceSlotSelectionActive)
+            return;
+
+        if (persistencePromptFocusIndex >= 0 && persistencePromptFocusIndex <= 2)
+            HandleSlotChosen(persistencePromptFocusIndex + 1);
+        else
+        {
+            CancelPrompt(clearDialogOverride: true);
+            BattleMapMenuRootController.SuppressMenuOpenForCurrentFrame();
+            cursorController?.PlayCancelSfx();
+        }
+    }
 
     public string GetPersistenceSlotButtonLabel(int slotIndex)
     {
@@ -505,6 +590,7 @@ public class SaveGameManager : MonoBehaviour
         {
             promptState = SlotPromptState.SaveSelectSlot;
             overwritePendingSlot = 0;
+            ResetPersistencePromptFocus();
             PanelDialogController.ClearExternalText();
             RefreshPromptHelper();
             cursorController?.PlayBeepSfx();
@@ -2485,6 +2571,8 @@ public class SaveGameManager : MonoBehaviour
             case KeyCode.Keypad8: return Keyboard.current.numpad8Key.wasPressedThisFrame;
             case KeyCode.Keypad9: return Keyboard.current.numpad9Key.wasPressedThisFrame;
             case KeyCode.Space: return Keyboard.current.spaceKey.wasPressedThisFrame;
+            case KeyCode.UpArrow: return Keyboard.current.upArrowKey.wasPressedThisFrame;
+            case KeyCode.DownArrow: return Keyboard.current.downArrowKey.wasPressedThisFrame;
             case KeyCode.Return: return Keyboard.current.enterKey.wasPressedThisFrame;
             case KeyCode.KeypadEnter: return Keyboard.current.numpadEnterKey.wasPressedThisFrame;
             case KeyCode.Escape: return Keyboard.current.escapeKey.wasPressedThisFrame;

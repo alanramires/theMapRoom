@@ -444,6 +444,10 @@ public class BattleMapMenuRootController : MonoBehaviour
         CaptureAndDisableEventSystemNavigation();
         RefreshButtonInteractability();
         SetPanel(MenuPanel.Menu, resetIndex: true);
+        // Na primeiríssima abertura os botões estão sendo ativados neste frame: o Selectable só aplica
+        // a cor de "selecionado" no frame seguinte. Reaplica a seleção 1 frame depois (como faz o
+        // RestoreMenuFromStateStack) para o "Situação" já vir destacado logo na primeira vez.
+        ScheduleRestoreSelectionNextFrame();
         PanelDialogController.ClearExternalText();
         ApplyPlayerMenuAiPauseIfNeeded();
     }

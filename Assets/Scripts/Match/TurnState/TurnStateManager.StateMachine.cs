@@ -872,13 +872,17 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileMoveuAndando()
     {
         LogStateStep("HandleConfirmWhileMoveuAndando");
-        return ActionSfx.None;
+        if (SensorOptionCancelFocused)
+            return HandleCancelWhileMoveuAndando();
+        return TryInvokeFocusedSensorOption() ? ActionSfx.Confirm : ActionSfx.None;
     }
 
     private ActionSfx HandleConfirmWhileMoveuParado()
     {
         LogStateStep("HandleConfirmWhileMoveuParado");
-        return ActionSfx.None;
+        if (SensorOptionCancelFocused)
+            return HandleCancelWhileMoveuParado();
+        return TryInvokeFocusedSensorOption() ? ActionSfx.Confirm : ActionSfx.None;
     }
 
     private ActionSfx HandleConfirmWhileCapturando()
@@ -948,6 +952,8 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileMirando()
     {
         LogStateStep("HandleConfirmWhileMirando");
+        if (mirandoCancelFocused || (IsMirandoConfirmStep && mirandoConfirmButtonFocus == 1))
+            return HandleCancelWhileMirando();
         if (TryConfirmScannerAttack())
             return ActionSfx.Confirm;
 
@@ -1017,6 +1023,9 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileShoppingAndServices()
     {
         LogStateStep("HandleConfirmWhileShoppingAndServices");
+        // Enter com o slot CANCELAR em foco sai da loja em vez de comprar.
+        if (ShoppingCancelFocused)
+            return HandleCancelWhileShoppingAndServices();
         if (!TryConfirmSelectedShoppingOption())
             return ActionSfx.Error;
         if (ConsumeShoppingSuppressDefaultConfirmSfxOnce())
@@ -1075,6 +1084,9 @@ public partial class TurnStateManager
         LogStateStep("HandleConfirmWhileCommandService");
         if (IsCommandServiceExecutionRunning)
             return ActionSfx.None;
+        // Enter respeita o botao em foco: com CANCELAR destacado, cancela em vez de executar.
+        if (commandServicePreviewFocusIndex == CommandServicePreviewCancelIndex)
+            return HandleCancelWhileCommandService();
         return TryConfirmPendingCommandServiceOrder()
             ? ActionSfx.Confirm
             : ActionSfx.Error;
@@ -1092,6 +1104,8 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileRemovingUnit()
     {
         LogStateStep("HandleConfirmWhileRemovingUnit");
+        if (removingUnitFocusIndex == RemovingUnitCancelFocusIndex)
+            return HandleCancelWhileRemovingUnit();
         return TryConfirmRemovingUnit()
             ? ActionSfx.Confirm
             : ActionSfx.Error;

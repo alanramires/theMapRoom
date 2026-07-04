@@ -8,6 +8,35 @@ using UnityEngine.InputSystem;
 
 public partial class TurnStateManager
 {
+    private const int RemovingUnitConfirmFocusIndex = 0;
+    private const int RemovingUnitCancelFocusIndex = 1;
+    private int removingUnitFocusIndex = RemovingUnitConfirmFocusIndex;
+
+    public int RemovingUnitFocusIndex => removingUnitFocusIndex;
+
+    public bool NavigateRemovingUnitFocus(int delta)
+    {
+        if (CurrentCursorState != CursorState.RemovingUnit || delta == 0)
+            return false;
+
+        // Wrap: de CONFIRMAR pra cima vai pro CANCELAR e vice-versa (mesma flexibilidade dos demais).
+        int total = RemovingUnitCancelFocusIndex - RemovingUnitConfirmFocusIndex + 1;
+        int next = (removingUnitFocusIndex + (delta > 0 ? 1 : -1) + total) % total;
+        if (next == removingUnitFocusIndex)
+            return false;
+
+        removingUnitFocusIndex = next;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public void SetRemovingUnitFocus(int index)
+    {
+        if (CurrentCursorState != CursorState.RemovingUnit)
+            return;
+        removingUnitFocusIndex = Mathf.Clamp(index,
+            RemovingUnitConfirmFocusIndex, RemovingUnitCancelFocusIndex);
+    }
     private enum ScannerPromptStep
     {
         AwaitingAction = 0,
@@ -419,6 +448,7 @@ public partial class TurnStateManager
 
         string targetName = ResolveDebugUnitName(target);
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
+        removingUnitFocusIndex = RemovingUnitConfirmFocusIndex;
         Advance(CursorState.RemovingUnit, "ProcessDestroyUnitHotkeyInput");
         cursorController?.PlayConfirmSfx();
         RuntimeLog("[Destroy Unit] Confirmar com Enter | Cancelar com ESC.");
@@ -461,6 +491,7 @@ public partial class TurnStateManager
 
         string targetName = ResolveDebugUnitName(target);
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
+        removingUnitFocusIndex = RemovingUnitConfirmFocusIndex;
         Advance(CursorState.RemovingUnit, "TryOpenDestroyUnitPromptFromMenu");
         message = "[Destroy Unit] Confirmar com Enter | Cancelar com ESC.";
         RuntimeLog(message);
@@ -939,7 +970,7 @@ public partial class TurnStateManager
 
     }
 
-    public void HandleAimActionRequested(bool automatedSelection = false)
+    public void HandleAimActionRequested(bool automatedSelection = false, UnitManager preferredTarget = null)
     {
         bool canAim = availableSensorActionCodes.Contains('A');
         if (!canAim)
@@ -959,9 +990,15 @@ public partial class TurnStateManager
 
         cursorController?.PlayConfirmSfx();
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Attack, "AimActionRequested");
-        FocusFirstOptionForAction('A');
+        if (preferredTarget == null)
+            FocusFirstOptionForAction('A');
         suppressInitialMirandoAutoFocus = automatedSelection;
         EnterMirandoState();
+
+        // O clique em um alvo e apenas uma preferencia de entrada. A lista e a validacao
+        // continuam sendo as oficiais do PodeMirar, reconstruidas ao entrar em Mirando.
+        if (preferredTarget != null)
+            TryEnterMirandoConfirmForTarget(preferredTarget);
     }
 
     public bool TryInvokeSensorActionFromPointer(char actionCode)
@@ -984,17 +1021,98 @@ public partial class TurnStateManager
         }
     }
 
-    public bool TryInvokeInferredSensorActionByClickingSelectedUnit(Vector3Int clickedCell)
+    private static readonly char[] SensorOptionNavigationOrder = { 'A', 'E', 'D', 'C', 'F', 'S', 'T', 'M' };
+    private const char SensorOptionCancelCode = '\x1b';
+    private char sensorOptionFocusCode;
+    public bool SensorOptionCancelFocused => SensorOptionFocusCode == SensorOptionCancelCode;
+
+    public char SensorOptionFocusCode
+    {
+        get
+        {
+            EnsureSensorOptionFocusIsValid();
+            return sensorOptionFocusCode;
+        }
+    }
+
+    public bool NavigateSensorOptionFocus(int delta)
     {
         if ((CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado) ||
-            scannerPromptStep != ScannerPromptStep.AwaitingAction || selectedUnit == null)
+            scannerPromptStep != ScannerPromptStep.AwaitingAction || delta == 0)
+            return false;
+
+        List<char> options = BuildNavigableSensorOptionCodes();
+        if (options.Count <= 0)
+            return false;
+
+        int current = options.IndexOf(sensorOptionFocusCode);
+        if (current < 0)
+            current = 0;
+        int step = delta > 0 ? 1 : -1;
+        sensorOptionFocusCode = options[(current + step + options.Count) % options.Count];
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public void SetSensorOptionFocus(char actionCode)
+    {
+        char normalized = char.ToUpperInvariant(actionCode);
+        if (BuildNavigableSensorOptionCodes().Contains(normalized))
+            sensorOptionFocusCode = normalized;
+    }
+
+    public bool TryInvokeFocusedSensorOption()
+    {
+        EnsureSensorOptionFocusIsValid();
+        return sensorOptionFocusCode != '\0' && sensorOptionFocusCode != SensorOptionCancelCode &&
+               TryInvokeSensorActionFromPointer(sensorOptionFocusCode);
+    }
+
+    private void EnsureSensorOptionFocusIsValid()
+    {
+        List<char> options = BuildNavigableSensorOptionCodes();
+        if (options.Count <= 0)
+        {
+            sensorOptionFocusCode = '\0';
+            return;
+        }
+        if (!options.Contains(sensorOptionFocusCode))
+            sensorOptionFocusCode = options[0];
+    }
+
+    private List<char> BuildNavigableSensorOptionCodes()
+    {
+        var options = new List<char>();
+        for (int i = 0; i < SensorOptionNavigationOrder.Length; i++)
+        {
+            char code = SensorOptionNavigationOrder[i];
+            if (code == 'M' || (availableSensorActionCodes != null && availableSensorActionCodes.Contains(code)))
+                options.Add(code);
+        }
+        options.Add(SensorOptionCancelCode);
+        return options;
+    }
+
+    public bool TryInvokeInferredSensorActionByClickingSelectedUnit(Vector3Int clickedCell)
+    {
+        bool isMovementActionChoice = CurrentCursorState == CursorState.MoveuAndando ||
+                                      CurrentCursorState == CursorState.MoveuParado;
+        bool isAiming = CurrentCursorState == CursorState.Mirando;
+        if ((!isMovementActionChoice && !isAiming) || selectedUnit == null)
             return false;
 
         clickedCell.z = 0;
+
+        if (isAiming)
+            return TryHandleMirandoTargetClick(clickedCell);
+
+        if (scannerPromptStep != ScannerPromptStep.AwaitingAction)
+            return false;
+
         Vector3Int unitCell = selectedUnit.CurrentCellPosition;
         unitCell.z = 0;
         if (clickedCell != unitCell)
-            return false;
+            return TryBeginAimAtClickedTarget(clickedCell);
 
         // Prioridades contextuais para um segundo clique na propria unidade.
         // Capturar e uma acao inequivoca do hex atual e tem prioridade sobre M.
@@ -1013,6 +1131,98 @@ public partial class TurnStateManager
         }
 
         return false;
+    }
+
+    private bool TryBeginAimAtClickedTarget(Vector3Int clickedCell)
+    {
+        if (!availableSensorActionCodes.Contains('A'))
+            return false;
+
+        UnitManager target = FindUniqueValidAimTargetAtCell(clickedCell);
+        if (target == null)
+            return false;
+
+        HandleAimActionRequested(automatedSelection: true, preferredTarget: target);
+        return IsMirandoConfirmStep && IsCurrentMirandoTarget(target);
+    }
+
+    private bool TryHandleMirandoTargetClick(Vector3Int clickedCell)
+    {
+        if (combatExecutionInProgress)
+            return false;
+
+        UnitManager target = FindUniqueValidAimTargetAtCell(clickedCell);
+        if (target == null)
+            return false;
+
+        if (scannerPromptStep == ScannerPromptStep.MirandoCycleTarget)
+            return TryEnterMirandoConfirmForTarget(target);
+
+        if (scannerPromptStep != ScannerPromptStep.MirandoConfirmTarget ||
+            !IsCurrentMirandoTarget(target))
+            return false;
+
+        // Um segundo clique no mesmo alvo equivale ao Enter da confirmacao. Se CANCELAR
+        // estava em foco pelo teclado, o clique explicito no alvo recupera CONFIRMAR.
+        mirandoCancelFocused = false;
+        mirandoConfirmButtonFocus = 0;
+        HandleConfirmWithFeedback();
+        return true;
+    }
+
+    private UnitManager FindUniqueValidAimTargetAtCell(Vector3Int clickedCell)
+    {
+        clickedCell.z = 0;
+        UnitManager match = null;
+
+        for (int i = 0; i < cachedPodeMirarTargets.Count; i++)
+        {
+            PodeMirarTargetOption option = cachedPodeMirarTargets[i];
+            if (option == null || option.attackerUnit != selectedUnit || option.targetUnit == null)
+                continue;
+
+            Vector3Int targetCell = option.targetUnit.CurrentCellPosition;
+            targetCell.z = 0;
+            if (targetCell != clickedCell)
+                continue;
+
+            if (match != null && match != option.targetUnit)
+                return null;
+
+            match = option.targetUnit;
+        }
+
+        return match;
+    }
+
+    private bool TryEnterMirandoConfirmForTarget(UnitManager target)
+    {
+        if (CurrentCursorState != CursorState.Mirando || target == null)
+            return false;
+
+        for (int i = 0; i < cachedMirandoSelectionEntries.Count; i++)
+        {
+            MirandoSelectionEntry entry = cachedMirandoSelectionEntries[i];
+            if (!entry.isValid || entry.TargetUnit != target || entry.AttackerUnit != selectedUnit)
+                continue;
+
+            scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
+            scannerSelectedTargetIndex = i;
+            mirandoCancelFocused = false;
+            FocusCurrentMirandoTarget(logDetails: true, moveCursor: true);
+            return TryConfirmScannerAttack();
+        }
+
+        return false;
+    }
+
+    private bool IsCurrentMirandoTarget(UnitManager target)
+    {
+        return target != null &&
+               TryGetCurrentMirandoEntry(out MirandoSelectionEntry entry) &&
+               entry.isValid &&
+               entry.AttackerUnit == selectedUnit &&
+               entry.TargetUnit == target;
     }
 
     private void HandleMoveOnlyActionRequested()
@@ -2965,6 +3175,41 @@ public partial class TurnStateManager
         return TryConfirmScannerAttack();
     }
 
+    public bool TrySelectMirandoTargetFromPointer(int index)
+    {
+        if (CurrentCursorState != CursorState.Mirando || index < 0 || index >= GetMirandoEntryCount())
+            return false;
+        // Clicar no alvo = posicionar nele e apertar Enter. Reusa o mesmo fluxo do teclado
+        // (HandleConfirmWithFeedback), inclusive o SFX — e so um atalho pra funcao que ja existia.
+        scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
+        scannerSelectedTargetIndex = index;
+        mirandoCancelFocused = false;
+        FocusCurrentMirandoTarget(logDetails: true, moveCursor: true);
+        HandleConfirmWithFeedback();
+        return true;
+    }
+
+    private bool mirandoCancelFocused;
+    private int mirandoConfirmButtonFocus;
+    public bool MirandoCancelFocused => mirandoCancelFocused;
+    public int MirandoConfirmButtonFocus => mirandoConfirmButtonFocus;
+    public bool IsMirandoConfirmStep => CurrentCursorState == CursorState.Mirando &&
+                                        scannerPromptStep == ScannerPromptStep.MirandoConfirmTarget;
+
+    // So o passo de CONFIRMAR ataque usa este helper (alterna CONFIRMAR/CANCELAR). A navegacao de
+    // alvos (escolher alvo) vai pelo fluxo normal do cursor em TryResolveMirandoCursorMove.
+    public bool NavigateMirandoHelperFocus(int delta)
+    {
+        if (CurrentCursorState != CursorState.Mirando || delta == 0)
+            return false;
+        if (scannerPromptStep != ScannerPromptStep.MirandoConfirmTarget)
+            return false;
+
+        mirandoConfirmButtonFocus = (mirandoConfirmButtonFocus + (delta > 0 ? 1 : -1) + 2) % 2;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
     // -------------------------------------------------------------------------
     // API de replay para navegação em listas de sensor (genérica)
     // Usada por: Mirando (ataque). Futuramente: Embark, Supply, Transfer...
@@ -3692,6 +3937,8 @@ public partial class TurnStateManager
             RecordCinematicAimAction(cursorController.CurrentCell);
         scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
         scannerSelectedTargetIndex = 0;
+        mirandoCancelFocused = false;
+        mirandoConfirmButtonFocus = 0;
 
         if (GetMirandoEntryCount() <= 1)
         {
@@ -3725,6 +3972,8 @@ public partial class TurnStateManager
             scannerSelectedTargetIndex = 0;
 
         scannerPromptStep = ScannerPromptStep.MirandoConfirmTarget;
+        mirandoCancelFocused = false;
+        mirandoConfirmButtonFocus = 0;
         MirandoSelectionEntry picked = cachedMirandoSelectionEntries[scannerSelectedTargetIndex];
         RebuildMirandoPreviewPath(picked);
         SetMirandoPreviewVisible(CurrentCursorState == CursorState.Mirando);
@@ -3939,10 +4188,27 @@ public partial class TurnStateManager
             return false;
 
         int count = GetMirandoEntryCount();
-        if (count <= 1)
+        if (count <= 0)
             return false;
 
-        scannerSelectedTargetIndex = (scannerSelectedTargetIndex + step + count) % count;
+        // Slot virtual CANCELAR ao final (igual ao shopping): total = count + 1. As 4 setas passam
+        // por aqui (esquerda/cima = -1, direita/baixo = +1), com wrap, e o CANCELAR entra no loop.
+        int total = count + 1;
+        int current = mirandoCancelFocused ? count : scannerSelectedTargetIndex;
+        int next = (current + step + total) % total;
+        if (next == current)
+            return false;
+
+        if (next == count)
+        {
+            // CANCELAR em foco: nao move o cursor no mapa, so destaca na lista do painel.
+            mirandoCancelFocused = true;
+            cursorController?.PlayCursorMoveSfx();
+            return false;
+        }
+
+        mirandoCancelFocused = false;
+        scannerSelectedTargetIndex = next;
         FocusCurrentMirandoTarget(logDetails: true);
 
         if (scannerSelectedTargetIndex >= 0 && scannerSelectedTargetIndex < count)
