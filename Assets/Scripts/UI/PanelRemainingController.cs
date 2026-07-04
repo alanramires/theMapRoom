@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class PanelRemainingController : MonoBehaviour
 {
@@ -10,6 +11,9 @@ public class PanelRemainingController : MonoBehaviour
     [SerializeField] private TMP_Text textUnidade;
     [SerializeField] private TMP_Text textCap;
     [SerializeField] private TMP_Text textCamada;
+    [SerializeField] private Button buttonRodada;
+    [SerializeField] private CursorController cursorController;
+    [SerializeField] private TurnStateManager turnStateManager;
 
     private string lastActual = string.Empty;
     private string lastMax = string.Empty;
@@ -20,6 +24,7 @@ public class PanelRemainingController : MonoBehaviour
     private void Awake()
     {
         TryAutoAssignReferences();
+        HookRoundButton();
         Refresh(force: true);
         RefreshCamada(force: true);
     }
@@ -29,6 +34,13 @@ public class PanelRemainingController : MonoBehaviour
         TryAutoAssignReferences();
         Refresh(force: false);
         RefreshCamada(force: false);
+        RefreshRoundButtonInteractability();
+    }
+
+    private void OnDestroy()
+    {
+        if (buttonRodada != null)
+            buttonRodada.onClick.RemoveListener(HandleRoundButtonClicked);
     }
 
 #if UNITY_EDITOR
@@ -47,6 +59,10 @@ public class PanelRemainingController : MonoBehaviour
     {
         if (matchController == null)
             matchController = FindAnyObjectByType<MatchController>();
+        if (cursorController == null)
+            cursorController = FindAnyObjectByType<CursorController>();
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
 
         if (textActual == null)
             textActual = FindNamedTmpText("text_actual");
@@ -62,6 +78,52 @@ public class PanelRemainingController : MonoBehaviour
 
         if (textCamada == null)
             textCamada = FindNamedTmpText("text_camada");
+
+        if (buttonRodada == null)
+        {
+            Transform buttonTransform = FindChildRecursive(transform, "button_rodada");
+            if (buttonTransform != null)
+            {
+                buttonRodada = buttonTransform.GetComponent<Button>();
+                HookRoundButton();
+            }
+        }
+    }
+
+    private void HookRoundButton()
+    {
+        if (buttonRodada == null)
+            return;
+
+        buttonRodada.onClick.RemoveListener(HandleRoundButtonClicked);
+        buttonRodada.onClick.AddListener(HandleRoundButtonClicked);
+    }
+
+    private void HandleRoundButtonClicked()
+    {
+        TryAutoAssignReferences();
+        if (cursorController == null || turnStateManager == null || !buttonRodada.interactable)
+            return;
+
+        if (turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return;
+
+        if (!cursorController.TryExecuteEndTurnFromMenu())
+            cursorController.PlayErrorSfx();
+    }
+
+    private void RefreshRoundButtonInteractability()
+    {
+        if (buttonRodada == null)
+            return;
+
+        bool interactable = matchController != null &&
+                            turnStateManager != null &&
+                            turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral &&
+                            !matchController.HasVictoryWinner &&
+                            !matchController.IsTurnTransitionInProgress &&
+                            !matchController.IsPlayerInputLockedByActiveAI();
+        buttonRodada.interactable = interactable;
     }
 
     public void SetFogOfWarVisionMode(FogOfWarVisionMode mode)
@@ -88,7 +150,7 @@ public class PanelRemainingController : MonoBehaviour
         }
 
         string nextActual = $"{Mathf.Max(0, readyToAct)}";
-        string nextMax = $"/{Mathf.Max(0, totalInField):D2}";
+        string nextMax = $"/{Mathf.Max(0, totalInField)}";
         string nextCap = matchController != null ? matchController.MaxUnitsPerTeam.ToString() : "0";
         Color teamColor = TeamUtils.GetColor(activeTeam);
 

@@ -6,6 +6,13 @@ using UnityEngine.Tilemaps;
 using UnityEditor;
 #endif
 
+public enum ForwardObserverSpotUsage
+{
+    Operational = 0,
+    RevealOnly = 1,
+    Disabled = 2
+}
+
 [ExecuteAlways]
 public class ConstructionManager : MonoBehaviour
 {
@@ -51,6 +58,8 @@ public class ConstructionManager : MonoBehaviour
     [Header("Tactical Role")]
     [Tooltip("Este prédio serve como ponto de observação avançada (Forward Observer) para artilharia.")]
     [SerializeField] private bool isForwardObserverSpot;
+    [Tooltip("Operational gera interesse da AI. Reveal Only participa apenas da visibilidade. Disabled preserva a configuracao sem ativar o spot.")]
+    [SerializeField] private ForwardObserverSpotUsage forwardObserverSpotUsage = ForwardObserverSpotUsage.Operational;
     [Tooltip("Este prédio serve como ponto de reunião (Rally Point) para unidades recém-compradas.")]
     [SerializeField] private bool isRallyPoint;
     [Tooltip("Slot que usa este Rally Point como ponto de invasão. -1 = nenhum slot.")]
@@ -88,6 +97,9 @@ public class ConstructionManager : MonoBehaviour
     public int SlotIndex => slotIndex;
     public ConstructionSector Sector => sector;
     public bool IsForwardObserverSpot => isForwardObserverSpot;
+    public ForwardObserverSpotUsage ForwardObserverUsage => forwardObserverSpotUsage;
+    public bool IsOperationalForwardObserverSpot =>
+        isForwardObserverSpot && forwardObserverSpotUsage == ForwardObserverSpotUsage.Operational;
     public bool IsRallyPoint => isRallyPoint;
     public int RallyOwnerSlotIndex => rallyOwnerSlotIndex;
     public bool IsAnchorSector => isAnchorSector;
@@ -381,6 +393,19 @@ public class ConstructionManager : MonoBehaviour
     public void SetForwardObserverSpot(bool value)
     {
         isForwardObserverSpot = value;
+    }
+
+    public void SetForwardObserverSpotUsage(ForwardObserverSpotUsage value)
+    {
+        forwardObserverSpotUsage = System.Enum.IsDefined(typeof(ForwardObserverSpotUsage), value)
+            ? value
+            : ForwardObserverSpotUsage.Operational;
+    }
+
+    public bool IsPreferredForwardObserverSpotForTeam(TeamId observerTeam)
+    {
+        return IsOperationalForwardObserverSpot
+            && (teamId == TeamId.Neutral || teamId == observerTeam);
     }
 
     public void SetRallyPoint(bool value)

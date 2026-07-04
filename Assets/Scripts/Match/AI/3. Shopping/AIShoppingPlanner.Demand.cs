@@ -1210,6 +1210,12 @@ public partial class AIShoppingPlanner
 
     private const int RoleShoppingCartBeamWidth = 1024;
 
+    // Penalidade aplicada ao capturador AGRESSIVO quando disputa uma demanda de CAPTURA pura contra o
+    // capturador dedicado. Grande o bastante pra dominar o bônus de custo (cost/2, teto 25000) e o
+    // nudge de modo (12000), garantindo que o dedicado vença — mas afeta só QualityScore, então o
+    // agressivo segue como fallback quando é a única oferta pro slot.
+    private const int DedicatedCapturerPreferencePenalty = 80000;
+
     private static List<ShoppingOrder> DecideRoleBased(AIWorldSnapshot snapshot)
     {
         var orders = new List<ShoppingOrder>();
@@ -2477,6 +2483,17 @@ public partial class AIShoppingPlanner
         else if (eliteReady && (demand.Role == UnitRole.Assalto
             || demand.Role == UnitRole.FogoIndireto || demand.Role == UnitRole.AtaqueAereo))
             score -= 25000;
+
+        // Demanda de CAPTURA pura: o capturador dedicado (roles[0]==Capturador, ex.: Soldado) tem que
+        // ganhar do capturador AGRESSIVO (CapturadorAgressivo, ex.: Machine Gunner), que só captura a
+        // 50% e é quebra-galho. Sem isso, CanSatisfy/ResolveCompositionRole achatam os dois em
+        // "Capturador" e o viés de custo (cost/2) escolhe o agressivo por ser mais caro — torrando o
+        // caixa da expansão em unidades de combate. A penalidade domina qualquer diferença de custo,
+        // mas como coverage vem antes de QualityScore no desempate do carrinho, o agressivo ainda entra
+        // como FALLBACK quando nenhum capturador dedicado está ofertado pro slot. Demandas de combate
+        // (Assalto/anti-infantaria) seguem inalteradas: lá o agressivo é um corpo de combate legítimo.
+        if (demand.Role == UnitRole.Capturador && IsPrimaryRole(unit, UnitRole.CapturadorAgressivo))
+            score -= DedicatedCapturerPreferencePenalty;
 
         // Perdendo (Collapsing) conta como emergência defensiva: unidade de modo Defensivo ganha o
         // bônus pesado mesmo que a stance "oficial" ainda esteja Tactical — é o que faz a artilharia

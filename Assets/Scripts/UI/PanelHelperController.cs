@@ -27,6 +27,7 @@ public class PanelHelperController : MonoBehaviour
     [SerializeField] private MatchController matchController;
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private AnimationManager animationManager;
+    [SerializeField] private SaveGameManager saveGameManager;
     [SerializeField] private HelperDatabase helperDatabase;
     [SerializeField] private GameObject panelHelper;
     [SerializeField] private TMP_Text helperTitle;
@@ -69,6 +70,24 @@ public class PanelHelperController : MonoBehaviour
     private float helperScrollOffset;
     private float helperScrollMaxOffset;
     private bool helperScrollActive;
+    private GameObject cancelControlRoot;
+    private Button cancelActionButton;
+    private const float CancelControlHeight = 52f;
+    private GameObject executeCommandServiceControlRoot;
+    private Button executeCommandServiceButton;
+    private const float ExecuteCommandServiceControlHeight = 52f;
+    private GameObject sensorActionsRoot;
+    private readonly List<Button> sensorActionButtons = new List<Button>();
+    private string sensorActionsSignature = string.Empty;
+    private const float SensorActionButtonHeight = 42f;
+    private GameObject shoppingActionsRoot;
+    private readonly List<Button> shoppingActionButtons = new List<Button>();
+    private string shoppingActionsSignature = string.Empty;
+    private const float ShoppingActionButtonHeight = 42f;
+    private GameObject persistenceActionsRoot;
+    private readonly List<Button> persistenceActionButtons = new List<Button>();
+    private string persistenceActionsSignature = string.Empty;
+    private const float PersistenceActionButtonHeight = 42f;
     [SerializeField] [Range(1f, 80f)] private float helperScrollStep = 24f;
 
     [Header("Coordinate Overlay")]
@@ -182,6 +201,8 @@ public class PanelHelperController : MonoBehaviour
             turnStateManager = FindAnyObjectByType<TurnStateManager>();
         if (animationManager == null)
             animationManager = FindAnyObjectByType<AnimationManager>();
+        if (saveGameManager == null)
+            saveGameManager = FindAnyObjectByType<SaveGameManager>();
 
         if (panelHelper == null)
             panelHelper = FindNamedObject("panel_helper") ?? FindNamedObject("Panel_helper") ?? FindNamedObject("Panel_Helper");
@@ -199,6 +220,11 @@ public class PanelHelperController : MonoBehaviour
 
         if (helperRect == null && panelHelper != null)
             helperRect = panelHelper.GetComponent<RectTransform>();
+
+        EnsureCancelControl();
+        EnsureExecuteCommandServiceControl();
+        EnsureShoppingActionsRoot();
+        EnsurePersistenceActionsRoot();
 
 #if UNITY_EDITOR
         if (helperDatabase == null)
@@ -828,15 +854,20 @@ public class PanelHelperController : MonoBehaviour
                     continue;
 
                 string prefix = line.isFocused ? ">> " : string.Empty;
-                sb.AppendLine($"{prefix}{line.unitName}");
-                sb.AppendLine($"({line.gainsLabel})");
+                // Linhas desta lista sempre recebem ao menos um servico. Quando nem
+                // todos cabem no saldo, laranja comunica atendimento parcial; cinza
+                // fica reservado a CommandServiceSkippedUnitLines (nao atendidas).
+                string colorOpen = line.isFullyAffordable ? string.Empty : "<color=#FFB347>";
+                string colorClose = line.isFullyAffordable ? string.Empty : "</color>";
+                sb.AppendLine($"{colorOpen}{prefix}{line.unitName}{colorClose}");
+                sb.AppendLine($"{colorOpen}({line.gainsLabel}){colorClose}");
             }
         }
 
         if (data.CommandServiceIsEstimate && data.CommandServiceSkippedUnitLines != null && data.CommandServiceSkippedUnitLines.Count > 0)
         {
             sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
-            sb.AppendLine($"Unidades nao atendidas: {data.CommandServiceSkippedUnitLines.Count}");
+            sb.AppendLine($"<color=#FFB347>Unidades nao atendidas: {data.CommandServiceSkippedUnitLines.Count}</color>");
             for (int i = 0; i < data.CommandServiceSkippedUnitLines.Count; i++)
             {
                 TurnStateManager.HelperCommandServiceSkippedUnitLine line = data.CommandServiceSkippedUnitLines[i];
@@ -850,9 +881,10 @@ public class PanelHelperController : MonoBehaviour
         else if (data.CommandServiceStoppedByEconomy)
         {
             sb.AppendLine();
-            sb.Append(ResolveMessage(
+            string economyWarning = ResolveMessage(
                 data.CommandServiceIsEstimate ? "helper.command_service.economy_stop.estimate" : "helper.command_service.economy_stop",
-                data.CommandServiceIsEstimate ? "Fila vai parar por saldo" : "Fila interrompida por saldo"));
+                data.CommandServiceIsEstimate ? "Fila vai parar por saldo" : "Fila interrompida por saldo");
+            sb.Append($"<color=#FFB347>{economyWarning}</color>");
         }
 
         return sb.ToString().TrimEnd();
@@ -1286,6 +1318,11 @@ public class PanelHelperController : MonoBehaviour
             helperTxt.enabled = panelVisible;
         }
 
+        RefreshCancelControl(panelVisible);
+        RefreshExecuteCommandServiceControl(panelVisible);
+        RefreshSensorActionControls(panelVisible, data);
+        RefreshShoppingActionControls(panelVisible, data);
+        RefreshPersistenceActionControls(panelVisible);
         RefreshDynamicPanelHeight(panelVisible, textChanged);
 
         lastPanelVisible = panelVisible;
@@ -1325,7 +1362,22 @@ public class PanelHelperController : MonoBehaviour
         }
 
         float bodyHeight = 0f;
-        if (helperTxt != null)
+        bool sensorButtonsActive = sensorActionsRoot != null && sensorActionsRoot.activeSelf;
+        bool shoppingButtonsActive = shoppingActionsRoot != null && shoppingActionsRoot.activeSelf;
+        bool persistenceButtonsActive = persistenceActionsRoot != null && persistenceActionsRoot.activeSelf;
+        if (sensorButtonsActive)
+        {
+            bodyHeight = sensorActionButtons.Count * (SensorActionButtonHeight + 4f);
+        }
+        else if (shoppingButtonsActive)
+        {
+            bodyHeight = shoppingActionButtons.Count * (ShoppingActionButtonHeight + 4f);
+        }
+        else if (persistenceButtonsActive)
+        {
+            bodyHeight = persistenceActionButtons.Count * (PersistenceActionButtonHeight + 4f);
+        }
+        else if (helperTxt != null)
         {
             helperTxt.ForceMeshUpdate();
             bodyHeight = Mathf.Max(0f, helperTxt.preferredHeight);
@@ -1334,9 +1386,536 @@ public class PanelHelperController : MonoBehaviour
         float baseMin = cachedBasePanelHeight > 0f ? cachedBasePanelHeight : 0f;
         float minHeight = Mathf.Max(minPanelHeight, baseMin);
         float maxHeight = Mathf.Max(minHeight, maxPanelHeight);
-        float targetHeight = Mathf.Clamp(titleHeight + bodyHeight + Mathf.Max(0f, contentVerticalPadding), minHeight, maxHeight);
+        float footerHeight = GetActiveFooterHeight();
+        float targetHeight = Mathf.Clamp(titleHeight + bodyHeight + Mathf.Max(0f, contentVerticalPadding) + footerHeight, minHeight, maxHeight);
         helperRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
         RefreshHelperScrollLayout(titleHeight, bodyHeight, targetHeight);
+    }
+
+    private void RefreshSensorActionControls(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        bool active = panelVisible && data != null &&
+                      data.Kind == TurnStateManager.HelperPanelKind.Sensors &&
+                      !data.ThreatLayerSelectionActive &&
+                      data.SensorLines != null && data.SensorLines.Count > 0;
+
+        if (!active)
+        {
+            if (sensorActionsRoot != null)
+                sensorActionsRoot.SetActive(false);
+            sensorActionsSignature = string.Empty;
+            return;
+        }
+
+        EnsureSensorActionsRoot();
+        if (sensorActionsRoot == null)
+            return;
+
+        string signature = BuildSensorActionsSignature(data.SensorLines);
+        if (signature != sensorActionsSignature)
+        {
+            RebuildSensorActionButtons(data.SensorLines);
+            sensorActionsSignature = signature;
+        }
+
+        sensorActionsRoot.SetActive(true);
+        if (helperTxt != null)
+            helperTxt.enabled = false;
+
+        if (panelHelper == gameObject && selfPanelCanvasGroup != null)
+        {
+            selfPanelCanvasGroup.interactable = true;
+            selfPanelCanvasGroup.blocksRaycasts = true;
+        }
+    }
+
+    private void EnsureSensorActionsRoot()
+    {
+        if (!Application.isPlaying || sensorActionsRoot != null || helperRect == null)
+            return;
+
+        sensorActionsRoot = new GameObject("helper_sensor_actions", typeof(RectTransform), typeof(VerticalLayoutGroup));
+        RectTransform rect = sensorActionsRoot.GetComponent<RectTransform>();
+        rect.SetParent(helperRect, false);
+        rect.anchorMin = new Vector2(0.06f, 1f);
+        rect.anchorMax = new Vector2(0.94f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = new Vector2(0f, -48f);
+        rect.sizeDelta = new Vector2(0f, 1f);
+        rect.SetAsLastSibling();
+
+        VerticalLayoutGroup layout = sensorActionsRoot.GetComponent<VerticalLayoutGroup>();
+        layout.spacing = 4f;
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        sensorActionsRoot.SetActive(false);
+    }
+
+    private void RefreshShoppingActionControls(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        bool active = panelVisible && data != null &&
+                      data.Kind == TurnStateManager.HelperPanelKind.Shopping &&
+                      data.ShoppingLines != null && data.ShoppingLines.Count > 0;
+
+        if (!active)
+        {
+            if (shoppingActionsRoot != null)
+                shoppingActionsRoot.SetActive(false);
+            shoppingActionsSignature = string.Empty;
+            return;
+        }
+
+        EnsureShoppingActionsRoot();
+        if (shoppingActionsRoot == null)
+            return;
+
+        string signature = BuildShoppingActionsSignature(data.ShoppingLines);
+        if (signature != shoppingActionsSignature)
+        {
+            RebuildShoppingActionButtons(data.ShoppingLines);
+            shoppingActionsSignature = signature;
+        }
+
+        shoppingActionsRoot.SetActive(true);
+        if (helperTxt != null)
+            helperTxt.enabled = false;
+
+        if (panelHelper == gameObject && selfPanelCanvasGroup != null)
+        {
+            selfPanelCanvasGroup.interactable = true;
+            selfPanelCanvasGroup.blocksRaycasts = true;
+        }
+    }
+
+    private void EnsureShoppingActionsRoot()
+    {
+        if (!Application.isPlaying || shoppingActionsRoot != null || helperRect == null)
+            return;
+
+        shoppingActionsRoot = new GameObject("helper_shopping_actions", typeof(RectTransform), typeof(VerticalLayoutGroup));
+        RectTransform rect = shoppingActionsRoot.GetComponent<RectTransform>();
+        rect.SetParent(helperRect, false);
+        rect.anchorMin = new Vector2(0.06f, 1f);
+        rect.anchorMax = new Vector2(0.94f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = new Vector2(0f, -48f);
+        rect.sizeDelta = new Vector2(0f, 1f);
+        rect.SetAsLastSibling();
+
+        VerticalLayoutGroup layout = shoppingActionsRoot.GetComponent<VerticalLayoutGroup>();
+        layout.spacing = 4f;
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        shoppingActionsRoot.SetActive(false);
+    }
+
+    private void RefreshPersistenceActionControls(bool panelVisible)
+    {
+        bool active = panelVisible && saveGameManager != null &&
+                      (saveGameManager.IsPersistenceSlotSelectionActive ||
+                       saveGameManager.IsPersistenceOverwriteConfirmationActive);
+        if (!active)
+        {
+            if (persistenceActionsRoot != null)
+                persistenceActionsRoot.SetActive(false);
+            persistenceActionsSignature = string.Empty;
+            return;
+        }
+
+        EnsurePersistenceActionsRoot();
+        string signature = saveGameManager.IsPersistenceOverwriteConfirmationActive
+            ? "overwrite"
+            : string.Join("|", saveGameManager.GetPersistenceSlotButtonLabel(1),
+                saveGameManager.GetPersistenceSlotButtonLabel(2), saveGameManager.GetPersistenceSlotButtonLabel(3));
+        if (signature != persistenceActionsSignature)
+        {
+            RebuildPersistenceActionButtons();
+            persistenceActionsSignature = signature;
+        }
+
+        persistenceActionsRoot.SetActive(true);
+        if (helperTxt != null)
+            helperTxt.enabled = false;
+        if (panelHelper == gameObject && selfPanelCanvasGroup != null)
+        {
+            selfPanelCanvasGroup.interactable = true;
+            selfPanelCanvasGroup.blocksRaycasts = true;
+        }
+    }
+
+    private void EnsurePersistenceActionsRoot()
+    {
+        if (!Application.isPlaying || persistenceActionsRoot != null || helperRect == null)
+            return;
+        persistenceActionsRoot = new GameObject("helper_persistence_actions", typeof(RectTransform), typeof(VerticalLayoutGroup));
+        RectTransform rect = persistenceActionsRoot.GetComponent<RectTransform>();
+        rect.SetParent(helperRect, false);
+        rect.anchorMin = new Vector2(0.06f, 1f);
+        rect.anchorMax = new Vector2(0.94f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = new Vector2(0f, -48f);
+        rect.sizeDelta = new Vector2(0f, 1f);
+        rect.SetAsLastSibling();
+        VerticalLayoutGroup layout = persistenceActionsRoot.GetComponent<VerticalLayoutGroup>();
+        layout.spacing = 4f;
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        persistenceActionsRoot.SetActive(false);
+    }
+
+    private void RebuildPersistenceActionButtons()
+    {
+        for (int i = persistenceActionButtons.Count - 1; i >= 0; i--)
+            if (persistenceActionButtons[i] != null)
+                Destroy(persistenceActionButtons[i].gameObject);
+        persistenceActionButtons.Clear();
+
+        if (saveGameManager.IsPersistenceOverwriteConfirmationActive)
+        {
+            CreatePersistenceButton("CONFIRMAR SOBRESCRITA", () => saveGameManager.TryConfirmPersistenceOverwriteFromPointer());
+            CreatePersistenceButton("VOLTAR", () => saveGameManager.TryCancelPersistencePromptFromPointer());
+        }
+        else
+        {
+            for (int slot = 1; slot <= 3; slot++)
+            {
+                int selectedSlot = slot;
+                CreatePersistenceButton(saveGameManager.GetPersistenceSlotButtonLabel(slot),
+                    () => saveGameManager.TryChoosePersistenceSlotFromPointer(selectedSlot));
+            }
+            CreatePersistenceButton("CANCELAR", () => saveGameManager.TryCancelPersistencePromptFromPointer());
+        }
+
+        persistenceActionsRoot.GetComponent<RectTransform>().sizeDelta =
+            new Vector2(0f, persistenceActionButtons.Count * (PersistenceActionButtonHeight + 4f));
+    }
+
+    private void CreatePersistenceButton(string text, UnityEngine.Events.UnityAction action)
+    {
+        GameObject buttonObject = new GameObject("button_persistence", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
+        buttonObject.transform.SetParent(persistenceActionsRoot.transform, false);
+        buttonObject.GetComponent<Image>().color = new Color(0.04f, 0.12f, 0.06f, 0.92f);
+        LayoutElement element = buttonObject.GetComponent<LayoutElement>();
+        element.minHeight = PersistenceActionButtonHeight;
+        element.preferredHeight = PersistenceActionButtonHeight;
+        Button button = buttonObject.GetComponent<Button>();
+        Navigation navigation = button.navigation;
+        navigation.mode = Navigation.Mode.None;
+        button.navigation = navigation;
+        button.onClick.AddListener(action);
+
+        GameObject labelObject = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+        labelRect.SetParent(buttonObject.transform, false);
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+        TMP_Text label = labelObject.GetComponent<TMP_Text>();
+        label.text = text;
+        label.fontSize = 18f;
+        label.fontStyle = FontStyles.Bold;
+        label.color = new Color(0.65f, 1f, 0.65f, 1f);
+        label.alignment = TextAlignmentOptions.Center;
+        label.raycastTarget = false;
+        persistenceActionButtons.Add(button);
+    }
+
+    private static string BuildShoppingActionsSignature(List<TurnStateManager.HelperShoppingLine> lines)
+    {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lines.Count; i++)
+        {
+            TurnStateManager.HelperShoppingLine line = lines[i];
+            if (line != null)
+                sb.Append(line.index).Append('|').Append(line.unitName).Append('|').Append(line.cost).Append(';');
+        }
+        return sb.ToString();
+    }
+
+    private void RebuildShoppingActionButtons(List<TurnStateManager.HelperShoppingLine> lines)
+    {
+        for (int i = shoppingActionButtons.Count - 1; i >= 0; i--)
+            if (shoppingActionButtons[i] != null)
+                Destroy(shoppingActionButtons[i].gameObject);
+        shoppingActionButtons.Clear();
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            TurnStateManager.HelperShoppingLine line = lines[i];
+            if (line == null)
+                continue;
+
+            int optionIndex = line.index - 1;
+            GameObject buttonObject = new GameObject($"button_shopping_{line.index}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
+            buttonObject.transform.SetParent(shoppingActionsRoot.transform, false);
+            buttonObject.GetComponent<Image>().color = new Color(0.04f, 0.12f, 0.06f, 0.92f);
+            LayoutElement element = buttonObject.GetComponent<LayoutElement>();
+            element.minHeight = ShoppingActionButtonHeight;
+            element.preferredHeight = ShoppingActionButtonHeight;
+
+            Button button = buttonObject.GetComponent<Button>();
+            Navigation navigation = button.navigation;
+            navigation.mode = Navigation.Mode.None;
+            button.navigation = navigation;
+            button.onClick.AddListener(() => turnStateManager?.TryPurchaseShoppingOptionFromPointer(optionIndex));
+
+            GameObject labelObject = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+            labelRect.SetParent(buttonObject.transform, false);
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+            TMP_Text label = labelObject.GetComponent<TMP_Text>();
+            string cost = line.cost.HasValue ? $" (${line.cost.Value})" : string.Empty;
+            label.text = $"{line.index} - {line.unitName}{cost}";
+            label.fontSize = 20f;
+            label.fontStyle = FontStyles.Bold;
+            label.color = new Color(0.65f, 1f, 0.65f, 1f);
+            label.alignment = TextAlignmentOptions.Center;
+            label.raycastTarget = false;
+            shoppingActionButtons.Add(button);
+        }
+
+        RectTransform rootRect = shoppingActionsRoot.GetComponent<RectTransform>();
+        rootRect.sizeDelta = new Vector2(0f, shoppingActionButtons.Count * (ShoppingActionButtonHeight + 4f));
+    }
+
+    private static string BuildSensorActionsSignature(List<TurnStateManager.HelperSensorLine> lines)
+    {
+        StringBuilder sb = new StringBuilder(lines != null ? lines.Count : 0);
+        if (lines != null)
+        {
+            for (int i = 0; i < lines.Count; i++)
+                if (lines[i] != null)
+                    sb.Append(lines[i].actionCode);
+        }
+        return sb.ToString();
+    }
+
+    private void RebuildSensorActionButtons(List<TurnStateManager.HelperSensorLine> lines)
+    {
+        for (int i = sensorActionButtons.Count - 1; i >= 0; i--)
+            if (sensorActionButtons[i] != null)
+                Destroy(sensorActionButtons[i].gameObject);
+        sensorActionButtons.Clear();
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            TurnStateManager.HelperSensorLine line = lines[i];
+            if (line == null)
+                continue;
+
+            char actionCode = line.actionCode;
+            GameObject buttonObject = new GameObject($"button_action_{actionCode}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
+            buttonObject.transform.SetParent(sensorActionsRoot.transform, false);
+            buttonObject.GetComponent<Image>().color = new Color(0.04f, 0.12f, 0.06f, 0.92f);
+            LayoutElement element = buttonObject.GetComponent<LayoutElement>();
+            element.minHeight = SensorActionButtonHeight;
+            element.preferredHeight = SensorActionButtonHeight;
+
+            Button button = buttonObject.GetComponent<Button>();
+            Navigation navigation = button.navigation;
+            navigation.mode = Navigation.Mode.None;
+            button.navigation = navigation;
+            button.onClick.AddListener(() => turnStateManager?.TryInvokeSensorActionFromPointer(actionCode));
+
+            GameObject labelObject = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+            labelRect.SetParent(buttonObject.transform, false);
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+            TMP_Text label = labelObject.GetComponent<TMP_Text>();
+            label.text = $"{actionCode} - {ResolveSensorLabel(line.sensorKey)}";
+            label.fontSize = 20f;
+            label.fontStyle = FontStyles.Bold;
+            label.color = new Color(0.65f, 1f, 0.65f, 1f);
+            label.alignment = TextAlignmentOptions.Center;
+            label.raycastTarget = false;
+            sensorActionButtons.Add(button);
+        }
+
+        RectTransform rootRect = sensorActionsRoot.GetComponent<RectTransform>();
+        rootRect.sizeDelta = new Vector2(0f, sensorActionButtons.Count * (SensorActionButtonHeight + 4f));
+    }
+
+    private void EnsureCancelControl()
+    {
+        if (!Application.isPlaying || cancelControlRoot != null || helperRect == null)
+            return;
+
+        cancelControlRoot = new GameObject("helper_cancel_control", typeof(RectTransform));
+        RectTransform rootRect = cancelControlRoot.GetComponent<RectTransform>();
+        rootRect.SetParent(helperRect, false);
+        rootRect.anchorMin = new Vector2(0f, 0f);
+        rootRect.anchorMax = new Vector2(1f, 0f);
+        rootRect.pivot = new Vector2(0.5f, 0f);
+        rootRect.anchoredPosition = Vector2.zero;
+        rootRect.sizeDelta = new Vector2(0f, CancelControlHeight);
+        rootRect.SetAsLastSibling();
+
+        GameObject buttonObject = new GameObject("button_cancel_action", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.SetParent(rootRect, false);
+        buttonRect.anchorMin = new Vector2(0.08f, 0f);
+        buttonRect.anchorMax = new Vector2(0.92f, 1f);
+        buttonRect.offsetMin = new Vector2(4f, 5f);
+        buttonRect.offsetMax = new Vector2(-4f, -5f);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = new Color(0.04f, 0.12f, 0.06f, 0.92f);
+        cancelActionButton = buttonObject.GetComponent<Button>();
+        Navigation navigation = cancelActionButton.navigation;
+        navigation.mode = Navigation.Mode.None;
+        cancelActionButton.navigation = navigation;
+
+        GameObject labelObject = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+        labelRect.SetParent(buttonRect, false);
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+        TMP_Text label = labelObject.GetComponent<TMP_Text>();
+        label.text = "CANCELAR / DESFAZER";
+        label.fontSize = 20f;
+        label.fontStyle = FontStyles.Bold;
+        label.color = new Color(0.65f, 1f, 0.65f, 1f);
+        label.alignment = TextAlignmentOptions.Center;
+        label.raycastTarget = false;
+
+        cancelActionButton.onClick.AddListener(() => cursorController?.TryCancelCurrentActionFromPointer());
+        cancelControlRoot.SetActive(false);
+    }
+
+    private void EnsureExecuteCommandServiceControl()
+    {
+        if (!Application.isPlaying || executeCommandServiceControlRoot != null || helperRect == null)
+            return;
+
+        executeCommandServiceControlRoot = new GameObject("helper_execute_command_service_control", typeof(RectTransform));
+        RectTransform rootRect = executeCommandServiceControlRoot.GetComponent<RectTransform>();
+        rootRect.SetParent(helperRect, false);
+        rootRect.anchorMin = new Vector2(0f, 0f);
+        rootRect.anchorMax = new Vector2(1f, 0f);
+        rootRect.pivot = new Vector2(0.5f, 0f);
+        rootRect.anchoredPosition = new Vector2(0f, CancelControlHeight);
+        rootRect.sizeDelta = new Vector2(0f, ExecuteCommandServiceControlHeight);
+        rootRect.SetAsLastSibling();
+
+        GameObject buttonObject = new GameObject("button_execute_command_service", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.SetParent(rootRect, false);
+        buttonRect.anchorMin = new Vector2(0.08f, 0f);
+        buttonRect.anchorMax = new Vector2(0.92f, 1f);
+        buttonRect.offsetMin = new Vector2(4f, 5f);
+        buttonRect.offsetMax = new Vector2(-4f, -5f);
+
+        buttonObject.GetComponent<Image>().color = new Color(0.04f, 0.12f, 0.06f, 0.92f);
+        executeCommandServiceButton = buttonObject.GetComponent<Button>();
+        Navigation navigation = executeCommandServiceButton.navigation;
+        navigation.mode = Navigation.Mode.None;
+        executeCommandServiceButton.navigation = navigation;
+
+        GameObject labelObject = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+        labelRect.SetParent(buttonRect, false);
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+        TMP_Text label = labelObject.GetComponent<TMP_Text>();
+        label.text = "EXECUTAR";
+        label.fontSize = 20f;
+        label.fontStyle = FontStyles.Bold;
+        label.color = new Color(0.65f, 1f, 0.65f, 1f);
+        label.alignment = TextAlignmentOptions.Center;
+        label.raycastTarget = false;
+
+        executeCommandServiceButton.onClick.AddListener(() => turnStateManager?.HandleConfirmWithFeedback());
+        executeCommandServiceControlRoot.SetActive(false);
+    }
+
+    private void RefreshExecuteCommandServiceControl(bool panelVisible)
+    {
+        if (executeCommandServiceControlRoot == null)
+            return;
+
+        bool active = panelVisible && turnStateManager != null &&
+                      turnStateManager.CurrentCursorState == TurnStateManager.CursorState.CommandService;
+        if (executeCommandServiceControlRoot.activeSelf != active)
+            executeCommandServiceControlRoot.SetActive(active);
+
+        if (executeCommandServiceButton != null)
+            executeCommandServiceButton.interactable = active;
+
+        if (active && panelHelper == gameObject && selfPanelCanvasGroup != null)
+        {
+            selfPanelCanvasGroup.interactable = true;
+            selfPanelCanvasGroup.blocksRaycasts = true;
+        }
+    }
+
+    private float GetActiveFooterHeight()
+    {
+        float height = 0f;
+        if (cancelControlRoot != null && cancelControlRoot.activeSelf)
+            height += CancelControlHeight;
+        if (executeCommandServiceControlRoot != null && executeCommandServiceControlRoot.activeSelf)
+            height += ExecuteCommandServiceControlHeight;
+        return height;
+    }
+
+    private void RefreshCancelControl(bool panelVisible)
+    {
+        if (cancelControlRoot == null)
+            return;
+
+        bool active = panelVisible && CanCancelCurrentStateFromHelper();
+        if (cancelControlRoot.activeSelf != active)
+            cancelControlRoot.SetActive(active);
+
+        if (panelHelper == gameObject && selfPanelCanvasGroup != null)
+        {
+            selfPanelCanvasGroup.interactable = active;
+            selfPanelCanvasGroup.blocksRaycasts = active;
+        }
+    }
+
+    private bool CanCancelCurrentStateFromHelper()
+    {
+        if (turnStateManager == null)
+            return false;
+
+        switch (turnStateManager.CurrentCursorState)
+        {
+            case TurnStateManager.CursorState.Neutral:
+            case TurnStateManager.CursorState.ShoppingAndServices:
+            case TurnStateManager.CursorState.PlayerMenu:
+            case TurnStateManager.CursorState.Replay:
+            case TurnStateManager.CursorState.Saving:
+            case TurnStateManager.CursorState.Loading:
+            case TurnStateManager.CursorState.CommandServiceExecuting:
+            case TurnStateManager.CursorState.RemovingUnitExecuting:
+            case TurnStateManager.CursorState.EndingTurnExecuting:
+            case TurnStateManager.CursorState.AircraftFuelDepletionQueue:
+            case TurnStateManager.CursorState.TurnStartRallyQueue:
+                return false;
+            default:
+                return true;
+        }
     }
 
     private Color ResolveActiveTeamColor(TurnStateManager.HelperPanelData data)
@@ -1618,7 +2197,8 @@ public class PanelHelperController : MonoBehaviour
 
         float titleTopInset = Mathf.Max(0f, -originalHelperTitleAnchoredPosition.y);
         float combinedContentHeight = targetTitleHeight + originalBodySpacingFromTitle + targetBodyHeight;
-        float viewportHeight = Mathf.Max(1f, panelHeight - titleTopInset);
+        float footerHeight = GetActiveFooterHeight();
+        float viewportHeight = Mathf.Max(1f, panelHeight - titleTopInset - footerHeight);
         helperScrollMaxOffset = Mathf.Max(0f, combinedContentHeight - viewportHeight);
         helperScrollActive = helperScrollMaxOffset > 0.5f;
         helperScrollOffset = Mathf.Clamp(helperScrollOffset, 0f, helperScrollMaxOffset);

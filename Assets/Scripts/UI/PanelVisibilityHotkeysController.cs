@@ -92,8 +92,11 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
         RefreshReferences(forceSceneInit: false);
         bool textInputFocused = UiInputBlocker.IsTextInputFocused();
         bool debugInputFocused = DebugManager.IsDebugCommandInputFocused();
+        bool debugPanelOpen = panelDebug != null && panelDebug.activeSelf;
 
-        if (WasDebugTogglePressedThisFrame() && (!textInputFocused || debugInputFocused))
+        // Com o painel aberto, o proprio campo de comando captura foco. O atalho
+        // precisa furar esse bloqueio para funcionar como toggle e fechar de novo.
+        if (WasDebugTogglePressedThisFrame() && (debugPanelOpen || !textInputFocused || debugInputFocused))
             TogglePanelDebug();
 
         if (!textInputFocused && WasHotkeysTogglePressedThisFrame())

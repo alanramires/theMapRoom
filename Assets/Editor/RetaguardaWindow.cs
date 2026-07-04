@@ -86,6 +86,15 @@ public class RetaguardaWindow : EditorWindow
 
     private void OnSelectionChange()
     {
+        ConstructionManager selectedConstruction = Selection.activeGameObject != null
+            ? Selection.activeGameObject.GetComponent<ConstructionManager>()
+            : null;
+        if (selectedConstruction != null && selectedConstruction.IsForwardObserverSpot)
+        {
+            selectedSpot = selectedConstruction;
+            ClearResult();
+        }
+
         if (useSelectionTeam)
             Repaint();
     }
@@ -191,6 +200,13 @@ public class RetaguardaWindow : EditorWindow
         }
         GUI.backgroundColor = Color.white;
         EditorGUILayout.EndHorizontal();
+        EditorGUI.BeginDisabledGroup(true);
+        Vector3Int selectedSpotCell = selectedSpot != null
+            ? ResolveSceneCell(selectedSpot.transform, selectedSpot.CurrentCellPosition)
+            : default;
+        EditorGUILayout.Vector3IntField(
+            "Spot selecionado (x,y,z)", selectedSpotCell);
+        EditorGUI.EndDisabledGroup();
         EditorGUILayout.LabelField(
             "O cone pertence ao spot selecionado e independe da linha/vanguarda.",
             EditorStyles.miniLabel);

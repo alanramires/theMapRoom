@@ -4,6 +4,17 @@ using UnityEngine.Tilemaps;
 
 public partial class TurnStateManager
 {
+    public bool IsPointerMovementTargetSelectable(Vector3Int cell)
+    {
+        if (CurrentCursorState != CursorState.UnitSelected || selectedUnit == null)
+            return false;
+
+        cell.z = 0;
+        Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+        unitCell.z = 0;
+        return cell == unitCell || paintedRangeLookup.Contains(cell);
+    }
+
     public bool TryResolveCursorMove(Vector3Int currentCell, Vector3Int inputDelta, out Vector3Int resolvedCell)
     {
         resolvedCell = currentCell + inputDelta;
@@ -192,5 +203,4 @@ public partial class TurnStateManager
         });
     }
 }
-
 

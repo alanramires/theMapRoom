@@ -964,6 +964,57 @@ public partial class TurnStateManager
         EnterMirandoState();
     }
 
+    public bool TryInvokeSensorActionFromPointer(char actionCode)
+    {
+        if ((CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado) ||
+            scannerPromptStep != ScannerPromptStep.AwaitingAction)
+            return false;
+
+        switch (char.ToUpperInvariant(actionCode))
+        {
+            case 'A': HandleAimActionRequested(); return true;
+            case 'E': HandleEmbarkActionRequested(); return true;
+            case 'D': HandleDisembarkActionRequested(); return true;
+            case 'C': HandleCaptureActionRequested(); return true;
+            case 'F': HandleMergeActionRequested(); return true;
+            case 'S': HandleSupplyActionRequested(); return true;
+            case 'T': HandleTransferActionRequested(); return true;
+            case 'M': HandleMoveOnlyActionRequested(); return true;
+            default: return false;
+        }
+    }
+
+    public bool TryInvokeInferredSensorActionByClickingSelectedUnit(Vector3Int clickedCell)
+    {
+        if ((CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado) ||
+            scannerPromptStep != ScannerPromptStep.AwaitingAction || selectedUnit == null)
+            return false;
+
+        clickedCell.z = 0;
+        Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+        unitCell.z = 0;
+        if (clickedCell != unitCell)
+            return false;
+
+        // Prioridades contextuais para um segundo clique na propria unidade.
+        // Capturar e uma acao inequivoca do hex atual e tem prioridade sobre M.
+        if (availableSensorActionCodes.Contains('C'))
+        {
+            HandleCaptureActionRequested();
+            return true;
+        }
+
+        // M e sempre oferecido pelo helper, mas nao faz parte da lista dos sensores.
+        // Lista vazia significa que "Apenas Mover" e a unica escolha restante.
+        if (availableSensorActionCodes.Count == 0)
+        {
+            HandleMoveOnlyActionRequested();
+            return true;
+        }
+
+        return false;
+    }
+
     private void HandleMoveOnlyActionRequested()
     {
         bool finished = TryFinalizeSelectedUnitActionFromDebug();

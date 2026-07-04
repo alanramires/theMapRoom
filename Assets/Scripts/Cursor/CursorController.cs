@@ -71,7 +71,7 @@ public class CursorController : MonoBehaviour
     [SerializeField] private CameraController cameraController;
     [SerializeField] private bool adjustCameraOnMove = true;
     [Header("Overlay")]
-    [SerializeField] private bool showCoordinates = true;
+    [SerializeField] private bool showCoordinates = false;
     public bool ShowCoordinates { get => showCoordinates; set => showCoordinates = value; }
     [SerializeField] [Range(60f, 400f)] private float coordinateOverlayLabelWidth = 220f;
 
@@ -158,6 +158,8 @@ public class CursorController : MonoBehaviour
 
     private void Awake()
     {
+        // O overlay de coordenadas e opt-in por partida; F3 continua alternando-o.
+        showCoordinates = false;
         TryAutoAssignReferences();
         SnapToCell(currentCell);
     }
@@ -421,7 +423,17 @@ public class CursorController : MonoBehaviour
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
 
-        if (turnStateManager == null || turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+        if (turnStateManager == null)
+            return;
+
+        TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
+        bool isMovementActionChoice = state == TurnStateManager.CursorState.MoveuAndando ||
+                                      state == TurnStateManager.CursorState.MoveuParado;
+        bool isShopping = state == TurnStateManager.CursorState.ShoppingAndServices;
+        if (state != TurnStateManager.CursorState.Neutral &&
+            state != TurnStateManager.CursorState.UnitSelected &&
+            !isMovementActionChoice &&
+            !isShopping)
             return;
 
         Camera cam = cameraController != null ? cameraController.GetComponent<Camera>() : Camera.main;
@@ -434,10 +446,34 @@ public class CursorController : MonoBehaviour
         Vector3Int targetCell = boardTilemap.WorldToCell(mouseWorld);
         targetCell.z = 0;
 
+        if (isShopping)
+        {
+            // A construcao que abriu a loja permanece como atalho de compra rapida.
+            // Qualquer outro clique fora da UI fecha o shopping, como o botao SAIR/ESC.
+            if (!turnStateManager.TryConfirmShoppingByClickingConstruction(targetCell))
+                turnStateManager.TryCancelShoppingFromPointer();
+            return;
+        }
+
+        if (isMovementActionChoice)
+        {
+            turnStateManager.TryInvokeInferredSensorActionByClickingSelectedUnit(targetCell);
+            return;
+        }
+
+        if (state == TurnStateManager.CursorState.UnitSelected &&
+            !turnStateManager.IsPointerMovementTargetSelectable(targetCell))
+            return;
+
         if (!SetCell(targetCell, playMoveSfx: false))
             return;
 
-        PlayMoveSfx();
+        // O clique direto equivale a posicionar o cursor no hex e apertar Enter.
+        TurnStateManager.ActionSfx feedback = turnStateManager.HandleConfirm();
+        if (feedback == TurnStateManager.ActionSfx.None)
+            PlayMoveSfx();
+        else
+            PlayActionFeedback(feedback);
     }
 
     public bool TryMove(Vector3Int delta)
@@ -1269,6 +1305,16 @@ public class CursorController : MonoBehaviour
                 PlayUiSfx(errorSfx);
                 break;
         }
+    }
+
+    public bool TryCancelCurrentActionFromPointer()
+    {
+        if (turnStateManager == null || IsBattleMapMenuOpen())
+            return false;
+
+        TurnStateManager.ActionSfx feedback = turnStateManager.HandleCancel();
+        PlayActionFeedback(feedback);
+        return feedback != TurnStateManager.ActionSfx.None;
     }
 
 

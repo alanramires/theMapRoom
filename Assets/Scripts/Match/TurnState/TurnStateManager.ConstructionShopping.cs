@@ -53,6 +53,22 @@ public partial class TurnStateManager
         return true;
     }
 
+    public bool TryOpenConstructionShoppingFromPointer(Vector3Int cell)
+    {
+        if (CurrentCursorState != CursorState.Neutral)
+            return false;
+
+        cell.z = 0;
+        ConstructionManager construction = FindConstructionAtCell(cell);
+        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        if (!TryEnterConstructionShoppingState(construction, activeTeam))
+            return false;
+
+        DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Produce);
+        cursorController?.PlayConfirmSfx();
+        return true;
+    }
+
     private void ExitConstructionShoppingStateToNeutral(bool rollback)
     {
         shoppingConstruction = null;
@@ -105,6 +121,81 @@ public partial class TurnStateManager
             return false;
 
         return TryPurchaseShoppingUnitByIndex(index);
+    }
+
+    public int ShoppingOptionCount => shoppingUnitsForSale != null ? shoppingUnitsForSale.Count : 0;
+
+    public int ShoppingSelectedOptionIndex => ClampShoppingSelectedIndex();
+
+    public int ShoppingSelectedOptionCost
+    {
+        get
+        {
+            int index = ClampShoppingSelectedIndex();
+            if (index < 0 || index >= shoppingUnitsForSale.Count || shoppingUnitsForSale[index] == null)
+                return 0;
+
+            UnitData unit = shoppingUnitsForSale[index];
+            return matchController != null
+                ? matchController.ResolveEconomyCost(unit.cost)
+                : Mathf.Max(0, unit.cost);
+        }
+    }
+
+    public bool TrySelectShoppingOptionFromPointer(int direction)
+    {
+        if (CurrentCursorState != CursorState.ShoppingAndServices || shoppingUnitsForSale.Count <= 1 || direction == 0)
+            return false;
+
+        int count = shoppingUnitsForSale.Count;
+        int currentIndex = ClampShoppingSelectedIndex();
+        shoppingSelectedIndex = (currentIndex + (direction > 0 ? 1 : -1) + count) % count;
+        cursorController?.PlayCursorMoveSfx();
+        RefreshShoppingSelectionPresentation(logOptions: true);
+        return true;
+    }
+
+    public bool TryConfirmShoppingFromPointer()
+    {
+        if (CurrentCursorState != CursorState.ShoppingAndServices)
+            return false;
+
+        return TryConfirmSelectedShoppingOption();
+    }
+
+    public bool TryPurchaseShoppingOptionFromPointer(int index)
+    {
+        if (CurrentCursorState != CursorState.ShoppingAndServices ||
+            index < 0 || index >= shoppingUnitsForSale.Count)
+            return false;
+
+        shoppingSelectedIndex = index;
+        RefreshShoppingSelectionPresentation(logOptions: false);
+        return TryPurchaseShoppingUnitByIndex(index);
+    }
+
+    public bool TryConfirmShoppingByClickingConstruction(Vector3Int clickedCell)
+    {
+        if (CurrentCursorState != CursorState.ShoppingAndServices || shoppingConstruction == null)
+            return false;
+
+        clickedCell.z = 0;
+        Vector3Int constructionCell = shoppingConstruction.CurrentCellPosition;
+        constructionCell.z = 0;
+        if (clickedCell != constructionCell)
+            return false;
+
+        return TryConfirmSelectedShoppingOption();
+    }
+
+    public bool TryCancelShoppingFromPointer()
+    {
+        if (CurrentCursorState != CursorState.ShoppingAndServices)
+            return false;
+
+        ExitConstructionShoppingStateToNeutral(rollback: true);
+        cursorController?.PlayCancelSfx();
+        return true;
     }
 
     private bool TryPurchaseShoppingUnitByIndex(int index)

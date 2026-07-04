@@ -20,6 +20,7 @@ MonoBehaviour:
   heightLevel: 3
   aditionalDomainsAllowed: []
   alwaysAllowAirDomain: 1
+  allowDisembark: 1
   allowAircraftTakeoffAndLanding: 1
   allowedLandingClasses: 02000000
   requiredLandingSkills:
@@ -28,11 +29,14 @@ MonoBehaviour:
   requireAtLeastOneLandingSkill: 1
   allowedTakeoffModes: 02000000
   forceEndMovementOnTerrainDomainForDomains: []
+  forceDetectOnForcedEndMovementDomains: 0
+  forceDetectUnitsWithFollowingStealthSkills: []
   basicAutonomyCost: 1
   dpqData: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
   ev: 0
   shooterInheritsTerrainEv: 0
-  blockLoS: 1
+  shooterInheritedEvOverride: -1
+  blockLoS: 0
   constructionVisionOverrides:
   - construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
     ev: 1

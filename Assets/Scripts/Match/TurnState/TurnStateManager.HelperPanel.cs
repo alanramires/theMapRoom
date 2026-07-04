@@ -294,6 +294,7 @@ public partial class TurnStateManager
         public string sourceLabel;
         public string gainsLabel;
         public bool isFocused;
+        public bool isFullyAffordable = true;
     }
 
     public sealed class HelperCommandServiceSkippedUnitLine
@@ -1761,7 +1762,8 @@ public partial class TurnStateManager
                 unitName = line.unitName,
                 sourceLabel = line.sourceLabel,
                 gainsLabel = line.gainsLabel,
-                isFocused = line.isFocused
+                isFocused = line.isFocused,
+                isFullyAffordable = line.isFullyAffordable
             });
         }
 
@@ -1839,7 +1841,8 @@ public partial class TurnStateManager
                     unitName = line.unitName,
                     sourceLabel = line.sourceLabel,
                     gainsLabel = line.gainsLabel,
-                    isFocused = line.isFocused
+                    isFocused = line.isFocused,
+                    isFullyAffordable = line.isFullyAffordable
                 });
             }
         }

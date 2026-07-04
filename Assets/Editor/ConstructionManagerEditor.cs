@@ -33,6 +33,7 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty firstOwnerSlotIndexProp;
     private SerializedProperty sectorProp;
     private SerializedProperty isForwardObserverSpotProp;
+    private SerializedProperty forwardObserverSpotUsageProp;
     private SerializedProperty isRallyPointProp;
     private SerializedProperty rallyOwnerSlotIndexProp;
     private SerializedProperty isAnchorSectorProp;
@@ -87,6 +88,7 @@ public class ConstructionManagerEditor : Editor
         firstOwnerSlotIndexProp = serializedObject.FindProperty("firstOwnerSlotIndex");
         sectorProp = serializedObject.FindProperty("sector");
         isForwardObserverSpotProp = serializedObject.FindProperty("isForwardObserverSpot");
+        forwardObserverSpotUsageProp = serializedObject.FindProperty("forwardObserverSpotUsage");
         isRallyPointProp = serializedObject.FindProperty("isRallyPoint");
         rallyOwnerSlotIndexProp = serializedObject.FindProperty("rallyOwnerSlotIndex");
         isAnchorSectorProp = serializedObject.FindProperty("isAnchorSector");
@@ -173,7 +175,17 @@ public class ConstructionManagerEditor : Editor
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Role", EditorStyles.boldLabel);
         if (isForwardObserverSpotProp != null)
+        {
             EditorGUILayout.PropertyField(isForwardObserverSpotProp, new GUIContent("Forward Observer Spot"));
+            if (isForwardObserverSpotProp.boolValue && forwardObserverSpotUsageProp != null)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(
+                    forwardObserverSpotUsageProp,
+                    new GUIContent("Usage"));
+                EditorGUI.indentLevel--;
+            }
+        }
         if (isRallyPointProp != null)
             EditorGUILayout.PropertyField(isRallyPointProp, new GUIContent("Rally Point"));
         DrawRallyOwnerSlot();

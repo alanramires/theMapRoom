@@ -218,6 +218,7 @@ public class ConstructionSaveData
     public bool isActiveInHierarchy = true;
     public bool isVisible = true;
     public bool isForwardObserverSpot;
+    public int forwardObserverSpotUsage;
     public bool isRallyPoint;
     public int teamId;
     public int slotIndex = -1;

@@ -468,6 +468,56 @@ public class SaveGameManager : MonoBehaviour
         CompletePromptAfterConfirmedPersistence();
     }
 
+    public bool IsPersistenceSlotSelectionActive =>
+        promptState == SlotPromptState.SaveSelectSlot || promptState == SlotPromptState.LoadSelectSlot;
+
+    public bool IsPersistenceOverwriteConfirmationActive =>
+        promptState == SlotPromptState.SaveConfirmOverwrite;
+
+    public string GetPersistenceSlotButtonLabel(int slotIndex)
+    {
+        return BuildSlotDisplayLine(ReadSlotMetadata(NormalizeSlot(slotIndex)));
+    }
+
+    public bool TryChoosePersistenceSlotFromPointer(int slotIndex)
+    {
+        if (!IsPersistenceSlotSelectionActive)
+            return false;
+        HandleSlotChosen(slotIndex);
+        return true;
+    }
+
+    public bool TryConfirmPersistenceOverwriteFromPointer()
+    {
+        if (!IsPersistenceOverwriteConfirmationActive)
+            return false;
+        SaveSlot(overwritePendingSlot);
+        CompletePromptAfterConfirmedPersistence();
+        return true;
+    }
+
+    public bool TryCancelPersistencePromptFromPointer()
+    {
+        if (promptState == SlotPromptState.None)
+            return false;
+
+        if (promptState == SlotPromptState.SaveConfirmOverwrite)
+        {
+            promptState = SlotPromptState.SaveSelectSlot;
+            overwritePendingSlot = 0;
+            PanelDialogController.ClearExternalText();
+            RefreshPromptHelper();
+            cursorController?.PlayBeepSfx();
+        }
+        else
+        {
+            CancelPrompt(clearDialogOverride: true);
+            BattleMapMenuRootController.SuppressMenuOpenForCurrentFrame();
+            cursorController?.PlayCancelSfx();
+        }
+        return true;
+    }
+
     private void CompletePromptAfterConfirmedPersistence()
     {
         promptState = SlotPromptState.None;

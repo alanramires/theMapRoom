@@ -27,9 +27,11 @@ MonoBehaviour:
   requireAtLeastOneLandingSkill: 0
   allowedTakeoffModes: 
   forceEndMovementOnTerrainDomainForDomains: []
+  forceDetectOnForcedEndMovementDomains: 0
+  forceDetectUnitsWithFollowingStealthSkills: []
   basicAutonomyCost: 99
   dpqData: {fileID: 11400000, guid: 6a5f363f56705cf499d5c218e8050f29, type: 2}
-  ev: 2.5
+  ev: 2.25
   shooterInheritsTerrainEv: 1
   shooterInheritedEvOverride: 2
   blockLoS: 1

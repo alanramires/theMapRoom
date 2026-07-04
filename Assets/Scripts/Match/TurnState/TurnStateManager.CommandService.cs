@@ -332,6 +332,7 @@ public partial class TurnStateManager
             return false;
         }
 
+        NormalizeCommandServiceQueueForEmbarkedFamilies(commandServiceQueuedOrders);
         return true;
     }
 
@@ -1052,7 +1053,8 @@ public partial class TurnStateManager
                 {
                     unitName = ResolveUnitRuntimeName(target),
                     sourceLabel = ResolveCommandServiceSourceLabel(order),
-                    gainsLabel = BuildCommandServiceGainsInline(targetHp, targetFuel, targetAmmoByWeapon)
+                    gainsLabel = BuildCommandServiceGainsInline(targetHp, targetFuel, targetAmmoByWeapon),
+                    isFullyAffordable = !targetSkippedByMoney
                 });
                 summary.targetLineUnits.Add(target);
                 int targetLineIndex = summary.targetLines.Count - 1;
@@ -1084,7 +1086,9 @@ public partial class TurnStateManager
             }
         }
 
-        SortCommandServiceEstimateSummary(summary);
+        // As linhas e o preview devem refletir exatamente a fila de execucao.
+        // A fila ja esta ordenada pelo valor da unidade e mantem familias
+        // embarcadas agrupadas; nao reordenar aqui pela posicao no mapa.
         summary.moneyAfter = Mathf.Max(0, remainingMoney);
         return summary;
     }
@@ -1582,7 +1586,7 @@ public partial class TurnStateManager
         if (orders == null || orders.Count <= 1)
             return;
 
-        List<ServicoDoComandoOption> normalized = new List<ServicoDoComandoOption>(orders.Count);
+        var blocks = new List<(List<ServicoDoComandoOption> items, UnitManager sortUnit, int originalIndex)>();
         HashSet<ServicoDoComandoOption> used = new HashSet<ServicoDoComandoOption>();
 
         // Identifica transportadores raiz: nao sao passageiros de outro transporter na lista.
@@ -1612,21 +1616,46 @@ public partial class TurnStateManager
 
             bool isRoot = !allTransporters.Contains(transporter.EmbarkedTransporter);
             if (isRoot)
-                AppendTransportFamilyPreOrder(transporter, orders, normalized, used);
+            {
+                var family = new List<ServicoDoComandoOption>();
+                AppendTransportFamilyPreOrder(transporter, orders, family, used);
+                if (family.Count > 0)
+                    blocks.Add((family, transporter, i));
+            }
         }
 
-        // Demais ordens (sem familia) preservam a ordem original.
+        // Unidades sem familia formam blocos individuais.
         for (int i = 0; i < orders.Count; i++)
         {
             ServicoDoComandoOption option = orders[i];
             if (option == null || used.Contains(option))
                 continue;
-            normalized.Add(option);
+            blocks.Add((new List<ServicoDoComandoOption> { option }, option.targetUnit, i));
             used.Add(option);
         }
 
+        // Ordena os blocos pelo custo da unidade raiz. Assim uma familia embarcada
+        // permanece junta e ocupa a posicao correspondente ao custo do transportador.
+        blocks.Sort((a, b) =>
+        {
+            int byCost = ResolveCommandServiceUnitCost(b.sortUnit)
+                .CompareTo(ResolveCommandServiceUnitCost(a.sortUnit));
+            return byCost != 0 ? byCost : a.originalIndex.CompareTo(b.originalIndex);
+        });
+
+        List<ServicoDoComandoOption> normalized = new List<ServicoDoComandoOption>(orders.Count);
+        for (int i = 0; i < blocks.Count; i++)
+            normalized.AddRange(blocks[i].items);
+
         orders.Clear();
         orders.AddRange(normalized);
+    }
+
+    private static int ResolveCommandServiceUnitCost(UnitManager unit)
+    {
+        return unit != null && unit.TryGetUnitData(out UnitData data) && data != null
+            ? Mathf.Max(0, data.cost)
+            : 0;
     }
 
     private static void AppendTransportFamilyPreOrder(

@@ -106,6 +106,41 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     public bool IsMenuOpen => menuOpen;
 
+    public bool TryToggleMenuFromShortcut()
+    {
+        TryAutoAssignReferences();
+        EnsureButtonsCache();
+
+        if (menuRoot == null)
+            return false;
+
+        if (menuOpen)
+        {
+            CloseMenu(restoreCursor: true);
+            PlayCancelSfx();
+            return true;
+        }
+
+        if (turnStateManager == null)
+            return false;
+
+        if (turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            turnStateManager.ForceNeutral();
+
+        if (!CanOpenMenuNow())
+        {
+            cursorController?.PlayErrorSfx();
+            return false;
+        }
+
+        OpenMenu();
+        if (!menuOpen)
+            return false;
+
+        PlayConfirmSfxOncePerFrame();
+        return true;
+    }
+
     public static bool TryRestoreMenuFromStateStack(TurnStateManager.CursorState exitedState = TurnStateManager.CursorState.Neutral)
     {
         bool restored = false;
@@ -215,6 +250,15 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         if (restoredFromStateStackFrame == Time.frameCount)
             return true;
+
+        if (WasPrimaryPointerPressedThisFrame(out Vector2 pointerPosition) &&
+            !GetScreenRect(menuRootRect).Contains(pointerPosition) &&
+            !IsPointerOverMenuShortcut(pointerPosition))
+        {
+            CloseMenu(restoreCursor: true);
+            PlayCancelSfx();
+            return true;
+        }
 
         if (exitConfirmOpen)
         {
@@ -1341,6 +1385,51 @@ public class BattleMapMenuRootController : MonoBehaviour
             return Rect.zero;
 
         return Rect.MinMaxRect(minX, minY, maxX, maxY);
+    }
+
+    private static bool WasPrimaryPointerPressedThisFrame(out Vector2 screenPosition)
+    {
+        screenPosition = Vector2.zero;
+#if ENABLE_INPUT_SYSTEM
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        {
+            screenPosition = Mouse.current.position.ReadValue();
+            return true;
+        }
+
+        if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
+        {
+            screenPosition = Touchscreen.current.primaryTouch.position.ReadValue();
+            return true;
+        }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetMouseButtonDown(0))
+        {
+            screenPosition = Input.mousePosition;
+            return true;
+        }
+#endif
+        return false;
+    }
+
+    private static bool IsPointerOverMenuShortcut(Vector2 screenPosition)
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null)
+            return false;
+
+        PointerEventData pointerData = new PointerEventData(eventSystem) { position = screenPosition };
+        List<RaycastResult> results = new List<RaycastResult>();
+        eventSystem.RaycastAll(pointerData, results);
+        for (int i = 0; i < results.Count; i++)
+        {
+            GameObject target = results[i].gameObject;
+            if (target != null && target.GetComponentInParent<MenuShortcutButton>() != null)
+                return true;
+        }
+
+        return false;
     }
 
     private static Button FindButton(GameObject panel, string buttonName)

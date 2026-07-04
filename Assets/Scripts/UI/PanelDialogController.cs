@@ -1,4 +1,5 @@
 using TMPro;
+using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -56,6 +57,15 @@ public class PanelDialogController : MonoBehaviour
     private Vector2 baseTextPivot;
     private Vector2 baseTextAnchoredPosition;
     private Vector2 baseTextSizeDelta;
+    private bool cachedPreviewRectDefaults;
+    private Vector2 basePreviewAnchoredPosition;
+    private GameObject shoppingControlsRoot;
+    private Button shoppingPreviousButton;
+    private Button shoppingNextButton;
+    private Button shoppingBuyButton;
+    private Button shoppingExitButton;
+    private TMP_Text shoppingCounterText;
+    private TMP_Text shoppingBuyText;
 
     private void Awake()
     {
@@ -143,6 +153,13 @@ public class PanelDialogController : MonoBehaviour
                 ?? FindNamedImage("unit_preview")
                 ?? FindNamedImage("preview_unit")
                 ?? FindTopLeftPreviewImageCandidate();
+        if (!cachedPreviewRectDefaults && unitPreviewImage != null)
+        {
+            basePreviewAnchoredPosition = unitPreviewImage.rectTransform.anchoredPosition;
+            cachedPreviewRectDefaults = true;
+        }
+
+        EnsureShoppingControls();
 
 #if UNITY_EDITOR
         if (dialogDatabase == null)
@@ -508,11 +525,143 @@ public class PanelDialogController : MonoBehaviour
 
         float targetHeight = basePanelHeight;
         if (hasExternalOverrideText && shoppingPreviewMode)
-            targetHeight = Mathf.Max(350f, shoppingPreviewPanelHeight);
+            targetHeight = Mathf.Max(430f, shoppingPreviewPanelHeight);
 
         panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
         RefreshDockByHelperState(targetHeight);
         RefreshShoppingTextLayout();
+        RefreshShoppingControls();
+    }
+
+    private void EnsureShoppingControls()
+    {
+        // Os controles sao runtime-only. OnValidate tambem chama TryAutoAssignReferences
+        // enquanto um Prefab Asset esta aberto, e assets nao aceitam filhos de cena.
+        if (!Application.isPlaying || shoppingControlsRoot != null || panelRect == null)
+            return;
+
+#if UNITY_EDITOR
+        // Application.isPlaying pode continuar true quando o Inspector dispara
+        // OnValidate em um Prefab Asset durante o Play Mode.
+        if (EditorUtility.IsPersistent(panelRect.gameObject))
+            return;
+#endif
+
+        shoppingControlsRoot = new GameObject("shopping_touch_controls", typeof(RectTransform));
+        RectTransform rootRect = shoppingControlsRoot.GetComponent<RectTransform>();
+        rootRect.SetParent(panelRect, false);
+        rootRect.anchorMin = Vector2.zero;
+        rootRect.anchorMax = Vector2.one;
+        rootRect.offsetMin = Vector2.zero;
+        rootRect.offsetMax = Vector2.zero;
+        rootRect.SetAsLastSibling();
+
+        shoppingPreviousButton = CreateShoppingButton("shopping_previous", "<<", rootRect,
+            new Vector2(0f, 0.16f), new Vector2(0.15f, 0.88f));
+        shoppingNextButton = CreateShoppingButton("shopping_next", ">>", rootRect,
+            new Vector2(0.85f, 0.16f), new Vector2(1f, 0.88f));
+        shoppingBuyButton = CreateShoppingButton("shopping_buy", "COMPRAR", rootRect,
+            new Vector2(0.18f, 0.02f), new Vector2(0.75f, 0.15f));
+        shoppingExitButton = CreateShoppingButton("shopping_exit", "SAIR", rootRect,
+            new Vector2(0.77f, 0.02f), new Vector2(0.98f, 0.15f));
+
+        shoppingCounterText = CreateShoppingLabel("shopping_counter", rootRect,
+            new Vector2(0.36f, 0.88f), new Vector2(0.64f, 0.99f), 18f);
+        shoppingBuyText = shoppingBuyButton.GetComponentInChildren<TMP_Text>(true);
+
+        shoppingPreviousButton.onClick.AddListener(() => turnStateManager?.TrySelectShoppingOptionFromPointer(-1));
+        shoppingNextButton.onClick.AddListener(() => turnStateManager?.TrySelectShoppingOptionFromPointer(1));
+        shoppingBuyButton.onClick.AddListener(() => turnStateManager?.TryConfirmShoppingFromPointer());
+        shoppingExitButton.onClick.AddListener(() => turnStateManager?.TryCancelShoppingFromPointer());
+        shoppingControlsRoot.SetActive(false);
+    }
+
+    private static Button CreateShoppingButton(
+        string objectName,
+        string label,
+        RectTransform parent,
+        Vector2 anchorMin,
+        Vector2 anchorMax)
+    {
+        GameObject buttonObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.offsetMin = new Vector2(3f, 3f);
+        rect.offsetMax = new Vector2(-3f, -3f);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = new Color(0.04f, 0.12f, 0.06f, 0.88f);
+
+        Button button = buttonObject.GetComponent<Button>();
+        ColorBlock colors = button.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(0.65f, 1f, 0.65f, 1f);
+        colors.pressedColor = new Color(0.35f, 0.75f, 0.35f, 1f);
+        button.colors = colors;
+        Navigation navigation = button.navigation;
+        navigation.mode = Navigation.Mode.None;
+        button.navigation = navigation;
+
+        TMP_Text text = CreateShoppingLabel("label", rect, Vector2.zero, Vector2.one, 20f);
+        text.text = label;
+        text.alignment = TextAlignmentOptions.Center;
+        return button;
+    }
+
+    private static TMP_Text CreateShoppingLabel(
+        string objectName,
+        RectTransform parent,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        float fontSize)
+    {
+        GameObject labelObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform rect = labelObject.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+
+        TMP_Text text = labelObject.GetComponent<TMP_Text>();
+        text.fontSize = fontSize;
+        text.fontStyle = FontStyles.Bold;
+        text.color = new Color(0.65f, 1f, 0.65f, 1f);
+        text.alignment = TextAlignmentOptions.Center;
+        text.raycastTarget = false;
+        return text;
+    }
+
+    private void RefreshShoppingControls()
+    {
+        if (shoppingControlsRoot == null)
+            return;
+
+        bool active = hasExternalOverrideText && shoppingPreviewMode &&
+                      turnStateManager != null &&
+                      turnStateManager.CurrentCursorState == TurnStateManager.CursorState.ShoppingAndServices;
+        if (shoppingControlsRoot.activeSelf != active)
+            shoppingControlsRoot.SetActive(active);
+
+        if (panelUnit == gameObject && selfPanelCanvasGroup != null)
+        {
+            selfPanelCanvasGroup.interactable = active;
+            selfPanelCanvasGroup.blocksRaycasts = active;
+        }
+        if (!active)
+            return;
+
+        int count = turnStateManager.ShoppingOptionCount;
+        int index = turnStateManager.ShoppingSelectedOptionIndex;
+        int cost = turnStateManager.ShoppingSelectedOptionCost;
+        shoppingCounterText.text = count > 0 ? $"{index + 1} / {count}" : string.Empty;
+        shoppingBuyText.text = $"COMPRAR  $ {cost.ToString("N0", CultureInfo.GetCultureInfo("pt-BR"))}";
+
+        bool canNavigate = count > 1;
+        shoppingPreviousButton.gameObject.SetActive(canNavigate);
+        shoppingNextButton.gameObject.SetActive(canNavigate);
     }
 
     private void RefreshDockByHelperState(float currentPanelHeight)
@@ -520,7 +669,7 @@ public class PanelDialogController : MonoBehaviour
         bool isExpandedToShoppingSize =
             hasExternalOverrideText &&
             shoppingPreviewMode &&
-            currentPanelHeight >= Mathf.Max(350f, shoppingPreviewPanelHeight) - 0.01f;
+            currentPanelHeight >= Mathf.Max(430f, shoppingPreviewPanelHeight) - 0.01f;
 
         bool helperDockedLeft = PanelHelperController.IsDockedCenterLeft();
         bool cursorStillOnRight = PanelHelperController.IsCursorNearOriginalDockRegion();
@@ -575,6 +724,7 @@ public class PanelDialogController : MonoBehaviour
         bool shoppingActive = hasExternalOverrideText && shoppingPreviewMode;
         if (shoppingActive)
         {
+            const float navigationColumnWidth = 64f;
             textUnit.enableAutoSizing = false;
             textUnit.fontSize = Mathf.Max(10f, shoppingPreviewFontSize);
             textUnit.textWrappingMode = TextWrappingModes.Normal;
@@ -587,10 +737,10 @@ public class PanelDialogController : MonoBehaviour
                                       unitPreviewImage.gameObject.activeSelf &&
                                       unitPreviewImage.enabled;
                 float previewWidth = previewVisible ? Mathf.Max(0f, unitPreviewImage.rectTransform.rect.width) : 0f;
-                float leftInset = previewVisible ? 14f + previewWidth + 10f : 14f;
-                float rightInset = 10f;
-                float topInset = 10f;
-                float bottomInset = 10f;
+                float leftInset = navigationColumnWidth + (previewVisible ? 14f + previewWidth + 10f : 14f);
+                float rightInset = navigationColumnWidth + 10f;
+                float topInset = 44f;
+                float bottomInset = shoppingControlsRoot != null && shoppingControlsRoot.activeSelf ? 58f : 10f;
                 float targetWidth = Mathf.Max(24f, panelRect.rect.width - leftInset - rightInset);
                 float targetHeight = Mathf.Max(24f, panelRect.rect.height - topInset - bottomInset);
 
@@ -601,6 +751,8 @@ public class PanelDialogController : MonoBehaviour
                 textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, targetWidth);
                 textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
             }
+            if (cachedPreviewRectDefaults && unitPreviewImage != null)
+                unitPreviewImage.rectTransform.anchoredPosition = basePreviewAnchoredPosition + new Vector2(navigationColumnWidth, 0f);
             return;
         }
 
@@ -626,6 +778,8 @@ public class PanelDialogController : MonoBehaviour
         {
             textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, baseTextRectHeight);
         }
+        if (cachedPreviewRectDefaults && unitPreviewImage != null)
+            unitPreviewImage.rectTransform.anchoredPosition = basePreviewAnchoredPosition;
     }
 
     private void SetPanelVisible(bool visible)

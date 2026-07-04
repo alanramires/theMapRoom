@@ -463,7 +463,9 @@ public partial class TurnStateManager
         if (construction == null || activeTeam < 0 || (int)construction.TeamId != activeTeam)
             return false;
 
-        if (HasBlockingUnitOnConstructionCell(cursorCell))
+        // A unidade visivel no hex e sempre o alvo primario da confirmacao. A loja
+        // continua acessivel pelo ciclo de selecao quando as regras permitirem.
+        if (FindUnitAtCell(cursorCell) != null)
             return false;
 
         if (!TryEnterConstructionShoppingState(construction, activeTeam))
