@@ -377,8 +377,8 @@ public class PanelHelperController : MonoBehaviour
                 return;
 
             case TurnStateManager.HelperPanelKind.Merge:
-                title = ResolveMessage("helper.title.merge", "MERGE");
-                body = BuildMergeBody(data);
+                title = data.IsMergeConfirmStep ? "CONFIRMAR FUSÃO" : "ESCOLHER UNIDADE";
+                body = string.Empty;
                 return;
 
             case TurnStateManager.HelperPanelKind.Embark:
@@ -392,7 +392,7 @@ public class PanelHelperController : MonoBehaviour
                 return;
 
             case TurnStateManager.HelperPanelKind.Supply:
-                title = ResolveMessage("helper.title.supply_preview", "SUPPLY");
+                title = data.SupplyIsConfirmStep ? "CONFIRMAR SUPRIMENTO" : "ESCOLHER UNIDADE";
                 body = BuildSupplyBody(data);
                 return;
 
@@ -1069,15 +1069,28 @@ public class PanelHelperController : MonoBehaviour
             }
         }
 
+        // So listamos os recursos que realmente sao gastos. Ex.: reparo apenas de HP consome
+        // Pecas, entao Galoes/Municao (0 gastos) nao aparecem — evita o jogador achar que vai
+        // gastar combustivel quando nao vai.
         if (data.SupplyResourceLines != null && data.SupplyResourceLines.Count > 0)
         {
-            sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
-            sb.AppendLine(ResolveMessage("helper.supply.supplier_consumption", "Consumo do Supridor"));
+            bool wroteConsumptionHeader = false;
             for (int i = 0; i < data.SupplyResourceLines.Count; i++)
             {
                 TurnStateManager.HelperSupplyResourceLine line = data.SupplyResourceLines[i];
                 if (line == null)
                     continue;
+                int consumed = Mathf.Max(0, line.beforeAmount - line.afterAmount);
+                if (consumed <= 0)
+                    continue;
+
+                if (!wroteConsumptionHeader)
+                {
+                    sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
+                    sb.AppendLine(ResolveMessage("helper.supply.supplier_consumption", "Consumo do Supridor"));
+                    wroteConsumptionHeader = true;
+                }
+
                 sb.AppendLine(ResolveMessage(
                     "helper.supply.supplier_consumption.line",
                     "<supply>: <before> - <consumed> -> <after>",
@@ -1085,7 +1098,7 @@ public class PanelHelperController : MonoBehaviour
                     {
                         { "supply", line.supplyName ?? "Supply" },
                         { "before", Mathf.Max(0, line.beforeAmount).ToString() },
-                        { "consumed", Mathf.Max(0, line.beforeAmount - line.afterAmount).ToString() },
+                        { "consumed", consumed.ToString() },
                         { "after", Mathf.Max(0, line.afterAmount).ToString() }
                     }));
             }
@@ -1758,7 +1771,14 @@ public class PanelHelperController : MonoBehaviour
 
     private void RefreshDisembarkActionControls(bool panelVisible, TurnStateManager.HelperPanelData data)
     {
-        bool active = panelVisible && data != null && data.Kind == TurnStateManager.HelperPanelKind.Disembark;
+        bool isDisembark = data != null && data.Kind == TurnStateManager.HelperPanelKind.Disembark;
+        // No passo de CONFIRMAR suprimento nao usamos botoes: as infos (consumo/carroceria)
+        // vao pro texto do corpo e o "ADICIONAR A FILA" vira botao de rodape (igual ao
+        // CONFIRMAR do ataque). Assim o jogador nao confunde as linhas informativas com acoes
+        // e enxerga a acao real. So o passo de SELECAO (escolher unidade) usa a lista de botoes.
+        bool isSupply = data != null && data.Kind == TurnStateManager.HelperPanelKind.Supply && !data.SupplyIsConfirmStep;
+        bool isMerge = data != null && data.Kind == TurnStateManager.HelperPanelKind.Merge;
+        bool active = panelVisible && (isDisembark || isSupply || isMerge);
         if (!active)
         {
             if (disembarkActionsRoot != null) disembarkActionsRoot.SetActive(false);
@@ -1769,33 +1789,85 @@ public class PanelHelperController : MonoBehaviour
         EnsureDisembarkActionsRoot();
         if (disembarkActionsRoot == null) return;
 
-        StringBuilder sb = new StringBuilder().Append(data.DisembarkStep)
-            .Append('|').Append(data.DisembarkSelectedPassengerName)
-            .Append('|').Append(data.DisembarkSelectedLandingLabel)
-            .Append('|').Append(data.HasQueuedDisembarkOrders);
-        for (int i = 0; i < data.DisembarkOrderLines.Count; i++)
-            sb.Append('|').Append(data.DisembarkOrderLines[i].unitName).Append(data.DisembarkOrderLines[i].terrainName);
-        for (int i = 0; i < data.DisembarkPassengerLines.Count; i++)
-            sb.Append('|').Append(data.DisembarkPassengerLines[i].index).Append(data.DisembarkPassengerLines[i].unitName);
+        StringBuilder sb = new StringBuilder().Append(data.Kind);
+        if (isDisembark)
+        {
+            sb.Append('|').Append(data.DisembarkStep)
+                .Append('|').Append(data.DisembarkSelectedPassengerName)
+                .Append('|').Append(data.DisembarkSelectedLandingLabel)
+                .Append('|').Append(data.HasQueuedDisembarkOrders);
+            for (int i = 0; i < data.DisembarkOrderLines.Count; i++)
+                sb.Append('|').Append(data.DisembarkOrderLines[i].unitName).Append(data.DisembarkOrderLines[i].terrainName);
+            for (int i = 0; i < data.DisembarkPassengerLines.Count; i++)
+                sb.Append('|').Append(data.DisembarkPassengerLines[i].index).Append(data.DisembarkPassengerLines[i].unitName);
+        }
+        else if (isSupply)
+        {
+            sb.Append('|').Append(data.SupplyIsConfirmStep).Append('|').Append(data.SupplyHasQueuedOrders);
+            for (int i = 0; i < data.SupplyCandidateLines.Count; i++)
+                sb.Append('|').Append(data.SupplyCandidateLines[i].index)
+                    .Append(data.SupplyCandidateLines[i].unitName)
+                    .Append(data.SupplyCandidateLines[i].isValid)
+                    .Append(data.SupplyCandidateLines[i].invalidReason);
+            for (int i = 0; i < data.SupplyTargetLines.Count; i++)
+                sb.Append('|').Append(data.SupplyTargetLines[i].unitName).Append(data.SupplyTargetLines[i].gainsLabel);
+        }
+        else
+        {
+            sb.Append('|').Append(data.IsMergeConfirmStep).Append('|').Append(data.SelectedMergeCandidateNumber);
+            for (int i = 0; i < data.MergeCandidateLines.Count; i++)
+                sb.Append('|').Append(data.MergeCandidateLines[i].index)
+                    .Append(data.MergeCandidateLines[i].unitName)
+                    .Append(data.MergeCandidateLines[i].isValid)
+                    .Append(data.MergeCandidateLines[i].invalidReason);
+        }
         string signature = sb.ToString();
         if (signature != disembarkActionsSignature)
         {
-            RebuildDisembarkActionButtons(data);
+            if (isDisembark) RebuildDisembarkActionButtons(data);
+            else if (isSupply) RebuildSupplyActionButtons(data);
+            else RebuildMergeActionButtons(data);
             disembarkActionsSignature = signature;
             disembarkLayoutDirty = true;
         }
 
         disembarkActionsRoot.SetActive(true);
-        int focusedIndex = turnStateManager != null ? turnStateManager.DisembarkPassengerFocusIndex : -1;
+        int focusedIndex = turnStateManager == null ? -1 :
+            (isDisembark ? turnStateManager.DisembarkPassengerFocusIndex :
+             isSupply ? turnStateManager.SupplyHelperFocusIndex : turnStateManager.MergeHelperFocusIndex);
         for (int i = 0; i < disembarkActionButtons.Count; i++)
         {
             Button button = disembarkActionButtons[i];
             int buttonFocus = i < disembarkActionFocusIndices.Count ? disembarkActionFocusIndices[i] : -1;
             if (button != null && button.interactable)
-                TintScriptButtonToTeam(button, data.DisembarkStep == 0 && buttonFocus == focusedIndex);
+            {
+                bool focused = (isDisembark ? data.DisembarkStep == 0 :
+                                isSupply ? !data.SupplyIsConfirmStep : !data.IsMergeConfirmStep) &&
+                               buttonFocus == focusedIndex;
+                bool invalidSupply = isSupply && buttonFocus >= 0 &&
+                                     buttonFocus < data.SupplyCandidateLines.Count &&
+                                     !data.SupplyCandidateLines[buttonFocus].isValid;
+                bool invalidMerge = isMerge && !data.IsMergeConfirmStep && buttonFocus >= 0 &&
+                                    buttonFocus < data.MergeCandidateLines.Count &&
+                                    !data.MergeCandidateLines[buttonFocus].isValid;
+                if (invalidSupply || invalidMerge)
+                {
+                    button.GetComponent<Image>().color = focused
+                        ? new Color(0.28f, 0.28f, 0.28f, 0.98f)
+                        : new Color(0.12f, 0.12f, 0.12f, 0.92f);
+                    button.GetComponentInChildren<TMP_Text>(true).color = focused
+                        ? new Color(0.78f, 0.78f, 0.78f, 1f)
+                        : Color.gray;
+                }
+                else
+                    TintScriptButtonToTeam(button, focused);
+            }
         }
         ApplyFooterButtonFocus(cancelActionImage, cancelActionLabel,
-            turnStateManager != null && turnStateManager.DisembarkPassengerCancelFocused);
+            turnStateManager != null && (isDisembark
+                ? turnStateManager.DisembarkPassengerCancelFocused
+                : isSupply ? turnStateManager.SupplyHelperCancelFocused
+                : turnStateManager.MergeHelperCancelFocused));
         if (helperTxt != null) helperTxt.enabled = false;
         if (panelHelper == gameObject && selfPanelCanvasGroup != null)
         {
@@ -1859,6 +1931,123 @@ public class PanelHelperController : MonoBehaviour
 
         disembarkActionsRoot.GetComponent<RectTransform>().sizeDelta =
             new Vector2(0f, disembarkActionButtons.Count * (DisembarkActionButtonHeight + 4f));
+    }
+
+    private void RebuildSupplyActionButtons(TurnStateManager.HelperPanelData data)
+    {
+        for (int i = disembarkActionButtons.Count - 1; i >= 0; i--)
+            if (disembarkActionButtons[i] != null) Destroy(disembarkActionButtons[i].gameObject);
+        disembarkActionButtons.Clear();
+        disembarkActionFocusIndices.Clear();
+
+        if (!data.SupplyIsConfirmStep)
+        {
+            for (int i = 0; i < data.SupplyTargetLines.Count; i++)
+            {
+                TurnStateManager.HelperSupplyTargetLine queued = data.SupplyTargetLines[i];
+                if (queued == null || queued.isFocused)
+                    continue;
+                CreateDisembarkButton($"{queued.index} - {queued.unitName} | {queued.gainsLabel} | ${queued.estimatedCost}",
+                    null, false, -1, queued.unitSprite, queued.unitColor);
+            }
+            for (int i = 0; i < data.SupplyCandidateLines.Count; i++)
+            {
+                TurnStateManager.HelperSupplyCandidateLine candidate = data.SupplyCandidateLines[i];
+                int selectionNumber = candidate.index;
+                int invalidIndex = i - (data.SupplyCandidateLines.Count - CountInvalidSupplyCandidates(data));
+                UnityEngine.Events.UnityAction action = candidate.isValid
+                    ? () => turnStateManager?.TrySelectSupplyCandidateFromPointer(selectionNumber)
+                    : () => turnStateManager?.TrySelectInvalidSupplyCandidateFromPointer(invalidIndex);
+                CreateDisembarkButton($"{candidate.index} - {candidate.unitName} ({candidate.stats})",
+                    action, true, i,
+                    candidate.unitSprite, candidate.unitColor);
+                if (!candidate.isValid && disembarkActionButtons.Count > 0)
+                {
+                    Button invalidButton = disembarkActionButtons[disembarkActionButtons.Count - 1];
+                    invalidButton.GetComponent<Image>().color = new Color(0.12f, 0.12f, 0.12f, 0.92f);
+                    invalidButton.GetComponentInChildren<TMP_Text>(true).color = Color.gray;
+                }
+            }
+            if (data.SupplyHasQueuedOrders)
+                CreateDisembarkButton("EXECUTAR FILA", () => turnStateManager?.TryExecuteSupplyQueueFromPointer(), true,
+                    data.SupplyCandidateLines.Count);
+        }
+        // O passo de CONFIRMAR suprimento nao passa mais por aqui: as infos (consumo/carroceria)
+        // sao renderizadas como texto no corpo (BuildSupplyBody) e o "ADICIONAR A FILA" vira botao
+        // de rodape (RefreshExecuteCommandServiceControl).
+
+        disembarkActionsRoot.GetComponent<RectTransform>().sizeDelta =
+            new Vector2(0f, disembarkActionButtons.Count * (DisembarkActionButtonHeight + 4f));
+    }
+
+    private static int CountInvalidSupplyCandidates(TurnStateManager.HelperPanelData data)
+    {
+        int count = 0;
+        for (int i = 0; i < data.SupplyCandidateLines.Count; i++)
+            if (data.SupplyCandidateLines[i] != null && !data.SupplyCandidateLines[i].isValid)
+                count++;
+        return count;
+    }
+
+    private void RebuildMergeActionButtons(TurnStateManager.HelperPanelData data)
+    {
+        for (int i = disembarkActionButtons.Count - 1; i >= 0; i--)
+            if (disembarkActionButtons[i] != null) Destroy(disembarkActionButtons[i].gameObject);
+        disembarkActionButtons.Clear();
+        disembarkActionFocusIndices.Clear();
+
+        if (!data.IsMergeConfirmStep)
+        {
+            for (int i = 0; i < data.MergeCandidateLines.Count; i++)
+            {
+                TurnStateManager.HelperMergeCandidateLine candidate = data.MergeCandidateLines[i];
+                int selectionNumber = candidate.index;
+                CreateDisembarkButton($"{candidate.index} - {candidate.unitName} ({candidate.stats})",
+                    () => turnStateManager?.TrySelectMergeCandidateFromPointer(selectionNumber), true, i,
+                    candidate.unitSprite, candidate.unitColor);
+                if (!candidate.isValid && disembarkActionButtons.Count > 0)
+                {
+                    Button invalidButton = disembarkActionButtons[disembarkActionButtons.Count - 1];
+                    invalidButton.GetComponent<Image>().color = new Color(0.12f, 0.12f, 0.12f, 0.92f);
+                    invalidButton.GetComponentInChildren<TMP_Text>(true).color = Color.gray;
+                }
+            }
+        }
+        else
+        {
+            TurnStateManager.HelperMergeCandidateLine selected = null;
+            for (int i = 0; i < data.MergeCandidateLines.Count; i++)
+                if (data.MergeCandidateLines[i] != null &&
+                    data.MergeCandidateLines[i].index == data.SelectedMergeCandidateNumber)
+                {
+                    selected = data.MergeCandidateLines[i];
+                    break;
+                }
+            string summary = selected != null
+                ? $"{selected.unitName} ({selected.stats})"
+                : data.SelectedMergeCandidateName;
+            CreateDisembarkButton(summary, null, false, -1,
+                selected != null ? selected.unitSprite : null,
+                selected != null ? selected.unitColor : Color.white);
+            if (!string.IsNullOrWhiteSpace(data.MergeConfirmPreview))
+                CreateDisembarkButton($"RESULTADO: {data.MergeConfirmPreview}", null, false, -1);
+            CreateDisembarkButton("CONFIRMAR FUSÃO", () => turnStateManager?.TryAdvanceMergeFromPointer(), true, -1);
+        }
+
+        disembarkActionsRoot.GetComponent<RectTransform>().sizeDelta =
+            new Vector2(0f, disembarkActionButtons.Count * (DisembarkActionButtonHeight + 4f));
+    }
+
+    private void TintLastSupplyInformationRow(Color textColor)
+    {
+        if (disembarkActionButtons.Count <= 0)
+            return;
+        Button button = disembarkActionButtons[disembarkActionButtons.Count - 1];
+        if (button == null)
+            return;
+        TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+            label.color = textColor;
     }
 
     private void CreateDisembarkButton(
@@ -1948,7 +2137,9 @@ public class PanelHelperController : MonoBehaviour
                 button.onClick.AddListener(() => turnStateManager?.TrySelectMirandoTargetFromPointer(targetIndex));
             GameObject labelObj = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             RectTransform labelRect = labelObj.GetComponent<RectTransform>(); labelRect.SetParent(obj.transform, false);
-            labelRect.anchorMin = Vector2.zero; labelRect.anchorMax = Vector2.one; labelRect.offsetMin = Vector2.zero; labelRect.offsetMax = Vector2.zero;
+            labelRect.anchorMin = Vector2.zero; labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(line.unitSprite != null ? 48f : 0f, 0f);
+            labelRect.offsetMax = Vector2.zero;
             TMP_Text label = labelObj.GetComponent<TMP_Text>();
             if (isCancel)
                 label.text = line.unitName;
@@ -1961,6 +2152,8 @@ public class PanelHelperController : MonoBehaviour
             label.fontStyle = FontStyles.Bold; label.color = FooterLabelIdleColor; label.alignment = TextAlignmentOptions.Center; label.raycastTarget = false;
             // Auto-encolhe se o nome for grande, pra nao estourar a largura do botao.
             label.enableAutoSizing = true; label.fontSizeMin = 12f; label.fontSizeMax = 20f;
+            if (!isCancel && line.unitSprite != null)
+                CreateDisembarkRowIcon(obj.transform, "unit_icon", line.unitSprite, line.unitColor, true);
             aimTargetButtons.Add(button);
         }
         aimTargetsRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, aimTargetButtons.Count * (AimTargetButtonHeight + 4f));
@@ -2411,7 +2604,10 @@ public class PanelHelperController : MonoBehaviour
         labelRect.offsetMax = Vector2.zero;
         TMP_Text label = labelObject.GetComponent<TMP_Text>();
         label.text = "EXECUTAR";
-        label.fontSize = 20f;
+        // Auto-size para caber rotulos mais longos (ex.: "ADICIONAR À FILA") sem estourar a largura.
+        label.enableAutoSizing = true;
+        label.fontSizeMin = 12f;
+        label.fontSizeMax = 20f;
         label.fontStyle = FontStyles.Bold;
         label.color = FooterLabelIdleColor;
         label.alignment = TextAlignmentOptions.Center;
@@ -2471,14 +2667,17 @@ public class PanelHelperController : MonoBehaviour
                       turnStateManager.IsMirandoConfirmStep;
         bool embarking = turnStateManager != null &&
                          turnStateManager.IsEmbarkConfirmStep;
-        bool active = panelVisible && (commandService || removingUnit || aiming || embarking);
+        bool supplyConfirm = turnStateManager != null &&
+                             turnStateManager.IsSupplyConfirmStep;
+        bool active = panelVisible && (commandService || removingUnit || aiming || embarking || supplyConfirm);
         if (executeCommandServiceControlRoot.activeSelf != active)
             executeCommandServiceControlRoot.SetActive(active);
 
         if (executeCommandServiceButton != null)
             executeCommandServiceButton.interactable = active;
         if (executeCommandServiceLabel != null)
-            executeCommandServiceLabel.text = (removingUnit || aiming || embarking) ? "CONFIRMAR" : "EXECUTAR";
+            executeCommandServiceLabel.text = supplyConfirm ? "ADICIONAR À FILA"
+                : (removingUnit || aiming || embarking) ? "CONFIRMAR" : "EXECUTAR";
 
         if (active && panelHelper == gameObject && selfPanelCanvasGroup != null)
         {

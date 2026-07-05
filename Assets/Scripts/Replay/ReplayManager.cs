@@ -902,7 +902,32 @@ public class ReplayManager : MonoBehaviour
             if (step == null || string.IsNullOrWhiteSpace(step.TargetInstanceId))
                 continue;
 
-            if (!turnStateManager.TryQueueAutomatedSupplyReplayOrder(step.TargetInstanceId))
+            bool queued;
+            if (IsLiveAIPresentationMode)
+            {
+                int targetIndex = turnStateManager.FindSupplyTargetIndexForReplay(step.TargetInstanceId);
+                int guard = 0;
+                while (turnStateManager.IsSupplyCandidateSelectStep && targetIndex >= 0 &&
+                       turnStateManager.GetSupplyCurrentIndexForReplay() != targetIndex && guard++ < 64)
+                {
+                    if (!turnStateManager.StepSupplyForReplay())
+                        break;
+                    float navDelay = GetEffectiveSensorListNavDelay();
+                    if (navDelay > 0f)
+                        yield return new WaitForSecondsRealtime(navDelay);
+                }
+
+                bool selected = turnStateManager.TrySelectAutomatedSupplyReplayTarget(step.TargetInstanceId);
+                if (selected)
+                    yield return WaitForAIPresentationStage();
+                queued = selected && turnStateManager.ConfirmAutomatedSupplyReplayTarget();
+            }
+            else
+            {
+                queued = turnStateManager.TryQueueAutomatedSupplyReplayOrder(step.TargetInstanceId);
+            }
+
+            if (!queued)
                 yield return ExecuteDoubleConfirmFallback();
             else
                 yield return WaitForSensorSubstepDelay();
@@ -913,7 +938,9 @@ public class ReplayManager : MonoBehaviour
         if (!executedAny)
             yield return ExecuteDoubleConfirmFallback();
 
-        if (!turnStateManager.TryStartAutomatedSupplyReplayExecution())
+        if (!turnStateManager.TryStartAutomatedSupplyReplayExecution() &&
+            !turnStateManager.IsSupplyExecutionInProgress &&
+            turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             yield return ExecuteDoubleConfirmFallback();
 
         yield return WaitForSensorSubstepDelay();

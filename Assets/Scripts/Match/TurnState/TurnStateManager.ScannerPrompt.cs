@@ -1118,7 +1118,9 @@ public partial class TurnStateManager
         if (clickedCell != unitCell)
             return TryBeginAimAtClickedTarget(clickedCell) ||
                    TryBeginEmbarkAtClickedTarget(clickedCell) ||
-                   TryBeginDisembarkAtClickedCell(clickedCell);
+                   TryBeginDisembarkAtClickedCell(clickedCell) ||
+                   TryBeginMergeAtClickedTarget(clickedCell) ||
+                   TryBeginSupplyAtClickedTarget(clickedCell);
 
         // Prioridades contextuais para um segundo clique na propria unidade.
         // Capturar e uma acao inequivoca do hex atual e tem prioridade sobre M.

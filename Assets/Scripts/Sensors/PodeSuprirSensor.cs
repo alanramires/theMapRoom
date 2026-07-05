@@ -130,7 +130,7 @@ public static class PodeSuprirSensor
 
             if (target.TookOffRecently)
             {
-                AppendInvalid(invalidOutput, supplier, target, cell, "Unidade decolou recentemente e nao pode receber suprimento nesta rodada.");
+                AppendInvalid(invalidOutput, supplier, target, cell, "Unidade decolou recentemente.");
                 continue;
             }
 
@@ -318,7 +318,7 @@ public static class PodeSuprirSensor
 
         if (target.TookOffRecently)
         {
-            reason = "Unidade decolou recentemente e nao pode receber suprimento nesta rodada.";
+            reason = "Unidade decolou recentemente.";
             return false;
         }
 

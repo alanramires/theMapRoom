@@ -23,6 +23,13 @@ public partial class TurnStateManager
         public string label;
     }
 
+    private sealed class SupplyInvalidCandidateEntry
+    {
+        public UnitManager targetUnit;
+        public Vector3Int cell;
+        public string reason;
+    }
+
     private sealed class SupplyQueuePreviewTrack
     {
         public UnitManager target;
@@ -34,10 +41,12 @@ public partial class TurnStateManager
     }
 
     private readonly List<SupplyCandidateEntry> supplyCandidateEntries = new List<SupplyCandidateEntry>();
+    private readonly List<SupplyInvalidCandidateEntry> supplyInvalidCandidateEntries = new List<SupplyInvalidCandidateEntry>();
     private readonly Dictionary<Vector3Int, int> supplyCandidateIndexByCell = new Dictionary<Vector3Int, int>();
     private readonly List<PodeSuprirOption> supplyQueuedOrders = new List<PodeSuprirOption>();
     private readonly List<SupplyQueuePreviewTrack> supplyQueuePreviewTracks = new List<SupplyQueuePreviewTrack>();
     private int supplySelectedCandidateIndex = -1;
+    private int supplyHelperFocusIndex;
     private bool supplyTargetAutoEntered;
     private bool supplySuppressDefaultConfirmSfxOnce;
     private bool supplyExecutionInProgress;
@@ -56,6 +65,219 @@ public partial class TurnStateManager
         DefaultSameDomain = 0,
         AirLow = 1,
         NavalSurface = 2
+    }
+
+    public bool IsSupplyCandidateSelectStep => CurrentCursorState == CursorState.Suprindo &&
+                                               scannerPromptStep == ScannerPromptStep.MergeParticipantSelect;
+    public bool IsSupplyConfirmStep => CurrentCursorState == CursorState.Suprindo &&
+                                       scannerPromptStep == ScannerPromptStep.MergeConfirm;
+    public bool IsSupplyExecutionInProgress => supplyExecutionInProgress;
+    public int SupplyHelperFocusIndex => supplyHelperFocusIndex;
+    public bool SupplyHelperCancelFocused => IsSupplyCandidateSelectStep &&
+                                             supplyHelperFocusIndex == GetSupplyCancelFocusIndex();
+
+    private int GetSupplyChoiceCount() => supplyCandidateEntries.Count + supplyInvalidCandidateEntries.Count;
+    private int GetSupplyExecuteFocusIndex() => supplyQueuedOrders.Count > 0 ? GetSupplyChoiceCount() : -1;
+    private int GetSupplyCancelFocusIndex() => GetSupplyChoiceCount() + (supplyQueuedOrders.Count > 0 ? 1 : 0);
+
+    public bool NavigateSupplyHelperFocus(int delta)
+    {
+        if (!IsSupplyCandidateSelectStep || delta == 0)
+            return false;
+        int total = GetSupplyCancelFocusIndex() + 1;
+        if (total <= 0)
+            return false;
+        int step = delta > 0 ? 1 : -1;
+        supplyHelperFocusIndex = (supplyHelperFocusIndex + step + total) % total;
+        if (supplyHelperFocusIndex < supplyCandidateEntries.Count)
+        {
+            supplySelectedCandidateIndex = supplyHelperFocusIndex;
+            SupplyCandidateEntry entry = supplyCandidateEntries[supplySelectedCandidateIndex];
+            if (entry != null)
+                cursorController?.SetCell(entry.cell, playMoveSfx: false);
+            UpdateSupplyPreviewFromCurrentContext();
+            RefreshSupplyEmbarkedSelectionVisuals(queuedOnly: false);
+        }
+        else if (supplyHelperFocusIndex < GetSupplyChoiceCount())
+        {
+            supplySelectedCandidateIndex = -1;
+            SupplyInvalidCandidateEntry entry = supplyInvalidCandidateEntries[supplyHelperFocusIndex - supplyCandidateEntries.Count];
+            if (entry != null)
+                cursorController?.SetCell(entry.cell, playMoveSfx: false);
+            SetSupplyPreviewVisible(false);
+        }
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public bool TryInvokeFocusedSupplyOption()
+    {
+        if (!IsSupplyCandidateSelectStep || SupplyHelperCancelFocused)
+            return false;
+        if (supplyHelperFocusIndex == GetSupplyExecuteFocusIndex())
+            return TryExecuteSupplyQueueFromPointer();
+        if (supplyHelperFocusIndex < 0 || supplyHelperFocusIndex >= supplyCandidateEntries.Count)
+        {
+            int invalidIndex = supplyHelperFocusIndex - supplyCandidateEntries.Count;
+            return TrySelectInvalidSupplyCandidateFromPointer(invalidIndex);
+        }
+        return TrySelectSupplyCandidateFromPointer(supplyCandidateEntries[supplyHelperFocusIndex].selectionNumber);
+    }
+
+    public bool TrySelectInvalidSupplyCandidateFromPointer(int invalidIndex)
+    {
+        if (!IsSupplyCandidateSelectStep || invalidIndex < 0 || invalidIndex >= supplyInvalidCandidateEntries.Count)
+            return false;
+        supplyHelperFocusIndex = supplyCandidateEntries.Count + invalidIndex;
+        supplySelectedCandidateIndex = -1;
+        SupplyInvalidCandidateEntry entry = supplyInvalidCandidateEntries[invalidIndex];
+        if (entry != null)
+            cursorController?.SetCell(entry.cell, playMoveSfx: false);
+        string reason = entry != null && !string.IsNullOrWhiteSpace(entry.reason)
+            ? entry.reason : "Unidade invalida para suprimento.";
+        PushPanelUnitMessage(reason, 2.6f);
+        cursorController?.PlayErrorSfx();
+        return false;
+    }
+
+    public bool TrySelectSupplyCandidateFromPointer(int selectionNumber)
+    {
+        if (!IsSupplyCandidateSelectStep)
+            return false;
+        for (int i = 0; i < supplyCandidateEntries.Count; i++)
+        {
+            SupplyCandidateEntry entry = supplyCandidateEntries[i];
+            if (entry == null || entry.selectionNumber != selectionNumber)
+                continue;
+            supplySelectedCandidateIndex = i;
+            supplyHelperFocusIndex = i;
+            cursorController?.SetCell(entry.cell, playMoveSfx: false);
+            return TryConfirmScannerSupply();
+        }
+        return false;
+    }
+
+    public bool TryAdvanceSupplyFromPointer() => CurrentCursorState == CursorState.Suprindo && TryConfirmScannerSupply();
+
+    public bool TryExecuteSupplyQueueFromPointer()
+    {
+        if (!IsSupplyCandidateSelectStep || supplyQueuedOrders.Count <= 0)
+            return false;
+        supplyHelperFocusIndex = GetSupplyExecuteFocusIndex();
+        StartSupplyExecution();
+        return true;
+    }
+
+    public int FindSupplyTargetIndexForReplay(string targetInstanceId)
+    {
+        if (string.IsNullOrWhiteSpace(targetInstanceId))
+            return -1;
+        for (int i = 0; i < supplyCandidateEntries.Count; i++)
+        {
+            SupplyCandidateEntry entry = supplyCandidateEntries[i];
+            if (entry != null && entry.targetUnit != null &&
+                entry.targetUnit.InstanceId.ToString() == targetInstanceId)
+                return i;
+        }
+        return -1;
+    }
+
+    public int GetSupplyCurrentIndexForReplay() => supplySelectedCandidateIndex;
+    public bool StepSupplyForReplay() => NavigateSupplyHelperFocus(+1);
+
+    public bool TrySelectAutomatedSupplyReplayTarget(string targetInstanceId)
+    {
+        if (CurrentCursorState != CursorState.Suprindo)
+            return false;
+        RebuildSupplyCandidateEntries();
+        int index = FindSupplyTargetIndexForReplay(targetInstanceId);
+        if (index < 0)
+            return false;
+
+        if (scannerPromptStep == ScannerPromptStep.MergeConfirm)
+            return supplySelectedCandidateIndex == index;
+        if (scannerPromptStep != ScannerPromptStep.MergeParticipantSelect)
+            return false;
+        return TrySelectSupplyCandidateFromPointer(supplyCandidateEntries[index].selectionNumber) &&
+               scannerPromptStep == ScannerPromptStep.MergeConfirm;
+    }
+
+    public bool ConfirmAutomatedSupplyReplayTarget()
+    {
+        return CurrentCursorState == CursorState.Suprindo &&
+               scannerPromptStep == ScannerPromptStep.MergeConfirm &&
+               TryConfirmScannerSupply();
+    }
+
+    public bool TryHandleSupplyTargetClick(Vector3Int cell)
+    {
+        if (CurrentCursorState != CursorState.Suprindo)
+            return false;
+        cell.z = 0;
+        for (int i = 0; i < supplyCandidateEntries.Count; i++)
+        {
+            SupplyCandidateEntry entry = supplyCandidateEntries[i];
+            if (entry == null || entry.cell != cell)
+                continue;
+            if (scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
+                return TrySelectSupplyCandidateFromPointer(entry.selectionNumber);
+            if (scannerPromptStep == ScannerPromptStep.MergeConfirm && supplySelectedCandidateIndex == i)
+                return TryConfirmScannerSupply();
+            return false;
+        }
+        if (scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
+        {
+            for (int i = 0; i < supplyInvalidCandidateEntries.Count; i++)
+            {
+                SupplyInvalidCandidateEntry entry = supplyInvalidCandidateEntries[i];
+                if (entry != null && entry.cell == cell)
+                    return TrySelectInvalidSupplyCandidateFromPointer(i);
+            }
+        }
+        return false;
+    }
+
+    private bool TryBeginSupplyAtClickedTarget(Vector3Int cell)
+    {
+        if ((CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado) ||
+            scannerPromptStep != ScannerPromptStep.AwaitingAction ||
+            availableSensorActionCodes == null || !availableSensorActionCodes.Contains('S'))
+            return false;
+
+        cell.z = 0;
+        UnitManager target = null;
+        for (int i = 0; i < cachedPodeSuprirTargets.Count; i++)
+        {
+            PodeSuprirOption option = cachedPodeSuprirTargets[i];
+            if (option == null || option.targetUnit == null)
+                continue;
+            Vector3Int targetCell = option.targetCell;
+            targetCell.z = 0;
+            if (targetCell != cell)
+                continue;
+            if (target != null && target != option.targetUnit)
+                return false;
+            target = option.targetUnit;
+        }
+        if (target == null)
+            return false;
+
+        HandleSupplyActionRequested();
+        if (CurrentCursorState != CursorState.Suprindo)
+            return false;
+
+        for (int i = 0; i < supplyCandidateEntries.Count; i++)
+        {
+            SupplyCandidateEntry entry = supplyCandidateEntries[i];
+            if (entry != null && entry.targetUnit == target)
+            {
+                // Se a cardinalidade ja abriu a confirmacao, apenas preserva a etapa.
+                if (scannerPromptStep == ScannerPromptStep.MergeConfirm)
+                    return true;
+                return TrySelectSupplyCandidateFromPointer(entry.selectionNumber);
+            }
+        }
+        return false;
     }
 
     private void EnterSupplyStateFromSensors()
@@ -208,6 +430,7 @@ public partial class TurnStateManager
         PaintSupplyCandidateOptions();
         scannerPromptStep = ScannerPromptStep.MergeParticipantSelect;
         supplySelectedCandidateIndex = supplyCandidateEntries.Count > 0 ? 0 : -1;
+        supplyHelperFocusIndex = 0;
         supplyTargetAutoEntered = false;
 
         if (cursorController != null && supplySelectedCandidateIndex >= 0 && supplySelectedCandidateIndex < supplyCandidateEntries.Count)
@@ -225,7 +448,7 @@ public partial class TurnStateManager
             return;
         }
 
-        if (supplyCandidateEntries.Count == 1 && supplyQueuedOrders.Count <= 0)
+        if (GetSupplyChoiceCount() == 1 && supplyCandidateEntries.Count == 1 && supplyQueuedOrders.Count <= 0)
         {
             supplySelectedCandidateIndex = 0;
             supplyTargetAutoEntered = true;
@@ -248,6 +471,7 @@ public partial class TurnStateManager
         PaintSupplyCandidateOptions();
         if (supplySelectedCandidateIndex < 0 || supplySelectedCandidateIndex >= supplyCandidateEntries.Count)
             supplySelectedCandidateIndex = supplyCandidateEntries.Count > 0 ? 0 : -1;
+        supplyHelperFocusIndex = Mathf.Max(0, supplySelectedCandidateIndex);
         UpdateSupplyPreviewFromCurrentContext();
         RefreshSupplyEmbarkedSelectionVisuals(queuedOnly: false);
         LogSupplyCandidateSelectionPanel();
@@ -1016,10 +1240,12 @@ public partial class TurnStateManager
     private void ResetSupplyRuntimeState()
     {
         supplyCandidateEntries.Clear();
+        supplyInvalidCandidateEntries.Clear();
         supplyCandidateIndexByCell.Clear();
         supplyQueuedOrders.Clear();
         supplyQueuePreviewTracks.Clear();
         supplySelectedCandidateIndex = -1;
+        supplyHelperFocusIndex = 0;
         supplyTargetAutoEntered = false;
         supplySuppressDefaultConfirmSfxOnce = false;
         supplyPreviewLastTarget = null;
@@ -1036,6 +1262,7 @@ public partial class TurnStateManager
     private void RebuildSupplyCandidateEntries()
     {
         supplyCandidateEntries.Clear();
+        supplyInvalidCandidateEntries.Clear();
         supplyCandidateIndexByCell.Clear();
         if (cachedPodeSuprirTargets == null)
             return;
@@ -1075,6 +1302,28 @@ public partial class TurnStateManager
         SortClockwiseAroundUnit(supplyCandidateEntries, e => e.cell, selectedUnit);
         for (int i = 0; i < supplyCandidateEntries.Count; i++)
             supplyCandidateIndexByCell[supplyCandidateEntries[i].cell] = i;
+
+        HashSet<UnitManager> validTargets = new HashSet<UnitManager>();
+        for (int i = 0; i < supplyCandidateEntries.Count; i++)
+            if (supplyCandidateEntries[i] != null && supplyCandidateEntries[i].targetUnit != null)
+                validTargets.Add(supplyCandidateEntries[i].targetUnit);
+        for (int i = 0; i < cachedPodeSuprirInvalidTargets.Count; i++)
+        {
+            PodeSuprirInvalidOption invalid = cachedPodeSuprirInvalidTargets[i];
+            if (invalid == null || invalid.targetUnit == null || validTargets.Contains(invalid.targetUnit))
+                continue;
+            if (selectedUnit != null && invalid.targetUnit.TeamId != selectedUnit.TeamId)
+                continue;
+            Vector3Int cell = invalid.targetCell;
+            cell.z = 0;
+            supplyInvalidCandidateEntries.Add(new SupplyInvalidCandidateEntry
+            {
+                targetUnit = invalid.targetUnit,
+                cell = cell,
+                reason = string.IsNullOrWhiteSpace(invalid.reason) ? "Candidato invalido." : invalid.reason
+            });
+        }
+        SortClockwiseAroundUnit(supplyInvalidCandidateEntries, e => e.cell, selectedUnit);
     }
 
     private void PaintSupplyCandidateOptions()

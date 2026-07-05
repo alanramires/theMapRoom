@@ -38,6 +38,8 @@ public partial class TurnStateManager
     private int disembarkSelectedPassengerIndex = -1;
     private Vector3Int disembarkSelectedLandingCell = Vector3Int.zero;
     private bool disembarkSelectedLandingCellValid;
+    private Vector3Int disembarkPreferredLandingCell = Vector3Int.zero;
+    private bool disembarkPreferredLandingCellValid;
     private bool disembarkLandingAutoEntered;
     private bool disembarkExecutionInProgress;
     private bool disembarkSuppressDefaultConfirmSfxOnce;
@@ -132,6 +134,34 @@ public partial class TurnStateManager
 
         cell.z = 0;
 
+        if (scannerPromptStep == ScannerPromptStep.DisembarkPassengerSelect)
+        {
+            int matchingPassengers = 0;
+            int matchingPassengerIndex = -1;
+            for (int i = 0; i < disembarkPassengerEntries.Count; i++)
+            {
+                DisembarkPassengerEntry passenger = disembarkPassengerEntries[i];
+                if (!PassengerHasDisembarkOptionAtCell(passenger, cell))
+                    continue;
+                matchingPassengers++;
+                matchingPassengerIndex = i;
+            }
+            if (matchingPassengers <= 0)
+                return false;
+
+            SetPreferredDisembarkLandingCell(cell);
+            // Sem ambiguidade: atribui o unico passageiro restante, mas para em CONFIRMAR.
+            if (disembarkPassengerEntries.Count == 1 && matchingPassengerIndex == 0)
+            {
+                disembarkSelectedPassengerIndex = 0;
+                disembarkPassengerFocusIndex = 0;
+                return EnterDisembarkLandingSelectStep(autoEntered: true);
+            }
+
+            // Com mais passageiros, o local fica guardado ate o jogador escolher qual deles usar.
+            return true;
+        }
+
         if (scannerPromptStep == ScannerPromptStep.DisembarkConfirm)
         {
             Vector3Int selectedCell = disembarkSelectedLandingCell;
@@ -184,23 +214,19 @@ public partial class TurnStateManager
         if (passengersForClickedCell.Count <= 0)
             return false;
 
+        SetPreferredDisembarkLandingCell(cell);
         bool hasSinglePassenger = allValidPassengers.Count == 1;
         HandleDisembarkActionRequested();
         if (CurrentCursorState != CursorState.Desembarcando)
             return false;
 
-        // Com varios passageiros, nao inferimos qual deles o jogador quis usar.
+        // Com varios passageiros, nao inferimos qual deles o jogador quis usar. O hex fica
+        // guardado e sera revalidado quando o passageiro for escolhido.
         if (!hasSinglePassenger)
             return scannerPromptStep == ScannerPromptStep.DisembarkPassengerSelect;
 
-        // O fluxo oficial auto-seleciona o unico passageiro. Substitui o primeiro destino
-        // automatico pelo hex tocado e avanca somente ate CONFIRMAR LOCAL.
-        if (scannerPromptStep != ScannerPromptStep.DisembarkLandingSelect ||
-            !disembarkLandingByCell.ContainsKey(cell))
-            return true;
-
-        SetDisembarkSelectedLandingCell(cell, moveCursor: true);
-        TryConfirmScannerDisembark();
+        // O fluxo oficial auto-seleciona o unico passageiro e consome a preferencia,
+        // parando em CONFIRMAR sem adicionar a ordem automaticamente.
         return true;
     }
 
@@ -470,6 +496,22 @@ public partial class TurnStateManager
 
         scannerPromptStep = ScannerPromptStep.DisembarkLandingSelect;
         disembarkLandingAutoEntered = autoEntered;
+
+        if (disembarkPreferredLandingCellValid)
+        {
+            Vector3Int preferredCell = disembarkPreferredLandingCell;
+            preferredCell.z = 0;
+            ClearPreferredDisembarkLandingCell();
+            if (disembarkLandingByCell.ContainsKey(preferredCell))
+            {
+                SetDisembarkSelectedLandingCell(preferredCell, moveCursor: true);
+                PaintDisembarkLandingOptions();
+                scannerPromptStep = ScannerPromptStep.DisembarkConfirm;
+                LogDisembarkConfirmPrompt();
+                return true;
+            }
+        }
+
         SetDisembarkSelectedLandingCell(disembarkLandingOptions[0].disembarkCell, moveCursor: true);
         PaintDisembarkLandingOptions();
 
@@ -910,6 +952,40 @@ public partial class TurnStateManager
         disembarkSelectedPassengerIndex = -1;
         disembarkLandingAutoEntered = false;
         disembarkSuppressDefaultConfirmSfxOnce = false;
+        ClearPreferredDisembarkLandingCell();
+    }
+
+    private void SetPreferredDisembarkLandingCell(Vector3Int cell)
+    {
+        cell.z = 0;
+        disembarkPreferredLandingCell = cell;
+        disembarkPreferredLandingCellValid = true;
+    }
+
+    private void ClearPreferredDisembarkLandingCell()
+    {
+        disembarkPreferredLandingCell = Vector3Int.zero;
+        disembarkPreferredLandingCellValid = false;
+    }
+
+    private bool PassengerHasDisembarkOptionAtCell(DisembarkPassengerEntry passenger, Vector3Int cell)
+    {
+        if (passenger == null || passenger.passenger == null)
+            return false;
+        cell.z = 0;
+        for (int i = 0; i < cachedPodeDesembarcarTargets.Count; i++)
+        {
+            PodeDesembarcarOption option = cachedPodeDesembarcarTargets[i];
+            if (option == null || option.passengerUnit != passenger.passenger ||
+                option.transporterSlotIndex != passenger.slotIndex ||
+                option.transporterSeatIndex != passenger.seatIndex)
+                continue;
+            Vector3Int optionCell = option.disembarkCell;
+            optionCell.z = 0;
+            if (optionCell == cell && !IsCellAlreadyQueuedForDisembark(cell))
+                return true;
+        }
+        return false;
     }
 
     private void RebuildDisembarkPassengerEntries()

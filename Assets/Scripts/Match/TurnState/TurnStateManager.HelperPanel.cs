@@ -49,6 +49,7 @@ public partial class TurnStateManager
         public readonly List<HelperMergeCandidateLine> MergeCandidateLines = new List<HelperMergeCandidateLine>();
         public readonly List<HelperEmbarkCandidateLine> EmbarkCandidateLines = new List<HelperEmbarkCandidateLine>();
         public readonly List<HelperSupplyTargetLine> SupplyTargetLines = new List<HelperSupplyTargetLine>();
+        public readonly List<HelperSupplyCandidateLine> SupplyCandidateLines = new List<HelperSupplyCandidateLine>();
         public readonly List<HelperSupplyResourceLine> SupplyResourceLines = new List<HelperSupplyResourceLine>();
         public readonly List<HelperTransferCandidateLine> TransferCandidateLines = new List<HelperTransferCandidateLine>();
         public readonly List<HelperTransferResourceLine> TransferResourceLines = new List<HelperTransferResourceLine>();
@@ -242,6 +243,8 @@ public partial class TurnStateManager
         public int index;
         public string unitName;
         public string stats;
+        public Sprite unitSprite;
+        public Color unitColor = Color.white;
     }
 
     public sealed class HelperMergeCandidateLine
@@ -251,6 +254,8 @@ public partial class TurnStateManager
         public string stats;
         public bool isValid;
         public string invalidReason;
+        public Sprite unitSprite;
+        public Color unitColor = Color.white;
     }
 
     public sealed class HelperEmbarkCandidateLine
@@ -270,6 +275,19 @@ public partial class TurnStateManager
         public string gainsLabel;
         public int estimatedCost;
         public bool isFocused;
+        public Sprite unitSprite;
+        public Color unitColor = Color.white;
+    }
+
+    public sealed class HelperSupplyCandidateLine
+    {
+        public int index;
+        public string unitName;
+        public string stats;
+        public Sprite unitSprite;
+        public Color unitColor = Color.white;
+        public bool isValid = true;
+        public string invalidReason;
     }
 
     public sealed class HelperSupplyResourceLine
@@ -277,6 +295,7 @@ public partial class TurnStateManager
         public string supplyName;
         public int beforeAmount;
         public int afterAmount;
+        public int maxAmount;
     }
 
     public sealed class HelperTransferCandidateLine
@@ -432,6 +451,8 @@ public partial class TurnStateManager
         public bool isCancel;
         public int hp;
         public string terrainLabel;
+        public Sprite unitSprite;
+        public Color unitColor = Color.white;
     }
 
     private bool TryBuildAimTargetsHelperPanelData(HelperPanelData data)
@@ -465,6 +486,7 @@ public partial class TurnStateManager
         {
             MirandoSelectionEntry entry = cachedMirandoSelectionEntries[i];
             UnitManager target = entry.TargetUnit;
+            SpriteRenderer renderer = target != null ? target.GetMainSpriteRenderer() : null;
             data.AimTargetLines.Add(new HelperAimTargetLine
             {
                 index = i,
@@ -472,7 +494,9 @@ public partial class TurnStateManager
                 isValid = entry.isValid,
                 isFocused = !mirandoCancelFocused && scannerSelectedTargetIndex == i,
                 hp = target != null ? Mathf.Max(0, target.CurrentHP) : 0,
-                terrainLabel = target != null ? ResolveCellTerrainLabel(target.CurrentCellPosition) : string.Empty
+                terrainLabel = target != null ? ResolveCellTerrainLabel(target.CurrentCellPosition) : string.Empty,
+                unitSprite = renderer != null ? renderer.sprite : null,
+                unitColor = renderer != null ? renderer.color : Color.white
             });
         }
 
@@ -2239,7 +2263,9 @@ public partial class TurnStateManager
                 {
                     index = i + 1,
                     unitName = ResolveUnitRuntimeName(unit),
-                    stats = BuildUnitStatInline(unit)
+                    stats = BuildUnitStatInline(unit),
+                    unitSprite = unit.GetMainSpriteRenderer() != null ? unit.GetMainSpriteRenderer().sprite : null,
+                    unitColor = unit.GetMainSpriteRenderer() != null ? unit.GetMainSpriteRenderer().color : Color.white
                 });
             }
         }
@@ -2249,7 +2275,7 @@ public partial class TurnStateManager
             for (int i = 0; i < mergeCandidateEntries.Count; i++)
             {
                 MergeCandidateEntry entry = mergeCandidateEntries[i];
-                if (entry == null || entry.unit == null || !entry.isValid)
+                if (entry == null || entry.unit == null)
                     continue;
 
                 data.MergeCandidateLines.Add(new HelperMergeCandidateLine
@@ -2258,7 +2284,9 @@ public partial class TurnStateManager
                     unitName = ResolveUnitRuntimeName(entry.unit),
                     stats = BuildUnitStatInline(entry.unit),
                     isValid = entry.isValid,
-                    invalidReason = ResolveMergeInvalidReason(entry)
+                    invalidReason = ResolveMergeInvalidReason(entry),
+                    unitSprite = entry.unit.GetMainSpriteRenderer() != null ? entry.unit.GetMainSpriteRenderer().sprite : null,
+                    unitColor = entry.unit.GetMainSpriteRenderer() != null ? entry.unit.GetMainSpriteRenderer().color : Color.white
                 });
             }
         }
@@ -2341,7 +2369,11 @@ public partial class TurnStateManager
                     isValid = true,
                     isFocused = !embarkCancelFocused && isFocused,
                     hp = Mathf.Max(0, transporter.CurrentHP),
-                    terrainLabel = ResolveCellTerrainLabel(transporter.CurrentCellPosition)
+                    terrainLabel = ResolveCellTerrainLabel(transporter.CurrentCellPosition),
+                    unitSprite = transporter.GetMainSpriteRenderer() != null
+                        ? transporter.GetMainSpriteRenderer().sprite : null,
+                    unitColor = transporter.GetMainSpriteRenderer() != null
+                        ? transporter.GetMainSpriteRenderer().color : Color.white
                 });
             }
 
@@ -2366,6 +2398,44 @@ public partial class TurnStateManager
         if (scannerPromptStep != ScannerPromptStep.MergeParticipantSelect && scannerPromptStep != ScannerPromptStep.MergeConfirm)
             return false;
 
+        data.Kind = HelperPanelKind.Supply;
+        data.SupplyIsConfirmStep = scannerPromptStep == ScannerPromptStep.MergeConfirm;
+        data.SupplyHasQueuedOrders = supplyQueuedOrders != null && supplyQueuedOrders.Count > 0;
+
+        for (int i = 0; i < supplyCandidateEntries.Count; i++)
+        {
+            SupplyCandidateEntry candidate = supplyCandidateEntries[i];
+            if (candidate == null || candidate.targetUnit == null)
+                continue;
+            SpriteRenderer renderer = candidate.targetUnit.GetMainSpriteRenderer();
+            data.SupplyCandidateLines.Add(new HelperSupplyCandidateLine
+            {
+                index = candidate.selectionNumber,
+                unitName = ResolveUnitRuntimeName(candidate.targetUnit),
+                stats = BuildUnitStatInline(candidate.targetUnit),
+                unitSprite = renderer != null ? renderer.sprite : null,
+                unitColor = renderer != null ? renderer.color : Color.white,
+                isValid = true
+            });
+        }
+        for (int i = 0; i < supplyInvalidCandidateEntries.Count; i++)
+        {
+            SupplyInvalidCandidateEntry candidate = supplyInvalidCandidateEntries[i];
+            if (candidate == null || candidate.targetUnit == null)
+                continue;
+            SpriteRenderer renderer = candidate.targetUnit.GetMainSpriteRenderer();
+            data.SupplyCandidateLines.Add(new HelperSupplyCandidateLine
+            {
+                index = supplyCandidateEntries.Count + i + 1,
+                unitName = ResolveUnitRuntimeName(candidate.targetUnit),
+                stats = BuildUnitStatInline(candidate.targetUnit),
+                unitSprite = renderer != null ? renderer.sprite : null,
+                unitColor = renderer != null ? renderer.color : Color.white,
+                isValid = false,
+                invalidReason = candidate.reason
+            });
+        }
+
         List<UnitManager> executionOrder = new List<UnitManager>();
         if (supplyQueuedOrders != null)
         {
@@ -2387,15 +2457,11 @@ public partial class TurnStateManager
         }
 
         if (executionOrder.Count <= 0)
-            return false;
+            return data.SupplyCandidateLines.Count > 0;
 
         List<SupplyEstimateLine> estimateLines = EstimateSupplyQueueForHelper(selectedUnit, executionOrder, focusedTarget);
         if (estimateLines.Count <= 0)
-            return false;
-
-        data.Kind = HelperPanelKind.Supply;
-        data.SupplyIsConfirmStep = scannerPromptStep == ScannerPromptStep.MergeConfirm;
-        data.SupplyHasQueuedOrders = supplyQueuedOrders != null && supplyQueuedOrders.Count > 0;
+            return data.SupplyCandidateLines.Count > 0;
 
         int totalHp = 0;
         int totalFuel = 0;
@@ -2418,7 +2484,11 @@ public partial class TurnStateManager
                 unitName = ResolveUnitRuntimeName(line.target),
                 gainsLabel = FormatSupplyGains(line.hp, line.fuel, line.ammo),
                 estimatedCost = Mathf.Max(0, line.cost),
-                isFocused = line.isFocused
+                isFocused = line.isFocused,
+                unitSprite = line.target.GetMainSpriteRenderer() != null
+                    ? line.target.GetMainSpriteRenderer().sprite : null,
+                unitColor = line.target.GetMainSpriteRenderer() != null
+                    ? line.target.GetMainSpriteRenderer().color : Color.white
             });
         }
 
@@ -2428,7 +2498,7 @@ public partial class TurnStateManager
         data.SupplyRecoveredAmmo = Mathf.Max(0, totalAmmo);
         data.SupplyTotalCost = Mathf.Max(0, totalCost);
         BuildSupplyResourcePreviewLines(data, selectedUnit, executionOrder);
-        return data.SupplyTargetLines.Count > 0;
+        return data.SupplyTargetLines.Count > 0 || data.SupplyCandidateLines.Count > 0;
     }
 
     private bool TryBuildTransferHelperPanelData(HelperPanelData data)
@@ -2587,14 +2657,12 @@ public partial class TurnStateManager
 
             int before = Mathf.Max(0, pair.Value);
             int after = simulatedStock.TryGetValue(supply, out int simulated) ? Mathf.Max(0, simulated) : 0;
-            if (before == after)
-                continue;
-
             data.SupplyResourceLines.Add(new HelperSupplyResourceLine
             {
                 supplyName = ResolveSupplyDisplayName(supply),
                 beforeAmount = before,
-                afterAmount = after
+                afterAmount = after,
+                maxAmount = ResolveSupplierResourceMaxAmount(supplier, supply, before)
             });
         }
     }

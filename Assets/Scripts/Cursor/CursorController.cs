@@ -309,6 +309,29 @@ public class CursorController : MonoBehaviour
                 turnStateManager.NavigateDisembarkPassengerFocus(-1);
             else if (WasMenuDownPressedThisFrame() || WasMenuRightPressedThisFrame())
                 turnStateManager.NavigateDisembarkPassengerFocus(+1);
+            HandleNeutralLeftClickTeleport();
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
+        if (turnStateManager != null && turnStateManager.IsSupplyCandidateSelectStep)
+        {
+            if (WasMenuUpPressedThisFrame() || WasMenuLeftPressedThisFrame())
+                turnStateManager.NavigateSupplyHelperFocus(-1);
+            else if (WasMenuDownPressedThisFrame() || WasMenuRightPressedThisFrame())
+                turnStateManager.NavigateSupplyHelperFocus(+1);
+            HandleNeutralLeftClickTeleport();
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
+        if (turnStateManager != null && turnStateManager.IsMergeParticipantSelectStep)
+        {
+            if (WasMenuUpPressedThisFrame() || WasMenuLeftPressedThisFrame())
+                turnStateManager.NavigateMergeHelperFocus(-1);
+            else if (WasMenuDownPressedThisFrame() || WasMenuRightPressedThisFrame())
+                turnStateManager.NavigateMergeHelperFocus(+1);
+            HandleNeutralLeftClickTeleport();
             heldDirection = Vector3Int.zero;
             return;
         }
@@ -514,13 +537,17 @@ public class CursorController : MonoBehaviour
         bool isAiming = state == TurnStateManager.CursorState.Mirando;
         bool isEmbarking = state == TurnStateManager.CursorState.Embarcando;
         bool isDisembarking = state == TurnStateManager.CursorState.Desembarcando;
+        bool isSupplying = state == TurnStateManager.CursorState.Suprindo;
+        bool isMerging = state == TurnStateManager.CursorState.Fundindo;
         if (state != TurnStateManager.CursorState.Neutral &&
             state != TurnStateManager.CursorState.UnitSelected &&
             !isMovementActionChoice &&
             !isShopping &&
             !isAiming &&
             !isEmbarking &&
-            !isDisembarking)
+            !isDisembarking &&
+            !isSupplying &&
+            !isMerging)
             return;
 
         Camera cam = cameraController != null ? cameraController.GetComponent<Camera>() : Camera.main;
@@ -551,6 +578,18 @@ public class CursorController : MonoBehaviour
         if (isDisembarking)
         {
             turnStateManager.TryQueueDisembarkAtCellFromPointer(targetCell);
+            return;
+        }
+
+        if (isSupplying)
+        {
+            turnStateManager.TryHandleSupplyTargetClick(targetCell);
+            return;
+        }
+
+        if (isMerging)
+        {
+            turnStateManager.TryHandleMergeTargetClick(targetCell);
             return;
         }
 

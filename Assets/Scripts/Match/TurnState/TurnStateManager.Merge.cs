@@ -45,11 +45,123 @@ public partial class TurnStateManager
     private readonly List<MergeQueuePreviewTrack> mergeQueuePreviewTracks = new List<MergeQueuePreviewTrack>();
     private readonly MergeQueuePreviewTrack mergeConfirmPreviewTrack = new MergeQueuePreviewTrack();
     private int mergeSelectedCandidateIndex = -1;
+    private int mergeHelperFocusIndex;
     private Vector3Int mergeSelectedTargetCell = Vector3Int.zero;
     private bool mergeSelectedTargetCellValid;
     private bool mergeTargetAutoEntered;
     private bool mergeSuppressDefaultConfirmSfxOnce;
     private CursorState cursorStateBeforeFundindo = CursorState.MoveuParado;
+
+    public bool IsMergeParticipantSelectStep => CurrentCursorState == CursorState.Fundindo &&
+                                                scannerPromptStep == ScannerPromptStep.MergeParticipantSelect;
+    public int MergeHelperFocusIndex => mergeHelperFocusIndex;
+    public bool MergeHelperCancelFocused => IsMergeParticipantSelectStep &&
+                                            mergeHelperFocusIndex == mergeCandidateEntries.Count;
+
+    public bool NavigateMergeHelperFocus(int delta)
+    {
+        if (!IsMergeParticipantSelectStep || delta == 0)
+            return false;
+        int total = mergeCandidateEntries.Count + 1;
+        mergeHelperFocusIndex = (mergeHelperFocusIndex + (delta > 0 ? 1 : -1) + total) % total;
+        if (mergeHelperFocusIndex < mergeCandidateEntries.Count)
+        {
+            mergeSelectedCandidateIndex = mergeHelperFocusIndex;
+            MergeCandidateEntry entry = mergeCandidateEntries[mergeSelectedCandidateIndex];
+            if (entry != null)
+                cursorController?.SetCell(entry.cell, playMoveSfx: false);
+        }
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public bool TryInvokeFocusedMergeOption()
+    {
+        if (!IsMergeParticipantSelectStep || MergeHelperCancelFocused)
+            return false;
+        return TrySelectMergeCandidateFromPointer(mergeCandidateEntries[mergeHelperFocusIndex].selectionNumber);
+    }
+
+    public bool TrySelectMergeCandidateFromPointer(int selectionNumber)
+    {
+        if (!IsMergeParticipantSelectStep)
+            return false;
+        for (int i = 0; i < mergeCandidateEntries.Count; i++)
+        {
+            MergeCandidateEntry entry = mergeCandidateEntries[i];
+            if (entry == null || entry.selectionNumber != selectionNumber)
+                continue;
+            mergeSelectedCandidateIndex = i;
+            mergeHelperFocusIndex = i;
+            cursorController?.SetCell(entry.cell, playMoveSfx: false);
+            return TryConfirmScannerMerge();
+        }
+        return false;
+    }
+
+    public bool TryAdvanceMergeFromPointer() => CurrentCursorState == CursorState.Fundindo && TryConfirmScannerMerge();
+
+    public bool TryHandleMergeTargetClick(Vector3Int cell)
+    {
+        if (CurrentCursorState != CursorState.Fundindo)
+            return false;
+        cell.z = 0;
+        RebuildMergeCandidateEntries();
+        for (int i = 0; i < mergeCandidateEntries.Count; i++)
+        {
+            MergeCandidateEntry entry = mergeCandidateEntries[i];
+            if (entry == null || entry.unit == null || entry.cell != cell)
+                continue;
+            if (scannerPromptStep == ScannerPromptStep.MergeConfirm && i == mergeSelectedCandidateIndex)
+                return TryConfirmScannerMerge();
+            if (scannerPromptStep != ScannerPromptStep.MergeParticipantSelect)
+                return false;
+            return TrySelectMergeCandidateFromPointer(entry.selectionNumber);
+        }
+        return false;
+    }
+
+    private bool TryBeginMergeAtClickedTarget(Vector3Int cell)
+    {
+        if (!availableSensorActionCodes.Contains('F') || selectedUnit == null)
+            return false;
+        cell.z = 0;
+        EnsureMergeSensorSnapshot();
+        UnitManager clickedTarget = null;
+        for (int i = 0; i < cachedPodeFundirTargets.Count; i++)
+        {
+            PodeFundirOption option = cachedPodeFundirTargets[i];
+            UnitManager candidate = option != null ? option.candidateUnit : null;
+            if (candidate == null)
+                continue;
+            Vector3Int candidateCell = candidate.CurrentCellPosition;
+            candidateCell.z = 0;
+            if (candidateCell == cell)
+            {
+                clickedTarget = candidate;
+                break;
+            }
+        }
+        if (clickedTarget == null)
+            return false;
+
+        HandleMergeActionRequested();
+        if (CurrentCursorState != CursorState.Fundindo)
+            return false;
+        RebuildMergeCandidateEntries();
+        for (int i = 0; i < mergeCandidateEntries.Count; i++)
+        {
+            MergeCandidateEntry entry = mergeCandidateEntries[i];
+            if (entry == null || entry.unit != clickedTarget)
+                continue;
+            // Com candidato unico, a FSM ja abre a confirmacao. Com varios, o clique
+            // escolhe explicitamente o alvo e para na mesma confirmacao.
+            if (scannerPromptStep == ScannerPromptStep.MergeConfirm)
+                return true;
+            return TrySelectMergeCandidateFromPointer(entry.selectionNumber);
+        }
+        return false;
+    }
 
     private void LogMergeDebug(string message)
     {
@@ -235,6 +347,7 @@ public partial class TurnStateManager
         PaintMergeCandidateOptions();
         scannerPromptStep = ScannerPromptStep.MergeParticipantSelect;
         mergeSelectedCandidateIndex = FindFirstValidMergeCandidateIndex();
+        mergeHelperFocusIndex = Mathf.Max(0, mergeSelectedCandidateIndex);
         mergeTargetAutoEntered = false;
 
         if (cursorController != null && mergeSelectedCandidateIndex >= 0 && mergeSelectedCandidateIndex < mergeCandidateEntries.Count)
@@ -281,6 +394,7 @@ public partial class TurnStateManager
         PaintMergeCandidateOptions();
         if (mergeSelectedCandidateIndex < 0 || mergeSelectedCandidateIndex >= mergeCandidateEntries.Count)
             mergeSelectedCandidateIndex = FindFirstValidMergeCandidateIndex();
+        mergeHelperFocusIndex = Mathf.Max(0, mergeSelectedCandidateIndex);
         LogMergeParticipantSelectionPanel();
     }
 
@@ -302,6 +416,7 @@ public partial class TurnStateManager
 
         RebuildMergeCandidateEntries();
         mergeSelectedCandidateIndex = -1;
+        mergeHelperFocusIndex = 0;
         for (int i = 0; i < mergeCandidateEntries.Count; i++)
         {
             MergeCandidateEntry entry = mergeCandidateEntries[i];
@@ -845,6 +960,14 @@ public partial class TurnStateManager
             PodeFundirInvalidOption invalid = invalidOptions[i];
             UnitManager unit = invalid != null ? invalid.candidateUnit : null;
             if (unit == null || IsMergeUnitAlreadyQueued(unit))
+                continue;
+
+            // A fusao ja pressupoe unir unidades identicas do mesmo time. Nao trazemos
+            // vizinhos de outro time nem de tipo diferente para a lista (nem como invalido
+            // cinza) — so as identicas do mesmo time, validas e invalidas por motivos
+            // circunstanciais (movimento, camada, carga).
+            if (invalid.reasonId == PodeFundirInvalidOption.ReasonIdDifferentTeam ||
+                invalid.reasonId == PodeFundirInvalidOption.ReasonIdDifferentType)
                 continue;
 
             number++;

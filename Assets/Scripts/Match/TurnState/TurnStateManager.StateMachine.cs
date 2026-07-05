@@ -1054,6 +1054,12 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileFundindo()
     {
         LogStateStep("HandleConfirmWhileFundindo");
+        if (IsMergeParticipantSelectStep)
+        {
+            if (MergeHelperCancelFocused)
+                return HandleCancelWhileFundindo();
+            return TryInvokeFocusedMergeOption() ? ActionSfx.Confirm : ActionSfx.None;
+        }
         if (TryConfirmScannerMerge())
         {
             if (ConsumeMergeSuppressDefaultConfirmSfxOnce())
@@ -1145,6 +1151,12 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileSuprindo()
     {
         LogStateStep("HandleConfirmWhileSuprindo");
+        if (IsSupplyCandidateSelectStep)
+        {
+            if (SupplyHelperCancelFocused)
+                return HandleCancelWhileSuprindo();
+            return TryInvokeFocusedSupplyOption() ? ActionSfx.Confirm : ActionSfx.None;
+        }
         if (TryConfirmScannerSupply())
         {
             if (ConsumeSupplySuppressDefaultConfirmSfxOnce())
