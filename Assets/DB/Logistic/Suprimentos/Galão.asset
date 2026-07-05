@@ -16,6 +16,8 @@ MonoBehaviour:
   displayName: "Gal\xF5es"
   description: usado para recuperar Autonomia
   spriteDefault: {fileID: 21300000, guid: 0d5da139a3219074191fb5a7061cee49, type: 3}
+  spriteHalf: {fileID: 21300000, guid: 638bbb11172e3fb4d9b58699c34f64fb, type: 3}
+  spriteEmpty: {fileID: 21300000, guid: 0035894cb5ece6245a6cba1c5f09945b, type: 3}
   relatedServices:
   - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}

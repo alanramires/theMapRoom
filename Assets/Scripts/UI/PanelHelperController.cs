@@ -397,8 +397,8 @@ public class PanelHelperController : MonoBehaviour
                 return;
 
             case TurnStateManager.HelperPanelKind.Transfer:
-                title = ResolveMessage("helper.title.transfer_preview", "TRANSFER");
-                body = BuildTransferBody(data);
+                title = data.TransferIsConfirmStep ? "CONFIRMAR TRANSFERÊNCIA" : "ESCOLHER DESTINO";
+                body = string.Empty;
                 return;
 
             case TurnStateManager.HelperPanelKind.CommandService:
@@ -1778,7 +1778,8 @@ public class PanelHelperController : MonoBehaviour
         // e enxerga a acao real. So o passo de SELECAO (escolher unidade) usa a lista de botoes.
         bool isSupply = data != null && data.Kind == TurnStateManager.HelperPanelKind.Supply && !data.SupplyIsConfirmStep;
         bool isMerge = data != null && data.Kind == TurnStateManager.HelperPanelKind.Merge;
-        bool active = panelVisible && (isDisembark || isSupply || isMerge);
+        bool isTransfer = data != null && data.Kind == TurnStateManager.HelperPanelKind.Transfer;
+        bool active = panelVisible && (isDisembark || isSupply || isMerge || isTransfer);
         if (!active)
         {
             if (disembarkActionsRoot != null) disembarkActionsRoot.SetActive(false);
@@ -1812,7 +1813,7 @@ public class PanelHelperController : MonoBehaviour
             for (int i = 0; i < data.SupplyTargetLines.Count; i++)
                 sb.Append('|').Append(data.SupplyTargetLines[i].unitName).Append(data.SupplyTargetLines[i].gainsLabel);
         }
-        else
+        else if (isMerge)
         {
             sb.Append('|').Append(data.IsMergeConfirmStep).Append('|').Append(data.SelectedMergeCandidateNumber);
             for (int i = 0; i < data.MergeCandidateLines.Count; i++)
@@ -1821,12 +1822,25 @@ public class PanelHelperController : MonoBehaviour
                     .Append(data.MergeCandidateLines[i].isValid)
                     .Append(data.MergeCandidateLines[i].invalidReason);
         }
+        else
+        {
+            sb.Append('|').Append(data.TransferIsConfirmStep).Append('|').Append(data.TransferSelectedLabel);
+            for (int i = 0; i < data.TransferCandidateLines.Count; i++)
+                sb.Append('|').Append(data.TransferCandidateLines[i].index)
+                    .Append(data.TransferCandidateLines[i].unitName)
+                    .Append(data.TransferCandidateLines[i].isDonate)
+                    .Append(data.TransferCandidateLines[i].isFocused);
+            for (int i = 0; i < data.TransferResourceLines.Count; i++)
+                sb.Append('|').Append(data.TransferResourceLines[i].supplyName)
+                    .Append(data.TransferResourceLines[i].movedAmount);
+        }
         string signature = sb.ToString();
         if (signature != disembarkActionsSignature)
         {
             if (isDisembark) RebuildDisembarkActionButtons(data);
             else if (isSupply) RebuildSupplyActionButtons(data);
-            else RebuildMergeActionButtons(data);
+            else if (isMerge) RebuildMergeActionButtons(data);
+            else RebuildTransferActionButtons(data);
             disembarkActionsSignature = signature;
             disembarkLayoutDirty = true;
         }
@@ -1835,6 +1849,8 @@ public class PanelHelperController : MonoBehaviour
         int focusedIndex = turnStateManager == null ? -1 :
             (isDisembark ? turnStateManager.DisembarkPassengerFocusIndex :
              isSupply ? turnStateManager.SupplyHelperFocusIndex : turnStateManager.MergeHelperFocusIndex);
+        if (isTransfer && turnStateManager != null)
+            focusedIndex = turnStateManager.TransferHelperFocusIndex;
         for (int i = 0; i < disembarkActionButtons.Count; i++)
         {
             Button button = disembarkActionButtons[i];
@@ -1842,7 +1858,8 @@ public class PanelHelperController : MonoBehaviour
             if (button != null && button.interactable)
             {
                 bool focused = (isDisembark ? data.DisembarkStep == 0 :
-                                isSupply ? !data.SupplyIsConfirmStep : !data.IsMergeConfirmStep) &&
+                                isSupply ? !data.SupplyIsConfirmStep :
+                                isMerge ? !data.IsMergeConfirmStep : true) &&
                                buttonFocus == focusedIndex;
                 bool invalidSupply = isSupply && buttonFocus >= 0 &&
                                      buttonFocus < data.SupplyCandidateLines.Count &&
@@ -1867,7 +1884,8 @@ public class PanelHelperController : MonoBehaviour
             turnStateManager != null && (isDisembark
                 ? turnStateManager.DisembarkPassengerCancelFocused
                 : isSupply ? turnStateManager.SupplyHelperCancelFocused
-                : turnStateManager.MergeHelperCancelFocused));
+                : isMerge ? turnStateManager.MergeHelperCancelFocused
+                : turnStateManager.TransferHelperCancelFocused));
         if (helperTxt != null) helperTxt.enabled = false;
         if (panelHelper == gameObject && selfPanelCanvasGroup != null)
         {
@@ -2032,6 +2050,62 @@ public class PanelHelperController : MonoBehaviour
             if (!string.IsNullOrWhiteSpace(data.MergeConfirmPreview))
                 CreateDisembarkButton($"RESULTADO: {data.MergeConfirmPreview}", null, false, -1);
             CreateDisembarkButton("CONFIRMAR FUSÃO", () => turnStateManager?.TryAdvanceMergeFromPointer(), true, -1);
+        }
+
+        disembarkActionsRoot.GetComponent<RectTransform>().sizeDelta =
+            new Vector2(0f, disembarkActionButtons.Count * (DisembarkActionButtonHeight + 4f));
+    }
+
+    private void RebuildTransferActionButtons(TurnStateManager.HelperPanelData data)
+    {
+        for (int i = disembarkActionButtons.Count - 1; i >= 0; i--)
+            if (disembarkActionButtons[i] != null) Destroy(disembarkActionButtons[i].gameObject);
+        disembarkActionButtons.Clear();
+        disembarkActionFocusIndices.Clear();
+
+        if (!data.TransferIsConfirmStep)
+        {
+            for (int i = 0; i < data.TransferCandidateLines.Count; i++)
+            {
+                TurnStateManager.HelperTransferCandidateLine candidate = data.TransferCandidateLines[i];
+                int optionIndex = i;
+                string mode = candidate.isDonate ? "DOAR" : "RECEBER";
+                CreateDisembarkButton($"{candidate.index} - {mode} → {candidate.unitName}",
+                    () => turnStateManager?.TrySelectTransferOptionFromPointer(optionIndex), true, i,
+                    candidate.targetSprite, candidate.targetColor);
+            }
+        }
+        else
+        {
+            TurnStateManager.HelperTransferCandidateLine selected = null;
+            for (int i = 0; i < data.TransferCandidateLines.Count; i++)
+                if (data.TransferCandidateLines[i] != null && data.TransferCandidateLines[i].isFocused)
+                {
+                    selected = data.TransferCandidateLines[i];
+                    break;
+                }
+            string mode = selected != null && selected.isDonate ? "DOAR" : "RECEBER";
+            string target = selected != null ? selected.unitName : data.TransferSelectedLabel;
+            CreateDisembarkButton($"{mode} → {target}", null, false, -1,
+                selected != null ? selected.targetSprite : null,
+                selected != null ? selected.targetColor : Color.white);
+
+            for (int i = 0; i < data.TransferResourceLines.Count; i++)
+            {
+                TurnStateManager.HelperTransferResourceLine line = data.TransferResourceLines[i];
+                if (line == null) continue;
+                string sourceBefore = line.sourceIsInfinite ? "INF" : line.sourceBefore.ToString();
+                string sourceAfter = line.sourceIsInfinite ? "INF" : line.sourceAfter.ToString();
+                string destinationBefore = line.destinationIsInfinite ? "INF" : line.destinationBefore.ToString();
+                string destinationAfter = line.destinationIsInfinite ? "INF" : line.destinationAfter.ToString();
+                CreateDisembarkButton(
+                    $"{line.supplyName}: {sourceBefore} - {line.movedAmount} → {sourceAfter} | {destinationBefore} + {line.movedAmount} → {destinationAfter}",
+                    null, false, -1);
+                TintLastSupplyInformationRow(line.movedAmount > 0
+                    ? new Color(0.45f, 1f, 0.45f, 1f) : Color.gray);
+            }
+            CreateDisembarkButton("CONFIRMAR TRANSFERÊNCIA",
+                () => turnStateManager?.TryConfirmTransferFromPointer(), true, 0);
         }
 
         disembarkActionsRoot.GetComponent<RectTransform>().sizeDelta =
@@ -2776,6 +2850,31 @@ public class PanelHelperController : MonoBehaviour
             return ApplyInlineTokens(fallback ?? string.Empty, tokens);
 
         return instance.ResolveMessage(id, fallback, tokens);
+    }
+
+    // True se o ponto de tela (mouse/toque) esta sobre o painel de ajuda visivel.
+    // Usado pela camera para nao dar zoom no mapa quando o scroll rola o texto do painel.
+    public static bool IsPointerOverHelperPanel(Vector2 screenPoint)
+    {
+        if (instance == null)
+            return false;
+
+        return instance.ContainsScreenPoint(screenPoint);
+    }
+
+    private bool ContainsScreenPoint(Vector2 screenPoint)
+    {
+        RectTransform rect = helperRect;
+        if (rect == null && panelHelper != null)
+            rect = panelHelper.GetComponent<RectTransform>();
+        if (rect == null || panelHelper == null || !panelHelper.activeInHierarchy)
+            return false;
+
+        Canvas canvas = rect.GetComponentInParent<Canvas>();
+        Camera cam = (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            ? canvas.worldCamera
+            : null;
+        return RectTransformUtility.RectangleContainsScreenPoint(rect, screenPoint, cam);
     }
 
     public static bool IsDockedCenterLeft()

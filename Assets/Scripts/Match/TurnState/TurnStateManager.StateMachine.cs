@@ -10,8 +10,12 @@ public partial class TurnStateManager
         LogStateStep("HandleConfirm");
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
-        if (TryConfirmPendingTransferPrompt())
-            return ActionSfx.Confirm;
+        if (IsTransferPromptActive())
+        {
+            if (TransferHelperCancelFocused)
+                return TryCancelPendingTransferPrompt() ? ActionSfx.Cancel : ActionSfx.None;
+            return TryInvokeFocusedTransferOption() ? ActionSfx.Confirm : ActionSfx.None;
+        }
 
         switch (CurrentCursorState)
         {

@@ -585,7 +585,7 @@ public class PanelMenu : MonoBehaviour
         bool[]   flipX  = { false, true };
         bool[]   cmdAuto= { false, true };
         const MatchController.GameSetupPreset preset = MatchController.GameSetupPreset.FogOfWarTotal;
-        const string target = "Battle Map";
+        const string target = "Battle Map 1 - Ground";
 
         SaveGameManager.SetupForNewGame(string.Empty);
         PartidaConfig.Set(2, teams, isAI, flipX, preset, cmdAuto, target);

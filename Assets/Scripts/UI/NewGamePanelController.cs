@@ -17,7 +17,7 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class NewGamePanelController : MonoBehaviour
 {
-    private const string Scene2Players = "Battle Map";
+    private const string Scene2Players = "Battle Map 1 - Ground";
     private const string Scene3Players = "Triple Trouble";
     private const string Scene4Players = "Team Island";
 

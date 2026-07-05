@@ -27,6 +27,57 @@ public partial class TurnStateManager
     private float transferPreviewPathLength;
     private float transferPreviewHeadDistance;
     private bool transferPromptTemporarilyHidCommittedPath;
+    private int transferHelperFocusIndex;
+
+    public bool IsTransferSelectionStep => IsTransferSelectionStepActive();
+    public bool IsTransferHelperActive => IsTransferPromptActive();
+    public int TransferHelperFocusIndex => transferHelperFocusIndex;
+    public bool TransferHelperCancelFocused => IsTransferPromptActive() &&
+        (IsTransferConfirmStepActive() ? transferHelperFocusIndex == 1 : transferHelperFocusIndex == transferPromptOptions.Count);
+
+    public bool NavigateTransferHelperFocus(int delta)
+    {
+        if (!IsTransferPromptActive() || delta == 0)
+            return false;
+        int total = IsTransferConfirmStepActive() ? 2 : transferPromptOptions.Count + 1;
+        transferHelperFocusIndex = (transferHelperFocusIndex + (delta > 0 ? 1 : -1) + total) % total;
+        if (IsTransferSelectionStepActive() && transferHelperFocusIndex < transferPromptOptions.Count)
+        {
+            transferPromptSelectedIndex = transferHelperFocusIndex;
+            FocusTransferOptionByIndex(transferPromptSelectedIndex, playSfx: false);
+        }
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public bool TryInvokeFocusedTransferOption()
+    {
+        if (!IsTransferPromptActive() || TransferHelperCancelFocused)
+            return false;
+        if (IsTransferConfirmStepActive())
+            return TryConfirmPendingTransferPrompt();
+        return TrySelectTransferOptionFromPointer(transferHelperFocusIndex);
+    }
+
+    public bool TrySelectTransferOptionFromPointer(int index)
+    {
+        if (!IsTransferSelectionStepActive() || index < 0 || index >= transferPromptOptions.Count)
+            return false;
+        transferPromptSelectedIndex = index;
+        transferHelperFocusIndex = index;
+        FocusTransferOptionByIndex(index, playSfx: false);
+        EnterTransferConfirmStep();
+        cursorController?.PlayConfirmSfx();
+        return true;
+    }
+
+    public bool TryConfirmTransferFromPointer()
+    {
+        if (!IsTransferConfirmStepActive())
+            return false;
+        transferHelperFocusIndex = 0;
+        return TryConfirmPendingTransferPrompt();
+    }
 
     private void HandleTransferActionRequested()
     {
@@ -372,6 +423,7 @@ public partial class TurnStateManager
         transferPromptSelectionPending = false;
         transferPromptConfirmationPending = false;
         transferPromptSelectedIndex = -1;
+        transferHelperFocusIndex = 0;
         transferPromptOptions.Clear();
         transferPromptIndexByCell.Clear();
         transferPreviewLines.Clear();
@@ -389,6 +441,7 @@ public partial class TurnStateManager
         transferPromptSelectionPending = true;
         transferPromptConfirmationPending = false;
         transferPromptSelectedIndex = transferPromptOptions.Count > 0 ? 0 : -1;
+        transferHelperFocusIndex = 0;
         transferPreviewLines.Clear();
         RebuildTransferCellIndex();
         TrySelectTransferOptionFromCursor();
@@ -433,6 +486,7 @@ public partial class TurnStateManager
 
         transferPromptSelectionPending = false;
         transferPromptConfirmationPending = true;
+        transferHelperFocusIndex = 0;
         RebuildTransferPreviewLines();
         PodeTransferirOption selectedOption = transferPromptOptions[transferPromptSelectedIndex];
         Dictionary<string, string> tokens = BuildTransferDialogTokens(selectedOption, transferPromptSelectedIndex + 1);

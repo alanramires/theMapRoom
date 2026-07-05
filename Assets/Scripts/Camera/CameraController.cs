@@ -75,6 +75,7 @@ public class CameraController : MonoBehaviour
     {
         HandleQuickZoomToggle();
         HandleZoom();
+        HandlePinchZoom();
         HandlePan();
         ClampCamera();
     }
@@ -162,16 +163,90 @@ public class CameraController : MonoBehaviour
         scroll /= 120f;
 #endif
 
-        Vector3 mouseScreen = GetMousePosition();
-        mouseScreen.z = -transform.position.z;
-        Vector3 worldBefore = _cam.ScreenToWorldPoint(mouseScreen);
+        // Sobre o painel de ajuda o scroll rola o texto do painel, nao da zoom no mapa.
+        if (PanelHelperController.IsPointerOverHelperPanel(GetMousePosition()))
+            return;
 
         float target = _cam.orthographicSize - scroll * zoomSpeed * Time.unscaledDeltaTime * 10f;
-        _cam.orthographicSize = Mathf.Clamp(target, minOrthoSize, GetEffectiveMaxOrthoSize());
+        SetOrthoSizeKeepingAnchor(target, GetMousePosition());
+    }
 
-        Vector3 worldAfter = _cam.ScreenToWorldPoint(mouseScreen);
+    // Ajusta o orthographicSize mantendo fixo o ponto de mundo sob o ponto de tela informado
+    // (zoom "em direcao ao cursor/dedos"). Compartilhado por scroll do mouse e pinca (touch).
+    void SetOrthoSizeKeepingAnchor(float newOrthoSize, Vector3 screenPoint)
+    {
+        screenPoint.z = -transform.position.z;
+        Vector3 worldBefore = _cam.ScreenToWorldPoint(screenPoint);
+
+        _cam.orthographicSize = Mathf.Clamp(newOrthoSize, minOrthoSize, GetEffectiveMaxOrthoSize());
+
+        Vector3 worldAfter = _cam.ScreenToWorldPoint(screenPoint);
         Vector3 delta = worldBefore - worldAfter;
         transform.position += new Vector3(delta.x, delta.y, 0f);
+    }
+
+    // Zoom por pinca de dois dedos (tablet). Reaproveita a mesma logica de zoom do scroll:
+    // afastar os dedos = zoom in; aproximar = zoom out; ancora no ponto medio entre os dedos.
+    void HandlePinchZoom()
+    {
+        if (!TryGetPinch(out Vector3 pinchCenter, out float prevDistance, out float currDistance))
+            return;
+
+        if (prevDistance < 1f || currDistance < 1f)
+            return;
+
+        float ratio = prevDistance / currDistance; // >1 dedos aproximando (zoom out), <1 afastando (zoom in)
+        if (Mathf.Abs(1f - ratio) < 0.0001f)
+            return;
+
+        SetOrthoSizeKeepingAnchor(_cam.orthographicSize * ratio, pinchCenter);
+    }
+
+    // Retorna, quando ha exatamente dois toques ativos, o centro entre eles e as distancias
+    // atual e do frame anterior (via delta de cada toque, sem guardar estado entre frames).
+    bool TryGetPinch(out Vector3 center, out float prevDistance, out float currDistance)
+    {
+        center = default;
+        prevDistance = 0f;
+        currDistance = 0f;
+
+#if ENABLE_INPUT_SYSTEM
+        if (Touchscreen.current == null)
+            return false;
+
+        var touches = Touchscreen.current.touches;
+        Vector2 p0 = default, p1 = default, pp0 = default, pp1 = default;
+        int n = 0;
+        for (int i = 0; i < touches.Count && n < 2; i++)
+        {
+            if (!touches[i].press.isPressed)
+                continue;
+            Vector2 pos = touches[i].position.ReadValue();
+            Vector2 prev = pos - touches[i].delta.ReadValue();
+            if (n == 0) { p0 = pos; pp0 = prev; }
+            else { p1 = pos; pp1 = prev; }
+            n++;
+        }
+        if (n < 2)
+            return false;
+
+        center = (p0 + p1) * 0.5f;
+        currDistance = Vector2.Distance(p0, p1);
+        prevDistance = Vector2.Distance(pp0, pp1);
+        return true;
+#else
+        if (Input.touchCount < 2)
+            return false;
+
+        Touch t0 = Input.GetTouch(0);
+        Touch t1 = Input.GetTouch(1);
+        Vector2 p0 = t0.position;
+        Vector2 p1 = t1.position;
+        center = (p0 + p1) * 0.5f;
+        currDistance = Vector2.Distance(p0, p1);
+        prevDistance = Vector2.Distance(p0 - t0.deltaPosition, p1 - t1.deltaPosition);
+        return true;
+#endif
     }
 
     void HandlePan()

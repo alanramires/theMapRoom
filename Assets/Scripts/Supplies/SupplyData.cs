@@ -18,6 +18,12 @@ public class SupplyData : ScriptableObject
     [Header("Visuals")]
     public Sprite spriteDefault;
 
+    [Tooltip("Icone de alerta quando o estoque deste suprimento esta pela metade (<= limiar).")]
+    public Sprite spriteHalf;
+
+    [Tooltip("Icone de alerta quando o estoque deste suprimento zerou.")]
+    public Sprite spriteEmpty;
+
     [Header("Related Service")]
     [Tooltip("Servicos relacionados que consomem este suprimento.")]
     [FormerlySerializedAs("relatedService")]

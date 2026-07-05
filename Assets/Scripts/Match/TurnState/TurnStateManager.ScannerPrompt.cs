@@ -1130,6 +1130,15 @@ public partial class TurnStateManager
             return true;
         }
 
+        // Para um supridor estacionado sobre uma construcao, o segundo clique na
+        // propria unidade expressa a acao contextual Transferir. A disponibilidade
+        // e os destinos continuam vindo integralmente do PodeTransferir.
+        if (availableSensorActionCodes.Contains('T') && FindConstructionAtCell(unitCell) != null)
+        {
+            HandleTransferActionRequested();
+            return IsTransferPromptActive();
+        }
+
         // As demais acoes contextuais apontam para outro alvo (inimigo, transportador,
         // passageiro etc.). Portanto, depois da prioridade de Capturar, clicar novamente
         // na propria unidade expressa inequivocamente "Apenas Mover", mesmo que existam

@@ -304,6 +304,8 @@ public partial class TurnStateManager
         public string unitName;
         public bool isDonate;
         public bool isFocused;
+        public Sprite targetSprite;
+        public Color targetColor = Color.white;
     }
 
     public sealed class HelperTransferResourceLine
@@ -1722,7 +1724,13 @@ public partial class TurnStateManager
 
         if (!IsInspectedHelperActive())
         {
-            if (inspectedHelperUnit != null || inspectedHelperConstruction != null)
+            bool hadHelper = inspectedHelperUnit != null || inspectedHelperConstruction != null;
+            // Timeout de um helper de unidade/construcao: se ainda estamos presos no estado
+            // de inspecao, volta pra neutral (Retreat). So limpar deixaria o CursorState travado
+            // em InspectingUnit/Building. (InspectingHotZone nao usa helper e tem dismiss proprio.)
+            if (hadHelper && IsInspectingState())
+                ExitInspectStateToNeutral();
+            else if (hadHelper)
                 ClearInspectedHelper();
             return;
         }
@@ -2522,7 +2530,15 @@ public partial class TurnStateManager
                 index = i + 1,
                 unitName = ResolveTransferOptionTargetName(option),
                 isDonate = option.flowMode == TransferFlowMode.Fornecimento,
-                isFocused = transferPromptSelectedIndex == i
+                isFocused = transferPromptSelectedIndex == i,
+                targetSprite = option.targetUnit != null
+                    ? (option.targetUnit.GetMainSpriteRenderer() != null ? option.targetUnit.GetMainSpriteRenderer().sprite : null)
+                    : (option.targetConstruction != null && option.targetConstruction.GetMainSpriteRenderer() != null
+                        ? option.targetConstruction.GetMainSpriteRenderer().sprite : null),
+                targetColor = option.targetUnit != null
+                    ? (option.targetUnit.GetMainSpriteRenderer() != null ? option.targetUnit.GetMainSpriteRenderer().color : Color.white)
+                    : (option.targetConstruction != null && option.targetConstruction.GetMainSpriteRenderer() != null
+                        ? option.targetConstruction.GetMainSpriteRenderer().color : Color.white)
             });
         }
 

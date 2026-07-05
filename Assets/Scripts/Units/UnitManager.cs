@@ -69,6 +69,11 @@ public class UnitManager : MonoBehaviour
     [Header("Supplier Runtime")]
     [SerializeField] private List<UnitEmbarkedSupply> embarkedResourcesRuntime = new List<UnitEmbarkedSupply>();
     [SerializeField] private List<ServiceData> embarkedServicesRuntime = new List<ServiceData>();
+    [Header("Supplier Stock Alerts")]
+    [SerializeField] private Image supplyTop;
+    [SerializeField] private Image supplyMiddle;
+    [SerializeField] private Image supplyBottom;
+    [SerializeField] [Range(0.01f, 0.99f)] private float supplierStockAlertThreshold = 0.5f;
     [SerializeField, HideInInspector] private bool appliedHasActed;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField] private bool isEmbarked;
@@ -292,11 +297,20 @@ public class UnitManager : MonoBehaviour
     private MaterialPropertyBlock spritePropertyBlock;
     private static Material actedGlowMaterial;
     private Coroutine selectionBlinkRoutine;
+    private int supplierStockAlertSignature = int.MinValue;
+
+    private struct SupplierStockAlert
+    {
+        public float ratio;
+        public bool empty;
+        public Sprite sprite;
+    }
 
     private void Awake()
     {
         EnsureDefaults();
         TryAutoAssignHud();
+        TryAutoAssignSupplyAlertSlots();
         TryAutoAssignLockRenderer();
         TryAutoAssignBoardTilemap();
         TryAutoAssignMatchController();
@@ -307,6 +321,7 @@ public class UnitManager : MonoBehaviour
         appliedHasActed = hasActed;
         appliedActiveTeamId = matchController != null ? matchController.ActiveTeamId : int.MinValue;
         RefreshActedVisual();
+        RefreshSupplierStockAlerts(force: true);
     }
     private void Update()
     {
@@ -317,6 +332,7 @@ public class UnitManager : MonoBehaviour
             SyncDeadFlagFromHp();
 
         SyncRuntimeFlagInspectorView();
+        RefreshSupplierStockAlerts(force: false);
     }
 
     private void LateUpdate()
@@ -340,11 +356,13 @@ public class UnitManager : MonoBehaviour
     private void Start()
     {
         TryAutoAssignMatchController();
+        TryAutoAssignSupplyAlertSlots();
         appliedHasActed = hasActed;
         appliedActiveTeamId = matchController != null ? matchController.ActiveTeamId : int.MinValue;
         RefreshActedVisual();
         RefreshDetectedIndicator();
         RefreshAIAssignedPlanBadge();
+        RefreshSupplierStockAlerts(force: true);
     }
 
     private void OnEnable()
@@ -393,6 +411,7 @@ public class UnitManager : MonoBehaviour
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
 
         TryAutoAssignHud();
+        TryAutoAssignSupplyAlertSlots();
         TryAutoAssignLockRenderer();
         EnsureDefaults();
         TryAutoAssignBoardTilemap();
@@ -409,8 +428,134 @@ public class UnitManager : MonoBehaviour
         SyncRuntimeFlagInspectorView();
 
         RefreshActedVisual();
+        RefreshSupplierStockAlerts(force: true);
     }
 #endif
+
+    private void TryAutoAssignSupplyAlertSlots()
+    {
+        if (supplyTop == null) supplyTop = FindChildImageByName("supply_top");
+        if (supplyMiddle == null) supplyMiddle = FindChildImageByName("supply_middle");
+        if (supplyBottom == null) supplyBottom = FindChildImageByName("supply_bottom");
+        ConfigureSupplyAlertSlot(supplyTop);
+        ConfigureSupplyAlertSlot(supplyMiddle);
+        ConfigureSupplyAlertSlot(supplyBottom);
+    }
+
+    private Image FindChildImageByName(string objectName)
+    {
+        Image[] images = GetComponentsInChildren<Image>(true);
+        for (int i = 0; i < images.Length; i++)
+            if (images[i] != null && images[i].name == objectName)
+                return images[i];
+        return null;
+    }
+
+    private static void ConfigureSupplyAlertSlot(Image slot)
+    {
+        if (slot == null) return;
+        slot.raycastTarget = false;
+        slot.preserveAspect = true;
+    }
+
+    private void RefreshSupplierStockAlerts(bool force)
+    {
+        if (supplyTop == null || supplyMiddle == null || supplyBottom == null)
+            TryAutoAssignSupplyAlertSlots();
+
+        UnitData data = TryGetUnitData();
+        bool isSupplier = data != null && data.isSupplier;
+
+        // Somente supridores exibem a pilha de alerta de estoque; o resto fica oculto.
+        if (!isSupplier)
+        {
+            if (force || supplierStockAlertSignature != 0)
+            {
+                supplierStockAlertSignature = 0;
+                HideSupplyAlertSlot(supplyTop);
+                HideSupplyAlertSlot(supplyMiddle);
+                HideSupplyAlertSlot(supplyBottom);
+            }
+            return;
+        }
+
+        int signature = 17;
+        for (int i = 0; i < embarkedResourcesRuntime.Count; i++)
+        {
+            UnitEmbarkedSupply entry = embarkedResourcesRuntime[i];
+            signature = unchecked(signature * 31 + (entry != null ? entry.amount : 0));
+        }
+        if (!force && signature == supplierStockAlertSignature)
+            return;
+        supplierStockAlertSignature = signature;
+
+        List<SupplierStockAlert> alerts = new List<SupplierStockAlert>(3);
+        if (data.supplierResources != null)
+        {
+            for (int i = 0; i < data.supplierResources.Count; i++)
+            {
+                UnitEmbarkedSupply baseline = data.supplierResources[i];
+                if (baseline == null || baseline.supply == null || baseline.amount <= 0)
+                    continue;
+                int current = ResolveRuntimeSupplyAmount(baseline.supply);
+                float ratio = Mathf.Clamp01((float)current / baseline.amount);
+                if (ratio > supplierStockAlertThreshold)
+                    continue;
+                Sprite alertSprite = ResolveSupplierAlertSprite(baseline.supply, current <= 0);
+                if (alertSprite == null)
+                    continue;
+                alerts.Add(new SupplierStockAlert { ratio = ratio, empty = current <= 0, sprite = alertSprite });
+            }
+        }
+        alerts.Sort((a, b) =>
+        {
+            int byEmpty = b.empty.CompareTo(a.empty);
+            return byEmpty != 0 ? byEmpty : a.ratio.CompareTo(b.ratio);
+        });
+        // Pilha enche de baixo pra cima: o primeiro/mais critico ocupa o bottom.
+        ApplySupplyAlertSlot(supplyBottom, alerts, 0);
+        ApplySupplyAlertSlot(supplyMiddle, alerts, 1);
+        ApplySupplyAlertSlot(supplyTop, alerts, 2);
+    }
+
+    private int ResolveRuntimeSupplyAmount(SupplyData supply)
+    {
+        int total = 0;
+        for (int i = 0; i < embarkedResourcesRuntime.Count; i++)
+        {
+            UnitEmbarkedSupply entry = embarkedResourcesRuntime[i];
+            if (entry != null && entry.supply == supply)
+                total += Mathf.Max(0, entry.amount);
+        }
+        return total;
+    }
+
+    private static Sprite ResolveSupplierAlertSprite(SupplyData supply, bool empty)
+    {
+        if (supply == null)
+            return null;
+        Sprite chosen = empty ? supply.spriteEmpty : supply.spriteHalf;
+        return chosen != null ? chosen : supply.spriteDefault;
+    }
+
+    private static void ApplySupplyAlertSlot(Image slot, List<SupplierStockAlert> alerts, int index)
+    {
+        if (slot == null) return;
+        bool visible = alerts != null && index >= 0 && index < alerts.Count && alerts[index].sprite != null;
+        slot.sprite = visible ? alerts[index].sprite : null;
+        slot.enabled = visible;
+        if (slot.gameObject.activeSelf != visible)
+            slot.gameObject.SetActive(visible);
+    }
+
+    private static void HideSupplyAlertSlot(Image slot)
+    {
+        if (slot == null) return;
+        slot.sprite = null;
+        slot.enabled = false;
+        if (slot.gameObject.activeSelf)
+            slot.gameObject.SetActive(false);
+    }
 
     public void Setup(UnitDatabase database, string id)
     {

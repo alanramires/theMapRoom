@@ -141,12 +141,22 @@ public class CursorController : MonoBehaviour
     [SerializeField] private ReplayManager replayManager;
     [SerializeField] private MonoBehaviour battleMapMenuRootController;
     [SerializeField] private bool enableNeutralLeftClickTeleport = true;
+    [Header("Right-Click As Cancel")]
+    [Tooltip("Clique direito curto (sem arrastar) age como ESC/cancelar. Arrastar continua fazendo pan da camera.")]
+    [SerializeField] private bool rightClickActsAsCancel = true;
+    [Tooltip("Deslocamento maximo em pixels para o clique direito ainda contar como 'clique' e nao 'arrasto'. 0 = automatico (relativo a tela).")]
+    [SerializeField] private float rightClickTapMaxTravelPixels = 0f;
 
     private Vector3Int heldDirection = Vector3Int.zero;
     private float nextRepeatTime;
     private static int lastConfirmFrameProcessed = -1;
     private static int lastCancelFrameProcessed = -1;
     private bool pendingEndTurnConfirmation;
+
+    private Vector2 rightClickDownScreenPos;
+    private bool rightClickTracking;
+    private bool rightClickMovedBeyondTap;
+    private bool rightClickCancelTapThisFrame;
 
     public Vector3Int CurrentCell => currentCell;
     public Tilemap BoardTilemap => boardTilemap;
@@ -207,6 +217,7 @@ public class CursorController : MonoBehaviour
     private void Update()
     {
         UpdateCursorBlink();
+        UpdateRightClickCancelTap();
         TryAutoAssignMatchController();
         TryAutoAssignReplayManager();
         if (replayManager != null && replayManager.IsReplaying)
@@ -283,6 +294,16 @@ public class CursorController : MonoBehaviour
             else if (WasMenuDownPressedThisFrame())
                 turnStateManager.NavigateEmbarkHelperFocus(+1);
             HandleNeutralLeftClickTeleport();
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
+        if (turnStateManager != null && turnStateManager.IsTransferHelperActive)
+        {
+            if (WasMenuUpPressedThisFrame() || WasMenuLeftPressedThisFrame())
+                turnStateManager.NavigateTransferHelperFocus(-1);
+            else if (WasMenuDownPressedThisFrame() || WasMenuRightPressedThisFrame())
+                turnStateManager.NavigateTransferHelperFocus(+1);
             heldDirection = Vector3Int.zero;
             return;
         }
@@ -522,6 +543,10 @@ public class CursorController : MonoBehaviour
             return;
 
         if (!GetMouseButtonDown(0))
+            return;
+
+        // Durante pinca (2+ dedos) o "clique esquerdo" simulado nao deve teleportar o cursor.
+        if (IsMultiTouchActive())
             return;
 
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
@@ -1251,6 +1276,8 @@ public class CursorController : MonoBehaviour
 
     private bool WasCancelPressedThisFrame()
     {
+        if (rightClickCancelTapThisFrame)
+            return true;
 #if ENABLE_INPUT_SYSTEM
         EnsureInputActionsBound();
         if (cancelAction != null && cancelAction.WasPerformedThisFrame())
@@ -1442,6 +1469,79 @@ public class CursorController : MonoBehaviour
         return Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
 #else
         return Input.mousePosition;
+#endif
+    }
+
+    private bool GetMouseButtonUp(int button)
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Mouse.current == null)
+            return false;
+
+        if (button == 0) return Mouse.current.leftButton.wasReleasedThisFrame;
+        if (button == 1) return Mouse.current.rightButton.wasReleasedThisFrame;
+        if (button == 2) return Mouse.current.middleButton.wasReleasedThisFrame;
+        return false;
+#else
+        return Input.GetMouseButtonUp(button);
+#endif
+    }
+
+    // Clique direito curto (sem arrasto) = ESC/cancelar. Arrastar continua fazendo pan (CameraController).
+    // Distingue tap de arrasto pelo deslocamento em pixels entre o press e o release.
+    private void UpdateRightClickCancelTap()
+    {
+        rightClickCancelTapThisFrame = false;
+        if (!rightClickActsAsCancel)
+        {
+            rightClickTracking = false;
+            return;
+        }
+
+        if (GetMouseButtonDown(1))
+        {
+            rightClickTracking = true;
+            rightClickMovedBeyondTap = false;
+            rightClickDownScreenPos = GetMousePosition();
+        }
+
+        if (rightClickTracking && !rightClickMovedBeyondTap)
+        {
+            float travel = Vector2.Distance((Vector2)GetMousePosition(), rightClickDownScreenPos);
+            if (travel > GetRightClickTapMaxTravelPixels())
+                rightClickMovedBeyondTap = true;
+        }
+
+        if (GetMouseButtonUp(1))
+        {
+            if (rightClickTracking && !rightClickMovedBeyondTap)
+                rightClickCancelTapThisFrame = true;
+            rightClickTracking = false;
+        }
+    }
+
+    private float GetRightClickTapMaxTravelPixels()
+    {
+        if (rightClickTapMaxTravelPixels > 0f)
+            return rightClickTapMaxTravelPixels;
+        // Automatico: ~2% da altura da tela, com piso, pra escalar bem em telas de alto DPI/tablet.
+        return Mathf.Max(8f, Screen.height * 0.02f);
+    }
+
+    // Dois ou mais toques ativos (ex.: pinca pra zoom). Usado para nao disparar acoes de um dedo so.
+    private bool IsMultiTouchActive()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Touchscreen.current == null)
+            return false;
+        int active = 0;
+        var touches = Touchscreen.current.touches;
+        for (int i = 0; i < touches.Count; i++)
+            if (touches[i].press.isPressed && ++active >= 2)
+                return true;
+        return false;
+#else
+        return Input.touchCount >= 2;
 #endif
     }
 
