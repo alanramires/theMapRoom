@@ -48,13 +48,125 @@ public class PanelMenu : MonoBehaviour
     private int lastConfirmSfxFrame = -1;
     private bool pendingInitialFocus;
     private bool quitConfirmOpen;
+    private int quitConfirmFocusIndex;
     private Vector2 previousUiMove;
     private bool previousUiSubmitPressed;
     private bool previousUiCancelPressed;
     private int ignoreInputUntilFrame = -1;
     private int lastLoadOpenRequestFrame = -1;
+    private bool newGameWizardOpen;
+    private int newGameWizardStep;
+    private int newGameWizardFocusIndex;
+    private TeamId newGameHumanTeam = TeamId.Green;
+    private TeamId newGameAiTeam = TeamId.Red;
+    private MatchController.GameSetupPreset newGamePreset = MatchController.GameSetupPreset.FogOfWarTotal;
+
+    private static readonly TeamId[] NewGameTeams = { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
+    private static readonly MatchController.GameSetupPreset[] NewGamePresets =
+    {
+        MatchController.GameSetupPreset.GameBoyClassic,
+        MatchController.GameSetupPreset.FisicaBasica,
+        MatchController.GameSetupPreset.AMontanhaAvacalha,
+        MatchController.GameSetupPreset.NeblinaLeve,
+        MatchController.GameSetupPreset.FogOfWarTotal
+    };
 
     public int CurrentIndex => currentIndex;
+    public bool IsNewGameWizardOpen => newGameWizardOpen;
+    public int NewGameWizardFocusIndex => newGameWizardFocusIndex;
+    public int NewGameWizardStep => newGameWizardStep;
+
+    public int GetNewGameWizardOptionCount()
+    {
+        if (!newGameWizardOpen) return 0;
+        if (newGameWizardStep == 0) return NewGameTeams.Length + 1;
+        if (newGameWizardStep == 1) return NewGameTeams.Length;
+        if (newGameWizardStep == 2) return NewGamePresets.Length + 1;
+        return 2;
+    }
+
+    public string GetNewGameWizardOptionLabel(int index)
+    {
+        if (newGameWizardStep == 0)
+            return index < NewGameTeams.Length ? ResolveTeamLabel(NewGameTeams[index]) : "CANCELAR";
+        if (newGameWizardStep == 1)
+        {
+            List<TeamId> opponents = BuildAvailableOpponentTeams();
+            return index < opponents.Count ? $"IA {ResolveTeamLabel(opponents[index])}" : "VOLTAR";
+        }
+        if (newGameWizardStep == 2)
+            return index < NewGamePresets.Length ? ResolvePresetLabel(NewGamePresets[index]) : "VOLTAR";
+        return index == 0 ? "INICIAR JOGO" : "VOLTAR";
+    }
+
+    public bool TryGetNewGameWizardOptionColor(int index, out Color color)
+    {
+        color = Color.white;
+        TeamId team;
+        if (newGameWizardStep == 0 && index >= 0 && index < NewGameTeams.Length)
+            team = NewGameTeams[index];
+        else if (newGameWizardStep == 1)
+        {
+            List<TeamId> opponents = BuildAvailableOpponentTeams();
+            if (index < 0 || index >= opponents.Count) return false;
+            team = opponents[index];
+        }
+        else return false;
+
+        color = TeamUtils.GetColor(team);
+        return true;
+    }
+
+    public bool NavigateNewGameWizard(int direction)
+    {
+        if (!newGameWizardOpen || direction == 0) return false;
+        int count = GetNewGameWizardOptionCount();
+        newGameWizardFocusIndex = (newGameWizardFocusIndex + (direction > 0 ? 1 : -1) + count) % count;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public void InvokeNewGameWizardOption(int index)
+    {
+        if (!newGameWizardOpen || index < 0 || index >= GetNewGameWizardOptionCount()) return;
+        newGameWizardFocusIndex = index;
+        if (newGameWizardStep == 0)
+        {
+            if (index >= NewGameTeams.Length) { CloseNewGameWizard(); return; }
+            newGameHumanTeam = NewGameTeams[index];
+            newGameWizardStep = 1;
+        }
+        else if (newGameWizardStep == 1)
+        {
+            List<TeamId> opponents = BuildAvailableOpponentTeams();
+            if (index >= opponents.Count) { newGameWizardStep = 0; }
+            else { newGameAiTeam = opponents[index]; newGameWizardStep = 2; }
+        }
+        else if (newGameWizardStep == 2)
+        {
+            if (index >= NewGamePresets.Length) { newGameWizardStep = 1; }
+            else { newGamePreset = NewGamePresets[index]; newGameWizardStep = 3; }
+        }
+        else if (index == 0)
+        {
+            StartConfiguredNewGame();
+            return;
+        }
+        else newGameWizardStep = 2;
+
+        newGameWizardFocusIndex = 0;
+        RefreshNewGameWizardHelper();
+        cursorController?.PlayConfirmSfx();
+    }
+
+    public void InvokeFocusedNewGameWizardOption() => InvokeNewGameWizardOption(newGameWizardFocusIndex);
+
+    public void CancelNewGameWizardStep()
+    {
+        if (!newGameWizardOpen) return;
+        if (newGameWizardStep <= 0) CloseNewGameWizard();
+        else { newGameWizardStep--; newGameWizardFocusIndex = 0; RefreshNewGameWizardHelper(); cursorController?.PlayCancelSfx(); }
+    }
 
     protected virtual void Awake()
     {
@@ -122,11 +234,30 @@ public class PanelMenu : MonoBehaviour
             out bool confirmPressed,
             out bool cancelPressed);
 
+        if (newGameWizardOpen)
+        {
+            if (upPressed || leftPressed) { NavigateNewGameWizard(-1); return; }
+            if (downPressed || rightPressed) { NavigateNewGameWizard(+1); return; }
+            if (confirmPressed) { InvokeFocusedNewGameWizardOption(); return; }
+            if (cancelPressed) { CancelNewGameWizardStep(); return; }
+            return;
+        }
+
         if (quitConfirmOpen)
         {
+            if (upPressed || leftPressed)
+            {
+                NavigateQuitConfirmation(-1);
+                return;
+            }
+            if (downPressed || rightPressed)
+            {
+                NavigateQuitConfirmation(+1);
+                return;
+            }
             if (confirmPressed)
             {
-                ConfirmQuitGame();
+                InvokeFocusedQuitConfirmation();
                 return;
             }
 
@@ -266,6 +397,25 @@ public class PanelMenu : MonoBehaviour
     }
 
     public bool IsQuitConfirmationOpen => quitConfirmOpen;
+    public int QuitConfirmationFocusIndex => quitConfirmFocusIndex;
+
+    public bool NavigateQuitConfirmation(int direction)
+    {
+        if (!quitConfirmOpen || direction == 0) return false;
+        quitConfirmFocusIndex = (quitConfirmFocusIndex + (direction > 0 ? 1 : -1) + 2) % 2;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public void InvokeFocusedQuitConfirmation()
+    {
+        if (!quitConfirmOpen) return;
+        if (quitConfirmFocusIndex == 0) ConfirmQuitGame();
+        else CancelQuitGame();
+    }
+
+    public void ConfirmQuitFromPointer() { quitConfirmFocusIndex = 0; ConfirmQuitGame(); }
+    public void CancelQuitFromPointer() { quitConfirmFocusIndex = 1; CancelQuitGame(); }
 
     public void SetCurrentIndex(int index)
     {
@@ -580,17 +730,70 @@ public class PanelMenu : MonoBehaviour
 
         PlayConfirmSfxOncePerFrame();
 
-        TeamId[] teams  = { TeamId.Green, TeamId.Red };
-        bool[]   isAI   = { false, true };
-        bool[]   flipX  = { false, true };
-        bool[]   cmdAuto= { false, true };
-        const MatchController.GameSetupPreset preset = MatchController.GameSetupPreset.FogOfWarTotal;
-        const string target = "Battle Map 1 - Ground";
-
-        SaveGameManager.SetupForNewGame(string.Empty);
-        PartidaConfig.Set(2, teams, isAI, flipX, preset, cmdAuto, target);
-        UnityEngine.SceneManagement.SceneManager.LoadScene(target);
+        newGameWizardOpen = true;
+        newGameWizardStep = 0;
+        newGameWizardFocusIndex = 0;
+        newGameHumanTeam = TeamId.Green;
+        newGameAiTeam = TeamId.Red;
+        newGamePreset = MatchController.GameSetupPreset.FogOfWarTotal;
+        RefreshNewGameWizardHelper();
     }
+
+    private void RefreshNewGameWizardHelper()
+    {
+        string title = newGameWizardStep == 0 ? "ESCOLHA SUA COR" :
+                       newGameWizardStep == 1 ? "ESCOLHA A IA ADVERSÁRIA" :
+                       newGameWizardStep == 2 ? "CONFIGURE O JOGO" : "CONFIRMAR PARTIDA";
+        string body = newGameWizardStep == 3
+            ? $"Você: {ResolveTeamLabel(newGameHumanTeam)}\nIA adversária: {ResolveTeamLabel(newGameAiTeam)}\nRegras: {ResolvePresetLabel(newGamePreset)}"
+            : (newGameWizardStep == 1 ? "Slot 1 será controlado pela IA." : string.Empty);
+        PanelHelperController.TrySetExternalText(title, body);
+    }
+
+    private void CloseNewGameWizard()
+    {
+        newGameWizardOpen = false;
+        newGameWizardStep = 0;
+        newGameWizardFocusIndex = 0;
+        PanelHelperController.ClearExternalText();
+        cursorController?.PlayCancelSfx();
+    }
+
+    private List<TeamId> BuildAvailableOpponentTeams()
+    {
+        List<TeamId> result = new List<TeamId>(3);
+        for (int i = 0; i < NewGameTeams.Length; i++)
+            if (NewGameTeams[i] != newGameHumanTeam) result.Add(NewGameTeams[i]);
+        return result;
+    }
+
+    private void StartConfiguredNewGame()
+    {
+        const string target = "Battle Map 1 - Ground";
+        TeamId[] teams = { newGameHumanTeam, newGameAiTeam };
+        bool[] isAI = { false, true };
+        bool[] flipX = { IsTeamFlipped(newGameHumanTeam), IsTeamFlipped(newGameAiTeam) };
+        bool[] cmdAuto = { false, true };
+        SaveGameManager.SetupForNewGame(string.Empty);
+        PartidaConfig.Set(2, teams, isAI, flipX, newGamePreset, cmdAuto, target);
+        newGameWizardOpen = false;
+        PanelHelperController.ClearExternalText();
+        SceneManager.LoadScene(target);
+    }
+
+    private static bool IsTeamFlipped(TeamId team) => team == TeamId.Red || team == TeamId.Yellow;
+    private static string ResolveTeamLabel(TeamId team) => team switch
+    {
+        TeamId.Green => "VERDE", TeamId.Red => "VERMELHO", TeamId.Blue => "AZUL", TeamId.Yellow => "AMARELO", _ => team.ToString().ToUpperInvariant()
+    };
+    private static string ResolvePresetLabel(MatchController.GameSetupPreset preset) => preset switch
+    {
+        MatchController.GameSetupPreset.GameBoyClassic => "GAME BOY CLÁSSICO",
+        MatchController.GameSetupPreset.FisicaBasica => "FÍSICA BÁSICA",
+        MatchController.GameSetupPreset.AMontanhaAvacalha => "A MONTANHA AVACALHA",
+        MatchController.GameSetupPreset.NeblinaLeve => "NEBLINA LEVE",
+        _ => "FOG OF WAR TOTAL"
+    };
 
     private void OnLoadButtonClicked()
     {
@@ -685,7 +888,9 @@ public class PanelMenu : MonoBehaviour
             return;
 
         quitConfirmOpen = false;
+        quitConfirmFocusIndex = 0;
         PanelDialogController.ClearExternalText();
+        PanelHelperController.ClearExternalText();
     }
 
     public void CancelQuitGameFromState()
@@ -752,14 +957,13 @@ public class PanelMenu : MonoBehaviour
     private void OpenQuitConfirmation()
     {
         quitConfirmOpen = true;
+        quitConfirmFocusIndex = 0;
         // Evita auto-confirmacao no frame seguinte quando o mesmo submit
         // (mouse/enter/gamepad) que abriu o dialogo ainda esta pressionado.
         ignoreInputUntilFrame = Time.frameCount + 1;
         previousUiSubmitPressed = true;
-        string text = PanelDialogController.ResolveDialogMessage(
-            "dialog.main_menu.quit_confirm",
-            "sair para o windows?\nENTER: sim | ESC: nao");
-        PanelDialogController.TrySetExternalText(text);
+        PanelDialogController.ClearExternalText();
+        PanelHelperController.TrySetExternalText("SAIR", "Sair e voltar para o Windows?");
         cursorController?.PlayBeepSfx();
     }
 
@@ -769,7 +973,9 @@ public class PanelMenu : MonoBehaviour
             return;
 
         quitConfirmOpen = false;
+        quitConfirmFocusIndex = 0;
         PanelDialogController.ClearExternalText();
+        PanelHelperController.ClearExternalText();
         cursorController?.PlayCancelSfx();
     }
 
@@ -779,7 +985,9 @@ public class PanelMenu : MonoBehaviour
             return;
 
         quitConfirmOpen = false;
+        quitConfirmFocusIndex = 0;
         PanelDialogController.ClearExternalText();
+        PanelHelperController.ClearExternalText();
 #if UNITY_EDITOR
         EditorApplication.isPlaying = false;
 #else
@@ -937,6 +1145,10 @@ public class PanelMenu : MonoBehaviour
         rightPressed |= Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D);
         confirmPressed |= Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
         cancelPressed |= Input.GetKeyDown(KeyCode.Escape);
+
+        // Fire TV / gamepad e clique direito (= ESC) tambem confirmam/cancelam no menu.
+        confirmPressed |= RemoteInput.ConfirmDownThisFrame();
+        cancelPressed |= RemoteInput.CancelDownThisFrame() || RemoteInput.RightClickCancelDownThisFrame();
     }
 
     private static bool IsFocusedOnTextInputControl()

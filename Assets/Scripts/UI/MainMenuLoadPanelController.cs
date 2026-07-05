@@ -12,7 +12,6 @@ using UnityEngine.InputSystem;
 public class MainMenuLoadPanelController : MonoBehaviour
 {
     private const string UnknownMapSlotLabelFormat = "#{0} game nao encontrado";
-    private const string DeleteConfirmDialogId = "dialog.load_prompt.delete_confirm";
     private const string DeleteSuccessDialogId = "dialog.load_prompt.delete_success";
 
     [Header("References")]
@@ -39,12 +38,43 @@ public class MainMenuLoadPanelController : MonoBehaviour
     private bool loadTransitionInProgress;
     private bool deleteConfirmOpen;
     private int deleteConfirmSlot;
+    private int deleteConfirmFocusIndex;
     private int panelOpenedFrame = -1;
     private int lastOpenFrame = -1;
     private int lastCloseFrame = -1;
 
     public bool IsOpen => !isHidden && panelLoadRoot != null && panelLoadRoot.activeInHierarchy;
     public bool IsDeleteConfirmationOpen => deleteConfirmOpen;
+    public int DeleteConfirmationFocusIndex => deleteConfirmFocusIndex;
+
+    public bool NavigateDeleteConfirmation(int direction)
+    {
+        if (!deleteConfirmOpen || direction == 0)
+            return false;
+        deleteConfirmFocusIndex = (deleteConfirmFocusIndex + (direction > 0 ? 1 : -1) + 2) % 2;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public void InvokeFocusedDeleteConfirmation()
+    {
+        if (!deleteConfirmOpen)
+            return;
+        if (deleteConfirmFocusIndex == 0) ConfirmDeleteSlot();
+        else CancelDeleteConfirmation(playCancelSfx: true);
+    }
+
+    public void ConfirmDeleteFromPointer()
+    {
+        deleteConfirmFocusIndex = 0;
+        ConfirmDeleteSlot();
+    }
+
+    public void CancelDeleteFromPointer()
+    {
+        deleteConfirmFocusIndex = 1;
+        CancelDeleteConfirmation(playCancelSfx: true);
+    }
 
     private void Awake()
     {
@@ -87,9 +117,19 @@ public class MainMenuLoadPanelController : MonoBehaviour
 
         if (deleteConfirmOpen)
         {
+            if (WasUpPressed() || WasLeftPressed())
+            {
+                NavigateDeleteConfirmation(-1);
+                return;
+            }
+            if (WasDownPressed() || WasRightPressed())
+            {
+                NavigateDeleteConfirmation(+1);
+                return;
+            }
             if (WasConfirmPressed())
             {
-                ConfirmDeleteSlot();
+                InvokeFocusedDeleteConfirmation();
                 return;
             }
 
@@ -671,21 +711,13 @@ public class MainMenuLoadPanelController : MonoBehaviour
         }
 
         string sceneName = saveGameManager.TryGetSlotSceneName(slot, out string scene) ? scene : "game nao encontrado";
-        string fallback = $"#{slot} {sceneName}\nDeletar este save?\nENTER: confirmar | ESC: voltar";
-        string text = PanelDialogController.ResolveDialogMessage(
-            DeleteConfirmDialogId,
-            fallback,
-            new Dictionary<string, string>
-            {
-                { "slot", slot.ToString() },
-                { "scene", sceneName }
-            });
-
         deleteConfirmOpen = true;
         deleteConfirmSlot = slot;
+        deleteConfirmFocusIndex = 0;
         // Enter/click de UI nao deve disparar feedback paralelo de gameplay.
         UiInputBlocker.SuppressGameplayInputForFrames(2);
-        PanelDialogController.TrySetExternalText(text);
+        PanelDialogController.ClearExternalText();
+        PanelHelperController.TrySetExternalText("DELETAR SAVE", $"#{slot} {sceneName}\nDeletar este save?");
         cursorController?.PlayBeepSfx();
     }
 
@@ -700,7 +732,9 @@ public class MainMenuLoadPanelController : MonoBehaviour
         int slot = deleteConfirmSlot;
         deleteConfirmOpen = false;
         deleteConfirmSlot = 0;
+        deleteConfirmFocusIndex = 0;
         PanelDialogController.ClearExternalText();
+        PanelHelperController.ClearExternalText();
 
         if (saveGameManager == null)
         {
@@ -729,7 +763,9 @@ public class MainMenuLoadPanelController : MonoBehaviour
 
         deleteConfirmOpen = false;
         deleteConfirmSlot = 0;
+        deleteConfirmFocusIndex = 0;
         PanelDialogController.ClearExternalText();
+        PanelHelperController.ClearExternalText();
         if (playCancelSfx)
             cursorController?.PlayCancelSfx();
     }
@@ -850,6 +886,8 @@ public class MainMenuLoadPanelController : MonoBehaviour
 
     private static bool WasConfirmPressed()
     {
+        if (RemoteInput.ConfirmDownThisFrame())
+            return true;
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
             return Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame;
@@ -859,6 +897,8 @@ public class MainMenuLoadPanelController : MonoBehaviour
 
     private static bool WasCancelPressed()
     {
+        if (RemoteInput.CancelDownThisFrame() || RemoteInput.RightClickCancelDownThisFrame())
+            return true;
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
             return Keyboard.current.escapeKey.wasPressedThisFrame;
@@ -904,4 +944,3 @@ public class MainMenuLoadPanelController : MonoBehaviour
     }
 
 }
-

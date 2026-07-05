@@ -158,6 +158,10 @@ public class CursorController : MonoBehaviour
     private bool rightClickMovedBeyondTap;
     private bool rightClickCancelTapThisFrame;
 
+    // Exposto para o menu do mapa: clique direito curto (= ESC) tambem abre/fecha o menu.
+    // Calculado no topo do Update (UpdateRightClickCancelTap), antes de TryHandleBattleMapMenuInput.
+    public bool WasRightClickCancelTapThisFrame => rightClickCancelTapThisFrame;
+
     public Vector3Int CurrentCell => currentCell;
     public Tilemap BoardTilemap => boardTilemap;
     public float CoordinateOverlayLabelWidth => Mathf.Clamp(coordinateOverlayLabelWidth, 60f, 400f);
@@ -1233,6 +1237,11 @@ public class CursorController : MonoBehaviour
         return true;
     }
 
+    public bool TryTeleportToActiveTeamHeadQuarterFromShortcut()
+    {
+        return TryTeleportToActiveTeamHeadQuarterOnNeutral();
+    }
+
     private bool HasAnyUnitUnderCursor()
     {
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
@@ -1263,6 +1272,8 @@ public class CursorController : MonoBehaviour
 
     private bool WasConfirmPressedThisFrame()
     {
+        if (RemoteInput.ConfirmDownThisFrame())
+            return true;
 #if ENABLE_INPUT_SYSTEM
         EnsureInputActionsBound();
         if (submitAction != null && submitAction.WasPerformedThisFrame())
@@ -1277,6 +1288,8 @@ public class CursorController : MonoBehaviour
     private bool WasCancelPressedThisFrame()
     {
         if (rightClickCancelTapThisFrame)
+            return true;
+        if (RemoteInput.CancelDownThisFrame())
             return true;
 #if ENABLE_INPUT_SYSTEM
         EnsureInputActionsBound();

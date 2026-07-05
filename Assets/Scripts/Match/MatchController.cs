@@ -3342,6 +3342,35 @@ public class MatchController : MonoBehaviour
             enforceStealthValidation);
     }
 
+    public void DeclareSurrenderDefeat()
+    {
+        if (hasVictoryWinner)
+            return;
+
+        hasVictoryWinner = true;
+        victoryWinnerTeam = TeamId.Neutral;
+        matchMusicAudioManager?.StopPlaybackPermanently();
+        CursorController cursor = FindAnyObjectByType<CursorController>();
+        cursor?.PlayDefeatSfx();
+        PanelDialogController.TrySetExternalText("DERROTA! VOCÊ SE RENDEU.");
+
+        foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
+        {
+            if (go.name != "Panel_endGame" || !go.scene.IsValid())
+                continue;
+            go.SetActive(true);
+            TMPro.TMP_Text[] texts = go.GetComponentsInChildren<TMPro.TMP_Text>(true);
+            for (int i = 0; i < texts.Length; i++)
+            {
+                TMPro.TMP_Text txt = texts[i];
+                if (txt.name == "text_endgame") txt.text = "DERROTA!";
+                else if (txt.name == "text_descrição" || txt.name == "text_description" || txt.name == "txt_descricao")
+                    txt.text = "Você se rendeu";
+            }
+            break;
+        }
+    }
+
     private bool IsUnitOnFriendlyConstruction(UnitManager unit, TeamId observerTeam, Tilemap boardMap)
     {
         if (unit == null || boardMap == null || observerTeam == TeamId.Neutral)

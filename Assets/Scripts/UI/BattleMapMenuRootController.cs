@@ -95,6 +95,99 @@ public class BattleMapMenuRootController : MonoBehaviour
     private bool menuInitialized;
     private bool menuOpen;
     private bool exitConfirmOpen;
+    private int exitConfirmFocusIndex;
+    private bool surrenderConfirmOpen;
+    private int surrenderConfirmFocusIndex;
+    private CanvasGroup modalMenuCanvasGroup;
+    private float modalMenuPreviousAlpha = 1f;
+    private bool modalMenuPreviousInteractable = true;
+    private bool modalMenuPreviousBlocksRaycasts = true;
+    private bool menuHiddenForModalPrompt;
+    public bool IsExitConfirmationOpen => exitConfirmOpen;
+    public int ExitConfirmationFocusIndex => exitConfirmFocusIndex;
+    public bool IsSurrenderConfirmationOpen => surrenderConfirmOpen;
+    public int SurrenderConfirmationFocusIndex => surrenderConfirmFocusIndex;
+
+    public bool NavigateSurrenderConfirmation(int direction)
+    {
+        if (!surrenderConfirmOpen || direction == 0) return false;
+        surrenderConfirmFocusIndex = (surrenderConfirmFocusIndex + (direction > 0 ? 1 : -1) + 2) % 2;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public void InvokeSurrenderConfirmationOption(int index)
+    {
+        if (!surrenderConfirmOpen || index < 0 || index > 1) return;
+        surrenderConfirmFocusIndex = index;
+        if (index == 0)
+        {
+            surrenderConfirmOpen = false;
+            PanelHelperController.ClearExternalText();
+            CloseMenu(restoreCursor: false);
+            matchController?.DeclareSurrenderDefeat();
+        }
+        else
+            CancelSurrenderConfirmation();
+    }
+
+    public void CancelSurrenderConfirmation()
+    {
+        if (!surrenderConfirmOpen) return;
+        surrenderConfirmOpen = false;
+        surrenderConfirmFocusIndex = 0;
+        RestoreMenuAfterModalPrompt();
+        PanelHelperController.ClearExternalText();
+        PlayCancelSfx();
+        RestoreDefaultDialogForCurrentPanel();
+    }
+
+    public bool NavigateExitConfirmation(int direction)
+    {
+        if (!exitConfirmOpen || direction == 0) return false;
+        exitConfirmFocusIndex = (exitConfirmFocusIndex + (direction > 0 ? 1 : -1) + 3) % 3;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public void InvokeExitConfirmationOption(int index)
+    {
+        if (!exitConfirmOpen || index < 0 || index > 2) return;
+        exitConfirmFocusIndex = index;
+        if (index == 0)
+        {
+            exitConfirmOpen = false;
+            PanelHelperController.ClearExternalText();
+            PlayConfirmSfxOncePerFrame();
+            SceneManager.LoadScene(mainMenuSceneName);
+        }
+        else if (index == 1)
+        {
+            exitConfirmOpen = false;
+            PanelHelperController.ClearExternalText();
+            PlayConfirmSfxOncePerFrame();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+        }
+        else
+            CancelExitConfirmation();
+    }
+
+    public void InvokeFocusedExitConfirmationOption() => InvokeExitConfirmationOption(exitConfirmFocusIndex);
+
+    public void CancelExitConfirmation()
+    {
+        if (!exitConfirmOpen) return;
+        exitConfirmOpen = false;
+        exitConfirmFocusIndex = 0;
+        RestoreMenuAfterModalPrompt();
+        PanelHelperController.ClearExternalText();
+        PlayCancelSfx();
+        RestoreDefaultDialogForCurrentPanel();
+    }
     private bool pendingOpenOnNextNeutral;
     private bool eventSystemNavStateCaptured;
     private bool previousSendNavigationEvents;
@@ -209,7 +302,7 @@ public class BattleMapMenuRootController : MonoBehaviour
                 return true;
             }
 
-            if (!WasCancelShortcutPressedThisFrame())
+            if (!WasCancelRequestedThisFrame())
                 return false;
 
             if (suppressMenuOpenFrame == Time.frameCount)
@@ -251,7 +344,7 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (restoredFromStateStackFrame == Time.frameCount)
             return true;
 
-        if (WasPrimaryPointerPressedThisFrame(out Vector2 pointerPosition) &&
+        if (!exitConfirmOpen && !surrenderConfirmOpen && WasPrimaryPointerPressedThisFrame(out Vector2 pointerPosition) &&
             !GetScreenRect(menuRootRect).Contains(pointerPosition) &&
             !IsPointerOverMenuShortcut(pointerPosition))
         {
@@ -262,26 +355,41 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         if (exitConfirmOpen)
         {
-            if (WasCancelShortcutPressedThisFrame())
+            if (WasUpPressedThisFrame() || WasLeftPressedThisFrame())
             {
-                exitConfirmOpen = false;
-                PlayCancelSfx();
-                RestoreDefaultDialogForCurrentPanel();
+                NavigateExitConfirmation(-1);
+                return true;
+            }
+            if (WasDownPressedThisFrame() || WasRightPressedThisFrame())
+            {
+                NavigateExitConfirmation(+1);
+                return true;
+            }
+            if (WasCancelRequestedThisFrame())
+            {
+                CancelExitConfirmation();
                 return true;
             }
 
             if (WasConfirmPressedThisFrame())
             {
-                exitConfirmOpen = false;
-                PlayConfirmSfxOncePerFrame();
-                SceneManager.LoadScene(mainMenuSceneName);
+                InvokeFocusedExitConfirmationOption();
                 return true;
             }
 
             return true;
         }
 
-        if (WasCancelShortcutPressedThisFrame())
+        if (surrenderConfirmOpen)
+        {
+            if (WasUpPressedThisFrame() || WasLeftPressedThisFrame()) { NavigateSurrenderConfirmation(-1); return true; }
+            if (WasDownPressedThisFrame() || WasRightPressedThisFrame()) { NavigateSurrenderConfirmation(+1); return true; }
+            if (WasCancelRequestedThisFrame()) { CancelSurrenderConfirmation(); return true; }
+            if (WasConfirmPressedThisFrame()) { InvokeSurrenderConfirmationOption(surrenderConfirmFocusIndex); return true; }
+            return true;
+        }
+
+        if (WasCancelRequestedThisFrame())
         {
             HandleBackByEsc();
             PlayCancelSfx();
@@ -341,6 +449,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         menuOpen = true;
         pendingOpenOnNextNeutral = false;
         exitConfirmOpen = false;
+        surrenderConfirmOpen = false;
+        RestoreMenuAfterModalPrompt();
         RestoreUndockedLayout();
         hasLastUndockedScreenRect = false;
         cursorNearUndockedDockRegion = false;
@@ -438,6 +548,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         menuOpen = true;
         pendingOpenOnNextNeutral = false;
         exitConfirmOpen = false;
+        surrenderConfirmOpen = false;
+        RestoreMenuAfterModalPrompt();
         RestoreUndockedLayout();
         hasLastUndockedScreenRect = false;
         cursorNearUndockedDockRegion = false;
@@ -478,6 +590,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         menuOpen = true;
         pendingOpenOnNextNeutral = false;
         exitConfirmOpen = false;
+        surrenderConfirmOpen = false;
+        RestoreMenuAfterModalPrompt();
         RestoreUndockedLayout();
         hasLastUndockedScreenRect = false;
         cursorNearUndockedDockRegion = false;
@@ -540,12 +654,14 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     private void CloseMenu(bool restoreCursor, bool exitPlayerMenuState)
     {
+        RestoreMenuAfterModalPrompt();
         if (menuRoot != null)
             menuRoot.SetActive(false);
 
         menuOpen = false;
         pendingOpenOnNextNeutral = false;
         exitConfirmOpen = false;
+        surrenderConfirmOpen = false;
         if (exitPlayerMenuState)
         {
             turnStateManager?.TryExitPlayerMenuStateToNeutral();
@@ -562,12 +678,14 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     private void ForceCloseMenuState()
     {
+        RestoreMenuAfterModalPrompt();
         if (menuRoot != null)
             menuRoot.SetActive(false);
 
         menuOpen = false;
         pendingOpenOnNextNeutral = false;
         exitConfirmOpen = false;
+        surrenderConfirmOpen = false;
     }
 
     private void HandleBackByEsc()
@@ -990,11 +1108,18 @@ public class BattleMapMenuRootController : MonoBehaviour
                 }
                 break;
             case MenuAction.Render:
-                PanelDialogController.TrySetTransientText("Render: em desenvolvimento.", 2.4f);
+                surrenderConfirmOpen = true;
+                surrenderConfirmFocusIndex = 0;
+                HideMenuForModalPrompt();
+                PanelDialogController.ClearExternalText();
+                PanelHelperController.TrySetExternalText("RENDER-SE", "Confirmar rendição? A partida será perdida.");
                 break;
             case MenuAction.Sair:
                 exitConfirmOpen = true;
-                PanelDialogController.TrySetExternalText("Sair para tela principal?\nENTER: sim | ESC: nao");
+                exitConfirmFocusIndex = 0;
+                HideMenuForModalPrompt();
+                PanelDialogController.ClearExternalText();
+                PanelHelperController.TrySetExternalText("SAIR DA PARTIDA", "Escolha o destino:");
                 break;
             case MenuAction.VoltarGerenciar:
                 SetPanel(MenuPanel.Options, resetIndex: false);
@@ -1002,6 +1127,37 @@ public class BattleMapMenuRootController : MonoBehaviour
                 ScheduleRestoreSelectionNextFrame();
                 break;
         }
+    }
+
+    private void HideMenuForModalPrompt()
+    {
+        if (menuRoot == null || menuHiddenForModalPrompt)
+            return;
+        modalMenuCanvasGroup = menuRoot.GetComponent<CanvasGroup>();
+        if (modalMenuCanvasGroup == null)
+            modalMenuCanvasGroup = menuRoot.AddComponent<CanvasGroup>();
+        modalMenuPreviousAlpha = modalMenuCanvasGroup.alpha;
+        modalMenuPreviousInteractable = modalMenuCanvasGroup.interactable;
+        modalMenuPreviousBlocksRaycasts = modalMenuCanvasGroup.blocksRaycasts;
+        modalMenuCanvasGroup.alpha = 0f;
+        modalMenuCanvasGroup.interactable = false;
+        modalMenuCanvasGroup.blocksRaycasts = false;
+        menuHiddenForModalPrompt = true;
+    }
+
+    private void RestoreMenuAfterModalPrompt()
+    {
+        if (!menuHiddenForModalPrompt)
+            return;
+        if (modalMenuCanvasGroup != null)
+        {
+            modalMenuCanvasGroup.alpha = modalMenuPreviousAlpha;
+            modalMenuCanvasGroup.interactable = modalMenuPreviousInteractable;
+            modalMenuCanvasGroup.blocksRaycasts = modalMenuPreviousBlocksRaycasts;
+        }
+        menuHiddenForModalPrompt = false;
+        SelectCurrentButton();
+        ScheduleRestoreSelectionNextFrame();
     }
 
     private bool SetPanelSelectionByButton(Button target)
@@ -1529,8 +1685,28 @@ public class BattleMapMenuRootController : MonoBehaviour
         return Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S);
     }
 
+    private static bool WasLeftPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+            return Keyboard.current.leftArrowKey.wasPressedThisFrame || Keyboard.current.aKey.wasPressedThisFrame;
+#endif
+        return Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A);
+    }
+
+    private static bool WasRightPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+            return Keyboard.current.rightArrowKey.wasPressedThisFrame || Keyboard.current.dKey.wasPressedThisFrame;
+#endif
+        return Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D);
+    }
+
     private static bool WasConfirmPressedThisFrame()
     {
+        if (RemoteInput.ConfirmDownThisFrame())
+            return true;
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
             return Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame;
@@ -1538,8 +1714,18 @@ public class BattleMapMenuRootController : MonoBehaviour
         return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
     }
 
+    // Cancelar (ESC/Backspace) OU clique direito curto (o CursorController trata direito=ESC).
+    // Assim o jogador de mouse abre/fecha o menu com o botao direito, igual ao ESC.
+    private bool WasCancelRequestedThisFrame()
+    {
+        return WasCancelShortcutPressedThisFrame() ||
+               (cursorController != null && cursorController.WasRightClickCancelTapThisFrame);
+    }
+
     private static bool WasCancelShortcutPressedThisFrame()
     {
+        if (RemoteInput.CancelDownThisFrame())
+            return true;
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
         {

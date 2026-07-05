@@ -34,6 +34,8 @@ public class PanelMoneyController : MonoBehaviour
     [SerializeField] private TMP_Text textProgress;
     [SerializeField] private Sprite starSilverSprite;
     [SerializeField] private Sprite starGoldSprite;
+    [SerializeField] private Button hqShortcut;
+    [SerializeField] private Image hqShortcutImage;
 
     [Header("Display")]
     [SerializeField] private string prefix = "$ ";
@@ -53,6 +55,9 @@ public class PanelMoneyController : MonoBehaviour
     private TeamId lastRenderedVictoryTeam = (TeamId)int.MinValue;
     private Sprite lastStarSilverSprite;
     private Sprite lastStarGoldSprite;
+    private CursorController cursorController;
+    private bool hqShortcutBound;
+    private TeamId lastHqShortcutTeam = (TeamId)int.MinValue;
 
     public static void PushContextualUpdate(TeamId team, int resultingMoney, string label, int delta)
     {
@@ -81,6 +86,7 @@ public class PanelMoneyController : MonoBehaviour
         RefreshMoneyText(force: true);
         RefreshVictoryProgressText(force: true);
         RefreshVictoryStars(force: true);
+        RefreshHqShortcut(force: true);
         ConsumePendingMoneyUpdates();
     }
 
@@ -111,6 +117,7 @@ public class PanelMoneyController : MonoBehaviour
         RefreshMoneyText(force: false);
         RefreshVictoryProgressText(force: false);
         RefreshVictoryStars(force: false);
+        RefreshHqShortcut(force: false);
     }
 
 #if UNITY_EDITOR
@@ -121,6 +128,7 @@ public class PanelMoneyController : MonoBehaviour
         RefreshMoneyText(force: true);
         RefreshVictoryProgressText(force: true);
         RefreshVictoryStars(force: true);
+        RefreshHqShortcut(force: true);
     }
 #endif
 
@@ -131,6 +139,23 @@ public class PanelMoneyController : MonoBehaviour
 
         if (animationManager == null)
             animationManager = FindAnyObjectByType<AnimationManager>();
+        if (cursorController == null)
+            cursorController = FindAnyObjectByType<CursorController>();
+
+        if (hqShortcut == null || hqShortcutImage == null)
+        {
+            Transform shortcut = FindChildRecursive(transform, "hq_shortcut");
+            if (shortcut != null)
+            {
+                if (hqShortcutImage == null)
+                    hqShortcutImage = shortcut.GetComponent<Image>();
+                if (hqShortcut == null)
+                    hqShortcut = shortcut.GetComponent<Button>();
+                if (Application.isPlaying && hqShortcut == null)
+                    hqShortcut = shortcut.gameObject.AddComponent<Button>();
+            }
+        }
+        BindHqShortcutIfNeeded();
 
         if (textMoney == null)
             textMoney = FindMoneyTextByName();
@@ -144,6 +169,44 @@ public class PanelMoneyController : MonoBehaviour
 
         if (textMoney == null)
             textMoney = GetComponentInChildren<TMP_Text>(true);
+    }
+
+    private void BindHqShortcutIfNeeded()
+    {
+        if (!Application.isPlaying || hqShortcut == null || hqShortcutBound)
+            return;
+        if (hqShortcutImage != null)
+        {
+            hqShortcutImage.raycastTarget = true;
+            hqShortcut.targetGraphic = hqShortcutImage;
+        }
+        hqShortcut.onClick.AddListener(HandleHqShortcutClicked);
+        hqShortcutBound = true;
+    }
+
+    private void HandleHqShortcutClicked()
+    {
+        if (cursorController == null)
+            cursorController = FindAnyObjectByType<CursorController>();
+        cursorController?.TryTeleportToActiveTeamHeadQuarterFromShortcut();
+    }
+
+    private void RefreshHqShortcut(bool force)
+    {
+        if (hqShortcutImage == null || hqShortcut == null)
+            TryAutoAssignReferences();
+        TeamId team = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
+        if (!force && team == lastHqShortcutTeam && hqShortcut != null && hqShortcut.interactable)
+            return;
+        lastHqShortcutTeam = team;
+        Color color = team == TeamId.Neutral ? Color.gray : TeamUtils.GetColor(team);
+        if (hqShortcutImage != null)
+            hqShortcutImage.color = color;
+        if (hqShortcut != null)
+        {
+            int teamId = matchController != null ? matchController.ActiveTeamId : -1;
+            hqShortcut.interactable = teamId >= 0 && TeamAnchorResolver.TryResolveAnchorCell(teamId, out _);
+        }
     }
 
     private void DiscoverStarIcons()

@@ -28,6 +28,9 @@ public class PanelHelperController : MonoBehaviour
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private AnimationManager animationManager;
     [SerializeField] private SaveGameManager saveGameManager;
+    [SerializeField] private MainMenuLoadPanelController mainMenuLoadPanelController;
+    [SerializeField] private PanelMenu mainMenuPanel;
+    [SerializeField] private BattleMapMenuRootController battleMapMenuController;
     [SerializeField] private HelperDatabase helperDatabase;
     [SerializeField] private GameObject panelHelper;
     [SerializeField] private TMP_Text helperTitle;
@@ -149,6 +152,8 @@ public class PanelHelperController : MonoBehaviour
     private readonly List<Button> persistenceActionButtons = new List<Button>();
     private readonly List<Image> persistenceActionImages = new List<Image>();
     private readonly List<TMP_Text> persistenceActionLabels = new List<TMP_Text>();
+    private readonly List<Color> persistenceActionTeamColors = new List<Color>();
+    private readonly List<bool> persistenceActionUsesTeamColor = new List<bool>();
     private string persistenceActionsSignature = string.Empty;
     private const float PersistenceActionButtonHeight = 42f;
     [SerializeField] [Range(1f, 80f)] private float helperScrollStep = 24f;
@@ -283,6 +288,12 @@ public class PanelHelperController : MonoBehaviour
 
         if (helperRect == null && panelHelper != null)
             helperRect = panelHelper.GetComponent<RectTransform>();
+        if (mainMenuLoadPanelController == null)
+            mainMenuLoadPanelController = FindAnyObjectByType<MainMenuLoadPanelController>();
+        if (mainMenuPanel == null)
+            mainMenuPanel = FindAnyObjectByType<PanelMenu>();
+        if (battleMapMenuController == null)
+            battleMapMenuController = FindAnyObjectByType<BattleMapMenuRootController>();
 
         EnsureCancelControl();
         EnsureExecuteCommandServiceControl();
@@ -2310,9 +2321,16 @@ public class PanelHelperController : MonoBehaviour
 
     private void RefreshPersistenceActionControls(bool panelVisible)
     {
-        bool active = panelVisible && saveGameManager != null &&
-                      (saveGameManager.IsPersistenceSlotSelectionActive ||
-                       saveGameManager.IsPersistenceOverwriteConfirmationActive);
+        bool menuDeleteActive = mainMenuLoadPanelController != null &&
+                                mainMenuLoadPanelController.IsDeleteConfirmationOpen;
+        bool menuQuitActive = mainMenuPanel != null && mainMenuPanel.IsQuitConfirmationOpen;
+        bool newGameWizardActive = mainMenuPanel != null && mainMenuPanel.IsNewGameWizardOpen;
+        bool battleExitActive = battleMapMenuController != null && battleMapMenuController.IsExitConfirmationOpen;
+        bool battleSurrenderActive = battleMapMenuController != null && battleMapMenuController.IsSurrenderConfirmationOpen;
+        bool savePromptActive = saveGameManager != null &&
+                                (saveGameManager.IsPersistenceSlotSelectionActive ||
+                                 saveGameManager.IsPersistenceOverwriteConfirmationActive);
+        bool active = panelVisible && (menuDeleteActive || menuQuitActive || newGameWizardActive || battleExitActive || battleSurrenderActive || savePromptActive);
         if (!active)
         {
             if (persistenceActionsRoot != null)
@@ -2322,13 +2340,18 @@ public class PanelHelperController : MonoBehaviour
         }
 
         EnsurePersistenceActionsRoot();
-        string signature = saveGameManager.IsPersistenceOverwriteConfirmationActive
+        string signature = menuDeleteActive ? "main_menu_delete" :
+            menuQuitActive ? "main_menu_quit" :
+            newGameWizardActive ? $"new_game_{mainMenuPanel.NewGameWizardStep}" :
+            battleExitActive ? "battle_exit" :
+            battleSurrenderActive ? "battle_surrender" :
+            saveGameManager.IsPersistenceOverwriteConfirmationActive
             ? "overwrite"
             : string.Join("|", saveGameManager.GetPersistenceSlotButtonLabel(1),
                 saveGameManager.GetPersistenceSlotButtonLabel(2), saveGameManager.GetPersistenceSlotButtonLabel(3));
         if (signature != persistenceActionsSignature)
         {
-            RebuildPersistenceActionButtons();
+            RebuildPersistenceActionButtons(menuDeleteActive, menuQuitActive, newGameWizardActive, battleExitActive, battleSurrenderActive);
             persistenceActionsSignature = signature;
         }
 
@@ -2366,7 +2389,7 @@ public class PanelHelperController : MonoBehaviour
         persistenceActionsRoot.SetActive(false);
     }
 
-    private void RebuildPersistenceActionButtons()
+    private void RebuildPersistenceActionButtons(bool menuDeleteActive, bool menuQuitActive, bool newGameWizardActive, bool battleExitActive, bool battleSurrenderActive)
     {
         for (int i = persistenceActionButtons.Count - 1; i >= 0; i--)
             if (persistenceActionButtons[i] != null)
@@ -2374,8 +2397,43 @@ public class PanelHelperController : MonoBehaviour
         persistenceActionButtons.Clear();
         persistenceActionImages.Clear();
         persistenceActionLabels.Clear();
+        persistenceActionTeamColors.Clear();
+        persistenceActionUsesTeamColor.Clear();
 
-        if (saveGameManager.IsPersistenceOverwriteConfirmationActive)
+        if (menuDeleteActive)
+        {
+            CreatePersistenceButton("CONFIRMAR EXCLUSÃO", () => mainMenuLoadPanelController?.ConfirmDeleteFromPointer());
+            CreatePersistenceButton("CANCELAR", () => mainMenuLoadPanelController?.CancelDeleteFromPointer());
+        }
+        else if (menuQuitActive)
+        {
+            CreatePersistenceButton("SAIR PARA O WINDOWS", () => mainMenuPanel?.ConfirmQuitFromPointer());
+            CreatePersistenceButton("CANCELAR", () => mainMenuPanel?.CancelQuitFromPointer());
+        }
+        else if (newGameWizardActive)
+        {
+            int count = mainMenuPanel.GetNewGameWizardOptionCount();
+            for (int i = 0; i < count; i++)
+            {
+                int selected = i;
+                bool hasTeamColor = mainMenuPanel.TryGetNewGameWizardOptionColor(i, out Color teamColor);
+                CreatePersistenceButton(mainMenuPanel.GetNewGameWizardOptionLabel(i),
+                    () => mainMenuPanel?.InvokeNewGameWizardOption(selected),
+                    hasTeamColor ? teamColor : (Color?)null);
+            }
+        }
+        else if (battleExitActive)
+        {
+            CreatePersistenceButton("VOLTAR AO MENU PRINCIPAL", () => battleMapMenuController?.InvokeExitConfirmationOption(0));
+            CreatePersistenceButton("SAIR PARA O WINDOWS", () => battleMapMenuController?.InvokeExitConfirmationOption(1));
+            CreatePersistenceButton("CANCELAR", () => battleMapMenuController?.InvokeExitConfirmationOption(2));
+        }
+        else if (battleSurrenderActive)
+        {
+            CreatePersistenceButton("CONFIRMAR RENDIÇÃO", () => battleMapMenuController?.InvokeSurrenderConfirmationOption(0));
+            CreatePersistenceButton("CANCELAR", () => battleMapMenuController?.InvokeSurrenderConfirmationOption(1));
+        }
+        else if (saveGameManager.IsPersistenceOverwriteConfirmationActive)
         {
             CreatePersistenceButton("CONFIRMAR SOBRESCRITA", () => saveGameManager.TryConfirmPersistenceOverwriteFromPointer());
             CreatePersistenceButton("VOLTAR", () => saveGameManager.TryCancelPersistencePromptFromPointer());
@@ -2398,16 +2456,34 @@ public class PanelHelperController : MonoBehaviour
     // Destaca o botao de save/load em foco (mesmo visual do preview do Servico do Comando).
     private void RefreshPersistencePromptFocusHighlight()
     {
-        int focus = saveGameManager != null ? saveGameManager.PersistencePromptFocusIndex : -1;
+        int focus = mainMenuLoadPanelController != null && mainMenuLoadPanelController.IsDeleteConfirmationOpen
+            ? mainMenuLoadPanelController.DeleteConfirmationFocusIndex
+            : (mainMenuPanel != null && mainMenuPanel.IsQuitConfirmationOpen
+                ? mainMenuPanel.QuitConfirmationFocusIndex
+                : (mainMenuPanel != null && mainMenuPanel.IsNewGameWizardOpen
+                    ? mainMenuPanel.NewGameWizardFocusIndex
+                    : (battleMapMenuController != null && battleMapMenuController.IsExitConfirmationOpen
+                        ? battleMapMenuController.ExitConfirmationFocusIndex
+                        : (battleMapMenuController != null && battleMapMenuController.IsSurrenderConfirmationOpen
+                            ? battleMapMenuController.SurrenderConfirmationFocusIndex
+                            : (saveGameManager != null ? saveGameManager.PersistencePromptFocusIndex : -1)))));
         for (int i = 0; i < persistenceActionButtons.Count; i++)
         {
             Image image = i < persistenceActionImages.Count ? persistenceActionImages[i] : null;
             TMP_Text label = i < persistenceActionLabels.Count ? persistenceActionLabels[i] : null;
-            ApplyFooterButtonFocus(image, label, i == focus);
+            bool focused = i == focus;
+            if (i < persistenceActionUsesTeamColor.Count && persistenceActionUsesTeamColor[i])
+            {
+                Color team = persistenceActionTeamColors[i];
+                if (image != null) image.color = TeamButtonBackground(team, focused);
+                if (label != null) label.color = TeamButtonLabel(team, focused);
+            }
+            else
+                ApplyFooterButtonFocus(image, label, focused);
         }
     }
 
-    private void CreatePersistenceButton(string text, UnityEngine.Events.UnityAction action)
+    private void CreatePersistenceButton(string text, UnityEngine.Events.UnityAction action, Color? teamColor = null)
     {
         GameObject buttonObject = new GameObject("button_persistence", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
         buttonObject.transform.SetParent(persistenceActionsRoot.transform, false);
@@ -2439,6 +2515,8 @@ public class PanelHelperController : MonoBehaviour
         persistenceActionButtons.Add(button);
         persistenceActionImages.Add(buttonImage);
         persistenceActionLabels.Add(label);
+        persistenceActionTeamColors.Add(teamColor ?? Color.white);
+        persistenceActionUsesTeamColor.Add(teamColor.HasValue);
     }
 
     private static string BuildShoppingActionsSignature(List<TurnStateManager.HelperShoppingLine> lines)

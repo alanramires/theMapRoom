@@ -49,19 +49,44 @@ public static class PartidaConfig
         List<int> incomePerTurns = new List<int>(PlayerCount);
         List<bool> startMoneyAppliedFlags = new List<bool>(PlayerCount);
 
+        // A economia da cena-base pertence ao slot logico, nao a cor escolhida.
+        // Ex.: ao trocar slot 0 de Green para Yellow, ele deve conservar o caixa
+        // inicial configurado para o slot 0, em vez de consultar a entrada Yellow
+        // (que normalmente esta zerada na cena de dois jogadores).
+        List<int> sourceTeamIds = new List<int>();
+        List<bool> sourceFlipXs = new List<bool>();
+        List<bool> sourceIsAIs = new List<bool>();
+        List<int> sourceStartMoneys = new List<int>();
+        List<int> sourceActualMoneys = new List<int>();
+        List<int> sourceIncomePerTurns = new List<int>();
+        List<bool> sourceStartMoneyApplied = new List<bool>();
+        mc.ExportPlayersState(
+            sourceTeamIds,
+            sourceFlipXs,
+            sourceIsAIs,
+            sourceStartMoneys,
+            sourceActualMoneys,
+            sourceIncomePerTurns,
+            sourceStartMoneyApplied);
+
         for (int i = 0; i < PlayerCount; i++)
         {
             TeamId team = (Teams != null && i < Teams.Length) ? Teams[i] : TeamId.Green;
             teamIds.Add((int)team);
             flipXs.Add((FlipX != null && i < FlipX.Length) ? FlipX[i] : DefaultFlipX(team));
             isAIs.Add((IsAI != null && i < IsAI.Length) && IsAI[i]);
-            startMoneys.Add(mc.GetStartMoney(team));
-            actualMoneys.Add(mc.GetActualMoney(team));
-            incomePerTurns.Add(mc.GetIncomePerTurn(team));
+            startMoneys.Add(i < sourceStartMoneys.Count ? sourceStartMoneys[i] : 0);
+            actualMoneys.Add(i < sourceActualMoneys.Count ? sourceActualMoneys[i] : 0);
+            incomePerTurns.Add(i < sourceIncomePerTurns.Count ? sourceIncomePerTurns[i] : 0);
             startMoneyAppliedFlags.Add(false);
         }
 
         mc.ImportPlayersState(teamIds, flipXs, isAIs, startMoneys, actualMoneys, incomePerTurns, startMoneyAppliedFlags, false);
+        // Define o slot 0 como ativo sem consumir economia/upkeep durante o Awake.
+        // O MatchController.Start reaplica o time com efeitos de inicio de turno,
+        // depois que construcoes e unidades ja resolveram seus slotIndex.
+        if (teamIds.Count > 0)
+            mc.SetActiveTeamIdWithoutTurnStart(teamIds[0]);
         mc.SetGameSetupPreset(Preset);
         for (int i = 0; i < PlayerCount; i++)
         {

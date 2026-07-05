@@ -319,11 +319,30 @@ public class MainMenuStateController : MonoBehaviour
             out bool confirmPressed,
             out bool cancelPressed);
 
+        if (panelMenu.IsNewGameWizardOpen)
+        {
+            if (upPressed || leftPressed) { panelMenu.NavigateNewGameWizard(-1); return; }
+            if (downPressed || rightPressed) { panelMenu.NavigateNewGameWizard(+1); return; }
+            if (confirmPressed) { panelMenu.InvokeFocusedNewGameWizardOption(); return; }
+            if (cancelPressed) { panelMenu.CancelNewGameWizardStep(); return; }
+            return;
+        }
+
         if (allowExitConfirmation && panelMenu.IsQuitConfirmationOpen)
         {
+            if (upPressed || leftPressed)
+            {
+                panelMenu.NavigateQuitConfirmation(-1);
+                return;
+            }
+            if (downPressed || rightPressed)
+            {
+                panelMenu.NavigateQuitConfirmation(+1);
+                return;
+            }
             if (confirmPressed)
             {
-                panelMenu.ConfirmQuitGameFromState();
+                panelMenu.InvokeFocusedQuitConfirmation();
                 return;
             }
 
@@ -377,9 +396,19 @@ public class MainMenuStateController : MonoBehaviour
 
         if (loadPanelController.IsDeleteConfirmationOpen)
         {
+            if (WasUpPressed() || WasLeftPressed())
+            {
+                loadPanelController.NavigateDeleteConfirmation(-1);
+                return;
+            }
+            if (WasDownPressed() || WasRightPressed())
+            {
+                loadPanelController.NavigateDeleteConfirmation(+1);
+                return;
+            }
             if (WasConfirmPressed())
             {
-                loadPanelController.ConfirmDeleteFromKeyboard();
+                loadPanelController.InvokeFocusedDeleteConfirmation();
                 return;
             }
 
@@ -424,7 +453,9 @@ public class MainMenuStateController : MonoBehaviour
         }
 
         if (WasCancelPressed())
-            ChangeState(MainMenuState.RootMenu);
+            // Passa por CloseLoadPanel (nao ChangeState direto) para tocar o cancel.mp3,
+            // igual ao botao "Voltar". A transicao de estado e a mesma (RequestState -> RootMenu).
+            loadPanelController.CloseLoadPanel();
     }
 
     private bool CanAdvanceFromNeutral()
@@ -624,6 +655,11 @@ public class MainMenuStateController : MonoBehaviour
         rightPressed |= Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D);
         confirmPressed |= Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
         cancelPressed |= Input.GetKeyDown(KeyCode.Escape);
+
+        // Fire TV / gamepad: Select (botao A) confirma, Voltar (Back->Esc) / botao B cancelam.
+        // Clique direito tambem cancela (= ESC), ja que o menu nao usa pan de camera.
+        confirmPressed |= RemoteInput.ConfirmDownThisFrame();
+        cancelPressed |= RemoteInput.CancelDownThisFrame() || RemoteInput.RightClickCancelDownThisFrame();
     }
 
     private static Vector2 ReadCurrentUiMove()
@@ -745,6 +781,8 @@ public class MainMenuStateController : MonoBehaviour
 
     private static bool WasConfirmPressed()
     {
+        if (RemoteInput.ConfirmDownThisFrame())
+            return true;
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
             return Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame;
@@ -754,6 +792,8 @@ public class MainMenuStateController : MonoBehaviour
 
     private static bool WasCancelPressed()
     {
+        if (RemoteInput.CancelDownThisFrame() || RemoteInput.RightClickCancelDownThisFrame())
+            return true;
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
             return Keyboard.current.escapeKey.wasPressedThisFrame;
