@@ -2438,6 +2438,13 @@ public partial class TurnStateManager
 
     public bool TryExecuteAutomatedEmbarkReplayTarget(string transporterInstanceId, Vector3Int targetCell)
     {
+        if (!TrySelectAutomatedEmbarkReplayTarget(transporterInstanceId, targetCell))
+            return false;
+        return ConfirmAutomatedEmbarkTarget();
+    }
+
+    public bool TrySelectAutomatedEmbarkReplayTarget(string transporterInstanceId, Vector3Int targetCell)
+    {
         if (CurrentCursorState != CursorState.Embarcando)
             return false;
         if (cachedPodeEmbarcarTargets == null || cachedPodeEmbarcarTargets.Count <= 0)
@@ -2468,8 +2475,16 @@ public partial class TurnStateManager
             selectedIndex = 0;
 
         scannerSelectedEmbarkIndex = selectedIndex;
-        scannerPromptStep = ScannerPromptStep.EmbarkConfirmTarget;
-        return TryConfirmScannerEmbark();
+        scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+        FocusCurrentEmbarkTarget(logDetails: true, moveCursor: true);
+        return TryConfirmScannerEmbark() && scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget;
+    }
+
+    public bool ConfirmAutomatedEmbarkTarget()
+    {
+        return CurrentCursorState == CursorState.Embarcando &&
+               scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget &&
+               TryConfirmScannerEmbark();
     }
 
     private bool TryGetSelectedValidEmbarkOption(out PodeEmbarcarOption option, out int shownIndex)

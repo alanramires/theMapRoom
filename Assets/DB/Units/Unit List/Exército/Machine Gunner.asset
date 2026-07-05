@@ -15,7 +15,8 @@ MonoBehaviour:
   id: machinegun
   displayName: Machine Gunner
   apelido: MG
-  description: Unidade counter de infantaria
+  description: "Unidade defesiva de infantaria. Capaz de disparar sua metralhadora
+    a distancia e segurar posi\xE7\xF5es em montanha."
   spriteDefault: {fileID: 21300000, guid: 7a907eaea1ab79841900f85802c76f8b, type: 3}
   teamVariantSprites: []
   maxHP: 10

@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HelperData
   id: helper.command_service.balance.estimate
   condition: Linha de saldo previsto apos a execucao do preview do Servico do Comando.
-  message: 'Saldo: $<after>'
+  message: 'Restante: $<after>'

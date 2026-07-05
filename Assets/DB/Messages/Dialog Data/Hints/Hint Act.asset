@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DialogData
   id: hint.act
   condition: Auto-generated context hint dialog.
-  message: '<Unit> :: Enter para Agir'
+  message: '<Unit> :: Enter/Clique para Agir'

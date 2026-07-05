@@ -1381,6 +1381,15 @@ public partial class TurnStateManager
     }
     public bool TryQueueAutomatedDisembarkReplayOrder(string passengerInstanceId, Vector3Int targetCell)
     {
+        if (!TrySelectAutomatedDisembarkPassengerForPresentation(passengerInstanceId))
+            return false;
+        if (!TrySelectAutomatedDisembarkLandingForPresentation(targetCell))
+            return false;
+        return ConfirmAutomatedDisembarkOrderForPresentation();
+    }
+
+    public bool TrySelectAutomatedDisembarkPassengerForPresentation(string passengerInstanceId)
+    {
         if (CurrentCursorState != CursorState.Desembarcando || selectedUnit == null)
             return false;
 
@@ -1409,17 +1418,30 @@ public partial class TurnStateManager
             selectedIndex = 0;
 
         disembarkSelectedPassengerIndex = selectedIndex;
-        if (!EnterDisembarkLandingSelectStep(autoEntered: false))
-            return false;
+        return EnterDisembarkLandingSelectStep(autoEntered: false);
+    }
 
+    public bool TrySelectAutomatedDisembarkLandingForPresentation(Vector3Int targetCell)
+    {
+        if (CurrentCursorState != CursorState.Desembarcando)
+            return false;
         targetCell.z = 0;
         if (!disembarkLandingByCell.ContainsKey(targetCell))
             return false;
 
         SetDisembarkSelectedLandingCell(targetCell, moveCursor: false);
-        scannerPromptStep = ScannerPromptStep.DisembarkConfirm;
+        if (scannerPromptStep == ScannerPromptStep.DisembarkConfirm)
+            return true;
+        if (scannerPromptStep != ScannerPromptStep.DisembarkLandingSelect)
+            return false;
+        return TryConfirmScannerDisembark() && scannerPromptStep == ScannerPromptStep.DisembarkConfirm;
+    }
 
-        return TryConfirmScannerDisembark();
+    public bool ConfirmAutomatedDisembarkOrderForPresentation()
+    {
+        return CurrentCursorState == CursorState.Desembarcando &&
+               scannerPromptStep == ScannerPromptStep.DisembarkConfirm &&
+               TryConfirmScannerDisembark();
     }
 
     public bool TryStartAutomatedDisembarkReplayExecution()

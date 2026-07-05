@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DialogData
   id: hint.inspect
   condition: Auto-generated context hint dialog.
-  message: '<Unit> :: Enter para Inspecionar'
+  message: '<Unit> :: Enter/Clique para Inspecionar'

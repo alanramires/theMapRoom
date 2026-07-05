@@ -24,6 +24,11 @@ public partial class AIController : MonoBehaviour
     [Tooltip("Inicia a partida com a IA pausada, equivalente a pressionar F10.")]
     [SerializeField] private bool startOnPause;
 
+    [Tooltip("Quando ligada, a IA executa batches sem sustentar menus e confirmações intermediárias. Desligue para apresentar no cursor e no panel_helper as mesmas etapas vistas pelo jogador.")]
+    [InspectorName("IA Rapida")]
+    [SerializeField] private bool iaRapida = true;
+    public bool IARapida => iaRapida;
+
     [Tooltip("Modo difícil. Por enquanto: dobra os slots de capturador por setor e habilita os limites/banimentos espec�ficos de hard mode (log�stica e unidades banidas).")]
     [SerializeField] private bool hardMode = false;
     public bool HardMode => hardMode;

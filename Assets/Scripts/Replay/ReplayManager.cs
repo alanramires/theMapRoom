@@ -498,7 +498,20 @@ public class ReplayManager : MonoBehaviour
             if (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral)
                 yield break;
 
-            if (!turnStateManager.HandleAutomatedMoveOnlyActionRequested())
+            bool moveOnlyHandled;
+            if (IsLiveAIPresentationMode)
+            {
+                yield return WaitForAIPresentationStage();
+                yield return NavigateSensorMenuForAIPresentation(SensorActionType.None);
+                moveOnlyHandled = turnStateManager.SensorOptionFocusCode == 'M' &&
+                                  turnStateManager.TryInvokeFocusedSensorOption();
+            }
+            else
+            {
+                moveOnlyHandled = turnStateManager.HandleAutomatedMoveOnlyActionRequested();
+            }
+
+            if (!moveOnlyHandled)
             {
                 AbortReplayBatchDueToError(
                     "dialog.replay.error",
@@ -512,7 +525,24 @@ public class ReplayManager : MonoBehaviour
             yield break;
         }
 
-        if (!turnStateManager.HandleAutomatedSensorActionRequested(action.SensorAction))
+        // No modo de apresentação, sustenta o estado pós-movimento por pelo menos
+        // um frame para o panel_helper exibir OPÇÕES antes da IA escolher o sensor.
+        if (IsLiveAIPresentationMode)
+            yield return WaitForAIPresentationStage();
+
+        bool sensorActionHandled;
+        if (IsLiveAIPresentationMode && TryGetSensorMenuCode(action.SensorAction, out char sensorMenuCode))
+        {
+            yield return NavigateSensorMenuForAIPresentation(action.SensorAction);
+            sensorActionHandled = turnStateManager.SensorOptionFocusCode == sensorMenuCode &&
+                                  turnStateManager.TryInvokeFocusedSensorOption();
+        }
+        else
+        {
+            sensorActionHandled = turnStateManager.HandleAutomatedSensorActionRequested(action.SensorAction);
+        }
+
+        if (!sensorActionHandled)
             yield break;
 
         yield return WaitForSensorSubstepDelay();
@@ -716,7 +746,25 @@ public class ReplayManager : MonoBehaviour
             if (cursorController != null && NormalizeCell(cursorController.CurrentCell) != targetCell)
                 yield return MoveCursorToCellWithTravel(targetCell);
 
-            bool queued = turnStateManager.TryQueueAutomatedDisembarkReplayOrder(step.TargetInstanceId, targetCell);
+            bool queued;
+            if (IsLiveAIPresentationMode)
+            {
+                bool passengerSelected = turnStateManager.TrySelectAutomatedDisembarkPassengerForPresentation(step.TargetInstanceId);
+                if (passengerSelected)
+                    yield return WaitForAIPresentationStage();
+
+                bool landingSelected = passengerSelected &&
+                    turnStateManager.TrySelectAutomatedDisembarkLandingForPresentation(targetCell);
+                if (landingSelected)
+                    yield return WaitForAIPresentationStage();
+
+                queued = landingSelected &&
+                    turnStateManager.ConfirmAutomatedDisembarkOrderForPresentation();
+            }
+            else
+            {
+                queued = turnStateManager.TryQueueAutomatedDisembarkReplayOrder(step.TargetInstanceId, targetCell);
+            }
             if (!queued)
             {
                 ExecuteReplayConfirmInput();
@@ -735,7 +783,9 @@ public class ReplayManager : MonoBehaviour
         if (!executedAny)
             yield return ExecuteDoubleConfirmFallback();
 
-        if (!turnStateManager.TryStartAutomatedDisembarkReplayExecution())
+        if (!turnStateManager.TryStartAutomatedDisembarkReplayExecution() &&
+            !turnStateManager.IsDisembarkExecutionInProgress &&
+            turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             yield return ExecuteDoubleConfirmFallback();
 
         yield return WaitForSensorSubstepDelay();
@@ -911,7 +961,20 @@ public class ReplayManager : MonoBehaviour
             if (cursorController != null && NormalizeCell(cursorController.CurrentCell) != targetCell)
                 yield return MoveCursorToCellWithTravel(targetCell);
 
-            if (!turnStateManager.TryExecuteAutomatedEmbarkReplayTarget(step.TargetInstanceId, targetCell))
+            bool embarked;
+            if (IsLiveAIPresentationMode)
+            {
+                bool selected = turnStateManager.TrySelectAutomatedEmbarkReplayTarget(step.TargetInstanceId, targetCell);
+                if (selected)
+                    yield return WaitForAIPresentationStage();
+                embarked = selected && turnStateManager.ConfirmAutomatedEmbarkTarget();
+            }
+            else
+            {
+                embarked = turnStateManager.TryExecuteAutomatedEmbarkReplayTarget(step.TargetInstanceId, targetCell);
+            }
+
+            if (!embarked)
                 yield return ExecuteDoubleConfirmFallback();
             else
                 yield return WaitForSensorSubstepDelay();
@@ -1146,6 +1209,25 @@ public class ReplayManager : MonoBehaviour
     {
         Debug.Log("[Replay][CommandService] ExecuteRecordedCommandServiceBatch iniciado.");
 
+        // A IA rapida equivale ao atalho X: abre o preview diretamente, sem depender
+        // da selecao visual do menu, que nao estabiliza com delay zero.
+        if (IsLiveAIFastMode)
+        {
+            string commandMessage = string.Empty;
+            if (turnStateManager == null ||
+                !turnStateManager.TryOpenCommandServiceFromMenu(out commandMessage))
+            {
+                if (!string.IsNullOrWhiteSpace(commandMessage))
+                    ReplayLogWarning($"[Replay][CommandService] Atalho X recusado: {commandMessage}");
+                yield break;
+            }
+
+            yield return null;
+            ExecuteReplayConfirmInput();
+            yield return null;
+            yield break;
+        }
+
         // Passo 1: "ESC" — abre o menu do jogador
         BattleMapMenuRootController menu = GetBattleMapMenu();
         Debug.Log($"[Replay][CommandService] BattleMapMenuRootController encontrado: {menu != null}");
@@ -1193,6 +1275,16 @@ public class ReplayManager : MonoBehaviour
     private IEnumerator ExecuteRecordedEndTurnBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
     {
         Debug.Log("[Replay][EndTurn] ExecuteRecordedEndTurnBatch iniciado.");
+
+        // A IA rapida equivale ao atalho R confirmado: passa a vez diretamente a
+        // partir de Neutral, sem abrir e navegar o menu do jogador.
+        if (IsLiveAIFastMode)
+        {
+            if (cursorController == null || !cursorController.TryExecuteEndTurnFromMenu())
+                ReplayLogWarning("[Replay][EndTurn] Atalho R recusado.");
+            yield return null;
+            yield break;
+        }
 
         BattleMapMenuRootController menu = GetBattleMapMenu();
         if (menu == null || !menu.TryOpenMenuFromAI())
@@ -2229,12 +2321,17 @@ public class ReplayManager : MonoBehaviour
     }
 
     private bool isLiveAIBatchExecution = false;
+    private bool liveAIFastMode = true;
+    private bool IsFastPresentation => fastReplayMode || (isLiveAIBatchExecution && liveAIFastMode);
+    private bool IsLiveAIPresentationMode => isLiveAIBatchExecution && !liveAIFastMode;
+    private bool IsLiveAIFastMode => isLiveAIBatchExecution && liveAIFastMode;
 
-    public void ExecuteLiveAIBatch(PlayerAction action)
+    public void ExecuteLiveAIBatch(PlayerAction action, bool fastAI = true)
     {
         if (action == null || actionStepExecutionRoutine != null)
             return;
 
+        liveAIFastMode = fastAI;
         actionStepExecutionRoutine = StartCoroutine(ExecuteLiveAIBatchRoutine(action));
     }
 
@@ -2242,13 +2339,18 @@ public class ReplayManager : MonoBehaviour
     {
         replayBatchAbortRequested = false;
         isLiveAIBatchExecution = true;
-
-        bool canEmulateAction = action != null && CanReplayActionAsLiveInputs(action.ActionType);
-        if (canEmulateAction)
-            yield return ExecuteRecordedActionBatch(action, null);
-
-        actionStepExecutionRoutine = null;
-        isLiveAIBatchExecution = false;
+        try
+        {
+            bool canEmulateAction = action != null && CanReplayActionAsLiveInputs(action.ActionType);
+            if (canEmulateAction)
+                yield return ExecuteRecordedActionBatch(action, null);
+        }
+        finally
+        {
+            actionStepExecutionRoutine = null;
+            isLiveAIBatchExecution = false;
+            liveAIFastMode = true;
+        }
     }
 
     public bool ExecuteNextReplayBatch()
@@ -2461,7 +2563,7 @@ public class ReplayManager : MonoBehaviour
                 cursorController.TryAdjustCameraToCursor();
             }
 
-            if (!fastReplayMode && animateCursorTravelBetweenActions && cursorTravelStepDelay > 0f)
+            if (!IsFastPresentation && animateCursorTravelBetweenActions && cursorTravelStepDelay > 0f)
                 yield return new WaitForSecondsRealtime(cursorTravelStepDelay);
 
 
@@ -2475,8 +2577,8 @@ public class ReplayManager : MonoBehaviour
 
             yield return null;
 
-            float delay = fastReplayMode ? 0f : Mathf.Max(0f, cinematicEvent.DelayAfter);
-            if (!fastReplayMode && !skipTrailingConfirm && (cinematicEvent.Action == CinematicAction.Confirm || cinematicEvent.Action == CinematicAction.AimAction))
+            float delay = IsFastPresentation ? 0f : Mathf.Max(0f, cinematicEvent.DelayAfter);
+            if (!IsFastPresentation && !skipTrailingConfirm && (cinematicEvent.Action == CinematicAction.Confirm || cinematicEvent.Action == CinematicAction.AimAction))
                 delay = Mathf.Max(delay, replayConfirmVisualDelay);
 
             if (delay > 0f)
@@ -2485,22 +2587,22 @@ public class ReplayManager : MonoBehaviour
     }
     private float GetEffectiveCursorTravelStepDelay()
     {
-        return fastReplayMode ? 0f : Mathf.Max(0f, cursorTravelStepDelay);
+        return IsFastPresentation ? 0f : Mathf.Max(0f, cursorTravelStepDelay);
     }
 
     private float GetEffectiveShoppingNavDelay()
     {
-        return fastReplayMode ? 0f : Mathf.Max(0f, shoppingNavDelay);
+        return IsFastPresentation ? 0f : Mathf.Max(0f, shoppingNavDelay);
     }
 
     private float GetEffectiveShoppingMenuOpenDelay()
     {
-        return fastReplayMode ? 0f : Mathf.Max(0f, shoppingMenuOpenDelay);
+        return IsFastPresentation ? 0f : Mathf.Max(0f, shoppingMenuOpenDelay);
     }
 
     private float GetEffectivePlayerMenuStepDelay()
     {
-        return fastReplayMode ? 0f : Mathf.Max(0f, playerMenuStepDelay);
+        return IsFastPresentation ? 0f : Mathf.Max(0f, playerMenuStepDelay);
     }
 
     private BattleMapMenuRootController GetBattleMapMenu()
@@ -2516,22 +2618,22 @@ public class ReplayManager : MonoBehaviour
     }
     private float GetEffectiveSensorSubstepDelay()
     {
-        return fastReplayMode ? 0f : Mathf.Max(0f, sensorSubstepDelay);
+        return IsFastPresentation ? 0f : Mathf.Max(0f, sensorSubstepDelay);
     }
 
     private float GetEffectiveUnitSelectionHoldDelay()
     {
-        return fastReplayMode ? 0f : Mathf.Max(0f, unitSelectionHoldDelay);
+        return IsFastPresentation ? 0f : Mathf.Max(0f, unitSelectionHoldDelay);
     }
 
     private float GetEffectiveBeforeConfirmDelay()
     {
-        return fastReplayMode ? 0f : Mathf.Max(0f, beforeConfirmDelay);
+        return IsFastPresentation ? 0f : Mathf.Max(0f, beforeConfirmDelay);
     }
 
     private float GetEffectiveSensorListNavDelay()
     {
-        return fastReplayMode ? 0f : Mathf.Max(0f, sensorListNavDelay);
+        return IsFastPresentation ? 0f : Mathf.Max(0f, sensorListNavDelay);
     }
 
     private IEnumerator WaitForSensorSubstepDelay()
@@ -2542,14 +2644,63 @@ public class ReplayManager : MonoBehaviour
         else
             yield return null;
     }
+
+    private IEnumerator WaitForAIPresentationStage()
+    {
+        // Garante ao menos um frame para o panel_helper observar o novo estado, mesmo
+        // quando o delay configurado estiver em zero.
+        yield return null;
+        float delay = GetEffectiveBeforeConfirmDelay();
+        if (delay > 0f)
+            yield return new WaitForSecondsRealtime(delay);
+    }
+
+    private IEnumerator NavigateSensorMenuForAIPresentation(SensorActionType action)
+    {
+        if (turnStateManager == null || !TryGetSensorMenuCode(action, out char targetCode))
+            yield break;
+
+        const int navigationGuard = 16;
+        int steps = 0;
+        while (turnStateManager.SensorOptionFocusCode != targetCode && steps < navigationGuard)
+        {
+            if (!turnStateManager.NavigateSensorOptionFocus(+1))
+                yield break;
+
+            steps++;
+            yield return null;
+
+            float delay = GetEffectiveSensorListNavDelay();
+            if (delay > 0f)
+                yield return new WaitForSecondsRealtime(delay);
+        }
+    }
+
+    private static bool TryGetSensorMenuCode(SensorActionType action, out char code)
+    {
+        switch (action)
+        {
+            case SensorActionType.None: code = 'M'; return true;
+            case SensorActionType.Attack: code = 'A'; return true;
+            case SensorActionType.Embark: code = 'E'; return true;
+            case SensorActionType.Disembark: code = 'D'; return true;
+            case SensorActionType.Capture: code = 'C'; return true;
+            case SensorActionType.Merge: code = 'F'; return true;
+            case SensorActionType.Supply: code = 'S'; return true;
+            case SensorActionType.Transfer: code = 'T'; return true;
+            default:
+                code = '\0';
+                return false;
+        }
+    }
     private float GetEffectiveReplayConfirmVisualDelay()
     {
-        return fastReplayMode ? 0f : Mathf.Max(0f, replayConfirmVisualDelay);
+        return IsFastPresentation ? 0f : Mathf.Max(0f, replayConfirmVisualDelay);
     }
 
     private float GetEffectiveTimeBetweenBatches()
     {
-        return fastReplayMode ? 0f : Mathf.Max(0.01f, timeBetweenBatches);
+        return IsFastPresentation ? 0f : Mathf.Max(0.01f, timeBetweenBatches);
     }
 
     private int ResolveCurrentReplayBatchCount()
