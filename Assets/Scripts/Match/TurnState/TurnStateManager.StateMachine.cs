@@ -992,6 +992,8 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileEmbarcando()
     {
         LogStateStep("HandleConfirmWhileEmbarcando");
+        if (embarkCancelFocused || (IsEmbarkConfirmStep && embarkConfirmButtonFocus == 1))
+            return HandleCancelWhileEmbarcando();
         if (TryConfirmScannerEmbark())
             return ActionSfx.Confirm;
 
@@ -1011,6 +1013,12 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileDesembarcando()
     {
         LogStateStep("HandleConfirmWhileDesembarcando");
+        if (IsDisembarkPassengerSelectStep)
+        {
+            if (DisembarkPassengerCancelFocused)
+                return HandleCancelWhileDesembarcando();
+            return TryInvokeFocusedDisembarkPassengerOption() ? ActionSfx.Confirm : ActionSfx.None;
+        }
         if (TryConfirmScannerDisembark())
         {
             if (ConsumeDisembarkSuppressDefaultConfirmSfxOnce())

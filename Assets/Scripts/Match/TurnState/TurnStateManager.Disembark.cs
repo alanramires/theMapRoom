@@ -41,6 +41,7 @@ public partial class TurnStateManager
     private bool disembarkLandingAutoEntered;
     private bool disembarkExecutionInProgress;
     private bool disembarkSuppressDefaultConfirmSfxOnce;
+    private int disembarkPassengerFocusIndex;
     private CursorState cursorStateBeforeDesembarcando = CursorState.MoveuParado;
 
     public bool IsDisembarkExecutionInProgress => disembarkExecutionInProgress;
@@ -52,6 +53,167 @@ public partial class TurnStateManager
     public int DisembarkQueuedOrdersCount => disembarkQueuedOrders.Count;
     public int DisembarkLandingOptionsCount => disembarkLandingOptions.Count;
     public string CurrentScannerPromptStepDebug => scannerPromptStep.ToString();
+    public bool IsDisembarkPassengerSelectStep => CurrentCursorState == CursorState.Desembarcando &&
+                                                  scannerPromptStep == ScannerPromptStep.DisembarkPassengerSelect;
+    public int DisembarkPassengerFocusIndex => disembarkPassengerFocusIndex;
+    public bool DisembarkPassengerCancelFocused => IsDisembarkPassengerSelectStep &&
+                                                   disembarkPassengerFocusIndex == GetDisembarkPassengerCancelFocusIndex();
+
+    private int GetDisembarkPassengerExecuteFocusIndex()
+    {
+        return disembarkQueuedOrders.Count > 0 ? disembarkPassengerEntries.Count : -1;
+    }
+
+    private int GetDisembarkPassengerCancelFocusIndex()
+    {
+        return disembarkPassengerEntries.Count + (disembarkQueuedOrders.Count > 0 ? 1 : 0);
+    }
+
+    public bool NavigateDisembarkPassengerFocus(int delta)
+    {
+        if (!IsDisembarkPassengerSelectStep || delta == 0)
+            return false;
+        int total = GetDisembarkPassengerCancelFocusIndex() + 1;
+        if (total <= 0)
+            return false;
+        disembarkPassengerFocusIndex =
+            (disembarkPassengerFocusIndex + (delta > 0 ? 1 : -1) + total) % total;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public bool TryInvokeFocusedDisembarkPassengerOption()
+    {
+        if (!IsDisembarkPassengerSelectStep || DisembarkPassengerCancelFocused)
+            return false;
+        int executeIndex = GetDisembarkPassengerExecuteFocusIndex();
+        if (executeIndex >= 0 && disembarkPassengerFocusIndex == executeIndex)
+            return TryExecuteDisembarkQueueFromPointer();
+        if (disembarkPassengerFocusIndex < 0 || disembarkPassengerFocusIndex >= disembarkPassengerEntries.Count)
+            return false;
+        DisembarkPassengerEntry entry = disembarkPassengerEntries[disembarkPassengerFocusIndex];
+        return entry != null && TrySelectDisembarkPassengerFromPointer(entry.selectionNumber);
+    }
+
+    public bool TrySelectDisembarkPassengerFromPointer(int selectionNumber)
+    {
+        if (CurrentCursorState != CursorState.Desembarcando ||
+            scannerPromptStep != ScannerPromptStep.DisembarkPassengerSelect)
+            return false;
+
+        for (int i = 0; i < disembarkPassengerEntries.Count; i++)
+        {
+            DisembarkPassengerEntry entry = disembarkPassengerEntries[i];
+            if (entry == null || entry.selectionNumber != selectionNumber)
+                continue;
+            disembarkPassengerFocusIndex = i;
+            disembarkSelectedPassengerIndex = i;
+            cursorController?.PlayConfirmSfx();
+            if (!EnterDisembarkLandingSelectStep(autoEntered: false))
+                EnterDisembarkPassengerSelectStep();
+            return true;
+        }
+        return false;
+    }
+
+    public bool TryAdvanceDisembarkFromPointer()
+    {
+        if (CurrentCursorState != CursorState.Desembarcando ||
+            scannerPromptStep == ScannerPromptStep.DisembarkPassengerSelect)
+            return false;
+        HandleConfirmWithFeedback();
+        return true;
+    }
+
+    public bool TryQueueDisembarkAtCellFromPointer(Vector3Int cell)
+    {
+        if (CurrentCursorState != CursorState.Desembarcando)
+            return false;
+
+        cell.z = 0;
+
+        if (scannerPromptStep == ScannerPromptStep.DisembarkConfirm)
+        {
+            Vector3Int selectedCell = disembarkSelectedLandingCell;
+            selectedCell.z = 0;
+            if (!disembarkSelectedLandingCellValid || cell != selectedCell)
+                return false;
+
+            // Segundo clique no mesmo hex confirma a ordem e a adiciona a fila.
+            return TryConfirmScannerDisembark();
+        }
+
+        if (scannerPromptStep != ScannerPromptStep.DisembarkLandingSelect)
+            return false;
+
+        if (!disembarkLandingByCell.ContainsKey(cell))
+            return false;
+
+        SetDisembarkSelectedLandingCell(cell, moveCursor: true);
+        // O clique escolhe o local e avanca somente ate a confirmacao. A ordem entra
+        // na fila apenas com um novo comando explicito (botao/Enter), evitando toque acidental.
+        return TryConfirmScannerDisembark() &&
+               scannerPromptStep == ScannerPromptStep.DisembarkConfirm;
+    }
+
+    private bool TryBeginDisembarkAtClickedCell(Vector3Int cell)
+    {
+        if ((CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado) ||
+            scannerPromptStep != ScannerPromptStep.AwaitingAction ||
+            selectedUnit == null ||
+            !availableSensorActionCodes.Contains('D'))
+            return false;
+
+        cell.z = 0;
+        HashSet<UnitManager> passengersForClickedCell = new HashSet<UnitManager>();
+        HashSet<UnitManager> allValidPassengers = new HashSet<UnitManager>();
+        for (int i = 0; i < cachedPodeDesembarcarTargets.Count; i++)
+        {
+            PodeDesembarcarOption option = cachedPodeDesembarcarTargets[i];
+            if (option == null || option.passengerUnit == null)
+                continue;
+
+            allValidPassengers.Add(option.passengerUnit);
+            Vector3Int optionCell = option.disembarkCell;
+            optionCell.z = 0;
+            if (optionCell == cell)
+                passengersForClickedCell.Add(option.passengerUnit);
+        }
+
+        // O clique so e trigger quando o proprio sensor reconhece o hex como destino valido.
+        if (passengersForClickedCell.Count <= 0)
+            return false;
+
+        bool hasSinglePassenger = allValidPassengers.Count == 1;
+        HandleDisembarkActionRequested();
+        if (CurrentCursorState != CursorState.Desembarcando)
+            return false;
+
+        // Com varios passageiros, nao inferimos qual deles o jogador quis usar.
+        if (!hasSinglePassenger)
+            return scannerPromptStep == ScannerPromptStep.DisembarkPassengerSelect;
+
+        // O fluxo oficial auto-seleciona o unico passageiro. Substitui o primeiro destino
+        // automatico pelo hex tocado e avanca somente ate CONFIRMAR LOCAL.
+        if (scannerPromptStep != ScannerPromptStep.DisembarkLandingSelect ||
+            !disembarkLandingByCell.ContainsKey(cell))
+            return true;
+
+        SetDisembarkSelectedLandingCell(cell, moveCursor: true);
+        TryConfirmScannerDisembark();
+        return true;
+    }
+
+    public bool TryExecuteDisembarkQueueFromPointer()
+    {
+        if (CurrentCursorState != CursorState.Desembarcando ||
+            scannerPromptStep != ScannerPromptStep.DisembarkPassengerSelect ||
+            disembarkQueuedOrders.Count <= 0 || disembarkExecutionInProgress)
+            return false;
+        disembarkPassengerFocusIndex = GetDisembarkPassengerExecuteFocusIndex();
+        StartDisembarkExecution();
+        return true;
+    }
 
     public string[] GetDisembarkPassengerDebugLines()
     {
@@ -264,6 +426,7 @@ public partial class TurnStateManager
         RebuildDisembarkPassengerEntries();
         scannerPromptStep = ScannerPromptStep.DisembarkPassengerSelect;
         disembarkSelectedPassengerIndex = -1;
+        disembarkPassengerFocusIndex = 0;
         disembarkLandingAutoEntered = false;
 
         if (cursorController != null && selectedUnit != null)
@@ -309,6 +472,14 @@ public partial class TurnStateManager
         disembarkLandingAutoEntered = autoEntered;
         SetDisembarkSelectedLandingCell(disembarkLandingOptions[0].disembarkCell, moveCursor: true);
         PaintDisembarkLandingOptions();
+
+        if (disembarkLandingOptions.Count == 1)
+        {
+            scannerPromptStep = ScannerPromptStep.DisembarkConfirm;
+            LogDisembarkConfirmPrompt();
+            return true;
+        }
+
         LogDisembarkLandingSelectionPanel(entry);
         return true;
     }
@@ -937,6 +1108,8 @@ public partial class TurnStateManager
 
     private int CountRemainingPassengersForDisembark()
     {
+        // Conta somente passageiros que ainda possuem ao menos um hex valido nao reservado.
+        // Passageiro embarcado sem destino disponivel nao deve manter a montagem da fila aberta.
         int count = 0;
         if (selectedUnit == null)
             return 0;
@@ -952,10 +1125,34 @@ public partial class TurnStateManager
                 continue;
             if (IsPassengerAlreadyQueued(seat.embarkedUnit))
                 continue;
-            count++;
+            if (HasAvailableDisembarkTargetForSeat(seat))
+                count++;
         }
 
         return count;
+    }
+
+    private bool HasAvailableDisembarkTargetForSeat(UnitTransportSeatRuntime seat)
+    {
+        if (seat == null || seat.embarkedUnit == null)
+            return false;
+
+        for (int i = 0; i < cachedPodeDesembarcarTargets.Count; i++)
+        {
+            PodeDesembarcarOption option = cachedPodeDesembarcarTargets[i];
+            if (option == null || option.passengerUnit != seat.embarkedUnit)
+                continue;
+            if (option.transporterSlotIndex != seat.slotIndex ||
+                option.transporterSeatIndex != seat.seatIndex)
+                continue;
+
+            Vector3Int cell = option.disembarkCell;
+            cell.z = 0;
+            if (!IsCellAlreadyQueuedForDisembark(cell))
+                return true;
+        }
+
+        return false;
     }
 
     private bool IsPassengerAlreadyQueued(UnitManager passenger)

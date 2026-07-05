@@ -275,19 +275,42 @@ public class CursorController : MonoBehaviour
         }
 
         if (turnStateManager != null &&
+            turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Embarcando &&
+            turnStateManager.IsEmbarkConfirmStep)
+        {
+            if (WasMenuUpPressedThisFrame())
+                turnStateManager.NavigateEmbarkHelperFocus(-1);
+            else if (WasMenuDownPressedThisFrame())
+                turnStateManager.NavigateEmbarkHelperFocus(+1);
+            HandleNeutralLeftClickTeleport();
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
+        if (turnStateManager != null &&
             (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.MoveuAndando ||
              turnStateManager.CurrentCursorState == TurnStateManager.CursorState.MoveuParado))
         {
             bool navigated = false;
-            if (WasMenuUpPressedThisFrame())
+            if (WasMenuUpPressedThisFrame() || WasMenuLeftPressedThisFrame())
                 navigated = turnStateManager.NavigateSensorOptionFocus(-1);
-            else if (WasMenuDownPressedThisFrame())
+            else if (WasMenuDownPressedThisFrame() || WasMenuRightPressedThisFrame())
                 navigated = turnStateManager.NavigateSensorOptionFocus(+1);
             if (navigated)
             {
                 heldDirection = Vector3Int.zero;
                 return;
             }
+        }
+
+        if (turnStateManager != null && turnStateManager.IsDisembarkPassengerSelectStep)
+        {
+            if (WasMenuUpPressedThisFrame() || WasMenuLeftPressedThisFrame())
+                turnStateManager.NavigateDisembarkPassengerFocus(-1);
+            else if (WasMenuDownPressedThisFrame() || WasMenuRightPressedThisFrame())
+                turnStateManager.NavigateDisembarkPassengerFocus(+1);
+            heldDirection = Vector3Int.zero;
+            return;
         }
 
         if (IsBattleMapMenuOpen())
@@ -489,11 +512,15 @@ public class CursorController : MonoBehaviour
                                       state == TurnStateManager.CursorState.MoveuParado;
         bool isShopping = state == TurnStateManager.CursorState.ShoppingAndServices;
         bool isAiming = state == TurnStateManager.CursorState.Mirando;
+        bool isEmbarking = state == TurnStateManager.CursorState.Embarcando;
+        bool isDisembarking = state == TurnStateManager.CursorState.Desembarcando;
         if (state != TurnStateManager.CursorState.Neutral &&
             state != TurnStateManager.CursorState.UnitSelected &&
             !isMovementActionChoice &&
             !isShopping &&
-            !isAiming)
+            !isAiming &&
+            !isEmbarking &&
+            !isDisembarking)
             return;
 
         Camera cam = cameraController != null ? cameraController.GetComponent<Camera>() : Camera.main;
@@ -515,9 +542,15 @@ public class CursorController : MonoBehaviour
             return;
         }
 
-        if (isMovementActionChoice || isAiming)
+        if (isMovementActionChoice || isAiming || isEmbarking)
         {
             turnStateManager.TryInvokeInferredSensorActionByClickingSelectedUnit(targetCell);
+            return;
+        }
+
+        if (isDisembarking)
+        {
+            turnStateManager.TryQueueDisembarkAtCellFromPointer(targetCell);
             return;
         }
 
@@ -1207,6 +1240,24 @@ public class CursorController : MonoBehaviour
         return Keyboard.current != null && Keyboard.current.downArrowKey.wasPressedThisFrame;
 #else
         return Input.GetKeyDown(KeyCode.DownArrow);
+#endif
+    }
+
+    private bool WasMenuLeftPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.leftArrowKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.LeftArrow);
+#endif
+    }
+
+    private bool WasMenuRightPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.rightArrowKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.RightArrow);
 #endif
     }
 

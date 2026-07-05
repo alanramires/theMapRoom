@@ -30,7 +30,8 @@ public partial class TurnStateManager
         ConstructionStats = 11,
         RemovingUnit = 12,
         AimTargets = 13,
-        AimConfirm = 14
+        AimConfirm = 14,
+        EmbarkConfirm = 15
     }
 
     public sealed class HelperPanelData
@@ -41,6 +42,9 @@ public partial class TurnStateManager
         public readonly List<HelperThreatLayerTeamLine> ThreatLayerTeamLines = new List<HelperThreatLayerTeamLine>();
         public readonly List<HelperDisembarkOrderLine> DisembarkOrderLines = new List<HelperDisembarkOrderLine>();
         public readonly List<HelperDisembarkPassengerLine> DisembarkPassengerLines = new List<HelperDisembarkPassengerLine>();
+        public int DisembarkStep;
+        public string DisembarkSelectedPassengerName;
+        public string DisembarkSelectedLandingLabel;
         public readonly List<HelperMergeQueueLine> MergeQueueLines = new List<HelperMergeQueueLine>();
         public readonly List<HelperMergeCandidateLine> MergeCandidateLines = new List<HelperMergeCandidateLine>();
         public readonly List<HelperEmbarkCandidateLine> EmbarkCandidateLines = new List<HelperEmbarkCandidateLine>();
@@ -220,6 +224,10 @@ public partial class TurnStateManager
         public string unitName;
         public string stats;
         public string terrainName;
+        public Sprite unitSprite;
+        public Color unitColor = Color.white;
+        public Sprite localSprite;
+        public Color localColor = Color.white;
     }
 
     public sealed class HelperDisembarkPassengerLine
@@ -2155,6 +2163,18 @@ public partial class TurnStateManager
             return false;
 
         data.Kind = HelperPanelKind.Disembark;
+        data.DisembarkStep = scannerPromptStep == ScannerPromptStep.DisembarkPassengerSelect ? 0 :
+                             scannerPromptStep == ScannerPromptStep.DisembarkLandingSelect ? 1 : 2;
+
+        if (TryGetSelectedPassengerEntry(out DisembarkPassengerEntry selectedPassenger))
+            data.DisembarkSelectedPassengerName = ResolveUnitRuntimeName(selectedPassenger.passenger);
+        if (disembarkSelectedLandingCellValid)
+        {
+            string terrain = ResolveTerrainLabelForCell(disembarkSelectedLandingCell);
+            data.DisembarkSelectedLandingLabel = string.IsNullOrWhiteSpace(terrain)
+                ? FormatMapCell(disembarkSelectedLandingCell)
+                : $"{terrain} {FormatMapCell(disembarkSelectedLandingCell)}";
+        }
 
         if (disembarkQueuedOrders != null && disembarkQueuedOrders.Count > 0)
         {
@@ -2166,11 +2186,17 @@ public partial class TurnStateManager
 
                 data.DisembarkOrderLines.Add(new HelperDisembarkOrderLine
                 {
-                    index = i,
+                    index = i + 1,
                     unitName = ResolveUnitRuntimeName(order.passenger),
                     stats = BuildUnitStatInline(order.passenger),
-                    terrainName = ResolveTerrainLabelForCell(order.targetCell)
+                    terrainName = ResolveCellTerrainLabel(order.targetCell),
+                    unitSprite = order.passenger.GetMainSpriteRenderer() != null
+                        ? order.passenger.GetMainSpriteRenderer().sprite : null,
+                    unitColor = order.passenger.GetMainSpriteRenderer() != null
+                        ? order.passenger.GetMainSpriteRenderer().color : Color.white
                 });
+                HelperDisembarkOrderLine added = data.DisembarkOrderLines[data.DisembarkOrderLines.Count - 1];
+                ResolveCellLocalVisual(order.targetCell, out added.localSprite, out added.localColor);
             }
         }
 
@@ -2263,6 +2289,28 @@ public partial class TurnStateManager
         if (data == null || CurrentCursorState != CursorState.Embarcando)
             return false;
 
+        if (IsEmbarkConfirmStep)
+        {
+            data.Kind = HelperPanelKind.EmbarkConfirm;
+            if (scannerSelectedEmbarkIndex >= 0 && scannerSelectedEmbarkIndex < cachedPodeEmbarcarTargets.Count)
+            {
+                PodeEmbarcarOption selected = cachedPodeEmbarcarTargets[scannerSelectedEmbarkIndex];
+                UnitManager transporter = selected != null ? selected.transporterUnit : null;
+                data.AimConfirmTargetName = transporter != null ? ResolveUnitRuntimeName(transporter) : "Transportador";
+                if (transporter != null)
+                {
+                    SpriteRenderer renderer = transporter.GetMainSpriteRenderer();
+                    data.AimConfirmTargetSprite = renderer != null ? renderer.sprite : null;
+                    data.AimConfirmTargetColor = renderer != null ? renderer.color : Color.white;
+                    data.AimConfirmHp = Mathf.Max(0, transporter.CurrentHP);
+                    Vector3Int cell = transporter.CurrentCellPosition;
+                    data.AimConfirmTerrainLabel = ResolveCellTerrainLabel(cell);
+                    ResolveCellLocalVisual(cell, out data.AimConfirmLocalSprite, out data.AimConfirmLocalColor);
+                }
+            }
+            return true;
+        }
+
         data.Kind = HelperPanelKind.Embark;
         if (cachedPodeEmbarcarTargets != null)
         {
@@ -2286,11 +2334,29 @@ public partial class TurnStateManager
                     invalidReason = string.Empty,
                     isFocused = isFocused
                 });
+                data.AimTargetLines.Add(new HelperAimTargetLine
+                {
+                    index = i,
+                    unitName = ResolveUnitRuntimeName(transporter),
+                    isValid = true,
+                    isFocused = !embarkCancelFocused && isFocused,
+                    hp = Mathf.Max(0, transporter.CurrentHP),
+                    terrainLabel = ResolveCellTerrainLabel(transporter.CurrentCellPosition)
+                });
             }
 
         }
 
-        return data.EmbarkCandidateLines.Count > 0;
+        data.AimTargetLines.Add(new HelperAimTargetLine
+        {
+            index = -1,
+            unitName = "CANCELAR",
+            isValid = true,
+            isFocused = embarkCancelFocused,
+            isCancel = true
+        });
+
+        return data.AimTargetLines.Count > 1;
     }
 
     private bool TryBuildSupplyHelperPanelData(HelperPanelData data)

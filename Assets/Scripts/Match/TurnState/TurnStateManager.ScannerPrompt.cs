@@ -653,6 +653,7 @@ public partial class TurnStateManager
             scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget)
         {
             scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+            embarkConfirmButtonFocus = 0;
             FocusCurrentEmbarkTarget(logDetails: true);
             return true;
         }
@@ -1098,13 +1099,16 @@ public partial class TurnStateManager
         bool isMovementActionChoice = CurrentCursorState == CursorState.MoveuAndando ||
                                       CurrentCursorState == CursorState.MoveuParado;
         bool isAiming = CurrentCursorState == CursorState.Mirando;
-        if ((!isMovementActionChoice && !isAiming) || selectedUnit == null)
+        bool isEmbarking = CurrentCursorState == CursorState.Embarcando;
+        if ((!isMovementActionChoice && !isAiming && !isEmbarking) || selectedUnit == null)
             return false;
 
         clickedCell.z = 0;
 
         if (isAiming)
             return TryHandleMirandoTargetClick(clickedCell);
+        if (isEmbarking)
+            return TryHandleEmbarkTargetClick(clickedCell);
 
         if (scannerPromptStep != ScannerPromptStep.AwaitingAction)
             return false;
@@ -1112,7 +1116,9 @@ public partial class TurnStateManager
         Vector3Int unitCell = selectedUnit.CurrentCellPosition;
         unitCell.z = 0;
         if (clickedCell != unitCell)
-            return TryBeginAimAtClickedTarget(clickedCell);
+            return TryBeginAimAtClickedTarget(clickedCell) ||
+                   TryBeginEmbarkAtClickedTarget(clickedCell) ||
+                   TryBeginDisembarkAtClickedCell(clickedCell);
 
         // Prioridades contextuais para um segundo clique na propria unidade.
         // Capturar e uma acao inequivoca do hex atual e tem prioridade sobre M.
@@ -1122,15 +1128,12 @@ public partial class TurnStateManager
             return true;
         }
 
-        // M e sempre oferecido pelo helper, mas nao faz parte da lista dos sensores.
-        // Lista vazia significa que "Apenas Mover" e a unica escolha restante.
-        if (availableSensorActionCodes.Count == 0)
-        {
-            HandleMoveOnlyActionRequested();
-            return true;
-        }
-
-        return false;
+        // As demais acoes contextuais apontam para outro alvo (inimigo, transportador,
+        // passageiro etc.). Portanto, depois da prioridade de Capturar, clicar novamente
+        // na propria unidade expressa inequivocamente "Apenas Mover", mesmo que existam
+        // outros sensores disponiveis no painel.
+        HandleMoveOnlyActionRequested();
+        return true;
     }
 
     private bool TryBeginAimAtClickedTarget(Vector3Int clickedCell)
@@ -1223,6 +1226,88 @@ public partial class TurnStateManager
                entry.isValid &&
                entry.AttackerUnit == selectedUnit &&
                entry.TargetUnit == target;
+    }
+
+    private bool TryBeginEmbarkAtClickedTarget(Vector3Int clickedCell)
+    {
+        if (!availableSensorActionCodes.Contains('E'))
+            return false;
+
+        UnitManager transporter = FindUniqueValidEmbarkTargetAtCell(clickedCell);
+        if (transporter == null)
+            return false;
+
+        HandleEmbarkActionRequested(transporter);
+        return IsEmbarkConfirmStep && IsCurrentEmbarkTarget(transporter);
+    }
+
+    private bool TryHandleEmbarkTargetClick(Vector3Int clickedCell)
+    {
+        if (embarkExecutionInProgress)
+            return false;
+
+        UnitManager transporter = FindUniqueValidEmbarkTargetAtCell(clickedCell);
+        if (transporter == null)
+            return false;
+
+        if (scannerPromptStep == ScannerPromptStep.EmbarkCycleTarget)
+            return TryEnterEmbarkConfirmForTarget(transporter);
+
+        if (scannerPromptStep != ScannerPromptStep.EmbarkConfirmTarget ||
+            !IsCurrentEmbarkTarget(transporter))
+            return false;
+
+        embarkCancelFocused = false;
+        embarkConfirmButtonFocus = 0;
+        HandleConfirmWithFeedback();
+        return true;
+    }
+
+    private UnitManager FindUniqueValidEmbarkTargetAtCell(Vector3Int clickedCell)
+    {
+        clickedCell.z = 0;
+        UnitManager match = null;
+        for (int i = 0; i < cachedPodeEmbarcarTargets.Count; i++)
+        {
+            PodeEmbarcarOption option = cachedPodeEmbarcarTargets[i];
+            if (option == null || (option.sourceUnit != null && option.sourceUnit != selectedUnit) || option.transporterUnit == null)
+                continue;
+            Vector3Int targetCell = option.transporterUnit.CurrentCellPosition;
+            targetCell.z = 0;
+            if (targetCell != clickedCell)
+                continue;
+            if (match != null && match != option.transporterUnit)
+                return null;
+            match = option.transporterUnit;
+        }
+        return match;
+    }
+
+    private bool TryEnterEmbarkConfirmForTarget(UnitManager transporter)
+    {
+        if (CurrentCursorState != CursorState.Embarcando || transporter == null)
+            return false;
+        for (int i = 0; i < cachedPodeEmbarcarTargets.Count; i++)
+        {
+            PodeEmbarcarOption option = cachedPodeEmbarcarTargets[i];
+            if (option == null || (option.sourceUnit != null && option.sourceUnit != selectedUnit) || option.transporterUnit != transporter)
+                continue;
+            scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
+            scannerSelectedEmbarkIndex = i;
+            embarkCancelFocused = false;
+            embarkConfirmButtonFocus = 0;
+            FocusCurrentEmbarkTarget(logDetails: true, moveCursor: true);
+            return TryConfirmScannerEmbark();
+        }
+        return false;
+    }
+
+    private bool IsCurrentEmbarkTarget(UnitManager transporter)
+    {
+        return transporter != null &&
+               TryGetSelectedValidEmbarkOption(out PodeEmbarcarOption option, out _) &&
+               (option.sourceUnit == null || option.sourceUnit == selectedUnit) &&
+               option.transporterUnit == transporter;
     }
 
     private void HandleMoveOnlyActionRequested()
@@ -1406,7 +1491,7 @@ public partial class TurnStateManager
         return true;
     }
 
-    private void HandleEmbarkActionRequested()
+    private void HandleEmbarkActionRequested(UnitManager preferredTransporter = null)
     {
         if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
             return;
@@ -1427,6 +1512,14 @@ public partial class TurnStateManager
         ClearCommittedPathVisual();
         scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
         scannerSelectedEmbarkIndex = 0;
+        embarkCancelFocused = false;
+        embarkConfirmButtonFocus = 0;
+
+        if (preferredTransporter != null)
+        {
+            TryEnterEmbarkConfirmForTarget(preferredTransporter);
+            return;
+        }
 
         if (cachedPodeEmbarcarTargets.Count == 1)
         {
@@ -3210,6 +3303,37 @@ public partial class TurnStateManager
         return true;
     }
 
+    private bool embarkCancelFocused;
+    private int embarkConfirmButtonFocus;
+    public bool EmbarkCancelFocused => embarkCancelFocused;
+    public int EmbarkConfirmButtonFocus => embarkConfirmButtonFocus;
+    public bool IsEmbarkConfirmStep => CurrentCursorState == CursorState.Embarcando &&
+                                       scannerPromptStep == ScannerPromptStep.EmbarkConfirmTarget;
+
+    public bool NavigateEmbarkHelperFocus(int delta)
+    {
+        if (!IsEmbarkConfirmStep || delta == 0)
+            return false;
+        embarkConfirmButtonFocus = (embarkConfirmButtonFocus + (delta > 0 ? 1 : -1) + 2) % 2;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public void SetEmbarkConfirmFocus(int index)
+    {
+        if (IsEmbarkConfirmStep)
+            embarkConfirmButtonFocus = Mathf.Clamp(index, 0, 1);
+    }
+
+    public bool TrySelectEmbarkTargetFromPointer(int index)
+    {
+        if (CurrentCursorState != CursorState.Embarcando ||
+            index < 0 || index >= cachedPodeEmbarcarTargets.Count)
+            return false;
+        PodeEmbarcarOption option = cachedPodeEmbarcarTargets[index];
+        return option != null && TryEnterEmbarkConfirmForTarget(option.transporterUnit);
+    }
+
     // -------------------------------------------------------------------------
     // API de replay para navegação em listas de sensor (genérica)
     // Usada por: Mirando (ataque). Futuramente: Embark, Supply, Transfer...
@@ -4240,10 +4364,18 @@ public partial class TurnStateManager
             return false;
 
         int count = cachedPodeEmbarcarTargets.Count;
-        if (count <= 1)
+        int total = count + 1;
+        int current = embarkCancelFocused ? count : scannerSelectedEmbarkIndex;
+        int next = (current + step + total) % total;
+        if (next == count)
+        {
+            embarkCancelFocused = true;
+            cursorController?.PlayCursorMoveSfx();
             return false;
+        }
 
-        scannerSelectedEmbarkIndex = (scannerSelectedEmbarkIndex + step + count) % count;
+        embarkCancelFocused = false;
+        scannerSelectedEmbarkIndex = next;
         FocusCurrentEmbarkTarget(logDetails: true);
 
         if (scannerSelectedEmbarkIndex < 0 || scannerSelectedEmbarkIndex >= count)

@@ -135,6 +135,12 @@ public class PanelHelperController : MonoBehaviour
     private Image aimConfirmLocalIcon;
     private TMP_Text aimConfirmLocalText;
     private const float AimConfirmDetailsHeight = 172f;
+    private GameObject disembarkActionsRoot;
+    private readonly List<Button> disembarkActionButtons = new List<Button>();
+    private readonly List<int> disembarkActionFocusIndices = new List<int>();
+    private string disembarkActionsSignature = string.Empty;
+    private bool disembarkLayoutDirty;
+    private const float DisembarkActionButtonHeight = 48f;
     private GameObject shoppingActionsRoot;
     private readonly List<Button> shoppingActionButtons = new List<Button>();
     private string shoppingActionsSignature = string.Empty;
@@ -365,8 +371,9 @@ public class PanelHelperController : MonoBehaviour
                 return;
 
             case TurnStateManager.HelperPanelKind.Disembark:
-                title = ResolveMessage("helper.title.disembark", "DISEMBARK");
-                body = BuildDisembarkBody(data);
+                title = data.DisembarkStep == 0 ? "ESCOLHER UNIDADE" :
+                        data.DisembarkStep == 1 ? "ESCOLHER LOCAL" : "CONFIRMAR DESEMBARQUE";
+                body = string.Empty;
                 return;
 
             case TurnStateManager.HelperPanelKind.Merge:
@@ -376,7 +383,12 @@ public class PanelHelperController : MonoBehaviour
 
             case TurnStateManager.HelperPanelKind.Embark:
                 title = ResolveMessage("helper.title.embark", "EMBARK");
-                body = BuildEmbarkBody(data);
+                body = string.Empty;
+                return;
+
+            case TurnStateManager.HelperPanelKind.EmbarkConfirm:
+                title = "CONFIRMAR EMBARQUE";
+                body = string.Empty;
                 return;
 
             case TurnStateManager.HelperPanelKind.Supply:
@@ -1399,6 +1411,7 @@ public class PanelHelperController : MonoBehaviour
         RefreshAimTargetControls(panelVisible, data);
         RefreshAimFooterFocus(panelVisible, data);
         RefreshAimConfirmDetails(panelVisible, data);
+        RefreshDisembarkActionControls(panelVisible, data);
         RefreshShoppingActionControls(panelVisible, data);
         RefreshPersistenceActionControls(panelVisible);
         RefreshDynamicPanelHeight(panelVisible, textChanged);
@@ -1427,7 +1440,7 @@ public class PanelHelperController : MonoBehaviour
             return;
         }
 
-        if (!contentChanged)
+        if (!contentChanged && !disembarkLayoutDirty)
             return;
 
         float titleHeight = 0f;
@@ -1443,6 +1456,7 @@ public class PanelHelperController : MonoBehaviour
         bool sensorButtonsActive = sensorActionsRoot != null && sensorActionsRoot.activeSelf;
         bool aimButtonsActive = aimTargetsRoot != null && aimTargetsRoot.activeSelf;
         bool aimConfirmActive = aimConfirmDetailsRoot != null && aimConfirmDetailsRoot.activeSelf;
+        bool disembarkButtonsActive = disembarkActionsRoot != null && disembarkActionsRoot.activeSelf;
         bool shoppingButtonsActive = shoppingActionsRoot != null && shoppingActionsRoot.activeSelf;
         bool persistenceButtonsActive = persistenceActionsRoot != null && persistenceActionsRoot.activeSelf;
         if (sensorButtonsActive)
@@ -1456,6 +1470,10 @@ public class PanelHelperController : MonoBehaviour
         else if (aimConfirmActive)
         {
             bodyHeight = AimConfirmDetailsHeight;
+        }
+        else if (disembarkButtonsActive)
+        {
+            bodyHeight = disembarkActionButtons.Count * (DisembarkActionButtonHeight + 4f);
         }
         else if (shoppingButtonsActive)
         {
@@ -1478,6 +1496,7 @@ public class PanelHelperController : MonoBehaviour
         float targetHeight = Mathf.Clamp(titleHeight + bodyHeight + Mathf.Max(0f, contentVerticalPadding) + footerHeight, minHeight, maxHeight);
         helperRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
         RefreshHelperScrollLayout(titleHeight, bodyHeight, targetHeight);
+        disembarkLayoutDirty = false;
     }
 
     private void RefreshSensorActionControls(bool panelVisible, TurnStateManager.HelperPanelData data)
@@ -1552,7 +1571,9 @@ public class PanelHelperController : MonoBehaviour
 
     private void RefreshAimTargetControls(bool panelVisible, TurnStateManager.HelperPanelData data)
     {
-        bool active = panelVisible && data != null && data.Kind == TurnStateManager.HelperPanelKind.AimTargets &&
+        bool active = panelVisible && data != null &&
+                      (data.Kind == TurnStateManager.HelperPanelKind.AimTargets ||
+                       data.Kind == TurnStateManager.HelperPanelKind.Embark) &&
                       data.AimTargetLines != null && data.AimTargetLines.Count > 0;
         if (!active)
         {
@@ -1564,10 +1585,11 @@ public class PanelHelperController : MonoBehaviour
         StringBuilder signatureBuilder = new StringBuilder();
         for (int i = 0; i < data.AimTargetLines.Count; i++)
             signatureBuilder.Append(data.AimTargetLines[i].unitName).Append(data.AimTargetLines[i].isValid);
-        string signature = signatureBuilder.ToString();
+        string signature = data.Kind + signatureBuilder.ToString();
         if (signature != aimTargetsSignature)
         {
-            RebuildAimTargetButtons(data.AimTargetLines);
+            RebuildAimTargetButtons(data.AimTargetLines,
+                data.Kind == TurnStateManager.HelperPanelKind.Embark);
             aimTargetsSignature = signature;
         }
         aimTargetsRoot.SetActive(true);
@@ -1593,9 +1615,14 @@ public class PanelHelperController : MonoBehaviour
 
     private void RefreshAimFooterFocus(bool panelVisible, TurnStateManager.HelperPanelData data)
     {
-        if (!panelVisible || data == null || data.Kind != TurnStateManager.HelperPanelKind.AimConfirm || turnStateManager == null)
+        if (!panelVisible || data == null ||
+            (data.Kind != TurnStateManager.HelperPanelKind.AimConfirm &&
+             data.Kind != TurnStateManager.HelperPanelKind.EmbarkConfirm) ||
+            turnStateManager == null)
             return;
-        int focus = turnStateManager.MirandoConfirmButtonFocus;
+        int focus = data.Kind == TurnStateManager.HelperPanelKind.EmbarkConfirm
+            ? turnStateManager.EmbarkConfirmButtonFocus
+            : turnStateManager.MirandoConfirmButtonFocus;
         ApplyFooterButtonFocus(executeCommandServiceImage, executeCommandServiceLabel, focus == 0);
         ApplyFooterButtonFocus(cancelActionImage, cancelActionLabel, focus == 1);
     }
@@ -1603,7 +1630,9 @@ public class PanelHelperController : MonoBehaviour
     // Detalhes do CONFIRMAR ATAQUE: sprite + nome do alvo, HP e LOCAL.
     private void RefreshAimConfirmDetails(bool panelVisible, TurnStateManager.HelperPanelData data)
     {
-        bool active = panelVisible && data != null && data.Kind == TurnStateManager.HelperPanelKind.AimConfirm;
+        bool active = panelVisible && data != null &&
+                      (data.Kind == TurnStateManager.HelperPanelKind.AimConfirm ||
+                       data.Kind == TurnStateManager.HelperPanelKind.EmbarkConfirm);
         if (!active)
         {
             if (aimConfirmDetailsRoot != null) aimConfirmDetailsRoot.SetActive(false);
@@ -1727,7 +1756,175 @@ public class PanelHelperController : MonoBehaviour
         aimTargetsRoot.SetActive(false);
     }
 
-    private void RebuildAimTargetButtons(List<TurnStateManager.HelperAimTargetLine> lines)
+    private void RefreshDisembarkActionControls(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        bool active = panelVisible && data != null && data.Kind == TurnStateManager.HelperPanelKind.Disembark;
+        if (!active)
+        {
+            if (disembarkActionsRoot != null) disembarkActionsRoot.SetActive(false);
+            disembarkActionsSignature = string.Empty;
+            return;
+        }
+
+        EnsureDisembarkActionsRoot();
+        if (disembarkActionsRoot == null) return;
+
+        StringBuilder sb = new StringBuilder().Append(data.DisembarkStep)
+            .Append('|').Append(data.DisembarkSelectedPassengerName)
+            .Append('|').Append(data.DisembarkSelectedLandingLabel)
+            .Append('|').Append(data.HasQueuedDisembarkOrders);
+        for (int i = 0; i < data.DisembarkOrderLines.Count; i++)
+            sb.Append('|').Append(data.DisembarkOrderLines[i].unitName).Append(data.DisembarkOrderLines[i].terrainName);
+        for (int i = 0; i < data.DisembarkPassengerLines.Count; i++)
+            sb.Append('|').Append(data.DisembarkPassengerLines[i].index).Append(data.DisembarkPassengerLines[i].unitName);
+        string signature = sb.ToString();
+        if (signature != disembarkActionsSignature)
+        {
+            RebuildDisembarkActionButtons(data);
+            disembarkActionsSignature = signature;
+            disembarkLayoutDirty = true;
+        }
+
+        disembarkActionsRoot.SetActive(true);
+        int focusedIndex = turnStateManager != null ? turnStateManager.DisembarkPassengerFocusIndex : -1;
+        for (int i = 0; i < disembarkActionButtons.Count; i++)
+        {
+            Button button = disembarkActionButtons[i];
+            int buttonFocus = i < disembarkActionFocusIndices.Count ? disembarkActionFocusIndices[i] : -1;
+            if (button != null && button.interactable)
+                TintScriptButtonToTeam(button, data.DisembarkStep == 0 && buttonFocus == focusedIndex);
+        }
+        ApplyFooterButtonFocus(cancelActionImage, cancelActionLabel,
+            turnStateManager != null && turnStateManager.DisembarkPassengerCancelFocused);
+        if (helperTxt != null) helperTxt.enabled = false;
+        if (panelHelper == gameObject && selfPanelCanvasGroup != null)
+        {
+            selfPanelCanvasGroup.interactable = true;
+            selfPanelCanvasGroup.blocksRaycasts = true;
+        }
+    }
+
+    private void EnsureDisembarkActionsRoot()
+    {
+        if (!Application.isPlaying || disembarkActionsRoot != null || helperRect == null) return;
+        disembarkActionsRoot = new GameObject("helper_disembark_actions", typeof(RectTransform), typeof(VerticalLayoutGroup));
+        RectTransform rect = disembarkActionsRoot.GetComponent<RectTransform>();
+        rect.SetParent(helperRect, false);
+        rect.anchorMin = new Vector2(0.06f, 1f); rect.anchorMax = new Vector2(0.94f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f); rect.anchoredPosition = new Vector2(0f, -48f);
+        VerticalLayoutGroup layout = disembarkActionsRoot.GetComponent<VerticalLayoutGroup>();
+        layout.spacing = 4f; layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true; layout.childControlHeight = true;
+        layout.childForceExpandWidth = true; layout.childForceExpandHeight = false;
+        disembarkActionsRoot.SetActive(false);
+    }
+
+    private void RebuildDisembarkActionButtons(TurnStateManager.HelperPanelData data)
+    {
+        for (int i = disembarkActionButtons.Count - 1; i >= 0; i--)
+            if (disembarkActionButtons[i] != null) Destroy(disembarkActionButtons[i].gameObject);
+        disembarkActionButtons.Clear();
+        disembarkActionFocusIndices.Clear();
+
+        for (int i = 0; i < data.DisembarkOrderLines.Count; i++)
+        {
+            TurnStateManager.HelperDisembarkOrderLine order = data.DisembarkOrderLines[i];
+            CreateDisembarkButton($"{order.index} - {order.unitName} → {order.terrainName}", null, false, -1,
+                order.unitSprite, order.unitColor, order.localSprite, order.localColor);
+        }
+
+        if (data.DisembarkStep == 0)
+        {
+            for (int i = 0; i < data.DisembarkPassengerLines.Count; i++)
+            {
+                TurnStateManager.HelperDisembarkPassengerLine passenger = data.DisembarkPassengerLines[i];
+                int selectionNumber = passenger.index;
+                CreateDisembarkButton($"{passenger.index} - {passenger.unitName} ({passenger.stats})",
+                    () => turnStateManager?.TrySelectDisembarkPassengerFromPointer(selectionNumber), true, i);
+            }
+            if (data.HasQueuedDisembarkOrders)
+                CreateDisembarkButton("EXECUTAR FILA", () => turnStateManager?.TryExecuteDisembarkQueueFromPointer(), true,
+                    data.DisembarkPassengerLines.Count);
+        }
+        else
+        {
+            string passenger = string.IsNullOrWhiteSpace(data.DisembarkSelectedPassengerName)
+                ? "Unidade" : data.DisembarkSelectedPassengerName;
+            string landing = string.IsNullOrWhiteSpace(data.DisembarkSelectedLandingLabel)
+                ? "Local não selecionado" : data.DisembarkSelectedLandingLabel;
+            CreateDisembarkButton($"{passenger} → {landing}", null, false, -1);
+            string action = data.DisembarkStep == 1 ? "CONFIRMAR LOCAL" : "ADICIONAR À FILA";
+            CreateDisembarkButton(action, () => turnStateManager?.TryAdvanceDisembarkFromPointer(), true, -1);
+        }
+
+        disembarkActionsRoot.GetComponent<RectTransform>().sizeDelta =
+            new Vector2(0f, disembarkActionButtons.Count * (DisembarkActionButtonHeight + 4f));
+    }
+
+    private void CreateDisembarkButton(
+        string text,
+        UnityEngine.Events.UnityAction action,
+        bool interactable,
+        int focusIndex,
+        Sprite leftSprite = null,
+        Color? leftColor = null,
+        Sprite rightSprite = null,
+        Color? rightColor = null)
+    {
+        GameObject obj = new GameObject("button_disembark", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
+        obj.transform.SetParent(disembarkActionsRoot.transform, false);
+        LayoutElement element = obj.GetComponent<LayoutElement>();
+        element.minHeight = DisembarkActionButtonHeight; element.preferredHeight = DisembarkActionButtonHeight;
+        Button button = obj.GetComponent<Button>();
+        button.interactable = interactable;
+        if (action != null) button.onClick.AddListener(action);
+        GameObject labelObj = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform labelRect = labelObj.GetComponent<RectTransform>();
+        labelRect.SetParent(obj.transform, false); labelRect.anchorMin = Vector2.zero; labelRect.anchorMax = Vector2.one;
+        float iconReserve = leftSprite != null || rightSprite != null ? 48f : 8f;
+        labelRect.offsetMin = new Vector2(iconReserve, 2f); labelRect.offsetMax = new Vector2(-iconReserve, -2f);
+        TMP_Text label = labelObj.GetComponent<TMP_Text>();
+        label.text = text; label.fontStyle = FontStyles.Bold; label.alignment = TextAlignmentOptions.Center;
+        label.enableAutoSizing = true; label.fontSizeMin = 11f; label.fontSizeMax = 18f; label.raycastTarget = false;
+        if (interactable)
+            TintScriptButtonToTeam(button, false);
+        else
+        {
+            obj.GetComponent<Image>().color = new Color(0.08f, 0.08f, 0.08f, 0.88f);
+            label.color = Color.gray;
+        }
+
+        if (leftSprite != null)
+            CreateDisembarkRowIcon(obj.transform, "unit_icon", leftSprite, leftColor ?? Color.white, true);
+        if (rightSprite != null)
+            CreateDisembarkRowIcon(obj.transform, "local_icon", rightSprite, rightColor ?? Color.white, false);
+        disembarkActionButtons.Add(button);
+        disembarkActionFocusIndices.Add(focusIndex);
+    }
+
+    private static void CreateDisembarkRowIcon(
+        Transform parent,
+        string objectName,
+        Sprite sprite,
+        Color color,
+        bool alignLeft)
+    {
+        GameObject iconObj = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        RectTransform rect = iconObj.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        rect.anchorMin = new Vector2(alignLeft ? 0f : 1f, 0.5f);
+        rect.anchorMax = rect.anchorMin;
+        rect.pivot = new Vector2(alignLeft ? 0f : 1f, 0.5f);
+        rect.anchoredPosition = new Vector2(alignLeft ? 5f : -5f, 0f);
+        rect.sizeDelta = new Vector2(40f, 40f);
+        Image image = iconObj.GetComponent<Image>();
+        image.sprite = sprite;
+        image.color = color;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+    }
+
+    private void RebuildAimTargetButtons(List<TurnStateManager.HelperAimTargetLine> lines, bool embark)
     {
         for (int i = aimTargetButtons.Count - 1; i >= 0; i--)
             if (aimTargetButtons[i] != null) Destroy(aimTargetButtons[i].gameObject);
@@ -1745,6 +1942,8 @@ public class PanelHelperController : MonoBehaviour
             Button button = obj.GetComponent<Button>();
             if (isCancel)
                 button.onClick.AddListener(() => cursorController?.TryCancelCurrentActionFromPointer());
+            else if (embark)
+                button.onClick.AddListener(() => turnStateManager?.TrySelectEmbarkTargetFromPointer(targetIndex));
             else
                 button.onClick.AddListener(() => turnStateManager?.TrySelectMirandoTargetFromPointer(targetIndex));
             GameObject labelObj = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
@@ -2227,6 +2426,8 @@ public class PanelHelperController : MonoBehaviour
             else if (turnStateManager != null &&
                      turnStateManager.CurrentCursorState == TurnStateManager.CursorState.RemovingUnit)
                 turnStateManager.SetRemovingUnitFocus(0);
+            else if (turnStateManager != null && turnStateManager.IsEmbarkConfirmStep)
+                turnStateManager.SetEmbarkConfirmFocus(0);
             turnStateManager?.HandleConfirmWithFeedback();
         });
         executeCommandServiceControlRoot.SetActive(false);
@@ -2268,14 +2469,16 @@ public class PanelHelperController : MonoBehaviour
                             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.RemovingUnit;
         bool aiming = turnStateManager != null &&
                       turnStateManager.IsMirandoConfirmStep;
-        bool active = panelVisible && (commandService || removingUnit || aiming);
+        bool embarking = turnStateManager != null &&
+                         turnStateManager.IsEmbarkConfirmStep;
+        bool active = panelVisible && (commandService || removingUnit || aiming || embarking);
         if (executeCommandServiceControlRoot.activeSelf != active)
             executeCommandServiceControlRoot.SetActive(active);
 
         if (executeCommandServiceButton != null)
             executeCommandServiceButton.interactable = active;
         if (executeCommandServiceLabel != null)
-            executeCommandServiceLabel.text = (removingUnit || aiming) ? "CONFIRMAR" : "EXECUTAR";
+            executeCommandServiceLabel.text = (removingUnit || aiming || embarking) ? "CONFIRMAR" : "EXECUTAR";
 
         if (active && panelHelper == gameObject && selfPanelCanvasGroup != null)
         {
@@ -2333,6 +2536,8 @@ public class PanelHelperController : MonoBehaviour
                 // No passo de escolher alvo o CANCELAR fica na propria lista (como no shopping);
                 // o rodape so aparece no passo de confirmar o ataque (CONFIRMAR/CANCELAR).
                 return turnStateManager.IsMirandoConfirmStep;
+            case TurnStateManager.CursorState.Embarcando:
+                return turnStateManager.IsEmbarkConfirmStep;
             default:
                 return true;
         }
