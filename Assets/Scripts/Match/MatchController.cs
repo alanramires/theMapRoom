@@ -266,6 +266,21 @@ public class MatchController : MonoBehaviour
         return players[slotIndex].teamId;
     }
 
+    public bool TryGetFirstAITeam(out TeamId team)
+    {
+        team = TeamId.Neutral;
+        if (players == null)
+            return false;
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (!players[i].isAI)
+                continue;
+            team = players[i].teamId;
+            return team != TeamId.Neutral;
+        }
+        return false;
+    }
+
     public int GetSlotIndexForTeam(TeamId teamId)
     {
         if (teamId == TeamId.Neutral || players == null)

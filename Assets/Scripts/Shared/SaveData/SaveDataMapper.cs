@@ -150,6 +150,7 @@ public static class SaveDataMapper
             unitId = unit.UnitId,
             isActiveInHierarchy = unit.gameObject.activeInHierarchy,
             teamId = (int)unit.TeamId,
+            slotIndex = unit.SlotIndex,
             cellX = unit.CurrentCellPosition.x,
             cellY = unit.CurrentCellPosition.y,
             worldX = unit.transform.position.x,
@@ -221,6 +222,15 @@ public static class SaveDataMapper
             return;
 
         unit.AssignSpawnInstanceId(saved.instanceId);
+        if (saved.slotIndex >= 0)
+            unit.SetSlotIndex(saved.slotIndex);
+        else if (unit.SlotIndex < 0)
+        {
+            MatchController match = UnityEngine.Object.FindAnyObjectByType<MatchController>();
+            int resolvedSlot = match != null ? match.GetSlotIndexForTeam((TeamId)saved.teamId) : -1;
+            if (resolvedSlot >= 0)
+                unit.SetSlotIndex(resolvedSlot);
+        }
         unit.SetCurrentCellPosition(new Vector3Int(saved.cellX, saved.cellY, 0), enforceFinalOccupancyRule: false);
         unit.SetCurrentHP(saved.currentHP);
         unit.RestoreLifecycleAudit(

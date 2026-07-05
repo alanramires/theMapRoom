@@ -1147,11 +1147,17 @@ public class SaveGameManager : MonoBehaviour
 
             double preprocessStartMs = PerfNowMs();
             LogLoadPerf(normalizedSlot, "preprocess.begin", preprocessStartMs, preprocessStartMs - asyncStartMs);
+            LoadPreprocessResult preprocess;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // WebGL normalmente roda sem workers. Task.Run pode nunca executar e
+            // deixar o indicador preso antes do restore comecar. O syncfs inicial
+            // ja trouxe o arquivo persistente para o MEMFS.
+            preprocess = PreprocessLoadData(path);
+            yield return null;
+#else
             Task<LoadPreprocessResult> preprocessTask = Task.Run(() => PreprocessLoadData(path));
             while (!preprocessTask.IsCompleted)
                 yield return null;
-            LogLoadPerf(normalizedSlot, "preprocess.end", preprocessStartMs, PerfNowMs() - asyncStartMs);
-
             if (preprocessTask.IsFaulted)
             {
                 Debug.LogError($"[SaveGame] Falha no preprocess assíncrono: {preprocessTask.Exception?.GetBaseException().Message}");
@@ -1160,7 +1166,9 @@ public class SaveGameManager : MonoBehaviour
                 yield break;
             }
 
-            LoadPreprocessResult preprocess = preprocessTask.Result;
+            preprocess = preprocessTask.Result;
+#endif
+            LogLoadPerf(normalizedSlot, "preprocess.end", preprocessStartMs, PerfNowMs() - asyncStartMs);
             if (!string.IsNullOrWhiteSpace(preprocess.error))
             {
                 Debug.LogError($"[SaveGame] Falha ao preprocessar save: {preprocess.error}");
@@ -1426,6 +1434,13 @@ public class SaveGameManager : MonoBehaviour
         yield return null;
         LogLoadPerf(loadedSlot, "clear_runtime.end", clearRuntimeStartMs, PerfNowMs() - routineStartMs);
 
+        // Restaura os slots antes dos spawns. UnitSpawner/ConstructionSpawner
+        // resolvem slotIndex a partir do TeamId; com a cena-base ainda Green/Red,
+        // saves Yellow/Blue perderiam o vinculo e virariam objetos sem slot.
+        stage = "restore-match-slots-before-spawn";
+        if (matchController != null)
+            RestoreMatchPlayers(data);
+
         // Hoisted para ficar acessivel apos o try-catch (necessario para reaplicar flags depois de ForceReapplyActiveTeamWithTurnStart).
         Dictionary<int, UnitManager> unitsById = new Dictionary<int, UnitManager>();
 
@@ -1590,9 +1605,13 @@ public class SaveGameManager : MonoBehaviour
 
             if (aiController != null)
             {
+                TeamId restoredAiTeam = (TeamId)data.aiRuntimeTeamId;
+                if (matchController != null && !matchController.IsPlayerAI(restoredAiTeam) &&
+                    matchController.TryGetFirstAITeam(out TeamId configuredAiTeam))
+                    restoredAiTeam = configuredAiTeam;
                 aiController.RestoreAIRuntimeState(
                     data.aiRuntimeActive,
-                    (TeamId)data.aiRuntimeTeamId,
+                    restoredAiTeam,
                     data.aiRuntimeTurnNumber,
                     data.aiRuntimeStage);
             }

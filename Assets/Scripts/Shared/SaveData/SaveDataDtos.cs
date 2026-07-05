@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 8;
+    public int version = 9;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
@@ -151,6 +151,7 @@ public class UnitSaveData
     public string unitId;
     public bool isActiveInHierarchy = true;
     public int teamId;
+    public int slotIndex = -1;
     public int cellX;
     public int cellY;
     public float worldX;
