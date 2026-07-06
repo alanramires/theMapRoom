@@ -4,6 +4,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using System;
 
 public class PanelMoneyController : MonoBehaviour
@@ -156,6 +157,16 @@ public class PanelMoneyController : MonoBehaviour
             }
         }
         BindHqShortcutIfNeeded();
+
+        Transform fullscreenShortcut = FindChildRecursive(transform, "tela_cheia");
+        if (Application.isPlaying && fullscreenShortcut != null &&
+            fullscreenShortcut.GetComponent<FullscreenShortcutButton>() == null)
+        {
+            Image image = fullscreenShortcut.GetComponent<Image>();
+            if (image != null)
+                image.raycastTarget = true;
+            fullscreenShortcut.gameObject.AddComponent<FullscreenShortcutButton>();
+        }
 
         if (textMoney == null)
             textMoney = FindMoneyTextByName();
@@ -593,5 +604,34 @@ public class PanelMoneyController : MonoBehaviour
         }
 
         return null;
+    }
+}
+
+// Fullscreen no WebGL precisa ser solicitado diretamente por um gesto do usuario.
+// PointerDown e mais confiavel que Button.onClick/PointerClick, que chegam no release.
+public sealed class FullscreenShortcutButton : MonoBehaviour, IPointerDownHandler
+{
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        if (eventData == null || eventData.button != PointerEventData.InputButton.Left)
+            return;
+
+        bool enable = !Screen.fullScreen;
+#if !UNITY_WEBGL || UNITY_EDITOR
+        Screen.fullScreenMode = enable
+            ? FullScreenMode.FullScreenWindow
+            : FullScreenMode.Windowed;
+#endif
+        Screen.fullScreen = enable;
+        PanelDialogController.TrySetTransientText(
+            enable ? "Solicitando tela cheia..." : "Tela cheia: OFF",
+            1.6f);
+    }
+
+    private void Awake()
+    {
+        Image image = GetComponent<Image>();
+        if (image != null)
+            image.raycastTarget = true;
     }
 }

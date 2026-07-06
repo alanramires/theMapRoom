@@ -18,6 +18,9 @@ public partial class AIController
         if (ShouldStopAIForMatchEnd("turn_start"))
             yield break;
 
+        // Devolve um frame para desenhar o indicador antes do planejamento pesado.
+        yield return null;
+
         int activeTurn = matchController != null ? matchController.CurrentTurn : aiTurnNumber;
         bool sameRuntimeTurn = currentAITeam == aiTeam && aiTurnNumber == activeTurn;
         int resumeStage = sameRuntimeTurn ? Mathf.Clamp(currentAIStage, 0, 4) : 0;
@@ -61,6 +64,7 @@ public partial class AIController
         Debug.Log($"[AI Perf] CommitAIWorldHeavy: {(Time.realtimeSinceStartup - tCommit) * 1000f:F0}ms");
 
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
+        yield return null;
         aiTurnNumber = snapshot.TurnNumber;
         aiTeamTag    = TeamUtils.GetName(aiTeam).ToUpper();
         Debug.Log($"{TL()} Turno {snapshot.TurnNumber} | Stance: {snapshot.Stance} " +
@@ -83,9 +87,11 @@ public partial class AIController
             float tPlan = Time.realtimeSinceStartup;
             BuildObjectivePlan(snapshot);
             Debug.Log($"[AI Perf] BuildObjectivePlan: {(Time.realtimeSinceStartup - tPlan) * 1000f:F0}ms");
+            yield return null;
             float tAnalyzer = Time.realtimeSinceStartup;
             AITacticalAnalyzer.Instance.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
             Debug.Log($"[AI Perf] TacticalAnalyzer.Rebuild: {(Time.realtimeSinceStartup - tAnalyzer) * 1000f:F0}ms");
+            yield return null;
         }
 
         if (emulateStage1 && resumeStage <= 1)

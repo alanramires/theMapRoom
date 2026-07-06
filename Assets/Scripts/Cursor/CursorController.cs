@@ -157,6 +157,11 @@ public class CursorController : MonoBehaviour
     private bool rightClickTracking;
     private bool rightClickMovedBeyondTap;
     private bool rightClickCancelTapThisFrame;
+#if ENABLE_INPUT_SYSTEM
+    private bool primaryTouchTapTracking;
+    private bool primaryTouchTapSuppressed;
+    private Vector2 primaryTouchDownScreenPos;
+#endif
 
     // Exposto para o menu do mapa: clique direito curto (= ESC) tambem abre/fecha o menu.
     // Calculado no topo do Update (UpdateRightClickCancelTap), antes de TryHandleBattleMapMenuInput.
@@ -553,13 +558,31 @@ public class CursorController : MonoBehaviour
         if (IsMultiTouchActive())
             return;
 
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-            return;
-
         if (turnStateManager == null)
             return;
 
+        Vector2 pointerScreenPosition = GetMousePosition();
         TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
+        bool isInspecting = state == TurnStateManager.CursorState.InspectingUnit ||
+                            state == TurnStateManager.CursorState.InspectingBuilding ||
+                            state == TurnStateManager.CursorState.InspectingHotZone;
+
+        if (isInspecting)
+        {
+            // RaycastAll tambem encontra imagens transparentes que cobrem o Canvas
+            // inteiro. Para dismiss do Inspect, bloqueie apenas a area real do helper
+            // e controles clicaveis; o restante da tela conta como "fora".
+            if (PanelHelperController.IsPointerOverHelperPanel(pointerScreenPosition) ||
+                IsScreenPointOverClickableUI(pointerScreenPosition))
+                return;
+
+            TryCancelCurrentActionFromPointer();
+            return;
+        }
+
+        if (IsScreenPointOverUI(pointerScreenPosition))
+            return;
+
         bool isMovementActionChoice = state == TurnStateManager.CursorState.MoveuAndando ||
                                       state == TurnStateManager.CursorState.MoveuParado;
         bool isShopping = state == TurnStateManager.CursorState.ShoppingAndServices;
@@ -1464,12 +1487,14 @@ public class CursorController : MonoBehaviour
     private bool GetMouseButtonDown(int button)
     {
 #if ENABLE_INPUT_SYSTEM
-        if (Mouse.current == null)
-            return false;
-
-        if (button == 0) return Mouse.current.leftButton.wasPressedThisFrame;
-        if (button == 1) return Mouse.current.rightButton.wasPressedThisFrame;
-        if (button == 2) return Mouse.current.middleButton.wasPressedThisFrame;
+        if (button == 0)
+        {
+            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+                return true;
+            return WasPrimaryTouchTapReleasedThisFrame();
+        }
+        if (button == 1) return Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame;
+        if (button == 2) return Mouse.current != null && Mouse.current.middleButton.wasPressedThisFrame;
         return false;
 #else
         return Input.GetMouseButtonDown(button);
@@ -1479,10 +1504,85 @@ public class CursorController : MonoBehaviour
     private Vector3 GetMousePosition()
     {
 #if ENABLE_INPUT_SYSTEM
-        return Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
+        if (Touchscreen.current != null &&
+            (primaryTouchTapTracking ||
+             Touchscreen.current.primaryTouch.press.wasPressedThisFrame ||
+             Touchscreen.current.primaryTouch.press.wasReleasedThisFrame))
+            return Touchscreen.current.primaryTouch.position.ReadValue();
+        if (Mouse.current != null)
+            return Mouse.current.position.ReadValue();
+        return Touchscreen.current != null
+            ? Touchscreen.current.primaryTouch.position.ReadValue()
+            : Vector2.zero;
 #else
         return Input.mousePosition;
 #endif
+    }
+
+#if ENABLE_INPUT_SYSTEM
+    // No touch, confirma no release para distinguir um tap de pan/pinca. Um press
+    // imediato dispararia uma acao antes de o segundo dedo da pinca tocar a tela.
+    private bool WasPrimaryTouchTapReleasedThisFrame()
+    {
+        if (Touchscreen.current == null)
+            return false;
+
+        var primary = Touchscreen.current.primaryTouch;
+        if (primary.press.wasPressedThisFrame)
+        {
+            primaryTouchTapTracking = true;
+            primaryTouchTapSuppressed = false;
+            primaryTouchDownScreenPos = primary.position.ReadValue();
+        }
+
+        if (primaryTouchTapTracking)
+        {
+            if (IsMultiTouchActive())
+                primaryTouchTapSuppressed = true;
+
+            float travel = Vector2.Distance(primary.position.ReadValue(), primaryTouchDownScreenPos);
+            if (travel > GetRightClickTapMaxTravelPixels())
+                primaryTouchTapSuppressed = true;
+        }
+
+        if (!primary.press.wasReleasedThisFrame)
+            return false;
+
+        bool isTap = primaryTouchTapTracking && !primaryTouchTapSuppressed;
+        primaryTouchTapTracking = false;
+        primaryTouchTapSuppressed = false;
+        return isTap;
+    }
+#endif
+
+    private static bool IsScreenPointOverUI(Vector2 screenPosition)
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null)
+            return false;
+
+        PointerEventData pointer = new PointerEventData(eventSystem) { position = screenPosition };
+        List<RaycastResult> hits = new List<RaycastResult>();
+        eventSystem.RaycastAll(pointer, hits);
+        return hits.Count > 0;
+    }
+
+    private static bool IsScreenPointOverClickableUI(Vector2 screenPosition)
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null)
+            return false;
+
+        PointerEventData pointer = new PointerEventData(eventSystem) { position = screenPosition };
+        List<RaycastResult> hits = new List<RaycastResult>();
+        eventSystem.RaycastAll(pointer, hits);
+        for (int i = 0; i < hits.Count; i++)
+        {
+            GameObject hit = hits[i].gameObject;
+            if (hit != null && ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit) != null)
+                return true;
+        }
+        return false;
     }
 
     private bool GetMouseButtonUp(int button)

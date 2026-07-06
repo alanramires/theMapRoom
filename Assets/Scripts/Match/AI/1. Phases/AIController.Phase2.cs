@@ -62,6 +62,9 @@ public partial class AIController
         Debug.Log(_initLogBuilder.ToString());
         _initLogBuilder.Clear();
 
+        // Atualiza indicador/cursor antes da primeira decisao potencialmente cara.
+        yield return null;
+
         // ---- Loop por unidade: decisão + execução ----
         var deferredUnitIds = new HashSet<int>();
         int cursor = 0;

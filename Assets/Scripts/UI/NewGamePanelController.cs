@@ -356,7 +356,7 @@ public class NewGamePanelController : MonoBehaviour
         descricaoRegras.text = BuildDescricao(preset);
     }
 
-    private static string BuildDescricao(MatchController.GameSetupPreset preset)
+    public static string BuildDescricao(MatchController.GameSetupPreset preset)
     {
         bool ldt, los, spotter, stealth, fow;
 
@@ -386,12 +386,12 @@ public class NewGamePanelController : MonoBehaviour
         Classify(los,     "Linha de Visão", on, off);
         Classify(spotter, "Spotter",        on, off);
         Classify(stealth, "Stealth",        on, off);
-        Classify(fow,     "Total War",      on, off);
+        Classify(fow,     "Nevoa de Guerra", on, off);
 
         string onPart  = on.Count  > 0 ? string.Join(", ", on)  : "nenhum";
         string offPart = off.Count > 0 ? string.Join(", ", off) : "nenhum";
 
-        return $"Ativado: {onPart} | Desativado: {offPart}";
+        return $"Ativado: {onPart}\nDesativado: {offPart}";
     }
 
     private static void Classify(bool active, string label, List<string> on, List<string> off)

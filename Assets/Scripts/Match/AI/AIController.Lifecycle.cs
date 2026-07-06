@@ -8,6 +8,11 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private GUIStyle aiTurnIndicatorTitleStyle;
+    private GUIStyle aiTurnIndicatorStageStyle;
+    private GUIStyle aiTurnIndicatorBoxStyle;
+    private bool aiTurnBatchExecuting;
+
     private bool IsMatchEnded()
     {
         return matchController != null && matchController.HasVictoryWinner;
@@ -25,6 +30,7 @@ public partial class AIController
     private void StopAIForMatchEnd(string context)
     {
         isActive = false;
+        aiTurnBatchExecuting = false;
         currentAIStage = 0;
         currentAITeam = TeamId.Neutral;
         aiCoroutine = null;
@@ -34,6 +40,75 @@ public partial class AIController
         if (IsDebugShoppingPaused) IsDebugShoppingPaused = false;
         PanelDialogController.ClearExternalText();
         Debug.Log($"[AI] Partida encerrada ({context}); IA interrompida.");
+    }
+
+    private void OnGUI()
+    {
+        if (aiTurnBatchExecuting || matchController == null || matchController.HasVictoryWinner ||
+            !matchController.IsPlayerAI(matchController.ActiveTeam))
+            return;
+
+        EnsureAITurnIndicatorStyles();
+        float width = Mathf.Clamp(Screen.width * 0.34f, 250f, 440f);
+        float height = Mathf.Clamp(Screen.height * 0.085f, 58f, 90f);
+        Rect panel = new Rect(
+            (Screen.width - width) * 0.5f,
+            (Screen.height - height) * 0.5f,
+            width,
+            height);
+        float pulse = 0.68f + 0.32f * (0.5f + 0.5f * Mathf.Sin(Time.realtimeSinceStartup * 5f));
+        Color team = TeamUtils.GetColor(matchController.ActiveTeam);
+
+        Color previousColor = GUI.color;
+        GUI.color = new Color(0.025f, 0.06f, 0.075f, 0.88f * pulse);
+        GUI.Box(panel, GUIContent.none, aiTurnIndicatorBoxStyle);
+
+        GUI.color = new Color(1f, 1f, 1f, pulse);
+        aiTurnIndicatorTitleStyle.fontSize = Mathf.RoundToInt(Mathf.Clamp(Screen.height * 0.027f, 18f, 32f));
+        aiTurnIndicatorTitleStyle.normal.textColor = Color.Lerp(team, Color.white, 0.28f);
+        GUI.Label(new Rect(panel.x + 8f, panel.y + 4f, panel.width - 16f, panel.height * 0.55f),
+            "TURNO DA IA", aiTurnIndicatorTitleStyle);
+
+        aiTurnIndicatorStageStyle.fontSize = Mathf.RoundToInt(Mathf.Clamp(Screen.height * 0.017f, 12f, 20f));
+        aiTurnIndicatorStageStyle.normal.textColor = Color.Lerp(team, Color.white, 0.5f);
+        GUI.Label(new Rect(panel.x + 8f, panel.y + panel.height * 0.5f, panel.width - 16f, panel.height * 0.42f),
+            ResolveAITurnIndicatorStage(), aiTurnIndicatorStageStyle);
+        GUI.color = previousColor;
+    }
+
+    private void EnsureAITurnIndicatorStyles()
+    {
+        if (aiTurnIndicatorBoxStyle == null)
+            aiTurnIndicatorBoxStyle = new GUIStyle(GUI.skin.box);
+        if (aiTurnIndicatorTitleStyle == null)
+        {
+            aiTurnIndicatorTitleStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontStyle = FontStyle.Bold
+            };
+        }
+        if (aiTurnIndicatorStageStyle == null)
+        {
+            aiTurnIndicatorStageStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontStyle = FontStyle.Bold
+            };
+        }
+    }
+
+    private string ResolveAITurnIndicatorStage()
+    {
+        switch (currentAIStage)
+        {
+            case 0: return "PREPARANDO...";
+            case 1: return "SERVICOS DO COMANDO...";
+            case 2: return "CALCULANDO MOVIMENTOS...";
+            case 3: return "ORGANIZANDO COMPRAS...";
+            case 4: return "ENCERRANDO TURNO...";
+            default: return "CALCULANDO...";
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -158,6 +233,7 @@ public partial class AIController
         if (aiCheck)
 
         {
+            aiTurnBatchExecuting = false;
 
             // Durante um load, NAO iniciar o turno: o estado da AI (stage/plano) ainda esta sendo
             // restaurado pelo LoadRoutine. Iniciar agora leria estado default -> resumeStage=0 ->
@@ -184,6 +260,7 @@ public partial class AIController
         {
 
             isActive = false;
+            aiTurnBatchExecuting = false;
 
             if (currentAIStage < 4)
             {

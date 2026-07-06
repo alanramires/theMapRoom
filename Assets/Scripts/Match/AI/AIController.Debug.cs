@@ -203,8 +203,10 @@ public partial class AIController
         if (replayManager == null)
             yield break;
 
+        aiTurnBatchExecuting = true;
         replayManager.ExecuteLiveAIBatch(action, iaRapida);
         yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
+        aiTurnBatchExecuting = false;
         if (ShouldStopAIForMatchEnd("batch_end"))
             yield break;
         debugStepPendingAction = null;

@@ -76,6 +76,18 @@ public class PanelMenu : MonoBehaviour
     public int NewGameWizardFocusIndex => newGameWizardFocusIndex;
     public int NewGameWizardStep => newGameWizardStep;
 
+    public string GetNewGameWizardConfirmationSummary()
+    {
+        const string targetMap = "Battle Map 1 - Ground";
+        string humanColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(newGameHumanTeam));
+        string aiColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(newGameAiTeam));
+        return $"MAPA: {targetMap}\n" +
+               $"SETUP: {ResolvePresetLabel(newGamePreset)}\n" +
+               $"JOGADOR 1: <color=#{humanColor}>{ResolveTeamLabel(newGameHumanTeam)}</color>\n" +
+               $"JOGADOR 2: <color=#{aiColor}>{ResolveTeamLabel(newGameAiTeam)}</color> (IA)\n\n" +
+               $"REGRAS\n{NewGamePanelController.BuildDescricao(newGamePreset)}";
+    }
+
     public int GetNewGameWizardOptionCount()
     {
         if (!newGameWizardOpen) return 0;

@@ -154,8 +154,10 @@ public class PanelHelperController : MonoBehaviour
     private readonly List<TMP_Text> persistenceActionLabels = new List<TMP_Text>();
     private readonly List<Color> persistenceActionTeamColors = new List<Color>();
     private readonly List<bool> persistenceActionUsesTeamColor = new List<bool>();
+    private GameObject persistenceConfirmationDetails;
     private string persistenceActionsSignature = string.Empty;
     private const float PersistenceActionButtonHeight = 42f;
+    private const float PersistenceConfirmationDetailsHeight = 190f;
     [SerializeField] [Range(1f, 80f)] private float helperScrollStep = 24f;
 
     [Header("Coordinate Overlay")]
@@ -1505,7 +1507,8 @@ public class PanelHelperController : MonoBehaviour
         }
         else if (persistenceButtonsActive)
         {
-            bodyHeight = persistenceActionButtons.Count * (PersistenceActionButtonHeight + 4f);
+            bodyHeight = persistenceActionButtons.Count * (PersistenceActionButtonHeight + 4f)
+                + (persistenceConfirmationDetails != null ? PersistenceConfirmationDetailsHeight + 4f : 0f);
         }
         else if (helperTxt != null)
         {
@@ -2399,6 +2402,11 @@ public class PanelHelperController : MonoBehaviour
         persistenceActionLabels.Clear();
         persistenceActionTeamColors.Clear();
         persistenceActionUsesTeamColor.Clear();
+        if (persistenceConfirmationDetails != null)
+        {
+            Destroy(persistenceConfirmationDetails);
+            persistenceConfirmationDetails = null;
+        }
 
         if (menuDeleteActive)
         {
@@ -2412,6 +2420,9 @@ public class PanelHelperController : MonoBehaviour
         }
         else if (newGameWizardActive)
         {
+            if (mainMenuPanel.NewGameWizardStep == 3)
+                CreateNewGameConfirmationDetails(mainMenuPanel.GetNewGameWizardConfirmationSummary());
+
             int count = mainMenuPanel.GetNewGameWizardOptionCount();
             for (int i = 0; i < count; i++)
             {
@@ -2449,8 +2460,36 @@ public class PanelHelperController : MonoBehaviour
             CreatePersistenceButton("CANCELAR", () => saveGameManager.TryCancelPersistencePromptFromPointer());
         }
 
+        float detailsHeight = persistenceConfirmationDetails != null
+            ? PersistenceConfirmationDetailsHeight + 4f
+            : 0f;
         persistenceActionsRoot.GetComponent<RectTransform>().sizeDelta =
-            new Vector2(0f, persistenceActionButtons.Count * (PersistenceActionButtonHeight + 4f));
+            new Vector2(0f, persistenceActionButtons.Count * (PersistenceActionButtonHeight + 4f) + detailsHeight);
+    }
+
+    private void CreateNewGameConfirmationDetails(string text)
+    {
+        persistenceConfirmationDetails = new GameObject(
+            "new_game_confirmation_details",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(TextMeshProUGUI),
+            typeof(LayoutElement));
+        persistenceConfirmationDetails.transform.SetParent(persistenceActionsRoot.transform, false);
+
+        LayoutElement element = persistenceConfirmationDetails.GetComponent<LayoutElement>();
+        element.minHeight = PersistenceConfirmationDetailsHeight;
+        element.preferredHeight = PersistenceConfirmationDetailsHeight;
+
+        TMP_Text label = persistenceConfirmationDetails.GetComponent<TMP_Text>();
+        label.text = text ?? string.Empty;
+        label.richText = true;
+        label.fontSize = 16f;
+        label.fontStyle = FontStyles.Bold;
+        label.color = FooterLabelIdleColor;
+        label.alignment = TextAlignmentOptions.TopLeft;
+        label.textWrappingMode = TextWrappingModes.Normal;
+        label.raycastTarget = false;
     }
 
     // Destaca o botao de save/load em foco (mesmo visual do preview do Servico do Comando).
