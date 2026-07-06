@@ -113,7 +113,11 @@ public partial class TurnStateManager
             if (entry == null || entry.unit == null || entry.cell != cell)
                 continue;
             if (scannerPromptStep == ScannerPromptStep.MergeConfirm && i == mergeSelectedCandidateIndex)
+            {
+                if (!AllowsContextualPointerConfirmation())
+                    return true;
                 return TryConfirmScannerMerge();
+            }
             if (scannerPromptStep != ScannerPromptStep.MergeParticipantSelect)
                 return false;
             return TrySelectMergeCandidateFromPointer(entry.selectionNumber);

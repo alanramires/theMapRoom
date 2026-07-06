@@ -170,6 +170,8 @@ public partial class TurnStateManager
                 return false;
 
             // Segundo clique no mesmo hex confirma a ordem e a adiciona a fila.
+            if (!AllowsContextualPointerConfirmation())
+                return true;
             return TryConfirmScannerDisembark();
         }
 

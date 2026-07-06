@@ -83,6 +83,11 @@ public class PanelHelperController : MonoBehaviour
     private Image executeCommandServiceImage;
     private TMP_Text executeCommandServiceLabel;
     private const float ExecuteCommandServiceControlHeight = 52f;
+    private GameObject keepPositionControlRoot;
+    private Button keepPositionButton;
+    private Image keepPositionImage;
+    private TMP_Text keepPositionLabel;
+    private const float KeepPositionControlHeight = 52f;
     // Cor de fallback dos botoes gerados via script (usada so na criacao; o tint por time
     // sobrescreve todo frame). Os botoes seguem a cor do time ativo (virou tudo slot de jogador).
     private static readonly Color FooterButtonIdleColor = new Color(0.04f, 0.12f, 0.06f, 0.92f);
@@ -299,6 +304,7 @@ public class PanelHelperController : MonoBehaviour
 
         EnsureCancelControl();
         EnsureExecuteCommandServiceControl();
+        EnsureKeepPositionControl();
         EnsureShoppingActionsRoot();
         EnsurePersistenceActionsRoot();
 
@@ -453,6 +459,15 @@ public class PanelHelperController : MonoBehaviour
             if (i > 0)
                 sb.AppendLine();
             sb.Append(line);
+        }
+
+        if (data.UnitStatsShowKeepPositionAimHint)
+        {
+            if (sb.Length > 0)
+                sb.AppendLine().AppendLine();
+            sb.Append(ResolveMessage(
+                "helper.unit_stats.hint.keep_position_to_aim",
+                "Dica: mantenha posição para mirar com armas de longo alcance."));
         }
 
         return sb.ToString();
@@ -1431,6 +1446,7 @@ public class PanelHelperController : MonoBehaviour
         // Cor do time ativo deste frame — aplicada a todos os botoes gerados via script abaixo.
         currentTeamColor = ResolveActiveTeamColor(data);
         RefreshCancelControl(panelVisible);
+        RefreshKeepPositionControl(panelVisible, data);
         RefreshExecuteCommandServiceControl(panelVisible);
         RefreshCommandServicePreviewFocusHighlight(panelVisible);
         RefreshSensorActionControls(panelVisible, data);
@@ -2884,7 +2900,82 @@ public class PanelHelperController : MonoBehaviour
             height += CancelControlHeight;
         if (executeCommandServiceControlRoot != null && executeCommandServiceControlRoot.activeSelf)
             height += ExecuteCommandServiceControlHeight;
+        if (keepPositionControlRoot != null && keepPositionControlRoot.activeSelf)
+            height += KeepPositionControlHeight;
         return height;
+    }
+
+    private void EnsureKeepPositionControl()
+    {
+        if (!Application.isPlaying || keepPositionControlRoot != null || helperRect == null)
+            return;
+
+        keepPositionControlRoot = new GameObject("helper_keep_position_control", typeof(RectTransform));
+        RectTransform rootRect = keepPositionControlRoot.GetComponent<RectTransform>();
+        rootRect.SetParent(helperRect, false);
+        rootRect.anchorMin = new Vector2(0f, 0f);
+        rootRect.anchorMax = new Vector2(1f, 0f);
+        rootRect.pivot = new Vector2(0.5f, 0f);
+        rootRect.anchoredPosition = new Vector2(0f, CancelControlHeight);
+        rootRect.sizeDelta = new Vector2(0f, KeepPositionControlHeight);
+        rootRect.SetAsLastSibling();
+
+        GameObject buttonObject = new GameObject("button_keep_position", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.SetParent(rootRect, false);
+        buttonRect.anchorMin = new Vector2(0.08f, 0f);
+        buttonRect.anchorMax = new Vector2(0.92f, 1f);
+        buttonRect.offsetMin = new Vector2(4f, 5f);
+        buttonRect.offsetMax = new Vector2(-4f, -5f);
+
+        keepPositionImage = buttonObject.GetComponent<Image>();
+        keepPositionImage.color = FooterButtonIdleColor;
+        keepPositionButton = buttonObject.GetComponent<Button>();
+        Navigation navigation = keepPositionButton.navigation;
+        navigation.mode = Navigation.Mode.None;
+        keepPositionButton.navigation = navigation;
+
+        GameObject labelObject = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+        labelRect.SetParent(buttonRect, false);
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+        keepPositionLabel = labelObject.GetComponent<TMP_Text>();
+        keepPositionLabel.text = "MANTER POSIÇÃO";
+        keepPositionLabel.fontSize = 20f;
+        keepPositionLabel.fontStyle = FontStyles.Bold;
+        keepPositionLabel.color = FooterLabelIdleColor;
+        keepPositionLabel.alignment = TextAlignmentOptions.Center;
+        keepPositionLabel.raycastTarget = false;
+
+        keepPositionButton.onClick.AddListener(() => turnStateManager?.TryKeepSelectedUnitPositionFromHelper());
+        keepPositionControlRoot.SetActive(false);
+    }
+
+    private void RefreshKeepPositionControl(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        if (keepPositionControlRoot == null)
+            return;
+
+        bool active = panelVisible && data != null &&
+                      data.Kind == TurnStateManager.HelperPanelKind.UnitStats &&
+                      turnStateManager != null &&
+                      turnStateManager.CurrentCursorState == TurnStateManager.CursorState.UnitSelected;
+        if (keepPositionControlRoot.activeSelf != active)
+            keepPositionControlRoot.SetActive(active);
+        if (keepPositionButton != null)
+            keepPositionButton.interactable = active;
+        if (active)
+        {
+            TintScriptButtonToTeamIdle(keepPositionButton);
+            if (panelHelper == gameObject && selfPanelCanvasGroup != null)
+            {
+                selfPanelCanvasGroup.interactable = true;
+                selfPanelCanvasGroup.blocksRaycasts = true;
+            }
+        }
     }
 
     private void RefreshCancelControl(bool panelVisible)

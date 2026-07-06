@@ -59,6 +59,7 @@ public partial class TurnStateManager
         public string ShoppingConstructionName;
         public string UnitStatsName;
         public readonly List<string> UnitStatsLines = new List<string>();
+        public bool UnitStatsShowKeepPositionAimHint;
         public string ConstructionStatsName;
         public readonly List<string> ConstructionStatsLines = new List<string>();
         public string RemovingUnitName;
@@ -686,6 +687,9 @@ public partial class TurnStateManager
         data.Kind = HelperPanelKind.UnitStats;
         data.UnitStatsName = ResolveUnitRuntimeName(unit);
         data.SubjectTeamId = (int)unit.TeamId;
+        data.UnitStatsShowKeepPositionAimHint =
+            CurrentCursorState == CursorState.UnitSelected &&
+            HasEmbarkedLongRangeWeapon(unit);
 
         int hpCurrent = Mathf.Max(0, unit.CurrentHP);
         int hpMax = Mathf.Max(1, unit.GetMaxHP());
@@ -735,6 +739,30 @@ public partial class TurnStateManager
         AppendUnitSuppliesDetailedLines(data.UnitStatsLines, unit);
 
         return data.UnitStatsLines.Count > 0;
+    }
+
+    private static bool HasEmbarkedLongRangeWeapon(UnitManager unit)
+    {
+        if (unit == null)
+            return false;
+
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+        if (weapons == null)
+            return false;
+
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = weapons[i];
+            if (embarked == null || embarked.weapon == null)
+                continue;
+
+            int min = embarked.GetRangeMin();
+            int max = embarked.GetRangeMax();
+            if ((min == 1 && max > 1) || min > 1)
+                return true;
+        }
+
+        return false;
     }
 
     private void AppendUnitWeaponsDetailedLines(List<string> lines, UnitManager unit)
@@ -1039,6 +1067,20 @@ public partial class TurnStateManager
         ApplyEnemyThreatLayersOverlayForTeam(enemyThreatLayersInspectedTeamId);
         enemyThreatLayersEnabled = enemyThreatLineCells.Count > 0 || enemyThreatRangeCells.Count > 0;
         return true;
+    }
+
+    public bool TryKeepSelectedUnitPositionFromHelper()
+    {
+        if (CurrentCursorState != CursorState.UnitSelected || selectedUnit == null || cursorController == null)
+            return false;
+
+        Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+        unitCell.z = 0;
+        if (!cursorController.SetCell(unitCell, playMoveSfx: false))
+            return false;
+
+        HandleConfirmWithFeedback();
+        return CurrentCursorState == CursorState.MoveuParado;
     }
 
     private int ResolveDefaultThreatLayerTeamId(int activeTeam)

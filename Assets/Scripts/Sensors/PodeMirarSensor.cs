@@ -316,10 +316,9 @@ public static class PodeMirarSensor
                                 null);
                             continue;
                         }
-                        usedForwardObserver = longRangeObserver != null;
+                        usedForwardObserver = true;
                         forwardObserver = longRangeObserver;
-                        if (usedForwardObserver)
-                            forwardObserverReason = $"Forward observer confirmou alvo fora da visao do atacante ({attackerObservationRange} hex).";
+                        forwardObserverReason = $"Forward observer confirmou alvo fora da visao do atacante ({attackerObservationRange} hex).";
                     }
                 }
                 else
@@ -364,7 +363,7 @@ public static class PodeMirarSensor
                                     dpqAirHeightConfig,
                                     out UnitManager indirectObserver,
                                     enableLosValidation);
-                                if (allowParabolic && indirectObserver != null)
+                                if (allowParabolic)
                                 {
                                     usedForwardObserver = true;
                                     forwardObserver = indirectObserver;
@@ -394,7 +393,8 @@ public static class PodeMirarSensor
                     }
                 }
 
-                if (enableStealthValidation && !IsTargetDetectableByAttacker(attacker, target, map, terrainDatabase))
+                if (enableStealthValidation && !usedForwardObserver &&
+                    !IsTargetDetectableByAttacker(attacker, target, map, terrainDatabase))
                 {
                     AppendInvalid(
                         invalidOutput,
@@ -953,7 +953,7 @@ public static class PodeMirarSensor
             dpqAirHeightConfig,
             enableLosValidation);
         if (observers.Count <= 0)
-            return false;
+            return HasControlledConstructionObserverForTarget(attacker, target, map, terrainDatabase, dpqAirHeightConfig, enableLosValidation);
 
         observer = observers[0];
         return true;
@@ -1053,6 +1053,9 @@ public static class PodeMirarSensor
             if (allyDistanceToTarget > allyObservationRange)
                 continue;
 
+            if (!CanForwardObserverDetectTarget(ally, target))
+                continue;
+
             if (!HasValidStraightObservationLine(
                     map,
                     terrainDatabase,
@@ -1074,6 +1077,56 @@ public static class PodeMirarSensor
         }
 
         return observers;
+    }
+
+    private static bool CanForwardObserverDetectTarget(UnitManager observer, UnitManager target)
+    {
+        if (observer == null || target == null || !IsStealthTarget(target))
+            return observer != null && target != null;
+
+        if (!observer.TryGetUnitData(out UnitData observerData) || observerData == null)
+            return false;
+        target.TryGetUnitData(out UnitData targetData);
+        return observerData.CanDetectStealthFor(target.GetDomain(), target.GetHeightLevel(), targetData);
+    }
+
+    private static bool HasControlledConstructionObserverForTarget(
+        UnitManager attacker,
+        UnitManager target,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        bool enableLosValidation)
+    {
+        if (attacker == null || target == null || map == null || IsStealthTarget(target))
+            return false;
+
+        Vector3Int targetCell = target.CurrentCellPosition;
+        targetCell.z = 0;
+        IReadOnlyList<ConstructionManager> constructions = ConstructionManager.AllActive;
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if (construction.TeamId == TeamId.Neutral || construction.TeamId != attacker.TeamId)
+                continue;
+            if (construction.BoardTilemap != map || !construction.TryResolveConstructionData(out ConstructionData data) || data == null)
+                continue;
+
+            Vector3Int constructionCell = construction.CurrentCellPosition;
+            constructionCell.z = 0;
+            int range = Mathf.Max(0, data.visao);
+            Dictionary<Vector3Int, int> distances = BuildDistanceMap(map, constructionCell, range);
+            if (!distances.TryGetValue(targetCell, out int distance) || distance > range)
+                continue;
+            if (distance == 0 || HasValidStraightObservationLine(
+                    map, terrainDatabase, constructionCell, targetCell, null, target,
+                    dpqAirHeightConfig, out _, out _, out _, enableLosValidation))
+                return true;
+        }
+
+        return false;
     }
 
     private static List<UnitManager> CollectUnitsForSensor()
@@ -2055,4 +2108,3 @@ public static class PodeMirarSensor
         return embarked.CanFireAtLayer(domain, heightLevel);
     }
 }
-

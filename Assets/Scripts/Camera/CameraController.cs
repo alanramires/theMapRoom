@@ -48,6 +48,7 @@ public class CameraController : MonoBehaviour
     private Coroutine _focusRoutine;
     private CursorController _cursorController;
     private TurnStateManager _turnStateManager;
+    private MatchController _matchController;
 
     private Vector3 _dragStartWorld;
     private bool _dragging;
@@ -64,6 +65,7 @@ public class CameraController : MonoBehaviour
         _cam = GetComponent<Camera>();
         _cursorController = FindAnyObjectByType<CursorController>();
         _turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        _matchController = FindAnyObjectByType<MatchController>();
         if (!_cam.orthographic)
             Debug.LogWarning("[CameraController] Sua camera nao esta Orthographic.");
     }
@@ -705,6 +707,16 @@ public class CameraController : MonoBehaviour
 
     public void AdjustCameraForCursor(Vector3 cursorWorldPos)
     {
+        if (ShouldSuppressCursorFollowForHiddenAiTurn())
+        {
+            if (_focusRoutine != null)
+            {
+                StopCoroutine(_focusRoutine);
+                _focusRoutine = null;
+            }
+            return;
+        }
+
         if (_cam == null)
             _cam = GetComponent<Camera>();
         if (_cam == null)
@@ -750,6 +762,16 @@ public class CameraController : MonoBehaviour
             StopCoroutine(_focusRoutine);
 
         _focusRoutine = StartCoroutine(SmoothFocus(targetCamPos));
+    }
+
+    private bool ShouldSuppressCursorFollowForHiddenAiTurn()
+    {
+        if (_matchController == null)
+            _matchController = FindAnyObjectByType<MatchController>();
+
+        return _matchController != null &&
+               _matchController.GameSetup == MatchController.GameSetupPreset.FogOfWarTotal &&
+               _matchController.IsActiveTeamAI();
     }
 
     IEnumerator SmoothFocus(Vector3 target)

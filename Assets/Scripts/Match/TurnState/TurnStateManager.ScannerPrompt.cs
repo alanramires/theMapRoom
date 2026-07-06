@@ -1110,6 +1110,12 @@ public partial class TurnStateManager
         if (isEmbarking)
             return TryHandleEmbarkTargetClick(clickedCell);
 
+        // Durante a escolha de acao pos-movimento, cliques no mapa so podem
+        // inferir sensores (inclusive "Apenas Mover" na propria unidade) quando
+        // o atalho contextual estiver explicitamente habilitado na partida.
+        if (matchController == null || !matchController.AtalhoContextual)
+            return false;
+
         if (scannerPromptStep != ScannerPromptStep.AwaitingAction)
             return false;
 
@@ -1147,6 +1153,11 @@ public partial class TurnStateManager
         return true;
     }
 
+    private bool AllowsContextualPointerConfirmation()
+    {
+        return matchController != null && matchController.AtalhoContextual;
+    }
+
     private bool TryBeginAimAtClickedTarget(Vector3Int clickedCell)
     {
         if (!availableSensorActionCodes.Contains('A'))
@@ -1175,6 +1186,9 @@ public partial class TurnStateManager
         if (scannerPromptStep != ScannerPromptStep.MirandoConfirmTarget ||
             !IsCurrentMirandoTarget(target))
             return false;
+
+        if (!AllowsContextualPointerConfirmation())
+            return true;
 
         // Um segundo clique no mesmo alvo equivale ao Enter da confirmacao. Se CANCELAR
         // estava em foco pelo teclado, o clique explicito no alvo recupera CONFIRMAR.
@@ -1267,6 +1281,9 @@ public partial class TurnStateManager
         if (scannerPromptStep != ScannerPromptStep.EmbarkConfirmTarget ||
             !IsCurrentEmbarkTarget(transporter))
             return false;
+
+        if (!AllowsContextualPointerConfirmation())
+            return true;
 
         embarkCancelFocused = false;
         embarkConfirmButtonFocus = 0;

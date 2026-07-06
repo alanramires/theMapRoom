@@ -953,6 +953,11 @@ public static class PodeDetectarSensor
                             usedForwardObserver = true;
                             forwardObserver = forwardObservers[0];
                         }
+                        else if (HasControlledConstructionObserverForTarget(
+                                     observer, target, boardMap, terrainDatabase, dpqAirHeightConfig, enableLosValidation: true))
+                        {
+                            usedForwardObserver = true;
+                        }
                     }
                 }
 
@@ -1025,8 +1030,8 @@ public static class PodeDetectarSensor
                         continue;
                     }
 
-                    bool canDetectStealth = observerData != null &&
-                        observerData.CanDetectStealthFor(targetDomain, targetHeight, targetData);
+                    bool canDetectStealth = usedForwardObserver ||
+                        (observerData != null && observerData.CanDetectStealthFor(targetDomain, targetHeight, targetData));
                     if (!canDetectStealth)
                     {
                         undetectedStealthOutput.Add(new PodeDetectarOption
@@ -1282,7 +1287,8 @@ public static class PodeDetectarSensor
     private static bool ShouldUseForwardObserverRule(Domain domain, HeightLevel heightLevel)
     {
         return (domain == Domain.Land && heightLevel == HeightLevel.Surface) ||
-            (domain == Domain.Naval && heightLevel == HeightLevel.Surface);
+            (domain == Domain.Naval && heightLevel == HeightLevel.Surface) ||
+            (domain == Domain.Submarine && heightLevel == HeightLevel.Submerged);
     }
 
     private static List<UnitManager> CollectForwardObserversForTarget(
@@ -1328,9 +1334,12 @@ public static class PodeDetectarSensor
                 if (!localAroundTarget.TryGetValue(allyCell, out int allyDistanceToTarget))
                     continue;
 
-                int allyObservationRange = GetObservationRangeHexes(ally, target);
-                if (allyDistanceToTarget > allyObservationRange)
-                    continue;
+            int allyObservationRange = GetObservationRangeHexes(ally, target);
+            if (allyDistanceToTarget > allyObservationRange)
+                continue;
+
+            if (!CanForwardObserverDetectTarget(ally, target))
+                continue;
 
                 if (!HasValidStraightObservationLine(
                         map,
@@ -1358,6 +1367,68 @@ public static class PodeDetectarSensor
         }
 
         return observers;
+    }
+
+    private static bool CanForwardObserverDetectTarget(UnitManager observer, UnitManager target)
+    {
+        if (observer == null || target == null)
+            return false;
+        if (!target.TryGetUnitData(out UnitData targetData) || targetData == null ||
+            !targetData.IsStealthUnit(target.GetDomain(), target.GetHeightLevel()))
+            return true;
+        if (!observer.TryGetUnitData(out UnitData observerData) || observerData == null)
+            return false;
+        return observerData.CanDetectStealthFor(target.GetDomain(), target.GetHeightLevel(), targetData);
+    }
+
+    private static bool HasControlledConstructionObserverForTarget(
+        UnitManager observer,
+        UnitManager target,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        bool enableLosValidation)
+    {
+        if (observer == null || target == null || map == null)
+            return false;
+        if (target.TryGetUnitData(out UnitData targetData) && targetData != null &&
+            targetData.IsStealthUnit(target.GetDomain(), target.GetHeightLevel()))
+            return false;
+
+        Vector3Int targetCell = target.CurrentCellPosition;
+        targetCell.z = 0;
+        IReadOnlyList<ConstructionManager> constructions = ConstructionManager.AllActive;
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if (construction.TeamId == TeamId.Neutral || construction.TeamId != observer.TeamId)
+                continue;
+            if (construction.BoardTilemap != map || !construction.TryResolveConstructionData(out ConstructionData data) || data == null)
+                continue;
+
+            Vector3Int constructionCell = construction.CurrentCellPosition;
+            constructionCell.z = 0;
+            int range = Mathf.Max(0, data.visao);
+            DistanceMapWorkspace workspace = RentDistanceMapWorkspace();
+            try
+            {
+                BuildDistanceMapInto(map, constructionCell, range, workspace);
+                if (!workspace.distances.TryGetValue(targetCell, out int distance) || distance > range)
+                    continue;
+                if (distance == 0 || HasValidStraightObservationLine(
+                        map, terrainDatabase, constructionCell, targetCell, null, target,
+                        dpqAirHeightConfig, out _, out _, out _, enableLosValidation))
+                    return true;
+            }
+            finally
+            {
+                ReleaseDistanceMapWorkspace(workspace);
+            }
+        }
+
+        return false;
     }
 
     private static int GetObservationRangeHexes(UnitManager unit, UnitManager target)
@@ -1652,7 +1723,9 @@ public static class PodeDetectarSensor
                     terrainDatabase,
                     dpqAirHeightConfig,
                     enableLosValidation: true);
-                usedForwardObserver = forwardObservers.Count > 0;
+                usedForwardObserver = forwardObservers.Count > 0 ||
+                    HasControlledConstructionObserverForTarget(
+                        observer, target, boardMap, terrainDatabase, dpqAirHeightConfig, enableLosValidation: true);
             }
         }
 
@@ -1662,6 +1735,9 @@ public static class PodeDetectarSensor
 
         bool isStealthTarget = targetData != null && targetData.IsStealthUnit(targetDomain, targetHeight);
         if (!isStealthTarget || !enableStealthValidation)
+            return true;
+
+        if (usedForwardObserver)
             return true;
 
         return observerData != null && observerData.CanDetectStealthFor(targetDomain, targetHeight, targetData);

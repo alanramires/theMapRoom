@@ -126,6 +126,8 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enableSpotter = true;
     [SerializeField] private bool enableStealthValidation = true;
     [SerializeField] private bool enableTotalWar = true;
+    [Tooltip("Permite inferir acoes contextuais a partir de cliques no mapa.")]
+    [SerializeField] private bool atalhoContextual = false;
     [Tooltip("Se false, o time com 0 unidades nao e eliminado automaticamente. Util para testes sem unidades.")]
     [SerializeField] private bool allowDefeatForZeroUnits = true;
     [SerializeField, Min(1)] private int maxUnitsPerTeam = 40;
@@ -351,6 +353,7 @@ public class MatchController : MonoBehaviour
     public bool EnableSpotter => enableSpotter;
     public bool EnableStealthValidation => enableStealthValidation;
     public bool EnableTotalWar => enableTotalWar;
+    public bool AtalhoContextual => atalhoContextual;
     public bool EnableSensorsRuntimeLogs => enableSensorsRuntimeLogs;
     public bool EnablePodeMirarSensorLogs => enableSensorsRuntimeLogs || enablePodeMirarSensorLogs;
     public bool EnablePodeEmbarcarSensorLogs => enableSensorsRuntimeLogs || enablePodeEmbarcarSensorLogs;

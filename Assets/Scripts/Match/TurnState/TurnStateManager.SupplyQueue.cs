@@ -222,7 +222,11 @@ public partial class TurnStateManager
             if (scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)
                 return TrySelectSupplyCandidateFromPointer(entry.selectionNumber);
             if (scannerPromptStep == ScannerPromptStep.MergeConfirm && supplySelectedCandidateIndex == i)
+            {
+                if (!AllowsContextualPointerConfirmation())
+                    return true;
                 return TryConfirmScannerSupply();
+            }
             return false;
         }
         if (scannerPromptStep == ScannerPromptStep.MergeParticipantSelect)

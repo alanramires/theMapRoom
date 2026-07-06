@@ -196,6 +196,9 @@ public partial class TurnStateManager
         if (clickedCell != constructionCell)
             return false;
 
+        if (!AllowsContextualPointerConfirmation())
+            return true;
+
         return TryConfirmSelectedShoppingOption();
     }
 

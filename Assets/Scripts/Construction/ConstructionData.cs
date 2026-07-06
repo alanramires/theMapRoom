@@ -45,6 +45,9 @@ public class ConstructionData : ScriptableObject
     public Sprite spriteYellow;
 
     [Header("Attributes")]
+    [Min(0)]
+    [Tooltip("Alcance de visao da construcao. Zero permite observar apenas alvos no proprio hex.")]
+    public int visao = 0;
     [Tooltip("Custo basico de movimento/autonomia para entrar neste hex de construcao. Minimo 1.")]
     [Min(1)]
     public int baseMovementCost = 1;
@@ -122,6 +125,7 @@ public class ConstructionData : ScriptableObject
 
     private void OnValidate()
     {
+        visao = Mathf.Max(0, visao);
         maxUnitsServedPerTurn = Mathf.Max(0, maxUnitsServedPerTurn);
         if (supplierTier == SupplierTier.SelfSupplier)
             supplierTier = SupplierTier.Receiver;
