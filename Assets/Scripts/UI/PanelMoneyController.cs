@@ -616,6 +616,13 @@ public sealed class FullscreenShortcutButton : MonoBehaviour, IPointerDownHandle
         if (eventData == null || eventData.button != PointerEventData.InputButton.Left)
             return;
 
+        ToggleFullscreen();
+        CursorController cursor = FindAnyObjectByType<CursorController>();
+        cursor?.PlayConfirmSfx();
+    }
+
+    public void ToggleFullscreen()
+    {
         bool enable = !Screen.fullScreen;
 #if !UNITY_WEBGL || UNITY_EDITOR
         Screen.fullScreenMode = enable

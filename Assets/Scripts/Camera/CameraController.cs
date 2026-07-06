@@ -1,5 +1,8 @@
 ﻿using UnityEngine;
 using UnityEngine.Tilemaps;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+using System.Collections.Generic;
 using System.Collections;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -48,6 +51,9 @@ public class CameraController : MonoBehaviour
 
     private Vector3 _dragStartWorld;
     private bool _dragging;
+    private bool _touchPanning;
+    private bool _touchPanBlocked;
+    private Vector2 _touchPanLastScreenPosition;
     private float _quickZoomNearSize;
     private bool _hasQuickZoomNearSize;
     private bool _quickZoomFarActive;
@@ -76,6 +82,7 @@ public class CameraController : MonoBehaviour
         HandleQuickZoomToggle();
         HandleZoom();
         HandlePinchZoom();
+        HandleTouchPan();
         HandlePan();
         ClampCamera();
     }
@@ -269,6 +276,123 @@ public class CameraController : MonoBehaviour
 
         // mantem o "gancho" no ponto inicial do mouse pra arrastar continuo
         _dragStartWorld = MouseWorld();
+    }
+
+    // Um dedo arrasta o mapa; dois dedos ficam exclusivamente com a pinca.
+    // O CursorController confirma taps apenas no release e descarta o gesto quando
+    // ele percorre distancia suficiente, separando naturalmente tap de drag.
+    void HandleTouchPan()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Touchscreen.current == null)
+            return;
+
+        int activeTouches = 0;
+        var touches = Touchscreen.current.touches;
+        for (int i = 0; i < touches.Count; i++)
+            if (touches[i].press.isPressed)
+                activeTouches++;
+
+        var primary = Touchscreen.current.primaryTouch;
+        Vector2 position = primary.position.ReadValue();
+
+        if (activeTouches >= 2)
+        {
+            _touchPanning = false;
+            _touchPanBlocked = true;
+            return;
+        }
+
+        if (primary.press.wasPressedThisFrame)
+        {
+            _touchPanBlocked = IsTouchOverInteractiveUI(position);
+            _touchPanning = !_touchPanBlocked;
+            _touchPanLastScreenPosition = position;
+            return;
+        }
+
+        if (primary.press.wasReleasedThisFrame || !primary.press.isPressed)
+        {
+            _touchPanning = false;
+            _touchPanBlocked = false;
+            return;
+        }
+
+        if (!_touchPanning || _touchPanBlocked)
+            return;
+
+        Vector3 previousScreen = _touchPanLastScreenPosition;
+        Vector3 currentScreen = position;
+        previousScreen.z = -transform.position.z;
+        currentScreen.z = -transform.position.z;
+        Vector3 previousWorld = _cam.ScreenToWorldPoint(previousScreen);
+        Vector3 currentWorld = _cam.ScreenToWorldPoint(currentScreen);
+        transform.position += (previousWorld - currentWorld) * panSpeed;
+        _touchPanLastScreenPosition = position;
+#else
+        if (Input.touchCount >= 2)
+        {
+            _touchPanning = false;
+            _touchPanBlocked = true;
+            return;
+        }
+        if (Input.touchCount <= 0)
+        {
+            _touchPanning = false;
+            _touchPanBlocked = false;
+            return;
+        }
+
+        Touch touch = Input.GetTouch(0);
+        if (touch.phase == TouchPhase.Began)
+        {
+            _touchPanBlocked = IsTouchOverInteractiveUI(touch.position);
+            _touchPanning = !_touchPanBlocked;
+            _touchPanLastScreenPosition = touch.position;
+            return;
+        }
+        if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+        {
+            _touchPanning = false;
+            _touchPanBlocked = false;
+            return;
+        }
+        if (!_touchPanning || _touchPanBlocked)
+            return;
+
+        Vector3 previousScreen = _touchPanLastScreenPosition;
+        Vector3 currentScreen = touch.position;
+        previousScreen.z = -transform.position.z;
+        currentScreen.z = -transform.position.z;
+        Vector3 previousWorld = _cam.ScreenToWorldPoint(previousScreen);
+        Vector3 currentWorld = _cam.ScreenToWorldPoint(currentScreen);
+        transform.position += (previousWorld - currentWorld) * panSpeed;
+        _touchPanLastScreenPosition = touch.position;
+#endif
+    }
+
+    private static bool IsTouchOverInteractiveUI(Vector2 screenPosition)
+    {
+        if (PanelHelperController.IsPointerOverHelperPanel(screenPosition))
+            return true;
+
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null)
+            return false;
+
+        PointerEventData pointer = new PointerEventData(eventSystem) { position = screenPosition };
+        List<RaycastResult> hits = new List<RaycastResult>();
+        eventSystem.RaycastAll(pointer, hits);
+        for (int i = 0; i < hits.Count; i++)
+        {
+            GameObject hit = hits[i].gameObject;
+            if (hit == null)
+                continue;
+            if (hit.GetComponentInParent<Selectable>() != null ||
+                ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit) != null)
+                return true;
+        }
+        return false;
     }
 
     bool PanStartPressed()

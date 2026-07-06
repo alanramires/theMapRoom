@@ -23,6 +23,7 @@ public class PanelMenu : MonoBehaviour
     [FormerlySerializedAs("buttonSobre")]
     [SerializeField] private Button buttonConfig;
     [SerializeField] private Button buttonCinematic;
+    [SerializeField] private Button buttonFullscreen;
     [SerializeField] private Button buttonSair;
     [SerializeField] private int defaultButtonIndex = 0;
     [SerializeField] private bool wrapSelection = true;
@@ -194,6 +195,7 @@ public class PanelMenu : MonoBehaviour
         if (stateController == null)
             stateController = MainMenuStateController.EnsureSceneInstance();
         ResolvePanelReferencesIfNeeded();
+        BindFullscreenShortcutIfNeeded();
 
         BindButtonCallbacksIfNeeded();
         ClampCurrentIndex();
@@ -397,6 +399,13 @@ public class PanelMenu : MonoBehaviour
             return;
         }
 
+        if (buttonFullscreen != null && button == buttonFullscreen)
+        {
+            PlayConfirmSfxOncePerFrame();
+            buttonFullscreen.GetComponent<FullscreenShortcutButton>()?.ToggleFullscreen();
+            return;
+        }
+
         button.onClick?.Invoke();
     }
 
@@ -536,12 +545,13 @@ public class PanelMenu : MonoBehaviour
 
     private List<Button> GetRootButtons()
     {
-        List<Button> list = new List<Button>(6);
+        List<Button> list = new List<Button>(7);
         AddIfActive(list, buttonNew);
         AddIfActive(list, buttonLoad);
         AddIfActive(list, buttonTutorial);
         AddIfActive(list, buttonConfig);
         AddIfActive(list, buttonCinematic);
+        AddIfActive(list, buttonFullscreen);
         AddIfActive(list, buttonSair);
         return list;
     }
@@ -559,6 +569,7 @@ public class PanelMenu : MonoBehaviour
         if (buttonTutorial == null) buttonTutorial = FindButtonByNames("button_tutorial", "tutorial");
         if (buttonConfig == null) buttonConfig = FindButtonByNames("button_config", "button_sobre", "config", "sobre", "about");
         if (buttonCinematic == null) buttonCinematic = FindButtonByNames("button_cinematic", "cinematic", "cinema");
+        if (buttonFullscreen == null) buttonFullscreen = FindButtonByNames("button_TelaCheia", "tela_cheia", "fullscreen");
         if (buttonSair == null) buttonSair = FindButtonByNames("button_sair", "sair", "quit", "exit");
         if (buttonSair == null) buttonSair = FindButtonByLabel("sair", "quit", "exit");
     }
@@ -585,6 +596,30 @@ public class PanelMenu : MonoBehaviour
             if (t != null)
                 panelConfigRoot = t.gameObject;
         }
+    }
+
+    private void BindFullscreenShortcutIfNeeded()
+    {
+        if (!Application.isPlaying)
+            return;
+
+        Transform shortcut = FindTransformByName("button_TelaCheia");
+        if (shortcut == null)
+            return;
+
+        if (buttonFullscreen == null)
+            buttonFullscreen = shortcut.GetComponent<Button>();
+        if (buttonFullscreen == null)
+            buttonFullscreen = shortcut.gameObject.AddComponent<Button>();
+
+        Image image = shortcut.GetComponent<Image>();
+        if (image != null)
+        {
+            image.raycastTarget = true;
+            buttonFullscreen.targetGraphic = image;
+        }
+        if (shortcut.GetComponent<FullscreenShortcutButton>() == null)
+            shortcut.gameObject.AddComponent<FullscreenShortcutButton>();
     }
 
     private Button FindButtonByNames(params string[] keywords)

@@ -67,6 +67,7 @@ public class PanelDialogController : MonoBehaviour
     private Button shoppingExitButton;
     private TMP_Text shoppingCounterText;
     private TMP_Text shoppingBuyText;
+    private bool shoppingControlsBound;
 
     private void Awake()
     {
@@ -546,9 +547,34 @@ public class PanelDialogController : MonoBehaviour
 
     private void EnsureShoppingControls()
     {
-        // Os controles sao runtime-only. OnValidate tambem chama TryAutoAssignReferences
-        // enquanto um Prefab Asset esta aberto, e assets nao aceitam filhos de cena.
-        if (!Application.isPlaying || shoppingControlsRoot != null || panelRect == null)
+        if (panelRect == null)
+            return;
+
+        if (shoppingControlsRoot == null)
+        {
+            Transform existingRoot = panelRect.Find("shopping_touch_controls");
+            if (existingRoot != null)
+            {
+                shoppingControlsRoot = existingRoot.gameObject;
+                shoppingPreviousButton = existingRoot.Find("shopping_previous")?.GetComponent<Button>();
+                shoppingNextButton = existingRoot.Find("shopping_next")?.GetComponent<Button>();
+                shoppingBuyButton = existingRoot.Find("shopping_buy")?.GetComponent<Button>();
+                shoppingExitButton = existingRoot.Find("shopping_exit")?.GetComponent<Button>();
+                shoppingCounterText = existingRoot.Find("shopping_counter")?.GetComponent<TMP_Text>();
+                shoppingBuyText = shoppingBuyButton != null
+                    ? shoppingBuyButton.GetComponentInChildren<TMP_Text>(true)
+                    : null;
+            }
+        }
+
+        if (shoppingControlsRoot != null)
+        {
+            BindShoppingControls();
+            return;
+        }
+
+        // Compatibilidade para cenas antigas que ainda nao tenham o prefab migrado.
+        if (!Application.isPlaying)
             return;
 
 #if UNITY_EDITOR
@@ -580,11 +606,21 @@ public class PanelDialogController : MonoBehaviour
             new Vector2(0.36f, 0.88f), new Vector2(0.64f, 0.99f), 18f);
         shoppingBuyText = shoppingBuyButton.GetComponentInChildren<TMP_Text>(true);
 
+        BindShoppingControls();
+        shoppingControlsRoot.SetActive(false);
+    }
+
+    private void BindShoppingControls()
+    {
+        if (shoppingControlsBound || shoppingPreviousButton == null || shoppingNextButton == null ||
+            shoppingBuyButton == null || shoppingExitButton == null)
+            return;
+
         shoppingPreviousButton.onClick.AddListener(() => turnStateManager?.TrySelectShoppingOptionFromPointer(-1));
         shoppingNextButton.onClick.AddListener(() => turnStateManager?.TrySelectShoppingOptionFromPointer(1));
         shoppingBuyButton.onClick.AddListener(() => turnStateManager?.TryConfirmShoppingFromPointer());
         shoppingExitButton.onClick.AddListener(() => turnStateManager?.TryCancelShoppingFromPointer());
-        shoppingControlsRoot.SetActive(false);
+        shoppingControlsBound = true;
     }
 
     private static void TintShoppingButton(Button button, Color background, Color labelColor)
