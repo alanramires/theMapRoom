@@ -225,9 +225,10 @@ public class CursorController : MonoBehaviour
 
     private void Update()
     {
+        TryAutoAssignMatchController();
+        UpdateCursorFogVisibility();
         UpdateCursorBlink();
         UpdateRightClickCancelTap();
-        TryAutoAssignMatchController();
         TryAutoAssignReplayManager();
         if (replayManager != null && replayManager.IsReplaying)
         {
@@ -623,7 +624,10 @@ public class CursorController : MonoBehaviour
 
         if (isMovementActionChoice || isAiming || isEmbarking)
         {
-            turnStateManager.TryInvokeInferredSensorActionByClickingSelectedUnit(targetCell);
+            bool isChoosingAimTarget = isAiming && !turnStateManager.IsMirandoConfirmStep;
+            bool handled = turnStateManager.TryInvokeInferredSensorActionByClickingSelectedUnit(targetCell);
+            if (handled && isChoosingAimTarget)
+                PlayMoveSfx();
             return;
         }
 
@@ -762,6 +766,15 @@ public class CursorController : MonoBehaviour
             : cursorColorA;
         float phase = Time.time % (cursorBlinkInterval * 2f);
         cursorRenderer.color = phase < cursorBlinkInterval ? colorA : cursorColorB;
+    }
+
+    private void UpdateCursorFogVisibility()
+    {
+        if (cursorRenderer == null)
+            return;
+
+        cursorRenderer.enabled = matchController == null
+            || matchController.ShouldShowActiveAiWorldEffectAt(transform.position);
     }
 
     private void SnapToCell(Vector3Int cell)
@@ -1660,6 +1673,9 @@ public class CursorController : MonoBehaviour
 
     private void PlayMoveSfx()
     {
+        if (ShouldSuppressHiddenAiShoppingUiSfx())
+            return;
+
         if (moveSfx == null)
             return;
 
@@ -1670,6 +1686,16 @@ public class CursorController : MonoBehaviour
         }
 
         audioSource.PlayOneShot(moveSfx, moveSfxVolume);
+    }
+
+    private bool ShouldSuppressHiddenAiShoppingUiSfx()
+    {
+        if (turnStateManager == null ||
+            turnStateManager.CurrentCursorState != TurnStateManager.CursorState.ShoppingAndServices)
+            return false;
+
+        TryAutoAssignMatchController();
+        return matchController != null && matchController.ShouldHideActiveAiActionPresentation();
     }
 
 
@@ -1970,7 +1996,11 @@ public class CursorController : MonoBehaviour
     public void PlayErrorSfx() => PlayUiSfx(errorSfx);
     public void PlayConfirmSfx() => PlayUiSfx(confirmSfx);
     public void PlayCancelSfx() => PlayUiSfx(cancelSfx);
-    public void PlayDoneSfx() => PlayUiSfx(doneSfx);
+    public void PlayDoneSfx()
+    {
+        if (!ShouldSuppressHiddenAiShoppingUiSfx())
+            PlayUiSfx(doneSfx);
+    }
     public void PlayLoadSfx() => PlayUiSfx(loadSfx);
     public void PlayCursorMoveSfx() => PlayMoveSfx();
 

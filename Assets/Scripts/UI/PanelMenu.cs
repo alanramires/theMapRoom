@@ -60,9 +60,14 @@ public class PanelMenu : MonoBehaviour
     private int newGameWizardFocusIndex;
     private TeamId newGameHumanTeam = TeamId.Green;
     private TeamId newGameAiTeam = TeamId.Red;
+    private AIDifficulty newGameDifficulty = AIDifficulty.Normal;
     private MatchController.GameSetupPreset newGamePreset = MatchController.GameSetupPreset.FogOfWarTotal;
 
     private static readonly TeamId[] NewGameTeams = { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
+    private static readonly AIDifficulty[] NewGameDifficulties =
+    {
+        AIDifficulty.Facil, AIDifficulty.Normal, AIDifficulty.Dificil
+    };
     private static readonly MatchController.GameSetupPreset[] NewGamePresets =
     {
         MatchController.GameSetupPreset.GameBoyClassic,
@@ -84,17 +89,23 @@ public class PanelMenu : MonoBehaviour
         string aiColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(newGameAiTeam));
         return $"MAPA: {targetMap}\n" +
                $"SETUP: {ResolvePresetLabel(newGamePreset)}\n" +
+               $"DIFICULDADE: {ResolveDifficultyLabel(newGameDifficulty)}\n" +
                $"JOGADOR 1: <color=#{humanColor}>{ResolveTeamLabel(newGameHumanTeam)}</color>\n" +
                $"JOGADOR 2: <color=#{aiColor}>{ResolveTeamLabel(newGameAiTeam)}</color> (IA)\n\n" +
                $"REGRAS\n{NewGamePanelController.BuildDescricao(newGamePreset)}";
     }
+
+    // Passo 4 = CONFIRMAR PARTIDA. Exposto para o PanelHelper montar os detalhes de confirmacao
+    // sem depender do numero magico do passo.
+    public bool IsNewGameWizardConfirmStep => newGameWizardOpen && newGameWizardStep == 4;
 
     public int GetNewGameWizardOptionCount()
     {
         if (!newGameWizardOpen) return 0;
         if (newGameWizardStep == 0) return NewGameTeams.Length + 1;
         if (newGameWizardStep == 1) return NewGameTeams.Length;
-        if (newGameWizardStep == 2) return NewGamePresets.Length + 1;
+        if (newGameWizardStep == 2) return NewGameDifficulties.Length + 1;
+        if (newGameWizardStep == 3) return NewGamePresets.Length + 1;
         return 2;
     }
 
@@ -108,6 +119,8 @@ public class PanelMenu : MonoBehaviour
             return index < opponents.Count ? $"IA {ResolveTeamLabel(opponents[index])}" : "VOLTAR";
         }
         if (newGameWizardStep == 2)
+            return index < NewGameDifficulties.Length ? ResolveDifficultyLabel(NewGameDifficulties[index]) : "VOLTAR";
+        if (newGameWizardStep == 3)
             return index < NewGamePresets.Length ? ResolvePresetLabel(NewGamePresets[index]) : "VOLTAR";
         return index == 0 ? "INICIAR JOGO" : "VOLTAR";
     }
@@ -157,15 +170,20 @@ public class PanelMenu : MonoBehaviour
         }
         else if (newGameWizardStep == 2)
         {
-            if (index >= NewGamePresets.Length) { newGameWizardStep = 1; }
-            else { newGamePreset = NewGamePresets[index]; newGameWizardStep = 3; }
+            if (index >= NewGameDifficulties.Length) { newGameWizardStep = 1; }
+            else { newGameDifficulty = NewGameDifficulties[index]; newGameWizardStep = 3; }
+        }
+        else if (newGameWizardStep == 3)
+        {
+            if (index >= NewGamePresets.Length) { newGameWizardStep = 2; }
+            else { newGamePreset = NewGamePresets[index]; newGameWizardStep = 4; }
         }
         else if (index == 0)
         {
             StartConfiguredNewGame();
             return;
         }
-        else newGameWizardStep = 2;
+        else newGameWizardStep = 3;
 
         newGameWizardFocusIndex = 0;
         RefreshNewGameWizardHelper();
@@ -782,6 +800,7 @@ public class PanelMenu : MonoBehaviour
         newGameWizardFocusIndex = 0;
         newGameHumanTeam = TeamId.Green;
         newGameAiTeam = TeamId.Red;
+        newGameDifficulty = AIDifficulty.Normal;
         newGamePreset = MatchController.GameSetupPreset.FogOfWarTotal;
         RefreshNewGameWizardHelper();
     }
@@ -790,9 +809,10 @@ public class PanelMenu : MonoBehaviour
     {
         string title = newGameWizardStep == 0 ? "ESCOLHA SUA COR" :
                        newGameWizardStep == 1 ? "ESCOLHA A IA ADVERSÁRIA" :
-                       newGameWizardStep == 2 ? "CONFIGURE O JOGO" : "CONFIRMAR PARTIDA";
-        string body = newGameWizardStep == 3
-            ? $"Você: {ResolveTeamLabel(newGameHumanTeam)}\nIA adversária: {ResolveTeamLabel(newGameAiTeam)}\nRegras: {ResolvePresetLabel(newGamePreset)}"
+                       newGameWizardStep == 2 ? "ESCOLHA A DIFICULDADE" :
+                       newGameWizardStep == 3 ? "CONFIGURE O JOGO" : "CONFIRMAR PARTIDA";
+        string body = newGameWizardStep == 4
+            ? $"Você: {ResolveTeamLabel(newGameHumanTeam)}\nIA adversária: {ResolveTeamLabel(newGameAiTeam)}\nDificuldade: {ResolveDifficultyLabel(newGameDifficulty)}\nRegras: {ResolvePresetLabel(newGamePreset)}"
             : (newGameWizardStep == 1 ? "Slot 1 será controlado pela IA." : string.Empty);
         PanelHelperController.TrySetExternalText(title, body);
     }
@@ -804,6 +824,19 @@ public class PanelMenu : MonoBehaviour
         newGameWizardFocusIndex = 0;
         PanelHelperController.ClearExternalText();
         cursorController?.PlayCancelSfx();
+    }
+
+    // Fecha o assistente de novo jogo sem SFX de cancelamento. Usado quando o jogador
+    // abre "Carregar Jogo" com o assistente aberto — o painel do assistente (ESCOLHA
+    // SUA COR etc.) precisa sumir para nao ficar sobreposto ao painel de load.
+    public void CloseNewGameWizardIfOpen()
+    {
+        if (!newGameWizardOpen)
+            return;
+        newGameWizardOpen = false;
+        newGameWizardStep = 0;
+        newGameWizardFocusIndex = 0;
+        PanelHelperController.ClearExternalText();
     }
 
     private List<TeamId> BuildAvailableOpponentTeams()
@@ -823,6 +856,7 @@ public class PanelMenu : MonoBehaviour
         bool[] cmdAuto = { false, true };
         SaveGameManager.SetupForNewGame(string.Empty);
         PartidaConfig.Set(2, teams, isAI, flipX, newGamePreset, cmdAuto, target);
+        PartidaConfig.SetDifficulty(newGameDifficulty);
         newGameWizardOpen = false;
         PanelHelperController.ClearExternalText();
         SceneManager.LoadScene(target);
@@ -832,6 +866,10 @@ public class PanelMenu : MonoBehaviour
     private static string ResolveTeamLabel(TeamId team) => team switch
     {
         TeamId.Green => "VERDE", TeamId.Red => "VERMELHO", TeamId.Blue => "AZUL", TeamId.Yellow => "AMARELO", _ => team.ToString().ToUpperInvariant()
+    };
+    private static string ResolveDifficultyLabel(AIDifficulty difficulty) => difficulty switch
+    {
+        AIDifficulty.Facil => "FÁCIL", AIDifficulty.Dificil => "DIFÍCIL", _ => "NORMAL"
     };
     private static string ResolvePresetLabel(MatchController.GameSetupPreset preset) => preset switch
     {

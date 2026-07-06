@@ -44,8 +44,10 @@ public partial class AIController
 
     private void OnGUI()
     {
-        if (aiTurnBatchExecuting || matchController == null || matchController.HasVictoryWinner ||
+        if (matchController == null || matchController.HasVictoryWinner ||
             !matchController.IsPlayerAI(matchController.ActiveTeam))
+            return;
+        if (currentAIStage == 2 && aiTurnBatchExecuting)
             return;
 
         EnsureAITurnIndicatorStyles();
@@ -131,6 +133,10 @@ public partial class AIController
     private void Start()
 
     {
+
+        // Dificuldade escolhida na Tela de Entrada (consumida uma vez por partida nova).
+        if (PartidaConfig.TryConsumeDifficulty(out AIDifficulty pendingDifficulty))
+            ApplyDifficulty(pendingDifficulty);
 
         if (matchController == null)  matchController  = FindAnyObjectByType<MatchController>();
 

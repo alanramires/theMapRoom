@@ -190,6 +190,8 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private bool fogOverlayInitialized;
     [System.NonSerialized] private bool initialStealthDetectionBootstrapped;
     [System.NonSerialized] private bool debugFogOfWarEnabled = true;
+    [System.NonSerialized] private bool debugFogOfWarPartial;
+    [System.NonSerialized] private int fogPresentationGameplayTeamId = int.MinValue;
     [System.NonSerialized] private float runtimeConstructionIncomeRefreshTimer;
     [System.NonSerialized] private readonly HashSet<Vector3Int> victoryOverlayActiveCells = new HashSet<Vector3Int>();
     [System.NonSerialized] private int cachedVictoryOverlaySignature;
@@ -243,6 +245,9 @@ public class MatchController : MonoBehaviour
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
+    public int VisualContrastActiveTeamId => fogPresentationGameplayTeamId != int.MinValue
+        ? fogPresentationGameplayTeamId
+        : activeTeamId;
     public TeamId ActiveTeam => ClampToTeamId(activeTeamId);
     public IReadOnlyList<TeamId> Players
     {
@@ -280,6 +285,25 @@ public class MatchController : MonoBehaviour
             team = players[i].teamId;
             return team != TeamId.Neutral;
         }
+        return false;
+    }
+
+    public bool TryGetFirstHumanTeam(out TeamId team)
+    {
+        team = TeamId.Neutral;
+        if (players == null)
+            return false;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            PlayerEntry player = players[i];
+            if (player.isAI || player.defeated || player.teamId == TeamId.Neutral)
+                continue;
+
+            team = player.teamId;
+            return true;
+        }
+
         return false;
     }
 
@@ -370,6 +394,7 @@ public class MatchController : MonoBehaviour
     public bool IsTutorialMode => activeTutorial != null;
     public TerrainDatabase TerrainDatabaseRef => ResolveFogTerrainDatabase();
     public bool IsFogOfWarDebugEnabled => debugFogOfWarEnabled;
+    public bool IsFogOfWarDebugPartial => debugFogOfWarPartial;
     public FogOfWarVisionMode FogOfWarVisionMode => fogOfWarVisionMode;
     public int MaxUnitsPerTeam => Mathf.Max(1, maxUnitsPerTeam);
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;
@@ -903,7 +928,10 @@ public class MatchController : MonoBehaviour
             return;
         if (activeTeamId < 0 && !includeNeutralTeam)
             return;
-        if (fogCachedTeamId == activeTeamId && fogOverlayInitialized)
+        int expectedVisualTeamId = activeTeamId;
+        if (ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+            expectedVisualTeamId = (int)presentationTeam;
+        if (fogCachedTeamId == expectedVisualTeamId && fogOverlayInitialized)
             return;
 
         // Domain reloads durante o Play Mode limpam o cache nao serializado, mas o
@@ -1043,6 +1071,18 @@ public class MatchController : MonoBehaviour
             // Hard guard: the Total FoW preset must always start with FoW enabled.
             fogOfWar = true;
             debugFogOfWarEnabled = true;
+        }
+        else
+        {
+            fogOfWar = false;
+            ResetFogOfWarRuntime(clearTilemap: true);
+            ShowAllUnitsIgnoringFog();
+
+            ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(
+                FindObjectsInactive.Exclude,
+                FindObjectsSortMode.None);
+            for (int i = 0; i < constructions.Length; i++)
+                constructions[i]?.RefreshRuntimeVisualState(force: true);
         }
         SyncThreatRevisionFlags();
     }
@@ -2200,12 +2240,31 @@ public class MatchController : MonoBehaviour
                 if (construction.TeamId != entry.teamId)
                     continue;
 
-                income += Mathf.Max(0, construction.CapturedIncoming);
+                income += ResolveConstructionIncomeForPlayer(entry, construction);
             }
 
             entry.incomePerTurn = Mathf.Max(0, income);
             players[i] = entry;
         }
+    }
+
+    private static int ResolveConstructionIncomeForPlayer(PlayerEntry player, ConstructionManager construction)
+    {
+        if (construction == null)
+            return 0;
+
+        int baseIncome = Mathf.Max(0, construction.CapturedIncoming);
+        bool easyAiEconomy = player.isAI &&
+                             AIController.Instance != null &&
+                             AIController.Instance.EasyMode;
+        if (!easyAiEconomy)
+            return baseIncome;
+
+        if (construction.TryResolveConstructionData(out ConstructionData data) &&
+            data != null && data.isCity)
+            return baseIncome;
+
+        return baseIncome / 3;
     }
 
     private void ApplyEconomyAtTurnStartForActiveTeam(List<ConstructionManager> constructions = null)
@@ -2284,6 +2343,11 @@ public class MatchController : MonoBehaviour
     private static void ComputeConstructionIncomeSignature(out int signature, out int count)
     {
         signature = 17;
+        unchecked
+        {
+            signature = (signature * 31) +
+                        (AIController.Instance != null && AIController.Instance.EasyMode ? 1 : 0);
+        }
         count = 0;
         ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < constructions.Length; i++)
@@ -2505,6 +2569,35 @@ public class MatchController : MonoBehaviour
 
     public void RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode mode = FogOfWarRefreshMode.FullVisual)
     {
+        if (!ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+        {
+            RefreshFogOfWarForCurrentTeamInternal(mode);
+            return;
+        }
+
+        int gameplayTeamId = activeTeamId;
+        int gameplayPlayerIndex = activePlayerListIndex;
+        try
+        {
+            fogPresentationGameplayTeamId = gameplayTeamId;
+            // Mantem a percepção da AI atualizada para decisões e memória.
+            RefreshFogOfWarForCurrentTeamInternal(FogOfWarRefreshMode.DataOnly);
+
+            // A apresentação permanece sempre sob os sensores do jogador humano.
+            activeTeamId = (int)presentationTeam;
+            activePlayerListIndex = GetSlotIndexForTeam(presentationTeam);
+            RefreshFogOfWarForCurrentTeamInternal(FogOfWarRefreshMode.FullVisual);
+        }
+        finally
+        {
+            activeTeamId = gameplayTeamId;
+            activePlayerListIndex = gameplayPlayerIndex;
+            fogPresentationGameplayTeamId = int.MinValue;
+        }
+    }
+
+    private void RefreshFogOfWarForCurrentTeamInternal(FogOfWarRefreshMode mode)
+    {
         PodeDetectarSensor.ClearRefreshScopedTerrainCache();
         if (SuppressFogOfWarRefresh)
             return;
@@ -2611,7 +2704,8 @@ public class MatchController : MonoBehaviour
         double constructionVisionMs = enableFogStepPerfLogs
             ? (Time.realtimeSinceStartupAsDouble - constructionVisionStartMs) * 1000d
             : 0d;
-        RefreshRuntimeUnitFogVisibility();
+        if (mode == FogOfWarRefreshMode.FullVisual)
+            RefreshRuntimeUnitFogVisibility();
         if (Application.isPlaying && activeTeamId >= 0
             && Enum.IsDefined(typeof(TeamId), activeTeamId))
             AIIntelLedger.RecordVisibleContactsForTeam(
@@ -3454,6 +3548,66 @@ public class MatchController : MonoBehaviour
         return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
     }
 
+    public bool ShouldShowActiveAiWorldEffectAt(Vector3 worldPosition)
+    {
+        if (!ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+            return true;
+
+        if (fogCachedTeamId != (int)presentationTeam)
+            return false;
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return false;
+
+        Vector3Int cell = boardMap.WorldToCell(worldPosition);
+        cell.z = 0;
+        return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
+    }
+
+    public bool ShouldShowActiveAiUnitAt(UnitManager unit, Vector3 worldPosition, bool allowReveal)
+    {
+        if (!ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+            return true;
+        if (unit == null || !ShouldShowActiveAiWorldEffectAt(worldPosition))
+            return false;
+
+        // Durante a interpolacao, uma unidade previamente oculta nao pode surgir antes
+        // de sua celula logica ser atualizada. Ao chegar no hex, valida inclusive stealth.
+        if (!allowReveal && unit.IsHiddenByFogOfWar)
+            return false;
+
+        if (!allowReveal)
+            return true;
+
+        int cacheIndex = ResolveFogCacheIndex(unit);
+        if (fogCachedTeamId == (int)presentationTeam &&
+            fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible))
+        {
+            return cachedVisible;
+        }
+
+        return IsUnitVisibleForTeamNoCache(unit, presentationTeam);
+    }
+
+    public bool ShouldHideActiveAiActionPresentation()
+    {
+        return ShouldUseHumanFogPresentation(out _);
+    }
+
+    private bool ShouldUseHumanFogPresentation(out TeamId presentationTeam)
+    {
+        presentationTeam = TeamId.Neutral;
+        if (!Application.isPlaying || !debugFogOfWarEnabled || debugFogOfWarPartial)
+            return false;
+        if (!enableTotalWar || gameSetup != GameSetupPreset.FogOfWarTotal || activeTeamId < 0)
+            return false;
+        if (!Enum.IsDefined(typeof(TeamId), activeTeamId) || !IsPlayerAI((TeamId)activeTeamId))
+            return false;
+
+        return TryGetFirstHumanTeam(out presentationTeam);
+    }
+
     public void ExportFogRuntimeCacheForSave(
         out int cachedTeamId,
         List<FogCellContributorSaveData> visibleContributorsByCell,
@@ -4272,11 +4426,15 @@ public class MatchController : MonoBehaviour
 
     private void RefreshRuntimeUnitFogVisibility()
     {
-        if (!debugFogOfWarEnabled)
+        if (!debugFogOfWarEnabled || !enableTotalWar || gameSetup != GameSetupPreset.FogOfWarTotal)
         {
             ShowAllUnitsIgnoringFog();
             return;
         }
+
+        TeamId observerTeam = ActiveTeam;
+        if (ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+            observerTeam = presentationTeam;
 
         List<UnitManager> units = UnitManager.AllActive;
         fogUnitVisibilityByCacheIndex.Clear();
@@ -4289,7 +4447,8 @@ public class MatchController : MonoBehaviour
             if (boardMap != null && !IsUnitOnBoard(unit, boardMap))
                 continue;
 
-            bool visible = ComputeIsUnitVisibleForActiveTeam(unit);
+            bool visible = unit.TeamId == observerTeam
+                || ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
             unit.SetFogOfWarVisibility(visible);
         }
@@ -4318,7 +4477,9 @@ public class MatchController : MonoBehaviour
 
     public void SetFogOfWarDebugEnabled(bool enabled)
     {
-        if (debugFogOfWarEnabled == enabled)
+        bool modeChanged = debugFogOfWarPartial;
+        debugFogOfWarPartial = false;
+        if (debugFogOfWarEnabled == enabled && !modeChanged)
             return;
 
         debugFogOfWarEnabled = enabled;
@@ -4337,6 +4498,23 @@ public class MatchController : MonoBehaviour
 
         RefreshRuntimeUnitFogVisibility();
         Debug.Log("[Debug Command] FoW ON (debug).");
+    }
+
+    public void SetFogOfWarDebugPartial()
+    {
+        bool modeChanged = !debugFogOfWarEnabled || !debugFogOfWarPartial;
+        debugFogOfWarEnabled = true;
+        debugFogOfWarPartial = true;
+        if (!modeChanged)
+            return;
+
+        if (enableTotalWar)
+            RefreshFogOfWarForActiveTeam();
+        else
+            ResetFogOfWarRuntime(clearTilemap: true);
+
+        RefreshRuntimeUnitFogVisibility();
+        Debug.Log("[Debug Command] FoW PARTIAL (debug): exibindo a perspectiva do time ativo.");
     }
 
     private void ShowAllUnitsIgnoringFog()

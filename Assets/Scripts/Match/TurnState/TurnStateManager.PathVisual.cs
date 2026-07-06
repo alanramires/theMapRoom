@@ -6,6 +6,12 @@ public partial class TurnStateManager
 {
     private void DrawCommittedPathVisual(List<Vector3Int> path)
     {
+        if (matchController != null && matchController.ShouldHideActiveAiActionPresentation())
+        {
+            pathManager?.ClearCommittedPath();
+            return;
+        }
+
         if (pathManager == null)
             return;
 

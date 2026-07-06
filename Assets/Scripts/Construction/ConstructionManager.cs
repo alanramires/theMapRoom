@@ -1056,7 +1056,8 @@ public class ConstructionManager : MonoBehaviour
     {
         if (occupant == null || !IsOccupantVisibleForHud(occupant))
             return false;
-        bool isActiveTeam = matchController != null && (int)occupant.TeamId == matchController.ActiveTeamId;
+        bool isActiveTeam = matchController != null &&
+                            (int)occupant.TeamId == matchController.VisualContrastActiveTeamId;
         return !isActiveTeam || !occupant.HasActed;
     }
 

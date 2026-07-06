@@ -185,6 +185,12 @@ public class PanelDialogController : MonoBehaviour
             externalPreviewColor = Color.white;
         }
 
+        if (matchController != null && matchController.ShouldHideActiveAiActionPresentation())
+        {
+            HideAll(force);
+            return;
+        }
+
         if (hasExternalOverrideText)
         {
             Color overrideColor = ResolveActiveTeamColor();

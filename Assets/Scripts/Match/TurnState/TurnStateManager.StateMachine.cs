@@ -878,7 +878,10 @@ public partial class TurnStateManager
         LogStateStep("HandleConfirmWhileMoveuAndando");
         if (SensorOptionCancelFocused)
             return HandleCancelWhileMoveuAndando();
-        return TryInvokeFocusedSensorOption() ? ActionSfx.Confirm : ActionSfx.None;
+        // Cada opcao do scanner ja emite o proprio feedback: entrada em submenu toca
+        // Confirm e a acao "Apenas Mover" toca Done. Nao solicite um segundo SFX ao cursor.
+        TryInvokeFocusedSensorOption();
+        return ActionSfx.None;
     }
 
     private ActionSfx HandleConfirmWhileMoveuParado()
@@ -886,7 +889,8 @@ public partial class TurnStateManager
         LogStateStep("HandleConfirmWhileMoveuParado");
         if (SensorOptionCancelFocused)
             return HandleCancelWhileMoveuParado();
-        return TryInvokeFocusedSensorOption() ? ActionSfx.Confirm : ActionSfx.None;
+        TryInvokeFocusedSensorOption();
+        return ActionSfx.None;
     }
 
     private ActionSfx HandleConfirmWhileCapturando()

@@ -9,6 +9,25 @@ public static class PartidaConfig
 {
     public static bool HasPending { get; private set; }
 
+    // Dificuldade da IA escolhida na Tela de Entrada. Vive separada do restante do config
+    // (nao e limpa por Clear()) porque quem a consome e o AIController.Start, que roda depois
+    // do MatchController.Awake ja ter chamado Apply()+Clear().
+    private static AIDifficulty? pendingDifficulty;
+
+    public static void SetDifficulty(AIDifficulty difficulty) => pendingDifficulty = difficulty;
+
+    public static bool TryConsumeDifficulty(out AIDifficulty difficulty)
+    {
+        if (pendingDifficulty.HasValue)
+        {
+            difficulty = pendingDifficulty.Value;
+            pendingDifficulty = null;
+            return true;
+        }
+        difficulty = AIDifficulty.Normal;
+        return false;
+    }
+
     public static int PlayerCount { get; private set; }
     public static TeamId[] Teams { get; private set; }
     public static bool[] IsAI { get; private set; }

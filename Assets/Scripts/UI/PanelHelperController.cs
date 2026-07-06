@@ -77,17 +77,17 @@ public class PanelHelperController : MonoBehaviour
     private Button cancelActionButton;
     private Image cancelActionImage;
     private TMP_Text cancelActionLabel;
-    private const float CancelControlHeight = 52f;
+    private const float CancelControlHeight = 80f;
     private GameObject executeCommandServiceControlRoot;
     private Button executeCommandServiceButton;
     private Image executeCommandServiceImage;
     private TMP_Text executeCommandServiceLabel;
-    private const float ExecuteCommandServiceControlHeight = 52f;
+    private const float ExecuteCommandServiceControlHeight = 80f;
     private GameObject keepPositionControlRoot;
     private Button keepPositionButton;
     private Image keepPositionImage;
     private TMP_Text keepPositionLabel;
-    private const float KeepPositionControlHeight = 52f;
+    private const float KeepPositionControlHeight = 80f;
     // Cor de fallback dos botoes gerados via script (usada so na criacao; o tint por time
     // sobrescreve todo frame). Os botoes seguem a cor do time ativo (virou tudo slot de jogador).
     private static readonly Color FooterButtonIdleColor = new Color(0.04f, 0.12f, 0.06f, 0.92f);
@@ -125,16 +125,32 @@ public class PanelHelperController : MonoBehaviour
             label.color = TeamButtonLabel(currentTeamColor, focused);
     }
 
+    private void ConfigureMobileActionLabel(TMP_Text label)
+    {
+        if (label == null)
+            return;
+
+        if (helperTxt != null && helperTxt.font != null)
+            label.font = helperTxt.font;
+        label.fontSize = 22f;
+        label.enableAutoSizing = true;
+        label.fontSizeMin = 22f;
+        label.fontSizeMax = 22f;
+        label.fontStyle = FontStyles.Bold;
+        label.alignment = TextAlignmentOptions.Center;
+        label.raycastTarget = false;
+    }
+
     private GameObject sensorActionsRoot;
     private readonly List<Button> sensorActionButtons = new List<Button>();
     private readonly List<char> sensorActionButtonCodes = new List<char>();
     private string sensorActionsSignature = string.Empty;
-    private const float SensorActionButtonHeight = 42f;
+    private const float SensorActionButtonHeight = 50f;
     private GameObject aimTargetsRoot;
     private readonly List<Button> aimTargetButtons = new List<Button>();
     private string aimTargetsSignature = string.Empty;
     // Alvo mostra 2 linhas (nome+HP / terreno), entao precisa de mais altura que os demais botoes.
-    private const float AimTargetButtonHeight = 58f;
+    private const float AimTargetButtonHeight = 50f;
     // Seccao de detalhes do passo CONFIRMAR ATAQUE: HP + LOCAL (icone do hex + nome do terreno).
     private GameObject aimConfirmDetailsRoot;
     private Image aimConfirmTargetIcon;
@@ -148,11 +164,11 @@ public class PanelHelperController : MonoBehaviour
     private readonly List<int> disembarkActionFocusIndices = new List<int>();
     private string disembarkActionsSignature = string.Empty;
     private bool disembarkLayoutDirty;
-    private const float DisembarkActionButtonHeight = 48f;
+    private const float DisembarkActionButtonHeight = 50f;
     private GameObject shoppingActionsRoot;
     private readonly List<Button> shoppingActionButtons = new List<Button>();
     private string shoppingActionsSignature = string.Empty;
-    private const float ShoppingActionButtonHeight = 42f;
+    private const float ShoppingActionButtonHeight = 50f;
     private GameObject persistenceActionsRoot;
     private readonly List<Button> persistenceActionButtons = new List<Button>();
     private readonly List<Image> persistenceActionImages = new List<Image>();
@@ -161,8 +177,12 @@ public class PanelHelperController : MonoBehaviour
     private readonly List<bool> persistenceActionUsesTeamColor = new List<bool>();
     private GameObject persistenceConfirmationDetails;
     private string persistenceActionsSignature = string.Empty;
-    private const float PersistenceActionButtonHeight = 42f;
+    private const float PersistenceActionButtonHeight = 50f;
     private const float PersistenceConfirmationDetailsHeight = 190f;
+    // Respiro entre as opcoes e o botao de cancelar/voltar, pra ele parecer um rodape
+    // destacado (como MANTER POSICAO/CANCELAR nas telas de unidade), e nao mais um item da lista.
+    private const float PersistenceFooterGap = 24f;
+    private float persistenceFooterSpacerHeight;
     [SerializeField] [Range(1f, 80f)] private float helperScrollStep = 24f;
 
     [Header("Coordinate Overlay")]
@@ -216,6 +236,8 @@ public class PanelHelperController : MonoBehaviour
     private void OnGUI()
     {
         if (!showCoordinateOverlay)
+            return;
+        if (matchController != null && matchController.ShouldHideActiveAiActionPresentation())
             return;
 
         if (!Application.isPlaying || cursorController == null || cursorController.BoardTilemap == null)
@@ -324,6 +346,12 @@ public class PanelHelperController : MonoBehaviour
             externalOverrideTitle = string.Empty;
             externalOverrideBody = string.Empty;
             externalOverrideUntilUnscaledTime = -1f;
+        }
+
+        if (matchController != null && matchController.ShouldHideActiveAiActionPresentation())
+        {
+            HideAll(force);
+            return;
         }
 
         if (hasExternalOverrideText)
@@ -1523,8 +1551,9 @@ public class PanelHelperController : MonoBehaviour
         }
         else if (persistenceButtonsActive)
         {
-            bodyHeight = persistenceActionButtons.Count * (PersistenceActionButtonHeight + 4f)
-                + (persistenceConfirmationDetails != null ? PersistenceConfirmationDetailsHeight + 4f : 0f);
+            bodyHeight = persistenceActionButtons.Count * (PersistenceActionButtonHeight + 10f)
+                + (persistenceConfirmationDetails != null ? PersistenceConfirmationDetailsHeight + 10f : 0f)
+                + persistenceFooterSpacerHeight;
         }
         else if (helperTxt != null)
         {
@@ -2179,6 +2208,7 @@ public class PanelHelperController : MonoBehaviour
         TMP_Text label = labelObj.GetComponent<TMP_Text>();
         label.text = text; label.fontStyle = FontStyles.Bold; label.alignment = TextAlignmentOptions.Center;
         label.enableAutoSizing = true; label.fontSizeMin = 11f; label.fontSizeMax = 18f; label.raycastTarget = false;
+        ConfigureMobileActionLabel(label);
         if (interactable)
             TintScriptButtonToTeam(button, false);
         else
@@ -2256,6 +2286,7 @@ public class PanelHelperController : MonoBehaviour
             label.fontStyle = FontStyles.Bold; label.color = FooterLabelIdleColor; label.alignment = TextAlignmentOptions.Center; label.raycastTarget = false;
             // Auto-encolhe se o nome for grande, pra nao estourar a largura do botao.
             label.enableAutoSizing = true; label.fontSizeMin = 12f; label.fontSizeMax = 20f;
+            ConfigureMobileActionLabel(label);
             if (!isCancel && line.unitSprite != null)
                 CreateDisembarkRowIcon(obj.transform, "unit_icon", line.unitSprite, line.unitColor, true);
             aimTargetButtons.Add(button);
@@ -2399,7 +2430,7 @@ public class PanelHelperController : MonoBehaviour
         rect.sizeDelta = new Vector2(0f, 1f);
         rect.SetAsLastSibling();
         VerticalLayoutGroup layout = persistenceActionsRoot.GetComponent<VerticalLayoutGroup>();
-        layout.spacing = 4f;
+        layout.spacing = 10f;
         layout.childAlignment = TextAnchor.UpperCenter;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
@@ -2410,19 +2441,17 @@ public class PanelHelperController : MonoBehaviour
 
     private void RebuildPersistenceActionButtons(bool menuDeleteActive, bool menuQuitActive, bool newGameWizardActive, bool battleExitActive, bool battleSurrenderActive)
     {
-        for (int i = persistenceActionButtons.Count - 1; i >= 0; i--)
-            if (persistenceActionButtons[i] != null)
-                Destroy(persistenceActionButtons[i].gameObject);
+        // Destroi todos os filhos (botoes, spacers de rodape e detalhes de confirmacao) de uma vez.
+        RectTransform persistenceRootRect = persistenceActionsRoot.GetComponent<RectTransform>();
+        for (int i = persistenceRootRect.childCount - 1; i >= 0; i--)
+            Destroy(persistenceRootRect.GetChild(i).gameObject);
         persistenceActionButtons.Clear();
         persistenceActionImages.Clear();
         persistenceActionLabels.Clear();
         persistenceActionTeamColors.Clear();
         persistenceActionUsesTeamColor.Clear();
-        if (persistenceConfirmationDetails != null)
-        {
-            Destroy(persistenceConfirmationDetails);
-            persistenceConfirmationDetails = null;
-        }
+        persistenceConfirmationDetails = null;
+        persistenceFooterSpacerHeight = 0f;
 
         if (menuDeleteActive)
         {
@@ -2436,12 +2465,15 @@ public class PanelHelperController : MonoBehaviour
         }
         else if (newGameWizardActive)
         {
-            if (mainMenuPanel.NewGameWizardStep == 3)
+            if (mainMenuPanel.IsNewGameWizardConfirmStep)
                 CreateNewGameConfirmationDetails(mainMenuPanel.GetNewGameWizardConfirmationSummary());
 
             int count = mainMenuPanel.GetNewGameWizardOptionCount();
             for (int i = 0; i < count; i++)
             {
+                // A ultima opcao de todo passo e sempre CANCELAR/VOLTAR: destaca ela no rodape.
+                if (count > 1 && i == count - 1)
+                    CreatePersistenceFooterSpacer(PersistenceFooterGap);
                 int selected = i;
                 bool hasTeamColor = mainMenuPanel.TryGetNewGameWizardOptionColor(i, out Color teamColor);
                 CreatePersistenceButton(mainMenuPanel.GetNewGameWizardOptionLabel(i),
@@ -2477,10 +2509,10 @@ public class PanelHelperController : MonoBehaviour
         }
 
         float detailsHeight = persistenceConfirmationDetails != null
-            ? PersistenceConfirmationDetailsHeight + 4f
+            ? PersistenceConfirmationDetailsHeight + 10f
             : 0f;
         persistenceActionsRoot.GetComponent<RectTransform>().sizeDelta =
-            new Vector2(0f, persistenceActionButtons.Count * (PersistenceActionButtonHeight + 4f) + detailsHeight);
+            new Vector2(0f, persistenceActionButtons.Count * (PersistenceActionButtonHeight + 10f) + detailsHeight + persistenceFooterSpacerHeight);
     }
 
     private void CreateNewGameConfirmationDetails(string text)
@@ -2538,6 +2570,19 @@ public class PanelHelperController : MonoBehaviour
         }
     }
 
+    // Elemento invisivel de altura fixa que abre um respiro no VerticalLayoutGroup, empurrando
+    // o botao de cancelar/voltar pra baixo (visual de rodape destacado).
+    private void CreatePersistenceFooterSpacer(float height)
+    {
+        GameObject spacer = new GameObject("persistence_footer_spacer", typeof(RectTransform), typeof(LayoutElement));
+        spacer.transform.SetParent(persistenceActionsRoot.transform, false);
+        LayoutElement element = spacer.GetComponent<LayoutElement>();
+        element.minHeight = height;
+        element.preferredHeight = height;
+        element.flexibleHeight = 0f;
+        persistenceFooterSpacerHeight += height;
+    }
+
     private void CreatePersistenceButton(string text, UnityEngine.Events.UnityAction action, Color? teamColor = null)
     {
         GameObject buttonObject = new GameObject("button_persistence", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
@@ -2567,6 +2612,7 @@ public class PanelHelperController : MonoBehaviour
         label.color = FooterLabelIdleColor;
         label.alignment = TextAlignmentOptions.Center;
         label.raycastTarget = false;
+        ConfigureMobileActionLabel(label);
         persistenceActionButtons.Add(button);
         persistenceActionImages.Add(buttonImage);
         persistenceActionLabels.Add(label);
@@ -2640,6 +2686,7 @@ public class PanelHelperController : MonoBehaviour
             label.color = FooterLabelIdleColor;
             label.alignment = TextAlignmentOptions.Center;
             label.raycastTarget = false;
+            ConfigureMobileActionLabel(label);
             shoppingActionButtons.Add(button);
         }
 
@@ -2705,6 +2752,7 @@ public class PanelHelperController : MonoBehaviour
             label.color = new Color(0.65f, 1f, 0.65f, 1f);
             label.alignment = TextAlignmentOptions.Center;
             label.raycastTarget = false;
+            ConfigureMobileActionLabel(label);
             sensorActionButtons.Add(button);
             sensorActionButtonCodes.Add(actionCode);
         }
@@ -2758,6 +2806,7 @@ public class PanelHelperController : MonoBehaviour
         label.color = FooterLabelIdleColor;
         label.alignment = TextAlignmentOptions.Center;
         label.raycastTarget = false;
+        ConfigureMobileActionLabel(label);
         cancelActionLabel = label;
 
         cancelActionButton.onClick.AddListener(() =>
@@ -2819,6 +2868,7 @@ public class PanelHelperController : MonoBehaviour
         label.color = FooterLabelIdleColor;
         label.alignment = TextAlignmentOptions.Center;
         label.raycastTarget = false;
+        ConfigureMobileActionLabel(label);
         executeCommandServiceLabel = label;
 
         executeCommandServiceButton.onClick.AddListener(() =>
@@ -2949,6 +2999,7 @@ public class PanelHelperController : MonoBehaviour
         keepPositionLabel.color = FooterLabelIdleColor;
         keepPositionLabel.alignment = TextAlignmentOptions.Center;
         keepPositionLabel.raycastTarget = false;
+        ConfigureMobileActionLabel(keepPositionLabel);
 
         keepPositionButton.onClick.AddListener(() => turnStateManager?.TryKeepSelectedUnitPositionFromHelper());
         keepPositionControlRoot.SetActive(false);

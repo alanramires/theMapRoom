@@ -636,6 +636,7 @@ public partial class TurnStateManager
                 receiver.TrySetCurrentLayerMode(fusionDomain, fusionHeight);
             PlayMovementStartSfx(receiver);
             receiver.SetCurrentCellPosition(targetMergeCell, enforceFinalOccupancyRule: false);
+            ReapplyForcedUnitVisualForFog(receiver);
             if (cursorController != null)
                 cursorController.SetCell(targetMergeCell, playMoveSfx: false);
         }
@@ -1487,7 +1488,8 @@ public partial class TurnStateManager
 
     private void UpdateMergeQueuePreviewAnimation()
     {
-        bool shouldShow = CurrentCursorState == CursorState.Fundindo &&
+        bool shouldShow = !ShouldSuppressAiActionPreviewLines() &&
+                          CurrentCursorState == CursorState.Fundindo &&
                           (mergeQueuedUnits.Count > 0 ||
                            scannerPromptStep == ScannerPromptStep.MergeConfirm ||
                            scannerPromptStep == ScannerPromptStep.MergeParticipantSelect);
@@ -1744,6 +1746,7 @@ public partial class TurnStateManager
 
     private void SetMergeQueuePreviewVisible(bool visible)
     {
+        visible = visible && !ShouldSuppressAiActionPreviewLines();
         for (int i = 0; i < mergeQueuePreviewTracks.Count; i++)
         {
             MergeQueuePreviewTrack track = mergeQueuePreviewTracks[i];

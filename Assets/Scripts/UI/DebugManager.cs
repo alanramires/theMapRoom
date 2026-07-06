@@ -433,6 +433,20 @@ public class DebugManager : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
+        else if (command == "FOW PARTIAL" || command == "FOG OF WAR PARTIAL")
+        {
+            if (matchController == null)
+            {
+                Debug.Log("[Debug Command] MatchController nao encontrado.");
+            }
+            else
+            {
+                matchController.SetFogOfWarDebugPartial();
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log("[Debug Command] FoW PARTIAL.");
+            }
+        }
         else if (TryParseSetFoWCommand(rawCommand, out bool fogEnabled))
         {
             if (matchController == null)
@@ -974,7 +988,7 @@ public class DebugManager : MonoBehaviour
             "change altitude <dominio>/<altura>\n" +
             "land unit\n" +
             "landing | emerge | submerge | take off | fast take off\n" +
-            "fow on|off\n" +
+            "fow on|off|partial\n" +
             "ai pause | pause ai\n" +
             "ai resume | resume ai\n" +
             "ai shopping pause | pause ai shopping\n" +

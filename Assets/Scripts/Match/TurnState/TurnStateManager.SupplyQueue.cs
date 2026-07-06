@@ -932,7 +932,7 @@ public partial class TurnStateManager
         return 0f;
     }
 
-    private static IEnumerator AnimateFuelRecoverFill(UnitManager target, int fromFuel, int toFuel, bool emitLogs = true)
+    private IEnumerator AnimateFuelRecoverFill(UnitManager target, int fromFuel, int toFuel, bool emitLogs = true)
     {
         if (target == null)
             yield break;
@@ -987,7 +987,7 @@ public partial class TurnStateManager
             Debug.Log($"[FuelAnim] Fim {target.name}: {target.CurrentFuel}/{target.MaxFuel}");
     }
 
-    private static IEnumerator AnimateHpRecoverFill(UnitManager target, int fromHp, int toHp, bool emitLogs = true)
+    private IEnumerator AnimateHpRecoverFill(UnitManager target, int fromHp, int toHp, bool emitLogs = true)
     {
         if (target == null)
             yield break;
@@ -1055,7 +1055,7 @@ public partial class TurnStateManager
             showDetectedIndicator: ResolveDetectedIndicatorForHud(unit));
     }
 
-    private static void EnsureFuelHudReadyForAnimation(UnitManager unit, bool emitLogs = true)
+    private void EnsureFuelHudReadyForAnimation(UnitManager unit, bool emitLogs = true)
     {
         if (unit == null)
             return;
@@ -1118,6 +1118,7 @@ public partial class TurnStateManager
         bool visualReenable = reenabledCanvas || reenabledImages || reenabledTexts;
         if (emitLogs && (structuralActivation || (unit.IsEmbarked && visualReenable)))
             Debug.Log($"[FuelAnim] Reativado HUD para animacao: unidade={unit.name} | hud={(reactivatedHud ? "on" : "ok")} | fuel_container={(reactivatedFuelContainer ? "on" : "ok")} | canvas={(reenabledCanvas ? "on" : "ok")} | img={(reenabledImages ? "on" : "ok")} | txt={(reenabledTexts ? "on" : "ok")}");
+        ReapplyForcedUnitVisualForFog(unit);
     }
 
     private float GetSupplySpawnInterval()
@@ -1489,6 +1490,7 @@ public partial class TurnStateManager
         UpdateSupplyPreviewFromCurrentContext();
 
         bool shouldShow =
+            !ShouldSuppressAiActionPreviewLines() &&
             CurrentCursorState == CursorState.Suprindo &&
             (supplyQueuedOrders.Count > 0 || scannerPromptStep == ScannerPromptStep.MergeConfirm);
         if (!shouldShow)
@@ -1746,6 +1748,7 @@ public partial class TurnStateManager
 
     private void SetSupplyPreviewVisible(bool visible)
     {
+        visible = visible && !ShouldSuppressAiActionPreviewLines();
         for (int i = 0; i < supplyPreviewRenderers.Count; i++)
         {
             LineRenderer renderer = supplyPreviewRenderers[i];
@@ -1765,6 +1768,7 @@ public partial class TurnStateManager
 
     private void SetSupplyQueuedPreviewVisible(bool visible)
     {
+        visible = visible && !ShouldSuppressAiActionPreviewLines();
         for (int i = 0; i < supplyQueuePreviewTracks.Count; i++)
         {
             SupplyQueuePreviewTrack track = supplyQueuePreviewTracks[i];
@@ -2242,7 +2246,7 @@ public partial class TurnStateManager
         return true;
     }
 
-    private static void RestoreTransporterHudVisibility(HashSet<UnitManager> hiddenTransporterHudSet)
+    private void RestoreTransporterHudVisibility(HashSet<UnitManager> hiddenTransporterHudSet)
     {
         if (hiddenTransporterHudSet == null || hiddenTransporterHudSet.Count <= 0)
             return;
@@ -2252,7 +2256,7 @@ public partial class TurnStateManager
         hiddenTransporterHudSet.Clear();
     }
 
-    private static void ShowEmbarkedPassengerForSupply(UnitManager passenger, UnitManager supplier)
+    private void ShowEmbarkedPassengerForSupply(UnitManager passenger, UnitManager supplier)
     {
         if (passenger == null || supplier == null || !passenger.IsEmbarked || passenger.EmbarkedTransporter != supplier)
             return;
@@ -2317,6 +2321,7 @@ public partial class TurnStateManager
                 showTransportIndicator: false,
                 showDetectedIndicator: ResolveDetectedIndicatorForHud(passenger));
         }
+        ReapplyForcedUnitVisualForFog(passenger);
     }
 
     private static Transform FindChildRecursive(Transform parent, string childName)

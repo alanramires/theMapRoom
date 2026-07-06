@@ -740,7 +740,6 @@ public partial class TurnStateManager
             if (passenger == null)
                 continue;
 
-            passenger.SetFogOfWarVisibility(true);
             // Passageiro nasce exatamente na coordenada atual do transportador.
             passenger.SetCurrentCellPosition(transporterCellForSpawn, enforceFinalOccupancyRule: false);
             if (passenger.TryGetUnitData(out UnitData passengerDataAtSpawn) && passengerDataAtSpawn != null && passengerDataAtSpawn.IsAircraft())
@@ -751,6 +750,7 @@ public partial class TurnStateManager
             passenger.SetTemporarySortingOrder(1000 + i);
             // Evita mostrar lock de "ja agiu" durante o spawn/movimento.
             passenger.ResetActed();
+            ReapplyForcedUnitVisualForFog(passenger);
             runtimeOrders.Add(new DisembarkRuntimeOrder
             {
                 passenger = passenger,

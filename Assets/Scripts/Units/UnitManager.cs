@@ -337,8 +337,22 @@ public class UnitManager : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (Application.isPlaying)
+        {
+            TryAutoAssignMatchController();
+            if (matchController != null && matchController.ShouldHideActiveAiActionPresentation())
+            {
+                bool visible = matchController.ShouldShowActiveAiUnitAt(
+                    this,
+                    transform.position,
+                    allowReveal: true);
+                ForceFogOfWarPresentationVisibility(visible);
+            }
+            return;
+        }
+
 #if UNITY_EDITOR
-        if (Application.isPlaying || !autoSnapWhenMovedInEditor)
+        if (!autoSnapWhenMovedInEditor)
             return;
 
         if (boardTilemap == null)
@@ -835,6 +849,22 @@ public class UnitManager : MonoBehaviour
         {
             TurnStateManager.NotifyUnitRevealedFromFog(this);
         }
+    }
+
+    public void ForceFogOfWarPresentationVisibility(bool visible)
+    {
+        hiddenByFogOfWar = !visible;
+        if (visible)
+        {
+            ApplyFogOfWarVisibility();
+            return;
+        }
+
+        StopSelectionBlinkRoutine();
+        isSelected = false;
+        SetSpriteVisible(false);
+        SetHudVisible(false);
+        SetOwnedUiVisualsVisible(false);
     }
 
     public void ResetActed()
@@ -2855,6 +2885,7 @@ public class UnitManager : MonoBehaviour
             if (actedLockRenderer != null)
                 actedLockRenderer.enabled = false;
 
+            ApplyFogOfWarVisibility();
             return;
         }
 
@@ -2890,6 +2921,8 @@ public class UnitManager : MonoBehaviour
 
         if (actedLockRenderer != null)
             actedLockRenderer.enabled = false;
+
+        ApplyFogOfWarVisibility();
     }
 
     private Color ResolvePreviewDimmedColor(Color baseColor)

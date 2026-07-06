@@ -114,8 +114,13 @@ public partial class TurnStateManager
     private void HandleMovementAnimationCompleted(CursorState onCompleteState)
     {
         LogStateStep($"HandleMovementAnimationCompleted(target={onCompleteState})", rollback: onCompleteState == CursorState.UnitSelected);
+        if (matchController != null && matchController.ShouldHideActiveAiActionPresentation())
+            matchController.RefreshFogOfWarForActiveTeam();
         if (selectedUnit != null)
+        {
             animationManager?.ApplySelectionVisual(selectedUnit);
+            ReapplyForcedUnitVisualForFog(selectedUnit);
+        }
 
         if (onCompleteState == CursorState.UnitSelected)
         {
@@ -512,7 +517,6 @@ public partial class TurnStateManager
         cursorController.PlayUnitMovementSfx(unit.GetMovementCategory());
     }
 }
-
 
 
 

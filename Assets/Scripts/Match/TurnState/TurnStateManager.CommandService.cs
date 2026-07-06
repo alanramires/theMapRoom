@@ -1466,7 +1466,7 @@ public partial class TurnStateManager
         }
     }
 
-    private static void SetSupplierHudVisibleForCommandSource(UnitManager supplier, bool visible)
+    private void SetSupplierHudVisibleForCommandSource(UnitManager supplier, bool visible)
     {
         if (supplier == null)
             return;
@@ -1495,9 +1495,10 @@ public partial class TurnStateManager
             supplier.GetHeightLevel(),
             showTransportIndicator,
             showDetectedIndicator: ResolveDetectedIndicatorForHud(supplier));
+        ReapplyForcedUnitVisualForFog(supplier);
     }
 
-    private static void RefreshTransporterHudAfterCommandService(HashSet<UnitManager> touchedSupplierUnits)
+    private void RefreshTransporterHudAfterCommandService(HashSet<UnitManager> touchedSupplierUnits)
     {
         if (touchedSupplierUnits == null || touchedSupplierUnits.Count <= 0)
             return;

@@ -770,7 +770,9 @@ public class CameraController : MonoBehaviour
             _matchController = FindAnyObjectByType<MatchController>();
 
         return _matchController != null &&
+               _matchController.IsFogOfWarDebugEnabled &&
                _matchController.GameSetup == MatchController.GameSetupPreset.FogOfWarTotal &&
+               !_matchController.IsFogOfWarDebugPartial &&
                _matchController.IsActiveTeamAI();
     }
 

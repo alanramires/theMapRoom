@@ -149,8 +149,10 @@ public class PanelRemainingController : MonoBehaviour
             matchController.GetTeamUnitCounts(activeTeam, out _, out readyToAct, includeEmbarked: false);
         }
 
-        string nextActual = $"{Mathf.Max(0, readyToAct)}";
-        string nextMax = $"/{Mathf.Max(0, totalInField)}";
+        bool hideAiUnitCounts = matchController != null &&
+                                matchController.ShouldHideActiveAiActionPresentation();
+        string nextActual = hideAiUnitCounts ? "?" : $"{Mathf.Max(0, readyToAct)}";
+        string nextMax = hideAiUnitCounts ? "/ ?" : $"/{Mathf.Max(0, totalInField)}";
         string nextCap = matchController != null ? matchController.MaxUnitsPerTeam.ToString() : "0";
         Color teamColor = TeamUtils.GetColor(activeTeam);
 

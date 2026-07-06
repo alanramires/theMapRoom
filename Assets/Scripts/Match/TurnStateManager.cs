@@ -165,6 +165,17 @@ public partial class TurnStateManager : MonoBehaviour
     public Tilemap MovementTilemapRef => terrainTilemap != null
         ? terrainTilemap
         : cursorController != null ? cursorController.BoardTilemap : null;
+    private void ReapplyForcedUnitVisualForFog(UnitManager unit)
+    {
+        if (unit == null || matchController == null || !matchController.ShouldHideActiveAiActionPresentation())
+            return;
+
+        bool visible = matchController.ShouldShowActiveAiUnitAt(
+            unit,
+            unit.transform.position,
+            allowReveal: true);
+        unit.ForceFogOfWarPresentationVisibility(visible);
+    }
     public WeaponPriorityData WeaponPriorityDataRef => weaponPriorityData;
     public DPQMatchupDatabase DpqMatchupDatabaseRef => dpqMatchupDatabase;
     public RPSDatabase RpsDatabaseRef => rpsDatabase;

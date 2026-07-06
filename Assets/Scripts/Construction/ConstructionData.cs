@@ -35,6 +35,8 @@ public class ConstructionData : ScriptableObject
     public bool isAirport = false;
     [Tooltip("Marca esta construcao como porto real para prioridades de IA e regras navais.")]
     public bool isHarbor = false;
+    [Tooltip("Cidade mantem renda integral para a IA mesmo no modo Easy.")]
+    public bool isCity = false;
 
     [Header("Visuals")]
     [FormerlySerializedAs("sprite")]

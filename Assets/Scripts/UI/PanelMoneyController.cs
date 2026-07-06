@@ -59,6 +59,7 @@ public class PanelMoneyController : MonoBehaviour
     private CursorController cursorController;
     private bool hqShortcutBound;
     private TeamId lastHqShortcutTeam = (TeamId)int.MinValue;
+    private bool economyDetailsHidden;
 
     public static void PushContextualUpdate(TeamId team, int resultingMoney, string label, int delta)
     {
@@ -322,9 +323,12 @@ public class PanelMoneyController : MonoBehaviour
             }
         }
 
-        string nextValue = $"{prefix}{FormatWithThousandsDots(money)}";
-        string nextIncoming = $"{incoming} / turn";
+        bool hideEconomy = ShouldHideActiveAiEconomy();
+        string nextValue = hideEconomy ? $"{prefix}----" : $"{prefix}{FormatWithThousandsDots(money)}";
+        string nextIncoming = hideEconomy ? "---- / turn" : $"{incoming} / turn";
         Color nextColor = ResolveTextColor(activeTeam);
+
+        RefreshEconomyDetailsPrivacy(hideEconomy);
 
         if (!force && nextValue == lastRenderedValue && nextColor == lastRenderedColor && nextIncoming == lastRenderedIncoming)
             return;
@@ -401,7 +405,7 @@ public class PanelMoneyController : MonoBehaviour
         }
 
         int delta = currentMoney - previousMoney;
-        if (delta != 0)
+        if (delta != 0 && !ShouldHideActiveAiEconomy())
             ShowMoneyUpdate(string.Empty, delta);
 
         knownMoneyByTeam[activeTeam] = currentMoney;
@@ -432,8 +436,37 @@ public class PanelMoneyController : MonoBehaviour
             return;
         if (delta == 0)
             return;
+        if (ShouldHideActiveAiEconomy())
+            return;
 
         ShowMoneyUpdate(label, delta);
+    }
+
+    private bool ShouldHideActiveAiEconomy()
+    {
+        return matchController != null && matchController.ShouldHideActiveAiActionPresentation();
+    }
+
+    private void RefreshEconomyDetailsPrivacy(bool hidden)
+    {
+        if (hidden)
+        {
+            InterruptMoneyUpdateFade();
+            if (textUpdate != null)
+            {
+                textUpdate.text = "Informação oculta";
+                textUpdate.color = Color.white;
+                textUpdate.enabled = true;
+            }
+            economyDetailsHidden = true;
+            return;
+        }
+
+        if (!economyDetailsHidden)
+            return;
+
+        economyDetailsHidden = false;
+        SetUpdateTextVisible(false);
     }
 
     private void ShowMoneyUpdate(string label, int delta)

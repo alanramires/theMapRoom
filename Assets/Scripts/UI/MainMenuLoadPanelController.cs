@@ -190,6 +190,9 @@ public class MainMenuLoadPanelController : MonoBehaviour
         lastOpenFrame = Time.frameCount;
 
         ResolveReferences();
+        // Se o assistente de novo jogo (ESCOLHA SUA COR, etc.) estiver aberto, fecha o
+        // painel dele ao entrar em Carregar Jogo — senao os dois ficam disputando o panel_helper.
+        panelMenu?.CloseNewGameWizardIfOpen();
         RefreshSlotButtonsInteractable();
         CancelDeleteConfirmation(playCancelSfx: false);
         SetLoadPanelHidden(false);

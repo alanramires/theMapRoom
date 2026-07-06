@@ -146,7 +146,8 @@ public partial class TurnStateManager
 
     private void UpdateTransferPromptPreview()
     {
-        bool shouldShow = IsTransferPromptActive() &&
+        bool shouldShow = !ShouldSuppressAiActionPreviewLines() &&
+                          IsTransferPromptActive() &&
                           !transferExecutionInProgress &&
                           selectedUnit != null &&
                           transferPromptSelectedIndex >= 0 &&
@@ -685,6 +686,7 @@ public partial class TurnStateManager
 
     private void SetTransferPreviewVisible(bool visible)
     {
+        visible = visible && !ShouldSuppressAiActionPreviewLines();
         for (int i = 0; i < transferPreviewRenderers.Count; i++)
         {
             LineRenderer renderer = transferPreviewRenderers[i];

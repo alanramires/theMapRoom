@@ -4,6 +4,15 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
+// Nivel de dificuldade escolhido na Tela de Entrada. Mapeia direto para os flags
+// easyMode/hardMode do AIController (a mecanica ja esta pronta em cima desses flags).
+public enum AIDifficulty
+{
+    Facil,
+    Normal,
+    Dificil
+}
+
 /// <summary>
 // Controla a IA Global, incluindo a execu��o do plano de objetivos, compras, movimenta��o e combate.
 
@@ -32,6 +41,31 @@ public partial class AIController : MonoBehaviour
     [Tooltip("Modo difícil. Por enquanto: dobra os slots de capturador por setor e habilita os limites/banimentos espec�ficos de hard mode (log�stica e unidades banidas).")]
     [SerializeField] private bool hardMode = false;
     public bool HardMode => hardMode;
+
+    [Tooltip("Modo facil: a IA recebe 1/3 da renda de construcoes que nao sejam cidades. Ignorado quando Hard Mode esta ligado.")]
+    [SerializeField] private bool easyMode = false;
+    public bool EasyMode => easyMode && !hardMode;
+
+    // Aplica a dificuldade escolhida na Tela de Entrada. Facil e Dificil sao mutuamente
+    // exclusivos; Normal desliga ambos os flags.
+    public void ApplyDifficulty(AIDifficulty difficulty)
+    {
+        switch (difficulty)
+        {
+            case AIDifficulty.Facil:
+                easyMode = true;
+                hardMode = false;
+                break;
+            case AIDifficulty.Dificil:
+                easyMode = false;
+                hardMode = true;
+                break;
+            default:
+                easyMode = false;
+                hardMode = false;
+                break;
+        }
+    }
 
     [Header("AI Stage Emulation")]
     [Tooltip("O core da IA pode ser testado em diferentes est�gios")]

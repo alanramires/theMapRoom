@@ -1204,7 +1204,10 @@ public class BattleMapMenuRootController : MonoBehaviour
         TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
         int turnNumber = matchController != null ? matchController.CurrentTurn : 0;
         int money = matchController != null ? matchController.GetActualMoney(activeTeam) : 0;
-        string message = $"Status da partida\nRodada: {turnNumber}\nTime ativo: {TeamUtils.GetName(activeTeam)}\nTesouro: ${Mathf.Max(0, money)}";
+        string treasury = matchController != null && matchController.ShouldHideActiveAiActionPresentation()
+            ? "----"
+            : Mathf.Max(0, money).ToString();
+        string message = $"Status da partida\nRodada: {turnNumber}\nTime ativo: {TeamUtils.GetName(activeTeam)}\nTesouro: ${treasury}";
         PanelDialogController.TrySetExternalText(message + "\nESC: voltar");
     }
 
