@@ -121,6 +121,7 @@ public partial class TurnStateManager
 
                 if (operationType == PodeCapturarSensor.CaptureOperationType.CaptureEnemy)
                 {
+                    TeamId previousOwnerTeam = targetConstruction.TeamId;
                     targetConstruction.SetTeamId(capturer.TeamId);
                     targetConstruction.SetCurrentCapturePoints(targetConstruction.CapturePointsMax);
                     captureCompletedForReplay = true;
@@ -128,6 +129,9 @@ public partial class TurnStateManager
                     RuntimeLog(
                         $"[Captura] Construcao capturada por {TeamUtils.GetName(capturer.TeamId)}. " +
                         $"Capture resetado para {targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}.");
+
+                    // Captura de QG encerra o jogo para o antigo dono (humano ou IA passam por aqui).
+                    matchController?.NotifyConstructionCaptured(targetConstruction, previousOwnerTeam, capturer.TeamId);
                 }
                 else
                 {

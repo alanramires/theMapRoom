@@ -319,7 +319,9 @@ public class BattleMapMenuRootController : MonoBehaviour
                 return true;
             }
 
-            if (!WasCancelRequestedThisFrame())
+            bool cancelShortcut = WasCancelShortcutPressedThisFrame();
+            bool rightClickCancel = cursorController != null && cursorController.WasRightClickCancelTapThisFrame;
+            if (!cancelShortcut && !rightClickCancel)
                 return false;
 
             if (suppressMenuOpenFrame == Time.frameCount)
@@ -333,9 +335,17 @@ public class BattleMapMenuRootController : MonoBehaviour
             if (cursorController != null && cursorController.IsEndTurnConfirmationPending)
                 return false;
 
+            bool aiTurn = matchController != null && matchController.IsPlayerInputLockedByActiveAI();
+
+            // Durante o turno da IA, o clique direito NUNCA abre nem agenda o menu — mesmo sendo o
+            // equivalente do ESC. So o ESC/Backspace pode pausar a simulacao e abrir. Sem esta guarda,
+            // um Rclick numa janela Neutral entre batches da IA (CanOpenMenuNow() == true) cairia
+            // direto no OpenMenu() logo abaixo.
+            if (aiTurn && !cancelShortcut)
+                return false;
+
             if (!CanOpenMenuNow())
             {
-                bool aiTurn = matchController != null && matchController.IsPlayerInputLockedByActiveAI();
                 if (!aiTurn)
                     return false;
 

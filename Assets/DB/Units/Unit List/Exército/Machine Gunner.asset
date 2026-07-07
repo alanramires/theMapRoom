@@ -13,15 +13,15 @@ MonoBehaviour:
   m_Name: Machine Gunner
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
   id: machinegun
-  displayName: Machine Gunner
+  displayName: Metranca
   apelido: MG
   description: "Unidade defesiva de infantaria. Capaz de disparar sua metralhadora
     a distancia e segurar posi\xE7\xF5es em montanha."
   spriteDefault: {fileID: 21300000, guid: 7a907eaea1ab79841900f85802c76f8b, type: 3}
   teamVariantSprites: []
   maxHP: 10
-  defense: 11
-  armorClass: 0
+  defense: 12
+  armorClass: 1
   movement: 2
   visao: 3
   visionSpecializations: []

@@ -130,6 +130,8 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool atalhoContextual = false;
     [Tooltip("Se false, o time com 0 unidades nao e eliminado automaticamente. Util para testes sem unidades.")]
     [SerializeField] private bool allowDefeatForZeroUnits = true;
+    [Tooltip("Se true, capturar o QG (isPlayerHeadQuarter) de um time o elimina imediatamente e pode encerrar a partida.")]
+    [SerializeField] private bool allowDefeatForHeadQuarterCapture = true;
     [SerializeField, Min(1)] private int maxUnitsPerTeam = 40;
     [Header("Tutorial")]
     [Tooltip("Tutorial ativo desta partida. Nulo = sandbox/campanha sem tutorial guiado.")]
@@ -784,6 +786,11 @@ public class MatchController : MonoBehaviour
                 AutoComputeFlipXFromHqPositions();
             ResetUnfundedStartMoneyFlagsForFreshMatch();
             ApplyActiveTeamIfChanged(force: true);
+            // Hard-code de observacao: em partidas AI vs AI, mantenha a apresentacao
+            // de debug equivalente ao comando `fow partial` para acompanharmos ambos
+            // os times em suas proprias perspectivas.
+            if (AreAllPlayerSlotsAI())
+                SetFogOfWarDebugPartial();
             TryAutoAssignTurnTransitionReferences();
             matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);
             
@@ -799,6 +806,26 @@ public class MatchController : MonoBehaviour
         }
         TryBootstrapInitialStealthDetection();
         RunTurnStartStillObservedForActiveTeamStealthUnits();
+    }
+
+    private bool AreAllPlayerSlotsAI()
+    {
+        if (players == null)
+            return false;
+
+        int participatingSlots = 0;
+        for (int i = 0; i < players.Count; i++)
+        {
+            PlayerEntry player = players[i];
+            if (player.teamId == TeamId.Neutral)
+                continue;
+
+            participatingSlots++;
+            if (!player.isAI)
+                return false;
+        }
+
+        return participatingSlots >= 2;
     }
 
 #if UNITY_EDITOR
@@ -1412,7 +1439,7 @@ public class MatchController : MonoBehaviour
 
         hasVictoryWinner = true;
         victoryWinnerTeam = activeTeam;
-        HandleVictoryAestheticPresentation(activeTeam, goal);
+        HandleVictoryAestheticPresentation(activeTeam, TeamId.Neutral, VictoryReason.VictoryStars);
     }
 
     public void DeclareTutorialVictory(TutorialData tutorial = null)
@@ -1561,6 +1588,50 @@ public class MatchController : MonoBehaviour
         return true;
     }
 
+    // Chamado do ponto unico de conclusao de captura (ExecuteCaptureSequence), valido tanto para o
+    // jogador humano quanto para a IA (que captura pelo mesmo caminho via Automation ->
+    // HandleCaptureActionRequested). Se o alvo for um QG, o antigo dono e eliminado na hora e o
+    // capturador vence imediatamente (mesmo com outros jogadores/IA ainda em jogo).
+    public void NotifyConstructionCaptured(ConstructionManager construction, TeamId previousOwner, TeamId newOwner)
+    {
+        if (!Application.isPlaying || hasVictoryWinner)
+            return;
+        if (!allowDefeatForHeadQuarterCapture)
+            return;
+        if (construction == null || !IsHeadQuarterConstruction(construction))
+            return;
+        if (previousOwner == TeamId.Neutral || previousOwner == newOwner)
+            return;
+
+        if (!MarkTeamDefeated(previousOwner, "QG capturado"))
+            return;
+
+        Debug.Log($"[Match] QG de {TeamUtils.GetName(previousOwner)} capturado por {TeamUtils.GetName(newOwner)}. Time eliminado.");
+        // O primeiro a capturar um QG vence na hora, mesmo com outros jogadores em jogo.
+        DeclareEliminationVictory(newOwner, previousOwner, VictoryReason.HeadQuarterCaptured);
+    }
+
+    // Marca um time como derrotado por qualquer condicao (QG capturado, rendicao, etc.): neutraliza
+    // suas construcoes e dispara OnTeamDefeated. A checagem de 0 unidades tem seu proprio caminho
+    // (TryDefeatTeamIfZeroUnits) por causa do pre-requisito de contagem de unidades.
+    private bool MarkTeamDefeated(TeamId team, string reasonLabel)
+    {
+        int playerIndex = FindPlayerEconomyIndex(team);
+        if (playerIndex < 0 || players == null || playerIndex >= players.Count)
+            return false;
+        if (players[playerIndex].defeated)
+            return false;
+
+        PlayerEntry entry = players[playerIndex];
+        entry.defeated = true;
+        players[playerIndex] = entry;
+
+        NeutralizeConstructionsOwnedByTeam(team);
+        Debug.Log($"[Match] Team {TeamUtils.GetName(team)} derrotado ({reasonLabel}). Construcoes neutralizadas.");
+        OnTeamDefeated?.Invoke(team);
+        return true;
+    }
+
     private void NeutralizeConstructionsOwnedByTeam(TeamId defeatedTeam)
     {
         List<ConstructionManager> constructions = GetActiveConstructionsOnScene();
@@ -1598,8 +1669,61 @@ public class MatchController : MonoBehaviour
 
         hasVictoryWinner = true;
         victoryWinnerTeam = winner;
-        HandleVictoryAestheticPresentation(winner, 0);
+        HandleVictoryAestheticPresentation(winner, TeamId.Neutral, VictoryReason.ArmyEliminated);
         return true;
+    }
+
+    // Regra: o PRIMEIRO a eliminar um jogador (capturando o QG ou destruindo o exercito por
+    // inteiro) vence na hora, mesmo que ainda restem outros jogadores/IA. O vencedor e o time
+    // que executou a eliminacao.
+    private bool DeclareEliminationVictory(TeamId winnerTeam, TeamId defeatedTeam, VictoryReason reason)
+    {
+        if (hasVictoryWinner)
+            return true;
+        if (winnerTeam == TeamId.Neutral || winnerTeam == defeatedTeam)
+            return false;
+
+        hasVictoryWinner = true;
+        victoryWinnerTeam = winnerTeam;
+        HandleVictoryAestheticPresentation(winnerTeam, defeatedTeam, reason);
+        return true;
+    }
+
+    // Atribui a eliminacao por 0 unidades a quem estava agindo (time ativo). Se nao der para
+    // atribuir (ex.: o time comeca o turno ja sem unidades), cai no primeiro oponente vivo.
+    private TeamId ResolveEliminatorTeamFor(TeamId defeatedTeam)
+    {
+        TeamId active = ClampToTeamId(activeTeamId);
+        if (active != TeamId.Neutral && active != defeatedTeam && !IsTeamDefeated(active))
+            return active;
+
+        if (players != null)
+        {
+            for (int i = 0; i < players.Count; i++)
+            {
+                if (!players[i].defeated && players[i].teamId != defeatedTeam && players[i].teamId != TeamId.Neutral)
+                    return players[i].teamId;
+            }
+        }
+        return TeamId.Neutral;
+    }
+
+    // Time controlado por humano (nao IA, nao neutro).
+    private bool IsHumanTeam(TeamId team)
+    {
+        return team != TeamId.Neutral && !IsPlayerAI(team);
+    }
+
+    private bool AnyHumanPlayerExists()
+    {
+        if (players == null)
+            return false;
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (!players[i].isAI && players[i].teamId != TeamId.Neutral)
+                return true;
+        }
+        return false;
     }
 
     private void HandleUnitDestroyed(UnitManager unit)
@@ -1614,8 +1738,12 @@ public class MatchController : MonoBehaviour
         if (unit.TeamId == TeamId.Neutral)
             return;
 
-        TryDefeatTeamIfZeroUnits(unit.TeamId);
-        TryDeclareLastStandingWinner();
+        TeamId defeatedTeam = unit.TeamId;
+        if (TryDefeatTeamIfZeroUnits(defeatedTeam))
+        {
+            // O primeiro a destruir por completo o exercito de um jogador vence na hora.
+            DeclareEliminationVictory(ResolveEliminatorTeamFor(defeatedTeam), defeatedTeam, VictoryReason.ArmyEliminated);
+        }
     }
 
     private void NormalizeState()
@@ -1816,19 +1944,62 @@ public class MatchController : MonoBehaviour
         return Mathf.Clamp(value, 1, MaxVictoryStarsGoal);
     }
 
-    private void HandleVictoryAestheticPresentation(TeamId winnerTeam, int goal)
+    private enum VictoryReason
     {
-        string winnerLabel = TeamUtils.GetName(winnerTeam);
-        Debug.Log($"[VictoryStars] Vitoria de {winnerLabel}: meta de {goal} estrela(s) atingida.");
+        HeadQuarterCaptured,
+        ArmyEliminated,
+        Surrender,
+        VictoryStars
+    }
+
+    private void HandleVictoryAestheticPresentation(TeamId winnerTeam, TeamId defeatedTeam, VictoryReason reason)
+    {
+        Debug.Log($"[Victory] Vitoria de {TeamUtils.GetName(winnerTeam)} " +
+                  $"({reason}{(defeatedTeam != TeamId.Neutral ? $" | derrotado: {TeamUtils.GetName(defeatedTeam)}" : string.Empty)}).");
 
         TryAutoAssignTurnTransitionReferences();
         if (matchMusicAudioManager != null)
             matchMusicAudioManager.StopPlaybackPermanently();
 
-        CursorController cursor = FindAnyObjectByType<CursorController>();
-        cursor?.PlayVictorySfx();
+        // Resultado do ponto de vista do humano local: se o vencedor for humano -> VITORIA;
+        // se quem venceu foi IA e existe humano na partida -> aquele humano perdeu (DERROTA).
+        bool humanLost = !IsHumanTeam(winnerTeam) && AnyHumanPlayerExists();
 
-        string reason = goal > 0 ? "CAPTURA DO QG" : "EXÉRCITO OPONENTE ELIMINADO";
+        CursorController cursor = FindAnyObjectByType<CursorController>();
+        if (humanLost)
+            cursor?.PlayDefeatSfx();
+        else
+            cursor?.PlayVictorySfx();
+
+        Color winnerColor = TeamUtils.GetColor(winnerTeam);
+        string coloredWinner = $"TIME {ColorizeTeamName(winnerTeam)}";
+
+        // O motivo cita o time derrotado pintado com a cor dele (mesmo texto para vitoria/derrota;
+        // o que muda e o titulo VITORIA!/DERROTA!).
+        string descricao = coloredWinner;
+        if (defeatedTeam != TeamId.Neutral)
+        {
+            string coloredLoser = ColorizeTeamName(defeatedTeam);
+            string motivo;
+            switch (reason)
+            {
+                case VictoryReason.HeadQuarterCaptured: motivo = $"QG {coloredLoser} CAPTURADO"; break;
+                case VictoryReason.Surrender:           motivo = $"RENDIÇÃO DO TIME {coloredLoser}"; break;
+                default:                                motivo = $"EXÉRCITO {coloredLoser} DERROTADO"; break;
+            }
+            descricao = $"{coloredWinner} — {motivo}";
+        }
+        else if (reason == VictoryReason.VictoryStars)
+        {
+            descricao = $"{coloredWinner} — PONTOS DE VITÓRIA";
+        }
+
+        // Titulo: cor do vencedor na vitoria; cor do time derrotado (o proprio humano) na derrota.
+        string titulo = humanLost ? "DERROTA!" : "VITÓRIA!";
+        Color tituloColor = humanLost
+            ? (defeatedTeam != TeamId.Neutral ? TeamUtils.GetColor(defeatedTeam) : new Color(0.85f, 0.25f, 0.25f))
+            : winnerColor;
+
         foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
         {
             if (go.name == "Panel_vitoria" && go.scene.IsValid())
@@ -1837,11 +2008,27 @@ public class MatchController : MonoBehaviour
                 foreach (TMPro.TMP_Text t in go.GetComponentsInChildren<TMPro.TMP_Text>(includeInactive: true))
                 {
                     if (t.name == "text_descricao")
-                        t.text = $"TIME {(winnerLabel ?? string.Empty).ToUpperInvariant()} — {reason}";
+                    {
+                        t.richText = true;
+                        t.text = descricao;
+                    }
+                    else if (t.name == "text_vitoria")
+                    {
+                        t.text = titulo;
+                        t.color = tituloColor;
+                    }
                 }
                 break;
             }
         }
+    }
+
+    // Nome do time em maiusculas, pintado com a cor do time via rich text do TMP.
+    private static string ColorizeTeamName(TeamId team)
+    {
+        string name = (TeamUtils.GetName(team) ?? string.Empty).ToUpperInvariant();
+        string hex = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(team));
+        return $"<color=#{hex}>{name}</color>";
     }
 
     private void SyncActivePlayerIndexFromActiveTeam()
@@ -2103,7 +2290,7 @@ public class MatchController : MonoBehaviour
             TeamId activeTeam = ClampToTeamId(activeTeamId);
             if (TryDefeatTeamIfZeroUnits(activeTeam))
             {
-                TryDeclareLastStandingWinner();
+                DeclareEliminationVictory(ResolveEliminatorTeamFor(activeTeam), activeTeam, VictoryReason.ArmyEliminated);
                 return;
             }
         }
@@ -3459,28 +3646,21 @@ public class MatchController : MonoBehaviour
         if (hasVictoryWinner)
             return;
 
+        // Rendicao e mais uma condicao de derrota: entra no mesmo ciclo de eliminacao/vitoria.
+        // Quem se rende e o jogador ativo (dono do menu). Ele e marcado como derrotado e o vencedor
+        // vira o primeiro oponente vivo — a apresentacao unica mostra DERROTA! para o humano.
+        TeamId surrenderingTeam = ClampToTeamId(activeTeamId);
+        if (surrenderingTeam != TeamId.Neutral)
+            MarkTeamDefeated(surrenderingTeam, "rendicao");
+
+        TeamId winner = ResolveEliminatorTeamFor(surrenderingTeam);
+        if (DeclareEliminationVictory(winner, surrenderingTeam, VictoryReason.Surrender))
+            return;
+
+        // Sem oponente vivo para coroar (config atipica): encerra como derrota simples.
         hasVictoryWinner = true;
         victoryWinnerTeam = TeamId.Neutral;
-        matchMusicAudioManager?.StopPlaybackPermanently();
-        CursorController cursor = FindAnyObjectByType<CursorController>();
-        cursor?.PlayDefeatSfx();
-        PanelDialogController.TrySetExternalText("DERROTA! VOCÊ SE RENDEU.");
-
-        foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
-        {
-            if (go.name != "Panel_endGame" || !go.scene.IsValid())
-                continue;
-            go.SetActive(true);
-            TMPro.TMP_Text[] texts = go.GetComponentsInChildren<TMPro.TMP_Text>(true);
-            for (int i = 0; i < texts.Length; i++)
-            {
-                TMPro.TMP_Text txt = texts[i];
-                if (txt.name == "text_endgame") txt.text = "DERROTA!";
-                else if (txt.name == "text_descrição" || txt.name == "text_description" || txt.name == "txt_descricao")
-                    txt.text = "Você se rendeu";
-            }
-            break;
-        }
+        HandleVictoryAestheticPresentation(TeamId.Neutral, surrenderingTeam, VictoryReason.Surrender);
     }
 
     private bool IsUnitOnFriendlyConstruction(UnitManager unit, TeamId observerTeam, Tilemap boardMap)

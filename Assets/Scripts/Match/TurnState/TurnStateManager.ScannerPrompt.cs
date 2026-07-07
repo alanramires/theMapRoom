@@ -1183,9 +1183,21 @@ public partial class TurnStateManager
     private List<char> BuildNavigableSensorOptionCodes()
     {
         var options = new List<char>();
+
+        // Capturador: se "Capturar" (C) estiver disponivel, ela vai pro topo tanto na navegacao
+        // (setas) quanto no foco pre-selecionado (options[0], resolvido em EnsureSensorOptionFocusIsValid),
+        // batendo com a ordem do painel OPÇÕES. Para os demais papeis, ordem padrao.
+        bool capturerFirst = IsSelectedUnitPrimaryCapturer() &&
+                             availableSensorActionCodes != null &&
+                             availableSensorActionCodes.Contains('C');
+        if (capturerFirst)
+            options.Add('C');
+
         for (int i = 0; i < SensorOptionNavigationOrder.Length; i++)
         {
             char code = SensorOptionNavigationOrder[i];
+            if (capturerFirst && code == 'C')
+                continue; // ja adicionado no topo
             if (code == 'M' || (availableSensorActionCodes != null && availableSensorActionCodes.Contains(code)))
                 options.Add(code);
         }

@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StructureData
   id: road
   displayName: Rodovia
-  description: rodovia para veiculos +1 se full move
+  description: rodovia para veiculos +1 se full move (apenas unidades com 4 ou mais
+    de movimento)
   priorityOrder: 3
   domain: 0
   heightLevel: 3

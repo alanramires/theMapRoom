@@ -2418,10 +2418,17 @@ public partial class TurnStateManager
         data.Kind = HelperPanelKind.Sensors;
         if (isMovementSensorState)
         {
+            // Capturador: se "Capturar" estiver disponivel, sobe pro topo pra ser a primeira opcao
+            // (o proprio papel da unidade prioriza captura). Para os demais papeis, ordem padrao.
+            bool capturerFirst = IsSelectedUnitPrimaryCapturer();
+            if (capturerFirst)
+                TryAddSensorLine(data, 'C', "capture");
+
             TryAddSensorLine(data, 'A', "aim");
             TryAddSensorLine(data, 'E', "embark");
             TryAddSensorLine(data, 'D', "disembark");
-            TryAddSensorLine(data, 'C', "capture");
+            if (!capturerFirst)
+                TryAddSensorLine(data, 'C', "capture");
             TryAddSensorLine(data, 'F', "fuse");
             TryAddSensorLine(data, 'S', "supply");
             TryAddSensorLine(data, 'T', "transfer");
@@ -2461,6 +2468,15 @@ public partial class TurnStateManager
             actionCode = actionCode,
             sensorKey = sensorKey ?? string.Empty
         });
+    }
+
+    // Papel de composicao Capturador (inclui CapturadorAgressivo via ResolveCompositionRole).
+    // Usado para priorizar "Capturar" no topo do painel de opcoes do sensor.
+    private bool IsSelectedUnitPrimaryCapturer()
+    {
+        if (selectedUnit == null || !selectedUnit.TryGetUnitData(out UnitData data) || data == null)
+            return false;
+        return UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Capturador;
     }
 
     private bool TryBuildDisembarkHelperPanelData(HelperPanelData data)
