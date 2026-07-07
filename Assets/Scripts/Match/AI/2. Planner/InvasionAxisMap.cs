@@ -99,7 +99,9 @@ public class InvasionAxisMap
     }
 
     // Constroi o mapa de eixos do time. tilemap pode ser null (resolve automaticamente).
-    public static InvasionAxisMap Build(TeamId team, Tilemap tilemap = null)
+    // applyOverrides=false devolve a classificacao PURA (geometria), sem os overrides manuais —
+    // usado pelo inspector pra mostrar o "eixo automatico" que o override esta sobrepondo.
+    public static InvasionAxisMap Build(TeamId team, Tilemap tilemap = null, bool applyOverrides = true)
     {
         var map = new InvasionAxisMap { Team = team };
 
@@ -152,6 +154,17 @@ public class InvasionAxisMap
             foreach (ConstructionSector sec in axis.Corridor)
                 map.sectorToEixo[sec] = axis.EixoIndex;
             ComputeFront(axis, team);
+        }
+
+        // Override manual (designer, ConstructionManager.OverrideEixo): reclassifica setores forcados
+        // para o eixo escolhido, depois da numeracao. Escopado pelo SLOT deste leque (o indice do eixo
+        // e relativo ao leque de cada slot). Recomputa as frentes dos eixos afetados.
+        if (applyOverrides)
+        {
+            int teamSlot = -1;
+            foreach (ConstructionManager hq in allHqs)
+                if (hq != null && hq.TeamId == team) { teamSlot = hq.SlotIndex; break; }
+            map.ApplyEixoOverrides(board, team, teamSlot);
         }
 
         // 4o eixo: INVASAO (HQ -> QG inimigo). Append depois da numeracao (rally = 1..N, invasao = N+1).
@@ -337,6 +350,80 @@ public class InvasionAxisMap
     {
         return SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)
             && info != null && info.ControllingTeam == team;
+    }
+
+    // Aplica os overrides manuais de eixo (ConstructionManager.OverrideEixo), depois da numeracao.
+    // Para cada setor forcado: remove do corredor atual e, se o eixo-alvo (1..N) existe, insere no
+    // corredor dele em ordem de distancia ao HQ (mantem "sempre pra frente"). Override 0 ou eixo
+    // inexistente => fora de eixo (rogue). Setores de rally nao podem ser reatribuidos (sao o eixo).
+    private void ApplyEixoOverrides(Tilemap board, TeamId team, int teamSlot)
+    {
+        Dictionary<ConstructionSector, int> overrides = null;
+        foreach (ConstructionManager c in GetConstructions())
+        {
+            if (c == null || !c.HasEixoOverride) continue;
+            // Resolve a entrada da LISTA aplicavel a este slot (exato > -1). Sem entrada: nao mexe.
+            if (!c.TryGetEixoOverride(teamSlot, out int eixoForSlot)) continue;
+            ConstructionSector sec = c.Sector;
+            if (sec == ConstructionSector.None || ConstructionSectorHelper.IsBase(sec)) continue;
+            overrides ??= new Dictionary<ConstructionSector, int>();
+            if (!overrides.ContainsKey(sec)) // primeira construcao do setor com override vence
+                overrides[sec] = eixoForSlot;
+        }
+        if (overrides == null) return;
+
+        bool changed = false;
+        foreach (var kv in overrides)
+        {
+            ConstructionSector sec = kv.Key;
+            int target = kv.Value;
+
+            bool isRallySector = false;
+            foreach (Axis ax in axes)
+                if (ax.RallySector == sec) { isRallySector = true; break; }
+            if (isRallySector) continue; // o setor do rally define o eixo; nao reatribui
+
+            foreach (Axis ax in axes)
+                if (ax.Corridor.Remove(sec)) changed = true;
+            if (sectorToEixo.Remove(sec)) changed = true;
+
+            if (target <= 0) // forcar fora de eixo
+                continue;
+            if (!TryGetAxis(target, out Axis targetAxis)) // eixo inexistente: fica fora de eixo
+                continue;
+            InsertIntoCorridorByDistance(board, targetAxis, sec);
+            sectorToEixo[sec] = target;
+            changed = true;
+        }
+
+        if (changed)
+            foreach (Axis ax in axes)
+                ComputeFront(ax, team);
+    }
+
+    // Insere o setor no corredor mantendo a ordem por distancia (world) do HQ ao setor, igual ao
+    // BuildFan — o corredor precisa continuar do mais perto do HQ ao mais longe.
+    private static void InsertIntoCorridorByDistance(Tilemap board, Axis axis, ConstructionSector sec)
+    {
+        if (axis.Corridor.Contains(sec))
+            return;
+        if (board == null
+            || !SectorManager.TryGetSectorInfo(sec, out SectorManager.SectorInfo info) || info == null)
+        {
+            axis.Corridor.Add(sec);
+            return;
+        }
+        Vector3 hqW = board.GetCellCenterWorld(axis.HqCell);
+        float d = Vector2.Distance(hqW, board.GetCellCenterWorld(info.RepresentativeCell));
+        int idx = axis.Corridor.Count;
+        for (int i = 0; i < axis.Corridor.Count; i++)
+        {
+            float di = SectorManager.TryGetSectorInfo(axis.Corridor[i], out SectorManager.SectorInfo ci) && ci != null
+                ? Vector2.Distance(hqW, board.GetCellCenterWorld(ci.RepresentativeCell))
+                : float.MaxValue;
+            if (d < di) { idx = i; break; }
+        }
+        axis.Corridor.Insert(idx, sec);
     }
 
     private static ConstructionManager FindAxisHQ(List<ConstructionManager> hqs, ConstructionManager rally, int slot)

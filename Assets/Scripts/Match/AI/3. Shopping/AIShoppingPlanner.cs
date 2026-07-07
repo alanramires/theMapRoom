@@ -166,6 +166,9 @@ public partial class AIShoppingPlanner : MonoBehaviour
             preferDefensiveFireSupport = true;
             Debug.Log($"[AI Shopping] proactive_anti_air: SAM proativo activeAAAs={activeAAAs} activeSAMs={activeSAMs}/{maxSAMCap} â†’ slot fire_support defensivo aberto");
         }
+
+        // Hard: o primeiro elite terrestre é a peça de ruptura (MBT), não o Obus Médio.
+        // Defesa antiaérea emergencial continua podendo furar esta regra mais abaixo.
         ComputeGuaranteedBaseDefense(snapshot, out int baseArtSlots, out bool forceBaseAAA);
         if (baseArtSlots > 0)
         {
@@ -533,6 +536,19 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 eliteFireSupportTarget = samTarget;
                 Debug.Log($"[AI Shopping] proactive_anti_air: SAM target={samTarget.displayName} custo={samTarget.cost}");
             }
+        }
+        // Hard: o primeiro elite terrestre é a peça de ruptura (MBT), não o Obus Médio.
+        // Defesa antiaérea emergencial continua podendo furar esta regra mais abaixo.
+        if (AIController.Instance != null
+            && AIController.Instance.HardMode
+            && activeEliteAssaultCount == 0
+            && eliteAssaultTargetForReserve != null
+            && eliteFireSupportTarget != null
+            && !IsAntiAirOnlyUnit(eliteFireSupportTarget))
+        {
+            Debug.Log($"[AI Shopping] hard_blitz: adiando primeiro elite fire_support "
+                + $"{eliteFireSupportTarget.displayName}; prioridade={eliteAssaultTargetForReserve.displayName}");
+            eliteFireSupportTarget = null;
         }
         int activeFireSupportCount = CountActiveUnitsWithRole(snapshot, UnitRole.FogoIndireto, requirePrimary: false);
         bool criticalBaseAirThreat = aaaThreat || proactiveSAM || forceSAMBypass;

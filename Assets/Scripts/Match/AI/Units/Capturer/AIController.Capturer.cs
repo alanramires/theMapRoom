@@ -23,6 +23,11 @@ public partial class AIController
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
 
+        // Hard: a ponta de lança que já iniciou uma captura não fica terminando o prédio.
+        // Ela continua pelo mesmo eixo; outra infantaria fecha a captura atrás dela.
+        if (TryDecideHardBlitzkriegHandoff(unit, snapshot, plan, out PlayerAction blitzAction))
+            return blitzAction;
+
         // Swap: se um capturador mais forte do mesmo objetivo consegue chegar este turno,
         // cede o edificio e sai do caminho.
         if (plan != null)

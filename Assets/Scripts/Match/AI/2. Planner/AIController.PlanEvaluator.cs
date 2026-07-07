@@ -31,6 +31,11 @@ public partial class AIController
     private const float AxisStarvedCoverReward = 10f;
     // Diferenca minima de presenca (atual - alvo) para considerar o eixo-alvo faminto.
     private const int AxisStarvedPresenceGap = 2;
+    // Histerese: bonus (custo negativo) por reatribuir um capturador ao MESMO objetivo/setor que ele
+    // tinha no turno anterior. Evita que o otimizador global embaralhe quem ja estava a caminho de um
+    // setor (ex.: chegando em Charlie e ser mandado pra Bravo do outro lado). Forte o bastante pra
+    // vencer trocas globais marginais; distancia/necessidade real ainda podem quebrar. Dial de ajuste.
+    private const float PreviousObjectiveHysteresisBonus = 15f;
 
     // Hard Mode dobra a demanda de capturadores por setor, mas com teto proprio para
     // aumentar pressao territorial sem explodir setores grandes em demanda absurda de
@@ -50,6 +55,10 @@ public partial class AIController
     // Presenca por eixo (eixo 1..N -> nº de unidades do time com aquele aiEixo). Snapshot do
     // campo no inicio do BuildObjectivePlan, usado para decidir rebalanceamento de eixo.
     private Dictionary<int, int> currentEixoPresence;
+    // Setor do objetivo de cada unidade NO TURNO ANTERIOR (unitId -> nome do setor). Snapshot tirado
+    // no topo do BuildObjectivePlan, ANTES das liberacoes limparem o AIAssignedPlan. Usado pela
+    // histerese de atribuicao pra manter o capturador no objetivo pra onde ja estava indo.
+    private Dictionary<int, string> previousUnitObjectiveSectorName;
 
     // Garante que TODO objetivo de base inimiga no plano esteja marcado InvasionAttack — inclusive
     // os já existentes (criados antes desta marcação ou restaurados de save antigo), que o Passo 2c
@@ -78,6 +87,9 @@ public partial class AIController
         // Presenca por eixo (quantas unidades em cada eixo AGORA, incluindo as que vao dar
         // handoff). Construido antes dos releases para a contagem refletir o campo atual.
         BuildEixoPresence(aiTeam);
+        // Snapshot do objetivo anterior de cada unidade, ANTES das liberacoes deste turno limparem o
+        // AIAssignedPlan — a histerese usa isso pra nao arrancar quem ja estava a caminho do setor.
+        BuildPreviousObjectiveSnapshot(aiTeam);
         AIIntelReport intel = BuildPlanIntelReport(snapshot);
         AIRallyPlanContext rallyContext = BuildRallyPlanContext(
             aiTeam,
@@ -1644,8 +1656,10 @@ public partial class AIController
         if (unit == null || targetSector == ConstructionSector.None)
             return 0f;
 
-        // Estabilidade de eixo: soma-se a qualquer custo base de continuidade.
-        float axisCost = CalculateAxisStabilityCost(unit, targetSector);
+        // Estabilidade de eixo + histerese (manter o objetivo do turno anterior): somam-se a
+        // qualquer custo base de continuidade.
+        float axisCost = CalculateAxisStabilityCost(unit, targetSector)
+            + GetObjectiveHysteresisBonus(unit, targetSector);
 
         ConstructionSector originSector = ResolveUnitSectorForPlan(unit);
         if (originSector == ConstructionSector.None)
@@ -1709,6 +1723,35 @@ public partial class AIController
 
     private int GetEixoPresence(int eixo)
         => currentEixoPresence != null && currentEixoPresence.TryGetValue(eixo, out int c) ? c : 0;
+
+    private void BuildPreviousObjectiveSnapshot(TeamId aiTeam)
+    {
+        var map = new Dictionary<int, string>();
+        foreach (UnitManager u in UnitManager.AllActive)
+        {
+            if (u == null || u.TeamId != aiTeam || u.IsDead)
+                continue;
+            if (!u.AIHasAssignedPlan)
+                continue;
+            string sector = u.AIAssignedPlanName;
+            if (!string.IsNullOrEmpty(sector))
+                map[u.InstanceId] = sector;
+        }
+        previousUnitObjectiveSectorName = map;
+    }
+
+    // Bonus de histerese: negativo se `targetSector` e o mesmo objetivo/setor que a unidade tinha no
+    // turno anterior (mantem quem ja estava a caminho). 0 caso contrario.
+    private float GetObjectiveHysteresisBonus(UnitManager unit, ConstructionSector targetSector)
+    {
+        if (previousUnitObjectiveSectorName == null || unit == null
+            || targetSector == ConstructionSector.None)
+            return 0f;
+        return previousUnitObjectiveSectorName.TryGetValue(unit.InstanceId, out string prev)
+            && prev == targetSector.ToString()
+            ? -PreviousObjectiveHysteresisBonus
+            : 0f;
+    }
 
     private int GetAxisFrontPriorityBonus(ConstructionSector sector)
     {

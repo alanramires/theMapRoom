@@ -20,7 +20,9 @@ public partial class AIController
         foreach (UnitManager u in allCapturers)
             if (!assignedIds.Contains(u.InstanceId)) freeCapturers.Add(u);
 
-        if (freeCapturers.Count == 0) return;
+        // No Hard, a retaguarda pode j� estar preenchendo o segundo slot do mesmo objetivo.
+        // Portanto, aus�ncia de capturadores livres n�o significa aus�ncia de sucessor.
+        if (freeCapturers.Count == 0 && !hardMode) return;
 
         for (int i = 0; i < plan.Objectives.Count; i++)
         {
@@ -47,27 +49,68 @@ public partial class AIController
             Vector3Int targetCell = target.CurrentCellPosition; targetCell.z = 0;
             if (HasEnemyNearCell(targetCell, aiTeam)) continue;
 
+            // Blitzkrieg: a ponta de lança pode estar EM CIMA do prédio parcial, bloqueando a
+            // célula. Nesse caso o seguidor do eixo nunca "alcança" o alvo (célula ocupada) e o
+            // handoff era pulado — a ponta ficava terminando a captura. Se há Foxtrot à frente,
+            // aceitamos um seguidor que alcance um VIZINHO do prédio: ele entra assim que a ponta
+            // vaga a célula (grp=0), e a ponta segue o eixo. Sem seguidor, mantém o fallback.
+            Vector3Int assignedPos0 = assignedUnit.CurrentCellPosition; assignedPos0.z = 0;
+            bool frontBlocksTarget = hardMode && assignedPos0 == targetCell
+                && ComputeBlitzkriegForwardSector(obj.Sector, aiTeam) != ConstructionSector.None;
+
             UnitManager substitute   = null;
+            SlotNeed substituteExistingSlot = null;
             float       bestSubScore = float.MinValue;
 
-            foreach (UnitManager candidate in freeCapturers)
+            var handoffCandidates = new List<UnitManager>(freeCapturers);
+            if (hardMode)
+            {
+                foreach (SlotNeed slot in obj.Slots)
+                {
+                    if (!slot.Filled || slot == filledSlot || slot.Role != UnitRole.Capturador)
+                        continue;
+                    UnitManager trailing = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                    if (trailing != null && !trailing.IsUnderRepair && !handoffCandidates.Contains(trailing))
+                        handoffCandidates.Add(trailing);
+                }
+            }
+
+            foreach (UnitManager candidate in handoffCandidates)
             {
                 if (!SimulateCaptureSensor(candidate, targetCell, out _)) continue;
+
+                SlotNeed candidateExistingSlot = null;
+                foreach (SlotNeed slot in obj.Slots)
+                    if (slot.Filled && slot.Role == UnitRole.Capturador
+                        && slot.AssignedUnitId == candidate.InstanceId)
+                    {
+                        candidateExistingSlot = slot;
+                        break;
+                    }
 
                 Dictionary<Vector3Int, List<Vector3Int>> candidatePaths =
                     UnitMovementPathRules.CalcularCaminhosValidos(
                         boardTilemap, candidate,
                         Mathf.Max(0, candidate.RemainingMovementPoints), terrainDatabase);
-                if (candidatePaths == null || !candidatePaths.ContainsKey(targetCell)) continue;
+                bool reachesTarget = candidatePaths != null && (candidatePaths.ContainsKey(targetCell)
+                    || (frontBlocksTarget && CandidateReachesTargetNeighbor(candidatePaths, targetCell)));
+                if (!reachesTarget && candidateExistingSlot == null) continue;
 
                 int capturePower = PodeCapturarSensor.GetCapturePower(candidate);
                 bool completesCapture = pts + capturePower >= max;
                 Vector3Int cc = candidate.CurrentCellPosition; cc.z = 0;
-                float dist  = SectorManager.HexDistance(cc, targetCell);
+                float dist = SectorManager.TryGetLandMovementDistance(cc, targetCell, out int landDistance)
+                    ? landDistance : SectorManager.HexDistance(cc, targetCell);
                 float score = capturePower * 100f - dist * 20f;
                 if (completesCapture) score += 500f;
+                if (reachesTarget) score += 250f;
 
-                if (score > bestSubScore) { bestSubScore = score; substitute = candidate; }
+                if (score > bestSubScore)
+                {
+                    bestSubScore = score;
+                    substitute = candidate;
+                    substituteExistingSlot = candidateExistingSlot;
+                }
             }
 
             if (substitute == null)
@@ -121,7 +164,9 @@ public partial class AIController
                 filledSlot.AssignedUnitId = -1;
                 assignedUnit.ClearAIAssignedPlan();
                 plan.HandoffVacaterIds.Add(assignedUnit.InstanceId);
-                ConstructionSector fwdSec = ComputeForwardNeighborSector(obj.Sector, aiTeam);
+                ConstructionSector fwdSec = hardMode
+                    ? ComputeBlitzkriegForwardSector(obj.Sector, aiTeam)
+                    : ComputeForwardNeighborSector(obj.Sector, aiTeam);
                 if (fwdSec != default) plan.VacaterForwardSectors.Add(fwdSec);
 
                 swapFromSlot.Filled         = false;
@@ -144,22 +189,27 @@ public partial class AIController
             bool subCompletes = pts + PodeCapturarSensor.GetCapturePower(substitute) >= max;
             Debug.Log($"{TL("Handoff")} Unit{assignedUnit.InstanceId} hp={assignedUnit.CurrentHP} avança; " +
                       $"Unit{substitute.InstanceId} hp={substitute.CurrentHP} herda {obj.Sector} " +
-                      $"({pts}/{max}){(subCompletes ? " → completa" : "")}");
+                      $"({pts}/{max}){(subCompletes ? " → completa" : "")}" +
+                      $"{(frontBlocksTarget ? " [blitz: ponta sai de cima, seguidor do eixo assume]" : "")}");
 
             filledSlot.Filled         = false;
             filledSlot.AssignedUnitId = -1;
             assignedUnit.ClearAIAssignedPlan();
             plan.HandoffVacaterIds.Add(assignedUnit.InstanceId);
-            ConstructionSector fwdSector = ComputeForwardNeighborSector(obj.Sector, aiTeam);
+            ConstructionSector fwdSector = hardMode
+                ? ComputeBlitzkriegForwardSector(obj.Sector, aiTeam)
+                : ComputeForwardNeighborSector(obj.Sector, aiTeam);
             if (fwdSector != default) plan.VacaterForwardSectors.Add(fwdSector);
 
-            obj.TryFillSlot(UnitRole.Capturador, substitute.InstanceId);
+            if (substituteExistingSlot == null)
+                obj.TryFillSlot(UnitRole.Capturador, substitute.InstanceId);
             obj.Status                     = ObjectiveStatus.PartialReadyForHandoff;
             obj.HandoffEligible            = true;
             obj.PreferredHandoffFromUnitId = assignedUnit.InstanceId;
             ApplyPlanHUD(substitute, obj);
 
-            freeCapturers.Remove(substitute);
+            if (substituteExistingSlot == null)
+                freeCapturers.Remove(substitute);
             assignedIds.Add(substitute.InstanceId);
         }
     }
@@ -261,6 +311,24 @@ public partial class AIController
     {
         foreach (SectorObjective obj in plan.Objectives)
             if (obj != exclude && obj.HasOpenSlot(UnitRole.Capturador)) return true;
+        return false;
+    }
+
+    // Verdadeiro se o candidato consegue parar num hex adjacente ao prédio parcial neste turno.
+    // Usado no handoff blitz quando a ponta de lança ocupa a própria célula do alvo: o seguidor
+    // não pode parar sobre o prédio (ocupado), mas fica pronto ao lado para assumir assim que a
+    // ponta vaga. A célula do alvo em si é liberada em Phase 2 (a ponta é grp=0 e sai primeiro).
+    private readonly List<Vector3Int> handoffNeighborBuffer = new List<Vector3Int>(6);
+    private bool CandidateReachesTargetNeighbor(
+        Dictionary<Vector3Int, List<Vector3Int>> candidatePaths, Vector3Int targetCell)
+    {
+        if (candidatePaths == null) return false;
+        UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, targetCell, handoffNeighborBuffer);
+        foreach (Vector3Int raw in handoffNeighborBuffer)
+        {
+            Vector3Int neighbor = raw; neighbor.z = 0;
+            if (candidatePaths.ContainsKey(neighbor)) return true;
+        }
         return false;
     }
 }

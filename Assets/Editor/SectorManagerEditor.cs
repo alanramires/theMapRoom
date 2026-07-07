@@ -93,9 +93,10 @@ public class SectorManagerEditor : Editor
     private static readonly Color pathMarkerColor = new Color(1f, 0.25f, 0.15f, 1f);
     private static readonly Color axisFrontMarkerColor = new Color(1f, 0.35f, 0.05f, 1f);
 
-    // Filtro de time para os eixos. 0 = Todos; senão (TeamId)(idx-1).
-    private static readonly string[] AxisTeamOptions = { "Todos", "Green", "Red", "Blue", "Yellow" };
-    private static int axisTeamFilterIdx = 1;
+    // Filtro de SLOT para os eixos (o jogo usa slots; o time e resolvido do slot). 0 = Todos.
+    private static int axisSlotFilterIdx = 0;
+    // So no DESENHO: oculta o eixo sintetico de invasao (HQ->QG inimigo) pra ver so os principais.
+    private static bool hideInvasionAxis = false;
 
     private struct SectorEdgeLine
     {
@@ -165,8 +166,11 @@ public class SectorManagerEditor : Editor
         }
 
         EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.LabelField("Eixos do time:", GUILayout.Width(90));
-        axisTeamFilterIdx = EditorGUILayout.Popup(axisTeamFilterIdx, AxisTeamOptions, GUILayout.Width(100));
+        EditorGUILayout.LabelField("Eixos do slot:", GUILayout.Width(90));
+        axisSlotFilterIdx = EditorGUILayout.Popup(axisSlotFilterIdx, BuildAxisSlotOptions(), GUILayout.Width(140));
+        hideInvasionAxis = GUILayout.Toggle(hideInvasionAxis, new GUIContent(
+            " Ocultar eixo de invasão (visual)",
+            "Esconde no desenho o eixo sintético HQ→QG inimigo, mostrando só os eixos principais (rally)."));
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
@@ -196,6 +200,8 @@ public class SectorManagerEditor : Editor
         DrawSectorList(sectorInfosProp, "Sector Infos", manager, enableDrawButtons: true, enableRepButtons: true);
         EditorGUILayout.Space(4f);
         DrawSectorList(baseInfosProp, "Base Infos", manager, enableDrawButtons: false, enableRepButtons: true);
+        EditorGUILayout.Space(4f);
+        DrawEixoInfos();
 
         serializedObject.ApplyModifiedProperties();
     }
@@ -475,8 +481,103 @@ public class SectorManagerEditor : Editor
     // Eixos de invasão: caminho HQ → setores intermediários → rally (em vez da
     // linha reta HQ→rally). Um eixo por rally configurado (por slot).
     // -----------------------------------------------------------------------
+    // Opcoes do filtro: [Todos, Slot 0 - <time>, Slot 1 - <time>, ...].
+    private static string[] BuildAxisSlotOptions()
+    {
+        MatchController mc = Object.FindAnyObjectByType<MatchController>();
+        int slotCount = mc != null ? mc.SlotCount : 0;
+        string[] options = new string[slotCount + 1];
+        options[0] = "Todos";
+        for (int i = 0; i < slotCount; i++)
+        {
+            TeamId t = mc.GetTeamIdForSlot(i);
+            options[i + 1] = $"Slot {i} - {TeamUtils.GetName(t)}";
+        }
+        return options;
+    }
+
+    // Filtro resolvido a um time (o InvasionAxisMap e construido por time; time vem do slot).
+    // 0 = Todos (null). O jogo usa 1 slot por time, entao slot->time e 1:1.
     private static TeamId? AxisTeamFilter()
-        => axisTeamFilterIdx <= 0 ? (TeamId?)null : (TeamId)(axisTeamFilterIdx - 1);
+    {
+        if (axisSlotFilterIdx <= 0)
+            return null;
+        MatchController mc = Object.FindAnyObjectByType<MatchController>();
+        int slot = axisSlotFilterIdx - 1;
+        if (mc == null || slot >= mc.SlotCount)
+            return null;
+        return mc.GetTeamIdForSlot(slot);
+    }
+
+    // Painel read-only: lista os eixos do InvasionAxisMap por time (respeita o filtro "Eixos do
+    // time"). Reflete os overrides de eixo (ConstructionManager.OverrideEixo) — util pra conferir.
+    private static void DrawEixoInfos()
+    {
+        EditorGUILayout.LabelField("Eixo Infos", EditorStyles.boldLabel);
+
+        Tilemap map = ResolveDrawTilemap();
+        if (map == null)
+        {
+            EditorGUILayout.HelpBox("Tilemap nao resolvido — nao da pra montar os eixos.", MessageType.Info);
+            return;
+        }
+
+        TeamId? filter = AxisTeamFilter();
+        var teams = new List<TeamId>();
+        if (filter.HasValue)
+            teams.Add(filter.Value);
+        else
+        {
+            var seen = new HashSet<TeamId>();
+            ConstructionManager[] all = Object.FindObjectsByType<ConstructionManager>(FindObjectsSortMode.None);
+            foreach (ConstructionManager c in all)
+                if (c != null && c.IsPlayerHeadQuarter && seen.Add(c.TeamId))
+                    teams.Add(c.TeamId);
+        }
+        if (teams.Count == 0)
+        {
+            EditorGUILayout.HelpBox("Nenhum HQ na cena.", MessageType.Info);
+            return;
+        }
+
+        EditorGUI.indentLevel++;
+        foreach (TeamId team in teams)
+        {
+            InvasionAxisMap axisMap = InvasionAxisMap.Build(team, map);
+            EditorGUILayout.LabelField($"{team} ({axisMap.AxisCount} eixo(s))", EditorStyles.miniBoldLabel);
+            EditorGUI.indentLevel++;
+            foreach (InvasionAxisMap.Axis axis in axisMap.Axes)
+            {
+                string firstSec = axis.Corridor.Count > 0
+                    ? axis.Corridor[0].ToString()
+                    : axis.RallySector.ToString();
+                string tag = axis.IsInvasionAxis ? " [invasao]" : "";
+                // Nome auto-atribuido (mesmo do "Desenhar eixos"): E{n} {primeiroNo}->{rally}.
+                EditorGUILayout.LabelField(
+                    $"E{axis.EixoIndex} {firstSec}->{axis.RallySector} (slot {axis.RallyOwnerSlotIndex}){tag}",
+                    EditorStyles.miniBoldLabel);
+
+                EditorGUI.indentLevel++;
+                // Caminho completo: HQ -> nos do corredor -> rally, com a frente marcada (>).
+                var sb = new System.Text.StringBuilder("HQ -> ");
+                for (int i = 0; i < axis.Corridor.Count; i++)
+                {
+                    bool nodeIsFront = !axis.Complete && axis.Corridor[i] == axis.FrontSector;
+                    sb.Append(nodeIsFront ? ">" : "").Append(axis.Corridor[i]).Append(" -> ");
+                }
+                bool rallyIsFront = !axis.Complete && axis.FrontSector == axis.RallySector;
+                sb.Append(rallyIsFront ? ">" : "").Append(axis.RallySector).Append(" [rally]");
+                EditorGUILayout.LabelField("nós (frente = >)", sb.ToString());
+                EditorGUILayout.LabelField("frente", axis.Complete ? "completo (todo o eixo é seu)" : axis.FrontSector.ToString());
+                EditorGUILayout.LabelField("rally", axis.RallySector.ToString());
+                int participantes = axis.Corridor.Count + 1; // corredor + o setor do rally
+                EditorGUILayout.LabelField("setores participantes", participantes.ToString());
+                EditorGUI.indentLevel--;
+            }
+            EditorGUI.indentLevel--;
+        }
+        EditorGUI.indentLevel--;
+    }
 
     private static void DrawInvasionAxes(SectorManager manager)
     {
@@ -507,7 +608,11 @@ public class SectorManagerEditor : Editor
         {
             InvasionAxisMap axisMap = InvasionAxisMap.Build(team, map);
             foreach (InvasionAxisMap.Axis axis in axisMap.Axes)
+            {
+                if (hideInvasionAxis && axis.IsInvasionAxis)
+                    continue;
                 DrawAxisLines(axis);
+            }
         }
 
         SceneView.RepaintAll();

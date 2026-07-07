@@ -30,8 +30,10 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private TeamId teamId = TeamId.Green;
     [Tooltip("Slot do MatchController que controla este time. -1 = Neutral fixo (sem slot).")]
     [SerializeField] private int slotIndex = -1;
-    [Tooltip("Setor estratégico ao qual esta construção pertence. Use Base1-Base4 para areas de base de cada jogador.")]
+    [Tooltip("Setor estratégico ao qual esta construção pertence. Use Base0-Base3 para areas de base de cada jogador.")]
     [SerializeField] private ConstructionSector sector = ConstructionSector.None;
+    [Tooltip("Overrides manuais de eixo, POR SLOT. O mesmo setor pode ser nó do leque de um slot e rally de outro, então cada entrada força o eixo para um slot (ou -1 = todos). Sobrepõe o cálculo por ângulo do InvasionAxisMap.")]
+    [SerializeField] private System.Collections.Generic.List<EixoOverrideEntry> eixoOverrides = new System.Collections.Generic.List<EixoOverrideEntry>();
     [SerializeField] private string constructionId;
     [SerializeField] private int instanceId;
     [SerializeField] private Vector3 currentPosition = Vector3.zero;
@@ -96,6 +98,26 @@ public class ConstructionManager : MonoBehaviour
     public TeamId TeamId => teamId;
     public int SlotIndex => slotIndex;
     public ConstructionSector Sector => sector;
+    public System.Collections.Generic.IReadOnlyList<EixoOverrideEntry> EixoOverrides => eixoOverrides;
+    public bool HasEixoOverride => eixoOverrides != null && eixoOverrides.Count > 0;
+
+    // Resolve o eixo forçado para um slot: a entrada do slot exato tem precedência sobre a de -1
+    // (todos). Retorna false se não há override aplicável a esse slot.
+    public bool TryGetEixoOverride(int slot, out int eixo)
+    {
+        eixo = 0;
+        if (eixoOverrides == null)
+            return false;
+        bool foundAll = false;
+        int allEixo = 0;
+        foreach (EixoOverrideEntry e in eixoOverrides)
+        {
+            if (e.slotIndex == slot) { eixo = e.eixo; return true; }
+            if (e.slotIndex == -1) { foundAll = true; allEixo = e.eixo; }
+        }
+        if (foundAll) { eixo = allEixo; return true; }
+        return false;
+    }
     public bool IsForwardObserverSpot => isForwardObserverSpot;
     public ForwardObserverSpotUsage ForwardObserverUsage => forwardObserverSpotUsage;
     public bool IsOperationalForwardObserverSpot =>

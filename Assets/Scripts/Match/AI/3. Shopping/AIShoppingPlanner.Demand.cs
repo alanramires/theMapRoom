@@ -1235,6 +1235,16 @@ public partial class AIShoppingPlanner
         int reserve = ComputeStrategicSavingReserve(
             snapshot, demands, remaining, eliteCommitment,
             out AIShoppingDemand reserveTarget);
+        // Bootstrap Blitz: no Hard o primeiro Assalto É o MBT elite caro (básico banido). A reserva
+        // elite normal exige um core que já inclui Assalto — impossível antes de comprar o primeiro.
+        // Este bootstrap fura esse catch-22 e segura o grosso do caixa até o MBT ficar pagável.
+        int blitzArmorReserve = ComputeBlitzFirstArmorReserve(
+            snapshot, demands, remaining, out AIShoppingDemand blitzArmorTarget);
+        if (blitzArmorReserve > reserve)
+        {
+            reserve = blitzArmorReserve;
+            reserveTarget = blitzArmorTarget;
+        }
         bool hasStrategicReserve = reserve > 0 && reserveTarget != null;
 
         // Collapsing aumenta o peso defensivo, mas nao invalida sozinho um compromisso
@@ -1958,6 +1968,95 @@ public partial class AIShoppingPlanner
         return reserve;
     }
 
+    // Bootstrap da poupança Blitzkrieg para o PRIMEIRO blindado elite (MBT). No Hard o assalto
+    // básico é banido, então a única peça de Assalto comprável é o MBT elite (caro). A reserva
+    // elite padrão (ComputeStrategicSavingReserve) só forma compromisso com o core já pronto — que
+    // exige Assalto em campo, impossível antes de comprar o primeiro. Este método fura esse
+    // deadlock: enquanto não há Assalto elite em campo e há demanda de Assalto pendente, segura o
+    // grosso do caixa até o MBT ficar pagável, liberando apenas um corpo barato (renda/screen).
+    private static int ComputeBlitzFirstArmorReserve(
+        AIWorldSnapshot snapshot, List<AIShoppingDemand> demands, int remaining,
+        out AIShoppingDemand target)
+    {
+        target = null;
+        if (snapshot == null || demands == null || remaining <= 0)
+            return 0;
+        if (AIController.Instance == null || !AIController.Instance.HardMode)
+            return 0;
+        if (CountActiveEliteAssaultUnits(snapshot) > 0)
+            return 0;
+
+        // NÃO entesoura pro MBT antes de ter a massa de captura inicial. No começo (poucos/zero
+        // capturadores) a prioridade é EXPANDIR — spam de capturador barato. Só passa a poupar pro
+        // blindado quando o núcleo de captura já existe (mesmo limiar que libera suporte). Sem isso
+        // a reserva estrangulava o early game comprando 1 corpo por turno em vez de expandir.
+        int capturerMass = CountCompositionRole(snapshot, UnitRole.Capturador);
+        int massGate = Instance != null ? Instance.MinCapturerMassForSupport : 4;
+        if (capturerMass < massGate)
+            return 0;
+
+        AIShoppingDemand assaultDemand = null;
+        foreach (AIShoppingDemand d in demands)
+        {
+            if (d == null || d.Count <= 0 || d.Role != UnitRole.Assalto)
+                continue;
+            if (d.Domain == Domain.Air) // AAA/ar não é a peça de ruptura terrestre
+                continue;
+            if (assaultDemand == null || d.Priority < assaultDemand.Priority)
+                assaultDemand = d;
+        }
+        if (assaultDemand == null)
+            return 0;
+
+        int mbtCost = FindCheapestBuildableCost(snapshot, assaultDemand, out bool availableNow);
+        if (mbtCost <= 0) // MBT não ofertado / cadeia indisponível: nada a poupar
+            return 0;
+
+        int income = Mathf.Max(0, snapshot.IncomePerTurn);
+        float upkeepBufferPct = BlitzArmorUpkeepReservePercent;
+        // Gordura de manutenção SEMPRE reservada p/ o Serviço do Comando (~10% do caixa). A compra
+        // do MBT não pode zerar o caixa, senão o Refuel/reparo cobrado na Fase 1 do turno seguinte
+        // não fecha. Por isso só compra quando dá pra pagar MBT + gordura, e mesmo aí segura os 20%.
+        int upkeepFat = Mathf.CeilToInt(remaining * upkeepBufferPct);
+
+        // Já dá pra comprar o MBT mantendo a gordura? Libera a compra segurando só os 20%.
+        if (mbtCost + upkeepFat <= remaining && availableNow)
+        {
+            target = assaultDemand;
+            UnitData mbtNow = FindBestOfferedUnitForDemand(snapshot, assaultDemand);
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] blitz_armor: "
+                + $"compra 1º MBT {(mbtNow != null ? mbtNow.displayName : "Assalto")} custo={mbtCost} "
+                + $"caixa={remaining} segura gordura={upkeepFat} ({upkeepBufferPct:P0} p/ Serviço do Comando)");
+            return upkeepFat;
+        }
+
+        // Ainda juntando. A renda NÃO acumula 100% rumo ao MBT — o Serviço do Comando drena caixa
+        // todo turno (custo dinâmico, Fase 1) e ainda liberamos um corpo barato por turno. Desconta a
+        // gordura da renda projetada; senão a conta nunca fecha e a IA entesoura eternamente. Ok
+        // esperar até 3 rodadas comprando soldado enquanto junta (peça de maior ticket).
+        int netIncome = Mathf.FloorToInt(income * (1f - upkeepBufferPct));
+        int maxTurns = Mathf.Max(3, AIController.Instance.EliteSaveTurns);
+        if (remaining + netIncome * maxTurns < mbtCost + upkeepFat)
+            return 0;
+
+        // Segura o grosso; libera um corpo barato (soldado) por turno — vai comprando soldados
+        // enquanto junta, sem deixar a fábrica ociosa e crescendo renda/screen.
+        int cheapBody = EstimateCheapBodyCost(snapshot);
+        int spendable = Mathf.Clamp(cheapBody, 0, remaining);
+        int reserve = Mathf.Clamp(remaining - spendable, 0, remaining);
+        if (reserve <= 0)
+            return 0;
+
+        target = assaultDemand;
+        UnitData mbt = FindBestOfferedUnitForDemand(snapshot, assaultDemand);
+        Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] blitz_armor: "
+            + $"poupando p/ 1º MBT {(mbt != null ? mbt.displayName : "Assalto")} custo={mbtCost} "
+            + $"caixa={remaining} renda={income} rendaLiq={netIncome} gordura={upkeepFat} "
+            + $"({upkeepBufferPct:P0} p/ Serviço do Comando) horizonte={maxTurns}T reserva={reserve} "
+            + $"gastoLivre={remaining - reserve} (vai comprando soldado até o MBT)");
+        return reserve;
+    }
+
     private static bool IsCriticalCapabilityDemand(AIShoppingDemand demand)
         => demand != null && (demand.Urgent || demand.RequiredWeaponCategory.HasValue);
 
@@ -2251,6 +2350,8 @@ public partial class AIShoppingPlanner
             groundCounterPressureCovered, rallyAssemblyActive);
         AddOperationalPressureDemands(snapshot, demands, BuildOperationalPressure(snapshot));
 
+        ApplyHardModeArmorFirst(snapshot, demands);
+
         demands.Sort((a, b) =>
         {
             int urgent = b.Urgent.CompareTo(a.Urgent);
@@ -2260,6 +2361,62 @@ public partial class AIShoppingPlanner
             return ((int)a.Role).CompareTo((int)b.Role);
         });
         return demands;
+    }
+
+    // Hard/Blitz: enquanto não há NENHUM blindado de assalto elite em campo, o primeiro elite
+    // terrestre deve ser a peça de ruptura (MBT), não o Obus Médio. Rebaixa a artilharia de
+    // composição/operação para logo abaixo do assalto pendente, de modo que o carrinho compre o
+    // blindado primeiro quando o caixa só dá pra um — mas ainda compre a artilharia se o MBT for
+    // inviável no turno (o beam só compara carrinhos realmente pagáveis). Preserva fogo pesado de
+    // rally (GoGreen), antiaéreo (SAM) e demandas urgentes — que continuam furando a regra.
+    // Espelha a intenção da regra legada em AIShoppingPlanner.cs (path não-role-based, desativado).
+    // Gordura de manutenção do bootstrap Blitz (Serviço do Comando): reservada ao poupar pro 1º MBT
+    // e descontada da renda projetada. Dedicada (não usa EliteMaintenanceReservePercent da reserva
+    // madura) — 10% aqui é menos conservador, compra o MBT mais cedo. Dial de ajuste.
+    private const float BlitzArmorUpkeepReservePercent = 0.10f;
+
+    private static void ApplyHardModeArmorFirst(AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
+    {
+        if (snapshot == null || demands == null || demands.Count == 0)
+            return;
+        if (AIController.Instance == null || !AIController.Instance.HardMode)
+            return;
+        if (CountActiveEliteAssaultUnits(snapshot) > 0)
+            return;
+
+        int bestAssaultPriority = int.MaxValue;
+        foreach (AIShoppingDemand d in demands)
+        {
+            if (d == null || d.Count <= 0 || d.Role != UnitRole.Assalto)
+                continue;
+            if (d.Domain == Domain.Air) // AAA/ar não é a peça de ruptura terrestre
+                continue;
+            if (d.Priority < bestAssaultPriority)
+                bestAssaultPriority = d.Priority;
+        }
+        if (bestAssaultPriority == int.MaxValue) // sem assalto pendente: nada a proteger
+            return;
+
+        int deferPriority = bestAssaultPriority + 1;
+        foreach (AIShoppingDemand d in demands)
+        {
+            if (d == null || d.Count <= 0 || d.Role != UnitRole.FogoIndireto)
+                continue;
+            if (d.Urgent) // urgências (ex.: ameaça imediata) furam a regra
+                continue;
+            if (d.Domain == Domain.Air) // SAM / fogo antiaéreo preservado
+                continue;
+            if (d.Origin == "rally-assembly" || d.RequireRallyBreakthrough
+                || d.MinRallyArtilleryWeight > 0f) // fogo pesado de GoGreen preservado
+                continue;
+            if (d.Priority >= deferPriority) // já está atrás do assalto
+                continue;
+
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] hard_blitz: "
+                + $"adiando artilharia {FormatDemandCapability(d)} pri {d.Priority}->{deferPriority} "
+                + $"(primeiro elite terrestre = MBT, origem={d.Origin})");
+            d.Priority = deferPriority;
+        }
     }
 
     private static SectorObjective FindRallyShoppingFocus(List<TacticalDeficit> deficits)

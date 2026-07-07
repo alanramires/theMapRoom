@@ -50,7 +50,8 @@
       "Bash(git commit *)",
       "Bash(git -C \"d:/Unity Projects/The Map Room\" log --oneline -15)",
       "Bash(grep -vE \"\\\\.meta$\")",
-      "Bash(grep -viE \"^\\\\+\\\\s*//|^\\\\+\\\\s*$\")"
+      "Bash(grep -viE \"^\\\\+\\\\s*//|^\\\\+\\\\s*$\")",
+      "Bash(xargs -0 git rm --cached --quiet)"
     ],
     "additionalDirectories": [
       "d:\\Unity Projects\\The Map Room\\Assets\\Scripts\\Match\\AI\\Units\\Assault"

@@ -32,6 +32,7 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty originalOwnerSlotIndexProp;
     private SerializedProperty firstOwnerSlotIndexProp;
     private SerializedProperty sectorProp;
+    private SerializedProperty eixoOverridesProp;
     private SerializedProperty isForwardObserverSpotProp;
     private SerializedProperty forwardObserverSpotUsageProp;
     private SerializedProperty isRallyPointProp;
@@ -87,6 +88,7 @@ public class ConstructionManagerEditor : Editor
         originalOwnerSlotIndexProp = serializedObject.FindProperty("originalOwnerSlotIndex");
         firstOwnerSlotIndexProp = serializedObject.FindProperty("firstOwnerSlotIndex");
         sectorProp = serializedObject.FindProperty("sector");
+        eixoOverridesProp = serializedObject.FindProperty("eixoOverrides");
         isForwardObserverSpotProp = serializedObject.FindProperty("isForwardObserverSpot");
         forwardObserverSpotUsageProp = serializedObject.FindProperty("forwardObserverSpotUsage");
         isRallyPointProp = serializedObject.FindProperty("isRallyPoint");
@@ -114,6 +116,7 @@ public class ConstructionManagerEditor : Editor
         EditorGUILayout.PropertyField(currentCellPositionProp, new GUIContent("Cell Position"));
         DrawSlotAndTeamBlock();
         DrawSectorPopup();
+        DrawEixoOverrideBlock();
 
         DrawRoleBlock();
         DrawConstructionIdPopup();
@@ -292,6 +295,136 @@ public class ConstructionManagerEditor : Editor
         if (next != current)
             sectorProp.enumValueIndex = next;
     }
+
+    private void DrawEixoOverrideBlock()
+    {
+        if (eixoOverridesProp == null)
+            return;
+
+        EditorGUILayout.Space(2f);
+        EditorGUILayout.LabelField("Override Eixo (por slot)", EditorStyles.boldLabel);
+
+        ConstructionManager cm = target as ConstructionManager;
+        MatchController mc = Object.FindAnyObjectByType<MatchController>();
+        int slotCount = mc != null ? mc.SlotCount : 0;
+
+        string[] slotLabels = new string[slotCount + 1];
+        slotLabels[0] = "Todos os slots";
+        for (int i = 0; i < slotCount; i++)
+            slotLabels[i + 1] = $"Slot {i} - {TeamUtils.GetName(mc.GetTeamIdForSlot(i))}";
+
+        if (eixoOverridesProp.arraySize == 0)
+            EditorGUILayout.LabelField("   (nenhum — usa o cálculo automático por ângulo)");
+
+        int removeIndex = -1;
+        EditorGUI.indentLevel++;
+        for (int i = 0; i < eixoOverridesProp.arraySize; i++)
+        {
+            SerializedProperty entry = eixoOverridesProp.GetArrayElementAtIndex(i);
+            SerializedProperty slotProp = entry.FindPropertyRelative("slotIndex");
+            SerializedProperty eixoProp = entry.FindPropertyRelative("eixo");
+
+            EditorGUILayout.BeginHorizontal();
+            if (slotCount > 0)
+            {
+                int cur = Mathf.Clamp(slotProp.intValue + 1, 0, slotCount);
+                int sel = EditorGUILayout.Popup(cur, slotLabels);
+                slotProp.intValue = sel - 1;
+            }
+            else
+            {
+                slotProp.intValue = EditorGUILayout.IntField(slotProp.intValue);
+            }
+            GUILayout.Label("Eixo", GUILayout.Width(34));
+            int slotForEixo = slotProp.intValue;
+            if (cm != null && cm.Sector != ConstructionSector.None && mc != null
+                && slotForEixo >= 0 && slotForEixo < slotCount)
+            {
+                BuildEixoOptionsForSlot(mc.GetTeamIdForSlot(slotForEixo), cm.Sector,
+                    out string[] eLabels, out int[] eValues);
+                int curIdx = System.Array.IndexOf(eValues, eixoProp.intValue);
+                EditorGUI.BeginChangeCheck();
+                int newIdx = EditorGUILayout.Popup(Mathf.Max(0, curIdx), eLabels, GUILayout.Width(150));
+                if (EditorGUI.EndChangeCheck())
+                    eixoProp.intValue = eValues[Mathf.Clamp(newIdx, 0, eValues.Length - 1)];
+            }
+            else
+            {
+                // Slot "Todos" ou sem MatchController: cai pro campo numérico simples.
+                eixoProp.intValue = EditorGUILayout.IntField(eixoProp.intValue, GUILayout.Width(42));
+            }
+            if (GUILayout.Button("−", GUILayout.Width(24)))
+                removeIndex = i;
+            EditorGUILayout.EndHorizontal();
+
+            // Referencia: eixo automatico (sem override) do setor pro slot desta entrada.
+            if (cm != null && cm.Sector != ConstructionSector.None && mc != null && slotCount > 0)
+            {
+                int slot = slotProp.intValue;
+                string autoInfo;
+                if (slot >= 0 && slot < slotCount)
+                    autoInfo = $"Slot {slot}: {DescribeAutoEixo(mc.GetTeamIdForSlot(slot), cm.Sector)}";
+                else
+                {
+                    var parts = new System.Text.StringBuilder();
+                    for (int s = 0; s < slotCount; s++)
+                    {
+                        if (s > 0) parts.Append("   ");
+                        parts.Append($"S{s}:{DescribeAutoEixo(mc.GetTeamIdForSlot(s), cm.Sector)}");
+                    }
+                    autoInfo = parts.ToString();
+                }
+                EditorGUILayout.LabelField("auto (sem override)", autoInfo);
+            }
+        }
+        EditorGUI.indentLevel--;
+
+        if (removeIndex >= 0)
+            eixoOverridesProp.DeleteArrayElementAtIndex(removeIndex);
+
+        if (GUILayout.Button("+ Adicionar override de eixo"))
+        {
+            int idx = eixoOverridesProp.arraySize;
+            eixoOverridesProp.InsertArrayElementAtIndex(idx);
+            SerializedProperty newEntry = eixoOverridesProp.GetArrayElementAtIndex(idx);
+            newEntry.FindPropertyRelative("slotIndex").intValue = -1; // default: todos
+            newEntry.FindPropertyRelative("eixo").intValue = 0;
+        }
+    }
+
+    private static string DescribeAutoEixo(TeamId team, ConstructionSector sector)
+    {
+        InvasionAxisMap map = InvasionAxisMap.Build(team, null, applyOverrides: false);
+        int e = map.GetEixo(sector);
+        return e > 0 ? $"E{e}" : "fora de eixo";
+    }
+
+    // Opcoes de eixo do leque do slot: "0 - fora de eixo" + cada eixo principal como "E{n}: I-R"
+    // (inicial do 1o no -> inicial do rally, ex.: Bravo->Foxtrot = "B-F"). Exclui o eixo de invasao
+    // (sintetico, nao e alvo valido de override). values[] guarda o EixoIndex correspondente (0=fora).
+    private static void BuildEixoOptionsForSlot(TeamId team, ConstructionSector sector,
+        out string[] labels, out int[] values)
+    {
+        InvasionAxisMap map = InvasionAxisMap.Build(team, null, applyOverrides: false);
+        var lbls = new System.Collections.Generic.List<string> { "0 - fora de eixo" };
+        var vals = new System.Collections.Generic.List<int> { 0 };
+        foreach (InvasionAxisMap.Axis axis in map.Axes)
+        {
+            if (axis.IsInvasionAxis)
+                continue;
+            string firstSec = axis.Corridor.Count > 0
+                ? axis.Corridor[0].ToString()
+                : axis.RallySector.ToString();
+            string here = map.GetEixo(sector) == axis.EixoIndex ? "  (atual)" : "";
+            lbls.Add($"E{axis.EixoIndex}: {Initial(firstSec)}-{Initial(axis.RallySector.ToString())}{here}");
+            vals.Add(axis.EixoIndex);
+        }
+        labels = lbls.ToArray();
+        values = vals.ToArray();
+    }
+
+    private static string Initial(string s)
+        => string.IsNullOrEmpty(s) ? "?" : s.Substring(0, 1).ToUpperInvariant();
 
     private void DrawOwnershipSlotPopup(string label, SerializedProperty slotProp)
     {

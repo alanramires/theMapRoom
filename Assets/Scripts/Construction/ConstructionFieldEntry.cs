@@ -12,7 +12,7 @@ public class ConstructionFieldEntry
     [Tooltip("Slot do MatchController que controla esta construcao no inicio. -1 = Neutral.")]
     public int initialSlotIndex = -1;
 
-    [Tooltip("Setor estrategico ao qual esta construcao pertence. Use Base1-Base4 para areas de base de cada jogador.")]
+    [Tooltip("Setor estrategico ao qual esta construcao pertence. Use Base0-Base3 para areas de base de cada jogador.")]
     public ConstructionSector sector = ConstructionSector.Alpha;
 
     [Tooltip("Posicao da construcao no mapa (hex).")]

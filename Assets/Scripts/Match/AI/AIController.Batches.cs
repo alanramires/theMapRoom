@@ -67,6 +67,8 @@ public partial class AIController
 
     {
 
+        RememberHardBlitzkriegCapture(unit, team, to);
+
         List<Vector3Int> movementPath = null;
 
         paths?.TryGetValue(to, out movementPath);
