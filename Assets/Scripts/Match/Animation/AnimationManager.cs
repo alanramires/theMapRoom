@@ -462,30 +462,15 @@ public class AnimationManager : MonoBehaviour
                 p.y += Mathf.Sin(eased * Mathf.PI) * arc;
                 p.z = preservedZ;
                 unit.transform.position = p;
-                ApplyMovingUnitFogVisibility(unit, p, allowReveal: false);
                 yield return null;
             }
 
             unit.SetCurrentCellPosition(toCell, enforceFinalOccupancyRule: false);
-            ApplyMovingUnitFogVisibility(unit, unit.transform.position, allowReveal: true);
             onCellReached?.Invoke(toCell);
         }
 
         movementRoutine = null;
         onAnimationFinished?.Invoke();
-    }
-
-    private void ApplyMovingUnitFogVisibility(UnitManager unit, Vector3 worldPosition, bool allowReveal)
-    {
-        if (unit == null)
-            return;
-        if (matchController == null)
-            matchController = FindAnyObjectByType<MatchController>();
-        if (matchController == null || !matchController.ShouldHideActiveAiActionPresentation())
-            return;
-
-        unit.SetFogOfWarVisibility(
-            matchController.ShouldShowActiveAiUnitAt(unit, worldPosition, allowReveal));
     }
 
     private float EvaluateMoveCurve(float t)
@@ -922,9 +907,7 @@ public class AnimationManager : MonoBehaviour
                 ? QuadraticBezier(from, control, to, p)
                 : Vector3.Lerp(from, to, p);
             t.position = pos;
-            if (matchController == null)
-                matchController = FindAnyObjectByType<MatchController>();
-            sr.enabled = matchController == null || matchController.ShouldShowActiveAiWorldEffectAt(pos);
+            sr.enabled = true;
 
             float nextP = Mathf.Clamp01(p + 0.02f);
             Vector3 nextPos = trajectory == WeaponTrajectoryType.Parabolic

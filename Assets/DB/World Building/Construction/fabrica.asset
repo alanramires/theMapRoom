@@ -18,11 +18,13 @@ MonoBehaviour:
   description: "F\xE1brica, produz unidades militares"
   isAirport: 0
   isHarbor: 0
+  isCity: 0
   spriteDefault: {fileID: 21300000, guid: 5b54171212af91644a739e50e759212b, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
+  visao: 1
   baseMovementCost: 1
   isFakeBuilding: 0
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}

@@ -1111,6 +1111,9 @@ public class MatchController : MonoBehaviour
             for (int i = 0; i < constructions.Length; i++)
                 constructions[i]?.RefreshRuntimeVisualState(force: true);
         }
+        fogSortingLayerValidated = false;
+        TryAutoAssignFogOfWarReferences();
+        ValidateFogOfWarSortingLayer();
         SyncThreatRevisionFlags();
     }
 
@@ -2780,6 +2783,9 @@ public class MatchController : MonoBehaviour
             activeTeamId = gameplayTeamId;
             activePlayerListIndex = gameplayPlayerIndex;
             fogPresentationGameplayTeamId = int.MinValue;
+            // O refresh visual usa temporariamente o time humano. Reaplica a layer
+            // depois de restaurar o turno real para a nevoa subir apenas no turno da IA.
+            ValidateFogOfWarSortingLayer();
         }
     }
 
@@ -3728,46 +3734,19 @@ public class MatchController : MonoBehaviour
         return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
     }
 
-    public bool ShouldShowActiveAiWorldEffectAt(Vector3 worldPosition)
+    public bool IsCellVisibleInFogPresentation(Vector3Int cell)
     {
-        if (!ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+        if (!debugFogOfWarEnabled || !enableTotalWar)
             return true;
 
-        if (fogCachedTeamId != (int)presentationTeam)
+        int expectedTeamId = activeTeamId;
+        if (ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+            expectedTeamId = (int)presentationTeam;
+        if (fogCachedTeamId != expectedTeamId)
             return false;
 
-        Tilemap boardMap = ResolveFogBoardTilemap();
-        if (boardMap == null)
-            return false;
-
-        Vector3Int cell = boardMap.WorldToCell(worldPosition);
         cell.z = 0;
         return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
-    }
-
-    public bool ShouldShowActiveAiUnitAt(UnitManager unit, Vector3 worldPosition, bool allowReveal)
-    {
-        if (!ShouldUseHumanFogPresentation(out TeamId presentationTeam))
-            return true;
-        if (unit == null || !ShouldShowActiveAiWorldEffectAt(worldPosition))
-            return false;
-
-        // Durante a interpolacao, uma unidade previamente oculta nao pode surgir antes
-        // de sua celula logica ser atualizada. Ao chegar no hex, valida inclusive stealth.
-        if (!allowReveal && unit.IsHiddenByFogOfWar)
-            return false;
-
-        if (!allowReveal)
-            return true;
-
-        int cacheIndex = ResolveFogCacheIndex(unit);
-        if (fogCachedTeamId == (int)presentationTeam &&
-            fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible))
-        {
-            return cachedVisible;
-        }
-
-        return IsUnitVisibleForTeamNoCache(unit, presentationTeam);
     }
 
     public bool ShouldHideActiveAiActionPresentation()
@@ -3893,6 +3872,7 @@ public class MatchController : MonoBehaviour
 
     private void ApplyRuntimeUnitFogVisibilityFromCache(Tilemap boardMap)
     {
+        bool fogOverlayOwnsWorldOcclusion = UsesFogOverlayForWorldOcclusion();
         List<UnitManager> units = UnitManager.AllActive;
         for (int i = 0; i < units.Count; i++)
         {
@@ -3910,7 +3890,7 @@ public class MatchController : MonoBehaviour
                     visible = false;
             }
 
-            unit.SetFogOfWarVisibility(visible);
+            unit.SetFogOfWarVisibility(fogOverlayOwnsWorldOcclusion || visible);
         }
     }
 
@@ -4072,23 +4052,40 @@ public class MatchController : MonoBehaviour
 
     private void ValidateFogOfWarSortingLayer()
     {
-        if (fogSortingLayerValidated || fogOfWarTilemap == null)
+        if (fogOfWarTilemap == null)
             return;
 
-        fogSortingLayerValidated = true;
         TilemapRenderer renderer = fogOfWarTilemap.GetComponent<TilemapRenderer>();
         if (renderer == null)
             return;
 
-        const string expectedLayer = "SFX";
+        bool coverWorldPresentation = UsesFogOverlayForWorldOcclusion();
+        string expectedLayer = coverWorldPresentation ? "FogOfWar" : "SFX";
         string currentLayer = SortingLayer.IDToName(renderer.sortingLayerID);
+        if (!string.Equals(currentLayer, expectedLayer, StringComparison.OrdinalIgnoreCase))
+        {
+            renderer.sortingLayerName = expectedLayer;
+            renderer.sortingOrder = 0;
+            currentLayer = SortingLayer.IDToName(renderer.sortingLayerID);
+        }
+
+        if (fogSortingLayerValidated)
+            return;
+        fogSortingLayerValidated = true;
         if (!enableFogValidationLogs)
             return;
 
         if (!string.Equals(currentLayer, expectedLayer, StringComparison.OrdinalIgnoreCase))
             Debug.LogWarning($"[FogOfWar] Sorting layer atual = {currentLayer}. Esperado = {expectedLayer}.");
         else
-            Debug.Log("[FogOfWar] Sorting layer validada em SFX.");
+            Debug.Log($"[FogOfWar] Sorting layer validada em {expectedLayer}.");
+    }
+
+    private bool UsesFogOverlayForWorldOcclusion()
+    {
+        // A nevoa sobe acima do mundo apenas enquanto a IA joga e a partida
+        // precisa continuar sendo apresentada pela perspectiva do humano.
+        return ShouldUseHumanFogPresentation(out _);
     }
 
     private Tilemap ResolveFogBoardTilemap()
@@ -4505,13 +4502,16 @@ public class MatchController : MonoBehaviour
             }
             if (construction == null || !construction.gameObject.activeInHierarchy)
                 continue;
-            if (!IsConstructionOwnedByActivePlayer(construction))
+            bool ownedByActivePlayer = IsConstructionOwnedByActivePlayer(construction);
+            bool alwaysVisibleHeadQuarter = construction.IsPlayerHeadQuarter;
+            if (!ownedByActivePlayer && !alwaysVisibleHeadQuarter)
             {
                 if (ShouldLogPodeEnxergarRuntime)
                     Debug.Log($"[FoW][Construction][Skip] {construction?.name} reason=other_team team={(int)construction.TeamId}");
                 continue;
             }
-            activeTeamCandidates++;
+            if (ownedByActivePlayer)
+                activeTeamCandidates++;
             Tilemap constructionMap = construction.BoardTilemap;
             if (constructionMap == null && construction.gameObject.scene == boardMap.gameObject.scene)
             {
@@ -4548,10 +4548,33 @@ public class MatchController : MonoBehaviour
             if (boardMap.GetTile(cell) == null)
                 continue;
 
+            // O QG e um marco global do tabuleiro: todos conhecem seu hex.
+            // Apenas o dono recebe o restante do raio de visao configurado.
+            if (!ownedByActivePlayer)
+            {
+                constructionsIncluded++;
+                ApplyFogContribution(cell, +1, boardMap, updateVisual);
+                if (ShouldLogPodeEnxergarRuntime)
+                {
+                    Debug.Log($"[FoW][Construction][Use] {construction.name} cell={cell.x},{cell.y} reason=global_hq");
+                }
+                continue;
+            }
+
+            int visionRange = 0;
+            if (construction.TryResolveConstructionData(out ConstructionData constructionData) &&
+                constructionData != null)
+            {
+                visionRange = Mathf.Max(0, constructionData.visao);
+            }
+
             constructionsIncluded++;
             if (ShouldLogPodeEnxergarRuntime)
-                Debug.Log($"[FoW][Construction][Use] {construction.name} cell={cell.x},{cell.y}");
-            ApplyFogContribution(cell, +1, boardMap, updateVisual);
+                Debug.Log($"[FoW][Construction][Use] {construction.name} cell={cell.x},{cell.y} vision={visionRange}");
+
+            HashSet<Vector3Int> visibleCells = BuildCellsInRadius(boardMap, cell, visionRange);
+            foreach (Vector3Int visibleCell in visibleCells)
+                ApplyFogContribution(visibleCell, +1, boardMap, updateVisual);
         }
 
         if (ShouldLogPodeEnxergarRuntime)
@@ -4613,7 +4636,9 @@ public class MatchController : MonoBehaviour
         }
 
         TeamId observerTeam = ActiveTeam;
-        if (ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+        bool useHumanPresentation = ShouldUseHumanFogPresentation(out TeamId presentationTeam);
+        bool fogOverlayOwnsWorldOcclusion = UsesFogOverlayForWorldOcclusion();
+        if (useHumanPresentation)
             observerTeam = presentationTeam;
 
         List<UnitManager> units = UnitManager.AllActive;
@@ -4630,7 +4655,7 @@ public class MatchController : MonoBehaviour
             bool visible = unit.TeamId == observerTeam
                 || ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
-            unit.SetFogOfWarVisibility(visible);
+            unit.SetFogOfWarVisibility(fogOverlayOwnsWorldOcclusion || visible);
         }
     }
 
@@ -4640,6 +4665,7 @@ public class MatchController : MonoBehaviour
         fogUnitVisibilityByCacheIndex.Clear();
         Tilemap boardMap = ResolveFogBoardTilemap();
         bool useConservativeFog = debugFogOfWarEnabled && enableTotalWar && activeTeamId >= 0;
+        bool fogOverlayOwnsWorldOcclusion = UsesFogOverlayForWorldOcclusion();
 
         for (int i = 0; i < units.Length; i++)
         {
@@ -4651,7 +4677,7 @@ public class MatchController : MonoBehaviour
 
             bool visible = !useConservativeFog || (int)unit.TeamId == activeTeamId;
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
-            unit.SetFogOfWarVisibility(visible);
+            unit.SetFogOfWarVisibility(fogOverlayOwnsWorldOcclusion || visible);
         }
     }
 
@@ -4663,6 +4689,8 @@ public class MatchController : MonoBehaviour
             return;
 
         debugFogOfWarEnabled = enabled;
+        fogSortingLayerValidated = false;
+        ValidateFogOfWarSortingLayer();
         if (!enabled)
         {
             ResetFogOfWarRuntime(clearTilemap: true);
@@ -4680,11 +4708,29 @@ public class MatchController : MonoBehaviour
         Debug.Log("[Debug Command] FoW ON (debug).");
     }
 
+    public void SetFogOfWarAlphaPercent(int alphaPercent)
+    {
+        int clampedPercent = Mathf.Clamp(alphaPercent, 0, 100);
+        fogOfWarAlpha = clampedPercent / 100f;
+        if (fogOfWarTilemap == null)
+            return;
+
+        Color fogColor = new Color(0f, 0f, 0f, fogOfWarAlpha);
+        BoundsInt bounds = fogOfWarTilemap.cellBounds;
+        foreach (Vector3Int cell in bounds.allPositionsWithin)
+        {
+            if (fogOfWarTilemap.HasTile(cell))
+                fogOfWarTilemap.SetColor(cell, fogColor);
+        }
+    }
+
     public void SetFogOfWarDebugPartial()
     {
         bool modeChanged = !debugFogOfWarEnabled || !debugFogOfWarPartial;
         debugFogOfWarEnabled = true;
         debugFogOfWarPartial = true;
+        fogSortingLayerValidated = false;
+        ValidateFogOfWarSortingLayer();
         if (!modeChanged)
             return;
 

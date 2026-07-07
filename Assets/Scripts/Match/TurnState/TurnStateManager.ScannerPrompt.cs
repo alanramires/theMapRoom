@@ -235,20 +235,8 @@ public partial class TurnStateManager
 
     private void UpdateAiActionOverlayPresentation()
     {
-        bool suppress = matchController != null && matchController.ShouldHideActiveAiActionPresentation();
         TilemapRenderer rangeRenderer = rangeMapTilemap != null ? rangeMapTilemap.GetComponent<TilemapRenderer>() : null;
         TilemapRenderer lineRenderer = lineOfFireMapTilemap != null ? lineOfFireMapTilemap.GetComponent<TilemapRenderer>() : null;
-
-        if (suppress)
-        {
-            if (rangeRenderer != null)
-                rangeRenderer.enabled = false;
-            if (lineRenderer != null)
-                lineRenderer.enabled = false;
-            ClearCommittedPathVisual();
-            aiActionOverlaysSuppressed = true;
-            return;
-        }
 
         if (aiActionOverlaysSuppressed)
         {
@@ -266,68 +254,8 @@ public partial class TurnStateManager
 
     private bool ShouldSuppressAiActionPreviewLines()
     {
-        return matchController != null && matchController.ShouldHideActiveAiActionPresentation();
-    }
-
-    private void ClipAiAimingPreviewToHumanVisibility(List<Vector3> points, bool allowFullLineForVisibleAttacker)
-    {
-        if (points == null || points.Count < 2 || !ShouldSuppressAiActionPreviewLines())
-            return;
-
-        if (allowFullLineForVisibleAttacker && selectedUnit != null &&
-            matchController.ShouldShowActiveAiUnitAt(selectedUnit, selectedUnit.transform.position, true))
-            return;
-
-        int firstVisible = -1;
-        for (int i = 0; i < points.Count; i++)
-        {
-            if (matchController.ShouldShowActiveAiWorldEffectAt(points[i]))
-            {
-                firstVisible = i;
-                break;
-            }
-        }
-
-        if (firstVisible < 0)
-        {
-            points.Clear();
-            return;
-        }
-
-        Vector3 entryPoint = points[firstVisible];
-        if (firstVisible > 0)
-            entryPoint = FindAiPreviewVisibilityBoundary(points[firstVisible - 1], entryPoint, seekVisibleSide: true);
-
-        if (firstVisible > 0)
-            points.RemoveRange(0, firstVisible);
-        points[0] = entryPoint;
-
-        for (int i = 1; i < points.Count; i++)
-        {
-            if (matchController.ShouldShowActiveAiWorldEffectAt(points[i]))
-                continue;
-
-            Vector3 exitPoint = FindAiPreviewVisibilityBoundary(points[i - 1], points[i], seekVisibleSide: false);
-            points.RemoveRange(i, points.Count - i);
-            points.Add(exitPoint);
-            break;
-        }
-    }
-
-    private Vector3 FindAiPreviewVisibilityBoundary(Vector3 hiddenSide, Vector3 visibleSide, bool seekVisibleSide)
-    {
-        Vector3 hidden = seekVisibleSide ? hiddenSide : visibleSide;
-        Vector3 visible = seekVisibleSide ? visibleSide : hiddenSide;
-        for (int i = 0; i < 8; i++)
-        {
-            Vector3 middle = Vector3.Lerp(hidden, visible, 0.5f);
-            if (matchController.ShouldShowActiveAiWorldEffectAt(middle))
-                visible = middle;
-            else
-                hidden = middle;
-        }
-
-        return visible;
+        // A layer FogOfWar cobre as linhas e previews nas celulas ocultas.
+        return false;
     }
 
     private void RecordFramePerfSample()
@@ -4734,7 +4662,6 @@ public partial class TurnStateManager
             }
 
             BuildPathSegmentPoints(segmentStartDist, segmentEndDist, mirandoPreviewSegmentPoints);
-            ClipAiAimingPreviewToHumanVisibility(mirandoPreviewSegmentPoints, allowFullLineForVisibleAttacker: true);
             if (mirandoPreviewSegmentPoints.Count < 2)
             {
                 renderer.positionCount = 0;
@@ -5089,7 +5016,6 @@ public partial class TurnStateManager
                 }
 
                 BuildPathSegmentPointsFrom(track.pathPoints, startDist, endDist, track.tempSegmentPoints);
-                ClipAiAimingPreviewToHumanVisibility(track.tempSegmentPoints, allowFullLineForVisibleAttacker: false);
                 if (track.tempSegmentPoints.Count < 2)
                 {
                     renderer.positionCount = 0;

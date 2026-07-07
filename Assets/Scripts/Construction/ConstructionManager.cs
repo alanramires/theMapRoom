@@ -1072,7 +1072,7 @@ public class ConstructionManager : MonoBehaviour
 
         hudController.RefreshBindings();
 
-        bool effectiveVisible = IsRuntimeVisible();
+        bool effectiveVisible = IsHudVisibleThroughFog();
         if (hudController.gameObject.activeSelf != effectiveVisible)
             hudController.gameObject.SetActive(effectiveVisible);
         if (!effectiveVisible)
@@ -1109,7 +1109,7 @@ public class ConstructionManager : MonoBehaviour
             return;
 
         hudController.RefreshBindings();
-        bool effectiveVisible = IsRuntimeVisible();
+        bool effectiveVisible = IsHudVisibleThroughFog();
         if (hudController.gameObject.activeSelf != effectiveVisible)
             hudController.gameObject.SetActive(effectiveVisible);
         if (!effectiveVisible)
@@ -1355,6 +1355,15 @@ public class ConstructionManager : MonoBehaviour
     private bool IsRuntimeVisible()
     {
         return !Application.isPlaying || isVisible;
+    }
+
+    private bool IsHudVisibleThroughFog()
+    {
+        if (!IsRuntimeVisible() || !Application.isPlaying)
+            return IsRuntimeVisible();
+
+        TryAutoAssignMatchController();
+        return matchController == null || matchController.IsCellVisibleInFogPresentation(currentCellPosition);
     }
 
     private void HandleActiveTeamChanged(int _)

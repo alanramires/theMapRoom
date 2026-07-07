@@ -167,14 +167,7 @@ public partial class TurnStateManager : MonoBehaviour
         : cursorController != null ? cursorController.BoardTilemap : null;
     private void ReapplyForcedUnitVisualForFog(UnitManager unit)
     {
-        if (unit == null || matchController == null || !matchController.ShouldHideActiveAiActionPresentation())
-            return;
-
-        bool visible = matchController.ShouldShowActiveAiUnitAt(
-            unit,
-            unit.transform.position,
-            allowReveal: true);
-        unit.ForceFogOfWarPresentationVisibility(visible);
+        // A tilemap do FOW Total esta acima das unidades e controla a oclusao visual.
     }
     public WeaponPriorityData WeaponPriorityDataRef => weaponPriorityData;
     public DPQMatchupDatabase DpqMatchupDatabaseRef => dpqMatchupDatabase;

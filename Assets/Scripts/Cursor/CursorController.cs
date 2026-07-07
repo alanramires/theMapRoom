@@ -773,8 +773,8 @@ public class CursorController : MonoBehaviour
         if (cursorRenderer == null)
             return;
 
-        cursorRenderer.enabled = matchController == null
-            || matchController.ShouldShowActiveAiWorldEffectAt(transform.position);
+        // No FOW Total a tilemap da nevoa fica acima do Cursor e faz a oclusao.
+        cursorRenderer.enabled = true;
     }
 
     private void SnapToCell(Vector3Int cell)
@@ -1697,9 +1697,6 @@ public class CursorController : MonoBehaviour
 
     private void PlayMoveSfx()
     {
-        if (ShouldSuppressHiddenAiShoppingUiSfx())
-            return;
-
         if (moveSfx == null)
             return;
 
@@ -1711,18 +1708,6 @@ public class CursorController : MonoBehaviour
 
         audioSource.PlayOneShot(moveSfx, moveSfxVolume);
     }
-
-    private bool ShouldSuppressHiddenAiShoppingUiSfx()
-    {
-        if (turnStateManager == null ||
-            turnStateManager.CurrentCursorState != TurnStateManager.CursorState.ShoppingAndServices)
-            return false;
-
-        TryAutoAssignMatchController();
-        return matchController != null && matchController.ShouldHideActiveAiActionPresentation();
-    }
-
-
 
     private void PlayActionFeedback(TurnStateManager.ActionSfx feedback)
     {
@@ -2020,11 +2005,7 @@ public class CursorController : MonoBehaviour
     public void PlayErrorSfx() => PlayUiSfx(errorSfx);
     public void PlayConfirmSfx() => PlayUiSfx(confirmSfx);
     public void PlayCancelSfx() => PlayUiSfx(cancelSfx);
-    public void PlayDoneSfx()
-    {
-        if (!ShouldSuppressHiddenAiShoppingUiSfx())
-            PlayUiSfx(doneSfx);
-    }
+    public void PlayDoneSfx() => PlayUiSfx(doneSfx);
     public void PlayLoadSfx() => PlayUiSfx(loadSfx);
     public void PlayCursorMoveSfx() => PlayMoveSfx();
 

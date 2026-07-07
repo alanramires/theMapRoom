@@ -433,7 +433,22 @@ public class DebugManager : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
-        else if (command == "FOW PARTIAL" || command == "FOG OF WAR PARTIAL")
+        else if (TryParseSetFogAlphaCommand(rawCommand, out int fogAlphaPercent))
+        {
+            if (matchController == null)
+            {
+                Debug.Log("[Debug Command] MatchController nao encontrado.");
+            }
+            else
+            {
+                matchController.SetFogOfWarAlphaPercent(fogAlphaPercent);
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log($"[Debug Command] FoW alpha = {fogAlphaPercent}%.");
+            }
+        }
+        else if (command == "FOW PARTIAL" || command == "FOG OF WAR PARTIAL" ||
+                 command == "SET FOG PARTIAL" || command == "SET FOW PARTIAL")
         {
             if (matchController == null)
             {
@@ -1352,11 +1367,17 @@ public class DebugManager : MonoBehaviour
         string trimmed = rawCommand.Trim();
         const string prefixA = "fow ";
         const string prefixB = "fog of war ";
+        const string prefixC = "set fog ";
+        const string prefixD = "set fow ";
         string token;
         if (trimmed.StartsWith(prefixA, System.StringComparison.OrdinalIgnoreCase))
             token = trimmed.Substring(prefixA.Length).Trim();
         else if (trimmed.StartsWith(prefixB, System.StringComparison.OrdinalIgnoreCase))
             token = trimmed.Substring(prefixB.Length).Trim();
+        else if (trimmed.StartsWith(prefixC, System.StringComparison.OrdinalIgnoreCase))
+            token = trimmed.Substring(prefixC.Length).Trim();
+        else if (trimmed.StartsWith(prefixD, System.StringComparison.OrdinalIgnoreCase))
+            token = trimmed.Substring(prefixD.Length).Trim();
         else
             return false;
 
@@ -1380,6 +1401,25 @@ public class DebugManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static bool TryParseSetFogAlphaCommand(string rawCommand, out int alphaPercent)
+    {
+        alphaPercent = 0;
+        if (string.IsNullOrWhiteSpace(rawCommand))
+            return false;
+
+        string trimmed = rawCommand.Trim();
+        const string prefix = "set fog ";
+        if (!trimmed.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string token = trimmed.Substring(prefix.Length).Trim();
+        if (!int.TryParse(token, out int parsed) || parsed < 0 || parsed > 100)
+            return false;
+
+        alphaPercent = parsed;
+        return true;
     }
 
     private string GetInputText()

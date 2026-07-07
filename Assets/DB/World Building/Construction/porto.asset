@@ -18,11 +18,13 @@ MonoBehaviour:
   description: 
   isAirport: 0
   isHarbor: 1
+  isCity: 0
   spriteDefault: {fileID: 21300000, guid: f1bc5d6faae2ff144a2013c87abaa197, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
+  visao: 1
   baseMovementCost: 1
   isFakeBuilding: 0
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}

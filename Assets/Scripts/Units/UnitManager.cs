@@ -340,14 +340,6 @@ public class UnitManager : MonoBehaviour
         if (Application.isPlaying)
         {
             TryAutoAssignMatchController();
-            if (matchController != null && matchController.ShouldHideActiveAiActionPresentation())
-            {
-                bool visible = matchController.ShouldShowActiveAiUnitAt(
-                    this,
-                    transform.position,
-                    allowReveal: true);
-                ForceFogOfWarPresentationVisibility(visible);
-            }
             return;
         }
 

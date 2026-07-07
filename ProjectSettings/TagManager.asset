@@ -59,5 +59,8 @@ TagManager:
   - name: Cursor
     uniqueID: 388763641
     locked: 0
+  - name: FogOfWar
+    uniqueID: 1467093287
+    locked: 0
   m_RenderingLayers:
   - Default
