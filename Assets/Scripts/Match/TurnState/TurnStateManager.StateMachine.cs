@@ -399,6 +399,11 @@ public partial class TurnStateManager
         Vector3Int cursorCell = cursorController.CurrentCell;
         int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
 
+        // O FOW visual tambem protege as consultas: nao permita selecionar loja,
+        // unidade ou construcao que exista sob um hex ainda coberto.
+        if (matchController != null && !matchController.IsCellVisibleInFogPresentation(cursorCell))
+            return ActionSfx.None;
+
         if (TryEnterUnblockedConstructionShoppingBeforeUnit(cursorCell, activeTeam))
             return ActionSfx.Confirm;
 

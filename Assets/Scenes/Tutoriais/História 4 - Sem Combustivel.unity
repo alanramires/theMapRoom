@@ -8157,7 +8157,7 @@ MonoBehaviour:
   hasVictoryWinner: 0
   victoryWinnerTeam: -1
   fogOfWarTilemap: {fileID: 2015085660}
-  fogOfWarOverlayTile: {fileID: 0}
+  fogOfWarOverlayTile: {fileID: 11400000, guid: a9d34637cfec5f34f85ff83701fe1885, type: 2}
   fogOfWarTerrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
   fogOfWarDpqAirHeightConfig: {fileID: 11400000, guid: 74c8a09efff211941b27a37f6bb948f1, type: 2}
   fogOfWarAlpha: 0.8

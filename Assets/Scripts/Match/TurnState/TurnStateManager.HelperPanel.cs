@@ -2044,6 +2044,9 @@ public partial class TurnStateManager
         if (Time.unscaledTime - hoveredCellStartTime >= delay)
         {
             hasTriggeredHoverAtCurrentCell = true;
+            if (matchController != null && !matchController.IsCellVisibleInFogPresentation(currentCell))
+                return;
+
             int activeTeamId = matchController != null ? matchController.ActiveTeamId : -1;
             TeamId activeTeam = activeTeamId >= 0 ? (TeamId)activeTeamId : TeamId.Neutral;
 
@@ -2074,7 +2077,7 @@ public partial class TurnStateManager
                 }
 
                 bool hasLocation = terrainTilemap != null && terrainTilemap.HasTile(currentCell);
-                bool visibleToPlayer = matchController == null || matchController.IsCellVisibleForActiveTeam(currentCell);
+                bool visibleToPlayer = matchController == null || matchController.IsCellVisibleInFogPresentation(currentCell);
                 if (hasLocation && visibleToPlayer)
                     BeginInspectedTerrainHelper(currentCell);
             }

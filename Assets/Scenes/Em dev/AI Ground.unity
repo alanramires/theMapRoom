@@ -20689,7 +20689,7 @@ MonoBehaviour:
   hasVictoryWinner: 0
   victoryWinnerTeam: -1
   fogOfWarTilemap: {fileID: 702628902}
-  fogOfWarOverlayTile: {fileID: 11400000, guid: c6f919cced6cd3a4a8d994a2a1f8ab2e, type: 2}
+  fogOfWarOverlayTile: {fileID: 11400000, guid: a9d34637cfec5f34f85ff83701fe1885, type: 2}
   fogOfWarTerrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
   fogOfWarDpqAirHeightConfig: {fileID: 11400000, guid: 74c8a09efff211941b27a37f6bb948f1, type: 2}
   fogOfWarAlpha: 0.65
