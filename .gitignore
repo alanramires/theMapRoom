@@ -38,3 +38,7 @@ desktop.ini
 *_Legacy/
 *_legacy.meta
 *_Legacy.meta
+
+# Design sources (Photoshop) — fontes de design, nao fazem parte do projeto
+*.psd
+*.psd.meta
