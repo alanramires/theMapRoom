@@ -1208,7 +1208,9 @@ public partial class TurnStateManager
         }
 
         Advance(CursorState.EndingTurn, "TryOpenEndingTurnConfirmation");
-        PanelDialogController.TrySetExternalText("End Turn :: Confirm");
+        // Confirmacao clicavel/tocavel no helper panel, mesmo tratamento de Render-se/Sair.
+        PanelDialogController.ClearExternalText();
+        PanelHelperController.TrySetExternalText("PASSAR A VEZ", "Encerrar seu turno agora?");
         return true;
     }
 
@@ -1218,6 +1220,7 @@ public partial class TurnStateManager
             return false;
 
         PanelDialogController.ClearExternalText();
+        PanelHelperController.ClearExternalText();
         Retreat("TryCancelEndingTurnConfirmation");
         return true;
     }
@@ -1253,6 +1256,7 @@ public partial class TurnStateManager
         {
             message = "MatchController ausente para passar a vez.";
             PanelDialogController.ClearExternalText();
+            PanelHelperController.ClearExternalText();
             if (CurrentCursorState == CursorState.EndingTurn)
                 Retreat($"{reason}: missing MatchController");
             return false;
@@ -1262,6 +1266,7 @@ public partial class TurnStateManager
             Advance(CursorState.EndingTurnExecuting, reason);
 
         PanelDialogController.ClearExternalText();
+        PanelHelperController.ClearExternalText();
         matchController.AdvanceTurnWithTransition();
         ExecuteAndReset($"{reason}: dispatched");
         return true;

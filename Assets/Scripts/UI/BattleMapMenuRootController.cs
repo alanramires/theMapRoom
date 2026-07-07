@@ -108,6 +108,23 @@ public class BattleMapMenuRootController : MonoBehaviour
     public bool IsSurrenderConfirmationOpen => surrenderConfirmOpen;
     public int SurrenderConfirmationFocusIndex => surrenderConfirmFocusIndex;
 
+    // Confirmacao de fim de turno (helper panel clicavel, mesmo tratamento de Render-se/Sair).
+    // O backing e o estado EndingTurn do TurnStateManager (compartilhado por humano e IA);
+    // aqui so expomos para o PanelHelperController montar os botoes e o clique invoca-los.
+    public bool IsEndTurnConfirmationOpen =>
+        turnStateManager != null && turnStateManager.CurrentCursorState == TurnStateManager.CursorState.EndingTurn;
+    public int EndTurnConfirmationFocusIndex => 0;
+
+    public void InvokeEndTurnConfirmationOption(int index)
+    {
+        if (cursorController == null)
+            return;
+        if (index == 0)
+            cursorController.ConfirmEndTurnFromPointer();
+        else
+            cursorController.CancelEndTurnFromPointer();
+    }
+
     public bool NavigateSurrenderConfirmation(int direction)
     {
         if (!surrenderConfirmOpen || direction == 0) return false;
@@ -505,6 +522,20 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (!TryCloseMenuForEndTurnDispatch()) return false;
         if (cursorController == null) return false;
         return cursorController.TryExecuteEndTurnFromMenu();
+    }
+
+    /// <summary>
+    /// Fecha o menu e ABRE a confirmação de Passar a Vez (estado EndingTurn, com o
+    /// helper panel de confirmação) sem executar. A IA no modo visível usa isto para
+    /// confirmar como um humano faria, em vez de passar a vez direto.
+    /// </summary>
+    public bool TryOpenRodadaConfirmationForAI()
+    {
+        if (!TryCloseMenuForEndTurnDispatch()) return false;
+        if (turnStateManager == null) return false;
+        // O fechamento do menu pode deixar o cursor em PlayerMenu; a confirmação exige Neutral.
+        turnStateManager.TryExitPlayerMenuStateToNeutral();
+        return turnStateManager.TryOpenEndingTurnConfirmation(out _);
     }
 
     /// <summary>
@@ -1061,7 +1092,10 @@ public class BattleMapMenuRootController : MonoBehaviour
             case MenuAction.Rodada:
                 if (!TryCloseMenuForEndTurnDispatch())
                     break;
-                if (cursorController == null || !cursorController.TryExecuteEndTurnFromMenu())
+                // Botão deliberado do menu → abre a confirmação (prompt de fim de turno), não
+                // passa direto. O atalho R é o caminho rápido; os botões pedem confirmação.
+                turnStateManager?.TryExitPlayerMenuStateToNeutral();
+                if (cursorController == null || !cursorController.RequestEndTurnConfirmation())
                     cursorController?.PlayErrorSfx();
                 break;
             case MenuAction.Opcoes:

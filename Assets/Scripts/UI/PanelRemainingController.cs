@@ -108,7 +108,9 @@ public class PanelRemainingController : MonoBehaviour
         if (turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             return;
 
-        if (!cursorController.TryExecuteEndTurnFromMenu())
+        // Botão flutuante de fim de turno → abre a confirmação (prompt de fim de turno),
+        // não passa direto. O atalho R continua sendo o caminho rápido.
+        if (!cursorController.RequestEndTurnConfirmation())
             cursorController.PlayErrorSfx();
     }
 

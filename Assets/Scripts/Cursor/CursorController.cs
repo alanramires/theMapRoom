@@ -1101,23 +1101,14 @@ public class CursorController : MonoBehaviour
 
         if (WasAdvanceTurnPressedThisFrame())
         {
-            turnStateManager?.TryCloseThreatLayerHotzone();
-
+            // Atalho R = caminho rápido: passa a vez direto de Neutral, sem confirmação
+            // (mesmo comportamento da IA em modo rápido). Os botões de fim de turno
+            // (menu Rodada e HUD flutuante) é que abrem a confirmação.
             if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
                 return;
-
-            if (turnStateManager != null && !turnStateManager.TryOpenEndingTurnConfirmation(out string endTurnMessage))
-            {
-                if (!string.IsNullOrWhiteSpace(endTurnMessage))
-                    PanelDialogController.TrySetTransientText(endTurnMessage, 2.4f);
+            turnStateManager?.TryCloseThreatLayerHotzone();
+            if (!TryExecuteEndTurnFromMenu())
                 PlayErrorSfx();
-                return;
-            }
-
-            pendingEndTurnConfirmation = true;
-            if (turnStateManager == null)
-                PanelDialogController.TrySetExternalText("End Turn :: Confirm");
-            PlayBeepSfx();
             return;
         }
 
@@ -1173,7 +1164,14 @@ public class CursorController : MonoBehaviour
 #endif
     }
 
-    public bool TryOpenEndTurnConfirmationFromMenu()
+    /// <summary>
+    /// Abre a confirmação de Passar a Vez (estado EndingTurn + prompt de confirmação) a
+    /// partir de Neutral e arma o pending para o próximo confirmar/cancelar do jogador.
+    /// Caminho canônico dos botões humanos de fim de turno (menu Rodada e HUD
+    /// flutuante). O atalho R usa o caminho direto, sem confirmação.
+    /// Retorna false se não deu para abrir.
+    /// </summary>
+    public bool RequestEndTurnConfirmation()
     {
         if (pendingEndTurnConfirmation)
             return true;
@@ -1182,8 +1180,17 @@ public class CursorController : MonoBehaviour
         if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             return false;
 
+        if (turnStateManager != null && !turnStateManager.TryOpenEndingTurnConfirmation(out string endTurnMessage))
+        {
+            if (!string.IsNullOrWhiteSpace(endTurnMessage))
+                PanelDialogController.TrySetTransientText(endTurnMessage, 2.4f);
+            PlayErrorSfx();
+            return false;
+        }
+
         pendingEndTurnConfirmation = true;
-        PanelDialogController.TrySetExternalText("End Turn :: Confirm");
+        if (turnStateManager == null)
+            PanelDialogController.TrySetExternalText("End Turn :: Confirm");
         PlayBeepSfx();
         return true;
     }
@@ -1245,6 +1252,22 @@ public class CursorController : MonoBehaviour
         PlayActionFeedback(TurnStateManager.ActionSfx.Cancel);
     }
 
+    /// <summary>Confirma o fim de turno por clique/toque no botao do helper panel (PASSAR A VEZ).</summary>
+    public void ConfirmEndTurnFromPointer()
+    {
+        if (!pendingEndTurnConfirmation)
+            return;
+        ConfirmPendingEndTurn();
+    }
+
+    /// <summary>Cancela o fim de turno por clique/toque no botao do helper panel (CANCELAR).</summary>
+    public void CancelEndTurnFromPointer()
+    {
+        if (!pendingEndTurnConfirmation)
+            return;
+        CancelPendingEndTurn();
+    }
+
     private void ClearPendingEndTurnConfirmation()
     {
         if (!pendingEndTurnConfirmation)
@@ -1252,6 +1275,7 @@ public class CursorController : MonoBehaviour
 
         pendingEndTurnConfirmation = false;
         PanelDialogController.ClearExternalText();
+        PanelHelperController.ClearExternalText();
     }
 
     private bool TryTeleportToActiveTeamHeadQuarterOnNeutral()

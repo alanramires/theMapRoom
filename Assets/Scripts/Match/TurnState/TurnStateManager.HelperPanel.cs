@@ -31,7 +31,8 @@ public partial class TurnStateManager
         RemovingUnit = 12,
         AimTargets = 13,
         AimConfirm = 14,
-        EmbarkConfirm = 15
+        EmbarkConfirm = 15,
+        TerrainStats = 16
     }
 
     public sealed class HelperPanelData
@@ -60,6 +61,12 @@ public partial class TurnStateManager
         public string UnitStatsName;
         public readonly List<string> UnitStatsLines = new List<string>();
         public bool UnitStatsShowKeepPositionAimHint;
+        public string UnitStatsLocalLabel;
+        public Sprite UnitStatsLocalSprite;
+        public Color UnitStatsLocalColor = Color.white;
+        public int UnitStatsDefensePoints;
+        public string TerrainStatsName;
+        public string TerrainStatsDescription;
         public string ConstructionStatsName;
         public readonly List<string> ConstructionStatsLines = new List<string>();
         public string RemovingUnitName;
@@ -120,6 +127,7 @@ public partial class TurnStateManager
     private readonly List<HelperCommandServiceSkippedUnitLine> commandServiceHelperSkippedUnitLines = new List<HelperCommandServiceSkippedUnitLine>();
     private UnitManager inspectedHelperUnit;
     private ConstructionManager inspectedHelperConstruction;
+    private bool inspectedHelperTerrain;
     private readonly List<Vector3Int> inspectedThreatRangeCells = new List<Vector3Int>();
     private readonly HashSet<Vector3Int> inspectedThreatRangeLookup = new HashSet<Vector3Int>();
     private readonly List<Vector3Int> inspectedThreatLineCells = new List<Vector3Int>();
@@ -202,6 +210,7 @@ public partial class TurnStateManager
         public int index;
         public string unitName;
         public int? cost;
+        public bool canAfford = true;
         public bool isFocused;
         public bool isCancel;
     }
@@ -406,6 +415,8 @@ public partial class TurnStateManager
         if (TryBuildUnitStatsHelperPanelData(data))
             return true;
         if (TryBuildConstructionStatsHelperPanelData(data))
+            return true;
+        if (TryBuildTerrainStatsHelperPanelData(data))
             return true;
 
         if (scannerPromptStep == ScannerPromptStep.ThreatLayerTeamSelect)
@@ -691,6 +702,14 @@ public partial class TurnStateManager
             CurrentCursorState == CursorState.UnitSelected &&
             HasEmbarkedLongRangeWeapon(unit);
 
+        Vector3Int unitCell = unit.CurrentCellPosition;
+        unitCell.z = 0;
+        ResolveUnitActiveLocalVisual(unit, unitCell,
+            out data.UnitStatsLocalLabel,
+            out data.UnitStatsLocalSprite,
+            out data.UnitStatsLocalColor);
+        data.UnitStatsDefensePoints = Mathf.Max(0, ResolveDpqAtUnitPosition(unit, null).points);
+
         int hpCurrent = Mathf.Max(0, unit.CurrentHP);
         int hpMax = Mathf.Max(1, unit.GetMaxHP());
         int movement = 0;
@@ -738,7 +757,125 @@ public partial class TurnStateManager
         // 5. Supplies
         AppendUnitSuppliesDetailedLines(data.UnitStatsLines, unit);
 
+        // 6. Vision (somente em partidas com nevoa de guerra)
+        if (matchController != null && matchController.EnableTotalWar)
+            AppendUnitVisionDetailedLines(data.UnitStatsLines, unit);
+
         return data.UnitStatsLines.Count > 0;
+    }
+
+    private void ResolveUnitActiveLocalVisual(
+        UnitManager unit,
+        Vector3Int cell,
+        out string label,
+        out Sprite sprite,
+        out Color color)
+    {
+        label = string.Empty;
+        sprite = null;
+        color = Color.white;
+
+        if (unit != null && dpqAirHeightConfig != null)
+        {
+            Domain domain = unit.GetDomain();
+            HeightLevel height = unit.GetHeightLevel();
+            TileBase layerTile = null;
+
+            if (domain == Domain.Air && height == HeightLevel.AirLow)
+            {
+                label = dpqAirHeightConfig.airLowDisplayName;
+                layerTile = dpqAirHeightConfig.airLowTile;
+            }
+            else if (domain == Domain.Air && height == HeightLevel.AirHigh)
+            {
+                label = dpqAirHeightConfig.airHighDisplayName;
+                layerTile = dpqAirHeightConfig.airHighTile;
+            }
+            else if (domain == Domain.Submarine && height == HeightLevel.Submerged)
+            {
+                label = dpqAirHeightConfig.subDisplayName;
+                layerTile = dpqAirHeightConfig.subTile;
+            }
+
+            if (layerTile != null)
+            {
+                if (layerTile is Tile tile)
+                {
+                    sprite = tile.sprite;
+                    color = tile.color;
+                }
+                if (string.IsNullOrWhiteSpace(label))
+                    label = layerTile.name;
+                return;
+            }
+        }
+
+        label = ResolveCellTerrainLabel(cell);
+        ResolveCellLocalVisual(cell, out sprite, out color);
+    }
+
+    private static void AppendUnitVisionDetailedLines(List<string> lines, UnitManager unit)
+    {
+        if (lines == null || unit == null || !unit.TryGetUnitData(out UnitData unitData) || unitData == null)
+            return;
+
+        lines.Add(string.Empty);
+        lines.Add("SECTION:Vision");
+        lines.Add($"Alcance: {Mathf.Max(1, unitData.visao)}");
+
+        IReadOnlyList<UnitVisionException> specializations = unitData.visionSpecializations;
+        if (specializations == null)
+            return;
+
+        for (int i = 0; i < specializations.Count; i++)
+        {
+            UnitVisionException entry = specializations[i];
+            if (entry == null)
+                continue;
+
+            string layer = ResolveVisionLayerLabel(entry);
+            string detection = ResolveVisionDetectionSkillsLabel(entry.detectUnitsWithFollowingSkills);
+            lines.Add(string.IsNullOrWhiteSpace(detection)
+                ? $"- {layer}: {Mathf.Max(0, entry.vision)}"
+                : $"- {layer}: {Mathf.Max(0, entry.vision)} | Detecta: {detection}");
+        }
+    }
+
+    private static string ResolveVisionLayerLabel(UnitVisionException entry)
+    {
+        if (entry == null)
+            return "Especial";
+
+        switch (entry.domain)
+        {
+            case Domain.Land: return entry.allHeights ? "Terrestre" : "Terrestre/Superficie";
+            case Domain.Naval: return entry.allHeights ? "Naval" : "Naval/Superficie";
+            case Domain.Submarine: return entry.allHeights ? "Submarino" : "Submarino/Submerso";
+            case Domain.Air:
+                if (entry.allHeights) return "Aereo";
+                return entry.heightLevel == HeightLevel.AirHigh ? "Aereo/Alto" : "Aereo/Baixo";
+            default: return entry.domain.ToString();
+        }
+    }
+
+    private static string ResolveVisionDetectionSkillsLabel(IReadOnlyList<SkillData> skills)
+    {
+        if (skills == null || skills.Count == 0)
+            return string.Empty;
+
+        List<string> names = new List<string>();
+        for (int i = 0; i < skills.Count; i++)
+        {
+            SkillData skill = skills[i];
+            if (skill == null)
+                continue;
+            string name = !string.IsNullOrWhiteSpace(skill.displayName)
+                ? skill.displayName
+                : (!string.IsNullOrWhiteSpace(skill.id) ? skill.id : skill.name);
+            if (!string.IsNullOrWhiteSpace(name) && !names.Contains(name))
+                names.Add(name);
+        }
+        return string.Join(", ", names);
     }
 
     private static bool HasEmbarkedLongRangeWeapon(UnitManager unit)
@@ -885,6 +1022,11 @@ public partial class TurnStateManager
         data.Kind = HelperPanelKind.ConstructionStats;
         data.SubjectTeamId = (int)construction.TeamId;
         data.ConstructionStatsName = constructionName;
+        Vector3Int constructionCell = construction.CurrentCellPosition;
+        constructionCell.z = 0;
+        data.UnitStatsLocalLabel = ResolveCellTerrainLabel(constructionCell);
+        ResolveCellLocalVisual(constructionCell, out data.UnitStatsLocalSprite, out data.UnitStatsLocalColor);
+        data.UnitStatsDefensePoints = ResolveCellDefensePoints(constructionCell);
         data.ConstructionStatsLines.Add($"Dono Atual: {TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId})");
         data.ConstructionStatsLines.Add($"Capture: {construction.CurrentCapturePoints}/{construction.CapturePointsMax}");
 
@@ -952,9 +1094,88 @@ public partial class TurnStateManager
 
     private bool IsInspectedHelperActive()
     {
-        return (inspectedHelperUnit != null || inspectedHelperConstruction != null) &&
+        return (inspectedHelperUnit != null || inspectedHelperConstruction != null || inspectedHelperTerrain) &&
             inspectedHelperVisibleUntil > 0f &&
             Time.time <= inspectedHelperVisibleUntil;
+    }
+
+    private bool TryBuildTerrainStatsHelperPanelData(HelperPanelData data)
+    {
+        if (data == null || !inspectedHelperTerrain || !IsInspectedHelperActive())
+            return false;
+
+        Vector3Int cell = inspectedHelperCursorCell;
+        cell.z = 0;
+        data.Kind = HelperPanelKind.TerrainStats;
+        data.UnitStatsLocalLabel = ResolveCellTerrainLabel(cell);
+        data.TerrainStatsName = string.IsNullOrWhiteSpace(data.UnitStatsLocalLabel)
+            ? "LOCAL"
+            : data.UnitStatsLocalLabel;
+        ResolveCellLocalVisual(cell, out data.UnitStatsLocalSprite, out data.UnitStatsLocalColor);
+        data.UnitStatsDefensePoints = ResolveCellDefensePoints(cell);
+        data.TerrainStatsDescription = ResolveCellLocationDescription(cell);
+        return !string.IsNullOrWhiteSpace(data.UnitStatsLocalLabel) || data.UnitStatsLocalSprite != null;
+    }
+
+    private int ResolveCellDefensePoints(Vector3Int cell)
+    {
+        cell.z = 0;
+        Tilemap board = terrainTilemap;
+        if (board == null)
+            return 0;
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(board, cell);
+        if (construction != null && TryGetConstructionDpq(construction, out DPQData constructionDpq))
+            return Mathf.Max(0, constructionDpq.Pontos);
+
+        StructureData structure = ResolveStructureAtCell(cell);
+        if (structure != null && structure.dpqData != null)
+            return Mathf.Max(0, structure.dpqData.Pontos);
+
+        if (terrainDatabase != null &&
+            terrainDatabase.TryGetByPaletteTile(board.GetTile(cell), out TerrainTypeData terrain) &&
+            terrain != null && terrain.dpqData != null)
+            return Mathf.Max(0, terrain.dpqData.Pontos);
+
+        return 0;
+    }
+
+    private string ResolveCellLocationDescription(Vector3Int cell)
+    {
+        cell.z = 0;
+        Tilemap board = terrainTilemap;
+        if (board == null)
+            return string.Empty;
+
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(board, cell);
+        if (construction != null && construction.TryResolveConstructionData(out ConstructionData constructionData) && constructionData != null)
+            return constructionData.description ?? string.Empty;
+
+        StructureData structure = ResolveStructureAtCell(cell);
+        if (structure != null && !string.IsNullOrWhiteSpace(structure.description))
+            return structure.description;
+
+        if (terrainDatabase != null &&
+            terrainDatabase.TryGetByPaletteTile(board.GetTile(cell), out TerrainTypeData terrain) && terrain != null)
+            return terrain.description ?? string.Empty;
+
+        return string.Empty;
+    }
+
+    private void BeginInspectedTerrainHelper(Vector3Int cell)
+    {
+        if (cursorController == null)
+            return;
+
+        cell.z = 0;
+        inspectedHelperUnit = null;
+        inspectedHelperConstruction = null;
+        inspectedHelperTerrain = true;
+        ClearEnemyThreatLayersOverlay();
+        ClearInspectedThreatOverlay();
+        inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, inspectedHelperDurationSeconds);
+        inspectedHelperActivatedFrame = Time.frameCount;
+        inspectedHelperCursorCell = cell;
     }
 
     private void BeginInspectedHelper(UnitManager unit, bool paintThreatOverlay = true, bool triggerEvents = true)
@@ -964,6 +1185,7 @@ public partial class TurnStateManager
 
         inspectedHelperUnit = unit;
         inspectedHelperConstruction = null;
+        inspectedHelperTerrain = false;
         ClearEnemyThreatLayersOverlay();
         if (paintThreatOverlay)
             ApplyInspectedThreatOverlay(unit);
@@ -984,6 +1206,7 @@ public partial class TurnStateManager
 
         inspectedHelperConstruction = construction;
         inspectedHelperUnit = null;
+        inspectedHelperTerrain = false;
         ClearEnemyThreatLayersOverlay();
         ClearInspectedThreatOverlay();
         inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, GetInspectConstructionHelperDurationSeconds());
@@ -1012,6 +1235,7 @@ public partial class TurnStateManager
     {
         inspectedHelperUnit = null;
         inspectedHelperConstruction = null;
+        inspectedHelperTerrain = false;
         ClearInspectedThreatOverlay();
         inspectedHelperVisibleUntil = -1f;
         inspectedHelperActivatedFrame = -1;
@@ -1766,7 +1990,7 @@ public partial class TurnStateManager
 
         if (!IsInspectedHelperActive())
         {
-            bool hadHelper = inspectedHelperUnit != null || inspectedHelperConstruction != null;
+            bool hadHelper = inspectedHelperUnit != null || inspectedHelperConstruction != null || inspectedHelperTerrain;
             // Timeout de um helper de unidade/construcao: se ainda estamos presos no estado
             // de inspecao, volta pra neutral (Retreat). So limpar deixaria o CursorState travado
             // em InspectingUnit/Building. (InspectingHotZone nao usa helper e tem dismiss proprio.)
@@ -1848,6 +2072,11 @@ public partial class TurnStateManager
 
                     DialogManager.Instance?.TryShowHint(activeTeam, hint, constructionName);
                 }
+
+                bool hasLocation = terrainTilemap != null && terrainTilemap.HasTile(currentCell);
+                bool visibleToPlayer = matchController == null || matchController.IsCellVisibleForActiveTeam(currentCell);
+                if (hasLocation && visibleToPlayer)
+                    BeginInspectedTerrainHelper(currentCell);
             }
         }
     }
@@ -2150,12 +2379,15 @@ public partial class TurnStateManager
             int? resolvedCost = null;
             if (matchController != null)
                 resolvedCost = matchController.ResolveEconomyCost(unit.cost);
+            bool canAfford = !resolvedCost.HasValue || matchController == null ||
+                matchController.GetActualMoney((TeamId)matchController.ActiveTeamId) >= resolvedCost.Value;
 
             data.ShoppingLines.Add(new HelperShoppingLine
             {
                 index = i + 1,
                 unitName = ResolveUnitName(unit),
                 cost = resolvedCost,
+                canAfford = canAfford,
                 isFocused = !shoppingCancelFocused && shoppingSelectedIndex == i
             });
         }

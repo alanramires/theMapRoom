@@ -1303,8 +1303,8 @@ public class ReplayManager : MonoBehaviour
     {
         Debug.Log("[Replay][EndTurn] ExecuteRecordedEndTurnBatch iniciado.");
 
-        // A IA rapida equivale ao atalho R confirmado: passa a vez diretamente a
-        // partir de Neutral, sem abrir e navegar o menu do jogador.
+        // A IA rapida equivale ao atalho R: passa a vez diretamente a partir de Neutral,
+        // sem confirmacao e sem abrir/navegar o menu do jogador.
         if (IsLiveAIFastMode)
         {
             if (cursorController == null || !cursorController.TryExecuteEndTurnFromMenu())
@@ -1340,7 +1340,27 @@ public class ReplayManager : MonoBehaviour
 
         if (stepDelay > 0f) yield return new WaitForSecondsRealtime(stepDelay);
 
-        menu.TryTriggerRodadaForAI();
+        // Modo visível: a IA abre a confirmação de Passar a Vez (helper panel) e confirma,
+        // igual um humano faria — em vez de passar a vez direto. O modo rápido (IsLiveAIFastMode,
+        // tratado acima) continua instantâneo.
+        if (!menu.TryOpenRodadaConfirmationForAI())
+        {
+            ReplayLogWarning("[Replay][EndTurn] Confirmação de Passar a Vez indisponível — fallback direto.");
+            menu.TryTriggerRodadaForAI();
+            yield return null;
+            yield break;
+        }
+
+        // Segura o painel de confirmação visível por um beat antes do "sim" (mesma pausa
+        // que a IA usa antes de confirmar qualquer ação).
+        float confirmHold = Mathf.Max(GetEffectiveBeforeConfirmDelay(), stepDelay);
+        if (confirmHold > 0f) yield return new WaitForSecondsRealtime(confirmHold);
+
+        if (turnStateManager == null || !turnStateManager.TryExecuteEndingTurnFromConfirmation(out _))
+        {
+            ReplayLogWarning("[Replay][EndTurn] Falha ao confirmar Passar a Vez — fallback direto.");
+            cursorController?.TryExecuteEndTurnFromMenu();
+        }
         yield return null;
     }
 

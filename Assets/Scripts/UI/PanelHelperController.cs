@@ -159,6 +159,11 @@ public class PanelHelperController : MonoBehaviour
     private Image aimConfirmLocalIcon;
     private TMP_Text aimConfirmLocalText;
     private const float AimConfirmDetailsHeight = 172f;
+    private GameObject unitStatsLocalRoot;
+    private Image unitStatsLocalIcon;
+    private TMP_Text unitStatsLocalText;
+    private TMP_Text unitStatsDefenseText;
+    private bool unitStatsLocalAtBottom;
     private GameObject disembarkActionsRoot;
     private readonly List<Button> disembarkActionButtons = new List<Button>();
     private readonly List<int> disembarkActionFocusIndices = new List<int>();
@@ -463,6 +468,11 @@ public class PanelHelperController : MonoBehaviour
                 body = BuildConstructionStatsBody(data);
                 return;
 
+            case TurnStateManager.HelperPanelKind.TerrainStats:
+                title = data.TerrainStatsName ?? "TERRENO";
+                body = BuildTerrainStatsBody(data);
+                return;
+
             case TurnStateManager.HelperPanelKind.TurnStartAutonomy:
                 title = ResolveMessage("helper.title.turn_start_autonomy", "TURN START");
                 body = BuildTurnStartAutonomyBody(data);
@@ -498,6 +508,15 @@ public class PanelHelperController : MonoBehaviour
                 "Dica: mantenha posição para mirar com armas de longo alcance."));
         }
 
+        return sb.ToString();
+    }
+
+    private static string BuildTerrainStatsBody(TurnStateManager.HelperPanelData data)
+    {
+        // LOCAL/DEFESA ocupa o topo; a descricao comeca somente abaixo dessa linha visual.
+        StringBuilder sb = new StringBuilder("\n\n\n");
+        if (!string.IsNullOrWhiteSpace(data?.TerrainStatsDescription))
+            sb.Append(data.TerrainStatsDescription.Trim());
         return sb.ToString();
     }
 
@@ -582,6 +601,9 @@ public class PanelHelperController : MonoBehaviour
 
         if (line == "SECTION:Supplies" || line == "Suprimentos Carregados" || line == "Reserva")
             return ResolveMessage("helper.unit_stats.section.supplies", "Suprimentos Carregados");
+
+        if (line == "SECTION:Vision")
+            return ResolveMessage("helper.unit_stats.section.vision", "Visão");
 
         string supplies = string.Empty;
         const string transportedSuppliesMarker = "||SUPPLIES||";
@@ -1481,6 +1503,7 @@ public class PanelHelperController : MonoBehaviour
         RefreshAimTargetControls(panelVisible, data);
         RefreshAimFooterFocus(panelVisible, data);
         RefreshAimConfirmDetails(panelVisible, data);
+        RefreshUnitStatsLocal(panelVisible, data);
         RefreshDisembarkActionControls(panelVisible, data);
         RefreshShoppingActionControls(panelVisible, data);
         RefreshPersistenceActionControls(panelVisible);
@@ -1559,6 +1582,8 @@ public class PanelHelperController : MonoBehaviour
         {
             helperTxt.ForceMeshUpdate();
             bodyHeight = Mathf.Max(0f, helperTxt.preferredHeight);
+            if (unitStatsLocalAtBottom && unitStatsLocalRoot != null && unitStatsLocalRoot.activeSelf)
+                bodyHeight += 66f;
         }
 
         float baseMin = cachedBasePanelHeight > 0f ? cachedBasePanelHeight : 0f;
@@ -1731,6 +1756,120 @@ public class PanelHelperController : MonoBehaviour
 
         aimConfirmDetailsRoot.SetActive(true);
         if (helperTxt != null) helperTxt.enabled = false;
+    }
+
+    private void RefreshUnitStatsLocal(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        bool active = panelVisible && data != null &&
+                      (data.Kind == TurnStateManager.HelperPanelKind.UnitStats ||
+                       data.Kind == TurnStateManager.HelperPanelKind.ConstructionStats ||
+                       data.Kind == TurnStateManager.HelperPanelKind.TerrainStats);
+        if (!active)
+        {
+            unitStatsLocalAtBottom = false;
+            if (unitStatsLocalRoot != null)
+                unitStatsLocalRoot.SetActive(false);
+            return;
+        }
+
+        EnsureUnitStatsLocalRoot();
+        if (unitStatsLocalRoot == null)
+            return;
+
+        unitStatsLocalText.text = string.IsNullOrWhiteSpace(data.UnitStatsLocalLabel)
+            ? "LOCAL: —"
+            : $"LOCAL: {data.UnitStatsLocalLabel}";
+        unitStatsDefenseText.text = $"DEFESA: {data.UnitStatsDefensePoints}";
+        unitStatsLocalIcon.sprite = data.UnitStatsLocalSprite;
+        unitStatsLocalIcon.enabled = data.UnitStatsLocalSprite != null;
+        unitStatsLocalIcon.color = data.UnitStatsLocalColor;
+        unitStatsLocalText.color = currentTeamColor;
+        unitStatsDefenseText.color = currentTeamColor;
+        RectTransform localRect = unitStatsLocalRoot.GetComponent<RectTransform>();
+        if (data.Kind == TurnStateManager.HelperPanelKind.TerrainStats)
+        {
+            localRect.anchoredPosition = new Vector2(0f, -48f);
+        }
+        else if (helperTxt != null)
+        {
+            helperTxt.ForceMeshUpdate();
+            float contentHeight = Mathf.Max(0f, helperTxt.preferredHeight);
+            localRect.anchoredPosition = new Vector2(0f, -48f - contentHeight - 6f);
+        }
+        unitStatsLocalAtBottom = data.Kind == TurnStateManager.HelperPanelKind.UnitStats ||
+                                 data.Kind == TurnStateManager.HelperPanelKind.ConstructionStats;
+        unitStatsLocalRoot.SetActive(true);
+    }
+
+    private void EnsureUnitStatsLocalRoot()
+    {
+        if (!Application.isPlaying || unitStatsLocalRoot != null || helperRect == null)
+            return;
+
+        unitStatsLocalRoot = new GameObject("helper_unit_stats_local", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        RectTransform rootRect = unitStatsLocalRoot.GetComponent<RectTransform>();
+        rootRect.SetParent(helperRect, false);
+        rootRect.anchorMin = new Vector2(0.06f, 1f);
+        rootRect.anchorMax = new Vector2(0.94f, 1f);
+        rootRect.pivot = new Vector2(0.5f, 1f);
+        rootRect.anchoredPosition = new Vector2(0f, -48f);
+        rootRect.sizeDelta = new Vector2(0f, 60f);
+
+        HorizontalLayoutGroup layout = unitStatsLocalRoot.GetComponent<HorizontalLayoutGroup>();
+        layout.spacing = 10f;
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+
+        GameObject iconObject = new GameObject("local_icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement));
+        iconObject.transform.SetParent(rootRect, false);
+        LayoutElement iconLayout = iconObject.GetComponent<LayoutElement>();
+        iconLayout.minWidth = 52f;
+        iconLayout.preferredWidth = 52f;
+        iconLayout.minHeight = 52f;
+        iconLayout.preferredHeight = 52f;
+        unitStatsLocalIcon = iconObject.GetComponent<Image>();
+        unitStatsLocalIcon.preserveAspect = true;
+        unitStatsLocalIcon.raycastTarget = false;
+
+        GameObject textObject = new GameObject("local_details", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+        textObject.transform.SetParent(rootRect, false);
+        LayoutElement textLayout = textObject.GetComponent<LayoutElement>();
+        textLayout.minWidth = 130f;
+        textLayout.preferredWidth = 190f;
+        VerticalLayoutGroup textGroup = textObject.GetComponent<VerticalLayoutGroup>();
+        textGroup.spacing = 2f;
+        textGroup.childAlignment = TextAnchor.MiddleLeft;
+        textGroup.childControlWidth = true;
+        textGroup.childControlHeight = true;
+        textGroup.childForceExpandWidth = true;
+        textGroup.childForceExpandHeight = false;
+
+        unitStatsLocalText = CreateUnitStatsLocalText("local_name", textObject.transform);
+        unitStatsDefenseText = CreateUnitStatsLocalText("local_defense", textObject.transform);
+        unitStatsLocalRoot.SetActive(false);
+    }
+
+    private TMP_Text CreateUnitStatsLocalText(string objectName, Transform parent)
+    {
+        GameObject obj = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI), typeof(LayoutElement));
+        obj.transform.SetParent(parent, false);
+        LayoutElement element = obj.GetComponent<LayoutElement>();
+        element.minHeight = 25f;
+        element.preferredHeight = 25f;
+        TMP_Text text = obj.GetComponent<TMP_Text>();
+        if (helperTxt != null && helperTxt.font != null)
+            text.font = helperTxt.font;
+        text.fontSize = 18f;
+        text.fontStyle = FontStyles.Bold;
+        text.alignment = TextAlignmentOptions.MidlineLeft;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 12f;
+        text.fontSizeMax = 18f;
+        text.raycastTarget = false;
+        return text;
     }
 
     private void EnsureAimConfirmDetailsRoot()
@@ -2329,10 +2468,24 @@ public class PanelHelperController : MonoBehaviour
             Button shoppingButton = shoppingActionButtons[i];
             if (shoppingButton == null)
                 continue;
+            bool unavailable = i < data.ShoppingLines.Count &&
+                               data.ShoppingLines[i] != null &&
+                               !data.ShoppingLines[i].isCancel &&
+                               !data.ShoppingLines[i].canAfford;
+            shoppingButton.interactable = !unavailable;
             ApplyFooterButtonFocus(
                 shoppingButton.GetComponent<Image>(),
                 shoppingButton.GetComponentInChildren<TMP_Text>(true),
                 i == focusedShoppingIndex);
+            if (unavailable)
+            {
+                Image image = shoppingButton.GetComponent<Image>();
+                TMP_Text label = shoppingButton.GetComponentInChildren<TMP_Text>(true);
+                if (image != null)
+                    image.color = new Color(0.12f, 0.12f, 0.12f, 0.88f);
+                if (label != null)
+                    label.color = new Color(0.52f, 0.52f, 0.52f, 1f);
+            }
         }
         if (helperTxt != null)
             helperTxt.enabled = false;
@@ -2377,10 +2530,11 @@ public class PanelHelperController : MonoBehaviour
         bool newGameWizardActive = mainMenuPanel != null && mainMenuPanel.IsNewGameWizardOpen;
         bool battleExitActive = battleMapMenuController != null && battleMapMenuController.IsExitConfirmationOpen;
         bool battleSurrenderActive = battleMapMenuController != null && battleMapMenuController.IsSurrenderConfirmationOpen;
+        bool battleEndTurnActive = battleMapMenuController != null && battleMapMenuController.IsEndTurnConfirmationOpen;
         bool savePromptActive = saveGameManager != null &&
                                 (saveGameManager.IsPersistenceSlotSelectionActive ||
                                  saveGameManager.IsPersistenceOverwriteConfirmationActive);
-        bool active = panelVisible && (menuDeleteActive || menuQuitActive || newGameWizardActive || battleExitActive || battleSurrenderActive || savePromptActive);
+        bool active = panelVisible && (menuDeleteActive || menuQuitActive || newGameWizardActive || battleExitActive || battleSurrenderActive || battleEndTurnActive || savePromptActive);
         if (!active)
         {
             if (persistenceActionsRoot != null)
@@ -2395,13 +2549,14 @@ public class PanelHelperController : MonoBehaviour
             newGameWizardActive ? $"new_game_{mainMenuPanel.NewGameWizardStep}" :
             battleExitActive ? "battle_exit" :
             battleSurrenderActive ? "battle_surrender" :
+            battleEndTurnActive ? "battle_end_turn" :
             saveGameManager.IsPersistenceOverwriteConfirmationActive
             ? "overwrite"
             : string.Join("|", saveGameManager.GetPersistenceSlotButtonLabel(1),
                 saveGameManager.GetPersistenceSlotButtonLabel(2), saveGameManager.GetPersistenceSlotButtonLabel(3));
         if (signature != persistenceActionsSignature)
         {
-            RebuildPersistenceActionButtons(menuDeleteActive, menuQuitActive, newGameWizardActive, battleExitActive, battleSurrenderActive);
+            RebuildPersistenceActionButtons(menuDeleteActive, menuQuitActive, newGameWizardActive, battleExitActive, battleSurrenderActive, battleEndTurnActive);
             persistenceActionsSignature = signature;
         }
 
@@ -2439,7 +2594,7 @@ public class PanelHelperController : MonoBehaviour
         persistenceActionsRoot.SetActive(false);
     }
 
-    private void RebuildPersistenceActionButtons(bool menuDeleteActive, bool menuQuitActive, bool newGameWizardActive, bool battleExitActive, bool battleSurrenderActive)
+    private void RebuildPersistenceActionButtons(bool menuDeleteActive, bool menuQuitActive, bool newGameWizardActive, bool battleExitActive, bool battleSurrenderActive, bool battleEndTurnActive)
     {
         // Destroi todos os filhos (botoes, spacers de rodape e detalhes de confirmacao) de uma vez.
         RectTransform persistenceRootRect = persistenceActionsRoot.GetComponent<RectTransform>();
@@ -2491,6 +2646,11 @@ public class PanelHelperController : MonoBehaviour
         {
             CreatePersistenceButton("CONFIRMAR RENDIÇÃO", () => battleMapMenuController?.InvokeSurrenderConfirmationOption(0));
             CreatePersistenceButton("CANCELAR", () => battleMapMenuController?.InvokeSurrenderConfirmationOption(1));
+        }
+        else if (battleEndTurnActive)
+        {
+            CreatePersistenceButton("PASSAR A VEZ", () => battleMapMenuController?.InvokeEndTurnConfirmationOption(0));
+            CreatePersistenceButton("CANCELAR", () => battleMapMenuController?.InvokeEndTurnConfirmationOption(1));
         }
         else if (saveGameManager.IsPersistenceOverwriteConfirmationActive)
         {
@@ -2553,7 +2713,9 @@ public class PanelHelperController : MonoBehaviour
                         ? battleMapMenuController.ExitConfirmationFocusIndex
                         : (battleMapMenuController != null && battleMapMenuController.IsSurrenderConfirmationOpen
                             ? battleMapMenuController.SurrenderConfirmationFocusIndex
-                            : (saveGameManager != null ? saveGameManager.PersistencePromptFocusIndex : -1)))));
+                            : (battleMapMenuController != null && battleMapMenuController.IsEndTurnConfirmationOpen
+                                ? battleMapMenuController.EndTurnConfirmationFocusIndex
+                                : (saveGameManager != null ? saveGameManager.PersistencePromptFocusIndex : -1))))));
         for (int i = 0; i < persistenceActionButtons.Count; i++)
         {
             Image image = i < persistenceActionImages.Count ? persistenceActionImages[i] : null;
@@ -2627,7 +2789,8 @@ public class PanelHelperController : MonoBehaviour
         {
             TurnStateManager.HelperShoppingLine line = lines[i];
             if (line != null)
-                sb.Append(line.index).Append('|').Append(line.unitName).Append('|').Append(line.cost).Append(';');
+                sb.Append(line.index).Append('|').Append(line.unitName).Append('|').Append(line.cost)
+                    .Append('|').Append(line.canAfford).Append(';');
         }
         return sb.ToString();
     }
@@ -2656,6 +2819,7 @@ public class PanelHelperController : MonoBehaviour
             element.preferredHeight = ShoppingActionButtonHeight;
 
             Button button = buttonObject.GetComponent<Button>();
+            button.interactable = isCancel || line.canAfford;
             Navigation navigation = button.navigation;
             navigation.mode = Navigation.Mode.None;
             button.navigation = navigation;

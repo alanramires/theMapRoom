@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 [CreateAssetMenu(menuName = "Game/DPQ/DPQ Air Height Config", fileName = "DPQAirHeightConfig")]
 public class DPQAirHeightConfig : ScriptableObject
@@ -12,6 +13,20 @@ public class DPQAirHeightConfig : ScriptableObject
 
     [Tooltip("Fallback opcional quando AirLow/AirHigh nao estiver configurado.")]
     public DPQData fallbackDpq;
+
+    [Header("Air Tiles")]
+    [Tooltip("Tile usado para Domain.Air + HeightLevel.AirLow.")]
+    public TileBase airLowTile;
+
+    [Tooltip("Tile usado para Domain.Air + HeightLevel.AirHigh.")]
+    public TileBase airHighTile;
+
+    [Header("Air Display Names")]
+    [Tooltip("Nome de exibicao para Domain.Air + HeightLevel.AirLow.")]
+    public string airLowDisplayName;
+
+    [Tooltip("Nome de exibicao para Domain.Air + HeightLevel.AirHigh.")]
+    public string airHighDisplayName;
 
     [Header("Air Vision")]
     [Tooltip("EV para Domain.Air + HeightLevel.AirLow.")]
@@ -32,6 +47,24 @@ public class DPQAirHeightConfig : ScriptableObject
     [Tooltip("Block LoS fallback opcional para camada de ar sem config especifica.")]
     public bool fallbackBlockLoS = true;
 
+    // Nao tem relacao com air height, mas aproveitamos este asset para guardar a config
+    // do submarino (Domain.Submarine + HeightLevel.Submerged, camada unica).
+    [Header("Submar")]
+    [Tooltip("DPQ usado por unidades em Domain.Submarine + HeightLevel.Submerged.")]
+    public DPQData subDpq;
+
+    [Tooltip("Tile usado para Domain.Submarine + HeightLevel.Submerged.")]
+    public TileBase subTile;
+
+    [Tooltip("Nome de exibicao para Domain.Submarine + HeightLevel.Submerged.")]
+    public string subDisplayName;
+
+    [Tooltip("EV para Domain.Submarine + HeightLevel.Submerged.")]
+    public int subEv = 2;
+
+    [Tooltip("Block LoS para Domain.Submarine + HeightLevel.Submerged.")]
+    public bool subBlockLoS;
+
     public bool TryGetFor(Domain domain, HeightLevel heightLevel, out DPQData dpq)
     {
         if (domain == Domain.Air)
@@ -49,8 +82,14 @@ public class DPQAirHeightConfig : ScriptableObject
             }
         }
 
-        dpq = fallbackDpq;
-        return dpq != null;
+        if (domain == Domain.Submarine && heightLevel == HeightLevel.Submerged)
+        {
+            dpq = subDpq;
+            return dpq != null;
+        }
+
+        dpq = null;
+        return false;
     }
 
     public bool TryGetVisionFor(Domain domain, HeightLevel heightLevel, out int ev, out bool blockLoS)
@@ -72,6 +111,13 @@ public class DPQAirHeightConfig : ScriptableObject
             }
         }
 
+        if (domain == Domain.Submarine && heightLevel == HeightLevel.Submerged)
+        {
+            ev = subEv;
+            blockLoS = subBlockLoS;
+            return true;
+        }
+
         ev = fallbackEv;
         blockLoS = fallbackBlockLoS;
         return true;
@@ -85,5 +131,7 @@ public class DPQAirHeightConfig : ScriptableObject
             airHighEv = 0;
         if (fallbackEv < 0)
             fallbackEv = 0;
+        if (subEv < 0)
+            subEv = 0;
     }
 }

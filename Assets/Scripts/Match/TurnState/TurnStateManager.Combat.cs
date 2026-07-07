@@ -394,12 +394,14 @@ public partial class TurnStateManager
         Domain activeDomain = unit.GetDomain();
         HeightLevel activeHeight = unit.GetHeightLevel();
 
-        if (activeDomain == Domain.Air
+        bool usesConfiguredLayerDpq = activeDomain == Domain.Air ||
+            (activeDomain == Domain.Submarine && activeHeight == HeightLevel.Submerged);
+        if (usesConfiguredLayerDpq
             && dpqAirHeightConfig != null
-            && dpqAirHeightConfig.TryGetFor(activeDomain, activeHeight, out DPQData airDpq)
-            && airDpq != null)
+            && dpqAirHeightConfig.TryGetFor(activeDomain, activeHeight, out DPQData layerDpq)
+            && layerDpq != null)
         {
-            return BuildDpqInfo(airDpq, $"Camada ativa: {activeDomain}/{activeHeight}");
+            return BuildDpqInfo(layerDpq, $"Camada ativa: {activeDomain}/{activeHeight}");
         }
 
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(referenceTilemap, cell);

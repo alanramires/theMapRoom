@@ -184,9 +184,37 @@ public sealed class MatchStatsManager : MonoBehaviour
         destroyedUnitIds.Add(unit.InstanceId);
         SlotMatchStats ownerStats = GetOrCreateStats(unit.TeamId);
         UnitTypeMatchStats typeStats = ownerStats.GetOrCreateUnitStats(ResolveUnitKey(unit, out UnitData data), data, unit);
+        int cost = ResolveCost(data);
         typeStats.lost++;
-        typeStats.valueLost += ResolveCost(data);
+        typeStats.valueLost += cost;
+        // Non-combat deaths (merge donors, out-of-fuel, transporter-chain losses) reach here
+        // via OnUnitDestroyed instead of an "Ataque" jogada. They must count as a death for the
+        // owner — mirroring RecordKill's slot-level accounting — but credit no kill to anyone
+        // (this path never touches totalKills). A unit that merges is a death, not an enemy kill.
+        ownerStats.totalLosses++;
+        ownerStats.totalLostValue += cost;
+        if (data != null && data.eliteLevel > 0)
+            ownerStats.eliteLosses++;
         RecountCurrentUnits();
+    }
+
+    // Conta a perda do doador de uma fusão reconstruída do log (o doador já não existe,
+    // então o custo vem do stats de tipo — mesma sigla, pois fusão exige unidades idênticas).
+    // Espelha o lado de perda do RecordKill/HandleUnitDestroyed sem creditar kill a ninguém.
+    private void CountMergeDonorLoss(SlotMatchStats ownerStats, string sigla)
+    {
+        if (ownerStats == null)
+            return;
+
+        UnitTypeMatchStats typeStats = ownerStats.GetOrCreateUnitStats(
+            ResolveUnitKey(sigla, null, null), null, null, sigla);
+        int cost = Mathf.Max(0, typeStats.cost);
+        typeStats.lost++;
+        typeStats.valueLost += cost;
+        ownerStats.totalLosses++;
+        ownerStats.totalLostValue += cost;
+        if (typeStats.eliteLevel > 0)
+            ownerStats.eliteLosses++;
     }
 
     private void ApplyJogada(Jogada jogada, bool fromReplay)
@@ -227,7 +255,15 @@ public sealed class MatchStatsManager : MonoBehaviour
 
         if (string.Equals(action, "Fusao", StringComparison.OrdinalIgnoreCase))
         {
-            GetOrCreateStats(ToTeam(jogada.team)).mergeActions++;
+            SlotMatchStats mergeStats = GetOrCreateStats(ToTeam(jogada.team));
+            mergeStats.mergeActions++;
+            // Cada fusão confirmada consome exatamente um doador (unidades idênticas do
+            // mesmo time). No jogo ao vivo essa morte já é contada pelo evento
+            // OnUnitDestroyed (HandleUnitDestroyed). Na reconstrução a partir do log o
+            // evento não dispara, então contamos a perda aqui — sem creditar kill a
+            // ninguém, pois fundir é death, não kill para o outro lado.
+            if (fromReplay)
+                CountMergeDonorLoss(mergeStats, jogada.unidadeSigla);
             return;
         }
 

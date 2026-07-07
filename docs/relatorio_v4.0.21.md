@@ -5,8 +5,8 @@ Esta versão introduz o modo Easy da AI e completa a apresentação do turno ini
 ## AI Easy
 
 - Novo modo `Easy Mode` no AI Manager.
-- A AI recebe apenas `1/6` da renda normal de construções que não sejam cidades.
-- HQ de `$3000` passa a render `$500`; construções de `$1500` passam a render `$250`.
+- A AI recebe apenas `1/3` da renda normal de construções que não sejam cidades.
+- HQ de `$3000` passa a render `$1000`; construções de `$1500` passam a render `$500`.
 - Cidades continuam rendendo o valor integral de `$1000`.
 - A redução vale apenas para jogadores controlados pela AI; jogadores humanos mantêm a renda integral.
 - `ConstructionData` passa a identificar cidades explicitamente.
@@ -35,4 +35,3 @@ Esta versão introduz o modo Easy da AI e completa a apresentação do turno ini
 ## Validação
 
 - `Assembly-CSharp.csproj`: build sem erros.
-
